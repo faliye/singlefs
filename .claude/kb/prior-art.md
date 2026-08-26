@@ -524,6 +524,43 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 [Kent Overstreet: Bcachefs - encryption, fsck, and more (LWN 镜像)](https://lwn.net/Articles/717378/)、
 [Bringing bcachefs to the mainline (LWN, LSFMM 2022)](https://lwn.net/Articles/895266/)。
 
+### 7.11 bcachefs 的记账验证有一处自我作废（2026-08-26 源码逐字核实，Linux v6.17）
+
+**这一节记的是一个已经发生的失效，不是推测。**
+
+bcachefs 的 `bch2_check_allocations()` 用全量遍历重建记账、再与运行时计数器 `memcmp` 比对——
+**形态与本工程 [invariants.md](invariants.md) 的 I-3.1 相同**。但两侧共用同一段加减代码：
+
+```c
+this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h:208
+```
+
+`gc` 是唯一的差别——运行时写 `v[0]`，GC 重建写 `v[1]`。
+上游的 `__trigger_extent()` 同样只靠一个 `bool gc = flags & BTREE_TRIGGER_gc;` 分流。
+`btree_gc.c` 的注释自陈重建侧「is not idempotant; we'll calculate the wrong result
+if we run it multiple times」——**重建侧本身就是一串 `+=`**。
+
+| 它能抓到的 | 它抓不到的 |
+|---|---|
+| 增量**应用过程**出偏差：漏一次更新、并发丢失、崩溃后未重放 | **加减语义本身写错**：某分支符号搞反，运行时与重建一起错到同一个值，`memcmp` 全绿 |
+
+**对本工程**：`singlefs-ai-sop/rules/evidence-discipline.md` 写着「校验的两条路径不共享
+同一段代码、同一次采样、同一个工具」。这一节是那条规则在真实系统里**已经被违反并产生盲区**的实例。
+处置见 [checks-owed.md](checks-owed.md) C12。
+
+**顺带记下的记账形态事实**（同批核实）：accounting 树在 `bcachefs_format.h:1415` 被
+**格式级**绑定 `BTREE_IS_write_buffer`；`disk_accounting_format.h` 原文
+「Unlike with other key types, **updates are _deltas_**」；
+合并函数是 `dst->v.d[i] += src.v->d[i]`；
+write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btree 三处显式分叉；
+因为 Δ 非幂等，它必须另造一套 **bversion 全序**判断某条 Δ 有没有被应用过，
+且 journal replay 未完成时 accounting key 一律不许 flush。
+**「缓冲里放增量」派生出的成本，这几条就是清单。**
+
+来源：Linux mainline v6.17 `fs/bcachefs/`（`disk_accounting.{c,h}`、`disk_accounting_format.h`、
+`btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`），
+2026-08-26 现拉并逐字比对。
+
 ### 7.9 本节来源
 
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
@@ -548,6 +585,12 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 ---
 
 ## 历史版本
+
+### 2026-08-26（其七）
+- 补 7.11：bcachefs 的记账验证有一处自我作废——checker 与运行时共用同一行加减代码
+  （`disk_accounting.h:208`，只差 gc 下标），因此抓不到「加减语义本身写错」。
+  这是 evidence-discipline 那条规则在真实系统里已经被违反并产生盲区的实例，不是推测。
+  同批核实了 accounting 的 delta 形态与它派生出的成本清单。
 
 ### 2026-08-26（其六）
 - 补 7.10：bcachefs 官方文档现查补录六条，含 bucket gen 限定为缓存数据、

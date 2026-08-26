@@ -571,10 +571,41 @@ Q13 悬着 → [experiments.md](experiments.md) E1 按「内部节点是纯路�
 | **幂等完整值**（含 tombstone） | 「后者胜」覆盖 | **不要**——那是十几行可以独立重新实现的代码 | **不构成**。`evidence-discipline` 说的「共享同一段代码」够不着它 |
 | **增量 Δ**（「减 1」「再释放 N 个」） | 依赖 value 语义 | **要** | **这才是代价 1 的成立条件** |
 
-⚠️ **而 D8 已定的 write buffer 前端覆盖「反向索引、LRU、记账」三类，
-若其中记账那一棵是 delta 形态，那么代价 1 的一部分 D8 已经在付了，只是没人记账。**
-（bcachefs 的 accounting 走 write buffer 且疑为加减形态——**本条未核实**，
-2026-08-26 的源码摘录里没有 `disk_accounting.c`，不许当成已知事实用。）
+⚠️ **而 D8 已定的 write buffer 前端覆盖「反向索引、LRU、记账」三类。
+记账那一棵在 bcachefs 里确实是 delta 形态——已核实（Linux v6.17 源码，逐字比对）：**
+
+| 事实 | 源码 |
+|---|---|
+| accounting 树**格式级**绑定 write buffer | `bcachefs_format.h:1415` `x(accounting, 20, BTREE_IS_snapshot_field\|BTREE_IS_write_buffer, ...)` |
+| 缓冲里放的是增量，不是完整值 | `disk_accounting_format.h` 原文：「Unlike with other key types, **updates are _deltas_**, and the deltas are not resolved until the update to the underlying btree, done by btree write buffer flush or journal replay」 |
+| 合并是加法不是「后者胜」 | `disk_accounting.h:33` `bch2_accounting_accumulate()`：`dst->v.d[i] += src.v->d[i]` |
+| write buffer 对 accounting 与普通 key **三处显式分叉** | 入 buffer（两个不同容器）、flush 去重（普通是后者胜、accounting 是先加进后者）、落 btree（accounting 要先读现值加进 Δ） |
+| 非幂等派生出的额外成本 | 必须另造一套 **bversion 全序**来判断某条 Δ 有没有被应用过；journal replay 未完成时 accounting key **一律不许 flush** |
+
+**⇒ 代价 1 的一部分，D8 已经在付了，只是此前没人记账。**
+
+### 而 bcachefs 的 checker 在这一格上是被自己绊倒的（本工程必须避开）
+
+它的 `bch2_check_allocations()` 用全量遍历重建记账再 `memcmp` 比对——形态与本工程 I-3.1 相同。
+**但重建那一侧用的是同一段加减代码**，已核实：
+
+```c
+this_cpu_add(e->v[gc][i], a.v->d[i]);        // disk_accounting.h:208
+```
+
+**运行时与 GC 重建走的是这同一行，只差 `gc` 这个下标**；
+上游的 `__trigger_extent()` 也只靠一个 `bool gc = flags & BTREE_TRIGGER_gc;` 分流。
+`btree_gc.c` 自己的注释还写明重建侧「is not idempotant; we'll calculate the
+wrong result if we run it multiple times」——**重建侧本身就是一串 `+=`**。
+
+**后果**：它的 checker 能抓「增量应用过程出了偏差」（漏一次更新、并发丢失、崩溃后未重放），
+**抓不到「加减语义本身写错了」**——某个分支符号搞反，运行时与重建会一起错到同一个值上，
+`memcmp` 全绿。
+
+**这正是 `singlefs-ai-sop/rules/evidence-discipline.md`「校验的两条路径不许共享同一段代码」
+要拦的那个失效，而它在一个真实文件系统里已经发生。**
+本工程若照搬这个形态，I-3.1 会**在最需要它的那一类错误上失去判别力**，且门禁全绿。
+处置见 [checks-owed.md](checks-owed.md) C12。
 
 **推论：这条代价的适用范围应当从「D11 要不要做」改写成
 「索引里任何一层缓冲允不允许出现非幂等增量」——那条线横跨 D8 和 D11，
@@ -1227,6 +1258,16 @@ D5 已定采纳 ZFS 的 birth txg。**而 ZFS 的 txg 本身就是 checkpoint**�
 ---
 
 ## 历史版本
+
+### 2026-08-26（其十六）
+- D11 代价 1 的承重事实**核实完成，判定成立**：bcachefs 的 disk accounting 走 write buffer
+  且是增量 Δ 形态（`BTREE_IS_write_buffer` 格式级绑定、格式头原文 "updates are _deltas_"、
+  `dst->v.d[i] += src.v->d[i]`），三处 flush 分叉均已逐字核对。
+  ⇒ D8 已定的 write buffer 覆盖记账，代价 1 的一部分本工程已经在付。
+- 附带核实到一个更重的事实：bcachefs 的 checker 与运行时**共用同一行**加减代码
+  （`this_cpu_add(e->v[gc][i], ...)`，只差 gc 下标），
+  因此它抓不到「加减语义本身写错」——那正是 evidence-discipline 要拦的失效，
+  而它在一个真实文件系统里已经发生。新增 C12 拦本工程重蹈。
 
 ### 2026-08-26（其十五）
 - D11 代价 1 的适用范围改写：分界不在「消息放节点内还是独立树」，
