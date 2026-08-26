@@ -502,6 +502,28 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 加强为「**移出主线之后项目仍在正常演进，并且在这之后才去掉实验标签**」——
 主线之外是一条可行的分发路径，不只是失败后的退路。
 
+### 7.10 bcachefs 官方文档补录（2026-08-26 现查，Principles of Operation Rev 1.39.2+2202696）
+
+| 事实 | 原文 / 口径 | 对本工程 |
+|---|---|---|
+| **bucket gen 的适用范围限定为缓存数据** | §1.5：「we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number」 | [decisions.md](decisions.md) D1：它只管失效不管搬运 |
+| **gen 绕回机制已被反向索引取代** | 状态清单 `need_gc_gens`：「Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**」 | 与 D1 已选的「反向索引 day-1」同向 |
+| **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
+| **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9 的方向；但注意本工程 D9 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
+| ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9 与 D10 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10 的任何候选都不许走原地覆盖写这条路 |
+| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9 未答项 5 那条推理的前提之一 |
+
+**未找到的（明说，不补）**：没有任何一手材料用散文明说
+「copygc / rebalance / scrub / fsck 在无密钥时不能跑」。
+「无密钥后台整理瘫痪」是从上面几条推出来的，**是推论不是引文**，见 decisions.md D9。
+
+来源：[bcachefs Principles of Operation (PDF)](https://bcachefs.org/bcachefs-principles-of-operation.pdf)、
+[bcachefs.org/Encryption](https://bcachefs.org/Encryption/)、
+[bcachefs.org/FAQ](https://bcachefs.org/FAQ/)、
+[The Programmer's Guide to bcache](https://bcache.evilpiepirate.org/BcacheGuide/)、
+[Kent Overstreet: Bcachefs - encryption, fsck, and more (LWN 镜像)](https://lwn.net/Articles/717378/)、
+[Bringing bcachefs to the mainline (LWN, LSFMM 2022)](https://lwn.net/Articles/895266/)。
+
 ### 7.9 本节来源
 
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
@@ -526,6 +548,12 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 ---
 
 ## 历史版本
+
+### 2026-08-26（其六）
+- 补 7.10：bcachefs 官方文档现查补录六条，含 bucket gen 限定为缓存数据、
+  gen 绕回机制已被反向索引取代（`need_gc_gens` 标为 legacy）、copygc 预留 8%、
+  以及 `nocow` 数据在加密文件系统上明文存储这条硬不兼容。
+  同时明说一条**未找到**：没有一手材料用散文说「无密钥时后台任务不能跑」，那是推论。
 
 ### 2026-08-26（其五）
 - 7.1 与 7.5 删掉「每事务发布新根」这个说法。它曾经被当成本工程的既有承诺写进正文，
