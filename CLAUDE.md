@@ -13,8 +13,6 @@
 @.claude/singlefs-ai-sop/rules/doc-discipline.md
 @.claude/singlefs-ai-sop/rules/design-doc-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
-@.claude/singlefs-ai-sop/rules/fs-design.md
-@.claude/singlefs-ai-sop/rules/format-evolution.md
 @.claude/singlefs-ai-sop/rules/test-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
@@ -22,8 +20,30 @@
 @.claude/singlefs-ai-sop/rules/writing-economy.md
 @.claude/singlefs-ai-sop/rules/session-wrapup.md
 
-（这些是 [singlefs-ai-sop](.claude/singlefs-ai-sop/README.md) 分发的共享规则，
-**改它们等于改所有项目**——要改就改上游并抬 `VERSION`，不许在项目里就地改。）
+## 规范从哪来
+
+| 项 | 值 |
+|---|---|
+| 上游仓 | `singlefs-ai-sop`，本机在兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
+| 项目里的副本 | `.claude/singlefs-ai-sop/`，是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份 |
+| 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
+| 怎么改 | 共享规则只能在**上游**改并抬 `VERSION`，然后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了 |
+
+上游管的是「项目怎么和 AI 协作」，不管文件系统怎么设计；
+只有本工程需要的纪律放 `.claude/rules/`，不要往上游推。
+
+## 项目本地规则
+
+@.claude/rules/fs-design.md
+@.claude/rules/format-evolution.md
+@.claude/rules/three-way-inference.md
+
+文件系统的设计纪律只有本工程需要，所以它不在共享 SOP 里——
+共享 SOP 管的是「项目怎么和 AI 协作」，不管某一类系统怎么设计。
+
+（上面那批是 [singlefs-ai-sop](.claude/singlefs-ai-sop/README.md) 分发的共享规则，
+**改它们等于改所有项目**——要改就改上游并抬 `VERSION`，不许在项目里就地改。
+上游的改动应当罕见：经常变说明规范本身没设计好。**作业在本仓，不在上游仓。**）
 
 ## 项目本地事实
 
@@ -33,6 +53,8 @@
 | `.claude/kb/invariants.md` | 不变量清单，checker 是它的可执行形式 |
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
+| `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
+| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证） |
 | `records/` | 建设过程 |
 
 ## 门禁

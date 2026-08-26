@@ -1,4 +1,9 @@
 /target/
+# 任意层级的 cargo 产物（工作区建立之前在子目录编过，会留下陈旧的一份）
+target/
 *.img
 *.qcow2
 /.claude/singlefs-ai-sop/
+
+# 研究性的代码与脚本留在本地，不进仓库
+/research/

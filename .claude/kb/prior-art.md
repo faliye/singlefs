@@ -167,17 +167,44 @@ bcachefs **在后台对整个 bucket 编码**，而不是把前台写切成条�
 路子完全不同：一个是让部分条带写不存在，一个是让 parity 只对不可变数据算一次。
 代价：stripe 里只要还有活数据，其中的 bucket 就不能复用，copygc 得整条 stripe 疏散。
 
-### 5.6 Bε-tree / BetrFS：写优化索引的教训
+### 5.6 Bε-tree / BetrFS：全路径索引的改名代价已在 2018 年被降到子树深度
 
 Bε-tree 是 B-tree 变体，**内部节点留出 ε 比例的空间缓冲消息**，
 写被批量摊销着往下刷，写 I/O 在理论上低于 B+tree。BetrFS 是第一个用它的内核文件系统。
 
-**教训比结构本身更值钱**：BetrFS 用**全路径索引**（key 就是完整路径），
-于是 scan 极快，但**改名代价高到不可接受**。直到 BetrFS 0.4 引入 `range rename`
-才把改名拉回可用区间。
+BetrFS 用**全路径索引**（key 就是完整路径），scan 极快。
+改名要替换子树里每一个 key 的前缀，**朴素实现必须重写整棵子树**——
+FAST 2018 论文原文称这是全路径索引的「Achilles' heel」。
 
-> 对本工程：**写优化索引 + 全路径索引 = 改名问题**。
-> 按 inode 编 key 就不继承这个坑；按路径编 key 就会。这是选 key 布局时的一条硬约束。
+**BetrFS 0.4（FAST 2018）用 lifted Bε-tree 把这个代价从「子树大小」降到「子树深度」。**
+论文原话：采用 key lifting 之后，「the number of paths that need to be modified in a
+range rename also changes from being proportional to the size of the subtree to the
+depth of the subtree」；复杂度一节进一步说，tree surgery 里被切分或合并的节点数
+「at most proportional to the height of the tree」。
+
+机制两步：
+
+1. **tree surgery**——把子树左右边缘那些「混装了要搬和不要搬的 key」的节点切开
+   （复用普通节点分裂的代码，只是按切分 key 而不是按中点切），然后做指针搬移。
+2. **batched key update**——把子树里所有 key 的前缀整体换掉。
+   这一步由 **lifting 不变量免费完成**：lifted Bε-tree 里 key 的值由「走到该节点所经过的路径」
+   定义，指针搬移一落地，子树里所有 key 就已被隐式换掉前缀。
+
+**lifting 对 key 编码的要求**：key 必须让「同一子树共享前缀」在树结构层面成立。
+BetrFS 0.4 另外调整了 key 格式，使 `memcmp` 足以做 key 比较。
+另有 healing 机制维持「内部节点 4–16 个孩子」的不变量，用来把树高卡住。
+
+**论文自陈的代价**：BetrFS 0.4 相对 0.3 变差的情形是**节点切分与合并落在关键路径上**时，
+lifting 的额外计算开销压过收益；全部形态里唯一被害的是**顺序写**。
+改名的声明是「competitive with indirection-based file systems for a range of sizes」——
+**是一段尺寸区间内竞争力相当，不是全尺寸都赢**。
+
+口径：FAST 2018 论文 + TOS 2018 扩展版，**未在本工程验证**。
+对本工程 key 布局的影响见 [decisions.md](decisions.md) D8。
+
+来源：
+- [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/system/files/conference/fast18/fast18-zhan.pdf)
+- [Efficient Directory Mutations in a Full-Path-Indexed File System (TOS 2018)](https://www.cs.unc.edu/~porter/pubs/tos18.pdf)
 
 ### 5.7 XFS 反向映射：成本量级与另一个理由
 
@@ -312,9 +339,213 @@ MAC 对不上就判设备故障并很快停用它，
 - [Phoronix：OpenZFS Native Encryption Use Raises Data Corruption Concerns (2024-02-12)](https://www.phoronix.com/news/OpenZFS-Encrypt-Corrupt)
 - [Kelsey, Compression and Information Leakage of Plaintext (FSE 2002)](https://link.springer.com/chapter/10.1007/3-540-45661-9_21)
 
+## 七、近十年学术成果扫描（2012–2026）
+
+**本节只收「可能推翻某条既有决策前提」的成果，不做文献综述。** 每条注明它冲击哪条决策。
+全部来自公开论文与项目文档，**未在本工程验证**。
+
+### 7.1 随机小写：写优化索引把它变成非问题（冲击 D10）
+
+BetrFS 0.4 与主流文件系统在同一个随机小写微基准上的实测（FAST 2018 论文 Table 2）：
+
+| 文件系统 | 256K 次 4 字节随机写耗时（秒，越低越好） |
+|---|---|
+| BetrFS 0.4 | 4.9 ± 0.3 |
+| BetrFS 0.3 | 5.9 ± 0.1 |
+| nilfs2 | 2013.1 ± 19.1 |
+| btrfs | 2147.5 ± 7.4 |
+| ext4 | 2776.0 ± 40.2 |
+| xfs | 2835.7 ± 67.9 |
+| zfs | 3288.9 ± 394.7 |
+
+**口径**：256K 次 4 字节随机写、合计仅 1 MiB 写入量——这是**放到极端的微基准**，
+不是数据库或虚拟机镜像的真实负载。论文自述「up to 600 times faster」。
+
+**⚠️ 这组数字的持久化模型与 singlefs 不同，外推前必须先看这一段（2026-08-26 核实）。**
+FAST 2018 论文 2.1 与 4.x 节原文：
+
+> Crash consistency is ensured using **logical logging**, i.e., by logging the inserts,
+> deletes, etc, performed on the tree. **Internal operations, such as node splits, flushes,
+> etc, are not logged.** Nodes are written to disk using **copy-on-write**. At a periodic
+> checkpoint (**every 5 seconds**), all dirty nodes are written to disk and the log can be trimmed.
+
+> BetrFS ensures crash consistency by keeping a **redo log** of pending messages and applying
+> messages to nodes copy-on-write. Crash recovery simply replays the redo log since the last checkpoint.
+
+由此得到三条对本工程要紧的事实：
+
+| 事实 | 对 singlefs 的含义 |
+|---|---|
+| BetrFS **是** COW 的——节点用 copy-on-write 写盘 | 「那个数字来自非 COW 系统」这个说法不成立，不能用它否掉 Bε |
+| BetrFS 的持久化靠 **redo log + 每 5 秒一次 checkpoint** | 那 5 秒窗口把大量 COW 节点重写摊掉了。⚠️ **本工程并没有「每事务发布一次新根」这条承诺**——`litmus/commit-publish.litmus` 只钉一次发布事件**内部**的顺序（写块内容 → `smp_wmb` → 写 generation），对发布频率一字未提；`decisions.md` / `CLAUDE.md` / `.claude/rules/fs-design.md` 全文均无此表述（2026-08-26 逐文件 grep 核实）。发布频率是**尚未决定**的事项 |
+| 全文**没有出现 checksum**，不存在「父节点存子节点校验和」的 Merkle 链 | singlefs 的 D4 内联校验和 + D9 的 MAC/nonce 给每次节点重写加了一份 BetrFS 不付的固定成本，交叉点因此会移动，移多少未知 |
+
+**所以这组数字能证明的是**：消息缓冲区能把「一个 key 要被重写几次」从 O(树高) 降到 O(树高/B)。
+**它不能证明的是**：在「Merkle 校验和链 + AEAD」都在、且发布频率取某个具体值的前提下还剩多少收益。
+后者要靠 [experiments.md](experiments.md) E7 自己量。
+
+⚠️ **发布频率是这里的自由变量，不是常量。** 若本工程采用 checkpoint 语义
+（内存里攒脏节点、定期合并写一次），那么「一次小写不必立刻重写整条从叶子到根的路径」
+这个效果，**checkpoint 批量本身就免费给了**，不需要在格式里放一个持久化的消息缓冲区。
+BetrFS 那个数字里有多少来自消息缓冲、多少来自 5 秒 checkpoint，**论文没有拆开过**。
+E7 的对照组因此必须区分两种「无消息缓冲」基线：完全无批量，
+以及有 checkpoint 批量但无格式级消息缓冲。两者混为一谈会让消息缓冲显得比实际更必要。
+
+机制是把小写变成 Bε-tree 的消息批量下刷，而不是原地改块，也不是关掉 COW。
+
+对 D10 的意义：btrfs 的 `nodatacow` 是「关掉 COW 换随机写性能，代价是同时丢校验和与快照一致性」，
+而这条路是「把随机写吸收进索引的消息层」，校验和与快照都不动。
+**这是 D10 目前唯一一条有实测数字支撑的候选方向。**
+
+**另一条顺带核实到的事实**：BetrFS 的所有版本都用**两棵** Bε-tree——
+一棵放文件数据，一棵放文件系统元数据（论文 2.2 节原文：
+「All versions of BetrFS use two Bε-trees: one for file data and one for file system metadata」）。
+这与 D8「多个独立 keyspace」是同一个思路，只是数量少得多（bcachefs 是 28 棵）。
+
+### 7.2 老化不是宿命，可以在结构层面设计掉（冲击 D3、D10）
+
+FAST 2017「File Systems Fated for Senescence? Nonsense, Says Science!」用
+**连续 git checkout Linux 内核源码**把文件系统做老，测 btrfs / ext4 / F2FS / XFS / ZFS 与 BetrFS。
+结论：**老化后的 BetrFS 甚至胜过其余文件系统未老化时的表现（btrfs 除外）**。
+另一条被 FAST 2018 引作动机的数字：git 版本控制负载可把 ext4 的 scan 性能退化至多 **15 倍**。
+
+对本工程：D3 承诺常驻自动整理，理由是「不分类 → 碎片压力集中在一个分配器」。
+这条成果给出第二条路——**老化可以被索引结构本身吸收掉，不必全靠事后整理**。
+两条路各要多少代价可测，判据见 [experiments.md](experiments.md) E10。
+
+### 7.3 索引结构：参数空间比「换一种树」大得多（冲击 D8）
+
+| 成果 | 结论 | 口径 |
+|---|---|---|
+| SplinterDB（ATC 2020） | STBε-tree = Bε-tree 加 LSM 的 size-tiering，做成「树的树」：主干 trunk 树的每个节点指向一组 B-tree 分支，每个分支带一个 quotient filter。相对 RocksDB：插入快 6–10×、点查快 2–2.6×、写放大降 2× | 论文摘要数字，面向 NVMe SSD |
+| FAST 2022「Closing the B+-tree vs. LSM-tree Write Amplification Gap」 | 在带内建透明压缩的硬件上，Bε-tree 写放大 28（8KB 页）/ 36（16KB 页）；同条件 RocksDB 38、WiredTiger 268（8KB 页）/ 530（16KB 页） | 500GB 数据集、32B 记录、4 客户端线程 |
+| WiscKey 式 key-value 分离 | 大 value 移出索引、只在索引里留指针，compaction 只搬 key 与元数据，写放大最多降两个数量级。工业界已落地为 RocksDB BlobDB、Titan、TerarkDB | 论文 + 工业实现 |
+| HashFS（FAST 2021「Rethinking File Mapping for Persistent Memory」） | 文件映射本身可占 IO 路径的 **70%**；哈希式映射相对「页缓存里的 extent 树」把 LevelDB 上的 YCSB 吞吐提高至多 45% | **持久内存场景**；本工程若不针对 PM 只作参考 |
+| TableFS（ATC 2013） | 元数据全部塞进 LSM（LevelDB），元数据密集负载相对 ext4 / XFS / btrfs 快 50%–1000% | FUSE 实现，作者自陈实现低效，即便如此仍赢 |
+
+对 D8 的意义：D8 已定「一套 btree 实现 + 多 keyspace + write buffer / key cache 两个前端」。
+这几条不否定该方向，但把**同一套结构内部的可调项**显著扩大了：
+Bε 缓冲比例、size-tiering、key-value 分离、过滤器类型——
+都是一套 btree 里的参数，不是「再加一种树」。
+这与 D8「不做异构结构」不冲突，反而是它的补充。
+
+### 7.4 崩溃一致性验证：「没有 oracle」这条前提需要重估（冲击验证计划）
+
+[CLAUDE.md](../../CLAUDE.md) 记着本工程最大的隐性成本是「从零设计没有参照实现可比对」。
+近十年至少有五类现成办法，各自给的东西不同：
+
+| 办法 | 代表 | 它给什么 | 代价 / 前提 |
+|---|---|---|---|
+| 按钮式形式验证 | Yggdrasil（OSDI 2016，Best Paper） | **crash refinement** 正确性定义：实现能产生的磁盘状态集合（含崩溃产生的）必须是规范允许集合的子集。Z3 自动验，**无需人工标注或证明** | 实现要写成可符号执行的形态；论文称把逻辑表示与物理表示分离后验证时间降到一分钟内 |
+| 有界黑盒崩溃测试 | CrashMonkey + ACE（OSDI 2018） | 按有界参数穷举工作负载，每个崩溃点后检查恢复。65 机跑两天：复现 24 个已知 bug、找到 10 个新 bug（7 个自 2014 年就在内核里）；**并且在已形式验证的 FSCQ 上也找到一个崩溃一致性 bug** | 只覆盖有界空间；对「界外」什么也不说 |
+| PM 专项同类框架 | Chipmunk（EuroSys 2023 最佳论文之一） | 同类方法用于持久内存文件系统，在 5 个 PM 文件系统里找到 23 个新 bug，后果含无法挂载、rename 原子性被破坏 | 针对 PM 语义 |
+| 模型检验 + 差分对拍 | Metis（FAST 2024） | 把模型检验的状态空间穷举与差分测试结合，**不需要抽象模型**：拿另一个文件系统当参照，逐操作比对抽象状态、系统调用返回值与 errno。配套写了 **RefFS**——一个专为「加速模型检验、提高 bug 可复现性」而设计的小而快的参照文件系统 | 需要一个可信参照实现 |
+| 并发 + 崩溃的机器检查证明 | GoJournal（OSDI 2021）/ DaisyNFS（OSDI 2022） | GoJournal 是验证过的并发崩溃安全日志层（Coq / Perennial 2.0），**验证过程中揪出一个大量单测都没抓到的严重并发 bug**；DaisyNFS 在 GoTxn（GoJournal 加两阶段锁与分配器）之上，用 Dafny **顺序地**验证每个 NFS 操作 | 证明成本高 |
+
+**对本工程最直接的两条**：
+
+1. **Metis 的 RefFS 说明「参照实现」不必是别人的成熟文件系统，可以是为对拍专门写的小实现。**
+   这正是 `singlefs-ai-sop/rules/test-discipline.md` 说的模型对拍，
+   但 Metis 多给了一件事：把它和状态空间穷举接起来，而不是只喂随机操作序列。
+2. **DaisyNFS 的分层与 `.claude/rules/fs-design.md`「一个事务层，所有结构共用」同构**：
+   事务层一次把并发与崩溃解决掉，上层就只剩顺序正确性要验。
+   这条给那条纪律加了一个本工程之外的独立理由。
+
+### 7.5 提交协议：排序未必要靠 flush 换（冲击事务层设计）
+
+OptFS（SOSP 2013）把 ext4 的日志提交改成乐观协议，三件事：
+**事务校验和**（把数据块也纳入校验，恢复时校验和对不上就整笔丢弃）代替提交时排序；
+**异步持久化通知**（asynchronous durability notification）代替阻塞式 flush；
+把顺序与持久拆成两个 API（`osync()` / `dsync()`）。论文称部分负载提升达一个数量级。
+
+NoFS（FAST 2012，「Consistency Without Ordering」）走得更远：
+每个数据块带**反向指针**，读时靠反向指针判一致性，**完全不排序写**，并给了形式化模型。
+
+对本工程：`litmus/commit-publish.litmus` 钉住的是一次发布事件内部「先写块内容、再写超级块」这条序，
+不涉及发布频率。
+这两条成果说明该序有替代形态，代价各不相同。
+⚠️ **NoFS 的反向指针与 D1 的反向索引是两件不同的东西**：
+NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被谁引用」的可查询索引。
+本工程「元数据块必须自描述」（`.claude/rules/fs-design.md`）已经接近 NoFS 那个字段。
+
+### 7.6 硬件接口：块接口不再是唯一的对接层（冲击 D2、D3、D8 节点大小）
+
+| 接口 | 状态 | 对本工程 |
+|---|---|---|
+| ZNS（Zoned Namespace） | 顺序写、由主机管 GC；因成本效率在规模部署中被采用 | zone 大小是 D8「按设备特性选节点大小」那条规则的输入 |
+| NVMe FDP（Flexible Data Placement） | 合并了 Google SmartFTL 与 Meta Direct Placement Mode 两个提案，填 ZNS 与普通 SSD 之间的成本收益空档。**不要求顺序写、向后兼容，应用不改也能跑** | 比 ZNS 更可能是本工程该对接的那一层：不强制顺序写，与 COW 的分配自由度不打架 |
+
+口径：NVM Express 与 SNIA 公开材料、2025 年 arXiv 论文，**未在本工程验证**。
+两者共同点是把数据放置与 GC 的责任交给主机——**这与 COW 文件系统自己就管分配是重叠的**，
+重叠部分是收益还是双重管理的代价，需要实测。
+
+### 7.7 Rust 在内核文件系统里的现状（冲击工程路线，不冲击格式）
+
+| 事实 | 来源与日期 |
+|---|---|
+| Bento（FAST 2021）：safe Rust 写内核文件系统，错误基本被沙箱在文件系统内。性能与 VFS 原生 ext4 相当，比 FUSE 版快 7×（`git clone`）到 90×（Filebench）；**支持在线升级，服务中断约 10ms**，替换运行中的文件系统对应用无中断 | 论文与项目页 |
+| Greg Kroah-Hartman 2026-07-15 表态：Rust 在内核已不是实验，是永久组成部分；图形子系统今后只接受 Rust 写的新驱动 | 二手报道，**未核对原始邮件** |
+| Rust binder 驱动进 Linux 6.18；PuzzleFS 列在 Rust for Linux 项目清单内 | 二手报道 |
+
+对 D7（不进主线）：Bento 的在线升级能力值得注意——它把「文件系统要不要在内核里」
+从二选一变成了三选一（用户态 / 内核 C 模块 / 可热替换的内核 Rust 模块）。
+
+### 7.8 bcachefs 现状更新（加强 D7 的依据，不改结论）
+
+| 事实 | 日期 |
+|---|---|
+| bcachefs 在 Linux 6.17 被标记 externally maintained，**代码在 6.18 被从主线移除** | 2025–2026，公开报道 |
+| 改为 DKMS 模块分发，形态与 OpenZFS on Linux 相同；开发者改向独立邮件列表投 patch | 同期 |
+| bcachefs-tools v1.38.6 **去掉 experimental 标签** | 2026-06-17 |
+
+对 D7：这条把依据从「bcachefs 被移出主线是社交失败不是技术失败」
+加强为「**移出主线之后项目仍在正常演进，并且在这之后才去掉实验标签**」——
+主线之外是一条可行的分发路径，不只是失败后的退路。
+
+### 7.9 本节来源
+
+- [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
+- [Copy-on-Abundant-Write for Nimble File System Clones (TOS 2021) / How to Copy Files (FAST 2020)](https://www.usenix.org/conference/fast20/presentation/zhan)
+- [File Systems Fated for Senescence? Nonsense, Says Science! (FAST 2017)](https://www.usenix.org/conference/fast17/technical-sessions/presentation/conway)
+- [SplinterDB: Closing the Bandwidth Gap for NVMe Key-Value Stores (ATC 2020)](https://www.usenix.org/conference/atc20/presentation/conway)
+- [Closing the B+-tree vs. LSM-tree Write Amplification Gap (FAST 2022)](https://www.usenix.org/conference/fast22/presentation/qiao)
+- [Rethinking File Mapping for Persistent Memory (FAST 2021)](https://www.usenix.org/conference/fast21/presentation/neal)
+- [TABLEFS: Enhancing Metadata Efficiency in the Local File System (ATC 2013)](https://www.usenix.org/conference/atc13/technical-sessions/presentation/ren)
+- [Push-Button Verification of File Systems via Crash Refinement (OSDI 2016)](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/sigurbjarnarson)
+- [Finding Crash-Consistency Bugs with Bounded Black-Box Crash Testing (OSDI 2018)](https://www.usenix.org/conference/osdi18/presentation/mohan)
+- [Chipmunk: Investigating Crash-Consistency in Persistent-Memory File Systems (EuroSys 2023)](https://dl.acm.org/doi/10.1145/3552326.3567498)
+- [Metis: File System Model Checking via Versatile Input and State Exploration (FAST 2024)](https://www.usenix.org/conference/fast24/presentation/liu-yifei)
+- [GoJournal: a verified, concurrent, crash-safe journaling system (OSDI 2021)](https://www.usenix.org/conference/osdi21/presentation/chajed)
+- [Verifying the DaisyNFS concurrent and crash-safe file system with sequential reasoning (OSDI 2022)](https://www.usenix.org/conference/osdi22/presentation/chajed)
+- [Optimistic Crash Consistency (SOSP 2013)](https://research.cs.wisc.edu/adsl/Publications/optfs-sosp13.pdf)
+- [Consistency Without Ordering (FAST 2012)](https://www.usenix.org/conference/fast12/consistency-without-ordering)
+- [High Velocity Kernel File Systems with Bento (FAST 2021)](https://www.usenix.org/publications/loginonline/high-velocity-kernel-file-systems-bento)
+- [NVMe Flexible Data Placement 概览（NVM Express, FMS 2023）](https://nvmexpress.org/wp-content/uploads/FMS-2023-Flexible-Data-Placement-FDP-Overview.pdf)
+- [Bcachefs removed from the mainline kernel (LWN)](https://lwn.net/Articles/1040120/)
+
 ---
 
 ## 历史版本
+
+### 2026-08-26（其五）
+- 7.1 与 7.5 删掉「每事务发布新根」这个说法。它曾经被当成本工程的既有承诺写进正文，
+  实际上项目里从来没有这条：litmus 只钉一次发布事件内部的顺序，
+  decisions.md / CLAUDE.md / rules/fs-design.md 全文无此表述（逐文件 grep 核实）。
+  改动依据：它是一个未经审查的默认假设，而基于它做出的「Bε 收益在本工程会缩水」的推理
+  因此站不住——发布频率是自由变量，checkpoint 语义下批量是免费的。
+
+### 2026-08-26（其四）
+- 7.1 补核实结果：BetrFS 的持久化是 redo log + 每 5 秒 checkpoint、节点 copy-on-write、
+  全文无 checksum。核实经过：本地提取 FAST 2018 论文 PDF 文本后逐词检索。
+  据此给那组随机写数字加了「能证明什么 / 不能证明什么」的分界。
+  起因是一次三方论证里有一条腿断言「那个数字来自没有 COW 的系统」，核实后该断言不成立。
+
+### 2026-08-26（其三）
+- 补第七节：2012–2026 学术成果扫描，只收「可能推翻既有决策前提」的条目，共 8 小节。
+- 5.6 改写：曾经写作「BetrFS 用全路径索引，改名代价高到不可接受……按路径编 key 就会继承这个坑」，
+  现在写作「BetrFS 0.4（FAST 2018）用 lifted Bε-tree 把改名代价从子树大小降到子树深度」。
+  改动依据：读了 FAST 2018 论文原文，复杂度一节明写被切分或合并的节点数
+  「at most proportional to the height of the tree」。旧写法把 BetrFS 0.3 的状态当成了现状。
 
 ### 2026-08-26（其二）
 - 补第六节：D9 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
