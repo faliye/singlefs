@@ -24,6 +24,33 @@
 **处置**：`.claude/rules/three-way-inference.md` 规定这类输出**整轮作废重跑**，
 不许记成「三方不一致」——否则每轮都会不一致，三方论证退化成摆设。
 
+**发生率高到值得单记**（2026-08-27 一次论证里连跑三轮，**三轮都带复读**：
+「物理物理物理」「依赖依赖」「大小大小大小」「简单简单」「跟踪跟踪」）。
+⚠️ **因此「重跑到干净为止」不是可行策略**——它既跑不出干净的，又等同于挑选合意输出。
+**改用的判据是：损坏落不落在承重的那句话上。**
+落在括注、修饰语里而结论本身无歧义 ⇒ 记为**带瑕疵的一票**，若最终三方有分歧则这一票不算数；
+落在结论本身 ⇒ 整轮作废。判决由主 agent 做，且**要在结论里写明这一票带瑕疵**。
+
+### 第二类毛病：会答非所问，把「同一系统在两种介质上」偷换成「两个不同系统」
+
+实测（2026-08-27）：问「同一个 COW 文件系统在旋转盘与固态盘上盘上结构非得不同吗」，
+它给出的四个反例全是「ext4 没有 F2FS 的段表」——**那证明的是两个文件系统不同，
+不是介质要求结构不同**。F2FS 的段表是 F2FS 的设计选择，不是闪存的物理要求。
+
+**处置**：在提示里显式写出这个偷换并禁止它，重跑后得到有效回答。
+**推广的做法**：给本地腿的提示要**把最容易上钩的那个类别错误写出来并禁止**，
+不能只描述问题——它的模式匹配倾向会直奔最像的那个已知答案。
+
+### 用阳性对照证明这条腿有判别力
+
+本地腿答「举不出来」时，分不清是**真没有**还是**它对什么都答举不出来**。
+
+**做法**：把同一份提示逐字复制，只换掉被问的对象，换成一个**已知答案是「有」**的对象，
+确认它这次举得出来。实测（2026-08-27）：同一问法对「旋转 vs 固态」答举不出来，
+对「常规 vs zoned」举出 3 个结构反例 ⇒ **该问法有判别力，那个「举不出来」算数**。
+
+⚠️ **没跑阳性对照的「举不出来」不许当证据用**——它与「这条腿坏了」在外观上完全一样。
+
 ## Rust 工具链
 
 | 项 | 值 | 口径 |
@@ -98,9 +125,64 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 ---
 
+## 造几何量不同的设备：不需要真硬件
+
+**本机（2026-08-27 现查）具备造异构设备池的全部手段**，因此
+[decisions.md](decisions.md) D12 未定项 3「设备级几何量该放哪、异构池支不支持」
+**是可测的，不必只靠论证**。
+
+### QEMU 路线（推荐：无需 root，直接接现有 harness）
+
+`zoned.zone_size` 与 `logical_block_size` 挂在 **`nvme-ns`（命名空间）** 上，不是挂在控制器上
+⇒ **同一个控制器下的多个命名空间可以有不同的几何量**。
+
+已实测通过（QEMU 8.2.2，退出码 0，三个设备全部构造成功）：
+
+```
+-device nvme,serial=A,id=nv0
+-device nvme-ns,drive=d1,bus=nv0,nsid=1,zoned=true,zoned.zone_size=64M,logical_block_size=4096,physical_block_size=4096
+-device nvme-ns,drive=d2,bus=nv0,nsid=2,zoned=true,zoned.zone_size=128M,logical_block_size=4096,physical_block_size=4096
+-device nvme-ns,drive=d3,bus=nv0,nsid=3,logical_block_size=512,physical_block_size=512
+```
+
+⇒ 一条命令同时造出：**异构 zoned 池**（64M vs 128M zone）、**512e/4Kn 混用**、**zoned 与常规混用**。
+
+⚠️ **`logical_block_size` 必须配 `physical_block_size`**，只给前者会被拒：
+`logical_block_size > physical_block_size not supported`。**这一步是实测撞出来的，不是读文档得的。**
+
+⚠️ **已证明的只是「QEMU 接受并构造了这三个设备」，不是「来宾内核看到三份不同的几何」。**
+后者要进来宾读 `/sys/block/*/queue/{logical_block_size,chunk_sectors}` 与 `blkzone report` 才算。
+**两件事不许当成一件**（`singlefs-ai-sop/rules/verify-before-claiming.md`）。
+
+### 宿主侧路线（要 root，胜在不用启虚机）
+
+| 手段 | 造什么 | 关键参数 |
+|---|---|---|
+| `null_blk` | zoned 设备，内存后端 | `zoned=1 zone_size=<MB> zone_capacity zone_nr_conv zone_max_open`。模块参数是全局的，**每设备各自的几何要走 configfs**（`/sys/kernel/config` 本机已挂载） |
+| `zloop` | **文件后端**的 zoned 设备 | 模块在 `drivers/block/zloop.ko.zst`，本机有 |
+| `scsi_debug` | 任意扇区大小 + ZBC | `sector_size=<bytes> zbc=host-managed zone_cap_mb zone_nr_conv` |
+
+运行内核 6.17.0-1028-oem 的相关配置：`CONFIG_BLK_DEV_ZONED=y`、
+`CONFIG_BLK_DEV_NULL_BLK=m`、`CONFIG_BLK_DEV_ZONED_LOOP=m`、`CONFIG_SCSI_DEBUG=m`。
+
+⚠️ 本机唯一的真实块设备是 `nvme0n1`（3.6T，512/512，非旋转）——
+**没有真的旋转盘、没有真的 4Kn 盘、没有真的 zoned 盘**，所有相关数字都只能是模拟出来的，
+引用时必须带这个口径。
+
 ## 历史版本
 
+### 2026-08-27（其二）
+- 记「造几何量不同的设备」这条：QEMU 的 `nvme-ns` 每命名空间各自带 zone 大小与扇区大小，
+  实测一条命令造出异构 zoned 池 + 512e/4Kn 混用 + zoned/常规混用；
+  另记宿主侧的 null_blk / zloop / scsi_debug 三条路与本机内核配置。
+  ⇒ D12 未定项 3 从「只能论证」变成「可测」。
+
 ### 2026-08-26（其三）
+### 2026-08-27
+- 记本地腿的复读发生率（三轮全中）与由此改的判据（看损坏落不落在承重句上，
+  不再「重跑到干净为止」）；记第二类毛病（把「同一系统两种介质」偷换成「两个不同系统」）；
+  记「阳性对照证明判别力」这个做法——没跑阳性对照的「举不出来」不许当证据。
+
 - 实测数字从单次采样改为 N=5 轮，并据此判定**顺序写不稳定（极差 42%）**，
   在查明离群点之前不作为任何判断的输入；随机读写稳定（<7%）。
   单次采样时报的 3509 MiB/s 恰在中位附近，但那是运气，单次看不出这个问题。
