@@ -28,7 +28,7 @@
 
 | 腿 | 用什么 | 怎么调 |
 |---|---|---|
-| 本地 | Qwen3-Next-80B-A3B-Thinking-AWQ-4bit，经 `~/code/ai-center` 网关（`:8200`，模型 id `local`） | `bash research/scripts/ask-local.sh <提示文件>` |
+| 本地 | Qwen3-Next-80B-A3B-Thinking-AWQ-4bit，经 `~/code/ai-center` 网关（`:8200`，模型 id `local`） | `bash research/scripts/ask-local.sh <提示文件>`，**提示用英文写** |
 | 云端 A | Sonnet | Agent 工具，`model: sonnet` |
 | 云端 B | Opus | Agent 工具，`model: opus` |
 
@@ -53,8 +53,25 @@
 理由与 `singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」同一条：
 一个悄悄只跑了两条腿的「三方一致」，比公开的两条腿危险得多。
 
-## 本地腿的已知毛病要当噪声处理，不当分歧处理
+## 给本地腿的提示一律用英文
 
-本地那条腿是 4-bit 量化模型，**会串字、会复读**（实测记录见 `.claude/kb/tooling.md`）。
-输出出现明显的字词损坏时，那一轮**作废重跑**，不许把它记成「三方不一致」——
+本地那条腿是 4-bit 量化模型，**中文输出会退化性复读**（「有效的有效性」「恢复恢复」），
+**英文不会**。实测 23 轮：中文 12/13 判红，英文 5/5 干净、1263 个英文词零复读；
+`presence_penalty` 与 `repetition_penalty` 两个采样旋钮都修不掉（前者反而 5/5 全红）。
+数据与口径见 `.claude/kb/tooling.md`。
+
+⇒ **提示用英文写，答案也让它用英文回。** 读英文答案是主 agent 的事，不构成成本；
+而中文提示等于每一轮都要赌它这次坏没坏。
+
+**这条不靠自觉**：`ask-local.sh` 里有一道会拒绝的闸——输出判定为字词损坏时
+**退出码 5**，并打印下一步。`.claude/singlefs-ai-sop/rules/show-me-test.md` 明写
+「踩过的坑要做成会失败的检查，不要做成提醒句」，此前这里正是一句提醒句。
+
+**闸判红之后**：那一轮**作废重跑**，不许记成「三方不一致」——
 否则每次都会不一致，这条规则就退化成了摆设。
+确有必要采用带损坏的输出时，设 `ASK_LOCAL_ALLOW_CORRUPT=1`，
+并在结论里写明这一票带瑕疵。
+
+⚠️ **闸报「没跑成」时不是通过。** 检测器自己出错（退出码 2）与判红（退出码 1）
+是两件事，`ask-local.sh` 分开报。看到「没做字词损坏检查」就是**这一项没验**，
+不许当成验过了。
