@@ -70,8 +70,13 @@ bash .claude/scripts/check.sh         # 快速反馈（格式/lint/构建/单测
 bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/）
 bash .claude/scripts/qemu.sh --selftest    # QEMU harness 自检
 bash .claude/scripts/gate-lint.sh     # 门禁自身：每条拒绝是否都给了下一步
+bash .claude/scripts/kb-rot.sh        # kb 腐化：引用悬空、结论悬空、条数对不上
 bash .claude/scripts/env.sh           # 环境自检
 ```
+
+⚠️ **`kb-rot.sh` 还没进门禁，因此它现在只是一句提醒，而提醒句拦不住手敲命令。**
+接进去需要在共享 `gate.sh` 里开一个项目本地阶段的挂载点——那是上游改动。
+在它接进去之前，**「kb 没腐化」这一项每次都要人手动跑一遍才算数**。
 
 **Gate proves evidence requirements, not semantic correctness.**
 绿色只说明证据要求被满足，不代表语义正确——`gate.sh` 每次都会列出未实现的阶段。
