@@ -3027,12 +3027,30 @@ XFS 只在最后 `XLOG_MAX_ICLOGS` 条记录内把 CRC 失败**当作撕裂**（
 | # | 环 | 现役破法（逐字核实，Linux 7.2.0 本地树） | 对本工程 |
 |---|---|---|---|
 | 1 | journal 满 → checkpoint → 发根 → **发根要不要写 journal** | jbd2 `fs/jbd2/transaction.c`：「The commit code assumes that it can get enough log space **without forcing a checkpoint**. This is \*critical\* for correctness: a checkpoint of a buffer which is also associated with a committing transaction creates a **deadlock**」 | **D16 那句措辞必须显式裁一个读法**，见下 |
-| 2 | **COW 独有**：checkpoint → COW 写新节点 → 要分配 → 盘满 → 发不出根 | jbd2/XFS **没有**这个环，因为它们**原地写**、回家不需要新空间。btrfs 有，用 `global_block_rsv`（`fs/btrfs/block-rsv.c`）按 extent/csum/root 树大小动态定尺 | 必须有保留池。⚠️ **D22 的 K 加重它**：盘快满时最该救命的空间正是被 K 扣住的 ⇒ **K 必须是运行时策略，不能是格式常量** |
+| 2 | **COW 独有**：checkpoint → COW 写新节点 → 要分配 → 盘满 → 发不出根 | jbd2/XFS **没有**这个环，因为它们**原地写**、回家不需要新空间。btrfs 有，用 `global_block_rsv`（`fs/btrfs/block-rsv.c`）按 extent/csum/root 树大小动态定尺 | **破法是准入，不是保留池**（E19 实测，见下）。⚠️ **D22 的 K 加重它**：盘快满时最该救命的空间正是被 K 扣住的 ⇒ **K 必须是运行时策略，不能是格式常量** |
 | 3 | 单条操作大于环 | XFS `fs/xfs/libxfs/xfs_log_rlimit.c`：「no single transaction can be larger than half size of the log… **dead loop situation**」；`XFS_MIN_LOG_FACTOR = 3`（`libxfs/xfs_log_format.h:42`），**mkfs 时算、mount 时校验** | 需要等价的几何不变量：**任一操作的最坏 journal 占用 ≤ 环大小 / F，F ≥ 2** |
 
 **死锁 3 推出一条此前没写在任何地方的依赖关系**：
 **[decisions.md](decisions.md) D8 的意图分批机制不是「删大文件的便利设施」，
 它是 journal 满死锁的必要条件之一**——算不下的操作必须能拆成若干个各自合法的事务。
+
+### 死锁 2 的破法是准入，不是保留池（E19 实测，2026-08-28）
+
+**保留池救不了。** [experiments.md](experiments.md) E19 实测：预留从 0 加到 16384 块，
+`checkpoint 卡死`次数纹丝不动（199 → 200），假性 ENOSPC 反而从 3150 涨到 **7246**。
+
+**机制**：卡死不是「普通分配把空间吃光了」，是「**defer 窗口与根环 K 扣住的量本身
+超过了剩余空间**」。btrfs 的 `global_block_rsv` 防的是前者，**防不了后者**。
+
+**破法是一条可计算的准入规则**（E19 跨 6 档填充率 × 6 档延迟共 36 格，预测与实测逐格一致）：
+
+> **剩余空间必须 > 每 checkpoint 搅动量 × (延迟代数 + 1) + 一次 checkpoint 的开销**
+
+⇒ 不许把盘填到 `容量 − 搅动量 × (延迟+1) − checkpoint 开销` 以上。
+这与 `.claude/rules/fs-design.md`「准入控制要在进门前先算最坏情况」同构——
+**「最坏情况」里必须含 defer 窗口与 K 扣住的那一块**，此前从未写明。
+
+⚠️ **搅动量在真实负载里是变量，本实验把它当常数。** 怎么估它是真机压测那一半的问题。
 
 ### D16 那句措辞必须显式裁一个读法
 
@@ -3099,6 +3117,14 @@ checkpoint 不是「操作」，是 journal 机制本身的一部分；普通用
 ---
 
 ## 历史版本
+
+### 2026-08-28（其二十）
+- **改正 D23 死锁 2 的破法**：曾写「必须有保留池」（引 btrfs 的 global_block_rsv），
+  E19 实测保留池救不了——预留 0→16384 块，checkpoint 卡死次数纹丝不动（199→200），
+  假性 ENOSPC 反而从 3150 涨到 7246。机制是卡死源于 defer/K 扣住的量本身超过剩余空间，
+  而 global_block_rsv 防的是普通分配吃光空间。
+  改为**可计算的准入规则**：剩余空间 > 搅动量 × (延迟+1) + checkpoint 开销，
+  E19 跨 6 档填充率 × 6 档延迟共 36 格，预测与实测逐格一致。
 
 ### 2026-08-28（其十九）
 - **D5 标题里那个条件升级为正确性条件**（E18 实测）：曾写「已定（条件于 D6 不取
