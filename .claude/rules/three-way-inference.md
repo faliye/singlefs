@@ -35,7 +35,7 @@
 **「不能重复」指的是三条腿要拿到不同的切入角，不是只换个模型名。**
 同一份提示发给三个模型只能测出模型差异，测不出推论对不对——
 每条腿要被指定一个不同的立场（例如：正推 / 反推 / 找反例），
-对齐 `singlefs-ai-sop/rules/evidence-discipline.md` 的三步。
+对齐 `.claude/singlefs-ai-sop/rules/evidence-discipline.md` 的三步。
 
 ## 判决由主 agent 做，不由投票做
 
@@ -50,7 +50,7 @@
 `ask-local.sh` 取不到 key、网关不通、或正文为空时，**一律报错退出，不许静默跳过**。
 少一条腿就说少了一条腿，然后由人决定要不要在两条腿上继续。
 
-理由与 `singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」同一条：
+理由与 `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」同一条：
 一个悄悄只跑了两条腿的「三方一致」，比公开的两条腿危险得多。
 
 ## 给本地腿的提示一律用英文

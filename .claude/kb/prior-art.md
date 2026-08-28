@@ -62,7 +62,7 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 **对本工程的意义**：btrfsutils 证明了「照着 btrfs 格式做 Rust 实现」三个月能出雏形，
 但那是因为**格式现成、且 `btrfs inspect-internal dump-tree` 是免费的裁判**。
 本工程从零设计，这两样都没有——**没有 oracle 是从头做的最大隐性成本**，
-必须在预算里，见 `singlefs-ai-sop/rules/test-discipline.md`「模型对拍」。
+必须在预算里，见 `.claude/singlefs-ai-sop/rules/test-discipline.md`「模型对拍」。
 
 ## 四、内核 Rust 文件系统抽象层
 
@@ -445,7 +445,7 @@ Bε 缓冲比例、size-tiering、key-value 分离、过滤器类型——
 **对本工程最直接的两条**：
 
 1. **Metis 的 RefFS 说明「参照实现」不必是别人的成熟文件系统，可以是为对拍专门写的小实现。**
-   这正是 `singlefs-ai-sop/rules/test-discipline.md` 说的模型对拍，
+   这正是 `.claude/singlefs-ai-sop/rules/test-discipline.md` 说的模型对拍，
    但 Metis 多给了一件事：把它和状态空间穷举接起来，而不是只喂随机操作序列。
 2. **DaisyNFS 的分层与 `.claude/rules/fs-design.md`「一个事务层，所有结构共用」同构**：
    事务层一次把并发与崩溃解决掉，上层就只剩顺序正确性要验。
@@ -511,7 +511,7 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 | **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
 | **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9 的方向；但注意本工程 D9 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
 | ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9 与 D10 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10 的任何候选都不许走原地覆盖写这条路 |
-| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9 未答项 5 那条推理的前提之一 |
+| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9 未定项 5 那条推理的前提之一 |
 
 **未找到的（明说，不补）**：没有任何一手材料用散文明说
 「copygc / rebalance / scrub / fsck 在无密钥时不能跑」。
@@ -544,7 +544,7 @@ if we run it multiple times」——**重建侧本身就是一串 `+=`**。
 |---|---|
 | 增量**应用过程**出偏差：漏一次更新、并发丢失、崩溃后未重放 | **加减语义本身写错**：某分支符号搞反，运行时与重建一起错到同一个值，`memcmp` 全绿 |
 
-**对本工程**：`singlefs-ai-sop/rules/evidence-discipline.md` 写着「校验的两条路径不共享
+**对本工程**：`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 写着「校验的两条路径不共享
 同一段代码、同一次采样、同一个工具」。这一节是那条规则在真实系统里**已经被违反并产生盲区**的实例。
 处置见 [checks-owed.md](checks-owed.md) C12。
 

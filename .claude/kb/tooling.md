@@ -105,7 +105,7 @@ D19 那轮的背景材料里写着「ZFS 的 256 位里没给 nonce 留位置」
 
 ## 实验纪律：本轮踩出来的三条（欠一次上游修订）
 
-这三条都属于 `singlefs-ai-sop/rules/test-discipline.md` 的射程（证据纪律），
+这三条都属于 `.claude/singlefs-ai-sop/rules/test-discipline.md` 的射程（证据纪律），
 **欠一次上游修订**（要走「先提交 → 抬 VERSION → 三语同步 → 重新盖章」）。
 在那之前先记在这里。
 
@@ -185,7 +185,7 @@ D19 那轮的背景材料里写着「ZFS 的 256 位里没给 nonce 留位置」
 | 安装方式 | rustup，`--profile minimal --default-toolchain stable`，装在宿主 `~/.cargo` | —— |
 | 额外目标 | `x86_64-unknown-linux-musl`，产出静态二进制在虚机的 busybox initramfs 里跑 | **已验证**：`e7-index-bench` 编出 static-pie，虚机里跑通 |
 | 组件 | `rustfmt` + `clippy`（门禁两个阶段都要用，`--profile minimal` 不含它们） | 已装 |
-| **PATH** | rustup 的 shim 已软链到 `~/.local/bin/`（cargo / rustc / rustup / rustdoc / rustfmt / cargo-fmt / cargo-clippy） | 见下方说明 |
+| **PATH** | rustup 的 shim 已软链到 `~/.local/bin/`（cargo / rustc / rustup / rustdoc / rustfmt / cargo-fmt / cargo-clippy） | 见「坑：装了 rust 而门禁看不见」 |
 
 ### 坑：装了 rust 而门禁看不见
 
@@ -214,7 +214,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 实测控制台首行形如 `Booting from ROM..^[c^[[?7l^[[2JE7RESULT name=device_size ...`，
 用 `grep '^E7RESULT'` 锚定行首会**静默漏掉第一条结果**。
-处置：不锚定行首，并用上面那道「条数完整性闸」把漏行变成会红的事实。
+处置：不锚定行首，并用「条数完整性闸」把漏行变成会红的事实。
 
 ### 实测数字（虚机内、O_DIRECT、2 GiB virtio 盘，N=5 轮）
 
@@ -229,7 +229,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 **顺序写为什么不稳定**：第 1 轮 2245、其余四轮 3400–3667，**第一轮是离群点**。
 每轮各建一个新的稀疏文件，推测是宿主侧首次分配 / 宿主页缓存预热的代价，**未验证**。
 处置：这一项在查明并消除之前**不作为任何判断的输入**
-（`singlefs-ai-sop/rules/test-discipline.md`：两侧都不满足就如实报「不稳定」，不下结论）。
+（`.claude/singlefs-ai-sop/rules/test-discipline.md`：两侧都不满足就如实报「不稳定」，不下结论）。
 
 口径：`e7-index-bench` v0.1.0，musl 静态，固定种子 xorshift64\*；
 宿主 32 核 / 60 GiB 内存，QEMU 8.2.2 + KVM，虚机 2048M / 4 vCPU，
@@ -278,7 +278,7 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 
 ⚠️ **已证明的只是「QEMU 接受并构造了这三个设备」，不是「来宾内核看到三份不同的几何」。**
 后者要进来宾读 `/sys/block/*/queue/{logical_block_size,chunk_sectors}` 与 `blkzone report` 才算。
-**两件事不许当成一件**（`singlefs-ai-sop/rules/verify-before-claiming.md`）。
+**两件事不许当成一件**（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`）。
 
 ### 宿主侧路线（要 root，胜在不用启虚机）
 
