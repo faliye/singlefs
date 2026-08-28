@@ -2492,6 +2492,40 @@ D10 的候选 A/B 仍然必须在 D8 节点格式冻结前判完——**先后�
 | 2 | 谁**保证**它——设备声明，还是核心层合成？ | D17 未定项 1；[checks-owed.md](checks-owed.md) C16 |
 | 3 | 被**违反**时怎么发现 | 崩溃点重放 + checker；本仓对「失败原子性宽度 / 撕裂 / 重排序」目前零覆盖 |
 
+### 推论三第一问的实测答案：设备侧的原子宽度是 512，且不可依赖
+
+**已核实（2026-08-28 逐字现查，两条独立路径 + 主 agent 自核）：**
+
+| # | 事实 | 出处 |
+|---|---|---|
+| 1 | 本机 NVMe：`atomic_write_unit_min = atomic_write_unit_max = logical_block_size = physical_block_size = 512` | `/sys/block/nvme0n1/queue/` 现读 |
+| 2 | **Linux 上 `physical_block_size` 已经就是「设备承诺的掉电原子宽度」** | `drivers/nvme/host/core.c`：`lim->physical_block_size = min(phys_bs, atomic_bs);` 上方注释原文「Linux filesystems assume writing a single physical block is an atomic operation. Hence limit the physical block size to the value of the Atomic Write Unit **Power Fail** parameter.」 |
+| 3 | 内核只认 Power Fail 变体（`AWUPF`/`NAWUPF`），对 `AWUN`/`NAWUN` **零引用** | `nvme_configure_atomic_write()` |
+| 4 | **「设备声明 1 块」与「设备什么也没声明」不可区分** | `drivers/nvme/host/core.c` 的 `nvme_configure_atomic_write()`：设备不声明时走 `atomic_bs = (1 + ns->ctrl->subsys->awupf) * bs`，`awupf == 0` ⇒ `atomic_bs = bs`，且 `lim->features \|= BLK_FEAT_ATOMIC_WRITES` **无条件执行**，没有「未声明就不置该 feature」的分支 |
+| 5 | **块层从未承诺「一个 bio 不会被撕裂」** | `Documentation/ABI/stable/sysfs-block` 的四个 `atomic_write_*` 条目**没有一处**出现 crash / power loss；`Documentation/block/writeback_cache_control.rst`（95 行）**全文没有 atomic / torn / tear**——`REQ_PREFLUSH`/`REQ_FUA` 管的是持久化时序 |
+
+### 现役实现全部自己合成撕裂检测，没有一家靠设备
+
+| 实现 | 机制 |
+|---|---|
+| **ZFS 根** | 4 label × 128K uberblock 环；槽号 = `txg % 槽数`（**轮换，不覆写上一代**）；SHA-256 **内嵌块尾**、verifier 是该块自己的物理偏移；读时全扫所有槽按 `txg → timestamp` 择新；偶数 label → uberblock → 奇数 label 三阶段带 flush |
+| **ZFS 普通块** | 校验和在父指针里；撕裂 ⇒ 失配 ⇒ 靠副本修 |
+| **btrfs 节点** | `csum` 覆盖 `[32, nodesize)`；**第二道独立闸**：父指针的 transid 与节点头 generation 对拍；本事务内释放的块 **pin 住不重用** |
+| **XFS log** | `xlog_pack_data()`：**每 512 字节格的首个 `__be32` 覆写成 cycle_lsn，原值存进 record 头的 `h_cycle_data[i]`**，恢复时换回；另有整条 record 的 CRC。自述原文：「Storage without sector atomicity guarantees can result in torn writes… **Our only means to detect this scenario is via CRC verification.**」 |
+| **jbd2** | commit block 整块 csum + `REQ_PREFLUSH\|REQ_FUA` 定序；另有一条接受「只有头部有效、其余为零」的 `verify_partial` |
+
+**两处例外，方向都指向同一个结论**：
+
+- 唯一明文声称依赖设备的是 ZFS `vdev_label.c` 那句
+  「the disk does not do single-sector overwrites atomically (**even though it is required to**)」——
+  量级是**单扇区 512**，而且 ZFS 仍然靠**换槽**绕开它。
+- 唯一真正吃设备 >512 原子保证的是 XFS 的 `RWF_ATOMIC` **用户数据**直写，
+  且配一条纯软件 COW 回退（`-ENOPROTOOPT` ⇒ 换 COW 路径），
+  **XFS 自己的日志与元数据一个字节都不走这条路。**
+
+⇒ **本工程不能假设大于 512 字节的原子性，且连 512 也只能当作「大概率成立」。
+单元原子性必须自己合成。**
+
 ⚠️ **一条不许顺手推过去的**：**「设备新」不等于「原子写宽度更大」。**
 NVMe 的原子写单元要看设备自己声明的 `AWUN` / `NAWUPF`，不声明就是没有。
 放弃兼容旧设备能换到的是「可假设 4 KiB 物理扇区」「可假设 FLUSH/FUA 由块层合成」
@@ -2581,7 +2615,21 @@ C10 拦的是「新代码读不了旧镜像却没人发现」——按本条，
 依据：存储是当前最便宜的资源，用空间换性能与安全划算；
 且这是 D12「谁开的线谁维护」在单元格式里的形态。
 
-**已定：扩展点取固定字节上限，不按单元大小取比例。**
+**已定（2026-08-28）：扩展点的大小按线声明，不按单元变长。**
+每条线在超级块里声明一个值（开线方自己定，可以定 0），上限由本仓定。
+
+三档里取中间那一档的理由：
+
+| 形态 | 开线方 | 代价 |
+|---|---|---|
+| 全局固定值 | 他要 200 字节而本仓定了 128，只能忍 | 无 |
+| **每条线声明一个值** | **他自己定** | 几乎无：线内几何仍然一致 |
+| 每个单元各自变长 | 最灵活 | 每单元多一个长度字段；**几何不再一致**，扫描重建与记账都要按单元算 |
+
+⇒ 中间那档从开线方看是可伸缩的，从格式几何看是固定的。
+第三档只在「同一条线里不同单元需要不同大小」时才有意义，**那个需求目前不存在**。
+
+**已定：上限取固定字节数，不按单元大小取比例。**
 理由是语义——它承载的是**每对象的语义字段，与单元多大无关**。
 按比例定会在大单元上失控：1% 在 128 KiB 单元上是 **1310 字节**，
 是本工程自己全部单元元数据（108 字节）的 **12 倍**。
@@ -2595,7 +2643,8 @@ C10 拦的是「新代码读不了旧镜像却没人发现」——按本条，
 1. **必须落在校验 / 认证覆盖范围之内。** 落在外面 ⇒ 那一段是损坏盲区，
    且加密开启时是未认证字节，直接是攻击面（D9 的 AEAD 边界不许开洞）。
 2. **checker 不许对它的内容有任何判定。** 它对本工程是不透明的。
-3. **大小必须由格式声明。** 通用工具（scrub、扫描重建、救援）要能跳过它。
+3. **大小必须由格式声明**（按上面已定：在该线的超级块里）。
+   通用工具（scrub、扫描重建、救援）要能跳过它。
 4. **扩展点里的指向，其目标空间必须走本工程的分配与记账。**
    开线方不许自己划一块盘外空间——`.claude/rules/fs-design.md` 第一格已定
    「运行时决策路径不许遍历」，ENOSPC 准入要在进门前算最坏情况，
@@ -2684,6 +2733,17 @@ C10 拦的是「新代码读不了旧镜像却没人发现」——按本条，
 ---
 
 ## 历史版本
+
+### 2026-08-28（其十四）
+- D20 推论三第一问有实测答案了：**设备侧原子宽度是 512，且不可依赖**。
+  五条已核实事实 + 现役四家的合成机制表（ZFS 环/btrfs transid 对拍/XFS cycle 覆写/jbd2 整块 csum）。
+  两条独立查证路径 + 主 agent 自核逐字复验。
+  ⇒ 本工程不能假设 >512 的原子性，单元原子性必须自己合成。
+
+### 2026-08-28（其十三）
+- D21 扩展点大小已定：**按线在超级块里声明**（开线方自己定，可为 0），上限由本仓定固定字节数。
+  依据：这是「可伸缩」的低成本形态——从开线方看可伸缩，从格式几何看线内一致；
+  每单元变长那一档只在「同一条线里不同单元要不同大小」时才有意义，该需求不存在。
 
 ### 2026-08-28（其十二）
 - D21「厂商自定义空间」改写为「开线方的扩展点」/ 依据：用户澄清——形态不是不透明字节，
