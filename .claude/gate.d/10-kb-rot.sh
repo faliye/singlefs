@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
+# gate-stage: kb 腐化
+#
 # kb 腐化审计：查「一处改了、引用它的地方没跟着改」。
+#
+# 这是一个**项目本地门禁阶段**：共享 gate.sh 会扫 .claude/gate.d/*.sh 逐个当阶段跑。
+# 单独跑也可以： bash .claude/gate.d/10-kb-rot.sh
 #
 # 这类腐化对模型比对人更危险——检索会把陈旧的那一条**单独**端出来，
 # 既没有上下文也没有对照（singlefs-ai-sop/rules/kb-discipline.md 第 7 条）。
@@ -9,7 +14,8 @@
 #   2. 正文里写死的条数与实际条数对不上
 #   3. 引用了不存在的编号（doc-lint 已覆盖一部分，这里补实验号）
 set -uo pipefail
-cd "$(dirname "$0")/../.." || exit 2
+# 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。
+cd "${1:-$(dirname "$0")/../..}" || exit 2
 KB=.claude/kb
 fail=0
 say() { printf '  %s\n' "$*"; }
