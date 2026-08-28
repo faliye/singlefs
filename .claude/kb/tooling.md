@@ -74,6 +74,25 @@ D19 那轮的背景材料里写着「ZFS 的 256 位里没给 nonce 留位置」
 
 ⚠️ **没跑阳性对照的「举不出来」不许当证据用**——它与「这条腿坏了」在外观上完全一样。
 
+## 内核源码：本机有完整树，不必 WebFetch
+
+| 项 | 值 | 怎么知道的 |
+|---|---|---|
+| 路径 | `/home/fy5090/kbuild/linux-om`（1.8 GB） | 2026-08-28 现查 |
+| 版本 | **Linux 7.2.0**（`Makefile` 前四行 `VERSION = 7` / `PATCHLEVEL = 2` / `SUBLEVEL = 0`） | 2026-08-28 现查 |
+| 有什么 | 完整 `.c`/`.h` 正文，含 `fs/jbd2/`、`fs/xfs/`、`fs/btrfs/`、`fs/bcachefs/`、`drivers/nvme/` | 2026-08-28 现查 |
+
+⚠️ **`/usr/src/linux-*-headers-*` 只有 `Kconfig` 与 `Makefile`，没有源码正文**——
+`fs/btrfs/` 在 headers 树里只有 2 个文件。查源码要用 `/home/fy5090/kbuild/linux-om`，不要用 headers 树。
+
+⚠️ **版本口径要写清**：本机树是 **7.2.0**，而 kb 里早先的引用多数标着「现查 Linux 6.17」——
+那些来自 GitHub 的 `v6.17` tag（不可变，可复核）。
+**两个版本的结论不许混着引用**，引哪棵树就标哪个版本号。
+
+⚠️ **OpenZFS 本机没有树**。ZFS 的源码仍要现取
+（`https://raw.githubusercontent.com/openzfs/zfs/master/...`），
+且 master 会动，**引用时要记下取回日期，行号不是永久的**。
+
 ## Rust 工具链
 
 | 项 | 值 | 口径 |
@@ -193,6 +212,11 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 引用时必须带这个口径。
 
 ## 历史版本
+
+### 2026-08-28（其二）
+- 记本机有完整内核源码树 `/home/fy5090/kbuild/linux-om`（**Linux 7.2.0**，1.8 GB）。
+  此前整轮都在用 WebFetch 取源码。同时记下版本口径：kb 里早先的引用来自 GitHub v6.17 tag，
+  与本机树不是同一版本，不许混着引用。
 
 ### 2026-08-28
 - 记本地腿第三类毛病：会编造字段与机制，被明令禁止后照编，且**编造在外观上与正确回答一样**。
