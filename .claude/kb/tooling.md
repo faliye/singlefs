@@ -164,7 +164,9 @@ D19 那轮的背景材料里写着「ZFS 的 256 位里没给 nonce 留位置」
 |---|---|---|
 | 路径 | `/home/fy5090/kbuild/linux-om`（1.8 GB） | 2026-08-28 现查 |
 | 版本 | **Linux 7.2.0**（`Makefile` 前四行 `VERSION = 7` / `PATCHLEVEL = 2` / `SUBLEVEL = 0`） | 2026-08-28 现查 |
-| 有什么 | 完整 `.c`/`.h` 正文，含 `fs/jbd2/`、`fs/xfs/`、`fs/btrfs/`、`fs/bcachefs/`、`drivers/nvme/` | 2026-08-28 现查 |
+| 有什么 | 完整 `.c`/`.h` 正文，含 `fs/jbd2/`、`fs/xfs/`、`fs/btrfs/`、`fs/erofs/`、`fs/ext4/`、`fs/f2fs/`、`drivers/nvme/`、`drivers/md/`、`crypto/`、`Documentation/` | 2026-08-28 现查 |
+| **没有什么** | **`fs/bcachefs/` 不在这棵树里**（bcachefs 已被移出主线，见 [decisions.md](decisions.md) D7）。`/usr/src/linux-headers-6.17.0-1028-oem/fs/bcachefs/` 只有 `Kconfig` + `Makefile`，**没有源码** | 2026-08-28 现查 |
+| 版本 | **Linux 7.2.0**（`Makefile` 的 `VERSION = 7 / PATCHLEVEL = 2`）。⚠️ kb 里多处引用标的是「现查 Linux 6.17」，**那个版本本机没有** | 2026-08-28 现查 |
 
 ⚠️ **`/usr/src/linux-*-headers-*` 只有 `Kconfig` 与 `Makefile`，没有源码正文**——
 `fs/btrfs/` 在 headers 树里只有 2 个文件。查源码要用 `/home/fy5090/kbuild/linux-om`，不要用 headers 树。
@@ -296,6 +298,14 @@ rustup 追加在文件末尾的 PATH 那句因此从不执行；
 引用时必须带这个口径。
 
 ## 历史版本
+
+### 2026-08-28（其三）
+- **改正一条自己写错的「现查」记录**：本文件曾写内核树「含 `fs/bcachefs/`」，
+  而现查该树 `fs/` 下**没有** bcachefs 目录（bcachefs 已被移出主线），
+  `/usr/src` 的 headers 包里也只有 `Kconfig` + `Makefile`。
+  ⚠️ **一条标着「现查」却是假的记录，比没有记录更坏**——它让后来的人以为复核过了。
+- 记下树的版本是 **7.2.0**，而 kb 里多处引用标的是「现查 Linux 6.17」。
+  ⇒ **所有 bcachefs 逐行引用在本机不可复核**，受影响的决策见 decisions.md 里那条总标注。
 
 ### 2026-08-28（其二）
 - 本地腿的「字词损坏」从「只能忍受的噪声」改为**已定位、已有处置**：复现 23 轮，
