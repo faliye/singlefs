@@ -10,14 +10,14 @@
 但**概念模型要慢**：代码和字节扔了不心疼，「空间怎么记账」「快照是什么」
 这类心智模型一旦错了，会在被发现之前渗进上百个决定里。
 
-**推论：真正要慎重的是 `kb/decisions.md`，不是 `.rs` 文件。**
+**推论：真正要慎重的是 `kb/decisions/` 下的决策正文，不是 `.rs` 文件。**
 
 ## 硬约束
 
 - 改格式**必须同步更新** `.claude/kb/invariants.md` 和 checker。三者不同步的 commit 一律不收。
-- 决策变更**必须记进** `.claude/kb/decisions.md`，含推翻依据。
+- 决策变更**必须记进** `.claude/kb/decisions-history.md`，含推翻依据；正文改 `.claude/kb/decisions/` 下对应文件。
 - 一旦有外部用户，本文作废，改为严格兼容——那时直接改本文，
-  并把推翻依据写进 `.claude/kb/decisions.md`。
+  并把推翻依据写进 `.claude/kb/decisions-history.md`。
 
 ## 从写开始，不从读开始
 

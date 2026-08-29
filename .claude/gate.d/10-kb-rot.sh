@@ -38,7 +38,7 @@ echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
 for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,2}([^A-Za-z0-9-]|$)' $KB/*.md .claude/rules/*.md 2>/dev/null \
              | grep -oE 'D[0-9]{1,2}' | sort -u); do
-  grep -qE "^## $d " "$KB/decisions.md" || { bad "$d 被引用但 decisions.md 里没有它"; missing=1; }
+  grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"; missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "决策号引用全部有定义"
 
@@ -72,9 +72,9 @@ orphan=0
 while read -r line; do
   e="${line%% *}"
   grep -q "已跑" <<<"$line" || continue
-  n=$(grep -cE "(^|[^A-Za-z0-9/-])$e([^A-Za-z0-9-]|$)" "$KB/decisions.md")
+  n=$(cat "$KB/decisions.md" "$KB"/decisions/*.md | grep -cE "(^|[^A-Za-z0-9/-])$e([^A-Za-z0-9-]|$)")
   if [[ "$n" -eq 0 ]]; then
-    bad "$e 已跑，但 decisions.md 一次都没引用它——它的结论悬空了"
+    bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
     orphan=1
   fi
 done < <(grep -E "^## E[0-9]+ " "$KB/experiments.md" | sed 's/^## //')
@@ -83,7 +83,8 @@ done < <(grep -E "^## E[0-9]+ " "$KB/experiments.md" | sed 's/^## //')
 echo
 echo "── 5. 正文写死的条数 vs 实际条数 ──"
 inv_actual=$(grep -cE '^\| I-[0-9]+\.[0-9]+ ' "$KB/invariants.md")
-inv_retired=$(grep -cE '^\| I-[0-9]+\.[0-9]+ \| \*\*此编号不再使用' "$KB/invariants.md")
+# 表里第 2 列是简称（singlefs-ai-sop/rules/kb-discipline.md 第 5 条），陈述在第 3 列
+inv_retired=$(grep -cE '^\| I-[0-9]+\.[0-9]+ \| [^|]* \| \*\*此编号不再使用' "$KB/invariants.md")
 inv_live=$(( inv_actual - inv_retired ))
 # 历史版本是新的在前 ⇒ 取**第一处**。取 tail 会拿到最老那条，永远判红（实测踩过）。
 inv_claim=$(grep -oE '现共 [0-9]+ 条在用' "$KB/invariants.md" | head -1 | grep -oE '[0-9]+')

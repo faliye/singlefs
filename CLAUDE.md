@@ -4,7 +4,7 @@
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
 
 当前里程碑：**格式设计阶段**——尚无磁盘格式、无代码。
-先定 `.claude/kb/decisions.md` 里的待定项，再动第一行实现。
+先定决策里的待定项，再动第一行实现——索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`。
 
 ## 规则（始终生效）
 
@@ -49,7 +49,9 @@
 
 | 文件 | 内容 |
 |---|---|
-| `.claude/kb/decisions.md` | 设计决策：定了什么、为什么、还没定什么 |
+| `.claude/kb/decisions.md` | **决策索引**：编号、简称、状态、指向正文的链接 |
+| `.claude/kb/decisions/` | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
+| `.claude/kb/decisions-history.md` | 全部决策的变更史：每条写改前、改后、依据 |
 | `.claude/kb/invariants.md` | 不变量清单，checker 是它的可执行形式 |
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |

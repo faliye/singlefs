@@ -34,7 +34,7 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 **后者是最新最权威的 bcachefs 设计文档，尚未通读。**
 
 1. **bucket + generation 号**。盘切成 bucket，每个带一个代号；指针存「期望代号」，
-   代号对不上说明这块已被回收 → 数据失效不需要更新任何反向索引。对 D1 是直接减负。
+   代号对不上说明这块已被回收 → 数据失效不需要更新任何反向索引。对 D1（数据可移动性 / 反向索引） 是直接减负。
 2. **快照 ID 进 key 低位**。快照 ID 自成一棵树（根 `U32_MAX`，向下分配，父 ID 恒大于子 ID），
    查找按祖先关系过滤，**不 clone 任何树**，创建 O(1)，可有百万级快照。
    代价：删快照要遍历所有带快照的 btree（官方提到想用 bloom filter 优化）；
@@ -70,9 +70,9 @@ btrfs qgroup 事后遍历 → 死；ZFS 与重写后的 bcachefs 事务时增量
 且尚未就「通用 vs 只服务简单文件系统」达成结论。
 
 来源：[Rust for filesystems (LWN)](https://lwn.net/Articles/978738/)。
-**与本工程当前关系不大**——D7 已定前几年不进主线。
+**与本工程当前关系不大**——D7（是否进 Linux 主线） 已定前几年不进主线。
 
-## 五、索引结构（D8 专项调查）
+## 五、索引结构（D8（核心索引结构） 专项调查）
 
 **口径**：以下来自 bcachefs *Principles of Operation* Rev 1.39.2（2026-08-25 修订）原文、
 LWN、XFS 文档与论文摘要。**未在本工程验证，也未 clone/编译/运行任何一个实现。**
@@ -126,7 +126,7 @@ key 在 bset 内是**打包**的：每个 bset 有个格式描述符记录哪些
 > seeks per lookup and level-2 nodes too large to stay resident under page
 > cache pressure."
 
-**对本工程的意义**：D7 已定不进主线，所以**这条约束对我们根本不存在**——
+**对本工程的意义**：D7（是否进 Linux 主线） 已定不进主线，所以**这条约束对我们根本不存在**——
 大节点是白捡的，不需要为它付出「自管缓存」以外的代价。
 
 ### 5.3 bucket 分配器：从扫描线程改成 btree
@@ -137,7 +137,7 @@ key 在 bset 内是**打包**的：每个 bset 有个格式描述符记录哪些
   它让 journal replay 时**自举分配信息**变得可做，
   并且**让某些本来不可恢复的损坏变得可修**。← 直接呼应我们的「可重建性」设计目标。
 - bucket 内**永不重写**，顺序写满即封存 → 必须有 copying GC。
-  **copyGC 预留 8%（默认，可配 5%–20%）**——这是 D3「预留不能过大」的一个现成参照量。
+  **copyGC 预留 8%（默认，可配 5%–20%）**——这是 D3（空间分配）「预留不能过大」的一个现成参照量。
 - 有一棵 **fragmentation LRU btree** 记录 bucket 填充度，
   copygc 直接找最碎的，不用扫整棵 alloc btree。
 - **分配器原本是内存 bucket 数组 + 专用扫描线程**维护 freelist/discard/eviction；
@@ -146,13 +146,13 @@ key 在 bset 内是**打包**的：每个 bset 有个格式描述符记录哪些
   而且旧线程在文件系统接近满时会**吃掉大量 CPU**——换成 btree 后这些角落情况消失。
 - bucket 天然映射到 SMR / zoned 设备的 zone。
 
-### 5.4 记账（对 D5 的独立印证）
+### 5.4 记账（对 D5（快照 / 空间记账机制） 的独立印证）
 
 > "Accounting counters are maintained by triggers as keys are committed,
 > not by walking the btrees."
 
 而 `check_allocations` **靠全量遍历重建记账**，用来分辨「计数器过期」和「key 真的还在」。
-这与 `invariants.md` 的 I-3.1 是同一个设计：**运行时增量维护，checker 用遍历来验它**。
+这与 `invariants.md` 的 I-3.1（已分配统计对得上） 是同一个设计：**运行时增量维护，checker 用遍历来验它**。
 
 ### 5.5 纠删码：write hole 的第二个已知解法
 
@@ -200,7 +200,7 @@ lifting 的额外计算开销压过收益；全部形态里唯一被害的是**�
 **是一段尺寸区间内竞争力相当，不是全尺寸都赢**。
 
 口径：FAST 2018 论文 + TOS 2018 扩展版，**未在本工程验证**。
-对本工程 key 布局的影响见 [decisions.md](decisions.md) D8。
+对本工程 key 布局的影响见 [decisions.md](decisions.md) D8（核心索引结构）。
 
 来源：
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/system/files/conference/fast18/fast18-zhan.pdf)
@@ -216,7 +216,7 @@ rmapbt 是每个 AG 一棵 b+tree，记录 `(物理块, 属主, 偏移, 块数)`
 ⚠️ 该数字来自一篇个人博客的 mkfs 输出，**是格式化时的元数据规模，不是实际使用量**，
 只能当量级参考。
 
-**更重要的是它给了 D1 第二个理由**：XFS 文档说反向映射
+**更重要的是它给了 D1（数据可移动性 / 反向索引） 第二个理由**：XFS 文档说反向映射
 「is an essential feature for repairing filesystems online because the secondary
 copy can be used to rebuild damaged primary metadata」。
 
@@ -234,7 +234,7 @@ copy can be used to rebuild damaged primary metadata」。
 - [The Full Path to Full-Path Indexing (FAST'18)](https://oscarlab.github.io/papers/fast18-betrfs.pdf)
 - [Closing the B-tree vs LSM-tree Write Amplification Gap (FAST'22)](https://arxiv.org/abs/2107.13987)
 
-## 六、加密（D9 专项调查）
+## 六、加密（D9（加密） 专项调查）
 
 **口径**：来自 bcachefs Encryption 设计文档原文（页面标注最后编辑 2025-11-02）、
 OpenZFS `module/os/linux/zfs/zio_crypt.c` 顶部设计注释（master 分支，2026-08-26 取）、
@@ -259,7 +259,7 @@ fscrypt 内核文档自己写明它不认证：
 > accessing the filesystem."
 理由是「ciphertext expansion 难处理」——即密文比明文长，块对齐的文件系统塞不下。
 
-**对本工程的意义**：校验和跟着指针走（[decisions.md](decisions.md) D4）本身就把 MAC 和 nonce
+**对本工程的意义**：校验和跟着指针走（[decisions.md](decisions.md) D4（校验和位置））本身就把 MAC 和 nonce
 的位置腾出来了。AEAD 对本工程是白捡的，对块对齐的文件系统不是。
 
 ### 6.2 ZFS 与 bcachefs 在同一个问题上分道扬镳：无 key 时还能不能维护
@@ -341,7 +341,7 @@ MAC 对不上就判设备故障并很快停用它，
 
 ### 6.5 卷身份放在哪一层：ext4 与 fscrypt 都放在派生层，不放在逐单元输入里
 
-**2026-08-29 本机内核树逐行现查，用于 D9 未定项 8 定案。**
+**2026-08-29 本机内核树逐行现查，用于 D9（加密） 未定项 8 定案。**
 
 | 实现 | 卷/文件身份进哪一层 | 逐单元输入里有什么 | 出处 |
 |---|---|---|---|
@@ -352,8 +352,8 @@ MAC 对不上就判设备故障并很快停用它，
 nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次挂载读回同一个值。
 「每次挂载换新盐」这个形态如果真做了，上一次挂载写的块就永远解不开。
 
-**对本工程的意义**：D9 把 fsid 从 AAD 移进 KDF，与这两家的分层一致——
-卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9 未定项 8。
+**对本工程的意义**：D9（加密） 把 fsid 从 AAD 移进 KDF，与这两家的分层一致——
+卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9（加密） 未定项 8。
 
 ### 6.6 明文超级块里的水位字段可被回滚，这是有现役演示的失败模式
 
@@ -369,9 +369,9 @@ nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次�
 要开必须显式加 `legacy_recalculate`（`drivers/md/dm-integrity.c:395
 dm_integrity_disable_recalculate()`）。
 
-**对本工程的意义**：I-6.5 的 nonce 水位是同一个形状，而后果更硬——
+**对本工程的意义**：I-6.5（nonce 水位单调） 的 nonce 水位是同一个形状，而后果更硬——
 回滚它不是「漏检一次篡改」，是**流密码 nonce 重用 ⇒ 两段明文直接 XOR**。
-⇒ D9 未定项 8 定「水位必须被主密钥派生的 MAC 覆盖，无密钥侧不许写它」。
+⇒ D9（加密） 未定项 8 定「水位必须被主密钥派生的 MAC 覆盖，无密钥侧不许写它」。
 
 ### 6.7 AEAD 的 tag 长度：内核允许截断到 32 位
 
@@ -385,7 +385,7 @@ dm_integrity_disable_recalculate()`）。
 **本节只收「可能推翻某条既有决策前提」的成果，不做文献综述。** 每条注明它冲击哪条决策。
 全部来自公开论文与项目文档，**未在本工程验证**。
 
-### 7.1 随机小写：写优化索引把它变成非问题（冲击 D10）
+### 7.1 随机小写：写优化索引把它变成非问题（冲击 D10（随机写 / 碎片化的真答案））
 
 BetrFS 0.4 与主流文件系统在同一个随机小写微基准上的实测（FAST 2018 论文 Table 2）：
 
@@ -419,42 +419,42 @@ FAST 2018 论文 2.1 与 4.x 节原文：
 |---|---|
 | BetrFS **是** COW 的——节点用 copy-on-write 写盘 | 「那个数字来自非 COW 系统」这个说法不成立，不能用它否掉 Bε |
 | BetrFS 的持久化靠 **redo log + 每 5 秒一次 checkpoint** | 那 5 秒窗口把大量 COW 节点重写摊掉了。⚠️ **本工程并没有「每事务发布一次新根」这条承诺**——`litmus/commit-publish.litmus` 只钉一次发布事件**内部**的顺序（写块内容 → `smp_wmb` → 写 generation），对发布频率一字未提；`decisions.md` / `CLAUDE.md` / `.claude/rules/fs-design.md` 全文均无此表述（2026-08-26 逐文件 grep 核实）。发布频率是**尚未决定**的事项 |
-| 全文**没有出现 checksum**，不存在「父节点存子节点校验和」的 Merkle 链 | singlefs 的 D4 内联校验和 + D9 的 MAC/nonce 给每次节点重写加了一份 BetrFS 不付的固定成本，交叉点因此会移动，移多少未知 |
+| 全文**没有出现 checksum**，不存在「父节点存子节点校验和」的 Merkle 链 | singlefs 的 D4（校验和位置） 内联校验和 + D9（加密） 的 MAC/nonce 给每次节点重写加了一份 BetrFS 不付的固定成本，交叉点因此会移动，移多少未知 |
 
 **所以这组数字能证明的是**：消息缓冲区能把「一个 key 要被重写几次」从 O(树高) 降到 O(树高/B)。
 **它不能证明的是**：在「Merkle 校验和链 + AEAD」都在、且发布频率取某个具体值的前提下还剩多少收益。
-后者要靠 [experiments.md](experiments.md) E7 自己量。
+后者要靠 [experiments.md](experiments.md) E7（离线索引 harness） 自己量。
 
 ⚠️ **发布频率是这里的自由变量，不是常量。** 若本工程采用 checkpoint 语义
 （内存里攒脏节点、定期合并写一次），那么「一次小写不必立刻重写整条从叶子到根的路径」
 这个效果，**checkpoint 批量本身就免费给了**，不需要在格式里放一个持久化的消息缓冲区。
 BetrFS 那个数字里有多少来自消息缓冲、多少来自 5 秒 checkpoint，**论文没有拆开过**。
-E7 的对照组因此必须区分两种「无消息缓冲」基线：完全无批量，
+E7（离线索引 harness） 的对照组因此必须区分两种「无消息缓冲」基线：完全无批量，
 以及有 checkpoint 批量但无格式级消息缓冲。两者混为一谈会让消息缓冲显得比实际更必要。
 
 机制是把小写变成 Bε-tree 的消息批量下刷，而不是原地改块，也不是关掉 COW。
 
-对 D10 的意义：btrfs 的 `nodatacow` 是「关掉 COW 换随机写性能，代价是同时丢校验和与快照一致性」，
+对 D10（随机写 / 碎片化的真答案） 的意义：btrfs 的 `nodatacow` 是「关掉 COW 换随机写性能，代价是同时丢校验和与快照一致性」，
 而这条路是「把随机写吸收进索引的消息层」，校验和与快照都不动。
-**这是 D10 目前唯一一条有实测数字支撑的候选方向。**
+**这是 D10（随机写 / 碎片化的真答案） 目前唯一一条有实测数字支撑的候选方向。**
 
 **另一条顺带核实到的事实**：BetrFS 的所有版本都用**两棵** Bε-tree——
 一棵放文件数据，一棵放文件系统元数据（论文 2.2 节原文：
 「All versions of BetrFS use two Bε-trees: one for file data and one for file system metadata」）。
-这与 D8「多个独立 keyspace」是同一个思路，只是数量少得多（bcachefs 是 28 棵）。
+这与 D8（核心索引结构）「多个独立 keyspace」是同一个思路，只是数量少得多（bcachefs 是 28 棵）。
 
-### 7.2 老化不是宿命，可以在结构层面设计掉（冲击 D3、D10）
+### 7.2 老化不是宿命，可以在结构层面设计掉（冲击 D3（空间分配）、D10（随机写 / 碎片化的真答案））
 
 FAST 2017「File Systems Fated for Senescence? Nonsense, Says Science!」用
 **连续 git checkout Linux 内核源码**把文件系统做老，测 btrfs / ext4 / F2FS / XFS / ZFS 与 BetrFS。
 结论：**老化后的 BetrFS 甚至胜过其余文件系统未老化时的表现（btrfs 除外）**。
 另一条被 FAST 2018 引作动机的数字：git 版本控制负载可把 ext4 的 scan 性能退化至多 **15 倍**。
 
-对本工程：D3 承诺常驻自动整理，理由是「不分类 → 碎片压力集中在一个分配器」。
+对本工程：D3（空间分配） 承诺常驻自动整理，理由是「不分类 → 碎片压力集中在一个分配器」。
 这条成果给出第二条路——**老化可以被索引结构本身吸收掉，不必全靠事后整理**。
-两条路各要多少代价可测，判据见 [experiments.md](experiments.md) E10。
+两条路各要多少代价可测，判据见 [experiments.md](experiments.md) E10（老化：结构抗老化 vs 事后整理）。
 
-### 7.3 索引结构：参数空间比「换一种树」大得多（冲击 D8）
+### 7.3 索引结构：参数空间比「换一种树」大得多（冲击 D8（核心索引结构））
 
 | 成果 | 结论 | 口径 |
 |---|---|---|
@@ -464,11 +464,11 @@ FAST 2017「File Systems Fated for Senescence? Nonsense, Says Science!」用
 | HashFS（FAST 2021「Rethinking File Mapping for Persistent Memory」） | 文件映射本身可占 IO 路径的 **70%**；哈希式映射相对「页缓存里的 extent 树」把 LevelDB 上的 YCSB 吞吐提高至多 45% | **持久内存场景**；本工程若不针对 PM 只作参考 |
 | TableFS（ATC 2013） | 元数据全部塞进 LSM（LevelDB），元数据密集负载相对 ext4 / XFS / btrfs 快 50%–1000% | FUSE 实现，作者自陈实现低效，即便如此仍赢 |
 
-对 D8 的意义：D8 已定「一套 btree 实现 + 多 keyspace + write buffer / key cache 两个前端」。
+对 D8（核心索引结构） 的意义：D8（核心索引结构） 已定「一套 btree 实现 + 多 keyspace + write buffer / key cache 两个前端」。
 这几条不否定该方向，但把**同一套结构内部的可调项**显著扩大了：
 Bε 缓冲比例、size-tiering、key-value 分离、过滤器类型——
 都是一套 btree 里的参数，不是「再加一种树」。
-这与 D8「不做异构结构」不冲突，反而是它的补充。
+这与 D8（核心索引结构）「不做异构结构」不冲突，反而是它的补充。
 
 ### 7.4 崩溃一致性验证：「没有 oracle」这条前提需要重估（冲击验证计划）
 
@@ -505,15 +505,15 @@ NoFS（FAST 2012，「Consistency Without Ordering」）走得更远：
 对本工程：`litmus/commit-publish.litmus` 钉住的是一次发布事件内部「先写块内容、再写超级块」这条序，
 不涉及发布频率。
 这两条成果说明该序有替代形态，代价各不相同。
-⚠️ **NoFS 的反向指针与 D1 的反向索引是两件不同的东西**：
-NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被谁引用」的可查询索引。
+⚠️ **NoFS 的反向指针与 D1（数据可移动性 / 反向索引） 的反向索引是两件不同的东西**：
+NoFS 的是「每块自证属于谁」的一个字段，D1（数据可移动性 / 反向索引） 的是「物理块被谁引用」的可查询索引。
 本工程「元数据块必须自描述」（`.claude/rules/fs-design.md`）已经接近 NoFS 那个字段。
 
-### 7.6 硬件接口：块接口不再是唯一的对接层（冲击 D2、D3、D8 节点大小）
+### 7.6 硬件接口：块接口不再是唯一的对接层（冲击 D2（RAID 条带策略）、D3（空间分配）、D8（核心索引结构） 节点大小）
 
 | 接口 | 状态 | 对本工程 |
 |---|---|---|
-| ZNS（Zoned Namespace） | 顺序写、由主机管 GC；因成本效率在规模部署中被采用 | zone 大小是 D8「按设备特性选节点大小」那条规则的输入 |
+| ZNS（Zoned Namespace） | 顺序写、由主机管 GC；因成本效率在规模部署中被采用 | zone 大小是 D8（核心索引结构）「按设备特性选节点大小」那条规则的输入 |
 | NVMe FDP（Flexible Data Placement） | 合并了 Google SmartFTL 与 Meta Direct Placement Mode 两个提案，填 ZNS 与普通 SSD 之间的成本收益空档。**不要求顺序写、向后兼容，应用不改也能跑** | 比 ZNS 更可能是本工程该对接的那一层：不强制顺序写，与 COW 的分配自由度不打架 |
 
 口径：NVM Express 与 SNIA 公开材料、2025 年 arXiv 论文，**未在本工程验证**。
@@ -528,10 +528,10 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 | Greg Kroah-Hartman 2026-07-15 表态：Rust 在内核已不是实验，是永久组成部分；图形子系统今后只接受 Rust 写的新驱动 | 二手报道，**未核对原始邮件** |
 | Rust binder 驱动进 Linux 6.18；PuzzleFS 列在 Rust for Linux 项目清单内 | 二手报道 |
 
-对 D7（不进主线）：Bento 的在线升级能力值得注意——它把「文件系统要不要在内核里」
+对 D7（是否进 Linux 主线）已定的不进主线：Bento 的在线升级能力值得注意——它把「文件系统要不要在内核里」
 从二选一变成了三选一（用户态 / 内核 C 模块 / 可热替换的内核 Rust 模块）。
 
-### 7.8 bcachefs 现状更新（加强 D7 的依据，不改结论）
+### 7.8 bcachefs 现状更新（加强 D7（是否进 Linux 主线） 的依据，不改结论）
 
 | 事实 | 日期 |
 |---|---|
@@ -539,7 +539,7 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 | 改为 DKMS 模块分发，形态与 OpenZFS on Linux 相同；开发者改向独立邮件列表投 patch | 同期 |
 | bcachefs-tools v1.38.6 **去掉 experimental 标签** | 2026-06-17 |
 
-对 D7：这条把依据从「bcachefs 被移出主线是社交失败不是技术失败」
+对 D7（是否进 Linux 主线）已定的不进主线：这条把依据从「bcachefs 被移出主线是社交失败不是技术失败」
 加强为「**移出主线之后项目仍在正常演进，并且在这之后才去掉实验标签**」——
 主线之外是一条可行的分发路径，不只是失败后的退路。
 
@@ -547,16 +547,16 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 
 | 事实 | 原文 / 口径 | 对本工程 |
 |---|---|---|
-| **bucket gen 的适用范围限定为缓存数据** | §1.5：「we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number」 | [decisions.md](decisions.md) D1：它只管失效不管搬运 |
-| **gen 绕回机制已被反向索引取代** | 状态清单 `need_gc_gens`：「Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**」 | 与 D1 已选的「反向索引 day-1」同向 |
-| **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
-| **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9 的方向；但注意本工程 D9 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
-| ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9 与 D10 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10 的任何候选都不许走原地覆盖写这条路 |
-| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9 未定项 5 那条推理的前提之一 |
+| **bucket gen 的适用范围限定为缓存数据** | §1.5：「we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number」 | [decisions.md](decisions.md) D1（数据可移动性 / 反向索引）：它只管失效不管搬运 |
+| **gen 绕回机制已被反向索引取代** | 状态清单 `need_gc_gens`：「Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**」 | 与 D1（数据可移动性 / 反向索引） 已选的「反向索引 day-1」同向 |
+| **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3（空间分配） 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
+| **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9（加密） 的方向；但注意本工程 D9（加密） 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
+| ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9（加密） 与 D10（随机写 / 碎片化的真答案） 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10（随机写 / 碎片化的真答案） 的任何候选都不许走原地覆盖写这条路 |
+| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9（加密） 未定项 5 那条推理的前提之一 |
 
 **未找到的（明说，不补）**：没有任何一手材料用散文明说
 「copygc / rebalance / scrub / fsck 在无密钥时不能跑」。
-「无密钥后台整理瘫痪」是从上面几条推出来的，**是推论不是引文**，见 decisions.md D9。
+「无密钥后台整理瘫痪」是从上面几条推出来的，**是推论不是引文**，见 decisions.md D9（加密）。
 
 来源：[bcachefs Principles of Operation (PDF)](https://bcachefs.org/bcachefs-principles-of-operation.pdf)、
 [bcachefs.org/Encryption](https://bcachefs.org/Encryption/)、
@@ -570,7 +570,7 @@ NoFS 的是「每块自证属于谁」的一个字段，D1 的是「物理块被
 **这一节记的是一个已经发生的失效，不是推测。**
 
 bcachefs 的 `bch2_check_allocations()` 用全量遍历重建记账、再与运行时计数器 `memcmp` 比对——
-**形态与本工程 [invariants.md](invariants.md) 的 I-3.1 相同**。但两侧共用同一段加减代码：
+**形态与本工程 [invariants.md](invariants.md) 的 I-3.1（已分配统计对得上） 相同**。但两侧共用同一段加减代码：
 
 ```c
 this_cpu_add(e->v[gc][i], a.v->d[i]);        // fs/bcachefs/disk_accounting.h:208
@@ -587,7 +587,7 @@ if we run it multiple times」——**重建侧本身就是一串 `+=`**。
 
 **对本工程**：`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 写着「校验的两条路径不共享
 同一段代码、同一次采样、同一个工具」。这一节是那条规则在真实系统里**已经被违反并产生盲区**的实例。
-处置见 [checks-owed.md](checks-owed.md) C12。
+处置见 [checks-owed.md](checks-owed.md) C12（增量语义共用）。
 
 **顺带记下的记账形态事实**（同批核实）：accounting 树在 `bcachefs_format.h:1415` 被
 **格式级**绑定 `BTREE_IS_write_buffer`；`disk_accounting_format.h` 原文
@@ -629,7 +629,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 
 ### 2026-08-29
 - 新增 6.5 / 6.6 / 6.7（卷身份的分层、明文水位字段的回滚先例、AEAD tag 可截断），
-  三节均为本机内核树逐行现查，用于 D9 未定项 8 定案。
+  三节均为本机内核树逐行现查，用于 D9（加密） 未定项 8 定案。
 - **更正一处转述**：本仓草稿曾把 fscrypt 说成「每次挂载换新盐」。
   **曾经**：per-mount fresh salt；**现在**：每文件 nonce 在建 inode 时取一次并持久化；
   **依据**：`fs/crypto/keysetup.c:762` 与 `fs/crypto/fscrypt_private.h:78` 逐行现查。
@@ -669,12 +669,12 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
   「at most proportional to the height of the tree」。旧写法把 BetrFS 0.3 的状态当成了现状。
 
 ### 2026-08-26（其二）
-- 补第六节：D9 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
+- 补第六节：D9（加密） 加密专项调查。读了 bcachefs Encryption 设计文档与 OpenZFS
   `zio_crypt.c` 设计注释原文，记下三种加密边界的取舍、ZFS 与 bcachefs 在
   「无 key 能否维护」上的分岔、nonce 被迫进格式的那个字段，以及四条公开的坑。
 
 ### 2026-08-26
-- 补第五节：D8 索引结构专项调查。读了 bcachefs Principles of Operation
+- 补第五节：D8（核心索引结构） 索引结构专项调查。读了 bcachefs Principles of Operation
   Rev 1.39.2（2026-08-25）原文，含 28 棵树的清单、write buffer 的代价、
   日志结构节点的三条性质、bucket 分配器的演进；另加 XFS rmapbt 成本量级
   与 BetrFS 的改名教训。

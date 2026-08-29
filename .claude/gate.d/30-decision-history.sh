@@ -14,28 +14,29 @@
 # ⚠️ 判据是「有没有新增条目」，不判「条目写得对不对」——后者只有人能判。
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
-KB=.claude/kb/decisions.md
+KB=".claude/kb/decisions.md .claude/kb/decisions"
+HIST=.claude/kb/decisions-history.md
 bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
 
 if git diff --quiet HEAD -- "$KB" 2>/dev/null; then
-  ok "decisions.md 与 HEAD 无差异，本阶段无对象可判"
+  ok "决策正文与 HEAD 无差异，本阶段无对象可判"
   exit 0
 fi
 
 added=$(git diff HEAD -- "$KB" | grep -c '^+### 2026-' || true)
 changed=$(git diff HEAD --numstat -- "$KB" | awk '{print $1+$2}')
 if [[ "$added" -gt 0 ]]; then
-  ok "decisions.md 改了 $changed 行，新增 $added 条历史版本条目"
+  ok "决策正文改了 $changed 行，新增 $added 条历史版本条目"
   exit 0
 fi
 if [[ "${changed:-0}" -le 4 ]]; then
-  ok "decisions.md 只改了 $changed 行，按小改动放行"
+  ok "决策正文只改了 $changed 行，按小改动放行"
   exit 0
 fi
 
-bad "decisions.md 改了 $changed 行，却没有新增任何历史版本条目"
+bad "决策正文改了 $changed 行，却没有新增任何历史版本条目"
 howto "若这次改动推翻或定下了任何结论，在文末「## 历史版本」加一条："
 howto "  ### $(date +%F)  —— 曾经 X / 现在 Y / 依据 Z"
 howto "纯排版改动可以拆成单独一个提交，那时这一项就无对象可判了。"

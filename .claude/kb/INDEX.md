@@ -4,10 +4,19 @@
 
 | 文件 | 内容 |
 |---|---|
-| [decisions.md](decisions.md) | 设计决策记录：定了什么、为什么、还没定什么 |
+| [decisions.md](decisions.md) | 决策索引：编号、简称、状态、指向正文的链接 |
+| [decisions/](decisions/) | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
+| [decisions-history.md](decisions-history.md) | 全部决策的变更史 |
 | [invariants.md](invariants.md) | 不变量清单。checker 是它的可执行形式 |
 | [prior-art.md](prior-art.md) | 他家方案调研，含来源与口径 |
 | [pitfalls.md](pitfalls.md) | 避坑清单。每做一个设计决定回来对一遍 |
 | [experiments.md](experiments.md) | 待做实验：测什么、判据、怎样算失败 |
 | [checks-owed.md](checks-owed.md) | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
+
+## 不是编号的记号
+
+`doc-lint:not-numbers` 那一行里的记号与编号同形（大写字母 + 数字），
+但它们是领域术语，不是本工程的编号，所以不要求带简称。新增同类术语加进那一行，别改门禁。
+
+<!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC32C RAID5 RAID6 OCFS2 Z3 T10 -->
