@@ -395,6 +395,25 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+
+    /// **口径由检查钉住，不靠运气。**
+    ///
+    /// kb 引用 E7（离线索引 harness） 时带的口径逐字是「树只有 1057 个节点、缓存住 6%」，
+    /// 而那两个数是 `FANOUT` / `N_LEAF` / `DEFAULT_CACHE_PAGES` 算出来的。
+    /// ⚠️ 改掉任一个常量，此前三条单测**全绿**（2026-08-29 变异测试实测三条全是盲区），
+    /// 而归档里的数字会变、kb 里那句口径会静默失效。
+    #[test]
+    fn the_geometry_quoted_in_the_kb_is_pinned() {
+        let total_nodes = 1 + FANOUT + N_LEAF;
+        assert_eq!(total_nodes, 1057, "kb 引的是 1057 个节点");
+        assert_eq!(N_LEAF, FANOUT * FANOUT, "N_LEAF 该恰好是 FANOUT 的平方");
+        let ratio = DEFAULT_CACHE_PAGES as f64 / total_nodes as f64;
+        assert!(
+            (0.055..0.065).contains(&ratio),
+            "kb 引的是「缓存住 6%」，实算 {:.4}",
+            ratio
+        );
+    }
     use super::*;
 
     /// **页号分配不许重叠。** 根 / 内部节点 / 叶各占一段，重叠的话

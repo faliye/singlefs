@@ -1,0 +1,42 @@
+E7RESULT name=config note=定长环+断号即止+jsn重用 slots=64 settled=20
+E7RESULT name=cell arm=resume_at_prefix stale_left=1 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=1 lost_new=0 second_prefix=22
+E7RESULT name=cell arm=resume_at_prefix stale_left=1 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=resume_at_prefix stale_left=1 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=resume_at_prefix stale_left=3 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=3 lost_new=0 second_prefix=24
+E7RESULT name=cell arm=resume_at_prefix stale_left=3 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=1 lost_new=0 second_prefix=24
+E7RESULT name=cell arm=resume_at_prefix stale_left=3 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=resume_at_prefix stale_left=7 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=7 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=resume_at_prefix stale_left=7 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=5 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=resume_at_prefix stale_left=7 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=skip_hole stale_left=1 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=1 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=1 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=3 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=1 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=8 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=3 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=1 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=3 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=3 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=3 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=8 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=7 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=1 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=7 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=3 second_prefix=20
+E7RESULT name=cell arm=skip_hole stale_left=7 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=8 second_prefix=20
+E7RESULT name=cell arm=back_chain stale_left=1 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=back_chain stale_left=1 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=back_chain stale_left=1 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=back_chain stale_left=3 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=back_chain stale_left=3 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=back_chain stale_left=3 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=back_chain stale_left=7 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=back_chain stale_left=7 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=back_chain stale_left=7 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=erase_then_resume stale_left=1 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=erase_then_resume stale_left=1 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=erase_then_resume stale_left=1 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=erase_then_resume stale_left=3 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=erase_then_resume stale_left=3 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=erase_then_resume stale_left=3 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=cell arm=erase_then_resume stale_left=7 new_after=1 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=21
+E7RESULT name=cell arm=erase_then_resume stale_left=7 new_after=3 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=cell arm=erase_then_resume stale_left=7 new_after=8 first_prefix=20 hole_stopped=true stale_replayed=0 lost_new=0 second_prefix=28
+E7RESULT name=nohole arm=resume_at_prefix first_prefix=20 stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=nohole arm=skip_hole first_prefix=20 stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=nohole arm=back_chain first_prefix=20 stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=nohole arm=erase_then_resume first_prefix=20 stale_replayed=0 lost_new=0 second_prefix=23
+E7RESULT name=done emitted=42

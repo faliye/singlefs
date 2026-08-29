@@ -1,0 +1,9 @@
+Question 1. Yes. A 256 byte slot within a 512 byte atomicity unit means two slots share one unit. Writing one slot requires modifying the entire unit. A power loss during this write could corrupt both slots because the device performs atomic writes at the unit size, so partial writes leave the entire unit in an inconsistent state.
+
+Question 2. Yes. If the entire 2048 byte ring fits within a single minimum_io_size unit (e.g., 64 KiB), writing any part of the ring requires writing the full unit. A power loss during such a write could corrupt the entire unit, destroying all slots in the ring and defeating the redundancy purpose.
+
+Question 3. A device with minimum_io_size of 256 bytes would not violate the rules. Each 256 byte slot fits exactly within one minimum_io_size unit, so no sharing occurs. Writing a single slot uses one unit without affecting others.
+
+Question 4. Slot width must equal or exceed the minimum_io_size, and slots must be spaced such that each slot resides entirely within its own minimum_io_size unit with no overlap between slots.
+
+The assumption in Fact 2 is wrong. Atomicity width for writes should be based on minimum_io_size, not physical_block_size. Fact 5 states minimum_io_size is the relevant granularity for I/O operations, and physical_block_size may differ (e.g., devices with 512 byte physical_block_size but 4096 byte minimum_io_size). Fact 2 incorrectly ties atomicity to physical_block_size when Rule A and device behavior depend on minimum_io_size.

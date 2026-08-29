@@ -1,0 +1,15 @@
+Question 1a: No, there is no way to support multiple writable heads without adding a snapshot dimension to the key. The key (locality id, inode, offset) cannot distinguish between versions from different heads for the same inode and offset, leading to collisions.
+
+Question 1b: There is no counterexample. Sharing the same key slot for the same (inode, offset) from different writable heads would cause one version to overwrite the other, resulting in data loss.
+
+Question 2a: Yes, mutual exclusion is real. The sort order of the key must be fixed, and placing the snapshot identifier at the highest or lowest sort weight are incompatible positions in the key structure.
+
+Question 2b: Use an auxiliary structure that maps each snapshot ID to the keys belonging to it. For snapshot deletion, query this structure to retrieve the keys and delete them, which provides efficient deletion without requiring contiguous ranges.
+
+Question 3a: Use a sequence number field that includes a generation counter. This allows records from different journal instances to have distinct high bits, preventing stale records from being accepted during recovery.
+
+Question 3b: Tail advancement does not remove leftover records from consideration if they have sequence numbers greater than or equal to the new tail position. It only removes records before the tail, but leftover records from discarded timelines often have higher sequence numbers and remain in the tail-to-head range.
+
+Question 3c: No. Idempotent replay means applying the same record multiple times has no effect, but a discarded timeline record may contain different data for the same operation. Applying it would write incorrect data.
+
+The statement "recovery scans the whole ring" in CLAIM THREE is unverified. In practice, journal recovery scans only from the tail to the head, not the entire ring, to avoid obsolete records.

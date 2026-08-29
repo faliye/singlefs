@@ -31,10 +31,11 @@ struct SelfDesc { obj: u64, tree: u64, gen: u64 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Kind { Meta, Data }
 
+/// 单元。⚠️ **这里不再存 `kind`**：单元是元数据还是数据这件事只在 `build` 返回的
+/// 那张分类表里记一份——存两份会漂移，而扫描重建只看得到 `desc`。
 #[derive(Clone)]
 struct Unit {
     pba: u64,                 // 物理地址
-    kind: Kind,
     /// 自描述头。**数据块今天是 None**——那正是 D20 点名的承重面上的洞。
     desc: Option<SelfDesc>,
 }
@@ -42,23 +43,32 @@ struct Unit {
 /// 明文映射层：逻辑身份 → 物理地址。
 type Map = BTreeMap<(u64, u64, u64), u64>;
 
-fn build(n_meta: u64, n_data: u64, data_self_desc: bool) -> (Vec<Unit>, Map) {
+/// 返回 `(单元表, 明文映射, 每个 key 是元数据还是数据)`。
+///
+/// ⚠️ **第三项不是冗余**：缺自描述的数据块在重建表里根本不出现，
+/// 所以「缺的那一条是元数据还是数据」只能从这里查。
+/// 曾经靠 `对象号 >= 10_000` 这个约定去分类，而 `Unit.kind` 同时也记着同一件事，
+/// 编译器为此一直报 `kind` 从没被读过——**两份表示会漂移**，现在只留一份。
+fn build(n_meta: u64, n_data: u64, data_self_desc: bool) -> (Vec<Unit>, Map, BTreeMap<(u64, u64, u64), Kind>) {
     let mut units = Vec::new();
     let mut map = Map::new();
+    let mut kinds: BTreeMap<(u64, u64, u64), Kind> = BTreeMap::new();
     let mut pba = 1000u64;
     for i in 0..n_meta {
         let d = SelfDesc { obj: i, tree: i % 4, gen: 1 };
-        units.push(Unit { pba, kind: Kind::Meta, desc: Some(d) });
+        units.push(Unit { pba, desc: Some(d) });
         map.insert((d.tree, d.obj, d.gen), pba);
+        kinds.insert((d.tree, d.obj, d.gen), Kind::Meta);
         pba += 1;
     }
     for i in 0..n_data {
         let d = SelfDesc { obj: 10_000 + i, tree: i % 4, gen: 1 };
-        units.push(Unit { pba, kind: Kind::Data, desc: if data_self_desc { Some(d) } else { None } });
+        units.push(Unit { pba, desc: if data_self_desc { Some(d) } else { None } });
         map.insert((d.tree, d.obj, d.gen), pba);
+        kinds.insert((d.tree, d.obj, d.gen), Kind::Data);
         pba += 1;
     }
-    (units, map)
+    (units, map, kinds)
 }
 
 /// 只扫单元头重建映射。**没有自描述头的单元贡献不了任何条目。**
@@ -90,7 +100,7 @@ fn measure(n_meta: u64, n_data: u64, data_self_desc: bool) -> Out {
 /// 搬运正是本工程要支持的事（D1），所以「重建出的地址跟着搬」是**正确行为**；
 /// 本参数用来喂那条「判据必须逐条比地址、不能只比条数」的测试。
 fn measure_with_moved(n_meta: u64, n_data: u64, data_self_desc: bool, moved: usize) -> Out {
-    let (mut units, orig) = build(n_meta, n_data, data_self_desc);
+    let (mut units, orig, kinds) = build(n_meta, n_data, data_self_desc);
     for u in units.iter_mut().take(moved) { u.pba += 999_000; }
     let re = rebuild(&units);
     let mut o = Out { total: orig.len() as u64, rebuilt: re.len() as u64, ..Default::default() };
@@ -98,7 +108,12 @@ fn measure_with_moved(n_meta: u64, n_data: u64, data_self_desc: bool, moved: usi
         match re.get(k) {
             None => {
                 o.missing += 1;
-                if k.1 >= 10_000 { o.missing_data += 1 } else { o.missing_meta += 1 }
+                match kinds.get(k) {
+                    // 没有 `_ =>` —— 新增单元类不补这里就编译不过
+                    Some(Kind::Data) => o.missing_data += 1,
+                    Some(Kind::Meta) => o.missing_meta += 1,
+                    None => unreachable!("原表里的 key 必须有单元类"),
+                }
             }
             Some(p) if p != v => o.wrong += 1,
             _ => {}

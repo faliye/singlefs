@@ -8,6 +8,36 @@
 # （singlefs-ai-sop/rules/command-safety.md「脚本改文件之后要回读确认」）。
 set -uo pipefail
 BIN="$1"; SRC="$2"; TABLE="$3"
+
+# ⚠️ **先确认「改的文件」与「跑的二进制」对得上。**
+# 不确认的话，变异会改 X 而跑 Y 的测试：一条真能被抓的破坏被报成盲区
+# （2026-08-29 实测踩过：`e7_index.rs` 配上 crate 主二进制的名字，
+# 三条变异全被误报成盲区，换对名字后三条全被抓）。
+# 反方向更坏：Y 的测试恰好因别的原因红了，会被记成「变异被抓」。
+_manifest="$(dirname "$SRC")/../../Cargo.toml"
+[[ -f "$_manifest" ]] || _manifest="e7-index-bench/Cargo.toml"
+_declared="$(awk -v src="$SRC" '
+  /^\[\[bin\]\]/ { name=""; path=""; next }
+  /^name *=/ { gsub(/.*= *"|"/,""); name=$0; next }
+  /^path *=/ { gsub(/.*= *"|"/,""); path=$0;
+               if (src ~ path"$") print name; next }
+' "$_manifest" 2>/dev/null | head -1)"
+if [[ -n "$_declared" ]]; then
+  if [[ "$_declared" != "$BIN" ]]; then
+    echo "mutate: 源文件 $SRC 在 Cargo.toml 里声明的二进制是 '$_declared'，不是 '$BIN'" >&2
+    echo "        改的文件与跑的测试对不上，整份证明作废。用： mutate.sh $_declared $SRC $TABLE" >&2
+    exit 6
+  fi
+else
+  # 没有显式 [[bin]] ⇒ cargo 自动发现，名字就是文件名去掉扩展名
+  _stem="$(basename "$SRC" .rs)"
+  if [[ "$_stem" != "$BIN" ]]; then
+    echo "mutate: $SRC 没有显式 [[bin]]，自动发现的名字是 '$_stem'，不是 '$BIN'" >&2
+    echo "        改的文件与跑的测试对不上，整份证明作废。用： mutate.sh $_stem $SRC $TABLE" >&2
+    exit 6
+  fi
+fi
+
 BAK="$(mktemp)"; cp "$SRC" "$BAK"
 restore() { cp "$BAK" "$SRC"; }
 trap restore EXIT

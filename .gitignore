@@ -9,3 +9,8 @@ target/
 # 因为决策正文把它们当依据引用——只在一台机器上的证据对第二个人不是证据。
 # 只有构建产物除外，它由上面那条 `target/` 兜住（research/target 有 315 MB）。
 /research/target/
+
+.env
+
+# 本机个人权限规则（含本机路径），不进仓
+.claude/settings.local.json

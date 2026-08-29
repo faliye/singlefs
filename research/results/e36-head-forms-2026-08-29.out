@@ -1,0 +1,5 @@
+E7RESULT name=config heads=2 pt_len=64 aead=chacha20poly1305 note=多可写头两种形态
+E7RESULT name=arm arm=key3_derived keystream_reuse_pairs=1 xor_identity_holds=1 own_reads_ok=1 ranges_to_drop_a_head=0 key_compare_fields=3 pass=false
+E7RESULT name=arm arm=key4_derived keystream_reuse_pairs=0 xor_identity_holds=0 own_reads_ok=2 ranges_to_drop_a_head=1 key_compare_fields=4 pass=true
+E7RESULT name=arm arm=clone_per_head keystream_reuse_pairs=0 xor_identity_holds=0 own_reads_ok=2 ranges_to_drop_a_head=1 key_compare_fields=3 pass=true
+E7RESULT name=done emitted=5

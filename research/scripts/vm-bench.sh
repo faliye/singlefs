@@ -27,6 +27,10 @@ find_kernel() {
   return 1
 }
 
+# 工作目录登记簿。**必须在 run_one 之前声明**：run_one 在命令替换（子 shell）里跑，
+# 它只能继承已经存在的变量，且它对变量的赋值传不回来——所以走文件，不走变量。
+VM_WORKLIST="${VM_WORKLIST:-}"
+
 # 跑一次。stdout 回显退出码；控制台日志路径留在 VM_LOG。
 run_one() {
   local bin="$1"; shift
@@ -90,13 +94,43 @@ INIT
   # 子 shell 里的变量赋值传不回父进程——日志路径必须落文件传出去，
   # 否则父进程抓不到 E7RESULT，结果会静默变成「零条」。
   printf '%s' "$logf" > "$VM_LOGPTR"
+  # **每次都登记工作目录**——`--selftest` 会连跑三次，只记最后一次会漏掉前两个
+  # （2026-08-29 实测：修了「只删最后一个」之后仍剩 2 个）。追加写，父进程在 EXIT 里逐个删。
+  printf '%s\n' "$work" >> "$VM_WORKLIST"
   local rc; rc="$(sed -n 's/.*SINGLEFS_EXIT=\([0-9]\+\).*/\1/p' "$logf" | tail -1)"
   [[ -n "$rc" ]] && { printf '%s' "$rc"; return 0; }
   return 1
 }
 
 VM_LOGPTR="$(mktemp "${TMPDIR:-/tmp}/singlefs-vmlog.XXXXXX")"
-trap 'rm -f "$VM_LOGPTR"' EXIT
+VM_WORKLIST="$(mktemp "${TMPDIR:-/tmp}/singlefs-vmwork.XXXXXX")"
+
+# ⚠️ **工作目录必须收掉。** `run_one` 在命令替换里跑（子 shell），
+# 它 `mktemp -d` 出来的路径传不回父进程——正是
+# `.claude/singlefs-ai-sop/rules/command-safety.md`「子 shell 里的赋值传不回父进程」那一条。
+# 实测后果：2026-08-29 清出 **154 个残留目录、4.5 GB**。
+# 修法沿用本脚本已有的指针文件模式：日志路径在 `$VM_LOGPTR` 里，工作目录是它的父目录。
+# 只删名字对得上 `singlefs-vmbench.*` 的那一个，删错目录的风险按模式挡住。
+# `VM_KEEP=1` 时保留，供失败后翻现场。
+cleanup_work() {
+  if [[ "${VM_KEEP:-0}" == "1" ]]; then
+    [[ -s "$VM_WORKLIST" ]] && { printf '  ! 工作目录保留：\n'; sed 's/^/      /' "$VM_WORKLIST"; }
+    rm -f "$VM_LOGPTR" "$VM_WORKLIST"; return
+  fi
+  if [[ -s "$VM_WORKLIST" ]]; then
+    local d
+    while IFS= read -r d; do
+      [[ -n "$d" ]] || continue
+      # 只删名字对得上的那些，删错目录的风险按模式挡住
+      case "$d" in
+        */singlefs-vmbench.*) rm -rf "$d" ;;
+        *) printf '  ! 工作目录名字不符合预期，未删：%s\n' "$d" >&2 ;;
+      esac
+    done < "$VM_WORKLIST"
+  fi
+  rm -f "$VM_LOGPTR" "$VM_WORKLIST"
+}
+trap cleanup_work EXIT
 
 say ""; say "══ 虚机 benchmark harness ══"
 command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失"

@@ -46,6 +46,9 @@ struct Snap {
     parent: Option<u64>,
     txg: u64,
     /// 本快照**新建**的 extent（归属原创建者用得着）
+    /// 本快照自己创建的 extent。**「归属原创建者」这件事只在这里记一份**——
+    /// 曾经在 `Extent` 里另存过一个 `creator`，两份表示会漂移而 `owner_ref` 臂只读这一份，
+    /// 编译器为此一直报 `creator` 从没被读过。⇒ 删掉那一份，不加检查去追漂移。
     created: Vec<u64>,
     live: bool,
 }
@@ -54,7 +57,6 @@ struct Snap {
 struct Extent {
     id: u64,
     birth_txg: u64,
-    creator: u64,
     /// 引用它的快照集合。**真值靠它算，臂不许直接读它去省查找**。
     refs: BTreeSet<u64>,
 }
@@ -191,7 +193,7 @@ fn build(topo: Topo, n_snaps: u64, exts_per_snap: u64, share_pct: u64, seed: u64
         for _ in 0..exts_per_snap {
             let id = next_ext; next_ext += 1;
             let mut refs = BTreeSet::new(); refs.insert(i);
-            exts.insert(id, Extent { id, birth_txg: i, creator: i, refs });
+            exts.insert(id, Extent { id, birth_txg: i, refs });
             created.push(id);
         }
         // 共享：本快照按比例也引用祖先的 extent

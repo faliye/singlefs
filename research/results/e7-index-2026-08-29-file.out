@@ -1,0 +1,45 @@
+# seed=1
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=1 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187458 writes=200000 io=387458 io_per_op=1.937290 bytes_per_op=7935.1 elapsed_ns=14416542571 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24889 reads_per_query=1.2445 elapsed_ns=1496401618 blk_r=NA blk_w=NA probe_reads=24889
+E7RESULT name=update arm=logstruct_wb reads=157336 writes=157336 io=314672 io_per_op=1.573360 bytes_per_op=6444.5 elapsed_ns=13293946451 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24889 reads_per_query=1.2445 elapsed_ns=1495498971 blk_r=NA blk_w=NA probe_reads=24889
+E7RESULT name=update arm=betree reads=48551 writes=49290 io=97841 io_per_op=0.489205 bytes_per_op=2003.8 elapsed_ns=3440990845 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23747 reads_per_query=1.1873 elapsed_ns=1423615892 blk_r=NA blk_w=NA probe_reads=23747
+E7RESULT name=done emitted=8
+# seed=2
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=2 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187490 writes=200000 io=387490 io_per_op=1.937450 bytes_per_op=7935.8 elapsed_ns=14425674459 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24899 reads_per_query=1.2450 elapsed_ns=1495227138 blk_r=NA blk_w=NA probe_reads=24899
+E7RESULT name=update arm=logstruct_wb reads=157434 writes=157434 io=314868 io_per_op=1.574340 bytes_per_op=6448.5 elapsed_ns=13325486390 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24899 reads_per_query=1.2450 elapsed_ns=1503757133 blk_r=NA blk_w=NA probe_reads=24899
+E7RESULT name=update arm=betree reads=49006 writes=49720 io=98726 io_per_op=0.493630 bytes_per_op=2021.9 elapsed_ns=3460774418 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23605 reads_per_query=1.1803 elapsed_ns=1416229510 blk_r=NA blk_w=NA probe_reads=23605
+E7RESULT name=done emitted=8
+# seed=3
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=3 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187452 writes=200000 io=387452 io_per_op=1.937260 bytes_per_op=7935.0 elapsed_ns=14412410803 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24776 reads_per_query=1.2388 elapsed_ns=1490507216 blk_r=NA blk_w=NA probe_reads=24776
+E7RESULT name=update arm=logstruct_wb reads=157373 writes=157373 io=314746 io_per_op=1.573730 bytes_per_op=6446.0 elapsed_ns=13327252527 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24776 reads_per_query=1.2388 elapsed_ns=1488190536 blk_r=NA blk_w=NA probe_reads=24776
+E7RESULT name=update arm=betree reads=48838 writes=49431 io=98269 io_per_op=0.491345 bytes_per_op=2012.5 elapsed_ns=3452152771 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23578 reads_per_query=1.1789 elapsed_ns=1422533823 blk_r=NA blk_w=NA probe_reads=23578
+E7RESULT name=done emitted=8
+# seed=4
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=4 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187575 writes=200000 io=387575 io_per_op=1.937875 bytes_per_op=7937.5 elapsed_ns=14432028608 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24734 reads_per_query=1.2367 elapsed_ns=1491253029 blk_r=NA blk_w=NA probe_reads=24734
+E7RESULT name=update arm=logstruct_wb reads=157373 writes=157373 io=314746 io_per_op=1.573730 bytes_per_op=6446.0 elapsed_ns=13330907711 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24734 reads_per_query=1.2367 elapsed_ns=1478784250 blk_r=NA blk_w=NA probe_reads=24734
+E7RESULT name=update arm=betree reads=48507 writes=49231 io=97738 io_per_op=0.488690 bytes_per_op=2001.7 elapsed_ns=3409049237 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23702 reads_per_query=1.1851 elapsed_ns=1421884010 blk_r=NA blk_w=NA probe_reads=23702
+E7RESULT name=done emitted=8
+# seed=5
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=5 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187231 writes=200000 io=387231 io_per_op=1.936155 bytes_per_op=7930.5 elapsed_ns=14383883838 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24981 reads_per_query=1.2490 elapsed_ns=1512686661 blk_r=NA blk_w=NA probe_reads=24981
+E7RESULT name=update arm=logstruct_wb reads=157109 writes=157109 io=314218 io_per_op=1.571090 bytes_per_op=6435.2 elapsed_ns=13339478095 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24981 reads_per_query=1.2490 elapsed_ns=1512585055 blk_r=NA blk_w=NA probe_reads=24981
+E7RESULT name=update arm=betree reads=48998 writes=49730 io=98728 io_per_op=0.493640 bytes_per_op=2021.9 elapsed_ns=3467733586 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23873 reads_per_query=1.1937 elapsed_ns=1436908017 blk_r=NA blk_w=NA probe_reads=23873
+E7RESULT name=done emitted=8

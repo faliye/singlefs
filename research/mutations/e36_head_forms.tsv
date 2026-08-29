@@ -1,0 +1,6 @@
+M1_快照维不进身份	            snapshot: if arm.key_has_snapshot() { head } else { 0 },	            snapshot: 0,
+M2_每头一树被取消	            tree: if arm.tree_per_head() { 100 + head as u64 } else { 100 },	            tree: 100,
+M3_现算nonce不看树	    mix(id.tree);	    mix(0u64);
+M4_复用判定漏掉明文不同	if nonces[i].0 == nonces[j].0 && nonces[i].1 != nonces[j].1 {	if false && nonces[i].0 == nonces[j].0 {
+M5_异或恒等式恒真	            if xor(&nonces[i].2, &nonces[j].2) == xor(&nonces[i].1, &nonces[j].1) {	            if true {
+M6_自读计数不比内容	            if open(&id, 1, ct, tag).as_deref() == Some(want.as_slice()) {	            if open(&id, 1, ct, tag).is_some() {

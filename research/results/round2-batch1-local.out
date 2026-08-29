@@ -1,0 +1,15 @@
+For CLAIM ONE question 1a: No concrete layout satisfies all statements. The location segment cannot be read without the key if the parent index node payload is fully encrypted, but the invariant requires checking without the key. The statement "every index node payload is encrypted" must be false or the checksum must not be part of the encrypted payload.
+
+For CLAIM ONE question 1b: The reasoning breaks down if the parent index node has an unencrypted header where the pointer is stored, so the location segment is in plaintext and readable without the key. However, the design states "every index node payload is encrypted," which is ambiguous about whether the header is included.
+
+For CLAIM TWO question 2a: The phase counting is incorrect. In a checkpoint cycle, the root ring rule never holds strictly more blocks than the replay window rule. For any fsync i after checkpoint, root ring holds min(i, K) * 8 blocks and replay window holds i * 8 blocks. Thus, for i <= K, both hold equal blocks, and for i > K, replay window holds more blocks.
+
+For CLAIM TWO question 2b: A concrete counterexample: with checkpoint every 1000 fsyncs and 8 blocks freed per fsync, lowering K from 100 to 2 frees no useful space because blocks held by root ring rule are also held by replay window rule until checkpoint. For instance, blocks freed at fsync 1 remain held by replay window until next checkpoint regardless of K.
+
+For CLAIM TWO question 2c: No, there is no mechanism for the journal tail to advance without a checkpoint completing. The design states journal tail advances only after checkpoint is durable, meaning checkpoint must complete successfully.
+
+Final list of wrong or unverified statements: 
+- The statement "every index node payload is encrypted" for CLAIM ONE is unverified and likely incorrect if it includes the header, as it conflicts with the checksum being plaintext and readable without key.
+- For CLAIM TWO, the claim that lowering K frees useful space when disk is nearly full is wrong because replay window rule holds all freed blocks until checkpoint.
+- The model's "replay window rule holding about 4004 blocks" is incorrect; it should hold 8000 blocks for 1000 fsyncs with 8 blocks freed per fsync.
+- The phase counting in CLAIM TWO for root ring holding more blocks than replay window is impossible as shown in question 2a.

@@ -1,0 +1,14 @@
+E7RESULT name=config slots=64 settled=20 epoch_bits=16 counter_bits=48 note=日志实例代号
+E7RESULT name=cell arm=baseline stale=3 new_after=1 first_prefix=20 stale_replayed=3 lost_new=0 pass=false
+E7RESULT name=cell arm=baseline stale=3 new_after=3 first_prefix=20 stale_replayed=1 lost_new=0 pass=false
+E7RESULT name=cell arm=baseline stale=7 new_after=1 first_prefix=20 stale_replayed=7 lost_new=0 pass=false
+E7RESULT name=cell arm=epoch stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 pass=false
+E7RESULT name=cell arm=epoch stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=3 pass=false
+E7RESULT name=cell arm=epoch stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 pass=false
+E7RESULT name=cell arm=epoch_rolled_back stale=3 new_after=1 first_prefix=20 stale_replayed=3 lost_new=0 pass=false
+E7RESULT name=cell arm=epoch_rolled_back stale=3 new_after=3 first_prefix=20 stale_replayed=1 lost_new=0 pass=false
+E7RESULT name=cell arm=epoch_rolled_back stale=7 new_after=1 first_prefix=20 stale_replayed=7 lost_new=0 pass=false
+E7RESULT name=cell arm=epoch_aware_recovery stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 pass=true
+E7RESULT name=cell arm=epoch_aware_recovery stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=0 pass=true
+E7RESULT name=cell arm=epoch_aware_recovery stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 pass=true
+E7RESULT name=done emitted=14

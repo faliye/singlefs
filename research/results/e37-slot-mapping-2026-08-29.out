@@ -1,0 +1,26 @@
+E7RESULT name=config slots=256 settled=20 old_len=2 note=槽位映射那一维
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=2 stale=3 new_after=1 first_prefix=20 stale_replayed=3 lost_new=0 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=2 stale=3 new_after=3 first_prefix=20 stale_replayed=1 lost_new=0 stale_overwritten=2 pass=false
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=2 stale=7 new_after=1 first_prefix=20 stale_replayed=7 lost_new=0 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=3 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=1 pass=true
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=3 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=3 pass=true
+E7RESULT name=cell map=by_jsn resume=at_prefix new_len=3 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=1 pass=true
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=2 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=2 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=3 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=2 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=3 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=3 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=3 stale_overwritten=0 pass=false
+E7RESULT name=cell map=by_jsn resume=skip_hole new_len=3 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=2 stale=3 new_after=1 first_prefix=20 stale_replayed=3 lost_new=0 stale_overwritten=0 pass=false
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=2 stale=3 new_after=3 first_prefix=20 stale_replayed=1 lost_new=0 stale_overwritten=2 pass=false
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=2 stale=7 new_after=1 first_prefix=20 stale_replayed=7 lost_new=0 stale_overwritten=0 pass=false
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=3 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=1 pass=true
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=3 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=3 pass=true
+E7RESULT name=cell map=decoupled resume=at_prefix new_len=3 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=0 stale_overwritten=1 pass=true
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=2 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=2 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=3 stale_overwritten=2 pass=false
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=2 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=0 pass=false
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=3 stale=3 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=1 pass=false
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=3 stale=3 new_after=3 first_prefix=20 stale_replayed=0 lost_new=3 stale_overwritten=3 pass=false
+E7RESULT name=cell map=decoupled resume=skip_hole new_len=3 stale=7 new_after=1 first_prefix=20 stale_replayed=0 lost_new=1 stale_overwritten=1 pass=false
+E7RESULT name=done emitted=26

@@ -1,0 +1,6 @@
+M1_代号不递增	            Arm::Epoch => old + 1,              // 递增	            Arm::Epoch => old,              // 递增
+M2_恢复不认代号跳变	            if !(accept_epoch_bump && r.jsn == bumped) {	            if true {
+M3_槽位按整个序号取	        ((jsn & ((1u64 << COUNTER_BITS) - 1)) as usize) % self.slot.len()	        (jsn as usize) % self.slot.len()
+M4_代号与计数器串位	    (epoch << EPOCH_SHIFT) | counter	    (epoch << 1) | counter
+M5_断号即止被摘掉	        if r.jsn != expected {	        if false {
+M6_残留计数漏掉时间线	        .filter(|r| r.timeline == TIMELINE_A && (r.jsn & ((1u64 << COUNTER_BITS) - 1)) >= hole_counter)	        .filter(|r| r.timeline == TIMELINE_A && (r.jsn & ((1u64 << COUNTER_BITS) - 1)) >= hole_counter + 1000)

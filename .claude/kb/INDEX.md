@@ -15,6 +15,7 @@
 | [experiments-history.md](experiments-history.md) | 全部实验的变更史 |
 | [checks-owed.md](checks-owed.md) | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
+| [vm-harness.md](vm-harness.md) | 怎么把一个实验送进虚机在**真块设备**上跑：三个前置、卫生检查、虚机里多了哪条校验路径 |
 
 ## 不是编号的记号
 

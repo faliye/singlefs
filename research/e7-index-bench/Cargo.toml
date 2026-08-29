@@ -65,4 +65,22 @@ chacha20poly1305 = "0.11.0"
 name = "e32-aad-snapshot"
 path = "src/bin/e32_aad_snapshot.rs"
 
+[[bin]]
+name = "e33-journal-timeline"
+path = "src/bin/e33_journal_timeline.rs"
 
+[[bin]]
+name = "e34-pin-rules"
+path = "src/bin/e34_pin_rules.rs"
+
+[[bin]]
+name = "e36-head-forms"
+path = "src/bin/e36_head_forms.rs"
+
+[[bin]]
+name = "e37-slot-mapping"
+path = "src/bin/e37_slot_mapping.rs"
+
+[[bin]]
+name = "e38-log-epoch"
+path = "src/bin/e38_log_epoch.rs"

@@ -1,0 +1,34 @@
+E7RESULT name=config note=调小K能腾出多少 freed_per_fsync=8 rule1=最近K次fsync rule2=本checkpoint窗口
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=1 mean_pinned_by_window=8 mean_pinned_total=8 pinned_at_phase0=8
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1 k=4 max_freed=16 total_freed=16 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=24 pinned_at_phase0=24
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1 k=8 max_freed=48 total_freed=48 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=56 pinned_at_phase0=56
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1 k=16 max_freed=112 total_freed=112 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=120 pinned_at_phase0=120
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=8 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=8 mean_pinned_by_window=36 mean_pinned_total=36 pinned_at_phase0=8
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=8 k=4 max_freed=16 total_freed=24 phases_where_k_helps=2 phases=8 mean_pinned_by_window=36 mean_pinned_total=39 pinned_at_phase0=24
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=8 k=8 max_freed=48 total_freed=168 phases_where_k_helps=6 phases=8 mean_pinned_by_window=36 mean_pinned_total=57 pinned_at_phase0=56
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=8 k=16 max_freed=112 total_freed=672 phases_where_k_helps=8 phases=8 mean_pinned_by_window=36 mean_pinned_total=120 pinned_at_phase0=120
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=100 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=100 mean_pinned_by_window=404 mean_pinned_total=404 pinned_at_phase0=8
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=100 k=4 max_freed=16 total_freed=24 phases_where_k_helps=2 phases=100 mean_pinned_by_window=404 mean_pinned_total=404 pinned_at_phase0=24
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=100 k=8 max_freed=48 total_freed=168 phases_where_k_helps=6 phases=100 mean_pinned_by_window=404 mean_pinned_total=405 pinned_at_phase0=56
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=100 k=16 max_freed=112 total_freed=840 phases_where_k_helps=14 phases=100 mean_pinned_by_window=404 mean_pinned_total=412 pinned_at_phase0=120
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1000 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=8
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1000 k=4 max_freed=16 total_freed=24 phases_where_k_helps=2 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=24
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1000 k=8 max_freed=48 total_freed=168 phases_where_k_helps=6 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=56
+E7RESULT name=cell reading=invariant_i74 ckpt_interval=1000 k=16 max_freed=112 total_freed=840 phases_where_k_helps=14 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=120
+E7RESULT name=cell reading=d22_prose ckpt_interval=1 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=1 mean_pinned_by_window=8 mean_pinned_total=16 pinned_at_phase0=16
+E7RESULT name=cell reading=d22_prose ckpt_interval=1 k=4 max_freed=16 total_freed=16 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=32 pinned_at_phase0=32
+E7RESULT name=cell reading=d22_prose ckpt_interval=1 k=8 max_freed=48 total_freed=48 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=64 pinned_at_phase0=64
+E7RESULT name=cell reading=d22_prose ckpt_interval=1 k=16 max_freed=112 total_freed=112 phases_where_k_helps=1 phases=1 mean_pinned_by_window=8 mean_pinned_total=128 pinned_at_phase0=128
+E7RESULT name=cell reading=d22_prose ckpt_interval=8 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=8 mean_pinned_by_window=36 mean_pinned_total=37 pinned_at_phase0=16
+E7RESULT name=cell reading=d22_prose ckpt_interval=8 k=4 max_freed=16 total_freed=40 phases_where_k_helps=3 phases=8 mean_pinned_by_window=36 mean_pinned_total=42 pinned_at_phase0=32
+E7RESULT name=cell reading=d22_prose ckpt_interval=8 k=8 max_freed=48 total_freed=216 phases_where_k_helps=7 phases=8 mean_pinned_by_window=36 mean_pinned_total=64 pinned_at_phase0=64
+E7RESULT name=cell reading=d22_prose ckpt_interval=8 k=16 max_freed=112 total_freed=728 phases_where_k_helps=8 phases=8 mean_pinned_by_window=36 mean_pinned_total=128 pinned_at_phase0=128
+E7RESULT name=cell reading=d22_prose ckpt_interval=100 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=100 mean_pinned_by_window=404 mean_pinned_total=404 pinned_at_phase0=16
+E7RESULT name=cell reading=d22_prose ckpt_interval=100 k=4 max_freed=16 total_freed=40 phases_where_k_helps=3 phases=100 mean_pinned_by_window=404 mean_pinned_total=404 pinned_at_phase0=32
+E7RESULT name=cell reading=d22_prose ckpt_interval=100 k=8 max_freed=48 total_freed=216 phases_where_k_helps=7 phases=100 mean_pinned_by_window=404 mean_pinned_total=406 pinned_at_phase0=64
+E7RESULT name=cell reading=d22_prose ckpt_interval=100 k=16 max_freed=112 total_freed=952 phases_where_k_helps=15 phases=100 mean_pinned_by_window=404 mean_pinned_total=413 pinned_at_phase0=128
+E7RESULT name=cell reading=d22_prose ckpt_interval=1000 k=2 max_freed=0 total_freed=0 phases_where_k_helps=0 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=16
+E7RESULT name=cell reading=d22_prose ckpt_interval=1000 k=4 max_freed=16 total_freed=40 phases_where_k_helps=3 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=32
+E7RESULT name=cell reading=d22_prose ckpt_interval=1000 k=8 max_freed=48 total_freed=216 phases_where_k_helps=7 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=64
+E7RESULT name=cell reading=d22_prose ckpt_interval=1000 k=16 max_freed=112 total_freed=952 phases_where_k_helps=15 phases=1000 mean_pinned_by_window=4004 mean_pinned_total=4004 pinned_at_phase0=128
+E7RESULT name=done emitted=34

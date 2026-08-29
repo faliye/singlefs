@@ -1,0 +1,15 @@
+
+══ 虚机 benchmark harness ══
+  [32m✓[0m 内核 /boot/vmlinuz-6.17.0-lockdep
+  [32m✓[0m 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=1364595252 mode=1 o_direct=true blkstat=true
+E7RESULT name=update arm=sorted_bplus reads=187477 writes=200000 io=387477 io_per_op=1.937385 bytes_per_op=7935.5 elapsed_ns=29744122504 blk_r=187477 blk_w=200000
+E7RESULT name=query arm=sorted_bplus reads=24873 reads_per_query=1.2436 elapsed_ns=2385651042 blk_r=24873 blk_w=0 probe_reads=24873
+E7RESULT name=update arm=logstruct_wb reads=157592 writes=157592 io=315184 io_per_op=1.575920 bytes_per_op=6455.0 elapsed_ns=25607914064 blk_r=157592 blk_w=157592
+E7RESULT name=query arm=logstruct_wb reads=24873 reads_per_query=1.2436 elapsed_ns=2379938154 blk_r=24873 blk_w=0 probe_reads=24873
+E7RESULT name=update arm=betree reads=48947 writes=49787 io=98734 io_per_op=0.493670 bytes_per_op=2022.1 elapsed_ns=6902371667 blk_r=48947 blk_w=49787
+E7RESULT name=query arm=betree reads=23890 reads_per_query=1.1945 elapsed_ns=2319765645 blk_r=23890 blk_w=0 probe_reads=23890
+E7RESULT name=done emitted=8
+  [32m✓[0m 退出码 0，抓到 8 条结果（与程序声称的 8 条相符）
+
+[exited with code 0]

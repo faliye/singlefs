@@ -59,6 +59,7 @@
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
+| `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证） |
 | `records/` | 建设过程 |
 

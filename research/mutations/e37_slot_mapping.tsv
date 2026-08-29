@@ -1,0 +1,7 @@
+M1_解耦位置改成按序号	        SlotMap::Decoupled => hole_pos,	        SlotMap::Decoupled => ((resume_jsn - tail_jsn) as usize * old_len) % slots,
+M2_记录长度不参与占位	        for k in 1..r.len {	        for k in 1..1 {
+M3_恢复不按长度前进	        pos = (pos + r.len) % ring.n();	        pos = (pos + 1) % ring.n();
+M4_断号即止被摘掉	        if !r.csum_ok || r.jsn != expected {	        if !r.csum_ok {
+M5_残留计数漏掉时间线	    o.stale_replayed = acc2\n        .iter()\n        .filter(|r| r.timeline == TIMELINE_A && r.jsn >= hole_jsn)	    o.stale_replayed = acc2\n        .iter()\n        .filter(|r| r.timeline == TIMELINE_A && r.jsn >= hole_jsn + 1000)
+M6_续位也当成记录起始	            Cell::Start(r) => Some(r),\n            Cell::Empty | Cell::Filler => None,	            Cell::Start(r) => Some(r),\n            Cell::Filler => Some(Rec { jsn: 0, timeline: 9, len: 1, csum_ok: false }),\n            Cell::Empty => None,
+M7_盖掉计数恒为零	    o.stale_overwritten = stale - survived.min(stale);	    o.stale_overwritten = 0;

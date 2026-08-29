@@ -1,0 +1,6 @@
+M1_窗口按K算	let replay_window = (phase + 1).min(ckpt_interval);\n    root_ring.max(replay_window)	let replay_window = reading.root_ring_events(k).min(ckpt_interval);\n    root_ring.max(replay_window)
+M2_两种读法合成一种	            Reading::Invariant => k.saturating_sub(1),	            Reading::Invariant => k,
+M3_K-only不减基线	let freed = (k_only_events(reading, k, phase, ckpt_interval)\n            .saturating_sub(k_only_events(reading, 2, phase, ckpt_interval)))\n            * FREED_PER_FSYNC;	let freed = k_only_events(reading, k, phase, ckpt_interval) * FREED_PER_FSYNC;
+M4_同相位对照按均值取	o.pinned_at_phase0 = pinned_events(reading, k, 0, ckpt_interval) * FREED_PER_FSYNC;	o.pinned_at_phase0 = o.mean_pinned_by_window;
+M5_有帮助的相位不计数	        if freed > 0 {\n            o.phases_where_k_helps += 1;\n        }	        let _ = freed;
+M6_根环被相位截短	    let root_ring = reading.root_ring_events(k);	    let root_ring = reading.root_ring_events(k).min(phase + 1);
