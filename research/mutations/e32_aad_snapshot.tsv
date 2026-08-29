@@ -1,0 +1,4 @@
+M1_出生快照维去掉	Arm::BirthSnapshot  => v.extend_from_slice(&k.snap.to_le_bytes()),	Arm::BirthSnapshot  => {},
+M2_现算nonce不含快照	.wrapping_add((k.snap as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93));	.wrapping_add(0u64);
+M3_错配没真的换过来	for (k, wrong, expect_other) in [(&ka, &sb, &pb), (&kb, &sa, &pa)] {	for (k, wrong, expect_other) in [(&ka, &sa, &pb), (&kb, &sb, &pa)] {
+M4_阳性对照不翻字节	bad.ct[0] ^= 0x01;	bad.ct[0] ^= 0x00;

@@ -77,12 +77,15 @@ bash .claude/scripts/qemu.sh --selftest    # QEMU harness 自检
 bash .claude/scripts/gate-lint.sh     # 门禁自身：每条拒绝是否都给了下一步
 bash .claude/scripts/env.sh           # 环境自检
 bash .claude/gate.d/10-kb-rot.sh          # kb 腐化：引用悬空、结论悬空、条数对不上
+bash .claude/gate.d/15-research-build.sh  # research 构建与单测（共享门禁只看 crates/，而证据住在 research/）
 bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接、条数与标题相符
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
-bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）却没回收
+bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
+bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（55 条承重引用，源码树不在也判红）
+bash .claude/gate.d/80-absolute-assertions.sh # 每个实验都要有钉绝对值的断言（防「所有臂一起错」）却没回收
 ```
 
 **`.claude/gate.d/*.sh` 是项目本地门禁阶段**，`gate.sh` 按文件名顺序逐个跑，

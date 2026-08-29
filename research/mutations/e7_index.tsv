@@ -1,0 +1,3 @@
+M1_叶数改了	const N_LEAF: usize = 1024;	const N_LEAF: usize = 2048;
+M2_扇出改了	const FANOUT: usize = 32;	const FANOUT: usize = 16;
+M3_缓存默认值改了	const DEFAULT_CACHE_PAGES: usize = 64;	const DEFAULT_CACHE_PAGES: usize = 128;

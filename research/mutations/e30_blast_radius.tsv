@@ -1,0 +1,4 @@
+M1_扇出公式除以2	/ PTR_BYTES).max(2)	/ (PTR_BYTES * 2)).max(2)
+M2_不减块头	node_bytes.saturating_sub(64)	node_bytes.saturating_sub(0)
+M3_重扫量改成扇出减一	fanout(node_bytes).saturating_pow(level)	fanout().saturating_pow(level).saturating_sub(1)
+M4_树高多算一层	while cap < leaves { cap = cap.saturating_mul(f); h += 1; }	while cap < leaves { cap = cap.saturating_mul(f); h += 1; } h += 1;

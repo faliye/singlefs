@@ -174,22 +174,37 @@ fn main() {
     // key 数：跨越 L1(48K) / L2(1M) / L3(32M) / DRAM 四档
     let key_counts = [1usize << 11, 1 << 15, 1 << 19, 1 << 23];
 
-    // ── 阳性对照：同一宽度下，L1 档必须显著快于 DRAM 档 ──
+    // ── 阳性对照：L1 档必须显著快于 DRAM 档 ──
+    //
+    // ⚠️ **必须对每一个产出结论的配置各跑一遍，不许只跑一个点**（2026-08-29 对抗验证改）。
+    // 此前这里硬编码 `entry=16 / node=4096` 跑一次就放行，
+    // 而本实验产出结论的是 **entry=40 × 六档节点** 那组扫描——**那组从没过闸**。
+    // 这正是 `.claude/singlefs-ai-sop/rules/test-discipline.md` 记下的 E18 教训在重演：
+    // 「阳性对照只跑一条臂，等于另一条从没过闸，**而它偏偏就是产出结论的那一条**」。
+    // 尤其要紧的是 8 KiB 那一档：它比 4K 和 16K 都差、四轮稳定、至今无解释——
+    // **一个没过闸的配置上的反常，分不清是性质还是量错了。**
     {
-        let small = Tree::new(key_counts[0], 16, 4096);
-        let big = Tree::new(key_counts[3], 16, 4096);
-        let ks = gen_keys(&small, iters / 4, 100);
-        let kb = gen_keys(&big, iters / 4, 100);
-        let ns_s = (0..rounds).map(|_| bench(&small, &ks)).min().unwrap();
-        let ns_b = (0..rounds).map(|_| bench(&big, &kb)).min().unwrap();
-        let ratio = ns_b as f64 / ns_s as f64;
-        let ok = ratio >= 2.0;
-        say(em.emit_raw(&format!(
-            "name=poscontrol small_footprint={} big_footprint={} ns_small={ns_s} ns_big={ns_b} ratio={ratio:.2} ok={ok}",
-            small.footprint(), big.footprint())));
-        if !ok {
+        let mut bad = 0;
+        for &nb in &[2048usize, 4096, 8192, 16384, 32768, 65536] {
+            for &w in &[16usize, 40, 111] {
+                let small = Tree::new(key_counts[0], w, nb);
+                let big = Tree::new(key_counts[3], w, nb);
+                let ks = gen_keys(&small, iters / 8, 100);
+                let kb = gen_keys(&big, iters / 8, 100);
+                let ns_s = (0..rounds).map(|_| bench(&small, &ks)).min().unwrap();
+                let ns_b = (0..rounds).map(|_| bench(&big, &kb)).min().unwrap();
+                let ratio = ns_b as f64 / ns_s as f64;
+                let ok = ratio >= 2.0;
+                if !ok { bad += 1; }
+                say(em.emit_raw(&format!(
+                    "name=poscontrol node_bytes={nb} entry_bytes={w} small_footprint={} \
+big_footprint={} ns_small={ns_s} ns_big={ns_b} ratio={ratio:.2} ok={ok}",
+                    small.footprint(), big.footprint())));
+            }
+        }
+        if bad > 0 {
             say(em.finish()); print!("{out}");
-            eprintln!("E20: L1 档与 DRAM 档差不到 2 倍 —— 这个 benchmark 没在量缓存，本轮作废");
+            eprintln!("E20: 有 {bad} 个配置的 L1 档与 DRAM 档差不到 2 倍 —— 那些配置没在量缓存，本轮作废");
             std::process::exit(4);
         }
     }

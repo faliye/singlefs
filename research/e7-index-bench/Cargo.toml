@@ -60,3 +60,9 @@ path = "src/bin/e6_multicore.rs"
 [dependencies]
 aes-gcm = "0.11.1"
 chacha20poly1305 = "0.11.0"
+
+[[bin]]
+name = "e32-aad-snapshot"
+path = "src/bin/e32_aad_snapshot.rs"
+
+

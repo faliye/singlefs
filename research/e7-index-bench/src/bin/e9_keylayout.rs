@@ -153,14 +153,24 @@ impl Dev {
 
 /// 跑一档：把全部对象按该编码排序，切成叶；然后逐个子树遍历，数「碰了多少不同的叶」
 /// 和「实际发生多少次设备读」（带 LRU 缓存，缓存大小是自变量）。
-fn run(dev: &mut Dev, objs: &[Obj], n_dirs: usize, l: Layout4, cache_leaves: usize)
-    -> (usize, u64, u64, usize) {
-    // 1) 排序 → 叶编号
+/// 按某种 key 布局排序，算出每个对象落在第几个叶，以及叶总数。
+///
+/// ⚠️ **抽成函数是为了让测试能考它本身，不是为了好看**（2026-08-29 对抗验证）：
+/// 此前这段逻辑内联在 `run` 里，而新加的绝对值测试**自己重实现了一遍**——
+/// 变异测试把生产侧的 `pos / SLOTS` 改成 `pos / (SLOTS + 1)` 时**一个测试都没红**。
+/// 那正是 kb 在 E29 记过的同一个错：测试绕开了被测代码。
+fn assign_leaves(objs: &[Obj], l: Layout4) -> (Vec<usize>, usize) {
     let mut ks: Vec<(u64, usize)> = objs.iter().enumerate().map(|(i, o)| (key_of(o, l), i)).collect();
     ks.sort_unstable();
     let mut leaf_of_obj = vec![0usize; objs.len()];
     for (pos, &(_, oi)) in ks.iter().enumerate() { leaf_of_obj[oi] = pos / SLOTS; }
-    let n_leaves = (ks.len() + SLOTS - 1) / SLOTS;
+    (leaf_of_obj, (ks.len() + SLOTS - 1) / SLOTS)
+}
+
+fn run(dev: &mut Dev, objs: &[Obj], n_dirs: usize, l: Layout4, cache_leaves: usize)
+    -> (usize, u64, u64, usize) {
+    // 1) 排序 → 叶编号
+    let (leaf_of_obj, n_leaves) = assign_leaves(objs, l);
 
     // 2) 把叶写到盘上（内容不重要，重要的是它们真的落盘、真的被读回）
     let mut buf = Aligned::new(PAGE);
@@ -252,6 +262,96 @@ mod tests {
         for o in &objs { *per_dir.entry(o.dir_id).or_insert(0usize) += 1; }
         assert_eq!(per_dir.len(), n_dirs, "有目录一个文件都没有");
         assert!(per_dir.values().all(|&c| c == FILES_PER_DIR), "每目录的文件数不齐");
+    }
+
+    /// **把叶总数钉成一个独立算出来的绝对值：122。**
+    ///
+    /// ⚠️ **这条是补 `test-discipline.md`「只让多条臂互相比，测不出所有臂一起错」的洞**
+    /// （2026-08-29 对抗验证补入）。本实验此前**一条绝对值断言都没有**：
+    /// 七个单测钉的全是结构性质（树形、key 编码、改名语义、interleave 真的换了顺序），
+    /// **没有一条钉住被量的那个数**。⇒ 叶归属或几何一旦整体错掉，
+    /// 四条臂会一起错，而 `Inode/Locality = 1.46×` 这个比值仍然「成立」——
+    /// **而那个比值正是 D8 采纳 locality 前缀时引用的数。**
+    ///
+    /// 122 由独立算术给出，不从代码里读：
+    /// 槽数 `(4096 − 16) / 16 = 255`；对象数 `6^4 × 24 = 31104`；
+    /// 叶数 `⌈31104 / 255⌉ = 122`。
+    #[test]
+    fn leaf_count_is_the_independently_computed_absolute_value() {
+        assert_eq!(SLOTS, 255, "每叶槽数变了，122 这个绝对值跟着失效");
+        let (objs, n_dirs) = build_tree(false, 1);
+        assert_eq!(n_dirs * FILES_PER_DIR, 31104, "对象总数变了");
+        let (_, n_leaves) = assign_leaves(&objs, Layout4::Inode);
+        assert_eq!(n_leaves, 122, "叶总数不是独立算出来的那个 122");
+    }
+
+    /// **缓存装得下整棵树时，四条臂的读次数必须全部等于叶总数（122）。**
+    ///
+    /// 这是上一条的另一半：它把「四条臂相等」从一句互比，
+    /// 变成「四条臂都等于一个独立算出来的绝对值」。
+    /// kb 里那句「`cache_leaves ≥ 128` 时四条臂全部相等（各 122 次设备读）」
+    /// 此前**只是观测记录，没有任何断言钉它**。
+    ///
+    /// ⚠️ 判据用的是「每条臂触到的不同叶的并集」——无限缓存下读次数恰等于它。
+    /// 并集小于 122 说明有叶从没被任何目录读到，那时 122 这个上界就不是被测出来的。
+    #[test]
+    fn every_arm_touches_every_leaf_so_an_infinite_cache_reads_exactly_122() {
+        let (objs, n_dirs) = build_tree(true, 7);
+        for l in [Layout4::FullPath, Layout4::Inode, Layout4::Locality, Layout4::Hashed] {
+            // ⚠️ 走**生产侧**那个 `assign_leaves`，不许在测试里重实现一遍
+            let (leaf_of_obj, n_leaves) = assign_leaves(&objs, l);
+            let mut by_dir: Vec<Vec<usize>> = vec![Vec::new(); n_dirs];
+            for (i, o) in objs.iter().enumerate() { by_dir[o.dir_id].push(i); }
+            let mut union = std::collections::HashSet::new();
+            for d in 0..n_dirs { for &i in &by_dir[d] { union.insert(leaf_of_obj[i]); } }
+            assert_eq!(union.len(), n_leaves, "{l:?} 臂没有触到全部叶");
+            assert_eq!(union.len(), 122, "{l:?} 臂的无限缓存读次数不是 122");
+        }
+    }
+
+    /// **一个叶装不下超过 `SLOTS` 个对象。** 这是叶归属那段算术的绝对判据。
+    ///
+    /// ⚠️ **它是变异测试逼出来的**（2026-08-29 对抗验证）：把生产侧的
+    /// `pos / SLOTS` 改成 `pos / (SLOTS + 1)` 时，**叶总数、并集大小、每目录不同叶数全都不变**
+    /// ——那三个量在这个变异下恰好巧合地相等，于是先加的两条绝对值断言一条都没红。
+    /// 真正被破坏的是「一个叶装了 256 个对象而它只有 255 个槽」，**只有这条看得见**。
+    #[test]
+    fn no_leaf_holds_more_objects_than_it_has_slots() {
+        let (objs, _) = build_tree(true, 7);
+        for l in [Layout4::FullPath, Layout4::Inode, Layout4::Locality, Layout4::Hashed] {
+            let (leaf_of_obj, n_leaves) = assign_leaves(&objs, l);
+            let mut per_leaf = vec![0usize; n_leaves];
+            for &lf in &leaf_of_obj { per_leaf[lf] += 1; }
+            let max = *per_leaf.iter().max().unwrap();
+            assert!(max <= SLOTS, "{l:?} 臂有叶装了 {max} 个对象，而每叶只有 {SLOTS} 个槽");
+            assert_eq!(per_leaf.iter().sum::<usize>(), objs.len(), "{l:?} 臂有对象没被分配到叶");
+        }
+    }
+
+    /// **全路径布局下，每个目录的 24 个文件最多跨 2 个叶。** 这是「排序真的发生了」的绝对判据。
+    ///
+    /// ⚠️ **同样是变异测试逼出来的**：把 `ks.sort_unstable()` 整行删掉时，
+    /// 叶总数与并集大小仍然不变（对象照样铺满 122 个叶），**先加的两条断言都没红**。
+    /// 而没有排序，全路径 key 的全部意义就没了——**这条才看得见它。**
+    ///
+    /// 上界 2 由算术给出：一个目录 24 个文件在 key 序上连续，
+    /// 而一个叶有 255 个槽，24 个连续对象最多被一条叶边界切一次。
+    #[test]
+    fn sorting_makes_each_directory_span_at_most_two_leaves_under_fullpath() {
+        let (objs, n_dirs) = build_tree(true, 7);
+        let (leaf_of_obj, _) = assign_leaves(&objs, Layout4::FullPath);
+        let mut by_dir: Vec<std::collections::HashSet<usize>> =
+            vec![std::collections::HashSet::new(); n_dirs];
+        for (i, o) in objs.iter().enumerate() { by_dir[o.dir_id].insert(leaf_of_obj[i]); }
+        let worst = by_dir.iter().map(|s| s.len()).max().unwrap();
+        assert!(worst <= 2, "全路径下有目录跨了 {worst} 个叶，排序没生效或 key 编码坏了");
+        // 阴性对照：哈希打散必须显著更差，否则这条判据没有判别力
+        let (hl, _) = assign_leaves(&objs, Layout4::Hashed);
+        let mut hd: Vec<std::collections::HashSet<usize>> =
+            vec![std::collections::HashSet::new(); n_dirs];
+        for (i, o) in objs.iter().enumerate() { hd[o.dir_id].insert(hl[i]); }
+        let hworst = hd.iter().map(|s| s.len()).max().unwrap();
+        assert!(hworst > 10, "哈希臂只跨了 {hworst} 个叶，这条判据没有判别力");
     }
 
     /// **全路径 key 必须让兄弟相邻、子树连续。** 这是它作为遍历局部性上界的全部理由。

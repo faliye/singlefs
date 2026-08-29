@@ -27,6 +27,10 @@ const FANOUT: usize = 32;
 const N_LEAF: usize = 1024; // FANOUT^2
 const KEYS_PER_LEAF: usize = 64;
 const N_KEYS: u64 = (N_LEAF * KEYS_PER_LEAF) as u64;
+/// 缓存页数的默认值。**测试要钉的解析值 1.9375 就是按它算的**——
+/// 抽成常量是为了让测试绑住**生产用的那个数**，而不是在测试里再抄一遍
+/// （2026-08-29：e9 那边正因为在测试里重抄了一遍逻辑，变异测试一条都没红）。
+const DEFAULT_CACHE_PAGES: usize = 64;
 
 // 盘上布局：页 0 = 根，页 1..=16 = 内部节点，页 17..=272 = 叶子
 fn root_pg() -> u64 { 0 }
@@ -331,7 +335,7 @@ fn main() {
     let ops: u64 = 200_000;
     // 缓存/树比是本实验最承重的自变量：缓存住整棵树会让三条臂都好看，量不出结构差异。
     // 第 4 个参数指定缓存页数，不给则用 64（约占 1057 个节点的 6%）。
-    let cache_pages: usize = std::env::args().nth(4).and_then(|x| x.parse().ok()).unwrap_or(64);
+    let cache_pages: usize = std::env::args().nth(4).and_then(|x| x.parse().ok()).unwrap_or(DEFAULT_CACHE_PAGES);
     // 第 5 个参数：一个节点占几个 4 KiB 页。节点大小是 D8 已定的每套布局格式参数。
     let node_pages: usize = std::env::args().nth(5).and_then(|x| x.parse().ok()).unwrap_or(1);
     unsafe { NODE_PAGES = node_pages.max(1) };
@@ -395,6 +399,29 @@ mod tests {
 
     /// **页号分配不许重叠。** 根 / 内部节点 / 叶各占一段，重叠的话
     /// 一次写会踩掉另一个节点，而实验只数 I/O 次数、看不出内容被踩。
+    /// **把无批量对照臂的解析式钉成绝对值 1.9375。**
+    ///
+    /// ⚠️ **本实验此前一条绝对值断言都没有**（2026-08-29 对抗验证补入）：
+    /// 四个单测钉的是页号不重叠、key 映射在界内、树的几何自洽——**全是结构性质**。
+    /// 而 kb 里写着的第三条独立校验路径「两条解析式与实测吻合（1.9375 vs 1.9378）」
+    /// **只活在散文里，没有任何断言钉它**。⇒ 几何常量一改，那个 1.9375 就静默作废，
+    /// 而 decisions.md D11（索引节点要不要留消息缓冲区） 前置 2 引的 3.22 倍正是这套数算出来的。
+    ///
+    /// 解析式：`sorted_bplus` 每次操作恰好 1 次写 + `(1 − 缓存页 / 叶数)` 次读。
+    /// 缓存 64 页、1024 个叶 ⇒ `1 + (1 − 64/1024) = 1.9375`。
+    ///
+    /// ⚠️ **它钉的是解析式与几何常量，不是实测值**——实测要设备与虚机，
+    /// 单测里跑不了。两者的比对仍然只能靠复跑（口径见 E7 正文）。
+    #[test]
+    fn the_no_batching_control_arm_has_an_analytic_io_per_op_of_1_9375() {
+        assert_eq!(N_LEAF, 1024, "叶数变了，1.9375 这个解析值跟着失效");
+        assert_eq!(FANOUT * FANOUT, N_LEAF, "几何不自洽");
+        assert_eq!(DEFAULT_CACHE_PAGES, 64, "缓存页默认值变了，1.9375 这个解析值跟着失效");
+        let analytic = 1.0 + (1.0 - DEFAULT_CACHE_PAGES as f64 / N_LEAF as f64);
+        assert!((analytic - 1.9375).abs() < 1e-12,
+                "解析式算出 {analytic}，而 kb 与实测对的是 1.9375");
+    }
+
     #[test]
     fn page_ranges_do_not_overlap() {
         let mut seen = std::collections::HashSet::new();

@@ -1,0 +1,3 @@
+M1_换成GiB口径	bytes as f64 / (ns as f64)	(bytes as f64 / 1.073741824) / (ns as f64)
+M2_分块用floor而不是ceil	let chunk = n.div_ceil(threads);	let chunk = n / threads;
+M3_末块不截到n	((t + 1) * chunk).min(n)	((t + 1) * chunk)

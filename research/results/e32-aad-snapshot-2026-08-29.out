@@ -1,0 +1,6 @@
+E7RESULT name=config heads=2 swaps=2 shared_readers=3 aead=chacha20poly1305
+E7RESULT name=arm arm=current clean_own_ok=2 corrupt_detected=2 swap_detected=0 swap_silent_wrong=2 shared_ok=3 crit1=false crit2=true pass=false
+E7RESULT name=arm arm=reader_snapshot clean_own_ok=2 corrupt_detected=2 swap_detected=2 swap_silent_wrong=0 shared_ok=1 crit1=true crit2=false pass=false
+E7RESULT name=arm arm=birth_snapshot clean_own_ok=2 corrupt_detected=2 swap_detected=2 swap_silent_wrong=0 shared_ok=3 crit1=true crit2=true pass=true
+E7RESULT name=arm arm=derived_nonce clean_own_ok=2 corrupt_detected=2 swap_detected=2 swap_silent_wrong=0 shared_ok=3 crit1=true crit2=true pass=true
+E7RESULT name=done emitted=6

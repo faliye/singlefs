@@ -47,7 +47,21 @@ PY
     echo "⏭  [$name] 变异导致编译失败，本条无效（不计入盲区，也不算命中）"
     continue
   fi
-  red="$(sed -n 's/^test tests::\([a-z_]*\) \.\.\. FAILED$/\1/p' <<<"$out" | paste -sd, -)"
+  # ⚠️ **第四种结局：测试进程根本没跑完**（挂死被 OOM 杀、段错误、abort）。
+  # 它既不是「编译失败」也不是「一个测试都没红」——报成后者会把人引去改测试，
+  # 而实际发生的事是「这条破坏让被测代码不终止了」。实测踩过：
+  # 摘掉一条循环终止条件之后 recover 无限接受记录，进程 SIGKILL，
+  # 当时被报成「没有被任何检查看见」。
+  if grep -q "process didn't exit successfully" <<<"$out"; then
+    sig="$(sed -n 's/.*(signal: \([0-9]*\).*/\1/p' <<<"$out" | head -1)"
+    echo "💥 [$name] 测试进程没跑完（signal ${sig:-?}）——破坏被看见了，但不是断言抓到的"
+    continue
+  fi
+  # ⚠️ **字符类必须含数字与大写。** 写成 `[a-z_]*` 时，任何名字里带数字的测试
+  # （例如 `..._analytic_io_per_op_of_1_9375`、`..._reads_exactly_122`）匹配不上，
+  # `red` 为空 ⇒ **一条确实红了的变异被报成「一个测试都没红」**。
+  # 方向是谎报盲区，会把人引去补一条本来就有的检查。2026-08-29 实测踩过并修。
+  red="$(sed -n 's/^test tests::\([A-Za-z0-9_]*\) \.\.\. FAILED$/\1/p' <<<"$out" | paste -sd, -)"
   if [[ -z "$red" ]]; then
     echo "❌ [$name] 一个测试都没红 —— 这条破坏没有被任何检查看见"
     fail=1
