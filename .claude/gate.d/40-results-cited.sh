@@ -29,3 +29,26 @@ if ((${#missing[@]})); then
   exit 1
 fi
 echo "  ✓ $RES 下的实验产物全部被 experiments.md 点名（$(find "$RES" -maxdepth 1 -name '*.out'|wc -l) 个文件）"
+
+# ── 反方向：已跑的实验必须要么点名产物，要么显式说明产物没留 ──
+# 只查一个方向会漏掉「实验写了结论、但产物从没存在过」——那种情况下
+# 读的人既翻不到档案也不知道翻不到，比明说「没留」更糟。
+awk '
+  /^## E[0-9]+ /{
+    if (cur != "" && done && !cited && !excused) print cur
+    cur=$2; done=($0 ~ /已跑|已测/); cited=0; excused=0; next
+  }
+  /research\/results\//{ cited=1 }
+  /原始输出未留存|输出未留存/{ excused=1 }
+  END{ if (cur != "" && done && !cited && !excused) print cur }
+' "$EXP" > /tmp/.gate-uncited-$$ 2>/dev/null
+if [[ -s /tmp/.gate-uncited-$$ ]]; then
+  echo "  ✗ 这些实验标着已跑，却既没点名原始输出、也没说明产物为什么没留："
+  sed 's/^/     /' /tmp/.gate-uncited-$$
+  echo "     → 怎么办：存一份产物并在口径段点名；确实留不下（要虚机/真设备）"
+  echo "               就写明「原始输出未留存」以及为什么，别让读的人以为能翻到。"
+  rm -f /tmp/.gate-uncited-$$
+  exit 1
+fi
+rm -f /tmp/.gate-uncited-$$
+echo "  ✓ 已跑的实验都点了名或写明了产物未留存"

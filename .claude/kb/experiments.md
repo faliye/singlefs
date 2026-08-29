@@ -410,6 +410,8 @@ mkfs 时写进超级块的格式参数——**参数就够，不需要为此多�
 **模型化设备上的实测，不是旋转盘实测**。模型 = QEMU `throttle-group x-iops-total=4000`，
 不设 `x-iops-size` ⇒ **每次 I/O 代价相同、与请求大小无关**，即寻道主导的极端。
 复跑：`VM_IOPS=4000 bash research/scripts/vm-bench.sh <musl 二进制> 11 none <cache> <node_pages>`。
+⚠️ **原始输出未留存**：本实验跑在 QEMU 里，当时没有把宿主抓回的结果落盘。
+本节数字因此**只能靠重跑复核，不能靠翻档案复核**——重跑要 QEMU。
 
 **限流路径自证会红**：同样 300 次直接读，不限流 0.18 s；限流 100 IOPS 用 2.89 s
 （≈ 300/100 = 3 s）。不做这一步就分不清「没测出差异」和「限流根本没生效」。
@@ -1461,6 +1463,9 @@ D5（快照 / 空间记账机制） 立项时引的是 btrfs qgroup 的数字（
 
 **前置**：E7（离线索引 harness） 的虚机 harness（**已就绪并自检通过**）、块设备、Rust 工具链。**不需要文件系统。**
 
+⚠️ **原始输出未留存**：本实验要真块设备（`e12-lifecycle <块设备>`），不是纯内存模型，
+当时没有把结果落盘。本节数字只能靠重跑复核，重跑要虚机与块设备。
+
 ### 本实验测的是什么（读结果之前必须先读这一段）
 
 **它测的是「攒批的顺序追加」与「不攒批的随机页读-改-写」的 I/O 对比，
@@ -1689,7 +1694,8 @@ D5（快照 / 空间记账机制） 立项时引的是 btrfs qgroup 的数字（
 **口径**：纯逻辑实验，无设备、无虚机、无文件系统。20000 次操作 / 512 个键 /
 批大小 64 / 5 个种子（11 22 33 44 55），5 个种子结论完全一致（`test-discipline` 的
 「判通过要全通过、判失败要全失败」两侧都满足）。
-复跑：`research/e7-index-bench/src/bin/e14_discrimination.rs`（不入库，见 D15（格式冻结政策） 口径）。
+复跑：`cargo run --release --bin e14-discrimination`，代码 `research/e7-index-bench/src/bin/e14_discrimination.rs`。
+原始输出 `research/results/e14-discrimination-2026-08-29.out`（2026-08-29 复跑，逐格与本节数字相同）。
 
 ### 实测
 
@@ -1755,6 +1761,8 @@ I-3.1（已分配统计对得上） 只比「运行时计数器」和「checker 
 **口径**：QEMU 8.2.2 + 内核 6.17.0-lockdep，`nvme` 走 initramfs 里 insmod 的模块。
 被测的是**来宾内核读出来的几何**（`/sys/block/*/queue/`），不是 QEMU 的命令行参数。
 复跑：`research/scripts/vm-geom.sh`（不入库）。
+⚠️ **原始输出未留存**：本实验读的是来宾内核的 `/sys/block/*/queue/`，当时没落盘。
+本节那两张几何表因此只能靠重跑复核，而重跑要 QEMU。
 
 ### 实测
 
