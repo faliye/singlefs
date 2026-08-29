@@ -29,7 +29,7 @@ missing=0
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
 for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,2}([^A-Za-z0-9-]|$)' $KB/*.md .claude/rules/*.md 2>/dev/null \
              | grep -oE 'E[0-9]{1,2}' | sort -u); do
-  grep -qE "^## $e " "$KB/experiments.md" || { bad "$e 被引用但 experiments.md 里没有它"; missing=1; }
+  grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"; missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "实验号引用全部有定义"
 
@@ -53,7 +53,7 @@ while read -r line; do
   # 引用它的决策
   refs=$(grep -nE "\b$e\b" "$KB/decisions.md" | head -3 | cut -d: -f1 | paste -sd, -)
   [[ -n "$refs" ]] || continue
-  c=$(git log -1 --format=%h -S"## $e " -- "$KB/experiments.md" 2>/dev/null)
+  c=$(git log -1 --format=%h -S"## $e " -- "$KB/experiments" "$KB/experiments.md" 2>/dev/null)
   [[ -n "$c" ]] || continue
   if git show --stat --format= "$c" 2>/dev/null | grep -q "decisions.md"; then
     ok "$e 已跑，其状态变动的提交 $c 同时动过 decisions.md"
@@ -61,7 +61,7 @@ while read -r line; do
     bad "$e 已跑，但把它改成已跑的提交 $c **没有动 decisions.md**（decisions.md 第 $refs 行引用了它）"
     stale=1
   fi
-done < <(grep -E "^## E[0-9]+ " "$KB/experiments.md" | sed 's/^## //')
+done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
 [[ $stale -eq 0 ]] && ok "已跑实验与引用它的决策都在同一个提交里动过"
 
 echo
@@ -77,7 +77,7 @@ while read -r line; do
     bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
     orphan=1
   fi
-done < <(grep -E "^## E[0-9]+ " "$KB/experiments.md" | sed 's/^## //')
+done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
 [[ $orphan -eq 0 ]] && ok "每个已跑实验都至少被一条决策引用"
 
 echo

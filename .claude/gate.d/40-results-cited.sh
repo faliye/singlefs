@@ -8,9 +8,14 @@
 # 跑了三轮、原始输出 22 KB 落了盘，而 experiments.md 里那一节还是两点对比，
 # 决策侧一次都没引——报告只存在于对话里。
 set -uo pipefail
-EXP=.claude/kb/experiments.md
+# ⚠️ 2026-08-29 起实验正文拆到 `kb/experiments/` 下，索引只剩导航表。
+# 两侧都要扫：产物可能被任一实验正文点名。
+EXP_DIR=.claude/kb/experiments
+EXP_ALL="$(mktemp)"; trap 'rm -f "$EXP_ALL"' EXIT
+cat .claude/kb/experiments.md "$EXP_DIR"/*.md > "$EXP_ALL" 2>/dev/null
+EXP="$EXP_ALL"
 RES=research/results
-[[ -f "$EXP" ]] || { echo "  ! 找不到 $EXP，本阶段跳过"; exit 0; }
+[[ -s "$EXP" ]] || { echo "  ! 找不到实验正文，本阶段跳过"; exit 0; }
 [[ -d "$RES" ]] || { echo "  ✓ 没有 $RES 目录，无对象可判"; exit 0; }
 
 missing=()

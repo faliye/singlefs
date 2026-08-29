@@ -10,7 +10,9 @@
 | [invariants.md](invariants.md) | 不变量清单。checker 是它的可执行形式 |
 | [prior-art.md](prior-art.md) | 他家方案调研，含来源与口径 |
 | [pitfalls.md](pitfalls.md) | 避坑清单。每做一个设计决定回来对一遍 |
-| [experiments.md](experiments.md) | 待做实验：测什么、判据、怎样算失败 |
+| [experiments.md](experiments.md) | 实验索引：编号、简称、状态、指向正文的链接 |
+| [experiments/](experiments/) | 每个实验一个文件（`NN-简称.md`），测什么、判据、口径都在这里 |
+| [experiments-history.md](experiments-history.md) | 全部实验的变更史 |
 | [checks-owed.md](checks-owed.md) | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
 

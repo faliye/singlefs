@@ -52,6 +52,9 @@
 | `.claude/kb/decisions.md` | **决策索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/decisions/` | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
 | `.claude/kb/decisions-history.md` | 全部决策的变更史：每条写改前、改后、依据 |
+| `.claude/kb/experiments.md` | **实验索引**：编号、简称、状态、指向正文的链接 |
+| `.claude/kb/experiments/` | 每个实验一个文件（`NN-简称.md`），正文与口径都在这里 |
+| `.claude/kb/experiments-history.md` | 全部实验的变更史 |
 | `.claude/kb/invariants.md` | 不变量清单，checker 是它的可执行形式 |
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
