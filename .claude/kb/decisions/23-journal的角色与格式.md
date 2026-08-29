@@ -171,6 +171,16 @@ checkpoint 不是「操作」，是 journal 机制本身的一部分；普通用
 （`ckpt_cost = 64 块` 由 [experiments.md](../experiments.md) E19（defer 窗口下的假性 ENOSPC）实测；
 窗口内 journal 块由 E24（journal 几何）的每记录块数 × checkpoint 间隔算出。）
 
+**这条式子已实测**（[experiments.md](../experiments.md) E26（环与链各要多大保留池），
+2026-08-29，三轮字节一致）：checkpoint 卡死次数**恰好**在预测的那一档归零——
+环在 `reserve = 64`（= `ckpt_cost`），链在 `reserve = 164`（= `64 + 100`）。
+阴性对照：盘只用 95% 时两条臂任何 reserve 都不卡，效应确实来自空间紧张。
+
+⚠️ **同时收窄了 E19（defer 窗口下的假性 ENOSPC）的一句话**：「保留池对普通分配是纯税」
+有一个隐含前提——**保留池已经大到不卡死**。前提之外符号是反的：
+`reserve = 0` 时普通分配被拒 9340 次，`reserve = 64` 时只有 756 次，
+因为卡死之后空间根本不回收。
+
 而 E19（defer 窗口下的假性 ENOSPC）同时实测：**保留池对普通分配是纯税**，预留 0 → 16384 块时假性 ENOSPC 从 3150 涨到 7246。
 ⇒ **链式不是把代价变成死锁，是把它变成假性 ENOSPC**——而 E19（defer 窗口下的假性 ENOSPC）已定「假性 ENOSPC 只有准入治得了，保留池反而加重它」。
 
