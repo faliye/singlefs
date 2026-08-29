@@ -339,6 +339,47 @@ MAC 对不上就判设备故障并很快停用它，
 - [Phoronix：OpenZFS Native Encryption Use Raises Data Corruption Concerns (2024-02-12)](https://www.phoronix.com/news/OpenZFS-Encrypt-Corrupt)
 - [Kelsey, Compression and Information Leakage of Plaintext (FSE 2002)](https://link.springer.com/chapter/10.1007/3-540-45661-9_21)
 
+### 6.5 卷身份放在哪一层：ext4 与 fscrypt 都放在派生层，不放在逐单元输入里
+
+**2026-08-29 本机内核树逐行现查，用于 D9 未定项 8 定案。**
+
+| 实现 | 卷/文件身份进哪一层 | 逐单元输入里有什么 | 出处 |
+|---|---|---|---|
+| ext4 校验和 | `s_uuid` **挂载时折一次**进 `s_csum_seed` | 只有 `inum`、`gen`、块内容；`s_uuid` 一次也没出现 | `fs/ext4/super.c:4725`；`fs/ext4/ialloc.c:1301`、`fs/ext4/bitmap.c:33`、`fs/ext4/super.c:3275` |
+| fscrypt 密钥 | 每文件 nonce **建 inode 时取一次随机数**，持久化在盘上的 context | 派生出的每文件密钥 | `fs/crypto/keysetup.c:762 get_random_bytes(nonce, FSCRYPT_FILE_NONCE_SIZE)`；`fs/crypto/fscrypt_private.h:78 struct fscrypt_context_v2 { ...; u8 nonce[16]; }` |
+
+⚠️ **fscrypt 不是「每次挂载换新盐」**——本工程曾在草稿里这么转述过，那是错的。
+nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次挂载读回同一个值。
+「每次挂载换新盐」这个形态如果真做了，上一次挂载写的块就永远解不开。
+
+**对本工程的意义**：D9 把 fsid 从 AAD 移进 KDF，与这两家的分层一致——
+卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9 未定项 8。
+
+### 6.6 明文超级块里的水位字段可被回滚，这是有现役演示的失败模式
+
+**2026-08-29 本机内核树现查。** dm-integrity 的 `recalc_sector` 住在明文超级块里，
+它的文档自陈：
+
+> "legacy_recalculate — Allow recalculating of volumes with HMAC keys. This is disabled by
+> default for security reasons - an attacker could modify the volume, set recalc_sector to
+> zero, and the kernel would not detect the modification."
+> （`Documentation/admin-guide/device-mapper/dm-integrity.rst`）
+
+上游的处置不是「把水位算进 MAC」，而是**带密钥时默认禁掉那条路径**，
+要开必须显式加 `legacy_recalculate`（`drivers/md/dm-integrity.c:395
+dm_integrity_disable_recalculate()`）。
+
+**对本工程的意义**：I-6.5 的 nonce 水位是同一个形状，而后果更硬——
+回滚它不是「漏检一次篡改」，是**流密码 nonce 重用 ⇒ 两段明文直接 XOR**。
+⇒ D9 未定项 8 定「水位必须被主密钥派生的 MAC 覆盖，无密钥侧不许写它」。
+
+### 6.7 AEAD 的 tag 长度：内核允许截断到 32 位
+
+`crypto_gcm_check_authsize()` 接受 4 / 8 / 12 / 13 / 14 / 15 / 16 字节
+（`include/crypto/gcm.h:13-26`，2026-08-29 现查）。
+⇒ 「MAC 一律 128 位不截断」是**本工程自己的设计约束，不是密码学或内核强加的**；
+它要付的空间代价（每单元 16 字节）应当按这个口径记，不能说成「没得选」。
+
 ## 七、近十年学术成果扫描（2012–2026）
 
 **本节只收「可能推翻某条既有决策前提」的成果，不做文献综述。** 每条注明它冲击哪条决策。
@@ -585,6 +626,15 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ---
 
 ## 历史版本
+
+### 2026-08-29
+- 新增 6.5 / 6.6 / 6.7（卷身份的分层、明文水位字段的回滚先例、AEAD tag 可截断），
+  三节均为本机内核树逐行现查，用于 D9 未定项 8 定案。
+- **更正一处转述**：本仓草稿曾把 fscrypt 说成「每次挂载换新盐」。
+  **曾经**：per-mount fresh salt；**现在**：每文件 nonce 在建 inode 时取一次并持久化；
+  **依据**：`fs/crypto/keysetup.c:762` 与 `fs/crypto/fscrypt_private.h:78` 逐行现查。
+  该错误只在工作笔记里，未进过任何决策，喂给三方论证的背景材料也把它写成「待攻击的提案」
+  而非 fscrypt 的做法——**三条腿没有继承这个错误**。
 
 ### 2026-08-26（其七）
 - 补 7.11：bcachefs 的记账验证有一处自我作废——checker 与运行时共用同一行加减代码
