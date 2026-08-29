@@ -23,7 +23,7 @@ echo "══ kb 形状检查 ══"
 echo
 
 echo "── 1. 同一概念只许一个名字 ──"
-hit=$(grep -rn '未答项\|已答项' $KB/*.md .claude/rules/*.md 2>/dev/null || true)
+hit=$(grep -rn '未答项\|已答项' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null || true)
 if [[ -n "$hit" ]]; then
   bad "kb 里出现「未答项 / 已答项」"; printf '%s\n' "$hit" | sed 's/^/     /'
   howto "统一写「未定项 / 已定项」。records/ 是当时的会话记录，不在本检查范围。"
@@ -38,7 +38,7 @@ else ok "未定项小节标题统一"; fi
 echo
 echo "── 2. 跨小节的上下文指代（检索时会断掉）──"
 hit=$(grep -rnE '上表|下表|上面那|上面这|下面那|下面这|上一节|下一节|见上方|见下方' \
-        $KB/*.md .claude/rules/*.md 2>/dev/null || true)
+        $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null || true)
 if [[ -n "$hit" ]]; then
   bad "kb 里出现按位置指代的写法"; printf '%s\n' "$hit" | sed 's/^/     /'
   howto "换成被指对象的名字（小节标题、表名、决策号），让这一条被单独取出时仍然成立。"
@@ -55,7 +55,7 @@ else ok "没有文件内自指链接"; fi
 echo
 echo "── 4. 上游规则的路径写法 ──"
 # 裸 singlefs-ai-sop/rules/… 从仓库根解析不到，副本在 .claude/ 下。
-hit=$(grep -rn '[^/.]singlefs-ai-sop/rules/' $KB/*.md .claude/rules/*.md 2>/dev/null \
+hit=$(grep -rn '[^/.]singlefs-ai-sop/rules/' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
         | grep -v '\.claude/singlefs-ai-sop/rules/' || true)
 if [[ -n "$hit" ]]; then
   bad "上游规则写成了裸路径"; printf '%s\n' "$hit" | sed 's/^/     /'

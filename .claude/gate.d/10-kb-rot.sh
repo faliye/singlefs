@@ -22,12 +22,15 @@ say() { printf '  %s\n' "$*"; }
 bad() { printf '  ✗ %s\n' "$*"; fail=1; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 
+# ⚠️ **必须递归扫**：2026-08-29 决策与实验都拆进了子目录，
+# 而引用大半住在那里。用 $KB/*.md 单层通配会静默漏掉它们——
+# 实测拆分之后这段检查有一段时间对决策文件里的引用完全失明。
 echo "══ kb 腐化审计 ══"
 echo
 echo "── 1. 实验号引用是否都有定义 ──"
 missing=0
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
-for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,2}([^A-Za-z0-9-]|$)' $KB/*.md .claude/rules/*.md 2>/dev/null \
+for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,2}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
              | grep -oE 'E[0-9]{1,2}' | sort -u); do
   grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"; missing=1; }
 done
@@ -36,7 +39,7 @@ done
 echo
 echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
-for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,2}([^A-Za-z0-9-]|$)' $KB/*.md .claude/rules/*.md 2>/dev/null \
+for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,2}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
              | grep -oE 'D[0-9]{1,2}' | sort -u); do
   grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"; missing=1; }
 done
