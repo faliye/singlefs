@@ -1,0 +1,12 @@
+E7RESULT name=config entries=4000000 rounds=5 entry_bytes=24 leaves=4096 cores=32
+E7RESULT name=correctness single_len=139759 parallel_len=139759 truth_len=139759 all_equal=true
+E7RESULT name=merge arm=single threads=1 best_ns=129342644 mib_per_s=707.83 entries_per_s=30925609
+E7RESULT name=merge arm=parallel threads=2 best_ns=86565236 mib_per_s=1057.62 entries_per_s=46207926 speedup=1.49
+E7RESULT name=merge arm=parallel threads=4 best_ns=41465980 mib_per_s=2207.90 entries_per_s=96464620 speedup=3.12
+E7RESULT name=merge arm=parallel threads=8 best_ns=26562414 mib_per_s=3446.70 entries_per_s=150588723 speedup=4.87
+E7RESULT name=merge arm=parallel threads=16 best_ns=19669191 mib_per_s=4654.63 entries_per_s=203363728 speedup=6.58
+E7RESULT name=merge arm=parallel threads=32 best_ns=18210635 mib_per_s=5027.43 entries_per_s=219651868 speedup=7.10
+E7RESULT name=poscontrol threads=8 best_ns=15622039 speedup=7.60
+E7RESULT name=poscontrol threads=16 best_ns=9693157 speedup=12.25
+E7RESULT name=poscontrol threads=32 best_ns=8104552 speedup=14.65
+E7RESULT name=done emitted=12

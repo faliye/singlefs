@@ -5,5 +5,7 @@ target/
 *.qcow2
 /.claude/singlefs-ai-sop/
 
-# 研究性的代码与脚本留在本地，不进仓库
-/research/
+# research/ 入库（2026-08-29 用户定案）：实验代码、单测、变异脚本、原始产物都要进仓，
+# 因为决策正文把它们当依据引用——只在一台机器上的证据对第二个人不是证据。
+# 只有构建产物除外，它由上面那条 `target/` 兜住（research/target 有 315 MB）。
+/research/target/

@@ -1,0 +1,5 @@
+ask-local: 输出判定为字词损坏 —— 按 .claude/rules/three-way-inference.md 这一轮作废
+红 /tmp/tmp.opld9kYSot  生词=4 拼接=2
+     拼接: batchable(=batch+able) | contradicting(=contradict+ing)
+     生词: batchable endurance financial contradicting
+下一步：改用英文提示重跑（实测英文 0/5 损坏），或设 ASK_LOCAL_ALLOW_CORRUPT=1 强行采用

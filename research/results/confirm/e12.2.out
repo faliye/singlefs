@@ -1,0 +1,12 @@
+E7RESULT name=device_size bytes=1073741824
+E7RESULT name=config cache_pages=256 cache_counters=131072 ops=200000 counters_per_page=512 seed=7 blkstat_available=false fault=none o_direct=true
+E7RESULT name=d5 ws=fits counters=131072 reads=0 writes=2 bytes_w=1605632 elapsed_ns=1323371 io_per_op=0.000010 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=refcount ws=fits counters=131072 reads=256 writes=256 elapsed_ns=34412495 io_per_op=0.002560 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=hybrid ws=fits counters=131072 clone_permille=10 cloned_hits=2012 reads=249 writes=253 elapsed_ns=19523521 io_per_op=0.002510 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=d5 ws=x2 counters=262144 reads=0 writes=2 bytes_w=1605632 elapsed_ns=1286126 io_per_op=0.000010 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=refcount ws=x2 counters=262144 reads=100217 writes=100217 elapsed_ns=7569723387 io_per_op=1.002170 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=hybrid ws=x2 counters=262144 clone_permille=10 cloned_hits=2067 reads=987 writes=991 elapsed_ns=74482523 io_per_op=0.009890 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=d5 ws=x8 counters=1048576 reads=0 writes=2 bytes_w=1605632 elapsed_ns=1296556 io_per_op=0.000010 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=refcount ws=x8 counters=1048576 reads=175128 writes=175128 elapsed_ns=13378459456 io_per_op=1.751280 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=hybrid ws=x8 counters=1048576 clone_permille=10 cloned_hits=1997 reads=1728 writes=1732 elapsed_ns=132988889 io_per_op=0.017300 blk_reads=NA blk_writes=NA blk_read_kib=NA blk_write_kib=NA
+E7RESULT name=done emitted=12

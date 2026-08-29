@@ -1,0 +1,11 @@
+1. A workload where a single fsync operation requires 500 journal blocks, but the journal ring size is set to 200 blocks due to an incorrect mkfs calculation (e.g., assuming worst-case op size of 66 blocks with F=3, but actual worst-case is 500). This causes the fixed ring to force 2 checkpoints for this single operation, each adding a tail write in jbd2 shape. Total writes: 500 journal blocks + 2 tail blocks = 502. The chain would allocate 500 blocks with no extra writes, making fixed ring cost more.
+
+2. A workload where a single operation's journal usage depends on runtime fragmentationdata size, such as a database bulk insert of variable length. The worst-case journal usage is unbounded (e.g., a user can insert arbitrarily large data), making it impossible to compute at mkfs time. Thus, the geometry invariant cannot be verified.
+
+3. When measuring barriers instead of blocks, jbd2 shape writes the superblock tail with a separate barrier for each checkpoint, increasing total barrier count. For 20k fsyncs with 21 checkpoints, jbd2 has ~20k barriers for journal records plus 21 for tail writes, while XFS shape has only 20k barriers (tail inline in records). Thus, jbd2 has higher barrier cost, reversing Candidate B's conclusion that it is better.
+
+4. Chain's mount-time claim requires scanning and reserving all journal blocks from the chain structure, which is costly (proportional to journal size) and can fail if journal metadata is corrupted (e.g., invalid pointers). Fixed ring has no equivalent cost: its reserved blocks are known at mkfs time, making mount-time reservation trivial and reliable.
+
+5. XFS shape saves on I/O operation count during normal operation. Inline tail_lsn allows journal records to be written in a single I/O, whereas jbd2 shape requires separate I/Os for journal records and tail writes. Block count doesn't capture this reduction in I/O operations, leading to lower latency for XFS shape in high-frequency journaling workloads.
+
+6. "XFS 有 XFS_MIN_LOG_FACTOR = 3，mkfs 时算、mount 时校验。本工程需要等价的几何不变量：任一操作的最坏 journal 占用 ≤ 环大小 / F，F ≥ 2" is likely wrong because worst-case journal usage for single operations (e.g., database transactions with variable data sizes) cannot be predicted at mkfs time. Observing a single operation exceeding ring size / F despite mkfs checks would expose this.

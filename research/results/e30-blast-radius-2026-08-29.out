@@ -1,0 +1,8 @@
+E7RESULT name=config leaves=16777216 ptr_bytes=40
+E7RESULT name=cell node_bytes=2048 fanout=49 height=5 rescan_l1=49 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=cell node_bytes=4096 fanout=100 height=4 rescan_l1=100 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=cell node_bytes=8192 fanout=203 height=4 rescan_l1=203 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=cell node_bytes=16384 fanout=408 height=3 rescan_l1=408 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=cell node_bytes=32768 fanout=817 height=3 rescan_l1=817 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=cell node_bytes=65536 fanout=1636 height=3 rescan_l1=1636 rescan_root=16777216 index_data_loss=0 unit_data_loss=1
+E7RESULT name=done emitted=8

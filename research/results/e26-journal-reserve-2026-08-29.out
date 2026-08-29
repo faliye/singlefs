@@ -1,0 +1,34 @@
+E7RESULT name=config capacity=100000 ops=20000 ckpt_every=100 ckpt_cost=64 blocks_per_op=1 journal_per_window=100
+E7RESULT name=cell fill=95 shape=ring reserve=0 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=32 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=64 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=100 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=128 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=164 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=256 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=ring reserve=512 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3308
+E7RESULT name=cell fill=95 shape=chain reserve=0 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=32 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=64 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=100 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=128 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=164 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=256 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=95 shape=chain reserve=512 ckpt_stall=0 ckpts_done=200 normal_denied=0 min_free=3208
+E7RESULT name=cell fill=99 shape=ring reserve=0 ckpt_stall=95 ckpts_done=105 normal_denied=9340 min_free=0
+E7RESULT name=cell fill=99 shape=ring reserve=32 ckpt_stall=95 ckpts_done=105 normal_denied=9372 min_free=32
+E7RESULT name=cell fill=99 shape=ring reserve=64 ckpt_stall=0 ckpts_done=200 normal_denied=756 min_free=64
+E7RESULT name=cell fill=99 shape=ring reserve=100 ckpt_stall=0 ckpts_done=200 normal_denied=792 min_free=100
+E7RESULT name=cell fill=99 shape=ring reserve=128 ckpt_stall=0 ckpts_done=200 normal_denied=820 min_free=128
+E7RESULT name=cell fill=99 shape=ring reserve=164 ckpt_stall=0 ckpts_done=200 normal_denied=856 min_free=164
+E7RESULT name=cell fill=99 shape=ring reserve=256 ckpt_stall=0 ckpts_done=200 normal_denied=948 min_free=256
+E7RESULT name=cell fill=99 shape=ring reserve=512 ckpt_stall=0 ckpts_done=200 normal_denied=1204 min_free=512
+E7RESULT name=cell fill=99 shape=chain reserve=0 ckpt_stall=120 ckpts_done=80 normal_denied=23640 min_free=0
+E7RESULT name=cell fill=99 shape=chain reserve=32 ckpt_stall=120 ckpts_done=80 normal_denied=23672 min_free=32
+E7RESULT name=cell fill=99 shape=chain reserve=64 ckpt_stall=120 ckpts_done=80 normal_denied=23704 min_free=64
+E7RESULT name=cell fill=99 shape=chain reserve=100 ckpt_stall=120 ckpts_done=80 normal_denied=23740 min_free=100
+E7RESULT name=cell fill=99 shape=chain reserve=128 ckpt_stall=120 ckpts_done=80 normal_denied=23768 min_free=128
+E7RESULT name=cell fill=99 shape=chain reserve=164 ckpt_stall=0 ckpts_done=200 normal_denied=956 min_free=164
+E7RESULT name=cell fill=99 shape=chain reserve=256 ckpt_stall=0 ckpts_done=200 normal_denied=1048 min_free=256
+E7RESULT name=cell fill=99 shape=chain reserve=512 ckpt_stall=0 ckpts_done=200 normal_denied=1304 min_free=512
+E7RESULT name=done emitted=34

@@ -1,0 +1,28 @@
+E7RESULT name=config unit=4096 rounds=3 cores=32 e6_aes_4k_mibs=3888.51
+E7RESULT name=poscontrol arm=e6_single_core mibs=3429.36 e6=3888.51 dev=11.8% ok=true
+E7RESULT name=poscontrol arm=compute threads=16 speedup=15.24 ok=true
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=1 mibs=3562.2 gbps=3.74 speedup=1.00
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=2 mibs=6112.2 gbps=6.41 speedup=1.72
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=4 mibs=9131.1 gbps=9.57 speedup=2.56
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=8 mibs=24785.0 gbps=25.99 speedup=6.96
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=16 mibs=38999.1 gbps=40.89 speedup=10.95
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=aes256gcm threads=32 mibs=37181.6 gbps=38.99 speedup=10.44
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=1 mibs=1140.8 gbps=1.20 speedup=1.00
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=2 mibs=2260.9 gbps=2.37 speedup=1.98
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=4 mibs=4455.8 gbps=4.67 speedup=3.91
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=8 mibs=8715.6 gbps=9.14 speedup=7.64
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=16 mibs=16347.2 gbps=17.14 speedup=14.33
+E7RESULT name=scale workset=l2_resident per_thread_mib=1 alg=chacha20poly1305 threads=32 mibs=24404.5 gbps=25.59 speedup=21.39
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=1 mibs=3317.3 gbps=3.48 speedup=1.00
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=2 mibs=6475.9 gbps=6.79 speedup=1.95
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=4 mibs=10519.2 gbps=11.03 speedup=3.17
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=8 mibs=15784.2 gbps=16.55 speedup=4.76
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=16 mibs=16279.1 gbps=17.07 speedup=4.91
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=aes256gcm threads=32 mibs=16358.2 gbps=17.15 speedup=4.93
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=1 mibs=1172.9 gbps=1.23 speedup=1.00
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=2 mibs=2271.3 gbps=2.38 speedup=1.94
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=4 mibs=4146.9 gbps=4.35 speedup=3.54
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=8 mibs=7754.6 gbps=8.13 speedup=6.61
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=16 mibs=12961.9 gbps=13.59 speedup=11.05
+E7RESULT name=scale workset=dram per_thread_mib=64 alg=chacha20poly1305 threads=32 mibs=16291.1 gbps=17.08 speedup=13.89
+E7RESULT name=done emitted=28

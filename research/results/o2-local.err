@@ -1,0 +1,4 @@
+ask-local: 输出判定为字词损坏 —— 按 .claude/rules/three-way-inference.md 这一轮作废
+红 /tmp/tmp.GQ4Ghyli4C  cjk=0 words=842 fffd=0 汉字复读=0(0.00/千) 英文复读=1(1.19/千)
+     英文复读样本: the model
+下一步：改用英文提示重跑（实测英文 0/5 损坏），或设 ASK_LOCAL_ALLOW_CORRUPT=1 强行采用

@@ -1,0 +1,30 @@
+E7RESULT name=config ops=20000 block=4096 hdr=84 entry=56
+E7RESULT name=cell pbs=512 wl=grain1 shape=ring tail=tail_sb rec_blocks=2500 tail_blocks=21 steady=2521 allocs=0 ckpts=21 forced=0 replay=0 peak=125
+E7RESULT name=cell pbs=512 wl=grain1 shape=ring tail=tail_inline rec_blocks=2500 tail_blocks=0 steady=2500 allocs=0 ckpts=21 forced=0 replay=63 peak=125
+E7RESULT name=cell pbs=512 wl=grain1 shape=chain tail=tail_sb rec_blocks=2500 tail_blocks=21 steady=2521 allocs=2500 ckpts=21 forced=0 replay=0 peak=125
+E7RESULT name=cell pbs=512 wl=grain1 shape=chain tail=tail_inline rec_blocks=2500 tail_blocks=0 steady=2500 allocs=2500 ckpts=21 forced=0 replay=63 peak=125
+E7RESULT name=cell pbs=512 wl=grain10 shape=ring tail=tail_sb rec_blocks=5000 tail_blocks=21 steady=5021 allocs=0 ckpts=21 forced=0 replay=0 peak=250
+E7RESULT name=cell pbs=512 wl=grain10 shape=ring tail=tail_inline rec_blocks=5000 tail_blocks=0 steady=5000 allocs=0 ckpts=21 forced=0 replay=125 peak=250
+E7RESULT name=cell pbs=512 wl=grain10 shape=chain tail=tail_sb rec_blocks=5000 tail_blocks=21 steady=5021 allocs=5000 ckpts=21 forced=0 replay=0 peak=250
+E7RESULT name=cell pbs=512 wl=grain10 shape=chain tail=tail_inline rec_blocks=5000 tail_blocks=0 steady=5000 allocs=5000 ckpts=21 forced=0 replay=125 peak=250
+E7RESULT name=cell pbs=4096 wl=grain1 shape=ring tail=tail_sb rec_blocks=20000 tail_blocks=21 steady=20021 allocs=0 ckpts=21 forced=0 replay=0 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain1 shape=ring tail=tail_inline rec_blocks=20000 tail_blocks=0 steady=20000 allocs=0 ckpts=21 forced=0 replay=500 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain1 shape=chain tail=tail_sb rec_blocks=20000 tail_blocks=21 steady=20021 allocs=20000 ckpts=21 forced=0 replay=0 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain1 shape=chain tail=tail_inline rec_blocks=20000 tail_blocks=0 steady=20000 allocs=20000 ckpts=21 forced=0 replay=500 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain10 shape=ring tail=tail_sb rec_blocks=20000 tail_blocks=21 steady=20021 allocs=0 ckpts=21 forced=0 replay=0 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain10 shape=ring tail=tail_inline rec_blocks=20000 tail_blocks=0 steady=20000 allocs=0 ckpts=21 forced=0 replay=500 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain10 shape=chain tail=tail_sb rec_blocks=20000 tail_blocks=21 steady=20021 allocs=20000 ckpts=21 forced=0 replay=0 peak=1000
+E7RESULT name=cell pbs=4096 wl=grain10 shape=chain tail=tail_inline rec_blocks=20000 tail_blocks=0 steady=20000 allocs=20000 ckpts=21 forced=0 replay=500 peak=1000
+E7RESULT name=ringsweep pbs=512 ring_blocks=4 forced=620 ckpts=640 tail_blocks=640 peak=4
+E7RESULT name=ringsweep pbs=512 ring_blocks=16 forced=140 ckpts=160 tail_blocks=160 peak=16
+E7RESULT name=ringsweep pbs=512 ring_blocks=64 forced=20 ckpts=40 tail_blocks=40 peak=64
+E7RESULT name=ringsweep pbs=512 ring_blocks=256 forced=0 ckpts=20 tail_blocks=20 peak=125
+E7RESULT name=ringsweep pbs=512 ring_blocks=1024 forced=0 ckpts=20 tail_blocks=20 peak=125
+E7RESULT name=ringsweep pbs=512 ring_blocks=4096 forced=0 ckpts=20 tail_blocks=20 peak=125
+E7RESULT name=ringsweep pbs=4096 ring_blocks=4 forced=4980 ckpts=5000 tail_blocks=5000 peak=4
+E7RESULT name=ringsweep pbs=4096 ring_blocks=16 forced=1240 ckpts=1260 tail_blocks=1260 peak=16
+E7RESULT name=ringsweep pbs=4096 ring_blocks=64 forced=300 ckpts=320 tail_blocks=320 peak=64
+E7RESULT name=ringsweep pbs=4096 ring_blocks=256 forced=60 ckpts=80 tail_blocks=80 peak=256
+E7RESULT name=ringsweep pbs=4096 ring_blocks=1024 forced=0 ckpts=20 tail_blocks=20 peak=1000
+E7RESULT name=ringsweep pbs=4096 ring_blocks=4096 forced=0 ckpts=20 tail_blocks=20 peak=1000
+E7RESULT name=done emitted=30

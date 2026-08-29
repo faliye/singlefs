@@ -1,0 +1,30 @@
+E7RESULT name=config leaves=1048576 ptr_bytes=40
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=1 k=104857 per_item=1063 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=10 k=1048576 per_item=10595 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=50 k=5242880 per_item=52962 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=100 k=10485760 per_item=105920 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=300 k=31457280 per_item=317753 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Contiguous permille=1000 k=104857600 per_item=1059170 range=1059170
+E7RESULT name=crossover node_bytes=4096 layout=Contiguous permille=1000
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=1 k=104857 per_item=105919 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=10 k=1048576 per_item=1059170 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=50 k=5242880 per_item=1059170 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=100 k=10485760 per_item=1059170 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=300 k=31457280 per_item=1059170 range=1059170
+E7RESULT name=cell node_bytes=4096 layout=Scattered permille=1000 k=104857600 per_item=1059170 range=1059170
+E7RESULT name=crossover node_bytes=4096 layout=Scattered permille=10
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=1 k=427819 per_item=1054 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=10 k=4278190 per_item=10514 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=50 k=21390950 per_item=52560 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=100 k=42781900 per_item=105118 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=300 k=128345702 per_item=315348 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Contiguous permille=1000 k=427819008 per_item=1051155 range=1051155
+E7RESULT name=crossover node_bytes=16384 layout=Contiguous permille=1000
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=1 k=427819 per_item=428872 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=10 k=4278190 per_item=1051155 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=50 k=21390950 per_item=1051155 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=100 k=42781900 per_item=1051155 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=300 k=128345702 per_item=1051155 range=1051155
+E7RESULT name=cell node_bytes=16384 layout=Scattered permille=1000 k=427819008 per_item=1051155 range=1051155
+E7RESULT name=crossover node_bytes=16384 layout=Scattered permille=3
+E7RESULT name=done emitted=30

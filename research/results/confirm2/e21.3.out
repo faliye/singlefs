@@ -1,0 +1,10 @@
+E7RESULT name=config mib=2048 rounds=5 cores=32
+E7RESULT name=scan threads=1 best_ns=39752546 gbps=54.02 speedup=1.00
+E7RESULT name=scan threads=2 best_ns=36645843 gbps=58.60 speedup=1.08
+E7RESULT name=scan threads=4 best_ns=33334520 gbps=64.42 speedup=1.19
+E7RESULT name=scan threads=8 best_ns=33609217 gbps=63.90 speedup=1.18
+E7RESULT name=scan threads=16 best_ns=34252640 gbps=62.70 speedup=1.16
+E7RESULT name=scan threads=32 best_ns=35491466 gbps=60.51 speedup=1.12
+E7RESULT name=scaling arm=bandwidth threads16_speedup=1.16 peak_gbps=64.42
+E7RESULT name=poscontrol arm=compute threads=16 t1_ns=707258034 t16_ns=46313872 speedup=15.27
+E7RESULT name=done emitted=10

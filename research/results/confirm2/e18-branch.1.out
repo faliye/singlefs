@@ -1,0 +1,21 @@
+E7RESULT name=config prefix_txgs=40 per_branch_txgs=20 blocks_per_txg=3
+E7RESULT name=poscontrol shape=linear death_rule=earliest pairs=10800 fp=0 fn=0 zero_error=true
+E7RESULT name=poscontrol shape=linear death_rule=latest pairs=10800 fp=0 fn=0 zero_error=true
+E7RESULT name=poscontrol shape=linear death_rule=conservative pairs=10800 fp=0 fn=0 zero_error=true
+E7RESULT name=e18 shape=fork2 death_rule=earliest blocks=240 roots=80 pairs=19200 fp=1200 fn=352 fp_rate=0.0625 fn_rate=0.0183 cross_branch_refs=7860 refcount_bytes=960 refcount_touches=8100
+E7RESULT name=e18 shape=fork2 death_rule=latest blocks=240 roots=80 pairs=19200 fp=1258 fn=280 fp_rate=0.0655 fn_rate=0.0146 cross_branch_refs=7860 refcount_bytes=960 refcount_touches=8100
+E7RESULT name=e18 shape=fork2 death_rule=conservative blocks=240 roots=80 pairs=19200 fp=1572 fn=0 fp_rate=0.0819 fn_rate=0.0000 cross_branch_refs=7860 refcount_bytes=960 refcount_touches=8100
+E7RESULT name=e18 shape=fork2 death_rule=never blocks=240 roots=80 pairs=19200 fp=1620 fn=0 fp_rate=0.0844 fn_rate=0.0000 cross_branch_refs=7860 refcount_bytes=960 refcount_touches=8100
+E7RESULT name=e18 shape=heads3 death_rule=earliest blocks=300 roots=100 pairs=30000 fp=3600 fn=971 fp_rate=0.1200 fn_rate=0.0324 cross_branch_refs=10620 refcount_bytes=1200 refcount_touches=10920
+E7RESULT name=e18 shape=heads3 death_rule=latest blocks=300 roots=100 pairs=30000 fp=3709 fn=760 fp_rate=0.1236 fn_rate=0.0253 cross_branch_refs=10620 refcount_bytes=1200 refcount_touches=10920
+E7RESULT name=e18 shape=heads3 death_rule=conservative blocks=300 roots=100 pairs=30000 fp=4221 fn=0 fp_rate=0.1407 fn_rate=0.0000 cross_branch_refs=10620 refcount_bytes=1200 refcount_touches=10920
+E7RESULT name=e18 shape=heads3 death_rule=never blocks=300 roots=100 pairs=30000 fp=4230 fn=0 fp_rate=0.1410 fn_rate=0.0000 cross_branch_refs=10620 refcount_bytes=1200 refcount_touches=10920
+E7RESULT name=e18 shape=heads5 death_rule=earliest blocks=420 roots=140 pairs=58800 fp=12000 fn=2943 fp_rate=0.2041 fn_rate=0.0501 cross_branch_refs=16140 refcount_bytes=1680 refcount_touches=16560
+E7RESULT name=e18 shape=heads5 death_rule=latest blocks=420 roots=140 pairs=58800 fp=12273 fn=2220 fp_rate=0.2087 fn_rate=0.0378 cross_branch_refs=16140 refcount_bytes=1680 refcount_touches=16560
+E7RESULT name=e18 shape=heads5 death_rule=conservative blocks=420 roots=140 pairs=58800 fp=13050 fn=0 fp_rate=0.2219 fn_rate=0.0000 cross_branch_refs=16140 refcount_bytes=1680 refcount_touches=16560
+E7RESULT name=e18 shape=heads5 death_rule=never blocks=420 roots=140 pairs=58800 fp=13050 fn=0 fp_rate=0.2219 fn_rate=0.0000 cross_branch_refs=16140 refcount_bytes=1680 refcount_touches=16560
+E7RESULT name=e18 shape=heads8 death_rule=earliest blocks=600 roots=200 pairs=120000 fp=33600 fn=7422 fp_rate=0.2800 fn_rate=0.0619 cross_branch_refs=24420 refcount_bytes=2400 refcount_touches=25020
+E7RESULT name=e18 shape=heads8 death_rule=latest blocks=600 roots=200 pairs=120000 fp=34315 fn=4960 fp_rate=0.2860 fn_rate=0.0413 cross_branch_refs=24420 refcount_bytes=2400 refcount_touches=25020
+E7RESULT name=e18 shape=heads8 death_rule=conservative blocks=600 roots=200 pairs=120000 fp=35280 fn=0 fp_rate=0.2940 fn_rate=0.0000 cross_branch_refs=24420 refcount_bytes=2400 refcount_touches=25020
+E7RESULT name=e18 shape=heads8 death_rule=never blocks=600 roots=200 pairs=120000 fp=35280 fn=0 fp_rate=0.2940 fn_rate=0.0000 cross_branch_refs=24420 refcount_bytes=2400 refcount_touches=25020
+E7RESULT name=done emitted=21

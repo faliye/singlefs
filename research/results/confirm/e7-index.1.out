@@ -1,0 +1,8 @@
+E7RESULT name=config nodes=1057 node_kib=4 slots=255 keys=65536 ops=200000 cache_nodes=64 cache_ratio=0.061 wb_cap=512 betree_buf=200 ckpt=4096 seed=7 mode=none o_direct=true blkstat=false
+E7RESULT name=update arm=sorted_bplus reads=187346 writes=200000 io=387346 io_per_op=1.936730 bytes_per_op=7932.8 elapsed_ns=14485062211 blk_r=NA blk_w=NA
+E7RESULT name=query arm=sorted_bplus reads=24759 reads_per_query=1.2380 elapsed_ns=1481492198 blk_r=NA blk_w=NA probe_reads=24759
+E7RESULT name=update arm=logstruct_wb reads=157358 writes=157358 io=314716 io_per_op=1.573580 bytes_per_op=6445.4 elapsed_ns=13311115888 blk_r=NA blk_w=NA
+E7RESULT name=query arm=logstruct_wb reads=24759 reads_per_query=1.2380 elapsed_ns=1487368266 blk_r=NA blk_w=NA probe_reads=24759
+E7RESULT name=update arm=betree reads=48834 writes=49472 io=98306 io_per_op=0.491530 bytes_per_op=2013.3 elapsed_ns=3509115275 blk_r=NA blk_w=NA
+E7RESULT name=query arm=betree reads=23791 reads_per_query=1.1896 elapsed_ns=1418623775 blk_r=NA blk_w=NA probe_reads=23791
+E7RESULT name=done emitted=8

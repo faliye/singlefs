@@ -81,7 +81,8 @@ bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
-bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了却没回收
+bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
+bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）却没回收
 ```
 
 **`.claude/gate.d/*.sh` 是项目本地门禁阶段**，`gate.sh` 按文件名顺序逐个跑，

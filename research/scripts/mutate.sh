@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# 证明「这些测试会红」：逐条注入一个已知的破坏，跑测试，记下红了哪几个，然后还原。
+#
+#   mutate.sh <bin 名> <源文件> <变异表>
+#
+# 变异表每行三段，用制表符分隔：变异名 <TAB> 原文 <TAB> 替换文（原文/替换文里的 \n 表示换行）
+# 替换必须命中，命中数为 0 直接报错退出 —— 静默失效的替换会让整份证明变成假的
+# （singlefs-ai-sop/rules/command-safety.md「脚本改文件之后要回读确认」）。
+set -uo pipefail
+BIN="$1"; SRC="$2"; TABLE="$3"
+BAK="$(mktemp)"; cp "$SRC" "$BAK"
+restore() { cp "$BAK" "$SRC"; }
+trap restore EXIT
+
+# 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红
+if ! cargo test --release --bin "$BIN" >/dev/null 2>&1; then
+  echo "mutate: 基线就是红的，先修好再来" >&2; exit 2
+fi
+echo "基线：全绿"
+
+fail=0
+while IFS=$'\t' read -r name from to; do
+  [[ -z "${name:-}" || "${name:0:1}" == "#" ]] && continue
+  restore
+  NAME="$name" FROM="$from" TO="$to" SRC="$SRC" python3 - <<'PY' || { echo "mutate: [$name] 替换没命中，证明作废" >&2; exit 3; }
+import os,sys
+src=os.environ["SRC"]; s=open(src).read()
+f=os.environ["FROM"].replace("\\n","\n"); t=os.environ["TO"].replace("\\n","\n")
+n=s.count(f)
+if n!=1:
+    sys.stderr.write("命中 %d 次（要求恰好 1 次）：%r\n"%(n,f)); sys.exit(1)
+open(src,"w").write(s.replace(f,t))
+PY
+  out="$(cargo test --release --bin "$BIN" 2>&1)"
+  # ⚠️ **编译失败不等于「没抓到」。** 一个改坏了语法或穷尽性的变异根本跑不到测试，
+  # 那时既不能记成「测试抓到了」，也不能记成「测试没抓到」——它是一条**无效变异**。
+  # 混成一类的话，一个编译不过的变异会被报成测试盲区，把人引去改测试（实测踩过）。
+  # ⚠️ 判据是「测试进程有没有跑起来」，**不是「输出里有没有 error」**——
+  # `cargo test` 在测试变红时也会打 `error: test failed`，
+  # 拿它当编译失败的判据会把每一条成功的变异都误判成无效（实测踩过，全套复跑才发现）。
+  # ⚠️ **不许写成 `printf ... | grep -q ...`。** `grep -q` 命中后立刻退出并关闭管道，
+  # 上游 printf 收到 SIGPIPE；本脚本开了 `pipefail` ⇒ **整条管道判失败，命中被读成没命中**。
+  # 实测：那样写会让每一条「测试确实变红了」的变异都被误报成「编译失败」。
+  # 这正是 `.claude/singlefs-ai-sop/rules/command-safety.md`「管道里的退出码不是你想要的那个」。
+  # ⇒ 用 here-string，根本不建管道。
+  if ! grep -q '^running [0-9]* test' <<<"$out"; then
+    echo "⏭  [$name] 变异导致编译失败，本条无效（不计入盲区，也不算命中）"
+    continue
+  fi
+  red="$(sed -n 's/^test tests::\([a-z_]*\) \.\.\. FAILED$/\1/p' <<<"$out" | paste -sd, -)"
+  if [[ -z "$red" ]]; then
+    echo "❌ [$name] 一个测试都没红 —— 这条破坏没有被任何检查看见"
+    fail=1
+  else
+    echo "✅ [$name] 红：$red"
+  fi
+done < "$TABLE"
+
+restore
+cargo test --release --bin "$BIN" >/dev/null 2>&1 || { echo "mutate: 还原后没回到全绿" >&2; exit 4; }
+echo "已还原，基线仍全绿"
+exit $fail

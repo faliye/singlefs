@@ -1,0 +1,66 @@
+E7RESULT name=config capacity_blocks=1000000 file_blocks=4 ops_per_ckpt=200 ckpts=200 ckpt_cost=64
+E7RESULT name=poscontrol fill=0.50 delay=1 false_enospc=0 ckpt_stall=0 held_peak=1600 ok=true
+E7RESULT name=e19 fill=0.900 delay=1 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=1600 held_final=800 analytic_held=800 free_at_fill=99999 
+E7RESULT name=e19 fill=0.900 delay=2 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=2400 held_final=1600 analytic_held=1600 free_at_fill=99999 
+E7RESULT name=e19 fill=0.900 delay=4 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=4000 held_final=3200 analytic_held=3200 free_at_fill=99999 
+E7RESULT name=e19 fill=0.900 delay=8 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=7200 held_final=6400 analytic_held=6400 free_at_fill=99999 
+E7RESULT name=e19 fill=0.900 delay=16 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=13600 held_final=12800 analytic_held=12800 free_at_fill=99999 
+E7RESULT name=e19 fill=0.950 delay=1 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=1600 held_final=800 analytic_held=800 free_at_fill=50000 
+E7RESULT name=e19 fill=0.950 delay=2 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=2400 held_final=1600 analytic_held=1600 free_at_fill=50000 
+E7RESULT name=e19 fill=0.950 delay=4 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=4000 held_final=3200 analytic_held=3200 free_at_fill=50000 
+E7RESULT name=e19 fill=0.950 delay=8 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=7200 held_final=6400 analytic_held=6400 free_at_fill=50000 
+E7RESULT name=e19 fill=0.950 delay=16 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=13600 held_final=12800 analytic_held=12800 free_at_fill=50000 
+E7RESULT name=e19 fill=0.990 delay=1 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=1600 held_final=800 analytic_held=800 free_at_fill=10000 
+E7RESULT name=e19 fill=0.990 delay=2 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=2400 held_final=1600 analytic_held=1600 free_at_fill=10000 
+E7RESULT name=e19 fill=0.990 delay=4 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=4000 held_final=3200 analytic_held=3200 free_at_fill=10000 
+E7RESULT name=e19 fill=0.990 delay=8 allocs=40000 false_enospc=0 false_rate=0.00000 true_enospc=0 ckpt_stall=0 held_peak=7200 held_final=6400 analytic_held=6400 free_at_fill=10000 
+E7RESULT name=e19 fill=0.990 delay=16 allocs=40000 false_enospc=900 false_rate=0.02250 true_enospc=0 ckpt_stall=188 held_peak=13600 held_final=12800 analytic_held=12800 free_at_fill=10000 
+E7RESULT name=e19 fill=0.999 delay=1 allocs=40000 false_enospc=150 false_rate=0.00375 true_enospc=0 ckpt_stall=199 held_peak=1600 held_final=800 analytic_held=800 free_at_fill=1000 
+E7RESULT name=e19 fill=0.999 delay=2 allocs=40000 false_enospc=350 false_rate=0.00875 true_enospc=0 ckpt_stall=199 held_peak=2400 held_final=1600 analytic_held=1600 free_at_fill=1000 
+E7RESULT name=e19 fill=0.999 delay=4 allocs=40000 false_enospc=750 false_rate=0.01875 true_enospc=0 ckpt_stall=199 held_peak=4000 held_final=3200 analytic_held=3200 free_at_fill=1000 
+E7RESULT name=e19 fill=0.999 delay=8 allocs=40000 false_enospc=1550 false_rate=0.03875 true_enospc=0 ckpt_stall=199 held_peak=7200 held_final=6400 analytic_held=6400 free_at_fill=1000 
+E7RESULT name=e19 fill=0.999 delay=16 allocs=40000 false_enospc=3150 false_rate=0.07875 true_enospc=0 ckpt_stall=199 held_peak=13600 held_final=12800 analytic_held=12800 free_at_fill=1000 
+E7RESULT name=admission fill=0.900 delay=1 free=99999 bound=1664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.900 delay=2 free=99999 bound=2464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.900 delay=4 free=99999 bound=4064 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.900 delay=8 free=99999 bound=7264 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.900 delay=16 free=99999 bound=13664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.900 delay=32 free=99999 bound=26464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=1 free=50000 bound=1664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=2 free=50000 bound=2464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=4 free=50000 bound=4064 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=8 free=50000 bound=7264 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=16 free=50000 bound=13664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.950 delay=32 free=50000 bound=26464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=1 free=20000 bound=1664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=2 free=20000 bound=2464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=4 free=20000 bound=4064 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=8 free=20000 bound=7264 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=16 free=20000 bound=13664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.980 delay=32 free=20000 bound=26464 predicted=true observed=true false_enospc=1600 ckpt_stall=176
+E7RESULT name=admission fill=0.990 delay=1 free=10000 bound=1664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.990 delay=2 free=10000 bound=2464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.990 delay=4 free=10000 bound=4064 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.990 delay=8 free=10000 bound=7264 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.990 delay=16 free=10000 bound=13664 predicted=true observed=true false_enospc=900 ckpt_stall=188
+E7RESULT name=admission fill=0.990 delay=32 free=10000 bound=26464 predicted=true observed=true false_enospc=4100 ckpt_stall=188
+E7RESULT name=admission fill=0.995 delay=1 free=5000 bound=1664 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.995 delay=2 free=5000 bound=2464 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.995 delay=4 free=5000 bound=4064 predicted=false observed=false false_enospc=0 ckpt_stall=0
+E7RESULT name=admission fill=0.995 delay=8 free=5000 bound=7264 predicted=true observed=true false_enospc=550 ckpt_stall=194
+E7RESULT name=admission fill=0.995 delay=16 free=5000 bound=13664 predicted=true observed=true false_enospc=2150 ckpt_stall=194
+E7RESULT name=admission fill=0.995 delay=32 free=5000 bound=26464 predicted=true observed=true false_enospc=5350 ckpt_stall=194
+E7RESULT name=admission fill=0.999 delay=1 free=1000 bound=1664 predicted=true observed=true false_enospc=150 ckpt_stall=199
+E7RESULT name=admission fill=0.999 delay=2 free=1000 bound=2464 predicted=true observed=true false_enospc=350 ckpt_stall=199
+E7RESULT name=admission fill=0.999 delay=4 free=1000 bound=4064 predicted=true observed=true false_enospc=750 ckpt_stall=199
+E7RESULT name=admission fill=0.999 delay=8 free=1000 bound=7264 predicted=true observed=true false_enospc=1550 ckpt_stall=199
+E7RESULT name=admission fill=0.999 delay=16 free=1000 bound=13664 predicted=true observed=true false_enospc=3150 ckpt_stall=199
+E7RESULT name=admission fill=0.999 delay=32 free=1000 bound=26464 predicted=true observed=true false_enospc=6350 ckpt_stall=199
+E7RESULT name=admission_summary agree=36 of=36
+E7RESULT name=reserve reserve_blocks=0 fill=0.999 delay=16 ckpt_stall=199 false_enospc=3150
+E7RESULT name=reserve reserve_blocks=64 fill=0.999 delay=16 ckpt_stall=0 false_enospc=3166
+E7RESULT name=reserve reserve_blocks=256 fill=0.999 delay=16 ckpt_stall=0 false_enospc=3214
+E7RESULT name=reserve reserve_blocks=1024 fill=0.999 delay=16 ckpt_stall=0 false_enospc=3406
+E7RESULT name=reserve reserve_blocks=4096 fill=0.999 delay=16 ckpt_stall=0 false_enospc=4174
+E7RESULT name=reserve reserve_blocks=16384 fill=0.999 delay=16 ckpt_stall=0 false_enospc=7246
+E7RESULT name=done emitted=66

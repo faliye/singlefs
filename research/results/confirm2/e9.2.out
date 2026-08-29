@@ -1,0 +1,6 @@
+E7RESULT name=config depth=4 dir_fanout=6 files_per_dir=24 dirs=1296 objs=31104 slots_per_leaf=255 cache_leaves=8 interleave=true seed=7 renames=0 fullpath_key_writes=0 o_direct=true blkstat=false
+E7RESULT name=scan layout=FullPath leaves=122 distinct_leaves=1402 distinct_per_dir=1.0818 dev_reads=122 dev_writes=0 blk_r=0 blk_w=0
+E7RESULT name=scan layout=Inode leaves=122 distinct_leaves=1402 distinct_per_dir=1.0818 dev_reads=1312 dev_writes=0 blk_r=0 blk_w=0
+E7RESULT name=scan layout=Locality leaves=122 distinct_leaves=1402 distinct_per_dir=1.0818 dev_reads=900 dev_writes=0 blk_r=0 blk_w=0
+E7RESULT name=scan layout=Hashed leaves=122 distinct_leaves=28367 distinct_per_dir=21.8881 dev_reads=28367 dev_writes=0 blk_r=0 blk_w=0
+E7RESULT name=done emitted=6

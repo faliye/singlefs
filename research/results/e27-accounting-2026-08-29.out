@@ -1,0 +1,32 @@
+E7RESULT name=config snaps=64 exts_per_snap=8
+E7RESULT name=cell topo=Linear share=0 arm=deadlist lookups=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=0 arm=refcount lookups=8 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=0 arm=owner_ref lookups=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=30 arm=deadlist lookups=0 freed=6 truly_free=6 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=30 arm=refcount lookups=10 freed=6 truly_free=6 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=30 arm=owner_ref lookups=0 freed=8 truly_free=6 wrong_free=2 leaked=0
+E7RESULT name=cell topo=Linear share=70 arm=deadlist lookups=0 freed=3 truly_free=3 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=70 arm=refcount lookups=28 freed=3 truly_free=3 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=70 arm=owner_ref lookups=0 freed=8 truly_free=3 wrong_free=5 leaked=0
+E7RESULT name=cell topo=MultiHead share=0 arm=deadlist lookups=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=0 arm=refcount lookups=8 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=0 arm=owner_ref lookups=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=30 arm=deadlist lookups=3 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=30 arm=refcount lookups=12 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=30 arm=owner_ref lookups=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=70 arm=deadlist lookups=13 freed=0 truly_free=0 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=70 arm=refcount lookups=23 freed=0 truly_free=0 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=70 arm=owner_ref lookups=0 freed=8 truly_free=0 wrong_free=8 leaked=0
+E7RESULT name=scale topo=Linear exts_per_snap=4 total_exts=256 deadlist_lookups=0 refcount_lookups=14
+E7RESULT name=scale topo=MultiHead exts_per_snap=4 total_exts=256 deadlist_lookups=1 refcount_lookups=13
+E7RESULT name=scale topo=Linear exts_per_snap=8 total_exts=512 deadlist_lookups=0 refcount_lookups=28
+E7RESULT name=scale topo=MultiHead exts_per_snap=8 total_exts=512 deadlist_lookups=13 refcount_lookups=23
+E7RESULT name=scale topo=Linear exts_per_snap=16 total_exts=1024 deadlist_lookups=0 refcount_lookups=58
+E7RESULT name=scale topo=MultiHead exts_per_snap=16 total_exts=1024 deadlist_lookups=17 refcount_lookups=52
+E7RESULT name=scale topo=Linear exts_per_snap=32 total_exts=2048 deadlist_lookups=0 refcount_lookups=107
+E7RESULT name=scale topo=MultiHead exts_per_snap=32 total_exts=2048 deadlist_lookups=33 refcount_lookups=65
+E7RESULT name=scale topo=Linear exts_per_snap=64 total_exts=4096 deadlist_lookups=0 refcount_lookups=214
+E7RESULT name=scale topo=MultiHead exts_per_snap=64 total_exts=4096 deadlist_lookups=58 refcount_lookups=169
+E7RESULT name=scale topo=Linear exts_per_snap=128 total_exts=8192 deadlist_lookups=0 refcount_lookups=416
+E7RESULT name=scale topo=MultiHead exts_per_snap=128 total_exts=8192 deadlist_lookups=213 refcount_lookups=379
+E7RESULT name=done emitted=32

@@ -1,0 +1,62 @@
+[package]
+name = "e7-index-bench"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "e7-index-bench"
+path = "src/main.rs"
+
+
+[[bin]]
+name = "e12-lifecycle"
+path = "src/bin/e12_lifecycle.rs"
+
+[[bin]]
+name = "e7-index"
+path = "src/bin/e7_index.rs"
+
+[[bin]]
+name = "e14-discrimination"
+path = "src/bin/e14_discrimination.rs"
+
+[[bin]]
+name = "e9-keylayout"
+path = "src/bin/e9_keylayout.rs"
+
+[[bin]]
+name = "e8-split"
+path = "src/bin/e8_split.rs"
+
+[[bin]]
+name = "e17-merge"
+path = "src/bin/e17_merge.rs"
+
+[[bin]]
+name = "e18-branch"
+path = "src/bin/e18_branch.rs"
+
+[[bin]]
+name = "e19-defer"
+path = "src/bin/e19_defer.rs"
+
+[[bin]]
+name = "e20-fanout"
+path = "src/bin/e20_fanout.rs"
+
+[[bin]]
+name = "e16-journal"
+path = "src/bin/e16_journal.rs"
+
+[[bin]]
+name = "e21-cpu"
+path = "src/bin/e21_cpu.rs"
+
+[[bin]]
+name = "e6-multicore"
+path = "src/bin/e6_multicore.rs"
+
+[dependencies]
+aes-gcm = "0.11.1"
+chacha20poly1305 = "0.11.0"

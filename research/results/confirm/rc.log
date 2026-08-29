@@ -1,0 +1,26 @@
+e8-split 轮1 rc=0
+e8-split 轮2 rc=0
+e8-split 轮3 rc=0
+e17-merge 轮1 rc=0
+e17-merge 轮2 rc=0
+e17-merge 轮3 rc=0
+e18-branch 轮1 rc=0
+e18-branch 轮2 rc=0
+e18-branch 轮3 rc=0
+e19-defer 轮1 rc=0
+e19-defer 轮2 rc=0
+e19-defer 轮3 rc=0
+e20-fanout 轮1 rc=0
+e20-fanout 轮2 rc=0
+e20-fanout 轮3 rc=0
+e16-journal 轮1 rc=0
+e16-journal 轮2 rc=0
+e16-journal 轮3 rc=0
+e21-cpu 轮1 rc=0
+e21-cpu 轮2 rc=0
+e21-cpu 轮3 rc=0
+DONE
+e12轮1 rc=0
+e12轮2 rc=0
+e12轮3 rc=0
+E12DONE

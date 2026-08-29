@@ -1,0 +1,12 @@
+
+
+In a copy-on-write (COW) filesystem, **fsync** ensures data durability by flushing modifications to stable storage. The two implementation strategies differ significantly in crash recovery requirements:
+
+**Method (A): Immediate Full Checkpoint**  
+When `fsync` is called, it writes all dirty leaf data blocks, all modified ancestor nodes (e.g., indirect blocks, directory entries), and a new root node. After this, the filesystem’s entire tree structure is consistent and up-to-date. During crash recovery, the system simply reads the latest root node from disk. Since all nodes are flushed, the tree is immediately valid, requiring no reconstruction. Recovery is fast and deterministic—only a single root read is needed to access the consistent state.
+
+**Method (B): Deferred Ancestor Writes**  
+Here, `fsync` writes only dirty leaf data blocks and a journal record (e.g., a "checkpoint pending" marker), but **defers writing ancestor nodes** until the next full checkpoint. During a crash, the journal record indicates an incomplete operation. Recovery must now **reconstruct the entire tree structure** from scratch: it reads the journal, then traverses the dirty leaves to rebuild all ancestor nodes (e.g., recalculating pointers for parent blocks). This involves scanning multiple blocks, recalomputing intermediate node values, and verifying consistency—a process that is I/O-intensive and time-consuming.
+
+**Main Cost of (B)**  
+The primary drawback is **significantly higher crash recovery time and I/O overhead**. Rebuilding the tree on-the-fly after a crash requires reading and processing potentially large portions of the filesystem (e.g., all dirty leaves and their ancestors), which can delay system availability. While method (B) reduces `fsync` latency during normal operation (by avoiding immediate ancestor writes), this efficiency is offset by slower recovery—especially critical in systems where rapid post-crash resumption is essential. This trade-off makes (B) less suitable for workloads where crash recovery speed is prioritized over `fsync` performance.

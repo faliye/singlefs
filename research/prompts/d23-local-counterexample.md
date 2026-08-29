@@ -1,0 +1,96 @@
+# Background: singlefs D23 open items 2 and 3
+
+## 已定的相关前提（原文，不是转述）
+
+- D23 已定方向：journal 记录承载「指针层的目标态」；分配先于 journal；
+  轴一「每次 fsync 发一个根」，轴二取甲「祖先不延后」。
+- D23 已定：记录头要两个计数字段——jsn（每条记录、全局单调、u64、前缀判定靠它）与
+  checkpoint_txg（每个 checkpoint、供记账）。前缀判定是 jsn == expected，断号即止，
+  且必须限定在「在飞窗口」内。
+- D22 已证链式是可行的另一条路：ZFS 的 ZIL 不是定长环，块动态分配，
+  每块 trailer 里带一个 blkptr 指向链上下一块，链头存在 zil_header_t.zh_log。
+  循环被「指针住在前一条记录里」打破，不必提交到根。代价是 mount 时要 claim 日志块，
+  以免分配器把它们提前发出去（ZFS 为此有 zh_claim_txg）。
+- D20 刚定（2026-08-29）：有父指针的单元不依赖任何原子宽度；自证单元
+  （根槽、journal 记录头）依赖运行时探测的 physical_block_size，不许硬编码。
+- D23 的三个死锁：
+  1. journal 满 → checkpoint → 发根 → 发根要不要写 journal。
+     jbd2 原话：提交代码假定它不用强制 checkpoint 就能拿到足够日志空间，
+     这对正确性是关键，否则会死锁。
+  2. COW 独有：checkpoint → COW 写新节点 → 要分配 → 盘满 → 发不出根。
+     jbd2/XFS 没有这个环，因为它们原地写、回家不需要新空间。btrfs 有，用 global_block_rsv。
+  3. 单条操作大于环。XFS 有 XFS_MIN_LOG_FACTOR = 3，mkfs 时算、mount 时校验。
+     本工程需要等价的几何不变量：任一操作的最坏 journal 占用 ≤ 环大小 / F，F ≥ 2。
+
+## 本轮实测（E24 journal 几何，2026-08-29）
+
+纯计数模型，20000 次 fsync，每 1000 次一个 checkpoint。数的是块，不是字节也不是屏障。
+
+未定项 3 两条臂：
+
+| tail 形态 | 稳态额外写 | 空闲期崩溃后要重放 |
+|---|---|---|
+| jbd2 形态（住 journal 超级块、原地覆盖、FUA） | 21 块（= checkpoint 次数，占 20000 次 fsync 的 0.105%） | 0 |
+| XFS 形态（内联在每条记录头的 tail_lsn） | 0 | 500 块（原子宽度 4096）/ 63 块（512） |
+
+机制：内联形态只能搭记录的便车推进，不写记录就推不动 tail；
+超级块形态可以在 checkpoint 完成时单独写一次。空闲期崩溃时两者因此分开。
+
+未定项 2 两条臂：除一项外每个指标都相同，那一项是分配次数。
+
+| | 定长环 | 链式 |
+|---|---|---|
+| 稳态写块数 | 相同 | 相同 |
+| 向分配器要块 | 0 次 | 每个 journal 块一次（20000 次 fsync ⇒ 20000 次） |
+| 死锁 3（单条操作大于环） | 存在，需要几何不变量 | 不存在 |
+
+三者耦合：原子宽度决定记录占几块 → 决定环要多大 → 环太小把 tail 写放大。
+原子宽度 512 时环 ≥ 256 块，4096 时环 ≥ 1024 块；环只有 4 块时
+20000 次 fsync 里有 4980 次强制 checkpoint，tail 写从 20 涨到 5000。
+
+## 尚未做的
+
+- 崩溃点重放没有实现，本仓对撕裂与重排序目前零覆盖。
+- 没有量过字节数与屏障数，只量过块数。
+- 没有真机、没有事务层。E24 是模型层数字。
+
+# Your task: find counterexamples
+
+Two candidate answers have been drafted from the measurements above. Attack both.
+
+Candidate A (open item 2): "Take the fixed-size ring, not the chain. The chain turns the
+journal write path into an allocating path, which puts it inside deadlock 2, and deadlock 2
+is the COW-specific one that is already the hardest. The chain buys only the removal of
+deadlock 3, and deadlock 3 is already handled by a geometry invariant checked at mkfs time."
+
+Candidate B (open item 3): "Take the jbd2 shape, tail in the journal superblock. It costs
+21 extra writes across 20000 fsyncs, that is 0.105 percent, and it buys replay after an idle
+crash going from 500 blocks to zero. The XFS shape saves nothing measurable and loses that."
+
+Answer these, numbered 1 to 6:
+
+1. Give a concrete workload or failure sequence where candidate A is the wrong choice, that
+   is, where the fixed ring costs more than the chain would. Be specific.
+
+2. Candidate A says deadlock 3 is handled by a geometry invariant checked at mkfs time. Attack
+   that: name a case where the worst-case journal usage of a single operation cannot be
+   computed at mkfs time, so the invariant cannot be checked.
+
+3. Candidate B counts blocks. The jbd2 shape writes the journal superblock in place with a
+   forced unit access. Work out whether that changes the answer when the metric is barriers
+   or device write latency rather than blocks, and say which way.
+
+4. The chain needs mount-time claim of its blocks so the allocator does not hand them out.
+   Work out what that costs and whether it can fail, and whether the ring has any equivalent
+   cost that the table above is hiding.
+
+5. Candidate B says the XFS shape saves nothing measurable. Find something it does save that
+   the block-count model cannot see.
+
+6. Which single sentence in this whole picture is most likely to be wrong, and what
+   observation would show it?
+
+Language: answer in English only. Do not use Chinese anywhere in your answer.
+
+Formatting: answer in plain prose. Do NOT use bold, italics, backticks or any markdown
+emphasis anywhere in your answer. Number each answer 1 to 6 and nothing else.

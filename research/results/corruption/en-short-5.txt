@@ -1,0 +1,9 @@
+
+
+In copy-on-write (COW) filesystems like Btrfs or ZFS, `fsync` ensures data durability. Option (A) performs an immediate full checkpoint: all dirty data leaves, ancestor nodes, and a new root are written to disk. Option (B) writes only dirty leaves and a single journal record, deferring ancestor updates to the next checkpoint.  
+
+Crash recovery differs significantly. For (A), after `fsync`, the filesystem is fully consistent—the root pointer references a complete, valid tree. If a crash occurs post-`fsync`, recovery simply uses the last checkpointed root; no additional steps are needed beyond standard recovery, ensuring minimal overhead.  
+
+For (B), after `fsync`, the journal record indicates pending changes, but ancestor nodes remain unwritten. A crash during this window leaves the filesystem inconsistent: the root may point to stale data, and the tree structure is incomplete. Recovery must replay the journal to reconstruct ancestors and rebuild the tree, which involves complex traversal and validation of journal entries. This process is computationally expensive and time-consuming, especially if many `fsync` operations occurred since the last checkpoint.  
+
+The main cost of (B) is **increased crash recovery time and complexity**. While (B) reduces `fsync` latency by minimizinging less data immediately, it shifts the burden to recovery, where journal replay can dominate recovery duration, potentially causing prolonged downtime after failures. This trade-off prioritizes write performance at the expense of robustness during failures.

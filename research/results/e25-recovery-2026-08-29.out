@@ -1,0 +1,26 @@
+E7RESULT name=config ring_blocks=64
+E7RESULT name=cell warmup=200 gap=0 algo=TrustTail missed=0 replayed=0 needed=0 spurious=0
+E7RESULT name=cell warmup=200 gap=0 algo=ScanAll missed=0 replayed=64 needed=0 spurious=64
+E7RESULT name=cell warmup=200 gap=1 algo=TrustTail missed=1 replayed=0 needed=1 spurious=0
+E7RESULT name=cell warmup=200 gap=1 algo=ScanAll missed=0 replayed=64 needed=1 spurious=63
+E7RESULT name=cell warmup=200 gap=5 algo=TrustTail missed=5 replayed=0 needed=5 spurious=0
+E7RESULT name=cell warmup=200 gap=5 algo=ScanAll missed=0 replayed=64 needed=5 spurious=59
+E7RESULT name=cell warmup=200 gap=20 algo=TrustTail missed=20 replayed=0 needed=20 spurious=0
+E7RESULT name=cell warmup=200 gap=20 algo=ScanAll missed=0 replayed=64 needed=20 spurious=44
+E7RESULT name=cell warmup=200 gap=63 algo=TrustTail missed=63 replayed=0 needed=63 spurious=0
+E7RESULT name=cell warmup=200 gap=63 algo=ScanAll missed=0 replayed=64 needed=63 spurious=1
+E7RESULT name=cell warmup=200 gap=100 algo=TrustTail missed=100 replayed=0 needed=100 spurious=0
+E7RESULT name=cell warmup=200 gap=100 algo=ScanAll missed=36 replayed=64 needed=100 spurious=0
+E7RESULT name=cell warmup=1000 gap=0 algo=TrustTail missed=0 replayed=0 needed=0 spurious=0
+E7RESULT name=cell warmup=1000 gap=0 algo=ScanAll missed=0 replayed=64 needed=0 spurious=64
+E7RESULT name=cell warmup=1000 gap=1 algo=TrustTail missed=1 replayed=0 needed=1 spurious=0
+E7RESULT name=cell warmup=1000 gap=1 algo=ScanAll missed=0 replayed=64 needed=1 spurious=63
+E7RESULT name=cell warmup=1000 gap=5 algo=TrustTail missed=5 replayed=0 needed=5 spurious=0
+E7RESULT name=cell warmup=1000 gap=5 algo=ScanAll missed=0 replayed=64 needed=5 spurious=59
+E7RESULT name=cell warmup=1000 gap=20 algo=TrustTail missed=20 replayed=0 needed=20 spurious=0
+E7RESULT name=cell warmup=1000 gap=20 algo=ScanAll missed=0 replayed=64 needed=20 spurious=44
+E7RESULT name=cell warmup=1000 gap=63 algo=TrustTail missed=63 replayed=0 needed=63 spurious=0
+E7RESULT name=cell warmup=1000 gap=63 algo=ScanAll missed=0 replayed=64 needed=63 spurious=1
+E7RESULT name=cell warmup=1000 gap=100 algo=TrustTail missed=100 replayed=0 needed=100 spurious=0
+E7RESULT name=cell warmup=1000 gap=100 algo=ScanAll missed=36 replayed=64 needed=100 spurious=0
+E7RESULT name=done emitted=26

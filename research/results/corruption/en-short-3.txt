@@ -1,0 +1,12 @@
+
+
+In a copy-on-write (COW) filesystem, `fsync` ensures data durability, but implementation choices impact crash recovery.  
+
+**Method (A): Immediate Full Checkpoint**  
+When `fsync` triggers a full checkpoint, all dirty leaves, ancestor nodes, and a new root are written synchronously. After completion, the filesystem is fully consistent. During crash recovery, the system only needs to validate the latest root pointer. Since all nodes are up-to-date, recovery is trivial: it reads the root and traverses the tree directly, requiring no replay or reconstruction. This ensures fast, deterministic recovery with minimal overhead.  
+
+**Method (B): Deferred Ancestor Writes**  
+Here, `fsync` writes only dirty leaves and a journal record (e.g., a transaction log entry), deferring ancestor node updates to the next checkpoint. After `fsync`, the tree is inconsistent—leaves are updated but ancestors still point to old data. If a crash occurs before the next checkpoint, recovery must replay the journal to rebuild the missing intermediate nodes. This involves reading the written leaves, reconstructing parent nodes from scratch, and verifying consistency across the tree.  
+
+**Main Cost of (B)**  
+The primary cost is **increased crash recovery latency and complexity**. Reconstructing ancestor nodes on-demand requires additional I/O operations to read leaf data and compute intermediate paths, which scales with filesystem size and depth. This can significantly slow down recovery compared to method (A), especially for large trees. While (B) reduces `fsync` latency (by writing less data upfront), it shifts the performance burden to recovery, making it less suitable for systems where fast post-crash restarts are critical.

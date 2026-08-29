@@ -1,0 +1,23 @@
+E7RESULT name=config s_txg=100
+E7RESULT name=p1 rule=correct data_loss=0 leak=0 agree=3
+E7RESULT name=p1 rule=strict_birth data_loss=1 leak=0 agree=2
+E7RESULT name=p1 rule=closed_death data_loss=0 leak=2 agree=1
+E7RESULT name=p2 entries=64 bucket_span=16 plain=64 bucketed=34
+E7RESULT name=p2 entries=64 bucket_span=64 plain=64 bucketed=64
+E7RESULT name=p2 entries=64 bucket_span=256 plain=64 bucketed=64
+E7RESULT name=p2 entries=256 bucket_span=16 plain=256 bucketed=136
+E7RESULT name=p2 entries=256 bucket_span=64 plain=256 bucketed=130
+E7RESULT name=p2 entries=256 bucket_span=256 plain=256 bucketed=256
+E7RESULT name=p2 entries=1024 bucket_span=16 plain=1024 bucketed=544
+E7RESULT name=p2 entries=1024 bucket_span=64 plain=1024 bucketed=520
+E7RESULT name=p2 entries=1024 bucket_span=256 plain=1024 bucketed=514
+E7RESULT name=p2 entries=4096 bucket_span=16 plain=4096 bucketed=2176
+E7RESULT name=p2 entries=4096 bucket_span=64 plain=4096 bucketed=2080
+E7RESULT name=p2 entries=4096 bucket_span=256 plain=4096 bucketed=2056
+E7RESULT name=p4 immediate_frees=64 per_block=128 defer_entries=64 defer_ios=1
+E7RESULT name=p4 immediate_frees=64 per_block=512 defer_entries=64 defer_ios=1
+E7RESULT name=p4 immediate_frees=1024 per_block=128 defer_entries=1024 defer_ios=8
+E7RESULT name=p4 immediate_frees=1024 per_block=512 defer_entries=1024 defer_ios=2
+E7RESULT name=p4 immediate_frees=16384 per_block=128 defer_entries=16384 defer_ios=128
+E7RESULT name=p4 immediate_frees=16384 per_block=512 defer_entries=16384 defer_ios=32
+E7RESULT name=done emitted=23

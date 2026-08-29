@@ -1,0 +1,36 @@
+e8-split 轮1 rc=0
+e8-split 轮2 rc=0
+e8-split 轮3 rc=0
+e17-merge 轮1 rc=0
+e17-merge 轮2 rc=0
+e17-merge 轮3 rc=0
+e18-branch 轮1 rc=0
+e18-branch 轮2 rc=0
+e18-branch 轮3 rc=0
+e19-defer 轮1 rc=0
+e19-defer 轮2 rc=0
+e19-defer 轮3 rc=0
+e14-discrimination 轮1 rc=0
+e14-discrimination 轮2 rc=0
+e14-discrimination 轮3 rc=0
+BATCH1
+e20 轮1 rc=0
+e20 轮2 rc=0
+e20 轮3 rc=0
+e16 轮1 rc=0
+e16 轮2 rc=0
+e16 轮3 rc=0
+e21 轮1 rc=0
+e21 轮2 rc=0
+e21 轮3 rc=0
+e9 轮1 rc=0
+e9 轮2 rc=0
+e9 轮3 rc=0
+e7 轮1 rc=0
+e7 轮2 rc=0
+e7 轮3 rc=0
+e12 轮1 rc=0
+e12 轮2 rc=0
+e12 轮3 rc=0
+e6mc rc=0
+BATCH2

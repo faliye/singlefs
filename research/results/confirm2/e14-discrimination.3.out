@@ -1,0 +1,12 @@
+E7RESULT name=config keys=512 ops=20000 batch=64 seeds=5
+E7RESULT name=case form=idempotent bug=None i31_red=0/5 value_correct=5/5 flushed_entries=20000
+E7RESULT name=case form=idempotent bug=MergeReversed i31_red=5/5 value_correct=5/5 flushed_entries=20000
+E7RESULT name=case form=idempotent bug=TombstoneIgnored i31_red=5/5 value_correct=5/5 flushed_entries=20000
+E7RESULT name=case form=idempotent bug=DropMessage i31_red=5/5 value_correct=5/5 flushed_entries=19687
+E7RESULT name=case form=idempotent bug=DoubleApply i31_red=0/5 value_correct=5/5 flushed_entries=40000
+E7RESULT name=case form=delta bug=None i31_red=0/5 value_correct=5/5 flushed_entries=20000
+E7RESULT name=case form=delta bug=MergeReversed i31_red=0/5 value_correct=0/5 flushed_entries=20000
+E7RESULT name=case form=delta bug=TombstoneIgnored i31_red=0/5 value_correct=0/5 flushed_entries=20000
+E7RESULT name=case form=delta bug=DropMessage i31_red=0/5 value_correct=0/5 flushed_entries=19687
+E7RESULT name=case form=delta bug=DoubleApply i31_red=0/5 value_correct=0/5 flushed_entries=40000
+E7RESULT name=done emitted=12

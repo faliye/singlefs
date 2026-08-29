@@ -1,0 +1,8 @@
+E7RESULT name=config note=只扫单元头重建明文映射
+E7RESULT name=cell meta=64 data=256 data_self_desc=false total=320 rebuilt=64 missing=256 wrong=0 missing_meta=0 missing_data=256
+E7RESULT name=cell meta=64 data=256 data_self_desc=true total=320 rebuilt=320 missing=0 wrong=0 missing_meta=0 missing_data=0
+E7RESULT name=cell meta=256 data=1024 data_self_desc=false total=1280 rebuilt=256 missing=1024 wrong=0 missing_meta=0 missing_data=1024
+E7RESULT name=cell meta=256 data=1024 data_self_desc=true total=1280 rebuilt=1280 missing=0 wrong=0 missing_meta=0 missing_data=0
+E7RESULT name=cell meta=1024 data=4096 data_self_desc=false total=5120 rebuilt=1024 missing=4096 wrong=0 missing_meta=0 missing_data=4096
+E7RESULT name=cell meta=1024 data=4096 data_self_desc=true total=5120 rebuilt=5120 missing=0 wrong=0 missing_meta=0 missing_data=0
+E7RESULT name=done emitted=8
