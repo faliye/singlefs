@@ -68,19 +68,24 @@ else ok "上游规则路径统一"; fi
 
 echo
 echo "── 5. 决策标题：编号连续、带状态、未定项条数与列表相符 ──"
-python3 - "$KB/decisions.md" <<'PY'
+# ⚠️ 2026-08-29：此前这一段只读 decisions.md，而决策正文早已拆到 decisions/ 下，
+# decisions.md 里一个 `## D<n>` 标题都没有 ⇒ **整段恒绿**，标题声明的未定项条数从没被核过。
+# 现在逐个读 decisions/*.md。
+python3 - $KB/decisions/*.md <<'PY'
 import re, sys
-p = sys.argv[1]
-s = open(p, encoding="utf-8").read()
-body = s.split("\n## 历史版本", 1)[0]
+body = ""
+for p in sys.argv[1:]:
+    body += open(p, encoding="utf-8").read().split("\n## 历史版本", 1)[0] + "\n"
 CN = {"一":1,"二":2,"两":2,"三":3,"四":4,"五":5,"六":6,"七":7,"八":8,"九":9,"十":10}
 fail = 0
 def bad(m):
     global fail; print(f"  ✗ {m}"); fail = 1
 
-# 编号连续
+# 编号连续（每个文件一个标题，按文件名顺序读进来，所以直接比对）
 nums = [int(m.group(1)) for m in re.finditer(r'^## D(\d+) ', body, flags=re.M)]
-if nums != list(range(1, len(nums) + 1)):
+if not nums:
+    bad("一个 `## D<n>` 标题都没读到——这一段又变成恒绿了，先修检查再谈别的")
+elif nums != list(range(1, len(nums) + 1)):
     bad(f"决策编号不连续或不从 D1 起：{nums}")
 
 # 切成每条决策
