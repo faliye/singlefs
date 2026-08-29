@@ -90,7 +90,7 @@
   （见 E16（journal 的角色：WAL vs 意图日志）），本实验只数了它发生几次。
 - **重放量只按块算，没算重放时的随机读**。链式重放要沿指针逐块跳，
   环式可以顺序预读——这一层本实验够不着。
-- 代码 `research/e7-index-bench/src/bin/e24_journal_geom.rs`，
+- 代码 `research/e7-index-bench/src/bin/e24_journal_geom.rs`（`cargo run --release --bin e24_journal_geom`），
   原始输出 `research/results/e24-journal-geom-2026-08-29.out`。三轮字节一致。
 
 ### 这一轮踩的两个坑，都由变异测试抓出来

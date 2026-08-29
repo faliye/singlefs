@@ -97,7 +97,7 @@
   真实的 btree split/merge、write buffer 去重能造出的错配形态更多，本实验够不着。
 - **没有建模 nonce 重用**：`derived_nonce` 臂把逻辑身份折进 nonce，
   真实实现里那要与 I-6.1（nonce 不重用） 一起验，本实验对此一个字没说。
-- 代码 `research/e7-index-bench/src/bin/e32_aad_snapshot.rs`，
+- 代码 `research/e7-index-bench/src/bin/e32_aad_snapshot.rs`（`cargo run --release --bin e32-aad-snapshot`），
   原始输出 `research/results/e32-aad-snapshot-2026-08-29.out`。
   5 个单测、**4 条变异全部被抓**（表在 `research/mutations/e32_aad_snapshot.tsv`）。
 

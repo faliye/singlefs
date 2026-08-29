@@ -63,8 +63,24 @@ depth-first 创建（解压 tar 的形态）时 `Inode` 与 `Locality` **逐位�
 每叶 255 个 (key,val) 槽；`O_DIRECT`，镜像落临时目录（512 MiB，不进仓库）。
 5 个种子（3/7/11/13/17）取中位数。
 代码 `research/e7-index-bench/src/bin/e9_keylayout.rs`，
-调用 `e9-keylayout <镜像> <种子> interleave <cache_leaves> <改名次数>`；
+调用 `cargo run --release --bin e9-keylayout -- <镜像> <种子> interleave <cache_leaves> <改名次数>`；
 输出 `research/results/e9-keylayout-2026-08-28.out`（25 轮，完成标记 25 个）。
+
+⚠️ **那 25 轮是一个循环拼出来的，而这个循环 2026-08-29 之前没写进本文**——
+复跑的人只能从产物的 config 行反推参数。逐字补上（`cache_leaves` 恒为 8）：
+
+```bash
+truncate -s 512M "$IMG"                       # 镜像落临时目录，不进仓库
+for r in 0 500 2000 5000 20000; do            # 改名次数，外层
+  for s in 3 7 11 13 17; do                   # 种子，内层
+    cargo run --release --bin e9-keylayout -- "$IMG" "$s" interleave 8 "$r"
+  done
+done
+```
+
+2026-08-29 按这个循环重跑，与入库产物**逐字节一致**（150 行、25 个完成标记全部对上）。
+现在它由 `research/scripts/replay.sh` 的 `driver_e9` 承载，
+复跑只需把本实验的编号作为参数传给它：`bash research/scripts/replay.sh <本实验编号>`。
 
 ### ⚠️ 本实验此前一条绝对值断言都没有（2026-08-29 对抗验证补上）
 

@@ -65,7 +65,7 @@
 条目第二个 8 字节存子节点号（形成依赖式载入链）。**固定 key 数、不固定工作集**——
 条目变宽 ⇒ 工作集变大 ⇒ 被挤出缓存，这才是要问的。
 本机每核 L1d 48 KiB、L2 1 MiB、L3 32 MiB、缓存行 64 字节。
-代码 `research/e7-index-bench/src/bin/e20_fanout.rs`，
+代码 `research/e7-index-bench/src/bin/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
 原始输出 `research/results/e20-fanout-2026-08-28.out`（两档首版）与
 `research/results/e20-sweep-2026-08-29.out`（六档 × 三轮）。
 

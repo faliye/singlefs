@@ -70,6 +70,9 @@ ck  D5  "分叉点快照不许销毁"            "$ZFS/module/zfs/dsl_destroy.c"
 ck  D16 "TXG_DEFER_SIZE 是 2"           "$ZFS/include/sys/txg.h" 'TXG_DEFER_SIZE[[:space:]]+2'
 ck  D17 "vdev 后端签名里带 txg"          "$ZFS/include/sys/vdev_impl.h" 'vdev_asize_func_t\(vdev_t \*vd, uint64_t psize, uint64_t txg\)'
 ck  D20 "ZFS 自陈设备不做单扇区原子覆写"  "$ZFS/module/zfs/vdev_label.c" 'even though it is required to'
+ck  D20 "ZFS 的 4 个 label"                "$ZFS/include/sys/vdev_impl.h" '#define[[:space:]]+VDEV_LABELS[[:space:]]+4'
+ck  D20 "ZFS 的 128 KiB uberblock 环"      "$ZFS/include/sys/vdev_impl.h" '#define[[:space:]]+VDEV_UBERBLOCK_RING[[:space:]]+\(128 << 10\)'
+ck  D20 "ZFS 槽号 = txg % 槽数（轮换）"     "$ZFS/module/zfs/vdev_label.c" 'ub->ub_txg - \(RRSS_GET_STATE'
 ck  D23 "ZIL 有 zh_claim_txg"           "$ZFS/include/sys/zil.h" 'zh_claim_txg'
 echo
 echo "── btrfs（Linux 6.17）──"
@@ -105,6 +108,76 @@ ck  D18 "ocfs2 的 metaecc"                "$KERN/fs/ocfs2/ocfs2_fs.h" 'ocfs2_bl
 ck  D19 "btrfs 的 sys_chunk_array 定长"    "$KERN/include/uapi/linux/btrfs_tree.h" 'BTRFS_SYSTEM_CHUNK_ARRAY_SIZE'
 ck  D9  "ext4 把 uuid 折进 s_csum_seed"    "$KERN/fs/ext4/super.c" 's_csum_seed'
 ck  D13 "iomap 契约里没有事务概念"          "$KERN/include/linux/iomap.h" 'iomap_begin'
+
+# ── 外部文献（PDF）──────────────────────────────────────────────────────
+# checks-owed.md C38 欠的另一半：源码那一侧 2026-08-29 已还，文献这一侧当时只还了 RFC 8439。
+# 取回方式 research/scripts/fetch-refs.sh（含 URL 与 sha256），抽取器 research/scripts/pdf-text.py。
+# ⚠️ 抽取器只解 FlateDecode + 单字节字体。抽出乱码要当**抽取失败**处理，不许当成「原文没这句」——
+#    ZFS On-Disk Specification 就是这种（CID 字体），所以它不在下面这张表里，见文末说明。
+PDFTXT_CACHE="${TMPDIR:-/tmp}/singlefs-pdftext-$(id -u)"
+mkdir -p "$PDFTXT_CACHE"
+pdftxt() { # pdftxt <pdf 名> —— 抽一次缓存一次，打印缓存路径；抽不出就打印空
+  local name="$1" pdf="$DOCS/$name" out="$PDFTXT_CACHE/${name%.pdf}.txt"
+  [[ -f "$pdf" ]] || return 1
+  if [[ ! -s "$out" || "$pdf" -nt "$out" ]]; then
+    python3 "$(dirname "$0")/pdf-text.py" "$pdf" >"$out" 2>/dev/null || return 1
+  fi
+  printf '%s' "$out"
+}
+ckdoc() { # ckdoc <决策> <说的是什么> <pdf 名> <ERE 模式>
+  local d="$1" what="$2" name="$3" pat="$4" txt
+  if [[ ! -f "$DOCS/$name" ]]; then
+    printf '  ✗ %-6s %-42s 文献不在本机：%s ⇒ 跑 research/scripts/fetch-refs.sh\n' "$d" "$what" "$DOCS/$name"
+    fail=$((fail+1)); return
+  fi
+  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }
+  # 原文按栏排版，一句话常被折成多行、还会在断行处加连字符（per-\nformance）⇒
+  # 先接行、去掉断行连字符、再把空白压成单空格。**只在这份规范化文本上匹配**，
+  # 所以模式里不要指望能对上原文的换行。
+  if tr '\n' ' ' <"$txt" | sed -E 's/([a-z])- ([a-z])/\1\2/g' | tr -s ' ' | grep -qE "$pat"; then
+    printf '  ✓ %-6s %s\n' "$d" "$what"; pass=$((pass+1))
+  else
+    printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$name"; fail=$((fail+1))
+  fi
+}
+ckdocn() { # ckdocn <决策> <说的是什么> <pdf 名> <ERE 模式> <期望命中数>
+  local d="$1" what="$2" name="$3" pat="$4" want="$5" txt got
+  if [[ ! -f "$DOCS/$name" ]]; then
+    printf '  ✗ %-6s %-42s 文献不在本机：%s\n' "$d" "$what" "$DOCS/$name"; fail=$((fail+1)); return
+  fi
+  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }
+  got=$(grep -oiE "$pat" "$txt" | wc -l)
+  if [[ "$got" == "$want" ]]; then printf '  ✓ %-6s %s（%s 次）\n' "$d" "$what" "$got"; pass=$((pass+1))
+  else printf '  ✗ %-6s %-42s 期望 %s 次，实测 %s 次\n' "$d" "$what" "$want" "$got"; fail=$((fail+1)); fi
+}
+
+echo
+echo "══ 外部文献逐字 ══"
+ckdoc D18 "OSTEP §45.6：身份校验抓不到丢失写"  ostep-45-file-integrity.pdf \
+      'the old block likely has a matching checksum'
+ckdoc D18 "NetApp FAST.20：lost write 占 13.54%" netapp-fast20-ssd-reliability.pdf \
+      'Lost Writes 13 ?: ?54%'
+ckdoc D18 "NetApp FAST.20：靠 WAFL 块签名发现"   netapp-fast20-ssd-reliability.pdf \
+      'signature, ?which includes attributes ?and ?version number'
+ckdoc D9  "NaCl §9：一次伪造即可解出 r"          naclcrypto.pdf \
+      'by polynomial root-finding, easily determine ClampP'
+ckdoc D9  "SP 800-38D §5.2.1.2 的五个 t 取值"     nist-sp800-38d.pdf \
+      '128, 120, 112, 104, or 96'
+ckdoc D9  "SP 800-38D 的 shall not（七选一）"     nist-sp800-38d.pdf \
+      'shall not support values for t'
+ckdocn D9 "MaxInvalids 属 38B 不属 38D（38B 侧）"  nist-sp800-38b.pdf 'MaxInvalids' 2
+ckdocn D9 "MaxInvalids 属 38B 不属 38D（38D 侧）"  nist-sp800-38d.pdf 'MaxInvalids' 0
+ckdoc D8  "FAST18：全路径索引的 Achilles heel"   betrfs-fast18-fullpath.pdf \
+      "Achilles' heel of full-path indexing"
+ckdoc D8  "FAST18：改名代价从子树大小降到深度"   betrfs-fast18-fullpath.pdf \
+      'proportional to the size of the subtree to the depth of the subtree'
+ckdocn D8 "FAST18 全文无 checksum"               betrfs-fast18-fullpath.pdf 'checksum' 0
+ckdoc D10 "FAST18：git 负载把 ext4 scan 退化 15 倍" betrfs-fast18-fullpath.pdf \
+      'degrade ext4 scan performance by up to 15'
+ckdoc D10 "FAST17：老化用连续 git checkout 内核树" betrfs-fast17-senescence.pdf \
+      'successive git checkouts of the Linux kernel source'
+ckdoc D10 "FAST17：老化的 BetrFS 胜过别家未老化" betrfs-fast17-senescence.pdf \
+      "Other than Btrfs, BetrFS's aged performance is better than the other file systems' unaged performance"
 
 echo
 echo "══ 结果：$pass 条命中，$fail 条未命中 ══"

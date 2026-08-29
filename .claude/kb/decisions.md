@@ -17,17 +17,21 @@
 > 并挂进门禁阶段「外部引用还核得动吗」（`.claude/gate.d/70-citations.sh`）。
 > ⚠️ **源码树不在也判红**——「跳过」正是让上一批文献无声蒸发的那个行为。
 >
-> ⚠️ **仍然不可复核的是另一类：外部文献。** 本机 `find` 确认已不存在
-> （`research/data/` 下只有一份英文词表）——
-> NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl* §9、OSTEP 第 45 章、
-> BetrFS 的 FAST 2017 / 2018 两篇、NetApp FAST'20、ZFS On-Disk Specification。
-> 它们当初标着「本机 PDF 核实」，**那份 PDF 现在不在了**。
-> ⇒ 受影响的引用散在 D5（快照 / 空间记账机制） / D9（加密） / D10（随机写 / 碎片化的真答案） / D14（双轨（大小文件 / 持久临时）） / D18（块里携带什么信息） / D23（journal 的角色与格式）。
-> 要拿它们支撑新结论，先把文献重新固定到 `/home/fy5090/code/fs-refs/docs/` 再逐条复核；
-> 在那之前它们只能当**线索**，不当证据。
-> **已重新固定的一份**：RFC 8439（`docs/rfc8439.txt`），D9（加密） 引的两处
-> （`:1483-1484` 的 `Tag truncation MUST NOT be done.`、`:1473` 的 `2^128 possible tags`）
-> 逐字命中，**连行号都对得上**。
+> **外部文献也已重新固定，并做成了会红的断言（2026-08-29 复跑轮）。**
+> 取回方式与 sha256 见 `research/scripts/fetch-refs.sh`，落在 `/home/fy5090/code/fs-refs/docs/`：
+> RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、OSTEP 第 45 章、
+> BetrFS 的 FAST 2017 / 2018 两篇、NetApp FAST'20，共 **7 份**。
+> 逐字断言并入 `research/scripts/verify-citations.sh`（承重引用由 55 条涨到 **72 条**），
+> 抽取器是 `research/scripts/pdf-text.py`（本机没有 poppler-utils 也没有 pip，只依赖标准库 zlib）。
+> 双向证过会红：`FS_REFS=/nonexistent` ⇒ 14 条文献断言全部未命中；
+> 把「SP 800-38D 里 MaxInvalids 命中 0 次」的期望改成 1 ⇒ 该条判红。
+>
+> ⚠️ **一份没收：ZFS On-Disk Specification。** 下得回来，但它用 CID 双字节字体，
+> `pdf-text.py` 抽出的是乱码——按该脚本自己的规矩这算**抽取失败**，不算「原文没这句」。
+> 引它的那几条（4 个 label × 128 KiB uberblock 环、槽号 = `txg % 槽数`）
+> 改从已固定的 OpenZFS 源码树核，断言是 `verify-citations.sh` 里 D20（承重面：单元的原子性与自包含） 的三条。
+> ⚠️ **一处口径缺失**：源码里槽号是 `ub_txg % (VDEV_UBERBLOCK_COUNT − m)`，
+> `m` 是多主机保护（MMP）占掉的槽数；D20（承重面：单元的原子性与自包含） 写的「槽号 = `txg % 槽数`」没有提这个减项。
 
 ## 决策索引
 
@@ -46,7 +50,7 @@
 | D8（核心索引结构） | 半定 | [08-核心索引结构.md](decisions/08-核心索引结构.md) |
 | D9（加密） | 半定（方向与七项已定；nonce 载体一项未定，等 D8（核心索引结构） 的 key 布局） | [09-加密.md](decisions/09-加密.md) |
 | D10（随机写 / 碎片化的真答案） | 已定（取候选 C：交给设备；普通 SSD 那一格仍空） | [10-随机写-碎片化的真答案.md](decisions/10-随机写-碎片化的真答案.md) |
-| D11（索引节点要不要留消息缓冲区） | 待定（不能拖，前置是 D12（目标介质）） | [11-索引节点要不要留消息缓冲区.md](decisions/11-索引节点要不要留消息缓冲区.md) |
+| D11（索引节点要不要留消息缓冲区） | 待定（不能拖；**前置已不是 D12（目标介质）**——四条前置里三条已答，详见正文「定它需要先回答」；紧迫性条件于 D18（块里携带什么信息） 未定项 3） | [11-索引节点要不要留消息缓冲区.md](decisions/11-索引节点要不要留消息缓冲区.md) |
 | D12（目标介质） | 已定：**按介质开放分支**，每套布局各一个 incompat 位；三项未定 | [12-目标介质.md](decisions/12-目标介质.md) |
 | D13（验证路线） | 半定（三类都做已定，分工与两处冲突未定） | [13-验证路线.md](decisions/13-验证路线.md) |
 | D14（双轨（大小文件 / 持久临时）） | 半定（两层已采纳、格式级第二轨不采纳，四项未定） | [14-双轨大小文件-持久临时.md](decisions/14-双轨大小文件-持久临时.md) |

@@ -60,6 +60,8 @@
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
+| `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
+| `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证） |
 | `records/` | 建设过程 |
 
@@ -87,6 +89,10 @@ bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了�
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
 bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（55 条承重引用，源码树不在也判红）
 bash .claude/gate.d/80-absolute-assertions.sh # 每个实验都要有钉绝对值的断言（防「所有臂一起错」）却没回收
+bash .claude/gate.d/85-repro-command.sh   # 点了产物的实验有没有写复跑命令
+bash .claude/gate.d/86-experiment-orphans.sh # research 里的实验号在 kb 里有没有正文
+bash .claude/gate.d/87-replay.sh          # 入库的实验数今天还复现得出来吗（默认只跑快的 19 个）
+bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红（样本在 gate.d/fixtures/）
 ```
 
 **`.claude/gate.d/*.sh` 是项目本地门禁阶段**，`gate.sh` 按文件名顺序逐个跑，
