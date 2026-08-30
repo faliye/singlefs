@@ -15,6 +15,10 @@ set -uo pipefail
 VM_MEM="${VM_MEM:-2048}"
 VM_CPUS="${VM_CPUS:-4}"
 VM_DISK_MB="${VM_DISK_MB:-4096}"
+# 挂几块盘。默认 1（保持既有用法与 --selftest 不变）；>1 时来宾看到 /dev/vda /dev/vdb …，
+# 全部路径按顺序作为**前缀参数**传给二进制。多盘是 E54（根环丢盘）要的：
+# 「丢一整块盘之后还挂不挂得上」只有在真的有多块盘时才问得出来。
+VM_DISKS="${VM_DISKS:-1}"
 VM_TIMEOUT="${VM_TIMEOUT:-900}"
 
 die() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
@@ -43,7 +47,14 @@ run_one() {
   ( cd "$ird/bin" && ./busybox --list | while read -r a; do ln -sf busybox "$a"; done ) 2>/dev/null || true
   cp "$bin" "$ird/bench"; chmod +x "$ird/bench"
   printf '%s\n' "$*" > "$ird/args"
-  truncate -s "${VM_DISK_MB}M" "$disk"
+  # N 块盘：disk.img / disk1.img …；来宾侧设备名按 virtio 顺序 vda vdb vdc …
+  local d devs=""
+  for ((d=0; d<VM_DISKS; d++)); do
+    truncate -s "${VM_DISK_MB}M" "$work/disk$d.img"
+    devs="$devs /dev/vd$(printf "\\$(printf '%03o' $((97+d)))")"
+  done
+  printf '%s\n' "${devs# }" > "$ird/devs"
+  disk="$work/disk0.img"
 
   cat > "$ird/init" <<'INIT'
 #!/bin/sh
@@ -55,7 +66,7 @@ if [ ! -b /dev/vda ]; then
   echo "SINGLEFS_EXIT=200"
   /bin/busybox poweroff -f
 fi
-/bench /dev/vda $(cat /args); rc=$?
+/bench $(cat /devs) $(cat /args); rc=$?
 echo "SINGLEFS_EXIT=$rc"
 /bin/busybox poweroff -f
 INIT
@@ -73,7 +84,10 @@ INIT
                -blockdev "driver=throttle,node-name=thr0,throttle-group=tg0,file=raw0"
                -device "virtio-blk-pci,drive=thr0" )
   else
-    drivearg=( -drive "file=$disk,if=virtio,format=raw,cache=none,aio=native" )
+    drivearg=()
+    for ((d=0; d<VM_DISKS; d++)); do
+      drivearg+=( -drive "file=$work/disk$d.img,if=virtio,format=raw,cache=none,aio=native" )
+    done
   fi
   # VM_CPU 让上层控制来宾看到哪些 CPU 特性（例如屏蔽 AES-NI：VM_CPU="host,-aes"）。
   # 不设时用 host，否则默认 CPU 模型不暴露 AES-NI，会把「算法慢」和「没有指令集」混为一谈。

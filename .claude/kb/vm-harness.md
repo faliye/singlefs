@@ -12,6 +12,21 @@ cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制�
 bash scripts/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
 ```
 
+## 挂几块盘
+
+`VM_DISKS`（默认 1）。>1 时来宾看到 `/dev/vda` `/dev/vdb` …，
+**全部设备路径按顺序作为前缀参数传给二进制**，二进制自己的参数跟在后面。
+
+```bash
+VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
+```
+
+多盘是 E54（丢一整块盘之后根环还挂不挂得上） 要的：「丢一整块盘之后还挂不挂得上」
+只有在真的有多块盘时才问得出来。改完 harness **先跑 `--selftest`**，通过了才算数。
+
+⚠️ **最小 initramfs 里没有 `dm-error` / `mdadm`**：
+做不出「读返回 EIO」和「条带阵列」，只做得出「把某块盘的内容真的抹掉」。
+
 ## 三个前置，每个都有确定的处置
 
 | 前置 | 怎么查 | 不满足怎么办 |

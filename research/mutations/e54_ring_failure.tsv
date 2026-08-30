@@ -1,0 +1,6 @@
+M1_跨区轮转退化成区内连续	fn placement(gen: u64, regions: u64, slots: u64) -> (u64, u64) {\n    (gen % regions, (gen / regions) % slots)\n}	fn placement(gen: u64, regions: u64, slots: u64) -> (u64, u64) {\n    ((gen / slots) % regions, gen % slots)\n}
+M2_CRC不参与判定	if crc32(&buf[0..16]) != want {\n        return None;\n    }	if false {\n        return None;\n    }
+M3_magic不参与判定	if u32::from_le_bytes(buf[0..4].try_into().ok()?) != MAGIC {\n        return None;\n    }	if false {\n        return None;\n    }
+M4_槽偏移不乘槽宽	REGION_OFF + slot_in_region * SLOT_BYTES	REGION_OFF + slot_in_region
+M5_CRC多项式写错	crc = (crc >> 1) ^ (0xEDB8_8320 & m);	crc = (crc >> 1) ^ (0xEDB8_8321 & m);
+M6_代数不够转三圈	const GENERATIONS: u64 = 24;	const GENERATIONS: u64 = 8;

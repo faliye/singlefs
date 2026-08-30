@@ -1,0 +1,7 @@
+M1_盘上占用不向上取整	sz.div_ceil(unit)	sz / unit
+M2_分岔扫描少一档	for items in 0..=max_items {	for items in 0..=(max_items / 100) {
+M3_期望值不除位宽	chances / 2f64.powi(bits as i32)	chances
+M4_至少一次退化成期望	1.0 - (-expected).exp()	expected
+M5_盘上占用漏掉链宽	let sz = base + chain + items * ITEM_BYTES;	let sz = base + items * ITEM_BYTES;
+M6_够用判据放宽到全通过	fn enough(at_least_once_p: f64) -> bool {\n    at_least_once_p < 0.01\n}	fn enough(at_least_once_p: f64) -> bool {\n    at_least_once_p <= 1.0\n}
+M7_每项字节算错	const ITEM_BYTES: u64 = 56;	const ITEM_BYTES: u64 = 64;

@@ -1,0 +1,56 @@
+E7RESULT name=config incidents=36500 seams_per_incident=1 fsync_per_sec=2785
+E7RESULT name=clean_log records=10 comparisons=9 cross_origin=0 expect_cross=0
+E7RESULT name=clean_log records=100 comparisons=99 cross_origin=0 expect_cross=0
+E7RESULT name=clean_log records=20480 comparisons=20479 cross_origin=0 expect_cross=0
+E7RESULT name=stale_log clean=100 stale=1 comparisons=100 cross_origin=1 expect_cross=1
+E7RESULT name=stale_log clean=100 stale=6 comparisons=105 cross_origin=1 expect_cross=1
+E7RESULT name=stale_log clean=100 stale=20 comparisons=119 cross_origin=1 expect_cross=1
+E7RESULT name=lap ring=10485760 rec_on_disk=512 records=20480 lap_seconds=7.354 freq=weekly scans_before_overwrite=1.216386e-5
+E7RESULT name=lap ring=10485760 rec_on_disk=512 records=20480 lap_seconds=7.354 freq=daily scans_before_overwrite=8.505379e-5
+E7RESULT name=lap ring=10485760 rec_on_disk=4096 records=2560 lap_seconds=0.919 freq=weekly scans_before_overwrite=1.520482e-6
+E7RESULT name=lap ring=10485760 rec_on_disk=4096 records=2560 lap_seconds=0.919 freq=daily scans_before_overwrite=1.063172e-5
+E7RESULT name=lap ring=104857600 rec_on_disk=512 records=204800 lap_seconds=73.537 freq=weekly scans_before_overwrite=1.216386e-4
+E7RESULT name=lap ring=104857600 rec_on_disk=512 records=204800 lap_seconds=73.537 freq=daily scans_before_overwrite=8.505379e-4
+E7RESULT name=lap ring=104857600 rec_on_disk=4096 records=25600 lap_seconds=9.192 freq=weekly scans_before_overwrite=1.520482e-5
+E7RESULT name=lap ring=104857600 rec_on_disk=4096 records=25600 lap_seconds=9.192 freq=daily scans_before_overwrite=1.063172e-4
+E7RESULT name=lap ring=2147483648 rec_on_disk=512 records=4194304 lap_seconds=1506.034 freq=weekly scans_before_overwrite=2.491158e-3
+E7RESULT name=lap ring=2147483648 rec_on_disk=512 records=4194304 lap_seconds=1506.034 freq=daily scans_before_overwrite=1.741902e-2
+E7RESULT name=lap ring=2147483648 rec_on_disk=4096 records=524288 lap_seconds=188.254 freq=weekly scans_before_overwrite=3.113947e-4
+E7RESULT name=lap ring=2147483648 rec_on_disk=4096 records=524288 lap_seconds=188.254 freq=daily scans_before_overwrite=2.177377e-3
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=weekly bits=16 chances_a=1.069056e7 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650044e4 at_least_once_b=4.270476e-1 enough_b=0
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=weekly bits=32 chances_a=1.069056e7 at_least_once_a=2.485995e-3 enough_a=1 chances_b=3.650044e4 at_least_once_b=8.498386e-6 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=weekly bits=64 chances_a=1.069056e7 at_least_once_a=5.795364e-13 enough_a=1 chances_b=3.650044e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=daily bits=16 chances_a=7.475200e7 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650310e4 at_least_once_b=4.270708e-1 enough_b=0
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=daily bits=32 chances_a=7.475200e7 at_least_once_a=1.725397e-2 enough_a=0 chances_b=3.650310e4 at_least_once_b=8.499005e-6 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=512 freq=daily bits=64 chances_a=7.475200e7 at_least_once_a=4.052314e-12 enough_a=1 chances_b=3.650310e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=weekly bits=16 chances_a=1.336320e6 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650006e4 at_least_once_b=4.270442e-1 enough_b=0
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=weekly bits=32 chances_a=1.336320e6 at_least_once_a=3.110878e-4 enough_a=1 chances_b=3.650006e4 at_least_once_b=8.498295e-6 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=weekly bits=64 chances_a=1.336320e6 at_least_once_a=7.238654e-14 enough_a=1 chances_b=3.650006e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=daily bits=16 chances_a=9.344000e6 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650039e4 at_least_once_b=4.270471e-1 enough_b=0
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=daily bits=32 chances_a=9.344000e6 at_least_once_a=2.173205e-3 enough_a=1 chances_b=3.650039e4 at_least_once_b=8.498373e-6 enough_b=1
+E7RESULT name=readings ring=10485760 rec_on_disk=4096 freq=daily bits=64 chances_a=9.344000e6 at_least_once_a=5.064837e-13 enough_a=1 chances_b=3.650039e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=weekly bits=16 chances_a=1.069056e8 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650444e4 at_least_once_b=4.270825e-1 enough_b=0
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=weekly bits=32 chances_a=1.069056e8 at_least_once_a=2.458368e-2 enough_a=0 chances_b=3.650444e4 at_least_once_b=8.499316e-6 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=weekly bits=64 chances_a=1.069056e8 at_least_once_a=5.795364e-12 enough_a=1 chances_b=3.650444e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=daily bits=16 chances_a=7.475200e8 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.653104e4 at_least_once_b=4.273150e-1 enough_b=0
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=daily bits=32 chances_a=7.475200e8 at_least_once_a=1.597414e-1 enough_a=0 chances_b=3.653104e4 at_least_once_b=8.505510e-6 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=512 freq=daily bits=64 chances_a=7.475200e8 at_least_once_a=4.052314e-11 enough_a=1 chances_b=3.653104e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=weekly bits=16 chances_a=1.336320e7 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650055e4 at_least_once_b=4.270485e-1 enough_b=0
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=weekly bits=32 chances_a=1.336320e7 at_least_once_a=3.106527e-3 enough_a=1 chances_b=3.650055e4 at_least_once_b=8.498412e-6 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=weekly bits=64 chances_a=1.336320e7 at_least_once_a=7.244205e-13 enough_a=1 chances_b=3.650055e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=daily bits=16 chances_a=9.344000e7 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.650388e4 at_least_once_b=4.270776e-1 enough_b=0
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=daily bits=32 chances_a=9.344000e7 at_least_once_a=2.152075e-2 enough_a=0 chances_b=3.650388e4 at_least_once_b=8.499186e-6 enough_b=1
+E7RESULT name=readings ring=104857600 rec_on_disk=4096 freq=daily bits=64 chances_a=9.344000e7 at_least_once_a=5.065393e-12 enough_a=1 chances_b=3.650388e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=weekly bits=16 chances_a=2.189427e9 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.659093e4 at_least_once_b=4.278381e-1 enough_b=0
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=weekly bits=32 chances_a=2.189427e9 at_least_once_a=3.993637e-1 enough_a=0 chances_b=3.659093e4 at_least_once_b=8.519453e-6 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=weekly bits=64 chances_a=2.189427e9 at_least_once_a=1.186891e-10 enough_a=1 chances_b=3.659093e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=daily bits=16 chances_a=1.530921e10 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.713579e4 at_least_once_b=4.325753e-1 enough_b=0
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=daily bits=32 chances_a=1.530921e10 at_least_once_a=9.716875e-1 enough_a=0 chances_b=3.713579e4 at_least_once_b=8.646313e-6 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=512 freq=daily bits=64 chances_a=1.530921e10 at_least_once_a=8.299139e-10 enough_a=1 chances_b=3.713579e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=weekly bits=16 chances_a=2.736783e8 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.651137e4 at_least_once_b=4.271430e-1 enough_b=0
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=weekly bits=32 chances_a=2.736783e8 at_least_once_a=6.173298e-2 enough_a=0 chances_b=3.651137e4 at_least_once_b=8.500929e-6 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=weekly bits=64 chances_a=2.736783e8 at_least_once_a=1.483613e-11 enough_a=1 chances_b=3.651137e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=daily bits=16 chances_a=1.913651e9 at_least_once_a=1.000000e0 enough_a=0 chances_b=3.657947e4 at_least_once_b=4.277381e-1 enough_b=0
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=daily bits=32 chances_a=1.913651e9 at_least_once_a=3.595323e-1 enough_a=0 chances_b=3.657947e4 at_least_once_b=8.516786e-6 enough_b=1
+E7RESULT name=readings ring=2147483648 rec_on_disk=4096 freq=daily bits=64 chances_a=1.913651e9 at_least_once_a=1.037392e-10 enough_a=1 chances_b=3.657947e4 at_least_once_b=1.998401e-15 enough_b=1
+E7RESULT name=done emitted=56

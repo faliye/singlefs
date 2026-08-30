@@ -1,0 +1,9 @@
+M1_删头触及不乘头数	Arm::KeySnapshotSuffix => heads * keys_per_head,	Arm::KeySnapshotSuffix => keys_per_head,
+M2_每头一棵树也逐key删	Arm::TreePerHead => keys_per_head.div_ceil(fanout(node_bytes, arm)),	Arm::TreePerHead => keys_per_head,
+M3_点查不走祖先链	Arm::KeySnapshotSuffix => 4 + heads.saturating_sub(1),	Arm::KeySnapshotSuffix => 4,
+M4_旁表算到单树那条臂上	Arm::KeySnapshotSuffix | Arm::KeySnapshotPrefix => 0,\n        Arm::TreePerHead => {	Arm::KeySnapshotSuffix | Arm::KeySnapshotPrefix => keys_per_head,\n        Arm::TreePerHead => {
+M5_单头也算跨头共享	if heads <= 1 {\n                0\n            } else {	if heads <= 0 {\n                0\n            } else {
+M6_快照维不占字节	Arm::KeySnapshotSuffix | Arm::KeySnapshotPrefix => 8 * 3 + 4,	Arm::KeySnapshotSuffix | Arm::KeySnapshotPrefix => 8 * 3,
+M7_每头元数据不乘头数	Arm::TreePerHead => 3 * heads,	Arm::TreePerHead => 3,
+M8_前缀臂也全扫	Arm::KeySnapshotPrefix => keys_per_head.div_ceil(fanout(node_bytes, arm)),	Arm::KeySnapshotPrefix => heads * keys_per_head,
+M9_前缀臂下降次数不随头数	Arm::KeySnapshotPrefix => heads,\n        Arm::TreePerHead => 1,	Arm::KeySnapshotPrefix => 1,\n        Arm::TreePerHead => 1,

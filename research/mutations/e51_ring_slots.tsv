@@ -1,0 +1,6 @@
+M1_一圈时长不除fsync率	fn lap_seconds(slots: u64, fsync_per_sec: f64) -> f64 {\n    slots as f64 / fsync_per_sec\n}	fn lap_seconds(slots: u64, fsync_per_sec: f64) -> f64 {\n    let _ = fsync_per_sec;\n    slots as f64\n}
+M2_扣块数不乘槽数	fn pinned_blocks(slots: u64, blocks_per_fsync: u64) -> u64 {\n    slots * blocks_per_fsync\n}	fn pinned_blocks(slots: u64, blocks_per_fsync: u64) -> u64 {\n    let _ = slots;\n    blocks_per_fsync\n}
+M3_幸存槽不减死区	fn surviving_slots(regions: u64, slots_per_region: u64) -> u64 {\n    (regions - 1) * slots_per_region\n}	fn surviving_slots(regions: u64, slots_per_region: u64) -> u64 {\n    regions * slots_per_region\n}
+M4_要紧的线调低	const PINNED_MATTERS: u64 = 1000;	const PINNED_MATTERS: u64 = 100;
+M5_粗粒度块数算错	const COARSE_BLOCKS: u64 = 8 + 3 + 1 + 1;	const COARSE_BLOCKS: u64 = 8 + 3;
+M6_散开档退化成粗粒度	const SCATTERED_BLOCKS: u64 = 8 + 8 * 3 + 1 + 1;	const SCATTERED_BLOCKS: u64 = 8 + 3 + 1 + 1;

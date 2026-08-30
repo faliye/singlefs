@@ -56,6 +56,10 @@ E41|e41_csum_width||e41-csum-width-2026-08-30.out|exact
 E47|e47_region_spacing||e47-region-spacing-2026-08-30.out|exact
 E48|e48_ring_loss||e48-ring-loss-2026-08-30.out|exact
 E49|e49_ring_placement||e49-ring-placement-2026-08-30.out|exact
+E51|e51_ring_slots||e51-ring-slots-2026-08-30.out|exact
+E50|e50_chain_width||e50-chain-width-2026-08-30.out|exact
+E52|e52_chain_chances||e52-chain-chances-2026-08-30.out|exact
+E53|e53_head_mechanisms||e53-head-mechanisms-2026-08-30.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-28.out|exact

@@ -1,0 +1,7 @@
+M1_不同源计数把同源也算上	if prev.origin != cur.origin {	if prev.origin == cur.origin {
+M2_链值不含前一条	for x in [r.jsn, r.origin as u64, r.prev_hash] {	for x in [r.jsn, r.origin as u64] {
+M3_残留造成同源	let r = Rec { jsn: clean + k, origin: 0, prev_hash: sp };	let r = Rec { jsn: clean + k, origin: 1, prev_hash: sp };
+M4_读法B退化成读法A	fn chances_reading_b(incidents: f64, seams_per_incident: f64, scans_before_overwrite: f64) -> f64 {\n    incidents * (seams_per_incident + scans_before_overwrite)\n}	fn chances_reading_b(incidents: f64, seams_per_incident: f64, scans_before_overwrite: f64) -> f64 {\n    let _ = (seams_per_incident, scans_before_overwrite);\n    incidents * 293.0\n}
+M5_一圈时长不除fsync率	fn lap_seconds(records: f64) -> f64 {\n    records / FSYNC_PER_SEC\n}	fn lap_seconds(records: f64) -> f64 {\n    records\n}
+M6_够用判据放宽	fn enough(p: f64) -> bool {\n    p < 0.01\n}	fn enough(p: f64) -> bool {\n    p <= 1.0\n}
+M7_截断不生效	h & ((1u64 << bits) - 1)	h

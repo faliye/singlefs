@@ -1,0 +1,9 @@
+E7RESULT name=config devices=4 regions=4 slots_per_region=2 generations=24 slot_bytes=4096 region_off=1048576
+E7RESULT name=poscontrol_nofault survivors=8 chosen_gen=23 rollback=0 expect_survivors=8 expect_rollback=0
+E7RESULT name=lost_one_device wiped=/dev/vda survivors=6 chosen_gen=23 rollback=0 mountable=1
+E7RESULT name=lost_one_device wiped=/dev/vdb survivors=6 chosen_gen=23 rollback=0 mountable=1
+E7RESULT name=lost_one_device wiped=/dev/vdc survivors=6 chosen_gen=23 rollback=0 mountable=1
+E7RESULT name=lost_one_device wiped=/dev/vdd survivors=6 chosen_gen=22 rollback=1 mountable=1
+E7RESULT name=verdict worst_rollback=1 all_mountable=1 criterion_rollback_le_1=1 criterion_mountable=1
+E7RESULT name=negcontrol_wipe_all survivors=0 expect=0
+E7RESULT name=done emitted=9

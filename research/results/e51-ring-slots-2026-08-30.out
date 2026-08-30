@@ -1,0 +1,27 @@
+E7RESULT name=config pinned_matters=1000 coarse_blocks=13 scattered_blocks=34
+E7RESULT name=slots n=2 fsync=local_2785 lap_seconds=0.000718 pinned_coarse=26 pinned_scattered=68 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=2 fsync=enterprise_1e5 lap_seconds=0.000020 pinned_coarse=26 pinned_scattered=68 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=4 fsync=local_2785 lap_seconds=0.001436 pinned_coarse=52 pinned_scattered=136 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=4 fsync=enterprise_1e5 lap_seconds=0.000040 pinned_coarse=52 pinned_scattered=136 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=8 fsync=local_2785 lap_seconds=0.002873 pinned_coarse=104 pinned_scattered=272 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=8 fsync=enterprise_1e5 lap_seconds=0.000080 pinned_coarse=104 pinned_scattered=272 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=16 fsync=local_2785 lap_seconds=0.005745 pinned_coarse=208 pinned_scattered=544 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=16 fsync=enterprise_1e5 lap_seconds=0.000160 pinned_coarse=208 pinned_scattered=544 coarse_matters=0 scattered_matters=0
+E7RESULT name=slots n=32 fsync=local_2785 lap_seconds=0.011490 pinned_coarse=416 pinned_scattered=1088 coarse_matters=0 scattered_matters=1
+E7RESULT name=slots n=32 fsync=enterprise_1e5 lap_seconds=0.000320 pinned_coarse=416 pinned_scattered=1088 coarse_matters=0 scattered_matters=1
+E7RESULT name=slots n=64 fsync=local_2785 lap_seconds=0.022980 pinned_coarse=832 pinned_scattered=2176 coarse_matters=0 scattered_matters=1
+E7RESULT name=slots n=64 fsync=enterprise_1e5 lap_seconds=0.000640 pinned_coarse=832 pinned_scattered=2176 coarse_matters=0 scattered_matters=1
+E7RESULT name=slots n=256 fsync=local_2785 lap_seconds=0.091921 pinned_coarse=3328 pinned_scattered=8704 coarse_matters=1 scattered_matters=1
+E7RESULT name=slots n=256 fsync=enterprise_1e5 lap_seconds=0.002560 pinned_coarse=3328 pinned_scattered=8704 coarse_matters=1 scattered_matters=1
+E7RESULT name=slots n=1024 fsync=local_2785 lap_seconds=0.367684 pinned_coarse=13312 pinned_scattered=34816 coarse_matters=1 scattered_matters=1
+E7RESULT name=slots n=1024 fsync=enterprise_1e5 lap_seconds=0.010240 pinned_coarse=13312 pinned_scattered=34816 coarse_matters=1 scattered_matters=1
+E7RESULT name=upper_bound first_matter_coarse=256 first_matter_scattered=32 max_n_scanned=1024
+E7RESULT name=lower_bound regions=2 slots_per_region=1 total=2 surviving_after_one_domain=1 meets_k2=1
+E7RESULT name=lower_bound regions=2 slots_per_region=2 total=4 surviving_after_one_domain=2 meets_k2=1
+E7RESULT name=lower_bound regions=2 slots_per_region=4 total=8 surviving_after_one_domain=4 meets_k2=1
+E7RESULT name=lower_bound regions=3 slots_per_region=2 total=6 surviving_after_one_domain=4 meets_k2=1
+E7RESULT name=lower_bound regions=3 slots_per_region=4 total=12 surviving_after_one_domain=8 meets_k2=1
+E7RESULT name=lower_bound regions=4 slots_per_region=2 total=8 surviving_after_one_domain=6 meets_k2=1
+E7RESULT name=poscontrol_linear n8=104 n16=208 doubled=1
+E7RESULT name=negcontrol_zero_blocks pinned=0 expect=0
+E7RESULT name=done emitted=27
