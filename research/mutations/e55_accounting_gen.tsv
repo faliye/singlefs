@@ -1,0 +1,6 @@
+M1_丙不封顶	stats * checkpoints.min(k)	stats * checkpoints
+M2_丢弃改成遍历全部key	fn discard_touched(stats: u64, k: u64, checkpoints: u64) -> u64 {\n    if k == 0 || checkpoints <= k {\n        0 // 还没满 K 代，没有可丢的\n    } else {\n        stats\n    }\n}	fn discard_touched(stats: u64, k: u64, checkpoints: u64) -> u64 {\n    if k == 0 || checkpoints <= k {\n        0\n    } else {\n        stats * checkpoints\n    }\n}
+M3_第一格判据反了	fn discard_depends_on_capacity() -> bool {\n    false\n}	fn discard_depends_on_capacity() -> bool {\n    true\n}
+M4_甲加丢弃不等于丙	fn keys_scheme_a_with_discard(stats: u64, checkpoints: u64, k: u64) -> u64 {\n    keys_scheme_c(stats, checkpoints, k)\n}	fn keys_scheme_a_with_discard(stats: u64, checkpoints: u64, k: u64) -> u64 {\n    let _ = k;\n    keys_scheme_a(stats, checkpoints)\n}
+M5_写次数不含删	stats + discard_touched(stats, k, checkpoints)	stats
+M6_K无穷不退化	if k == 0 {\n        keys_scheme_a(stats, checkpoints)\n    } else {	if k == 0 {\n        0\n    } else {

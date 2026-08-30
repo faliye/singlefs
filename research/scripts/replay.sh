@@ -60,6 +60,7 @@ E51|e51_ring_slots||e51-ring-slots-2026-08-30.out|exact
 E50|e50_chain_width||e50-chain-width-2026-08-30.out|exact
 E52|e52_chain_chances||e52-chain-chances-2026-08-30.out|exact
 E53|e53_head_mechanisms||e53-head-mechanisms-2026-08-30.out|exact
+E55|e55_accounting_gen||e55-accounting-gen-2026-08-30.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-28.out|exact

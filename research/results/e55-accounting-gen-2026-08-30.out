@@ -1,0 +1,71 @@
+E7RESULT name=config note=counting_model_only file_ops=0
+E7RESULT name=keys stats=0 checkpoints=1 k=2 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=1 k=8 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=1 k=32 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10 k=2 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10 k=8 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10 k=32 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=100 k=2 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=100 k=8 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=100 k=32 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10000 k=2 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10000 k=8 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=10000 k=32 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=1000000 k=2 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=1000000 k=8 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=0 checkpoints=1000000 k=32 scheme_a=0 scheme_c=0 a_with_discard=0 same=1 discard_touched=0 writes_per_cp=0
+E7RESULT name=keys stats=8 checkpoints=1 k=2 scheme_a=8 scheme_c=8 a_with_discard=8 same=1 discard_touched=0 writes_per_cp=8
+E7RESULT name=keys stats=8 checkpoints=1 k=8 scheme_a=8 scheme_c=8 a_with_discard=8 same=1 discard_touched=0 writes_per_cp=8
+E7RESULT name=keys stats=8 checkpoints=1 k=32 scheme_a=8 scheme_c=8 a_with_discard=8 same=1 discard_touched=0 writes_per_cp=8
+E7RESULT name=keys stats=8 checkpoints=10 k=2 scheme_a=80 scheme_c=16 a_with_discard=16 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=10 k=8 scheme_a=80 scheme_c=64 a_with_discard=64 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=10 k=32 scheme_a=80 scheme_c=80 a_with_discard=80 same=1 discard_touched=0 writes_per_cp=8
+E7RESULT name=keys stats=8 checkpoints=100 k=2 scheme_a=800 scheme_c=16 a_with_discard=16 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=100 k=8 scheme_a=800 scheme_c=64 a_with_discard=64 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=100 k=32 scheme_a=800 scheme_c=256 a_with_discard=256 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=10000 k=2 scheme_a=80000 scheme_c=16 a_with_discard=16 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=10000 k=8 scheme_a=80000 scheme_c=64 a_with_discard=64 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=10000 k=32 scheme_a=80000 scheme_c=256 a_with_discard=256 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=1000000 k=2 scheme_a=8000000 scheme_c=16 a_with_discard=16 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=1000000 k=8 scheme_a=8000000 scheme_c=64 a_with_discard=64 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=8 checkpoints=1000000 k=32 scheme_a=8000000 scheme_c=256 a_with_discard=256 same=1 discard_touched=8 writes_per_cp=16
+E7RESULT name=keys stats=64 checkpoints=1 k=2 scheme_a=64 scheme_c=64 a_with_discard=64 same=1 discard_touched=0 writes_per_cp=64
+E7RESULT name=keys stats=64 checkpoints=1 k=8 scheme_a=64 scheme_c=64 a_with_discard=64 same=1 discard_touched=0 writes_per_cp=64
+E7RESULT name=keys stats=64 checkpoints=1 k=32 scheme_a=64 scheme_c=64 a_with_discard=64 same=1 discard_touched=0 writes_per_cp=64
+E7RESULT name=keys stats=64 checkpoints=10 k=2 scheme_a=640 scheme_c=128 a_with_discard=128 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=10 k=8 scheme_a=640 scheme_c=512 a_with_discard=512 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=10 k=32 scheme_a=640 scheme_c=640 a_with_discard=640 same=1 discard_touched=0 writes_per_cp=64
+E7RESULT name=keys stats=64 checkpoints=100 k=2 scheme_a=6400 scheme_c=128 a_with_discard=128 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=100 k=8 scheme_a=6400 scheme_c=512 a_with_discard=512 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=100 k=32 scheme_a=6400 scheme_c=2048 a_with_discard=2048 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=10000 k=2 scheme_a=640000 scheme_c=128 a_with_discard=128 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=10000 k=8 scheme_a=640000 scheme_c=512 a_with_discard=512 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=10000 k=32 scheme_a=640000 scheme_c=2048 a_with_discard=2048 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=1000000 k=2 scheme_a=64000000 scheme_c=128 a_with_discard=128 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=1000000 k=8 scheme_a=64000000 scheme_c=512 a_with_discard=512 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=64 checkpoints=1000000 k=32 scheme_a=64000000 scheme_c=2048 a_with_discard=2048 same=1 discard_touched=64 writes_per_cp=128
+E7RESULT name=keys stats=512 checkpoints=1 k=2 scheme_a=512 scheme_c=512 a_with_discard=512 same=1 discard_touched=0 writes_per_cp=512
+E7RESULT name=keys stats=512 checkpoints=1 k=8 scheme_a=512 scheme_c=512 a_with_discard=512 same=1 discard_touched=0 writes_per_cp=512
+E7RESULT name=keys stats=512 checkpoints=1 k=32 scheme_a=512 scheme_c=512 a_with_discard=512 same=1 discard_touched=0 writes_per_cp=512
+E7RESULT name=keys stats=512 checkpoints=10 k=2 scheme_a=5120 scheme_c=1024 a_with_discard=1024 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=10 k=8 scheme_a=5120 scheme_c=4096 a_with_discard=4096 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=10 k=32 scheme_a=5120 scheme_c=5120 a_with_discard=5120 same=1 discard_touched=0 writes_per_cp=512
+E7RESULT name=keys stats=512 checkpoints=100 k=2 scheme_a=51200 scheme_c=1024 a_with_discard=1024 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=100 k=8 scheme_a=51200 scheme_c=4096 a_with_discard=4096 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=100 k=32 scheme_a=51200 scheme_c=16384 a_with_discard=16384 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=10000 k=2 scheme_a=5120000 scheme_c=1024 a_with_discard=1024 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=10000 k=8 scheme_a=5120000 scheme_c=4096 a_with_discard=4096 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=10000 k=32 scheme_a=5120000 scheme_c=16384 a_with_discard=16384 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=1000000 k=2 scheme_a=512000000 scheme_c=1024 a_with_discard=1024 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=1000000 k=8 scheme_a=512000000 scheme_c=4096 a_with_discard=4096 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=keys stats=512 checkpoints=1000000 k=32 scheme_a=512000000 scheme_c=16384 a_with_discard=16384 same=1 discard_touched=512 writes_per_cp=1024
+E7RESULT name=slope stats=8 slope_a=8 slope_c=0 a_grows=1 c_flat=1
+E7RESULT name=slope stats=64 slope_a=64 slope_c=0 a_grows=1 c_flat=1
+E7RESULT name=slope stats=512 slope_a=512 slope_c=0 a_grows=1 c_flat=1
+E7RESULT name=first_cell discard_depends_on_capacity=0 verdict_ok=1
+E7RESULT name=k_lower_bound source=e54_measured_worst_rollback rollback_depth=1 k_min=2 keys_at_64_stats=128
+E7RESULT name=k_lower_bound source=e51_ring_slots_n rollback_depth=8 k_min=9 keys_at_64_stats=576
+E7RESULT name=poscontrol_k_infinite scheme_c=64000000 scheme_a=64000000 degenerates=1
+E7RESULT name=negcontrol_zero_stats a=0 c=0 expect=0
+E7RESULT name=verdict a_and_c_identical_with_discard=1
+E7RESULT name=done emitted=71
