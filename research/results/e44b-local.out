@@ -1,0 +1,9 @@
+Counterexample 1: If the extension point exceeds 864 bytes, a 2 KiB index node loses a tree level. This increases tree depth by one, causing disk seeks for directory lookups to double in worst case. For example, a 3-level tree becomes 4-level, requiring four disk reads instead of three for a single path lookup.  
+
+Counterexample 2: If the extension point causes the total unit size to exceed the storage medium’s sector size (e.g., 4 KiB), writes become non-atomic. A power failure during write could leave the unit partially written, corrupting data. For instance, a 4097-byte unit on a 4 KiB sector device requires two sector writes; if interrupted, the first sector may be valid but the second incomplete, breaking consistency.  
+
+Cost not linear in N: Crossing a sector boundary (e.g., unit size > sector size) causes a step change in I/O behavior—writing one unit may require two physical writes instead of one, doubling I/O cost per operation. Similarly, tree level loss (e.g., 2 KiB node exceeding 865 bytes extension) increases path lookup I/Os by a fixed factor (e.g., 3→4 reads), not proportional to N.  
+
+The limit must exist. It cannot be removed because tree structure and sector alignment constraints create hard functional boundaries unrelated to space savings. The core must enforce these to prevent performance degradation or data corruption.  
+
+Reject Q. The upper limit must be set to 864 bytes to prevent tree level loss in 2 KiB index nodes, the smallest node type mentioned. This is the strictest constraint from design fact 4. A larger limit (e.g., 1000 bytes) would break the tree structure for the smallest nodes, while a smaller limit (e.g., 500 bytes) is unnecessary but safe. The value 864 bytes is derived directly from the measured threshold where tree level loss occurs.

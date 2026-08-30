@@ -1,0 +1,8 @@
+M1_不检查反向链	if chain_on && r.prev_hash != prev_hash { break }	if false && r.prev_hash != prev_hash { break }
+M2_链锚点取零	let mut prev_hash = 0u64;	let mut prev_hash = 1u64;
+M3_残留少造一条	for k in 0..stale {	for k in 1..stale {
+M4_新时间线不覆盖	if map == Slots::Decoupled { ring.head = (settled as usize) % slots; }	if map == Slots::Decoupled { ring.head = (settled as usize + 99) % slots; }
+M5_截断不生效	if bits >= 64 { h } else { h & ((1u64 << bits) - 1) }	h
+M6_残留不计数	if r.timeline == 0 && r.jsn >= settled { stale_hit += 1; }	if r.timeline == 0 && r.jsn >= settled + 99 { stale_hit += 1; }
+M7_序号不检查	if !r.csum_ok || r.jsn != expected { break }	if !r.csum_ok { break }
+M8_退回第一版哈希（种子在末尾且无终混）	    for x in [seed, r.jsn, r.timeline as u64, r.prev_hash] {\n        for b in x.to_le_bytes() {\n            h ^= b as u64;\n            h = h.wrapping_mul(0x0000_0100_0000_01b3);\n        }\n    }\n    // 终混（splitmix64 的形态）：把高位的差异搅进低位，否则截低位等于只看一条窄通道\n    h ^= h >> 33; h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);\n    h ^= h >> 33; h = h.wrapping_mul(0xc4ce_b9fe_1a85_ec53);\n    h ^= h >> 33;	    for x in [r.jsn, r.timeline as u64, r.prev_hash, seed] {\n        for b in x.to_le_bytes() {\n            h ^= b as u64;\n            h = h.wrapping_mul(0x0000_0100_0000_01b3);\n        }\n    }

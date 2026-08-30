@@ -1,0 +1,8 @@
+M1_祖先不去重	n += anc.len() as u64;	n += leaves.len() as u64;
+M2_原地也写祖先	fn inplace_writes(_t: &Tree, leaves: &BTreeSet<u64>) -> u64 { leaves.len() as u64 }	fn inplace_writes(t: &Tree, leaves: &BTreeSet<u64>) -> u64 { leaves.len() as u64 + t.height as u64 }
+M3_原地撕裂不算丢唯一份	torn_loses_only_copy: 1,	torn_loses_only_copy: 0,
+M4_原地恢复也只读路径	torn_rebuild_reads: pool_blocks }	torn_rebuild_reads: t.height as u64 }
+M5_预留只算叶不算内部节点	reserved: total_nodes(t) * 2,	reserved: t.leaves() * 2,
+M6_槽轮换不翻倍	Arm { writes, reserved: total_nodes(t) * 2, torn_loses_only_copy: 1,	Arm { writes, reserved: total_nodes(t), torn_loses_only_copy: 1,
+M7_粗粒度少碰一个叶	for k in 0..per_commit { s.insert((base + k) % l); }	for k in 1..per_commit { s.insert((base + k) % l); }
+M8_占比算成千分之一	reserved_blocks.saturating_mul(10_000) / pool_blocks	reserved_blocks.saturating_mul(1_000) / pool_blocks

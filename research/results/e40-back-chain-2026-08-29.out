@@ -1,0 +1,14 @@
+E7RESULT name=config slots=64 settled=20 stale=8 new_after=3 trials=2000000 hdr_bytes=84
+E7RESULT name=cell slots_map=ByJsn resume=AtPrefix chain=false bits=64 replayed_stale=6 lost_own=0 accepted=29
+E7RESULT name=cell slots_map=ByJsn resume=AtPrefix chain=true bits=64 replayed_stale=0 lost_own=0 accepted=23
+E7RESULT name=cell slots_map=ByJsn resume=SkipHole chain=false bits=64 replayed_stale=0 lost_own=0 accepted=20
+E7RESULT name=cell slots_map=ByJsn resume=SkipHole chain=true bits=64 replayed_stale=0 lost_own=0 accepted=20
+E7RESULT name=cell slots_map=Decoupled resume=AtPrefix chain=false bits=64 replayed_stale=6 lost_own=0 accepted=29
+E7RESULT name=cell slots_map=Decoupled resume=AtPrefix chain=true bits=64 replayed_stale=0 lost_own=0 accepted=23
+E7RESULT name=cell slots_map=Decoupled resume=SkipHole chain=false bits=64 replayed_stale=0 lost_own=0 accepted=20
+E7RESULT name=cell slots_map=Decoupled resume=SkipHole chain=true bits=64 replayed_stale=0 lost_own=0 accepted=20
+E7RESULT name=width bits=8 false_accept=7922 trials=2000000 false_accept_ppm=3961 hdr_bytes_added=1 hdr_bytes_total=85 hdr_growth_bp=119
+E7RESULT name=width bits=16 false_accept=33 trials=2000000 false_accept_ppm=16 hdr_bytes_added=2 hdr_bytes_total=86 hdr_growth_bp=238
+E7RESULT name=width bits=32 false_accept=0 trials=2000000 false_accept_ppm=0 hdr_bytes_added=4 hdr_bytes_total=88 hdr_growth_bp=476
+E7RESULT name=width bits=64 false_accept=0 trials=2000000 false_accept_ppm=0 hdr_bytes_added=8 hdr_bytes_total=92 hdr_growth_bp=952
+E7RESULT name=done emitted=14

@@ -1,0 +1,11 @@
+E7RESULT name=config txns=200 writes_per_txn=8
+E7RESULT name=cell chunk=1 arm=OneToOne records=200 prefixes=201 cut_prefixes=0 illegal=0
+E7RESULT name=cell chunk=1 arm=SplitNoBoundary records=1600 prefixes=1601 cut_prefixes=1400 illegal=1400
+E7RESULT name=cell chunk=1 arm=SplitWithBoundary records=1600 prefixes=1601 cut_prefixes=1400 illegal=0
+E7RESULT name=cell chunk=2 arm=OneToOne records=200 prefixes=201 cut_prefixes=0 illegal=0
+E7RESULT name=cell chunk=2 arm=SplitNoBoundary records=800 prefixes=801 cut_prefixes=600 illegal=600
+E7RESULT name=cell chunk=2 arm=SplitWithBoundary records=800 prefixes=801 cut_prefixes=600 illegal=0
+E7RESULT name=cell chunk=4 arm=OneToOne records=200 prefixes=201 cut_prefixes=0 illegal=0
+E7RESULT name=cell chunk=4 arm=SplitNoBoundary records=400 prefixes=401 cut_prefixes=200 illegal=200
+E7RESULT name=cell chunk=4 arm=SplitWithBoundary records=400 prefixes=401 cut_prefixes=200 illegal=0
+E7RESULT name=done emitted=11

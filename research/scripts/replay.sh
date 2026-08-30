@@ -42,6 +42,10 @@ E34|e34-pin-rules||e34-pin-rules-2026-08-29.out|exact
 E36|e36-head-forms||e36-head-forms-2026-08-29.out|exact
 E37|e37-slot-mapping||e37-slot-mapping-2026-08-29.out|exact
 E38|e38-log-epoch||e38-log-epoch-2026-08-29.out|exact
+E39|e39_accounting_cow||e39-accounting-cow-2026-08-29.out|exact
+E40|e40_back_chain||e40-back-chain-2026-08-29.out|exact
+E43|e43_txn_records||e43-txn-records-2026-08-29.out|exact
+E44|e44_ext_budget||e44-ext-budget-2026-08-30.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-28.out|exact

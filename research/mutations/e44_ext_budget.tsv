@@ -1,0 +1,19 @@
+M1_基线元数据打错	const BASE_META_TENTHS: u64 = 1080;	const BASE_META_TENTHS: u64 = 1180;
+M2_占比不四舍五入	(meta_tenths * 10_000 + unit / 2) / unit	(meta_tenths * 10_000) / unit
+M3_扇出不扣扩展点	Carrier::AllUnits => ext,	Carrier::AllUnits => 0,
+M4_ZFS对照行打错	const ZFS_TENTHS: u64 = 1280;	const ZFS_TENTHS: u64 = 2280;
+M5_省写成不严格	while BASE_META_TENTHS + 10 * (n + 1) < ZFS_TENTHS {	while BASE_META_TENTHS + 10 * (n + 1) <= ZFS_TENTHS {
+M6_下界漏掉长度	n_min_bare() + LEN_BYTES	n_min_bare()
+M7_DataOnly也扣	Carrier::DataOnly => 0, // 索引节点不带 ⇒ 扇出不受影响	Carrier::DataOnly => ext, // 索引节点不带 ⇒ 扇出不受影响
+M8_树高少数一层	while cap < leaves {	while cap < leaves / 2 {
+M9_btrfs常量打错	const BTRFS_128K_TENTHS: u64 = 2073;	const BTRFS_128K_TENTHS: u64 = 2160;
+M10_下界漏掉校验和档	n_min_bare() + CSUM_BYTES\n}	n_min_bare()\n}
+M11_长度字段量程算错	(1u64 << (8 * LEN_BYTES)) - 1	(1u64 << (8 * LEN_BYTES + 8)) - 1
+M12_条带档基线打错	const BASE_META_RAID_TENTHS: u64 = 1520;	const BASE_META_RAID_TENTHS: u64 = 1220;
+M13_容器约束扣108	unit - IN_UNIT_HDR - 1 // 至少留 1 字节净荷	unit - IN_UNIT_HDR - OUT_OF_UNIT_PTR - 1 // 至少留 1 字节净荷
+M14_节点不留指针	node - NODE_HDR - PTR_BYTES	node - NODE_HDR
+M15_单元头宽度打错	const IN_UNIT_HDR: u64 = 55;	const IN_UNIT_HDR: u64 = 45;
+M16_自证余量算错	atomic - hdr	atomic - hdr / 2
+M17_槽不按原子单元数	(atomic / slot).max(1)	1
+M18_挂载判定漏掉撕裂隔离	if slots_per_atomic(slot, atomic) != 1 {	if false {
+M19_挂载判定漏掉自证溢出	if n > self_witness_room(JOURNAL_HDR, atomic) {	if false {

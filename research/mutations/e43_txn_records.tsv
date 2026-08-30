@@ -1,0 +1,7 @@
+M1_合法性改成看边界不看状态	if !truth.iter().any(|t| *t == st) { illegal += 1; }	if upto > 0 && !recs[upto - 1].commit { illegal += 1; }
+M2_边界字段不丢未提交尾巴	match committed { Some(c) if r.txn > c => continue, None => continue, _ => {} }	match committed { Some(_) => {}, None => {}, }
+M3_一事务一条也被切开	Arm::OneToOne => out.push(Record { writes: tx.writes.clone(), txn: t as u32, commit: true }),	Arm::OneToOne => out.push(Record { writes: tx.writes.clone(), txn: t as u32, commit: false }),
+M4_前缀少枚举一个	for upto in 0..=recs.len() {	for upto in 0..recs.len() {
+M5_真值多算一个状态	let mut out = vec![BTreeMap::new()];	let mut out = vec![BTreeMap::new(), BTreeMap::new()];
+M6_切开的前缀数少数一个	if upto > 0 && !recs[upto - 1].commit { cut += 1; }	if upto > 1 && !recs[upto - 1].commit { cut += 1; }
+M7_事务写入条数减一	writes: (0..writes_per_txn)	writes: (0..writes_per_txn.saturating_sub(1))

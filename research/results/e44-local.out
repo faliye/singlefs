@@ -1,0 +1,11 @@
+The byte limit can be decided without settling the accounting convention because bound B (864 bytes) is a structural constraint from the tree node size. For example, if the filesystem uses 2 KiB nodes, the extension point must be under 864 bytes to avoid losing a tree level, regardless of whether the bytes count as metadata or payload. This constraint is independent of accounting.
+
+Lower bound of 9 bytes assumes device id is 1 byte, offset is 6 bytes, and length is 2 bytes. This input is wrong if the storage device exceeds 2^48 bytes (256 TB), requiring more than 6 bytes for the offset. Modern storage often exceeds this, so the lower bound could be too low.
+
+Upper bound A of 19 bytes assumes singlefs metadata plus extension point must be under ZFS's 128 bytes. But ZFS uses 128 bytes per unit, and singlefs metadata is 108 bytes even with zero extension point, so 108 < 128 is already true. The input that singlefs must be cheaper than ZFS is valid but the bound A is unnecessary since even N=0 satisfies it.
+
+Upper bound B of 864 bytes assumes 2 KiB nodes. If the project uses larger nodes like 4 KiB or 16 KiB, the bound would be higher (1473 or 6081). The input that node size is 2 KiB is wrong because filesystems typically use larger nodes for efficiency.
+
+An unmodeled constraint is the unit size itself. If the unit size is small (e.g., 4 KiB), the total metadata plus extension point must fit within it, potentially tightening the limit. For example, with 4 KiB units, 108 + N < 4096 implies N < 3988, but bound B for 2 KiB nodes is tighter. However, if unit size is not fixed, it could override other bounds.
+
+Reject P. The byte limit can be decided based on structural constraints like bound B without resolving the accounting convention. The correct action is to set the limit based on the tightest structural constraint (e.g., bound B for the chosen node size) and handle accounting convention separately. The claim about using half of btrfs is already false (52.1% ratio) and should be corrected regardless of extension point size.
