@@ -14,3 +14,6 @@ target/
 
 # 本机个人权限规则（含本机路径），不进仓
 .claude/settings.local.json
+
+# Python 字节码（门禁的 lib-*.py 被 import 时留下）
+__pycache__/

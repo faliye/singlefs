@@ -1,4 +1,4 @@
-# 背景：singlefs D23 未定项 1 轴二 —— 祖先落盘延不延后
+# 背景：singlefs D23 已定项 1 轴二 —— 祖先落盘延不延后
 
 singlefs 是从零设计的 COW 文件系统（Rust，格式设计阶段，无代码）。
 下面每条都出自本仓 `.claude/kb/decisions.md` 的已定条款或 E16 实测。

@@ -110,7 +110,7 @@ fn enough(p: f64) -> bool {
     p < 0.01
 }
 
-const INCIDENTS: f64 = 36_500.0; // 每天崩 10 次 × 十年，与 E50 / D23 未定项 9 同一个场景点
+const INCIDENTS: f64 = 36_500.0; // 每天崩 10 次 × 十年，与 E50 / D23 已定项 9 同一个场景点
 const SEAMS_PER_INCIDENT: f64 = 1.0; // 一次事故留一个接缝
 const FSYNC_PER_SEC: f64 = 2785.0; // E45 本机实测
 const RINGS: [u64; 3] = [10 * 1024 * 1024, 100 * 1024 * 1024, 2 * 1024 * 1024 * 1024];

@@ -1,0 +1,107 @@
+E7RESULT name=config disk_mb=64 workdir_kind=tmpdir target=dm-stripe
+E7RESULT name=loops devices=/dev/loop0 /dev/loop1 /dev/loop2 /dev/loop3
+E7RESULT name=map devs=2 chunk=65536 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=65536 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=2 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=65536 k=3 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=4 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=65536 k=5 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=7 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=9 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=17 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=23 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=65536 k=31 predicted=1 observed=1 match=1
+E7RESULT name=map_summary devs=2 chunk=65536 matched=12 total=12
+E7RESULT name=prime_stride devs=2 chunk=65536 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=2 chunk=65536 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_summary devs=2 chunk=65536 regions=2 distinct_devices=2 all_distinct=1
+E7RESULT name=map devs=2 chunk=524288 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=524288 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=2 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=524288 k=3 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=4 predicted=0 observed=0 match=1
+E7RESULT name=map devs=2 chunk=524288 k=5 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=7 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=9 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=17 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=23 predicted=1 observed=1 match=1
+E7RESULT name=map devs=2 chunk=524288 k=31 predicted=1 observed=1 match=1
+E7RESULT name=map_summary devs=2 chunk=524288 matched=12 total=12
+E7RESULT name=prime_stride devs=2 chunk=524288 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=2 chunk=524288 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_summary devs=2 chunk=524288 regions=2 distinct_devices=2 all_distinct=1
+E7RESULT name=map devs=3 chunk=65536 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=65536 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=65536 k=2 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=65536 k=3 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=65536 k=4 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=65536 k=5 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=65536 k=7 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=65536 k=9 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=65536 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=65536 k=17 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=65536 k=23 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=65536 k=31 predicted=1 observed=1 match=1
+E7RESULT name=map_summary devs=3 chunk=65536 matched=12 total=12
+E7RESULT name=prime_stride devs=3 chunk=65536 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=3 chunk=65536 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_stride devs=3 chunk=65536 region=2 prime=13 predicted=2 observed=2
+E7RESULT name=prime_summary devs=3 chunk=65536 regions=3 distinct_devices=3 all_distinct=1
+E7RESULT name=map devs=3 chunk=524288 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=524288 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=524288 k=2 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=524288 k=3 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=524288 k=4 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=524288 k=5 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=524288 k=7 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=524288 k=9 predicted=0 observed=0 match=1
+E7RESULT name=map devs=3 chunk=524288 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=3 chunk=524288 k=17 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=524288 k=23 predicted=2 observed=2 match=1
+E7RESULT name=map devs=3 chunk=524288 k=31 predicted=1 observed=1 match=1
+E7RESULT name=map_summary devs=3 chunk=524288 matched=12 total=12
+E7RESULT name=prime_stride devs=3 chunk=524288 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=3 chunk=524288 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_stride devs=3 chunk=524288 region=2 prime=13 predicted=2 observed=2
+E7RESULT name=prime_summary devs=3 chunk=524288 regions=3 distinct_devices=3 all_distinct=1
+E7RESULT name=map devs=4 chunk=65536 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=4 chunk=65536 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=65536 k=2 predicted=2 observed=2 match=1
+E7RESULT name=map devs=4 chunk=65536 k=3 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=65536 k=4 predicted=0 observed=0 match=1
+E7RESULT name=map devs=4 chunk=65536 k=5 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=65536 k=7 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=65536 k=9 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=65536 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=65536 k=17 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=65536 k=23 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=65536 k=31 predicted=3 observed=3 match=1
+E7RESULT name=map_summary devs=4 chunk=65536 matched=12 total=12
+E7RESULT name=prime_stride devs=4 chunk=65536 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=4 chunk=65536 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_stride devs=4 chunk=65536 region=2 prime=13 predicted=2 observed=2
+E7RESULT name=prime_stride devs=4 chunk=65536 region=3 prime=13 predicted=3 observed=3
+E7RESULT name=prime_summary devs=4 chunk=65536 regions=4 distinct_devices=4 all_distinct=1
+E7RESULT name=poscontrol_composite_stride chunk=65536 stride=8 distinct_devices=1 expect=1 collides=1
+E7RESULT name=map devs=4 chunk=524288 k=0 predicted=0 observed=0 match=1
+E7RESULT name=map devs=4 chunk=524288 k=1 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=524288 k=2 predicted=2 observed=2 match=1
+E7RESULT name=map devs=4 chunk=524288 k=3 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=524288 k=4 predicted=0 observed=0 match=1
+E7RESULT name=map devs=4 chunk=524288 k=5 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=524288 k=7 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=524288 k=9 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=524288 k=13 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=524288 k=17 predicted=1 observed=1 match=1
+E7RESULT name=map devs=4 chunk=524288 k=23 predicted=3 observed=3 match=1
+E7RESULT name=map devs=4 chunk=524288 k=31 predicted=3 observed=3 match=1
+E7RESULT name=map_summary devs=4 chunk=524288 matched=12 total=12
+E7RESULT name=prime_stride devs=4 chunk=524288 region=0 prime=13 predicted=0 observed=0
+E7RESULT name=prime_stride devs=4 chunk=524288 region=1 prime=13 predicted=1 observed=1
+E7RESULT name=prime_stride devs=4 chunk=524288 region=2 prime=13 predicted=2 observed=2
+E7RESULT name=prime_stride devs=4 chunk=524288 region=3 prime=13 predicted=3 observed=3
+E7RESULT name=prime_summary devs=4 chunk=524288 regions=4 distinct_devices=4 all_distinct=1
+E7RESULT name=poscontrol_composite_stride chunk=524288 stride=8 distinct_devices=1 expect=1 collides=1
+E7RESULT name=done emitted=107

@@ -3,8 +3,8 @@
 //! 设计与依据见 `.claude/kb/experiments/36-多可写头两种形态.md`。
 //!
 //! **它攻的是两条已定项凑在一起**：
-//! - D8（核心索引结构）已定项 1：`key = (locality_id, inode, offset)` —— **三段，没有快照维**
-//! - D9（加密）未定项 4：nonce **现算**还是每 extent 存 —— 现算的输入就是逻辑身份，也就是 key
+//! - D8（核心索引结构）已定项 3：`key = (locality_id, inode, offset)` —— **三段，没有快照维**
+//! - D9（加密）已定项 4：nonce **现算**还是每 extent 存 —— 现算的输入就是逻辑身份，也就是 key
 //!
 //! 两个可写头各写一次同一个 `(locality, inode, offset)`：三段 key 下它们的逻辑身份
 //! **逐字节相同** ⇒ 现算出**同一个 nonce** ⇒ 同密钥同 nonce 加两段不同明文
@@ -17,7 +17,7 @@
 //!
 //! | 臂 | key | 每头一棵树 | nonce 来源 |
 //! |---|---|---|---|
-//! | `key3_derived` | 三段（D8 已定） | 否 | 现算（D9 未定项 4 的一个取值） |
+//! | `key3_derived` | 三段（D8 已定） | 否 | 现算（D9 已定项 4 的一个取值） |
 //! | `key4_derived` | 四段（加快照维） | 否 | 现算 |
 //! | `clone_per_head` | 三段 | **是**（D5 的克隆形态：每头一根一树） | 现算 |
 //!
@@ -48,7 +48,7 @@ const PT_LEN: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
-    /// D8 已定的三段 key + D9 未定项 4 取「现算」
+    /// D8 已定的三段 key + D9 已定项 4 取「现算」
     Key3Derived,
     /// 三段 key 加一维快照
     Key4Derived,
@@ -77,7 +77,7 @@ impl Arm {
     }
 }
 
-/// 逻辑身份——**nonce 现算的输入就是它**（D9 未定项 4 取「现算」时的定义）。
+/// 逻辑身份——**nonce 现算的输入就是它**（D9 已定项 4 取「现算」时的定义）。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct Ident {
     tree: u64,
@@ -273,7 +273,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// **D8 已定的三段 key 配 D9 未定项 4 取「现算」⇒ 恰好一对 keystream 复用。**
+    /// **D8 已定的三段 key 配 D9 已定项 4 取「现算」⇒ 恰好一对 keystream 复用。**
     /// 绝对值：两个头 ⇒ 恰好 1 对，不是「大于零」。
     #[test]
     fn the_settled_three_segment_key_with_derived_nonce_reuses_the_keystream() {

@@ -82,6 +82,9 @@ bash .claude/scripts/env.sh           # 环境自检
 bash .claude/gate.d/10-kb-rot.sh          # kb 腐化：引用悬空、结论悬空、条数对不上
 bash .claude/gate.d/15-research-build.sh  # research 构建与单测（共享门禁只看 crates/，而证据住在 research/）
 bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接、条数与标题相符
+bash .claude/gate.d/21-decision-items-sync.sh # 决策分项清单与正文同步（--write 重新生成）
+bash .claude/gate.d/22-item-ref-status.sh # 分项引用写的状态与正文的两张索引表相符
+bash .claude/gate.d/23-link-targets.sh    # 相对链接与「第 N 节」指向到不到得了
 bash .claude/gate.d/25-kb-deictic.sh      # kb 里的「本轮」锚不锚得到具体一轮
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
@@ -108,7 +111,7 @@ bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红
 
 1. **没有 oracle。** 从零设计意味着没有参照实现可比对——移植类项目那种
    「拿现成工具的输出当标准答案」的便利这里不存在。功能正确性只能靠模型对拍，
-   这是最大的隐性成本，见 `kb/prior-art.md` 第三节。
+   这是最大的隐性成本，见 `kb/prior-art.md`「三、Rust 侧现有轮子」。
 2. **格式还是软的。** 第一个外部用户出现前可以随时拆了重做。
    真正要慎重的是 `kb/decisions.md`，不是 `.rs` 文件。
 3. **不进 Linux 主线**（D7）。前几年按单人项目做，准入判据是门禁——

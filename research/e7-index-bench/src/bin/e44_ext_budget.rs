@@ -169,11 +169,11 @@ fn n_max_node_keeps_one_ptr(node: u64) -> u64 {
 // ── 自证单元那一档（D20 推论三：根槽、journal 记录头）──
 // 它们没有带校验和的父指针，原子宽度**等于运行时探测到的 `physical_block_size`**。
 // ⇒ 扩展点在这一档的余量由**原子宽度**夹，不由「省不省」夹。
-const JOURNAL_HDR: u64 = 84; // D23 未定项 4 逐字：头部字段合计 84 字节
+const JOURNAL_HDR: u64 = 84; // D23 已定项 4 逐字：头部字段合计 84 字节
 const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 未定项 2 的候选槽宽
 
 /// 一个自证单元的头部落进一个原子单元之后，还剩多少字节。
-/// D23 未定项 4 逐字：84 字节头「占 512 扇区的 16%，其后还余 428 字节」。
+/// D23 已定项 4 逐字：84 字节头「占 512 扇区的 16%，其后还余 428 字节」。
 fn self_witness_room(hdr: u64, atomic: u64) -> u64 {
     atomic - hdr
 }

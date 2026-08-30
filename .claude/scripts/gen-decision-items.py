@@ -4,8 +4,12 @@
 **它存在的唯一理由是「同一个事实只许一处权威记录」**：分项的权威记录是各决策正文，
 索引页只是它的投影。手抄一份就会漂，而漂了没有任何东西会发现——
 `.claude/gate.d/21-decision-items-sync.sh` 拿本脚本的输出与索引页比对，不一致判红。
+
+**每条决策的分项只有一套编号，分住两个小节**：`### 已定项` 与 `### 未定项`。
+状态由**它住在哪一节**决定，不由行内文字决定——正文里一句「与 D16（发布语义） 已定的
+checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把一条未定项判成已定。
 """
-import re, glob, sys
+import re, glob
 
 def clip(text, n):
     """截到 n 个字符，**但不许留下没闭合的括注**。
@@ -28,51 +32,44 @@ def clip(text, n):
     return t.rstrip()
 
 
-def items_of(body):
-    """返回 [(编号, 名字, 状态)]。编号可能是 '-'（无编号的单项未定项）。"""
-    # 未定项小节的本体：到下一个**同级或更高级**标题为止（`###` / `##`）。
-    # 不在 `####` 处停——D5 的分项就住在一个 `#### 已定：…` 之后。
-    m = re.search(r'^### 未定项\s*$(.*?)(?=^#{2,3} |\Z)', body, re.M | re.S)
-    if not m:
-        return []
-    sec = m.group(1)
+def name_of(txt):
+    name = re.sub(r'\*\*|`', '', txt)
+    name = re.split(r'——|\||。', name)[0].strip().rstrip('：:')
+    return clip(name, 46)
 
-    def harvest(text):
-        # **只取顶格的编号项**：缩进的是分项自己的子列表（论证的第 1/2/3 条），不是分项。
-        got = re.findall(r'^(\d+)\.\s+(.*)$', text, re.M)
-        if got:
-            return got
-        return re.findall(r'^\|\s*(\d+)\s*\|(.*)$', text, re.M)
 
-    # 小节里若有 `#### 子标题`，先只看它**之前**那一段；那一段抽得到分项就用它，
-    # 抽不到才回退到整节——D13 的子标题里另有一张表，不切会把它的行也当成分项。
+def harvest(sec):
+    """取一节里**顶格的**编号项：表格行优先，其次编号列表。
+
+    只看该节的**索引表**，即第一个 `####` 子标题之前那一段——
+    子标题之下是各分项各自的论证，里面另有编号列表与表格，那些不是分项。
+    """
     cut = re.search(r'^#{4}\s', sec, re.M)
-    out = harvest(sec[:cut.start()]) if cut else []
-    if not out:
-        out = harvest(sec)
-    if not out:
-        first = [l for l in sec.strip().split('\n') if l.strip()]
-        if first:
-            out = [('-', first[0])]
+    top = sec[:cut.start()] if cut else sec
+    rows = re.findall(r'^\|\s*(\d+)\s*\|([^|]*)\|', top, re.M)
+    if rows:
+        return rows
+    return re.findall(r'^(\d+)\.\s+(.*)$', top, re.M)
 
+
+def items_of(body):
+    """返回 [(编号, 名字, 状态)]，两节合起来按编号排。"""
     res = []
-    for n, txt in out:
-        # 状态判定按优先级来，**不许只看「文中有没有出现已定」**：
-        # 一条分项的正文里常常提到别处的「已定」（例：「与 D16 已定的 checkpoint 序号怎么共存」）。
-        if re.search(r'状态：\s*\*{0,2}已定', txt):
-            settled = True
-        elif re.search(r'状态：\s*\*{0,2}未定', txt):
-            settled = False
-        elif re.search(r'——\s*\*{0,2}已定', txt):      # 「名字 —— 已定（…）」
-            settled = True
-        elif re.search(r'\|\s*\*{0,2}已定', txt):       # 表格里状态列以「已定」开头
-            settled = True
-        else:
-            settled = False
-        name = re.sub(r'\*\*|`', '', txt)
-        name = re.split(r'——|\||。', name)[0].strip().rstrip('：:')
-        res.append((n, clip(name, 46), '已定' if settled else '**未定**'))
+    for head, st in (('已定项', '已定'), ('未定项', '**未定**')):
+        m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % head, body, re.M | re.S)
+        if not m:
+            continue
+        got = harvest(m.group(1))
+        if not got and head == '未定项':
+            first = [l for l in m.group(1).strip().split('\n') if l.strip()]
+            if first:
+                res.append(('-', name_of(first[0]), st))
+            continue
+        for n, txt in got:
+            res.append((n, name_of(txt), st))
+    res.sort(key=lambda r: (r[0] != '-', int(r[0]) if r[0] != '-' else 0))
     return res
+
 
 lines = []
 for f in sorted(glob.glob('.claude/kb/decisions/*.md')):

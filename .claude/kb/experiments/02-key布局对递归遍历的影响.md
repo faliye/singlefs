@@ -10,4 +10,4 @@ E9（key 编码对遍历局部性的影响） 里有答案：`cache_leaves ≥ 1
 
 ## 历史版本
 
-本实验的历史条目集中在 [experiments-history.md](../experiments-history.md)。
+E2（key 布局对递归遍历的影响）的历史条目集中在 [experiments-history.md](../experiments-history.md)。

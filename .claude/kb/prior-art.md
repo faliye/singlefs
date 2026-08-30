@@ -354,7 +354,7 @@ MAC 对不上就判设备故障并很快停用它，
 
 ### 6.5 卷身份放在哪一层：ext4 与 fscrypt 都放在派生层，不放在逐单元输入里
 
-**2026-08-29 本机内核树逐行现查，用于 D9（加密） 未定项 8 定案。**
+**2026-08-29 本机内核树逐行现查，用于 D9（加密） 已定项 8 定案。**
 
 | 实现 | 卷/文件身份进哪一层 | 逐单元输入里有什么 | 出处 |
 |---|---|---|---|
@@ -366,7 +366,7 @@ nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次�
 「每次挂载换新盐」这个形态如果真做了，上一次挂载写的块就永远解不开。
 
 **对本工程的意义**：D9（加密） 把 fsid 从 AAD 移进 KDF，与这两家的分层一致——
-卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9（加密） 未定项 8。
+卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9（加密） 已定项 8。
 
 ### 6.6 明文超级块里的水位字段可被回滚，这是有现役演示的失败模式
 
@@ -384,7 +384,7 @@ dm_integrity_disable_recalculate()`）。
 
 **对本工程的意义**：I-6.5（nonce 水位单调） 的 nonce 水位是同一个形状，而后果更硬——
 回滚它不是「漏检一次篡改」，是**流密码 nonce 重用 ⇒ 两段明文直接 XOR**。
-⇒ D9（加密） 未定项 8 定「水位必须被主密钥派生的 MAC 覆盖，无密钥侧不许写它」。
+⇒ D9（加密） 已定项 8 定「水位必须被主密钥派生的 MAC 覆盖，无密钥侧不许写它」。
 
 ### 6.7 AEAD 的 tag 长度：内核允许截断到 32 位
 
@@ -395,7 +395,7 @@ dm_integrity_disable_recalculate()`）。
 
 ## 七、近十年学术成果扫描（2012–2026）
 
-**本节只收「可能推翻某条既有决策前提」的成果，不做文献综述。** 每条注明它冲击哪条决策。
+**「七、近十年学术成果扫描（2012–2026）」只收「可能推翻某条既有决策前提」的成果，不做文献综述。** 每条注明它冲击哪条决策。
 全部来自公开论文与项目文档，**未在本工程验证**。
 
 ### 7.1 随机小写：写优化索引把它变成非问题（冲击 D10（随机写 / 碎片化的真答案））
@@ -565,7 +565,7 @@ NoFS 的是「每块自证属于谁」的一个字段，D1（数据可移动性 
 | **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3（空间分配） 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
 | **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9（加密） 的方向；但注意本工程 D9（加密） 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
 | ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9（加密） 与 D10（随机写 / 碎片化的真答案） 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10（随机写 / 碎片化的真答案） 的任何候选都不许走原地覆盖写这条路 |
-| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9（加密） 未定项 5 那条推理的前提之一 |
+| **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9（加密） 已定项 5 那条推理的前提之一 |
 
 **未找到的（明说，不补）**：没有任何一手材料用散文明说
 「copygc / rebalance / scrub / fsck 在无密钥时不能跑」。
@@ -615,7 +615,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 `btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`），
 2026-08-26 现拉并逐字比对。
 
-### 7.9 本节来源
+### 7.9 「七、近十年学术成果扫描（2012–2026）」的来源
 
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
 - [Copy-on-Abundant-Write for Nimble File System Clones (TOS 2021) / How to Copy Files (FAST 2020)](https://www.usenix.org/conference/fast20/presentation/zhan)
@@ -641,7 +641,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ## 历史版本
 
 ### 2026-08-30
-- 抬头新增「来源固定点与复核机制」：本节从 [decisions.md](decisions.md) 顶部那块
+- 抬头新增「来源固定点与复核机制」：那一节从 [decisions.md](decisions.md) 顶部那块
   「证据可靠性标注」搬来——那块写的是引用出处与复核机制，不是决策，
   留在决策索引页既重复又检索不到。**曾经**：抬头写「全部为文档阅读所得……未 clone」；
   **现在**：源码已固定在本机 `fs-refs/` 并逐行核对过，措辞随之改正。
@@ -649,7 +649,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 
 ### 2026-08-29
 - 新增 6.5 / 6.6 / 6.7（卷身份的分层、明文水位字段的回滚先例、AEAD tag 可截断），
-  三节均为本机内核树逐行现查，用于 D9（加密） 未定项 8 定案。
+  三节均为本机内核树逐行现查，用于 D9（加密） 已定项 8 定案。
 - **更正一处转述**：本仓草稿曾把 fscrypt 说成「每次挂载换新盐」。
   **曾经**：per-mount fresh salt；**现在**：每文件 nonce 在建 inode 时取一次并持久化；
   **依据**：`fs/crypto/keysetup.c:762` 与 `fs/crypto/fscrypt_private.h:78` 逐行现查。

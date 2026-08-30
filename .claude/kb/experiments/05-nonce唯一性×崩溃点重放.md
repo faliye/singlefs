@@ -26,4 +26,4 @@ nonce 重用在 ChaCha20 这类流密码下**直接泄漏明文**，而它不产
 
 ## 历史版本
 
-本实验的历史条目集中在 [experiments-history.md](../experiments-history.md)。
+E5（nonce 唯一性 × 崩溃点重放）的历史条目集中在 [experiments-history.md](../experiments-history.md)。

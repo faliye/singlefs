@@ -1,4 +1,4 @@
-//! E43：一个事务恰不恰好产生一条 journal 记录 —— D23 未定项 7。
+//! E43：一个事务恰不恰好产生一条 journal 记录 —— D23 已定项 7。
 //!
 //! ## 它不是「选一个更好的」
 //!
@@ -23,7 +23,7 @@
 use e7_index_bench::Emitter;
 use std::collections::BTreeMap;
 
-/// 一个事务：若干条「幂等完整值」写入（D8 未定项 1 已定的形态）。
+/// 一个事务：若干条「幂等完整值」写入（D8 已定项 1 已定的形态）。
 #[derive(Debug, Clone)]
 struct Txn { writes: Vec<(u32, u64)> }
 
