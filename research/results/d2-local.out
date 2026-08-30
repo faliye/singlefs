@@ -1,0 +1,11 @@
+The inference S claims ruling two settles both open questions about stripe width granularity and device heterogeneity. This is incorrect.
+
+For open question one, a counterexample exists where stripe width must vary per write based on runtime data not available at mount time. For instance, if the filesystem dynamically adjusts stripe width based on the current available space on each device, this space usage changes during operation. Since available space isn't in the superblock or fixed by format, ruling two cannot determine this width at mount time. The geometry would need to be recomputed per write, violating ruling two.
+
+For open question two, a counterexample is when disks have unequal sizes at mount time. Ruling two computes geometry using the probed physical sizes, but this doesn’t resolve whether unequalunequal sizes are allowed. If a disk is replaced with a different size after mount, the geometry becomes invalid. Ruling two assumes inputs don’t change, but it doesn’t prevent the design from allowing unequal sizes initially, leaving the open question unresolved.
+
+Inputs to stripe width decision that can change during mount include available space per device and device failure status. If available space changes, stripe width would need adjustment, but ruling two forbids recomputing geometry. If a device fails, the geometry based on the original device count becomes invalid, requiring remount to update.
+
+Ruling two is incompatible with the settled striping decision if variable width means per-write changes. Ruling two requires geometry to be fixed at mount, but per-write variable width requires dynamic recomputation per operation, which ruling two prohibits. If variable width is fixed per allocation group (not per write), ruling two could be compatible, but the settled decision doesn’t specify this.
+
+Reject S. The narrowed version is: ruling two ensures geometry is computed once from static inputs (superblock values, fixed format sizes, probed block size) and cannot change during operation, but it does not resolve whether stripe width varies per write or per group, or whether disks must be equal in size. These remain separate design choices outside ruling two’s scope.

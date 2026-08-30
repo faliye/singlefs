@@ -1,0 +1,12 @@
+A very large transaction of tens of thousands of items requires a single record exceeding the ring's contiguous free space even when total free space is sufficient. For example a 1MB transaction on a 2MB ring with fragmented free space split into two 0.5MB chunks cannot be written as one record. The confirms failure to commit despite adequate total space.
+
+Forcing one record per transaction prevents streaming journal writes for large transactions. A 100MB file update requires buffering the entire transaction in memory before writing. If memory is insufficient the transaction fails. Observation shows memory exhaustion during commit attempts for large operations.
+
+A mix of small transactions like 100 single-item updates results in 51200 bytes of journal space on a 512-byte unit. Each item uses a full 512-byte record due to rounding. If spanning were allowed multiple small transactions could share a single record reducing space to under 10000 bytes. Observation shows journal size is 5x higher than necessary for small transactions.
+
+Ring wraparound causes large records to fail when written near the end of the ring. A 1MB record needing to start at 3.9MB on a 4MB ring has only 0.1MB contiguous space available at the end followed by 0.9MB at the start. The transaction cannot be written as a single record. Observation confirms commit failure despite 1MB total free space.
+
+Partial write visibility for multi-megabyte records does not create new issues since torn records are discarded either way. No counterexample found as both designs handle incomplete writes identically.
+
+The recommendation fails under multiple real-world conditions including ring fragmentation memory constraints transaction mix and wraparound scenarios.  
+no

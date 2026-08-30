@@ -1,7 +1,20 @@
 # 他家方案调研
 
-**全部为文档阅读所得，未在本工程验证**，也未 clone、编译、运行过任何一个项目。
+**全部为文档阅读或源码逐行核对所得，未在本工程验证**，也未编译、运行过任何一个项目。
 星数/提交数是页面当时显示的值（2026-08-25）。
+
+**来源固定点与复核机制（2026-08-29 起）**：承重引用的源码与文献固定在本机
+`/home/fy5090/code/fs-refs/`——`linux-6.17/fs/bcachefs/`（kernel.org 的 `linux-6.17.tar.xz`，260 个文件）、
+`zfs/`（OpenZFS master，`git log -1` = `58d73c9`，2026-08-27）、
+`docs/` 下 7 份文献（RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
+OSTEP 第 45 章、BetrFS FAST 2017 / 2018、NetApp FAST'20；取回方式与 sha256 见
+`research/scripts/fetch-refs.sh`，抽取器 `research/scripts/pdf-text.py`）。
+**72 条**承重引用做成了可重跑的逐字断言（`research/scripts/verify-citations.sh`），
+挂在门禁阶段「外部引用还核得动吗」（`.claude/gate.d/70-citations.sh`）——**源码树不在也判红**，
+「跳过」正是让上一批文献无声蒸发的那个行为。
+⚠️ **ZFS On-Disk Specification 没收**：它用 CID 双字节字体，`pdf-text.py` 抽出乱码 ⇒
+按该脚本自己的规矩算**抽取失败**，不算「原文没这句」；引它的几条改从已固定的 OpenZFS 源码树核。
+⚠️ 哪些引用核的不是固定点树，见 [checks-owed.md](checks-owed.md) C44（引用核到的不是固定点树）。
 
 ## 一、记账模型四选一
 
@@ -626,6 +639,13 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ---
 
 ## 历史版本
+
+### 2026-08-30
+- 抬头新增「来源固定点与复核机制」：本节从 [decisions.md](decisions.md) 顶部那块
+  「证据可靠性标注」搬来——那块写的是引用出处与复核机制，不是决策，
+  留在决策索引页既重复又检索不到。**曾经**：抬头写「全部为文档阅读所得……未 clone」；
+  **现在**：源码已固定在本机 `fs-refs/` 并逐行核对过，措辞随之改正。
+  变更依据见 [decisions-history.md](decisions-history.md) 2026-08-30（其十一）。
 
 ### 2026-08-29
 - 新增 6.5 / 6.6 / 6.7（卷身份的分层、明文水位字段的回滚先例、AEAD tag 可截断），

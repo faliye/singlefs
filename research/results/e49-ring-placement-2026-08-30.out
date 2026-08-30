@@ -1,0 +1,131 @@
+E7RESULT name=config capacity=10000000000000 region_bytes=1024 prime=8191 max_io_min=65536 k=2
+E7RESULT name=point place=even_span regions=1 slots=2 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=1 slots=2 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=1 slots=4 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=1 slots=4 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=1 slots=8 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=1 slots=8 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=2 order=within_region cells_ge_r=15 mount_ok=11 usable_ok=0 distinct_cells=11 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=2 order=across_regions cells_ge_r=15 mount_ok=11 usable_ok=11 distinct_cells=11 worst_rollback=1 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=4 order=within_region cells_ge_r=15 mount_ok=11 usable_ok=0 distinct_cells=11 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=4 order=across_regions cells_ge_r=15 mount_ok=11 usable_ok=11 distinct_cells=11 worst_rollback=1 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=8 order=within_region cells_ge_r=15 mount_ok=11 usable_ok=0 distinct_cells=11 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=2 slots=8 order=across_regions cells_ge_r=15 mount_ok=11 usable_ok=11 distinct_cells=11 worst_rollback=1 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=2 order=within_region cells_ge_r=12 mount_ok=11 usable_ok=0 distinct_cells=7 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=2 order=across_regions cells_ge_r=12 mount_ok=11 usable_ok=7 distinct_cells=7 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=4 order=within_region cells_ge_r=12 mount_ok=11 usable_ok=0 distinct_cells=7 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=4 order=across_regions cells_ge_r=12 mount_ok=11 usable_ok=7 distinct_cells=7 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=8 order=within_region cells_ge_r=12 mount_ok=11 usable_ok=0 distinct_cells=7 worst_rollback=16 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=3 slots=8 order=across_regions cells_ge_r=12 mount_ok=11 usable_ok=7 distinct_cells=7 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=2 order=within_region cells_ge_r=9 mount_ok=8 usable_ok=0 distinct_cells=3 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=2 order=across_regions cells_ge_r=9 mount_ok=8 usable_ok=4 distinct_cells=3 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=4 order=within_region cells_ge_r=9 mount_ok=8 usable_ok=0 distinct_cells=3 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=4 order=across_regions cells_ge_r=9 mount_ok=8 usable_ok=4 distinct_cells=3 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=8 order=within_region cells_ge_r=9 mount_ok=8 usable_ok=0 distinct_cells=3 worst_rollback=16 gap_ok=1 feasible=0
+E7RESULT name=point place=even_span regions=4 slots=8 order=across_regions cells_ge_r=9 mount_ok=8 usable_ok=4 distinct_cells=3 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=2 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=2 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=4 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=4 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=8 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=1 slots=8 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=2 slots=2 order=within_region cells_ge_r=15 mount_ok=15 usable_ok=0 distinct_cells=15 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=2 slots=2 order=across_regions cells_ge_r=15 mount_ok=15 usable_ok=15 distinct_cells=15 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=2 slots=4 order=within_region cells_ge_r=15 mount_ok=15 usable_ok=0 distinct_cells=15 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=2 slots=4 order=across_regions cells_ge_r=15 mount_ok=15 usable_ok=15 distinct_cells=15 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=2 slots=8 order=within_region cells_ge_r=15 mount_ok=15 usable_ok=0 distinct_cells=15 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=2 slots=8 order=across_regions cells_ge_r=15 mount_ok=15 usable_ok=15 distinct_cells=15 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=3 slots=2 order=within_region cells_ge_r=12 mount_ok=12 usable_ok=0 distinct_cells=12 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=3 slots=2 order=across_regions cells_ge_r=12 mount_ok=12 usable_ok=12 distinct_cells=12 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=3 slots=4 order=within_region cells_ge_r=12 mount_ok=12 usable_ok=0 distinct_cells=12 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=3 slots=4 order=across_regions cells_ge_r=12 mount_ok=12 usable_ok=12 distinct_cells=12 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=3 slots=8 order=within_region cells_ge_r=12 mount_ok=12 usable_ok=0 distinct_cells=12 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=3 slots=8 order=across_regions cells_ge_r=12 mount_ok=12 usable_ok=12 distinct_cells=12 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=4 slots=2 order=within_region cells_ge_r=9 mount_ok=9 usable_ok=0 distinct_cells=9 worst_rollback=2 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=4 slots=2 order=across_regions cells_ge_r=9 mount_ok=9 usable_ok=9 distinct_cells=9 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=4 slots=4 order=within_region cells_ge_r=9 mount_ok=9 usable_ok=0 distinct_cells=9 worst_rollback=4 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=4 slots=4 order=across_regions cells_ge_r=9 mount_ok=9 usable_ok=9 distinct_cells=9 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=prime_stride regions=4 slots=8 order=within_region cells_ge_r=9 mount_ok=9 usable_ok=0 distinct_cells=9 worst_rollback=8 gap_ok=1 feasible=0
+E7RESULT name=point place=prime_stride regions=4 slots=8 order=across_regions cells_ge_r=9 mount_ok=9 usable_ok=9 distinct_cells=9 worst_rollback=1 gap_ok=1 feasible=1
+E7RESULT name=point place=adjacent regions=1 slots=2 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=1 slots=2 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=1 slots=4 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=1 slots=4 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=1 slots=8 order=within_region cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=1 slots=8 order=across_regions cells_ge_r=18 mount_ok=0 usable_ok=0 distinct_cells=18 worst_rollback=0 gap_ok=1 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=2 order=within_region cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=2 order=across_regions cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=4 order=within_region cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=4 order=across_regions cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=8 order=within_region cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=2 slots=8 order=across_regions cells_ge_r=15 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=2 order=within_region cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=2 order=across_regions cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=4 order=within_region cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=4 order=across_regions cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=8 order=within_region cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=3 slots=8 order=across_regions cells_ge_r=12 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=2 order=within_region cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=2 order=across_regions cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=4 order=within_region cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=4 order=across_regions cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=8 order=within_region cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=point place=adjacent regions=4 slots=8 order=across_regions cells_ge_r=9 mount_ok=0 usable_ok=0 distinct_cells=0 worst_rollback=0 gap_ok=0 feasible=0
+E7RESULT name=search_summary feasible_points=9
+E7RESULT name=mapping place=even_span chunk=65536 devs=1 r0_3=0,0,0,0 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=65536 devs=2 r0_3=0,0,0,0 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=65536 devs=3 r0_3=0,0,0,0 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=65536 devs=4 r0_3=0,2,0,2 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=65536 devs=6 r0_3=0,0,0,0 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=65536 devs=8 r0_3=0,6,4,2 min_gap=3333333318656
+E7RESULT name=mapping place=even_span chunk=524288 devs=1 r0_3=0,0,0,0 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=524288 devs=2 r0_3=0,0,1,0 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=524288 devs=3 r0_3=0,0,1,2 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=524288 devs=4 r0_3=0,0,1,2 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=524288 devs=6 r0_3=0,0,1,2 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=524288 devs=8 r0_3=0,4,1,6 min_gap=3333332925440
+E7RESULT name=mapping place=even_span chunk=4194304 devs=1 r0_3=0,0,0,0 min_gap=3333330828288
+E7RESULT name=mapping place=even_span chunk=4194304 devs=2 r0_3=0,0,1,1 min_gap=3333330828288
+E7RESULT name=mapping place=even_span chunk=4194304 devs=3 r0_3=0,1,0,1 min_gap=3333330828288
+E7RESULT name=mapping place=even_span chunk=4194304 devs=4 r0_3=0,0,1,1 min_gap=3333330828288
+E7RESULT name=mapping place=even_span chunk=4194304 devs=6 r0_3=0,4,3,1 min_gap=3333330828288
+E7RESULT name=mapping place=even_span chunk=4194304 devs=8 r0_3=0,0,1,1 min_gap=3333330828288
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=1 r0_3=0,0,0,0 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=2 r0_3=0,1,0,1 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=3 r0_3=0,1,2,0 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=4 r0_3=0,3,2,1 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=6 r0_3=0,1,2,3 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=65536 devs=8 r0_3=0,7,6,5 min_gap=536804352
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=1 r0_3=0,0,0,0 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=2 r0_3=0,1,0,1 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=3 r0_3=0,1,2,0 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=4 r0_3=0,3,2,1 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=6 r0_3=0,1,2,3 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=524288 devs=8 r0_3=0,7,6,5 min_gap=4294441984
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=1 r0_3=0,0,0,0 min_gap=34355543040
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=2 r0_3=0,1,0,1 min_gap=34355543040
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=3 r0_3=0,1,2,0 min_gap=34355543040
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=4 r0_3=0,3,2,1 min_gap=34355543040
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=6 r0_3=0,1,2,3 min_gap=34355543040
+E7RESULT name=mapping place=prime_stride chunk=4194304 devs=8 r0_3=0,7,6,5 min_gap=34355543040
+E7RESULT name=mapping place=adjacent chunk=65536 devs=1 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=65536 devs=2 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=65536 devs=3 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=65536 devs=4 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=65536 devs=6 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=65536 devs=8 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=1 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=2 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=3 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=4 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=6 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=524288 devs=8 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=1 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=2 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=3 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=4 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=6 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=mapping place=adjacent chunk=4194304 devs=8 r0_3=0,0,0,0 min_gap=0
+E7RESULT name=poscontrol_single_device all_zero=1 expect=1
+E7RESULT name=negcontrol_adjacent_gap gap=0 below_io_min=1 expect=1
+E7RESULT name=done emitted=131

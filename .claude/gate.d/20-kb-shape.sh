@@ -133,5 +133,12 @@ if [[ -n "$hit" ]]; then
 else ok "正文没有历史语气"; fi
 
 echo
+echo "── 7. 决策索引行的状态 vs 正文标题的状态 ──"
+# ⚠️ 2026-08-30 实测踩过：给 D21 加了两个未定项、改了正文标题（两项→四项），
+# 而 decisions.md 的索引行还写「两项未定」。第 5 段只比「正文标题 vs 正文列表」，
+# 索引页在它的视野之外 ⇒ 这类不一致此前无人拦。
+if python3 "$(dirname "$0")/lib-index-vs-body.py" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
+
+echo
 if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过"; else echo "  ✗ kb 形状检查未通过"; fi
 exit $fail

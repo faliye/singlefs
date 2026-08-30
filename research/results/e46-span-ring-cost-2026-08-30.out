@@ -1,0 +1,38 @@
+E7RESULT name=config total_items=12 hdr=84 txn=9 chain=4 item=56 f=2
+E7RESULT name=cell unit=512 items_per_rec=12 records=1 path1_laid_out=1024 path2_closed_form=1024 paths_agree=true ring_min_bytes=2048 txns_lost_when_torn=1
+E7RESULT name=cell unit=512 items_per_rec=8 records=2 path1_laid_out=1536 path2_closed_form=1536 paths_agree=true ring_min_bytes=3072 txns_lost_when_torn=1
+E7RESULT name=cell unit=512 items_per_rec=4 records=3 path1_laid_out=1536 path2_closed_form=1536 paths_agree=true ring_min_bytes=3072 txns_lost_when_torn=1
+E7RESULT name=cell unit=512 items_per_rec=2 records=6 path1_laid_out=3072 path2_closed_form=3072 paths_agree=true ring_min_bytes=6144 txns_lost_when_torn=1
+E7RESULT name=cell unit=512 items_per_rec=1 records=12 path1_laid_out=6144 path2_closed_form=6144 paths_agree=true ring_min_bytes=12288 txns_lost_when_torn=1
+E7RESULT name=cell unit=4096 items_per_rec=12 records=1 path1_laid_out=4096 path2_closed_form=4096 paths_agree=true ring_min_bytes=8192 txns_lost_when_torn=1
+E7RESULT name=cell unit=4096 items_per_rec=8 records=2 path1_laid_out=8192 path2_closed_form=8192 paths_agree=true ring_min_bytes=16384 txns_lost_when_torn=1
+E7RESULT name=cell unit=4096 items_per_rec=4 records=3 path1_laid_out=12288 path2_closed_form=12288 paths_agree=true ring_min_bytes=24576 txns_lost_when_torn=1
+E7RESULT name=cell unit=4096 items_per_rec=2 records=6 path1_laid_out=24576 path2_closed_form=24576 paths_agree=true ring_min_bytes=49152 txns_lost_when_torn=1
+E7RESULT name=cell unit=4096 items_per_rec=1 records=12 path1_laid_out=49152 path2_closed_form=49152 paths_agree=true ring_min_bytes=98304 txns_lost_when_torn=1
+E7RESULT name=size items=1 unit=512 one_record=512 per_item=512 ratio_bp=10000 one_record_waste_bp=7011
+E7RESULT name=size items=1 unit=4096 one_record=4096 per_item=4096 ratio_bp=10000 one_record_waste_bp=9626
+E7RESULT name=size items=2 unit=512 one_record=512 per_item=1024 ratio_bp=20000 one_record_waste_bp=5917
+E7RESULT name=size items=2 unit=4096 one_record=4096 per_item=8192 ratio_bp=20000 one_record_waste_bp=9489
+E7RESULT name=size items=4 unit=512 one_record=512 per_item=2048 ratio_bp=40000 one_record_waste_bp=3730
+E7RESULT name=size items=4 unit=4096 one_record=4096 per_item=16384 ratio_bp=40000 one_record_waste_bp=9216
+E7RESULT name=size items=8 unit=512 one_record=1024 per_item=4096 ratio_bp=40000 one_record_waste_bp=4677
+E7RESULT name=size items=8 unit=4096 one_record=4096 per_item=32768 ratio_bp=80000 one_record_waste_bp=8669
+E7RESULT name=size items=12 unit=512 one_record=1024 per_item=6144 ratio_bp=60000 one_record_waste_bp=2490
+E7RESULT name=size items=12 unit=4096 one_record=4096 per_item=49152 ratio_bp=120000 one_record_waste_bp=8122
+E7RESULT name=size items=16 unit=512 one_record=1024 per_item=8192 ratio_bp=80000 one_record_waste_bp=302
+E7RESULT name=size items=16 unit=4096 one_record=4096 per_item=65536 ratio_bp=160000 one_record_waste_bp=7575
+E7RESULT name=size items=32 unit=512 one_record=2048 per_item=16384 ratio_bp=80000 one_record_waste_bp=776
+E7RESULT name=size items=32 unit=4096 one_record=4096 per_item=131072 ratio_bp=320000 one_record_waste_bp=5388
+E7RESULT name=size items=64 unit=512 one_record=4096 per_item=32768 ratio_bp=80000 one_record_waste_bp=1013
+E7RESULT name=size items=64 unit=4096 one_record=4096 per_item=262144 ratio_bp=640000 one_record_waste_bp=1013
+E7RESULT name=size items=128 unit=512 one_record=7680 per_item=65536 ratio_bp=85333 one_record_waste_bp=540
+E7RESULT name=size items=128 unit=4096 one_record=8192 per_item=524288 ratio_bp=640000 one_record_waste_bp=1131
+E7RESULT name=size items=1024 unit=512 one_record=57856 per_item=524288 ratio_bp=90619 one_record_waste_bp=71
+E7RESULT name=size items=1024 unit=4096 one_record=61440 per_item=4194304 ratio_bp=682666 one_record_waste_bp=650
+E7RESULT name=size items=62000 unit=512 one_record=3472384 per_item=31744000 ratio_bp=91418 one_record_waste_bp=0
+E7RESULT name=size items=62000 unit=4096 one_record=3473408 per_item=253952000 ratio_bp=731132 one_record_waste_bp=3
+E7RESULT name=poscontrol unit=1 one_record=769 per_item_records=1836 extra=1067 ok=true
+E7RESULT name=e24check items=1 want=512 got=512 ok=true
+E7RESULT name=e24check items=10 want=1024 got=1024 ok=true
+E7RESULT name=e24check items=100 want=6144 got=6144 ok=true
+E7RESULT name=done emitted=38

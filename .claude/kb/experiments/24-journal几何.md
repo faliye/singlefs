@@ -93,7 +93,7 @@
 - 代码 `research/e7-index-bench/src/bin/e24_journal_geom.rs`（`cargo run --release --bin e24_journal_geom`），
   原始输出 `research/results/e24-journal-geom-2026-08-29.out`。三轮字节一致。
 
-### 这一轮踩的两个坑，都由变异测试抓出来
+### 08-29 那一轮踩的两个坑，都由变异测试抓出来
 
 1. **`pbs` 那一维原本是死代码。** 第一版按「每条记录占几块」算，
    而 `pbs ≤ BLOCK` 时「先对齐到 pbs 再向上取整到 4096」是**恒等操作**，

@@ -1,0 +1,8 @@
+M1_不做fdatasync	if arm.syncs() { f.sync_data()?; }	if false { f.sync_data()?; }
+M2_Sync8只写一块	Arm::Sync8 => 8,	Arm::Sync8 => 1,
+M3_耗时为零当成测量值	if ns == 0 { None } else { Some((syncs, ns)) }	Some((syncs, ns.max(1)))
+M4_速率换算差一千倍	((syncs as u128) * 1_000_000_000_000 / ns) as u64	((syncs as u128) * 1_000_000_000 / ns) as u64
+M5_头部漏算事务字段	fn header_bytes(jsn_bytes: u64) -> u64 { HDR_BASE - JSN_BASE + jsn_bytes + TXN_BYTES + CHAIN_BYTES }	fn header_bytes(jsn_bytes: u64) -> u64 { HDR_BASE - JSN_BASE + jsn_bytes + CHAIN_BYTES }
+M6_盘上不向上取整	(header_bytes(jsn_bytes) + items * ITEM_BYTES).div_ceil(unit) * unit	header_bytes(jsn_bytes) + items * ITEM_BYTES
+M7_寿命少算一年制	(cap * 1000 / per_sec_milli as u128 / 31_557_600) as u64	(cap * 1000 / per_sec_milli as u128 / 3_155_760) as u64
+M8_代价扫描只看一格	(0..=max_items).filter(|&n| on_disk(to, n, unit) > on_disk(from, n, unit)).count() as u64	(0..=0).filter(|&n| on_disk(to, n, unit) > on_disk(from, n, unit)).count() as u64

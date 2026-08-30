@@ -1,0 +1,40 @@
+E7RESULT name=config regions=2 slots_per_region=4 slot_bytes=256 total_slots=8 total_bytes=2048 host_pbs=512 host_io_min=512
+E7RESULT name=cycle rate=per_fsync roots_per_op=1/1 slots=8 cycle_ops=8 reuse_delay_ops=8
+E7RESULT name=cycle rate=half roots_per_op=1/2 slots=8 cycle_ops=16 reuse_delay_ops=16
+E7RESULT name=cycle rate=tenth roots_per_op=1/10 slots=8 cycle_ops=80 reuse_delay_ops=80
+E7RESULT name=cycle rate=hundredth roots_per_op=1/100 slots=8 cycle_ops=800 reuse_delay_ops=800
+E7RESULT name=cycle rate=per_checkpoint roots_per_op=1/1000 slots=8 cycle_ops=8000 reuse_delay_ops=8000
+E7RESULT name=slots_required delay_ops=8 rate=per_fsync slots_needed=8 candidate_slots=8 enough=1
+E7RESULT name=slots_required delay_ops=8 rate=per_checkpoint slots_needed=1 candidate_slots=8 enough=1
+E7RESULT name=slots_required delay_ops=100 rate=per_fsync slots_needed=100 candidate_slots=8 enough=0
+E7RESULT name=slots_required delay_ops=100 rate=per_checkpoint slots_needed=1 candidate_slots=8 enough=1
+E7RESULT name=slots_required delay_ops=1000 rate=per_fsync slots_needed=1000 candidate_slots=8 enough=0
+E7RESULT name=slots_required delay_ops=1000 rate=per_checkpoint slots_needed=1 candidate_slots=8 enough=1
+E7RESULT name=slots_required delay_ops=200000 rate=per_fsync slots_needed=200000 candidate_slots=8 enough=0
+E7RESULT name=slots_required delay_ops=200000 rate=per_checkpoint slots_needed=200 candidate_slots=8 enough=0
+E7RESULT name=tear slot_bytes=256 atomic=512 slots_hit=2 isolated=0
+E7RESULT name=tear slot_bytes=256 atomic=4096 slots_hit=16 isolated=0
+E7RESULT name=tear slot_bytes=512 atomic=512 slots_hit=1 isolated=1
+E7RESULT name=tear slot_bytes=512 atomic=4096 slots_hit=8 isolated=0
+E7RESULT name=tear slot_bytes=4096 atomic=512 slots_hit=1 isolated=1
+E7RESULT name=tear slot_bytes=4096 atomic=4096 slots_hit=1 isolated=1
+E7RESULT name=align slot_bytes=256 atomic=512 placement=aligned slot_off=0 units_touched=1 slots_at_risk=2
+E7RESULT name=align slot_bytes=256 atomic=512 placement=misaligned slot_off=128 units_touched=1 slots_at_risk=2
+E7RESULT name=align slot_bytes=256 atomic=4096 placement=aligned slot_off=0 units_touched=1 slots_at_risk=16
+E7RESULT name=align slot_bytes=256 atomic=4096 placement=misaligned slot_off=128 units_touched=1 slots_at_risk=16
+E7RESULT name=align slot_bytes=512 atomic=512 placement=aligned slot_off=0 units_touched=1 slots_at_risk=1
+E7RESULT name=align slot_bytes=512 atomic=512 placement=misaligned slot_off=256 units_touched=2 slots_at_risk=2
+E7RESULT name=align slot_bytes=512 atomic=4096 placement=aligned slot_off=0 units_touched=1 slots_at_risk=8
+E7RESULT name=align slot_bytes=512 atomic=4096 placement=misaligned slot_off=256 units_touched=1 slots_at_risk=8
+E7RESULT name=align slot_bytes=4096 atomic=512 placement=aligned slot_off=0 units_touched=8 slots_at_risk=1
+E7RESULT name=align slot_bytes=4096 atomic=512 placement=misaligned slot_off=2048 units_touched=8 slots_at_risk=1
+E7RESULT name=align slot_bytes=4096 atomic=4096 placement=aligned slot_off=0 units_touched=1 slots_at_risk=1
+E7RESULT name=align slot_bytes=4096 atomic=4096 placement=misaligned slot_off=2048 units_touched=2 slots_at_risk=2
+E7RESULT name=io_min_span io_min=512 ring_bytes=2048 ring_fits_in_one_io_min=0 mechanism=internal_rmw_not_tearing
+E7RESULT name=io_min_span io_min=4096 ring_bytes=2048 ring_fits_in_one_io_min=1 mechanism=internal_rmw_not_tearing
+E7RESULT name=io_min_span io_min=65536 ring_bytes=2048 ring_fits_in_one_io_min=1 mechanism=internal_rmw_not_tearing
+E7RESULT name=poscontrol_tear slot_bytes=512 atomic=512 slots_hit=1 candidate_slots_hit=2
+E7RESULT name=min_slot atomic=512 min_slot_bytes=512 candidate_slot_bytes=256 ring_bytes_at_min=4096
+E7RESULT name=min_slot atomic=4096 min_slot_bytes=4096 candidate_slot_bytes=256 ring_bytes_at_min=32768
+E7RESULT name=verdict tear_isolated_on_host=0 cycle_ops_per_fsync=8 reuse_requirement_source=none tear_axis=physical_block_size io_min_axis=separate_mechanism
+E7RESULT name=done emitted=40

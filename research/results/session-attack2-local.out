@@ -1,0 +1,19 @@
+The session never asked how the filesystem handles partial writes during a power failure. This is load-bearing because without recovery mechanisms, a single crash could leave critical metadata inconsistent, causing data loss or corruption that users cannot recover from.  
+
+It did not consider how to detect silent data corruption from hardware faults like bit rot. This is load-bearing because checksums alone cannot catch all errors; without additional safeguards mechanisms like scrubbing or redundancy checks, undetected data corruption could persist indefinitely.  
+
+The session overlooked whether the filesystem supports concurrent access from multiple systems. This is load-bearing because shared access without coordination could lead to race conditions and data corruption, especially in networked or clustered environments.  
+
+It never addressed how the filesystem handles device failures during normal operation. This is load-bearing because disks can fail unexpectedly; without built-in strategies for replacing or recovering from failed devices, the system would be unusable in real-world deployments.  
+
+The session did not examine how filesystem operations interact with OS-level caching or virtual memory. This is load-bearing because ignoring these layers could cause performance bottlenecks or data inconsistency when the OS reorders or buffers writes.  
+
+For the extension point byte count experiment, the atomic write width is treated as fixed but is actually chosen by the system administrator when formatting the disk or dictated hardware capabilities.  
+
+For the ring geometry experiment, the number of root slots is treated as fixed but is chosen by the administrator based on expected snapshot frequency and retention policies.  
+
+For the checksum bits experiment, the acceptable collision risk is treated as fixed but is chosen by the user based on their tolerance for data integrity risks, such as in financial vs. archival use cases.  
+
+The focus on byte widths and geometry systematically neglects operational failure scenarios. For example, the current design likely has no plan for handling a disk failure mid-write, which could leave the filesystem in an unrecoverable state with no way to restore data from a backup.  
+
+The decision that unit geometry is computed once at mount time and never per operation will be expensive to undo later. Changing this would require rewriting the core mount logic and all operations that depend on static geometry, breaking compatibility and requiring extensive retesting of every feature.

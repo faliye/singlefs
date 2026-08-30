@@ -1,0 +1,9 @@
+The candidate shape issue isn't slot width alone. For example, with 4 slots of 512 bytes (2048 bytes total) on a 4096 byte atomic unit device, each write corrupts 8 slots (4096/512), exceeding the 4-slot ring. This shows the total ring size relative to atomic unit matters, not slot width alone. T1 fails.
+
+If slot width is fixed at format time (e.g., 4096 bytes) and the device later has a 512 byte atomic unit, writing a root slot requires multiple atomic writes, causing tearing. However, if mkfs reserved insufficient space for larger slot widths (e.g., ring space only for 2048 bytes), mounting on a 4096 atomic unit device fails due to insufficient space. This shows T2's requirement needs proper mkfs space reservation, but T2 itself is correct for safety.
+
+The worst case block reuse delay requirement can be derived from checkpoint interval. Measured checkpoint interval is 200 roots per 200000 operations, so 1000 operations per root. Thus, K must be at least 1000. T3 fails because the requirement exists.
+
+Block reuse delay of 8 operations is dangerous. If checkpoints occur every 1000 operations, blocks from root 1 might be reused by root 9. A crash between root 8 and root 9 could cause recovery using root 8 to reference reused blocks, corrupting data.
+
+Reject T. Narrowed version: slot width must match atomic unit at mount time, ring size must be at least atomic unit size, and K must equal checkpoint interval (e.g., 1000 operations).

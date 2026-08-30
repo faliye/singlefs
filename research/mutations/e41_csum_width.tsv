@@ -1,0 +1,9 @@
+M1_块读次数漏掉scrub周期	(i.pool_bytes / i.block_bytes) * (i.years * 365.0 / i.scrub_days)	(i.pool_bytes / i.block_bytes)
+M2_漏检期望不乘损坏率	block_reads(i) * i.corrupt_rate	block_reads(i)
+M3_最小位宽用小于等于	(1..=128).find(|&n| miss_expect(i, n) < i.target)	(1..=128).find(|&n| miss_expect(i, n) <= i.target * 10.0)
+M4_余量算反	i.target / miss_expect(i, n)	miss_expect(i, n) / i.target
+M5_CRC多项式打错	0x82F6_3B78	0x82F6_3B79
+M6_截断不截	(crc32c(data) as u64) & ((1u64 << n) - 1)	(crc32c(data) as u64)
+M7_没坏也计入分母	if !dmg.apply(&mut c, &b, &mut rng) {\n            continue; // 没真的改变字节，不计入分母\n        }\n        injected += 1;	dmg.apply(&mut c, &b, &mut rng);\n        injected += 1;
+M8_字节交换不检查相同	if buf[i] == buf[j] {\n                    return false; // 交换相同的两个字节等于什么都没做\n                }	if false {\n                    return false; // 交换相同的两个字节等于什么都没做\n                }
+M9_SHA轮常数打错	0x428a2f98	0x428a2f99

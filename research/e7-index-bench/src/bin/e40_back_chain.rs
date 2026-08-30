@@ -175,6 +175,34 @@ fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
 
 /// 记录头现在是 84 字节（E24 逐字列出的 11 个字段）。反向链要在它之上加 `bits/8` 字节。
 const HDR_BYTES: u64 = 84;
+/// D23 未定项 7 定案新增：事务号 8 + 提交标记 1。
+const TXN_BYTES: u64 = 9;
+/// E24 的点名项宽度。
+const ITEM_BYTES: u64 = 56;
+
+/// 一条记录**在盘上真的占几字节**：D23 未定项 4 已定「记录头完整落在一个原子单元内」
+/// ⇒ 记录要向上取整到原子单元。
+///
+/// ⚠️ **「头涨百分之几」不是盘上代价**：头住在一个已经被整单元占住的空间里，
+/// 多两个字节多半一个块都不多。本函数是拿来把这件事钉死的。
+fn on_disk_bytes(chain_bytes: u64, named_items: u64, unit: u64) -> u64 {
+    let sz = HDR_BYTES + TXN_BYTES + chain_bytes + named_items * ITEM_BYTES;
+    sz.div_ceil(unit) * unit
+}
+
+/// 一个原子单元里装得下几个点名项。
+fn items_per_unit(chain_bytes: u64, unit: u64) -> u64 {
+    unit.saturating_sub(HDR_BYTES + TXN_BYTES + chain_bytes) / ITEM_BYTES
+}
+
+/// **不对齐**（多条记录挤同一个原子单元）时的记录字节数。
+///
+/// ⚠️ 「链宽免费」这个结论**条件于 D23 未定项 4 已定的「记录头完整落在一个原子单元内」**。
+/// E24 已记：不对齐则空间不浪费，**但除第一条外都判不了撕裂**。
+/// 若那条决定被推翻，每条记录多的那几个字节就按比例收费——本函数把那一档也算出来。
+fn packed_bytes(chain_bytes: u64, named_items: u64) -> u64 {
+    HDR_BYTES + TXN_BYTES + chain_bytes + named_items * ITEM_BYTES
+}
 
 /// 跑 `trials` 轮独立试验，数有多少轮里残留骗过了反向链。
 /// **一轮试验量不出概率**：碰撞在每轮只有一次机会（新时间线最后一条 → 第一条活着的残留），
@@ -222,8 +250,10 @@ fn main() {
         let ppm = bad.saturating_mul(1_000_000) / trials;
         println!("{}", em.emit_raw(&format!(
             "name=width bits={bits} false_accept={bad} trials={trials} false_accept_ppm={ppm} \
-             hdr_bytes_added={add} hdr_bytes_total={} hdr_growth_bp={}",
-            HDR_BYTES + add, add.saturating_mul(10_000) / HDR_BYTES)));
+             hdr_bytes_added={add} hdr_bytes_total={} hdr_growth_bp={} \
+             on_disk_512_items1={} on_disk_512_items12={} items_per_512_unit={}",
+            HDR_BYTES + add, add.saturating_mul(10_000) / HDR_BYTES,
+            on_disk_bytes(add, 1, 512), on_disk_bytes(add, 12, 512), items_per_unit(add, 512))));
     }
     println!("{}", em.finish());
 }
@@ -357,6 +387,51 @@ mod tests {
         let b16 = false_accept_rate(Slots::ByJsn, Resume::AtPrefix, 16, S, SET, ST, NEW, trials);
         assert!(b8 > 100, "8 位在 20 万轮里该出几百次，实测 {b8}");
         assert!(b16 * 50 < b8, "16 位该比 8 位少两个数量级（{b16} vs {b8}）");
+    }
+
+    /// **绝对值断言：链取 2 / 4 / 8 字节，盘上占的字节数一个都不差。**
+    /// 「头涨 4.76%」那个百分比是头的百分比，**不是盘上代价**——
+    /// 记录头要向上取整到原子单元（D23 未定项 4 已定），多两个字节多半一个块都不多。
+    #[test]
+    fn two_four_and_eight_byte_chains_cost_the_same_on_disk() {
+        for unit in [512u64, 4096] {
+            for items in [1u64, 7, 8, 12, 16] {
+                let a = on_disk_bytes(2, items, unit);
+                let b = on_disk_bytes(4, items, unit);
+                let c = on_disk_bytes(8, items, unit);
+                assert_eq!((a, b), (b, c), "链 2/4/8 字节该占同样多（单元 {unit}，点名 {items} 项）");
+            }
+        }
+        // 绝对值：512 单元、点名 1 项时，2 字节链的记录是 151 字节，占满一个 512 扇区
+        assert_eq!(84 + 9 + 2 + 56, 151);
+        assert_eq!(on_disk_bytes(2, 1, 512), 512);
+        assert_eq!(on_disk_bytes(8, 12, 512), 1024);
+    }
+
+    /// **「免费」是条件性的**：只在「记录头独占一个原子单元」这条已定规则下成立。
+    /// 若改成多条记录挤一个单元，2 → 4 字节就按比例收费——**最坏也只有 1.3%**。
+    #[test]
+    fn if_records_were_packed_the_extra_bytes_would_cost_proportionally() {
+        // 点名 1 项：151 → 153 字节
+        assert_eq!(packed_bytes(2, 1), 151);
+        assert_eq!(packed_bytes(4, 1), 153);
+        let worst = (packed_bytes(4, 1) - packed_bytes(2, 1)) as f64 / packed_bytes(2, 1) as f64;
+        assert!(worst < 0.014, "点名 1 项时 2→4 字节最多涨 1.4%，实测 {:.3}", worst);
+        // 点名 12 项（D25 粗粒度那一档）：767 → 769，涨幅更小
+        assert_eq!(packed_bytes(2, 12), 767);
+        assert_eq!(packed_bytes(4, 12), 769);
+        let coarse = (packed_bytes(4, 12) - packed_bytes(2, 12)) as f64 / packed_bytes(2, 12) as f64;
+        assert!(coarse < 0.003, "点名 12 项时只涨 0.26%，实测 {:.4}", coarse);
+    }
+
+    /// **链要多宽才真的开始收费**：512 单元下 28 字节起才挤掉一个点名项。
+    /// ⇒ 2 与 4 的差别在容量上**不存在**，不是「很小」。
+    #[test]
+    fn a_chain_only_starts_costing_capacity_at_28_bytes() {
+        assert_eq!(items_per_unit(0, 512), 7);
+        assert_eq!(items_per_unit(4, 512), 7);
+        assert_eq!(items_per_unit(27, 512), 7);
+        assert_eq!(items_per_unit(28, 512), 6, "28 字节起容量掉到 6");
     }
 
     /// **hash 真的随宽度收窄**——否则宽度扫描测的是同一个东西四遍。

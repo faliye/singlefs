@@ -1,0 +1,11 @@
+The most fragile conclusion is X2 (root ring geometry). The current design assumes a 2 regions × 4 slots structure without considering failure domains. A new fact that would overturn this is discovering that the target storage devices have physical failure domains (e.g., sectors failing together in a track or cylinder), which requires regions to be physically spaced apart. This fact is cheap to obtain—simply checking disk manufacturer specifications or running basic hardware tests.
+
+Ranking the next four by fragility:  
+X3 (ciphertext checksum width) is next fragile; a new fact showing actual corruption rates are ten times higher than assumed would require more bits, though measuring real-world rates is expensive.  
+D5 (re-evaluating geometry after device changes) is third; if the target environment frequently adds/removes devices, the lack of re-evaluation process fails, and confirming this is cheap via use-case analysis.  
+X1 (extension point byte limit) is fourth; a new structural constraint requiring larger payload sizes would break the 7–13 byte lower bound, but discovering such constraints is expensive.  
+D4 (variable stripe width granularity) is fifth; if the workload demands specific stripe widths, the open granularity becomes problematic, and confirming this is cheap through workload profiling.  
+
+For X2, the project should narrow it immediately by requiring regions to be spaced apart to cover failure domains, rather than relying on slot width alone. This fixes the design flaw without major restructuring.  
+
+X1’s lower bound of 7–13 bytes appears fragile but is robust. It stems from inherent structural limits (payload squeezing, journal headers, and atomic unit sizes), which are fixed by the mount-time unit geometry and not dependent on external assumptions. Even with new facts about usage or hardware, these limits remain valid because they are derived from the design’s core mechanics.

@@ -1,0 +1,8 @@
+M1_落盘不取模设备数	(lba / chunk) % devs	(lba / chunk)
+M2_区内连续退化成跨区	SlotOrder::WithinRegion => (txg % (regions * slots)) / slots,	SlotOrder::WithinRegion => txg % regions,
+M3_跨区退化成区内连续	SlotOrder::AcrossRegions => txg % regions,	SlotOrder::AcrossRegions => (txg % (regions * slots)) / slots,
+M4_只取一个相位	for phase in 0..ring {	for phase in 0..1 {
+M5_读不到记成回退0	newest_alive.map(|t| latest - t)	Some(newest_alive.map(|t| latest - t).unwrap_or(0))
+M6_区域数少算一个	fn regions_needed(f: u64) -> u64 {\n    f + 1\n}	fn regions_needed(f: u64) -> u64 {\n    f\n}
+M7_区域位置全挤在盘首	let raw = span * r / (regions - 1);	let raw = 0 * span * r / (regions - 1);
+M8_死区也算幸存	if dev_of_region[r as usize] == failed_dev {	if false && dev_of_region[r as usize] == failed_dev {

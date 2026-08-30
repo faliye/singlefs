@@ -6,3 +6,5 @@ M5_截断不生效	if bits >= 64 { h } else { h & ((1u64 << bits) - 1) }	h
 M6_残留不计数	if r.timeline == 0 && r.jsn >= settled { stale_hit += 1; }	if r.timeline == 0 && r.jsn >= settled + 99 { stale_hit += 1; }
 M7_序号不检查	if !r.csum_ok || r.jsn != expected { break }	if !r.csum_ok { break }
 M8_退回第一版哈希（种子在末尾且无终混）	    for x in [seed, r.jsn, r.timeline as u64, r.prev_hash] {\n        for b in x.to_le_bytes() {\n            h ^= b as u64;\n            h = h.wrapping_mul(0x0000_0100_0000_01b3);\n        }\n    }\n    // 终混（splitmix64 的形态）：把高位的差异搅进低位，否则截低位等于只看一条窄通道\n    h ^= h >> 33; h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);\n    h ^= h >> 33; h = h.wrapping_mul(0xc4ce_b9fe_1a85_ec53);\n    h ^= h >> 33;	    for x in [r.jsn, r.timeline as u64, r.prev_hash, seed] {\n        for b in x.to_le_bytes() {\n            h ^= b as u64;\n            h = h.wrapping_mul(0x0000_0100_0000_01b3);\n        }\n    }
+M9_盘上代价不向上取整	sz.div_ceil(unit) * unit	sz
+M10_不对齐档漏算事务字段	HDR_BYTES + TXN_BYTES + chain_bytes + named_items * ITEM_BYTES\n}	HDR_BYTES + chain_bytes + named_items * ITEM_BYTES\n}

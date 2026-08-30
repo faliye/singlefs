@@ -1,0 +1,48 @@
+E7RESULT name=arith_base block_reads=1.273019e12 corrupt_reads=1.273019e3 min_bits=31 miss_at_32=2.963978e-7 margin_at_32=3.3738 miss_at_64=6.901050e-17
+E7RESULT name=sensitivity input=pool_bytes direction=proportional factor_to_break_32=3.3738 min_bits_after_break=33
+E7RESULT name=sensitivity input=corrupt_rate direction=proportional factor_to_break_32=3.3738 min_bits_after_break=33
+E7RESULT name=sensitivity input=years direction=proportional factor_to_break_32=3.3738 min_bits_after_break=33
+E7RESULT name=sensitivity input=scrub_days direction=inverse factor_to_break_32=3.3738 min_bits_after_break=33
+E7RESULT name=sensitivity input=block_bytes direction=inverse factor_to_break_32=3.3738 min_bits_after_break=33
+E7RESULT name=arith_scan corrupt_rate_factor=1 corrupt_rate=1.000e-9 min_bits=31 miss_at_32=2.963978e-7
+E7RESULT name=arith_scan corrupt_rate_factor=10 corrupt_rate=1.000e-8 min_bits=34 miss_at_32=2.963978e-6
+E7RESULT name=arith_scan corrupt_rate_factor=100 corrupt_rate=1.000e-7 min_bits=37 miss_at_32=2.963978e-5
+E7RESULT name=arith_scan corrupt_rate_factor=1000 corrupt_rate=1.000e-6 min_bits=41 miss_at_32=2.963978e-4
+E7RESULT name=arith_scan corrupt_rate_factor=10000 corrupt_rate=1.000e-5 min_bits=44 miss_at_32=2.963978e-3
+E7RESULT name=arith_scan corrupt_rate_factor=1000000 corrupt_rate=1.000e-3 min_bits=51 miss_at_32=2.963978e-1
+E7RESULT name=collide alg=sum8 bits=8 damage=bit_flip injected=250000 missed=0 measured_ppm=0.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=sum8 bits=8 damage=sector_zero injected=250000 missed=923 measured_ppm=3692.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=sum8 bits=8 damage=misdirect injected=250000 missed=981 measured_ppm=3924.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=sum8 bits=8 damage=whole_block injected=250000 missed=951 measured_ppm=3804.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=sum8 bits=8 damage=byte_swap injected=248951 missed=248951 measured_ppm=1000000.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc8 bits=8 damage=bit_flip injected=250000 missed=803 measured_ppm=3212.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc8 bits=8 damage=sector_zero injected=250000 missed=990 measured_ppm=3960.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc8 bits=8 damage=misdirect injected=250000 missed=1019 measured_ppm=4076.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc8 bits=8 damage=whole_block injected=250000 missed=977 measured_ppm=3908.000 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc8 bits=8 damage=byte_swap injected=248951 missed=982 measured_ppm=3944.551 theory_ppm=3906.250000
+E7RESULT name=collide alg=crc32c_trunc12 bits=12 damage=bit_flip injected=250000 missed=0 measured_ppm=0.000 theory_ppm=244.140625
+E7RESULT name=collide alg=crc32c_trunc12 bits=12 damage=sector_zero injected=250000 missed=61 measured_ppm=244.000 theory_ppm=244.140625
+E7RESULT name=collide alg=crc32c_trunc12 bits=12 damage=misdirect injected=250000 missed=65 measured_ppm=260.000 theory_ppm=244.140625
+E7RESULT name=collide alg=crc32c_trunc12 bits=12 damage=whole_block injected=250000 missed=58 measured_ppm=232.000 theory_ppm=244.140625
+E7RESULT name=collide alg=crc32c_trunc12 bits=12 damage=byte_swap injected=248951 missed=65 measured_ppm=261.096 theory_ppm=244.140625
+E7RESULT name=collide alg=crc32c_trunc16 bits=16 damage=bit_flip injected=250000 missed=0 measured_ppm=0.000 theory_ppm=15.258789
+E7RESULT name=collide alg=crc32c_trunc16 bits=16 damage=sector_zero injected=250000 missed=2 measured_ppm=8.000 theory_ppm=15.258789
+E7RESULT name=collide alg=crc32c_trunc16 bits=16 damage=misdirect injected=250000 missed=3 measured_ppm=12.000 theory_ppm=15.258789
+E7RESULT name=collide alg=crc32c_trunc16 bits=16 damage=whole_block injected=250000 missed=3 measured_ppm=12.000 theory_ppm=15.258789
+E7RESULT name=collide alg=crc32c_trunc16 bits=16 damage=byte_swap injected=248951 missed=4 measured_ppm=16.067 theory_ppm=15.258789
+E7RESULT name=collide alg=crc32c_full32 bits=32 damage=bit_flip injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=crc32c_full32 bits=32 damage=sector_zero injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=crc32c_full32 bits=32 damage=misdirect injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=crc32c_full32 bits=32 damage=whole_block injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=crc32c_full32 bits=32 damage=byte_swap injected=248951 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=crc64_full64 bits=64 damage=bit_flip injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000000
+E7RESULT name=collide alg=crc64_full64 bits=64 damage=sector_zero injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000000
+E7RESULT name=collide alg=crc64_full64 bits=64 damage=misdirect injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000000
+E7RESULT name=collide alg=crc64_full64 bits=64 damage=whole_block injected=250000 missed=0 measured_ppm=0.000 theory_ppm=0.000000
+E7RESULT name=collide alg=crc64_full64 bits=64 damage=byte_swap injected=248951 missed=0 measured_ppm=0.000 theory_ppm=0.000000
+E7RESULT name=collide alg=sha256_trunc32 bits=32 damage=bit_flip injected=25000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=sha256_trunc32 bits=32 damage=sector_zero injected=25000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=sha256_trunc32 bits=32 damage=misdirect injected=25000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=sha256_trunc32 bits=32 damage=whole_block injected=25000 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=collide alg=sha256_trunc32 bits=32 damage=byte_swap injected=24893 missed=0 measured_ppm=0.000 theory_ppm=0.000233
+E7RESULT name=done emitted=48

@@ -1,0 +1,35 @@
+E7RESULT name=config file_blocks=16384 block=4096 syncs_per_round=2000 rounds=5
+E7RESULT name=warmup arm=Sync1 syncs=2000 elapsed_ns=717301815 counted=false
+E7RESULT name=round arm=Sync1 round=0 syncs=2000 elapsed_ns=720129289 per_sec_milli=2777279
+E7RESULT name=round arm=Sync1 round=1 syncs=2000 elapsed_ns=717085985 per_sec_milli=2789065
+E7RESULT name=round arm=Sync1 round=2 syncs=2000 elapsed_ns=718043136 per_sec_milli=2785347
+E7RESULT name=round arm=Sync1 round=3 syncs=2000 elapsed_ns=717551446 per_sec_milli=2787256
+E7RESULT name=round arm=Sync1 round=4 syncs=2000 elapsed_ns=718747217 per_sec_milli=2782619
+E7RESULT name=arm arm=Sync1 median_per_sec_milli=2785347 spread_bp=42 min=2777279 max=2789065
+E7RESULT name=warmup arm=Sync8 syncs=2000 elapsed_ns=736260003 counted=false
+E7RESULT name=round arm=Sync8 round=0 syncs=2000 elapsed_ns=736580404 per_sec_milli=2715250
+E7RESULT name=round arm=Sync8 round=1 syncs=2000 elapsed_ns=736993684 per_sec_milli=2713727
+E7RESULT name=round arm=Sync8 round=2 syncs=2000 elapsed_ns=735883113 per_sec_milli=2717822
+E7RESULT name=round arm=Sync8 round=3 syncs=2000 elapsed_ns=736739663 per_sec_milli=2714663
+E7RESULT name=round arm=Sync8 round=4 syncs=2000 elapsed_ns=738180606 per_sec_milli=2709364
+E7RESULT name=arm arm=Sync8 median_per_sec_milli=2714663 spread_bp=31 min=2709364 max=2717822
+E7RESULT name=warmup arm=NoSync syncs=2000 elapsed_ns=22525064 counted=false
+E7RESULT name=round arm=NoSync round=0 syncs=2000 elapsed_ns=22354893 per_sec_milli=89465872
+E7RESULT name=round arm=NoSync round=1 syncs=2000 elapsed_ns=22524974 per_sec_milli=88790335
+E7RESULT name=round arm=NoSync round=2 syncs=2000 elapsed_ns=22529913 per_sec_milli=88770870
+E7RESULT name=round arm=NoSync round=3 syncs=2000 elapsed_ns=22348183 per_sec_milli=89492734
+E7RESULT name=round arm=NoSync round=4 syncs=2000 elapsed_ns=22351373 per_sec_milli=89479961
+E7RESULT name=arm arm=NoSync median_per_sec_milli=89465872 spread_bp=80 min=88770870 max=89492734
+E7RESULT name=poscontrol sync1_per_sec_milli=2785347 nosync_per_sec_milli=89465872 ratio_bp=321201 ok=true
+E7RESULT name=lifetime bits=48 years_at_sync1=3202 years_at_sync8=3285
+E7RESULT name=lifetime bits=56 years_at_sync1=819778 years_at_sync8=841123
+E7RESULT name=lifetime bits=64 years_at_sync1=209863275 years_at_sync8=215327665
+E7RESULT name=width unit=512 jsn_bytes=8 header=97 on_disk_items1=512 on_disk_items12=1024 items_per_unit=7 cost_unit_count_0_100=0
+E7RESULT name=width unit=512 jsn_bytes=10 header=99 on_disk_items1=512 on_disk_items12=1024 items_per_unit=7 cost_unit_count_0_100=0
+E7RESULT name=width unit=512 jsn_bytes=12 header=101 on_disk_items1=512 on_disk_items12=1024 items_per_unit=7 cost_unit_count_0_100=0
+E7RESULT name=width unit=512 jsn_bytes=16 header=105 on_disk_items1=512 on_disk_items12=1024 items_per_unit=7 cost_unit_count_0_100=1
+E7RESULT name=width unit=4096 jsn_bytes=8 header=97 on_disk_items1=4096 on_disk_items12=4096 items_per_unit=71 cost_unit_count_0_100=0
+E7RESULT name=width unit=4096 jsn_bytes=10 header=99 on_disk_items1=4096 on_disk_items12=4096 items_per_unit=71 cost_unit_count_0_100=0
+E7RESULT name=width unit=4096 jsn_bytes=12 header=101 on_disk_items1=4096 on_disk_items12=4096 items_per_unit=71 cost_unit_count_0_100=0
+E7RESULT name=width unit=4096 jsn_bytes=16 header=105 on_disk_items1=4096 on_disk_items12=4096 items_per_unit=71 cost_unit_count_0_100=0
+E7RESULT name=done emitted=35

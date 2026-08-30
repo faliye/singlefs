@@ -22,6 +22,10 @@ REPLAY_DEV="${REPLAY_DEV:-$OUT_DIR/e9.img}"
 # 所以 REPLAY_OUT 要落在真文件系统上（本机 /tmp 是 ext4，够用）。
 [[ -e "$REPLAY_DEV" ]] || truncate -s 512M "$REPLAY_DEV"
 export REPLAY_DEV
+# E45 要一个 64 MiB 的 O_DIRECT 后端量本机 fsync 率
+REPLAY_DEV45="${REPLAY_DEV45:-$OUT_DIR/e45.img}"
+[[ -e "$REPLAY_DEV45" ]] || truncate -s 64M "$REPLAY_DEV45"
+export REPLAY_DEV45
 
 # 实验号 | 二进制 | 参数 | 入库产物 | 判据（exact=应逐字节一致 / timing=含计时字段，只比结构）
 TABLE=$(cat <<'TSV'
@@ -45,7 +49,13 @@ E38|e38-log-epoch||e38-log-epoch-2026-08-29.out|exact
 E39|e39_accounting_cow||e39-accounting-cow-2026-08-29.out|exact
 E40|e40_back_chain||e40-back-chain-2026-08-29.out|exact
 E43|e43_txn_records||e43-txn-records-2026-08-29.out|exact
+E45|e45_jsn_width|$REPLAY_DEV45|e45-jsn-width-2026-08-30.out|timing
 E44|e44_ext_budget||e44-ext-budget-2026-08-30.out|exact
+E42|e42_root_ring_geom||e42-root-ring-geom-2026-08-30.out|exact
+E41|e41_csum_width||e41-csum-width-2026-08-30.out|exact
+E47|e47_region_spacing||e47-region-spacing-2026-08-30.out|exact
+E48|e48_ring_loss||e48-ring-loss-2026-08-30.out|exact
+E49|e49_ring_placement||e49-ring-placement-2026-08-30.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-28.out|exact
@@ -58,7 +68,7 @@ TSV
 # 计时字段：换机器、换负载就会变，比对时抹掉。抹掉的是**值**不是**字段名**——
 # 字段整个消失属于结构变化，仍然会被抓。
 strip_timing() {
-  sed -E 's/(elapsed_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
+  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
 }
 
 # ── 结论区间断言 ──────────────────────────────────────────────────────────
@@ -111,6 +121,20 @@ check_claims() {
     else
       printf '  ✗ %-5s %-46s 8K=%s ≤ 4K=%s ⇒ kb 记的「五轮稳定」不再成立\n' E20 "8 KiB 拐点这次没出现" "$v8192" "$v4096"; bad=1
     fi ;;
+  E45)
+    # 本机 fsync 率：换机器会变，但**量级**要稳住，否则寿命折算整个塌掉
+    v=$(grep 'name=arm arm=Sync1' "$f" | sed -n 's/.*median_per_sec_milli=\([0-9]*\).*/\1/p')
+    claim E45 "本机 fsync 率（每秒千分之一次）" "$v" 500000 20000000 || bad=1
+    # 阳性对照：不 fsync 必须至少快一倍，否则 fdatasync 没到设备
+    w=$(grep 'name=poscontrol' "$f" | sed -n 's/.*ok=\([a-z]*\).*/\1/p')
+    if [[ "$w" == true ]]; then printf '  ✓ %-5s %-46s\n' E45 "阳性对照：fdatasync 确实到了设备"
+    else printf '  ✗ %-5s %-46s ok=%s\n' E45 "阳性对照失败 ⇒ fdatasync 没到设备，整轮作废" "$w"; bad=1; fi
+    # 48 位计数器在本机速率下的寿命：这是「48 位够不够」那条结论的落点
+    x=$(grep 'name=lifetime bits=48' "$f" | sed -n 's/.*years_at_sync1=\([0-9]*\).*/\1/p')
+    claim E45 "48 位计数器在本机撑多少年" "$x" 500 50000 || bad=1
+    # 加宽 jsn 到 12 字节的代价：0..=100 项里一格都不该多占
+    y=$(grep 'name=width unit=512 jsn_bytes=12 ' "$f" | sed -n 's/.*cost_unit_count_0_100=\([0-9]*\).*/\1/p')
+    claim E45 "jsn 8→12 在 512 单元下多占几格" "$y" 0 0 || bad=1 ;;
   E21)
     # kb 的承重结论：CPU 扫描撞内存带宽墙（约 65 GB/s），16 线程几乎不加速 ⇒ GPU 传输地板已经更慢。
     v=$(grep 'name=scaling arm=bandwidth' "$f" | sed -n 's/.*peak_gbps=\([0-9.]*\).*/\1/p')
@@ -147,6 +171,7 @@ printf '%s\n' "-----------------------------------------------------------------
 while IFS='|' read -r exp bin args stored kind; do
   [[ -z "$exp" ]] && continue
   want "$exp" || continue
+  args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"  # 先换长的，否则前缀会被短的吃掉
   args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
   fresh="$OUT_DIR/$exp.out"
   rm -f "$fresh"                                    # 闸 1：不许跨轮复用

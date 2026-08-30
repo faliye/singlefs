@@ -1,0 +1,13 @@
+M1_槽数算错	REGIONS * SLOTS_PER_REGION	REGIONS + SLOTS_PER_REGION
+M2_一圈不除频率	slots * roots_den / roots_num	slots
+M3_覆盖算反	(atomic_units_touched(slot_off, slot_bytes, atomic) * atomic).div_ceil(slot_bytes)	(atomic_units_touched(slot_off, slot_bytes, atomic) * slot_bytes).div_ceil(atomic)
+# M4 曾是 `>=` 改 `>`，**那是等价变异**：slot == atomic 时 else 分支的 atomic/slot 恰好也是 1，
+# 任何输入下两者同值 ⇒ 永远抓不到，不算盲区。换成把条件整个反向，它才真会改行为。
+M4_偏移取模去掉	(slot_off % atomic) + slot_bytes	slot_off + slot_bytes
+M5_反解不向上取整	(delay_ops * roots_num).div_ceil(roots_den)	(delay_ops * roots_num) / roots_den
+M6_隔离门槛减半	fn min_slot_bytes_for_isolation(atomic: u64) -> u64 {\n    atomic\n}	fn min_slot_bytes_for_isolation(atomic: u64) -> u64 {\n    atomic / 2\n}
+M7_槽宽常量打错	const SLOT_BYTES: u64 = 256;	const SLOT_BYTES: u64 = 512;
+M8_对齐维被抹掉	((slot_off % atomic) + slot_bytes).div_ceil(atomic)	slot_bytes.div_ceil(atomic)
+M9_风险槽数不按覆盖算	(atomic_units_touched(slot_off, slot_bytes, atomic) * atomic).div_ceil(slot_bytes)	atomic_units_touched(slot_off, slot_bytes, atomic)
+M10_环跨度判反	fn ring_fits_in_one_io_min(ring_bytes: u64, io_min: u64) -> bool {\n    ring_bytes <= io_min\n}	fn ring_fits_in_one_io_min(ring_bytes: u64, io_min: u64) -> bool {\n    ring_bytes >= io_min\n}
+M11_环跨度用严格小于	fn ring_fits_in_one_io_min(ring_bytes: u64, io_min: u64) -> bool {\n    ring_bytes <= io_min\n}	fn ring_fits_in_one_io_min(ring_bytes: u64, io_min: u64) -> bool {\n    ring_bytes < io_min\n}

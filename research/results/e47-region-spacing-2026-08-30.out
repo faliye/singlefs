@@ -1,0 +1,45 @@
+E7RESULT name=config region_bytes=1024 ring_bytes=2048 capacity=10000000000000
+E7RESULT name=domain chunk=65536 devs=1 head_dev=0 tail_lba=9999999959040 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=65536 devs=2 head_dev=0 tail_lba=9999999959040 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=65536 devs=3 head_dev=0 tail_lba=9999999959040 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=65536 devs=4 head_dev=0 tail_lba=9999999959040 tail_dev=2 same_device=0
+E7RESULT name=domain chunk=65536 devs=6 head_dev=0 tail_lba=9999999959040 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=65536 devs=8 head_dev=0 tail_lba=9999999959040 tail_dev=2 same_device=0
+E7RESULT name=domain chunk=524288 devs=1 head_dev=0 tail_lba=9999999827968 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=524288 devs=2 head_dev=0 tail_lba=9999999827968 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=524288 devs=3 head_dev=0 tail_lba=9999999827968 tail_dev=2 same_device=0
+E7RESULT name=domain chunk=524288 devs=4 head_dev=0 tail_lba=9999999827968 tail_dev=2 same_device=0
+E7RESULT name=domain chunk=524288 devs=6 head_dev=0 tail_lba=9999999827968 tail_dev=2 same_device=0
+E7RESULT name=domain chunk=524288 devs=8 head_dev=0 tail_lba=9999999827968 tail_dev=6 same_device=0
+E7RESULT name=domain chunk=4194304 devs=1 head_dev=0 tail_lba=9999996682240 tail_dev=0 same_device=1
+E7RESULT name=domain chunk=4194304 devs=2 head_dev=0 tail_lba=9999996682240 tail_dev=1 same_device=0
+E7RESULT name=domain chunk=4194304 devs=3 head_dev=0 tail_lba=9999996682240 tail_dev=1 same_device=0
+E7RESULT name=domain chunk=4194304 devs=4 head_dev=0 tail_lba=9999996682240 tail_dev=1 same_device=0
+E7RESULT name=domain chunk=4194304 devs=6 head_dev=0 tail_lba=9999996682240 tail_dev=1 same_device=0
+E7RESULT name=domain chunk=4194304 devs=8 head_dev=0 tail_lba=9999996682240 tail_dev=1 same_device=0
+E7RESULT name=domain_summary same_device_cases=7 total_cases=18 head_tail_independent_geometrically=0
+E7RESULT name=spacing io_min=512 gap=0 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=512 gap=512 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=512 gap=4096 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=512 gap=65536 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=512 gap=1048576 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=4096 gap=0 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=4096 gap=512 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=4096 gap=4096 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=4096 gap=65536 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=4096 gap=1048576 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=65536 gap=0 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=65536 gap=512 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=65536 gap=4096 regions_hit=2 isolated=0
+E7RESULT name=spacing io_min=65536 gap=65536 regions_hit=1 isolated=1
+E7RESULT name=spacing io_min=65536 gap=1048576 regions_hit=1 isolated=1
+E7RESULT name=spacing_headtail io_min=512 gap=9999999958016 regions_hit=1
+E7RESULT name=spacing_headtail io_min=4096 gap=9999999958016 regions_hit=1
+E7RESULT name=spacing_headtail io_min=65536 gap=9999999958016 regions_hit=1
+E7RESULT name=regions_needed tolerate_domains=0 regions=1 candidate_regions=2 enough=1
+E7RESULT name=regions_needed tolerate_domains=1 regions=2 candidate_regions=2 enough=1
+E7RESULT name=regions_needed tolerate_domains=2 regions=3 candidate_regions=2 enough=0
+E7RESULT name=regions_needed tolerate_domains=3 regions=4 candidate_regions=2 enough=0
+E7RESULT name=poscontrol_same_chunk chunk=65536 devs=4 p0=0 p1=1024 same_device=1 expect=1
+E7RESULT name=poscontrol_zero_gap io_min=512 gap=0 regions_hit=2 expect=2
+E7RESULT name=done emitted=45

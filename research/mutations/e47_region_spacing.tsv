@@ -1,0 +1,6 @@
+M1_落盘不取模设备数	(lba / chunk) % devs	(lba / chunk)
+M2_落盘按字节取模	(lba / chunk) % devs	(lba % chunk) % devs
+M3_间距判据用严格小于	if gap < io_min { 2 } else { 1 }	if gap <= io_min { 2 } else { 1 }
+M4_间距不减区域大小	p1.saturating_sub(p0 + size)	p1.saturating_sub(p0)
+M5_区域数少算一个	fn regions_needed(f: u64) -> u64 {\n    f + 1\n}	fn regions_needed(f: u64) -> u64 {\n    f\n}
+M6_盘尾不按chunk对齐	((capacity - size) / chunk) * chunk	(capacity - size)

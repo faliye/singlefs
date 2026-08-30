@@ -47,7 +47,7 @@
 - 代码 `research/e7-index-bench/src/bin/e25_recovery.rs`（`cargo run --release --bin e25_recovery`），
   原始输出 `research/results/e25-recovery-2026-08-29.out`。三轮字节一致。
 
-### 这一轮踩的三个坑，都由测试自己抓出来
+### 08-29 那一轮踩的三个坑，都由测试自己抓出来
 
 1. **首次跑就红**：`gap=100` 而环 64，全环扫描漏 36 条。不是算法问题，是窗口撑爆了环。
    ⇒ 拆成两条测试，并把「窗口撑爆环」那格写成会红的断言，
