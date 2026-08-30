@@ -17,7 +17,7 @@ D20（承重面：单元的原子性与自包含）已定「承重面 = 单元�
 | 5 | 块层从未承诺「一个 bio 不会被撕裂」 | Documentation/ABI/stable/sysfs-block 的四个 atomic_write_* 条目没有一处提到 crash / power fail |
 | 6 | 现役实现全部自己合成撕裂检测，没有一家靠设备 | ZFS 根用 4 label × 128K uberblock 环、槽号 = txg % 槽数、SHA-256 内嵌块尾；ZFS 普通块把校验和放父指针；XFS 日志按扇区盖 cycle 号；jbd2 有 jbd2_commit_block_csum_verify_partial() 显式接受「只有头部有效、其余为零」 |
 
-## 本轮新量到的（E24 journal 几何，2026-08-29）
+## 本轮新量到的（E23 journal 几何，2026-08-29）
 
 要求「记录头完整落在一个原子单元内」的对齐代价：
 

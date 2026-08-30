@@ -1,7 +1,0 @@
-M1_摆放不对齐到单元	self.cursor += self.unit - self.cursor % self.unit;\n        }\n        self.cursor += rec_header() + items * ITEM;	self.cursor += 0;\n        }\n        self.cursor += rec_header() + items * ITEM;
-M2_闭式少算余数那条	full * one(per_rec) + if rest > 0 { one(rest) } else { 0 }	full * one(per_rec)
-M3_E24口径混进事务字段	fn e24_raw(items: u64) -> u64 { HDR + items * ITEM }	fn e24_raw(items: u64) -> u64 { rec_header() + items * ITEM }
-M4_头部漏算反向链	fn rec_header() -> u64 { HDR + TXN + CHAIN }	fn rec_header() -> u64 { HDR + TXN }
-M5_尾部不对齐	    fn finish(&mut self) -> u64 {\n        if self.cursor % self.unit != 0 {	    fn finish(&mut self) -> u64 {\n        if false {
-M6_撕裂损失改回按记录算	fn txns_lost_when_torn(_per_rec: u64) -> u64 { 1 }	fn txns_lost_when_torn(per_rec: u64) -> u64 { per_rec }
-M7_项宽写错	const ITEM: u64 = 56;	const ITEM: u64 = 48;

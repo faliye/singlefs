@@ -9,7 +9,7 @@
 # 且**本阶段会把它们显式列成「本次没跑」**——
 # `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」。
 set -uo pipefail
-FAST=(E14 E18 E19 E24 E25 E26 E27 E28 E29 E30 E31 E32 E33 E34 E36 E37 E38 E39 E40 E43 E8 E16)
+FAST=(E14 E18 E19 E23 E24 E25 E26 E27 E28 E29 E30 E31 E32 E33 E35 E36 E37 E38 E39 E42 E8 E16)
 SLOW=(E9 E17 E20 E21)
 
 if [[ "${GATE_REPLAY_FULL:-0}" == 1 ]]; then

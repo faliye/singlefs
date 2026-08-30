@@ -22,7 +22,7 @@ REPLAY_DEV="${REPLAY_DEV:-$OUT_DIR/e9.img}"
 # 所以 REPLAY_OUT 要落在真文件系统上（本机 /tmp 是 ext4，够用）。
 [[ -e "$REPLAY_DEV" ]] || truncate -s 512M "$REPLAY_DEV"
 export REPLAY_DEV
-# E45 要一个 64 MiB 的 O_DIRECT 后端量本机 fsync 率
+# E44 要一个 64 MiB 的 O_DIRECT 后端量本机 fsync 率
 REPLAY_DEV45="${REPLAY_DEV45:-$OUT_DIR/e45.img}"
 [[ -e "$REPLAY_DEV45" ]] || truncate -s 64M "$REPLAY_DEV45"
 export REPLAY_DEV45
@@ -32,35 +32,35 @@ TABLE=$(cat <<'TSV'
 E14|e14-discrimination||e14-discrimination-2026-08-29.out|exact
 E18|e18-branch||e18-branch-2026-08-28.out|exact
 E19|e19-defer||e19-defer-2026-08-28.out|exact
-E24|e24_journal_geom||e24-journal-geom-2026-08-29.out|exact
-E25|e25_recovery||e25-recovery-2026-08-29.out|exact
-E26|e26_journal_reserve||e26-journal-reserve-2026-08-29.out|exact
-E27|e27_accounting||e27-accounting-2026-08-29.out|exact
-E28|e28_d5_paths||e28-d5-paths-2026-08-29.out|exact
-E29|e29_map_rebuild||e29-map-rebuild-2026-08-29.out|exact
-E30|e30_blast_radius||e30-blast-radius-2026-08-29.out|exact
-E31|e31_range_rebuild||e31-range-rebuild-2026-08-29.out|exact
-E32|e32-aad-snapshot||e32-aad-snapshot-2026-08-29.out|exact
-E33|e33-journal-timeline||e33-journal-timeline-2026-08-29.out|exact
-E34|e34-pin-rules||e34-pin-rules-2026-08-29.out|exact
-E36|e36-head-forms||e36-head-forms-2026-08-29.out|exact
-E37|e37-slot-mapping||e37-slot-mapping-2026-08-29.out|exact
-E38|e38-log-epoch||e38-log-epoch-2026-08-29.out|exact
-E39|e39_accounting_cow||e39-accounting-cow-2026-08-29.out|exact
-E40|e40_back_chain||e40-back-chain-2026-08-29.out|exact
-E43|e43_txn_records||e43-txn-records-2026-08-29.out|exact
-E45|e45_jsn_width|$REPLAY_DEV45|e45-jsn-width-2026-08-30.out|timing
-E44|e44_ext_budget||e44-ext-budget-2026-08-30.out|exact
-E42|e42_root_ring_geom||e42-root-ring-geom-2026-08-30.out|exact
-E41|e41_csum_width||e41-csum-width-2026-08-30.out|exact
-E47|e47_region_spacing||e47-region-spacing-2026-08-30.out|exact
-E48|e48_ring_loss||e48-ring-loss-2026-08-30.out|exact
-E49|e49_ring_placement||e49-ring-placement-2026-08-30.out|exact
-E51|e51_ring_slots||e51-ring-slots-2026-08-30.out|exact
-E50|e50_chain_width||e50-chain-width-2026-08-30.out|exact
-E52|e52_chain_chances||e52-chain-chances-2026-08-30.out|exact
-E53|e53_head_mechanisms||e53-head-mechanisms-2026-08-30.out|exact
-E55|e55_accounting_gen||e55-accounting-gen-2026-08-30.out|exact
+E23|e23_journal_geom||e23-journal-geom-2026-08-29.out|exact
+E24|e24_recovery||e24-recovery-2026-08-29.out|exact
+E25|e25_journal_reserve||e25-journal-reserve-2026-08-29.out|exact
+E26|e26_accounting||e26-accounting-2026-08-29.out|exact
+E27|e27_d5_paths||e27-d5-paths-2026-08-29.out|exact
+E28|e28_map_rebuild||e28-map-rebuild-2026-08-29.out|exact
+E29|e29_blast_radius||e29-blast-radius-2026-08-29.out|exact
+E30|e30_range_rebuild||e30-range-rebuild-2026-08-29.out|exact
+E31|e31-aad-snapshot||e31-aad-snapshot-2026-08-29.out|exact
+E32|e32-journal-timeline||e32-journal-timeline-2026-08-29.out|exact
+E33|e33-pin-rules||e33-pin-rules-2026-08-29.out|exact
+E35|e35-head-forms||e35-head-forms-2026-08-29.out|exact
+E36|e36-slot-mapping||e36-slot-mapping-2026-08-29.out|exact
+E37|e37-log-epoch||e37-log-epoch-2026-08-29.out|exact
+E38|e38_accounting_cow||e38-accounting-cow-2026-08-29.out|exact
+E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
+E42|e42_txn_records||e42-txn-records-2026-08-29.out|exact
+E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
+E43|e43_ext_budget||e43-ext-budget-2026-08-30.out|exact
+E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
+E40|e40_csum_width||e40-csum-width-2026-08-30.out|exact
+E46|e46_region_spacing||e46-region-spacing-2026-08-30.out|exact
+E47|e47_ring_loss||e47-ring-loss-2026-08-30.out|exact
+E48|e48_ring_placement||e48-ring-placement-2026-08-30.out|exact
+E50|e50_ring_slots||e50-ring-slots-2026-08-30.out|exact
+E49|e49_chain_width||e49-chain-width-2026-08-30.out|exact
+E51|e51_chain_chances||e51-chain-chances-2026-08-30.out|exact
+E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
+E54|e54_accounting_gen||e54-accounting-gen-2026-08-30.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-28.out|exact
@@ -126,20 +126,20 @@ check_claims() {
     else
       printf '  ✗ %-5s %-46s 8K=%s ≤ 4K=%s ⇒ kb 记的「五轮稳定」不再成立\n' E20 "8 KiB 拐点这次没出现" "$v8192" "$v4096"; bad=1
     fi ;;
-  E45)
+  E44)
     # 本机 fsync 率：换机器会变，但**量级**要稳住，否则寿命折算整个塌掉
     v=$(grep 'name=arm arm=Sync1' "$f" | sed -n 's/.*median_per_sec_milli=\([0-9]*\).*/\1/p')
-    claim E45 "本机 fsync 率（每秒千分之一次）" "$v" 500000 20000000 || bad=1
+    claim E44 "本机 fsync 率（每秒千分之一次）" "$v" 500000 20000000 || bad=1
     # 阳性对照：不 fsync 必须至少快一倍，否则 fdatasync 没到设备
     w=$(grep 'name=poscontrol' "$f" | sed -n 's/.*ok=\([a-z]*\).*/\1/p')
-    if [[ "$w" == true ]]; then printf '  ✓ %-5s %-46s\n' E45 "阳性对照：fdatasync 确实到了设备"
-    else printf '  ✗ %-5s %-46s ok=%s\n' E45 "阳性对照失败 ⇒ fdatasync 没到设备，整轮作废" "$w"; bad=1; fi
+    if [[ "$w" == true ]]; then printf '  ✓ %-5s %-46s\n' E44 "阳性对照：fdatasync 确实到了设备"
+    else printf '  ✗ %-5s %-46s ok=%s\n' E44 "阳性对照失败 ⇒ fdatasync 没到设备，整轮作废" "$w"; bad=1; fi
     # 48 位计数器在本机速率下的寿命：这是「48 位够不够」那条结论的落点
     x=$(grep 'name=lifetime bits=48' "$f" | sed -n 's/.*years_at_sync1=\([0-9]*\).*/\1/p')
-    claim E45 "48 位计数器在本机撑多少年" "$x" 500 50000 || bad=1
+    claim E44 "48 位计数器在本机撑多少年" "$x" 500 50000 || bad=1
     # 加宽 jsn 到 12 字节的代价：0..=100 项里一格都不该多占
     y=$(grep 'name=width unit=512 jsn_bytes=12 ' "$f" | sed -n 's/.*cost_unit_count_0_100=\([0-9]*\).*/\1/p')
-    claim E45 "jsn 8→12 在 512 单元下多占几格" "$y" 0 0 || bad=1 ;;
+    claim E44 "jsn 8→12 在 512 单元下多占几格" "$y" 0 0 || bad=1 ;;
   E21)
     # kb 的承重结论：CPU 扫描撞内存带宽墙（约 65 GB/s），16 线程几乎不加速 ⇒ GPU 传输地板已经更慢。
     v=$(grep 'name=scaling arm=bandwidth' "$f" | sed -n 's/.*peak_gbps=\([0-9.]*\).*/\1/p')

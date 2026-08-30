@@ -21,7 +21,7 @@ bash scripts/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda
 VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
 ```
 
-多盘是 E54（丢一整块盘之后根环还挂不挂得上） 要的：「丢一整块盘之后还挂不挂得上」
+多盘是 E53（丢一整块盘之后根环还挂不挂得上） 要的：「丢一整块盘之后还挂不挂得上」
 只有在真的有多块盘时才问得出来。改完 harness **先跑 `--selftest`**，通过了才算数。
 
 ⚠️ **最小 initramfs 里没有 `dm-error` / `mdadm`**：

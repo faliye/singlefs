@@ -5,8 +5,8 @@
 # `kb/experiments/` 里就必须有对应编号的正文文件。没有 = 干了活但没入库，
 # 而**跑过的东西没入库比没跑更危险**——它会以「我们量过」的形式活在对话里，谁也复核不了。
 #
-# ⚠️ **这条是实测出来的**：2026-08-29 复跑轮现查，`research/prompts/e35-rootring-geometry-local.md`
-# 与 `research/results/e35-rootring-local.out` 都在，而 kb 里没有 E35。
+# ⚠️ **这条是实测出来的**：2026-08-29 复跑轮现查，`research/prompts/e34-rootring-geometry-local.md`
+# 与 `research/results/e34-rootring-local.out` 都在，而 kb 里没有 E34。
 # 已有的阶段 `40-results-cited.sh` 抓不到它，因为那个阶段把文件名含 `local` 的一律当本地腿问答排除掉了
 # ——**排除规则正好盖住了这一个**。
 set -uo pipefail

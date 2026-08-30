@@ -158,7 +158,7 @@ impl Dev {
 /// ⚠️ **抽成函数是为了让测试能考它本身，不是为了好看**（2026-08-29 对抗验证）：
 /// 此前这段逻辑内联在 `run` 里，而新加的绝对值测试**自己重实现了一遍**——
 /// 变异测试把生产侧的 `pos / SLOTS` 改成 `pos / (SLOTS + 1)` 时**一个测试都没红**。
-/// 那正是 kb 在 E29 记过的同一个错：测试绕开了被测代码。
+/// 那正是 kb 在 E28 记过的同一个错：测试绕开了被测代码。
 fn assign_leaves(objs: &[Obj], l: Layout4) -> (Vec<usize>, usize) {
     let mut ks: Vec<(u64, usize)> = objs.iter().enumerate().map(|(i, o)| (key_of(o, l), i)).collect();
     ks.sort_unstable();

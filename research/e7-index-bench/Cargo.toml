@@ -62,25 +62,25 @@ aes-gcm = "0.11.1"
 chacha20poly1305 = "0.11.0"
 
 [[bin]]
-name = "e32-aad-snapshot"
-path = "src/bin/e32_aad_snapshot.rs"
+name = "e31-aad-snapshot"
+path = "src/bin/e31_aad_snapshot.rs"
 
 [[bin]]
-name = "e33-journal-timeline"
-path = "src/bin/e33_journal_timeline.rs"
+name = "e32-journal-timeline"
+path = "src/bin/e32_journal_timeline.rs"
 
 [[bin]]
-name = "e34-pin-rules"
-path = "src/bin/e34_pin_rules.rs"
+name = "e33-pin-rules"
+path = "src/bin/e33_pin_rules.rs"
 
 [[bin]]
-name = "e36-head-forms"
-path = "src/bin/e36_head_forms.rs"
+name = "e35-head-forms"
+path = "src/bin/e35_head_forms.rs"
 
 [[bin]]
-name = "e37-slot-mapping"
-path = "src/bin/e37_slot_mapping.rs"
+name = "e36-slot-mapping"
+path = "src/bin/e36_slot_mapping.rs"
 
 [[bin]]
-name = "e38-log-epoch"
-path = "src/bin/e38_log_epoch.rs"
+name = "e37-log-epoch"
+path = "src/bin/e37_log_epoch.rs"
