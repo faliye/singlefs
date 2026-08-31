@@ -1,0 +1,27 @@
+E7RESULT name=config old_devs=4 cap=1000 prefill_pct=90 max_payload=8 model=allocation_counting file_ops=0
+E7RESULT name=absorption_bound new_dev_cap=1000 bound=400 stranded_floor=600
+E7RESULT name=arm seed=1 arm=jia_narrow2 data_units=400 phys_units=800 phys_per_data_ppm=2000000 stripes=400 mean_width_ppm=2000000 min_width=2 moved=0 stranded=600 stranded_new_dev=600
+E7RESULT name=arm seed=1 arm=jia_narrow3 data_units=362 phys_units=600 phys_per_data_ppm=1657458 stripes=200 mean_width_ppm=3000000 min_width=3 moved=0 stranded=800 stranded_new_dev=800
+E7RESULT name=arm seed=1 arm=yi_fullwidth data_units=297 phys_units=500 phys_per_data_ppm=1683501 stripes=100 mean_width_ppm=5000000 min_width=5 moved=0 stranded=900 stranded_new_dev=900
+E7RESULT name=arm seed=1 arm=bing_rebalance data_units=823 phys_units=1400 phys_per_data_ppm=1701093 stripes=280 mean_width_ppm=5000000 min_width=5 moved=720 stranded=0 stranded_new_dev=0
+E7RESULT name=arm seed=2 arm=jia_narrow2 data_units=400 phys_units=800 phys_per_data_ppm=2000000 stripes=400 mean_width_ppm=2000000 min_width=2 moved=0 stranded=600 stranded_new_dev=600
+E7RESULT name=arm seed=2 arm=jia_narrow3 data_units=358 phys_units=600 phys_per_data_ppm=1675977 stripes=200 mean_width_ppm=3000000 min_width=3 moved=0 stranded=800 stranded_new_dev=800
+E7RESULT name=arm seed=2 arm=yi_fullwidth data_units=302 phys_units=500 phys_per_data_ppm=1655629 stripes=100 mean_width_ppm=5000000 min_width=5 moved=0 stranded=900 stranded_new_dev=900
+E7RESULT name=arm seed=2 arm=bing_rebalance data_units=831 phys_units=1400 phys_per_data_ppm=1684717 stripes=280 mean_width_ppm=5000000 min_width=5 moved=720 stranded=0 stranded_new_dev=0
+E7RESULT name=arm seed=3 arm=jia_narrow2 data_units=400 phys_units=800 phys_per_data_ppm=2000000 stripes=400 mean_width_ppm=2000000 min_width=2 moved=0 stranded=600 stranded_new_dev=600
+E7RESULT name=arm seed=3 arm=jia_narrow3 data_units=361 phys_units=600 phys_per_data_ppm=1662049 stripes=200 mean_width_ppm=3000000 min_width=3 moved=0 stranded=800 stranded_new_dev=800
+E7RESULT name=arm seed=3 arm=yi_fullwidth data_units=300 phys_units=500 phys_per_data_ppm=1666666 stripes=100 mean_width_ppm=5000000 min_width=5 moved=0 stranded=900 stranded_new_dev=900
+E7RESULT name=arm seed=3 arm=bing_rebalance data_units=819 phys_units=1400 phys_per_data_ppm=1709401 stripes=280 mean_width_ppm=5000000 min_width=5 moved=720 stranded=0 stranded_new_dev=0
+E7RESULT name=arm seed=4 arm=jia_narrow2 data_units=400 phys_units=800 phys_per_data_ppm=2000000 stripes=400 mean_width_ppm=2000000 min_width=2 moved=0 stranded=600 stranded_new_dev=600
+E7RESULT name=arm seed=4 arm=jia_narrow3 data_units=360 phys_units=600 phys_per_data_ppm=1666666 stripes=200 mean_width_ppm=3000000 min_width=3 moved=0 stranded=800 stranded_new_dev=800
+E7RESULT name=arm seed=4 arm=yi_fullwidth data_units=294 phys_units=500 phys_per_data_ppm=1700680 stripes=100 mean_width_ppm=5000000 min_width=5 moved=0 stranded=900 stranded_new_dev=900
+E7RESULT name=arm seed=4 arm=bing_rebalance data_units=829 phys_units=1400 phys_per_data_ppm=1688781 stripes=280 mean_width_ppm=5000000 min_width=5 moved=720 stranded=0 stranded_new_dev=0
+E7RESULT name=arm seed=5 arm=jia_narrow2 data_units=400 phys_units=800 phys_per_data_ppm=2000000 stripes=400 mean_width_ppm=2000000 min_width=2 moved=0 stranded=600 stranded_new_dev=600
+E7RESULT name=arm seed=5 arm=jia_narrow3 data_units=358 phys_units=600 phys_per_data_ppm=1675977 stripes=200 mean_width_ppm=3000000 min_width=3 moved=0 stranded=800 stranded_new_dev=800
+E7RESULT name=arm seed=5 arm=yi_fullwidth data_units=294 phys_units=500 phys_per_data_ppm=1700680 stripes=100 mean_width_ppm=5000000 min_width=5 moved=0 stranded=900 stranded_new_dev=900
+E7RESULT name=arm seed=5 arm=bing_rebalance data_units=837 phys_units=1400 phys_per_data_ppm=1672640 stripes=280 mean_width_ppm=5000000 min_width=5 moved=720 stranded=0 stranded_new_dev=0
+E7RESULT name=positive_control_no_new_dev arm=jia_narrow2 data_units=200 phys_units=400 moved=0 stranded=0
+E7RESULT name=positive_control_no_new_dev arm=jia_narrow3 data_units=245 phys_units=399 moved=0 stranded=1
+E7RESULT name=positive_control_no_new_dev arm=yi_fullwidth data_units=245 phys_units=400 moved=0 stranded=0
+E7RESULT name=positive_control_no_new_dev arm=bing_rebalance data_units=245 phys_units=400 moved=0 stranded=0
+E7RESULT name=done emitted=27

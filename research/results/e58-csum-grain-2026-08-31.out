@@ -1,0 +1,180 @@
+== round seed=1 ==
+E7RESULT name=config path=/tmp/claude-1000/-home-fy5090-code-singlefs/7fc22ad7-804d-4d04-8f13-9802c40646ad/scratchpad/e58.img size=8589934592 region=8589934592 ops=4096 qd=16 seq_io=1048576 user_read=4096 ptr_bytes=108 seed=1 mode=none o_direct=true grains=[4096, 8192, 16384, 32768, 65536, 131072]
+E7RESULT name=rand_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=383345412 verify_ns=6496404 ns_per_op=93590.2 user_mib_per_s=41.738 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=randq_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=26783977 verify_ns=6541182 ns_per_op=6539.1 user_mib_per_s=597.372 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=seq_g4096 grain=4096 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=252053203 verify_ns=131677180 ns_per_op=492291.4 user_mib_per_s=2031.317 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=15597568
+E7RESULT name=meta_g4096 grain=4096 ptr_bytes=108 meta_ratio=0.026367 read_amp_4k=1.0000
+E7RESULT name=rand_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=605301852 verify_ns=11709482 ns_per_op=147778.8 user_mib_per_s=26.433 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=randq_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=71193011 verify_ns=11137316 ns_per_op=17381.1 user_mib_per_s=224.741 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=seq_g8192 grain=8192 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=252119862 verify_ns=131118137 ns_per_op=492421.6 user_mib_per_s=2030.780 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=11468800
+E7RESULT name=meta_g8192 grain=8192 ptr_bytes=108 meta_ratio=0.013184 read_amp_4k=2.0000
+E7RESULT name=rand_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=630684483 verify_ns=21213374 ns_per_op=153975.7 user_mib_per_s=25.369 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=randq_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=79698097 verify_ns=20064952 ns_per_op=19457.5 user_mib_per_s=200.758 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=seq_g16384 grain=16384 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=249977114 verify_ns=128835689 ns_per_op=488236.6 user_mib_per_s=2048.187 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=819200
+E7RESULT name=meta_g16384 grain=16384 ptr_bytes=108 meta_ratio=0.006592 read_amp_4k=4.0000
+E7RESULT name=rand_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=700806026 verify_ns=35873407 ns_per_op=171095.2 user_mib_per_s=22.831 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=randq_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=88884797 verify_ns=34509617 ns_per_op=21700.4 user_mib_per_s=180.008 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=seq_g32768 grain=32768 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=247248991 verify_ns=127104406 ns_per_op=482908.2 user_mib_per_s=2070.787 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=950272
+E7RESULT name=meta_g32768 grain=32768 ptr_bytes=108 meta_ratio=0.003296 read_amp_4k=8.0000
+E7RESULT name=rand_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=813942426 verify_ns=65008754 ns_per_op=198716.4 user_mib_per_s=19.657 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=randq_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=109481215 verify_ns=64242878 ns_per_op=26728.8 user_mib_per_s=146.144 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=seq_g65536 grain=65536 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=240650926 verify_ns=120555534 ns_per_op=470021.3 user_mib_per_s=2127.563 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=303104
+E7RESULT name=meta_g65536 grain=65536 ptr_bytes=108 meta_ratio=0.001648 read_amp_4k=16.0000
+E7RESULT name=rand_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=980665891 verify_ns=122592625 ns_per_op=239420.4 user_mib_per_s=16.315 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=randq_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=216453025 verify_ns=123027064 ns_per_op=52845.0 user_mib_per_s=73.919 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=seq_g131072 grain=131072 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=240053844 verify_ns=118671688 ns_per_op=468855.2 user_mib_per_s=2132.855 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=meta_g131072 grain=131072 ptr_bytes=108 meta_ratio=0.000824 read_amp_4k=32.0000
+E7RESULT name=model_cost p=0 g16384=4123.0000 g32768=4109.5000 ratio_32_over_16=0.996726
+E7RESULT name=model_cost p=0.0008233 g16384=4133.1834 g32768=4133.1835 ratio_32_over_16=1.000000
+E7RESULT name=model_cost p=0.01 g16384=4246.6900 g32768=4397.1650 ratio_32_over_16=1.035433
+E7RESULT name=model_cost p=0.1 g16384=5359.9000 g32768=6986.1500 ratio_32_over_16=1.303411
+E7RESULT name=model_cost p=1 g16384=16492.0000 g32768=32876.0000 ratio_32_over_16=1.993451
+E7RESULT name=model_p_star g1=4096 g2=16384 p_star=0.00654863
+E7RESULT name=model_p_star g1=16384 g2=32768 p_star=0.00082330
+E7RESULT name=model_p_star g1=16384 g2=65536 p_star=0.00041182
+E7RESULT name=model_p_star g1=32768 g2=65536 p_star=0.00020595
+E7RESULT name=done emitted=35
+== round seed=2 ==
+E7RESULT name=config path=/tmp/claude-1000/-home-fy5090-code-singlefs/7fc22ad7-804d-4d04-8f13-9802c40646ad/scratchpad/e58.img size=8589934592 region=8589934592 ops=4096 qd=16 seq_io=1048576 user_read=4096 ptr_bytes=108 seed=2 mode=none o_direct=true grains=[4096, 8192, 16384, 32768, 65536, 131072]
+E7RESULT name=rand_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=374226707 verify_ns=6535910 ns_per_op=91363.9 user_mib_per_s=42.755 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=randq_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=22597798 verify_ns=6545383 ns_per_op=5517.0 user_mib_per_s=708.034 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=seq_g4096 grain=4096 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=251082486 verify_ns=130974918 ns_per_op=490395.5 user_mib_per_s=2039.171 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=15597568
+E7RESULT name=meta_g4096 grain=4096 ptr_bytes=108 meta_ratio=0.026367 read_amp_4k=1.0000
+E7RESULT name=rand_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=605174231 verify_ns=11580111 ns_per_op=147747.6 user_mib_per_s=26.439 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=randq_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=71553987 verify_ns=11190355 ns_per_op=17469.2 user_mib_per_s=223.607 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=seq_g8192 grain=8192 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=246047945 verify_ns=125170771 ns_per_op=480562.4 user_mib_per_s=2080.895 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=11468800
+E7RESULT name=meta_g8192 grain=8192 ptr_bytes=108 meta_ratio=0.013184 read_amp_4k=2.0000
+E7RESULT name=rand_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=634301606 verify_ns=20903012 ns_per_op=154858.8 user_mib_per_s=25.225 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=randq_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=90120826 verify_ns=19830656 ns_per_op=22002.2 user_mib_per_s=177.539 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=seq_g16384 grain=16384 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=249830818 verify_ns=128405819 ns_per_op=487950.8 user_mib_per_s=2049.387 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=819200
+E7RESULT name=meta_g16384 grain=16384 ptr_bytes=108 meta_ratio=0.006592 read_amp_4k=4.0000
+E7RESULT name=rand_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=699611667 verify_ns=35498625 ns_per_op=170803.6 user_mib_per_s=22.870 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=randq_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=89010027 verify_ns=34610001 ns_per_op=21731.0 user_mib_per_s=179.755 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=seq_g32768 grain=32768 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=247946198 verify_ns=126548277 ns_per_op=484269.9 user_mib_per_s=2064.964 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=950272
+E7RESULT name=meta_g32768 grain=32768 ptr_bytes=108 meta_ratio=0.003296 read_amp_4k=8.0000
+E7RESULT name=rand_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=812635530 verify_ns=64319407 ns_per_op=198397.3 user_mib_per_s=19.689 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=randq_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=109720115 verify_ns=64641342 ns_per_op=26787.1 user_mib_per_s=145.826 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=seq_g65536 grain=65536 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=241963898 verify_ns=120367392 ns_per_op=472585.7 user_mib_per_s=2116.018 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=303104
+E7RESULT name=meta_g65536 grain=65536 ptr_bytes=108 meta_ratio=0.001648 read_amp_4k=16.0000
+E7RESULT name=rand_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=981876854 verify_ns=122461294 ns_per_op=239716.0 user_mib_per_s=16.295 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=randq_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=217679516 verify_ns=123147809 ns_per_op=53144.4 user_mib_per_s=73.503 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=seq_g131072 grain=131072 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=240592852 verify_ns=118720199 ns_per_op=469907.9 user_mib_per_s=2128.077 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=meta_g131072 grain=131072 ptr_bytes=108 meta_ratio=0.000824 read_amp_4k=32.0000
+E7RESULT name=model_cost p=0 g16384=4123.0000 g32768=4109.5000 ratio_32_over_16=0.996726
+E7RESULT name=model_cost p=0.0008233 g16384=4133.1834 g32768=4133.1835 ratio_32_over_16=1.000000
+E7RESULT name=model_cost p=0.01 g16384=4246.6900 g32768=4397.1650 ratio_32_over_16=1.035433
+E7RESULT name=model_cost p=0.1 g16384=5359.9000 g32768=6986.1500 ratio_32_over_16=1.303411
+E7RESULT name=model_cost p=1 g16384=16492.0000 g32768=32876.0000 ratio_32_over_16=1.993451
+E7RESULT name=model_p_star g1=4096 g2=16384 p_star=0.00654863
+E7RESULT name=model_p_star g1=16384 g2=32768 p_star=0.00082330
+E7RESULT name=model_p_star g1=16384 g2=65536 p_star=0.00041182
+E7RESULT name=model_p_star g1=32768 g2=65536 p_star=0.00020595
+E7RESULT name=done emitted=35
+== round seed=3 ==
+E7RESULT name=config path=/tmp/claude-1000/-home-fy5090-code-singlefs/7fc22ad7-804d-4d04-8f13-9802c40646ad/scratchpad/e58.img size=8589934592 region=8589934592 ops=4096 qd=16 seq_io=1048576 user_read=4096 ptr_bytes=108 seed=3 mode=none o_direct=true grains=[4096, 8192, 16384, 32768, 65536, 131072]
+E7RESULT name=rand_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=371844775 verify_ns=6557097 ns_per_op=90782.4 user_mib_per_s=43.029 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=randq_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=22283781 verify_ns=6506017 ns_per_op=5440.4 user_mib_per_s=718.011 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=seq_g4096 grain=4096 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=253315148 verify_ns=131535158 ns_per_op=494756.1 user_mib_per_s=2021.198 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=15597568
+E7RESULT name=meta_g4096 grain=4096 ptr_bytes=108 meta_ratio=0.026367 read_amp_4k=1.0000
+E7RESULT name=rand_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=601601464 verify_ns=11632345 ns_per_op=146875.4 user_mib_per_s=26.596 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=randq_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=71002544 verify_ns=11104798 ns_per_op=17334.6 user_mib_per_s=225.344 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=seq_g8192 grain=8192 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=251479266 verify_ns=129910493 ns_per_op=491170.4 user_mib_per_s=2035.953 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=11468800
+E7RESULT name=meta_g8192 grain=8192 ptr_bytes=108 meta_ratio=0.013184 read_amp_4k=2.0000
+E7RESULT name=rand_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=627479392 verify_ns=21069460 ns_per_op=153193.2 user_mib_per_s=25.499 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=randq_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=79131365 verify_ns=20006259 ns_per_op=19319.2 user_mib_per_s=202.195 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=seq_g16384 grain=16384 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=249459916 verify_ns=128104951 ns_per_op=487226.4 user_mib_per_s=2052.434 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=819200
+E7RESULT name=meta_g16384 grain=16384 ptr_bytes=108 meta_ratio=0.006592 read_amp_4k=4.0000
+E7RESULT name=rand_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=699292129 verify_ns=35708628 ns_per_op=170725.6 user_mib_per_s=22.880 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=randq_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=88468973 verify_ns=34853944 ns_per_op=21598.9 user_mib_per_s=180.854 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=seq_g32768 grain=32768 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=247853652 verify_ns=126241477 ns_per_op=484089.2 user_mib_per_s=2065.735 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=950272
+E7RESULT name=meta_g32768 grain=32768 ptr_bytes=108 meta_ratio=0.003296 read_amp_4k=8.0000
+E7RESULT name=rand_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=814948329 verify_ns=64987281 ns_per_op=198962.0 user_mib_per_s=19.633 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=randq_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=110659266 verify_ns=64561564 ns_per_op=27016.4 user_mib_per_s=144.588 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=seq_g65536 grain=65536 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=244642894 verify_ns=121316448 ns_per_op=477818.2 user_mib_per_s=2092.846 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=303104
+E7RESULT name=meta_g65536 grain=65536 ptr_bytes=108 meta_ratio=0.001648 read_amp_4k=16.0000
+E7RESULT name=rand_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=987197515 verify_ns=123117227 ns_per_op=241015.0 user_mib_per_s=16.207 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=randq_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=216662329 verify_ns=122938821 ns_per_op=52896.1 user_mib_per_s=73.848 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=seq_g131072 grain=131072 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=241860213 verify_ns=119484093 ns_per_op=472383.2 user_mib_per_s=2116.925 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=meta_g131072 grain=131072 ptr_bytes=108 meta_ratio=0.000824 read_amp_4k=32.0000
+E7RESULT name=model_cost p=0 g16384=4123.0000 g32768=4109.5000 ratio_32_over_16=0.996726
+E7RESULT name=model_cost p=0.0008233 g16384=4133.1834 g32768=4133.1835 ratio_32_over_16=1.000000
+E7RESULT name=model_cost p=0.01 g16384=4246.6900 g32768=4397.1650 ratio_32_over_16=1.035433
+E7RESULT name=model_cost p=0.1 g16384=5359.9000 g32768=6986.1500 ratio_32_over_16=1.303411
+E7RESULT name=model_cost p=1 g16384=16492.0000 g32768=32876.0000 ratio_32_over_16=1.993451
+E7RESULT name=model_p_star g1=4096 g2=16384 p_star=0.00654863
+E7RESULT name=model_p_star g1=16384 g2=32768 p_star=0.00082330
+E7RESULT name=model_p_star g1=16384 g2=65536 p_star=0.00041182
+E7RESULT name=model_p_star g1=32768 g2=65536 p_star=0.00020595
+E7RESULT name=done emitted=35
+== round seed=4 ==
+E7RESULT name=config path=/tmp/claude-1000/-home-fy5090-code-singlefs/7fc22ad7-804d-4d04-8f13-9802c40646ad/scratchpad/e58.img size=8589934592 region=8589934592 ops=4096 qd=16 seq_io=1048576 user_read=4096 ptr_bytes=108 seed=4 mode=none o_direct=true grains=[4096, 8192, 16384, 32768, 65536, 131072]
+E7RESULT name=rand_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=373715422 verify_ns=6576068 ns_per_op=91239.1 user_mib_per_s=42.813 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=randq_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=22346422 verify_ns=6461175 ns_per_op=5455.7 user_mib_per_s=715.998 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=seq_g4096 grain=4096 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=255243422 verify_ns=133016919 ns_per_op=498522.3 user_mib_per_s=2005.928 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=15597568
+E7RESULT name=meta_g4096 grain=4096 ptr_bytes=108 meta_ratio=0.026367 read_amp_4k=1.0000
+E7RESULT name=rand_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=605613162 verify_ns=11601837 ns_per_op=147854.8 user_mib_per_s=26.420 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=randq_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=71937936 verify_ns=11142660 ns_per_op=17563.0 user_mib_per_s=222.414 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=seq_g8192 grain=8192 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=252323641 verify_ns=129664324 ns_per_op=492819.6 user_mib_per_s=2029.140 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=11468800
+E7RESULT name=meta_g8192 grain=8192 ptr_bytes=108 meta_ratio=0.013184 read_amp_4k=2.0000
+E7RESULT name=rand_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=631084935 verify_ns=21327051 ns_per_op=154073.5 user_mib_per_s=25.353 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=randq_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=80368394 verify_ns=19784790 ns_per_op=19621.2 user_mib_per_s=199.083 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=seq_g16384 grain=16384 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=250788646 verify_ns=128348784 ns_per_op=489821.6 user_mib_per_s=2041.560 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=819200
+E7RESULT name=meta_g16384 grain=16384 ptr_bytes=108 meta_ratio=0.006592 read_amp_4k=4.0000
+E7RESULT name=rand_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=703046972 verify_ns=35682803 ns_per_op=171642.3 user_mib_per_s=22.758 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=randq_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=89609113 verify_ns=34934940 ns_per_op=21877.2 user_mib_per_s=178.553 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=seq_g32768 grain=32768 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=249016704 verify_ns=126964761 ns_per_op=486360.8 user_mib_per_s=2056.087 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=950272
+E7RESULT name=meta_g32768 grain=32768 ptr_bytes=108 meta_ratio=0.003296 read_amp_4k=8.0000
+E7RESULT name=rand_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=815962640 verify_ns=64713565 ns_per_op=199209.6 user_mib_per_s=19.609 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=randq_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=109802107 verify_ns=64317396 ns_per_op=26807.2 user_mib_per_s=145.717 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=seq_g65536 grain=65536 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=245272152 verify_ns=123059047 ns_per_op=479047.2 user_mib_per_s=2087.477 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=303104
+E7RESULT name=meta_g65536 grain=65536 ptr_bytes=108 meta_ratio=0.001648 read_amp_4k=16.0000
+E7RESULT name=rand_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=984280526 verify_ns=122247954 ns_per_op=240302.9 user_mib_per_s=16.256 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=randq_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=217039579 verify_ns=123108763 ns_per_op=52988.2 user_mib_per_s=73.719 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=seq_g131072 grain=131072 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=242289401 verify_ns=120231065 ns_per_op=473221.5 user_mib_per_s=2113.175 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=meta_g131072 grain=131072 ptr_bytes=108 meta_ratio=0.000824 read_amp_4k=32.0000
+E7RESULT name=model_cost p=0 g16384=4123.0000 g32768=4109.5000 ratio_32_over_16=0.996726
+E7RESULT name=model_cost p=0.0008233 g16384=4133.1834 g32768=4133.1835 ratio_32_over_16=1.000000
+E7RESULT name=model_cost p=0.01 g16384=4246.6900 g32768=4397.1650 ratio_32_over_16=1.035433
+E7RESULT name=model_cost p=0.1 g16384=5359.9000 g32768=6986.1500 ratio_32_over_16=1.303411
+E7RESULT name=model_cost p=1 g16384=16492.0000 g32768=32876.0000 ratio_32_over_16=1.993451
+E7RESULT name=model_p_star g1=4096 g2=16384 p_star=0.00654863
+E7RESULT name=model_p_star g1=16384 g2=32768 p_star=0.00082330
+E7RESULT name=model_p_star g1=16384 g2=65536 p_star=0.00041182
+E7RESULT name=model_p_star g1=32768 g2=65536 p_star=0.00020595
+E7RESULT name=done emitted=35
+== round seed=5 ==
+E7RESULT name=config path=/tmp/claude-1000/-home-fy5090-code-singlefs/7fc22ad7-804d-4d04-8f13-9802c40646ad/scratchpad/e58.img size=8589934592 region=8589934592 ops=4096 qd=16 seq_io=1048576 user_read=4096 ptr_bytes=108 seed=5 mode=none o_direct=true grains=[4096, 8192, 16384, 32768, 65536, 131072]
+E7RESULT name=rand_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=372989184 verify_ns=6547420 ns_per_op=91061.8 user_mib_per_s=42.897 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=randq_g4096 grain=4096 ops=4096 dev_bytes=16777216 user_bytes=16777216 elapsed_ns=22393011 verify_ns=6619756 ns_per_op=5467.0 user_mib_per_s=714.509 amp=1.0000 proc_read_bytes=16777216 pr_over_devbytes=1.0000 sink=487424
+E7RESULT name=seq_g4096 grain=4096 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=252881288 verify_ns=130502929 ns_per_op=493908.8 user_mib_per_s=2024.665 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=15597568
+E7RESULT name=meta_g4096 grain=4096 ptr_bytes=108 meta_ratio=0.026367 read_amp_4k=1.0000
+E7RESULT name=rand_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=605524662 verify_ns=11545223 ns_per_op=147833.2 user_mib_per_s=26.423 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=randq_g8192 grain=8192 ops=4096 dev_bytes=33554432 user_bytes=16777216 elapsed_ns=70847537 verify_ns=11353112 ns_per_op=17296.8 user_mib_per_s=225.837 amp=2.0000 proc_read_bytes=33554432 pr_over_devbytes=1.0000 sink=716800
+E7RESULT name=seq_g8192 grain=8192 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=252745010 verify_ns=129526800 ns_per_op=493642.6 user_mib_per_s=2025.757 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=11468800
+E7RESULT name=meta_g8192 grain=8192 ptr_bytes=108 meta_ratio=0.013184 read_amp_4k=2.0000
+E7RESULT name=rand_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=642543432 verify_ns=20959348 ns_per_op=156871.0 user_mib_per_s=24.901 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=randq_g16384 grain=16384 ops=4096 dev_bytes=67108864 user_bytes=16777216 elapsed_ns=79557093 verify_ns=19991865 ns_per_op=19423.1 user_mib_per_s=201.113 amp=4.0000 proc_read_bytes=67108864 pr_over_devbytes=1.0000 sink=102400
+E7RESULT name=seq_g16384 grain=16384 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=251465144 verify_ns=128928969 ns_per_op=491142.9 user_mib_per_s=2036.067 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=819200
+E7RESULT name=meta_g16384 grain=16384 ptr_bytes=108 meta_ratio=0.006592 read_amp_4k=4.0000
+E7RESULT name=rand_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=699976371 verify_ns=35634089 ns_per_op=170892.7 user_mib_per_s=22.858 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=randq_g32768 grain=32768 ops=4096 dev_bytes=134217728 user_bytes=16777216 elapsed_ns=89014101 verify_ns=34686758 ns_per_op=21732.0 user_mib_per_s=179.747 amp=8.0000 proc_read_bytes=134217728 pr_over_devbytes=1.0000 sink=237568
+E7RESULT name=seq_g32768 grain=32768 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=249098367 verify_ns=127444706 ns_per_op=486520.2 user_mib_per_s=2055.413 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=950272
+E7RESULT name=meta_g32768 grain=32768 ptr_bytes=108 meta_ratio=0.003296 read_amp_4k=8.0000
+E7RESULT name=rand_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=816074239 verify_ns=66727761 ns_per_op=199236.9 user_mib_per_s=19.606 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=randq_g65536 grain=65536 ops=4096 dev_bytes=268435456 user_bytes=16777216 elapsed_ns=110365242 verify_ns=64559476 ns_per_op=26944.6 user_mib_per_s=144.973 amp=16.0000 proc_read_bytes=268435456 pr_over_devbytes=1.0000 sink=151552
+E7RESULT name=seq_g65536 grain=65536 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=245235265 verify_ns=122644154 ns_per_op=478975.1 user_mib_per_s=2087.791 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=303104
+E7RESULT name=meta_g65536 grain=65536 ptr_bytes=108 meta_ratio=0.001648 read_amp_4k=16.0000
+E7RESULT name=rand_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=983625396 verify_ns=123256560 ns_per_op=240142.9 user_mib_per_s=16.266 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=randq_g131072 grain=131072 ops=4096 dev_bytes=536870912 user_bytes=16777216 elapsed_ns=215237539 verify_ns=124529425 ns_per_op=52548.2 user_mib_per_s=74.336 amp=32.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=seq_g131072 grain=131072 ops=512 dev_bytes=536870912 user_bytes=536870912 elapsed_ns=240533092 verify_ns=118967955 ns_per_op=469791.2 user_mib_per_s=2128.605 amp=1.0000 proc_read_bytes=536870912 pr_over_devbytes=1.0000 sink=208896
+E7RESULT name=meta_g131072 grain=131072 ptr_bytes=108 meta_ratio=0.000824 read_amp_4k=32.0000
+E7RESULT name=model_cost p=0 g16384=4123.0000 g32768=4109.5000 ratio_32_over_16=0.996726
+E7RESULT name=model_cost p=0.0008233 g16384=4133.1834 g32768=4133.1835 ratio_32_over_16=1.000000
+E7RESULT name=model_cost p=0.01 g16384=4246.6900 g32768=4397.1650 ratio_32_over_16=1.035433
+E7RESULT name=model_cost p=0.1 g16384=5359.9000 g32768=6986.1500 ratio_32_over_16=1.303411
+E7RESULT name=model_cost p=1 g16384=16492.0000 g32768=32876.0000 ratio_32_over_16=1.993451
+E7RESULT name=model_p_star g1=4096 g2=16384 p_star=0.00654863
+E7RESULT name=model_p_star g1=16384 g2=32768 p_star=0.00082330
+E7RESULT name=model_p_star g1=16384 g2=65536 p_star=0.00041182
+E7RESULT name=model_p_star g1=32768 g2=65536 p_star=0.00020595
+E7RESULT name=done emitted=35

@@ -26,6 +26,11 @@ export REPLAY_DEV
 REPLAY_DEV45="${REPLAY_DEV45:-$OUT_DIR/e45.img}"
 [[ -e "$REPLAY_DEV45" ]] || truncate -s 64M "$REPLAY_DEV45"
 export REPLAY_DEV45
+# ⚠️ **E58 的测试区不许预先 truncate 出来。** 稀疏洞读起来可能根本不碰设备，
+# 而 e58 只看文件大小决定填不填 ⇒ 预创建一个空洞文件会让它去量「读洞要多久」。
+# 交给二进制自己建、自己填。真读错了阳性对照会判红（读洞时 read_bytes 是 0）。
+REPLAY_DEV58="${REPLAY_DEV58:-$OUT_DIR/e58.img}"
+export REPLAY_DEV58
 
 # 实验号 | 二进制 | 参数 | 入库产物 | 判据（exact=应逐字节一致 / timing=含计时字段，只比结构）
 TABLE=$(cat <<'TSV'
@@ -50,7 +55,8 @@ E38|e38_accounting_cow||e38-accounting-cow-2026-08-29.out|exact
 E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
 E42|e42_txn_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
-E43|e43_ext_budget||e43-ext-budget-2026-08-30.out|exact
+E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
+E43|e43_ext_budget||e43-ext-budget-2026-08-31.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E40|e40_csum_width||e40-csum-width-2026-08-30.out|exact
 E46|e46_region_spacing||e46-region-spacing-2026-08-30.out|exact
@@ -62,6 +68,7 @@ E51|e51_chain_chances||e51-chain-chances-2026-08-30.out|exact
 E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
 E54|e54_accounting_gen||e54-accounting-gen-2026-08-30.out|exact
 E57|e57_field_authority||e57-field-authority-2026-08-31.out|exact
+E59|e59_msg_recompute||e59-msg-recompute-2026-08-31.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-31.out|exact
@@ -74,7 +81,7 @@ TSV
 # 计时字段：换机器、换负载就会变，比对时抹掉。抹掉的是**值**不是**字段名**——
 # 字段整个消失属于结构变化，仍然会被抓。
 strip_timing() {
-  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
+  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
 }
 
 # ── 结论区间断言 ──────────────────────────────────────────────────────────
@@ -141,6 +148,23 @@ check_claims() {
     # 加宽 jsn 到 12 字节的代价：0..=100 项里一格都不该多占
     y=$(grep 'name=width unit=512 jsn_bytes=12 ' "$f" | sed -n 's/.*cost_unit_count_0_100=\([0-9]*\).*/\1/p')
     claim E44 "jsn 8→12 在 512 单元下多占几格" "$y" 0 0 || bad=1 ;;
+  E58)
+    # kb 的承重结论：32 KiB 在随机小读上比 16 KiB 贵约一成，而顺序侧只快 0.83%。
+    # 只钉倍数不够（三条臂一起漂，倍数照样对），所以第三条钉的是绝对值。
+    v=$(grep 'name=rand_g16384 ' "$f" | sed -n 's/.*ns_per_op=\([0-9.]*\).*/\1/p')
+    w=$(grep 'name=rand_g32768 ' "$f" | sed -n 's/.*ns_per_op=\([0-9.]*\).*/\1/p')
+    x=$(awk -v a="$w" -v b="$v" 'BEGIN{if(b>0) printf "%.4f", a/b}')
+    claim E58 "随机小读 QD=1：32 KiB 是 16 KiB 的几倍" "$x" 1.03 1.25 || bad=1
+    v=$(grep 'name=randq_g16384 ' "$f" | sed -n 's/.*user_mib_per_s=\([0-9.]*\).*/\1/p')
+    w=$(grep 'name=randq_g32768 ' "$f" | sed -n 's/.*user_mib_per_s=\([0-9.]*\).*/\1/p')
+    x=$(awk -v a="$v" -v b="$w" 'BEGIN{if(b>0) printf "%.4f", a/b}')
+    claim E58 "QD=16 用户带宽：16 KiB 是 32 KiB 的几倍" "$x" 1.03 1.25 || bad=1
+    # 绝对值：32 KiB 单元读 4 KiB 的放大恰为 8，由独立算术给出（32768/4096）
+    x=$(grep 'name=meta_g32768 ' "$f" | sed -n 's/.*read_amp_4k=\([0-9.]*\).*/\1/p')
+    claim E58 "32 KiB 单元的读放大（绝对值）" "$x" 8.0 8.0 || bad=1
+    # 阳性对照：内核记的字节 ÷ ops×G，读到洞或读到缓存都会让它塌
+    x=$(grep 'name=rand_g32768 ' "$f" | sed -n 's/.*pr_over_devbytes=\([0-9.]*\).*/\1/p')
+    claim E58 "阳性对照：内核记的字节 ÷ (ops×G)" "$x" 0.98 1.02 || bad=1 ;;
   E21)
     # kb 的承重结论：CPU 扫描撞内存带宽墙（约 65 GB/s），16 线程几乎不加速 ⇒ GPU 传输地板已经更慢。
     v=$(grep 'name=scaling arm=bandwidth' "$f" | sed -n 's/.*peak_gbps=\([0-9.]*\).*/\1/p')
@@ -177,7 +201,8 @@ printf '%s\n' "-----------------------------------------------------------------
 while IFS='|' read -r exp bin args stored kind; do
   [[ -z "$exp" ]] && continue
   want "$exp" || continue
-  args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"  # 先换长的，否则前缀会被短的吃掉
+  args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"  # 先换长的，否则前缀会被短的吃掉
+  args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"
   args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
   fresh="$OUT_DIR/$exp.out"
   rm -f "$fresh"                                    # 闸 1：不许跨轮复用

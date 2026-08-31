@@ -1,0 +1,4 @@
+M1_存身份臂也按当前devs算	Arm::Stored => placed.clone(),	Arm::Stored => (0..R).map(|r| formula_home(r, devs)).collect(),
+M2_指错盘不计已失联的盘	if home[r] != placed[r] && placed[r] < devs {	if home[r] != placed[r] && placed[r] < devs && false {
+M3_素数改成合数	const P: u64 = 8191;	const P: u64 = 8192;
+M4_字节代价按位算	const DEV_ID_BYTES: u64 = 1;	const DEV_ID_BYTES: u64 = 0;

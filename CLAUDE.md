@@ -85,7 +85,10 @@ bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接
 bash .claude/gate.d/21-decision-items-sync.sh # 决策分项清单与正文同步（--write 重新生成）
 bash .claude/gate.d/22-item-ref-status.sh # 分项引用写的状态与正文的两张索引表相符
 bash .claude/gate.d/23-link-targets.sh    # 相对链接与「第 N 节」指向到不到得了
+bash .claude/gate.d/24-status-redundancy.sh   # 分项状态在索引表与正文里重复标注
 bash .claude/gate.d/25-kb-deictic.sh      # kb 里的「本轮」锚不锚得到具体一轮
+bash .claude/gate.d/26-number-name-sync.sh    # 编号简称在 doc-lint 够不到的地方也要一致
+bash .claude/gate.d/27-format-constants.sh    # 格式常量在 kb 与实验源码之间同步
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等

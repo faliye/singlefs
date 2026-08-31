@@ -1,0 +1,93 @@
+E7RESULT name=config devs=8 ops=20000 batch=16 parity_per_stripe=1 model=counting file_ops=0
+E7RESULT name=two_disk_hit width=2 hit_ppm=35714
+E7RESULT name=two_disk_hit width=3 hit_ppm=107142
+E7RESULT name=two_disk_hit width=4 hit_ppm=214285
+E7RESULT name=two_disk_hit width=5 hit_ppm=357142
+E7RESULT name=two_disk_hit width=6 hit_ppm=535714
+E7RESULT name=two_disk_hit width=7 hit_ppm=750000
+E7RESULT name=two_disk_hit width=8 hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=1 rule=always_full data=230285 phys=339624 phys_per_data_ppm=1474798 stripes=42453 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=1 rule=fit_payload data=230285 phys=339624 phys_per_data_ppm=1474798 stripes=42453 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=1 rule=fixed3 data=230285 phys=360231 phys_per_data_ppm=1564283 stripes=120077 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=0 seed=1 rule=batch_then_full data=230285 phys=267560 phys_per_data_ppm=1161864 stripes=33445 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=2 rule=always_full data=229974 phys=339824 phys_per_data_ppm=1477662 stripes=42478 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=2 rule=fit_payload data=229974 phys=339824 phys_per_data_ppm=1477662 stripes=42478 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=2 rule=fixed3 data=229974 phys=359865 phys_per_data_ppm=1564807 stripes=119955 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=0 seed=2 rule=batch_then_full data=229974 phys=267088 phys_per_data_ppm=1161383 stripes=33386 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=3 rule=always_full data=230787 phys=340952 phys_per_data_ppm=1477344 stripes=42619 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=3 rule=fit_payload data=230787 phys=340952 phys_per_data_ppm=1477344 stripes=42619 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=3 rule=fixed3 data=230787 phys=361539 phys_per_data_ppm=1566548 stripes=120513 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=0 seed=3 rule=batch_then_full data=230787 phys=268256 phys_per_data_ppm=1162353 stripes=33532 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=4 rule=always_full data=229976 phys=339992 phys_per_data_ppm=1478380 stripes=42499 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=4 rule=fit_payload data=229976 phys=339992 phys_per_data_ppm=1478380 stripes=42499 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=4 rule=fixed3 data=229976 phys=360108 phys_per_data_ppm=1565850 stripes=120036 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=0 seed=4 rule=batch_then_full data=229976 phys=267184 phys_per_data_ppm=1161790 stripes=33398 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=5 rule=always_full data=230365 phys=339920 phys_per_data_ppm=1475571 stripes=42490 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=5 rule=fit_payload data=230365 phys=339920 phys_per_data_ppm=1475571 stripes=42490 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=0 seed=5 rule=fixed3 data=230365 phys=360510 phys_per_data_ppm=1564951 stripes=120170 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=0 seed=5 rule=batch_then_full data=230365 phys=267528 phys_per_data_ppm=1161322 stripes=33441 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=1 rule=always_full data=176422 phys=293576 phys_per_data_ppm=1664055 stripes=36697 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=1 rule=fit_payload data=176422 phys=263210 phys_per_data_ppm=1491934 stripes=36697 mean_width_ppm=7172520 mean_hit_ppm=867012
+E7RESULT name=arm small_pct=250 seed=1 rule=fixed3 data=176422 phys=283326 phys_per_data_ppm=1605956 stripes=94442 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=250 seed=1 rule=batch_then_full data=176422 phys=205952 phys_per_data_ppm=1167382 stripes=25744 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=2 rule=always_full data=178219 phys=295344 phys_per_data_ppm=1657197 stripes=36918 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=2 rule=fit_payload data=178219 phys=265566 phys_per_data_ppm=1490110 stripes=36918 mean_width_ppm=7193401 mean_hit_ppm=870368
+E7RESULT name=arm small_pct=250 seed=2 rule=fixed3 data=178219 phys=286026 phys_per_data_ppm=1604913 stripes=95342 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=250 seed=2 rule=batch_then_full data=178219 phys=207976 phys_per_data_ppm=1166968 stripes=25997 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=3 rule=always_full data=178500 phys=296368 phys_per_data_ppm=1660324 stripes=37046 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=3 rule=fit_payload data=178500 phys=266836 phys_per_data_ppm=1494879 stripes=37046 mean_width_ppm=7202828 mean_hit_ppm=871883
+E7RESULT name=arm small_pct=250 seed=3 rule=fixed3 data=178500 phys=286689 phys_per_data_ppm=1606100 stripes=95563 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=250 seed=3 rule=batch_then_full data=178500 phys=208352 phys_per_data_ppm=1167238 stripes=26044 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=4 rule=always_full data=176777 phys=294488 phys_per_data_ppm=1665872 stripes=36811 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=4 rule=fit_payload data=176777 phys=264512 phys_per_data_ppm=1496303 stripes=36811 mean_width_ppm=7185678 mean_hit_ppm=869126
+E7RESULT name=arm small_pct=250 seed=4 rule=fixed3 data=176777 phys=283779 phys_per_data_ppm=1605293 stripes=94593 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=250 seed=4 rule=batch_then_full data=176777 phys=206312 phys_per_data_ppm=1167074 stripes=25789 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=5 rule=always_full data=177803 phys=295088 phys_per_data_ppm=1659634 stripes=36886 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=250 seed=5 rule=fit_payload data=177803 phys=265172 phys_per_data_ppm=1491380 stripes=36886 mean_width_ppm=7188960 mean_hit_ppm=869654
+E7RESULT name=arm small_pct=250 seed=5 rule=fixed3 data=177803 phys=285543 phys_per_data_ppm=1605951 stripes=95181 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=250 seed=5 rule=batch_then_full data=177803 phys=207544 phys_per_data_ppm=1167269 stripes=25943 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=1 rule=always_full data=124346 phys=249280 phys_per_data_ppm=2004728 stripes=31160 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=1 rule=fit_payload data=124346 phys=189094 phys_per_data_ppm=1520708 stripes=31160 mean_width_ppm=6068485 mean_hit_ppm=689577
+E7RESULT name=arm small_pct=500 seed=1 rule=fixed3 data=124346 phys=208929 phys_per_data_ppm=1680222 stripes=69643 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=500 seed=1 rule=batch_then_full data=124346 phys=146376 phys_per_data_ppm=1177166 stripes=18297 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=2 rule=always_full data=126070 phys=251008 phys_per_data_ppm=1991020 stripes=31376 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=2 rule=fit_payload data=126070 phys=191596 phys_per_data_ppm=1519758 stripes=31376 mean_width_ppm=6106450 mean_hit_ppm=695679
+E7RESULT name=arm small_pct=500 seed=2 rule=fixed3 data=126070 phys=211488 phys_per_data_ppm=1677544 stripes=70496 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=500 seed=2 rule=batch_then_full data=126070 phys=148448 phys_per_data_ppm=1177504 stripes=18556 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=3 rule=always_full data=124251 phys=249344 phys_per_data_ppm=2006776 stripes=31168 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=3 rule=fit_payload data=124251 phys=188864 phys_per_data_ppm=1520019 stripes=31168 mean_width_ppm=6059548 mean_hit_ppm=688141
+E7RESULT name=arm small_pct=500 seed=3 rule=fixed3 data=124251 phys=208941 phys_per_data_ppm=1681604 stripes=69647 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=500 seed=3 rule=batch_then_full data=124251 phys=146296 phys_per_data_ppm=1177423 stripes=18287 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=4 rule=always_full data=124643 phys=249728 phys_per_data_ppm=2003546 stripes=31216 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=4 rule=fit_payload data=124643 phys=189674 phys_per_data_ppm=1521738 stripes=31216 mean_width_ppm=6076178 mean_hit_ppm=690814
+E7RESULT name=arm small_pct=500 seed=4 rule=fixed3 data=124643 phys=209472 phys_per_data_ppm=1680575 stripes=69824 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=500 seed=4 rule=batch_then_full data=124643 phys=146920 phys_per_data_ppm=1178726 stripes=18365 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=5 rule=always_full data=125038 phys=249896 phys_per_data_ppm=1998560 stripes=31237 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=500 seed=5 rule=fit_payload data=125038 phys=189836 phys_per_data_ppm=1518226 stripes=31237 mean_width_ppm=6077280 mean_hit_ppm=690991
+E7RESULT name=arm small_pct=500 seed=5 rule=fixed3 data=125038 phys=210063 phys_per_data_ppm=1679993 stripes=70021 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=500 seed=5 rule=batch_then_full data=125038 phys=147304 phys_per_data_ppm=1178073 stripes=18413 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=1 rule=always_full data=40950 phys=177768 phys_per_data_ppm=4341098 stripes=22221 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=1 rule=fit_payload data=40950 phys=69678 phys_per_data_ppm=1701538 stripes=22221 mean_width_ppm=3135682 mean_hit_ppm=218234
+E7RESULT name=arm small_pct=900 seed=1 rule=fixed3 data=40950 phys=89901 phys_per_data_ppm=2195384 stripes=29967 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=900 seed=1 rule=batch_then_full data=40950 phys=51608 phys_per_data_ppm=1260268 stripes=6451 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=2 rule=always_full data=41178 phys=178112 phys_per_data_ppm=4325416 stripes=22264 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=2 rule=fit_payload data=41178 phys=70190 phys_per_data_ppm=1704550 stripes=22264 mean_width_ppm=3152623 mean_hit_ppm=220957
+E7RESULT name=arm small_pct=900 seed=2 rule=fixed3 data=41178 phys=90219 phys_per_data_ppm=2190951 stripes=30073 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=900 seed=2 rule=batch_then_full data=41178 phys=52072 phys_per_data_ppm=1264558 stripes=6509 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=3 rule=always_full data=40337 phys=177568 phys_per_data_ppm=4402112 stripes=22196 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=3 rule=fit_payload data=40337 phys=69232 phys_per_data_ppm=1716339 stripes=22196 mean_width_ppm=3119120 mean_hit_ppm=215572
+E7RESULT name=arm small_pct=900 seed=3 rule=fixed3 data=40337 phys=89067 phys_per_data_ppm=2208071 stripes=29689 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=900 seed=3 rule=batch_then_full data=40337 phys=51280 phys_per_data_ppm=1271289 stripes=6410 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=4 rule=always_full data=41771 phys=178696 phys_per_data_ppm=4277991 stripes=22337 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=4 rule=fit_payload data=41771 phys=71182 phys_per_data_ppm=1704100 stripes=22337 mean_width_ppm=3186730 mean_hit_ppm=226438
+E7RESULT name=arm small_pct=900 seed=4 rule=fixed3 data=41771 phys=91083 phys_per_data_ppm=2180531 stripes=30361 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=900 seed=4 rule=batch_then_full data=41771 phys=52568 phys_per_data_ppm=1258480 stripes=6571 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=5 rule=always_full data=40306 phys=177424 phys_per_data_ppm=4401925 stripes=22178 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=arm small_pct=900 seed=5 rule=fit_payload data=40306 phys=69100 phys_per_data_ppm=1714384 stripes=22178 mean_width_ppm=3115700 mean_hit_ppm=215023
+E7RESULT name=arm small_pct=900 seed=5 rule=fixed3 data=40306 phys=89019 phys_per_data_ppm=2208579 stripes=29673 mean_width_ppm=3000000 mean_hit_ppm=107142
+E7RESULT name=arm small_pct=900 seed=5 rule=batch_then_full data=40306 phys=51120 phys_per_data_ppm=1268297 stripes=6390 mean_width_ppm=8000000 mean_hit_ppm=1000000
+E7RESULT name=positive_control_exact_fill rule=always_full width=8 phys_per_data_ppm=1142857 expect_ppm=1142857
+E7RESULT name=positive_control_exact_fill rule=fit_payload width=8 phys_per_data_ppm=1142857 expect_ppm=1142857
+E7RESULT name=positive_control_exact_fill rule=fixed3 width=3 phys_per_data_ppm=1500000 expect_ppm=1500000
+E7RESULT name=positive_control_exact_fill rule=batch_then_full width=8 phys_per_data_ppm=1142857 expect_ppm=1142857
+E7RESULT name=done emitted=93

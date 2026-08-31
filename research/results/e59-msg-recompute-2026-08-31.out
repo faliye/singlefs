@@ -1,0 +1,26 @@
+E7RESULT name=config note=只扫单元头重算缓冲消息 node_bytes=16384 eps_bp=6500 fanout=119 buf_msgs=665
+E7RESULT name=geom nleaf=1024 resident_capacity=6650
+E7RESULT name=geom nleaf=8192 resident_capacity=46550
+E7RESULT name=geom nleaf=32768 resident_capacity=186200
+E7RESULT name=cell arm=jia_units_only n_obj=256 n_ow=64 n_del=32 units=320 expected_units=320 ambiguous=64 map_missing=0 map_wrong=0 resurrected=32 backref_bad=0 acct_bad=4 divergence=36
+E7RESULT name=cell arm=yi_units_plus_acct n_obj=256 n_ow=64 n_del=32 units=320 expected_units=320 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=bing_units_plus_seq n_obj=256 n_ow=64 n_del=32 units=320 expected_units=320 ambiguous=0 map_missing=0 map_wrong=0 resurrected=32 backref_bad=0 acct_bad=4 divergence=36
+E7RESULT name=cell arm=ding_seq_plus_tombstone n_obj=256 n_ow=64 n_del=32 units=352 expected_units=352 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=wu_stale_invisible n_obj=256 n_ow=64 n_del=32 units=224 expected_units=224 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=ji_headers_erased n_obj=256 n_ow=64 n_del=32 units=320 expected_units=320 ambiguous=0 map_missing=224 map_wrong=0 resurrected=0 backref_bad=224 acct_bad=4 divergence=452
+E7RESULT name=cell arm=geng_allocator_reuses_low_addresses n_obj=256 n_ow=64 n_del=32 units=320 expected_units=320 ambiguous=64 map_missing=0 map_wrong=64 resurrected=32 backref_bad=64 acct_bad=4 divergence=164
+E7RESULT name=cell arm=jia_units_only n_obj=4096 n_ow=1024 n_del=512 units=5120 expected_units=5120 ambiguous=1024 map_missing=0 map_wrong=0 resurrected=512 backref_bad=0 acct_bad=8 divergence=520
+E7RESULT name=cell arm=yi_units_plus_acct n_obj=4096 n_ow=1024 n_del=512 units=5120 expected_units=5120 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=bing_units_plus_seq n_obj=4096 n_ow=1024 n_del=512 units=5120 expected_units=5120 ambiguous=0 map_missing=0 map_wrong=0 resurrected=512 backref_bad=0 acct_bad=8 divergence=520
+E7RESULT name=cell arm=ding_seq_plus_tombstone n_obj=4096 n_ow=1024 n_del=512 units=5632 expected_units=5632 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=wu_stale_invisible n_obj=4096 n_ow=1024 n_del=512 units=3584 expected_units=3584 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=ji_headers_erased n_obj=4096 n_ow=1024 n_del=512 units=5120 expected_units=5120 ambiguous=0 map_missing=3584 map_wrong=0 resurrected=0 backref_bad=3584 acct_bad=8 divergence=7176
+E7RESULT name=cell arm=geng_allocator_reuses_low_addresses n_obj=4096 n_ow=1024 n_del=512 units=5120 expected_units=5120 ambiguous=1024 map_missing=0 map_wrong=1024 resurrected=512 backref_bad=1024 acct_bad=8 divergence=2568
+E7RESULT name=cell arm=jia_units_only n_obj=16384 n_ow=4096 n_del=2048 units=20480 expected_units=20480 ambiguous=4096 map_missing=0 map_wrong=0 resurrected=2048 backref_bad=0 acct_bad=16 divergence=2064
+E7RESULT name=cell arm=yi_units_plus_acct n_obj=16384 n_ow=4096 n_del=2048 units=20480 expected_units=20480 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=bing_units_plus_seq n_obj=16384 n_ow=4096 n_del=2048 units=20480 expected_units=20480 ambiguous=0 map_missing=0 map_wrong=0 resurrected=2048 backref_bad=0 acct_bad=16 divergence=2064
+E7RESULT name=cell arm=ding_seq_plus_tombstone n_obj=16384 n_ow=4096 n_del=2048 units=22528 expected_units=22528 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=wu_stale_invisible n_obj=16384 n_ow=4096 n_del=2048 units=14336 expected_units=14336 ambiguous=0 map_missing=0 map_wrong=0 resurrected=0 backref_bad=0 acct_bad=0 divergence=0
+E7RESULT name=cell arm=ji_headers_erased n_obj=16384 n_ow=4096 n_del=2048 units=20480 expected_units=20480 ambiguous=0 map_missing=14336 map_wrong=0 resurrected=0 backref_bad=14336 acct_bad=16 divergence=28688
+E7RESULT name=cell arm=geng_allocator_reuses_low_addresses n_obj=16384 n_ow=4096 n_del=2048 units=20480 expected_units=20480 ambiguous=4096 map_missing=0 map_wrong=4096 resurrected=2048 backref_bad=4096 acct_bad=16 divergence=10256
+E7RESULT name=done emitted=26

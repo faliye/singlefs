@@ -1,0 +1,5 @@
+M1_上界改成整块新盘	old_devs as u64 * (cap - cap * prefill_pct / 100)	cap
+M2_窄条带不截宽	avail.truncate(k.max(2));	let _ = k;
+M3_条带按w格计数据不扣parity	let carried = payload.min(w - 1);	let carried = payload.min(w);
+M4_搬平不夹容量	let mut goal: Vec<u64> = cap.iter().map(|&c| c.min(l)).collect();	let mut goal: Vec<u64> = cap.iter().map(|_| total / cap.len() as u64).collect();
+M5_宽度下界放开到1	if avail.len() < 2 {	if avail.is_empty() {

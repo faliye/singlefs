@@ -1,0 +1,7 @@
+M1_写放大取反	g as f64 / USER_WRITE as f64	USER_WRITE as f64 / g as f64
+M2_补齐用地板除	size.div_ceil(g as u64) * g as u64	size / g as u64 * g as u64
+M3_补齐忘了乘单元	let used = size.div_ceil(g as u64) * g as u64;	let used = size.div_ceil(g as u64);
+M4_数据单元取16K	const DATA_UNIT_BYTES: usize = 32768;	const DATA_UNIT_BYTES: usize = 16384;
+M5_用户写改成8K	const USER_WRITE: u64 = 4096;	const USER_WRITE: u64 = 8192;
+M6_粒度网格改一档	const GRAINS: [usize; 6] = [4096, 8192, 16384, 32768, 65536, 131072];	const GRAINS: [usize; 6] = [4096, 8192, 16384, 32768, 65536, 262144];
+M7_伪随机退化	x.wrapping_mul(0x2545_F491_4F6C_DD1D)	1

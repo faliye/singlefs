@@ -1,0 +1,24 @@
+E7RESULT name=config csum_bytes=32 hdr_lens=86/95/99 birthday_n=1048576
+E7RESULT name=rank_spectrum arm=jia_crc32c hdr_len=86 windows_full_rank=401 windows_total=401 worst_rank=32 worst_window_collisions=0
+E7RESULT name=rank_spectrum arm=bing_crc64_trunc32 hdr_len=86 windows_full_rank=193 windows_total=401 worst_rank=28 worst_window_collisions=15
+E7RESULT name=rank_spectrum arm=jia_crc32c hdr_len=95 windows_full_rank=473 windows_total=473 worst_rank=32 worst_window_collisions=0
+E7RESULT name=rank_spectrum arm=bing_crc64_trunc32 hdr_len=95 windows_full_rank=226 windows_total=473 worst_rank=28 worst_window_collisions=15
+E7RESULT name=rank_spectrum arm=jia_crc32c hdr_len=99 windows_full_rank=505 windows_total=505 worst_rank=32 worst_window_collisions=0
+E7RESULT name=rank_spectrum arm=bing_crc64_trunc32 hdr_len=99 windows_full_rank=237 windows_total=505 worst_rank=28 worst_window_collisions=15
+E7RESULT name=epoch_window arm=jia_crc32c hdr_len=86 rank=32 collisions=0
+E7RESULT name=epoch_window arm=bing_crc64_trunc32 hdr_len=86 rank=31 collisions=1
+E7RESULT name=epoch_window arm=jia_crc32c hdr_len=95 rank=32 collisions=0
+E7RESULT name=epoch_window arm=bing_crc64_trunc32 hdr_len=95 rank=30 collisions=3
+E7RESULT name=epoch_window arm=jia_crc32c hdr_len=99 rank=32 collisions=0
+E7RESULT name=epoch_window arm=bing_crc64_trunc32 hdr_len=99 rank=31 collisions=1
+E7RESULT name=birthday arm=jia_crc32c hdr_len=86 collisions=114 expect=128.00 ratio=0.891
+E7RESULT name=birthday arm=yi_sha256_trunc32 hdr_len=86 collisions=148 expect=128.00 ratio=1.156
+E7RESULT name=birthday arm=bing_crc64_trunc32 hdr_len=86 collisions=126 expect=128.00 ratio=0.984
+E7RESULT name=birthday arm=jia_crc32c hdr_len=95 collisions=114 expect=128.00 ratio=0.891
+E7RESULT name=birthday arm=yi_sha256_trunc32 hdr_len=95 collisions=116 expect=128.00 ratio=0.906
+E7RESULT name=birthday arm=bing_crc64_trunc32 hdr_len=95 collisions=142 expect=128.00 ratio=1.109
+E7RESULT name=birthday arm=jia_crc32c hdr_len=99 collisions=114 expect=128.00 ratio=0.891
+E7RESULT name=birthday arm=yi_sha256_trunc32 hdr_len=99 collisions=104 expect=128.00 ratio=0.813
+E7RESULT name=birthday arm=bing_crc64_trunc32 hdr_len=99 collisions=126 expect=128.00 ratio=0.984
+E7RESULT name=same_source crc32c_equal=true sha_equal=true crc64_equal=true
+E7RESULT name=done emitted=24

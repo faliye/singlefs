@@ -1,0 +1,4 @@
+M1_命中率分母写成设备数	c2(w) * 1_000_000 / c2(DEVS)	c2(w) * 1_000_000 / DEVS
+M2_条带按w格计数据	let per = w - 1;	let per = w;
+M3_贴合规则不夹下界	Rule::FitPayload => (payload + 1).clamp(2, DEVS),	Rule::FitPayload => (payload + 1).min(DEVS),
+M4_攒批批量归一	const BATCH: u64 = 16;	const BATCH: u64 = 1;

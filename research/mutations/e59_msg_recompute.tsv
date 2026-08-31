@@ -1,0 +1,16 @@
+M1_甲臂偷看记账	fn jia() -> Self { Arm { seq: false, tomb_unit: false, use_acct: false,	fn jia() -> Self { Arm { seq: false, tomb_unit: false, use_acct: true,
+M2_庚臂退回单调分配	fn geng() -> Self { Arm { reuse_alloc: true, ..Arm::jia() } }	fn geng() -> Self { Arm { reuse_alloc: false, ..Arm::jia() } }
+M3_戊臂陈旧副本其实留着	fn wu() -> Self { Arm { stale_visible: false, ..Arm::jia() } }	fn wu() -> Self { Arm { stale_visible: true, ..Arm::jia() } }
+M4_墓碑单元不写	        if arm.tomb_unit {\n            units.push(Unit { pba: pba_tomb, hdr: Some(h), live: true });	        if false {\n            units.push(Unit { pba: pba_tomb, hdr: Some(h), live: true });
+M5_序号取最小而不是最大	*v.iter().max_by_key(|(_, s, _)| s.expect(	*v.iter().min_by_key(|(_, s, _)| s.expect(
+M6_歧义不计数	            ambiguous += 1;\n            *v.last().unwrap()	            ambiguous += 0;\n            *v.last().unwrap()
+M7_墓碑读成活的	        if pick.2 {\n            continue;	        if false {\n            continue;
+M8_记账那条腿失效	        if arm.use_acct && !u.live { continue; }	        if false && !u.live { continue; }
+M9_陈旧副本清不干净	        units.retain(|u| u.live);	        units.retain(|u| u.live || u.pba > 0);
+M10_应有单元数少算覆写	        let base = self.n_obj + self.n_overwrite + if arm.tomb_unit	        let base = self.n_obj + 0 * self.n_overwrite + if arm.tomb_unit
+M11_复活不计数	        if re.map.contains_key(k) { o.resurrected += 1; }	        if re.map.contains_key(k) { o.resurrected += 0; }
+M12_反向索引缺条不计	            None => o.backref_bad += 1,	            None => o.backref_bad += 0,
+M13_记账类永远算对	        if a != b { o.acct_bad += 1; }	        if a != b { o.acct_bad += 0; }
+M14_缓冲条数改一档	const D11_BUF_MSGS: usize = 665;	const D11_BUF_MSGS: usize = 664;
+M15_扇出改一档	const D11_FANOUT: usize = 119;	const D11_FANOUT: usize = 120;
+M16_驻留容量少算一层	    internal * D11_BUF_MSGS as u64	    (internal - 1) * D11_BUF_MSGS as u64

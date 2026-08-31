@@ -1,0 +1,128 @@
+E7RESULT name=config base_meta_tenths=1080 base_meta_raid_tenths=1520 zfs_tenths=1280 btrfs_4k_tenths=825 btrfs_128k_tenths=2073 node_hdr=64 ptr_bytes=40 leaves=16777216 in_unit_hdr=55 out_of_unit_ptr=53
+E7RESULT name=space unit=4096 n=0 counted_tenths=1080 counted_pct_milli=2637 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=1520 raid_counted_pct_milli=3711 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=16 counted_tenths=1240 counted_pct_milli=3027 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=1680 raid_counted_pct_milli=4102 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=32 counted_tenths=1400 counted_pct_milli=3418 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=1840 raid_counted_pct_milli=4492 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=64 counted_tenths=1720 counted_pct_milli=4199 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=2160 raid_counted_pct_milli=5273 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=128 counted_tenths=2360 counted_pct_milli=5762 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=2800 raid_counted_pct_milli=6836 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=256 counted_tenths=3640 counted_pct_milli=8887 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=4080 raid_counted_pct_milli=9961 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=4096 n=512 counted_tenths=6200 counted_pct_milli=15137 uncounted_tenths=1080 uncounted_pct_milli=2637 raid_counted_tenths=6640 raid_counted_pct_milli=16211 zfs_tenths=1280 btrfs_tenths=825 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=0 counted_tenths=1080 counted_pct_milli=659 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=1520 raid_counted_pct_milli=928 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=16 counted_tenths=1240 counted_pct_milli=757 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=1680 raid_counted_pct_milli=1025 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=32 counted_tenths=1400 counted_pct_milli=854 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=1840 raid_counted_pct_milli=1123 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=64 counted_tenths=1720 counted_pct_milli=1050 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=2160 raid_counted_pct_milli=1318 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=128 counted_tenths=2360 counted_pct_milli=1440 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=2800 raid_counted_pct_milli=1709 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=256 counted_tenths=3640 counted_pct_milli=2222 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=4080 raid_counted_pct_milli=2490 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=16384 n=512 counted_tenths=6200 counted_pct_milli=3784 uncounted_tenths=1080 uncounted_pct_milli=659 raid_counted_tenths=6640 raid_counted_pct_milli=4053 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=0 counted_tenths=1080 counted_pct_milli=165 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=1520 raid_counted_pct_milli=232 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=16 counted_tenths=1240 counted_pct_milli=189 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=1680 raid_counted_pct_milli=256 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=32 counted_tenths=1400 counted_pct_milli=214 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=1840 raid_counted_pct_milli=281 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=64 counted_tenths=1720 counted_pct_milli=262 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=2160 raid_counted_pct_milli=330 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=128 counted_tenths=2360 counted_pct_milli=360 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=2800 raid_counted_pct_milli=427 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=256 counted_tenths=3640 counted_pct_milli=555 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=4080 raid_counted_pct_milli=623 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=65536 n=512 counted_tenths=6200 counted_pct_milli=946 uncounted_tenths=1080 uncounted_pct_milli=165 raid_counted_tenths=6640 raid_counted_pct_milli=1013 zfs_tenths=1280 btrfs_tenths=NA cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=0 counted_tenths=1080 counted_pct_milli=82 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=1520 raid_counted_pct_milli=116 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=16 counted_tenths=1240 counted_pct_milli=95 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=1680 raid_counted_pct_milli=128 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=1 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=32 counted_tenths=1400 counted_pct_milli=107 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=1840 raid_counted_pct_milli=140 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=64 counted_tenths=1720 counted_pct_milli=131 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=2160 raid_counted_pct_milli=165 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=128 counted_tenths=2360 counted_pct_milli=180 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=2800 raid_counted_pct_milli=214 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=256 counted_tenths=3640 counted_pct_milli=278 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=4080 raid_counted_pct_milli=311 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=space unit=131072 n=512 counted_tenths=6200 counted_pct_milli=473 uncounted_tenths=1080 uncounted_pct_milli=82 raid_counted_tenths=6640 raid_counted_pct_milli=507 zfs_tenths=1280 btrfs_tenths=2073 cheaper_than_zfs=0 raid_cheaper_than_zfs=0
+E7RESULT name=geom carrier=all_units node=2048 n=0 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=16 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=32 fanout=48 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=64 fanout=48 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=128 fanout=46 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=256 fanout=43 height=5 height_delta=0
+E7RESULT name=geom carrier=all_units node=2048 n=512 fanout=36 height=5 height_delta=0
+E7RESULT name=geom_threshold carrier=all_units node=2048 height_grows_at=865
+E7RESULT name=geom carrier=all_units node=4096 n=0 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=16 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=32 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=64 fanout=99 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=128 fanout=97 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=256 fanout=94 height=4 height_delta=0
+E7RESULT name=geom carrier=all_units node=4096 n=512 fanout=88 height=4 height_delta=0
+E7RESULT name=geom_threshold carrier=all_units node=4096 height_grows_at=1473
+E7RESULT name=geom carrier=all_units node=16384 n=0 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=16 fanout=407 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=32 fanout=407 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=64 fanout=406 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=128 fanout=404 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=256 fanout=401 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=16384 n=512 fanout=395 height=3 height_delta=0
+E7RESULT name=geom_threshold carrier=all_units node=16384 height_grows_at=6081
+E7RESULT name=geom carrier=all_units node=65536 n=0 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=16 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=32 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=64 fanout=1635 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=128 fanout=1633 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=256 fanout=1630 height=3 height_delta=0
+E7RESULT name=geom carrier=all_units node=65536 n=512 fanout=1624 height=3 height_delta=0
+E7RESULT name=geom_threshold carrier=all_units node=65536 height_grows_at=55233
+E7RESULT name=geom carrier=data_only node=2048 n=0 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=16 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=32 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=64 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=128 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=256 fanout=49 height=5 height_delta=0
+E7RESULT name=geom carrier=data_only node=2048 n=512 fanout=49 height=5 height_delta=0
+E7RESULT name=geom_threshold carrier=data_only node=2048 height_grows_at=never
+E7RESULT name=geom carrier=data_only node=4096 n=0 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=16 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=32 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=64 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=128 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=256 fanout=100 height=4 height_delta=0
+E7RESULT name=geom carrier=data_only node=4096 n=512 fanout=100 height=4 height_delta=0
+E7RESULT name=geom_threshold carrier=data_only node=4096 height_grows_at=never
+E7RESULT name=geom carrier=data_only node=16384 n=0 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=16 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=32 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=64 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=128 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=256 fanout=408 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=16384 n=512 fanout=408 height=3 height_delta=0
+E7RESULT name=geom_threshold carrier=data_only node=16384 height_grows_at=never
+E7RESULT name=geom carrier=data_only node=65536 n=0 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=16 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=32 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=64 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=128 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=256 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom carrier=data_only node=65536 n=512 fanout=1636 height=3 height_delta=0
+E7RESULT name=geom_threshold carrier=data_only node=65536 height_grows_at=never
+E7RESULT name=bounds n_min_bare=7 n_min_quota=9 n_min_with_csum=11 n_min_full=13 len_field_max_bytes=65535 len2_covers_128k=0 n_max_counted_zfs=19 raid_cheaper_than_zfs_at_zero=0 n_max_payload_4k=4040 n_max_payload_128k=131016 n_max_node_2k=1944 n_max_node_64k=65432 btrfs_half_holds_at_zero=0 n_max_geom_all_units=864 n_max_geom_data_only=unbounded
+E7RESULT name=interval counted_lo=9 counted_hi=19 counted_contains_128=0 uncounted_lo=9 uncounted_hi=864 uncounted_contains_128=1
+E7RESULT name=self_witness kind=journal_record hdr=86 atomic=512 room=426 slots_per_atomic=NA
+E7RESULT name=self_witness kind=journal_record hdr=86 atomic=4096 room=4010 slots_per_atomic=NA
+E7RESULT name=self_witness kind=root_slot slot=256 atomic=512 room_upper=255 slots_per_atomic=2
+E7RESULT name=self_witness kind=root_slot slot=256 atomic=4096 room_upper=255 slots_per_atomic=16
+E7RESULT name=poscontrol_slot slot=512 atomic=512 slots_per_atomic=1 slot=256_atomic=512_slots=2
+E7RESULT name=self_witness_bound n_max_journal_512=426 n_max_root_slot_256=255 n_max_if_self_witness_carries=255
+E7RESULT name=mount_eval atomic=512 slot=256 n=0 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=512 slot=256 n=128 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=512 slot=256 n=512 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=512 slot=512 n=0 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=512 slot=512 n=128 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=512 slot=512 n=512 unit=4096 node=4096 verdict=reject_self_witness_overflow
+E7RESULT name=mount_eval atomic=512 slot=4096 n=0 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=512 slot=4096 n=128 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=512 slot=4096 n=512 unit=4096 node=4096 verdict=reject_self_witness_overflow
+E7RESULT name=mount_eval atomic=4096 slot=256 n=0 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=256 n=128 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=256 n=512 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=512 n=0 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=512 n=128 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=512 n=512 unit=4096 node=4096 verdict=reject_slot_shares_atomic
+E7RESULT name=mount_eval atomic=4096 slot=4096 n=0 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=4096 slot=4096 n=128 unit=4096 node=4096 verdict=ok
+E7RESULT name=mount_eval atomic=4096 slot=4096 n=512 unit=4096 node=4096 verdict=ok
+E7RESULT name=poscontrol_space unit=4096 n=2048 pct_milli_at_zero=2637 pct_milli_at_half=52637
+E7RESULT name=poscontrol_space unit=16384 n=8192 pct_milli_at_zero=659 pct_milli_at_half=50659
+E7RESULT name=poscontrol_space unit=65536 n=32768 pct_milli_at_zero=165 pct_milli_at_half=50165
+E7RESULT name=poscontrol_space unit=131072 n=65536 pct_milli_at_zero=82 pct_milli_at_half=50082
+E7RESULT name=poscontrol_geom node=2048 n=1024 fanout_at_zero=49 fanout_at_half=24 fanout_data_only_at_half=49
+E7RESULT name=poscontrol_geom node=4096 n=2048 fanout_at_zero=100 fanout_at_half=49 fanout_data_only_at_half=100
+E7RESULT name=poscontrol_geom node=16384 n=8192 fanout_at_zero=408 fanout_at_half=203 fanout_data_only_at_half=408
+E7RESULT name=poscontrol_geom node=65536 n=32768 fanout_at_zero=1636 fanout_at_half=817 fanout_data_only_at_half=1636
+E7RESULT name=done emitted=128

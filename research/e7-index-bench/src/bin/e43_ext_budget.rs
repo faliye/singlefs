@@ -169,8 +169,8 @@ fn n_max_node_keeps_one_ptr(node: u64) -> u64 {
 // ── 自证单元那一档（D20 推论三：根槽、journal 记录头）──
 // 它们没有带校验和的父指针，原子宽度**等于运行时探测到的 `physical_block_size`**。
 // ⇒ 扩展点在这一档的余量由**原子宽度**夹，不由「省不省」夹。
-const JOURNAL_HDR: u64 = 84; // D23 已定项 4 逐字：头部字段合计 84 字节
-const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 未定项 2 的候选槽宽
+const JOURNAL_HDR: u64 = 86; // D23 已定项 4 逐字：头部字段合计 86 字节（已定项 9 定案后）
+const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 已定项 2 的候选槽宽
 
 /// 一个自证单元的头部落进一个原子单元之后，还剩多少字节。
 /// D23 已定项 4 逐字：84 字节头「占 512 扇区的 16%，其后还余 428 字节」。
@@ -516,11 +516,11 @@ mod tests {
     }
 
     /// **自证单元那一档的余量由原子宽度夹**，绝对值钉在 D23 逐字写下的那个数上：
-    /// 84 字节头落进 512 扇区之后余 428。
+    /// 86 字节头落进 512 扇区之后余 426。
     #[test]
     fn self_witness_room_matches_the_d23_number() {
-        assert_eq!(self_witness_room(JOURNAL_HDR, 512), 428);
-        assert_eq!(self_witness_room(JOURNAL_HDR, 4096), 4012);
+        assert_eq!(self_witness_room(JOURNAL_HDR, 512), 426);
+        assert_eq!(self_witness_room(JOURNAL_HDR, 4096), 4010);
     }
 
     /// **撕裂隔离**：E34 主张一——槽宽 256、原子宽度 512 ⇒ 一个原子单元里挤 2 个槽。
@@ -533,7 +533,7 @@ mod tests {
     }
 
     /// **若自证单元也带扩展点，上界是 255，不是 864。**
-    /// 独立算术：min(512 − 84, 256 − 1) = min(428, 255) = 255。
+    /// 独立算术：min(512 − 86, 256 − 1) = min(426, 255) = 255。
     #[test]
     fn the_self_witness_bound_is_255_not_864() {
         let bound = self_witness_room(JOURNAL_HDR, 512).min(ROOT_SLOT_CANDIDATE - 1);

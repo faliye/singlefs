@@ -1,0 +1,4 @@
+exit=1
+want=const SAMPLE_HDR = 84
+want=定的现行值是 86
+want=上界 428

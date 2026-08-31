@@ -1,0 +1,16 @@
+E7RESULT name=config regions=4 prime=8191 dev_id_bytes=1 bytes_cost=4 model=counting file_ops=0
+E7RESULT name=arm seed=1 arm=formula steps=8 misdirect=19 collisions=0 extra_reads=0
+E7RESULT name=arm seed=1 arm=stored steps=8 misdirect=0 collisions=0 extra_reads=0
+E7RESULT name=arm seed=2 arm=formula steps=8 misdirect=2 collisions=6 extra_reads=0
+E7RESULT name=arm seed=2 arm=stored steps=8 misdirect=0 collisions=0 extra_reads=0
+E7RESULT name=arm seed=3 arm=formula steps=8 misdirect=4 collisions=2 extra_reads=0
+E7RESULT name=arm seed=3 arm=stored steps=8 misdirect=0 collisions=0 extra_reads=0
+E7RESULT name=arm seed=4 arm=formula steps=8 misdirect=6 collisions=2 extra_reads=0
+E7RESULT name=arm seed=4 arm=stored steps=8 misdirect=0 collisions=0 extra_reads=0
+E7RESULT name=arm seed=5 arm=formula steps=8 misdirect=17 collisions=0 extra_reads=0
+E7RESULT name=arm seed=5 arm=stored steps=8 misdirect=0 collisions=0 extra_reads=0
+E7RESULT name=positive_control_no_change arm=formula misdirect=0 collisions=0
+E7RESULT name=positive_control_no_change arm=stored misdirect=0 collisions=0
+E7RESULT name=negative_control_pigeonhole arm=formula collisions=1
+E7RESULT name=negative_control_pigeonhole arm=stored collisions=1
+E7RESULT name=done emitted=16

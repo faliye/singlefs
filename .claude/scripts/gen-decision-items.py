@@ -68,14 +68,18 @@ def items_of(body):
         if not m:
             continue
         got = harvest(m.group(1))
-        if not got and head == '未定项':
-            first = [l for l in m.group(1).strip().split('\n') if l.strip()]
-            if first:
-                res.append(('-', name_of(first[0]), st))
-            continue
+        # 没有编号项就报错，不许猜。老版本在这里退而取该节第一行当一条无号分项，
+        # 生成出「- -. 校验和粒度与随机小读的张力」——**编号位是个破折号**。
+        # 它既不是分项的身份（引用不了「D4 未定项 -」），也不会红，
+        # 于是那一节没写索引表这件事在索引页上躺了很久没人看见。
+        if not got:
+            raise SystemExit(
+                f"  ✗ 「### {head}」一节里取不到编号项\n"
+                f"     → 该节要有索引表（`| # | 分项 | 状态 |`）或编号列表，"
+                f"每条分项一行、编号连号不重排")
         for n, txt in got:
             res.append((n, name_of(txt), st))
-    res.sort(key=lambda r: (r[0] != '-', int(r[0]) if r[0] != '-' else 0))
+    res.sort(key=lambda r: int(r[0]))
     return res
 
 

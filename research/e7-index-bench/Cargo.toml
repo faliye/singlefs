@@ -88,3 +88,27 @@ path = "src/bin/e37_log_epoch.rs"
 [[bin]]
 name = "e6-units"
 path = "src/bin/e6_units.rs"
+
+[[bin]]
+name = "e58-csum-grain"
+path = "src/bin/e58_csum_grain.rs"
+
+[[bin]]
+name = "e60-rebalance"
+path = "src/bin/e60_rebalance.rs"
+
+[[bin]]
+name = "e63-write-grain"
+path = "src/bin/e63_write_grain.rs"
+
+[[bin]]
+name = "e62-ring-home"
+path = "src/bin/e62_ring_home.rs"
+
+[[bin]]
+name = "e61-chain-hash"
+path = "src/bin/e61_chain_hash.rs"
+
+[[bin]]
+name = "e63-width-rule"
+path = "src/bin/e63_width_rule.rs"
