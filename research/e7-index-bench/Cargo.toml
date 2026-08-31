@@ -84,3 +84,7 @@ path = "src/bin/e36_slot_mapping.rs"
 [[bin]]
 name = "e37-log-epoch"
 path = "src/bin/e37_log_epoch.rs"
+
+[[bin]]
+name = "e6-units"
+path = "src/bin/e6_units.rs"

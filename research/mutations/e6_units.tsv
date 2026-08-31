@@ -1,0 +1,9 @@
+AES 臂一块都不加密	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit).take(0) {
+AES 臂只加密第一块	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit).take(1) {
+ChaCha 臂只加密第一块	Alg::Chacha => {\n            let c = ChaCha20Poly1305::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {	Alg::Chacha => {\n            let c = ChaCha20Poly1305::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit).take(1) {
+单元大小被写死成 4096	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(4096) {
+计费字节少报一半	    let n = buf.len();	    let n = buf.len() / 2;
+单档工作量减半	const TOTAL_MIB: usize = 256;	const TOTAL_MIB: usize = 128;
+ChaCha 臂分派到 AES	Alg::Chacha => {\n            let c = ChaCha20Poly1305::new_from_slice(&key).unwrap();	Alg::Chacha => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();
+tagchk 只记最后一个标签	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {\n                let t = c.encrypt_in_place_detached(nonce, b"", ch).unwrap();\n                tagchk += t[0] as u64;	Alg::Aes => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(unit) {\n                let t = c.encrypt_in_place_detached(nonce, b"", ch).unwrap();\n                tagchk = t[0] as u64;
+已知答案用了别的密钥	const KAT_KEY: [u8; 32] = [7u8; 32];	const KAT_KEY: [u8; 32] = [8u8; 32];

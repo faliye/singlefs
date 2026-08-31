@@ -1,0 +1,34 @@
+E7RESULT name=meta exp=E57 arms=6 metric=有缺口的单元数/逐字段缺口数
+E7RESULT name=arm arm=甲-现行 meta=1 data=1 n=2 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=2 B缺口字段=2 B缺的是=Kind
+E7RESULT name=arm arm=乙-阳性对照-映射层带类型 meta=1 data=1 n=2 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=丙-头只在元数据上 meta=1 data=1 n=2 A缺口单元=1 A缺口字段=4 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=1 B缺口字段=1 B缺的是=Kind
+E7RESULT name=arm arm=丁-阴性对照-块头全删 meta=1 data=1 n=2 A缺口单元=2 A缺口字段=8 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=戊-对称臂-方向B也拿免费输入 meta=1 data=1 n=2 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=2 B缺口字段=2 B缺的是=Kind
+E7RESULT name=arm arm=己-块头禁放物理落点 meta=1 data=1 n=2 A缺口单元=2 A缺口字段=4 A缺的是=Dev+Off B缺口单元=2 B缺口字段=2 B缺的是=Kind
+E7RESULT name=arm arm=甲-现行 meta=8 data=24 n=32 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=32 B缺口字段=32 B缺的是=Kind
+E7RESULT name=arm arm=乙-阳性对照-映射层带类型 meta=8 data=24 n=32 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=丙-头只在元数据上 meta=8 data=24 n=32 A缺口单元=24 A缺口字段=96 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=8 B缺口字段=8 B缺的是=Kind
+E7RESULT name=arm arm=丁-阴性对照-块头全删 meta=8 data=24 n=32 A缺口单元=32 A缺口字段=128 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=戊-对称臂-方向B也拿免费输入 meta=8 data=24 n=32 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=32 B缺口字段=32 B缺的是=Kind
+E7RESULT name=arm arm=己-块头禁放物理落点 meta=8 data=24 n=32 A缺口单元=32 A缺口字段=64 A缺的是=Dev+Off B缺口单元=32 B缺口字段=32 B缺的是=Kind
+E7RESULT name=arm arm=甲-现行 meta=64 data=192 n=256 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=256 B缺口字段=256 B缺的是=Kind
+E7RESULT name=arm arm=乙-阳性对照-映射层带类型 meta=64 data=192 n=256 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=丙-头只在元数据上 meta=64 data=192 n=256 A缺口单元=192 A缺口字段=768 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=64 B缺口字段=64 B缺的是=Kind
+E7RESULT name=arm arm=丁-阴性对照-块头全删 meta=64 data=192 n=256 A缺口单元=256 A缺口字段=1024 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=戊-对称臂-方向B也拿免费输入 meta=64 data=192 n=256 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=256 B缺口字段=256 B缺的是=Kind
+E7RESULT name=arm arm=己-块头禁放物理落点 meta=64 data=192 n=256 A缺口单元=256 A缺口字段=512 A缺的是=Dev+Off B缺口单元=256 B缺口字段=256 B缺的是=Kind
+E7RESULT name=arm arm=甲-现行 meta=1000 data=3000 n=4000 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=4000 B缺口字段=4000 B缺的是=Kind
+E7RESULT name=arm arm=乙-阳性对照-映射层带类型 meta=1000 data=3000 n=4000 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=丙-头只在元数据上 meta=1000 data=3000 n=4000 A缺口单元=3000 A缺口字段=12000 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=1000 B缺口字段=1000 B缺的是=Kind
+E7RESULT name=arm arm=丁-阴性对照-块头全删 meta=1000 data=3000 n=4000 A缺口单元=4000 A缺口字段=16000 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=戊-对称臂-方向B也拿免费输入 meta=1000 data=3000 n=4000 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=4000 B缺口字段=4000 B缺的是=Kind
+E7RESULT name=arm arm=己-块头禁放物理落点 meta=1000 data=3000 n=4000 A缺口单元=4000 A缺口字段=8000 A缺的是=Dev+Off B缺口单元=4000 B缺口字段=4000 B缺的是=Kind
+E7RESULT name=arm arm=甲-现行 meta=4096 data=12288 n=16384 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=16384 B缺口字段=16384 B缺的是=Kind
+E7RESULT name=arm arm=乙-阳性对照-映射层带类型 meta=4096 data=12288 n=16384 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=丙-头只在元数据上 meta=4096 data=12288 n=16384 A缺口单元=12288 A缺口字段=49152 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=4096 B缺口字段=4096 B缺的是=Kind
+E7RESULT name=arm arm=丁-阴性对照-块头全删 meta=4096 data=12288 n=16384 A缺口单元=16384 A缺口字段=65536 A缺的是=Tree+Obj+Birth+Anchor B缺口单元=0 B缺口字段=0 B缺的是=无
+E7RESULT name=arm arm=戊-对称臂-方向B也拿免费输入 meta=4096 data=12288 n=16384 A缺口单元=0 A缺口字段=0 A缺的是=无 B缺口单元=16384 B缺口字段=16384 B缺的是=Kind
+E7RESULT name=arm arm=己-块头禁放物理落点 meta=4096 data=12288 n=16384 A缺口单元=16384 A缺口字段=32768 A缺的是=Dev+Off B缺口单元=16384 B缺口字段=16384 B缺的是=Kind
+E7RESULT name=old_reading arm=甲 gap_a_units=0 note=把物理落点当免费输入的那一版
+E7RESULT name=verdict n=16384 gap_a_units=16384 gap_b_units=16384 verdict=两向都有缺口，权威要按字段拆（判据 4）
+E7RESULT name=done emitted=34

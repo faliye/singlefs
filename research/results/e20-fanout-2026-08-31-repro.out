@@ -1,0 +1,164 @@
+E7RESULT name=config iters=2000000 rounds=3 line_bytes=64 node_hdr=64
+E7RESULT name=poscontrol node_bytes=2048 entry_bytes=16 small_footprint=36864 big_footprint=139679744 ns_small=14660380 ns_big=74519608 ratio=5.08 ok=true
+E7RESULT name=poscontrol node_bytes=2048 entry_bytes=40 small_footprint=88064 big_footprint=357920768 ns_small=14004029 ns_big=103706714 ratio=7.41 ok=true
+E7RESULT name=poscontrol node_bytes=2048 entry_bytes=111 small_footprint=266240 big_footprint=1073747968 ns_small=13953358 ns_big=104277854 ratio=7.47 ok=true
+E7RESULT name=poscontrol node_bytes=4096 entry_bytes=16 small_footprint=40960 big_footprint=136900608 ns_small=14659499 ns_big=46097430 ratio=3.14 ok=true
+E7RESULT name=poscontrol node_bytes=4096 entry_bytes=40 small_footprint=90112 big_footprint=347078656 ns_small=14276553 ns_big=89853784 ratio=6.29 ok=true
+E7RESULT name=poscontrol node_bytes=4096 entry_bytes=111 small_footprint=245760 big_footprint=981712896 ns_small=14811041 ns_big=117894128 ratio=7.96 ok=true
+E7RESULT name=poscontrol node_bytes=8192 entry_bytes=16 small_footprint=49152 big_footprint=135561216 ns_small=15244018 ns_big=44925481 ratio=2.95 ok=true
+E7RESULT name=poscontrol node_bytes=8192 entry_bytes=40 small_footprint=98304 big_footprint=340221952 ns_small=14277263 ns_big=117536473 ratio=8.23 ok=true
+E7RESULT name=poscontrol node_bytes=8192 entry_bytes=111 small_footprint=245760 big_footprint=954458112 ns_small=14063328 ns_big=95314753 ratio=6.78 ok=true
+E7RESULT name=poscontrol node_bytes=16384 entry_bytes=16 small_footprint=65536 big_footprint=134922240 ns_small=16356344 ns_big=56765923 ratio=3.47 ok=true
+E7RESULT name=poscontrol node_bytes=16384 entry_bytes=40 small_footprint=114688 big_footprint=337723392 ns_small=14649488 ns_big=62543973 ratio=4.27 ok=true
+E7RESULT name=poscontrol node_bytes=16384 entry_bytes=111 small_footprint=245760 big_footprint=941408256 ns_small=14171650 ns_big=138763594 ratio=9.79 ok=true
+E7RESULT name=poscontrol node_bytes=32768 entry_bytes=16 small_footprint=98304 big_footprint=134643712 ns_small=17311588 ns_big=88344021 ratio=5.10 ok=true
+E7RESULT name=poscontrol node_bytes=32768 entry_bytes=40 small_footprint=131072 big_footprint=336920576 ns_small=15402249 ns_big=70025884 ratio=4.55 ok=true
+E7RESULT name=poscontrol node_bytes=32768 entry_bytes=111 small_footprint=262144 big_footprint=938213376 ns_small=14283371 ns_big=85966101 ratio=6.02 ok=true
+E7RESULT name=poscontrol node_bytes=65536 entry_bytes=16 small_footprint=65536 big_footprint=134479872 ns_small=15522960 ns_big=83392808 ratio=5.37 ok=true
+E7RESULT name=poscontrol node_bytes=65536 entry_bytes=40 small_footprint=196608 big_footprint=336396288 ns_small=16650757 ns_big=119468256 ratio=7.17 ok=true
+E7RESULT name=poscontrol node_bytes=65536 entry_bytes=111 small_footprint=327680 big_footprint=935133184 ns_small=15033502 ns_big=88141771 ratio=5.86 ok=true
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=16 slots=124 depth=2 nodes=18 footprint_bytes=36864 ns_per_lookup=57.78 lookups_per_s=17305912
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=24 slots=82 depth=2 nodes=26 footprint_bytes=53248 ns_per_lookup=54.12 lookups_per_s=18478260
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=32 slots=62 depth=2 nodes=35 footprint_bytes=71680 ns_per_lookup=57.88 lookups_per_s=17275883
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=40 slots=49 depth=2 nodes=43 footprint_bytes=88064 ns_per_lookup=55.45 lookups_per_s=18035669
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=67 slots=29 depth=3 nodes=75 footprint_bytes=153600 ns_per_lookup=60.02 lookups_per_s=16660161
+E7RESULT name=e20 node_bytes=2048 keys=2048 entry_bytes=111 slots=17 depth=3 nodes=130 footprint_bytes=266240 ns_per_lookup=55.65 lookups_per_s=17969298
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=16 slots=124 depth=3 nodes=269 footprint_bytes=550912 ns_per_lookup=81.24 lookups_per_s=12309604
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=24 slots=82 depth=3 nodes=406 footprint_bytes=831488 ns_per_lookup=75.29 lookups_per_s=13281901
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=32 slots=62 depth=3 nodes=539 footprint_bytes=1103872 ns_per_lookup=82.64 lookups_per_s=12100930
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=40 slots=49 depth=3 nodes=684 footprint_bytes=1400832 ns_per_lookup=77.91 lookups_per_s=12835018
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=67 slots=29 depth=4 nodes=1172 footprint_bytes=2400256 ns_per_lookup=88.96 lookups_per_s=11241101
+E7RESULT name=e20 node_bytes=2048 keys=32768 entry_bytes=111 slots=17 depth=4 nodes=2050 footprint_bytes=4198400 ns_per_lookup=75.27 lookups_per_s=13286017
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=16 slots=124 depth=3 nodes=4265 footprint_bytes=8734720 ns_per_lookup=108.02 lookups_per_s=9257338
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=24 slots=82 depth=3 nodes=6473 footprint_bytes=13256704 ns_per_lookup=102.15 lookups_per_s=9789856
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=32 slots=62 depth=4 nodes=8598 footprint_bytes=17608704 ns_per_lookup=122.62 lookups_per_s=8155185
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=40 slots=49 depth=4 nodes=10925 footprint_bytes=22374400 ns_per_lookup=115.95 lookups_per_s=8624099
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=67 slots=29 depth=4 nodes=18726 footprint_bytes=38350848 ns_per_lookup=138.60 lookups_per_s=7215204
+E7RESULT name=e20 node_bytes=2048 keys=524288 entry_bytes=111 slots=17 depth=5 nodes=32771 footprint_bytes=67115008 ns_per_lookup=142.11 lookups_per_s=7036706
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=16 slots=124 depth=4 nodes=68203 footprint_bytes=139679744 ns_per_lookup=296.72 lookups_per_s=3370219
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=24 slots=82 depth=4 nodes=103566 footprint_bytes=212103168 ns_per_lookup=250.77 lookups_per_s=3987718
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=32 slots=62 depth=4 nodes=137521 footprint_bytes=281643008 ns_per_lookup=327.48 lookups_per_s=3053613
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=40 slots=49 depth=5 nodes=174766 footprint_bytes=357920768 ns_per_lookup=420.83 lookups_per_s=2376277
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=67 slots=29 depth=5 nodes=299595 footprint_bytes=613570560 ns_per_lookup=465.73 lookups_per_s=2147189
+E7RESULT name=e20 node_bytes=2048 keys=8388608 entry_bytes=111 slots=17 depth=6 nodes=524291 footprint_bytes=1073747968 ns_per_lookup=407.36 lookups_per_s=2454828
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=16 slots=252 depth=2 nodes=10 footprint_bytes=40960 ns_per_lookup=58.79 lookups_per_s=17008860
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=24 slots=168 depth=2 nodes=14 footprint_bytes=57344 ns_per_lookup=55.99 lookups_per_s=17859837
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=32 slots=126 depth=2 nodes=18 footprint_bytes=73728 ns_per_lookup=59.64 lookups_per_s=16767326
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=40 slots=100 depth=2 nodes=22 footprint_bytes=90112 ns_per_lookup=57.20 lookups_per_s=17482553
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=67 slots=60 depth=2 nodes=36 footprint_bytes=147456 ns_per_lookup=59.30 lookups_per_s=16862208
+E7RESULT name=e20 node_bytes=4096 keys=2048 entry_bytes=111 slots=36 depth=3 nodes=60 footprint_bytes=245760 ns_per_lookup=59.12 lookups_per_s=16915697
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=16 slots=252 depth=2 nodes=132 footprint_bytes=540672 ns_per_lookup=76.53 lookups_per_s=13067125
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=24 slots=168 depth=3 nodes=199 footprint_bytes=815104 ns_per_lookup=78.53 lookups_per_s=12733191
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=32 slots=126 depth=3 nodes=265 footprint_bytes=1085440 ns_per_lookup=83.58 lookups_per_s=11965297
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=40 slots=100 depth=3 nodes=333 footprint_bytes=1363968 ns_per_lookup=79.14 lookups_per_s=12635084
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=67 slots=60 depth=3 nodes=558 footprint_bytes=2285568 ns_per_lookup=85.92 lookups_per_s=11638101
+E7RESULT name=e20 node_bytes=4096 keys=32768 entry_bytes=111 slots=36 depth=3 nodes=938 footprint_bytes=3842048 ns_per_lookup=76.91 lookups_per_s=13001586
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=16 slots=252 depth=3 nodes=2091 footprint_bytes=8564736 ns_per_lookup=108.52 lookups_per_s=9215275
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=24 slots=168 depth=3 nodes=3141 footprint_bytes=12865536 ns_per_lookup=100.89 lookups_per_s=9912141
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=32 slots=126 depth=3 nodes=4197 footprint_bytes=17190912 ns_per_lookup=117.38 lookups_per_s=8519274
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=40 slots=100 depth=3 nodes=5297 footprint_bytes=21696512 ns_per_lookup=110.98 lookups_per_s=9010894
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=67 slots=60 depth=4 nodes=8889 footprint_bytes=36409344 ns_per_lookup=139.51 lookups_per_s=7167966
+E7RESULT name=e20 node_bytes=4096 keys=524288 entry_bytes=111 slots=36 depth=4 nodes=14982 footprint_bytes=61366272 ns_per_lookup=124.40 lookups_per_s=8038417
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=16 slots=252 depth=3 nodes=33423 footprint_bytes=136900608 ns_per_lookup=183.60 lookups_per_s=5446643
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=24 slots=168 depth=4 nodes=50234 footprint_bytes=205758464 ns_per_lookup=356.22 lookups_per_s=2807253
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=32 slots=126 depth=4 nodes=67112 footprint_bytes=274890752 ns_per_lookup=423.12 lookups_per_s=2363401
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=40 slots=100 depth=4 nodes=84736 footprint_bytes=347078656 ns_per_lookup=369.22 lookups_per_s=2708404
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=67 slots=60 depth=4 nodes=142182 footprint_bytes=582377472 ns_per_lookup=423.35 lookups_per_s=2362089
+E7RESULT name=e20 node_bytes=4096 keys=8388608 entry_bytes=111 slots=36 depth=5 nodes=239676 footprint_bytes=981712896 ns_per_lookup=482.67 lookups_per_s=2071810
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=16 slots=508 depth=2 nodes=6 footprint_bytes=49152 ns_per_lookup=61.19 lookups_per_s=16341431
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=24 slots=338 depth=2 nodes=8 footprint_bytes=65536 ns_per_lookup=56.80 lookups_per_s=17606875
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=32 slots=254 depth=2 nodes=10 footprint_bytes=81920 ns_per_lookup=59.00 lookups_per_s=16949742
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=40 slots=203 depth=2 nodes=12 footprint_bytes=98304 ns_per_lookup=56.53 lookups_per_s=17688320
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=67 slots=121 depth=2 nodes=18 footprint_bytes=147456 ns_per_lookup=59.24 lookups_per_s=16879294
+E7RESULT name=e20 node_bytes=8192 keys=2048 entry_bytes=111 slots=73 depth=2 nodes=30 footprint_bytes=245760 ns_per_lookup=56.27 lookups_per_s=17771876
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=16 slots=508 depth=2 nodes=66 footprint_bytes=540672 ns_per_lookup=76.65 lookups_per_s=13046023
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=24 slots=338 depth=2 nodes=98 footprint_bytes=802816 ns_per_lookup=71.76 lookups_per_s=13934550
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=32 slots=254 depth=2 nodes=131 footprint_bytes=1073152 ns_per_lookup=78.37 lookups_per_s=12759821
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=40 slots=203 depth=2 nodes=163 footprint_bytes=1335296 ns_per_lookup=75.31 lookups_per_s=13277964
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=67 slots=121 depth=3 nodes=275 footprint_bytes=2252800 ns_per_lookup=86.16 lookups_per_s=11606587
+E7RESULT name=e20 node_bytes=8192 keys=32768 entry_bytes=111 slots=73 depth=3 nodes=457 footprint_bytes=3743744 ns_per_lookup=79.04 lookups_per_s=12652617
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=16 slots=508 depth=3 nodes=1037 footprint_bytes=8495104 ns_per_lookup=121.53 lookups_per_s=8228456
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=24 slots=338 depth=3 nodes=1558 footprint_bytes=12763136 ns_per_lookup=112.24 lookups_per_s=8909862
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=32 slots=254 depth=3 nodes=2075 footprint_bytes=16998400 ns_per_lookup=122.80 lookups_per_s=8143266
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=40 slots=203 depth=3 nodes=2597 footprint_bytes=21274624 ns_per_lookup=116.54 lookups_per_s=8580768
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=67 slots=121 depth=3 nodes=4370 footprint_bytes=35799040 ns_per_lookup=131.01 lookups_per_s=7632853
+E7RESULT name=e20 node_bytes=8192 keys=524288 entry_bytes=111 slots=73 depth=4 nodes=7285 footprint_bytes=59678720 ns_per_lookup=127.39 lookups_per_s=7850094
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=16 slots=508 depth=3 nodes=16548 footprint_bytes=135561216 ns_per_lookup=180.32 lookups_per_s=5545575
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=24 slots=338 depth=3 nodes=24894 footprint_bytes=203931648 ns_per_lookup=189.56 lookups_per_s=5275489
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=32 slots=254 depth=3 nodes=33159 footprint_bytes=271638528 ns_per_lookup=387.90 lookups_per_s=2577979
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=40 slots=203 depth=4 nodes=41531 footprint_bytes=340221952 ns_per_lookup=478.06 lookups_per_s=2091803
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=67 slots=121 depth=4 nodes=69907 footprint_bytes=572678144 ns_per_lookup=537.40 lookups_per_s=1860796
+E7RESULT name=e20 node_bytes=8192 keys=8388608 entry_bytes=111 slots=73 depth=4 nodes=116511 footprint_bytes=954458112 ns_per_lookup=380.56 lookups_per_s=2627706
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=16 slots=1020 depth=2 nodes=4 footprint_bytes=65536 ns_per_lookup=65.51 lookups_per_s=15265503
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=24 slots=680 depth=2 nodes=5 footprint_bytes=81920 ns_per_lookup=59.75 lookups_per_s=16736608
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=32 slots=510 depth=2 nodes=6 footprint_bytes=98304 ns_per_lookup=61.92 lookups_per_s=16150022
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=40 slots=408 depth=2 nodes=7 footprint_bytes=114688 ns_per_lookup=59.27 lookups_per_s=16872532
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=67 slots=243 depth=2 nodes=10 footprint_bytes=163840 ns_per_lookup=59.57 lookups_per_s=16786801
+E7RESULT name=e20 node_bytes=16384 keys=2048 entry_bytes=111 slots=147 depth=2 nodes=15 footprint_bytes=245760 ns_per_lookup=56.98 lookups_per_s=17550909
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=16 slots=1020 depth=2 nodes=34 footprint_bytes=557056 ns_per_lookup=77.30 lookups_per_s=12936065
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=24 slots=680 depth=2 nodes=50 footprint_bytes=819200 ns_per_lookup=73.48 lookups_per_s=13608648
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=32 slots=510 depth=2 nodes=66 footprint_bytes=1081344 ns_per_lookup=78.47 lookups_per_s=12743306
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=40 slots=408 depth=2 nodes=82 footprint_bytes=1343488 ns_per_lookup=75.18 lookups_per_s=13302126
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=67 slots=243 depth=2 nodes=136 footprint_bytes=2228224 ns_per_lookup=79.36 lookups_per_s=12600528
+E7RESULT name=e20 node_bytes=16384 keys=32768 entry_bytes=111 slots=147 depth=3 nodes=226 footprint_bytes=3702784 ns_per_lookup=84.72 lookups_per_s=11803956
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=16 slots=1020 depth=2 nodes=516 footprint_bytes=8454144 ns_per_lookup=103.95 lookups_per_s=9619763
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=24 slots=680 depth=3 nodes=775 footprint_bytes=12697600 ns_per_lookup=118.91 lookups_per_s=8410014
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=32 slots=510 depth=3 nodes=1033 footprint_bytes=16924672 ns_per_lookup=129.55 lookups_per_s=7719159
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=40 slots=408 depth=3 nodes=1291 footprint_bytes=21151744 ns_per_lookup=121.75 lookups_per_s=8213600
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=67 slots=243 depth=3 nodes=2168 footprint_bytes=35520512 ns_per_lookup=137.30 lookups_per_s=7283507
+E7RESULT name=e20 node_bytes=16384 keys=524288 entry_bytes=111 slots=147 depth=3 nodes=3593 footprint_bytes=58867712 ns_per_lookup=125.60 lookups_per_s=7961520
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=16 slots=1020 depth=3 nodes=8235 footprint_bytes=134922240 ns_per_lookup=226.74 lookups_per_s=4410394
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=24 slots=680 depth=3 nodes=12357 footprint_bytes=202457088 ns_per_lookup=220.63 lookups_per_s=4532524
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=32 slots=510 depth=3 nodes=16483 footprint_bytes=270057472 ns_per_lookup=227.55 lookups_per_s=4394656
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=40 slots=408 depth=3 nodes=20613 footprint_bytes=337723392 ns_per_lookup=243.50 lookups_per_s=4106798
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=67 slots=243 depth=3 nodes=34666 footprint_bytes=567967744 ns_per_lookup=467.93 lookups_per_s=2137068
+E7RESULT name=e20 node_bytes=16384 keys=8388608 entry_bytes=111 slots=147 depth=4 nodes=57459 footprint_bytes=941408256 ns_per_lookup=549.78 lookups_per_s=1818905
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=16 slots=2044 depth=2 nodes=3 footprint_bytes=98304 ns_per_lookup=69.10 lookups_per_s=14471570
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=24 slots=1362 depth=2 nodes=3 footprint_bytes=98304 ns_per_lookup=62.64 lookups_per_s=15965362
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=32 slots=1022 depth=2 nodes=4 footprint_bytes=131072 ns_per_lookup=66.44 lookups_per_s=15050635
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=40 slots=817 depth=2 nodes=4 footprint_bytes=131072 ns_per_lookup=60.75 lookups_per_s=16461819
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=67 slots=488 depth=2 nodes=6 footprint_bytes=196608 ns_per_lookup=61.35 lookups_per_s=16300328
+E7RESULT name=e20 node_bytes=32768 keys=2048 entry_bytes=111 slots=294 depth=2 nodes=8 footprint_bytes=262144 ns_per_lookup=57.46 lookups_per_s=17403857
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=16 slots=2044 depth=2 nodes=18 footprint_bytes=589824 ns_per_lookup=78.35 lookups_per_s=12763733
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=24 slots=1362 depth=2 nodes=26 footprint_bytes=851968 ns_per_lookup=74.25 lookups_per_s=13467420
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=32 slots=1022 depth=2 nodes=34 footprint_bytes=1114112 ns_per_lookup=80.04 lookups_per_s=12493698
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=40 slots=817 depth=2 nodes=42 footprint_bytes=1376256 ns_per_lookup=75.47 lookups_per_s=13249658
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=67 slots=488 depth=2 nodes=69 footprint_bytes=2260992 ns_per_lookup=81.02 lookups_per_s=12342180
+E7RESULT name=e20 node_bytes=32768 keys=32768 entry_bytes=111 slots=294 depth=2 nodes=113 footprint_bytes=3702784 ns_per_lookup=77.40 lookups_per_s=12919749
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=16 slots=2044 depth=2 nodes=258 footprint_bytes=8454144 ns_per_lookup=103.82 lookups_per_s=9632403
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=24 slots=1362 depth=2 nodes=386 footprint_bytes=12648448 ns_per_lookup=108.64 lookups_per_s=9204571
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=32 slots=1022 depth=2 nodes=515 footprint_bytes=16875520 ns_per_lookup=125.02 lookups_per_s=7998883
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=40 slots=817 depth=2 nodes=643 footprint_bytes=21069824 ns_per_lookup=123.03 lookups_per_s=8128383
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=67 slots=488 depth=3 nodes=1079 footprint_bytes=35356672 ns_per_lookup=139.60 lookups_per_s=7163162
+E7RESULT name=e20 node_bytes=32768 keys=524288 entry_bytes=111 slots=294 depth=3 nodes=1792 footprint_bytes=58720256 ns_per_lookup=130.74 lookups_per_s=7648953
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=16 slots=2044 depth=3 nodes=4109 footprint_bytes=134643712 ns_per_lookup=341.35 lookups_per_s=2929508
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=24 slots=1362 depth=3 nodes=6166 footprint_bytes=202047488 ns_per_lookup=261.25 lookups_per_s=3827759
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=32 slots=1022 depth=3 nodes=8219 footprint_bytes=269320192 ns_per_lookup=353.64 lookups_per_s=2827755
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=40 slots=817 depth=3 nodes=10282 footprint_bytes=336920576 ns_per_lookup=276.72 lookups_per_s=3613731
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=67 slots=488 depth=3 nodes=17227 footprint_bytes=564494336 ns_per_lookup=370.31 lookups_per_s=2700438
+E7RESULT name=e20 node_bytes=32768 keys=8388608 entry_bytes=111 slots=294 depth=3 nodes=28632 footprint_bytes=938213376 ns_per_lookup=351.54 lookups_per_s=2844630
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=16 slots=4092 depth=1 nodes=1 footprint_bytes=65536 ns_per_lookup=62.41 lookups_per_s=16022046
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=24 slots=2728 depth=1 nodes=1 footprint_bytes=65536 ns_per_lookup=58.97 lookups_per_s=16957065
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=32 slots=2046 depth=2 nodes=3 footprint_bytes=196608 ns_per_lookup=73.61 lookups_per_s=13585025
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=40 slots=1636 depth=2 nodes=3 footprint_bytes=196608 ns_per_lookup=66.68 lookups_per_s=14995986
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=67 slots=977 depth=2 nodes=4 footprint_bytes=262144 ns_per_lookup=66.84 lookups_per_s=14960263
+E7RESULT name=e20 node_bytes=65536 keys=2048 entry_bytes=111 slots=589 depth=2 nodes=5 footprint_bytes=327680 ns_per_lookup=60.15 lookups_per_s=16625862
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=16 slots=4092 depth=2 nodes=10 footprint_bytes=655360 ns_per_lookup=81.76 lookups_per_s=12230322
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=24 slots=2728 depth=2 nodes=14 footprint_bytes=917504 ns_per_lookup=79.64 lookups_per_s=12556434
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=32 slots=2046 depth=2 nodes=18 footprint_bytes=1179648 ns_per_lookup=84.29 lookups_per_s=11863775
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=40 slots=1636 depth=2 nodes=22 footprint_bytes=1441792 ns_per_lookup=80.23 lookups_per_s=12463677
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=67 slots=977 depth=2 nodes=35 footprint_bytes=2293760 ns_per_lookup=83.67 lookups_per_s=11951548
+E7RESULT name=e20 node_bytes=65536 keys=32768 entry_bytes=111 slots=589 depth=2 nodes=57 footprint_bytes=3735552 ns_per_lookup=78.95 lookups_per_s=12666230
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=16 slots=4092 depth=2 nodes=130 footprint_bytes=8519680 ns_per_lookup=103.91 lookups_per_s=9623287
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=24 slots=2728 depth=2 nodes=194 footprint_bytes=12713984 ns_per_lookup=101.91 lookups_per_s=9812617
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=32 slots=2046 depth=2 nodes=258 footprint_bytes=16908288 ns_per_lookup=116.79 lookups_per_s=8562097
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=40 slots=1636 depth=2 nodes=322 footprint_bytes=21102592 ns_per_lookup=117.70 lookups_per_s=8496386
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=67 slots=977 depth=2 nodes=538 footprint_bytes=35258368 ns_per_lookup=144.06 lookups_per_s=6941573
+E7RESULT name=e20 node_bytes=65536 keys=524288 entry_bytes=111 slots=589 depth=3 nodes=894 footprint_bytes=58589184 ns_per_lookup=160.22 lookups_per_s=6241493
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=16 slots=4092 depth=2 nodes=2052 footprint_bytes=134479872 ns_per_lookup=330.67 lookups_per_s=3024130
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=24 slots=2728 depth=3 nodes=3079 footprint_bytes=201785344 ns_per_lookup=405.93 lookups_per_s=2463483
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=32 slots=2046 depth=3 nodes=4105 footprint_bytes=269025280 ns_per_lookup=557.16 lookups_per_s=1794825
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=40 slots=1636 depth=3 nodes=5133 footprint_bytes=336396288 ns_per_lookup=478.08 lookups_per_s=2091706
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=67 slots=977 depth=3 nodes=8597 footprint_bytes=563412992 ns_per_lookup=493.03 lookups_per_s=2028280
+E7RESULT name=e20 node_bytes=65536 keys=8388608 entry_bytes=111 slots=589 depth=3 nodes=14269 footprint_bytes=935133184 ns_per_lookup=342.03 lookups_per_s=2923726
+E7RESULT name=done emitted=164

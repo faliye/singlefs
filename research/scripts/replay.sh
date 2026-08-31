@@ -61,9 +61,10 @@ E49|e49_chain_width||e49-chain-width-2026-08-30.out|exact
 E51|e51_chain_chances||e51-chain-chances-2026-08-30.out|exact
 E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
 E54|e54_accounting_gen||e54-accounting-gen-2026-08-30.out|exact
+E57|e57_field_authority||e57-field-authority-2026-08-31.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
-E16|e16-journal||e16-journal-2026-08-28.out|exact
+E16|e16-journal||e16-journal-2026-08-31.out|exact
 E17|e17-merge||e17-merge-2026-08-29-repro.out|timing
 E20|e20-fanout||e20-poscontrol-2026-08-29.out|timing
 E21|e21-cpu|2048 5|e21-cpu-2026-08-28.out|timing

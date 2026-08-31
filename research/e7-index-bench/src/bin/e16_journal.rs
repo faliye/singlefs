@@ -266,6 +266,12 @@ impl Arm {
 struct Out {
     journal_blocks: u64,
     ckpt_blocks: u64,
+    /// **祖先块**：`ckpt_blocks` 里属于内部节点（非脏叶）的那一部分。
+    /// 单列出来是因为「checkpoint 内摊销把祖先压到几块每操作」这个数
+    /// 被 [decisions.md] D10 当作依据用，而它此前在本实验的产物里**根本不存在**
+    /// （2026-08-31 现查：四个字段、宽松区间零命中）。
+    /// ⚠️ 它是 `ckpt_blocks` 的**子集**，不参与 `total_blocks()`——重复计费会把写放大算高。
+    anc_blocks: u64,
     root_blocks: u64,
     journal_bytes: u64,
     ring_peak_bytes: u64,
@@ -286,6 +292,13 @@ impl Out {
             return f64::NAN;
         }
         self.total_blocks() as f64 / self.user_writes as f64
+    }
+    /// 祖先块 / 用户写次数。**读不到 ≠ 读到 0**：没有用户写时返回 NaN，不返回 0。
+    fn anc_per_op(&self) -> f64 {
+        if self.user_writes == 0 {
+            return f64::NAN;
+        }
+        self.anc_blocks as f64 / self.user_writes as f64
     }
 }
 
@@ -339,6 +352,7 @@ fn run(ops: &[Op], arm: Arm, fsync_every: usize, ckpt_interval: usize, inject_sk
                 cost += cow_blocks(&dirty);
                 cost += append(&mut o, &mut ring, arm.record_bytes(named_subtree_roots(&dirty), false));
                 o.ckpt_blocks += cow_blocks(&dirty);
+                o.anc_blocks += cow_blocks(&dirty) - dirty.len() as u64;
                 if arm.fsync_publishes_root() {
                     o.root_blocks += ROOT_SLOT_BLOCKS;
                     cost += ROOT_SLOT_BLOCKS;
@@ -369,6 +383,7 @@ fn run(ops: &[Op], arm: Arm, fsync_every: usize, ckpt_interval: usize, inject_sk
             let fresh = dirty.difference(&persisted).count() as u64;
             let anc = cow_blocks(&dirty) - dirty.len() as u64;
             o.ckpt_blocks += fresh + anc;
+            o.anc_blocks += anc;
             append(&mut o, &mut ring, arm.record_bytes(named_subtree_roots(&dirty), true));
             o.root_blocks += ROOT_SLOT_BLOCKS;
             o.checkpoints += 1;
@@ -397,6 +412,14 @@ fn conserve(o: &Out, n_ops: usize, fsync_every: usize, ckpt_interval: usize) -> 
     }
     if o.journal_bytes == 0 && n_ops > 0 {
         return Err("一个字节的 journal 都没写".into());
+    }
+    // 祖先块是 ckpt_blocks 的子集：超出去说明它被重复计费了，
+    // 而重复计费在「三项之和」那道守恒里是隐形的（anc 不参与求和）。
+    if o.anc_blocks > o.ckpt_blocks {
+        return Err(format!(
+            "祖先块 {} 超过 checkpoint 块 {}，它本该是后者的子集",
+            o.anc_blocks, o.ckpt_blocks
+        ));
     }
     if o.fsync_cost.len() as u64 != o.fsyncs {
         return Err("fsync 代价样本数与 fsync 次数对不上".into());
@@ -539,10 +562,11 @@ fn main() {
                     let mut c = r.fsync_cost.clone();
                     say(em.emit_raw(&format!(
                         "name=cell wl={} fsync_every={fe} ckpt_interval={ci} arm={} \
-                         total={} journal={} ckpt={} root={} ring_peak={} wa={:.4} \
+                         total={} journal={} ckpt={} root={} anc={} anc_per_op={:.4} ring_peak={} wa={:.4} \
                          fsync_p50={} fsync_p99={} ckpts={} replay_alloc={}",
                         wl.name(), a.name(),
                         r.total_blocks(), r.journal_blocks, r.ckpt_blocks, r.root_blocks,
+                        r.anc_blocks, r.anc_per_op(),
                         r.ring_peak_bytes, r.write_amp(),
                         pct(&mut c, 0.50), pct(&mut c, 0.99), r.checkpoints,
                         a.replay_needs_allocator()
@@ -609,6 +633,38 @@ mod tests {
 
     /// wal_leaf 的 fsync **不许**写祖先：随机负载下每次 fsync 恰好是「一个叶 + 一条记录」。
     /// 它比 intent 便宜的那一截就是本实验要量的东西，写漏了就量不出来。
+    /// **绝对值断言**：祖先块数由几何独立算出，不从被测代码读回来。
+    /// 一片脏叶 ⇒ 恰好 `HEIGHT` 个祖先；同父的两片仍是 `HEIGHT`；
+    /// 跨父的两片只在最底那一层分叉 ⇒ `HEIGHT + 1`。
+    /// ⇒ 三条臂**一起**把祖先算错时，互比仍然相等，只有这条会红。
+    #[test]
+    fn ancestor_blocks_are_pinned_by_the_geometry() {
+        let anc = |leaves: &[u64]| {
+            let d: HashSet<u64> = leaves.iter().copied().collect();
+            cow_blocks(&d) - d.len() as u64
+        };
+        assert_eq!(anc(&[0]), HEIGHT as u64, "一片脏叶的祖先数应等于树高");
+        assert_eq!(anc(&[0, 1]), HEIGHT as u64, "同父两片不该多出祖先");
+        assert_eq!(anc(&[0, FANOUT]), HEIGHT as u64 + 1, "跨父两片该多出一个祖先");
+        assert_eq!(HEIGHT, 4, "树高变了，上面三个绝对值要跟着重算");
+    }
+
+    /// 祖先块必须是 checkpoint 块的**子集**，而且不许恒为 0——
+    /// 恒为 0 的话「祖先压到几块每操作」这个数就是个摆设。
+    #[test]
+    fn ancestor_blocks_are_a_nonzero_subset_of_checkpoint_blocks() {
+        for arm in [Arm::Intent, Arm::WalFull, Arm::WalLeaf] {
+            let r = run(&gen_ops(5_000, Workload::Rand, 17), arm, 0, 1_000, false);
+            assert!(
+                r.anc_blocks <= r.ckpt_blocks,
+                "{}: 祖先块 {} 超过 checkpoint 块 {}",
+                arm.name(), r.anc_blocks, r.ckpt_blocks
+            );
+            assert!(r.anc_blocks > 0, "{}: 祖先块恒为 0，这个计数器没在数东西", arm.name());
+            assert!(r.anc_per_op() > 0.0, "{}: 祖先块每操作恒为 0", arm.name());
+        }
+    }
+
     #[test]
     fn wal_leaf_fsync_does_not_write_ancestors() {
         let r = run(&gen_ops(200, Workload::Rand, 11), Arm::WalLeaf, 1, 1000, false);

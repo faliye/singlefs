@@ -23,7 +23,7 @@
 use e7_index_bench::Emitter;
 use std::collections::BTreeMap;
 
-/// 单元的自描述头。D20（承重面）要求任一单元单独捡起来能回答
+/// 单元的自描述头。D20（承重面：单元的原子性与自包含）要求任一单元单独捡起来能回答
 /// 「我是谁、我属于谁、我是第几代」。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct SelfDesc { obj: u64, tree: u64, gen: u64 }
@@ -142,7 +142,7 @@ mod tests {
     use super::*;
 
     /// **元数据侧：自描述在，重建必须逐条相同。**
-    /// 这条证实 D21（索引是派生态）与 I-6.10（可从权威侧重建）在元数据上成立。
+    /// 这条证实 D21（权威态与派生态的分界）与 I-6.10（可从权威侧重建）在元数据上成立。
     #[test]
     fn metadata_rebuilds_exactly_because_units_are_self_describing() {
         for (nm, nd) in [(64u64, 256u64), (1024, 4096)] {
@@ -153,7 +153,7 @@ mod tests {
     }
 
     /// **数据块侧：今天零自描述 ⇒ 一条都重建不出来。**
-    /// 这是 D20（承重面）点名的那个洞的可量形态，也是 D9 已定项 7 定案的未满足前置。
+    /// 这是 D20（承重面：单元的原子性与自包含）点名的那个洞的可量形态，也是 D9 已定项 7 定案的未满足前置。
     #[test]
     fn data_blocks_rebuild_nothing_when_they_carry_no_self_description() {
         let o = measure(64, 256, false);

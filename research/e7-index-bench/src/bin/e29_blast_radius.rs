@@ -87,7 +87,7 @@ mod tests {
     use super::*;
     const L: u64 = 1 << 24;
 
-    /// **索引坏不造成永久数据丢失**——这是 D21（索引是派生态）的直接推论，
+    /// **索引坏不造成永久数据丢失**——这是 D21（权威态与派生态的分界）的直接推论，
     /// 也是本实验纠正 E1 原判据的那一条。
     #[test]
     fn a_bad_index_node_causes_no_permanent_data_loss() {

@@ -1,0 +1,26 @@
+# E6 单元大小 × CPU 特性档，两档合成。ROUNDS=5
+# 档一 VM_CPU=host；档二 VM_CPU=host,-aes,-vaes（必须连 vaes 一起屏蔽，见脚本头注）
+E7RESULT name=config total_mib=256 rounds=5 cpu_aes=true
+E7RESULT name=kat cpu_aes=true alg=aes256gcm tag=62d27233cdaa1703b440830408c9d14d want=62d27233cdaa1703b440830408c9d14d ok=true
+E7RESULT name=kat cpu_aes=true alg=chacha20poly1305 tag=5ad7622fdcef10e164b2b6878c3300eb want=5ad7622fdcef10e164b2b6878c3300eb ok=true
+E7RESULT name=unit cpu_aes=true alg=aes256gcm unit=4096 mibs=3656.13 bytes=268435456 elapsed_ns=70019467 tagchk=9764864 spread_bp=75
+E7RESULT name=unit cpu_aes=true alg=chacha20poly1305 unit=4096 mibs=1192.00 bytes=268435456 elapsed_ns=214765681 tagchk=12124160 spread_bp=37
+E7RESULT name=unit cpu_aes=true alg=aes256gcm unit=16384 mibs=3842.83 bytes=268435456 elapsed_ns=66617575 tagchk=1130496 spread_bp=131
+E7RESULT name=unit cpu_aes=true alg=chacha20poly1305 unit=16384 mibs=1483.29 bytes=268435456 elapsed_ns=172588799 tagchk=2818048 spread_bp=99
+E7RESULT name=unit cpu_aes=true alg=aes256gcm unit=65536 mibs=4117.34 bytes=268435456 elapsed_ns=62176085 tagchk=397312 spread_bp=59
+E7RESULT name=unit cpu_aes=true alg=chacha20poly1305 unit=65536 mibs=1582.12 bytes=268435456 elapsed_ns=161807824 tagchk=270336 spread_bp=19
+E7RESULT name=unit cpu_aes=true alg=aes256gcm unit=262144 mibs=4209.66 bytes=268435456 elapsed_ns=60812549 tagchk=36864 spread_bp=152
+E7RESULT name=unit cpu_aes=true alg=chacha20poly1305 unit=262144 mibs=1608.29 bytes=268435456 elapsed_ns=159175501 tagchk=2048 spread_bp=16
+E7RESULT name=done emitted=12
+E7RESULT name=config total_mib=256 rounds=5 cpu_aes=false
+E7RESULT name=kat cpu_aes=false alg=aes256gcm tag=62d27233cdaa1703b440830408c9d14d want=62d27233cdaa1703b440830408c9d14d ok=true
+E7RESULT name=kat cpu_aes=false alg=chacha20poly1305 tag=5ad7622fdcef10e164b2b6878c3300eb want=5ad7622fdcef10e164b2b6878c3300eb ok=true
+E7RESULT name=unit cpu_aes=false alg=aes256gcm unit=4096 mibs=244.74 bytes=268435456 elapsed_ns=1045986857 tagchk=9764864 spread_bp=17
+E7RESULT name=unit cpu_aes=false alg=chacha20poly1305 unit=4096 mibs=1195.08 bytes=268435456 elapsed_ns=214211253 tagchk=12124160 spread_bp=44
+E7RESULT name=unit cpu_aes=false alg=aes256gcm unit=16384 mibs=248.23 bytes=268435456 elapsed_ns=1031311841 tagchk=1130496 spread_bp=44
+E7RESULT name=unit cpu_aes=false alg=chacha20poly1305 unit=16384 mibs=1492.12 bytes=268435456 elapsed_ns=171568321 tagchk=2818048 spread_bp=26
+E7RESULT name=unit cpu_aes=false alg=aes256gcm unit=65536 mibs=249.31 bytes=268435456 elapsed_ns=1026842042 tagchk=397312 spread_bp=75
+E7RESULT name=unit cpu_aes=false alg=chacha20poly1305 unit=65536 mibs=1585.14 bytes=268435456 elapsed_ns=161500104 tagchk=270336 spread_bp=9
+E7RESULT name=unit cpu_aes=false alg=aes256gcm unit=262144 mibs=249.57 bytes=268435456 elapsed_ns=1025747974 tagchk=36864 spread_bp=13
+E7RESULT name=unit cpu_aes=false alg=chacha20poly1305 unit=262144 mibs=1614.11 bytes=268435456 elapsed_ns=158601261 tagchk=2048 spread_bp=30
+E7RESULT name=done emitted=12

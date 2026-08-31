@@ -1,0 +1,8 @@
+M1_扇出不随ε变	let pivot_bytes = NODE * (1000 - eps_permille as usize) / 1000;	let pivot_bytes = NODE;
+M2_缓冲取成了1减ε	let b = NODE * eps_permille as usize / 1000 / MSG_BYTES;	let b = NODE * (1000 - eps_permille as usize) / 1000 / MSG_BYTES;
+M3_层数用下取整	n = n.div_ceil(fanout);	n /= fanout.max(1);
+M4_解析式丢掉min封顶	self.height() as f64 * ratio.min(1.0)	self.height() as f64 * ratio
+M5_叶容量忘了减节点头	const LEAF_CAP: usize = (NODE - HDR_BYTES) / MSG_BYTES;	const LEAF_CAP: usize = NODE / MSG_BYTES;
+M6_pivot漏了key那8字节	const PIVOT_BYTES: usize = 48;	const PIVOT_BYTES: usize = 40;
+M7_后者胜反了	for i in (0..self.n).rev() {\n            if self.e[i].0 == k {	for i in 0..self.n {\n            if self.e[i].0 == k {
+M8_逐层映射只除一次	for _ in 0..=l {\n            idx /= self.fanout;\n        }	idx /= self.fanout;

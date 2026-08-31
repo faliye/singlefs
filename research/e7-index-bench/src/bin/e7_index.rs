@@ -117,9 +117,21 @@ impl Dev {
 }
 
 /// 节点缓存 + checkpoint：三臂共用，保证摊销架构对称。
-struct Cache { lru: Lru, map: std::collections::HashMap<u64, Node> }
+struct Cache { cap: usize, lru: Lru, map: std::collections::HashMap<u64, Node> }
 impl Cache {
-    fn new(cap: usize) -> Self { Self { lru: Lru::new(cap), map: Default::default() } }
+    fn new(cap: usize) -> Self { Self { cap, lru: Lru::new(cap), map: Default::default() } }
+    /// 常驻集不许超过声明的缓存。
+    /// **补这一条的理由**（2026-08-31）：E56 的 harness 有一份形状完全相同的 `Cache`，
+    /// 那里 `put` 不过 LRU ⇒ 递归期间被逐出的页会被塞回 `map` 而 LRU 追踪不到，
+    /// 此后永远免费命中、还会繁殖；实测声明 66 个节点的缓存涨到常驻 688。
+    /// E7 的调用形态是「get 之后紧跟 put、中间不嵌套别的缓存操作」，按推理不该中招——
+    /// **但推理不算证据**，所以在这里放一道会红的闸，让它自己说话。
+    fn check_residency(&self) {
+        if self.map.len() > self.cap {
+            eprintln!("E7 常驻集闸破了：常驻 {} 超过声明的缓存 {}", self.map.len(), self.cap);
+            std::process::exit(8);
+        }
+    }
     fn get(&mut self, dev: &mut Dev, pg: u64, buf: &mut Aligned) -> Node {
         if let Some(n) = self.map.get(&pg) { self.lru.touch(pg); return n.clone(); }
         if let Some(ev) = self.lru.touch(pg) {
@@ -132,9 +144,10 @@ impl Cache {
         dev.rd(pg, buf);
         let n = Node::decode(buf);
         self.map.insert(pg, n.clone());
+        self.check_residency();
         n
     }
-    fn put(&mut self, pg: u64, n: Node) { self.map.insert(pg, n); self.lru.mark_dirty(pg); }
+    fn put(&mut self, pg: u64, n: Node) { self.map.insert(pg, n); self.lru.mark_dirty(pg); self.check_residency(); }
     /// checkpoint：把全部脏节点刷下去。三臂在同一节奏上调用它。
     fn checkpoint(&mut self, dev: &mut Dev, buf: &mut Aligned) {
         for pg in self.lru.drain_dirty() {

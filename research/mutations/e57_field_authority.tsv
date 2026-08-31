@@ -1,0 +1,14 @@
+数据块也认为无头	if u.is_meta { arm.header_on_meta } else { arm.header_on_data }	if u.is_meta { arm.header_on_meta } else { false }
+块头少一个字段	const ALL_HEADER: [F; 5] = [F::Kind, F::Tree, F::Obj, F::Birth, F::Anchor];	const ALL_HEADER: [F; 4] = [F::Tree, F::Obj, F::Birth, F::Anchor];
+映射层少了密文校验和	const ALL_MAPPING: [F; 7] = [F::Tree, F::Obj, F::Birth, F::Anchor, F::Dev, F::Off, F::Crc];	const ALL_MAPPING: [F; 6] = [F::Tree, F::Obj, F::Birth, F::Anchor, F::Dev, F::Off];
+扫描不再天然知道落点	    if arm.scan_supplies_physical {\n        s.insert(F::Dev);\n        s.insert(F::Off);\n    }\n    s.insert(F::Crc);	    s.insert(F::Crc);
+阳性对照不再补类型标签	if arm.mapping_carries_kind {\n        s.insert(F::Kind);\n    }	if false {\n        s.insert(F::Kind);\n    }
+缺口按单元数漏计	if !m.is_empty() {\n            g.units += 1;\n        }	if false {\n            g.units += 1;\n        }
+逐字段缺口改成只记一个	g.fields += m.len();	g.fields += if m.is_empty() { 0 } else { 1 };
+两个方向搞反	let (known, want) = if dir_a {	let (known, want) = if !dir_a {
+差集算成交集	want.difference(known).copied().collect()	want.intersection(known).copied().collect()
+对称臂顺手把类型标签也给了	    if arm.symmetric_free_inputs {\n        s.insert(F::Crc);\n    }	    if arm.symmetric_free_inputs {\n        s.insert(F::Crc);\n        s.insert(F::Kind);\n    }
+免费输入跑到映射层之外	const ALL_MAPPING: [F; 7] = [F::Tree, F::Obj, F::Birth, F::Anchor, F::Dev, F::Off, F::Crc];	const ALL_MAPPING: [F; 7] = [F::Tree, F::Obj, F::Birth, F::Anchor, F::Dev, F::Off, F::Kind];
+己臂偷偷拿回物理落点	    if arm.scan_supplies_physical {\n        s.insert(F::Dev);\n        s.insert(F::Off);\n    }	    {\n        s.insert(F::Dev);\n        s.insert(F::Off);\n    }
+判定表第一格与第二格互换	        (true, false) => "权威落在 D18：映射层可从块头重建，反向不可（判据 3）",\n        (false, true) => "权威落在 D9：块头可从映射层重建，反向不可（判据 3 的镜像）",	        (true, false) => "权威落在 D9：块头可从映射层重建，反向不可（判据 3 的镜像）",\n        (false, true) => "权威落在 D18：映射层可从块头重建，反向不可（判据 3）",
+按字段拆那一格被吞掉	        (false, false) => "两向都有缺口，权威要按字段拆（判据 4）",	        (false, false) => "两向都通，权威可任选（判据 4）",

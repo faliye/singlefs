@@ -28,6 +28,19 @@ def md_files(root='.'):
             if f.endswith('.md'):
                 yield os.path.normpath(os.path.join(dp, f))
 
+def mask_code(s):
+    """把代码块与行内代码涂成同长的空格，行号不变。
+
+    ⚠️ 反引号里的东西不是链接：`[本该](决策|实验)` 是一条**正则**，不是 markdown 链接。
+    不涂就会报一条不存在的坏链接——2026-08-31 实测撞过一次，报的是 doc-lint 自己的规则串。
+    """
+    def blank(m):
+        return re.sub(r'[^\n]', ' ', m.group(0))
+    s = re.sub(r'```.*?```', blank, s, flags=re.S)
+    s = re.sub(r'`[^`\n]*`', blank, s)
+    return s
+
+
 def heads(path):
     try:
         return re.findall(r'^## (.+)$', open(path, encoding='utf-8').read(), re.M)
@@ -44,6 +57,7 @@ for p in sorted(md_files()):
         s = open(p, encoding='utf-8').read()
     except OSError:
         continue
+    s = mask_code(s)
     for m in re.finditer(r'\[([^\]]*)\]\(([^)\s]+)\)', s):
         tgt = m.group(2)
         if tgt.startswith(('http://', 'https://', 'mailto:', '#')):

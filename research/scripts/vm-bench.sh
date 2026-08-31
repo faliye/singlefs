@@ -16,7 +16,7 @@ VM_MEM="${VM_MEM:-2048}"
 VM_CPUS="${VM_CPUS:-4}"
 VM_DISK_MB="${VM_DISK_MB:-4096}"
 # 挂几块盘。默认 1（保持既有用法与 --selftest 不变）；>1 时来宾看到 /dev/vda /dev/vdb …，
-# 全部路径按顺序作为**前缀参数**传给二进制。多盘是 E53（根环丢盘）要的：
+# 全部路径按顺序作为**前缀参数**传给二进制。多盘是 E53（丢一整块盘之后根环还挂不挂得上）要的：
 # 「丢一整块盘之后还挂不挂得上」只有在真的有多块盘时才问得出来。
 VM_DISKS="${VM_DISKS:-1}"
 VM_TIMEOUT="${VM_TIMEOUT:-900}"
@@ -214,4 +214,30 @@ if [[ "$n" -ne "$declared" ]]; then
   printf '  ✗ 结果条数对不上：程序声称发了 %s 条，宿主只抓到 %s 条 —— 控制台吞了结果，整轮作废\n' "$declared" "$n"
   exit 1
 fi
+# ⚠️ **屏蔽了 CPU 特性的那一档，必须自带已知答案测试。**
+# 2026-08-31 实测踩过：`-cpu host,-aes` 只摘掉 CPUID 的 `aes` 位，而 RustCrypto 的 `aes` 0.9.3
+# 还会去探 `vaes`（`src/lib.rs` 第 152–154 行）⇒ 来宾仍走 AES 指令，**跑得和没屏蔽一样快，
+# 而算出来的标签是错的**（tag=2112edc9… 而外部实现给 62d27233…）。
+# 那一档单看完全正常：吞吐合理、条数对得上、退出码 0 —— 只有拿外部实现算出的期望值比一比才看得见。
+# ⇒ 一旦 VM_CPU 里出现 `-<特性>`，就要求被测程序发过至少一条 `name=kat ... ok=true`。
+# 这是 `rules/show-me-test.md`「踩过的坑要做成会失败的检查，不要做成提醒句」。
+if [[ "${VM_CPU:-}" == *,-* ]]; then
+  kat_ok="$(printf '%s\n' "${LINES[@]}" | grep -c 'name=kat .*ok=true')"
+  kat_bad="$(printf '%s\n' "${LINES[@]}" | grep -c 'name=kat .*ok=false')"
+  if [[ "$kat_bad" -gt 0 ]]; then
+    printf '  ✗ VM_CPU=%s 屏蔽了特性，而已知答案测试有 %s 条判负 —— 这一档算的不是那个算法，整轮作废\n' "$VM_CPU" "$kat_bad"
+    printf '%s\n' "${LINES[@]}" | grep 'name=kat ' | sed 's/^/        /'
+    exit 1
+  fi
+  if [[ "$kat_ok" -eq 0 ]]; then
+    printf '  ✗ VM_CPU=%s 屏蔽了特性，但被测程序一条已知答案测试都没发 —— 判定不明，整轮作废\n' "$VM_CPU"
+    printf '  → 怎么办：让被测程序对每种被屏蔽特性影响到的算法各发一条\n'
+    printf '            `E7RESULT name=kat ... tag=<实测> want=<外部实现算的> ok=<真假>`。\n'
+    printf '            期望值要由**另一个实现**给出（例：python3 调 cryptography），\n'
+    printf '            不许拿被测程序自己在别的档上的输出当期望值——那是自己和自己比。\n'
+    exit 1
+  fi
+  ok "屏蔽档自带 $kat_ok 条已知答案测试，全部对上外部实现"
+fi
+
 ok "退出码 0，抓到 $n 条结果（与程序声称的 $declared 条相符）"
