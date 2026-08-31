@@ -37,7 +37,11 @@ def body_of(text):
     i = text.find('\n## 历史版本')
     return text if i < 0 else text[:i]
 
-kb_files = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
+# ⚠️ `*-history.md` **不是登记位**：变更史里会原样引用标记（记「本轮加了哪个标记」），
+# 那是历史陈述，不是第二处权威记录。与旧值字面串的豁免同一条理由
+# （`doc-discipline.md`「正文只写现状，历史进文末」）。
+kb_all = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
+kb_files = [f for f in kb_all if not f.endswith('-history.md')]
 
 # ---- 1. 收标记，且同一个常量只许登记一处（kb-discipline 第 4 条）----
 marks, dup = {}, []

@@ -245,17 +245,29 @@ mod tests {
     /// 没有任何检查看得见（变异 M1 实测：把 `if arm.syncs()` 改成 `if false`，一个测试都不红）。
     #[test]
     fn fdatasync_actually_reaches_the_device() {
+        // ⚠️ **这是计时断言，跑在与整个 workspace 并行的测试进程里**：60 轮的样本
+        // 在负载高时会被调度噪声盖过（2026-08-31 实测：单跑 3/3 过，全量套件里 1 过 1 红）。
+        // ⇒ 最多试 3 次，任意一次拿到 ≥2× 就算过；三次都拿不到才判红。
+        // **判别力不受影响**：`if arm.syncs()` 被改成 `if false` 时三次都不可能出现那个差距。
         let p = std::env::temp_dir().join(format!("e44-selftest-{}.img", std::process::id()));
         let path = p.to_string_lossy().to_string();
         std::fs::File::create(&p).unwrap().set_len(8 * 1024 * 1024).unwrap();
         let _ = one_round(&path, Arm::Sync1, 20, 2048);          // 预热
-        let (n1, t1) = one_round(&path, Arm::Sync1, 60, 2048).unwrap().unwrap();
-        let (n0, t0) = one_round(&path, Arm::NoSync, 60, 2048).unwrap().unwrap();
+        let mut seen = Vec::new();
+        let mut ok = false;
+        for _ in 0..3 {
+            let (n1, t1) = one_round(&path, Arm::Sync1, 60, 2048).unwrap().unwrap();
+            let (n0, t0) = one_round(&path, Arm::NoSync, 60, 2048).unwrap().unwrap();
+            let (sync_rate, nosync_rate) = (per_sec_milli(n1, t1), per_sec_milli(n0, t0));
+            seen.push((nosync_rate, sync_rate));
+            if nosync_rate > sync_rate * 2 {
+                ok = true;
+                break;
+            }
+        }
         let _ = std::fs::remove_file(&p);
-        let sync_rate = per_sec_milli(n1, t1);
-        let nosync_rate = per_sec_milli(n0, t0);
-        assert!(nosync_rate > sync_rate * 2,
-            "不 fdatasync 该至少快一倍，否则 fdatasync 根本没到设备（{nosync_rate} vs {sync_rate}）");
+        assert!(ok,
+            "不 fdatasync 该至少快一倍，否则 fdatasync 根本没到设备（三次都没拿到：{seen:?}）");
     }
 
     /// **代价不是「零」，是「零点几个百分点的项数上会多一个单元」。**

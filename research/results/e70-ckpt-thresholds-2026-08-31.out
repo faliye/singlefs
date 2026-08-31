@@ -1,0 +1,18 @@
+E7RESULT name=config rec_header=78 node=16384 entry=32 fsync_per_sec=2785 model=arithmetic file_ops=0
+E7RESULT name=t_dirty ring_mib=16 f=2 upper_bytes=4294927360 upper_gib=3 absurd=0
+E7RESULT name=t_dirty ring_mib=16 f=3 upper_bytes=2863271424 upper_gib=2 absurd=0
+E7RESULT name=t_dirty ring_mib=64 f=2 upper_bytes=17179829248 upper_gib=15 absurd=0
+E7RESULT name=t_dirty ring_mib=64 f=3 upper_bytes=11453206016 upper_gib=10 absurd=0
+E7RESULT name=t_dirty ring_mib=256 f=2 upper_bytes=68719436800 upper_gib=63 absurd=0
+E7RESULT name=t_dirty ring_mib=256 f=3 upper_bytes=45812944384 upper_gib=42 absurd=0
+E7RESULT name=t_dirty ring_mib=1024 f=2 upper_bytes=274877867008 upper_gib=255 absurd=0
+E7RESULT name=t_dirty ring_mib=1024 f=3 upper_bytes=183251897856 upper_gib=170 absurd=0
+E7RESULT name=t_time load=multistream budget_x1000=200 ops_needed=262 t_time_ms_x10=942 extrapolated=0 already_ok=0
+E7RESULT name=t_time load=multistream budget_x1000=100 ops_needed=547 t_time_ms_x10=1966 extrapolated=0 already_ok=0
+E7RESULT name=t_time load=multistream budget_x1000=50 ops_needed=1142 t_time_ms_x10=4103 extrapolated=1 already_ok=0
+E7RESULT name=t_time load=seq budget_x1000=200 ops_needed=0 t_time_ms_x10=0 extrapolated=0 already_ok=1
+E7RESULT name=t_time load=seq budget_x1000=100 ops_needed=0 t_time_ms_x10=0 extrapolated=0 already_ok=1
+E7RESULT name=t_time load=seq budget_x1000=50 ops_needed=0 t_time_ms_x10=0 extrapolated=0 already_ok=1
+E7RESULT name=positive_control_f_doubles a=17179829248 b=8589894656 halved=1
+E7RESULT name=negative_control_no_amplification bytes=33554354 expect=33554354
+E7RESULT name=done emitted=18

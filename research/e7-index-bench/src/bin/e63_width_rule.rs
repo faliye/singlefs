@@ -1,11 +1,11 @@
-//! E63：分配器每次写用几列 —— D2 未定项 6。
+//! E63：分配器每次写用几列 —— D2 已定项 6。
 //!
 //! ## 被引用条款逐字贴在这里
 //!
 //! - D2 主结论：条带宽度可变，每次写都是全条带写，永不 read-modify-write。
 //!   代价「空间效率略降，小写有浪费。接受」。
 //! - D2 已定项 1（2026-08-31）：逐次可变，格式侧逐个列出、各带设备身份。
-//! - D2 未定项 6：判据本身没写；`.claude/rules/fs-design.md` 五条硬要求第 1 条要求
+//! - D2 已定项 6：判据本身没写；`.claude/rules/fs-design.md` 五条硬要求第 1 条要求
 //!   切换判据显式、可计算、写下来；第 2 条要求每条分支能被测试强制进入。
 //! - E17（write buffer 合并上限）：单线程合并 30.9–31.6M 条目/秒 ⇒ 攒批在本工程是现成的。
 //!
@@ -35,7 +35,7 @@
 //! ## 它答不了的
 //!
 //! 计数模型：没有文件系统、没有块设备、文件操作 0 处。不建模「参与哪些设备」那一维
-//! （D2 未定项 6 c 的子集选择），只建模用几列。攒批的延迟代价不建模。
+//! （D2 已定项 6 c 的子集选择），只建模用几列。攒批的延迟代价不建模。
 
 use e7_index_bench::Emitter;
 
@@ -56,6 +56,8 @@ enum Rule {
     Fixed(u64),
     /// 先攒批再按全宽发。
     BatchThenFull,
+    /// 先攒批，再按上界封顶发（2026-08-31 第二轮补臂：量的是定案本身）。
+    BatchThenCapped(u64),
 }
 
 struct Lcg(u64);
@@ -69,6 +71,7 @@ impl Lcg {
 fn width_for(rule: Rule, payload: u64) -> u64 {
     match rule {
         Rule::AlwaysFull | Rule::BatchThenFull => DEVS,
+        Rule::BatchThenCapped(cap) => cap.clamp(2, DEVS),
         Rule::FitPayload => (payload + 1).clamp(2, DEVS),
         Rule::Fixed(w) => w.clamp(2, DEVS),
     }
@@ -111,7 +114,7 @@ fn run(rule: Rule, seed: u64, small_pct: u64) -> Out {
     for _ in 0..OPS {
         // 小写 = 1 格；大写 = 8..15 格
         let payload = if rng.next() % 1000 < small_pct { 1 } else { 8 + rng.next() % 8 };
-        if rule == Rule::BatchThenFull {
+        if matches!(rule, Rule::BatchThenFull | Rule::BatchThenCapped(_)) {
             pending += payload;
             batched += 1;
             if batched == BATCH {
@@ -154,6 +157,8 @@ fn main() {
         ("fit_payload", Rule::FitPayload),
         ("fixed3", Rule::Fixed(3)),
         ("batch_then_full", Rule::BatchThenFull),
+        ("batch_then_cap4", Rule::BatchThenCapped(4)),
+        ("batch_then_cap6", Rule::BatchThenCapped(6)),
     ];
     for &small in SMALL_PCT.iter() {
         for &seed in SEEDS.iter() {

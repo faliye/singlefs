@@ -69,6 +69,14 @@ E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
 E54|e54_accounting_gen||e54-accounting-gen-2026-08-30.out|exact
 E57|e57_field_authority||e57-field-authority-2026-08-31.out|exact
 E59|e59_msg_recompute||e59-msg-recompute-2026-08-31.out|exact
+E61|e61-chain-hash||e61-chain-hash-2026-08-31.out|exact
+E69|e69-backref-cost||e69-backref-cost-2026-08-31.out|exact
+E60|e60-rebalance||e60-rebalance-2026-08-31.out|exact
+E70|e70-ckpt-thresholds||e70-ckpt-thresholds-2026-08-31.out|exact
+E62|e62-ring-home||e62-ring-home-2026-08-31.out|exact
+E63|e63-width-rule||e63-width-rule-2026-08-31.out|exact
+E67|e67-device-subset||e67-device-subset-2026-08-31.out|exact
+E68|e68-inline-threshold||e68-inline-threshold-2026-08-31.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-31.out|exact

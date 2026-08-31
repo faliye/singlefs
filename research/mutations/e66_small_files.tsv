@@ -1,0 +1,8 @@
+M1_补齐用地板除	(size.div_ceil(UNIT) * UNIT) as u64	(size / UNIT * UNIT) as u64
+M2_打包也补齐	        _ => size as u64,	        _ => (size.div_ceil(UNIT) * UNIT) as u64,
+M3_内联上限忘减头	size <= NODE - NODE_HDR	size <= NODE
+M4_内联读整单元	        "inline" => NODE as u64,	        "inline" => UNIT as u64,
+M5_extent也要RMW	fn needs_rmw(arm: &str) -> bool { arm != "extent" }	fn needs_rmw(_arm: &str) -> bool { true }
+M6_单元取16K	const UNIT: usize = 32768;	const UNIT: usize = 16384;
+M7_伪随机退化	x.wrapping_mul(0x2545_F491_4F6C_DD1D)	1
+M8_预热不丢弃	const WARMUP: u64 = 64;	const WARMUP: u64 = 0;

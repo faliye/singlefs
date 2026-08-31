@@ -1,0 +1,90 @@
+E7RESULT name=config node=16384 block=4096 rec_base=64 files=100000 model=counting file_ops=0
+E7RESULT name=arm thr=0 seed=1 total_bytes_per_file=108247 data_per_file=108183 meta_per_file=64 leaves=391 inlined_pct_ppm=0 read_ops_x1000=3000
+E7RESULT name=arm thr=0 seed=2 total_bytes_per_file=109604 data_per_file=109540 meta_per_file=64 leaves=391 inlined_pct_ppm=0 read_ops_x1000=3000
+E7RESULT name=arm thr=0 seed=3 total_bytes_per_file=108773 data_per_file=108709 meta_per_file=64 leaves=391 inlined_pct_ppm=0 read_ops_x1000=3000
+E7RESULT name=arm thr=0 seed=4 total_bytes_per_file=110909 data_per_file=110845 meta_per_file=64 leaves=391 inlined_pct_ppm=0 read_ops_x1000=3000
+E7RESULT name=arm thr=0 seed=5 total_bytes_per_file=108879 data_per_file=108815 meta_per_file=64 leaves=391 inlined_pct_ppm=0 read_ops_x1000=3000
+E7RESULT name=arm thr=256 seed=1 total_bytes_per_file=108051 data_per_file=107981 meta_per_file=70 leaves=430 inlined_pct_ppm=49230 read_ops_x1000=3000
+E7RESULT name=arm thr=256 seed=2 total_bytes_per_file=109411 data_per_file=109341 meta_per_file=70 leaves=429 inlined_pct_ppm=48640 read_ops_x1000=3000
+E7RESULT name=arm thr=256 seed=3 total_bytes_per_file=108575 data_per_file=108505 meta_per_file=70 leaves=430 inlined_pct_ppm=49940 read_ops_x1000=3000
+E7RESULT name=arm thr=256 seed=4 total_bytes_per_file=110710 data_per_file=110639 meta_per_file=70 leaves=430 inlined_pct_ppm=50150 read_ops_x1000=3000
+E7RESULT name=arm thr=256 seed=5 total_bytes_per_file=108683 data_per_file=108612 meta_per_file=70 leaves=430 inlined_pct_ppm=49590 read_ops_x1000=3000
+E7RESULT name=arm thr=512 seed=1 total_bytes_per_file=107866 data_per_file=107776 meta_per_file=89 leaves=548 inlined_pct_ppm=99300 read_ops_x1000=3000
+E7RESULT name=arm thr=512 seed=2 total_bytes_per_file=109222 data_per_file=109132 meta_per_file=89 leaves=548 inlined_pct_ppm=99600 read_ops_x1000=3000
+E7RESULT name=arm thr=512 seed=3 total_bytes_per_file=108387 data_per_file=108297 meta_per_file=89 leaves=549 inlined_pct_ppm=100570 read_ops_x1000=3000
+E7RESULT name=arm thr=512 seed=4 total_bytes_per_file=110525 data_per_file=110435 meta_per_file=89 leaves=547 inlined_pct_ppm=100000 read_ops_x1000=3000
+E7RESULT name=arm thr=512 seed=5 total_bytes_per_file=108501 data_per_file=108412 meta_per_file=89 leaves=545 inlined_pct_ppm=98480 read_ops_x1000=3000
+E7RESULT name=arm thr=1024 seed=1 total_bytes_per_file=107533 data_per_file=107367 meta_per_file=166 leaves=1017 inlined_pct_ppm=199170 read_ops_x1000=4000
+E7RESULT name=arm thr=1024 seed=2 total_bytes_per_file=108884 data_per_file=108716 meta_per_file=167 leaves=1023 inlined_pct_ppm=201060 read_ops_x1000=4000
+E7RESULT name=arm thr=1024 seed=3 total_bytes_per_file=108047 data_per_file=107879 meta_per_file=168 leaves=1027 inlined_pct_ppm=202670 read_ops_x1000=4000
+E7RESULT name=arm thr=1024 seed=4 total_bytes_per_file=110193 data_per_file=110026 meta_per_file=166 leaves=1016 inlined_pct_ppm=199790 read_ops_x1000=4000
+E7RESULT name=arm thr=1024 seed=5 total_bytes_per_file=108169 data_per_file=108003 meta_per_file=165 leaves=1012 inlined_pct_ppm=198280 read_ops_x1000=4000
+E7RESULT name=arm thr=2048 seed=1 total_bytes_per_file=107018 data_per_file=106542 meta_per_file=476 leaves=2906 inlined_pct_ppm=400610 read_ops_x1000=4000
+E7RESULT name=arm thr=2048 seed=2 total_bytes_per_file=108378 data_per_file=107907 meta_per_file=471 leaves=2879 inlined_pct_ppm=398730 read_ops_x1000=4000
+E7RESULT name=arm thr=2048 seed=3 total_bytes_per_file=107544 data_per_file=107074 meta_per_file=469 leaves=2867 inlined_pct_ppm=399210 read_ops_x1000=4000
+E7RESULT name=arm thr=2048 seed=4 total_bytes_per_file=109688 data_per_file=109219 meta_per_file=468 leaves=2861 inlined_pct_ppm=396820 read_ops_x1000=4000
+E7RESULT name=arm thr=2048 seed=5 total_bytes_per_file=107661 data_per_file=107191 meta_per_file=470 leaves=2872 inlined_pct_ppm=396670 read_ops_x1000=4000
+E7RESULT name=arm thr=3072 seed=1 total_bytes_per_file=106708 data_per_file=105717 meta_per_file=991 leaves=6053 inlined_pct_ppm=601990 read_ops_x1000=4000
+E7RESULT name=arm thr=3072 seed=2 total_bytes_per_file=108071 data_per_file=107087 meta_per_file=984 leaves=6006 inlined_pct_ppm=598840 read_ops_x1000=4000
+E7RESULT name=arm thr=3072 seed=3 total_bytes_per_file=107234 data_per_file=106249 meta_per_file=985 leaves=6012 inlined_pct_ppm=600680 read_ops_x1000=4000
+E7RESULT name=arm thr=3072 seed=4 total_bytes_per_file=109381 data_per_file=108400 meta_per_file=980 leaves=5987 inlined_pct_ppm=596740 read_ops_x1000=4000
+E7RESULT name=arm thr=3072 seed=5 total_bytes_per_file=107354 data_per_file=106373 meta_per_file=981 leaves=5990 inlined_pct_ppm=596370 read_ops_x1000=4000
+E7RESULT name=arm thr=3584 seed=1 total_bytes_per_file=106632 data_per_file=105307 meta_per_file=1324 leaves=8086 inlined_pct_ppm=702000 read_ops_x1000=4000
+E7RESULT name=arm thr=3584 seed=2 total_bytes_per_file=107994 data_per_file=106675 meta_per_file=1318 leaves=8050 inlined_pct_ppm=699370 read_ops_x1000=4000
+E7RESULT name=arm thr=3584 seed=3 total_bytes_per_file=107157 data_per_file=105840 meta_per_file=1317 leaves=8039 inlined_pct_ppm=700420 read_ops_x1000=4000
+E7RESULT name=arm thr=3584 seed=4 total_bytes_per_file=109303 data_per_file=107984 meta_per_file=1319 leaves=8051 inlined_pct_ppm=698360 read_ops_x1000=4000
+E7RESULT name=arm thr=3584 seed=5 total_bytes_per_file=107275 data_per_file=105953 meta_per_file=1322 leaves=8072 inlined_pct_ppm=698850 read_ops_x1000=4000
+E7RESULT name=arm thr=4096 seed=1 total_bytes_per_file=106606 data_per_file=104896 meta_per_file=1710 leaves=10442 inlined_pct_ppm=802490 read_ops_x1000=4000
+E7RESULT name=arm thr=4096 seed=2 total_bytes_per_file=107969 data_per_file=106263 meta_per_file=1705 leaves=10410 inlined_pct_ppm=800030 read_ops_x1000=4000
+E7RESULT name=arm thr=4096 seed=3 total_bytes_per_file=107132 data_per_file=105432 meta_per_file=1699 leaves=10374 inlined_pct_ppm=800030 read_ops_x1000=4000
+E7RESULT name=arm thr=4096 seed=4 total_bytes_per_file=109278 data_per_file=107576 meta_per_file=1701 leaves=10387 inlined_pct_ppm=798010 read_ops_x1000=4000
+E7RESULT name=arm thr=4096 seed=5 total_bytes_per_file=107249 data_per_file=105540 meta_per_file=1708 leaves=10430 inlined_pct_ppm=799550 read_ops_x1000=4000
+E7RESULT name=cached_read cache_mib=1 thr=0 reads_per_lookup_ppm=1836318 meta_working_set_bytes=6406144
+E7RESULT name=cached_read cache_mib=1 thr=256 reads_per_lookup_ppm=1801933 meta_working_set_bytes=7045120
+E7RESULT name=cached_read cache_mib=1 thr=512 reads_per_lookup_ppm=1783912 meta_working_set_bytes=8978432
+E7RESULT name=cached_read cache_mib=1 thr=1024 reads_per_lookup_ppm=1737900 meta_working_set_bytes=16662528
+E7RESULT name=cached_read cache_mib=1 thr=2048 reads_per_lookup_ppm=1577367 meta_working_set_bytes=47611904
+E7RESULT name=cached_read cache_mib=1 thr=3072 reads_per_lookup_ppm=1387437 meta_working_set_bytes=99172352
+E7RESULT name=cached_read cache_mib=1 thr=3584 reads_per_lookup_ppm=1290086 meta_working_set_bytes=132481024
+E7RESULT name=cached_read cache_mib=1 thr=4096 reads_per_lookup_ppm=1191381 meta_working_set_bytes=171081728
+E7RESULT name=cached_read cache_mib=4 thr=0 reads_per_lookup_ppm=1345269 meta_working_set_bytes=6406144
+E7RESULT name=cached_read cache_mib=4 thr=256 reads_per_lookup_ppm=1355422 meta_working_set_bytes=7045120
+E7RESULT name=cached_read cache_mib=4 thr=512 reads_per_lookup_ppm=1433547 meta_working_set_bytes=8978432
+E7RESULT name=cached_read cache_mib=4 thr=1024 reads_per_lookup_ppm=1549110 meta_working_set_bytes=16662528
+E7RESULT name=cached_read cache_mib=4 thr=2048 reads_per_lookup_ppm=1511297 meta_working_set_bytes=47611904
+E7RESULT name=cached_read cache_mib=4 thr=3072 reads_per_lookup_ppm=1355717 meta_working_set_bytes=99172352
+E7RESULT name=cached_read cache_mib=4 thr=3584 reads_per_lookup_ppm=1266341 meta_working_set_bytes=132481024
+E7RESULT name=cached_read cache_mib=4 thr=4096 reads_per_lookup_ppm=1172994 meta_working_set_bytes=171081728
+E7RESULT name=cached_read cache_mib=16 thr=0 reads_per_lookup_ppm=1000000 meta_working_set_bytes=6406144
+E7RESULT name=cached_read cache_mib=16 thr=256 reads_per_lookup_ppm=950770 meta_working_set_bytes=7045120
+E7RESULT name=cached_read cache_mib=16 thr=512 reads_per_lookup_ppm=900700 meta_working_set_bytes=8978432
+E7RESULT name=cached_read cache_mib=16 thr=1024 reads_per_lookup_ppm=800830 meta_working_set_bytes=16662528
+E7RESULT name=cached_read cache_mib=16 thr=2048 reads_per_lookup_ppm=1247016 meta_working_set_bytes=47611904
+E7RESULT name=cached_read cache_mib=16 thr=3072 reads_per_lookup_ppm=1228838 meta_working_set_bytes=99172352
+E7RESULT name=cached_read cache_mib=16 thr=3584 reads_per_lookup_ppm=1171362 meta_working_set_bytes=132481024
+E7RESULT name=cached_read cache_mib=16 thr=4096 reads_per_lookup_ppm=1099445 meta_working_set_bytes=171081728
+E7RESULT name=cached_read cache_mib=64 thr=0 reads_per_lookup_ppm=1000000 meta_working_set_bytes=6406144
+E7RESULT name=cached_read cache_mib=64 thr=256 reads_per_lookup_ppm=950770 meta_working_set_bytes=7045120
+E7RESULT name=cached_read cache_mib=64 thr=512 reads_per_lookup_ppm=900700 meta_working_set_bytes=8978432
+E7RESULT name=cached_read cache_mib=64 thr=1024 reads_per_lookup_ppm=800830 meta_working_set_bytes=16662528
+E7RESULT name=cached_read cache_mib=64 thr=2048 reads_per_lookup_ppm=599390 meta_working_set_bytes=47611904
+E7RESULT name=cached_read cache_mib=64 thr=3072 reads_per_lookup_ppm=721321 meta_working_set_bytes=99172352
+E7RESULT name=cached_read cache_mib=64 thr=3584 reads_per_lookup_ppm=791446 meta_working_set_bytes=132481024
+E7RESULT name=cached_read cache_mib=64 thr=4096 reads_per_lookup_ppm=805248 meta_working_set_bytes=171081728
+E7RESULT name=cached_read cache_mib=256 thr=0 reads_per_lookup_ppm=1000000 meta_working_set_bytes=6406144
+E7RESULT name=cached_read cache_mib=256 thr=256 reads_per_lookup_ppm=950770 meta_working_set_bytes=7045120
+E7RESULT name=cached_read cache_mib=256 thr=512 reads_per_lookup_ppm=900700 meta_working_set_bytes=8978432
+E7RESULT name=cached_read cache_mib=256 thr=1024 reads_per_lookup_ppm=800830 meta_working_set_bytes=16662528
+E7RESULT name=cached_read cache_mib=256 thr=2048 reads_per_lookup_ppm=599390 meta_working_set_bytes=47611904
+E7RESULT name=cached_read cache_mib=256 thr=3072 reads_per_lookup_ppm=398010 meta_working_set_bytes=99172352
+E7RESULT name=cached_read cache_mib=256 thr=3584 reads_per_lookup_ppm=298000 meta_working_set_bytes=132481024
+E7RESULT name=cached_read cache_mib=256 thr=4096 reads_per_lookup_ppm=197510 meta_working_set_bytes=171081728
+E7RESULT name=negative_control_huge thr=0 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=256 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=512 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=1024 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=2048 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=3072 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=3584 data=1048576 rec=64
+E7RESULT name=negative_control_huge thr=4096 data=1048576 rec=64
+E7RESULT name=done emitted=90

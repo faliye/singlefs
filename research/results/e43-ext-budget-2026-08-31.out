@@ -93,12 +93,12 @@ E7RESULT name=geom carrier=data_only node=65536 n=512 fanout=1636 height=3 heigh
 E7RESULT name=geom_threshold carrier=data_only node=65536 height_grows_at=never
 E7RESULT name=bounds n_min_bare=7 n_min_quota=9 n_min_with_csum=11 n_min_full=13 len_field_max_bytes=65535 len2_covers_128k=0 n_max_counted_zfs=19 raid_cheaper_than_zfs_at_zero=0 n_max_payload_4k=4040 n_max_payload_128k=131016 n_max_node_2k=1944 n_max_node_64k=65432 btrfs_half_holds_at_zero=0 n_max_geom_all_units=864 n_max_geom_data_only=unbounded
 E7RESULT name=interval counted_lo=9 counted_hi=19 counted_contains_128=0 uncounted_lo=9 uncounted_hi=864 uncounted_contains_128=1
-E7RESULT name=self_witness kind=journal_record hdr=86 atomic=512 room=426 slots_per_atomic=NA
-E7RESULT name=self_witness kind=journal_record hdr=86 atomic=4096 room=4010 slots_per_atomic=NA
+E7RESULT name=self_witness kind=journal_record hdr=78 atomic=512 room=434 slots_per_atomic=NA
+E7RESULT name=self_witness kind=journal_record hdr=78 atomic=4096 room=4018 slots_per_atomic=NA
 E7RESULT name=self_witness kind=root_slot slot=256 atomic=512 room_upper=255 slots_per_atomic=2
 E7RESULT name=self_witness kind=root_slot slot=256 atomic=4096 room_upper=255 slots_per_atomic=16
 E7RESULT name=poscontrol_slot slot=512 atomic=512 slots_per_atomic=1 slot=256_atomic=512_slots=2
-E7RESULT name=self_witness_bound n_max_journal_512=426 n_max_root_slot_256=255 n_max_if_self_witness_carries=255
+E7RESULT name=self_witness_bound n_max_journal_512=434 n_max_root_slot_256=255 n_max_if_self_witness_carries=255
 E7RESULT name=mount_eval atomic=512 slot=256 n=0 unit=4096 node=4096 verdict=reject_slot_shares_atomic
 E7RESULT name=mount_eval atomic=512 slot=256 n=128 unit=4096 node=4096 verdict=reject_slot_shares_atomic
 E7RESULT name=mount_eval atomic=512 slot=256 n=512 unit=4096 node=4096 verdict=reject_slot_shares_atomic

@@ -96,8 +96,10 @@ if [[ -n "$inv_claim" && "$inv_claim" != "$inv_live" ]]; then
 else
   ok "不变量条数一致：在用 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
 fi
-chk_actual=$(grep -cE '^\| C[0-9]+ ' "$KB/checks-owed.md")
-ok "欠检查 $chk_actual 条（checks-owed.md）"
+# 历史版本里的「已还清」表也是 `| C<n> |` 行 —— 一起数会把还清的算进欠账里。
+chk_actual=$(sed '/^## 历史版本/,$d' "$KB/checks-owed.md" | grep -cE '^\| C[0-9]+ ')
+chk_done=$(sed -n '/^## 历史版本/,$p' "$KB/checks-owed.md" | grep -cE '^\| C[0-9]+ ')
+ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
 
 echo
 if [[ $fail -ne 0 ]]; then

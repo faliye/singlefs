@@ -1,4 +1,4 @@
-//! E63：校验和粒度的写侧代价 —— D4 已定项 2（补齐）与已定项 3（读—改—写）付多少。
+//! E65：校验和粒度的写侧代价 —— D4 已定项 2（补齐）与已定项 3（读—改—写）付多少。
 //!
 //! E58 三条臂全是读臂，写侧零覆盖。D4 已定项 3 定了「凑不满一个单元的写走读—改—写」，
 //! 而 RMW 的代价一个数都没有。本实验补写侧。
@@ -160,7 +160,7 @@ fn fill(path: &str, region: u64) {
 
 fn main() {
     let path = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("用法：e63-write-grain <块设备或文件> [种子] [ops] [区域 MiB]");
+        eprintln!("用法：e65-write-grain <块设备或文件> [种子] [ops] [区域 MiB]");
         std::process::exit(2)
     });
     let seed: u64 = std::env::args().nth(2).and_then(|x| x.parse().ok()).unwrap_or(0x6161_1234);

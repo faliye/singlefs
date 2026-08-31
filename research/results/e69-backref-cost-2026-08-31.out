@@ -1,0 +1,14 @@
+E7RESULT name=config units_per_txn=8 note=甲只在提交时碰本事务的单元_乙全盘扫描
+E7RESULT name=arm_cost case=none_small units=10000 closed_form_shared_refs=0 jia_entries=0 jia_units_read_on_commit=0 jia_entries_per_txn=0.0000 yi_units_read_on_rebuild=10000 maps_identical=true
+E7RESULT name=arm_cost case=none_big units=100000 closed_form_shared_refs=0 jia_entries=0 jia_units_read_on_commit=0 jia_entries_per_txn=0.0000 yi_units_read_on_rebuild=100000 maps_identical=true
+E7RESULT name=arm_cost case=shared_small units=10000 closed_form_shared_refs=2500 jia_entries=2500 jia_units_read_on_commit=0 jia_entries_per_txn=2.0000 yi_units_read_on_rebuild=10000 maps_identical=true
+E7RESULT name=arm_cost case=shared_big units=100000 closed_form_shared_refs=25000 jia_entries=25000 jia_units_read_on_commit=0 jia_entries_per_txn=2.0000 yi_units_read_on_rebuild=100000 maps_identical=true
+E7RESULT name=scale_invariance jia_per_txn_small=2.0000 jia_per_txn_big=2.0000 equal=true yi_read_small=10000 yi_read_big=100000 ratio=10.00
+E7RESULT name=density_sweep pct=0 shared_refs=0 jia_entries=0 jia_per_txn=0.0000 predicted_per_txn=0.0000 matches=true yi_units_read=100000 yi_read_per_shared_ref=inf
+E7RESULT name=density_sweep pct=1 shared_refs=1000 jia_entries=1000 jia_per_txn=0.0800 predicted_per_txn=0.0800 matches=true yi_units_read=100000 yi_read_per_shared_ref=100.00
+E7RESULT name=density_sweep pct=5 shared_refs=5000 jia_entries=5000 jia_per_txn=0.4000 predicted_per_txn=0.4000 matches=true yi_units_read=100000 yi_read_per_shared_ref=20.00
+E7RESULT name=density_sweep pct=10 shared_refs=10000 jia_entries=10000 jia_per_txn=0.8000 predicted_per_txn=0.8000 matches=true yi_units_read=100000 yi_read_per_shared_ref=10.00
+E7RESULT name=density_sweep pct=25 shared_refs=25000 jia_entries=25000 jia_per_txn=2.0000 predicted_per_txn=2.0000 matches=true yi_units_read=100000 yi_read_per_shared_ref=4.00
+E7RESULT name=density_sweep pct=50 shared_refs=50000 jia_entries=50000 jia_per_txn=4.0000 predicted_per_txn=4.0000 matches=true yi_units_read=100000 yi_read_per_shared_ref=2.00
+E7RESULT name=density_sweep pct=100 shared_refs=100000 jia_entries=100000 jia_per_txn=8.0000 predicted_per_txn=8.0000 matches=true yi_units_read=100000 yi_read_per_shared_ref=1.00
+E7RESULT name=done emitted=14

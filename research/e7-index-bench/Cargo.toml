@@ -98,8 +98,8 @@ name = "e60-rebalance"
 path = "src/bin/e60_rebalance.rs"
 
 [[bin]]
-name = "e63-write-grain"
-path = "src/bin/e63_write_grain.rs"
+name = "e65-write-grain"
+path = "src/bin/e65_write_grain.rs"
 
 [[bin]]
 name = "e62-ring-home"
@@ -112,3 +112,23 @@ path = "src/bin/e61_chain_hash.rs"
 [[bin]]
 name = "e63-width-rule"
 path = "src/bin/e63_width_rule.rs"
+
+[[bin]]
+name = "e66-small-files"
+path = "src/bin/e66_small_files.rs"
+
+[[bin]]
+name = "e67-device-subset"
+path = "src/bin/e67_device_subset.rs"
+
+[[bin]]
+name = "e68-inline-threshold"
+path = "src/bin/e68_inline_threshold.rs"
+
+[[bin]]
+name = "e69-backref-cost"
+path = "src/bin/e69_backref_cost.rs"
+
+[[bin]]
+name = "e70-ckpt-thresholds"
+path = "src/bin/e70_ckpt_thresholds.rs"

@@ -1,0 +1,52 @@
+E7RESULT name=config devs=8 width=4 objects=512 stripes_per_obj=8 pairs=28 model=counting file_ops=0
+E7RESULT name=arm seed=1 pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=1 pick=yi_round_robin intact_ppm=142857 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=1 pick=bing_emptiest intact_ppm=571428 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=1 pick=ding_random intact_ppm=141322 lost_ppm=107142 dev_spread=95 max_used=2098
+E7RESULT name=arm seed=1 pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=1 pick=ji_pinned_preferred intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=2 pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=2 pick=yi_round_robin intact_ppm=142857 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=2 pick=bing_emptiest intact_ppm=571428 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=2 pick=ding_random intact_ppm=148437 lost_ppm=107142 dev_spread=99 max_used=2086
+E7RESULT name=arm seed=2 pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=2 pick=ji_pinned_preferred intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=3 pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=3 pick=yi_round_robin intact_ppm=142857 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=3 pick=bing_emptiest intact_ppm=571428 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=3 pick=ding_random intact_ppm=145995 lost_ppm=107142 dev_spread=51 max_used=2075
+E7RESULT name=arm seed=3 pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=3 pick=ji_pinned_preferred intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=4 pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=4 pick=yi_round_robin intact_ppm=142857 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=4 pick=bing_emptiest intact_ppm=571428 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=4 pick=ding_random intact_ppm=146623 lost_ppm=107142 dev_spread=101 max_used=2098
+E7RESULT name=arm seed=4 pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=4 pick=ji_pinned_preferred intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=5 pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=5 pick=yi_round_robin intact_ppm=142857 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=5 pick=bing_emptiest intact_ppm=571428 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=5 pick=ding_random intact_ppm=143833 lost_ppm=107142 dev_spread=56 max_used=2078
+E7RESULT name=arm seed=5 pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=arm seed=5 pick=ji_pinned_preferred intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=2048
+E7RESULT name=skewed pick=jia_object_pinned intact_ppm=785714 lost_ppm=107142 dev_spread=2016 max_used=2272 spread_pct_ppm=887323
+E7RESULT name=skewed pick=yi_round_robin intact_ppm=745535 lost_ppm=107142 dev_spread=480 max_used=1504 spread_pct_ppm=319148
+E7RESULT name=skewed pick=bing_emptiest intact_ppm=772321 lost_ppm=107142 dev_spread=0 max_used=1264 spread_pct_ppm=0
+E7RESULT name=skewed pick=ding_random intact_ppm=736606 lost_ppm=107142 dev_spread=84 max_used=1307 spread_pct_ppm=64269
+E7RESULT name=skewed pick=wu_pinned_by_emptiest intact_ppm=785714 lost_ppm=107142 dev_spread=0 max_used=1264 spread_pct_ppm=0
+E7RESULT name=skewed pick=ji_pinned_preferred intact_ppm=783621 lost_ppm=107142 dev_spread=0 max_used=1264 spread_pct_ppm=0
+E7RESULT name=heterogeneous pick=jia_object_pinned wrote_to_full_dev=2012 max_used=2048 caps_exceeded=4
+E7RESULT name=heterogeneous pick=yi_round_robin wrote_to_full_dev=2009 max_used=2048 caps_exceeded=4
+E7RESULT name=heterogeneous pick=bing_emptiest wrote_to_full_dev=1148 max_used=2048 caps_exceeded=4
+E7RESULT name=heterogeneous pick=ding_random wrote_to_full_dev=2277 max_used=2098 caps_exceeded=4
+E7RESULT name=heterogeneous pick=wu_pinned_by_emptiest wrote_to_full_dev=1148 max_used=2048 caps_exceeded=4
+E7RESULT name=heterogeneous pick=ji_pinned_preferred wrote_to_full_dev=1148 max_used=2048 caps_exceeded=4
+E7RESULT name=add_device rebalance=whole_object intact_ppm=833333 moved_cells=1824
+E7RESULT name=add_device rebalance=per_stripe intact_ppm=750000 moved_cells=1820
+E7RESULT name=positive_control_full_width pick=jia_object_pinned intact_ppm=0 lost_ppm=250000
+E7RESULT name=positive_control_full_width pick=yi_round_robin intact_ppm=0 lost_ppm=250000
+E7RESULT name=positive_control_full_width pick=bing_emptiest intact_ppm=0 lost_ppm=250000
+E7RESULT name=positive_control_full_width pick=ding_random intact_ppm=0 lost_ppm=250000
+E7RESULT name=positive_control_full_width pick=wu_pinned_by_emptiest intact_ppm=0 lost_ppm=250000
+E7RESULT name=positive_control_full_width pick=ji_pinned_preferred intact_ppm=0 lost_ppm=250000
+E7RESULT name=done emitted=52
