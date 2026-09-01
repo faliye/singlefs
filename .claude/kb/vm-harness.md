@@ -31,10 +31,17 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
 
 | 前置 | 怎么查 | 不满足怎么办 |
 |---|---|---|
-| **KVM 可读写** | `ls -l /dev/kvm` 加 `getfacl -p /dev/kvm` | 本机靠 **ACL**（`user:fy5090:rw-`）拿到权限，**不在 `kvm` 组也能用**。查组会得出错误结论 |
+| **KVM 可读写** | `id -nG \| grep -w kvm`，再实测 `[ -r /dev/kvm ] && [ -w /dev/kvm ]` | 本机靠 **`kvm` 组成员身份**拿权限。不满足就 `sudo usermod -aG kvm $USER`（口令在 `.env` 的 `SUDO_PASS_A`）；当前 shell 用 `sg kvm -c '<命令>'` 立即取得，新会话自动带上 |
 | **内核镜像可读** | `bash scripts/vm-kernel.sh --check` | 跑 `bash scripts/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown |
 | **二进制是静态的** | `file <二进制>` | 用 `--target x86_64-unknown-linux-musl` 编。musl 目标已装（`rustup target list --installed`） |
 
+⚠️ **判断 KVM 前置一律查组并实测读写，不许查 ACL，也不许用 `setfacl` 去补。**
+`/dev/kvm` 带 `TAG+="uaccess"`（`/usr/lib/udev/rules.d/70-uaccess.rules:48`），
+它的 ACL 由 logind 按**本地 seat 会话**发放；SSH 会话没有 seat ⇒ 拿不到，
+而手工 `setfacl` 上去的那条会在下一次会话变化时被清掉——**设上去时 `getfacl` 看着是对的**。
+**实测到的失败形态是最坏的那种**（2026-09-01）：`qemu.sh --selftest` 要跑两次虚机，
+第一次拿得到 KVM、第二次拿不到，于是输出成「成功用例 → 0、失败用例 → 读不到退出标记」，
+**看起来像 harness 分辨不出失败，实际是权限在两次启动之间没了**。
 ⚠️ **本机 `/boot` 下只有一个可读内核：`vmlinuz-6.17.0-lockdep`**（其余是 `-rw-------`）。
 **它带 lockdep**，锁校验开销很大 ⇒ **虚机里量到的时间不可与宿主比**，
 但**计数类指标（I/O 次数、块数）不受影响**。引用虚机跑出来的时间数必须带这一句。

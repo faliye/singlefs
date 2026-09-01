@@ -14,7 +14,7 @@
 //!   `(单元类型标签, 树 ID, 对象 ID, 对象出生代, 锚点偏移)`。**禁放清单**：物理落点 /
 //!   设备 ID、文件名 / 分隔 key。
 //!   ⇒ 头里**没有**「这一次写是第几次写」——`对象出生代` 是对象的出生代，不是本次写的序号。
-//! - D18 未定项 1：谱系重写序号「要不要做、宽度多少」**未定**。
+//! - D18 已定项 1：谱系重写序号「要不要做、宽度多少」**未定**。
 //! - D20：单元自包含 =「我是谁、我属于谁、我是第几代」。
 //! - D21（权威态与派生态的分界）（2026-08-28 用户定案）：权威态 = 单元 + 记账 + 根；索引是派生态。
 //! - D8 已定项 1（2026-08-29 用户定案）：条目形态取**幂等完整值**（含 tombstone），不是增量 Δ。
@@ -62,7 +62,7 @@ const D11_EPS_BP: usize = 6500;
 #[cfg(test)] const NODE_HDR_BYTES: usize = 16;
 
 /// 单元的自描述头。字段集逐字取 D18 已定项 3 的那五个。
-/// `seq` 是 D18 未定项 1 的谱系重写序号——**未定**，所以它是臂的变量，不是既有事实。
+/// `seq` 是 D18 已定项 1 的谱系重写序号——**未定**，所以它是臂的变量，不是既有事实。
 /// `tomb` 是「删除也写一个单元」这条候选，同样未定。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Hdr {
@@ -103,7 +103,7 @@ struct State {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Arm {
-    /// 头里带谱系重写序号（D18 未定项 1）
+    /// 头里带谱系重写序号（D18 已定项 1）
     seq: bool,
     /// 删除也写一个墓碑单元
     tomb_unit: bool,
@@ -123,7 +123,7 @@ impl Arm {
     fn jia() -> Self { Arm { seq: false, tomb_unit: false, use_acct: false, stale_visible: true, no_hdr: false, reuse_alloc: false } }
     /// 乙：单元 + 记账（D21 已定记账也是权威态，它没跟着索引一起丢）
     fn yi() -> Self { Arm { use_acct: true, ..Arm::jia() } }
-    /// 丙：单元 + 谱系重写序号（D18 未定项 1 的候选）
+    /// 丙：单元 + 谱系重写序号（D18 已定项 1 的候选）
     fn bing() -> Self { Arm { seq: true, ..Arm::jia() } }
     /// 丁：序号 + 显式墓碑单元。**全对照：这一臂必须四类全 0，否则整轮作废。**
     fn ding() -> Self { Arm { seq: true, tomb_unit: true, ..Arm::jia() } }

@@ -49,9 +49,30 @@ for f in "$DEC"/*.md; do
     # ⚠️ **要看整个条目块的最新改动，不是首行。**
     # 复核通常写在条目下面，首行的 blame 时间不动——只看首行会让
     # 复核过的条目永远红着，检查退化成噪声（实测踩过）。
-    end=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}' "$f")
-    [[ -n "$end" ]] || end=$((ln+20))
-    it=$(git log -1 --format=%ct -L "$ln,$end:$f" 2>/dev/null | head -1)
+    # ⚠️ **行号必须先映射回 HEAD 的版本，不能直接拿工作区的行号喂 `git log -L`。**
+    # `-L` 的行范围是按**历史里的文件**解释的：工作区一旦有未提交改动，
+    # 上方插几行就让整段偏移，`-L` 去历史里看的是另一段内容（实测：工作区 140 行、
+    # HEAD 131 行，140 在 HEAD 里是空行）⇒ 取不到时间戳 ⇒ **把复核过的条目报成陈旧**。
+    # 这是假红，而假红压倒真红的检查等于没有检查
+    # （`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
+    # 判别力：改前在「工作区有未提交改动且条目上方插过行」时必红，改后转绿。
+    hln=$(git show "HEAD:$f" 2>/dev/null | grep -nxF "$text" | head -1 | cut -d: -f1)
+    if [[ -z "$hln" ]]; then
+      # HEAD 里找不到这一行 = 本条目是新加的或刚改过 ⇒ 它比任何决策都新，无从陈旧
+      continue
+    fi
+    end=$(git show "HEAD:$f" 2>/dev/null | awk -v s="$hln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}')
+    [[ -n "$end" ]] || end=$((hln+20))
+    # ⚠️ **未提交的复核也算复核。** 只看提交历史时，刚写下的复核看不见，
+    # 条目会一直红到提交为止——而复核恰恰是这道闸要的那个动作。
+    # ⇒ 条目块在工作区与 HEAD 之间有任何差异，就说明它刚被动过，不算陈旧。
+    wend=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}' "$f")
+    [[ -n "$wend" ]] || wend=$((ln+20))
+    if ! diff -q <(sed -n "${ln},${wend}p" "$f") \
+                 <(git show "HEAD:$f" 2>/dev/null | sed -n "${hln},${end}p") >/dev/null 2>&1; then
+      continue
+    fi
+    it=$(git log -1 --format=%ct -L "$hln,$end:$f" 2>/dev/null | head -1)
     [[ -n "$it" ]] || continue
     # 它点名的其它决策
     for d in $(grep -oE 'D[0-9]+' <<<"$text" | sort -u); do
