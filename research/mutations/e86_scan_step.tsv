@@ -1,0 +1,6 @@
+M1_扫描把内部探针也当头	Slot::DataTail => interior += 1,	Slot::DataTail => { interior += 1; data += 1; }
+M2_数据单元不再32K对齐	let base = (rng.below((SLOTS / 2) as u64) * 2) as usize;\n            if disk[base] == Slot::Free && disk[base + 1] == Slot::Free {\n                disk[base] = Slot::DataStart;	let base = (rng.below((SLOTS - 1) as u64)) as usize;\n            if disk[base] == Slot::Free && disk[base + 1] == Slot::Free {\n                disk[base] = Slot::DataStart;
+M3_独占槽对政策失效	if arm.pad_nodes() {	if false {
+M4_census漏数奇槽	if i % 2 == 1 {\n                    odd_nodes += 1;\n                }	if i % 2 == 3 {\n                    odd_nodes += 1;\n                }
+M5_步进写反	ArmId::Step16kAny => 1,	ArmId::Step16kAny => 2,
+M6_种子折叠回seed|1	let mut s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA076_1D64_78BD_642F);	let mut s = seed | 1;

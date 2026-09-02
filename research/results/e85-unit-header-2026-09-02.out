@@ -1,0 +1,6 @@
+E7RESULT name=config model=matrix file_ops=0
+E7RESULT name=set set=set_a_settled bytes=35 pct_16k=0.21 pct_32k=0.11 covered=I-1.3_tree_id,I-2.3_padding_zero,D18_3_scan_rebuild missing=I-1.1_self_laddr,I-1.2_block_birth,I-1.4_fsid,scrub_watermark,header_self_integrity,C74_mount_fsid_check,scanner_magic_probe
+E7RESULT name=set set=set_b_repair bytes=71 pct_16k=0.43 pct_32k=0.22 covered=I-1.2_block_birth,I-1.3_tree_id,I-1.4_fsid,I-2.3_padding_zero,D18_3_scan_rebuild,scrub_watermark,header_self_integrity,C74_mount_fsid_check,scanner_magic_probe missing=I-1.1_self_laddr
+E7RESULT name=set set=set_c_whitelist bytes=30 pct_16k=0.18 pct_32k=0.09 covered=I-2.3_padding_zero,scanner_magic_probe missing=I-1.1_self_laddr,I-1.2_block_birth,I-1.3_tree_id,I-1.4_fsid,D18_3_scan_rebuild,scrub_watermark,header_self_integrity,C74_mount_fsid_check
+E7RESULT name=whitelist_conflict fields=unit_type,tree_id,obj_id,obj_birth,anchor_off,fsid,block_birth,hdr_csum
+E7RESULT name=done emitted=6

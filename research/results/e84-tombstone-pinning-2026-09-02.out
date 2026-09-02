@@ -1,0 +1,10 @@
+E7RESULT name=config cap=584 snap_every=10 k_snap=8 pubs=4000 model=counting file_ops=0
+E7RESULT name=pinning arm=append_order per_cohort=10 total=4000 reclaimed=3504 stuck=416 live=80 units_alive=1 stuck_pct_of_resident=83.9
+E7RESULT name=pinning arm=cohort_bound per_cohort=10 total=4000 reclaimed=3920 stuck=0 live=80 units_alive=8 stuck_pct_of_resident=0.0
+E7RESULT name=pinning arm=append_order per_cohort=60 total=24000 reclaimed=23360 stuck=160 live=480 units_alive=2 stuck_pct_of_resident=25.0
+E7RESULT name=pinning arm=cohort_bound per_cohort=60 total=24000 reclaimed=23520 stuck=0 live=480 units_alive=8 stuck_pct_of_resident=0.0
+E7RESULT name=pinning arm=append_order per_cohort=600 total=240000 reclaimed=234768 stuck=432 live=4800 units_alive=9 stuck_pct_of_resident=8.3
+E7RESULT name=pinning arm=cohort_bound per_cohort=600 total=240000 reclaimed=235200 stuck=0 live=4800 units_alive=16 stuck_pct_of_resident=0.0
+E7RESULT name=pinning arm=append_order per_cohort=6000 total=2400000 reclaimed=2351768 stuck=232 live=48000 units_alive=83 stuck_pct_of_resident=0.5
+E7RESULT name=pinning arm=cohort_bound per_cohort=6000 total=2400000 reclaimed=2352000 stuck=0 live=48000 units_alive=88 stuck_pct_of_resident=0.0
+E7RESULT name=done emitted=10

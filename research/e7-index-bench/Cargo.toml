@@ -184,3 +184,19 @@ path = "src/bin/e82_admission_overlay.rs"
 [[bin]]
 name = "e83-tombstone-grain"
 path = "src/bin/e83_tombstone_grain.rs"
+
+[[bin]]
+name = "e84-tombstone-pinning"
+path = "src/bin/e84_tombstone_pinning.rs"
+
+[[bin]]
+name = "e86-scan-step"
+path = "src/bin/e86_scan_step.rs"
+
+[[bin]]
+name = "e85-unit-header"
+path = "src/bin/e85_unit_header.rs"
+
+[[bin]]
+name = "e87-fixed-placement"
+path = "src/bin/e87_fixed_placement.rs"

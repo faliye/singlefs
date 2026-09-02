@@ -1,0 +1,5 @@
+M1_单份超级块掉盘0也算可挂	SbArm::Single => dead_dev != 0,	SbArm::Single => true,
+M2_种子退化成只有区域0	if cand == 0 {\n            return back; // 第 0 代在全部区域都有种子 ⇒ 任何盘上都找得到\n        }	if cand == 0 {\n            return if dead_dev == 0 { u64::MAX } else { back };\n        }
+M3_区域指派全落一盘	r % DEVS	0
+M4_镜像journal也丢窗口	JArm::Mirror => false,	JArm::Mirror => dead_dev == 0,
+M5_轮转键写成隔代	(g % R as u64) as usize	((g / 2) % R as u64) as usize

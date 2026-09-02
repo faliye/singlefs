@@ -1,0 +1,7 @@
+M1_没封的单元也回收	if !u.cohorts.is_empty() && u.sealed && u.cohorts.iter().all(|&c| c <= dead_upto) {	if !u.cohorts.is_empty() && u.cohorts.iter().all(|&c| c <= dead_upto) {
+M2_只要有一条死就整单元回收	u.cohorts.iter().all(|&c| c <= dead_upto)	u.cohorts.iter().any(|&c| c <= dead_upto)
+M3_代际边界不再关单元	if arm == Arm::CohortBound {\n                sim.seal_open();\n            }	if false {\n                sim.seal_open();\n            }
+M4_审计把死算成活	if c <= dead_upto {\n                    stuck += 1; // 可回收却还躺在活单元里\n                } else {\n                    live += 1;\n                }	if c <= dead_upto {\n                    live += 1;\n                } else {\n                    stuck += 1;\n                }
+M5_回收计数器漏计	self.reclaimed_records += u.cohorts.len() as u64;\n                u.cohorts.clear();	u.cohorts.clear();
+M6_保留窗算错一格	dead_upto = cohort - k_snap;	dead_upto = cohort - k_snap + 1;
+M7_单元塞满不封	if self.units[idx].cohorts.len() == self.cap {\n            self.units[idx].sealed = true;\n            self.open = None;\n        }	if self.units[idx].cohorts.len() == self.cap {\n            self.open = None;\n        }

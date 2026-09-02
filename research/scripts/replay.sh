@@ -68,6 +68,10 @@ E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
 E83|e83-tombstone-grain||e83-tombstone-grain-2026-09-02.out|exact
+E84|e84-tombstone-pinning||e84-tombstone-pinning-2026-09-02.out|exact
+E85|e85-unit-header||e85-unit-header-2026-09-02.out|exact
+E86|e86-scan-step||e86-scan-step-2026-09-02.out|exact
+E87|e87-fixed-placement||e87-fixed-placement-2026-09-02.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact

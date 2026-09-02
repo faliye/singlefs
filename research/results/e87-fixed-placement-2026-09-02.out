@@ -1,0 +1,10 @@
+E7RESULT name=config devs=2 ring_regions=3 region_dev_map=0:0,1:1,2:0 model=arithmetic file_ops=0
+E7RESULT name=cell sb=single journal=single dead_dev=0 mountable=0 worst_root_fallback=2 replay_window_lost=1 journal_writes_per_record=1
+E7RESULT name=cell sb=single journal=single dead_dev=1 mountable=1 worst_root_fallback=1 replay_window_lost=0 journal_writes_per_record=1
+E7RESULT name=cell sb=single journal=mirror dead_dev=0 mountable=0 worst_root_fallback=2 replay_window_lost=0 journal_writes_per_record=2
+E7RESULT name=cell sb=single journal=mirror dead_dev=1 mountable=1 worst_root_fallback=1 replay_window_lost=0 journal_writes_per_record=2
+E7RESULT name=cell sb=per_dev journal=single dead_dev=0 mountable=1 worst_root_fallback=2 replay_window_lost=1 journal_writes_per_record=1
+E7RESULT name=cell sb=per_dev journal=single dead_dev=1 mountable=1 worst_root_fallback=1 replay_window_lost=0 journal_writes_per_record=1
+E7RESULT name=cell sb=per_dev journal=mirror dead_dev=0 mountable=1 worst_root_fallback=2 replay_window_lost=0 journal_writes_per_record=2
+E7RESULT name=cell sb=per_dev journal=mirror dead_dev=1 mountable=1 worst_root_fallback=1 replay_window_lost=0 journal_writes_per_record=2
+E7RESULT name=done emitted=10
