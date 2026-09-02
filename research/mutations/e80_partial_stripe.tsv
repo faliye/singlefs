@@ -1,0 +1,11 @@
+M1_丢失判定把复用格也当原始字节	Cell::FreedIntact(x) => x == *sid, // 字节还在，能参与重建	Cell::FreedIntact(_) | Cell::Reused => true,
+M2_pin臂条带没死透就回收	let dead = s.live_count == 0;	let dead = true;
+M3_修复忘了搬幸存者	if survivors.is_empty() {\n            return;\n        }	if true {\n            return;\n        }
+M4_parity列可以与数据列同盘	let pd = devs[w - 1];\n        let pidx = self.take_cell(pd);\n        self.cells[pd][pidx] = Cell::Parity(sid);	let pd = devs[0];\n        let pidx = self.take_cell(pd);\n        self.cells[pd][pidx] = Cell::Parity(sid);
+M5_守恒计数漏掉钉住格	Cell::FreedIntact(_) => freed_intact += 1,	Cell::FreedIntact(_) => {}
+M6_free_now不再把释放格进池	Arm::FreeNow => {\n                // 原始字节还在，但空间立刻可复用。\n                self.cells[d][i] = Cell::FreedIntact(sid);\n                self.free_pool.push((d, i));	Arm::FreeNow => {\n                self.cells[d][i] = Cell::FreedIntact(sid);
+M7_种子折叠回seed|1	let mut s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA076_1D64_78BD_642F);	let mut s = seed | 1;
+M8_额外写不再计数	self.extra_writes += self.total_writes - before;	let _ = before;
+M9_惰性预算归零永不修	for _ in 0..REPAIR_BUDGET {	for _ in 0..0 {
+M10_惰性释放直接进池不钉住	// 钉住，等后台修——不进池。\n                self.cells[d][i] = Cell::FreedIntact(sid);	// 钉住，等后台修——不进池。\n                self.cells[d][i] = Cell::FreedIntact(sid);\n                self.free_pool.push((d, i));
+M11_skew没接上	let o = if skew && rng.below(10) < 8 {	let o = if false {

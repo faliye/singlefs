@@ -1,0 +1,6 @@
+M1_overlay不再扣在飞	let visible = if overlay { published_free - inflight.min(published_free) } else { published_free };	let visible = published_free;
+M2_超卖计数器不计	let got = r.min(truly_free);\n            truly_free -= got;\n            t.oversold_units += r - got;	let got = r.min(truly_free);\n            truly_free -= got;
+M3_过早复用少算	let from_free = r_b.min(after_a);\n        t.premature_reuse = r_b - from_free;	let from_free = r_b;\n        t.premature_reuse = r_b - from_free;
+M4_墓碑预留白留不给删除用	let free_at_full = cap - n * per_obj + if reserve { n } else { 0 };	let free_at_full = cap - n * per_obj;
+M5_credit臂正确形态也发信用	let visible_b = if credit { after_a + a_frees } else { after_a };	let visible_b = after_a + a_frees;
+M6_忘预留时对象数也按2格算	let per_obj = if reserve { 2 } else { 1 };	let per_obj = 2;

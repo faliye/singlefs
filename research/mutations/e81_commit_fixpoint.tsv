@@ -1,0 +1,8 @@
+M1_固定点只跑一轮链被吞掉	while rounds < ROUNDS_CAP {	while rounds < 1 {
+M2_祖先层不脏	for level in dirty.iter_mut() {\n                if !level[id as usize] {	for level in dirty.iter_mut().take(1) {\n                if !level[id as usize] {
+M3_clustered偷偷用随机落点	Arm::Clustered => {\n                bump += 1;\n                bump - 1\n            }	Arm::Clustered => rng.below(geo.total_keys()),
+M4_scattered偷偷聚簇	Arm::Scattered => rng.below(geo.total_keys()),\n                }\n            })	Arm::Scattered => {\n                        bump += 1;\n                        bump - 1\n                    }\n                }\n            })
+M5_守恒计数器漏记链上的分配	.map(|_| {\n                blocks_allocated += 1;	.map(|_| {
+M6_种子折叠回seed|1	let mut s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA076_1D64_78BD_642F);	let mut s = seed | 1;
+M7_树脏节点计数翻倍	tree_dirty += newly;	tree_dirty += newly * 2;
+M8_记账节点不进起步集	for _ in 0..acc {	for _ in 0..0 {

@@ -1,0 +1,8 @@
+M1_条目数不按落点算	    (cap_bytes / grain) * fill_pct / 100	    cap_bytes / grain
+M2_填充率没生效	* fill_pct / 100	* 100 / 100
+M3_打散和连续算成一样	        Locality::Scattered => n.min(leaves_total).max(1),	        Locality::Scattered => n.div_ceil(f).max(1),
+M4_内部节点层没算	        interior += leaves.min(level_nodes);	        interior += 0;
+M5_COW按条目计费而不是按整节点	    nodes * NODE_BYTES	    nodes * ENTRY_BYTES
+M6_扇出少扣一次头	    (node - header) / entry	    node / entry
+M7_落点粒度写错	const DATA_UNIT_BYTES: u64 = 32768;	const DATA_UNIT_BYTES: u64 = 65536;
+M8_条目宽度漏掉value	const ENTRY_BYTES: u64 = KEY_DEV + KEY_OFFSET + VALUE_GEN; // 20	const ENTRY_BYTES: u64 = KEY_DEV + KEY_OFFSET; // 20

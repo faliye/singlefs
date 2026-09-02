@@ -1,0 +1,8 @@
+E7RESULT name=config model=arithmetic file_ops=0
+E7RESULT name=window overlay=0 admitted=4 rejected=0 oversold_units=80
+E7RESULT name=window overlay=1 admitted=1 rejected=3 oversold_units=0
+E7RESULT name=credit_frees credit=0 admitted=0 rejected=1 premature_reuse=0
+E7RESULT name=credit_frees credit=1 admitted=1 rejected=0 premature_reuse=20
+E7RESULT name=tombstone reserve=1 objects_fit=50 delete_deadlocks=0
+E7RESULT name=tombstone reserve=0 objects_fit=100 delete_deadlocks=100
+E7RESULT name=done emitted=8

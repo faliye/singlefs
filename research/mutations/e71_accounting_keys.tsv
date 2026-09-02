@@ -1,0 +1,8 @@
+M1_统计量数写成E54那版只数统计量	STATS as u64 * t * dev(true)	STATS as u64 * dev(true)
+M2_设备维根本没进key	if with_device && uses { d } else { 1 }	1
+M3_代数K漏乘	entries_per_generation(arm, t, d, with_device) * k	entries_per_generation(arm, t, d, with_device)
+M4_checkpoint写次数漏掉一写一删的2倍	    2 * entries_per_generation(arm, t, d, true) * (key_w + val_w)	    entries_per_generation(arm, t, d, true) * (key_w + val_w)
+M5_预算线取成T_dirty本身	const BUDGET: u64 = T_DIRTY / 100;	const BUDGET: u64 = T_DIRTY;
+M6_窄读把九项全按树分即两条臂塌成一条	if s.per_tree_narrow { t } else { 1 }	t
+M7_根环区域数写错	const RING_REGIONS: u64 = 3;	const RING_REGIONS: u64 = 2;
+M8_D5第4项被误标成带设备维	Stat { name: "pending_delete",   per_device: false, per_tree_narrow: false },	Stat { name: "pending_delete",   per_device: true, per_tree_narrow: false },

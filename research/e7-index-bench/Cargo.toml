@@ -57,6 +57,30 @@ path = "src/bin/e21_cpu.rs"
 name = "e6-multicore"
 path = "src/bin/e6_multicore.rs"
 
+[[bin]]
+name = "e75-record-size"
+path = "src/bin/e75_record_size.rs"
+
+[[bin]]
+name = "e76-payload-csum"
+path = "src/bin/e76_payload_csum.rs"
+
+[[bin]]
+name = "e71-accounting-keys"
+path = "src/bin/e71_accounting_keys.rs"
+
+[[bin]]
+name = "e34-ring-iomin"
+path = "src/bin/e34_ring_iomin.rs"
+
+[[bin]]
+name = "e73-key-range"
+path = "src/bin/e73_key_range.rs"
+
+[[bin]]
+name = "e74-alloc-records"
+path = "src/bin/e74_alloc_records.rs"
+
 [dependencies]
 aes-gcm = "0.11.1"
 chacha20poly1305 = "0.11.0"
@@ -132,3 +156,31 @@ path = "src/bin/e69_backref_cost.rs"
 [[bin]]
 name = "e70-ckpt-thresholds"
 path = "src/bin/e70_ckpt_thresholds.rs"
+
+[[bin]]
+name = "e77-publish-order"
+path = "src/bin/e77_publish_order.rs"
+
+[[bin]]
+name = "e78-replay-start"
+path = "src/bin/e78_replay_start.rs"
+
+[[bin]]
+name = "e79-root-record"
+path = "src/bin/e79_root_record.rs"
+
+[[bin]]
+name = "e80-partial-stripe"
+path = "src/bin/e80_partial_stripe.rs"
+
+[[bin]]
+name = "e81-commit-fixpoint"
+path = "src/bin/e81_commit_fixpoint.rs"
+
+[[bin]]
+name = "e82-admission-overlay"
+path = "src/bin/e82_admission_overlay.rs"
+
+[[bin]]
+name = "e83-tombstone-grain"
+path = "src/bin/e83_tombstone_grain.rs"

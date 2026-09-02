@@ -1,0 +1,8 @@
+M1_屏障约束被拿掉四条臂全变自由重排	for seg in segs.iter().take(frontier) {	for seg in segs.iter().take(0) {
+M2_重放验证被拿掉validating退化成盲嫁接	if !persisted(state, u) {\n                        return Outcome::StateOld;\n                    }	if false {\n                        return Outcome::StateOld;\n                    }
+M3_提交标记检查被拿掉不完整事务被施加	let committed = prefix_len == RECORDS;	let committed = prefix_len > 0;
+M4_走读漏验最后一个单元	for u in 0..UNITS {\n            if !persisted(state, u) {	for u in 0..UNITS - 1 {\n            if !persisted(state, u) {
+M5_断号不再止步	} else {\n            break; // 断号即止\n        }	} else {\n            // 断号照走\n        }
+M6_根槽持久时回旧态不再算违例	Outcome::StateOld => persisted(state, W_ROOT),	Outcome::StateOld => false,
+M7_审计被拿掉自称成功不再被改判	if claim == Outcome::StateNew && (0..UNITS).any(|u| !persisted(state, u)) {	if false {
+M8_记录洞的统计把any写成all	(0..RECORDS).any(|r| !persisted(s, UNITS + r))	(0..RECORDS).all(|r| !persisted(s, UNITS + r))

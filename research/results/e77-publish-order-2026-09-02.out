@@ -1,0 +1,12 @@
+E7RESULT name=config units=6 records=3 txn=1 commit_on_last=1 model=exhaustive file_ops=0
+E7RESULT name=tally arm=b_all mode=validating states=72 violations=0 state_new=2 state_old=70 record_holes=0
+E7RESULT name=tally arm=b_all mode=naive states=72 violations=0 state_new=2 state_old=70 record_holes=0
+E7RESULT name=tally arm=b_ur mode=validating states=79 violations=0 state_new=9 state_old=70 record_holes=7
+E7RESULT name=tally arm=b_ur mode=naive states=79 violations=0 state_new=9 state_old=70 record_holes=7
+E7RESULT name=tally arm=b_rs mode=validating states=513 violations=0 state_new=2 state_old=511 record_holes=0
+E7RESULT name=tally arm=b_rs mode=naive states=513 violations=63 state_new=2 state_old=448 record_holes=0
+E7RESULT name=tally arm=b_none mode=validating states=1024 violations=504 state_new=9 state_old=511 record_holes=448
+E7RESULT name=tally arm=b_none mode=naive states=1024 violations=567 state_new=9 state_old=448 record_holes=448
+E7RESULT name=verdict safe_arms_validating=b_all,b_ur,b_rs
+E7RESULT name=necessity barrier_before_root_necessary=1 replay_validation_load_bearing=1
+E7RESULT name=done emitted=12

@@ -1,0 +1,89 @@
+E7RESULT name=config ring_regions=3 model=geometry file_ops=0 host_pbs=512 host_io_min=512
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=512 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=1
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=4 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=4 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=4096 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=1 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=1
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=4 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=4 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=4 claim1_ge2=1 claim2_whole_ring=1
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=8 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=8 claim1_ge2=1 claim2_whole_ring=1
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=prime_stride slots_hit=16 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=16 slot_width_rule=settled_pbs slot_width=512 placement=contiguous slots_hit=16 claim1_ge2=1 claim2_whole_ring=1
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=512 io_min=65536 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=1 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=1 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=4 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=4 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=8 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=8 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=16 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=16 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=4096 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=1 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=1 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=1
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=1 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=4 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=4 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=4 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=4 claim1_ge2=1 claim2_whole_ring=1
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=4 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=8 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=8 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=8 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=8 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=16 slot_width_rule=settled_pbs slot_width=4096 placement=prime_stride slots_hit=16 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=16 slot_width_rule=settled_pbs slot_width=4096 placement=contiguous slots_hit=16 claim1_ge2=1 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=65536 placement=prime_stride slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=exposure pbs=4096 io_min=65536 slots_per_region=16 slot_width_rule=suggested_iomin slot_width=65536 placement=contiguous slots_hit=1 claim1_ge2=0 claim2_whole_ring=0
+E7RESULT name=rollback regions=3 wiped_region=0 worst_rollback_generations=1
+E7RESULT name=rollback regions=3 wiped_region=1 worst_rollback_generations=1
+E7RESULT name=rollback regions=3 wiped_region=2 worst_rollback_generations=1
+E7RESULT name=positive_control io_min=512 slot_width=512 slots_hit=1 whole_ring=0 both_are_one=1
+E7RESULT name=positive_control io_min=4096 slot_width=4096 slots_hit=1 whole_ring=0 both_are_one=1
+E7RESULT name=positive_control io_min=65536 slot_width=65536 slots_hit=1 whole_ring=0 both_are_one=1
+E7RESULT name=dead_candidate slot_width=256 io_min=65536 regions=2 slots=4 slots_hit=4 whole_ring=1 note=replaced_by_d22_item2
+E7RESULT name=done emitted=89

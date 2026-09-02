@@ -1,0 +1,46 @@
+E7RESULT name=config node=16384 node_header=64 entry=20 fanout=816 unit=32768 model=arithmetic file_ops=0
+E7RESULT name=scale cap_tib=1 grain=4096 fill_pct=90 entries=241591910 height=3 tree_bytes_mib=4626
+E7RESULT name=scale cap_tib=1 grain=32768 fill_pct=90 entries=30198988 height=3 tree_bytes_mib=578
+E7RESULT name=scale cap_tib=1 grain=1048576 fill_pct=90 entries=943718 height=3 tree_bytes_mib=18
+E7RESULT name=scale cap_tib=4 grain=4096 fill_pct=90 entries=966367641 height=4 tree_bytes_mib=18504
+E7RESULT name=scale cap_tib=4 grain=32768 fill_pct=90 entries=120795955 height=3 tree_bytes_mib=2313
+E7RESULT name=scale cap_tib=4 grain=1048576 fill_pct=90 entries=3774873 height=3 tree_bytes_mib=72
+E7RESULT name=scale cap_tib=16 grain=4096 fill_pct=90 entries=3865470566 height=4 tree_bytes_mib=74017
+E7RESULT name=scale cap_tib=16 grain=32768 fill_pct=90 entries=483183820 height=3 tree_bytes_mib=9252
+E7RESULT name=scale cap_tib=16 grain=1048576 fill_pct=90 entries=15099494 height=3 tree_bytes_mib=289
+E7RESULT name=scale cap_tib=64 grain=4096 fill_pct=90 entries=15461882265 height=4 tree_bytes_mib=296068
+E7RESULT name=scale cap_tib=64 grain=32768 fill_pct=90 entries=1932735283 height=4 tree_bytes_mib=37008
+E7RESULT name=scale cap_tib=64 grain=1048576 fill_pct=90 entries=60397977 height=3 tree_bytes_mib=1156
+E7RESULT name=scale cap_tib=256 grain=4096 fill_pct=90 entries=61847529062 height=4 tree_bytes_mib=1184274
+E7RESULT name=scale cap_tib=256 grain=32768 fill_pct=90 entries=7730941132 height=4 tree_bytes_mib=148034
+E7RESULT name=scale cap_tib=256 grain=1048576 fill_pct=90 entries=241591910 height=3 tree_bytes_mib=4626
+E7RESULT name=compact n=1 cap_tib=1 total_entries=30198988 locality=contiguous nodes=3 bytes=49152 ideal_bytes=20 amp_x100=245760
+E7RESULT name=compact n=1 cap_tib=1 total_entries=30198988 locality=scattered nodes=3 bytes=49152 ideal_bytes=20 amp_x100=245760
+E7RESULT name=compact n=1 cap_tib=16 total_entries=483183820 locality=contiguous nodes=3 bytes=49152 ideal_bytes=20 amp_x100=245760
+E7RESULT name=compact n=1 cap_tib=16 total_entries=483183820 locality=scattered nodes=3 bytes=49152 ideal_bytes=20 amp_x100=245760
+E7RESULT name=compact n=1 cap_tib=256 total_entries=7730941132 locality=contiguous nodes=4 bytes=65536 ideal_bytes=20 amp_x100=327680
+E7RESULT name=compact n=1 cap_tib=256 total_entries=7730941132 locality=scattered nodes=4 bytes=65536 ideal_bytes=20 amp_x100=327680
+E7RESULT name=compact n=64 cap_tib=1 total_entries=30198988 locality=contiguous nodes=3 bytes=49152 ideal_bytes=1280 amp_x100=3840
+E7RESULT name=compact n=64 cap_tib=1 total_entries=30198988 locality=scattered nodes=111 bytes=1818624 ideal_bytes=1280 amp_x100=142080
+E7RESULT name=compact n=64 cap_tib=16 total_entries=483183820 locality=contiguous nodes=3 bytes=49152 ideal_bytes=1280 amp_x100=3840
+E7RESULT name=compact n=64 cap_tib=16 total_entries=483183820 locality=scattered nodes=129 bytes=2113536 ideal_bytes=1280 amp_x100=165120
+E7RESULT name=compact n=64 cap_tib=256 total_entries=7730941132 locality=contiguous nodes=4 bytes=65536 ideal_bytes=1280 amp_x100=5120
+E7RESULT name=compact n=64 cap_tib=256 total_entries=7730941132 locality=scattered nodes=144 bytes=2359296 ideal_bytes=1280 amp_x100=184320
+E7RESULT name=compact n=4096 cap_tib=1 total_entries=30198988 locality=contiguous nodes=13 bytes=212992 ideal_bytes=81920 amp_x100=260
+E7RESULT name=compact n=4096 cap_tib=1 total_entries=30198988 locality=scattered nodes=4143 bytes=67878912 ideal_bytes=81920 amp_x100=82860
+E7RESULT name=compact n=4096 cap_tib=16 total_entries=483183820 locality=contiguous nodes=13 bytes=212992 ideal_bytes=81920 amp_x100=260
+E7RESULT name=compact n=4096 cap_tib=16 total_entries=483183820 locality=scattered nodes=4823 bytes=79020032 ideal_bytes=81920 amp_x100=96460
+E7RESULT name=compact n=4096 cap_tib=256 total_entries=7730941132 locality=contiguous nodes=19 bytes=311296 ideal_bytes=81920 amp_x100=380
+E7RESULT name=compact n=4096 cap_tib=256 total_entries=7730941132 locality=scattered nodes=8208 bytes=134479872 ideal_bytes=81920 amp_x100=164160
+E7RESULT name=compact n=65536 cap_tib=1 total_entries=30198988 locality=contiguous nodes=128 bytes=2097152 ideal_bytes=1310720 amp_x100=160
+E7RESULT name=compact n=65536 cap_tib=1 total_entries=30198988 locality=scattered nodes=37056 bytes=607125504 ideal_bytes=1310720 amp_x100=46320
+E7RESULT name=compact n=65536 cap_tib=16 total_entries=483183820 locality=contiguous nodes=163 bytes=2670592 ideal_bytes=1310720 amp_x100=203
+E7RESULT name=compact n=65536 cap_tib=16 total_entries=483183820 locality=scattered nodes=66263 bytes=1085652992 ideal_bytes=1310720 amp_x100=82828
+E7RESULT name=compact n=65536 cap_tib=256 total_entries=7730941132 locality=contiguous nodes=178 bytes=2916352 ideal_bytes=1310720 amp_x100=222
+E7RESULT name=compact n=65536 cap_tib=256 total_entries=7730941132 locality=scattered nodes=77163 bytes=1264238592 ideal_bytes=1310720 amp_x100=96453
+E7RESULT name=dimension cap_tib=1 alloc_entries=30198988 acct_entries=115200 alloc_scales_with_cap=1 acct_scales_with_cap=0 ratio=262
+E7RESULT name=dimension cap_tib=16 alloc_entries=483183820 acct_entries=115200 alloc_scales_with_cap=1 acct_scales_with_cap=0 ratio=4194
+E7RESULT name=dimension cap_tib=256 alloc_entries=7730941132 acct_entries=115200 alloc_scales_with_cap=1 acct_scales_with_cap=0 ratio=67108
+E7RESULT name=positive_control_capacity_doubles fill_pct=100 a=536870912 b=1073741824 exactly_2x=1 rounding_gap=0
+E7RESULT name=positive_control_capacity_doubles fill_pct=90 a=483183820 b=966367641 exactly_2x=0 rounding_gap=1
+E7RESULT name=done emitted=46

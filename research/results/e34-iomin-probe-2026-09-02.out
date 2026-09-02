@@ -1,0 +1,28 @@
+E7RESULT name=config devs=4 chunk=65536 disk_mb=64 level=raid5 rounds=5
+E7RESULT name=v1_geometry io_min=65536 pbs=512 lbs=512 io_opt=196608 expect_io_min=65536 v1_pass=1
+E7RESULT name=scenario scen=v2_writehole_hits round=1 legA=0 legV=1 torn=1 victim_intact=0 vacuous=0
+E7RESULT name=scenario scen=v3_no_tear_control round=1 legA=0 legV=1 torn=0 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region1_survives round=1 legA=0 legV=3 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region2_survives round=1 legA=0 legV=2 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v5_intra_slot_survives round=1 legA=0 legV=0 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v2_writehole_hits round=2 legA=0 legV=1 torn=1 victim_intact=0 vacuous=0
+E7RESULT name=scenario scen=v3_no_tear_control round=2 legA=0 legV=1 torn=0 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region1_survives round=2 legA=0 legV=3 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region2_survives round=2 legA=0 legV=2 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v5_intra_slot_survives round=2 legA=0 legV=0 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v2_writehole_hits round=3 legA=0 legV=1 torn=1 victim_intact=0 vacuous=0
+E7RESULT name=scenario scen=v3_no_tear_control round=3 legA=0 legV=1 torn=0 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region1_survives round=3 legA=0 legV=3 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region2_survives round=3 legA=0 legV=2 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v5_intra_slot_survives round=3 legA=0 legV=0 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v2_writehole_hits round=4 legA=0 legV=1 torn=1 victim_intact=0 vacuous=0
+E7RESULT name=scenario scen=v3_no_tear_control round=4 legA=0 legV=1 torn=0 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region1_survives round=4 legA=0 legV=3 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region2_survives round=4 legA=0 legV=2 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v5_intra_slot_survives round=4 legA=0 legV=0 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v2_writehole_hits round=5 legA=0 legV=1 torn=1 victim_intact=0 vacuous=0
+E7RESULT name=scenario scen=v3_no_tear_control round=5 legA=0 legV=1 torn=0 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region1_survives round=5 legA=0 legV=3 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v4_region2_survives round=5 legA=0 legV=2 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=scenario scen=v5_intra_slot_survives round=5 legA=0 legV=0 torn=1 victim_intact=1 vacuous=0
+E7RESULT name=done emitted=28

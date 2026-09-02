@@ -1,0 +1,209 @@
+E7RESULT name=config stats=9 t_dirty=2147483648 budget=21474836 ring_regions=3 model=arithmetic file_ops=0
+E7RESULT name=stat_dims stat=allocated per_device=1 per_tree_narrow=0
+E7RESULT name=stat_dims stat=free per_device=1 per_tree_narrow=0
+E7RESULT name=stat_dims stat=unreclaimable per_device=1 per_tree_narrow=0
+E7RESULT name=stat_dims stat=pending_delete per_device=0 per_tree_narrow=0
+E7RESULT name=stat_dims stat=defer_pending per_device=1 per_tree_narrow=0
+E7RESULT name=stat_dims stat=reserved per_device=0 per_tree_narrow=0
+E7RESULT name=stat_dims stat=ext_quota_used per_device=0 per_tree_narrow=0
+E7RESULT name=stat_dims stat=per_tree_exclusive per_device=0 per_tree_narrow=1
+E7RESULT name=stat_dims stat=per_tree_shared per_device=0 per_tree_narrow=1
+E7RESULT name=dim_counts stats=9 with_device=4 with_tree_narrow=2
+E7RESULT name=k_range slots_per_region=1 ring_slots=3 k_conservative=4 k_measured=2
+E7RESULT name=k_range slots_per_region=4 ring_slots=12 k_conservative=13 k_measured=2
+E7RESULT name=k_range slots_per_region=8 ring_slots=24 k_conservative=25 k_measured=2
+E7RESULT name=k_range slots_per_region=16 ring_slots=48 k_conservative=49 k_measured=2
+E7RESULT name=entries arm=upper_bound t=1 d=1 k=2 per_generation=9 total=18
+E7RESULT name=entries arm=per_stat_narrow t=1 d=1 k=2 per_generation=9 total=18
+E7RESULT name=entries arm=per_stat_wide t=1 d=1 k=2 per_generation=9 total=18
+E7RESULT name=entries arm=upper_bound t=1 d=1 k=25 per_generation=9 total=225
+E7RESULT name=entries arm=per_stat_narrow t=1 d=1 k=25 per_generation=9 total=225
+E7RESULT name=entries arm=per_stat_wide t=1 d=1 k=25 per_generation=9 total=225
+E7RESULT name=entries arm=upper_bound t=1 d=2 k=2 per_generation=18 total=36
+E7RESULT name=entries arm=per_stat_narrow t=1 d=2 k=2 per_generation=13 total=26
+E7RESULT name=entries arm=per_stat_wide t=1 d=2 k=2 per_generation=13 total=26
+E7RESULT name=entries arm=upper_bound t=1 d=2 k=25 per_generation=18 total=450
+E7RESULT name=entries arm=per_stat_narrow t=1 d=2 k=25 per_generation=13 total=325
+E7RESULT name=entries arm=per_stat_wide t=1 d=2 k=25 per_generation=13 total=325
+E7RESULT name=entries arm=upper_bound t=1 d=8 k=2 per_generation=72 total=144
+E7RESULT name=entries arm=per_stat_narrow t=1 d=8 k=2 per_generation=37 total=74
+E7RESULT name=entries arm=per_stat_wide t=1 d=8 k=2 per_generation=37 total=74
+E7RESULT name=entries arm=upper_bound t=1 d=8 k=25 per_generation=72 total=1800
+E7RESULT name=entries arm=per_stat_narrow t=1 d=8 k=25 per_generation=37 total=925
+E7RESULT name=entries arm=per_stat_wide t=1 d=8 k=25 per_generation=37 total=925
+E7RESULT name=entries arm=upper_bound t=1 d=64 k=2 per_generation=576 total=1152
+E7RESULT name=entries arm=per_stat_narrow t=1 d=64 k=2 per_generation=261 total=522
+E7RESULT name=entries arm=per_stat_wide t=1 d=64 k=2 per_generation=261 total=522
+E7RESULT name=entries arm=upper_bound t=1 d=64 k=25 per_generation=576 total=14400
+E7RESULT name=entries arm=per_stat_narrow t=1 d=64 k=25 per_generation=261 total=6525
+E7RESULT name=entries arm=per_stat_wide t=1 d=64 k=25 per_generation=261 total=6525
+E7RESULT name=entries arm=upper_bound t=8 d=1 k=2 per_generation=72 total=144
+E7RESULT name=entries arm=per_stat_narrow t=8 d=1 k=2 per_generation=23 total=46
+E7RESULT name=entries arm=per_stat_wide t=8 d=1 k=2 per_generation=72 total=144
+E7RESULT name=entries arm=upper_bound t=8 d=1 k=25 per_generation=72 total=1800
+E7RESULT name=entries arm=per_stat_narrow t=8 d=1 k=25 per_generation=23 total=575
+E7RESULT name=entries arm=per_stat_wide t=8 d=1 k=25 per_generation=72 total=1800
+E7RESULT name=entries arm=upper_bound t=8 d=2 k=2 per_generation=144 total=288
+E7RESULT name=entries arm=per_stat_narrow t=8 d=2 k=2 per_generation=27 total=54
+E7RESULT name=entries arm=per_stat_wide t=8 d=2 k=2 per_generation=104 total=208
+E7RESULT name=entries arm=upper_bound t=8 d=2 k=25 per_generation=144 total=3600
+E7RESULT name=entries arm=per_stat_narrow t=8 d=2 k=25 per_generation=27 total=675
+E7RESULT name=entries arm=per_stat_wide t=8 d=2 k=25 per_generation=104 total=2600
+E7RESULT name=entries arm=upper_bound t=8 d=8 k=2 per_generation=576 total=1152
+E7RESULT name=entries arm=per_stat_narrow t=8 d=8 k=2 per_generation=51 total=102
+E7RESULT name=entries arm=per_stat_wide t=8 d=8 k=2 per_generation=296 total=592
+E7RESULT name=entries arm=upper_bound t=8 d=8 k=25 per_generation=576 total=14400
+E7RESULT name=entries arm=per_stat_narrow t=8 d=8 k=25 per_generation=51 total=1275
+E7RESULT name=entries arm=per_stat_wide t=8 d=8 k=25 per_generation=296 total=7400
+E7RESULT name=entries arm=upper_bound t=8 d=64 k=2 per_generation=4608 total=9216
+E7RESULT name=entries arm=per_stat_narrow t=8 d=64 k=2 per_generation=275 total=550
+E7RESULT name=entries arm=per_stat_wide t=8 d=64 k=2 per_generation=2088 total=4176
+E7RESULT name=entries arm=upper_bound t=8 d=64 k=25 per_generation=4608 total=115200
+E7RESULT name=entries arm=per_stat_narrow t=8 d=64 k=25 per_generation=275 total=6875
+E7RESULT name=entries arm=per_stat_wide t=8 d=64 k=25 per_generation=2088 total=52200
+E7RESULT name=entries arm=upper_bound t=64 d=1 k=2 per_generation=576 total=1152
+E7RESULT name=entries arm=per_stat_narrow t=64 d=1 k=2 per_generation=135 total=270
+E7RESULT name=entries arm=per_stat_wide t=64 d=1 k=2 per_generation=576 total=1152
+E7RESULT name=entries arm=upper_bound t=64 d=1 k=25 per_generation=576 total=14400
+E7RESULT name=entries arm=per_stat_narrow t=64 d=1 k=25 per_generation=135 total=3375
+E7RESULT name=entries arm=per_stat_wide t=64 d=1 k=25 per_generation=576 total=14400
+E7RESULT name=entries arm=upper_bound t=64 d=2 k=2 per_generation=1152 total=2304
+E7RESULT name=entries arm=per_stat_narrow t=64 d=2 k=2 per_generation=139 total=278
+E7RESULT name=entries arm=per_stat_wide t=64 d=2 k=2 per_generation=832 total=1664
+E7RESULT name=entries arm=upper_bound t=64 d=2 k=25 per_generation=1152 total=28800
+E7RESULT name=entries arm=per_stat_narrow t=64 d=2 k=25 per_generation=139 total=3475
+E7RESULT name=entries arm=per_stat_wide t=64 d=2 k=25 per_generation=832 total=20800
+E7RESULT name=entries arm=upper_bound t=64 d=8 k=2 per_generation=4608 total=9216
+E7RESULT name=entries arm=per_stat_narrow t=64 d=8 k=2 per_generation=163 total=326
+E7RESULT name=entries arm=per_stat_wide t=64 d=8 k=2 per_generation=2368 total=4736
+E7RESULT name=entries arm=upper_bound t=64 d=8 k=25 per_generation=4608 total=115200
+E7RESULT name=entries arm=per_stat_narrow t=64 d=8 k=25 per_generation=163 total=4075
+E7RESULT name=entries arm=per_stat_wide t=64 d=8 k=25 per_generation=2368 total=59200
+E7RESULT name=entries arm=upper_bound t=64 d=64 k=2 per_generation=36864 total=73728
+E7RESULT name=entries arm=per_stat_narrow t=64 d=64 k=2 per_generation=387 total=774
+E7RESULT name=entries arm=per_stat_wide t=64 d=64 k=2 per_generation=16704 total=33408
+E7RESULT name=entries arm=upper_bound t=64 d=64 k=25 per_generation=36864 total=921600
+E7RESULT name=entries arm=per_stat_narrow t=64 d=64 k=25 per_generation=387 total=9675
+E7RESULT name=entries arm=per_stat_wide t=64 d=64 k=25 per_generation=16704 total=417600
+E7RESULT name=entries arm=upper_bound t=1024 d=1 k=2 per_generation=9216 total=18432
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=1 k=2 per_generation=2055 total=4110
+E7RESULT name=entries arm=per_stat_wide t=1024 d=1 k=2 per_generation=9216 total=18432
+E7RESULT name=entries arm=upper_bound t=1024 d=1 k=25 per_generation=9216 total=230400
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=1 k=25 per_generation=2055 total=51375
+E7RESULT name=entries arm=per_stat_wide t=1024 d=1 k=25 per_generation=9216 total=230400
+E7RESULT name=entries arm=upper_bound t=1024 d=2 k=2 per_generation=18432 total=36864
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=2 k=2 per_generation=2059 total=4118
+E7RESULT name=entries arm=per_stat_wide t=1024 d=2 k=2 per_generation=13312 total=26624
+E7RESULT name=entries arm=upper_bound t=1024 d=2 k=25 per_generation=18432 total=460800
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=2 k=25 per_generation=2059 total=51475
+E7RESULT name=entries arm=per_stat_wide t=1024 d=2 k=25 per_generation=13312 total=332800
+E7RESULT name=entries arm=upper_bound t=1024 d=8 k=2 per_generation=73728 total=147456
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=8 k=2 per_generation=2083 total=4166
+E7RESULT name=entries arm=per_stat_wide t=1024 d=8 k=2 per_generation=37888 total=75776
+E7RESULT name=entries arm=upper_bound t=1024 d=8 k=25 per_generation=73728 total=1843200
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=8 k=25 per_generation=2083 total=52075
+E7RESULT name=entries arm=per_stat_wide t=1024 d=8 k=25 per_generation=37888 total=947200
+E7RESULT name=entries arm=upper_bound t=1024 d=64 k=2 per_generation=589824 total=1179648
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=64 k=2 per_generation=2307 total=4614
+E7RESULT name=entries arm=per_stat_wide t=1024 d=64 k=2 per_generation=267264 total=534528
+E7RESULT name=entries arm=upper_bound t=1024 d=64 k=25 per_generation=589824 total=14745600
+E7RESULT name=entries arm=per_stat_narrow t=1024 d=64 k=25 per_generation=2307 total=57675
+E7RESULT name=entries arm=per_stat_wide t=1024 d=64 k=25 per_generation=267264 total=6681600
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1 d=1 bytes=396 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1 d=1 bytes=396 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1 d=8 bytes=3168 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1 d=8 bytes=1628 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1 d=64 bytes=25344 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1 d=64 bytes=11484 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8 d=1 bytes=3168 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8 d=1 bytes=1012 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8 d=8 bytes=25344 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8 d=8 bytes=2244 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8 d=64 bytes=202752 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8 d=64 bytes=12100 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=64 d=1 bytes=25344 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=64 d=1 bytes=5940 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=64 d=8 bytes=202752 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=64 d=8 bytes=7172 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=64 d=64 bytes=1622016 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=64 d=64 bytes=17028 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1024 d=1 bytes=405504 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1024 d=1 bytes=90420 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1024 d=8 bytes=3244032 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1024 d=8 bytes=91652 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=1024 d=64 bytes=25952256 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=1024 d=64 bytes=101508 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8192 d=1 bytes=3244032 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8192 d=1 bytes=721204 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8192 d=8 bytes=25952256 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8192 d=8 bytes=722436 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=upper_bound t=8192 d=64 bytes=207618048 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=narrow key_w=14 val_w=8 arm=per_stat_narrow t=8192 d=64 bytes=732292 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1 d=1 bytes=540 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1 d=1 bytes=540 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1 d=8 bytes=4320 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1 d=8 bytes=2220 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1 d=64 bytes=34560 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1 d=64 bytes=15660 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8 d=1 bytes=4320 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8 d=1 bytes=1380 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8 d=8 bytes=34560 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8 d=8 bytes=3060 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8 d=64 bytes=276480 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8 d=64 bytes=16500 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=64 d=1 bytes=34560 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=64 d=1 bytes=8100 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=64 d=8 bytes=276480 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=64 d=8 bytes=9780 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=64 d=64 bytes=2211840 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=64 d=64 bytes=23220 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1024 d=1 bytes=552960 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1024 d=1 bytes=123300 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1024 d=8 bytes=4423680 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1024 d=8 bytes=124980 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=1024 d=64 bytes=35389440 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=1024 d=64 bytes=138420 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8192 d=1 bytes=4423680 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8192 d=1 bytes=983460 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8192 d=8 bytes=35389440 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8192 d=8 bytes=985140 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=upper_bound t=8192 d=64 bytes=283115520 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=mid key_w=22 val_w=8 arm=per_stat_narrow t=8192 d=64 bytes=998580 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1 d=1 bytes=900 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1 d=1 bytes=900 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1 d=8 bytes=7200 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1 d=8 bytes=3700 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1 d=64 bytes=57600 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1 d=64 bytes=26100 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8 d=1 bytes=7200 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8 d=1 bytes=2300 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8 d=8 bytes=57600 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8 d=8 bytes=5100 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8 d=64 bytes=460800 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8 d=64 bytes=27500 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=64 d=1 bytes=57600 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=64 d=1 bytes=13500 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=64 d=8 bytes=460800 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=64 d=8 bytes=16300 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=64 d=64 bytes=3686400 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=64 d=64 bytes=38700 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1024 d=1 bytes=921600 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1024 d=1 bytes=205500 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1024 d=8 bytes=7372800 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1024 d=8 bytes=208300 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=1024 d=64 bytes=58982400 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=1024 d=64 bytes=230700 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8192 d=1 bytes=7372800 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8192 d=1 bytes=1639100 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8192 d=8 bytes=58982400 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8192 d=8 bytes=1641900 budget=21474836 over=0
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=upper_bound t=8192 d=64 bytes=471859200 budget=21474836 over=1
+E7RESULT name=ckpt_budget width=wide key_w=34 val_w=16 arm=per_stat_narrow t=8192 d=64 bytes=1664300 budget=21474836 over=0
+E7RESULT name=monotonic arm=upper_bound var=t base=115200 doubled=230400 exactly_2x=1
+E7RESULT name=monotonic arm=upper_bound var=d base=115200 doubled=230400 exactly_2x=1
+E7RESULT name=monotonic arm=upper_bound var=k base=115200 doubled=230400 exactly_2x=1
+E7RESULT name=monotonic arm=per_stat_narrow var=t base=4075 doubled=7275 exactly_2x=0 ratio_x1000=1785
+E7RESULT name=positive_control_drop_device arm=upper_bound with=115200 without=14400 ratio_x1000=8000 exactly_d=1
+E7RESULT name=positive_control_drop_device arm=per_stat_narrow with=4075 without=3375 ratio_x1000=1207 exactly_d=0
+E7RESULT name=positive_control_drop_device arm=per_stat_wide with=59200 without=14400 ratio_x1000=4111 exactly_d=0
+E7RESULT name=done emitted=209

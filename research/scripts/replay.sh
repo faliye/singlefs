@@ -58,6 +58,19 @@ E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
 E43|e43_ext_budget||e43-ext-budget-2026-08-31.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
+E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
+E75|e75-record-size||e75-record-size-2026-09-01.out|exact
+E76|e76-payload-csum||e76-payload-csum-2026-09-01.out|exact
+E77|e77-publish-order||e77-publish-order-2026-09-02.out|exact
+E78|e78-replay-start||e78-replay-start-2026-09-02.out|exact
+E79|e79-root-record||e79-root-record-2026-09-02.out|exact
+E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
+E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
+E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
+E83|e83-tombstone-grain||e83-tombstone-grain-2026-09-02.out|exact
+E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
+E73|e73-key-range||e73-key-range-2026-09-01.out|exact
+E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact
 E40|e40_csum_width||e40-csum-width-2026-08-30.out|exact
 E46|e46_region_spacing||e46-region-spacing-2026-08-30.out|exact
 E47|e47_ring_loss||e47-ring-loss-2026-08-30.out|exact

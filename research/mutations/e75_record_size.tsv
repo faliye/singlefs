@@ -1,0 +1,7 @@
+M1_I-8.2改回E45的严规则	o % unit + hdr > unit	o % unit != 0
+M2_容量少扣一次头	(rec - hdr) / ITEM	(rec - hdr / 2) / ITEM
+M3_取整方向反了	items.div_ceil(cap).max(1)	(items / cap).max(1)
+M4_对齐推进推过头	cur = cur.div_ceil(unit) * unit;	cur = (cur / unit + 2) * unit;
+M5_F系数写死1	Some(F * laid_out_bytes(n, rec, unit, hdr))	Some(laid_out_bytes(n, rec, unit, hdr))
+M6_头装不下时退化成0项而不是报NA	    if cap == 0 {\n        return None;\n    }	    if cap == 0 {\n        return Some(1);\n    }
+M7_载荷校验和那笔增量漏算	const INC_PAYLOAD_CSUM: u64 = 4;	const INC_PAYLOAD_CSUM: u64 = 0;

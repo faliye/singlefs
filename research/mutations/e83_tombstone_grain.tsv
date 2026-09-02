@@ -1,0 +1,5 @@
+M1_打包容量忘了扣单元头	(UNIT - UNIT_HDR) / TOMB_REC	UNIT / TOMB_REC
+M2_物理系数丢了副本	(units, units * UNIT * PHYS_FACTOR)	(units, units * UNIT)
+M3_perobject按extent算	RecordGrain::PerObject => load.objects,	RecordGrain::PerObject => load.objects * load.extents_per_obj,
+M4_打包向下取整	records.div_ceil(packed_capacity())	records / packed_capacity()
+M5_独占载体也打包	Carrier::DedicatedUnit => records,	Carrier::DedicatedUnit => records.div_ceil(packed_capacity()),

@@ -1,0 +1,8 @@
+M1_头校验和其实覆盖了整条记录即退化成候选甲	&buf[..OFF_HEADER_CSUM]	&buf[..buf.len()]
+M2_载荷校验和连头一起覆盖即回声头那一份	&buf[HDR..declared]	&buf[..declared]
+M3_第二行其实没截断载荷全落了	let half = HDR + (rec.len() - HDR) / 2;	let half = rec.len();
+M4_长度检查被拿掉短缓冲被记成校验和抓到	let pv = if m.len() < declared {	let pv = if false {
+M5_载荷校验和字段落到头校验和覆盖范围之外	const OFF_PAYLOAD_CSUM: usize = 59;	const OFF_PAYLOAD_CSUM: usize = 95;
+M6_CRC多项式写错	0x82F6_3B78	0x82F6_3B79
+M7_候选甲两列被人为拆成不同	            (v, v)	            (v, Verdict::Pass)
+M8_头部宽度漏掉载荷校验和那笔增量	const INC_PAYLOAD_CSUM: u64 = 4;	const INC_PAYLOAD_CSUM: u64 = 0;

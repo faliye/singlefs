@@ -1,0 +1,7 @@
+M1_槽数按单元算反了	        io_min / slot_w	        slot_w / io_min
+M2_槽宽超过单元时没夹到1	    if slot_w >= io_min {\n        1\n    } else {	    if false {\n        1\n    } else {
+M3_区域内槽数上限没夹	slots_per_unit(slot_w, io_min).min(slots_per_region)	slots_per_unit(slot_w, io_min)
+M4_建议取法退化成已定取法	SlotWidth::SuggestedIoMin => pbs.max(io_min),	SlotWidth::SuggestedIoMin => pbs,
+M5_素数步长区域间距算错	Placement::PrimeStride { p } => r * p * chunk,	Placement::PrimeStride { p } => r * p,
+M6_跨区放置被当成能盖住全环	            one_unit_spans_two_regions(pl, io_min, chunk, slots, slot_w)\n                && RING_REGIONS * slots * slot_w <= io_min	            RING_REGIONS * slots * slot_w <= io_min
+M7_区域数写错	const RING_REGIONS: u64 = 3;	const RING_REGIONS: u64 = 4;

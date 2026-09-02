@@ -1,0 +1,64 @@
+E7RESULT name=config item=56 hdr_now=78 hdr_landed=91 hdr_full=95 hdr_cited_by_d23_item12=99 target_items=12 f=2 model=arithmetic file_ops=0
+E7RESULT name=capacity rec_kib=1 hdr_tag=now78 hdr=78 items_per_record=16 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=1 hdr_tag=landed91 hdr=91 items_per_record=16 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=1 hdr_tag=full95 hdr=95 items_per_record=16 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=1 hdr_tag=d23item12_99 hdr=99 items_per_record=16 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=2 hdr_tag=now78 hdr=78 items_per_record=35 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=2 hdr_tag=landed91 hdr=91 items_per_record=34 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=2 hdr_tag=full95 hdr=95 items_per_record=34 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=2 hdr_tag=d23item12_99 hdr=99 items_per_record=34 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=4 hdr_tag=now78 hdr=78 items_per_record=71 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=4 hdr_tag=landed91 hdr=91 items_per_record=71 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=4 hdr_tag=full95 hdr=95 items_per_record=71 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=4 hdr_tag=d23item12_99 hdr=99 items_per_record=71 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=8 hdr_tag=now78 hdr=78 items_per_record=144 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=8 hdr_tag=landed91 hdr=91 items_per_record=144 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=8 hdr_tag=full95 hdr=95 items_per_record=144 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=8 hdr_tag=d23item12_99 hdr=99 items_per_record=144 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=32 hdr_tag=now78 hdr=78 items_per_record=583 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=32 hdr_tag=landed91 hdr=91 items_per_record=583 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=32 hdr_tag=full95 hdr=95 items_per_record=583 target_records=1 target_spans=0
+E7RESULT name=capacity rec_kib=32 hdr_tag=d23item12_99 hdr=99 items_per_record=583 target_records=1 target_spans=0
+E7RESULT name=i82_header_fits pbs=512 hdr_tag=now78 hdr=78 fits=1
+E7RESULT name=i82_header_fits pbs=512 hdr_tag=landed91 hdr=91 fits=1
+E7RESULT name=i82_header_fits pbs=512 hdr_tag=full95 hdr=95 fits=1
+E7RESULT name=i82_header_fits pbs=4096 hdr_tag=now78 hdr=78 fits=1
+E7RESULT name=i82_header_fits pbs=4096 hdr_tag=landed91 hdr=91 fits=1
+E7RESULT name=i82_header_fits pbs=4096 hdr_tag=full95 hdr=95 fits=1
+E7RESULT name=worst_txn items=1 rec_kib=4 unit=512 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=1 rec_kib=4 unit=4096 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=1 rec_kib=32 unit=512 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=1 rec_kib=32 unit=4096 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=4 rec_kib=4 unit=512 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=4 rec_kib=4 unit=4096 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=4 rec_kib=32 unit=512 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=4 rec_kib=32 unit=4096 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=12 rec_kib=4 unit=512 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=12 rec_kib=4 unit=4096 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=12 rec_kib=32 unit=512 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=12 rec_kib=32 unit=4096 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=64 rec_kib=4 unit=512 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=64 rec_kib=4 unit=4096 records=1 occupancy=4096 ring_floor=8192 ring_floor_kib=8
+E7RESULT name=worst_txn items=64 rec_kib=32 unit=512 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=64 rec_kib=32 unit=4096 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=200 rec_kib=4 unit=512 records=3 occupancy=12288 ring_floor=24576 ring_floor_kib=24
+E7RESULT name=worst_txn items=200 rec_kib=4 unit=4096 records=3 occupancy=12288 ring_floor=24576 ring_floor_kib=24
+E7RESULT name=worst_txn items=200 rec_kib=32 unit=512 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=200 rec_kib=32 unit=4096 records=1 occupancy=32768 ring_floor=65536 ring_floor_kib=64
+E7RESULT name=worst_txn items=1024 rec_kib=4 unit=512 records=15 occupancy=61440 ring_floor=122880 ring_floor_kib=120
+E7RESULT name=worst_txn items=1024 rec_kib=4 unit=4096 records=15 occupancy=61440 ring_floor=122880 ring_floor_kib=120
+E7RESULT name=worst_txn items=1024 rec_kib=32 unit=512 records=2 occupancy=65536 ring_floor=131072 ring_floor_kib=128
+E7RESULT name=worst_txn items=1024 rec_kib=32 unit=4096 records=2 occupancy=65536 ring_floor=131072 ring_floor_kib=128
+E7RESULT name=worst_txn items=62000 rec_kib=4 unit=512 records=874 occupancy=3579904 ring_floor=7159808 ring_floor_kib=6992
+E7RESULT name=worst_txn items=62000 rec_kib=4 unit=4096 records=874 occupancy=3579904 ring_floor=7159808 ring_floor_kib=6992
+E7RESULT name=worst_txn items=62000 rec_kib=32 unit=512 records=107 occupancy=3506176 ring_floor=7012352 ring_floor_kib=6848
+E7RESULT name=worst_txn items=62000 rec_kib=32 unit=4096 records=107 occupancy=3506176 ring_floor=7012352 ring_floor_kib=6848
+E7RESULT name=span_share rec_kib=1 cap=16 spanning_of_200=184 share_ppm=920000
+E7RESULT name=span_share rec_kib=2 cap=34 spanning_of_200=166 share_ppm=830000
+E7RESULT name=span_share rec_kib=4 cap=71 spanning_of_200=129 share_ppm=645000
+E7RESULT name=span_share rec_kib=8 cap=144 spanning_of_200=56 share_ppm=280000
+E7RESULT name=span_share rec_kib=32 cap=583 spanning_of_200=0 share_ppm=0
+E7RESULT name=positive_control_200_spans cap=71 records=3 spans=1
+E7RESULT name=positive_control_alignment rec=100 unit=512 n=6 bytes=612 naive=600 padded=1
+E7RESULT name=negative_control_unit1 bytes=600 expect=600
+E7RESULT name=done emitted=64

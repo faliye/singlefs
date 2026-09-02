@@ -1,0 +1,30 @@
+E7RESULT name=config hdr=95 item=56 hdr_csum_off=63 payload_csum_off=59 model=encoder file_ops=0
+E7RESULT name=digest_vector crc32c_123456789=0xe3069283 crc32c_empty=0x00000000
+E7RESULT name=verdict digest=crc32c scheme=yi construction=row1_intact header_csum=pass payload_csum=pass distinguishable=0
+E7RESULT name=verdict digest=crc32c scheme=yi construction=row2_half_payload_stale header_csum=pass payload_csum=fail distinguishable=1
+E7RESULT name=verdict digest=crc32c scheme=yi construction=row3_header_bitflip header_csum=fail payload_csum=pass distinguishable=1
+E7RESULT name=verdict digest=crc32c scheme=yi construction=row4_payload_bitflip header_csum=pass payload_csum=fail distinguishable=1
+E7RESULT name=verdict digest=crc32c scheme=yi construction=extra_payload_truncated_short header_csum=pass payload_csum=not_reached distinguishable=1
+E7RESULT name=verdict digest=crc32c scheme=jia construction=row1_intact header_csum=pass payload_csum=pass distinguishable=0
+E7RESULT name=verdict digest=crc32c scheme=jia construction=row2_half_payload_stale header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=crc32c scheme=jia construction=row3_header_bitflip header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=crc32c scheme=jia construction=row4_payload_bitflip header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=crc32c scheme=jia construction=extra_payload_truncated_short header_csum=not_reached payload_csum=not_reached distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=yi construction=row1_intact header_csum=pass payload_csum=pass distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=yi construction=row2_half_payload_stale header_csum=pass payload_csum=fail distinguishable=1
+E7RESULT name=verdict digest=fnv1a scheme=yi construction=row3_header_bitflip header_csum=fail payload_csum=pass distinguishable=1
+E7RESULT name=verdict digest=fnv1a scheme=yi construction=row4_payload_bitflip header_csum=pass payload_csum=fail distinguishable=1
+E7RESULT name=verdict digest=fnv1a scheme=yi construction=extra_payload_truncated_short header_csum=pass payload_csum=not_reached distinguishable=1
+E7RESULT name=verdict digest=fnv1a scheme=jia construction=row1_intact header_csum=pass payload_csum=pass distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=jia construction=row2_half_payload_stale header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=jia construction=row3_header_bitflip header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=jia construction=row4_payload_bitflip header_csum=fail payload_csum=fail distinguishable=0
+E7RESULT name=verdict digest=fnv1a scheme=jia construction=extra_payload_truncated_short header_csum=not_reached payload_csum=not_reached distinguishable=0
+E7RESULT name=load_bearing_row2 digest=crc32c header_pass=1 payload_fail=1 verdict_ok=1
+E7RESULT name=load_bearing_row2 digest=fnv1a header_pass=1 payload_fail=1 verdict_ok=1
+E7RESULT name=positive_control_jia_loses_it header=fail payload=fail distinguishable=0 expect_distinguishable=0
+E7RESULT name=sweep_named named=1 bytes=151 header=pass payload=fail
+E7RESULT name=sweep_named named=2 bytes=207 header=pass payload=fail
+E7RESULT name=sweep_named named=12 bytes=767 header=pass payload=fail
+E7RESULT name=sweep_named named=71 bytes=4071 header=pass payload=fail
+E7RESULT name=done emitted=30

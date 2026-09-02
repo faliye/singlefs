@@ -1,0 +1,42 @@
+E7RESULT name=config objects=4 ring=64 model=counting file_ops=0
+E7RESULT name=world m=23 pin=1 tail=16 torn=0 closed_form=2 tracker=2
+E7RESULT name=recover m=23 pin=1 tail=16 torn=0 algo=a1_abort completed=0 aborted=1 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=23 pin=1 tail=16 torn=0 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=2 skipped=2 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=1 tail=16 torn=0 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=1 tail=16 torn=0 algo=c_blind_walk completed=1 aborted=0 replayed=7 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=world m=23 pin=1 tail=16 torn=1 closed_form=2 tracker=2
+E7RESULT name=recover m=23 pin=1 tail=16 torn=1 algo=a1_abort completed=0 aborted=1 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=23 pin=1 tail=16 torn=1 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=3 skipped=3 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=1 tail=16 torn=1 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=1 final_ok=1
+E7RESULT name=recover m=23 pin=1 tail=16 torn=1 algo=c_blind_walk completed=1 aborted=0 replayed=7 mismatches=0 skipped=0 retries=1 torn_flagged=1 final_ok=1
+E7RESULT name=world m=13 pin=1 tail=8 torn=0 closed_form=0 tracker=0
+E7RESULT name=recover m=13 pin=1 tail=8 torn=0 algo=a1_abort completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=13 pin=1 tail=8 torn=0 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=13 pin=1 tail=8 torn=0 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=13 pin=1 tail=8 torn=0 algo=c_blind_walk completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=world m=13 pin=1 tail=8 torn=1 closed_form=0 tracker=0
+E7RESULT name=recover m=13 pin=1 tail=8 torn=1 algo=a1_abort completed=0 aborted=1 replayed=5 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=13 pin=1 tail=8 torn=1 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=1 skipped=1 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=13 pin=1 tail=8 torn=1 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=1 final_ok=1
+E7RESULT name=recover m=13 pin=1 tail=8 torn=1 algo=c_blind_walk completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=1 torn_flagged=1 final_ok=1
+E7RESULT name=world m=23 pin=2 tail=16 torn=0 closed_form=1 tracker=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=0 algo=a1_abort completed=0 aborted=1 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=23 pin=2 tail=16 torn=0 algo=a2_skip completed=1 aborted=0 replayed=6 mismatches=1 skipped=1 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=0 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=0 algo=c_blind_walk completed=1 aborted=0 replayed=7 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=world m=23 pin=2 tail=16 torn=1 closed_form=1 tracker=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=1 algo=a1_abort completed=0 aborted=1 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=23 pin=2 tail=16 torn=1 algo=a2_skip completed=1 aborted=0 replayed=6 mismatches=2 skipped=2 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=1 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=1 final_ok=1
+E7RESULT name=recover m=23 pin=2 tail=16 torn=1 algo=c_blind_walk completed=1 aborted=0 replayed=7 mismatches=0 skipped=0 retries=1 torn_flagged=1 final_ok=1
+E7RESULT name=world m=37 pin=1 tail=32 torn=0 closed_form=0 tracker=0
+E7RESULT name=recover m=37 pin=1 tail=32 torn=0 algo=a1_abort completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=37 pin=1 tail=32 torn=0 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=37 pin=1 tail=32 torn=0 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=37 pin=1 tail=32 torn=0 algo=c_blind_walk completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=world m=37 pin=1 tail=32 torn=1 closed_form=0 tracker=0
+E7RESULT name=recover m=37 pin=1 tail=32 torn=1 algo=a1_abort completed=0 aborted=1 replayed=5 mismatches=1 skipped=0 retries=0 torn_flagged=0 final_ok=0
+E7RESULT name=recover m=37 pin=1 tail=32 torn=1 algo=a2_skip completed=1 aborted=0 replayed=5 mismatches=1 skipped=1 retries=0 torn_flagged=0 final_ok=1
+E7RESULT name=recover m=37 pin=1 tail=32 torn=1 algo=b_watermark completed=1 aborted=0 replayed=0 mismatches=1 skipped=0 retries=0 torn_flagged=1 final_ok=1
+E7RESULT name=recover m=37 pin=1 tail=32 torn=1 algo=c_blind_walk completed=1 aborted=0 replayed=5 mismatches=0 skipped=0 retries=1 torn_flagged=1 final_ok=1
+E7RESULT name=done emitted=42

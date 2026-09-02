@@ -93,6 +93,7 @@ bash .claude/gate.d/28-cross-decision-status.sh # 说某条决策未定，而它
 bash .claude/gate.d/29-settled-item-self-open.sh # 已定分项的正文里说自己还没定
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/31-blocking-verdict.sh # 每个未定项有没有判过改不改第一个事务的字节
+bash .claude/gate.d/32-history-ordinal.sh # 本次新增的历史条目有没有撞号（并发会话共写一个仓）
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）

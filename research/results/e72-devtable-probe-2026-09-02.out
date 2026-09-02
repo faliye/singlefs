@@ -1,0 +1,40 @@
+E7RESULT name=config entry_width=40 disk_mb=16 rounds=5 pool=heterogeneous
+E7RESULT name=scale devs=2 table_entries=2 table_bytes_w40=80 table_bytes_w24=48 table_bytes_w64=128 recheck_ns=24949915
+E7RESULT name=scale devs=4 table_entries=4 table_bytes_w40=160 table_bytes_w24=96 table_bytes_w64=256 recheck_ns=48972777
+E7RESULT name=scale devs=8 table_entries=8 table_bytes_w40=320 table_bytes_w24=192 table_bytes_w64=512 recheck_ns=96247823
+E7RESULT name=item scen=control_unchanged round=1 pbs_mix=4096,512, pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=force_pbs_mismatch round=1 pbs=mismatch cap=ok id=ok layout=ok verdict=refuse_rw
+E7RESULT name=item scen=force_capacity_shrunk round=1 pbs=ok cap=shrunk id=ok layout=ok verdict=refuse
+E7RESULT name=item scen=force_capacity_grown round=1 pbs=ok cap=grown id=ok layout=ok verdict=allow_and_note
+E7RESULT name=item scen=force_devid_swap round=1 pbs=ok cap=ok id=mismatch layout=ok verdict=refuse
+E7RESULT name=item scen=force_unknown_layout round=1 pbs=ok cap=ok id=ok layout=mismatch verdict=refuse
+E7RESULT name=item scen=offlist_readahead_changed round=1 pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=control_unchanged round=2 pbs_mix=4096,512, pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=force_pbs_mismatch round=2 pbs=mismatch cap=ok id=ok layout=ok verdict=refuse_rw
+E7RESULT name=item scen=force_capacity_shrunk round=2 pbs=ok cap=shrunk id=ok layout=ok verdict=refuse
+E7RESULT name=item scen=force_capacity_grown round=2 pbs=ok cap=grown id=ok layout=ok verdict=allow_and_note
+E7RESULT name=item scen=force_devid_swap round=2 pbs=ok cap=ok id=mismatch layout=ok verdict=refuse
+E7RESULT name=item scen=force_unknown_layout round=2 pbs=ok cap=ok id=ok layout=mismatch verdict=refuse
+E7RESULT name=item scen=offlist_readahead_changed round=2 pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=control_unchanged round=3 pbs_mix=4096,512, pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=force_pbs_mismatch round=3 pbs=mismatch cap=ok id=ok layout=ok verdict=refuse_rw
+E7RESULT name=item scen=force_capacity_shrunk round=3 pbs=ok cap=shrunk id=ok layout=ok verdict=refuse
+E7RESULT name=item scen=force_capacity_grown round=3 pbs=ok cap=grown id=ok layout=ok verdict=allow_and_note
+E7RESULT name=item scen=force_devid_swap round=3 pbs=ok cap=ok id=mismatch layout=ok verdict=refuse
+E7RESULT name=item scen=force_unknown_layout round=3 pbs=ok cap=ok id=ok layout=mismatch verdict=refuse
+E7RESULT name=item scen=offlist_readahead_changed round=3 pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=control_unchanged round=4 pbs_mix=4096,512, pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=force_pbs_mismatch round=4 pbs=mismatch cap=ok id=ok layout=ok verdict=refuse_rw
+E7RESULT name=item scen=force_capacity_shrunk round=4 pbs=ok cap=shrunk id=ok layout=ok verdict=refuse
+E7RESULT name=item scen=force_capacity_grown round=4 pbs=ok cap=grown id=ok layout=ok verdict=allow_and_note
+E7RESULT name=item scen=force_devid_swap round=4 pbs=ok cap=ok id=mismatch layout=ok verdict=refuse
+E7RESULT name=item scen=force_unknown_layout round=4 pbs=ok cap=ok id=ok layout=mismatch verdict=refuse
+E7RESULT name=item scen=offlist_readahead_changed round=4 pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=control_unchanged round=5 pbs_mix=4096,512, pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=item scen=force_pbs_mismatch round=5 pbs=mismatch cap=ok id=ok layout=ok verdict=refuse_rw
+E7RESULT name=item scen=force_capacity_shrunk round=5 pbs=ok cap=shrunk id=ok layout=ok verdict=refuse
+E7RESULT name=item scen=force_capacity_grown round=5 pbs=ok cap=grown id=ok layout=ok verdict=allow_and_note
+E7RESULT name=item scen=force_devid_swap round=5 pbs=ok cap=ok id=mismatch layout=ok verdict=refuse
+E7RESULT name=item scen=force_unknown_layout round=5 pbs=ok cap=ok id=ok layout=mismatch verdict=refuse
+E7RESULT name=item scen=offlist_readahead_changed round=5 pbs=ok cap=ok id=ok layout=ok verdict=allow
+E7RESULT name=done emitted=40

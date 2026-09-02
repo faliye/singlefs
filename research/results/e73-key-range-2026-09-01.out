@@ -1,0 +1,26 @@
+E7RESULT name=config node=16384 key_bytes=22 child_ptr=32 entry=54 stats=9 model=arithmetic file_ops=0
+E7RESULT name=fanout base_header=32 arm=with_range header=76 fanout=302
+E7RESULT name=fanout base_header=32 arm=without_range header=32 fanout=302
+E7RESULT name=fanout base_header=64 arm=with_range header=108 fanout=301
+E7RESULT name=fanout base_header=64 arm=without_range header=64 fanout=302
+E7RESULT name=fanout base_header=128 arm=with_range header=172 fanout=300
+E7RESULT name=fanout base_header=128 arm=without_range header=128 fanout=301
+E7RESULT name=height entries=4075 base_header=32 fanout_with=302 fanout_without=302 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=4075 base_header=64 fanout_with=301 fanout_without=302 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=4075 base_header=128 fanout_with=300 fanout_without=301 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=59200 base_header=32 fanout_with=302 fanout_without=302 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=59200 base_header=64 fanout_with=301 fanout_without=302 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=59200 base_header=128 fanout_with=300 fanout_without=301 height_with=2 height_without=2 grew=0
+E7RESULT name=height entries=115200 base_header=32 fanout_with=302 fanout_without=302 height_with=3 height_without=3 grew=0
+E7RESULT name=height entries=115200 base_header=64 fanout_with=301 fanout_without=302 height_with=3 height_without=3 grew=0
+E7RESULT name=height entries=115200 base_header=128 fanout_with=300 fanout_without=301 height_with=3 height_without=3 grew=0
+E7RESULT name=height entries=1000000 base_header=32 fanout_with=302 fanout_without=302 height_with=3 height_without=3 grew=0
+E7RESULT name=height entries=1000000 base_header=64 fanout_with=301 fanout_without=302 height_with=3 height_without=3 grew=0
+E7RESULT name=height entries=1000000 base_header=128 fanout_with=300 fanout_without=301 height_with=3 height_without=3 grew=0
+E7RESULT name=orphan_self_describes arm=with_range answered=1 range=100..200
+E7RESULT name=orphan_self_describes arm=without_range answered=0 range=NA
+E7RESULT name=positive_control_huge_key key_bytes=4096 header=8256 fanout=150 fanout_normal=301 collapsed=1
+E7RESULT name=write_amp entries=4075 nodes_rewritten_with=2 nodes_rewritten_without=2
+E7RESULT name=write_amp entries=115200 nodes_rewritten_with=3 nodes_rewritten_without=3
+E7RESULT name=write_amp entries=1000000 nodes_rewritten_with=3 nodes_rewritten_without=3
+E7RESULT name=done emitted=26

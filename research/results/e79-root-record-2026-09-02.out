@@ -1,0 +1,8 @@
+E7RESULT name=config head_base=76 watermark=10 tree_entry=61 model=arithmetic file_ops=0
+E7RESULT name=flat slot=512 watermark=0 capacity_trees=7 fits_v1_min3=1 fits_v1_common7=1
+E7RESULT name=flat slot=512 watermark=1 capacity_trees=6 fits_v1_min3=1 fits_v1_common7=0
+E7RESULT name=flat slot=4096 watermark=0 capacity_trees=65 fits_v1_min3=1 fits_v1_common7=1
+E7RESULT name=flat slot=4096 watermark=1 capacity_trees=65 fits_v1_min3=1 fits_v1_common7=1
+E7RESULT name=indirect table_unit_trees=267 extra_units_per_publish=1 publish_overhead_blocks_pct=7.1 publish_overhead_bytes=16384 
+E7RESULT name=headroom slot512_used_if_7_trees=513 overflows_512=1
+E7RESULT name=done emitted=8

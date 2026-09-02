@@ -1,0 +1,5 @@
+M1_树条目漏掉第二个位置条目	const TREE_ENTRY: u64 = 8 + 31 + 11 * 2;	const TREE_ENTRY: u64 = 8 + 31 + 11;
+M2_固定头漏掉自证校验和	const HEAD_BASE: u64 = 4 + 16 + 4 + 8 + 8 + 4 + 32;	const HEAD_BASE: u64 = 4 + 16 + 4 + 8 + 8 + 4;
+M3_水位字段被记成0	const WATERMARK: u64 = 10;	const WATERMARK: u64 = 0;
+M4_容量除法变成向上取整	slot.saturating_sub(head) / TREE_ENTRY	slot.saturating_sub(head).div_ceil(TREE_ENTRY)
+M5_树表单元忘了扣单元头	(NODE_BYTES - UNIT_HDR - 32) / TREE_ENTRY	(NODE_BYTES - 32) / TREE_ENTRY

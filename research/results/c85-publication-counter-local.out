@@ -1,0 +1,7 @@
+1. Proposed proposed decision scenario breaking F5: during a single checkpoint window of 5 seconds, two fsync operations occur. The proposed decision increments checkpoint_txg for each publication (e.g., first fsync sets checkpoint_txg=100, second sets checkpoint_txg=101). However, F5 states that all journal records within one checkpoint window must share the same checkpoint_txg. This causes journal records to have different checkpoint_txg values, violating F5.
+
+2. re alternative scenario breaking F3: with R=3 regions and S=1 slot per region, a checkpoint window has checkpoint_txg=100. Two fsync operations trigger publications. Both compute region 100 mod 3 = 1 and write to slot 0. The second publication overwrites the first. The root ring now contains only one root (txg=100), violating I-7.3 which requires at least one older-generation root besides the newest.
+
+3. F9 claim check: yes, the scenario is reachable. F1 permits multiple fsyncs within one checkpoint window, F5 requires all journal records in the window to share the same checkpoint_txg, and with S=1 slot per region, the same region and slot are reused, causing overwrite of the previous root.
+
+4. The proposed decision has a reachable break (F5 violation) that is unavoidable. The alternative has a break only if slots per region is 1. The single measurement that would most change the answer is the actual slots per region value used in the system.

@@ -1,0 +1,9 @@
+M1_A1不再中止失配当没看见	Algo::A1AbortOnMismatch => {\n                            // 把失配当损坏，恢复中止。\n                            run.aborted = true;\n                            return run;\n                        }	Algo::A1AbortOnMismatch => {\n                            run.skipped += 1;\n                        }
+M2_B的水位起点退回tail	Algo::BWatermark => w.root_watermark,	Algo::BWatermark => w.tail,
+M3_C的收尾走读恒过	if walk_ok {	if true {
+M4_C的尾删一次删光	keep -= 1;	keep = 0;
+M5_PIN窗口被无视释放立刻进池	if f + pin <= p {	if f <= p {
+M6_追踪器漏数窗口边界	<= w.m) {\n            n += 1;	< w.m) {\n            n += 1;
+M7_撕裂构造其实落盘了	let r = Record { jsn: p, object: o as u64, block: nb, tag: p };\n        ring[(p % RING) as usize] = Some(r);	let r = Record { jsn: p, object: o as u64, block: nb, tag: p };\n        content[nb as usize] = p;\n        ring[(p % RING) as usize] = Some(r);
+M8_断号不再止步	Some(r) if r.jsn == expect => {	Some(r) => {
+M9_审计只看长度不看内容	run.final_map == w.root_map	run.final_map.len() == w.root_map.len()

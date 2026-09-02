@@ -1,0 +1,8 @@
+M1_区间字段没进节点头	Arm::WithRange => base + 2 * key_bytes, // min_key + max_key	Arm::WithRange => base,
+M2_只算一个key字段	base + 2 * key_bytes	base + key_bytes
+M3_扇出少扣一次头	    (node - header) / entry	    node / entry
+M4_树高少算一层	    let mut h = 1u64;	    let mut h = 0u64;
+M5_guard收紧把扇出2也判掉	    if f < 2 {\n        return None;\n    }	    if f < 3 {\n        return None;\n    }
+M6_不带区间的臂也能自证	        Arm::WithoutRange => None,	        Arm::WithoutRange => stored,
+M7_节点大小写错	const NODE_BYTES: u64 = 16384;	const NODE_BYTES: u64 = 32768;
+M8_key宽度少一段	const KEY_BYTES: u64 = KEY_TAG + KEY_TREE + KEY_DEV + KEY_GEN; // 22	const KEY_BYTES: u64 = KEY_TAG + KEY_TREE + KEY_DEV; // 22
