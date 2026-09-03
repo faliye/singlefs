@@ -1,0 +1,12 @@
+M1_波漏掉快照根	let roots: Vec<u32> =\n        std::iter::once(w.live_root).chain(w.snaps.iter().map(|s| s.root)).collect();	let roots: Vec<u32> = std::iter::once(w.live_root).collect();
+M2_重建叶不改槽位	if let Some(&(_, new_slot)) = plan.get(&e.ver) {\n                    e.slot = new_slot;\n                    hit = true;\n                }	if let Some(&(_, _new_slot)) = plan.get(&e.ver) {\n                    hit = true;\n                }
+M3_记忆化污染	memo.insert(node, result);\n    result	memo.insert(node, None);\n    result
+M4_deadlist只计数不改写	if let Some(&(_, new_slot)) = plan.get(&e.ver) {\n                e.slot = new_slot;\n                dl += 1;\n            }	if let Some(&(_, _new_slot)) = plan.get(&e.ver) {\n                dl += 1;\n            }
+# M5_销毁丢弃被转移条目：判定为等价变异——只销毁最旧者的轮换下被销毁者自己的 deadlist 恒空（等价性测试 oldest_first_rotation_means_own_deadlist_already_empty 留档），换 M5b 补位
+M5b_销毁不传递prev	if let Some(next) = self.snaps.first_mut() {\n            next.deadlist = kept;\n            next.prev_txg = s.prev_txg;\n        }	if let Some(next) = self.snaps.first_mut() {\n            next.deadlist = kept;\n        }
+M6_销毁过滤方向反	if self.versions[e.ver as usize].birth > s.prev_txg {	if self.versions[e.ver as usize].birth <= s.prev_txg {
+M7_映射树漏数叶层	let mut created = level.len() as u64;	let mut created = 0u64;
+M8_负臂判据抄树审计	let by_interval = w.interval_refs(v);	let by_interval = by_tree.clone();
+M9_审计不看deadlist	for snap in &w.snaps {\n                for e in &snap.deadlist {\n                    if old_slots.contains(&e.slot) {\n                        stale += 1;\n                    }\n                }\n            }	for snap in &w.snaps {\n                let _ = &snap.deadlist;\n            }
+M10_区间右边界写闭	.filter(|(_, s)| v.birth <= s.txg && s.txg < v.death)	.filter(|(_, s)| v.birth <= s.txg && s.txg <= v.death)
+M11_搬迁不还旧槽	assert_eq!(w.occupant.remove(&old_slot), Some(ver));\n        w.free.insert(old_slot);	assert_eq!(w.occupant.remove(&old_slot), Some(ver));

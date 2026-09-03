@@ -1,0 +1,12 @@
+M1_头匹配无视birth	Header::KeyBirth => occupant_ver == wanted,	Header::KeyBirth => self.versions[occupant_ver as usize].key == self.versions[wanted as usize].key,
+M2_失配后假装读对	let slot = self.map_slot[&e.ver];\n        (self.occupant[&slot], true)	let _ = &e; (e.ver, true)
+M3_整理不改映射	self.occupant.insert(new, ver);\n        self.map_slot.insert(ver, new);\n        assert_eq!(self.occupant.remove(&old), Some(ver));	self.occupant.insert(new, ver);\n        assert_eq!(self.occupant.remove(&old), Some(ver));
+M4_误放计数不比版本	if self.occupant.get(&e.hint) != Some(&e.ver) {	if false {
+M5_释放按提示解落点	let slot = self.map_slot[&e.ver];\n                self.release(slot, e.ver);	let slot = e.hint;\n                self.release(slot, e.ver);
+M6_独立扫描漏掉同key条件	if occ != e.ver && self.versions[occ as usize].key == self.versions[e.ver as usize].key {	if occ != e.ver {
+M7_崩溃回滚漏撤新副本	w.occupant.remove(&new);\n            w.free.insert(new);	w.free.insert(new);
+M8_更新不刷新提示	es[idx] = Entry { ver, hint: slot };	es[idx] = Entry { ver, hint: old.hint };
+M9_LIFO退化成最低空槽	Alloc::Lifo => loop {\n                match self.free_order.pop() {\n                    Some(s) if self.free.contains(&s) => break s,\n                    Some(_) => continue,\n                    None => break *self.free.iter().next().expect("槽用尽"),\n                }\n            },	Alloc::Lifo => *self.free.iter().next().expect("槽用尽"),
+M10_扫描游标不推进	self.sweep = out.last().map(|&(s, _)| s + 1).unwrap_or(0);	let _ = &out;
+M11_审计漏反向核对	for (&slot, &v) in &self.occupant {\n            if self.map_slot.get(&v) != Some(&slot) {\n                return Err(format!("槽 {slot} 被 {v} 占着但映射不指回来"));\n            }\n        }	let _ = &self.occupant;
+M12_读永远回映射	if let Some(&occ) = self.occupant.get(&e.hint) {\n            if self.header_matches(occ, e.ver) {\n                return (occ, false);\n            }\n        }	let _ = &e.hint;

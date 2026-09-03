@@ -1,0 +1,242 @@
+E7RESULT name=config l=4096 f=16 s=32768 n_batch=64 model=counting file_ops=0 seeds=5
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=17 root_refs=2 dl_rewrites=2 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=10 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=phys seed=0 key_runs=5 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=1 u=64 batch=phys seed=0 violations=64
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=19 root_refs=2 dl_rewrites=1 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=13 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=phys seed=1 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=1 u=64 batch=phys seed=1 violations=63
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=20 root_refs=2 dl_rewrites=2 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=13 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=phys seed=2 key_runs=8 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=1 u=64 batch=phys seed=2 violations=63
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=15 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=12 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=phys seed=3 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=1 u=64 batch=phys seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=20 root_refs=2 dl_rewrites=2 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=12 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=phys seed=4 key_runs=7 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=1 u=64 batch=phys seed=4 violations=64
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=8 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=keyclu seed=0 key_runs=1 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=1 u=64 batch=keyclu seed=0 violations=64
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=9 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=keyclu seed=1 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=1 u=64 batch=keyclu seed=1 violations=63
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=8 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=keyclu seed=2 key_runs=1 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=1 u=64 batch=keyclu seed=2 violations=64
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=9 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=keyclu seed=3 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=1 u=64 batch=keyclu seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=1 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=12 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=64 batch=keyclu seed=4 key_runs=1 moved=4 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=60
+E7RESULT name=new_birth k=1 u=64 batch=keyclu seed=4 violations=60
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=phys seed=0 key_runs=51 moved=64 cow_nodes=100 root_refs=2 dl_rewrites=11 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=phys seed=0 key_runs=51 moved=64 cow_nodes=55 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=phys seed=0 key_runs=51 moved=8 cow_nodes=16 root_refs=1 dl_rewrites=0 skipped=56
+E7RESULT name=new_birth k=1 u=1024 batch=phys seed=0 violations=56
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=phys seed=1 key_runs=60 moved=64 cow_nodes=109 root_refs=2 dl_rewrites=11 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=phys seed=1 key_runs=60 moved=64 cow_nodes=62 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=phys seed=1 key_runs=60 moved=12 cow_nodes=22 root_refs=1 dl_rewrites=0 skipped=52
+E7RESULT name=new_birth k=1 u=1024 batch=phys seed=1 violations=52
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=phys seed=2 key_runs=60 moved=64 cow_nodes=115 root_refs=2 dl_rewrites=10 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=phys seed=2 key_runs=60 moved=64 cow_nodes=67 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=phys seed=2 key_runs=60 moved=13 cow_nodes=23 root_refs=1 dl_rewrites=0 skipped=51
+E7RESULT name=new_birth k=1 u=1024 batch=phys seed=2 violations=51
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=phys seed=3 key_runs=59 moved=64 cow_nodes=103 root_refs=2 dl_rewrites=12 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=phys seed=3 key_runs=59 moved=64 cow_nodes=59 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=phys seed=3 key_runs=59 moved=5 cow_nodes=11 root_refs=1 dl_rewrites=0 skipped=59
+E7RESULT name=new_birth k=1 u=1024 batch=phys seed=3 violations=59
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=phys seed=4 key_runs=60 moved=64 cow_nodes=106 root_refs=2 dl_rewrites=14 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=phys seed=4 key_runs=60 moved=64 cow_nodes=63 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=phys seed=4 key_runs=60 moved=11 cow_nodes=21 root_refs=1 dl_rewrites=0 skipped=53
+E7RESULT name=new_birth k=1 u=1024 batch=phys seed=4 violations=53
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=12 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=keyclu seed=0 key_runs=1 moved=9 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=55
+E7RESULT name=new_birth k=1 u=1024 batch=keyclu seed=0 violations=55
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=12 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=keyclu seed=1 key_runs=1 moved=17 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=47
+E7RESULT name=new_birth k=1 u=1024 batch=keyclu seed=1 violations=47
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=12 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=keyclu seed=2 key_runs=1 moved=15 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=49
+E7RESULT name=new_birth k=1 u=1024 batch=keyclu seed=2 violations=49
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=11 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=keyclu seed=3 key_runs=1 moved=8 cow_nodes=5 root_refs=1 dl_rewrites=0 skipped=56
+E7RESULT name=new_birth k=1 u=1024 batch=keyclu seed=3 violations=56
+E7RESULT name=move arch=ptr_rewrite k=1 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=12 root_refs=2 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=1 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=1 u=1024 batch=keyclu seed=4 key_runs=1 moved=12 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=52
+E7RESULT name=new_birth k=1 u=1024 batch=keyclu seed=4 violations=52
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=29 root_refs=5 dl_rewrites=6 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=10 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=phys seed=0 key_runs=5 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=4 u=64 batch=phys seed=0 violations=64
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=36 root_refs=5 dl_rewrites=6 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=14 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=phys seed=1 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=4 u=64 batch=phys seed=1 violations=63
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=26 root_refs=5 dl_rewrites=5 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=12 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=phys seed=2 key_runs=8 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=4 u=64 batch=phys seed=2 violations=64
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=27 root_refs=5 dl_rewrites=1 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=13 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=phys seed=3 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=4 u=64 batch=phys seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=36 root_refs=5 dl_rewrites=3 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=12 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=phys seed=4 key_runs=7 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=4 u=64 batch=phys seed=4 violations=64
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=18 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=keyclu seed=0 key_runs=1 moved=2 cow_nodes=4 root_refs=1 dl_rewrites=0 skipped=62
+E7RESULT name=new_birth k=4 u=64 batch=keyclu seed=0 violations=62
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=19 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=keyclu seed=1 key_runs=1 moved=2 cow_nodes=4 root_refs=1 dl_rewrites=0 skipped=62
+E7RESULT name=new_birth k=4 u=64 batch=keyclu seed=1 violations=62
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=16 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=keyclu seed=2 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=4 u=64 batch=keyclu seed=2 violations=63
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=16 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=keyclu seed=3 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=4 u=64 batch=keyclu seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=4 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=20 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=64 batch=keyclu seed=4 key_runs=1 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=4 u=64 batch=keyclu seed=4 violations=64
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=phys seed=0 key_runs=52 moved=64 cow_nodes=162 root_refs=5 dl_rewrites=30 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=phys seed=0 key_runs=52 moved=64 cow_nodes=55 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=phys seed=0 key_runs=52 moved=4 cow_nodes=9 root_refs=1 dl_rewrites=0 skipped=60
+E7RESULT name=new_birth k=4 u=1024 batch=phys seed=0 violations=60
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=phys seed=1 key_runs=59 moved=64 cow_nodes=174 root_refs=5 dl_rewrites=28 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=phys seed=1 key_runs=59 moved=64 cow_nodes=59 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=phys seed=1 key_runs=59 moved=9 cow_nodes=17 root_refs=1 dl_rewrites=0 skipped=55
+E7RESULT name=new_birth k=4 u=1024 batch=phys seed=1 violations=55
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=phys seed=2 key_runs=59 moved=64 cow_nodes=200 root_refs=5 dl_rewrites=22 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=phys seed=2 key_runs=59 moved=64 cow_nodes=65 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=phys seed=2 key_runs=59 moved=8 cow_nodes=14 root_refs=1 dl_rewrites=0 skipped=56
+E7RESULT name=new_birth k=4 u=1024 batch=phys seed=2 violations=56
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=phys seed=3 key_runs=57 moved=64 cow_nodes=181 root_refs=5 dl_rewrites=21 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=phys seed=3 key_runs=57 moved=64 cow_nodes=61 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=phys seed=3 key_runs=57 moved=5 cow_nodes=10 root_refs=1 dl_rewrites=0 skipped=59
+E7RESULT name=new_birth k=4 u=1024 batch=phys seed=3 violations=59
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=phys seed=4 key_runs=59 moved=64 cow_nodes=194 root_refs=5 dl_rewrites=26 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=phys seed=4 key_runs=59 moved=64 cow_nodes=62 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=phys seed=4 key_runs=59 moved=4 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=60
+E7RESULT name=new_birth k=4 u=1024 batch=phys seed=4 violations=60
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=30 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=keyclu seed=0 key_runs=1 moved=16 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=48
+E7RESULT name=new_birth k=4 u=1024 batch=keyclu seed=0 violations=48
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=30 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=keyclu seed=1 key_runs=1 moved=7 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=57
+E7RESULT name=new_birth k=4 u=1024 batch=keyclu seed=1 violations=57
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=30 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=keyclu seed=2 key_runs=1 moved=11 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=53
+E7RESULT name=new_birth k=4 u=1024 batch=keyclu seed=2 violations=53
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=29 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=keyclu seed=3 key_runs=1 moved=12 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=52
+E7RESULT name=new_birth k=4 u=1024 batch=keyclu seed=3 violations=52
+E7RESULT name=move arch=ptr_rewrite k=4 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=30 root_refs=5 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=4 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=4 u=1024 batch=keyclu seed=4 key_runs=1 moved=14 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=50
+E7RESULT name=new_birth k=4 u=1024 batch=keyclu seed=4 violations=50
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=58 root_refs=17 dl_rewrites=12 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=phys seed=0 key_runs=5 moved=64 cow_nodes=9 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=phys seed=0 key_runs=5 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=16 u=64 batch=phys seed=0 violations=64
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=70 root_refs=17 dl_rewrites=13 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=phys seed=1 key_runs=9 moved=64 cow_nodes=13 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=phys seed=1 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=16 u=64 batch=phys seed=1 violations=63
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=74 root_refs=17 dl_rewrites=16 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=phys seed=2 key_runs=8 moved=64 cow_nodes=14 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=phys seed=2 key_runs=8 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=16 u=64 batch=phys seed=2 violations=64
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=60 root_refs=17 dl_rewrites=13 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=phys seed=3 key_runs=9 moved=64 cow_nodes=13 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=phys seed=3 key_runs=9 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=16 u=64 batch=phys seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=99 root_refs=17 dl_rewrites=13 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=phys seed=4 key_runs=7 moved=64 cow_nodes=12 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=phys seed=4 key_runs=7 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=16 u=64 batch=phys seed=4 violations=64
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=48 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=keyclu seed=0 key_runs=1 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=16 u=64 batch=keyclu seed=0 violations=64
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=49 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=keyclu seed=1 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=16 u=64 batch=keyclu seed=1 violations=63
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=50 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=keyclu seed=2 key_runs=1 moved=0 cow_nodes=0 root_refs=0 dl_rewrites=0 skipped=64
+E7RESULT name=new_birth k=16 u=64 batch=keyclu seed=2 violations=64
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=51 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=keyclu seed=3 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=16 u=64 batch=keyclu seed=3 violations=63
+E7RESULT name=move arch=ptr_rewrite k=16 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=53 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=64 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=64 batch=keyclu seed=4 key_runs=1 moved=1 cow_nodes=3 root_refs=1 dl_rewrites=0 skipped=63
+E7RESULT name=new_birth k=16 u=64 batch=keyclu seed=4 violations=63
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=phys seed=0 key_runs=52 moved=64 cow_nodes=219 root_refs=17 dl_rewrites=39 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=phys seed=0 key_runs=52 moved=64 cow_nodes=52 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=phys seed=0 key_runs=52 moved=4 cow_nodes=8 root_refs=1 dl_rewrites=0 skipped=60
+E7RESULT name=new_birth k=16 u=1024 batch=phys seed=0 violations=60
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=phys seed=1 key_runs=61 moved=64 cow_nodes=255 root_refs=15 dl_rewrites=30 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=phys seed=1 key_runs=61 moved=64 cow_nodes=62 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=phys seed=1 key_runs=61 moved=9 cow_nodes=16 root_refs=1 dl_rewrites=0 skipped=55
+E7RESULT name=new_birth k=16 u=1024 batch=phys seed=1 violations=55
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=phys seed=2 key_runs=60 moved=64 cow_nodes=241 root_refs=17 dl_rewrites=30 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=phys seed=2 key_runs=60 moved=64 cow_nodes=66 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=phys seed=2 key_runs=60 moved=8 cow_nodes=14 root_refs=1 dl_rewrites=0 skipped=56
+E7RESULT name=new_birth k=16 u=1024 batch=phys seed=2 violations=56
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=phys seed=3 key_runs=57 moved=64 cow_nodes=244 root_refs=17 dl_rewrites=38 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=phys seed=3 key_runs=57 moved=64 cow_nodes=57 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=phys seed=3 key_runs=57 moved=5 cow_nodes=11 root_refs=1 dl_rewrites=0 skipped=59
+E7RESULT name=new_birth k=16 u=1024 batch=phys seed=3 violations=59
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=phys seed=4 key_runs=60 moved=64 cow_nodes=261 root_refs=17 dl_rewrites=36 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=phys seed=4 key_runs=60 moved=64 cow_nodes=65 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=phys seed=4 key_runs=60 moved=4 cow_nodes=9 root_refs=1 dl_rewrites=0 skipped=60
+E7RESULT name=new_birth k=16 u=1024 batch=phys seed=4 violations=60
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=74 root_refs=15 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=keyclu seed=0 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=keyclu seed=0 key_runs=1 moved=11 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=53
+E7RESULT name=new_birth k=16 u=1024 batch=keyclu seed=0 violations=53
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=80 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=keyclu seed=1 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=keyclu seed=1 key_runs=1 moved=14 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=50
+E7RESULT name=new_birth k=16 u=1024 batch=keyclu seed=1 violations=50
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=83 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=keyclu seed=2 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=keyclu seed=2 key_runs=1 moved=15 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=49
+E7RESULT name=new_birth k=16 u=1024 batch=keyclu seed=2 violations=49
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=93 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=keyclu seed=3 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=keyclu seed=3 key_runs=1 moved=14 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=50
+E7RESULT name=new_birth k=16 u=1024 batch=keyclu seed=3 violations=50
+E7RESULT name=move arch=ptr_rewrite k=16 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=98 root_refs=17 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=central_map k=16 u=1024 batch=keyclu seed=4 key_runs=1 moved=64 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=0
+E7RESULT name=move arch=skip_shared k=16 u=1024 batch=keyclu seed=4 key_runs=1 moved=10 cow_nodes=6 root_refs=1 dl_rewrites=0 skipped=54
+E7RESULT name=new_birth k=16 u=1024 batch=keyclu seed=4 violations=54
+E7RESULT name=done emitted=242

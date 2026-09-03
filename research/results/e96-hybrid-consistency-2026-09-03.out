@@ -1,0 +1,50 @@
+E7RESULT name=config l=4096 f=16 s=32768 n_batch=64 u_per_round=64 rounds=200 snap_every=8 k_snap=4 model=counting file_ops=0 seeds=5
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=uniform seed=0 wrong_total=65 wrong_last=0 hop_live_mid=30.4 hop_live_last=30.3 hop_snap_mid=37.7 hop_snap_last=36.6 misfree_via_hint=5058 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_key alloc=alloc_lowest load=uniform seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=uniform seed=1 wrong_total=0 wrong_last=0 hop_live_mid=31.2 hop_live_last=30.2 hop_snap_mid=37.7 hop_snap_last=36.4 misfree_via_hint=5039 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=uniform seed=2 wrong_total=72 wrong_last=0 hop_live_mid=30.3 hop_live_last=31.0 hop_snap_mid=37.1 hop_snap_last=37.0 misfree_via_hint=5105 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=uniform seed=3 wrong_total=0 wrong_last=0 hop_live_mid=31.2 hop_live_last=31.4 hop_snap_mid=38.0 hop_snap_last=37.4 misfree_via_hint=5065 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=uniform seed=4 wrong_total=69 wrong_last=0 hop_live_mid=30.2 hop_live_last=30.9 hop_snap_mid=37.1 hop_snap_last=37.4 misfree_via_hint=5123 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=adversarial seed=0 wrong_total=4052 wrong_last=25 hop_live_mid=15.5 hop_live_last=21.4 hop_snap_mid=25.0 hop_snap_last=30.0 misfree_via_hint=6093 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_key alloc=alloc_lowest load=adversarial seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=adversarial seed=1 wrong_total=3925 wrong_last=22 hop_live_mid=15.8 hop_live_last=20.9 hop_snap_mid=26.1 hop_snap_last=29.4 misfree_via_hint=6125 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=adversarial seed=2 wrong_total=3992 wrong_last=31 hop_live_mid=15.6 hop_live_last=20.3 hop_snap_mid=26.1 hop_snap_last=29.1 misfree_via_hint=6158 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=adversarial seed=3 wrong_total=4503 wrong_last=24 hop_live_mid=16.0 hop_live_last=19.9 hop_snap_mid=26.2 hop_snap_last=28.9 misfree_via_hint=6104 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lowest load=adversarial seed=4 wrong_total=4326 wrong_last=25 hop_live_mid=15.2 hop_live_last=21.0 hop_snap_mid=25.4 hop_snap_last=29.7 misfree_via_hint=6138 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=uniform seed=0 wrong_total=66 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.4 hop_snap_mid=35.0 hop_snap_last=35.3 misfree_via_hint=4936 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_key alloc=alloc_lifo load=uniform seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=uniform seed=1 wrong_total=48 wrong_last=0 hop_live_mid=28.2 hop_live_last=29.1 hop_snap_mid=35.4 hop_snap_last=35.0 misfree_via_hint=4917 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=uniform seed=2 wrong_total=40 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.9 hop_snap_mid=34.3 hop_snap_last=35.7 misfree_via_hint=4929 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=uniform seed=3 wrong_total=128 wrong_last=0 hop_live_mid=28.4 hop_live_last=29.4 hop_snap_mid=35.6 hop_snap_last=35.3 misfree_via_hint=4861 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=uniform seed=4 wrong_total=57 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.8 hop_snap_mid=34.5 hop_snap_last=35.8 misfree_via_hint=4966 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=adversarial seed=0 wrong_total=5259 wrong_last=17 hop_live_mid=16.2 hop_live_last=19.0 hop_snap_mid=26.3 hop_snap_last=27.4 misfree_via_hint=6030 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_key alloc=alloc_lifo load=adversarial seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=adversarial seed=1 wrong_total=4848 wrong_last=17 hop_live_mid=16.2 hop_live_last=19.6 hop_snap_mid=26.6 hop_snap_last=27.8 misfree_via_hint=6003 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=adversarial seed=2 wrong_total=4581 wrong_last=23 hop_live_mid=15.6 hop_live_last=19.3 hop_snap_mid=26.0 hop_snap_last=27.7 misfree_via_hint=6061 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=adversarial seed=3 wrong_total=5014 wrong_last=18 hop_live_mid=16.1 hop_live_last=20.1 hop_snap_mid=25.8 hop_snap_last=28.1 misfree_via_hint=6027 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_key alloc=alloc_lifo load=adversarial seed=4 wrong_total=5053 wrong_last=19 hop_live_mid=15.3 hop_live_last=20.2 hop_snap_mid=26.1 hop_snap_last=28.8 misfree_via_hint=6078 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=uniform seed=0 wrong_total=0 wrong_last=0 hop_live_mid=30.4 hop_live_last=30.3 hop_snap_mid=37.7 hop_snap_last=36.6 misfree_via_hint=5058 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_birth alloc=alloc_lowest load=uniform seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=uniform seed=1 wrong_total=0 wrong_last=0 hop_live_mid=31.2 hop_live_last=30.2 hop_snap_mid=37.7 hop_snap_last=36.4 misfree_via_hint=5039 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=uniform seed=2 wrong_total=0 wrong_last=0 hop_live_mid=30.3 hop_live_last=31.0 hop_snap_mid=37.1 hop_snap_last=37.0 misfree_via_hint=5105 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=uniform seed=3 wrong_total=0 wrong_last=0 hop_live_mid=31.2 hop_live_last=31.4 hop_snap_mid=38.0 hop_snap_last=37.4 misfree_via_hint=5065 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=uniform seed=4 wrong_total=0 wrong_last=0 hop_live_mid=30.2 hop_live_last=30.9 hop_snap_mid=37.1 hop_snap_last=37.4 misfree_via_hint=5123 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=0 wrong_total=0 wrong_last=0 hop_live_mid=15.5 hop_live_last=21.4 hop_snap_mid=25.1 hop_snap_last=30.2 misfree_via_hint=6093 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=1 wrong_total=0 wrong_last=0 hop_live_mid=15.8 hop_live_last=20.9 hop_snap_mid=26.2 hop_snap_last=29.5 misfree_via_hint=6125 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=2 wrong_total=0 wrong_last=0 hop_live_mid=15.6 hop_live_last=20.3 hop_snap_mid=26.2 hop_snap_last=29.3 misfree_via_hint=6158 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=3 wrong_total=0 wrong_last=0 hop_live_mid=16.0 hop_live_last=19.9 hop_snap_mid=26.3 hop_snap_last=29.0 misfree_via_hint=6104 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lowest load=adversarial seed=4 wrong_total=0 wrong_last=0 hop_live_mid=15.2 hop_live_last=21.0 hop_snap_mid=25.5 hop_snap_last=29.9 misfree_via_hint=6138 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=uniform seed=0 wrong_total=0 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.4 hop_snap_mid=35.0 hop_snap_last=35.3 misfree_via_hint=4936 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_birth alloc=alloc_lifo load=uniform seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=uniform seed=1 wrong_total=0 wrong_last=0 hop_live_mid=28.2 hop_live_last=29.1 hop_snap_mid=35.4 hop_snap_last=35.0 misfree_via_hint=4917 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=uniform seed=2 wrong_total=0 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.9 hop_snap_mid=34.3 hop_snap_last=35.7 misfree_via_hint=4929 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=uniform seed=3 wrong_total=0 wrong_last=0 hop_live_mid=28.4 hop_live_last=29.4 hop_snap_mid=35.6 hop_snap_last=35.3 misfree_via_hint=4861 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=uniform seed=4 wrong_total=0 wrong_last=0 hop_live_mid=27.1 hop_live_last=29.8 hop_snap_mid=34.5 hop_snap_last=35.8 misfree_via_hint=4966 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=0 wrong_total=0 wrong_last=0 hop_live_mid=16.2 hop_live_last=19.0 hop_snap_mid=26.4 hop_snap_last=27.5 misfree_via_hint=6030 misfree_via_map=0
+E7RESULT name=crash hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=0 wrong_delta_after_cut=1:0,2:0,3:0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=1 wrong_total=0 wrong_last=0 hop_live_mid=16.2 hop_live_last=19.6 hop_snap_mid=26.7 hop_snap_last=27.9 misfree_via_hint=6003 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=2 wrong_total=0 wrong_last=0 hop_live_mid=15.6 hop_live_last=19.3 hop_snap_mid=26.0 hop_snap_last=27.8 misfree_via_hint=6061 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=3 wrong_total=0 wrong_last=0 hop_live_mid=16.1 hop_live_last=20.1 hop_snap_mid=25.9 hop_snap_last=28.2 misfree_via_hint=6027 misfree_via_map=0
+E7RESULT name=hybrid hdr=hdr_birth alloc=alloc_lifo load=adversarial seed=4 wrong_total=0 wrong_last=0 hop_live_mid=15.3 hop_live_last=20.2 hop_snap_mid=26.2 hop_snap_last=28.9 misfree_via_hint=6078 misfree_via_map=0
+E7RESULT name=done emitted=50

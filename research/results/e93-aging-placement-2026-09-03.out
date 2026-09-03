@@ -1,0 +1,107 @@
+E7RESULT name=config l=8192 s=10240 g=64 d=64 t=2000 model=counting file_ops=0 seeds=5
+E7RESULT name=control arm=first_fit scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_seg scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_nb_r1 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_nb_r2 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_cp_b32 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_cp_b128 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=bump_cp_b256 scatter_runs=8192 compact_runs=1
+E7RESULT name=traj arm=first_fit load=uniform seed=0 runs=0:1,500:8184,1000:8189,1500:8189,2000:8184
+E7RESULT name=aging arm=first_fit load=uniform seed=0 runs_final=8184 f_pct=99.90 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=uniform seed=1 runs_final=8182 f_pct=99.88 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=uniform seed=2 runs_final=8187 f_pct=99.94 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=uniform seed=3 runs_final=8188 f_pct=99.95 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=uniform seed=4 runs_final=8186 f_pct=99.93 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging_median arm=first_fit load=uniform runs_final_median=8186
+E7RESULT name=traj arm=first_fit load=runs8 seed=0 runs=0:1,500:5836,1000:7416,1500:7885,2000:7989
+E7RESULT name=aging arm=first_fit load=runs8 seed=0 runs_final=7989 f_pct=97.52 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=runs8 seed=1 runs_final=8002 f_pct=97.68 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=runs8 seed=2 runs_final=7997 f_pct=97.62 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=runs8 seed=3 runs_final=8002 f_pct=97.68 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging arm=first_fit load=runs8 seed=4 runs_final=7981 f_pct=97.42 write_amp=1.000 fallback_pct=0.0
+E7RESULT name=aging_median arm=first_fit load=runs8 runs_final_median=7997
+E7RESULT name=traj arm=bump_seg load=uniform seed=0 runs=0:1,500:8180,1000:8188,1500:8186,2000:8186
+E7RESULT name=aging arm=bump_seg load=uniform seed=0 runs_final=8186 f_pct=99.93 write_amp=1.000 fallback_pct=93.5
+E7RESULT name=aging arm=bump_seg load=uniform seed=1 runs_final=8185 f_pct=99.91 write_amp=1.000 fallback_pct=93.5
+E7RESULT name=aging arm=bump_seg load=uniform seed=2 runs_final=8187 f_pct=99.94 write_amp=1.000 fallback_pct=93.2
+E7RESULT name=aging arm=bump_seg load=uniform seed=3 runs_final=8185 f_pct=99.91 write_amp=1.000 fallback_pct=93.8
+E7RESULT name=aging arm=bump_seg load=uniform seed=4 runs_final=8188 f_pct=99.95 write_amp=1.000 fallback_pct=93.3
+E7RESULT name=aging_median arm=bump_seg load=uniform runs_final_median=8186
+E7RESULT name=traj arm=bump_seg load=runs8 seed=0 runs=0:1,500:5418,1000:6871,1500:7191,2000:7312
+E7RESULT name=aging arm=bump_seg load=runs8 seed=0 runs_final=7312 f_pct=89.26 write_amp=1.000 fallback_pct=92.0
+E7RESULT name=aging arm=bump_seg load=runs8 seed=1 runs_final=7285 f_pct=88.93 write_amp=1.000 fallback_pct=92.2
+E7RESULT name=aging arm=bump_seg load=runs8 seed=2 runs_final=7420 f_pct=90.58 write_amp=1.000 fallback_pct=92.7
+E7RESULT name=aging arm=bump_seg load=runs8 seed=3 runs_final=7239 f_pct=88.37 write_amp=1.000 fallback_pct=91.8
+E7RESULT name=aging arm=bump_seg load=runs8 seed=4 runs_final=7412 f_pct=90.48 write_amp=1.000 fallback_pct=92.0
+E7RESULT name=aging_median arm=bump_seg load=runs8 runs_final_median=7312
+E7RESULT name=traj arm=bump_nb_r1 load=uniform seed=0 runs=0:1,500:5505,1000:5556,1500:5515,2000:5501
+E7RESULT name=aging arm=bump_nb_r1 load=uniform seed=0 runs_final=5501 f_pct=67.15 write_amp=2.977 fallback_pct=35.3
+E7RESULT name=aging arm=bump_nb_r1 load=uniform seed=1 runs_final=5453 f_pct=66.56 write_amp=2.976 fallback_pct=35.7
+E7RESULT name=aging arm=bump_nb_r1 load=uniform seed=2 runs_final=5497 f_pct=67.10 write_amp=2.977 fallback_pct=35.8
+E7RESULT name=aging arm=bump_nb_r1 load=uniform seed=3 runs_final=5579 f_pct=68.10 write_amp=2.977 fallback_pct=36.0
+E7RESULT name=aging arm=bump_nb_r1 load=uniform seed=4 runs_final=5465 f_pct=66.71 write_amp=2.976 fallback_pct=35.6
+E7RESULT name=aging_median arm=bump_nb_r1 load=uniform runs_final_median=5497
+E7RESULT name=traj arm=bump_nb_r1 load=runs8 seed=0 runs=0:1,500:3979,1000:4986,1500:5167,2000:5116
+E7RESULT name=aging arm=bump_nb_r1 load=runs8 seed=0 runs_final=5116 f_pct=62.45 write_amp=1.250 fallback_pct=57.1
+E7RESULT name=aging arm=bump_nb_r1 load=runs8 seed=1 runs_final=5287 f_pct=64.54 write_amp=1.250 fallback_pct=56.3
+E7RESULT name=aging arm=bump_nb_r1 load=runs8 seed=2 runs_final=5181 f_pct=63.24 write_amp=1.250 fallback_pct=56.8
+E7RESULT name=aging arm=bump_nb_r1 load=runs8 seed=3 runs_final=5126 f_pct=62.57 write_amp=1.250 fallback_pct=56.0
+E7RESULT name=aging arm=bump_nb_r1 load=runs8 seed=4 runs_final=5350 f_pct=65.31 write_amp=1.250 fallback_pct=56.9
+E7RESULT name=aging_median arm=bump_nb_r1 load=runs8 runs_final_median=5181
+E7RESULT name=traj arm=bump_nb_r2 load=uniform seed=0 runs=0:1,500:5510,1000:5502,1500:5406,2000:5370
+E7RESULT name=aging arm=bump_nb_r2 load=uniform seed=0 runs_final=5370 f_pct=65.55 write_amp=4.923 fallback_pct=55.3
+E7RESULT name=aging arm=bump_nb_r2 load=uniform seed=1 runs_final=5548 f_pct=67.72 write_amp=4.922 fallback_pct=55.4
+E7RESULT name=aging arm=bump_nb_r2 load=uniform seed=2 runs_final=5444 f_pct=66.46 write_amp=4.923 fallback_pct=55.3
+E7RESULT name=aging arm=bump_nb_r2 load=uniform seed=3 runs_final=5537 f_pct=67.59 write_amp=4.922 fallback_pct=55.2
+E7RESULT name=aging arm=bump_nb_r2 load=uniform seed=4 runs_final=5460 f_pct=66.65 write_amp=4.921 fallback_pct=55.5
+E7RESULT name=aging_median arm=bump_nb_r2 load=uniform runs_final_median=5460
+E7RESULT name=traj arm=bump_nb_r2 load=runs8 seed=0 runs=0:1,500:3934,1000:4799,1500:5008,2000:5068
+E7RESULT name=aging arm=bump_nb_r2 load=runs8 seed=0 runs_final=5068 f_pct=61.87 write_amp=1.499 fallback_pct=59.2
+E7RESULT name=aging arm=bump_nb_r2 load=runs8 seed=1 runs_final=5111 f_pct=62.39 write_amp=1.499 fallback_pct=58.9
+E7RESULT name=aging arm=bump_nb_r2 load=runs8 seed=2 runs_final=5193 f_pct=63.39 write_amp=1.499 fallback_pct=59.1
+E7RESULT name=aging arm=bump_nb_r2 load=runs8 seed=3 runs_final=5056 f_pct=61.72 write_amp=1.499 fallback_pct=59.8
+E7RESULT name=aging arm=bump_nb_r2 load=runs8 seed=4 runs_final=5174 f_pct=63.16 write_amp=1.499 fallback_pct=59.1
+E7RESULT name=aging_median arm=bump_nb_r2 load=runs8 runs_final_median=5111
+E7RESULT name=traj arm=bump_cp_b32 load=uniform seed=0 runs=0:1,500:7498,1000:7466,1500:7476,2000:7524
+E7RESULT name=aging arm=bump_cp_b32 load=uniform seed=0 runs_final=7524 f_pct=91.85 write_amp=1.500 fallback_pct=88.1
+E7RESULT name=aging arm=bump_cp_b32 load=uniform seed=1 runs_final=7563 f_pct=92.32 write_amp=1.500 fallback_pct=88.3
+E7RESULT name=aging arm=bump_cp_b32 load=uniform seed=2 runs_final=7433 f_pct=90.73 write_amp=1.500 fallback_pct=87.6
+E7RESULT name=aging arm=bump_cp_b32 load=uniform seed=3 runs_final=7502 f_pct=91.58 write_amp=1.500 fallback_pct=88.6
+E7RESULT name=aging arm=bump_cp_b32 load=uniform seed=4 runs_final=7424 f_pct=90.62 write_amp=1.500 fallback_pct=88.1
+E7RESULT name=aging_median arm=bump_cp_b32 load=uniform runs_final_median=7502
+E7RESULT name=traj arm=bump_cp_b32 load=runs8 seed=0 runs=0:1,500:4916,1000:5926,1500:6102,2000:6058
+E7RESULT name=aging arm=bump_cp_b32 load=runs8 seed=0 runs_final=6058 f_pct=73.95 write_amp=1.500 fallback_pct=83.7
+E7RESULT name=aging arm=bump_cp_b32 load=runs8 seed=1 runs_final=6138 f_pct=74.93 write_amp=1.500 fallback_pct=84.2
+E7RESULT name=aging arm=bump_cp_b32 load=runs8 seed=2 runs_final=6073 f_pct=74.13 write_amp=1.500 fallback_pct=84.1
+E7RESULT name=aging arm=bump_cp_b32 load=runs8 seed=3 runs_final=6050 f_pct=73.85 write_amp=1.500 fallback_pct=83.9
+E7RESULT name=aging arm=bump_cp_b32 load=runs8 seed=4 runs_final=6114 f_pct=74.63 write_amp=1.500 fallback_pct=84.1
+E7RESULT name=aging_median arm=bump_cp_b32 load=runs8 runs_final_median=6073
+E7RESULT name=traj arm=bump_cp_b128 load=uniform seed=0 runs=0:1,500:5666,1000:6509,1500:5806,2000:6095
+E7RESULT name=aging arm=bump_cp_b128 load=uniform seed=0 runs_final=6095 f_pct=74.40 write_amp=3.000 fallback_pct=73.5
+E7RESULT name=aging arm=bump_cp_b128 load=uniform seed=1 runs_final=6017 f_pct=73.45 write_amp=3.000 fallback_pct=73.5
+E7RESULT name=aging arm=bump_cp_b128 load=uniform seed=2 runs_final=6433 f_pct=78.53 write_amp=3.000 fallback_pct=73.5
+E7RESULT name=aging arm=bump_cp_b128 load=uniform seed=3 runs_final=5877 f_pct=71.74 write_amp=3.000 fallback_pct=73.7
+E7RESULT name=aging arm=bump_cp_b128 load=uniform seed=4 runs_final=6227 f_pct=76.01 write_amp=3.000 fallback_pct=74.0
+E7RESULT name=aging_median arm=bump_cp_b128 load=uniform runs_final_median=6095
+E7RESULT name=traj arm=bump_cp_b128 load=runs8 seed=0 runs=0:1,500:3358,1000:3727,1500:3728,2000:4059
+E7RESULT name=aging arm=bump_cp_b128 load=runs8 seed=0 runs_final=4059 f_pct=49.55 write_amp=3.000 fallback_pct=65.1
+E7RESULT name=aging arm=bump_cp_b128 load=runs8 seed=1 runs_final=3959 f_pct=48.33 write_amp=3.000 fallback_pct=64.8
+E7RESULT name=aging arm=bump_cp_b128 load=runs8 seed=2 runs_final=3814 f_pct=46.56 write_amp=3.000 fallback_pct=65.2
+E7RESULT name=aging arm=bump_cp_b128 load=runs8 seed=3 runs_final=3718 f_pct=45.39 write_amp=3.000 fallback_pct=64.5
+E7RESULT name=aging arm=bump_cp_b128 load=runs8 seed=4 runs_final=3922 f_pct=47.88 write_amp=3.000 fallback_pct=66.1
+E7RESULT name=aging_median arm=bump_cp_b128 load=runs8 runs_final_median=3922
+E7RESULT name=traj arm=bump_cp_b256 load=uniform seed=0 runs=0:1,500:3502,1000:4900,1500:4183,2000:4866
+E7RESULT name=aging arm=bump_cp_b256 load=uniform seed=0 runs_final=4866 f_pct=59.40 write_amp=5.000 fallback_pct=49.6
+E7RESULT name=aging arm=bump_cp_b256 load=uniform seed=1 runs_final=4023 f_pct=49.11 write_amp=5.000 fallback_pct=50.5
+E7RESULT name=aging arm=bump_cp_b256 load=uniform seed=2 runs_final=4791 f_pct=58.48 write_amp=5.000 fallback_pct=48.7
+E7RESULT name=aging arm=bump_cp_b256 load=uniform seed=3 runs_final=5351 f_pct=65.32 write_amp=5.000 fallback_pct=49.6
+E7RESULT name=aging arm=bump_cp_b256 load=uniform seed=4 runs_final=4594 f_pct=56.08 write_amp=5.000 fallback_pct=50.1
+E7RESULT name=aging_median arm=bump_cp_b256 load=uniform runs_final_median=4791
+E7RESULT name=traj arm=bump_cp_b256 load=runs8 seed=0 runs=0:1,500:914,1000:1147,1500:1202,2000:1339
+E7RESULT name=aging arm=bump_cp_b256 load=runs8 seed=0 runs_final=1339 f_pct=16.35 write_amp=5.000 fallback_pct=31.4
+E7RESULT name=aging arm=bump_cp_b256 load=runs8 seed=1 runs_final=1670 f_pct=20.39 write_amp=5.000 fallback_pct=32.1
+E7RESULT name=aging arm=bump_cp_b256 load=runs8 seed=2 runs_final=1730 f_pct=21.12 write_amp=5.000 fallback_pct=31.7
+E7RESULT name=aging arm=bump_cp_b256 load=runs8 seed=3 runs_final=944 f_pct=11.52 write_amp=5.000 fallback_pct=33.3
+E7RESULT name=aging arm=bump_cp_b256 load=runs8 seed=4 runs_final=1068 f_pct=13.04 write_amp=5.000 fallback_pct=31.6
+E7RESULT name=aging_median arm=bump_cp_b256 load=runs8 runs_final_median=1339
+E7RESULT name=done emitted=107
