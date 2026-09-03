@@ -162,6 +162,15 @@ mod tests {
         }
     }
 
+    /// 散布触到的叶数封顶于叶总数：K 超过叶数后每叶都被触到，代价不再涨
+    /// （变异审计补的：此前 k > 叶数只在输出档出现，没有测试走到封顶分支）。
+    #[test]
+    fn scattered_leaf_count_saturates_at_the_leaf_total() {
+        let at = per_item_writes(4096, L, L, Layout::Scattered);
+        let beyond = per_item_writes(4096, L, 10 * L, Layout::Scattered);
+        assert_eq!(at, beyond, "K 超过叶数后散布代价该饱和");
+    }
+
     /// 扇出用独立算术钉死，防止所有臂一起错。
     #[test]
     fn fanout_matches_independent_arithmetic() {

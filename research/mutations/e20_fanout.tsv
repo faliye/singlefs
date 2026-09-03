@@ -1,0 +1,5 @@
+M1_key不按跨步写	let off = node * t.node_bytes + NODE_HDR + i * t.entry_bytes;	let off = node * t.node_bytes + NODE_HDR + i * 8;
+M2_key值域按节点错开	let k = i as u64;	let k = (node as u64) + i as u64;
+M3_二分比较方向反	if self.key_at(node, mid) < sk { lo = mid + 1; } else { hi = mid; }	if self.key_at(node, mid) <= sk { lo = mid + 1; } else { hi = mid; }
+M4_child读到key的位置	+ i * self.entry_bytes + 8;	+ i * self.entry_bytes;
+M5_树深起点错	let mut depth = 1;	let mut depth = 0;

@@ -1,0 +1,9 @@
+M1_先信tail偷看真值	let mut expect = self.tail_persisted;	let mut expect = self.tail_true;
+M2_ScanAll回溯下界删掉	while lo > self.tail_persisted {	while lo > 1 {
+M3_ScanAll空环多放一条	if max < self.tail_persisted { return Vec::new(); }	if false { return Vec::new(); }
+M4_checkpoint少推一格	self.tail_true = self.next_jsn;	self.tail_true = self.next_jsn - 1;
+M5_持久tail总是跟着推	if persist_tail {\n            self.tail_persisted = self.tail_true;\n        }	self.tail_persisted = self.tail_true;
+M6_写进槽的序号错位	Some(Record { jsn: j, ckpt })	Some(Record { jsn: j + 1, ckpt })
+M7_must_replay右边界闭	(tail_true..next_jsn).collect()	(tail_true..=next_jsn).collect()
+M8_missed判反	let missed = need.iter().filter(|x| !got.contains(x)).count();	let missed = need.iter().filter(|x| got.contains(x)).count();
+M9_spurious边界含真tail	let spurious = got.iter().filter(|&&x| x < j.tail_true).count();	let spurious = got.iter().filter(|&&x| x <= j.tail_true).count();

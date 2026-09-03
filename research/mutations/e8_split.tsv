@@ -1,0 +1,5 @@
+M1_整块分配不取整	let blocks = len.div_ceil(self.p.block_bytes);	let blocks = len / self.p.block_bytes;
+M2_内联边界改开	size <= self.p.inline_max	size < self.p.inline_max
+M3_KV分离也按块取整	self.log_head += len;\n                self.l.write_data(len);	self.log_head += len;\n                self.l.write_data(len.div_ceil(self.p.block_bytes) * self.p.block_bytes);
+M4_记账器出口分裂	self.data_bytes + self.meta_bytes\n    }	self.data_bytes + self.meta_bytes + self.pushdown_bytes\n    }
+M5_节点写不计数	fn write_node(&mut self, b: u64) {\n        self.meta_bytes += b;\n        self.node_writes += 1;\n    }	fn write_node(&mut self, b: u64) {\n        self.meta_bytes += b;\n    }

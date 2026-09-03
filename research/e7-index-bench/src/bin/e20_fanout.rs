@@ -266,6 +266,27 @@ mod tests {
         assert!(seen.len() > 50, "2000 次查找只落到 {} 个不同 slot 上", seen.len());
     }
 
+    /// 节点内二分必须命中恰好等于搜索键的那个槽：值域是 0..slots-1，
+    /// depth=1 时 slot 就是 key % slots，逐个钉死（变异审计补的：
+    /// 此前比较方向写反不会有任何测试红）。
+    #[test]
+    fn binary_search_lands_exactly_on_the_search_key() {
+        let t = Tree::new(100, 16, 4096);
+        assert_eq!(t.depth, 1);
+        for k in 0..t.slots as u64 {
+            assert_eq!(t.lookup(k), (k as usize) % t.slots, "key={k}");
+        }
+    }
+
+    /// 子指针必须存在条目的第二个 8 字节里，不与 key 重叠——
+    /// 否则指针追逐读的是 key，整条依赖链是假的。
+    #[test]
+    fn child_pointers_live_beside_keys_not_on_top_of_them() {
+        let t = Tree::new(1 << 16, 16, 4096);
+        let diff = (0..t.slots).any(|i| t.child_at(5, i) as u64 != t.key_at(5, i));
+        assert!(diff, "每个条目的子指针都等于它的 key——child_at 读到了 key 的位置");
+    }
+
     /// 查找必须真的走完 depth 层——树深为 1 时和多层时行为要不同。
     #[test]
     fn lookup_descends_all_levels() {

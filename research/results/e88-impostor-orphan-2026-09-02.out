@@ -1,0 +1,6 @@
+E7RESULT name=config unit=32768 step=16384 root_txg=100 drops=57 probes=114 live=37 lost=6 torn=9 misdirect=3 nest_foreign=5 nest_self=4 badcsum=2
+E7RESULT name=hdr91_claim visited=114 skipped=55 empty=2 csum=2 foreign=3 pruned=9 l2=37 l1=6 nested_in=0 misclass=0
+E7RESULT name=hdr91_noclaim visited=114 skipped=0 empty=48 csum=2 foreign=8 pruned=9 l2=37 l1=10 nested_in=4 misclass=4
+E7RESULT name=hdr47_claim visited=114 skipped=55 empty=2 csum=2 foreign=0 pruned=0 l2=40 l1=15 nested_in=0 misclass=12
+E7RESULT name=hdr47_noclaim visited=114 skipped=0 empty=48 csum=2 foreign=0 pruned=0 l2=40 l1=24 nested_in=9 misclass=21
+E7RESULT name=done emitted=6

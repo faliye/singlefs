@@ -1,0 +1,28 @@
+E7RESULT name=config snaps=64 exts_per_snap=8 victim=middle seed=42
+E7RESULT name=cell topo=Linear share=0 arm=paylookup lookups=0 snap_checks=0 max_frontier=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=0 arm=frontier lookups=0 snap_checks=16 max_frontier=1 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=30 arm=paylookup lookups=0 snap_checks=0 max_frontier=0 freed=5 truly_free=5 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=30 arm=frontier lookups=0 snap_checks=24 max_frontier=1 freed=5 truly_free=5 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=70 arm=paylookup lookups=0 snap_checks=0 max_frontier=0 freed=2 truly_free=2 wrong_free=0 leaked=0
+E7RESULT name=cell topo=Linear share=70 arm=frontier lookups=0 snap_checks=40 max_frontier=1 freed=2 truly_free=2 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=0 arm=paylookup lookups=0 snap_checks=0 max_frontier=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=0 arm=frontier lookups=0 snap_checks=8 max_frontier=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=30 arm=paylookup lookups=4 snap_checks=0 max_frontier=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=30 arm=frontier lookups=0 snap_checks=16 max_frontier=1 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=70 arm=paylookup lookups=18 snap_checks=0 max_frontier=0 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=cell topo=MultiHead share=70 arm=frontier lookups=0 snap_checks=118 max_frontier=12 freed=8 truly_free=8 wrong_free=0 leaked=0
+E7RESULT name=scale total_exts=256 paylookup_lookups=8 frontier_lookups=0 frontier_snap_checks=58 frontier_max=12
+E7RESULT name=scale total_exts=512 paylookup_lookups=18 frontier_lookups=0 frontier_snap_checks=118 frontier_max=12
+E7RESULT name=scale total_exts=1024 paylookup_lookups=27 frontier_lookups=0 frontier_snap_checks=172 frontier_max=10
+E7RESULT name=scale total_exts=2048 paylookup_lookups=68 frontier_lookups=0 frontier_snap_checks=376 frontier_max=16
+E7RESULT name=scale total_exts=4096 paylookup_lookups=121 frontier_lookups=0 frontier_snap_checks=778 frontier_max=15
+E7RESULT name=scale total_exts=8192 paylookup_lookups=252 frontier_lookups=0 frontier_snap_checks=1601 frontier_max=16
+E7RESULT name=branch snaps=16 table_size=16 lookups=0 max_frontier_world=5 mean_frontier_milli=617 wrong_free=0 leaked=0
+E7RESULT name=branch snaps=32 table_size=32 lookups=0 max_frontier_world=7 mean_frontier_milli=664 wrong_free=0 leaked=0
+E7RESULT name=branch snaps=64 table_size=64 lookups=0 max_frontier_world=15 mean_frontier_milli=744 wrong_free=0 leaked=0
+E7RESULT name=branch snaps=128 table_size=128 lookups=0 max_frontier_world=22 mean_frontier_milli=770 wrong_free=0 leaked=0
+E7RESULT name=frag share=10 max_frontier_world=10 mean_frontier_milli=967 wrong_free=0 leaked=0
+E7RESULT name=frag share=30 max_frontier_world=14 mean_frontier_milli=928 wrong_free=0 leaked=0
+E7RESULT name=frag share=70 max_frontier_world=17 mean_frontier_milli=651 wrong_free=0 leaked=0
+E7RESULT name=frag share=90 max_frontier_world=12 mean_frontier_milli=298 wrong_free=0 leaked=0
+E7RESULT name=done emitted=28

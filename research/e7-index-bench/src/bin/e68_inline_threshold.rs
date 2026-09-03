@@ -211,4 +211,52 @@ mod tests {
         assert_eq!(per_file(512, 512), (0, REC_BASE + 512));
         assert_eq!(per_file(513, 512), (BLOCK, REC_BASE));
     }
+
+    /// 内联计数必须与 per_file 的判定同一条边界——`run` 与 `per_file` 各写一遍
+    /// `<=`，只对总量断言的话两处漂移不会被任何测试看见（变异审计补的）。
+    #[test]
+    fn inlined_counter_agrees_with_an_independent_recount() {
+        for &thr in THRESHOLDS.iter() {
+            let o = run(thr, 3);
+            let mut rng = Lcg(3u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
+            let expect = (0..FILES).filter(|_| size_of(&mut rng) <= thr).count() as u64;
+            assert_eq!(o.inlined, expect, "thr={thr}: 内联计数与独立重算不等");
+        }
+    }
+
+    /// 带缓存读模型的两个端点钉死（第二轮结论「最优阈值＝工作集装得进缓存那档」
+    /// 出自这段代码，此前零断言）：缓存装下全部叶 ⇒ 读数恰为非内联占比；
+    /// 零缓存 ⇒ 叶未命中恰为 100%。
+    #[test]
+    fn cached_read_model_pins_full_and_zero_cache() {
+        let o = run(512, 1);
+        let inlined_ppm = o.inlined * 1_000_000 / FILES;
+        let (reads_full, ws) = reads_per_lookup(&o, 1 << 40);
+        assert_eq!(reads_full, 1_000_000 - inlined_ppm, "全缓存时读数应恰为非内联占比");
+        assert_eq!(ws, o.leaves * NODE);
+        let (reads_zero, _) = reads_per_lookup(&o, 0);
+        assert_eq!(reads_zero, 1_000_000 + (1_000_000 - inlined_ppm),
+            "零缓存时叶未命中应恰为 100%");
+    }
+
+    /// read_ops 的树高算术钉死：扇出 682（16 KiB / 24）下 682 叶高 2、683 叶高 3。
+    /// 683 这一格同时钉住扇出常数——扇出算错一档它就变 2。
+    #[test]
+    fn read_ops_pins_height_and_fanout_arithmetic() {
+        let mk = |leaves| Out { data_bytes: 0, meta_bytes: 0, leaves, inlined: 0 };
+        assert_eq!(read_ops(&mk(1), 0), 1, "单叶树高 1");
+        assert_eq!(read_ops(&mk(682), 0), 2, "682 叶恰好一层内节点");
+        assert_eq!(read_ops(&mk(683), 0), 3, "683 叶要两层");
+        assert_eq!(read_ops(&mk(400), 1), 3, "高 2 加一个数据块");
+    }
+
+    /// 大小分布必须两峰都在：≤4 KiB 与 >4 KiB 都要出现，
+    /// 否则「大文件把所有阈值档拉平」的阴性对照空转。
+    #[test]
+    fn size_distribution_has_both_modes() {
+        let mut rng = Lcg(1u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
+        let sizes: Vec<u64> = (0..10_000).map(|_| size_of(&mut rng)).collect();
+        assert!(sizes.iter().any(|&s| s <= 4096), "没有小文件");
+        assert!(sizes.iter().any(|&s| s > 4096), "没有大文件——阴性对照那一维空转");
+    }
 }

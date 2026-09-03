@@ -1,0 +1,7 @@
+M1_释放立刻可分配	self.freeing_now += f.blocks;   // 进入本窗口的释放，尚不可分配	let _ = f.blocks;   // 进入本窗口的释放，尚不可分配
+M2_到期不出队	self.pending.pop_front();       // 到期的那批不再被扣住	let _ = &self.pending;       // 到期的那批不再被扣住
+M3_入队丢本窗口	self.pending.push_back(self.freeing_now);	self.pending.push_back(0);
+M4_下溢不饱和	self.capacity.saturating_sub(self.live).saturating_sub(self.held()).saturating_sub(self.reserve)	self.capacity.wrapping_sub(self.live).wrapping_sub(self.held()).wrapping_sub(self.reserve)
+M5_ckpt用普通视图	if fs.allocatable_ckpt() < fs.ckpt_cost { st += 1; }	if fs.allocatable() < fs.ckpt_cost { st += 1; }
+M6_两类ENOSPC装反	if df >= file_blocks { fe += 1; } else { te += 1; }	if df >= file_blocks { te += 1; } else { fe += 1; }
+M7_公式漏乘延迟	churn_per_ckpt * delay as u64	churn_per_ckpt

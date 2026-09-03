@@ -164,6 +164,14 @@ mod tests {
         );
     }
 
+    /// 环小到装不下一个记录头 ⇒ 上界必须是 0，不许下溢绕回（变异审计补的：
+    /// 此前没有任何测试走过 `budget <= REC_HEADER` 的护栏）。
+    #[test]
+    fn tiny_ring_yields_zero_not_underflow() {
+        assert_eq!(t_dirty_upper(100, 2, ENTRY, NODE), 0);
+        assert_eq!(t_dirty_upper(REC_HEADER * 2, 2, ENTRY, NODE), 0, "预算恰等于头也该是 0");
+    }
+
     /// 插值自证：喂 E16 的两个点回去，必须还原出 100 与 1000。
     #[test]
     fn interpolation_reproduces_measured_points() {

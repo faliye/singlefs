@@ -1,0 +1,8 @@
+M1_每记录项数不扣头	(RECORD_BYTES - REC_HDR) / ENTRY_BYTES	RECORD_BYTES / ENTRY_BYTES
+M2_记录数向下取整	items.div_ceil(items_per_record())	items / items_per_record()
+M3_旧口径倍数错	T_DIRTY / (NODE_BYTES / OLD_ENTRY_BYTES)	T_DIRTY / (NODE_BYTES / ENTRY_BYTES)
+M4_水位不截断	live = 0; // 水位推进：所选根之下的记录全死（D23 已定项 14）	// 水位推进：所选根之下的记录全死（D23 已定项 14）
+M5_取先到变取后到	time_ticks.min(dirty_ticks)	time_ticks.max(dirty_ticks)
+M6_触发漏脏量支	|| ticks_since_pub >= time_ticks\n            || dirty_bytes >= T_DIRTY;	|| ticks_since_pub >= time_ticks;
+M7_准入公式漏加一	churn_micro * ops_per_ckpt / 1_000_000 * (delay + 1) + CKPT_COST_BLOCKS	churn_micro * ops_per_ckpt / 1_000_000 * delay + CKPT_COST_BLOCKS
+M8_队列不出队	pending.push(freeing_now);\n        pending.remove(0);	pending.push(freeing_now);

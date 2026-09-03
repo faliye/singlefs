@@ -200,3 +200,31 @@ path = "src/bin/e85_unit_header.rs"
 [[bin]]
 name = "e87-fixed-placement"
 path = "src/bin/e87_fixed_placement.rs"
+
+[[bin]]
+name = "e88-impostor-orphan"
+path = "src/bin/e88_impostor_orphan.rs"
+
+[[bin]]
+name = "e89-interval-frontier"
+path = "src/bin/e89_interval_frontier.rs"
+
+[[bin]]
+name = "e90-tree-aad"
+path = "src/bin/e90_tree_aad.rs"
+
+[[bin]]
+name = "e91-ring-admission"
+path = "src/bin/e91_ring_admission.rs"
+
+[[bin]]
+name = "e93-aging-placement"
+path = "src/bin/e93_aging_placement.rs"
+
+[[bin]]
+name = "e94-move-touchset"
+path = "src/bin/e94_move_touchset.rs"
+
+[[bin]]
+name = "e96-hybrid-consistency"
+path = "src/bin/e96_hybrid_consistency.rs"

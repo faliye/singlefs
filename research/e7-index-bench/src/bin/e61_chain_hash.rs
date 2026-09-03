@@ -376,6 +376,10 @@ mod tests {
         deficient[31] = deficient[0] ^ deficient[1]; // 制造一条线性相关
         assert_eq!(gf2_rank(deficient), 31);
         assert_eq!(gf2_rank(vec![0u32; 32]), 0);
+        // 消元不做会漏秩：{0b11, 0b10} 的真秩是 2，只按当前位找主元会数成 1
+        // （变异审计实测：上面三档在禁掉消元后照样全对——单位向量彼此不重叠，
+        //  消元从没被走到；这一格才是消元的判别用例）。
+        assert_eq!(gf2_rank(vec![0b11, 0b10]), 2);
     }
 
     /// 记录头模型的绝对值断言：三档长度、可变区比特数、csum 段必须为零。

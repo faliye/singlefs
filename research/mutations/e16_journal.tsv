@@ -1,3 +1,9 @@
 祖先块在 checkpoint 那一路漏计	            o.anc_blocks += anc;	            o.anc_blocks += 0;
 祖先块被重复计费	            o.anc_blocks += anc;	            o.anc_blocks += anc * 3;
 祖先只走到倒数第二层	        for lvl in 0..HEIGHT {	        for lvl in 0..HEIGHT - 1 {
+M15_geo扇出不扣头	((node_bytes.saturating_sub(64)) / 40).max(2)	((node_bytes) / 40).max(2)
+M16_geo树高起点错	let mut h = 0u32;\n    let mut cap = 1u64;	let mut h = 1u32;\n    let mut cap = 1u64;
+M17_geo祖先除错扇出	idx /= fanout;	idx /= fanout + 1;
+M18_区间乘2	if (i + 1) % ckpt_interval == 0 && (!dirty.is_empty() || ring > 0) {	if (i + 1) % (ckpt_interval * 2) == 0 && (!dirty.is_empty() || ring > 0) {
+M19_记录按脏叶计费	arm.record_bytes(named_subtree_roots(&dirty), false)	arm.record_bytes(dirty.len(), false)
+M20_不发根也清环	ring = 0;\n                }\n                dirty.clear();	}\n                ring = 0;\n                dirty.clear();

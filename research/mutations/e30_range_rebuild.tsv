@@ -1,0 +1,7 @@
+M1_扇出不扣头	((node_bytes.saturating_sub(64)) / PTR_BYTES).max(2)	((node_bytes) / PTR_BYTES).max(2)
+M2_连续当散布算	Layout::Contiguous => k.div_ceil(f).max(1),	Layout::Contiguous => k.min(leaves),
+M3_散布不封顶叶数	Layout::Scattered  => k.min(leaves),	Layout::Scattered  => k,
+M4_范围重建漏掉叶层	let mut total = range_leaves;\n    let mut cur = range_leaves;	let mut total = 0;\n    let mut cur = range_leaves;
+M5_逐项漏掉叶层	let mut total = touched_leaves;\n    let mut cur = touched_leaves;	let mut total = 0;\n    let mut cur = touched_leaves;
+M6_交叉判据反向	if per_item_writes(node_bytes, leaves, k, layout) >= range_rebuild_writes(node_bytes, leaves, leaves) {	if per_item_writes(node_bytes, leaves, k, layout) <= range_rebuild_writes(node_bytes, leaves, leaves) {
+M7_条目口径回退到叶数	fn total_entries(node_bytes: u64, leaves: u64) -> u64 { leaves.saturating_mul(fanout(node_bytes)) }	fn total_entries(node_bytes: u64, leaves: u64) -> u64 { let _ = node_bytes; leaves }

@@ -1,0 +1,9 @@
+M1_内联边界改开	if size <= thr {	if size < thr {
+M2_内联仍占数据块	(0, REC_BASE + size) // 内联：不占数据块，记录变长	(BLOCK, REC_BASE + size) // 内联：不占数据块，记录变长
+M3_extent不整块取整	(size.div_ceil(BLOCK) * BLOCK, REC_BASE) // 走 extent：整块分配	(size, REC_BASE) // 走 extent：整块分配
+M4_计数边界漂移	if s <= thr {	if s < thr {
+M5_命中率方向反	let leaf_miss_ppm = 1_000_000 - hit_ppm;	let leaf_miss_ppm = hit_ppm;
+M6_读数漏掉数据块	h + avg_data_blocks	h + avg_data_blocks * 0
+M7_扇出常数错	let fanout = NODE / 24;	let fanout = NODE / 32;
+M8_meta按记录字节不按叶	meta_bytes: leaves * NODE	meta_bytes: rec
+M9_大文件分布消失	if rng.next() % 100 < 80 {	if rng.next() % 100 < 100 {

@@ -1,0 +1,11 @@
+M1_容斥去掉前沿	let remaining = total - shadowed - 1;	let remaining = total - 1;
+M2_不排除victim	let remaining = total - shadowed - 1;	let remaining = total - shadowed;
+M3_区间右边界改开	a.pre <= pv && pv <= a.post	a.pre <= pv && pv < a.post
+M4_基线漏付旁支查找	lookups += 1;	lookups += 0;
+M5_前沿记在父亲	e.frontier.push(i);	e.frontier.push(p);
+M6_共享判反	% 100 < share_pct	% 100 >= share_pct
+M7_真值把死快照当活	.filter(|s| s.live).map(|s| s.id)	.map(|s| s.id)
+M8_death窗口加宽	let death = v.txg + 1;	let death = v.txg + 2;
+M9_前沿探查计零	cost.snap_checks += 1 + e.frontier.len() as u64;	cost.snap_checks += 1;
+M10_不过滤可见性	if !victim_sees { continue; }	let _ = victim_sees;
+M11_区间计数端点改开	let total = live_pre.range(b.pre..=b.post).count() as u64;	let total = live_pre.range(b.pre..b.post).count() as u64;

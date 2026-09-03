@@ -1,0 +1,9 @@
+M1_可比集漏后代	if x == id { out.insert(s.id); break; }	if x == id { break; }
+M2_旁支不付查找	lookups += 1;                            // O(1) 性质在这里破掉	lookups += 0;                            // O(1) 性质在这里破掉
+M3_死判定取反	if !death_finite { continue; }	if death_finite { continue; }
+M4_death窗口加宽	let death = v.txg + 1;	let death = v.txg + 2;
+M5_refcount漏计查找	lookups += 1;                       // 一次反向索引查找	lookups += 0;                       // 一次反向索引查找
+M6_owner什么都不放	.filter(|id| w.exts.contains_key(id)).collect(),	.filter(|_id| false).collect(),
+M7_真值把死快照当活	let live: BTreeSet<u64> = w.snaps.values().filter(|s| s.live).map(|s| s.id).collect();	let live: BTreeSet<u64> = w.snaps.values().map(|s| s.id).collect();
+M8_共享判反	if r() % 100 < share_pct { exts.get_mut(&id).unwrap().refs.insert(i); }	if r() % 100 >= share_pct { exts.get_mut(&id).unwrap().refs.insert(i); }
+M9_删根不删中间	let victim = n_snaps / 2;	let victim = 0;

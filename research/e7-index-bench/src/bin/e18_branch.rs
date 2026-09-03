@@ -315,6 +315,16 @@ mod tests {
         assert!(v.fn_ > 0, "多可写头下没有出现判死实活");
     }
 
+    /// D5 正文那条保守 death 在多可写头下不许出现判死实活——数据丢失方向
+    /// 结构性为零（E18 的主结论）。变异审计补的：此前测试只跑 Earliest，
+    /// 把「全部分支删过才写有限值」改成「任一分支删过」不会有任何测试红。
+    #[test]
+    fn conservative_rule_never_loses_data_even_with_many_heads() {
+        let h = build(Shape::MultiHead(5), 30, 15, 2);
+        let v = evaluate(&h, DeathRule::Conservative);
+        assert_eq!(v.fn_, 0, "保守规则出现判死实活——与 E18 已证性质矛盾");
+    }
+
     /// 真值与区间判定必须是两段独立的代码：真值走 DAG，区间只比两个数。
     /// 这条测的是「真值确实看了历史形状」——把 parent 全断开，真值必须变。
     #[test]

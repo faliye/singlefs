@@ -1,0 +1,7 @@
+M1_CRC32C多项式错	(crc >> 1) ^ 0x82F6_3B78	(crc >> 1) ^ 0x82F6_3B79
+M2_CRC64多项式错	(crc >> 1) ^ 0xC96C_5795_D787_0F42	(crc >> 1) ^ 0xC96C_5795_D787_0F43
+M3_SHA初始向量错	0x6a09e667, 0xbb67ae85,	0x6a09e668, 0xbb67ae85,
+M4_秩算法不消元	if i != rank && (v[i] >> bit & 1 == 1) {	if false && i != rank && (v[i] >> bit & 1 == 1) {
+M5_零向量算碰撞	(1u64 << (32 - rank as u32)) - 1	(1u64 << (32 - rank as u32))
+M6_窗口像不异或基准	f(&m) ^ h0	f(&m)
+M7_nonce溢进csum段	for i in 42..54 {	for i in 42..60 {

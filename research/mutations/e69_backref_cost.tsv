@@ -1,0 +1,8 @@
+M1_闭式漏reflink	self.snapshots * self.shared_per_snapshot + self.reflinks	self.snapshots * self.shared_per_snapshot
+M2_甲漏写条目	self.entries_written += 1;	self.entries_written += 0;
+M3_甲越过本事务范围	.take(hi).skip(lo)	.take(hi)
+M4_乙只读有共享的	read += 1; // 全盘扫描：每个单元都要读，不论它有没有共享引用	if !u.extra_refs.is_empty() { read += 1; }
+M5_乙把空集也塞进映射	if !u.extra_refs.is_empty() {\n                map.insert(i as u32, u.extra_refs.clone());\n            }	map.insert(i as u32, u.extra_refs.clone());
+M6_txns向下取整	self.units.div_ceil(self.units_per_txn)	self.units / self.units_per_txn
+M7_快照引用者不递增	us[idx].extra_refs.insert(referrer);\n            referrer += 1;	us[idx].extra_refs.insert(referrer);
+M8_每事务代价分母错	jia_entries_per_txn: jia.entries_written as f64 / w.txns() as f64,	jia_entries_per_txn: jia.entries_written as f64 / w.units as f64,

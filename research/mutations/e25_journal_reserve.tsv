@@ -1,0 +1,7 @@
+M1_链不加窗口块	Shape::Chain => ckpt_cost + journal_blocks_per_window,	Shape::Chain => ckpt_cost,
+M2_普通分配动保留池	if free.saturating_sub(reserve) >= want {	if free >= want {
+M3_ckpt不许动保留池	if free >= need {	if free.saturating_sub(reserve) >= need {
+M4_回收不扣泄漏	free += recycled.saturating_sub(LEAK_PER_WINDOW);	free += recycled;
+M5_链journal不消耗	if shape == Shape::Chain && free.saturating_sub(reserve) >= blocks_per_op {	if shape == Shape::Chain && false && free.saturating_sub(reserve) >= blocks_per_op {
+M6_回收多算一份需求	+ need;	+ need + need;
+M7_起始占用算反	let mut free = capacity - capacity * fill_pct / 100;	let mut free = capacity * fill_pct / 100;

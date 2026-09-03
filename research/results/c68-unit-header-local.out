@@ -1,0 +1,13 @@
+1. When encryption is enabled for metadata blocks, the plaintext header includes a 4-byte header checksum. This checksum is not part of the allowed set {magic, format version, flags, nonce epoch, length, MAC} specified in F1 for I-6.2, violating the invariant.
+
+2. Data units now have a header containing the five-tuple plus magic, version, flags, and other fields. F2 states data units must carry a plaintext five-tuple header only, so this extra data violates F2.
+
+3. For metadata blocks under encryption, the plaintext header lacks nonce epoch. I-6.2 requires nonce epoch to be in the plaintext header subset, but F12 omits it, breaking F1.
+
+4. During a full-disk scan, the scanner relies on magic and header checksum to reject probes inside data payloads (F9). F12's header checksum replaces MAC, but if the scanner expects MAC for validation and the checksum is not equivalent, the scanner fails to correctly identify block boundaries.
+
+5. Including fsid in the header causes redundant storage of 8 bytes per block, increasing disk usage without functional benefit (cost), as F4 states fsid is redundant due to key derivation.
+
+6. Including block birth generation in the header causes redundant storage of 8 bytes per block (cost), as F5 specifies block birth txg lives only in the parent pointer.
+
+F12 has reachable breaks violating settled facts (F1 and F2), while keeping fsid and block birth only incurs costs. The single repo check that would most change this is verifying whether the header checksum in F12 is functionally equivalent to MAC for I-6.2 compliance.

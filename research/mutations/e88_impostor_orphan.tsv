@@ -1,0 +1,11 @@
+M1_撕裂边界不严格	if has_id && d.head.birth > ROOT_TXG {	if has_id && d.head.birth >= ROOT_TXG {
+M2_fsid检查失效	if has_id && d.head.fsid != OWN_FSID {	if has_id && d.head.fsid != d.head.fsid {
+M3_坏头也认领	let mut claimed = false;	let mut claimed = true;
+M4_分配谓词取反	} else if d.allocated {	} else if !d.allocated {
+M5_嵌套头闯进级2	// 探针地址不是落点 ⇒ 分配记录谓词恒假 ⇒ 至多级 1\n                    t.ingest_l1 += 1;	// 探针地址不是落点 ⇒ 分配记录谓词恒假 ⇒ 至多级 1\n                    t.ingest_l2 += 1;
+M6_撕裂夹具少一个	const N_TORN: u64 = 9; // 撕裂孤儿：birth > ROOT_TXG、无分配记录	const N_TORN: u64 = 8; // 撕裂孤儿：birth > ROOT_TXG、无分配记录
+M7_步进退回32768	const STEP: u64 = 16384;	const STEP: u64 = 32768;
+M8_审计回声坏头档	a.rejected_csum = N_BADCSUM; // 两种臂、两种认领下都恰拒 2（坏头认领不了，其载荷是 empty）	a.rejected_csum = 0; // 两种臂、两种认领下都恰拒 2（坏头认领不了，其载荷是 empty）
+M9_错分类漏掉撕裂	let torn_unpruned = N_TORN - t.pruned_torn;	let torn_unpruned = 0;
+M10_跳过不真跳	t.skipped_claimed += 1;\n            continue;	t.skipped_claimed += 1;
+M11_嵌套fsid检查失效	} else if has_id && m.fsid != OWN_FSID {	} else if has_id && m.fsid != m.fsid {

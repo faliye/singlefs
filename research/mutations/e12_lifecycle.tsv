@@ -1,0 +1,4 @@
+M1_直接释放边界写松	birth > prev_snap_txg	birth >= prev_snap_txg
+M2_blk差值漏字段	write_sectors: b.write_sectors.saturating_sub(a.write_sectors),	write_sectors: b.write_sectors,
+M3_缺读数当零	let (a, b) = (a?, b?);	let (a, b) = (a.unwrap_or_default(), b.unwrap_or_default());
+M4_对齐参数退化	let layout = Layout::from_size_align(len, PAGE).expect("对齐参数非法");	let layout = Layout::from_size_align(len, 8).expect("对齐参数非法");

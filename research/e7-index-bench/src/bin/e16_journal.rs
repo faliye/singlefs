@@ -479,8 +479,80 @@ fn sweep() {
     print!("{out}");
 }
 
+// ── 字节口径（2026-09-03 补测，C27 的前置）─────────────────────────────────
+//
+// 块数口径数的是**被触到的节点数**，节点越大树越矮、数出来越省；
+// 字节口径 = 节点数 × 节点字节，节点越大越贵。两种口径给出的排序不同，
+// 拿块数结论去定扇出/节点大小这类格式参数，方向可能是反的（C27 立账原文）。
+// 主网格一字不动；这里参数化几何单独扫。
+
+/// 参数化扇出：与 E30 / E8 同一约定（节点头 64 B、指针条目 40 B）。
+fn geo_fanout(node_bytes: u64) -> u64 {
+    ((node_bytes.saturating_sub(64)) / 40).max(2)
+}
+
+/// 参数化树高：使 扇出^h ≥ 叶数 的最小 h。
+fn geo_height(node_bytes: u64, leaves: u64) -> u32 {
+    let f = geo_fanout(node_bytes);
+    let mut h = 0u32;
+    let mut cap = 1u64;
+    while cap < leaves {
+        cap = cap.saturating_mul(f);
+        h += 1;
+    }
+    h
+}
+
+/// 参数化的去重祖先数——与 `cow_blocks` 的祖先那一半同一逻辑，
+/// 两份实现由单测在 (FANOUT, HEIGHT) 上钉在一起，不许漂移。
+fn anc_nodes_geo(dirty: &HashSet<u64>, fanout: u64, height: u32) -> u64 {
+    let mut anc: HashSet<(u32, u64)> = HashSet::new();
+    for &leaf in dirty {
+        let mut idx = leaf;
+        for lvl in 0..height {
+            idx /= fanout;
+            anc.insert((lvl, idx));
+        }
+    }
+    anc.len() as u64
+}
+
+fn bytes_mode() {
+    let mut em = Emitter::new();
+    let leaves = FANOUT.pow(HEIGHT);
+    // ⚠️ 走 Emitter，不许直接 println——第一版绕过它，收尾行说 6 实收 7，
+    // replay 的完整性闸当场判红（闸在工作的证据，顺手留档）。
+    println!(
+        "{}",
+        em.emit_raw(&format!(
+            "name=bytes_config leaves={leaves} hdr=64 ptr=40 note=祖先代价的两种口径"
+        ))
+    );
+    // 与主网格同一份负载生成器：单操作（rand 1 叶）与 multistream 批 10。
+    let one: HashSet<u64> = [123_456_789 % leaves].into_iter().collect();
+    let batch: HashSet<u64> = gen_ops(10, Workload::MultiStream, 0x5eed)
+        .iter().flatten().copied().collect();
+    let mut out = String::new();
+    for nb in [512u64, 1024, 4096, 16384, 65536] {
+        let f = geo_fanout(nb);
+        let h = geo_height(nb, leaves);
+        let a1 = anc_nodes_geo(&one, f, h);
+        let a10 = anc_nodes_geo(&batch, f, h);
+        out.push_str(&em.emit_raw(&format!(
+            "name=anc_caliber node_bytes={nb} fanout={f} height={h} \
+             one_op_anc_nodes={a1} one_op_anc_bytes={} \
+             batch10_anc_nodes={a10} batch10_anc_bytes={}",
+            a1 * nb, a10 * nb
+        )));
+        out.push('\n');
+    }
+    out.push_str(&em.finish());
+    print!("{out}");
+}
+
 fn main() {
     if std::env::args().nth(1).as_deref() == Some("sweep") { sweep(); return; }
+    if std::env::args().nth(1).as_deref() == Some("bytes") { bytes_mode(); return; }
     let n: usize = std::env::args().nth(1).and_then(|x| x.parse().ok()).unwrap_or(200_000);
     let mut em = Emitter::new();
     let mut out = String::new();
@@ -834,6 +906,64 @@ mod tests {
         // 对照：同样多的 seq 操作只占 1 个子树根
         let seq: HashSet<u64> = gen_ops(STREAMS as usize, Workload::Seq, 59).iter().flatten().copied().collect();
         assert_eq!(named_subtree_roots(&seq), 1, "seq 应当只占一个子树根，否则对照没意义");
+    }
+
+    /// 字节口径判据 3：参数化几何与主网格常量代码在同一片脏叶集上逐点相等。
+    /// 两份实现不钉在一起就会漂移，而漂移在各自的输出里都看不见。
+    #[test]
+    fn geo_ancestors_agree_with_the_const_geometry() {
+        for (wl, seed) in [(Workload::Rand, 61u64), (Workload::MultiStream, 67), (Workload::Seq, 71)] {
+            let d: HashSet<u64> = gen_ops(50, wl, seed).iter().flatten().copied().collect();
+            assert_eq!(
+                anc_nodes_geo(&d, FANOUT, HEIGHT),
+                cow_blocks(&d) - d.len() as u64,
+                "{wl:?} 下参数化祖先数与常量代码不等"
+            );
+        }
+    }
+
+    /// 字节口径判据 1 的绝对值：单操作的祖先节点数恰等于该几何的树高；
+    /// 树高与扇出由独立算术钉死（不从被测代码读回来）。
+    #[test]
+    fn byte_caliber_absolutes_are_pinned() {
+        let leaves = FANOUT.pow(HEIGHT); // 128^4 = 268435456
+        assert_eq!(geo_fanout(512), 11, "(512-64)/40");
+        assert_eq!(geo_fanout(4096), 100);
+        assert_eq!(geo_fanout(65536), 1636);
+        // 11^8 = 214358881 < 268435456 ≤ 11^9 ⇒ 高 9
+        assert_eq!(geo_height(512, leaves), 9);
+        // 100^4 = 1e8 < 2.68e8 ≤ 100^5 ⇒ 高 5
+        assert_eq!(geo_height(4096, leaves), 5);
+        // 1636^2 ≈ 2.68e6 < 2.68e8 ≤ 1636^3 ⇒ 高 3
+        assert_eq!(geo_height(65536, leaves), 3);
+        let one: HashSet<u64> = [42].into_iter().collect();
+        for nb in [512u64, 4096, 65536] {
+            let h = geo_height(nb, leaves);
+            assert_eq!(anc_nodes_geo(&one, geo_fanout(nb), h), h as u64,
+                "单操作的祖先节点数该恰等于树高（nb={nb}）");
+        }
+    }
+
+    /// 字节口径判据 2（C27 的前提本身）：两种口径必须给出**不同的排序**——
+    /// 节点从 512 B 到 64 KiB，祖先节点数单调不增，而祖先字节数在大节点端更高。
+    #[test]
+    fn the_two_calibers_order_node_sizes_differently() {
+        let leaves = FANOUT.pow(HEIGHT);
+        let one: HashSet<u64> = [42].into_iter().collect();
+        let cost = |nb: u64| {
+            let h = geo_height(nb, leaves);
+            let n = anc_nodes_geo(&one, geo_fanout(nb), h);
+            (n, n * nb)
+        };
+        let sizes = [512u64, 1024, 4096, 16384, 65536];
+        for w in sizes.windows(2) {
+            assert!(cost(w[0]).0 >= cost(w[1]).0,
+                "祖先节点数该随节点变大单调不增（{} vs {}）", w[0], w[1]);
+        }
+        let (small_n, small_b) = cost(512);
+        let (big_n, big_b) = cost(65536);
+        assert!(big_n < small_n, "节点数口径：大节点该更省（{big_n} vs {small_n}）");
+        assert!(big_b > small_b, "字节口径：大节点该更贵（{big_b} vs {small_b}）——两口径同向则 C27 前提不成立");
     }
 
     /// 用户写次数与操作流一致 —— 写放大的分母算错会静默污染所有结论。

@@ -1,0 +1,5 @@
+M1_单线程去重先者胜	if last.0 == e.0 { *last = e; continue; } // seq 更大者胜	if last.0 == e.0 { continue; } // seq 更大者胜
+M2_并行去重先者胜	\n                    if last.0 == e.0 { *last = e; continue; }	\n                    if last.0 == e.0 { continue; }
+M3_真值先者胜	for &(k, sq, v) in input { m.insert((leaf_of(k), k), (sq, v)); }	for &(k, sq, v) in input { m.entry((leaf_of(k), k)).or_insert((sq, v)); }
+M4_分区边界丢一叶	let hi = ((t as u64 + 1) * per).min(N_LEAVES);	let hi = ((t as u64 + 1) * per).min(N_LEAVES) - 1;
+M5_负载没有重复key	let span = N_LEAVES * 64;	let span = u64::MAX;

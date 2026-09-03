@@ -22,8 +22,9 @@
 //!
 //! 粒度两维：**记录粒度**（每 extent 一条记录 / 每对象一条区间记录）×
 //! **载体**（每条记录独占一个墓碑单元 / 多条记录打包共享墓碑单元）。
-//! 单元 32768、头 55、墓碑记录 56（五元组 + 区间，按 E23（journal 几何）点名项宽度的量级）
-//! ⇒ 打包容量 (32768 − 55) / 56 = **584 条/单元**；物理字节 = 单元数 × 32768 × 2（w=2）。
+//! 单元 32768、头 91（D18 已定项 7 的数据单元头初值——墓碑单元用五元组，属数据单元类；
+//! 2026-09-03 从已废弃的 55 字节提议值改过来）、墓碑记录 56（五元组 + 区间，按 E23（journal 几何）点名项宽度的量级）
+//! ⇒ 打包容量 (32768 − 91) / 56 = **583 条/单元**；物理字节 = 单元数 × 32768 × 2（w=2）。
 //!
 //! 负载三个：unlink 一个单 extent 小文件；rm -rf N 个单 extent 文件（N = 1000 / 1000000）；
 //! truncate 一个 4096 extent 的大文件。
@@ -40,12 +41,12 @@
 //! ## 它答不了的
 //!
 //! 回收规则未定 ⇒ 打包臂的钉住量算不出（判据 3 只标定性）；墓碑记录宽度 56 是量级假设
-//! （字段表未定按 D18 未定项 7）；多 extent 文件在 rm -rf 里按单 extent 算（小文件口径）。
+//! （字段表按 D18 已定项 7 走，跑的时候还未定）；多 extent 文件在 rm -rf 里按单 extent 算（小文件口径）。
 
 use e7_index_bench::Emitter;
 
 const UNIT: u64 = 32768;
-const UNIT_HDR: u64 = 55;
+const UNIT_HDR: u64 = 91;
 const TOMB_REC: u64 = 56;
 /// 第一版 2 盘恒 w=2：每个单元物理两份。
 const PHYS_FACTOR: u64 = 2;
@@ -130,14 +131,14 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// **绝对值锚点**：打包容量 (32768−55)/56 = 584。
+    /// **绝对值锚点**：打包容量 (32768−91)/56 = 583。
     #[test]
     fn absolute_packed_capacity() {
-        assert_eq!(packed_capacity(), 584);
+        assert_eq!(packed_capacity(), 583);
     }
 
     /// **绝对值锚点**：unlink 一个小文件——独占单元 = 1 单元 = 64 KiB 物理；
-    /// 打包 = 同样 1 单元（584 容量装 1 条）。
+    /// 打包 = 同样 1 单元（583 容量装 1 条）。
     #[test]
     fn absolute_unlink_one() {
         let l = Load { name: "u", objects: 1, extents_per_obj: 1 };
@@ -146,7 +147,7 @@ mod tests {
     }
 
     /// **绝对值锚点（判据 2 点名的那格）**：rm -rf 1M 单 extent 文件、每条记录独占单元
-    /// ⇒ 1M 单元 × 64 KiB = 61.04 GiB 物理写。打包 ⇒ ⌈1e6/584⌉ = 1713 单元 ≈ 107.1 MiB。
+    /// ⇒ 1M 单元 × 64 KiB = 61.04 GiB 物理写。打包 ⇒ ⌈1e6/583⌉ = 1716 单元 ≈ 107.25 MiB。
     #[test]
     fn absolute_rm_rf_1m() {
         let l = Load { name: "m", objects: 1_000_000, extents_per_obj: 1 };
@@ -154,8 +155,8 @@ mod tests {
         assert_eq!(u_ded, 1_000_000);
         assert_eq!(b_ded, 65_536_000_000);
         let (u_pack, b_pack) = cost(&l, RecordGrain::PerExtent, Carrier::PackedShared);
-        assert_eq!(u_pack, 1713);
-        assert_eq!(b_pack, 1713 * 65536);
+        assert_eq!(u_pack, 1716);
+        assert_eq!(b_pack, 1716 * 65536);
         // 单 extent 文件下 per_object 与 per_extent 逐格相同
         assert_eq!(
             cost(&l, RecordGrain::PerObject, Carrier::PackedShared),
@@ -163,7 +164,7 @@ mod tests {
         );
     }
 
-    /// **绝对值锚点**：truncate 4096 个 extent——per_extent 打包 ⌈4096/584⌉ = 8 单元；
+    /// **绝对值锚点**：truncate 4096 个 extent——per_extent 打包 ⌈4096/583⌉ = 8 单元；
     /// per_object 恒 1 单元（区间记录）。粒度在多 extent 对象上差 4096 倍（独占载体）。
     #[test]
     fn absolute_truncate() {
@@ -176,7 +177,7 @@ mod tests {
     /// 打包容量对记录宽度的敏感性自检：宽度翻倍容量约减半（口径变了数字跟着变的那类）。
     #[test]
     fn capacity_scales_with_record_width() {
-        assert_eq!((UNIT - UNIT_HDR) / (TOMB_REC * 2), 292);
+        assert_eq!((UNIT - UNIT_HDR) / (TOMB_REC * 2), 291);
     }
 
     /// 物理系数：w=2 恒双份——公式里少了它，全表数字砍半。

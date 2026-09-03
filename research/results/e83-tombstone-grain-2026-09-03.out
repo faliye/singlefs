@@ -1,0 +1,18 @@
+E7RESULT name=config unit=32768 hdr=91 rec=56 packed_cap=583 phys_factor=2 model=arithmetic file_ops=0
+E7RESULT name=cost load=unlink_one grain=per_extent carrier=dedicated units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=cost load=unlink_one grain=per_extent carrier=packed units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=cost load=unlink_one grain=per_object carrier=dedicated units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=cost load=unlink_one grain=per_object carrier=packed units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=cost load=rm_rf_1k grain=per_extent carrier=dedicated units=1000 phys_bytes=65536000 phys_mib=62.5
+E7RESULT name=cost load=rm_rf_1k grain=per_extent carrier=packed units=2 phys_bytes=131072 phys_mib=0.1
+E7RESULT name=cost load=rm_rf_1k grain=per_object carrier=dedicated units=1000 phys_bytes=65536000 phys_mib=62.5
+E7RESULT name=cost load=rm_rf_1k grain=per_object carrier=packed units=2 phys_bytes=131072 phys_mib=0.1
+E7RESULT name=cost load=rm_rf_1m grain=per_extent carrier=dedicated units=1000000 phys_bytes=65536000000 phys_mib=62500.0
+E7RESULT name=cost load=rm_rf_1m grain=per_extent carrier=packed units=1716 phys_bytes=112459776 phys_mib=107.2
+E7RESULT name=cost load=rm_rf_1m grain=per_object carrier=dedicated units=1000000 phys_bytes=65536000000 phys_mib=62500.0
+E7RESULT name=cost load=rm_rf_1m grain=per_object carrier=packed units=1716 phys_bytes=112459776 phys_mib=107.2
+E7RESULT name=cost load=truncate_4096ext grain=per_extent carrier=dedicated units=4096 phys_bytes=268435456 phys_mib=256.0
+E7RESULT name=cost load=truncate_4096ext grain=per_extent carrier=packed units=8 phys_bytes=524288 phys_mib=0.5
+E7RESULT name=cost load=truncate_4096ext grain=per_object carrier=dedicated units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=cost load=truncate_4096ext grain=per_object carrier=packed units=1 phys_bytes=65536 phys_mib=0.1
+E7RESULT name=done emitted=18

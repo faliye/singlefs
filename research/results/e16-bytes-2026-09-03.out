@@ -1,0 +1,7 @@
+E7RESULT name=bytes_config leaves=268435456 hdr=64 ptr=40 note=祖先代价的两种口径
+E7RESULT name=anc_caliber node_bytes=512 fanout=11 height=9 one_op_anc_nodes=9 one_op_anc_bytes=4608 batch10_anc_nodes=70 batch10_anc_bytes=35840
+E7RESULT name=anc_caliber node_bytes=1024 fanout=24 height=7 one_op_anc_nodes=7 one_op_anc_bytes=7168 batch10_anc_nodes=52 batch10_anc_bytes=53248
+E7RESULT name=anc_caliber node_bytes=4096 fanout=100 height=5 one_op_anc_nodes=5 one_op_anc_bytes=20480 batch10_anc_nodes=33 batch10_anc_bytes=135168
+E7RESULT name=anc_caliber node_bytes=16384 fanout=408 height=4 one_op_anc_nodes=4 one_op_anc_bytes=65536 batch10_anc_nodes=24 batch10_anc_bytes=393216
+E7RESULT name=anc_caliber node_bytes=65536 fanout=1636 height=3 one_op_anc_nodes=3 one_op_anc_bytes=196608 batch10_anc_nodes=21 batch10_anc_bytes=1376256
+E7RESULT name=done emitted=7

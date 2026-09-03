@@ -1,0 +1,3 @@
+M1_加密只做第一块	let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(UNIT) {	let c = Aes256Gcm::new_from_slice(&key).unwrap();\n            for ch in buf.chunks_mut(UNIT).take(1) {
+M2_算法分派串线	Alg::Chacha => {\n            let c = ChaCha20Poly1305::new_from_slice(&key).unwrap();	Alg::Chacha => {\n            let c = Aes256Gcm::new_from_slice(&key).unwrap();
+M3_seal谎报处理量	let n = buf.len();	let n = buf.len() / 2;

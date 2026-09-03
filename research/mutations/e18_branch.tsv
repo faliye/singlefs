@@ -1,0 +1,6 @@
+M1_真值不看链上删除	!b.deaths.keys().any(|d| chain.contains(d))	true
+M2_真值不查诞生链	if !chain.contains(&b.birth) { return false; }         // 不在这条链上诞生	if false { return false; }         // 不在这条链上诞生
+M3_保守死亡不等全分支	if covered == n_branches {	if covered >= 1 {
+M4_区间左边界写严	b.birth <= root_txg && root_txg < d	b.birth < root_txg && root_txg < d
+M5_最早死亡不记账	blocks[i].deaths.insert(t, ());\n                blocks[i].d5_death_min = blocks[i].d5_death_min.min(t);	blocks[i].deaths.insert(t, ());
+M6_两个方向装反	if i && !t { fp += 1; }\n            if !i && t { fn_ += 1; }	if i && !t { fn_ += 1; }\n            if !i && t { fp += 1; }

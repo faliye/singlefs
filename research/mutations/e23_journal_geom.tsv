@@ -1,0 +1,8 @@
+M1_头常量漂移	const HDR_BYTES: u64 = 84;	const HDR_BYTES: u64 = 76;
+M2_条目常量漂移	const ENTRY_BYTES: u64 = 56;	const ENTRY_BYTES: u64 = 48;
+M3_对齐删掉	bytes.div_ceil(pbs) * pbs	bytes
+M4_sb头不省8字节	Tail::SuperBlock => HDR_BYTES - 8,	Tail::SuperBlock => HDR_BYTES,
+M5_链按记录分配	o.allocs += (rec_bytes + rb).div_ceil(BLOCK) - rec_bytes.div_ceil(BLOCK);	o.allocs += 1;
+M6_环也分配	if shape == Shape::Chain {\n            o.allocs	if shape != Shape::Chain {\n            o.allocs
+M7_重放漏掉搭不上车的	o.replay_blocks = tailing.max(tail_lag).div_ceil(BLOCK);	o.replay_blocks = tail_lag.div_ceil(BLOCK);
+M8_空闲重放窗口取反	let tailing: u64 = named[k.min(named.len())..].iter()	let tailing: u64 = named[..k.min(named.len())].iter()

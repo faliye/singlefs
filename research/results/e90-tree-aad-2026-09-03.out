@@ -1,0 +1,5 @@
+E7RESULT name=config heads=4 sealed=5 swaps=3 forged=1 shared_reads=6 aead=chacha20poly1305 nonce=stored
+E7RESULT name=arm arm=reader_tree own_ok=5 corrupt_detected=5 swap_detected=3 swap_silent_wrong=0 forged_detected=1 shared_ok=2 crit1=true crit2=false pass=false
+E7RESULT name=arm arm=pointer_tree own_ok=5 corrupt_detected=5 swap_detected=0 swap_silent_wrong=3 forged_detected=0 shared_ok=6 crit1=false crit2=true pass=false
+E7RESULT name=arm arm=ancestry_birth own_ok=5 corrupt_detected=5 swap_detected=3 swap_silent_wrong=0 forged_detected=1 shared_ok=6 crit1=true crit2=true pass=true
+E7RESULT name=done emitted=5

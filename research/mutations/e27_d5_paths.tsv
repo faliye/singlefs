@@ -1,0 +1,7 @@
+M1_正确规则左边界写严	Rule::Correct     => birth <= s_txg && s_txg < death,	Rule::Correct     => birth < s_txg && s_txg < death,
+M2_边界样例期望写反	("birth==S.txg", s_txg,     s_txg + 5, true),	("birth==S.txg", s_txg,     s_txg + 5, false),
+M3_丢失与泄漏方向混	(true, false) => o.data_loss += 1,	(true, false) => o.leak += 1,
+M4_桶头检查不付钱	if bucket_hi < target_txg {\n            examined += 1;	if bucket_hi < target_txg {
+M5_defer打包取整向下	let ios = entries.div_ceil(per_block.max(1));	let ios = entries / per_block.max(1);
+M6_逐条臂也按桶算	if !bucketed {\n        return entries.len() as u64;                    // 逐条看\n    }	if false {\n        return entries.len() as u64;                    // 逐条看\n    }
+M7_三边界少一格	("birth==death", s_txg,     s_txg,     false),	("birth==death", s_txg,     s_txg + 5, true),

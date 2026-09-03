@@ -284,4 +284,16 @@ mod tests {
         let r = run(1_000_000, 0.999, 16, 4, 200, 200, 64, 0, 7);
         assert!(r.false_enospc > 0, "99.9% 填充 + 延迟 16 都没出现假性 ENOSPC");
     }
+
+    /// checkpoint 必须用「能动保留池」的那个视图——第一版误用普通视图，
+    /// 「保留池救不了卡死」整个结论由那一行造成（正文已记）。此前的测试全在
+    /// reserve=0 上跑，两个视图相等，那一行写错不会有任何测试红（变异审计补的）。
+    #[test]
+    fn the_reserve_actually_rescues_checkpoint_stalls() {
+        let without = run(1_000_000, 0.999, 16, 4, 200, 200, 64, 0, 11);
+        let with_big = run(1_000_000, 0.999, 16, 4, 200, 200, 64, 16384, 11);
+        assert!(without.ckpt_stall > 0, "无保留池的紧盘该有卡死");
+        assert!(with_big.ckpt_stall < without.ckpt_stall,
+            "16384 块保留池没有减少卡死（{} -> {}）", without.ckpt_stall, with_big.ckpt_stall);
+    }
 }

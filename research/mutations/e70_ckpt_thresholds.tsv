@@ -1,0 +1,6 @@
+M1_预算不除F	let budget = ring_bytes / f;	let budget = ring_bytes;
+M2_头不扣	(budget - REC_HEADER) * node / entry	budget * node / entry
+M3_放大倍数装反	(budget - REC_HEADER) * node / entry	(budget - REC_HEADER) * entry / node
+M4_零预算护栏拆掉	if budget <= REC_HEADER {\n        return 0;\n    }	if false {\n        return 0;\n    }
+M5_插值斜率方向反	let k = (a1000 / a100).ln() / 10f64.ln();	let k = (a100 / a1000).ln() / 10f64.ln();
+M6_插值基点错	100.0 * (budget / a100).powf(1.0 / k)	1000.0 * (budget / a100).powf(1.0 / k)

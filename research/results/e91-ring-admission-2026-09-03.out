@@ -1,0 +1,32 @@
+E7RESULT name=config record=4096 hdr=78 entry=56 old_entry=32 node=16384 t_dirty=2147483648 t_time_ms=5000 fsync_per_sec=2785 items_per_record=71
+E7RESULT name=bound caliber=e75_target items=12 records=1 occupancy_bytes=4096 f2_bound_kib=8
+E7RESULT name=bound caliber=e75_worst items=62000 records=874 occupancy_bytes=3579904 f2_bound_kib=6992
+E7RESULT name=bound caliber=d16_item5_old_entry occupancy_mib=4 f2_bound_mib=8
+E7RESULT name=bound caliber=settled_t_dirty items=131072 records=1847 occupancy_kib=7388 f2_bound_kib=14776 f3_bound_kib=22164
+E7RESULT name=retention arm=jia peak_records=1 peak_bytes=4096 max_lifetime_ticks=1 publishes=40000
+E7RESULT name=retention arm=deferred peak_records=10923 peak_mib=42 max_lifetime_ticks=10923 lifetime_ms=3922 publishes=3 closed_form_window=10923
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=547 delay=2 bound_blocks=6628 bound_mib=25 sim_blocks=6628 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=547 delay=4 bound_blocks=11004 bound_mib=42 sim_blocks=11004 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=547 delay=8 bound_blocks=19756 bound_mib=77 sim_blocks=19756 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=547 delay=16 bound_blocks=37260 bound_mib=145 sim_blocks=37260 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=2785 delay=2 bound_blocks=33484 bound_mib=130 sim_blocks=33484 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=2785 delay=4 bound_blocks=55764 bound_mib=217 sim_blocks=55764 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=2785 delay=8 bound_blocks=100324 bound_mib=391 sim_blocks=100324 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=2785 delay=16 bound_blocks=189444 bound_mib=740 sim_blocks=189444 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=13925 delay=2 bound_blocks=167164 bound_mib=652 sim_blocks=167164 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=13925 delay=4 bound_blocks=278564 bound_mib=1088 sim_blocks=278564 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=13925 delay=8 bound_blocks=501364 bound_mib=1958 sim_blocks=501364 agree=true
+E7RESULT name=admission arm=jia_4.0 ops_per_ckpt=13925 delay=16 bound_blocks=946964 bound_mib=3699 sim_blocks=946964 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=547 delay=2 bound_blocks=157 bound_mib=0 sim_blocks=157 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=547 delay=4 bound_blocks=219 bound_mib=0 sim_blocks=219 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=547 delay=8 bound_blocks=343 bound_mib=1 sim_blocks=343 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=547 delay=16 bound_blocks=591 bound_mib=2 sim_blocks=591 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=2785 delay=2 bound_blocks=535 bound_mib=2 sim_blocks=535 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=2785 delay=4 bound_blocks=849 bound_mib=3 sim_blocks=849 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=2785 delay=8 bound_blocks=1477 bound_mib=5 sim_blocks=1477 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=2785 delay=16 bound_blocks=2733 bound_mib=10 sim_blocks=2733 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=13925 delay=2 bound_blocks=2431 bound_mib=9 sim_blocks=2431 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=13925 delay=4 bound_blocks=4009 bound_mib=15 sim_blocks=4009 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=13925 delay=8 bound_blocks=7165 bound_mib=27 sim_blocks=7165 agree=true
+E7RESULT name=admission arm=defer_0.0567 ops_per_ckpt=13925 delay=16 bound_blocks=13477 bound_mib=52 sim_blocks=13477 agree=true
+E7RESULT name=done emitted=32

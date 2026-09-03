@@ -563,6 +563,17 @@ mod tests {
         assert_eq!(a.node_writes, b.node_writes);
     }
 
+    /// 内联边界是 ≤（含阈值本身）：恰等于阈值的文件必须零数据块，多一字节必须整块
+    /// （变异审计补的：此前没有任何测试落在 3584 的边界上，`<=` 改 `<` 不会红）。
+    #[test]
+    fn inline_boundary_is_inclusive() {
+        let p = base(32);
+        let (at, _) = run_case(p, Strategy::InlineInode, p.inline_max, Form::OnceWrite, 64, 3);
+        assert_eq!(at.data_bytes, 0, "恰等于阈值该内联，零数据块");
+        let (over, _) = run_case(p, Strategy::InlineInode, p.inline_max + 1, Form::OnceWrite, 64, 3);
+        assert!(over.data_bytes >= 64 * p.block_bytes, "超过阈值一字节该走整块");
+    }
+
     /// KV 分离在小文件上不占整块——它与不分流的差别必须真的出现在数据字节上。
     #[test]
     fn kv_separation_avoids_block_rounding() {

@@ -1,0 +1,9 @@
+M1_真值忽略删除	Op::Del(k) => { m.remove(&k); }	Op::Del(_k) => { }
+M2_幂等合并先者胜	_ => { merged.insert(k, v); }	_ => { merged.entry(k).or_insert(v); }
+M3_运行时账不减旧值	rt += new - old;	rt += new;
+M4_Δ累加方向反	match bug { Bug::MergeReversed => *acc -= d, _ => *acc += d }	match bug { Bug::MergeReversed => *acc += d, _ => *acc -= d }
+M5_幂等丢消息注入失效	if bug == Bug::DropMessage && !buf.is_empty() { buf.pop(); }\n        if bug == Bug::DoubleApply { let d = buf.clone(); buf.extend(d); }\n        entries += buf.len();	if bug == Bug::DoubleApply { let d = buf.clone(); buf.extend(d); }\n        entries += buf.len();
+M6_Δ墓碑注入失效	if bug == Bug::TombstoneIgnored { (k, 0) }	if false { (k, 0) }
+M7_checker重放漏行	for &(_, d) in &log { accumulate(&mut ck, d, bug); }	for &(_, d) in log.iter().skip(1) { accumulate(&mut ck, d, bug); }
+M8_幂等checker回声	Reading { rt, ck: tree.values().sum(), truth: ground_truth(ops), entries }	Reading { rt, ck: rt, truth: ground_truth(ops), entries }
+M9_操作流不生成删除	if r() % 4 == 0 { Op::Del(k) }	if r() % 4 == 99 { Op::Del(k) }

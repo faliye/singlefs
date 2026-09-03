@@ -1,0 +1,9 @@
+M1_验收边界改开	claim.txg <= up_to	claim.txg < up_to
+M2_验收跳过	if arm == Arm::AncestryBirth && !ancestry_accepts(hs, reader_tree, p.claim) {	if false && arm == Arm::AncestryBirth && !ancestry_accepts(hs, reader_tree, p.claim) {
+M3_祖先链不夹min	let eff = t.min(clamp);	let eff = t;
+M4_祖先臂不绑txg	if arm == Arm::AncestryBirth {\n        v.extend_from_slice(&birth_txg.to_le_bytes());\n    }	if false {\n        v.extend_from_slice(&birth_txg.to_le_bytes());\n    }
+M5_读者树臂偷看指针	Arm::ReaderTree => reader_tree,	Arm::ReaderTree => p.claim.tree,
+M6_共享夹具挪到克隆点后	Birth { tree: 1, txg: 5 }	Birth { tree: 1, txg: 11 }
+M7_第三次换挂换成自读	(3u64, c_p, &c_ext.3),	(4u64, c_p, &c_ext.3),
+M8_对照翻了个寂寞	bad.ct[0] ^= 0x01;	bad.ct[0] ^= 0x00;
+M9_旁支头挂错父	(4, Some((1, 10))),	(4, Some((2, 20))),

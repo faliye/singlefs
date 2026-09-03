@@ -43,6 +43,10 @@ def splice_of(w, words):
 
     A 两个实词粘死，**各自都要 >=5 字母**——放宽到 4 就会把 `batch+able` 判红。
     B 名词后缀之后又接了动词后缀（`configuration+ing`），英语里不存在这种构词。
+    C 实词 + **缺了头一两个字母的另一个实词**。⚠️ 这条是补出来的：实测
+      `inaccessibleisabled`（inaccessible + disabled 少了 d）在 A 下切不开——
+      尾巴 `isabled` 不成词——于是被记成普通生词判绿，而那一轮的输出是坏的。
+      模型接着吐下一个词时丢掉开头一两个字母，是拼接的一种常见形态。
     """
     lw = w.lower()
     for suf in VERBAL:                                   # 规则 B
@@ -56,6 +60,18 @@ def splice_of(w, words):
             continue
         if a in words and b in words:
             return "%s+%s" % (a, b)
+    # 规则 C：前缀成词（>=6 字母），尾巴补一个字母成词。三道闸压假阳性——
+    # 前缀 >=6、尾巴 >=5、补出来的词 >=7。⚠️ 三道都是实测逼出来的：
+    # 只要求尾巴 >=4 时 `distinguish+able` 会被补成 `cable` 判红，
+    # 那是正常派生词，一旦误伤检测器就没人信了。
+    for i in range(len(lw) - 5, 5, -1):
+        a, b = lw[:i], lw[i:]
+        if len(a) < 6 or len(b) < 5 or a in PREFIX or a not in words:
+            continue
+        for c in 'abcdefghijklmnopqrstuvwxyz':
+            cand = c + b
+            if len(cand) >= 7 and cand in words:
+                return "%s+(%s)%s" % (a, c, b)
     return None
 
 def scan(path, prompt_path, words):
@@ -76,7 +92,42 @@ def scan(path, prompt_path, words):
             spliced.append("%s(=%s)" % (w, s))
     return oov, spliced
 
+# 检查自己会不会红：红样本必须判红，绿样本必须判绿。
+# ⚠️ **这一节是补出来的**：规则 C 加进来之前，`inaccessibleisabled` 被记成普通生词判绿，
+# 而那一轮的本地腿输出是坏的、并且差点被当成证据用掉。
+# 一个自己没被证明会红的检测器，与没有检测器的区别只在于它让人放心。
+SELFTEST_RED = [
+    'inaccessibleisabled',   # 规则 C：inaccessible + (d)isabled
+    'batchinggroup',         # 规则 A：两个实词粘死
+    'configurationing',      # 规则 B：名词后缀之后接动词后缀
+]
+SELFTEST_GREEN = [
+    'distinguishable',       # 曾被规则 C 误判成 distinguish+(c)able
+    'indistinguishable', 'unfalsifiable', 'counterobservation',
+    'misrepresents', 'factually',
+]
+
+def selftest(words):
+    bad = 0
+    for w in SELFTEST_RED:
+        if not splice_of(w, words):
+            print("  ✗ 红样本没被抓到：%s" % w); bad += 1
+    for w in SELFTEST_GREEN:
+        s = splice_of(w, words)
+        if s:
+            print("  ✗ 绿样本被误判：%s -> %s" % (w, s)); bad += 1
+    if bad:
+        print("  ✗ oov-check 自检未通过：%d 个样本判错" % bad)
+        print("     → 怎么办： 改 splice_of 的三条规则，改完把两组样本都跑一遍；"
+              "红样本抓不到说明检测器有盲区，绿样本被误判说明它会误伤正常英文。")
+        return EXIT_RED
+    print("  ✓ oov-check 自检通过（红样本 %d 个全抓，绿样本 %d 个不误伤）"
+          % (len(SELFTEST_RED), len(SELFTEST_GREEN)))
+    return EXIT_CLEAN
+
 if __name__ == '__main__':
+    if len(sys.argv) >= 2 and sys.argv[1] == '--selftest':
+        sys.exit(selftest(load_words()))
     if len(sys.argv) < 2:
         sys.stderr.write("用法: oov-check.py <输出文件> [提示文件]\n"); sys.exit(EXIT_BROKEN)
     words = load_words()

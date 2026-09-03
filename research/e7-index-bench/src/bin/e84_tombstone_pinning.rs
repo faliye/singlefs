@@ -16,7 +16,7 @@
 //! 发布推进；每 SNAP_EVERY 次发布立一个快照代际（cohort）；只保留最近 K_SNAP 个代际，
 //! 超出即销毁最旧的（D5（快照 / 空间记账机制）约定 B 的节奏）——**代际销毁那一刻，
 //! 归属它的墓碑记录全部变为可回收**。删除流每次发布产生 DEL_PER_PUB 条墓碑记录，
-//! 归属当前代际。打包容量 CAP 条/单元（E83（墓碑的粒度）口径 584，模型可参数化）。
+//! 归属当前代际。打包容量 CAP 条/单元（E83（墓碑的粒度）口径 583（2026-09-03 随 E83 的 91 字节单元头重算，原 584），模型可参数化）。
 //!
 //! 两条臂只差装载纪律：
 //!
@@ -46,7 +46,7 @@
 //!
 //! 计数模型，文件操作 0 处。删除流取匀速（无突发）；「随 deadlist 节奏清」按
 //! 「代际销毁 ⇒ 该代际记录可回收」的粗粒度建模，不建 deadlist 合并的细节；
-//! CAP=584 依赖 E83（墓碑的粒度）的记录宽度假设（56 字节）。
+//! CAP=583 依赖 E83（墓碑的粒度）的记录宽度假设（56 字节）。
 
 use e7_index_bench::Emitter;
 
@@ -162,12 +162,12 @@ fn main() {
     let mut em = Emitter::new();
     println!(
         "{}",
-        em.emit_raw("name=config cap=584 snap_every=10 k_snap=8 pubs=4000 model=counting file_ops=0")
+        em.emit_raw("name=config cap=583 snap_every=10 k_snap=8 pubs=4000 model=counting file_ops=0")
     );
     // 主扫描：每代际记录数 = del_per_pub × snap_every，扫四档相对 CAP 的比例
     for del_per_pub in [1u64, 6, 60, 600] {
         for arm in [Arm::AppendOrder, Arm::CohortBound] {
-            let (sim, dead_upto, total) = run(arm, 584, del_per_pub, 10, 8, 4000);
+            let (sim, dead_upto, total) = run(arm, 583, del_per_pub, 10, 8, 4000);
             let (stuck, live, units_alive) = sim.audit(dead_upto);
             assert_eq!(stuck + live + sim.reclaimed_records, total, "分类必须完备");
             let per_cohort = del_per_pub * 10;
@@ -225,7 +225,7 @@ mod tests {
     fn cohort_bound_never_sticks() {
         for del in [1u64, 6, 60, 600] {
             for (se, k) in [(10u64, 8u64), (2, 2), (5, 3)] {
-                let (sim, dead_upto, _) = run(Arm::CohortBound, 584, del, se, k, 4000);
+                let (sim, dead_upto, _) = run(Arm::CohortBound, 583, del, se, k, 4000);
                 let (stuck, _, _) = sim.audit(dead_upto);
                 assert_eq!(stuck, 0, "del={del} snap_every={se} k={k}");
             }
@@ -237,7 +237,7 @@ mod tests {
     fn audit_conservation() {
         for arm in [Arm::AppendOrder, Arm::CohortBound] {
             for del in [1u64, 60, 600] {
-                let (sim, dead_upto, total) = run(arm, 584, del, 10, 8, 4000);
+                let (sim, dead_upto, total) = run(arm, 583, del, 10, 8, 4000);
                 let (stuck, live, _) = sim.audit(dead_upto);
                 assert_eq!(stuck + live + sim.reclaimed_records, total, "{arm:?} del={del}");
             }
@@ -250,7 +250,7 @@ mod tests {
     fn append_stuck_shrinks_with_cohort_size() {
         let mut prev = f64::MAX;
         for del in [1u64, 6, 60, 600] {
-            let (sim, dead_upto, _) = run(Arm::AppendOrder, 584, del, 10, 8, 4000);
+            let (sim, dead_upto, _) = run(Arm::AppendOrder, 583, del, 10, 8, 4000);
             let (stuck, live, _) = sim.audit(dead_upto);
             let pct = stuck as f64 / (stuck + live).max(1) as f64;
             assert!(pct <= prev + 1e-9, "del={del}: {pct} > {prev}");
@@ -258,12 +258,12 @@ mod tests {
         }
     }
 
-    /// 稀疏删除是最坏格：每代际 10 条 ≪ CAP=584 ⇒ 一个单元跨约 58 个代际，
+    /// 稀疏删除是最坏格：每代际 10 条 ≪ CAP=583 ⇒ 一个单元跨约 58 个代际，
     /// **活着的墓碑单元里超过 80% 的记录是已死的**（实测 416/496 = 84%）；
     /// cohort_bound 同参数为 0。这一格就是「装载纪律买到什么」的判决格。
     #[test]
     fn sparse_deletes_are_the_worst_case() {
-        let (sim, dead_upto, _) = run(Arm::AppendOrder, 584, 1, 10, 8, 4000);
+        let (sim, dead_upto, _) = run(Arm::AppendOrder, 583, 1, 10, 8, 4000);
         let (stuck, live, _) = sim.audit(dead_upto);
         assert!(stuck + live > 0);
         assert!(
@@ -273,7 +273,7 @@ mod tests {
         );
         // 绝对值锚：live 恒等于保留窗口内的记录数（8 个活代际 × 每代际 10 条）
         assert_eq!(live, 80);
-        assert_eq!(stuck, 416);
+        assert_eq!(stuck, 422);
     }
 
     /// **开放单元即使全死也不回收**（回收要先封——单元还在被追加，收掉它会丢后来的记录）。

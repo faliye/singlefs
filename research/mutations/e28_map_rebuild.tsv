@@ -1,0 +1,7 @@
+M1_数据块凭空有头	desc: if data_self_desc { Some(d) } else { None }	desc: Some(d)
+M2_重建键序错	m.insert((d.tree, d.obj, d.gen), u.pba);	m.insert((d.obj, d.tree, d.gen), u.pba);
+M3_wrong统计删掉	Some(p) if p != v => o.wrong += 1,	Some(p) if p != v => { let _ = p; },
+M4_缺口分类装反	Some(Kind::Data) => o.missing_data += 1,	Some(Kind::Data) => o.missing_meta += 1,
+M5_搬运不动地址	for u in units.iter_mut().take(moved) { u.pba += 999_000; }	for u in units.iter_mut().take(moved) { u.pba += 0; }
+M6_原表漏建数据条目	units.push(Unit { pba, desc: if data_self_desc { Some(d) } else { None } });\n        map.insert((d.tree, d.obj, d.gen), pba);	units.push(Unit { pba, desc: if data_self_desc { Some(d) } else { None } });
+M7_数据单元类记成元	kinds.insert((d.tree, d.obj, d.gen), Kind::Data);	kinds.insert((d.tree, d.obj, d.gen), Kind::Meta);

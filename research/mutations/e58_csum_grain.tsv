@@ -4,7 +4,7 @@ M3_随机侧漏指针	p * (g as f64 + PTR_BYTES as f64)	p * (g as f64)
 M4_顺序侧忘摊薄	PTR_BYTES as f64 * USER_READ as f64 / g as f64	PTR_BYTES as f64
 M5_临界式符号反	(1.0 / g2 as f64 - 1.0 / g1 as f64)	(1.0 / g1 as f64 - 1.0 / g2 as f64)
 M6_粒度网格改一档	const GRAINS: [usize; 6] = [4096, 8192, 16384, 32768, 65536, 131072];	const GRAINS: [usize; 6] = [4096, 8192, 16384, 32768, 65536, 262144];
-M7_指针宽度取ZFS	const PTR_BYTES: u64 = 108;	const PTR_BYTES: u64 = 128;
+M7_指针宽度取ZFS	const PTR_BYTES: u64 = 53;	const PTR_BYTES: u64 = 128;
 M8_顺序IO跟着G变	const SEQ_IO: usize = 1024 * 1024;	const SEQ_IO: usize = 65536;
 M9_伪随机退化成常数	x.wrapping_mul(0x2545_F491_4F6C_DD1D)	1
 M10_用户读改成整单元	const USER_READ: u64 = 4096;	const USER_READ: u64 = 8192;

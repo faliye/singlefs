@@ -56,7 +56,7 @@ E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
 E42|e42_txn_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
-E43|e43_ext_budget||e43-ext-budget-2026-08-31.out|exact
+E43|e43_ext_budget||e43-ext-budget-2026-09-02.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
@@ -67,11 +67,18 @@ E79|e79-root-record||e79-root-record-2026-09-02.out|exact
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
-E83|e83-tombstone-grain||e83-tombstone-grain-2026-09-02.out|exact
-E84|e84-tombstone-pinning||e84-tombstone-pinning-2026-09-02.out|exact
+E83|e83-tombstone-grain||e83-tombstone-grain-2026-09-03.out|exact
+E84|e84-tombstone-pinning||e84-tombstone-pinning-2026-09-03.out|exact
 E85|e85-unit-header||e85-unit-header-2026-09-02.out|exact
 E86|e86-scan-step||e86-scan-step-2026-09-02.out|exact
 E87|e87-fixed-placement||e87-fixed-placement-2026-09-02.out|exact
+E88|e88-impostor-orphan||e88-impostor-orphan-2026-09-02.out|exact
+E89|e89-interval-frontier||e89-interval-frontier-2026-09-03.out|exact
+E90|e90-tree-aad||e90-tree-aad-2026-09-03.out|exact
+E91|e91-ring-admission||e91-ring-admission-2026-09-03.out|exact
+E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
+E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
+E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact
@@ -97,6 +104,7 @@ E68|e68-inline-threshold||e68-inline-threshold-2026-08-31.out|exact
 E8|e8-split||e8-split-2026-08-28.out|exact
 E9|@driver_e9||e9-keylayout-2026-08-28.out|exact
 E16|e16-journal||e16-journal-2026-08-31.out|exact
+E16|e16-journal|bytes|e16-bytes-2026-09-03.out|exact
 E17|e17-merge||e17-merge-2026-08-29-repro.out|timing
 E20|e20-fanout||e20-poscontrol-2026-08-29.out|timing
 E21|e21-cpu|2048 5|e21-cpu-2026-08-28.out|timing

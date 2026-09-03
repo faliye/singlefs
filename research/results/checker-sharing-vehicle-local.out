@@ -1,0 +1,7 @@
+1. The core writes a journal header of 78 bytes as specified in the kb, but the actual structure requires 91 bytes. The checker reads exactly 78 bytes and validates it against the same constant, reporting green. The image is corrupted beyond the 78th byte. Forbidding sharing would catch this because core and checker would independently use different constants, causing a mismatch.
+
+2. The core writes a five-tuple unit header with field1=6 bytes and field2=27 bytes (total 33), but the correct specification requires field1=5 and field2=28. Both core and checker independently assume the same incorrect split, so the checker validates the total 33 bytes as correct. Forbidding sharing might not catch this if both independently guess the same wrong split.
+
+3. A raw device reports 512-byte blocks during mkfs, so the superblock records 512. Later, the same image is accessed on a host where the device reports 4096-byte blocks. The checker probes the device and finds 4096, compares it to the superblock's 512, and reports red. This is correct because the device's block size changed legitimately.
+
+4. The journal header size counterexample is reachable due to existing kb inconsistencies. A single repository check that validates all kb references for each registered constant for consistency would most change this answer by preventing the kb from having conflicting values.
