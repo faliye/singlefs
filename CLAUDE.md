@@ -59,7 +59,9 @@
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
+| `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项，指不到的就是格式级空白 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
+| `.claude/kb/verification-build.md` | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证） |
@@ -94,6 +96,8 @@ bash .claude/gate.d/29-settled-item-self-open.sh # 已定分项的正文里说�
 bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
 bash .claude/gate.d/31-blocking-verdict.sh # 每个未定项有没有判过改不改第一个事务的字节
 bash .claude/gate.d/32-history-ordinal.sh # 本次新增的历史条目有没有撞号（并发会话共写一个仓）
+bash .claude/gate.d/32-first-txn-fields.sh # 第一个事务的每个字段都指到一条真实存在的分项
+bash .claude/gate.d/33-mutation-tables.sh # 每个实验二进制都有同名变异表（只验装置在，不跑变异）
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
