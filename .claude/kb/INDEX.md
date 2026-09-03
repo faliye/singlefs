@@ -16,6 +16,7 @@
 | [checks-owed.md](checks-owed.md) | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
 | [vm-harness.md](vm-harness.md) | 怎么把一个实验送进虚机在**真块设备**上跑：三个前置、卫生检查、虚机里多了哪条校验路径 |
+| [verification-build.md](verification-build.md) | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：各自消费哪些已定条款、被哪些未定项挡着、能从 research/ 抬走什么、第一版最小范围、待用户定案的问题 |
 
 ## 不是编号的记号
 
