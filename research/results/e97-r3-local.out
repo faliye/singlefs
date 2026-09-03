@@ -1,0 +1,9 @@
+The span field is 1 byte limiting maximum consecutive slots to 255. If a future device class uses a slot size of 100 bytes a data unit of 32768 bytes would require 328 slots exceeding the span field capacity. An implementer would be forced to either truncate the allocation or redesign the field width which is impossible once data exists.
+
+The device id width settled elsewhere might be too small. If it is 2 bytes supporting only 65536 devices but later the system needs 100000 devices device id collisions occur. An implementer cannot change the width after deployment causing device conflicts and data corruption.
+
+The sequence number field is required but its width and placement are open. If added later existing disk images lack this field. Mounting old images would fail because the sequence number is mandatory for operations. An implementer must handle missing sequence numbers which could lead to incorrect accounting or allocation decisions.
+
+The allocation record key assumes all slots are 16384 bytes. If a new device class uses 8192 byte slots the slot number interpretation would be wrong. A slot number of 1 would be treated as 16384 bytes instead of 8192. An implementer cannot adjust slot size per device without breaking existing data structures.
+
+There is no versioning mechanism for the on-disk format. If the span field width is increased to 2 bytes later old records with 1 byte span would be misread. Mounting old images would cause the next field to be read incorrectly. An implementer must support multiple format versions which is error-prone and complicates the codebase.

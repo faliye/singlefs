@@ -1,0 +1,17 @@
+M1_扇出少扣一次头	    (node - overhead) / entry	    node / entry
+M2_覆盖判定多给一字节	            if capacity(s.bytes) > u as u128 {	            if capacity(s.bytes + 1) > u as u128 {
+M3_逆序对数反了	            if enc(i) > enc(j) {	            if enc(i) < enc(j) {
+M4_槽号编码没生效	    if by_slot_number {\n        return 0;\n    }	    if !by_slot_number {\n        return 0;\n    }
+M5_寻址范围没乘粒度	        c.saturating_mul(grain as u128)	        c
+M6_全空聚簇段数丢了设备维	    Stat { per_device: true,  per_tree_narrow: false }, // 11 全空聚簇段数	    Stat { per_device: false, per_tree_narrow: false }, // 11 全空聚簇段数
+M7_树高不含叶层	    let mut h = 1u64;\n    let mut cap = leaf_f as u128;	    let mut h = 0u64;\n    let mut cap = leaf_f as u128;
+M8_内部层没算进树字节	        nodes += level;	        nodes += 0;
+M9_记账value宽度归零	const ACCT_VALUE_BYTES: u64 = 8;	const ACCT_VALUE_BYTES: u64 = 0;
+M10_设备维没进条目数	            let d = if s.per_device { devs } else { 1 };	            let d = 1;
+M11_对齐步长写死为一	    let step = (grain / NODE_ALIGN).max(1);	    let step = 1u64;
+M13_闭式漏掉尾巴项	    inv += q * tail;	    inv += 0;
+M14_段清单少一条要求	    Required { clause: "D8-wb3",   field: "seq",      present: false },	    Required { clause: "D8-wb3",   field: "seq",      present: true },
+M15_脏叶按条目算不按组算	    let groups_per_leaf = (leaf_f / k).max(1);	    let groups_per_leaf = leaf_f.max(1);
+M12_回绕期按5秒窗口不按发布率	    Some(m as u128 * 1000 / PUBLISH_PER_SEC as u128)	    Some(m as u128 * 5000)
+M17_跨度段没进条目宽	    dev_b + off_b + span_b + gen_b	    dev_b + off_b + gen_b
+M18_半单元判据退回按臂标签算	fn half_unit_representable(grain: u64) -> bool {\n    grain < DATA_UNIT_BYTES\n}	fn half_unit_representable(_grain: u64) -> bool {\n    false\n}

@@ -1,0 +1,240 @@
+E7RESULT name=config node_bytes=16384 unit_bytes=32768 stats=11 k_max=49 t_dirty=2147483648 budget=21474836 ckpt_txg_bytes=8
+E7RESULT name=coverage arm=acct_e73_22B seg=stat_tag bytes=2 verdict=covers
+E7RESULT name=coverage arm=acct_e73_22B seg=tree_id bytes=8 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_e73_22B seg=dev_id bytes=4 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_e73_22B seg=gen bytes=8 verdict=covers
+E7RESULT name=coverage arm=acct_wide_19B seg=stat_tag bytes=2 verdict=covers
+E7RESULT name=coverage arm=acct_wide_19B seg=tree_id bytes=8 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_wide_19B seg=dev_id bytes=1 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_wide_19B seg=gen bytes=8 verdict=covers
+E7RESULT name=coverage arm=acct_tight_14B seg=stat_tag bytes=1 verdict=covers
+E7RESULT name=coverage arm=acct_tight_14B seg=tree_id bytes=4 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_tight_14B seg=dev_id bytes=1 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_tight_14B seg=gen bytes=8 verdict=covers
+E7RESULT name=coverage arm=acct_windowgen_7B seg=stat_tag bytes=1 verdict=covers
+E7RESULT name=coverage arm=acct_windowgen_7B seg=tree_id bytes=4 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_windowgen_7B seg=dev_id bytes=1 verdict=upper_unknown
+E7RESULT name=coverage arm=acct_windowgen_7B seg=gen bytes=1 verdict=OVERFLOWS
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=54 header=58 child_ptr=32 leaf_fanout=542 inner_fanout=301 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=75 header=58 child_ptr=53 leaf_fanout=542 inner_fanout=217 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=54 header=67 child_ptr=32 leaf_fanout=542 inner_fanout=301 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=75 header=67 child_ptr=53 leaf_fanout=542 inner_fanout=216 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=54 header=76 child_ptr=32 leaf_fanout=542 inner_fanout=301 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_e73_22B key_bytes=22 leaf_entry=30 inner_entry=75 header=76 child_ptr=53 leaf_fanout=542 inner_fanout=216 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=51 header=58 child_ptr=32 leaf_fanout=603 inner_fanout=319 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=72 header=58 child_ptr=53 leaf_fanout=603 inner_fanout=226 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=51 header=67 child_ptr=32 leaf_fanout=602 inner_fanout=319 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=72 header=67 child_ptr=53 leaf_fanout=602 inner_fanout=226 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=51 header=76 child_ptr=32 leaf_fanout=602 inner_fanout=319 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_wide_19B key_bytes=19 leaf_entry=27 inner_entry=72 header=76 child_ptr=53 leaf_fanout=602 inner_fanout=225 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=46 header=58 child_ptr=32 leaf_fanout=740 inner_fanout=354 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=67 header=58 child_ptr=53 leaf_fanout=740 inner_fanout=243 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=46 header=67 child_ptr=32 leaf_fanout=740 inner_fanout=354 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=67 header=67 child_ptr=53 leaf_fanout=740 inner_fanout=243 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=46 header=76 child_ptr=32 leaf_fanout=740 inner_fanout=353 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_tight_14B key_bytes=14 leaf_entry=22 inner_entry=67 header=76 child_ptr=53 leaf_fanout=740 inner_fanout=242 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=39 header=58 child_ptr=32 leaf_fanout=1087 inner_fanout=418 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=60 header=58 child_ptr=53 leaf_fanout=1087 inner_fanout=271 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=39 header=67 child_ptr=32 leaf_fanout=1086 inner_fanout=418 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=60 header=67 child_ptr=53 leaf_fanout=1086 inner_fanout=271 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=39 header=76 child_ptr=32 leaf_fanout=1086 inner_fanout=417 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_geom arm=acct_windowgen_7B key_bytes=7 leaf_entry=15 inner_entry=60 header=76 child_ptr=53 leaf_fanout=1086 inner_fanout=271 entries_narrow=4300 height_narrow=2 entries_wide=73600 height_wide=2
+E7RESULT name=acct_budget arm=acct_e73_22B trees=64 devs=8 reading=narrow entry=30 leaf_fanout=542 groups=172 entry_bytes=10320 over_by_entry=0 node_bytes=147456 over_by_node=0
+E7RESULT name=acct_budget arm=acct_e73_22B trees=64 devs=8 reading=wide entry=30 leaf_fanout=542 groups=2944 entry_bytes=176640 over_by_entry=0 node_bytes=2310144 over_by_node=0
+E7RESULT name=acct_budget arm=acct_e73_22B trees=1024 devs=64 reading=narrow entry=30 leaf_fanout=542 groups=2372 entry_bytes=142320 over_by_entry=0 node_bytes=1851392 over_by_node=0
+E7RESULT name=acct_budget arm=acct_e73_22B trees=1024 devs=64 reading=wide entry=30 leaf_fanout=542 groups=333824 entry_bytes=20029440 over_by_entry=0 node_bytes=260456448 over_by_node=1
+E7RESULT name=acct_budget arm=acct_e73_22B trees=8192 devs=8 reading=narrow entry=30 leaf_fanout=542 groups=16428 entry_bytes=985680 over_by_entry=0 node_bytes=12828672 over_by_node=0
+E7RESULT name=acct_budget arm=acct_e73_22B trees=8192 devs=8 reading=wide entry=30 leaf_fanout=542 groups=376832 entry_bytes=22609920 over_by_entry=1 node_bytes=294010880 over_by_node=1
+E7RESULT name=acct_budget arm=acct_e73_22B trees=8192 devs=64 reading=narrow entry=30 leaf_fanout=542 groups=16708 entry_bytes=1002480 over_by_entry=0 node_bytes=13041664 over_by_node=0
+E7RESULT name=acct_budget arm=acct_e73_22B trees=8192 devs=64 reading=wide entry=30 leaf_fanout=542 groups=2670592 entry_bytes=160235520 over_by_entry=1 node_bytes=2083586048 over_by_node=1
+E7RESULT name=acct_budget arm=acct_wide_19B trees=64 devs=8 reading=narrow entry=27 leaf_fanout=603 groups=172 entry_bytes=9288 over_by_entry=0 node_bytes=131072 over_by_node=0
+E7RESULT name=acct_budget arm=acct_wide_19B trees=64 devs=8 reading=wide entry=27 leaf_fanout=603 groups=2944 entry_bytes=158976 over_by_entry=0 node_bytes=2015232 over_by_node=0
+E7RESULT name=acct_budget arm=acct_wide_19B trees=1024 devs=64 reading=narrow entry=27 leaf_fanout=603 groups=2372 entry_bytes=128088 over_by_entry=0 node_bytes=1622016 over_by_node=0
+E7RESULT name=acct_budget arm=acct_wide_19B trees=1024 devs=64 reading=wide entry=27 leaf_fanout=603 groups=333824 entry_bytes=18026496 over_by_entry=0 node_bytes=227901440 over_by_node=1
+E7RESULT name=acct_budget arm=acct_wide_19B trees=8192 devs=8 reading=narrow entry=27 leaf_fanout=603 groups=16428 entry_bytes=887112 over_by_entry=0 node_bytes=11223040 over_by_node=0
+E7RESULT name=acct_budget arm=acct_wide_19B trees=8192 devs=8 reading=wide entry=27 leaf_fanout=603 groups=376832 entry_bytes=20348928 over_by_entry=0 node_bytes=257261568 over_by_node=1
+E7RESULT name=acct_budget arm=acct_wide_19B trees=8192 devs=64 reading=narrow entry=27 leaf_fanout=603 groups=16708 entry_bytes=902232 over_by_entry=0 node_bytes=11419648 over_by_node=0
+E7RESULT name=acct_budget arm=acct_wide_19B trees=8192 devs=64 reading=wide entry=27 leaf_fanout=603 groups=2670592 entry_bytes=144211968 over_by_entry=1 node_bytes=1823129600 over_by_node=1
+E7RESULT name=acct_budget arm=acct_tight_14B trees=64 devs=8 reading=narrow entry=22 leaf_fanout=740 groups=172 entry_bytes=7568 over_by_entry=0 node_bytes=98304 over_by_node=0
+E7RESULT name=acct_budget arm=acct_tight_14B trees=64 devs=8 reading=wide entry=22 leaf_fanout=740 groups=2944 entry_bytes=129536 over_by_entry=0 node_bytes=1671168 over_by_node=0
+E7RESULT name=acct_budget arm=acct_tight_14B trees=1024 devs=64 reading=narrow entry=22 leaf_fanout=740 groups=2372 entry_bytes=104368 over_by_entry=0 node_bytes=1343488 over_by_node=0
+E7RESULT name=acct_budget arm=acct_tight_14B trees=1024 devs=64 reading=wide entry=22 leaf_fanout=740 groups=333824 entry_bytes=14688256 over_by_entry=0 node_bytes=188612608 over_by_node=1
+E7RESULT name=acct_budget arm=acct_tight_14B trees=8192 devs=8 reading=narrow entry=22 leaf_fanout=740 groups=16428 entry_bytes=722832 over_by_entry=0 node_bytes=9289728 over_by_node=0
+E7RESULT name=acct_budget arm=acct_tight_14B trees=8192 devs=8 reading=wide entry=22 leaf_fanout=740 groups=376832 entry_bytes=16580608 over_by_entry=0 node_bytes=212910080 over_by_node=1
+E7RESULT name=acct_budget arm=acct_tight_14B trees=8192 devs=64 reading=narrow entry=22 leaf_fanout=740 groups=16708 entry_bytes=735152 over_by_entry=0 node_bytes=9453568 over_by_node=0
+E7RESULT name=acct_budget arm=acct_tight_14B trees=8192 devs=64 reading=wide entry=22 leaf_fanout=740 groups=2670592 entry_bytes=117506048 over_by_entry=1 node_bytes=1508802560 over_by_node=1
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=64 devs=8 reading=narrow entry=15 leaf_fanout=1087 groups=172 entry_bytes=5160 over_by_entry=0 node_bytes=65536 over_by_node=0
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=64 devs=8 reading=wide entry=15 leaf_fanout=1087 groups=2944 entry_bytes=88320 over_by_entry=0 node_bytes=1130496 over_by_node=0
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=1024 devs=64 reading=narrow entry=15 leaf_fanout=1087 groups=2372 entry_bytes=71160 over_by_entry=0 node_bytes=917504 over_by_node=0
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=1024 devs=64 reading=wide entry=15 leaf_fanout=1087 groups=333824 entry_bytes=10014720 over_by_entry=0 node_bytes=127205376 over_by_node=1
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=8192 devs=8 reading=narrow entry=15 leaf_fanout=1087 groups=16428 entry_bytes=492840 over_by_entry=0 node_bytes=6275072 over_by_node=0
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=8192 devs=8 reading=wide entry=15 leaf_fanout=1087 groups=376832 entry_bytes=11304960 over_by_entry=0 node_bytes=143589376 over_by_node=1
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=8192 devs=64 reading=narrow entry=15 leaf_fanout=1087 groups=16708 entry_bytes=501240 over_by_entry=0 node_bytes=6373376 over_by_node=0
+E7RESULT name=acct_budget arm=acct_windowgen_7B trees=8192 devs=64 reading=wide entry=15 leaf_fanout=1087 groups=2670592 entry_bytes=80117760 over_by_entry=1 node_bytes=1017561088 over_by_node=1
+E7RESULT name=acct_key_ceiling trees=64 devs=8 reading=narrow touched_entries=344 budget=21474836 max_entry_bytes=62426 max_key_bytes=62418 feasible=1
+E7RESULT name=acct_key_ceiling trees=64 devs=8 reading=wide touched_entries=5888 budget=21474836 max_entry_bytes=3647 max_key_bytes=3639 feasible=1
+E7RESULT name=acct_key_ceiling trees=1024 devs=64 reading=narrow touched_entries=4744 budget=21474836 max_entry_bytes=4526 max_key_bytes=4518 feasible=1
+E7RESULT name=acct_key_ceiling trees=1024 devs=64 reading=wide touched_entries=667648 budget=21474836 max_entry_bytes=32 max_key_bytes=24 feasible=1
+E7RESULT name=acct_key_ceiling trees=8192 devs=8 reading=narrow touched_entries=32856 budget=21474836 max_entry_bytes=653 max_key_bytes=645 feasible=1
+E7RESULT name=acct_key_ceiling trees=8192 devs=8 reading=wide touched_entries=753664 budget=21474836 max_entry_bytes=28 max_key_bytes=20 feasible=1
+E7RESULT name=acct_key_ceiling trees=8192 devs=64 reading=narrow touched_entries=33416 budget=21474836 max_entry_bytes=642 max_key_bytes=634 feasible=1
+E7RESULT name=acct_key_ceiling trees=8192 devs=64 reading=wide touched_entries=5341184 budget=21474836 max_entry_bytes=4 max_key_bytes=0 feasible=0
+E7RESULT name=alloc_encoding arm=alloc_ptrcoord_15B dev_bytes=1 off_bytes=6 by_slot_number=0 grain=32768 gen_bytes=8 span_bytes=0 per_unit_record=0 entry=15 gen_coverage=covers misaligned_representable=281466386776064 addressable_bytes=281474976710656 half_unit_representable=0
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=7303069696 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=116848508928 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=7316619264 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=117065285632 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=7316619264 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_ptrcoord_15B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=117065285632 occupancy_ppm=415
+E7RESULT name=alloc_cow arm=alloc_ptrcoord_15B entry=15 leaf_fanout=1088 leaves_contiguous=4 amp_contiguous=1 amp_scattered=1092
+E7RESULT name=segment_required clause=D5-item1 field=stat_tag present=1
+E7RESULT name=segment_required clause=D5-item1 field=tree_id present=1
+E7RESULT name=segment_required clause=D5-item1 field=dev_id present=1
+E7RESULT name=segment_required clause=D5-item2 field=gen present=1
+E7RESULT name=segment_required clause=D5-item3 field=value present=1
+E7RESULT name=segment_required clause=D8-wb3 field=seq present=0
+E7RESULT name=alloc_encoding arm=alloc_e74_20B dev_bytes=4 off_bytes=8 by_slot_number=0 grain=32768 gen_bytes=8 span_bytes=0 per_unit_record=0 entry=20 gen_coverage=covers misaligned_representable=18446181123756130304 addressable_bytes=18446744073709551616 half_unit_representable=0
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=816 inner_fanout=251 height=4 tree_bytes=9740435456 occupancy_ppm=553
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=816 inner_fanout=251 height=4 tree_bytes=155846098944 occupancy_ppm=553
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=815 inner_fanout=251 height=4 tree_bytes=9752379392 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=815 inner_fanout=251 height=4 tree_bytes=156037332992 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=815 inner_fanout=250 height=4 tree_bytes=9752526848 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=815 inner_fanout=250 height=4 tree_bytes=156039823360 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=815 inner_fanout=250 height=4 tree_bytes=9752526848 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=815 inner_fanout=250 height=4 tree_bytes=156039823360 occupancy_ppm=554
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=814 inner_fanout=250 height=4 tree_bytes=9764503552 occupancy_ppm=555
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=814 inner_fanout=250 height=4 tree_bytes=156231499776 occupancy_ppm=555
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=814 inner_fanout=250 height=4 tree_bytes=9764503552 occupancy_ppm=555
+E7RESULT name=alloc_geom arm=alloc_e74_20B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=814 inner_fanout=250 height=4 tree_bytes=156231499776 occupancy_ppm=555
+E7RESULT name=alloc_cow arm=alloc_e74_20B entry=20 leaf_fanout=816 leaves_contiguous=6 amp_contiguous=1 amp_scattered=819
+E7RESULT name=alloc_encoding arm=alloc_unitno32k_14B dev_bytes=1 off_bytes=5 by_slot_number=1 grain=32768 gen_bytes=8 span_bytes=0 per_unit_record=0 entry=14 gen_coverage=covers misaligned_representable=0 addressable_bytes=36028797018963968 half_unit_representable=0
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1166 inner_fanout=276 height=4 tree_bytes=6814171136 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1166 inner_fanout=276 height=4 tree_bytes=109026050048 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1165 inner_fanout=276 height=4 tree_bytes=6820020224 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1165 inner_fanout=276 height=4 tree_bytes=109119635456 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=6825885696 occupancy_ppm=388
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=109213401088 occupancy_ppm=388
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1165 inner_fanout=276 height=4 tree_bytes=6820020224 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1165 inner_fanout=276 height=4 tree_bytes=109119635456 occupancy_ppm=387
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=6825885696 occupancy_ppm=388
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=109213401088 occupancy_ppm=388
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=6825885696 occupancy_ppm=388
+E7RESULT name=alloc_geom arm=alloc_unitno32k_14B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1164 inner_fanout=276 height=4 tree_bytes=109213401088 occupancy_ppm=388
+E7RESULT name=alloc_cow arm=alloc_unitno32k_14B entry=14 leaf_fanout=1166 leaves_contiguous=4 amp_contiguous=1 amp_scattered=1170
+E7RESULT name=alloc_encoding arm=alloc_unitno32k_15B dev_bytes=1 off_bytes=6 by_slot_number=1 grain=32768 gen_bytes=8 span_bytes=0 per_unit_record=0 entry=15 gen_coverage=covers misaligned_representable=0 addressable_bytes=9223372036854775808 half_unit_representable=0
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=7303069696 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=116848508928 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=7309901824 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=116957593600 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=7316619264 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=117065285632 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=7316619264 occupancy_ppm=415
+E7RESULT name=alloc_geom arm=alloc_unitno32k_15B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=117065285632 occupancy_ppm=415
+E7RESULT name=alloc_cow arm=alloc_unitno32k_15B entry=15 leaf_fanout=1088 leaves_contiguous=4 amp_contiguous=1 amp_scattered=1092
+E7RESULT name=alloc_encoding arm=alloc_windowgen_7B dev_bytes=1 off_bytes=5 by_slot_number=1 grain=32768 gen_bytes=1 span_bytes=0 per_unit_record=0 entry=7 gen_coverage=OVERFLOWS misaligned_representable=0 addressable_bytes=36028797018963968 half_unit_representable=0
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2332 inner_fanout=276 height=4 tree_bytes=3407101952 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2332 inner_fanout=276 height=4 tree_bytes=54513041408 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2331 inner_fanout=276 height=4 tree_bytes=3408576512 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2331 inner_fanout=276 height=4 tree_bytes=54536437760 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2329 inner_fanout=276 height=4 tree_bytes=3411492864 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2329 inner_fanout=276 height=4 tree_bytes=54583263232 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2330 inner_fanout=276 height=4 tree_bytes=3410034688 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2330 inner_fanout=276 height=4 tree_bytes=54559834112 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2329 inner_fanout=276 height=4 tree_bytes=3411492864 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2329 inner_fanout=276 height=4 tree_bytes=54583263232 occupancy_ppm=193
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=2328 inner_fanout=276 height=4 tree_bytes=3412967424 occupancy_ppm=194
+E7RESULT name=alloc_geom arm=alloc_windowgen_7B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=2328 inner_fanout=276 height=4 tree_bytes=54606725120 occupancy_ppm=194
+E7RESULT name=alloc_cow arm=alloc_windowgen_7B entry=7 leaf_fanout=2332 leaves_contiguous=2 amp_contiguous=1 amp_scattered=2340
+E7RESULT name=alloc_encoding arm=alloc_slot16k_15B dev_bytes=1 off_bytes=6 by_slot_number=1 grain=16384 gen_bytes=8 span_bytes=0 per_unit_record=0 entry=15 gen_coverage=covers misaligned_representable=0 addressable_bytes=4611686018427387904 half_unit_representable=1
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=58 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=14606106624 occupancy_ppm=830
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=58 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=233696968704 occupancy_ppm=830
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=67 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=14619738112 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=67 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=233915138048 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=76 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=14619738112 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=0 header=76 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=233915138048 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=58 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=14619738112 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=58 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1087 inner_fanout=271 height=4 tree_bytes=233915138048 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=67 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=14633205760 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=67 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=234130522112 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=76 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=14633205760 occupancy_ppm=831
+E7RESULT name=alloc_geom arm=alloc_slot16k_15B with_range=1 header=76 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1086 inner_fanout=271 height=4 tree_bytes=234130522112 occupancy_ppm=831
+E7RESULT name=alloc_cow arm=alloc_slot16k_15B entry=15 leaf_fanout=1088 leaves_contiguous=4 amp_contiguous=1 amp_scattered=1092
+E7RESULT name=alloc_encoding arm=alloc_span16k_16B dev_bytes=1 off_bytes=6 by_slot_number=1 grain=16384 gen_bytes=8 span_bytes=1 per_unit_record=1 entry=16 gen_coverage=covers misaligned_representable=0 addressable_bytes=4611686018427387904 half_unit_representable=1
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1020 inner_fanout=272 height=4 tree_bytes=7789936640 occupancy_ppm=442
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1020 inner_fanout=272 height=4 tree_bytes=124638412800 occupancy_ppm=442
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=7797686272 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=124762423296 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=7797686272 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=0 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=124762423296 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=58 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=7797686272 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=58 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1019 inner_fanout=271 height=4 tree_bytes=124762423296 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=67 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1018 inner_fanout=271 height=4 tree_bytes=7805353984 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=67 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1018 inner_fanout=271 height=4 tree_bytes=124884975616 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=76 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1018 inner_fanout=271 height=4 tree_bytes=7805353984 occupancy_ppm=443
+E7RESULT name=alloc_geom arm=alloc_span16k_16B with_range=1 header=76 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1018 inner_fanout=271 height=4 tree_bytes=124884975616 occupancy_ppm=443
+E7RESULT name=alloc_cow arm=alloc_span16k_16B entry=16 leaf_fanout=1020 leaves_contiguous=5 amp_contiguous=1 amp_scattered=1024
+E7RESULT name=gen_order modulus=0 gens=32 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=0 gens=64 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=0 gens=257 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=0 gens=300 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=0 gens=512 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=0 gens=70000 inversions=0 wrap_millis=never
+E7RESULT name=gen_order modulus=49 gens=32 inversions=0 wrap_millis=17
+E7RESULT name=gen_order modulus=49 gens=64 inversions=615 wrap_millis=17
+E7RESULT name=gen_order modulus=49 gens=257 inversions=14310 wrap_millis=17
+E7RESULT name=gen_order modulus=49 gens=300 inversions=19278 wrap_millis=17
+E7RESULT name=gen_order modulus=49 gens=512 inversions=61170 wrap_millis=17
+E7RESULT name=gen_order modulus=49 gens=70000 inversions=1199579976 wrap_millis=17
+E7RESULT name=gen_order modulus=256 gens=32 inversions=0 wrap_millis=91
+E7RESULT name=gen_order modulus=256 gens=64 inversions=0 wrap_millis=91
+E7RESULT name=gen_order modulus=256 gens=257 inversions=255 wrap_millis=91
+E7RESULT name=gen_order modulus=256 gens=300 inversions=10274 wrap_millis=91
+E7RESULT name=gen_order modulus=256 gens=512 inversions=32640 wrap_millis=91
+E7RESULT name=gen_order modulus=256 gens=70000 inversions=1217957832 wrap_millis=91
+E7RESULT name=gen_order modulus=1024 gens=32 inversions=0 wrap_millis=367
+E7RESULT name=gen_order modulus=1024 gens=64 inversions=0 wrap_millis=367
+E7RESULT name=gen_order modulus=1024 gens=257 inversions=0 wrap_millis=367
+E7RESULT name=gen_order modulus=1024 gens=300 inversions=0 wrap_millis=367
+E7RESULT name=gen_order modulus=1024 gens=512 inversions=0 wrap_millis=367
+E7RESULT name=gen_order modulus=1024 gens=70000 inversions=1214169376 wrap_millis=367
+E7RESULT name=gen_order modulus=65536 gens=32 inversions=0 wrap_millis=23531
+E7RESULT name=gen_order modulus=65536 gens=64 inversions=0 wrap_millis=23531
+E7RESULT name=gen_order modulus=65536 gens=257 inversions=0 wrap_millis=23531
+E7RESULT name=gen_order modulus=65536 gens=300 inversions=0 wrap_millis=23531
+E7RESULT name=gen_order modulus=65536 gens=512 inversions=0 wrap_millis=23531
+E7RESULT name=gen_order modulus=65536 gens=70000 inversions=282586824 wrap_millis=23531
+E7RESULT name=alignable slots_16k=4096 grain=16384 representable=4096 unrepresentable=0
+E7RESULT name=alignable slots_16k=4096 grain=32768 representable=2048 unrepresentable=2048
+E7RESULT name=alignable slots_16k=998 grain=16384 representable=998 unrepresentable=0
+E7RESULT name=alignable slots_16k=998 grain=32768 representable=499 unrepresentable=499
+E7RESULT name=grain_sweep grain=16384 cap_bytes=17592186044416 entries=966367641 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=14606106624 occupancy_ppm=830
+E7RESULT name=grain_sweep grain=16384 cap_bytes=281474976710656 entries=15461882265 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=233696968704 occupancy_ppm=830
+E7RESULT name=grain_sweep grain=32768 cap_bytes=17592186044416 entries=483183820 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=7303069696 occupancy_ppm=415
+E7RESULT name=grain_sweep grain=32768 cap_bytes=281474976710656 entries=7730941132 leaf_fanout=1088 inner_fanout=272 height=4 tree_bytes=116848508928 occupancy_ppm=415
+E7RESULT name=control_cut arm=acct_e73_22B seg=stat_tag was=2 key_full=22 key_cut=20 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_e73_22B seg=tree_id was=8 key_full=22 key_cut=14 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_e73_22B seg=dev_id was=4 key_full=22 key_cut=18 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_e73_22B seg=gen was=8 key_full=22 key_cut=14 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_wide_19B seg=stat_tag was=2 key_full=19 key_cut=17 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_wide_19B seg=tree_id was=8 key_full=19 key_cut=11 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_wide_19B seg=dev_id was=1 key_full=19 key_cut=18 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_wide_19B seg=gen was=8 key_full=19 key_cut=11 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_tight_14B seg=stat_tag was=1 key_full=14 key_cut=13 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_tight_14B seg=tree_id was=4 key_full=14 key_cut=10 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_tight_14B seg=dev_id was=1 key_full=14 key_cut=13 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_tight_14B seg=gen was=8 key_full=14 key_cut=6 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_windowgen_7B seg=stat_tag was=1 key_full=7 key_cut=6 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=control_cut arm=acct_windowgen_7B seg=tree_id was=4 key_full=7 key_cut=3 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_windowgen_7B seg=dev_id was=1 key_full=7 key_cut=6 delta_ok=1 verdict_after=upper_unknown
+E7RESULT name=control_cut arm=acct_windowgen_7B seg=gen was=1 key_full=7 key_cut=6 delta_ok=1 verdict_after=OVERFLOWS
+E7RESULT name=done emitted=240

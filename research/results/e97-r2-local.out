@@ -1,0 +1,5 @@
+1 When mounting a filesystem image created under a previous design where the statistic tag was 1 byte instead of the current 2 bytes the system misinterprets the first byte of the tree id as part of the statistic tag causing all subsequent key parsing to be incorrect and making the accounting tree unreadable
+
+2 After replacing a physical device with a new one using the same device id the allocation tree retains entries for the old device's offsets when the system accesses to access data for that device id it reads from the new device's storage at those offsets which contain unrelated data leading to silent data corruption
+
+3 During a crash while writing a data unit only one of the two 16 KiB slots is updated in the allocation tree when rebuilding the allocation tree by scanning the device the system finds only one allocated slot for a data unit that requires both slots causing read failures when attempting to access the data unit due to missing allocation records for the second slot

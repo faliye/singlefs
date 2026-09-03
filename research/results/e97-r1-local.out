@@ -1,0 +1,9 @@
+1. In a multi-device system with two physical devices, the accounting tree key lacks device ID. For example, both devices have the same statistic tag, tree id, and generation. When querying a specific device's statistic, the system returns the value from the other device due to key collision, causing incorrect statistics reporting.
+
+2. The allocation tree key does not include device identity, only offset. Two different devices with the same offset share the same key. When allocating a block on one device, the system incorrectly marks it as allocated on another device, leading to data corruption during write operations.
+
+3. During device replacement, the allocation tree's missing device ID causes new device allocations to reference the old device's allocation data. For example, after replacing device A with device B, writing to device B's offset 1000 uses the allocation generation from device A's offset 1000, which is invalid for the new device.
+
+4. After a crash, rebuilding the allocation tree from scratch merges entries from different devices due to missing device ID in keys. This results in incorrect allocation states where blocks from multiple devices are treated as a single allocation unit, causing data loss or corruption.
+
+5. The accounting tree's missing device ID prevents per-device statistics collection. When monitoring disk usage per device, the system reports aggregated values that do not distinguish between devices, making it impossible to track individual device usage for capacity planning or troubleshooting.

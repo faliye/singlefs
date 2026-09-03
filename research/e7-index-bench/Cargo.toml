@@ -228,3 +228,7 @@ path = "src/bin/e94_move_touchset.rs"
 [[bin]]
 name = "e96-hybrid-consistency"
 path = "src/bin/e96_hybrid_consistency.rs"
+
+[[bin]]
+name = "e97-entry-encoding"
+path = "src/bin/e97_entry_encoding.rs"
