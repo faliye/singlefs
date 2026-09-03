@@ -30,8 +30,8 @@ echo
 echo "── 1. 实验号引用是否都有定义 ──"
 missing=0
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
-for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,2}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
-             | grep -oE 'E[0-9]{1,2}' | sort -u); do
+for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
+             | grep -oE 'E[0-9]{1,3}' | sort -u); do
   grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"; missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "实验号引用全部有定义"
@@ -39,8 +39,8 @@ done
 echo
 echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
-for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,2}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
-             | grep -oE 'D[0-9]{1,2}' | sort -u); do
+for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
+             | grep -oE 'D[0-9]{1,3}' | sort -u); do
   grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"; missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "决策号引用全部有定义"

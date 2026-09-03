@@ -25,3 +25,17 @@ fi
 n="$(grep '^test result' <<<"$out" | sed 's/test result: ok\. \([0-9]*\) passed.*/\1/' | paste -sd+ | bc)"
 b="$(grep -c '^test result: ok' <<<"$out")"
 echo "  ✓ research 构建通过，$b 个测试批次、共 ${n:-?} 个单测全绿"
+
+# ── 本地腿的字词损坏闸，它自己会不会红 ──
+# 三方论证的本地腿靠 `ask-local.sh` 里那道闸挡损坏输出，而那道闸此前没人验过。
+# 实测（2026-09-03）：一份含 `inaccessibleisabled` 的输出被判绿，差点当成证据用掉。
+OOV="$R/scripts/oov-check.py"
+if [[ -f "$OOV" ]]; then
+  if ! out="$(python3 "$OOV" --selftest 2>&1)"; then
+    echo "$out" | sed 's/^/  /'
+    echo "     → 怎么办：本地腿的损坏闸判错了样本，修 splice_of 的规则再跑。"
+    echo "                闸不准 ⇒ 三方论证里那一腿的输出可信度归零。"
+    exit 1
+  fi
+  echo "$out" | sed 's/^  /  /'
+fi

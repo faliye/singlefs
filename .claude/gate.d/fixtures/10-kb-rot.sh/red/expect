@@ -1,0 +1,2 @@
+exit=1
+want=E999 被引用但 experiments/ 下没有它

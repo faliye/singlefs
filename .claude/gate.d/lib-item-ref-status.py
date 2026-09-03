@@ -38,6 +38,11 @@ bad = []
 files = sorted(set(sum([glob.glob(p, recursive=True) for p in
     ('.claude/kb/**/*.md', 'records/**/*.md', 'research/**/*.md',
      'research/**/*.rs', '.claude/rules/*.md')], [])))
+# research/prompts/ 显式排除，理由与 26 号门禁相同：那是原样发给模型的提示与模型的原样输出，
+# 与 research/results/ 里的产物一一对应，事后改它等于让产物对不上输入。
+# 实测（2026-09-03）：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
+# 没有决策号可归属，按正文规则判红，而那一行按证据链不许改。
+files = [f for f in files if '/prompts/' not in f]
 SELF = {f: re.match(r'## (D\d+)', open(f, encoding='utf-8').read()).group(1)
         for f in glob.glob('.claude/kb/decisions/*.md')}
 for path in files:
