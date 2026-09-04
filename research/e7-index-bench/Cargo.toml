@@ -252,3 +252,7 @@ path = "src/bin/e101_node_tag_reserve.rs"
 [[bin]]
 name = "e102-unit-class-registry"
 path = "src/bin/e102_unit_class_registry.rs"
+
+[[bin]]
+name = "e103-inode-update-cost"
+path = "src/bin/e103_inode_update_cost.rs"

@@ -85,6 +85,7 @@ E99|e99-writebuffer-seq||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-04.out|exact
+E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-04.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact
