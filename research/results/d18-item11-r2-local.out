@@ -1,0 +1,13 @@
+1 During a rebuild scan after all index trees are lost including the snapshot table the container's snapshot generation cannot be derived because the snapshot table is missing violating the loading rule that requires one snapshot generation per container
+
+2 If an implementation frees the old container version before the root pointer to the new container is durable a crash causes the root to reference freed space leading to data corruption when the freed space is reused
+
+3 A reader with older software that does not support packed record type 1 tombstone skips the container during rebuild scan causing tombstone records to be ignored and deleted keys to resurrect
+
+4 The 4 byte CRC32C payload checksum is insufficient for data integrity during rebuild scans allowing undetected corruption that could compromise filesystem recovery
+
+5 A reader with older software that does not support packed record type 2 inode skips the container rendering the filesystem completely unusable in read only mode despite the compat_ro bit
+
+6 A container not closed at a snapshot boundary due to a crash contains records spanning multiple generations but the rebuild scanner uses only the container's birth generation to determine the snapshot resulting in incorrect processing of records from different generations
+
+7 The container index is the sole holder of physical pointers if a new container is created and the old one freed before the container index update is durable a crash leaves the index pointing to a freed container causing data corruption

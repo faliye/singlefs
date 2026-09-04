@@ -1,0 +1,39 @@
+E7RESULT name=config unit=32768 common_prefix=42 data_hdr=91 packed_body=51 packed_hdr=93 tomb_rec=56 inode_rec=140 tag_values=256 registry=7 used_names=15 model=arithmetic file_ops=0
+E7RESULT name=coverage registry=proposal unmapped=0 multi_code=0 unregistered=0
+E7RESULT name=coverage registry=d9_only unmapped=0 multi_code=0 unregistered=5 note=positive_control_tombstone_missing
+E7RESULT name=aad_domain with_tag=0 synthetic_class=0 classes=2 colliding_pairs=0
+E7RESULT name=aad_domain with_tag=1 synthetic_class=0 classes=2 colliding_pairs=0
+E7RESULT name=aad_domain with_tag=0 synthetic_class=1 classes=3 colliding_pairs=1
+E7RESULT name=aad_domain with_tag=1 synthetic_class=1 classes=3 colliding_pairs=0
+E7RESULT name=aad_domain with_tag=0 synthetic_class=0 classes=1 colliding_pairs=0 note=negative_control
+E7RESULT name=capacity rec=56 hdr=64 cap=584
+E7RESULT name=capacity rec=56 hdr=65 cap=583
+E7RESULT name=capacity rec=56 hdr=76 cap=583
+E7RESULT name=capacity rec=56 hdr=91 cap=583
+E7RESULT name=capacity rec=56 hdr=93 cap=583
+E7RESULT name=capacity rec=56 hdr=120 cap=583
+E7RESULT name=capacity rec=56 hdr=121 cap=582
+E7RESULT name=capacity rec=56 hdr=148 cap=582
+E7RESULT name=capacity rec=56 hdr=149 cap=582
+E7RESULT name=capacity_interval rec=56 cap_at_packed_hdr=583 hdr_lo=65 hdr_hi=120 cap_at_lo_minus_1=584 cap_at_hi_plus_1=582
+E7RESULT name=capacity rec=140 hdr=64 cap=233
+E7RESULT name=capacity rec=140 hdr=65 cap=233
+E7RESULT name=capacity rec=140 hdr=76 cap=233
+E7RESULT name=capacity rec=140 hdr=91 cap=233
+E7RESULT name=capacity rec=140 hdr=93 cap=233
+E7RESULT name=capacity rec=140 hdr=120 cap=233
+E7RESULT name=capacity rec=140 hdr=121 cap=233
+E7RESULT name=capacity rec=140 hdr=148 cap=233
+E7RESULT name=capacity rec=140 hdr=149 cap=232
+E7RESULT name=capacity_interval rec=140 cap_at_packed_hdr=233 hdr_lo=9 hdr_hi=148 cap_at_lo_minus_1=234 cap_at_hi_plus_1=232
+E7RESULT name=identity records=583 unnamed_by_five_tuple=582 unnamed_by_packed_identity=0
+E7RESULT name=parse count=583 width=56 declared=32768 result=Records(583)
+E7RESULT name=parse count=584 width=56 declared=32768 result=Corrupt note=one_too_many
+E7RESULT name=mixing a=56 n_a=10 b=140 n_b=10 misparsed=5
+E7RESULT name=mixing a=56 n_a=10 b=56 n_b=10 misparsed=0 note=unmixed
+E7RESULT name=unknown_class k=7 policy=Incompat mount_ok=0 silent_missed=0
+E7RESULT name=unknown_class k=7 policy=Skip mount_ok=1 silent_missed=7
+E7RESULT name=unknown_class k=0 policy=Incompat mount_ok=1 silent_missed=0
+E7RESULT name=unknown_record_type m=3 containers_verified=3 records_applied=0 read_only=1 reclaim_allowed=0
+E7RESULT name=headroom tag_values=256 registered=7 free=249 flags_high_bits_free=8
+E7RESULT name=done emitted=39

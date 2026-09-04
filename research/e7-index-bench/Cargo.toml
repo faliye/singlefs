@@ -248,3 +248,7 @@ path = "src/bin/e100_superblock_slot.rs"
 [[bin]]
 name = "e101-node-tag-reserve"
 path = "src/bin/e101_node_tag_reserve.rs"
+
+[[bin]]
+name = "e102-unit-class-registry"
+path = "src/bin/e102_unit_class_registry.rs"

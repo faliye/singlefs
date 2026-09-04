@@ -1,0 +1,8 @@
+M1_墓碑从映射里掉了	        "tombstone" => vec![3],	        "tombstone" => vec![],
+M2_域分隔不看标签	    a.tag == b.tag && a.body == b.body	    a.body == b.body
+M3_容量按 16 KiB 节点算	    (UNIT - hdr) / rec	    (16384 - hdr) / rec
+M4_解析不查溢出	    if width == 0 || count.saturating_mul(width).saturating_add(UNIT_HDR_PACKED) > declared_len {	    if width == 0 {
+M5_混装错分算成零	    (0..n_b).filter(|i| i % period != 0).count() as u64	    0
+M6_incompat 政策也静默漏	        UnknownClassPolicy::Incompat => Ok(MountOutcome { mount_ok: false, silent_missed: 0 }),	        UnknownClassPolicy::Incompat => Ok(MountOutcome { mount_ok: false, silent_missed: k }),
+M7_余量少算一个	    TAG_VALUES - registry.len() as u64	    TAG_VALUES - registry.len() as u64 - 1
+M8_未登记记录类型也应用记录	        records_applied: 0,	        records_applied: m,

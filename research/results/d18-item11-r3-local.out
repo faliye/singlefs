@@ -1,0 +1,11 @@
+1 For change two, when encryption is enabled for packed units, the specification does not define which fields of the identity segment are plaintext versus ciphertext. This causes implementers to guess, leading to header checksum errors where valid units are rejected due to incorrect checksum computation.
+
+2 For change three, the per location predicate is built from the units being scanned. If a unit is corrupted, the predicate may be incorrect, causing the rebuild scan to misjudge which version is current. For example, a corrupted allocation record might result in a used block being marked as free, leading to data corruption when new data is written.
+
+3 For change four, if a crash occurs during snapshot publication before the open container is closed and written, the snapshot is published with an open container. After restart, the rebuild scan cannot detect the inconsistency because snapshot generation is not stored, resulting in inconsistent snapshot data.
+
+4 For change five, if a new packed record type for tombstone is added with compat_ro status, it violates the rule that successors of tombstone type must be incompat. A compat_ro reader will skip this record, causing deleted keys to be resurrected during rebuild.
+
+5 For change two, defining the header checksum coverage differently for encrypted and unencrypted states means that for the same format version, there are two on-disk formats. Moving a unit between encrypted and unencrypted filesystems causes header checksum verification failure because the checksum computation differs based on encryption state.
+
+6 For change one, the flag bit policy rejects any unit with nonzero flag bit. If a newer version sets a flag bit to 1 for a feature that is compatible with older readers (e.g., a minor enhancement that older readers can ignore), older readers will reject valid units unnecessarily, violating compatibility.
