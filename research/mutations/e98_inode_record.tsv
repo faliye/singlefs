@@ -1,0 +1,9 @@
+M1_态别判据按形态标签算	        Shape::BtreeValue => true,	        Shape::BtreeValue => false,
+M2_不能重算的字段没数	    FIELDS.iter().filter(|f| !f.recomputable).count()	    0
+M3_扇出少扣一次头	    (node - o) / entry	    node / entry
+M4_打包容器用错头	            if UNIT_BYTES <= DATA_UNIT_HEADER { 0 } else { (UNIT_BYTES - DATA_UNIT_HEADER) / rec }	            if UNIT_BYTES <= DATA_UNIT_HEADER { 0 } else { UNIT_BYTES / rec }
+M5_locality对照失效	        (bad, 0)\n    } else {\n        (0, bad)	        (bad, 0)\n    } else {\n        (bad, 0)
+M6_排不出先后算成零	    k * k.saturating_sub(1) / 2	    0
+M7_记录宽漏掉预留	    FIELDS.iter().map(|f| f.bytes).sum::<u64>() + RESERVED	    FIELDS.iter().map(|f| f.bytes).sum::<u64>()
+M8_树高不含叶层	    let mut h = 1u64;\n    let mut cap = leaf_f as u128;	    let mut h = 0u64;\n    let mut cap = leaf_f as u128;
+M9_永久损失不看可重算	    if non_recomputable == 0 {\n        return 0; // 全都算得回来 ⇒ 与 E29 的索引节点同形，永久损失恒 0\n    }	    if non_recomputable == 99 {\n        return 0; // 全都算得回来 ⇒ 与 E29 的索引节点同形，永久损失恒 0\n    }

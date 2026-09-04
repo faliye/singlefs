@@ -1,0 +1,6 @@
+M1_feature位只算一个bitmap	const FEATURE_BITS_BYTES: u64 = 3 * 256 / 8;	const FEATURE_BITS_BYTES: u64 = 256 / 8;
+M2_设备表没随设备数长	        b += devs * dev_entry;	        b += dev_entry;
+M3_间接层没省	        b += 59; // 指向设备表单元的指针，同 D22 已定项 7 的树表单元指针宽度	        b += devs * dev_entry;
+M4_撕裂态少减一致态	    (1u64 << sectors).saturating_sub(2)	    1u64 << sectors
+M5_自举偏移没累加	        off += w;	        off = *w;
+M6_加密预留没算	        b += sum(&SEC1_CRYPTO);	        b += 0;

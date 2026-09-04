@@ -1,0 +1,5 @@
+M1_节点组上界被当成有	        distinct_values: None,	        distinct_values: Some(16),
+M2_标签容量算错	    1u128 << (8 * w as u32)	    1u128 << w
+M3_被迫合并算成零	        Some(g - cap as u64)	        Some(0)
+M4_翻转判据不看臂	    ARMS.iter().all(|a| matches!(forced_merges(a.distinct_values, w), Some(0)))	    true
+M5_零字节容量算成零	        return 1; // 0 字节只表达得了一个值 = 所有节点同组	        return 0;

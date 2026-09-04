@@ -1,0 +1,50 @@
+E7RESULT name=config node_bytes=16384 child_ptr=59 k_max=49 arms=2
+E7RESULT name=cost tag_bytes=0 header=58 tree=acct entry=30 leaf_fanout=544 leaf_fanout_no_tag=544 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=58 tree=alloc entry=20 leaf_fanout=816 leaf_fanout_no_tag=816 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=58 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=67 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=67 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=67 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=76 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=76 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=0 header=76 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=58 tree=acct entry=30 leaf_fanout=544 leaf_fanout_no_tag=544 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=58 tree=alloc entry=20 leaf_fanout=816 leaf_fanout_no_tag=816 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=58 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=67 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=67 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=67 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=76 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=76 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=1 header=76 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=58 tree=acct entry=30 leaf_fanout=544 leaf_fanout_no_tag=544 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=58 tree=alloc entry=20 leaf_fanout=816 leaf_fanout_no_tag=816 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=58 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=67 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=67 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=67 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=76 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=76 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=2 header=76 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=58 tree=acct entry=30 leaf_fanout=544 leaf_fanout_no_tag=544 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=58 tree=alloc entry=20 leaf_fanout=816 leaf_fanout_no_tag=816 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=58 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=67 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=67 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=67 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=76 tree=acct entry=30 leaf_fanout=543 leaf_fanout_no_tag=543 lost=0 inner_fanout=201 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=76 tree=alloc entry=20 leaf_fanout=815 leaf_fanout_no_tag=815 lost=0 inner_fanout=229 height_1e8=4
+E7RESULT name=cost tag_bytes=4 header=76 tree=inode entry=140 leaf_fanout=116 leaf_fanout_no_tag=116 lost=0 inner_fanout=243 height_1e8=4
+E7RESULT name=expressive arm=generation_split tag_bytes=0 distinct_needed=49 capacity=1 forced_merges=48 why=D22-item2: K = 3S + 1, S<=16 => K<=49
+E7RESULT name=expressive arm=generation_split tag_bytes=1 distinct_needed=49 capacity=256 forced_merges=0 why=D22-item2: K = 3S + 1, S<=16 => K<=49
+E7RESULT name=expressive arm=generation_split tag_bytes=2 distinct_needed=49 capacity=65536 forced_merges=0 why=D22-item2: K = 3S + 1, S<=16 => K<=49
+E7RESULT name=expressive arm=generation_split tag_bytes=4 distinct_needed=49 capacity=4294967296 forced_merges=0 why=D22-item2: K = 3S + 1, S<=16 => K<=49
+E7RESULT name=expressive arm=node_group tag_bytes=0 distinct_needed=UPPER_UNKNOWN capacity=1 forced_merges=UNDECIDABLE why=E95 self-declared: widths not modelled; no settled clause bounds group count
+E7RESULT name=expressive arm=node_group tag_bytes=1 distinct_needed=UPPER_UNKNOWN capacity=256 forced_merges=UNDECIDABLE why=E95 self-declared: widths not modelled; no settled clause bounds group count
+E7RESULT name=expressive arm=node_group tag_bytes=2 distinct_needed=UPPER_UNKNOWN capacity=65536 forced_merges=UNDECIDABLE why=E95 self-declared: widths not modelled; no settled clause bounds group count
+E7RESULT name=expressive arm=node_group tag_bytes=4 distinct_needed=UPPER_UNKNOWN capacity=4294967296 forced_merges=UNDECIDABLE why=E95 self-declared: widths not modelled; no settled clause bounds group count
+E7RESULT name=flip tag_bytes=0 first_txn_bytes_stable=0 verdict_can_flip_to_no=0
+E7RESULT name=flip tag_bytes=1 first_txn_bytes_stable=0 verdict_can_flip_to_no=0
+E7RESULT name=flip tag_bytes=2 first_txn_bytes_stable=0 verdict_can_flip_to_no=0
+E7RESULT name=flip tag_bytes=4 first_txn_bytes_stable=0 verdict_can_flip_to_no=0
+E7RESULT name=done emitted=50

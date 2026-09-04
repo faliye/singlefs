@@ -80,6 +80,10 @@ E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
 E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
 E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E97|e97-entry-encoding||e97-entry-encoding-2026-09-03.out|exact
+E98|e98-inode-record||e98-inode-record-2026-09-03.out|exact
+E99|e99-writebuffer-seq||e99-writebuffer-seq-2026-09-03.out|exact
+E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
+E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact

@@ -1,0 +1,7 @@
+One. A shared unit containing 233 file metadata records for distinct objects has a single object ID in its header. During index rebuild, the system assumes all records belong to that header's object ID, causing incorrect metadata associations where files are linked to wrong objects or missing data.
+
+Two. The 4-byte counter in the write buffer sequence number can produce duplicate sequence numbers during a crash if the counter value is not written to disk before failure. This results in inconsistent accounting entries where multiple entries share the same sequence number, leading to incorrect recovery order and data corruption.
+
+Three. Moving the device table to a separate unit and storing a pointer in the superblock creates a torn write vulnerability. If a crash occurs after writing the new device table unit but before updating the superblock pointer, the superblock points to an obsolete location. This causes mount failure when the system reads invalid or garbage data from the old location.
+
+Four. The proposed tag field in the index node header has no fixed width because one anti-aging scheme requires an unknown number of distinct values. This makes it impossible to define the index node layout size, preventing the first transaction from being written as the filesystem cannot be initialized.

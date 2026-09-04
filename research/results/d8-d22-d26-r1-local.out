@@ -1,0 +1,9 @@
+Proposal two sequence number is 8 bytes wide but must combine a 64 bit checkpoint number and a counter within the publish window which is impossible because 64 bits exactly fits 8 bytes leaving no room for the counter
+
+Proposal three section one bootstrap header claims to never change but format version and feature bits must change during filesystem upgrades making version transitions impossible
+
+Proposal three device table is listed in section two geometry fixed at format time but adding new devices requires updating the device table which cannot happen if section two is fixed
+
+Proposal four adding a tag field to index node header increases header size beyond the original 42 bytes when mounting an old image with a new version the new version reads past the shorter header into payload data corrupting the filesystem
+
+Proposal three superblock spans multiple hardware sectors on a 512 byte sector device rotating slots requires atomic multi sector writes which hardware does not support causing inconsistent superblock after crash

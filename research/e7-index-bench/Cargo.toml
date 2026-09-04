@@ -232,3 +232,19 @@ path = "src/bin/e96_hybrid_consistency.rs"
 [[bin]]
 name = "e97-entry-encoding"
 path = "src/bin/e97_entry_encoding.rs"
+
+[[bin]]
+name = "e98-inode-record"
+path = "src/bin/e98_inode_record.rs"
+
+[[bin]]
+name = "e99-writebuffer-seq"
+path = "src/bin/e99_writebuffer_seq.rs"
+
+[[bin]]
+name = "e100-superblock-slot"
+path = "src/bin/e100_superblock_slot.rs"
+
+[[bin]]
+name = "e101-node-tag-reserve"
+path = "src/bin/e101_node_tag_reserve.rs"

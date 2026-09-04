@@ -1,0 +1,74 @@
+E7RESULT name=config node_bytes=16384 common_prefix=42 child_ptr=59 record_bytes=140 reserved=32 key_bytes=8 fields=14
+E7RESULT name=field name_of=locality_id bytes=8 recomputable=0 why=D8-item3: key 首段，改名永不更新；命名树 value 只有 inode；五元组里没有它
+E7RESULT name=field name_of=inode bytes=8 recomputable=1 why=D18-item3 五元组的对象 ID
+E7RESULT name=field name_of=obj_birth bytes=8 recomputable=1 why=D18-item3 五元组的对象出生代
+E7RESULT name=field name_of=mode bytes=4 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=uid bytes=4 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=gid bytes=4 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=nlink bytes=4 recomputable=0 why=要 dirent 树；第一版没有目录
+E7RESULT name=field name_of=size bytes=8 recomputable=0 why=尾部是洞时扫描给不出 size：锚点偏移只给已写到的最远处
+E7RESULT name=field name_of=blocks bytes=8 recomputable=1 why=数这个对象的单元数就得到（D4-item2 补齐到 32 KiB，每单元定长）
+E7RESULT name=field name_of=rdev bytes=8 recomputable=0 why=设备节点，五元组里没有
+E7RESULT name=field name_of=atime bytes=12 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=mtime bytes=12 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=ctime bytes=12 recomputable=0 why=五元组里没有
+E7RESULT name=field name_of=change_count bytes=8 recomputable=0 why=取 checkpoint_txg；扫描读不出「哪一次发布改的」
+E7RESULT name=state_class assume_all_recomputable=0 non_recomputable=11 total_fields=14
+E7RESULT name=state_class assume_all_recomputable=1 non_recomputable=0 total_fields=14
+E7RESULT name=shape shape=BtreeValue assume_all_recomputable=0 non_recomputable=11 triggers_hc6=1 records_per_container=116 container_bytes=16384 permanent_loss_per_container=116 needs_redundancy_clause=1
+E7RESULT name=shape shape=BtreeValue assume_all_recomputable=1 non_recomputable=0 triggers_hc6=0 records_per_container=116 container_bytes=16384 permanent_loss_per_container=0 needs_redundancy_clause=0
+E7RESULT name=shape shape=PackedUnit assume_all_recomputable=0 non_recomputable=11 triggers_hc6=0 records_per_container=233 container_bytes=32768 permanent_loss_per_container=233 needs_redundancy_clause=1
+E7RESULT name=shape shape=PackedUnit assume_all_recomputable=1 non_recomputable=0 triggers_hc6=0 records_per_container=233 container_bytes=32768 permanent_loss_per_container=0 needs_redundancy_clause=0
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=0 key=8 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=58 head_discrim=2 key=10 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=0 key=8 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=67 head_discrim=2 key=10 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=243 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=0 key=8 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=243 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=0 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=0 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=0 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=1 inodes=1000000 record=140 leaf_fanout=116 inner_fanout=236 height=3 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=1 inodes=100000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=geom header=76 head_discrim=2 key=10 with_range=1 inodes=1000000000 record=140 leaf_fanout=116 inner_fanout=236 height=4 records_lost_per_leaf=116
+E7RESULT name=locality objects=1000000 mismatched=1000 with_check=1 caught=1000 silent_holes=0
+E7RESULT name=locality objects=1000000 mismatched=1000 with_check=0 caught=0 silent_holes=1000
+E7RESULT name=locality objects=1000000 mismatched=100000 with_check=1 caught=100000 silent_holes=0
+E7RESULT name=locality objects=1000000 mismatched=100000 with_check=0 caught=0 silent_holes=100000
+E7RESULT name=change_order updates_in_window=1 window_seq_bits=0 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=1 window_seq_bits=8 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=1 window_seq_bits=16 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=2 window_seq_bits=0 unordered_pairs=1
+E7RESULT name=change_order updates_in_window=2 window_seq_bits=8 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=2 window_seq_bits=16 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=8 window_seq_bits=0 unordered_pairs=28
+E7RESULT name=change_order updates_in_window=8 window_seq_bits=8 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=8 window_seq_bits=16 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=64 window_seq_bits=0 unordered_pairs=2016
+E7RESULT name=change_order updates_in_window=64 window_seq_bits=8 unordered_pairs=0
+E7RESULT name=change_order updates_in_window=64 window_seq_bits=16 unordered_pairs=0
+E7RESULT name=done emitted=74
