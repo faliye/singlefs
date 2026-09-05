@@ -21,6 +21,7 @@ fail=0
 say() { printf '  %s\n' "$*"; }
 bad() { printf '  ✗ %s\n' "$*"; fail=1; }
 ok()  { printf '  ✓ %s\n' "$*"; }
+howto() { printf '     → 怎么办： %s\n' "$1"; shift; for l in "$@"; do printf '                %s\n' "$l"; done; }
 
 # ⚠️ **必须递归扫**：2026-08-29 决策与实验都拆进了子目录，
 # 而引用大半住在那里。用 $KB/*.md 单层通配会静默漏掉它们——
@@ -32,7 +33,10 @@ missing=0
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
 for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
              | grep -oE 'E[0-9]{1,3}' | sort -u); do
-  grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"; missing=1; }
+  grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"
+    howto "要么在 experiments/ 下给它建正文（\`## $e <简称>\` 起头），" \
+          "要么把引用它的那处改成真实存在的实验号——编号引用悬空，检索到的人会自己补一个。"
+    missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "实验号引用全部有定义"
 
@@ -41,7 +45,10 @@ echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
 for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
              | grep -oE 'D[0-9]{1,3}' | sort -u); do
-  grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"; missing=1; }
+  grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"
+    howto "要么在 decisions/ 下给它建正文（\`## $d <简称>\` 起头），" \
+          "要么把引用它的那处改成真实存在的决策号。"
+    missing=1; }
 done
 [[ $missing -eq 0 ]] && ok "决策号引用全部有定义"
 
@@ -62,6 +69,8 @@ while read -r line; do
     ok "$e 已跑，其状态变动的提交 $c 同时动过 decisions.md"
   else
     bad "$e 已跑，但把它改成已跑的提交 $c **没有动 decisions.md**（decisions.md 第 $refs 行引用了它）"
+    howto "把这个实验的结论写回它支撑的那条决策，与状态变动同批提交；" \
+          "结论没改变任何决策的话，在实验正文里写明这一点（零结论也是结论）。"
     stale=1
   fi
 done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
@@ -78,6 +87,8 @@ while read -r line; do
   n=$(cat "$KB/decisions.md" "$KB"/decisions/*.md | grep -cE "(^|[^A-Za-z0-9/-])$e([^A-Za-z0-9-]|$)")
   if [[ "$n" -eq 0 ]]; then
     bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
+    howto "在它支撑（或推翻）的那条决策正文里点它的名，写清它证明了什么；" \
+          "确实谁也不支撑的话，实验正文里写明它是备料、等哪条分项来用。"
     orphan=1
   fi
 done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
@@ -93,6 +104,8 @@ inv_live=$(( inv_actual - inv_retired ))
 inv_claim=$(grep -oE '现共 [0-9]+ 条在用' "$KB/invariants.md" | head -1 | grep -oE '[0-9]+')
 if [[ -n "$inv_claim" && "$inv_claim" != "$inv_live" ]]; then
   bad "invariants.md 正文声称在用 $inv_claim 条，实际 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
+  howto "把正文那句「现共 N 条在用」改成 $inv_live，或者补回漏掉的那几条——" \
+        "两个数对不上时，读的人不知道该信哪一个。"
 else
   ok "不变量条数一致：在用 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
 fi

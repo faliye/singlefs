@@ -98,6 +98,7 @@ bash .claude/gate.d/31-blocking-verdict.sh # 每个未定项有没有判过改�
 bash .claude/gate.d/32-history-ordinal.sh # 本次新增的历史条目有没有撞号（并发会话共写一个仓）
 bash .claude/gate.d/32-first-txn-fields.sh # 第一个事务的每个字段都指到一条真实存在的分项
 bash .claude/gate.d/33-mutation-tables.sh # 每个实验二进制都有同名变异表（只验装置在，不跑变异）
+bash .claude/gate.d/35-user-verdict-owed.sh # 动了用户定案的条款有没有记一笔未还的账
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）

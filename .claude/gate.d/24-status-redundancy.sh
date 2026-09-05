@@ -70,5 +70,7 @@ if bad:
     print('     → 状态与所在节不一致的，把条目搬到对的那一节，别就地改状态词。')
     sys.exit(1)
 
-print('  ✓ 状态只说一遍，且分项都在对的节里')
+# 报出扫了多少份：扫到 0 份也会走到这一句，不报数就看不出来
+# （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
+print(f'  ✓ 状态只说一遍，且分项都在对的节里（扫 {len(files)} 份）')
 PY

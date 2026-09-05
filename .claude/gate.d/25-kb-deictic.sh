@@ -48,4 +48,7 @@ if ((${#hits[@]})); then
   howto "判据是检索：这一条被单独端出来时，读的人能不能知道是哪一轮。"
   exit 1
 fi
-ok "kb 正文里的时间指代都锚得到具体一轮"
+# 报出扫了多少份：$KB 不在或空的时候也会走到这一句，不报数就看不出来
+# （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
+scanned=$(find "$KB" -name '*.md' 2>/dev/null | wc -l)
+ok "kb 正文里的时间指代都锚得到具体一轮（扫 $scanned 份）"
