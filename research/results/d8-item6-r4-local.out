@@ -1,0 +1,13 @@
+1 The packed record type field in the internal node entry uses value 0 to indicate a class 2 index node child, but the background states packed record type 0 is registered as invalid. This causes the system to reject valid references to index nodes because the container identity for such references includes an invalid type 0, leading to failures in tree traversal and data access.
+
+2 When a clone head initializes its watermark from the origin's runtime value including the write buffer, and both heads allocate the same inode number, uniqueness per tree id is maintained. However, the watermark watermark accounting entry merge rule takes the maximum value, which could cause the watermark to jump beyond the actual highest allocated inode if the origin and clone publish out of order. For example, if the origin writes watermark 100 and the clone writes 101, but the origin later publishes a higher value after the clone's publish, the accounting entry would reflect the higher value correctly. But if the clone publishes first with watermark watermark 101 and the origin publishes later with watermark 100, the accounting entry would still hold 101, which is correct. No contradiction observed here.
+
+3 The internal node split process changes key ranges for the new nodes. If the original node has key range [1, 100] and splits at separator key 50, the left child's key range becomes [1, 49] and the right child's becomes [50, 100]. The parent's entry for the left child uses separator key 50, which correctly points to the right child for key 50. No contradiction observed here.
+
+4 The buffer fraction zero branch for the inode tree's internal nodes means no message buffer. When a node is read from disk, the system uses the tree id in the header to determine buffer fraction settings. This allows correct interpretation of the node layout without expecting buffer data. No contradiction observed here.
+
+5 The container number for the right half after a split is set to the inode number of the triggering record. Since inode numbers are monotone and never reused, the container number is always higher than previous container numbers in the tree. The invariant that every record's inode number is at least its container's number holds. No contradiction observed here.
+
+6 The watermark row for a clone is written during the publish that creates the clone. The accounting entry key includes tree id, so missing rows are clearly identifiable as errors. No contradiction observed here.
+
+7 The first transaction writes a root node with key range [1, 1], one entry with key 1, type 2, container number 1, generation 1. The class 3 leaf container has packed record type 2, which is valid per background. No contradiction observed here.

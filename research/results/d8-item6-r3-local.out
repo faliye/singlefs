@@ -1,0 +1,13 @@
+1 When splitting a container the right half is assigned the split key as container number even if the split key is smaller than the smallest inode in the new container For example a split key of 25 where the right container only holds inode 30 violates the rule that container number must be the smallest inode at creation since 25 is not the smallest inode present
+
+2 During a single publish a split creates a container with number X and birth generation G then a merge followed by another split creates a second container also with number X and birth generation G When rebuilding the filesystem both containers share the same key for grouping causing ambiguity in selecting the current version due to the unresolved open debt about choosing versions
+
+3 When cloning a filesystem the origin s next inode number is only in the write buffer not yet flushed to disk The clone initializes from the on disk value which is lower than the buffer value The clone then allocates inodes starting from this lower value potentially reusing inode numbers already allocated by the origin
+
+4 During rebuild of the deleted inodes tree the largest inode number is not yet known If the watermark is less than the actual largest inode in the deleted inodes tree but the rebuild is incomplete the system may incorrectly pass the watermark check until the rebuild completes leading to a later violation
+
+5 The internal nodes buffer region is required to stay empty and can be checked during rebuild since the rebuild process constructs internal nodes from leaves without filling the buffer region
+
+6 The record with nonzero reserved byte written by a newer version causes an EIO when read by an older version so the older version does not rewrite it making the scenario irrelevant
+
+7 The take the max merge rule for accounting entries when a rolled back transaction wrote a larger watermark does not violate invariants because the watermark only needs to exceed the largest inode number which it does even if higher than necessary

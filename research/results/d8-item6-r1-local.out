@@ -1,0 +1,9 @@
+1 The inode tree key is only the inode number, but reuse requires birth generation to distinguish objects. When reusing an inode number, multiple records with the same key exist. This violates B-tree key uniqueness requirements, causing insertion conflicts or data corruption during reuse.
+
+2 Renaming a file to a different directory changes the extent key's locality id to the new directory's id, but the settled fact states locality id is never updated by rename. The proposal's invariant requires the inode record's locality id to match the extent key's leading component. This mismatch triggers EIO errors during normal rename operations.
+
+3 The tree table entry now includes a 2 byte tree kind field. Old software that does not recognize this field misinterprets the first two bytes as part of the tree id. This causes incorrect tree id values, preventing the filesystem from mounting due to invalid tree references.
+
+4 The inode tree's internal nodes can be rebuilt from the leaves, which are part of the authoritative state. The settled rule states only unrecomputable values must be authoritative. Treating internal nodes as authoritative violates this rule because they are computable from leaves.
+
+5 Salvaging an inode tree with lost internal nodes but surviving leaves requires rebuilding the internal structure. The proposal treats internal nodes as authoritative and requires salvage, but they are derived state. The implementer observes salvage failures because the process assumes internal nodes need recovery, but they can be reconstructed from leaves.

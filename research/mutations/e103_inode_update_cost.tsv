@@ -2,7 +2,10 @@ M1_扇出按单元算	    let a_leaf_f = fanout(NODE_BYTES, hdr, INODE_REC);	   
 M2_树高少算一层	    while count > 1 {	    while count > 1 && levels.len() < 2 {
 M3_打包侧漏掉容器	    let c = touched(g.b_containers, k) * (container_bytes * W) as f64;	    let c = 0.0 * touched(g.b_containers, k) * (container_bytes * W) as f64;
 M4_碰到的节点数不饱和	    lf * (1.0 - (1.0 - 1.0 / lf).powi(k as i32))	    (k as f64).min(lf * 1e9)
-M5_stat 漏掉单元读	    (h + 1, h * NODE_BYTES + UNIT_BYTES)	    (h, h * NODE_BYTES)
+M5_stat 漏掉单元读	    let h = (g.b_inode_levels.len() + g.b_index_levels.len()) as u64;\n    (h + 1, h * NODE_BYTES + UNIT_BYTES)	    let h = (g.b_inode_levels.len() + g.b_index_levels.len()) as u64;\n    (h, h * NODE_BYTES)
 M6_副本数算成 1	const W: u64 = 2;	const W: u64 = 1;
 M7_容器索引漏算	    let i = if count_index { cow_nodes(&g.b_index_levels, k) * (NODE_BYTES * W) as f64 } else { 0.0 };	    let i = 0.0;
 M8_比值算反	        b / a	        a / b
+M9_第三臂漏掉内部层	    touched(g.b_containers, k) * (UNIT_BYTES * W) as f64 + cow_nodes(&g.c_internal_levels, k) * (NODE_BYTES * W) as f64	    touched(g.b_containers, k) * (UNIT_BYTES * W) as f64
+M10_身份引用宽写成第三轮旧值	const CONT_KEY: u64 = 26;	const CONT_KEY: u64 = 24;
+M11_扇出多算一格	    (node - header) / entry	    (node - header) / entry + 1

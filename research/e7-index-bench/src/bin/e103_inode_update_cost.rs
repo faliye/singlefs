@@ -1,8 +1,8 @@
-//! E103：inode 打包路 ① 的更新代价 —— D8 未定项 6 比较表欠的那次测量。
+//! E103：inode 打包路 ① 的更新代价 —— D8 已定项 6 比较表欠的那次测量。
 //!
 //! ## 被引用条款逐字贴在这里
 //!
-//! - **D8 未定项 6**（2026-09-04 随 D18 已定项 11 补的那句）：「更新代价要进比较表（第二轮正推腿估算，
+//! - **D8 已定项 6**（2026-09-04 随 D18 已定项 11 补的那句）：「更新代价要进比较表（第二轮正推腿估算，
 //!   未实测：改一条记录 = COW 32 KiB × w + 容器索引一条 ≈ 3 倍于住索引叶；stat 多一次查找；爆炸半径 2 倍）」。
 //!   ⚠️ 那个估算**只数了叶子**：住索引叶那一侧算成 1 个 16 KiB 叶，打包那一侧算成 1 个容器 + 1 个索引叶。
 //! - **D23 已定项 1 取甲，逐字**：「每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录。祖先不延后。」
@@ -20,6 +20,11 @@
 //! 2. **批量更新**：一次发布改 k 条（k ∈ {1, 10, 100, 1000}），更新均匀散开，
 //!    每层被碰到的节点数按 L × (1 − (1 − 1/L)^k) 算；另报「全部落在同一容器 / 同一叶」的聚簇格。
 //! 3. **stat 的读代价**：住索引叶 = 树高次节点读；打包 = inode 树高 + 容器索引树高次节点读 + 1 次 32 KiB 单元读。
+//!    **第三臂「叶即容器」（2026-09-05 第一轮论证后加）**：inode 树的叶就是码 3 容器、内部节点就是容器索引
+//!    ⇒ 写 = 容器 + 内部层的节点；读 = 内部层次数 + 1 次 32 KiB 单元读。
+//!    内部节点条目 = 分隔 key 8 + 身份引用 26（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8，D18 已定项 11 给别的树引用容器的那 26 字节）+ 子指针 59 = 93
+//!    （第四版：类型段 0 表示子节点是码 2 索引节点、2 表示码 3 容器，读者由此知道读几个槽、AAD 期望值全部来自条目；出生树逐条目携带是因为克隆头共享 origin 的叶）。
+//!    基础节点头三档 58 / 67 / 76 是 E73 的**不带 key 区间**下界；inode 树内部节点带 16 字节区间后是 74 / 83 / 92，扇出仍 175（单测钉住 92，以及 109 / 110 那道边）。
 //! 4. **爆炸半径**：丢一个容器丢多少条，两条形态各一个数（沿用 E98 的口径）。
 //! 5. **判先前估算**：第二轮正推腿写的「≈ 3 倍」按判据 1 的单次更新比核——实测 ≥ 3 则估算成立，< 3 则估算作废并如实写。
 //!
@@ -29,7 +34,7 @@
 //!   否则两条臂不是在同一把尺子上比，整轮作废。
 //! - **阴性对照**：k = 0 时两条形态的结构字节都必须恰好 0。
 //! - **饱和对照**：k 远大于层内节点数时，被碰到的节点数必须收敛到该层节点数（差 < 0.5%）。
-//! - **反向接受条款**：若单次更新比 < 3，结论是「第二轮正推腿的 3 倍估算作废」，D8 未定项 6 那句要改成实测数。
+//! - **反向接受条款**：若单次更新比 < 3，结论是「第二轮正推腿的 3 倍估算作废」，D8 已定项 6 那句要改成实测数。
 //!
 //! ## 它答不了的
 //!
@@ -57,6 +62,11 @@ const IDENT_VALUE: u64 = 27;
 const INODE_KEY: u64 = 8;
 /// 容器索引的 key：出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8。
 const CONT_KEY: u64 = 26;
+/// 第三臂：inode 树内部节点的条目 = 分隔 key 8 + 身份引用 26（与 CONT_KEY 同一段）+ 子指针 59 = 93。
+/// 写成字面量是给 27 号门禁（format-const）钉的；与推导式的相等由单测守。
+const INODE_INTERNAL_ENTRY: u64 = 93;
+/// 一个类型 2 容器装几条记录 = ⌊(32768 − 93) / 140⌋；字面量同样为 27 号门禁，与 fanout() 的相等由单测守。
+const INODE_LEAF_RECORDS: u64 = 233;
 
 const NS: [u64; 3] = [10_000, 1_000_000, 100_000_000];
 const KS: [u64; 4] = [1, 10, 100, 1000];
@@ -113,6 +123,8 @@ struct Geometry {
     b_inode_levels: Vec<u64>,
     a_leaf_fanout: u64,
     b_per_container: u64,
+    /// 第三臂：叶即容器时内部层各层节点数（叶层 = 容器数，不在此列）。
+    c_internal_levels: Vec<u64>,
 }
 
 fn geometry(n: u64, hdr: u64) -> Geometry {
@@ -125,7 +137,9 @@ fn geometry(n: u64, hdr: u64) -> Geometry {
     let b_index_levels = tree_levels(containers, idx_f, idx_f);
     let b_leaf_f = fanout(NODE_BYTES, hdr, INODE_KEY + IDENT_VALUE);
     let b_inode_levels = tree_levels(n, b_leaf_f, inner_f);
-    Geometry { a_levels, b_containers: containers, b_index_levels, b_inode_levels, a_leaf_fanout: a_leaf_f, b_per_container: per_container }
+    let c_f = fanout(NODE_BYTES, hdr, INODE_INTERNAL_ENTRY);
+    let c_internal_levels = tree_levels(containers, c_f, c_f);
+    Geometry { a_levels, b_containers: containers, b_index_levels, b_inode_levels, a_leaf_fanout: a_leaf_f, b_per_container: per_container, c_internal_levels }
 }
 
 /// 住索引叶：k 次散开更新写出的结构字节。
@@ -138,6 +152,15 @@ fn write_b(g: &Geometry, k: u64, container_bytes: u64, count_index: bool) -> f64
     let c = touched(g.b_containers, k) * (container_bytes * W) as f64;
     let i = if count_index { cow_nodes(&g.b_index_levels, k) * (NODE_BYTES * W) as f64 } else { 0.0 };
     c + i
+}
+
+/// 第三臂：叶即容器。k 次散开更新 = 碰到的容器 + 内部层碰到的节点。
+fn write_c(g: &Geometry, k: u64) -> f64 {
+    touched(g.b_containers, k) * (UNIT_BYTES * W) as f64 + cow_nodes(&g.c_internal_levels, k) * (NODE_BYTES * W) as f64
+}
+fn read_c(g: &Geometry) -> (u64, u64) {
+    let h = g.c_internal_levels.len() as u64;
+    (h + 1, h * NODE_BYTES + UNIT_BYTES)
 }
 
 /// 聚簇格：k 条更新全落在同一个容器 / 同一片叶里（k ≤ 容器容量）。
@@ -175,7 +198,7 @@ fn main() {
     let mut out: Vec<String> = Vec::new();
     out.push(em.emit_raw(&format!(
         "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} packed_hdr={UNIT_HDR_PACKED} inode_rec={INODE_REC} \
-         child_ptr={CHILD_PTR} w={W} per_publish_const={} ident_value={IDENT_VALUE} cont_key={CONT_KEY} model=arithmetic file_ops=0",
+         child_ptr={CHILD_PTR} w={W} per_publish_const={} ident_value={IDENT_VALUE} cont_key={CONT_KEY} internal_entry={INODE_INTERNAL_ENTRY} leaf_records={INODE_LEAF_RECORDS} model=arithmetic file_ops=0",
         per_publish_const()
     )));
 
@@ -198,12 +221,14 @@ fn main() {
             for &k in KS.iter() {
                 let a = write_a(&g, k);
                 let b = write_b(&g, k, UNIT_BYTES, true);
+                let c = write_c(&g, k);
                 out.push(em.emit_raw(&format!(
                     "name=write header={hdr} inodes={n} k={k} a_bytes={a:.0} b_bytes={b:.0} b_over_a={:.3} \
-                     a_per_update={:.0} b_per_update={:.0} const_per_publish={}",
+                     a_per_update={:.0} b_per_update={:.0} c_bytes={c:.0} c_over_a={:.3} const_per_publish={}",
                     ratio(b, a),
                     a / k as f64,
                     b / k as f64,
+                    ratio(c, a),
                     per_publish_const()
                 )));
             }
@@ -217,9 +242,12 @@ fn main() {
             // 判据 3：读
             let (ra, rab) = read_a(&g);
             let (rb, rbb) = read_b(&g);
+            let (rc, rcb) = read_c(&g);
             out.push(em.emit_raw(&format!(
-                "name=stat header={hdr} inodes={n} a_reads={ra} a_bytes={rab} b_reads={rb} b_bytes={rbb} b_over_a={:.3}",
-                ratio(rbb as f64, rab as f64)
+                "name=stat header={hdr} inodes={n} a_reads={ra} a_bytes={rab} b_reads={rb} b_bytes={rbb} b_over_a={:.3} c_reads={rc} c_bytes={rcb} c_over_a={:.3} c_internal_height={}",
+                ratio(rbb as f64, rab as f64),
+                ratio(rcb as f64, rab as f64),
+                g.c_internal_levels.len()
             )));
         }
     }
@@ -370,6 +398,41 @@ mod tests {
         assert_eq!(write_b(&g, 0, UNIT_BYTES, true), 0.0);
         assert!(tree_levels(0, 116, 243).is_empty());
         assert_eq!(fanout(NODE_BYTES, NODE_BYTES, 140), 0);
+    }
+
+    /// **第三臂「叶即容器」的绝对值**（头 58）：写与路 ① 逐格相同（内部层数 = 容器索引树高），
+    /// 读少了 inode 树那一趟：1e6 是 2 次内部 + 1 次单元 = 65536 字节（1.333 倍），1e8 是 81920（1.25 倍）。
+    #[test]
+    fn third_arm_leaf_as_container_is_pinned() {
+        assert_eq!(INODE_INTERNAL_ENTRY, 93);
+        assert_eq!(INODE_INTERNAL_ENTRY, INODE_KEY + CONT_KEY + CHILD_PTR, "93 = 8 + 26 + 59");
+        assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, UNIT_HDR_PACKED, INODE_REC), "233 = ⌊(32768 − 93) / 140⌋");
+        assert_eq!(fanout(NODE_BYTES, 58, INODE_INTERNAL_ENTRY), 175, "(16384 − 58) / 93");
+        assert_eq!(fanout(NODE_BYTES, 76, INODE_INTERNAL_ENTRY), 175, "基础头三档（E73 的不带区间下界）里最大的 76");
+        assert_eq!(fanout(NODE_BYTES, 92, INODE_INTERNAL_ENTRY), 175, "基础头 76 加 16 字节 key 区间 = 92，扇出仍不掉格");
+        assert_eq!(fanout(NODE_BYTES, 109, INODE_INTERNAL_ENTRY), 175, "头到 109 仍是 175");
+        assert_eq!(fanout(NODE_BYTES, 110, INODE_INTERNAL_ENTRY), 174, "头 110 才掉一格");
+        let g6 = geometry(1_000_000, 58);
+        assert_eq!(g6.c_internal_levels, vec![25, 1]);
+        assert_eq!(write_c(&g6, 1), 131072.0);
+        assert_eq!(read_c(&g6), (3, 65536));
+        // k ≥ 10 时第三臂比路 ① 贵的正好是内部层多出来的节点：[25, 1] 对容器索引的 [23, 1]，多 2 个节点 × 16384 × 2
+        let extra = write_c(&g6, 1000) - write_b(&g6, 1000, UNIT_BYTES, true);
+        assert!((extra - 65536.0).abs() < 1.0, "第三臂多出的字节应恰为 2 个节点，实得 {extra}");
+        let g4 = geometry(10_000, 58);
+        assert_eq!(g4.c_internal_levels, vec![1]);
+        assert_eq!(write_c(&g4, 1), 98304.0);
+        assert_eq!(read_c(&g4), (2, 49152));
+        let g8 = geometry(100_000_000, 58);
+        assert_eq!(g8.c_internal_levels, vec![2453, 15, 1]);
+        assert_eq!(write_c(&g8, 1), 163840.0);
+        assert_eq!(read_c(&g8), (4, 81920));
+        // 与路 ① 的写逐格相同，读少一趟
+        for &n in NS.iter() {
+            let g = geometry(n, 58);
+            assert_eq!(write_c(&g, 1), write_b(&g, 1, UNIT_BYTES, true));
+            assert!(read_c(&g).1 < read_b(&g).1);
+        }
     }
 
     /// 三档节点头同向：比值都落在 [1.25, 2)。

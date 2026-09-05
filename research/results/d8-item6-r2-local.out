@@ -1,0 +1,13 @@
+1. The container index is defined as the internal nodes of the inode tree. The settled fact states the container index must be authoritative as the sole holder of physical pointers to containers, but internal nodes are derived and rebuildable. This causes physical pointers to be non-authoritative. An implementer would observe inconsistent container pointers after a crash, leading to data corruption when accessing files.
+
+2. During a leaf container split for the 234th record, the proposal does not specify how container numbers are assigned. Without a unique assignment mechanism, concurrent splits could reuse container numbers. An implementer would observe multiple containers with identical numbers, causing writes to overwrite unrelated data.
+
+3. When rebuilding internal nodes from leaves, a stale container with overlapping key ranges (e.g., one container for inodes 1-100 and another for 50-150) would produce invalid tree structure. An implementer would observe failed lookups for inodes in the overlap range, resulting in EIO errors.
+
+4. When two heads clone from the same origin, the next inode number accounting statistic uses the same generation key. Both heads start with the same next inode value. An implementer would observe duplicate inode numbers assigned by both heads, corrupting file metadata.
+
+5. The first transaction's inode tree root is a packed record unit (class 1), but index tree roots must be class 2 index nodes. A reader expecting class 2 would fail to parse the header. An implementer would observe immediate EIO errors when mounting the filesystem.
+
+6. The inode tree's internal nodes carry no message buffer, but the settled rule requires all index node layouts to share the same buffer fraction. Other trees like the extent tree may require a message buffer. An implementer would observe inconsistent buffer handling during updates, causing data loss or corruption.
+
+7. The proposal states internal node layout is not a permanent contract but does not restrict changes to reserved areas. Changing existing fields (e.g., container number field) would violate format extension rules. An implementer would observe old readers misinterpreting internal node structures, crashing on filesystem access.
