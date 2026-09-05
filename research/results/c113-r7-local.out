@@ -1,0 +1,11 @@
+1. History: Instance i=1 publishes checkpoint 5. Transaction T4 (txn 4) writes code 1 unit with birth 5. Journal record written, but root slot write fails during publish. Instance switch to i=2. Row for i=1: (i=1, T_pub=5, W=3). Before i=2 publishes new root, crash occurs. Recovery picks root checkpoint 5. Unit (i=1, birth=5, txn=4) is judged published because b=5 <= T_pub=5. But W=3 means txn 4 not applied. Rule: published predicate for code 1 units when i < mounted instance uses "b <= T_pub OR n <= W". Smallest change: replace OR with AND.
+
+2. History: Same as item 1. Instance i=1 published checkpoint 5. T4 writes code 1 unit (birth=5, txn=4). Instance switch to i=2, row for i=1: (i=1, T_pub=5, W=3). Recovery picks root checkpoint 5. Unit (i=1, birth=5, txn=4) judged published due to b <= T_pub. But txn 4 > W=3, so not applied. Rule: published predicate for code 1 units when i < mounted instance uses "b <= T_pub OR n <= W". Smallest change: replace OR with AND.
+
+3. History: Pool has 4 devices. Mount on A and B (majority=3, but system incorrectly allows mount). Calculates max id as 1 (ignoring ring roots), writes id=2 to A and B. Another mount on C and D also calculates max id=1, writes id=2 to C and D. Now superblocks have id=2, but ring roots have id=3. Mount admission allows duplicate id. Smallest change: include ring roots in max id calculation.
+
+4. The reclaim gate prevents resurrection. Clone's snapshot references origin's tombstone container, so it does not enter defer queue until clone is destroyed. Thus, old tombstone is not swept while clone exists. No history exists where clone rebuild resurrects deleted object.
+
+5. History: Instance i=1 has row (i=1, T_pub=5, W=9). Code 1 unit (birth=5, txn=10) exists. Sweep pass incorrectly judges it published (b <= T_pub). Row reclaim happens, row deleted. Mount i=2 sees unit as published (no row). But txn 10 > W=9, so not applied. Rule: published predicate for code 1 units when i < mounted instance uses "b <= T_pub OR n <= W". Smallest change: replace OR with AND.
+
+6. No transaction level failure exists that does not cause instance switch and leaves orphans. Failure table ensures all failures after unit write either retry or trigger instance switch. No leak or wrong sweep possible.

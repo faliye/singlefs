@@ -1,0 +1,61 @@
+1. History:  
+Step 1: Instance A starts, assigns transaction T1 to checkpoint 5.  
+Step 2: A writes code 1 unit with birth checkpoint 5.  
+Step 3: A appends journal record for T1.  
+Step 4: A writes barrier, begins writing root slot for checkpoint 5 but crashes before completion.  
+Step 5: Recovery instance B starts. Journal records up to T1 are applied (no gap), but root slot missing causes stop. B writes row (A, 4, T1) for instance A.  
+Step 6: Check unit (A, T1) with birth 5. Rule P2: i=A < B, row (4, T1). Condition: birth 5 = 4+1 and T1 <= T1 → published. But checkpoint 5 was never published (root slot not written), so unit should be unpublished. Rule broken: P2 published predicate incorrectly allows units from unpublished checkpoints via "b = T_pub+1 and n <= W". Smallest change: Remove "b = T_pub+1 and n <= W" clause for code 1; only check b <= T_pub.  
+
+2. History:  
+Step 1: Instance A publishes checkpoint 3 (root written).  
+Step 2: A starts checkpoint 4, writes code 3 container (birth checkpoint 4) at fixed point.  
+Step 3: A crashes before writing root for checkpoint 4.  
+Step 4: Recovery instance B starts, writes row (A, 3, 0) for A (in-flight checkpoint 4 minus 1).  
+Step 5: Administrator rolls back to checkpoint 3 (root 3). Rollback writes row (A, 3, 0) and (B, 0, 0).  
+Step 6: Check code 3 container (A, birth 4). Rule P3: i=A < B, row (3, 0). Condition: birth 4 <= 3? No. Published predicate fails → unpublished. But container was written at checkpoint 4 fixed point, which was part of A's in-flight checkpoint but never published. However, the container should be unpublished (correctly), but the rule also fails for a published checkpoint scenario:  
+Step 1: Instance A publishes checkpoint 4.  
+Step 2: A starts checkpoint 5, writes code 3 container (birth 5) at fixed point.  
+Step 3: A crashes before root 5.  
+Step 4: Recovery instance B starts, writes row (A, 4, 0).  
+Step 5: Check container (A, birth 5). Rule P3: birth 5 <= 4? No → unpublished. But container was written at checkpoint 5 fixed point, which was never published. Correctly unpublished. Now for a published checkpoint:  
+Step 1: Instance A publishes checkpoint 5 (root written).  
+Step 2: A writes code 3 container at checkpoint 5 fixed point.  
+Step 3: A crashes. Recovery B starts, row (A, 5, ...).  
+Step 4: Container birth 5 <= 5 → published. Correct.  
+The issue is with rollback rows. After rollback to checkpoint 3, the container from checkpoint 4 (unpublished) is correctly unpublished. But the rule "b at most T_pub" for code 2/3 uses the row's T_pub. If a checkpoint was published (T_pub = T), then b <= T_pub is correct. The problem is when a checkpoint is not published (T_pub < T), then b <= T_pub fails, which is correct. However, the rule in P3 says "for code 2 and 3, b at most T_pub". But in the rollback row (A, 3, 0), T_pub=3. If a container was written at checkpoint 4 (birth 4), then 4 <= 3 fails → unpublished (correct). No counterexample found. Rule works.  
+
+3. History:  
+Step 1: Instance A publishes checkpoint 5 (root 5).  
+Step 2: Instance B starts, publishes checkpoint 6 (root 6).  
+Step 3: Instance C starts, publishes checkpoint 7 (root 7).  
+Step 4: Root ring holds roots 5,6,7.  
+Step 5: Administrator rolls back to root 6. Rollback writes row (B, 6, 0) and (C, 0, 0).  
+Step 6: Sweepminal sweep confirms no unpublished units for C. Row for C is deleted.  
+Step 7: New snapshot created referencing root 7.  
+Step 8: Administrator rolls back to root 7. Rollback candidate set: roots in ring (5,6,7) valid per row? Row for C is deleted, so candidate check: (i=C, T=7) → no row → valid candidate. But row for C was deleted after sweep confirmed no units, but snapshot referencing root 7 exists. However, the row for C was deleted before the snapshot was created. Now, the snapshot references root 7, which was published by C. But row for C is deleted, so candidate check: no row → valid. However, the snapshot exists, so root 7 should not be a candidate for rollback (since it's referenced by a snapshot). But the candidate set rule says: "candidate iff no row for i, or row (i, T_pub, W) with T at most T_pub". For root 7 (i=C), no row → valid candidate. But snapshot exists, so root 7 should be excluded. Rule broken: row reclaim deleted row for C before snapshot was created, but snapshot still references root 7. Smallest change: row reclaim must not delete rows while any snapshot references roots from that instance; only delete when all snapshots referencing the instance are destroyed.  
+
+4. History:  
+Step 1: Writable mount M1 starts. Superblock has id=1, held flag set.  
+Step 2: M1 writes id=1 to all superblocks, holds flag.  
+Step 3: Device loss: one superblock becomes unavailable.  
+Step 4: M1 crashes.  
+Step 5: New mount M2 starts. Checks superblocks: one has id=1 held flag set (unavailable), others have id=1 but no held flag.  
+Step 6: M2 sees max(id)=1, tries to take id=2. But one superblock still has id=1 with held flag (unavailable), so M2 refuses writable mount (foreign id conflict). But the held flag is stale (M1 crashed), so M2 should be allowed. Rule broken: held flag is not cleared on crash. Smallest change: clear held flag during mount recovery if the instance is not active (e.g., no current journal records for that instance).  
+
+5. History:  
+Step 1: Snapshot S1 created, references location L.  
+Step 2: Location L is allocated to a unit.  
+Step 3: Unit is deleted, allocator puts L in defer queue.  
+Step 4: Sweep checks L: has allocation record (released, checkpoint 10).  
+Step 5: Oldest root in ring has checkpoint 5.  
+Step 6: Sweep condition: released checkpoint 10 <= oldest root checkpoint 5? No → not swept. Correct.  
+Step 7: Snapshot S1 is destroyed.  
+Step 8: Oldest root checkpoint is now 5 (no newer roots).  
+Step 9: Sweep condition: released checkpoint 10 <= 5? No → still not swept. But location L should be swept after snapshot destruction. Rule broken: release checkpoint is 10, but oldest root checkpoint is 5. The condition is "release checkpoint at most oldest root checkpoint", but after snapshot destruction, the oldest root checkpoint might be lower than release checkpoint. Smallest change: sweep condition should check release checkpoint <= current oldest root checkpoint OR the location is unreferenced by any snapshot.  
+
+6. History:  
+Step 1: Tree T has inode 10, container number 10 (type 2, birth checkpoint 5).  
+Step 2: Clone head modifies container, reborn as (T, 2, 10, checkpoint 6).  
+Step 3: Original container is retired with (T, 2, 10, 5).  
+Step 4: Later, inode 10 is reused for a new file (split), creating new container with (T, 2, 10, checkpoint 7).  
+Step 5: Now two containers: (T, 2, 10, 6) and (T, 2, 10, 7). Same identity (tree, type 2, number, birth checkpoint) → collision. Rule P6 says "container numbers are inode numbers that are never reused", but inode reuse happens. Smallest change: enforce inode numbers are never reused; or use a unique container number sequence separate from inodes.

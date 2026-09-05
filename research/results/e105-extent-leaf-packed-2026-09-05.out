@@ -1,0 +1,116 @@
+E7RESULT name=config note=extent 叶改码 3 的更新代价 node_bytes=16384 unit_bytes=32768 unit_hdr=103 extent_rec=83 extent_rec_narrow=52 child_ptr=59 w=2 model=arithmetic file_ops=0
+E7RESULT name=geom rec=wide n=10000 hdr=68 a_leaf_fanout=196 a_height=2 b_per_container=393 b_containers=26 b_height=2
+E7RESULT name=write rec=wide n=10000 hdr=68 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=wide n=10000 hdr=68 k=10 a_bytes=333497 b_bytes=585586 b_over_a=1.756
+E7RESULT name=write rec=wide n=10000 hdr=68 k=100 a_bytes=1492284 b_bytes=1702966 b_over_a=1.141
+E7RESULT name=write rec=wide n=10000 hdr=68 k=1000 a_bytes=1736704 b_bytes=1736704 b_over_a=1.000
+E7RESULT name=read rec=wide n=10000 hdr=68 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=wide n=10000 hdr=77 a_leaf_fanout=196 a_height=2 b_per_container=393 b_containers=26 b_height=2
+E7RESULT name=write rec=wide n=10000 hdr=77 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=wide n=10000 hdr=77 k=10 a_bytes=333497 b_bytes=585586 b_over_a=1.756
+E7RESULT name=write rec=wide n=10000 hdr=77 k=100 a_bytes=1492284 b_bytes=1702966 b_over_a=1.141
+E7RESULT name=write rec=wide n=10000 hdr=77 k=1000 a_bytes=1736704 b_bytes=1736704 b_over_a=1.000
+E7RESULT name=read rec=wide n=10000 hdr=77 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=wide n=10000 hdr=86 a_leaf_fanout=196 a_height=2 b_per_container=393 b_containers=26 b_height=2
+E7RESULT name=write rec=wide n=10000 hdr=86 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=wide n=10000 hdr=86 k=10 a_bytes=333497 b_bytes=585586 b_over_a=1.756
+E7RESULT name=write rec=wide n=10000 hdr=86 k=100 a_bytes=1492284 b_bytes=1702966 b_over_a=1.141
+E7RESULT name=write rec=wide n=10000 hdr=86 k=1000 a_bytes=1736704 b_bytes=1736704 b_over_a=1.000
+E7RESULT name=read rec=wide n=10000 hdr=86 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=wide n=1000000 hdr=68 a_leaf_fanout=196 a_height=3 b_per_container=393 b_containers=2545 b_height=3
+E7RESULT name=write rec=wide n=1000000 hdr=68 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=wide n=1000000 hdr=68 k=10 a_bytes=638285 b_bytes=921629 b_over_a=1.444
+E7RESULT name=write rec=wide n=1000000 hdr=68 k=100 a_bytes=4142408 b_bytes=6886363 b_over_a=1.662
+E7RESULT name=write rec=wide n=1000000 hdr=68 k=1000 a_bytes=30677322 b_bytes=54660931 b_over_a=1.782
+E7RESULT name=read rec=wide n=1000000 hdr=68 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=wide n=1000000 hdr=77 a_leaf_fanout=196 a_height=3 b_per_container=393 b_containers=2545 b_height=3
+E7RESULT name=write rec=wide n=1000000 hdr=77 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=wide n=1000000 hdr=77 k=10 a_bytes=638285 b_bytes=921629 b_over_a=1.444
+E7RESULT name=write rec=wide n=1000000 hdr=77 k=100 a_bytes=4142408 b_bytes=6886363 b_over_a=1.662
+E7RESULT name=write rec=wide n=1000000 hdr=77 k=1000 a_bytes=30677322 b_bytes=54660931 b_over_a=1.782
+E7RESULT name=read rec=wide n=1000000 hdr=77 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=wide n=1000000 hdr=86 a_leaf_fanout=196 a_height=3 b_per_container=393 b_containers=2545 b_height=3
+E7RESULT name=write rec=wide n=1000000 hdr=86 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=wide n=1000000 hdr=86 k=10 a_bytes=638285 b_bytes=921629 b_over_a=1.444
+E7RESULT name=write rec=wide n=1000000 hdr=86 k=100 a_bytes=4142408 b_bytes=6886363 b_over_a=1.662
+E7RESULT name=write rec=wide n=1000000 hdr=86 k=1000 a_bytes=30677322 b_bytes=54660931 b_over_a=1.782
+E7RESULT name=read rec=wide n=1000000 hdr=86 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=wide n=100000000 hdr=68 a_leaf_fanout=196 a_height=4 b_per_container=393 b_containers=254453 b_height=4
+E7RESULT name=write rec=wide n=100000000 hdr=68 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=wide n=100000000 hdr=68 k=10 a_bytes=927671 b_bytes=1194940 b_over_a=1.288
+E7RESULT name=write rec=wide n=100000000 hdr=68 k=100 a_bytes=6983009 b_bytes=9969485 b_over_a=1.428
+E7RESULT name=write rec=wide n=100000000 hdr=68 k=1000 a_bytes=60441552 b_bytes=88529204 b_over_a=1.465
+E7RESULT name=read rec=wide n=100000000 hdr=68 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=geom rec=wide n=100000000 hdr=77 a_leaf_fanout=196 a_height=4 b_per_container=393 b_containers=254453 b_height=4
+E7RESULT name=write rec=wide n=100000000 hdr=77 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=wide n=100000000 hdr=77 k=10 a_bytes=927671 b_bytes=1194940 b_over_a=1.288
+E7RESULT name=write rec=wide n=100000000 hdr=77 k=100 a_bytes=6983009 b_bytes=9969485 b_over_a=1.428
+E7RESULT name=write rec=wide n=100000000 hdr=77 k=1000 a_bytes=60441552 b_bytes=88529204 b_over_a=1.465
+E7RESULT name=read rec=wide n=100000000 hdr=77 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=geom rec=wide n=100000000 hdr=86 a_leaf_fanout=196 a_height=4 b_per_container=393 b_containers=254453 b_height=4
+E7RESULT name=write rec=wide n=100000000 hdr=86 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=wide n=100000000 hdr=86 k=10 a_bytes=927671 b_bytes=1194940 b_over_a=1.288
+E7RESULT name=write rec=wide n=100000000 hdr=86 k=100 a_bytes=6983009 b_bytes=9969485 b_over_a=1.428
+E7RESULT name=write rec=wide n=100000000 hdr=86 k=1000 a_bytes=60441552 b_bytes=88529204 b_over_a=1.465
+E7RESULT name=read rec=wide n=100000000 hdr=86 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=geom rec=narrow n=10000 hdr=68 a_leaf_fanout=313 a_height=2 b_per_container=628 b_containers=16 b_height=2
+E7RESULT name=write rec=narrow n=10000 hdr=68 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=narrow n=10000 hdr=68 k=10 a_bytes=318006 b_bytes=531407 b_over_a=1.671
+E7RESULT name=write rec=narrow n=10000 hdr=68 k=100 a_bytes=1037514 b_bytes=1079693 b_over_a=1.041
+E7RESULT name=write rec=narrow n=10000 hdr=68 k=1000 a_bytes=1081344 b_bytes=1081344 b_over_a=1.000
+E7RESULT name=read rec=narrow n=10000 hdr=68 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=narrow n=10000 hdr=77 a_leaf_fanout=313 a_height=2 b_per_container=628 b_containers=16 b_height=2
+E7RESULT name=write rec=narrow n=10000 hdr=77 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=narrow n=10000 hdr=77 k=10 a_bytes=318006 b_bytes=531407 b_over_a=1.671
+E7RESULT name=write rec=narrow n=10000 hdr=77 k=100 a_bytes=1037514 b_bytes=1079693 b_over_a=1.041
+E7RESULT name=write rec=narrow n=10000 hdr=77 k=1000 a_bytes=1081344 b_bytes=1081344 b_over_a=1.000
+E7RESULT name=read rec=narrow n=10000 hdr=77 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=narrow n=10000 hdr=86 a_leaf_fanout=313 a_height=2 b_per_container=628 b_containers=16 b_height=2
+E7RESULT name=write rec=narrow n=10000 hdr=86 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=write rec=narrow n=10000 hdr=86 k=10 a_bytes=318006 b_bytes=531407 b_over_a=1.671
+E7RESULT name=write rec=narrow n=10000 hdr=86 k=100 a_bytes=1037514 b_bytes=1079693 b_over_a=1.041
+E7RESULT name=write rec=narrow n=10000 hdr=86 k=1000 a_bytes=1081344 b_bytes=1081344 b_over_a=1.000
+E7RESULT name=read rec=narrow n=10000 hdr=86 a_reads=2 a_bytes=32768 b_reads=2 b_bytes=49152 b_over_a=1.500
+E7RESULT name=geom rec=narrow n=1000000 hdr=68 a_leaf_fanout=313 a_height=3 b_per_container=628 b_containers=1593 b_height=3
+E7RESULT name=write rec=narrow n=1000000 hdr=68 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=narrow n=1000000 hdr=68 k=10 a_bytes=613228 b_bytes=890375 b_over_a=1.452
+E7RESULT name=write rec=narrow n=1000000 hdr=68 k=100 a_bytes=3815075 b_bytes=6681748 b_over_a=1.751
+E7RESULT name=write rec=narrow n=1000000 hdr=68 k=1000 a_bytes=28729193 b_bytes=49010095 b_over_a=1.706
+E7RESULT name=read rec=narrow n=1000000 hdr=68 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=narrow n=1000000 hdr=77 a_leaf_fanout=313 a_height=3 b_per_container=628 b_containers=1593 b_height=3
+E7RESULT name=write rec=narrow n=1000000 hdr=77 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=narrow n=1000000 hdr=77 k=10 a_bytes=613228 b_bytes=890375 b_over_a=1.452
+E7RESULT name=write rec=narrow n=1000000 hdr=77 k=100 a_bytes=3815075 b_bytes=6681748 b_over_a=1.751
+E7RESULT name=write rec=narrow n=1000000 hdr=77 k=1000 a_bytes=28729193 b_bytes=49010095 b_over_a=1.706
+E7RESULT name=read rec=narrow n=1000000 hdr=77 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=narrow n=1000000 hdr=86 a_leaf_fanout=313 a_height=3 b_per_container=628 b_containers=1593 b_height=3
+E7RESULT name=write rec=narrow n=1000000 hdr=86 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=write rec=narrow n=1000000 hdr=86 k=10 a_bytes=613228 b_bytes=890375 b_over_a=1.452
+E7RESULT name=write rec=narrow n=1000000 hdr=86 k=100 a_bytes=3815075 b_bytes=6681748 b_over_a=1.751
+E7RESULT name=write rec=narrow n=1000000 hdr=86 k=1000 a_bytes=28729193 b_bytes=49010095 b_over_a=1.706
+E7RESULT name=read rec=narrow n=1000000 hdr=86 a_reads=3 a_bytes=49152 b_reads=3 b_bytes=65536 b_over_a=1.333
+E7RESULT name=geom rec=narrow n=100000000 hdr=68 a_leaf_fanout=313 a_height=4 b_per_container=628 b_containers=159236 b_height=4
+E7RESULT name=write rec=narrow n=100000000 hdr=68 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=narrow n=100000000 hdr=68 k=10 a_bytes=891316 b_bytes=1160230 b_over_a=1.302
+E7RESULT name=write rec=narrow n=100000000 hdr=68 k=100 a_bytes=6783283 b_bytes=9833244 b_over_a=1.450
+E7RESULT name=write rec=narrow n=100000000 hdr=68 k=1000 a_bytes=57545863 b_bytes=84387046 b_over_a=1.466
+E7RESULT name=read rec=narrow n=100000000 hdr=68 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=geom rec=narrow n=100000000 hdr=77 a_leaf_fanout=313 a_height=4 b_per_container=628 b_containers=159236 b_height=4
+E7RESULT name=write rec=narrow n=100000000 hdr=77 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=narrow n=100000000 hdr=77 k=10 a_bytes=891316 b_bytes=1160230 b_over_a=1.302
+E7RESULT name=write rec=narrow n=100000000 hdr=77 k=100 a_bytes=6783283 b_bytes=9833244 b_over_a=1.450
+E7RESULT name=write rec=narrow n=100000000 hdr=77 k=1000 a_bytes=57545863 b_bytes=84387046 b_over_a=1.466
+E7RESULT name=read rec=narrow n=100000000 hdr=77 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=geom rec=narrow n=100000000 hdr=86 a_leaf_fanout=313 a_height=4 b_per_container=628 b_containers=159236 b_height=4
+E7RESULT name=write rec=narrow n=100000000 hdr=86 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=write rec=narrow n=100000000 hdr=86 k=10 a_bytes=891316 b_bytes=1160230 b_over_a=1.302
+E7RESULT name=write rec=narrow n=100000000 hdr=86 k=100 a_bytes=6783283 b_bytes=9833244 b_over_a=1.450
+E7RESULT name=write rec=narrow n=100000000 hdr=86 k=1000 a_bytes=57545863 b_bytes=84387046 b_over_a=1.466
+E7RESULT name=read rec=narrow n=100000000 hdr=86 a_reads=4 a_bytes=65536 b_reads=4 b_bytes=81920 b_over_a=1.250
+E7RESULT name=equal_height rec=wide hdr=68 segments=38417-77028,7529537-15097488 log_share=0.132
+E7RESULT name=equal_height rec=wide hdr=77 segments=38417-77028,7529537-15097488 log_share=0.132
+E7RESULT name=equal_height rec=wide hdr=86 segments=38417-77028,7529537-15097488 log_share=0.132
+E7RESULT name=equal_height rec=narrow hdr=68 segments=61349-123088,12024209-24125248 log_share=0.132
+E7RESULT name=equal_height rec=narrow hdr=77 segments=61349-123088,12024209-24125248 log_share=0.132
+E7RESULT name=equal_height rec=narrow hdr=86 segments=61349-123088,12024209-24125248 log_share=0.132
+E7RESULT name=done emitted=116

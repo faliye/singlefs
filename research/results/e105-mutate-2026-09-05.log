@@ -1,0 +1,7 @@
+基线：全绿
+✅ [M1_扇出按节点算容器] 红：equal_height_segments_are_pinned,single_update_is_pinned
+✅ [M2_树高少算一层] 红：equal_height_segments_are_pinned,single_update_is_pinned,read_ratio_bounds
+✅ [M3_碰到的节点数不饱和] 红：zero_and_saturation
+✅ [M4_码3侧漏掉内部层] 红：equal_height_segments_are_pinned,single_update_is_pinned
+✅ [M5_点查漏掉那次单元读] 红：equal_height_segments_are_pinned,read_ratio_bounds
+已还原，基线仍全绿

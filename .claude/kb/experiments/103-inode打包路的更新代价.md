@@ -8,7 +8,7 @@
 | 条款 | 用到的那一句 |
 |---|---|
 | D23（journal 的角色与格式） 已定项 1 | 取甲：「每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录。祖先不延后」⇒ 树高要算进更新代价 |
-| D18（块里携带什么信息） 已定项 11 | 打包记录单元头 93；容器索引是物理指针唯一持有者；别的树按（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）引用 |
+| D18（块里携带什么信息） 已定项 11 | 打包记录单元头 103（2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 定案加写序 10 之前是 93，一叶 233 条不变）；容器索引是物理指针唯一持有者；别的树按（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）引用 |
 | D8（核心索引结构） 已定项 2 / D4（校验和位置） 已定项 7 / D2（RAID 条带策略） 已定项 9 | 节点 16384、单元 32768、w = 2 |
 | D19（块指针的结构与宽度预算） 已定项 4 / E98（inode 记录与 inode 树的几何） | 子指针 59；inode 记录 140、住索引叶时叶扇出 116、内部扇出 243、打包 233 条/容器 |
 | D23（journal 的角色与格式） 已定项 12 / E79（根记录的容量） | 每次发布的常量部分：journal 记录 4096 + 根槽 512，两侧相同 |
@@ -33,10 +33,10 @@
 ### 实测（2026-09-04，纯算术，N=5 轮逐字节一致，11 单测 / 11 条变异全抓）
 
 **口径与复跑**：代码 `research/e7-index-bench/src/bin/e103_inode_update_cost.rs`（`cargo run --release --bin e103-inode-update-cost`），
-产物 `research/results/e103-inode-update-cost-2026-09-04.out`（68 行，收尾 `emitted=68`；2026-09-05 随第三臂重生成、同日第三臂条目从 91 改 93 后再生成一次，再把 93 / 233 钉成字面量常量给 27 号门禁、config 行多两个字段后第三次生成，两臂原有的数一个没变），
+产物 `research/results/e103-inode-update-cost-2026-09-05.out`（68 行，收尾 `emitted=68`；打包头 103 的那一版，只有 config 行的 `packed_hdr` 变了；2026-09-05 随第三臂重生成、同日第三臂条目从 91 改 93 后再生成一次，再把 93 / 233 钉成字面量常量给 27 号门禁、config 行多两个字段后第三次生成，两臂原有的数一个没变），
 变异表 `research/mutations/e103_inode_update_cost.tsv`
 （`bash research/scripts/mutate.sh e103-inode-update-cost research/e7-index-bench/src/bin/e103_inode_update_cost.rs research/mutations/e103_inode_update_cost.tsv`，
-记录 `research/results/e103-mutate-2026-09-04.log`），已挂 `research/scripts/replay.sh`。
+记录 `research/results/e103-mutate-2026-09-05.log`），已挂 `research/scripts/replay.sh`。
 
 **几何（头 58，1e6 个 inode）**：住索引叶 8621 叶 → 36 → 1（高 3）；打包 4292 个容器，容器索引 23 叶 → 1（高 2；条目 26 + 59 = 85，扇出 192），
 inode 树按身份引用时叶扇出 466（条目 8 + 27）、高 3。

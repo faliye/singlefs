@@ -21,7 +21,7 @@
 //!
 //! 登记表码 0 无效 / 1 数据单元 / 2 索引节点 / 3 打包记录单元 / 16 根记录 / 17 journal 记录 /
 //! 18 超级块槽，其余保留；标签 1 字节住共同前缀偏移 6、是 AAD 首字节；打包记录单元类身份段 51 字节
-//! （含 4 字节自包含载荷校验和）⇒ 头 93；一个单元只装一种记录类型 / 一个代际 / 一棵树，记录定宽；未登记单元类 ⇒ 拒收 + incompat，
+//! （含 4 字节自包含载荷校验和；2026-09-05 C113 定案再加 10 字节写序）⇒ 头 103；一个单元只装一种记录类型 / 一个代际 / 一棵树，记录定宽；未登记单元类 ⇒ 拒收 + incompat，
 //! 未登记记录类型 ⇒ 容器可验、内容跳过、只读（compat_ro）。
 //!
 //! ## 判据（跑前写死，跑完不许改）
@@ -32,7 +32,7 @@
 //! 2. **域分隔**：两类 AAD 规范编码能相同 ⇔ 标签相同（或都没有）且身体等长。
 //!    阳性对照：与数据单元身体等宽（32 字节）的合成类，**去掉标签**必须恰撞 1 对；带标签恰 0 对。
 //!    阴性对照：只有一类时任何设置都 0 对。
-//! 3. **打包容量与下游数**：cap(h, r) = (32768 − h) / r。钉：cap(93, 56) = 583、cap(93, 140) = 233；
+//! 3. **打包容量与下游数**：cap(h, r) = (32768 − h) / r。钉：cap(103, 56) = 583、cap(103, 140) = 233（93 时同值，成立区间 [65, 120]）；
 //!    并算出 583 / 233 各自成立的头宽闭区间，两端各多 1 字节必须掉 1 格。
 //! 4. **指认力**：一个五元组只指认 1 个对象 ⇒ 装 N 条的打包单元用五元组指认不到 N − 1 条；
 //!    用打包类身份段 + 解析枚举则指认不到的恰好 0。
@@ -46,7 +46,7 @@
 //!
 //! - 判据 1/2/5 的阳性对照任一不中 ⇒ 那一维没进模型，**整轮作废**。
 //! - 判据 2/5 的阴性对照任一不为 0 ⇒ 模型在平凡输入上就错，整轮作废。
-//! - **反向接受条款**：若 cap(93, 56) ≠ 583 或 cap(93, 140) ≠ 233 ⇒ 提案 P8 不成立，
+//! - **反向接受条款**：若 cap(103, 56) ≠ 583 或 cap(103, 140) ≠ 233 ⇒ 提案 P8 不成立，
 //!   E83 / E84 / E98 必须重跑，如实写。
 //! - 读不到 ≠ 读到 0：未登记码的判定返回 `Err`，不许退化成「0 个单元」。
 //!
@@ -60,17 +60,17 @@ use e7_index_bench::Emitter;
 const UNIT: u64 = 32768;
 const COMMON_PREFIX: u64 = 42;
 /// D18 已定项 7 数据单元头（kb 里 `format-const: UNIT_HDR_DATA`）。
-const UNIT_HDR_DATA: u64 = 91;
+const UNIT_HDR_DATA: u64 = 105;
 /// 提案 P4（第三版）：打包记录单元类身份段 = 单元类型标签 1（偏移 6 的密文侧副本）+ 出生树 ID 8 +
 /// 打包记录类型 2 + 容器号 8 + 容器出生代 8 + 记录数 2 + 记录宽 2 + 诞生代号 8 + fsid 8 +
-/// 载荷校验和 4（CRC32C，D23 已定项 13 口径）= 51 ⇒ 头 93。
+/// 载荷校验和 4（CRC32C，D23 已定项 13 口径）+ 写序 10（C113 定案，2026-09-05）= 61 ⇒ 头 103。
 /// 载荷校验和为什么必须自包含：整单元校验和 / MAC 住父指针（D4），扫描认领时没有父指针，
 /// 头校验和按 D18 已定项 7 逐字只是「头完整性唯一防线」——E76 实测「头落了、载荷只落一半」
 /// 对只有头校验和的形态 distinguishable=0。记录宽在头里再抄一份：不认识记录类型的读者才判得了
 /// 「记录数 × 记录宽 ≤ 声明长度」这条头合法性条件（D23 已定项 1 的 B 条同形）。
-const PACKED_BODY: u64 = 51;
+const PACKED_BODY: u64 = 61;
 /// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`）；单测钉它 == 前缀 + 类身份段。
-const UNIT_HDR_PACKED: u64 = 93;
+const UNIT_HDR_PACKED: u64 = 103;
 /// E83 的墓碑区间记录量级假设；E98 的 inode 记录。
 const TOMB_REC: u64 = 56;
 const INODE_REC: u64 = 140;
@@ -435,8 +435,8 @@ mod tests {
     fn format_constants_match_kb() {
         assert_eq!(UNIT, 32768, "D4 已定项 7");
         assert_eq!(COMMON_PREFIX, 42, "D18 已定项 7");
-        assert_eq!(UNIT_HDR_DATA, 91, "D18 已定项 7");
-        assert_eq!(UNIT_HDR_PACKED, 93, "D18 已定项 11：42 + 51");
+        assert_eq!(UNIT_HDR_DATA, 105, "D18 已定项 7：42 + 33 + 8 + 8 + 写序 10 + 载荷 CRC 4（C113 定案，2026-09-05）");
+        assert_eq!(UNIT_HDR_PACKED, 103, "D18 已定项 11：42 + 61");
         assert_eq!(UNIT_HDR_PACKED, COMMON_PREFIX + PACKED_BODY, "头 = 共同前缀 + 类身份段");
         assert_eq!(AAD_PACKED_BODY, 26, "树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8");
         assert_eq!(TOMB_REC, 56, "E83 量级假设");
@@ -479,7 +479,7 @@ mod tests {
         ));
     }
 
-    /// **判据 3 的绝对值 + 反向接受条款**：93 字节头下 583 / 233 不动，区间两端各多 1 字节掉 1 格。
+    /// **判据 3 的绝对值 + 反向接受条款**：103 字节头下 583 / 233 不动（93 时同值），区间两端各多 1 字节掉 1 格。
     #[test]
     fn criterion3_downstream_capacities_do_not_move_under_the_packed_header() {
         assert_eq!(capacity(UNIT_HDR_PACKED, TOMB_REC), 583, "E83 / E84 的 583");
@@ -513,9 +513,9 @@ mod tests {
     #[test]
     fn criterion5_fixed_width_parsing_rejects_overflow_and_counts_mixing_errors() {
         assert_eq!(parse_packed(583, TOMB_REC, UNIT), Parse::Records(583));
-        assert_eq!(parse_packed(584, TOMB_REC, UNIT), Parse::Corrupt, "584 × 56 + 93 = 32797 > 32768");
+        assert_eq!(parse_packed(584, TOMB_REC, UNIT), Parse::Corrupt, "584 × 56 + 103 = 32807 > 32768");
         assert_eq!(parse_packed(1, 0, UNIT), Parse::Corrupt, "宽 0 不是记录");
-        // 声明长度可以小于单元：声明 1000 时最多 (1000 − 93) / 56 = 16 条
+        // 声明长度可以小于单元：声明 1000 时最多 (1000 − 103) / 56 = 16 条
         assert_eq!(parse_packed(16, TOMB_REC, 1000), Parse::Records(16));
         assert_eq!(parse_packed(17, TOMB_REC, 1000), Parse::Corrupt);
         // 阳性对照：56 / 140 混装各 10 条，period = 56 / gcd(56,140) = 56 / 28 = 2 ⇒ 错分 5

@@ -1,0 +1,24 @@
+M1_已发布谓词失效	        Key::Data { .. } => u.birth <= *tp || u.wseq.ctr <= *wc,	        Key::Data { .. } => true,
+M2_祖先上限不生效	            anc.iter().any(|(t, lim)| *t == u.writer && u.birth <= *lim)	            anc.iter().any(|(t, _lim)| *t == u.writer)
+M3_择新取最小写序	            let ms = v.iter().map(|(_, u)| u.wseq).max().unwrap();	            let ms = v.iter().map(|(_, u)| u.wseq).min().unwrap();
+M17_副本不归并	        if arm.merge_replicas && !seen_versions.insert((u.key, u.writer, u.birth, u.wseq)) {	        if !arm.merge_replicas && !seen_versions.insert((u.key, u.writer, u.birth, u.wseq)) {
+M4_墓碑平局单元赢	                    if arm.use_death_wseq && !arm.meta_only { if arm.tie_unit_wins { d > wseq } else { d >= wseq } } else {	                    if arm.use_death_wseq && !arm.meta_only { if arm.tie_unit_wins { d > wseq } else { d > wseq } } else {
+M5_退役记录被忽略	                        TombRec::Retire { cont, .. } => { if arm.use_retire { retired.insert(*cont); } }	                        TombRec::Retire { cont, .. } => { if !arm.use_retire { retired.insert(*cont); } }
+M6_诞生代号不过滤	        if u.birth > root.txg { return false; }	        if u.birth > root.txg + 1000 { return false; }
+M7_恢复不写水位行	            for (i, w) in rows { put_row(&mut self.watermarks, &sticky, true, i, w, &mut self.rollback_row_writes_blocked); }	            for (i, w) in rows { let _ = (i, w); }
+M16_回退不写回退行	            for (i, r) in rows { self.watermarks.insert(i, r); self.rollback_rows.insert(i); }	            for (i, r) in rows { let _ = (i, r); }
+M8_门的下限退回第一版	        let floor = if self.cfg.gate_v2 { self.last_root_removal_txg } else { 0 };	        let floor = 0;
+M9_重生不退役旧身份	                    tomb_new.push(TombRec::Retire { cont: c.key, at_txg: self.txg });	                    let _ = wseq;
+M14_码 3 不按行封	        Key::Cont { .. } => u.birth <= *tp,	        Key::Cont { .. } => true,
+M15_回退不给中间实例写 (i, 0, 0)	        for i in (r_old + 1)..new_inst { rows.push((i, (0, 0))); }	        for i in (r_old + 1)..new_inst { rows.push((i, (u64::MAX, u64::MAX))); }
+M10_扫描计数漏一格	                let expect = w.n_written_units - w.n_overwritten_locs - w.n_invalidated;	                let expect = w.n_written_units - w.n_overwritten_locs - w.n_invalidated + 1;
+M11_注入不改落点	        for k in victims { let l = re.data[&k]; re.data.insert(k, l + 500_000); o.injected += 1; to_inject -= 1; }	        for k in victims { let l = re.data[&k]; re.data.insert(k, l); o.injected += 1; to_inject -= 1; }
+M13_退役回收无视容器引用	                        let refs = cont_referenced(self, cont);	                        let refs = false;
+M18_回退后新根不压过根环	        self.txg = if self.cfg.rollback_skips_ring { max_ring_txg + 1 } else { t_old + 1 };	        self.txg = t_old + 1;
+M19_崩溃行的 W 取已分配不取已施加	        let mut rows: Vec<(u32, (Txg, u64))> = vec![(crashed_inst, (self.txg - 1, w))];	        let mut rows: Vec<(u32, (Txg, u64))> = vec![(crashed_inst, (self.txg - 1, self.ctr))];
+M20_行回收不看根环	            if self.cfg.row_reclaim_checks_ring && ring_insts.contains(&i) { continue; }	            if false && ring_insts.contains(&i) { continue; }
+M21_恢复不重写在飞容器	                    c.loc = self.write_unit(c.key, tree, Payload::Inodes(c.recs.clone()));	                    let _ = tree;
+M22_恢复行的 T_pub 取在飞 txg − 1	        let tpub = if self.cfg.row_tpub_from_chosen_root { chosen_txg } else { self.txg - 1 };	        let tpub = self.txg - 1;
+M23_码 3 也按写序择新	        let cont = arm.cont_key_by_birth && arm.use_wseq && v.iter().all(|(_, u)| matches!(u.key, Key::Cont { .. }));	        let cont = false && arm.use_wseq && v.iter().all(|(_, u)| matches!(u.key, Key::Cont { .. }));
+M24_恢复行的 W 不按实例分	        let w_row = if self.cfg.row_w_per_instance { 0 } else { chosen_w };	        let w_row = chosen_w;
+M25_回退行保护形同虚设	    if protect && sticky.contains(&i) { *blocked += 1; return; }	    if false && sticky.contains(&i) { *blocked += 1; return; }

@@ -1,0 +1,10 @@
+基线：全绿
+✅ [M1_墓碑从映射里掉了] 红：criterion1_every_used_name_maps_to_exactly_one_registered_code
+✅ [M2_域分隔不看标签] 红：criterion2_tag_is_the_only_thing_that_separates_equal_width_bodies
+✅ [M3_容量按 16 KiB 节点算] 红：criterion3_downstream_capacities_do_not_move_under_the_packed_header,criterion4_five_tuple_names_one_object_packed_identity_names_all
+✅ [M4_解析不查溢出] 红：criterion5_fixed_width_parsing_rejects_overflow_and_counts_mixing_errors,illegal_geometry_is_not_a_measurement
+✅ [M5_混装错分算成零] 红：criterion5_fixed_width_parsing_rejects_overflow_and_counts_mixing_errors
+✅ [M6_incompat 政策也静默漏] 红：criterion6_unknown_class_refuses_mount_and_unknown_record_type_is_read_only
+✅ [M7_余量少算一个] 红：criterion7_headroom_is_counted_not_estimated
+✅ [M8_未登记记录类型也应用记录] 红：criterion6_unknown_class_refuses_mount_and_unknown_record_type_is_read_only
+已还原，基线仍全绿

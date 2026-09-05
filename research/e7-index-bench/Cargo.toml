@@ -256,3 +256,11 @@ path = "src/bin/e102_unit_class_registry.rs"
 [[bin]]
 name = "e103-inode-update-cost"
 path = "src/bin/e103_inode_update_cost.rs"
+
+[[bin]]
+name = "e104-current-version"
+path = "src/bin/e104_current_version.rs"
+
+[[bin]]
+name = "e105-extent-leaf-packed"
+path = "src/bin/e105_extent_leaf_packed.rs"

@@ -1,0 +1,9 @@
+1. Rollback to root R_old with checkpoint 100 and instance 1. New instance ordinal becomes 2. Rollback rows written as (2, 100, 0). Crash before publishing new root. Recovery chooses R_old (checkpoint 100, instance 1) as the largest checkpoint root. Published predicate for instance 2 > 1: corruption. Truth: rollback should be preserved but system detects corruption due to instance table row for 2.
+
+2. Write a class 1 data unit with write sequence (1, 100) to two replicas. Corrupt payload in one replica (e.g., bit flip). Class 1 has no payload checksum. Replica merge rule requires byte identical copies but system cannot detect corruption. Truth: replicas are not byte identical violating settled fact that writes are byte identical copies.
+
+3. Slot X allocated to unit U (root R_old checkpoint 50). Free at checkpoint 100. Allocation record entry (freed, 100). After K checkpoints, sweep deletes entry. Reallocation of slot X for new unit V. Rollback to R_old (checkpoint 50). Rebuilt allocation record marks X as allocated but disk contains V's data. Truth: unit U's data is lost, system reads V's data instead.
+
+4. Instance 3 crashed during transaction. Row (3, 80, 90) exists. Sweep confirms no units exceed caps, deletes row. Disk B returns with unit from instance 3 (birth 75, transaction id 95). Published predicate for instance 3 < current instance: no row means published. Truth: unit is unpublished (transaction id 95 > 90) but system treats it as published.
+
+5. Settled fact requires every write to be replicated byte identical. Proposal allows class 1 data units with no payload checksum. Write with two replicas where payload differs. System cannot detect difference due to missing checksum. Truth: violates settled fact that writes are byte identical copies.
