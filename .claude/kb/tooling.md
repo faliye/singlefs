@@ -96,6 +96,40 @@
 判别力（4 份标定样本，双向）：两份已知损坏判红、两份已知干净判绿；
 并在 `ask-local.sh` 真链路里用假网关证过——损坏样本 rc=5 拒绝、干净样本 rc=0 放行。
 
+### 已知毛病四：**实词自复读**，闸曾经故意不查（2026-09-06 观测到并修）
+
+**签名**：`resetting resetting the counter`——同一个词连着出现两次，**中间隔一个空格**。
+与已知毛病三（`unequalunequal`，词内叠写、无分隔）签名不同，两者互不覆盖。
+
+**闸为什么曾经放它过去**：`corruption-check.py` 的英文复读走 `word_repeats(text, n=2)`，
+匹配的是**二元组重复**（`the model the model`）；单词自复读是 n=1，不在射程里。
+源码注释写明这是取舍——「that that」「had had」「very very」在正常英文里合法。
+⇒ 取舍本身没错，**是划得太宽**：短虚词的自复读合法，长实词的不合法。
+
+**修法**（2026-09-06）：新增 `long_word_dups()`，判「同一个 ≥5 字母的词连着出现两次」，
+且第二次出现后面不许紧跟 `=`（排掉 `name=shape shape=BtreeValue` 这种 key=value 流的伪影）。
+不设「至少两处」门槛——长实词自复读是二值事实不是比率，与拼接类同理。
+
+**判别力（双向，2026-09-06）**：`research/prompts/d8-item8-r2-local-output.md` 由绿转红；
+`research/results/e98-inode-record-2026-09-03.out`（含 4 处 `name=shape shape=` 伪影）保持绿。
+全语料回扫 434 个文件，**新增判红恰好 6 个，全是本地腿输出，全是真损坏，零误报**。
+
+⚠️ **代价是实打实的：这 6 份当时都被当成干净证据用掉了。**
+
+| 文件 | 损坏词 | 它当时支撑的是 |
+|---|---|---|
+| `research/results/d18-item11-r1-local.out` | `skips skips` | D18（块里携带什么信息） 已定项 11（实例代号）第一轮 |
+| `research/results/d8-item6-r4-local.out` | `watermark watermark` ×2 | D8（核心索引结构） 已定项 6（inode 号单调不复用）第四轮 |
+| `research/results/c85-publication-counter-local.out` | `proposed proposed` | C85（发布计数器的四个等号没写死） 那一轮 |
+| `research/prompts/d9-item9-r3-local-output.md` | `replicas replicas` | D9（加密） 未定项 9 第三轮 |
+| `research/prompts/d1-item56-r1-local-output.md` | `point point` | D1（数据可移动性 / 反向索引） 已定项 5 / 6 第一轮 |
+| `research/prompts/d8-item8-r2-local-output.md` | `resetting resetting` | D8（核心索引结构） 未定项 8 第二轮（当轮发现） |
+
+⇒ 按 `.claude/rules/three-way-inference.md`「闸判红之后那一轮作废重跑」，
+**这六轮的本地腿retroactively 作废**——它们当时实际上跑在两条腿上，而没有按
+「本地腿缺席时必须显式报告」报出来。⚠️ **这不自动推翻那几条决策**（各自还有两条云端腿），
+但凡是把「三方一致」当依据的地方，口径要改成「两方一致 + 本地腿作废」。
+
 ### 提示里的 `**粗体**:` 会诱发损坏（2026-08-29 实测 3/3 对 3/3）
 
 同一份 D9（加密） 问题、同一个模型，只改提示的排版：

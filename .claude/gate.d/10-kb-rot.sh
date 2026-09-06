@@ -116,7 +116,10 @@ ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
 
 echo
 if [[ $fail -ne 0 ]]; then
-  echo "  ✗ kb 腐化审计发现问题——上面每一条都要么改、要么写明为什么不用改"
+  echo "  ✗ kb 腐化审计发现问题"
+  echo "     → 怎么办：上面每一条都要处理掉，二选一——按现状改正文，"
+  echo "               或者在那一条旁边写明为什么现在不用改（带日期和依据）。"
+  echo "               放着不动会让下一轮再审一遍同样的东西。"
   exit 1
 fi
 echo "  ✓ kb 腐化审计通过"

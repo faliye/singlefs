@@ -52,6 +52,19 @@ def word_repeats(text, n=2):
                      % (n - 1), re.I)
     return [m.group(1).lower() for m in pat.finditer(text)]
 
+# 实词自复读：同一个 ≥5 字母的词连着出现两次。
+# ⚠️ **为什么长度设 5**：短词的自复读在正常英文里合法（that that / had had / very very），
+# 长实词的不合法。实测语料 434 个文件，≥5 字母命中 7 处，
+# 其中 6 处是真损坏（replicas replicas / proposed proposed / watermark watermark ×2 /
+# skips skips / point point），1 处是 `name=shape shape=BtreeValue` 这种 key=value 流的伪影
+# —— 后者靠「第二次出现后面不许紧跟 =」排掉。
+# ⚠️ **这条不设「至少两处」门槛**：长实词自复读不是比率，是二值事实，
+# 与拼接类同理——出现一次就是真的多吐了一个词。
+LONG_DUP = re.compile(r"\b([A-Za-z][A-Za-z'-]{4,})\s+\1\b(?!\s*=)", re.I)
+
+def long_word_dups(text):
+    return [m.group(1).lower() for m in LONG_DUP.finditer(text)]
+
 def splice_marks(text):
     """成对标记落单 + 标点粘连——**丢字**的签名。
 
@@ -73,12 +86,14 @@ def check(text):
     tri = ngram_repeats(text, 3)
     words = len(WORD.findall(text))
     wbi = word_repeats(text, 2)
+    ldup = long_word_dups(text)
     return {
         'chars': len(text), 'cjk': c, 'words': words,
         'fffd': fffd, 'bigram': len(bi), 'trigram': len(tri),
-        'wbigram': len(wbi), **splice_marks(text),
+        'wbigram': len(wbi), 'longdup': len(ldup), **splice_marks(text),
         'bigram_samples': bi[:6], 'trigram_samples': tri[:4],
         'wbigram_samples': wbi[:6],
+        'longdup_samples': ldup[:6],
     }
 
 # 退出码：0 干净 / 1 判红 / 2 **检测器自己出错**。
@@ -113,13 +128,17 @@ if __name__ == '__main__':
         # 不存在「偶然落单一次」——落单就是真的掉了字。
         spliced = r['odd_tick'] or r['odd_bold'] or r['glue'] > 0
         red = (r['fffd'] > 0 or (r['bigram'] >= 2 and rate > 1.0)
-               or (r['wbigram'] >= 2 and wrate > 1.0) or spliced)
+               or (r['wbigram'] >= 2 and wrate > 1.0) or spliced
+               or r['longdup'] > 0)
         bad |= red
         print(f"{'红' if red else '绿'} {path}  cjk={r['cjk']} words={r['words']} fffd={r['fffd']} "
               f"汉字复读={r['bigram']}({rate:.2f}/千) 英文复读={r['wbigram']}({wrate:.2f}/千) "
-              f"反引号落单={r['odd_tick']} 星号落单={r['odd_bold']} 粘连={r['glue']}")
+              f"反引号落单={r['odd_tick']} 星号落单={r['odd_bold']} 粘连={r['glue']} "
+              f"实词自复读={r['longdup']}")
         if r['bigram_samples']:
             print(f"     汉字复读样本: {' '.join(r['bigram_samples'])}")
         if r['wbigram_samples']:
             print(f"     英文复读样本: {' | '.join(r['wbigram_samples'])}")
+        if r['longdup_samples']:
+            print(f"     实词自复读: {' | '.join(r['longdup_samples'])}")
     sys.exit(EXIT_RED if bad else EXIT_CLEAN)

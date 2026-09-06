@@ -272,3 +272,19 @@ path = "src/bin/e106_stripe_member_table.rs"
 [[bin]]
 name = "e108-plaintext-layer-cost"
 path = "src/bin/e108_plaintext_layer_cost.rs"
+
+[[bin]]
+name = "e107-stripe-table-wa"
+path = "src/bin/e107_stripe_table_wa.rs"
+
+[[bin]]
+name = "e109-position-authority"
+path = "src/bin/e109_position_authority.rs"
+
+[[bin]]
+name = "e110-stripe-table-steady"
+path = "src/bin/e110_stripe_table_steady.rs"
+
+[[bin]]
+name = "e111-stripe-table-key"
+path = "src/bin/e111_stripe_table_key.rs"

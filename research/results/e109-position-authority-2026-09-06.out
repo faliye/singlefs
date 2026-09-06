@@ -1,0 +1,67 @@
+E7RESULT name=negative_control publish_leaves=0 verdict=pass
+E7RESULT name=geometry fanout=119 buffer_msgs=665 loc_entry=14 ref_height=4 total_units=483183820
+E7RESULT name=discriminating leaves=100000 pool=10000000 ref_height=3 map_height=3 ptr_bytes=49664 map_bytes=49664 same_height=true
+E7RESULT name=discriminating leaves=100000 pool=483183820 ref_height=3 map_height=4 ptr_bytes=49664 map_bytes=66048 same_height=false
+E7RESULT name=discriminating leaves=100000 pool=10000000000 ref_height=3 map_height=5 ptr_bytes=49664 map_bytes=82432 same_height=false
+E7RESULT name=discriminating leaves=4000000 pool=10000000 ref_height=4 map_height=3 ptr_bytes=66048 map_bytes=49664 same_height=false
+E7RESULT name=discriminating leaves=4000000 pool=483183820 ref_height=4 map_height=4 ptr_bytes=66048 map_bytes=66048 same_height=true
+E7RESULT name=discriminating leaves=300000000 pool=10000000 ref_height=5 map_height=3 ptr_bytes=82432 map_bytes=49664 same_height=false
+E7RESULT name=move key_bytes=16 k=1 map_fanout=370 map_height=4 ptr_bytes=66048 map_bytes=66048 ratio_ptr_over_map=1.0000
+E7RESULT name=move key_bytes=16 k=2 map_fanout=370 map_height=4 ptr_bytes=132096 map_bytes=66048 ratio_ptr_over_map=2.0000
+E7RESULT name=move key_bytes=16 k=4 map_fanout=370 map_height=4 ptr_bytes=264192 map_bytes=66048 ratio_ptr_over_map=4.0000
+E7RESULT name=move key_bytes=16 k=8 map_fanout=370 map_height=4 ptr_bytes=528384 map_bytes=66048 ratio_ptr_over_map=8.0000
+E7RESULT name=move key_bytes=16 k=16 map_fanout=370 map_height=4 ptr_bytes=1056768 map_bytes=66048 ratio_ptr_over_map=16.0000
+E7RESULT name=move key_bytes=24 k=1 map_fanout=313 map_height=4 ptr_bytes=66048 map_bytes=66048 ratio_ptr_over_map=1.0000
+E7RESULT name=move key_bytes=24 k=2 map_fanout=313 map_height=4 ptr_bytes=132096 map_bytes=66048 ratio_ptr_over_map=2.0000
+E7RESULT name=move key_bytes=24 k=4 map_fanout=313 map_height=4 ptr_bytes=264192 map_bytes=66048 ratio_ptr_over_map=4.0000
+E7RESULT name=move key_bytes=24 k=8 map_fanout=313 map_height=4 ptr_bytes=528384 map_bytes=66048 ratio_ptr_over_map=8.0000
+E7RESULT name=move key_bytes=24 k=16 map_fanout=313 map_height=4 ptr_bytes=1056768 map_bytes=66048 ratio_ptr_over_map=16.0000
+E7RESULT name=move key_bytes=33 k=1 map_fanout=267 map_height=4 ptr_bytes=66048 map_bytes=66048 ratio_ptr_over_map=1.0000
+E7RESULT name=move key_bytes=33 k=2 map_fanout=267 map_height=4 ptr_bytes=132096 map_bytes=66048 ratio_ptr_over_map=2.0000
+E7RESULT name=move key_bytes=33 k=4 map_fanout=267 map_height=4 ptr_bytes=264192 map_bytes=66048 ratio_ptr_over_map=4.0000
+E7RESULT name=move key_bytes=33 k=8 map_fanout=267 map_height=4 ptr_bytes=528384 map_bytes=66048 ratio_ptr_over_map=8.0000
+E7RESULT name=move key_bytes=33 k=16 map_fanout=267 map_height=4 ptr_bytes=1056768 map_bytes=66048 ratio_ptr_over_map=16.0000
+E7RESULT name=move key_bytes=40 k=1 map_fanout=239 map_height=4 ptr_bytes=66048 map_bytes=66048 ratio_ptr_over_map=1.0000
+E7RESULT name=move key_bytes=40 k=2 map_fanout=239 map_height=4 ptr_bytes=132096 map_bytes=66048 ratio_ptr_over_map=2.0000
+E7RESULT name=move key_bytes=40 k=4 map_fanout=239 map_height=4 ptr_bytes=264192 map_bytes=66048 ratio_ptr_over_map=4.0000
+E7RESULT name=move key_bytes=40 k=8 map_fanout=239 map_height=4 ptr_bytes=528384 map_bytes=66048 ratio_ptr_over_map=8.0000
+E7RESULT name=move key_bytes=40 k=16 map_fanout=239 map_height=4 ptr_bytes=1056768 map_bytes=66048 ratio_ptr_over_map=16.0000
+E7RESULT name=publish key_bytes=16 leaves=1 ptr_bytes=102912 map_bytes=168960 extra_bytes=66048 ratio_map_over_ptr=1.6418
+E7RESULT name=publish key_bytes=16 leaves=8 ptr_bytes=332288 map_bytes=398336 extra_bytes=66048 ratio_map_over_ptr=1.1988
+E7RESULT name=publish key_bytes=16 leaves=64 ptr_bytes=2167296 map_bytes=2233344 extra_bytes=66048 ratio_map_over_ptr=1.0305
+E7RESULT name=publish key_bytes=24 leaves=1 ptr_bytes=102912 map_bytes=168960 extra_bytes=66048 ratio_map_over_ptr=1.6418
+E7RESULT name=publish key_bytes=24 leaves=8 ptr_bytes=332288 map_bytes=398336 extra_bytes=66048 ratio_map_over_ptr=1.1988
+E7RESULT name=publish key_bytes=24 leaves=64 ptr_bytes=2167296 map_bytes=2233344 extra_bytes=66048 ratio_map_over_ptr=1.0305
+E7RESULT name=publish key_bytes=33 leaves=1 ptr_bytes=102912 map_bytes=168960 extra_bytes=66048 ratio_map_over_ptr=1.6418
+E7RESULT name=publish key_bytes=33 leaves=8 ptr_bytes=332288 map_bytes=398336 extra_bytes=66048 ratio_map_over_ptr=1.1988
+E7RESULT name=publish key_bytes=33 leaves=64 ptr_bytes=2167296 map_bytes=2233344 extra_bytes=66048 ratio_map_over_ptr=1.0305
+E7RESULT name=publish key_bytes=40 leaves=1 ptr_bytes=102912 map_bytes=168960 extra_bytes=66048 ratio_map_over_ptr=1.6418
+E7RESULT name=publish key_bytes=40 leaves=8 ptr_bytes=332288 map_bytes=398336 extra_bytes=66048 ratio_map_over_ptr=1.1988
+E7RESULT name=publish key_bytes=40 leaves=64 ptr_bytes=2167296 map_bytes=2233344 extra_bytes=66048 ratio_map_over_ptr=1.0305
+E7RESULT name=crossover key_bytes=16 k=1 publish_extra=66048 saved_per_move=0 moves_per_publish_to_break_even=-1
+E7RESULT name=crossover key_bytes=16 k=2 publish_extra=66048 saved_per_move=66048 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=16 k=4 publish_extra=66048 saved_per_move=198144 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=16 k=8 publish_extra=66048 saved_per_move=462336 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=16 k=16 publish_extra=66048 saved_per_move=990720 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=24 k=1 publish_extra=66048 saved_per_move=0 moves_per_publish_to_break_even=-1
+E7RESULT name=crossover key_bytes=24 k=2 publish_extra=66048 saved_per_move=66048 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=24 k=4 publish_extra=66048 saved_per_move=198144 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=24 k=8 publish_extra=66048 saved_per_move=462336 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=24 k=16 publish_extra=66048 saved_per_move=990720 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=33 k=1 publish_extra=66048 saved_per_move=0 moves_per_publish_to_break_even=-1
+E7RESULT name=crossover key_bytes=33 k=2 publish_extra=66048 saved_per_move=66048 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=33 k=4 publish_extra=66048 saved_per_move=198144 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=33 k=8 publish_extra=66048 saved_per_move=462336 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=33 k=16 publish_extra=66048 saved_per_move=990720 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=40 k=1 publish_extra=66048 saved_per_move=0 moves_per_publish_to_break_even=-1
+E7RESULT name=crossover key_bytes=40 k=2 publish_extra=66048 saved_per_move=66048 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=40 k=4 publish_extra=66048 saved_per_move=198144 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=40 k=8 publish_extra=66048 saved_per_move=462336 moves_per_publish_to_break_even=1
+E7RESULT name=crossover key_bytes=40 k=16 publish_extra=66048 saved_per_move=990720 moves_per_publish_to_break_even=1
+E7RESULT name=read stale_permille=0 nodes_per_1000_reads_ptr=4000 nodes_per_1000_reads_map=8000 nodes_per_1000_reads_hybrid=4000
+E7RESULT name=read stale_permille=190 nodes_per_1000_reads_ptr=4000 nodes_per_1000_reads_map=8000 nodes_per_1000_reads_hybrid=4760
+E7RESULT name=read stale_permille=370 nodes_per_1000_reads_ptr=4000 nodes_per_1000_reads_map=8000 nodes_per_1000_reads_hybrid=5480
+E7RESULT name=read stale_permille=1000 nodes_per_1000_reads_ptr=4000 nodes_per_1000_reads_map=8000 nodes_per_1000_reads_hybrid=8000
+E7RESULT name=positive_control map_at_pool_h3=49664 map_at_pool_h5=82432 ptr_at_pool_h3=66048 ptr_at_pool_h5=66048 verdict=pass
+E7RESULT name=main_workload_publish_ptr ops=1 bytes_per_op=332288 elapsed_ns=1 total_bytes=332288 mib_per_s=316894531.250 iops=1000000000.0
+E7RESULT name=done emitted=67

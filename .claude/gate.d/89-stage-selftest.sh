@@ -40,15 +40,15 @@ for stage in "$GD"/*.sh; do
     work="$(mktemp -d)"
     cp -a "$d/." "$work/"
     if [[ -f "$work/setup.sh" ]]; then
-      ( cd "$work" && bash setup.sh >/dev/null 2>&1 ) || { printf '  ✗ %-28s %-5s setup.sh 没跑成\n' "$name" "$kind"; fail=$((fail+1)); rm -rf "$work"; continue; }
+      ( cd "$work" && bash setup.sh >/dev/null 2>&1 ) || { printf '  ✗ %-28s %-5s setup.sh 没跑成\n' "$name" "$kind"; fail=$((fail+1)); rm -rf "$work"; continue; }   # gate-lint:detail
     fi
     out="$(cd "$work" && bash "$stage" "$work" 2>&1)"; got=$?
     rm -rf "$work"
     okc=1
-    [[ "$got" == "$want_exit" ]] || { printf '  ✗ %-28s %-5s 期望退出 %s，实测 %s\n' "$name" "$kind" "$want_exit" "$got"; okc=0; }
+    [[ "$got" == "$want_exit" ]] || { printf '  ✗ %-28s %-5s 期望退出 %s，实测 %s\n' "$name" "$kind" "$want_exit" "$got"; okc=0; }   # gate-lint:detail
     while IFS= read -r w; do
       [[ -z "$w" ]] && continue
-      grep -qF -- "$w" <<<"$out" || { printf '  ✗ %-28s %-5s 输出里找不到「%s」\n' "$name" "$kind" "$w"; okc=0; }
+      grep -qF -- "$w" <<<"$out" || { printf '  ✗ %-28s %-5s 输出里找不到「%s」\n' "$name" "$kind" "$w"; okc=0; }   # gate-lint:detail
     done < <(sed -n 's/^want=//p' "$d/expect")
     if ((okc)); then printf '  ✓ %-28s %-5s 判得对\n' "$name" "$kind"; pass=$((pass+1)); else fail=$((fail+1)); fi
   done
@@ -59,5 +59,10 @@ if ((${#nocase[@]})); then
   printf '      %s\n' "${nocase[@]}"
   echo "    → 一条永远不红的检查与没有这条检查，在门禁输出里长得一模一样。落点：kb/checks-owed.md"
 fi
-((fail == 0)) || exit 1
+if ((fail)); then
+  echo "  ✗ $fail 个样本判错"   # gate-lint:summary
+  echo "     → 怎么办：上面每一条写着它错在哪（退出码不对，或输出里找不到 want）。"
+  echo "               样本该改就改 expect，检查坏了就改那个阶段——别两边一起改到自洽为止。"
+  exit 1
+fi
 echo "  ✓ 有样本的阶段判得都对（$pass 个样本），$((${#nocase[@]})) 个阶段仍未自检"

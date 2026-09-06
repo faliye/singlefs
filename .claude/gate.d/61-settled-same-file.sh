@@ -74,7 +74,7 @@ for f in "${settled_files[@]}"; do
     hit=0
     for t in $touched; do (( t>=ln && t<=end )) && { hit=1; break; }; done
     (( hit )) && continue
-    echo "  ✗ $(basename "$f"):$ln 本次新增了「已定」小节，而这条未定项一个字都没动"
+    echo "  ✗ $(basename "$f"):$ln 本次新增了「已定」小节，而这条未定项一个字都没动"   # gate-lint:detail
     echo "     ⇒ 复核它是不是被这次定案顺带答掉了。原文：${text:0:60}"
     flagged=1
   done < <(awk '

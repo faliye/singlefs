@@ -1,0 +1,17 @@
+M1_搬迁不随引用树数走	Arm::Ptr => k * (ref_height(leaves_per_tree) * NODE + ROOT_SLOT),	Arm::Ptr => ref_height(leaves_per_tree) * NODE + ROOT_SLOT,
+M2_映射搬迁也随k走	            height(total_units, map_fanout(key_bytes, w)) * NODE + ROOT_SLOT\n        }	            k * (height(total_units, map_fanout(key_bytes, w)) * NODE + ROOT_SLOT)\n        }
+M3_映射条目只算key不算位置	(NODE - MAP_HDR) / (key_bytes + LOC_ENTRY * w)	(NODE - MAP_HDR) / key_bytes
+M4_映射树节点头不计	(NODE - MAP_HDR) / (key_bytes + LOC_ENTRY * w)	NODE / (key_bytes + LOC_ENTRY * w)
+M5_扇出用缓冲条数	const FANOUT: u64 = 119;	const FANOUT: u64 = 665;
+M6_位置条目漏掉校验和	const LOC_ENTRY: u64 = 14;	const LOC_ENTRY: u64 = 10;
+M7_发布不为新叶插映射条目	            base + (leaf_nodes + inner) * NODE + ROOT_SLOT	            base
+M8_发布只算叶层不算内部路径	let inner = height(total_units, f).saturating_sub(1);	let inner = 0u64;
+M9_读路径映射不多跳	Arm::Map => refh + maph,	Arm::Map => refh,
+M10_hybrid忽略提示过期率	Arm::Hybrid => refh * 1000 + maph * stale_permille,	Arm::Hybrid => refh * 1000,
+M11_树高少算一层	    let mut h = 1u64;\n    let mut cap = f;	    let mut h = 0u64;\n    let mut cap = f;
+M12_空发布也照常计费	    if n == 0 {\n        return 0;\n    }\n    let base	    let base
+M13_脊柱节点数改掉	const SPINE_NODES: u64 = 4;	const SPINE_NODES: u64 = 3;
+M14_根槽不计	Arm::Ptr => k * (ref_height(leaves_per_tree) * NODE + ROOT_SLOT),	Arm::Ptr => k * (ref_height(leaves_per_tree) * NODE),
+M15_map臂改用引用树的高	            height(total_units, map_fanout(key_bytes, w)) * NODE + ROOT_SLOT	            ref_height(leaves_per_tree) * NODE + ROOT_SLOT
+M16_读路径的映射高改用引用树的高	    let maph = height(total_units, map_fanout(key_bytes, w));	    let maph = refh;
+M17_key宽度改回未定那档	const KEY_BYTES: u64 = 33;	const KEY_BYTES: u64 = 32;

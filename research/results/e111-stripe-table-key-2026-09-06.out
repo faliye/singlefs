@@ -1,0 +1,14 @@
+E7RESULT name=negative_control w=2 entries=0 verdict=pass
+E7RESULT name=e97_crosscheck slots=966367641 e97_entries=483183820 e97_height=4 e97_ppm=442
+E7RESULT name=tree w=2 arm=slot data_cells=0 parity_cells=0 entries=0 key_bytes=10 fanout=906 height=0 tree_ppm=0 answers_slot_lookup=true
+E7RESULT name=tree w=2 arm=stripe data_cells=0 parity_cells=0 entries=0 key_bytes=12 fanout=815 height=0 tree_ppm=0 answers_slot_lookup=false
+E7RESULT name=tree w=2 arm=none data_cells=0 parity_cells=0 entries=0 key_bytes=0 fanout=0 height=0 tree_ppm=0 answers_slot_lookup=false
+E7RESULT name=tree w=3 arm=slot data_cells=483183820 parity_cells=241591910 entries=724775730 key_bytes=10 fanout=906 height=3 tree_ppm=4631 answers_slot_lookup=true
+E7RESULT name=tree w=3 arm=stripe data_cells=483183820 parity_cells=241591910 entries=724775730 key_bytes=12 fanout=815 height=4 tree_ppm=4631 answers_slot_lookup=false
+E7RESULT name=tree w=3 arm=none data_cells=483183820 parity_cells=241591910 entries=724775730 key_bytes=0 fanout=0 height=0 tree_ppm=4631 answers_slot_lookup=false
+E7RESULT name=tree w=4 arm=slot data_cells=483183820 parity_cells=161061274 entries=644245094 key_bytes=10 fanout=906 height=3 tree_ppm=4116 answers_slot_lookup=true
+E7RESULT name=tree w=4 arm=stripe data_cells=483183820 parity_cells=161061274 entries=644245094 key_bytes=12 fanout=815 height=4 tree_ppm=4116 answers_slot_lookup=false
+E7RESULT name=tree w=4 arm=none data_cells=483183820 parity_cells=161061274 entries=644245094 key_bytes=0 fanout=0 height=0 tree_ppm=4116 answers_slot_lookup=false
+E7RESULT name=positive_control fanout_slot_key=906 fanout_stripe_key=815 verdict=pass
+E7RESULT name=w3_entries ops=1 bytes_per_op=724775730 elapsed_ns=1 total_bytes=724775730 mib_per_s=691199998855.591 iops=1000000000.0
+E7RESULT name=done emitted=14

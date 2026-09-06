@@ -1,0 +1,9 @@
+1. Prove. The protocol ensures identifiers are never reused. Base is computed as the maximum of the next_free values from a majority of devices and the largest identifier in the tree table plus one. After each reservation, next_free is set to base + K. Subsequent reservations always use a base at least as large as the previous next_free, which is higher than all previously used identifiers. Crashes, rollbacks, and remounts do not cause reuse because the next_free values and tree table data are consistently updated and read in a way that guarantees monotonic increase of identifiers.
+
+2. During the period between range exhaustion and step 3 completing the second reservation, the filesystem is writable but has no available identifiers. Any request to create a tree must be blocked or rejected. Allowing creation would break the protocol by reusing identifiers or exceeding the reserved range. Blocking or rejecting is consistent; allowing creation is not.
+
+3. Circumstances where the tree table read fails: corruption of the root or device failure preventing access. Step 2 should fail the mount in such cases. If it proceeds without the tree table data, base could be smaller than necessary (e.g., if the tree table had a larger identifier), leading to potential identifier reuse, which is unsafe.
+
+4. Yes. Host B's majority includes one device from Host A's reservation (with next_free = base_A + K) and others with potentially lower next_free values. The maximum next_free read by Host B is at least base_A + K. The largest identifier in the tree table is at most base_A + K - 1, so base_B is at least base_A + K, ensuring all identifiers handed out by Host A are below Host B's reservation start.
+
+5. The protocol lacks concurrency control for multiple hosts mounting writable simultaneously. Concurrent mounts could result in overlapping majority sets both reserving the same identifier range, causing reuse.

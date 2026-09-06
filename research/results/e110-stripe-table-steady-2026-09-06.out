@@ -1,0 +1,11 @@
+E7RESULT name=negative_control rounds=0 arm_a=0 arm_c=0 verdict=pass
+E7RESULT name=e107_crosscheck a_f0=627200 a_f582=692736 c=659968 verdict=pass
+E7RESULT name=steady load=main rounds=100 arm_a_total=62851072 arm_c_total=65996800 overflow_rounds=2 rounds_where_a_cheaper=98 ratio_a_over_c=0.9523
+E7RESULT name=steady load=mixed rounds=100 arm_a_total=134187008 arm_c_total=171509760 overflow_rounds=6 rounds_where_a_cheaper=66 ratio_a_over_c=0.7824
+E7RESULT name=steady load=main rounds=1000 arm_a_total=629035008 arm_c_total=659968000 overflow_rounds=28 rounds_where_a_cheaper=972 ratio_a_over_c=0.9531
+E7RESULT name=steady load=mixed rounds=1000 arm_a_total=1351340032 arm_c_total=1728860160 overflow_rounds=65 rounds_where_a_cheaper=658 ratio_a_over_c=0.7816
+E7RESULT name=steady load=main rounds=10000 arm_a_total=6289956864 arm_c_total=6599680000 overflow_rounds=274 rounds_where_a_cheaper=9726 ratio_a_over_c=0.9531
+E7RESULT name=steady load=mixed rounds=10000 arm_a_total=13522673664 arm_c_total=17302364160 overflow_rounds=652 rounds_where_a_cheaper=6578 ratio_a_over_c=0.7816
+E7RESULT name=positive_control recs_per_container=583 overflow_period_rounds=34.29
+E7RESULT name=main_1000_arm_a ops=1 bytes_per_op=629035008 elapsed_ns=1 total_bytes=629035008 mib_per_s=599894531250.000 iops=1000000000.0
+E7RESULT name=done emitted=11

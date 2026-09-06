@@ -12,7 +12,11 @@
 set -uo pipefail
 R=research
 [[ -f "$R/Cargo.toml" ]] || { echo "  ✓ 没有 $R/Cargo.toml，本阶段无对象可判"; exit 0; }
-command -v cargo >/dev/null || { echo "  ✗ 没有 cargo，装不了就没法验 research 的证据"; exit 1; }
+command -v cargo >/dev/null || {
+  echo "  ✗ 没有 cargo，装不了就没法验 research 的证据"
+  echo "     → 怎么办：装 Rust 工具链（curl https://sh.rustup.rs -sSf | sh），"
+  echo "               或把已装的 cargo 放进 PATH。跳过这一步等于 research/ 的数字没人验过。"
+  exit 1; }
 
 out="$(cd "$R" && cargo test --release 2>&1)"
 rc=$?

@@ -41,6 +41,9 @@ done < <(find "$KB/decisions" -name '*.md' | sort)
 
 if [[ $fail -gt 0 ]]; then
   echo "  ✗ $fail 处待用户复核没有未还的账（共查 $checked 处）"
+  echo "     → 怎么办：每一处「待用户复核」都要在 kb/checks-owed.md 里有一条未还的账盯着，"
+  echo "               否则那句「待复核」没有任何人会回头看。补上那条账，或者"
+  echo "               这一条已经复核完了就把「待用户复核」改成结论。"
   exit 1
 fi
 echo "  ✓ 待用户复核的条款都有未还的账盯着（共 $checked 处）"

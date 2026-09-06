@@ -15,5 +15,9 @@
 #   把 spa.h 的 SPA_BLKPTRSHIFT 从 7 改成 9 ⇒ 该条未命中、rc=1。
 set -uo pipefail
 S=research/scripts/verify-citations.sh
-[[ -f "$S" ]] || { echo "  ✗ 找不到 $S"; exit 1; }
+[[ -f "$S" ]] || {
+  echo "  ✗ 找不到 $S"
+  echo "     → 怎么办：这一阶段靠它逐条复核引文。文件被挪走就改这里的路径，"
+  echo "               还没写就先写它——缺了它，引文一条都没被验过。"
+  exit 1; }
 bash "$S"

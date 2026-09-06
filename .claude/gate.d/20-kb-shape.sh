@@ -253,5 +253,5 @@ echo "── 7. 决策索引行的状态 vs 正文标题的状态 ──"
 if python3 "$(dirname "$0")/lib-index-vs-body.py" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
 
 echo
-if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过"; else echo "  ✗ kb 形状检查未通过"; fi
+if [[ $fail -eq 0 ]]; then echo "  ✓ kb 形状检查通过"; else echo "  ✗ kb 形状检查未通过"; fi   # gate-lint:summary
 exit $fail

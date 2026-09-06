@@ -90,6 +90,10 @@ E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-05.out|exact
 E106|e106-stripe-member-table||e106-stripe-member-table-2026-09-06.out|exact
 E108|e108-plaintext-layer-cost||e108-plaintext-layer-cost-2026-09-06.out|exact
+E107|e107-stripe-table-wa||e107-stripe-table-wa-2026-09-06.out|timing
+E109|e109-position-authority||e109-position-authority-2026-09-06.out|exact
+E110|e110-stripe-table-steady||e110-stripe-table-steady-2026-09-06.out|exact
+E111|e111-stripe-table-key||e111-stripe-table-key-2026-09-06.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact
@@ -125,7 +129,7 @@ TSV
 # 计时字段：换机器、换负载就会变，比对时抹掉。抹掉的是**值**不是**字段名**——
 # 字段整个消失属于结构变化，仍然会被抓。
 strip_timing() {
-  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
+  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
 }
 
 # ── 结论区间断言 ──────────────────────────────────────────────────────────
@@ -209,6 +213,26 @@ check_claims() {
     # 阳性对照：内核记的字节 ÷ ops×G，读到洞或读到缓存都会让它塌
     x=$(grep 'name=rand_g32768 ' "$f" | sed -n 's/.*pr_over_devbytes=\([0-9.]*\).*/\1/p')
     claim E58 "阳性对照：内核记的字节 ÷ (ops×G)" "$x" 0.98 1.02 || bad=1 ;;
+  E107)
+    # kb 的承重结论有两条，一条是字节、一条是延迟，两条都要钉。
+    # 字节那条是纯算术、逐次相同，但仍然钉住——只钉延迟会让一个把字节模型改错的变异照样绿。
+    v=$(grep 'name=bytes leaves=8 f=0 ' "$f" | sed -n 's/.*ratio_a_over_c=\([0-9.]*\).*/\1/p')
+    claim E107 "主负载 8 叶 f=0：甲臂 ÷ 丙臂" "$v" 0.9503 0.9503 || bad=1
+    v=$(grep 'name=crossover' "$f" | sed -n 's/.*first_leaves_where_arm_a_cheaper=\([0-9-]*\).*/\1/p')
+    claim E107 "甲臂第一次比丙臂便宜的叶数" "$v" 8 8 || bad=1
+    # 延迟那条：durable 语义下三段写序比一次提交慢多少倍
+    a=$(grep 'name=latency semantics=durable' "$f" | sed -n 's/.*one_shot_ns=\([0-9]*\).*/\1/p')
+    b=$(grep 'name=latency semantics=durable' "$f" | sed -n 's/.*two_phase_ns=\([0-9]*\).*/\1/p')
+    x=$(awk -v a="$a" -v b="$b" 'BEGIN{if(a>0) printf "%.4f", b/a}')
+    claim E107 "durable：三段写序 ÷ 一次提交" "$x" 1.15 2.10 || bad=1
+    # 阳性对照：注入的 5 ms 必须被量回来，落在 ±10% 内
+    x=$(grep 'name=latency semantics=durable' "$f" | sed -n 's/.*injected_recovered_ns=\([0-9-]*\).*/\1/p')
+    claim E107 "阳性对照：注入 5 ms 回收到的纳秒" "$x" 4500000 5500000 || bad=1
+    # 作废条款 3：不 O_DIRECT 不 fdatasync 那条必须快一个数量级，否则 I/O 没真落盘
+    a=$(grep 'name=latency semantics=durable' "$f" | sed -n 's/.*one_shot_ns=\([0-9]*\).*/\1/p')
+    b=$(grep 'name=nosync_control' "$f" | sed -n 's/.*per_round_ns=\([0-9]*\).*/\1/p')
+    x=$(awk -v a="$a" -v b="$b" 'BEGIN{if(b>0) printf "%.2f", a/b}')
+    claim E107 "作废条款 3：durable ÷ nosync" "$x" 10 500 || bad=1 ;;
   E21)
     # kb 的承重结论：CPU 扫描撞内存带宽墙（约 65 GB/s），16 线程几乎不加速 ⇒ GPU 传输地板已经更慢。
     v=$(grep 'name=scaling arm=bandwidth' "$f" | sed -n 's/.*peak_gbps=\([0-9.]*\).*/\1/p')

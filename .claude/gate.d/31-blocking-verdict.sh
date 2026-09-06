@@ -75,6 +75,8 @@ r = subprocess.run(['python3', gen], capture_output=True, text=True)
 if r.returncode != 0:
     print("  ✗ 生成器跑不起来，拿不到未定项清单")
     print('\n'.join('   ' + l for l in r.stderr.splitlines()))
+    print("     → 怎么办：按上面这段报错修生成器或它读的那几份 kb。")
+    print("               它跑不起来时本阶段一条未定项都没查过，不是通过。")
     sys.exit(1)
 want = set()
 cur = None

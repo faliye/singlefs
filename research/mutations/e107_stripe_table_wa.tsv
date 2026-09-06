@@ -1,0 +1,14 @@
+M1_条带数按宽度算不按数据列	let data_cols = w - 1;	let data_cols = w;
+M2_parity格不计入成员记录	let records = p.leaves + s_data + p.spine + s_meta;	let records = p.leaves + p.spine;
+M3_条带表不镜像	table_component * 2	table_component
+M4_容器容量按整单元算	(DATA_UNIT - PACKED_HDR) / STRIPE_REC	DATA_UNIT / STRIPE_REC
+M5_丙臂只翻倍数据不翻倍索引	(p.leaves * DATA_UNIT + p.spine * NODE) * 2	p.leaves * DATA_UNIT * 2 + p.spine * NODE
+M6_w的上界失效	let w = (cells + 1).clamp(W_MIN, W_MAX);	let w = (cells + 1).max(W_MIN);
+M7_容器索引层不计字节	+ u64::from(cidx_layers) * NODE	+ 0 * NODE
+M8_容器溢出不开新容器	let containers_touched = (f + records).div_ceil(per).max(1);	let containers_touched = 1u64;
+M9_元数据桶不算parity	let parity = s_data * DATA_UNIT + s_meta * NODE;	let parity = s_data * DATA_UNIT;
+M10_基线漏掉根槽	self.leaves * DATA_UNIT + self.spine * NODE + JOURNAL_REC + ROOT_SLOT	self.leaves * DATA_UNIT + self.spine * NODE + JOURNAL_REC
+M11_容器索引扇出按整节点	(NODE - CIDX_HDR) / CIDX_ENTRY	NODE / CIDX_ENTRY
+M12_空发布也带脊柱	spine: if leaves == 0 { 0 } else { SPINE_NODES },	spine: SPINE_NODES,
+M13_成员记录宽度改小	const STRIPE_REC: u64 = 56;	const STRIPE_REC: u64 = 48;
+M14_按设备数夹的那一步去掉	w.min(devices).max(W_MIN)	w.max(W_MIN)

@@ -1,0 +1,19 @@
+# install.sh 别再拿这几份跟上游模板比：项目已经接管了它们。
+# 一行一条：<相对路径>  # 为什么
+#
+# ⚠️ 接管的代价：此后上游对这几份的改动**都不会再送到**。
+#    要跟上游同步某一份，先把这一行删掉，重跑 install.sh 看差异，合并完再加回来。
+#    判据见 .claude/singlefs-ai-sop/README.md 的「install.sh 会铺下面这些东西」一节。
+
+CLAUDE.md  # 项目自己的开工说明：本地规则清单、里程碑、分工，模板只给了骨架
+.claude/kb/INDEX.md  # kb 索引由项目自己维护，模板只是起手的一张空表
+.claude/kb/checks-owed.md  # 欠的检查是项目自己的账，一条条都是这边记的
+.claude/kb/decisions.md  # 决策正文与索引归项目，模板只给了格式
+.claude/kb/experiments.md  # 同上，实验记录是项目自己的
+.claude/kb/invariants.md  # 不变量清单是这个文件系统特有的，模板给不了内容
+.claude/kb/pitfalls.md  # 踩过的坑是项目自己的
+.claude/kb/prior-art.md  # 别家实现的调研是项目自己做的
+litmus/commit-publish-nofence.litmus  # 按项目实际的同步模式改写过，不再是模板那一对
+.claude/skills/crash-test/SKILL.md  # 桩的 description 按项目实际能力改过
+.claude/skills/decide/SKILL.md  # 同上
+.claude/skills/gate/SKILL.md  # 同上

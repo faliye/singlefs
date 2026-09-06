@@ -1,0 +1,15 @@
+You are reviewing a design for an encrypted copy-on-write filesystem. Your stance is: find a concrete counterexample. Do not summarize, do not praise. Do not use any markdown emphasis such as bold or italics. Answer in English. Answer all three items, number them 1, 2, 3. Keep each item under 250 words.
+
+Setting, all settled and not open for debate. The whole volume is encrypted and mounting requires the key. Before the volume is locked, the key side signs a lease area: a set of physical slots that a later keyless mount is allowed to write into. The keyless mount may move units into the lease area but may never free anything, and it may never write outside the lease area. Accounting is authoritative and encrypted, so the keyless mount cannot update it. The admission rule for space is: available equals, summed over devices, capacity minus allocated minus unreclaimable minus deferred, then minus pending deletion and minus already promised reservation. A stripe of width three or more whose member has been deleted is pinned: that cell and its whole stripe including parity may not be reused until repaired, and nothing on disk records that pinned state; the ordinary allocation admission test never asks about stripes. There is no written rule anywhere saying how the lease area picks its slots.
+
+The design under review. The lease area is signed once, at lock time, with a message authentication code computed by the key side. The keyless mount appends a record per move to a ring, and at unlock the key side replays the ring and accepts or rejects each batch. The claim being defended is that this arrangement can only waste work, never lose data.
+
+Your task:
+
+1. The lock period can contain many separate keyless mounts, because each crash or power cut ends one and the next boot starts another. The lease area signature was computed once, before any of them existed, so it cannot cover anything they produce. Construct a history with two keyless mounts where the second one cannot tell what the first one did, and say what the key side sees at unlock and which batch boundary it uses.
+
+2. Say what the lease area costs the user while the volume is locked. It is a set of slots reserved for a party that may never free anything. Work out which term of the admission rule it belongs to, what the user sees in a free space report before locking, and what has to happen to the leftover slots at unlock. Then construct a crash that happens after unlock begins but before the leftover is returned.
+
+3. The keyless side is given, for every slot, whether it is live and a checksum of the ciphertext stored there, plus which slots share a stripe. Nothing else. Say what an observer with only that information can deduce about the contents of the volume across two successive lock periods. Give one concrete inference chain, stating each step and what it needs.
+
+For each item give the history as numbered steps, say which rule it breaks, and give the smallest change that would close it. If you cannot construct one, say so and say exactly which step blocked you.

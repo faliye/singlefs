@@ -29,7 +29,7 @@ done
 
 if ((${#missing[@]} + ${#malformed[@]})); then
   if ((${#missing[@]})); then
-    echo "  ✗ 这些实验二进制没有同名变异表："
+    echo "  ✗ 这些实验二进制没有同名变异表："   # gate-lint:detail
     printf '      %s\n' "${missing[@]}"
   fi
   if ((${#malformed[@]})); then

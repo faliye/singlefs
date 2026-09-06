@@ -54,8 +54,11 @@ use e7_index_bench::Emitter;
 const HEAD_BASE: u64 = 4 + 16 + 4 + 8 + 8 + 4 + 32;
 /// E78 出路 B 要的 jsn 水位（D23 已定项 9 的宽度）。
 const WATERMARK: u64 = 10;
-/// 每棵树一条：tree_id 8 + 指针头部 31 + 位置条目 11 × 2 副本。
-const TREE_ENTRY: u64 = 8 + 31 + 11 * 2;
+/// 位置条目宽（D19 已定项 4，2026-09-03 用户定案）。与 e109 同名，受门禁阶段 27 的
+/// `format-const: LOC_ENTRY` 绑住——此前这里写死 11，D19 定案后漂了三天没人发现。
+const LOC_ENTRY: u64 = 14;
+/// 每棵树一条：tree_id 8 + 指针头部 31 + 位置条目 × 2 副本。
+const TREE_ENTRY: u64 = 8 + 31 + LOC_ENTRY * 2;
 /// 树表单元取 16 KiB 元数据单元（D8 已定项 2 的节点大小）。单元头按 D18 已定项 7 的**索引节点类**：
 /// E73 的三档下界 58 / 67 / 76 加 C113 定案（2026-09-05）的 10 字节写序 ⇒ 68 / 77 / 86。
 /// 树表单元不带 key 区间 ⇒ 取最窄那档 68；三档给出同一个容量，由单测钉住。
@@ -126,51 +129,73 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// **绝对值锚点**：固定头 76 / 含水位 86；树条目 61。手算：4+16+4+8+8+4+32=76；8+31+22=61。
+    /// **绝对值锚点**：固定头 76 / 含水位 86；树条目 67。手算：4+16+4+8+8+4+32=76；8+31+28=67。
     #[test]
     fn absolute_field_arithmetic() {
         assert_eq!(HEAD_BASE, 76);
         assert_eq!(HEAD_BASE + WATERMARK, 86);
-        assert_eq!(TREE_ENTRY, 61);
+        assert_eq!(TREE_ENTRY, 67);
+        // 位置条目取 D19 已定项 4 的 14 而不是 11：11 那个值在 2026-09-03 就被顶掉了，
+        // 而这里停在旧值到 2026-09-06 才被发现。写成加法而不是减法，让变异活到运行期。
+        assert_eq!(TREE_ENTRY, 8 + 31 + LOC_ENTRY * 2);
+        assert_eq!(LOC_ENTRY, 14);
     }
 
-    /// **绝对值锚点**：512 槽、带水位 ⇒ (512−86)/61 = 6 棵；不带水位 ⇒ 7 棵。
-    /// 4096 槽、带水位 ⇒ (4096−86)/61 = 65 棵。
+    /// **绝对值锚点**：512 槽、带水位 ⇒ (512−86)/67 = 6 棵；不带水位 ⇒ (512−76)/67 = 6 棵。
+    /// 4096 槽、带水位 ⇒ (4096−86)/67 = 59 棵；不带水位 ⇒ 4020/67 = 60 棵（整除）。
     #[test]
     fn absolute_flat_capacity() {
         assert_eq!(flat_capacity(512, true), 6);
-        assert_eq!(flat_capacity(512, false), 7);
-        assert_eq!(flat_capacity(4096, true), 65);
-        assert_eq!(flat_capacity(4096, false), 65);
+        assert_eq!(flat_capacity(512, false), 6);
+        assert_eq!(flat_capacity(4096, true), 59);
+        assert_eq!(flat_capacity(4096, false), 60);
+        // 整除那一格单独钉住：67 × 60 = 4020 = 4096 − 76，边界上不许差一。
+        assert_eq!(67 * flat_capacity(4096, false), 4096 - HEAD_BASE);
     }
 
     /// v1 最小树集（记账、分配记录、数据 extent = 3 棵）在 512 槽上装得下；
-    /// 常识树集 7 棵在带水位的 512 槽上**装不下**——这是判决性的那一格。
+    /// 常识树集 7 棵在 512 槽上**装不下**，而且**去掉水位也装不下**——
+    /// 位置条目取 14 之后，压垮平铺形态的是条目宽，不是水位。
     #[test]
     fn v1_min_fits_common_does_not() {
         assert!(flat_capacity(512, true) >= 3);
         assert!(flat_capacity(512, true) < 7, "带水位的 512 槽装不下 7 棵");
-        assert!(flat_capacity(512, false) >= 7, "不带水位恰好装下 7 棵——水位挤掉了第 7 棵");
+        assert!(flat_capacity(512, false) < 7, "去掉水位仍装不下 7 棵——不是水位挤掉的");
+        assert_eq!(flat_capacity(512, false), flat_capacity(512, true),
+                   "512 槽上水位一棵树都没挤掉");
     }
 
-    /// 树表单元（16 KiB）装得下 266 棵：(16384−68−32)/61 = 266。
-    /// **三档节点头逐格同值**：77 与 86 也是 266 ⇒ 这个容量不由头宽的档位定。
+    /// 树表单元（16 KiB）装得下 243 棵：(16384−68−32)/67 = 16284/67 = 243。
+    /// **三档节点头不再逐格同值**：68 → 243，77 与 86 → 242 ⇒ 条目宽 61 时那句
+    /// 「容量不由头宽的档位定」在 67 上不成立，差一棵。
     #[test]
     fn absolute_table_unit_capacity() {
-        assert_eq!(table_unit_capacity(), 266);
-        for h in NODE_HDR_TIERS {
-            assert_eq!((NODE_BYTES - h - 32) / TREE_ENTRY, 266, "节点头 {h} 那一档");
-        }
+        assert_eq!(table_unit_capacity(), 243);
+        // ⚠️ **条目变宽之后容量对头宽不再敏感**：67 字节条目下 UNIT_HDR 取 68 或 55
+        // 都得 243（16284/67 与 16297/67 同为 243），M6 那条变异因此变成盲区。
+        // ⇒ 把头宽本身与它算出的净空间各钉一格，别只钉最终容量。
+        assert_eq!(UNIT_HDR, 68);
+        assert_eq!(UNIT_HDR, NODE_HDR_TIERS[0], "UNIT_HDR 必须就是最窄那一档");
+        assert_eq!(NODE_BYTES - UNIT_HDR - 32, 16284);
+        assert_eq!(NODE_BYTES - NODE_HDR_TIERS[0] - 32, 16284);
+        let per_tier: Vec<u64> = NODE_HDR_TIERS
+            .iter()
+            .map(|h| (NODE_BYTES - h - 32) / TREE_ENTRY)
+            .collect();
+        assert_eq!(per_tier, vec![243, 242, 242]);
+        // 边界各钉一格：243 装得下、244 装不下（最宽那一档）。
+        assert!(67 * 243 <= 16284);
+        assert!(67 * 244 > 16284);
     }
 
     /// 每头一棵树（D6）：8 个可写头 + 7 棵基础树 = 15 棵，两种 512 形态都装不下，
-    /// 4096 槽装得下。头数过 58 连 4096 槽也翻——开放树表迟早逼出间接层。
+    /// 4096 槽装得下。头数过 52 连 4096 槽也翻——开放树表迟早逼出间接层。
     #[test]
     fn heads_push_past_flat() {
         assert!(15 > flat_capacity(512, true));
         assert!(15 <= flat_capacity(4096, true));
-        assert!(58 + 7 <= flat_capacity(4096, true), "65 棵是 4096 槽的上限");
-        assert!(58 + 8 > flat_capacity(4096, true));
+        assert!(52 + 7 <= flat_capacity(4096, true), "59 棵是 4096 槽带水位的上限");
+        assert!(52 + 8 > flat_capacity(4096, true));
     }
 
     /// 间接层的每发布代价：+1 个 16 KiB 单元 = 目标负载 14 块上的 +7.1%。

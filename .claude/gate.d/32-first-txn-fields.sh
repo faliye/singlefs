@@ -37,7 +37,7 @@ while IFS=$'\t' read -r lineno dnum kind item; do
   # 找到那条决策的正文文件：文件名以两位编号打头
   file="$(ls "$KB/decisions/" 2>/dev/null | grep -E "^0*${dnum}-" | head -1)"
   if [[ -z "$file" ]]; then
-    echo "  ✗ $TABLE:$lineno 指向 D$dnum，而 decisions/ 里没有这条决策"
+    echo "  ✗ $TABLE:$lineno 指向 D$dnum，而 decisions/ 里没有这条决策"   # gate-lint:detail
     bad=$((bad + 1))
     continue
   fi
@@ -54,7 +54,7 @@ while IFS=$'\t' read -r lineno dnum kind item; do
   # 分项行有两种写法：表格行 `| k | …`（D18 / D22 一类），
   # 或编号列表 `k. **…**`（D16 / D19 / D23 一类）。两种都认。
   if ! grep -qE "^(\| *${item} *\||${item}\. )" <<<"$section"; then
-    echo "  ✗ $TABLE:$lineno 指向 D$dnum（$file）的「$kind $item」，而那张表里没有这一条"
+    echo "  ✗ $TABLE:$lineno 指向 D$dnum（$file）的「$kind $item」，而那张表里没有这一条"   # gate-lint:detail
     bad=$((bad + 1))
   fi
 done < <(

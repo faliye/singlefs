@@ -21,7 +21,7 @@ extra="$(comm -13 <(printf '%s\n' "$on_disk") <(printf '%s\n' "$referenced"))"
 
 rc=0
 if [[ -n "$missing" ]]; then
-  echo "  ✗ 这些规则文件存在，但 $MD 没有 @ 引用它们——不会被读进上下文，等于没写："
+  echo "  ✗ 这些规则文件存在，但 $MD 没有 @ 引用它们——不会被读进上下文，等于没写："   # gate-lint:detail
   printf '%s\n' "$missing" | sed 's|^|     .claude/rules/|'
   rc=1
 fi

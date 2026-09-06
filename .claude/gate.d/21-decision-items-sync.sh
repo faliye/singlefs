@@ -22,7 +22,12 @@ grep -qF "$S" "$IDX" || { echo "  ✗ $IDX 里没有生成块标记 $S"; echo " 
 
 gen_err="$(mktemp)"
 # 生成器自己会说清哪一节取不到编号项、下一步怎么办 —— 吞掉 stderr 等于把那条 howto 扔了
-want="$(python3 "$GEN" 2>"$gen_err")" || { echo "  ✗ 生成器跑不起来"; sed 's/^/   /' "$gen_err"; rm -f "$gen_err"; exit 1; }
+want="$(python3 "$GEN" 2>"$gen_err")" || {
+  echo "  ✗ 生成器跑不起来"
+  sed 's/^/   /' "$gen_err"
+  echo "     → 怎么办：按上面这段报错改 $GEN 或它读的那几份 kb；"
+  echo "               生成器跑不起来时这一阶段什么都没查，不是通过。"
+  rm -f "$gen_err"; exit 1; }
 rm -f "$gen_err"
 got="$(awk -v s="$S" -v e="$E" 'index($0,s){f=1;next} index($0,e){f=0} f' "$IDX")"
 
