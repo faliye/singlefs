@@ -89,6 +89,7 @@ E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-05.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-05.out|exact
 E106|e106-stripe-member-table||e106-stripe-member-table-2026-09-06.out|exact
+E108|e108-plaintext-layer-cost||e108-plaintext-layer-cost-2026-09-06.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact

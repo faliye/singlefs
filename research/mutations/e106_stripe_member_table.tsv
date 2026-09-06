@@ -1,0 +1,11 @@
+M1_不可解判定只看第一轮	        if !changed { break; }	        if true { break; }
+M2_阳性对照臂也走求解	    if arm == Arm::Z { return (lost.len() as u64, 0, 0); }	    if arm == Arm::Z { return (0, 0, 0); }
+M3_容器不动点忽略自己	        let units = n_ord + c;	        let units = n_ord;
+M4_记录容量按整单元算	    (UNIT_BYTES - PACKED_HDR) / STRIPE_REC	    UNIT_BYTES / STRIPE_REC
+M5_镜像臂也发parity格	        let mirror = arm == Arm::A2 && kind == Kind::Container;	        let mirror = false;
+M6_成员表只看自己那一条	            for &m in &l.stripes[sid] {	            for &m in &l.stripes[sid][..1] {
+M7_代价漏掉parity落点	        let locs = units + n_stripes(units, widths);	        let locs = units;
+M8_镜像副本当成两个容器	        if arm == Arm::A2 {	        if false {
+M9_自指那格换一块没坏的盘	    let dev = l.grids[l.containers[0][0]].dev;	    let dev = 99;
+M10_占用当成数据格数	            if mid + n_stripes(mid, widths) <= occ { lo = mid; } else { hi = mid - 1; }	            if mid <= occ { lo = mid; } else { hi = mid - 1; }
+M11_闭式条带数少算一轮	    let cycles = units / per_cycle;	    let cycles = units / per_cycle + 1;

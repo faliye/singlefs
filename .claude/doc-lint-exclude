@@ -1,0 +1,4 @@
+# doc-lint 扫描要绕开的目录。一行一条：<相对目录>  # 为什么
+# 判据见 .claude/singlefs-ai-sop/rules/evidence-discipline.md 的「原样保存的证据不许事后改」。
+# 与 .claude/gate.d/26-number-name-sync.sh 排除 prompts/ 是同一条理由，别处不再抄第三份。
+research/prompts/  # 当时原样发给模型的提示，与 research/results/ 的产物一一对应；改提示只能连同重跑一起改

@@ -264,3 +264,11 @@ path = "src/bin/e104_current_version.rs"
 [[bin]]
 name = "e105-extent-leaf-packed"
 path = "src/bin/e105_extent_leaf_packed.rs"
+
+[[bin]]
+name = "e106-stripe-member-table"
+path = "src/bin/e106_stripe_member_table.rs"
+
+[[bin]]
+name = "e108-plaintext-layer-cost"
+path = "src/bin/e108_plaintext_layer_cost.rs"

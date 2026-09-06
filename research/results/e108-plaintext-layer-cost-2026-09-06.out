@@ -1,0 +1,9 @@
+E7RESULT name=config note=明文层代价交叉点 cap=17592186044416 slot=16384 unit=32768 fill=0.9 map_entry=47 csum_per_slot=4 member_key=10 t_time_s=5 leaves=8
+E7RESULT name=cost cap=1099511627776 w=2 live_bitmap=8388608 csum_table=241591908 member_snapshot=603979770 signed_total=853960286 lock_cycle_bytes=3415841144 map_resident=2838704872 map_resident_ppm=2581.8 map_per_publish=163840 crossover_publishes=20848 crossover_days=1
+E7RESULT name=cost cap=1099511627776 w=4 live_bitmap=8388608 csum_table=241591908 member_snapshot=1811939310 signed_total=2061919826 lock_cycle_bytes=16495358608 map_resident=5677409744 map_resident_ppm=5163.6 map_per_publish=327680 crossover_publishes=50339 crossover_days=2
+E7RESULT name=cost cap=17592186044416 w=2 live_bitmap=134217728 csum_table=3865470564 member_snapshot=9663676410 signed_total=13663364702 lock_cycle_bytes=54653458808 map_resident=45419279080 map_resident_ppm=2581.8 map_per_publish=163840 crossover_publishes=333578 crossover_days=19
+E7RESULT name=cost cap=17592186044416 w=4 live_bitmap=134217728 csum_table=3865470564 member_snapshot=28991029230 signed_total=32990717522 lock_cycle_bytes=263925740176 map_resident=90838558160 map_resident_ppm=5163.6 map_per_publish=327680 crossover_publishes=805437 crossover_days=46
+E7RESULT name=cost cap=281474976710656 w=2 live_bitmap=2147483648 csum_table=61847529060 member_snapshot=154618822650 signed_total=218613835358 lock_cycle_bytes=874455341432 map_resident=726708466408 map_resident_ppm=2581.8 map_per_publish=196608 crossover_publishes=4447709 crossover_days=257
+E7RESULT name=cost cap=281474976710656 w=4 live_bitmap=2147483648 csum_table=61847529060 member_snapshot=463856467950 signed_total=527851480658 lock_cycle_bytes=4222811845264 map_resident=1453416932816 map_resident_ppm=5163.6 map_per_publish=393216 crossover_publishes=10739165 crossover_days=621
+E7RESULT name=positive_control zero_tables_crossover=0
+E7RESULT name=done emitted=9

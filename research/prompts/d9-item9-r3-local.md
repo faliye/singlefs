@@ -1,0 +1,15 @@
+You are reviewing a design for an encrypted copy-on-write filesystem. Your stance is: find a concrete counterexample. Do not summarize, do not praise. Do not use any markdown emphasis such as bold or italics. Answer in English. Answer all three items, number them 1, 2, 3. Keep each item under 250 words.
+
+Setting, all settled. The whole volume is encrypted; mounting requires the key. A mount without the key must still be able to move blocks, because continuous background defragmentation is a hard promise, and it may only allocate inside a lease area signed by the key side before locking. It may move blocks but may not free them. Data unit identities are plaintext in the unit header; metadata unit identities are ciphertext. A pointer holds one location entry per replica, and every location entry carries a keyless corruption checksum. The width floor is two replicas.
+
+The design under attack. Nothing in plaintext maps a logical identity to a location. Instead, at the moment the volume is locked, the key side signs and publishes three read only tables, all keyed by physical slot: a live slot table saying which slots hold live data, a table from physical slot to the ciphertext checksum of what lives there, and a snapshot of stripe membership saying which slots belong to one stripe. The keyless mount reads those three tables, moves blocks inside the lease area, and appends one thirty two byte record per move to a log ring: source slot, destination slot, the first eight bytes of the moved unit's header checksum, a sequence number, and an instance id. At unlock the key side replays the ring in order, verifying each record against the authoritative tree, and only then rewrites the authoritative pointer and retires the source.
+
+Your task:
+
+1. Attack the freshness of the three signed tables. They are signed once, when the volume is locked, and the lock period can last weeks. Construct a history in which the keyless mount, acting on a table that was correct at signing time, does something harmful. Note that it may not free anything, so consider what else can change during a lock period.
+
+2. Attack the size of the live slot table. A sixteen tebibyte pool with sixteen kibibyte slots has about one billion slots. Say what the table costs at one bit per slot and at one record per slot, and say what that does to the act of locking, given the table must be covered by a signature computed at lock time. Give the arithmetic.
+
+3. Attack the claim that keying everything by physical slot treats all unit kinds alike. Consider that a packed record container's physical pointer is held by exactly one structure, a container index, and that this index is itself encrypted metadata. Construct a history in which moving such a container leaves the volume inconsistent until unlock, and say whether anything can read it in the meantime.
+
+For each item give the history as numbered steps, the rule text it breaks, and the smallest change that would close it. If you cannot construct one, say so and say which step blocked you.
