@@ -1,3 +1,4 @@
 exit=1
 want=简称与登记位不符
 want=D103
+want=D106

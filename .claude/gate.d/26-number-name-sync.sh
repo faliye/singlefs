@@ -37,7 +37,10 @@ targets = [f for f in targets if '/prompts/' not in f]
 bad = []
 for f in sorted(set(targets)):
     for i, line in enumerate(open(f, encoding='utf-8', errors='ignore'), 1):
-        for num, nm in re.findall(r'([ED]\d+)（([^）]*)）', line):
+        # 简称本身可以含一层全角括号（D14 的「双轨（大小文件 / 持久临时）」）。
+        # naive 的 [^）]* 吃到第一个「）」就停，于是**没有任何写法能让这类引用通过**——
+        # 实测 2026-09-06：records/ 里写对的 D14 引用被判红，只能退回裸编号绕开。
+        for num, nm in re.findall(r'([ED]\d+)（((?:[^（）]|（[^（）]*）)*)）', line):
             if num in truth and truth[num] != nm:
                 bad.append((f, i, num, nm, truth[num]))
 
