@@ -56,9 +56,12 @@ const HEAD_BASE: u64 = 4 + 16 + 4 + 8 + 8 + 4 + 32;
 const WATERMARK: u64 = 10;
 /// 每棵树一条：tree_id 8 + 指针头部 31 + 位置条目 11 × 2 副本。
 const TREE_ENTRY: u64 = 8 + 31 + 11 * 2;
-/// 树表单元取 16 KiB 元数据单元（D8 已定项 2 的节点大小），单元头 55（D21 提议值）。
+/// 树表单元取 16 KiB 元数据单元（D8 已定项 2 的节点大小）。单元头按 D18 已定项 7 的**索引节点类**：
+/// E73 的三档下界 58 / 67 / 76 加 C113 定案（2026-09-05）的 10 字节写序 ⇒ 68 / 77 / 86。
+/// 树表单元不带 key 区间 ⇒ 取最窄那档 68；三档给出同一个容量，由单测钉住。
 const NODE_BYTES: u64 = 16384;
-const UNIT_HDR: u64 = 55;
+const UNIT_HDR: u64 = 68;
+const NODE_HDR_TIERS: [u64; 3] = [68, 77, 86];
 /// D25 目标负载一次 fsync 的块数（8 叶 + 4 祖先 + 1 根槽 + 1 记录）。
 const FSYNC_BLOCKS: u64 = 14;
 
@@ -150,10 +153,14 @@ mod tests {
         assert!(flat_capacity(512, false) >= 7, "不带水位恰好装下 7 棵——水位挤掉了第 7 棵");
     }
 
-    /// 树表单元（16 KiB）装得下 267 棵：(16384−55−32)/61 = 267。
+    /// 树表单元（16 KiB）装得下 266 棵：(16384−68−32)/61 = 266。
+    /// **三档节点头逐格同值**：77 与 86 也是 266 ⇒ 这个容量不由头宽的档位定。
     #[test]
     fn absolute_table_unit_capacity() {
-        assert_eq!(table_unit_capacity(), 267);
+        assert_eq!(table_unit_capacity(), 266);
+        for h in NODE_HDR_TIERS {
+            assert_eq!((NODE_BYTES - h - 32) / TREE_ENTRY, 266, "节点头 {h} 那一档");
+        }
     }
 
     /// 每头一棵树（D6）：8 个可写头 + 7 棵基础树 = 15 棵，两种 512 形态都装不下，

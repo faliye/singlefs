@@ -3,3 +3,4 @@ M2_固定头漏掉自证校验和	const HEAD_BASE: u64 = 4 + 16 + 4 + 8 + 8 + 4 
 M3_水位字段被记成0	const WATERMARK: u64 = 10;	const WATERMARK: u64 = 0;
 M4_容量除法变成向上取整	slot.saturating_sub(head) / TREE_ENTRY	slot.saturating_sub(head).div_ceil(TREE_ENTRY)
 M5_树表单元忘了扣单元头	(NODE_BYTES - UNIT_HDR - 32) / TREE_ENTRY	(NODE_BYTES - 32) / TREE_ENTRY
+M6_单元头停在旧值	const UNIT_HDR: u64 = 68;	const UNIT_HDR: u64 = 55;

@@ -24,7 +24,8 @@ const UNIT_BYTES: u64 = 32768;
 /// D18 已定项 7 三档 58 / 67 / 76 加 C113 的写序 10。
 const NODE_HEADERS: [u64; 3] = [68, 77, 86];
 /// 码 3 头 93（D18 已定项 11 登记的现行值）+ 写序 10。不用登记名，免得格式常量门禁把它当成现行值的漂移。
-const PACKED_HDR_WITH_WSEQ: u64 = 103;
+/// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`；C113 定案 2026-09-05 加写序 10）。
+const UNIT_HDR_PACKED: u64 = 103;
 const CHILD_PTR: u64 = 59;
 const EXTENT_KEY: u64 = 24;
 /// extent 记录 = key 24 + 位置指针 59。
@@ -105,7 +106,7 @@ fn read_b(g: &Geometry) -> (u64, u64) {
 
 /// 树高：甲 = 码 2 叶形态的层数，乙 = 码 3 叶形态的层数（容器算一层）。
 fn heights(n: u64, hdr: u64, rec: u64) -> (usize, usize) {
-    let g = geometry(n, hdr, rec, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+    let g = geometry(n, hdr, rec, UNIT_BYTES, UNIT_HDR_PACKED);
     (g.a_levels.len(), g.b_internal.len() + 1)
 }
 
@@ -115,7 +116,7 @@ fn heights(n: u64, hdr: u64, rec: u64) -> (usize, usize) {
 fn equal_cost_segments(hdr: u64, rec: u64, n_max: u64) -> Vec<(u64, u64)> {
     let a_f = fanout(NODE_BYTES, hdr, rec);
     let inner = fanout(NODE_BYTES, hdr, EXTENT_KEY + CHILD_PTR);
-    let b_f = fanout(UNIT_BYTES, PACKED_HDR_WITH_WSEQ, rec);
+    let b_f = fanout(UNIT_BYTES, UNIT_HDR_PACKED, rec);
     let mut edges: Vec<u64> = vec![0];
     let (mut a_edge, mut b_edge) = (a_f, b_f);
     while a_edge < n_max || b_edge < n_max {
@@ -137,12 +138,12 @@ fn equal_cost_segments(hdr: u64, rec: u64, n_max: u64) -> Vec<(u64, u64)> {
 fn main() {
     let mut em = Emitter::new();
     println!("{}", em.emit_raw(&format!(
-        "name=config note=extent 叶改码 3 的更新代价 node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} unit_hdr={PACKED_HDR_WITH_WSEQ} \
+        "name=config note=extent 叶改码 3 的更新代价 node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} unit_hdr={UNIT_HDR_PACKED} \
          extent_rec={EXTENT_REC} extent_rec_narrow={EXTENT_REC_NARROW} child_ptr={CHILD_PTR} w={W} model=arithmetic file_ops=0")));
     for (rec_name, rec) in [("wide", EXTENT_REC), ("narrow", EXTENT_REC_NARROW)] {
         for &n in &NS {
             for &hdr in &NODE_HEADERS {
-                let g = geometry(n, hdr, rec, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+                let g = geometry(n, hdr, rec, UNIT_BYTES, UNIT_HDR_PACKED);
                 println!("{}", em.emit_raw(&format!(
                     "name=geom rec={rec_name} n={n} hdr={hdr} a_leaf_fanout={} a_height={} b_per_container={} b_containers={} b_height={}",
                     g.a_leaf_fanout, g.a_levels.len(), g.b_per_container, g.b_containers, g.b_internal.len() + 1)));
@@ -182,8 +183,8 @@ mod tests {
     fn fanouts_are_absolute() {
         assert_eq!(fanout(NODE_BYTES, 68, EXTENT_REC), 196);
         assert_eq!(fanout(NODE_BYTES, 86, EXTENT_REC), 196);
-        assert_eq!(fanout(UNIT_BYTES, PACKED_HDR_WITH_WSEQ, EXTENT_REC), 393);
-        assert_eq!(fanout(UNIT_BYTES, PACKED_HDR_WITH_WSEQ, EXTENT_REC_NARROW), 628);
+        assert_eq!(fanout(UNIT_BYTES, UNIT_HDR_PACKED, EXTENT_REC), 393);
+        assert_eq!(fanout(UNIT_BYTES, UNIT_HDR_PACKED, EXTENT_REC_NARROW), 628);
         assert_eq!(fanout(NODE_BYTES, 68, EXTENT_KEY + CHILD_PTR), 196);
     }
 
@@ -191,7 +192,7 @@ mod tests {
     /// 码 3 叶写 1 个 32 KiB 单元 × 2 + 2 层内部节点 × 16 KiB × 2 = 131072 ⇒ 1.333。
     #[test]
     fn single_update_is_pinned() {
-        let g = geometry(1_000_000, 68, EXTENT_REC, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+        let g = geometry(1_000_000, 68, EXTENT_REC, UNIT_BYTES, UNIT_HDR_PACKED);
         assert_eq!(g.a_levels.len(), 3);
         assert_eq!(g.b_internal.len(), 2);
         // 容器扇出与容器数要单独钉：单次更新的字节数不随容器数变，变异「扇出按节点算容器」曾一个测试都不红
@@ -216,7 +217,7 @@ mod tests {
     /// 判据 5 阴性对照 + 判据 2 饱和对照。
     #[test]
     fn zero_and_saturation() {
-        let g = geometry(1_000_000, 68, EXTENT_REC, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+        let g = geometry(1_000_000, 68, EXTENT_REC, UNIT_BYTES, UNIT_HDR_PACKED);
         assert_eq!(write_a(&g, 0), 0.0);
         assert_eq!(write_b(&g, 0, UNIT_BYTES), 0.0);
         let l = g.b_containers;
@@ -234,7 +235,7 @@ mod tests {
         assert_eq!(segs, vec![(38417, 77028), (7529537, 15097488)], "{segs:?}");
         for (lo, hi) in [(38417u64, 77028u64), (7529537, 15097488)] {
             for n in [lo, hi] {
-                let g = geometry(n, 68, EXTENT_REC, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+                let g = geometry(n, 68, EXTENT_REC, UNIT_BYTES, UNIT_HDR_PACKED);
                 let (ha, hb) = heights(n, 68, EXTENT_REC);
                 assert_eq!(hb + 1, ha, "n={n}");
                 assert_eq!(write_b(&g, 1, UNIT_BYTES), write_a(&g, 1), "n={n}");
@@ -245,7 +246,7 @@ mod tests {
             }
             // 区段两端之外恰好回到 1 + 1/h_A
             for n in [lo - 1, hi + 1] {
-                let g = geometry(n, 68, EXTENT_REC, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+                let g = geometry(n, 68, EXTENT_REC, UNIT_BYTES, UNIT_HDR_PACKED);
                 let (ha, hb) = heights(n, 68, EXTENT_REC);
                 assert_eq!(hb, ha, "n={n}");
                 assert!(write_b(&g, 1, UNIT_BYTES) > write_a(&g, 1), "n={n}");
@@ -263,7 +264,7 @@ mod tests {
     fn read_ratio_bounds() {
         for &n in &NS {
             for &hdr in &NODE_HEADERS {
-                let g = geometry(n, hdr, EXTENT_REC, UNIT_BYTES, PACKED_HDR_WITH_WSEQ);
+                let g = geometry(n, hdr, EXTENT_REC, UNIT_BYTES, UNIT_HDR_PACKED);
                 let (_, ab) = read_a(&g);
                 let (_, bb) = read_b(&g);
                 let r = bb as f64 / ab as f64;

@@ -1,0 +1,8 @@
+基线：全绿
+✅ [M1_树条目漏掉第二个位置条目] 红：absolute_field_arithmetic,absolute_table_unit_capacity,absolute_flat_capacity,heads_push_past_flat,v1_min_fits_common_does_not
+✅ [M2_固定头漏掉自证校验和] 红：absolute_field_arithmetic,absolute_flat_capacity,heads_push_past_flat,v1_min_fits_common_does_not
+✅ [M3_水位字段被记成0] 红：absolute_field_arithmetic,absolute_flat_capacity,v1_min_fits_common_does_not
+✅ [M4_容量除法变成向上取整] 红：absolute_flat_capacity,heads_push_past_flat,v1_min_fits_common_does_not
+✅ [M5_树表单元忘了扣单元头] 红：absolute_table_unit_capacity
+✅ [M6_单元头停在旧值] 红：absolute_table_unit_capacity
+已还原，基线仍全绿

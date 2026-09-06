@@ -56,14 +56,14 @@ E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
 E42|e42_txn_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
-E43|e43_ext_budget||e43-ext-budget-2026-09-02.out|exact
+E43|e43_ext_budget||e43-ext-budget-2026-09-06.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
 E76|e76-payload-csum||e76-payload-csum-2026-09-01.out|exact
 E77|e77-publish-order||e77-publish-order-2026-09-02.out|exact
 E78|e78-replay-start||e78-replay-start-2026-09-02.out|exact
-E79|e79-root-record||e79-root-record-2026-09-02.out|exact
+E79|e79-root-record||e79-root-record-2026-09-06.out|exact
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
@@ -88,6 +88,7 @@ E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-05.out|exact
 E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-05.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-05.out|exact
+E106|e106-stripe-member-table||e106-stripe-member-table-2026-09-06.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-01.out|exact
 E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact

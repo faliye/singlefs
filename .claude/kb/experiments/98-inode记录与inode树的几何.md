@@ -49,6 +49,10 @@
   原始输出 `research/results/e98-inode-record-2026-09-03.out`（74 行，收尾 `emitted=74`）。
 - 变异表 `research/mutations/e98_inode_record.tsv`，9 条逐条命中、0 条判等价；单测 12 个。
 - 已挂进 `research/scripts/replay.sh`（exact 档）。
+- ⚠️ **头宽停在旧值，欠一次复跑**（C89（单元头收口的遗留重算） ④ ⑤）：源码 `DATA_UNIT_HEADER = 91`，
+  现行 105（`format-const: UNIT_HDR_DATA`）；索引节点头按 58 / 67 / 76 算，现行 68 / 77 / 86。
+  两处按 E102（单元类登记表与打包记录单元） 的头宽区间算都不翻（打包 233 在 [9, 148] 内、索引叶 116 在 16 KiB 节点上同值），
+  **但引用这两个数之前要先复跑**——旧数只是参考。
 
 #### 判据 2：14 个字段里 **11 个**不能只从权威态重算
 

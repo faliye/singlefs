@@ -7,7 +7,7 @@
 | 条款 | 用到的那一句 |
 |---|---|
 | D8（核心索引结构） 已定项 2 / 3 | 节点 16 KiB；extent 记录 = key 24（locality 8 + inode 8 + offset 8）+ 位置指针 59 = 83 |
-| D18（块里携带什么信息） 已定项 7 / 11 | 索引节点头三档 58 / 67 / 76；打包记录单元头 93 |
+| D18（块里携带什么信息） 已定项 7 / 11 | 索引节点头三档 58 / 67 / 76、打包记录单元头 93（都是 C113（扫描重建时多版单元的现行版本判定无输入） 定案之前的值，加写序 10 之后见下一行）|
 | D23（journal 的角色与格式） 已定项 1 甲 | 更新代价 = 脏叶 + 全部祖先各重写一遍（与 E103（inode 打包路 ① 的更新代价） 同一套算法） |
 | C113（扫描重建时多版单元的现行版本判定无输入） 定案第五版 P1 | 类身份段加 10 字节写序 ⇒ 节点头 68 / 77 / 86、容器头 103 |
 | D4（校验和位置） | 单元 32 KiB |
@@ -53,9 +53,17 @@
 - 代码 `research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `research/results/e105-extent-leaf-packed-2026-09-05.out`（116 行，收尾行 `emitted=116`）。
 - 变异表 `research/mutations/e105_extent_leaf_packed.tsv`，日志 `research/results/e105-mutate-2026-09-05.log`（`cd research && bash scripts/mutate.sh e105-extent-leaf-packed e7-index-bench/src/bin/e105_extent_leaf_packed.rs mutations/e105_extent_leaf_packed.tsv`）。
 - 复跑比对：`bash research/scripts/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
-- 容器头常量在源码里叫 `PACKED_HDR_WITH_WSEQ`（93 + 10），不用登记名 `UNIT_HDR_PACKED`，免得格式常量门禁把 103 当成现行值 93 的漂移；C113（扫描重建时多版单元的现行版本判定无输入） 落地把登记值改成 103 之后再改回登记名。
+- 容器头常量在源码里叫 `UNIT_HDR_PACKED`，与 kb 的登记名同名 ⇒ `.claude/gate.d/27-format-constants.sh` 绑得住它。
+  （2026-09-05 跑的时候它临时叫 `PACKED_HDR_WITH_WSEQ`，为的是不让门禁把 103 当成当时登记值 93 的漂移；
+  C113（扫描重建时多版单元的现行版本判定无输入） 定案当日已把登记值改成 103，2026-09-06 改回登记名，产物逐字节不变。）
 
 ## 历史版本
+
+### 2026-09-06
+
+- 容器头常量改回登记名 `UNIT_HDR_PACKED`（此前叫 `PACKED_HDR_WITH_WSEQ`），让格式常量门禁绑得住它；
+  值仍是 103，6 个单测与 5 条变异全绿、产物逐字节不变。
+  依据：立项时写下的那个条件——「C113（扫描重建时多版单元的现行版本判定无输入） 落地把登记值改成 103 之后再改回登记名」——已经满足。
 
 ### 2026-09-05
 

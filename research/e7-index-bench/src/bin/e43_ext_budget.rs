@@ -27,10 +27,10 @@
 //!
 //! ## 常量的出处（2026-08-29 逐字现查 kb 正文）
 //!
-//! - `BASE_META_TENTHS = 1440`：D21「单元元数据的记账」表，本工程 2 副本档 144.0 B
+//! - `BASE_META_TENTHS = 1580`：D21「单元元数据的记账」表，本工程 2 副本档 158.0 B
 //!   （2026-09-02 起单元头按 D18（块里携带什么信息）已定项 7 的 91 字节初值计，原 55 字节假设作废）
 //!   （单元头 55 + 指针头部 31 + 位置条目 ×2 共 22）
-//! - `BASE_META_RAID_TENTHS = 1880`：同表 4+2 条带档 188.0 B
+//! - `BASE_META_RAID_TENTHS = 2020`：同表 4+2 条带档 202.0 B
 //! - `ZFS_TENTHS = 1280` / `BTRFS_4K_TENTHS = 825` / `BTRFS_128K_TENTHS = 2073`：同表对照行
 //! - `NODE_HDR = 64`、`PTR_BYTES = 40`：E29（坏一个节点的爆炸半径）的扇出口径，
 //!   本实验的 N=0 档必须逐字复现它的 49 / 100 / 408 / 1636
@@ -48,8 +48,8 @@
 use e7_index_bench::Emitter;
 
 // ── D21 对照表的常量（单位：0.1 字节，避免浮点）──
-const BASE_META_TENTHS: u64 = 1440; // 本工程 2 副本档 144.0 B（单元头 91 + 父节点侧 53）
-const BASE_META_RAID_TENTHS: u64 = 1880; // 本工程 4+2 条带档 188.0 B（单元头 91 + 指针头部 31 + 位置条目 ×6 共 66）
+const BASE_META_TENTHS: u64 = 1580; // 本工程 2 副本档 158.0 B（单元头 105 + 父节点侧 53）
+const BASE_META_RAID_TENTHS: u64 = 2020; // 本工程 4+2 条带档 202.0 B（单元头 105 + 指针头部 31 + 位置条目 ×6 共 66）
 const ZFS_TENTHS: u64 = 1280; // ZFS blkptr 128.0 B
 const BTRFS_4K_TENTHS: u64 = 825; // btrfs 4 KiB 单元 82.5 B
 const BTRFS_128K_TENTHS: u64 = 2073; // btrfs 128 KiB 单元 207.3 B
@@ -64,10 +64,10 @@ const PBA_BYTES: u64 = 6;
 const LEN_BYTES: u64 = 2;
 const CSUM_BYTES: u64 = 4; // 位置条目里的密文校验和
 
-// ── 144 字节里，哪些住在单元自己身上 ──
+// ── 158 字节里，哪些住在单元自己身上 ──
 // D4（校验和位置）已定「父节点存子节点校验和」⇒ **指针住在父节点里，不在被指的单元里**。
-// ⇒ 单元自身的容器约束只扣得到单元头那 91 字节，扣不到指针那 53 字节。
-const IN_UNIT_HDR: u64 = 91; // 单元头（自描述，D18 已定项 7 初值），住在单元里
+// ⇒ 单元自身的容器约束只扣得到单元头那 105 字节，扣不到指针那 53 字节。
+const IN_UNIT_HDR: u64 = 105; // 单元头（kb 里 `format-const: UNIT_HDR_DATA`，D18 已定项 7），住在单元里
 const OUT_OF_UNIT_PTR: u64 = 53; // 指针头部 31 + 位置条目 ×2 共 22，住在父节点里
 
 /// 扩展点长在哪些单元上。D21 没区分，所以两档都跑。
@@ -436,10 +436,10 @@ mod tests {
     /// 本工程那两行必须逐字复现 D21「单元元数据的记账」表。
     #[test]
     fn our_rows_reproduce_the_d21_table() {
-        assert_eq!(pct_milli(BASE_META_TENTHS, 4096), 3516); // 144.0 B → 3.516%
-        assert_eq!(pct_milli(BASE_META_TENTHS, 131072), 110); // 144.0 B → 0.110%
-        assert_eq!(pct_milli(BASE_META_RAID_TENTHS, 4096), 4590); // 188.0 B → 4.590%
-        assert_eq!(pct_milli(BASE_META_RAID_TENTHS, 131072), 143); // 188.0 B → 0.143%
+        assert_eq!(pct_milli(BASE_META_TENTHS, 4096), 3857); // 158.0 B → 3.857%
+        assert_eq!(pct_milli(BASE_META_TENTHS, 131072), 121); // 158.0 B → 0.121%
+        assert_eq!(pct_milli(BASE_META_RAID_TENTHS, 4096), 4932); // 202.0 B → 4.932%
+        assert_eq!(pct_milli(BASE_META_RAID_TENTHS, 131072), 154); // 202.0 B → 0.154%
     }
 
     /// 对照行也必须复现——它们是判据的输入，错了整个上界跟着错。
@@ -463,53 +463,53 @@ mod tests {
         assert_eq!(h, vec![5, 4, 3, 3]);
     }
 
-    /// 段一那条「比 ZFS 省」的计数：144 > 128，在 N = 0 就不成立 ⇒ 计数为 0。
+    /// 段一那条「比 ZFS 省」的计数：158 > 128，在 N = 0 就不成立 ⇒ 计数为 0。
     /// （上界 A 本来就已按「比谁省不是判据」删掉；这条钉死的是计算本身没有静默漂移。）
     #[test]
     fn counted_upper_bound_from_the_zfs_clause_is_zero_now() {
         assert_eq!(n_max_cheaper_than_zfs(), 0);
-        assert_eq!(BASE_META_TENTHS, ZFS_TENTHS + 160); // 2 副本档比 ZFS 贵 16.0 字节
+        assert_eq!(BASE_META_TENTHS, ZFS_TENTHS + 300); // 2 副本档比 ZFS 贵 30.0 字节
     }
 
-    /// **D21 那半句按字面读在 N=0 就不成立**：144 × 2 = 288 > 207.3。
+    /// **D21 那半句按字面读在 N=0 就不成立**：158 × 2 = 316 > 207.3。
     /// 这条不是模型坏了，是被测的那句话该改写——所以它要有自己的断言，不能只在正文里提一句。
     #[test]
     fn the_btrfs_half_clause_already_fails_at_zero() {
         assert!(!btrfs_half_holds(0));
-        // 实际比值 144 / 207.3 = 69.5%（千分之一为单位，四舍五入）
+        // 实际比值 158 / 207.3 = 76.2%（千分之一为单位，向下取整）
         let ratio_permille =
             (BASE_META_TENTHS * 1000 + BTRFS_128K_TENTHS / 2) / BTRFS_128K_TENTHS;
-        assert_eq!(ratio_permille, 695);
+        assert_eq!(ratio_permille, 762);
     }
 
-    /// **91 字节头之后两档都比 ZFS 贵**（2026-09-02 起）：
-    /// 2 副本档 144.0、条带档 188.0，都超过 ZFS 的 128.0——
+    /// **105 字节头之后两档都比 ZFS 贵**（2026-09-05 C113 定案加写序 10 与载荷 CRC 4 起）：
+    /// 2 副本档 158.0、条带档 202.0，都超过 ZFS 的 128.0——
     /// 「比谁省」本来就不是判据（D21 2026-08-30 用户定案），这里只钉数字没有漂。
     #[test]
     fn both_rows_are_dearer_than_zfs_at_zero() {
         assert!(BASE_META_RAID_TENTHS > ZFS_TENTHS);
         // 写成加法而不是减法：常量相减在变异下会**编译期溢出**，
         // 那时变异被记成「无效」而不是「被抓到」——一条本该会红的断言就静默失效了。
-        assert_eq!(BASE_META_RAID_TENTHS, ZFS_TENTHS + 600); // 条带档超出 60.0 字节
-        assert_eq!(BASE_META_TENTHS, ZFS_TENTHS + 160); // 2 副本档超出 16.0 字节
+        assert_eq!(BASE_META_RAID_TENTHS, ZFS_TENTHS + 740); // 条带档超出 74.0 字节
+        assert_eq!(BASE_META_TENTHS, ZFS_TENTHS + 300); // 2 副本档超出 30.0 字节
     }
 
-    /// **144 字节里只有 91 住在单元里**——D4（校验和位置）已定父节点存子节点校验和，
-    /// 指针那 53 字节住在父节点。⇒ 容器约束扣的是 91，不是 144。
+    /// **158 字节里只有 105 住在单元里**——D4（校验和位置）已定父节点存子节点校验和，
+    /// 指针那 53 字节住在父节点。⇒ 容器约束扣的是 105，不是 158。
     #[test]
     fn only_the_unit_header_lives_inside_the_unit() {
-        assert_eq!(IN_UNIT_HDR + OUT_OF_UNIT_PTR, 144);
-        assert_eq!(IN_UNIT_HDR * 10, 910);
+        assert_eq!(IN_UNIT_HDR + OUT_OF_UNIT_PTR, 158);
+        assert_eq!(IN_UNIT_HDR * 10, 1050);
         assert_eq!(IN_UNIT_HDR + OUT_OF_UNIT_PTR, BASE_META_TENTHS / 10);
     }
 
     /// **结构上界**：把净荷挤成 0 才是「放不下」。这是唯一一条能把「用错了」变成「挂不上」的上界。
-    /// 独立算术：4096 − 91 − 1 = 4004；131072 − 91 − 1 = 130980；
+    /// 独立算术：4096 − 105 − 1 = 3990；131072 − 105 − 1 = 130966；
     /// 索引节点 2048 − 64 − 40 = 1944；65536 − 64 − 40 = 65432。
     #[test]
     fn structural_upper_bounds_are_pinned() {
-        assert_eq!(n_max_payload_positive(4096), 4004);
-        assert_eq!(n_max_payload_positive(131072), 130980);
+        assert_eq!(n_max_payload_positive(4096), 3990);
+        assert_eq!(n_max_payload_positive(131072), 130966);
         assert_eq!(n_max_node_keeps_one_ptr(2048), 1944);
         assert_eq!(n_max_node_keeps_one_ptr(65536), 65432);
     }
@@ -558,10 +558,18 @@ mod tests {
     }
 
     /// **每条拒绝理由都要够得到**——一条永远返回不了的分支等于没写。
+    ///
+    /// ⚠️ **单元头 91 → 105 之后，4 KiB 那一格的两个上界换了次序**：净荷上界
+    /// 4096 − 105 − 1 = 3990 比指针上界 4096 − 64 − 40 = 3992 紧 2 字节
+    /// ⇒ `unit == node == 4096` 那一格再也够不到 `reject_no_pointer`，
+    /// 要用「单元大于节点」的格子（128 KiB 单元 + 4 KiB 节点）才够得到。
+    /// 次序本身钉成绝对值断言，免得下次改常量时它又静默翻回去。
     #[test]
     fn every_rejection_reason_is_reachable() {
+        assert_eq!(n_max_payload_positive(4096) + 2, n_max_node_keeps_one_ptr(4096));
         assert_eq!(mount_verdict(5000, 4096, 4096, 512, 512), "reject_no_payload");
-        assert_eq!(mount_verdict(4000, 4096, 4096, 512, 512), "reject_no_pointer");
+        assert_eq!(mount_verdict(4000, 4096, 4096, 512, 512), "reject_no_payload");
+        assert_eq!(mount_verdict(4000, 131072, 4096, 512, 512), "reject_no_pointer");
         assert_eq!(
             mount_verdict(0, 4096, 4096, 256, 512),
             "reject_slot_shares_atomic"
@@ -629,10 +637,10 @@ mod tests {
             let half = pct_milli(BASE_META_TENTHS + 10 * (u / 2), u);
             assert!(half > base, "单元 {u}：抬到一半之后占比没涨");
         }
-        // 绝对值锚：4 KiB 单元、N = 2048 ⇒ (144 + 2048) / 4096 = 53.516%
-        assert_eq!(pct_milli(BASE_META_TENTHS + 10 * 2048, 4096), 53516);
-        // 128 KiB 单元、N = 65536 ⇒ (144 + 65536) / 131072 = 50.110%
-        assert_eq!(pct_milli(BASE_META_TENTHS + 10 * 65536, 131072), 50110);
+        // 绝对值锚：4 KiB 单元、N = 2048 ⇒ (158 + 2048) / 4096 = 53.857%
+        assert_eq!(pct_milli(BASE_META_TENTHS + 10 * 2048, 4096), 53857);
+        // 128 KiB 单元、N = 65536 ⇒ (158 + 65536) / 131072 = 50.121%
+        assert_eq!(pct_milli(BASE_META_TENTHS + 10 * 65536, 131072), 50121);
     }
 
     /// 四个节点档各自把 N 抬到节点的一半，扇出必须下降，且等于独立算出的值。
