@@ -288,3 +288,11 @@ path = "src/bin/e110_stripe_table_steady.rs"
 [[bin]]
 name = "e111-stripe-table-key"
 path = "src/bin/e111_stripe_table_key.rs"
+
+[[bin]]
+name = "e112-old-writer-unknown-tree"
+path = "src/bin/e112_old_writer_unknown_tree.rs"
+
+[[bin]]
+name = "e113-unknown-tree-full-arms"
+path = "src/bin/e113_unknown_tree_full_arms.rs"

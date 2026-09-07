@@ -1,0 +1,15 @@
+基线：全绿
+✅ [M1_parity格不计入条目] 红：parity_cell_count_is_pinned,total_cell_count_matches_e97_entry_count
+✅ [M2_parity按w−1算不按w] 红：parity_cell_count_is_pinned,total_cell_count_matches_e97_entry_count
+✅ [M3_w等于2也写记录] 红：width_two_writes_no_stripe_records
+✅ [M4_容器不镜像] 红：tree_ppm_is_pinned_and_comparable_to_e97
+✅ [M5_容器容量按整单元算] 红：tree_ppm_is_pinned_and_comparable_to_e97
+✅ [M6_落点key漏掉设备身份] 红：positive_control_fanout_depends_on_key_width,slot_keyed_tree_geometry_is_pinned
+✅ [M7_扇出不计value] 红：positive_control_fanout_depends_on_key_width,slot_keyed_tree_geometry_is_pinned
+✅ [M8_扇出不计节点头] 红：positive_control_fanout_depends_on_key_width,slot_keyed_tree_geometry_is_pinned
+✅ [M9_树高少算一层] 红：height_algorithm_matches_e97,slot_keyed_tree_geometry_is_pinned
+✅ [M10_条带号臂也答得出落点查询] 红：only_the_slot_keyed_arm_answers_the_lookup
+✅ [M11_格数按16KiB槽算不按单元算] 红：cells_never_overfill_the_pool,slot_keyed_tree_geometry_is_pinned,parity_cell_count_is_pinned,total_cell_count_matches_e97_entry_count,tree_ppm_is_pinned_and_comparable_to_e97
+✅ [M12_填充率当满算] 红：cells_never_overfill_the_pool,parity_cell_count_is_pinned,tree_ppm_is_pinned_and_comparable_to_e97,total_cell_count_matches_e97_entry_count
+✅ [M13_parity加在预算之上] 红：cells_never_overfill_the_pool,parity_cell_count_is_pinned,total_cell_count_matches_e97_entry_count,tree_ppm_is_pinned_and_comparable_to_e97
+已还原，基线仍全绿

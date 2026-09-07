@@ -1,0 +1,11 @@
+基线：全绿
+✅ [M1_带树维统计量数归零] 红：absolute_carry_cost,absolute_generation_boundary,absolute_model_constants,absolute_silent_counts,absolute_rows_per_gen,absolute_verdict,positive_control_skip_nocarry_loses_rows
+✅ [M2_保留代数大到永不丢弃] 红：absolute_model_constants,absolute_silent_counts,absolute_verdict,positive_control_skip_nocarry_loses_rows
+✅ [M3_不搬运臂也不丢行] 红：absolute_generation_boundary,absolute_silent_counts,absolute_verdict,closed_form_matches_every_cell,positive_control_skip_nocarry_loses_rows
+✅ [M4_自以为认识的臂不误读] 红：absolute_verdict,absolute_silent_counts,positive_control_ignore_misreads_but_keeps_rows
+✅ [M5_未实现的不变量当成会抓] 红：absolute_silent_counts,absolute_verdict
+✅ [M6_闭式不看代数] 红：closed_form_matches_every_cell
+✅ [M7_搬运臂不含不认识的头] 红：absolute_carry_cost,absolute_rows_per_gen
+✅ [M8_拒绝挂载臂其实挂上了] 红：absolute_verdict,positive_control_refuse_mounts_nothing
+✅ [M9_不认识的可写头数归零] 红：absolute_generation_boundary,absolute_carry_cost,absolute_rows_per_gen,absolute_silent_counts,absolute_verdict,positive_control_skip_nocarry_loses_rows
+已还原，基线仍全绿

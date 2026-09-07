@@ -1,0 +1,11 @@
+1. Crash and reuse of a checkpoint number.  
+No counterexample found. Code 2 nodes are excluded from current-version selection per C113 ruling revision 9. Rebuild recomputes code 2 nodes from scratch regardless of multiple versions. Birth txg and instance ID alone are for garbage sweeping, but no current-version choice is needed for code 2. The system does not rely on transaction number for code 2 selection, so removal of 6 bytes does not affect this scenario.
+
+2. Sweeping garbage.  
+No counterexample found. Published predicate I-1.2 for code 2 requires only birth txg ≤ T_pub. The write sequence instance ID (4 bytes) is used solely to look up the instance table row. The transaction number is never used for code 2 in the predicate. The instance table row lookup works correctly with 4-byte instance ID. Cases with missing instance table row or root instance ID are system errors unrelated to write sequence width.
+
+3. Authoritative code 2 nodes.  
+No counterexample found. Authoritative code 2 nodes (e.g., accounting tree) use birth txg from the unit header for version selection, not the write sequence transaction number. Birth txg is stored in the header and sufficient to choose the latest version (higher birth txg). The exclusion from current-version selection in C113 ruling holds because birth txg comparison handles version selection. Transaction number is irrelevant for this purpose.
+
+4. Arm C specifically.  
+Counterexample for arm A. Under arm A, code 2 header is 6 bytes shorter. Old readers expecting 10-byte write sequence read past the actual header, misinterpreting subsequent fields (e.g., identity segment or trailing data). This violates the unit header integrity. For example, if code 2 header is 62 bytes instead of 68, an old reader reads 10 bytes for write sequence but the actual write sequence is 4 bytes, causing the next 6 bytes to be misread as part of write sequence. This corrupts all fields after the write sequence. Under arm C, reserved bytes are zero; old readers see 10 bytes of zero and process correctly per I-9.7. New readers also accept zero. Non-zero reserved bytes would cause EIO, but arm C ensures they are zero.

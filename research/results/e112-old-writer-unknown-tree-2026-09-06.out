@@ -1,0 +1,11 @@
+E7RESULT name=config t_known=12 h_known=6 t_new=4 h_new=2 r_tree_dim=1 r_pool=11 k_keep=4 g_gens=10 records_per_new_tree=1000 model=arithmetic file_ops=0
+E7RESULT name=cell arm=Ignore_Carry mount_ok=1 misread_records=4000 rows_lost=0 rows_lost_closed_form=0 rows_written_per_gen=19 caught_by_spec=0 caught_today=0 silent_today=1 silent_by_spec=1
+E7RESULT name=cell arm=Ignore_NoCarry mount_ok=1 misread_records=4000 rows_lost=0 rows_lost_closed_form=0 rows_written_per_gen=19 caught_by_spec=0 caught_today=0 silent_today=1 silent_by_spec=1
+E7RESULT name=cell arm=Skip_Carry mount_ok=1 misread_records=0 rows_lost=0 rows_lost_closed_form=0 rows_written_per_gen=19 caught_by_spec=0 caught_today=0 silent_today=0 silent_by_spec=0
+E7RESULT name=cell arm=Skip_NoCarry mount_ok=1 misread_records=0 rows_lost=2 rows_lost_closed_form=2 rows_written_per_gen=17 caught_by_spec=1 caught_today=0 silent_today=1 silent_by_spec=0
+E7RESULT name=cell arm=Refuse_Carry mount_ok=0 misread_records=0 rows_lost=0 rows_lost_closed_form=0 rows_written_per_gen=0 caught_by_spec=0 caught_today=0 silent_today=0 silent_by_spec=0
+E7RESULT name=cell arm=Refuse_NoCarry mount_ok=0 misread_records=0 rows_lost=0 rows_lost_closed_form=0 rows_written_per_gen=0 caught_by_spec=0 caught_today=0 silent_today=0 silent_by_spec=0
+E7RESULT name=carry_cost extra_rows_per_gen=2 own_rows_per_gen=17 threshold_rows=144 over_threshold=0
+E7RESULT name=refuse_cost unmountable_gens=10 compat_with_d15_item2=0
+E7RESULT name=verdict min_silent_today=0 winners=Skip_Carry
+E7RESULT name=done emitted=11

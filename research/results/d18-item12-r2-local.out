@@ -1,0 +1,9 @@
+Step 1 has a counterexample. Traversal can recompute the inode number watermark exactly. The inode tree contains all issued inodes, including those with nlink=0 (deleted but not yet reclaimed). Scanning the inode tree yields the highest issued inode number, and the watermark is exactly that value plus one. For example, if the highest issued inode number is 100 (even if deleted), traversal finds 100, and the watermark is 101. This satisfies D8 settled item 6 (monotonic and never reused) because the watermark is always greater than any issued number. D5 settled item 4 states the watermark lives in the accounting tree, but it is recomputable from the inode tree, contradicting Step 1's claim that traversal cannot recompute it. No other settled clauses are violated by this scenario.  
+
+Step 3 has no counterexample. Within one checkpoint, the accounting tree leaf for the inode number watermark is written multiple times during allocation operations (e.g., creating multiple inodes increments the watermark), so birth txg alone cannot distinguish versions. This aligns with I-1.8 and C113 ruling P3.  
+
+Arm D has no counterexample. During scan-based rebuild, code 2 nodes are read directly from disk without parent pointers. A payload CRC is necessary for self-consistency verification at level 1 (per D18 settled item 5), as the parent's checksum does not cover the payload. C104 confirms code 2 lacks payload integrity evidence, so Arm D pays off this debt.  
+
+Arm E has no counterexample. Changing the code 2 transaction number to a fixed-point iteration counter (distinct from code 1 and code 3's transaction number meaning) does not break anything. The system interprets the field based on class during key processing, and the counter serves as a valid tie-breaker within a checkpoint (as required by I-1.8).  
+
+Arm A, B, and C are not evaluated as per assignment instructions. Only counterexamples in settled clauses are considered.

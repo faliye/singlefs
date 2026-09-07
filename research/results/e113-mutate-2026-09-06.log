@@ -1,0 +1,12 @@
+基线：全绿
+✅ [M1_误释放公式去掉窗口] 红：absolute_winner_at_base,lexicographic_order_puts_data_loss_first,positive_skip
+✅ [M2_跳过臂不再误释放] 红：absolute_winner_at_base,lexicographic_order_puts_data_loss_first,positive_skip
+✅ [M3_自以为认识不再违反只读] 红：absolute_winner_at_base,positive_ignore
+✅ [M4_只读挂载其实能写] 红：absolute_winner_at_base,positive_read_only
+✅ [M5_拒收条目也认错邻居] 红：absolute_winner_at_base,positive_reject_entry
+✅ [M6_字典序把丢数据排到最后] 红：absolute_winner_at_base,lexicographic_order_puts_data_loss_first
+✅ [M7_豁免点删其实照样丢] 红：absolute_rows_written,absolute_winner_at_base
+✅ [M8_按位分档不看登记数] 红：positive_per_bit_is_conditional
+✅ [M9_保留代数边界差一] 红：absolute_k_boundary
+✅ [M10_可写代数不进字典序] 红：absolute_winner_at_base
+已还原，基线仍全绿

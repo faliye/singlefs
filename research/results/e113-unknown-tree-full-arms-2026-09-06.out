@@ -1,0 +1,139 @@
+E7RESULT name=config t_known=12 h_known=6 t_new=4 h_new=2 t_new_rdonly=1 t_new_dead=1 r_tree_dim=1 r_pool=11 g_gens=10 blocks_per_gen=64 k_keep=4 w_gens=3 model=arithmetic file_ops=0
+E7RESULT name=cell arm=Ignore_Carry writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=10 dead_revived=1 rows_lost=0 rows_written_per_gen=19 silent=2
+E7RESULT name=cell arm=Ignore_NoCarry writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=10 dead_revived=1 rows_lost=0 rows_written_per_gen=19 silent=2
+E7RESULT name=cell arm=Ignore_Exempt writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=10 dead_revived=1 rows_lost=0 rows_written_per_gen=19 silent=2
+E7RESULT name=cell arm=Skip_Carry writable_gens=10 blocks_freed_while_referenced=192 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=19 silent=0
+E7RESULT name=cell arm=Skip_NoCarry writable_gens=10 blocks_freed_while_referenced=192 rdonly_violations=0 dead_revived=0 rows_lost=2 rows_written_per_gen=17 silent=0
+E7RESULT name=cell arm=Skip_Exempt writable_gens=10 blocks_freed_while_referenced=192 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=17 silent=0
+E7RESULT name=cell arm=RejectEntry_Carry writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=19 silent=0
+E7RESULT name=cell arm=RejectEntry_NoCarry writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=2 rows_written_per_gen=17 silent=0
+E7RESULT name=cell arm=RejectEntry_Exempt writable_gens=10 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=17 silent=0
+E7RESULT name=cell arm=ReadOnly_Carry writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=cell arm=ReadOnly_NoCarry writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=cell arm=ReadOnly_Exempt writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=cell arm=PerBit_Carry writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=cell arm=PerBit_NoCarry writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=cell arm=PerBit_Exempt writable_gens=0 blocks_freed_while_referenced=0 rdonly_violations=0 dead_revived=0 rows_lost=0 rows_written_per_gen=0 silent=0
+E7RESULT name=verdict_base winners=RejectEntry_Exempt
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=0 registered=4 winners=PerBit_Carry+PerBit_Exempt+PerBit_NoCarry+RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=2 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=2 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=4 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=0 h_new=4 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=1 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=3 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=1 w_gens=8 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=0 registered=4 winners=PerBit_Carry+PerBit_Exempt+PerBit_NoCarry+RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=2 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=2 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=4 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=0 h_new=4 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=1 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=3 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=2 w_gens=8 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=0 registered=4 winners=PerBit_Carry+PerBit_Exempt+PerBit_NoCarry+RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=2 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=2 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=4 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=0 h_new=4 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=1 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=3 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=4 w_gens=8 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=0 registered=4 winners=PerBit_Carry+PerBit_Exempt+PerBit_NoCarry+RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=2 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=2 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=4 registered=0 winners=RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=0 h_new=4 registered=4 winners=PerBit_Exempt+RejectEntry_Exempt+Skip_Exempt flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=1 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=3 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=2 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=2 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=4 registered=0 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=8 w_gens=8 h_new=4 registered=4 winners=RejectEntry_Exempt flipped=0
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=0 registered=4 winners=PerBit_Carry+PerBit_Exempt+PerBit_NoCarry+RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Carry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=2 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=2 registered=4 winners=PerBit_Exempt+PerBit_NoCarry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=4 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=0 h_new=4 registered=4 winners=PerBit_Exempt+PerBit_NoCarry+RejectEntry_Exempt+RejectEntry_NoCarry+Skip_Exempt+Skip_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=2 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=2 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=4 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=1 h_new=4 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=2 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=2 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=4 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=3 h_new=4 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=0 registered=0 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=0 registered=4 winners=RejectEntry_Carry+RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=2 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=2 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=4 registered=0 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep k_keep=20 w_gens=8 h_new=4 registered=4 winners=RejectEntry_Exempt+RejectEntry_NoCarry flipped=1
+E7RESULT name=sweep_summary points=120 flipped=72
+E7RESULT name=done emitted=139

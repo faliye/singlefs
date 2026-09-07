@@ -1,5 +1,5 @@
-M1_parity格不计入条目	let parity_cells = data_cells.div_ceil(w - 1);	let parity_cells = 0u64;
-M2_数据列按w算不按w−1	data_cells.div_ceil(w - 1)	data_cells.div_ceil(w)
+M1_parity格不计入条目	let parity_cells = total_cells / w;	let parity_cells = 0u64;
+M2_parity按w−1算不按w	let parity_cells = total_cells / w;	let parity_cells = total_cells / (w - 1);
 M3_w等于2也写记录	    if w < 3 {\n        // w = 2 全镜像，一条条带记录都不写（D2 已定项 12 的射程）\n        return (0, 0, 0);\n    }	    if false {\n        return (0, 0, 0);\n    }
 M4_容器不镜像	let bytes = containers * DATA_UNIT * 2;	let bytes = containers * DATA_UNIT;
 M5_容器容量按整单元算	    let per = (DATA_UNIT - PACKED_HDR) / STRIPE_REC;\n    let containers = entries.div_ceil(per);	    let per = DATA_UNIT / STRIPE_REC;\n    let containers = entries.div_ceil(per);
@@ -8,5 +8,6 @@ M7_扇出不计value	(NODE - NODE_HDR) / (k + 8)	(NODE - NODE_HDR) / k
 M8_扇出不计节点头	(NODE - NODE_HDR) / (k + 8)	NODE / (k + 8)
 M9_树高少算一层	    let mut h = 1u32;\n    let mut cap = f;	    let mut h = 0u32;\n    let mut cap = f;
 M10_条带号臂也答得出落点查询	        matches!(self, Arm::Slot)	        !matches!(self, Arm::None)
-M11_格数按16KiB槽算不按单元算	let data_cells = usable / DATA_UNIT;	let data_cells = usable / SLOT;
-M12_填充率当满算	let usable = CAP / FILL_DEN * FILL_NUM;	let usable = CAP;
+M11_格数按16KiB槽算不按单元算	let total_cells = usable / DATA_UNIT;	let total_cells = usable / SLOT;
+M12_填充率当满算	    let usable = CAP / FILL_DEN * FILL_NUM;\n    // 这笔预算总共切出多少个格	    let usable = CAP;\n    // 这笔预算总共切出多少个格
+M13_parity加在预算之上	    (data_cells, parity_cells, total_cells)	    (total_cells, parity_cells, total_cells + parity_cells)

@@ -110,11 +110,13 @@
 且第二次出现后面不许紧跟 `=`（排掉 `name=shape shape=BtreeValue` 这种 key=value 流的伪影）。
 不设「至少两处」门槛——长实词自复读是二值事实不是比率，与拼接类同理。
 
-**判别力（双向，2026-09-06）**：`research/prompts/d8-item8-r2-local-output.md` 由绿转红；
+**判别力（双向，2026-09-06）**：`research/prompts/d8-item8-r2-local-output-void1.md` 由绿转红；
 `research/results/e98-inode-record-2026-09-03.out`（含 4 处 `name=shape shape=` 伪影）保持绿。
 全语料回扫 434 个文件，**新增判红恰好 6 个，全是本地腿输出，全是真损坏，零误报**。
+同日晚些时候语料涨到 551 个文件时再回扫一次，仍是这 6 个，外加标定样本
+`research/results/corruption/zh-long-1.txt`（本来就是已知损坏的红样本，不算新增）。
 
-⚠️ **代价是实打实的：这 6 份当时都被当成干净证据用掉了。**
+⚠️ **代价是实打实的：这 6 份里有 5 份当时被当成干净证据用掉了**（第 6 份是 D8（核心索引结构） 已定项 8 第二轮那份，当轮就发现并作废重跑）。
 
 | 文件 | 损坏词 | 它当时支撑的是 |
 |---|---|---|
@@ -123,10 +125,10 @@
 | `research/results/c85-publication-counter-local.out` | `proposed proposed` | C85（发布计数器的四个等号没写死） 那一轮 |
 | `research/prompts/d9-item9-r3-local-output.md` | `replicas replicas` | D9（加密） 未定项 9 第三轮 |
 | `research/prompts/d1-item56-r1-local-output.md` | `point point` | D1（数据可移动性 / 反向索引） 已定项 5 / 6 第一轮 |
-| `research/prompts/d8-item8-r2-local-output.md` | `resetting resetting` | D8（核心索引结构） 未定项 8 第二轮（当轮发现） |
+| `research/prompts/d8-item8-r2-local-output-void1.md` | `resetting resetting` | D8（核心索引结构） 已定项 8 第二轮（**当轮就发现并作废重跑**，重跑那份 `d8-item8-r2-local-output.md` 判绿） |
 
 ⇒ 按 `.claude/rules/three-way-inference.md`「闸判红之后那一轮作废重跑」，
-**这六轮的本地腿retroactively 作废**——它们当时实际上跑在两条腿上，而没有按
+**这六轮的本地腿一律回溯作废**——它们当时实际上跑在两条腿上，而没有按
 「本地腿缺席时必须显式报告」报出来。⚠️ **这不自动推翻那几条决策**（各自还有两条云端腿），
 但凡是把「三方一致」当依据的地方，口径要改成「两方一致 + 本地腿作废」。
 

@@ -101,20 +101,27 @@ fn fanout(k: u64) -> u64 {
     (NODE - NODE_HDR) / (k + 8)
 }
 
-/// 池里有多少个数据格（32768 一格）与元数据格（16384 一格）。
-/// 口径与 E97 / E106 同：16 TiB、90% 填充；这里只算数据格那一档，
-/// 元数据格另算一份，两者相加就是成员记录的条数。
+/// 池里 90% 那笔预算切成多少个格（32768 一格），其中多少是数据格、多少是 parity 格。
+/// 口径与 E106（条带成员表的载体） 同：**16 TiB × 90% 是数据格与 parity 格一起花的一笔预算**，
+/// 一条 `w` 列的条带占 `w` 个格、其中 1 个是 parity ⇒ 条目数（一格一条）恒等于这笔预算的格数，
+/// **与 `w` 无关**；`w` 只改这笔预算里有多少是用户数据。
+///
+/// ⚠️ **不许把 483 183 820 当成数据格数再往上加 parity。** 那样 `w = 3` 会往一块 16 TiB 的盘上
+/// 摆 724 775 730 个 32 KiB 格 = 135% 的盘。E106（条带成员表的载体） 第一版正是这个错（126.3%），
+/// 当日已修并留了会红的断言；E111（条带表的 key 与它的几何） 第一版重犯了一次，
+/// 现在由 `cells_never_overfill_the_pool` 挡住。
 fn cells(w: u64) -> (u64, u64, u64) {
     if w < 3 {
         // w = 2 全镜像，一条条带记录都不写（D2 已定项 12 的射程）
         return (0, 0, 0);
     }
     let usable = CAP / FILL_DEN * FILL_NUM;
-    // 数据格：整池按数据单元切
-    let data_cells = usable / DATA_UNIT;
-    // parity 格：每条带一格，数据列 w−1
-    let parity_cells = data_cells.div_ceil(w - 1);
-    (data_cells, parity_cells, data_cells + parity_cells)
+    // 这笔预算总共切出多少个格 —— 数据格与 parity 格都从这里出
+    let total_cells = usable / DATA_UNIT;
+    // parity 格：每条 w 列的条带一格
+    let parity_cells = total_cells / w;
+    let data_cells = total_cells - parity_cells;
+    (data_cells, parity_cells, total_cells)
 }
 
 /// 这棵树自己占多少 ppm：条目住码 3 容器，容器 32768、头 103、一条 56。
@@ -209,57 +216,93 @@ mod tests {
 
     /// 格数的绝对值：16 TiB × 90% ÷ 32768 = 483 183 820，
     /// **与 E97 已入库的分配记录条目数逐位相同**——两个实验同尺的交叉校验。
+    /// ⚠️ 逐位相同的是**总格数**（一格一条 ⇒ 条目数），**不是数据格数**：
+    /// 数据格比它少一个 parity 的份额（`w = 3` 时少 161 061 273）。
     #[test]
-    fn data_cell_count_matches_e97_entry_count() {
-        let (dc, _, _) = cells(3);
-        assert_eq!(dc, 483_183_820);
-        assert_eq!(dc, E97_ENTRIES);
+    fn total_cell_count_matches_e97_entry_count() {
+        let (dc, pc, total) = cells(3);
+        assert_eq!(total, 483_183_820);
+        assert_eq!(total, E97_ENTRIES);
         assert_eq!(CAP / FILL_DEN * FILL_NUM / DATA_UNIT, 483_183_820);
+        assert_eq!(dc, 322_122_547);
+        assert_eq!(pc, 161_061_273);
+        assert!(dc < E97_ENTRIES);
     }
 
-    /// parity 格：`w = 3` 时数据列 2 ⇒ 每 2 个数据格一个 parity 格。
+    /// **摆进去的格不许超过 90% 那笔预算。**
+    /// E106（条带成员表的载体） 第一版把这笔预算当成数据格数、再往上加 parity 与容器
+    /// ⇒ 往盘里摆了 126.3% 的格；E111（条带表的 key 与它的几何） 第一版重犯了一次（135%）。
+    /// 这条断言就是那个坑的会红形态——它自己的判别力在最后两行。
+    #[test]
+    fn cells_never_overfill_the_pool() {
+        let usable = CAP / FILL_DEN * FILL_NUM;
+        for w in [2u64, 3, 4] {
+            let (dc, pc, total) = cells(w);
+            assert_eq!(total, dc + pc, "w={w}: 总格数不等于两类之和");
+            assert!(
+                total * DATA_UNIT <= usable,
+                "w={w}: 摆了 {} 字节，90% 预算只有 {usable}",
+                total * DATA_UNIT
+            );
+        }
+        // 判别力：第一版那种写法（预算当数据格、parity 加在上面）必须被这条判据判红
+        let v1 = E97_ENTRIES + E97_ENTRIES.div_ceil(2);
+        assert_eq!(v1, 724_775_730);
+        assert!(v1 * DATA_UNIT > usable, "这条断言分不出差别，等于没写");
+    }
+
+    /// parity 格：一条 `w` 列的条带一格 ⇒ `w = 3` 占预算的 1/3、`w = 4` 占 1/4。
+    /// **条目数与 `w` 无关**——这是换口径之后最反直觉的一条，所以单独钉住。
     #[test]
     fn parity_cell_count_is_pinned() {
         let (dc, pc, total) = cells(3);
-        assert_eq!(pc, dc.div_ceil(2));
-        assert_eq!(pc, 241_591_910);
-        assert_eq!(total, 724_775_730);
+        assert_eq!(pc, total / 3);
+        assert_eq!(pc, 161_061_273);
+        assert_eq!(total, 483_183_820);
         let (dc4, pc4, total4) = cells(4);
-        assert_eq!(pc4, dc4.div_ceil(3));
+        assert_eq!(pc4, total4 / 4);
+        assert_eq!(pc4, 120_795_955);
         assert_eq!(total4, dc4 + pc4);
-        // w 越大 parity 越少 ⇒ 条目数越少
-        assert!(total4 < total);
+        // w 越大 parity 越少、数据格越多，而**总格数一格不变**
+        assert!(pc4 < pc);
+        assert!(dc4 > dc);
+        assert_eq!(total4, total);
     }
 
     /// **这个实验要回答的那个数**：按落点排的那棵树有多大。
-    /// 扇出 (16384 − 76) / (10 + 8) = 906；724 775 730 条 ⇒ 906³ = 743 677 416 < 条目数 ≤ 906⁴ ⇒ 高 4。
+    /// 扇出 (16384 − 76) / (10 + 8) = 906；483 183 820 条 ⇒ 906² = 820 836 < 条目数 ≤ 906³ = 743 677 416 ⇒ 高 3。
     #[test]
     fn slot_keyed_tree_geometry_is_pinned() {
         assert_eq!(SLOT_KEY, 10);
         assert_eq!(fanout(SLOT_KEY), 906);
+        assert_eq!(906u64.pow(2), 820_836);
         assert_eq!(906u64.pow(3), 743_677_416);
         let (_, _, total) = cells(3);
-        assert!(906u64.pow(3) > total);
+        assert!(906u64.pow(2) < total && total <= 906u64.pow(3));
         assert_eq!(height(total, fanout(SLOT_KEY)), 3);
     }
 
     /// 这棵树自己占多少（手算，逐步列出来）：
-    /// 条目 724 775 730 ÷ 583 条每容器 ⇒ `583 × 1 243 183 = 724 775 689 < 724 775 730`
-    /// ⇒ 向上取整是 **1 243 184** 个容器（⚠️ 建模时先写成 1 243 183，差在最后那 41 条）；
-    /// 容器恒走镜像 ⇒ `1 243 184 × 32768 × 2 = 81 473 306 624` 字节；
-    /// `÷ 16 TiB × 10⁶` ⇒ **4631 ppm**。与 E97（记账与分配记录的条目编码） 的 442 ppm 放同一把尺子上。
+    /// 条目 483 183 820 ÷ 583 条每容器 ⇒ `583 × 828 788 = 483 183 404 < 483 183 820`
+    /// ⇒ 向上取整是 **828 789** 个容器；容器恒走镜像
+    /// ⇒ `828 789 × 32768 × 2 = 54 315 515 904` 字节；`÷ 16 TiB × 10⁶` ⇒ **3087 ppm**。
+    /// 与 E97（记账与分配记录的条目编码） 的 442 ppm 放同一把尺子上 ⇒ 6.98 倍。
+    ///
+    /// ⚠️ **这个字节数与 E106（条带成员表的载体） 的臂甲镜逐位相同**（`cost_bytes=54315515904`、
+    /// `cost_ppm=3087.5`）——两个实验用**互不相同**的算法算同一个量而落到同一个数，
+    /// 这是换口径之后才出现的交叉校验；旧口径下 E111 报 4631、E106 报 3087.5，谁也没去对。
     #[test]
     fn tree_ppm_is_pinned_and_comparable_to_e97() {
         let (_, _, total) = cells(3);
         let per = (DATA_UNIT - PACKED_HDR) / STRIPE_REC;
         assert_eq!(per, 583);
-        assert_eq!(per * 1_243_183, 724_775_689);
-        assert!(per * 1_243_183 < total);
-        assert_eq!(total.div_ceil(per), 1_243_184);
-        assert_eq!(1_243_184u64 * DATA_UNIT * 2, 81_473_306_624);
-        assert_eq!(tree_ppm(total), 4631);
-        // 它比分配记录树贵一个数量级——这是判据要看的那个对比
-        assert!(tree_ppm(total) > E97_PPM * 10);
+        assert_eq!(per * 828_788, 483_183_404);
+        assert!(per * 828_788 < total);
+        assert_eq!(total.div_ceil(per), 828_789);
+        assert_eq!(828_789u64 * DATA_UNIT * 2, 54_315_515_904);
+        assert_eq!(tree_ppm(total), 3087);
+        // 它比分配记录树贵将近七倍——这是判据要看的那个对比
+        assert!(tree_ppm(total) > E97_PPM * 6 && tree_ppm(total) < E97_PPM * 8);
     }
 
     /// **三条臂里只有一条答得出那句话。** 这是这个实验的承重结论，
