@@ -123,7 +123,7 @@
 | `research/results/d18-item11-r1-local.out` | `skips skips` | D18（块里携带什么信息） 已定项 11（实例代号）第一轮 |
 | `research/results/d8-item6-r4-local.out` | `watermark watermark` ×2 | D8（核心索引结构） 已定项 6（inode 号单调不复用）第四轮 |
 | `research/results/c85-publication-counter-local.out` | `proposed proposed` | C85（发布计数器的四个等号没写死） 那一轮 |
-| `research/prompts/d9-item9-r3-local-output.md` | `replicas replicas` | D9（加密） 未定项 9 第三轮 |
+| `research/prompts/d9-item9-r3-local-output.md` | `replicas replicas` | D9（加密） 已定项 9 第三轮 |
 | `research/prompts/d1-item56-r1-local-output.md` | `point point` | D1（数据可移动性 / 反向索引） 已定项 5 / 6 第一轮 |
 | `research/prompts/d8-item8-r2-local-output-void1.md` | `resetting resetting` | D8（核心索引结构） 已定项 8 第二轮（**当轮就发现并作废重跑**，重跑那份 `d8-item8-r2-local-output.md` 判绿） |
 
