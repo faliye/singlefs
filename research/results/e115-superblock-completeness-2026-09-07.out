@@ -1,0 +1,31 @@
+E7RESULT name=completeness required=31 candidate_rows=24 missing=9
+E7RESULT name=missing idx=0 item=journal 最坏占用与 F source=I-8.1 逐字「写进超级块」
+E7RESULT name=missing idx=1 item=根环逐区域设备身份 source=D2 已定项 7 用户定案
+E7RESULT name=missing idx=2 item=条带宽度上界 w_max source=D2 已定项 6 逐字「超级块声明的常量」
+E7RESULT name=missing idx=3 item=组大小 g source=D2 已定项 8 逐字「超级块声明的常量」
+E7RESULT name=missing idx=4 item=KDF 标识 source=D9 day-1 预留 3 + D12 已定项 2
+E7RESULT name=missing idx=5 item=加密类型 source=D9 day-1 预留 3 + D12 已定项 2
+E7RESULT name=missing idx=6 item=主密钥槽 source=D9 day-1 预留 3 + D12 已定项 2
+E7RESULT name=missing idx=7 item=MAC 长度声明 source=I-6.6 逐字「与超级块声明的一致」
+E7RESULT name=missing idx=8 item=设备数 devs source=D22 已定项 2「P > devs」；设备表移出后槽里无条目数
+E7RESULT name=budget wide=0 map_sep=0 merge_ptrs=0 total=503 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=0 merge_ptrs=0 total=503 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=0 merge_ptrs=1 total=385 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=0 merge_ptrs=1 total=385 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=1 merge_ptrs=0 total=562 slot=512 fits=0 over_by=50 torn_states=2
+E7RESULT name=budget wide=0 map_sep=1 merge_ptrs=0 total=562 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=1 merge_ptrs=1 total=385 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=0 map_sep=1 merge_ptrs=1 total=385 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=0 merge_ptrs=0 total=532 slot=512 fits=0 over_by=20 torn_states=2
+E7RESULT name=budget wide=1 map_sep=0 merge_ptrs=0 total=532 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=0 merge_ptrs=1 total=473 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=0 merge_ptrs=1 total=473 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=1 merge_ptrs=0 total=591 slot=512 fits=0 over_by=79 torn_states=2
+E7RESULT name=budget wide=1 map_sep=1 merge_ptrs=0 total=591 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=1 merge_ptrs=1 total=473 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget wide=1 map_sep=1 merge_ptrs=1 total=473 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=merge_cost unit_header=68 saved_in_slot=177 paid_in_unit=68
+E7RESULT name=merge_cost unit_header=77 saved_in_slot=177 paid_in_unit=77
+E7RESULT name=merge_cost unit_header=86 saved_in_slot=177 paid_in_unit=86
+E7RESULT name=e100_baseline candidate_bytes=361 plus_devtable_ptr=420
+E7RESULT name=done emitted=31

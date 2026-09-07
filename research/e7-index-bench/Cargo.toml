@@ -300,3 +300,7 @@ path = "src/bin/e113_unknown_tree_full_arms.rs"
 [[bin]]
 name = "e114-pack-ledger"
 path = "src/bin/e114_pack_ledger.rs"
+
+[[bin]]
+name = "e115-superblock-completeness"
+path = "src/bin/e115_superblock_completeness.rs"

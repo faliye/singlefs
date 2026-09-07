@@ -1,0 +1,10 @@
+M1_缺项闸漏报一项	    REQUIRED.iter().filter(|(_, _, c)| c.is_none()).map(|(n, _, _)| *n).collect()	    REQUIRED.iter().take(REQUIRED.len() - 1).filter(|(_, _, c)| c.is_none()).map(|(n, _, _)| *n).collect()
+M2_指针宽度错	const PTR_BYTES: u64 = 59;	const PTR_BYTES: u64 = 58;
+M3_根环区域数错	const RING_REGIONS: u64 = 3;	const RING_REGIONS: u64 = 4;
+M4_合并没省指针	        b -= (n - 1) * PTR_BYTES;	        b -= 0;
+M5_中央映射指针没算	        b += PTR_BYTES;	        b += 0;
+M6_缺项字节没加进总数	    let base = candidate_bytes() + PTR_BYTES + missing_bytes(wide);	    let base = candidate_bytes() + PTR_BYTES;
+M7_宽窄档取反	    MISSING_WIDTHS.iter().map(|&(_, a, b)| if wide { b } else { a }).sum()	    MISSING_WIDTHS.iter().map(|&(_, a, b)| if wide { a } else { b }).sum()
+M8_撕裂态少减一致态	    (1u64 << sectors).saturating_sub(2)	    1u64 << sectors
+M9_主密钥槽内联宽度错	    ("主密钥槽", PTR_BYTES, 80),	    ("主密钥槽", PTR_BYTES, 60),
+M10_指针计数漏一个	    1 + 1 + u64::from(key_slot_indirect) + u64::from(map_sep)	    1 + u64::from(key_slot_indirect) + u64::from(map_sep)

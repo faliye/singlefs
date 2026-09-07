@@ -216,6 +216,21 @@ mod tests {
         );
     }
 
+    /// **上限按条目宽度各钉一个绝对值**（2026-09-07 补）。
+    /// 此前正文写「512 槽只装得下 2 台盘」，而扫描集合只有 {1,2,8,64,256}，
+    /// 3–7 台一格没跑 ⇒ 表里读不出上限。这条测试把三档上限直接钉住，正文再漂就会红。
+    #[test]
+    fn criterion2_inline_capacity_per_entry_width_is_absolute() {
+        let cap = |e: u64| (1u64..40).filter(|d| total_bytes(*d, e, true, true) <= 512).max().unwrap();
+        assert_eq!(cap(24), 6, "24 字节条目：6 台装得下、7 台爆");
+        assert_eq!(cap(40), 3, "40 字节条目（E72 的假设档）：3 台");
+        assert_eq!(cap(64), 2, "64 字节条目：2 台");
+        // 临界处的绝对字节数，防止三档一起错
+        assert_eq!(total_bytes(6, 24, true, true), 505);
+        assert_eq!(total_bytes(3, 40, true, true), 481);
+        assert_eq!(total_bytes(2, 64, true, true), 489);
+    }
+
     /// **判据 2 的绝对值 + 阳性对照**：设备表留在槽里时，512 字节槽在很小的设备数上就爆。
     #[test]
     fn criterion2_inline_device_table_overflows_a_512_byte_slot_early() {
