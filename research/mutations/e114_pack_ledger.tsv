@@ -1,0 +1,12 @@
+M1_容器头算成0	const PACK_HDR: u64 = 103; // D18 已定项 11	const PACK_HDR: u64 = 0; // D18 已定项 11
+M2_末次发布按满算	    full * m.div_ceil(cap) + rem.div_ceil(cap)	    n.div_ceil(m) * m.div_ceil(cap)
+M3_pad不补齐	    let units = n;\n    let data_bytes = units * UNIT;	    let units = n;\n    let data_bytes = units * _size;
+M4_副本数算成1	const W: u64 = 2; // D2 已定项 9	const W: u64 = 1; // D2 已定项 9
+M5_槽额外开销漏掉	const SLOT_FULL: u64 = 47; // 五元组 33 + 写序 10 + 槽表 4	const SLOT_FULL: u64 = 0; // 五元组 33 + 写序 10 + 槽表 4
+M6_容器索引漏计	    let cidx = containers * (CONTAINER_REF + LOC_ENTRY * W);	    let cidx = 0 * containers * (CONTAINER_REF + LOC_ENTRY * W);
+M7_活槽记账漏计	    let live = containers * LIVE_COUNT_ENTRY;	    let live = 0 * containers * LIVE_COUNT_ENTRY;
+M8_故障域算成1	             objects_lost_per_unit: cap.min(m) }	             objects_lost_per_unit: 1 }
+M9_落点粒度算成单元	const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度	const GRAIN: u64 = 32768; // D3 已定项 7 落点粒度
+M10_覆写不产生新单元	    let units = containers + overwritten;	    let units = containers;
+M11_整理触及率不饱和	        let p = 1.0 - (1.0 - 1.0 / containers as f64).powi(overwritten as i32);	        let p = (overwritten as f64) / (containers as f64) * 0.5;
+M12_容器容量多算一格	    avail / per	    avail / per + 1

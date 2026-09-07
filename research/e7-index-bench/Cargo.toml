@@ -296,3 +296,7 @@ path = "src/bin/e112_old_writer_unknown_tree.rs"
 [[bin]]
 name = "e113-unknown-tree-full-arms"
 path = "src/bin/e113_unknown_tree_full_arms.rs"
+
+[[bin]]
+name = "e114-pack-ledger"
+path = "src/bin/e114_pack_ledger.rs"

@@ -18,7 +18,28 @@ SKIP = {'.git', 'node_modules', 'target'}
 # 在副本里当然指不到。它也不许在本仓就地改（CLAUDE.md：改共享规则只能改上游）。
 # `gate.d/fixtures/` 里的红样本**故意**放着坏链接——那是它的判别力来源。
 # 样本跑的时候会被拷进临时目录、以那里为根来判，所以在本仓里跳过它不影响自检。
-SKIP_PATH = ('.claude/singlefs-ai-sop/', '.claude/gate.d/fixtures/')
+def _excluded_dirs():
+    """从 .claude/doc-lint-exclude 读要绕开的目录。
+
+    ⚠️ 这份清单是 evidence-discipline.md「门禁也得绕开这批目录」指定的落点：
+    原样保存的证据（发给模型的提示、跑出来的原始输出）不许事后改，
+    那么一道要求人回去改原件的检查，逼出来的只有证据链断掉或整道检查被绕过。
+    此前本文件自己硬编码两条、不读清单，于是 research/prompts/ 下模型输出里的
+    相对链接被判红（2026-09-07 实测 2 处），而那些文件按纪律恰恰不许改。
+    """
+    out = []
+    try:
+        with open('.claude/doc-lint-exclude', encoding='utf-8') as f:
+            for line in f:
+                line = line.split('#')[0].strip()
+                if line:
+                    out.append(line if line.endswith('/') else line + '/')
+    except OSError:
+        pass
+    return tuple(out)
+
+
+SKIP_PATH = ('.claude/singlefs-ai-sop/', '.claude/gate.d/fixtures/') + _excluded_dirs()
 CN = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10}
 
 def md_files(root='.'):

@@ -37,6 +37,7 @@
 @.claude/rules/fs-design.md
 @.claude/rules/format-evolution.md
 @.claude/rules/three-way-inference.md
+@.claude/rules/mutation-sampling.md
 
 文件系统的设计纪律只有本工程需要，所以它不在共享 SOP 里——
 共享 SOP 管的是「项目怎么和 AI 协作」，不管某一类系统怎么设计。
@@ -64,7 +65,7 @@
 | `.claude/kb/verification-build.md` | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
-| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证） |
+| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
 
 ## 门禁

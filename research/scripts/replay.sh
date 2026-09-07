@@ -66,6 +66,7 @@ E78|e78-replay-start||e78-replay-start-2026-09-02.out|exact
 E79|e79-root-record||e79-root-record-2026-09-06.out|exact
 E112|e112-old-writer-unknown-tree||e112-old-writer-unknown-tree-2026-09-06.out|exact
 E113|e113-unknown-tree-full-arms||e113-unknown-tree-full-arms-2026-09-06.out|exact
+E114|e114-pack-ledger||e114-pack-ledger-2026-09-07.out|exact
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
