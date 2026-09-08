@@ -1,0 +1,7 @@
+1. Clause 1 breaks when a crash occurs during compaction after writing new data but before updating the central map. Timeline: (1) Unit T with birth=1 exists at location L1. (2) Compaction moves T to L2, writing data to L2. (3) System crashes before updating the central map. (4) On restart, central map still points to L1. (5) Reading T returns data from L1 (stale), while L2 contains the correct data. Observable wrong outcome: stale data read despite compaction having written new data.
+
+2. No counterexample for Clause 2.
+
+3. Clause 3 breaks when the central map key lacks birth generation. Timeline: (1) Write unit T birth=1 at L1; central map (key=T) points to L1. (2) Overwrite T to birth=2 at L2; central map updates to point to L2. (3) Create snapshot S1 (txg=1) referencing birth=1. (4) Destroy S1; deadlist entry for T birth=1 processes. (5) Map lookup for T (no birth) returns L2, which is freed. Observable wrong outcome: live data L2 is double-freed while birth=1 data remains allocated.
+
+4. Clause 4 breaks when no contiguous destination exists but compaction proceeds with non-contiguous allocation and sequential writing. Timeline: (1) Compaction batch of 4096 contiguous source locations (e.g., 100-4195). (2) Allocator reports no contiguous destination. (3) System allocates scattered locations (e.g., 5000, 5002, 5005) but assumes contiguous. (4) Writes data sequentially starting at 5000, overwriting location 5001 (which is live data for another unit). Observable wrong outcome: data corruption from overwriting live blocks.

@@ -1,0 +1,7 @@
+Clause 1 breaks. Timeline: Round 0 unit created at L0 with birth=0. Round 1 snapshot S1 (txg=1) created. Round 2 overwrite creates new unit with birth=2; old unit (birth=0) is dead and added to S1's deadlist. Round 3 destroy S1: previous txg=0, birth=0 not >0 so merged into next snapshot's deadlist. Subsequent snapshot destroys never free birth=0 because no txg <0 exists. Unit at L0 (or relocated location) remains allocated forever despite being dead. Leak occurs.
+
+Clause 2 breaks. Timeline: Round 0 unit created at L0 with birth=0. Round 1 snapshot S1 created. Round 2 overwrite creates new unit; old unit added to deadlist with hint L0. Round 3 compaction moves unit to L1; allocation record for L0 freed. Round 4 destroy S1: system uses deadlist hint L0 for freeing instead of central map (violating settled fact 2). L0 is already freed during compaction, causing double free.
+
+Clause 3 breaks. Timeline: Overwrite same file offset 1,000,000 times with 1,000,000 snapshots retained. Encoding B stores all versions in single btree entry. Value size grows to 1,000,000 * 22 bytes = 22MB per key. Unbounded memory usage causes system failure.
+
+Clause 4 breaks. Timeline: Compact 1000 locations with fanout=100. Destination policy lowest free slot first scatters new offsets. Inserting into allocation-record btree causes 1000 node splits (worst case) instead of ceil(1000/100)=10 leaves as claimed. Actual cost is 100x higher than stated formula, causing severe performance degradation.
