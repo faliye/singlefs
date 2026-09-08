@@ -65,7 +65,7 @@
 | `.claude/kb/verification-build.md` | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
-| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证、`mutation-sampling.md` 变异没被抓时的三分判据） |
+| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
 
 ## 门禁
@@ -101,6 +101,10 @@ bash .claude/gate.d/32-first-txn-fields.sh # 第一个事务的每个字段都�
 bash .claude/gate.d/33-mutation-tables.sh # 每个实验二进制都有同名变异表（只验装置在，不跑变异）
 bash .claude/gate.d/34-experiment-index-sync.sh # 实验索引行与正文标题说的是不是同一件事
 bash .claude/gate.d/35-user-verdict-owed.sh # 动了用户定案的条款有没有记一笔未还的账
+bash .claude/gate.d/36-invariant-count-cross-file.sh # 不变量条数在 invariants.md 之外也要对
+bash .claude/gate.d/37-decision-summary-width.sh # 决策索引结论列的宽度（上限从 decisions.md 那一句读）
+bash .claude/gate.d/38-field-table-projection.sh # 决策里定的字段有没有漏投影进第一个事务的表
+bash .claude/gate.d/39-field-table-sum.sh # 字段表加出来的数：表后合计与 format-const 标记
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
