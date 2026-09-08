@@ -615,6 +615,72 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 `btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`），
 2026-08-26 现拉并逐字比对。
 
+## 八、根环槽宽与「墙钟消费者走旧代根」这两件事，现役实现怎么做
+
+**2026-09-08 在本机固定点 `/home/fy5090/code/fs-refs` 现查逐字抄出。均未在本项目验证。**
+它们回答的是 D2（RAID 条带策略） 未定项 15（「生命周期不同的对象」的通用判据）
+与 [checks-owed.md](checks-owed.md) C213（走旧代根的墙钟消费者没有承担者）。
+
+### 8.1 ZFS：根环槽宽确实随设备粒度抬，但封顶 8 KiB，而且抬槽宽是减槽数不是多占地
+
+来源 `zfs/include/sys/vdev_impl.h:467-486` 与 `zfs/include/sys/uberblock_impl.h:37`，逐字：
+
+```c
+#define	VDEV_UBERBLOCK_RING	(128 << 10)
+/* The largest uberblock we support is 8k. */
+#define	MAX_UBERBLOCK_SHIFT (13)
+#define	VDEV_UBERBLOCK_SHIFT(vd)	\
+	MIN(MAX((vd)->vdev_top->vdev_ashift, UBERBLOCK_SHIFT), \
+	    MAX_UBERBLOCK_SHIFT)
+#define	VDEV_UBERBLOCK_COUNT(vd)	\
+	(VDEV_UBERBLOCK_RING >> VDEV_UBERBLOCK_SHIFT(vd))
+```
+
+`UBERBLOCK_SHIFT` 逐字 `10			/* up to 1K	*/`；`vdev_ashift` 的字段注释逐字 `/* block alignment shift	*/`。
+
+**三件事一起读出来**：
+
+| 读出什么 | 逐字依据 |
+|---|---|
+| **槽宽跟设备粒度走**，不是固定常量 | `MAX((vd)->vdev_top->vdev_ashift, UBERBLOCK_SHIFT)` |
+| **但封顶 8 KiB** ——不会因为阵列的条带块大就把槽抬到那么大 | `MAX_UBERBLOCK_SHIFT (13)` 与它上方那句注释 |
+| **环的总大小固定 128 KiB ⇒ 抬槽宽等于减槽数**，不是多占盘 | `VDEV_UBERBLOCK_COUNT = VDEV_UBERBLOCK_RING >> SHIFT` |
+
+⚠️ **它用的量是 `ashift`（对齐 / 最小分配单元），不是 Linux 的 `io_min`（阵列上是条带块大小）。**
+两个量在 md 阵列上差很远——E34（根环槽几何） 在真 md/raid5 上量到 128 倍。
+
+⚠️ **与本工程的一处已知差异（`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 要求写下来）**：
+ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock 环恒占其中 128 KiB；
+而本工程的根环是 R 个区域按素数步长撒在盘上，**区域多大不是格式常量**——
+每区槽数 S 住超级块（D22（单元原子性怎么合成） 已定项 2 逐字「S 住超级块。**下界 1、上界由
+I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ 「抬槽宽 = 减槽数」这个等式在本工程
+**要先把「区域大小固定」写成条款**才成立，而仓里今天没有这条。
+
+### 8.2 btrfs：墙钟消费者不靠拉长保护窗口，靠走 commit root + 可暂停
+
+来源 `linux-6.17/fs/btrfs/`，2026-09-08 现查，逐字：
+
+| 位置 | 逐字 |
+|---|---|
+| `scrub.c:463` / `scrub.c:465` | `sctx->extent_path.search_commit_root = 1;` / `sctx->csum_path.search_commit_root = 1;` |
+| `scrub.c:2607` | `path->search_commit_root = 1;` |
+| `transaction.c:190` / `:217` | `down_write(&fs_info->commit_root_sem);` / `up_write(&fs_info->commit_root_sem);` |
+| `ctree.c:1795` | `lockdep_assert_held_read(&lowest->fs_info->commit_root_sem);` |
+| `transaction.c:2360` | `btrfs_scrub_pause(fs_info);` |
+
+⇒ **三件套**：scrub 读的不是活树而是 **commit root**（上一个已提交事务的根）；
+提交路径切换 commit root 时拿 `commit_root_sem` 的**写锁**、遍历方拿读锁，两者互斥；
+且提交路径**显式把 scrub 停下来**（`btrfs_scrub_pause`），不是让它带着一个即将失效的根继续走。
+
+**这是一条与「把保护窗口拉长到覆盖扫描时长」完全不同的路**：
+它不动块重用的代数窗口，而是把消费者做成**可暂停、且与提交点同步**的。
+
+⚠️ **与本工程的一处已知差异**：btrfs 的 commit root 只有**一代**（上一个已提交事务），
+靠内存里的读写锁维持，因此它只覆盖**运行期**那一半；
+而 I-7.4（近 K 代块未被复用） 逐字写着「崩溃后 defer 队列的内存态丢失，运行时的 K 由根环深度接管
+（清扫准入「释放代 ≤ 环里最旧根 txg」那条闸），保护宽度随之变」——
+**崩溃之后那一半，锁一个字都说不上话。**
+
 ### 7.9 「七、近十年学术成果扫描（2012–2026）」的来源
 
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
