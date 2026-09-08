@@ -110,10 +110,21 @@ COW 下改一条 key 要重写的节点数 = 树高，两条臂**逐格相同**�
 
 - 代码 `research/e7-index-bench/src/bin/e73_key_range.rs`
   （`cargo run --release --bin e73-key-range`），
-  原始输出 `research/results/e73-key-range-2026-09-01.out`（26 行，收尾行 `emitted=26`）。
+  原始输出 `research/results/e73-key-range-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e73-key-range-2026-09-01.out，留在 results/ 里不动）`（26 行，收尾行 `emitted=26`）。
 - **N=5 轮逐字节一致**（同一个 md5）。**8 个单测，8 条变异逐条命中、0 个盲区**，
   变异表 `research/mutations/e73_key_range.tsv`
   （`bash research/scripts/mutate.sh e73-key-range research/e7-index-bench/src/bin/e73_key_range.rs research/mutations/e73_key_range.tsv`）。
+
+⚠️ **2026-09-07 按今天成立的头宽重跑过一遍**（用户在 D18（块里携带什么信息） 已定项 14
+定案前要的那一步）。此前源码里的三档基础节点头是 **58 / 67 / 76**，那是 E73（节点 key 区间的扇出代价）
+跑那天的下界；此后两笔加宽从来没落到源码里，这次一起补上：
+写序 10（D18（块里携带什么信息） 已定项 7 补注）+ 预留位 28
+（D18（块里携带什么信息） 已定项 7 逐字「v1 就预留 nonce 代号与 MAC 的字段位」，
+按已定项 14 臂甲的 nonce 代号 12 与 D9（加密） 已定项 2 的 MAC 16）⇒ **96 / 105 / 114**。
+两组头都留在源码里逐格跑，旧那组是这条结论此前站的地方。
+**结论没翻**，变的只是中间量。产物换成同日重跑的那份。
+
+**中间量**：不带 key 区间的扇出 302 → **301**，带区间 301 → **300**；两者仍差一格。
 
 ## 历史版本
 

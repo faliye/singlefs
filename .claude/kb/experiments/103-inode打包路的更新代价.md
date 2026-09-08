@@ -33,7 +33,7 @@
 ### 实测（2026-09-04，纯算术，N=5 轮逐字节一致，11 单测 / 11 条变异全抓）
 
 **口径与复跑**：代码 `research/e7-index-bench/src/bin/e103_inode_update_cost.rs`（`cargo run --release --bin e103-inode-update-cost`），
-产物 `research/results/e103-inode-update-cost-2026-09-05.out`（68 行，收尾 `emitted=68`；打包头 103 的那一版，只有 config 行的 `packed_hdr` 变了；2026-09-05 随第三臂重生成、同日第三臂条目从 91 改 93 后再生成一次，再把 93 / 233 钉成字面量常量给 27 号门禁、config 行多两个字段后第三次生成，两臂原有的数一个没变），
+产物 `research/results/e103-inode-update-cost-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e103-inode-update-cost-2026-09-05.out，留在 results/ 里不动）`（68 行，收尾 `emitted=68`；打包头 103 的那一版，只有 config 行的 `packed_hdr` 变了；2026-09-05 随第三臂重生成、同日第三臂条目从 91 改 93 后再生成一次，再把 93 / 233 钉成字面量常量给 27 号门禁、config 行多两个字段后第三次生成，两臂原有的数一个没变），
 变异表 `research/mutations/e103_inode_update_cost.tsv`
 （`bash research/scripts/mutate.sh e103-inode-update-cost research/e7-index-bench/src/bin/e103_inode_update_cost.rs research/mutations/e103_inode_update_cost.tsv`，
 记录 `research/results/e103-mutate-2026-09-05.log`），已挂 `research/scripts/replay.sh`。
@@ -61,6 +61,17 @@ inode 树按身份引用时叶扇出 466（条目 8 + 27）、高 3。
 纯算术：没有 btree 实现、没有 I/O、没有缓存、没有崩溃点重放，文件操作 0 处。不答挂钟。
 更新均匀散开是选定的场景点，真实负载的局部性只用聚簇格给一个上界；打包侧的容器每次发布重写一次那笔账（C105（打包容器按发布频率重写的写放大））
 在这里体现为「k 条更新落在几个容器」，没有单独建模。
+
+⚠️ **2026-09-07 按今天成立的头宽重跑过一遍**（用户在 D18（块里携带什么信息） 已定项 14
+定案前要的那一步）。此前源码里的三档基础节点头是 **58 / 67 / 76**，那是 E73（节点 key 区间的扇出代价）
+跑那天的下界；此后两笔加宽从来没落到源码里，这次一起补上：
+写序 10（D18（块里携带什么信息） 已定项 7 补注）+ 预留位 28
+（D18（块里携带什么信息） 已定项 7 逐字「v1 就预留 nonce 代号与 MAC 的字段位」，
+按已定项 14 臂甲的 nonce 代号 12 与 D9（加密） 已定项 2 的 MAC 16）⇒ **96 / 105 / 114**。
+两组头都留在源码里逐格跑，旧那组是这条结论此前站的地方。
+**结论没翻**，变的只是中间量。产物换成同日重跑的那份。
+
+**中间量**：内部扇出 243 → **242**、容器索引扇出 192 → **191**；而 `b_over_a`、树高、容器数**逐格不动**——被树高的向上取整吸收（⌈8621 / 243⌉ = ⌈8621 / 242⌉ = 36）。⚠️ 这不是「头宽不影响结论」，中间量确实变了，单测 `geometry_at_today_header_is_absolute` 把它钉住。
 
 ## 历史版本
 
