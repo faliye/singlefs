@@ -1,0 +1,20 @@
+E7RESULT name=config grain=16384 slots_per_unit=2 segs=[32, 64, 128] dirs=16 files=32
+E7RESULT name=walk arm=grouped stride=1 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=arrival stride=1 total_runs=512 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=random stride=1 total_runs=484 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=grouped stride=2 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=arrival stride=2 total_runs=256 worst_dir_runs=16 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=random stride=2 total_runs=484 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=grouped stride=4 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=arrival stride=4 total_runs=128 worst_dir_runs=8 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=random stride=4 total_runs=484 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=grouped stride=8 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=arrival stride=8 total_runs=64 worst_dir_runs=4 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=random stride=8 total_runs=484 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=walk arm=grouped stride=32 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=arrival stride=32 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0
+E7RESULT name=walk arm=random stride=32 total_runs=484 worst_dir_runs=32 empty_segs_at_32=0 empty_segs_at_64=0 empty_segs_at_128=0
+E7RESULT name=negcontrol arm=grouped total_runs=0
+E7RESULT name=negcontrol arm=arrival total_runs=0
+E7RESULT name=negcontrol arm=random total_runs=0
+E7RESULT name=done emitted=20

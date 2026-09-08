@@ -1,0 +1,12 @@
+M1_容器头算成0	const PACK_HDR: u64 = 103; // D18 已定项 11	const PACK_HDR: u64 = 0; // D18 已定项 11
+M2_每槽额外算成0	const SLOT_EXTRA: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目	const SLOT_EXTRA: u64 = 0; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
+M3_界线抬到8KiB	const LIMIT: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB	const LIMIT: u64 = 8192; // D27 已定项 2：界线 ≤ 4 KiB
+M4_定宽臂不补齐	        let n_t: u64 = (lo..=w).map(|s| c[s as usize]).sum();\n        let cap = cap_of(w);	        let n_t: u64 = (lo..=w).map(|s| c[s as usize]).sum();\n        let cap = cap_of(lo);
+M5_变长臂退回完美装填	            if room < need {\n                containers += 1;\n                room = NET;\n            }	            if room < need {\n                containers += 1;\n                room = NET + room;\n            }
+M6_档表少最细那档	        "gran64" => (1..=64).map(|i| i * 64).collect(),	        "gran64" => (2..=64).map(|i| i * 64).collect(),
+M7_pow2档表写错	        "pow2" => vec![64, 128, 256, 512, 1024, 2048, 4096],	        "pow2" => vec![64, 256, 512, 1024, 2048, 4096, 4096],
+M8_对数均匀退化成均匀	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
+M9_取整误差丢对象	    c[last] += n - acc; // 取整误差全给最后一格，总数恒为 n	    let _ = last; // 取整误差全给最后一格，总数恒为 n
+M10_容器数不上取整	        if n_t > 0 { containers += n_t.div_ceil(cap.max(1)); }	        if n_t > 0 { containers += n_t / cap.max(1); }
+M11_档区间下界写错	        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };	        let lo = if i == 0 { 1 } else { ts[i - 1] };
+M12_单元大小算错	const UNIT: u64 = 32768; // D4 已定项 5	const UNIT: u64 = 16384; // D4 已定项 5

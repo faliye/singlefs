@@ -1,0 +1,64 @@
+E7RESULT name=config disk_slots=262144 grain=16384 meta_units=5242 data_units=128451 ditto_spread=32768 chain_bytes=12 total_bytes=4294967296
+E7RESULT name=recover arm=none start=0 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=0 len=4096 rec_meta=1146 rec_data=128451 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=4096 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=4096 rec_meta=1146 rec_data=128451 detected_only=0 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=0 len=16384 rec_meta=0 rec_data=122880 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=16384 rec_meta=5242 rec_data=122880 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=16384 rec_meta=0 rec_data=122880 detected_only=1 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=0 len=32768 rec_meta=0 rec_data=114688 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=32768 rec_meta=5242 rec_data=114688 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=32768 rec_meta=0 rec_data=114688 detected_only=1 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=0 len=65536 rec_meta=0 rec_data=98304 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=65536 rec_meta=524 rec_data=98304 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=65536 rec_meta=0 rec_data=98304 detected_only=1 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=0 len=262144 rec_meta=0 rec_data=0 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=0 len=262144 rec_meta=0 rec_data=0 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=0 len=262144 rec_meta=0 rec_data=0 detected_only=0 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=0 rec_meta=5242 rec_data=128451 detected_only=0 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=4096 rec_meta=5242 rec_data=126403 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=4096 rec_meta=5242 rec_data=126403 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=4096 rec_meta=5242 rec_data=126403 detected_only=2 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=16384 rec_meta=5242 rec_data=120259 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=16384 rec_meta=5242 rec_data=120259 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=16384 rec_meta=5242 rec_data=120259 detected_only=2 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=32768 rec_meta=5242 rec_data=112067 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=32768 rec_meta=5242 rec_data=112067 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=32768 rec_meta=5242 rec_data=112067 detected_only=2 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=65536 rec_meta=5242 rec_data=95683 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=65536 rec_meta=5242 rec_data=95683 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=65536 rec_meta=5242 rec_data=95683 detected_only=2 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none start=131072 len=262144 rec_meta=5242 rec_data=62915 detected_only=0 overhead_bytes=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto start=131072 len=262144 rec_meta=5242 rec_data=62915 detected_only=0 overhead_bytes=94470144 overhead_ppm=21995
+E7RESULT name=recover arm=chain start=131072 len=262144 rec_meta=5242 rec_data=62915 detected_only=1 overhead_bytes=1604316 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=64 rec_meta=5160 rec_data=124437 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=64 rec_meta=5160 rec_data=124437 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=64 rec_meta=5160 rec_data=124437 detected_only=4014 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=16 rec_meta=4914 rec_data=112395 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=16 rec_meta=4914 rec_data=112395 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=16 rec_meta=4914 rec_data=112395 detected_only=16056 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=8 rec_meta=4586 rec_data=96339 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=8 rec_meta=4586 rec_data=96339 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=8 rec_meta=4586 rec_data=96339 detected_only=32112 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=4 rec_meta=3931 rec_data=64226 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=4 rec_meta=3931 rec_data=64226 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=4 rec_meta=3931 rec_data=64226 detected_only=64225 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=63 rec_meta=5158 rec_data=126412 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=63 rec_meta=5242 rec_data=126412 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=63 rec_meta=5158 rec_data=126412 detected_only=2039 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=17 rec_meta=4933 rec_data=120895 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=17 rec_meta=5242 rec_data=120895 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=17 rec_meta=4933 rec_data=120895 detected_only=7556 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=9 rec_meta=4659 rec_data=114179 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=9 rec_meta=5242 rec_data=114179 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=9 rec_meta=4659 rec_data=114179 detected_only=14272 overhead_ppm=373
+E7RESULT name=recover arm=none fault=scatter k=5 rec_meta=4193 rec_data=102761 detected_only=0 overhead_ppm=0
+E7RESULT name=recover arm=ditto fault=scatter k=5 rec_meta=5242 rec_data=102761 detected_only=0 overhead_ppm=21995
+E7RESULT name=recover arm=chain fault=scatter k=5 rec_meta=4193 rec_data=102761 detected_only=25690 overhead_ppm=373
+E7RESULT name=blastradius rec_data_intact=128451 rec_data_one_gone=128450 delta=1
+E7RESULT name=discriminate distinct_outcomes=2
+E7RESULT name=done emitted=64

@@ -1,0 +1,14 @@
+M1_容器头算成0	const PACK_HDR: u64 = 103;	const PACK_HDR: u64 = 0;
+M2_每槽额外算成0	const SLOT_EXTRA: u64 = 43;	const SLOT_EXTRA: u64 = 0;
+M3_界线抬到8KiB	const LIMIT: u64 = 4096;	const LIMIT: u64 = 8192;
+M4_去重比错cap	        if cap_of(last) == cap_of(w) { out.pop(); }	        if last == w { out.pop(); }
+M5_同cap取最小W	    let w = (NET / c).saturating_sub(SLOT_EXTRA);	    let w = (NET / (c + 1)).saturating_sub(SLOT_EXTRA);
+M6_capgeo从错的cap起步	    let mut c = cap_of(LIMIT);	    let mut c = 1;
+M7_档区间下界写错	        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };	        let lo = if i == 0 { 1 } else { ts[i - 1] };
+M8_容器数不上取整	        if n_t > 0 { total += n_t.div_ceil(cap_of(w).max(1)); }	        if n_t > 0 { total += n_t / cap_of(w).max(1); }
+M9_变长臂退回完美装填	            if room < need { cont += 1; room = NET; }	            if room < need { cont += 1; room = NET + room; }
+M10_界线截断去掉	    let w = w.min(LIMIT);	    let w = w;
+M11_对数均匀退化成均匀	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
+M12_取整误差丢对象	    c[last] += n - acc;	    let _ = last;
+M13_单元大小算错	const UNIT: u64 = 32768;	const UNIT: u64 = 16384;
+M14_wgeo公比写错	        "wgeo" => wgeo_tiers(1125, w_min),	        "wgeo" => wgeo_tiers(1250, w_min),

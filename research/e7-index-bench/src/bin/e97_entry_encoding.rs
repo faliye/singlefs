@@ -120,6 +120,18 @@ const K_MAX: u64 = RING_REGIONS * SLOTS_MAX + 1;
 const CKPT_TXG_BYTES: u64 = 8;
 /// E73 按 D18 已定项 7 重算过的三档基础节点头下界。
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
+/// D18 已定项 7 的两个预留位合计（nonce 代号 12 + MAC 16）。E117 的 `resv12` 臂同一个数。
+const RESERVED_HDR: u64 = 12 + 16;
+/// 写序（C113 定案 P1）。D18 已定项 7 补注：三档下界各加它。
+const WRITE_ORDER: u64 = 10;
+/// 今天成立的三档基础节点头。上面那组 58 / 67 / 76 是 E73 跑那天的下界，
+/// 此后两笔加宽从来没落到本实验的源码里，2026-09-07 一次补上（C89 ④ 与 C193）：
+/// 写序 10 + 预留位 28。两组都留着并逐格跑——删掉旧那组就看不出这次补账改了什么。
+const NODE_HEADERS_TODAY: [u64; 3] = [
+    NODE_HEADERS[0] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HDR,
+];
 /// E73 用的子指针宽度（它的参数）与 D22 已定项 7 的树表单元指针实宽。
 const CHILD_PTR_E73: u64 = 32;
 const CHILD_PTR_SETTLED: u64 = 53;
@@ -237,7 +249,10 @@ fn inversions_mod_closed(gens: u64, m: u64) -> u64 {
     let r = gens % m;
     let pairs_within = m * (m - 1) / 2;
     let mut inv = q * (q - 1) / 2 * pairs_within;
-    let tail = r * (m - 1) - r * (r - 1) / 2;
+    // ⚠️ `r * (r - 1)` 在 r = 0 时先算 `r - 1` 就下溢：release 下静默回绕
+    // （0 × u64::MAX = 0，答案照样对），debug 下 panic。
+    // 门禁跑的是 `cargo test --release`，所以这条 2026-09-07 之前一直没人看见。
+    let tail = r * (m - 1) - r * r.saturating_sub(1) / 2;
     inv += q * tail;
     inv
 }
@@ -423,7 +438,7 @@ fn main() {
     for (name, segs) in &acct_arms {
         let kb = key_bytes(segs);
         let leaf_entry = kb + ACCT_VALUE_BYTES;
-        for &hdr in NODE_HEADERS.iter() {
+        for &hdr in NODE_HEADERS.iter().chain(NODE_HEADERS_TODAY.iter()) {
             for &cp in [CHILD_PTR_E73, CHILD_PTR_SETTLED].iter() {
                 let inner_entry = kb + cp;
                 // D18 已定项 2：记账树的节点带 key 区间 ⇒ 区间字段 = 2 × key

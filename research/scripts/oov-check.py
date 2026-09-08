@@ -10,6 +10,11 @@
 所以真英文词也会进生词表（实测 `factually` `misrepresents`）。
 因此判红的不是「有生词」，是「生词能切成两个词表里的词」。
 
+⚠️ **粘死的第二个词可以缺头，缺到切不开为止。** `inaccessibleisabled` 缺一个字母（规则 C 补得回），
+而 `cryptographicord`（cryptographic + [Rec]ord）缺三个——尾巴只剩 `ord`，A / B / C 全切不开。
+规则 D 换个方向判：成词的长前缀 + 一截既不成词也不是后缀的短尾巴。实测 2026-09-08：
+在 395 份既有输出上回扫，新增判红 4 份、两个词（`cryptographicord`、`rewritingopy`），全是真损坏、零误报。
+
 排掉常见构词前缀，否则 `mis+represents` 这类正常派生词会被误判。
 """
 import sys, re, os
@@ -28,6 +33,13 @@ PREFIX = {'mis', 'pre', 'non', 'sub', 'inter', 'over', 'under', 'multi',
           # 与上面同类的英语组合前缀。加进来是因为实测把 counter+observation
           # 判成了拼接——那是模型造的复合词，不是损坏。
           'counter', 'cross', 'self', 'post', 'pseudo', 'quasi'}
+# 规则 D 用：正常派生后缀。切在这里不算拼接（`distinguish+able` 是派生，不是损坏）。
+SUFFIX = {'s', 'es', 'ed', 'ing', 'er', 'ers', 'est', 'ly', 'y', 'al', 'ial', 'ic',
+          'ive', 'ion', 'ions', 'ity', 'ies', 'ism', 'ist', 'ous', 'ful', 'less',
+          'ness', 'ment', 'ance', 'ence', 'able', 'ably', 'ible', 'ate', 'ated',
+          'ize', 'ized', 'ise', 'ised', 'ish', 'like', 'wise', 'ward', 'ings', 'd', 'n',
+          # 下面这批是 2026-09-08 在 395 份既有输出上回扫逼出来的：不加就是几十份误报
+          'ally', 'izes', 'ises', 'r', 'rs', 'ry', 'cy', 'ent', 'ant', 'ial', 'ual'}
 EXIT_CLEAN, EXIT_RED, EXIT_BROKEN = 0, 1, 2
 
 def load_words():
@@ -72,6 +84,22 @@ def splice_of(w, words):
             cand = c + b
             if len(cand) >= 7 and cand in words:
                 return "%s+(%s)%s" % (a, c, b)
+    # 规则 D：成词的长前缀后面粘着一截**既不成词也不是后缀**的短尾巴。
+    # ⚠️ 这条是补出来的：实测 `cryptographicord`（cryptographic + [Rec]ord，后一个词掉了三个
+    # 字母）在 A / B / C 下全切不开——A 要两截各 >=5，C 只补得回一个字母——于是被记成
+    # 普通生词判绿，而 `oov-check` 判绿那一份输出正被当成一条论证腿在用。
+    # 三道闸压假阳性：前缀 >=8、尾巴 <=4、且尾巴既不是常见后缀也不是词表里的词
+    # （后者放掉 `filesystemwide` 这类模型自造的合成词——它是造词，不是损坏）。
+    # 两类词不进规则 D，回扫 395 份逼出来的：所有格（`snapshot's` 会被切成 snapshot+'s）、
+    # 驼峰标识符（`InstanceId` 小写后成 instance+id）。两者都不是损坏，是正常写法。
+    if "'" not in w and not any(c.isupper() for c in w[1:]):
+        for i in range(len(lw) - 1, 7, -1):
+            a, b = lw[:i], lw[i:]
+            if len(b) > 4 or a in PREFIX or a not in words:
+                continue
+            if b in SUFFIX or b in words:
+                continue
+            return "%s+%s" % (a, b)
     return None
 
 def scan(path, prompt_path, words):
@@ -100,11 +128,15 @@ SELFTEST_RED = [
     'inaccessibleisabled',   # 规则 C：inaccessible + (d)isabled
     'batchinggroup',         # 规则 A：两个实词粘死
     'configurationing',      # 规则 B：名词后缀之后接动词后缀
+    'cryptographicord',      # 规则 D：cryptographic + [Rec]ord，尾巴只剩三个字母
 ]
 SELFTEST_GREEN = [
     'distinguishable',       # 曾被规则 C 误判成 distinguish+(c)able
     'indistinguishable', 'unfalsifiable', 'counterobservation',
     'misrepresents', 'factually',
+    # 规则 D 的假阳性靶子：合成词与正常派生都不许判红
+    # 只放真会走到 splice_of 的词（词表里没有的），否则测的不是实际会发生的事
+    'filesystemwide', 'rollbacked',
 ]
 
 def selftest(words):

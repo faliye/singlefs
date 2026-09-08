@@ -16,13 +16,21 @@ TIMEOUT="${ASK_LOCAL_TIMEOUT:-900}"
 KEY="$(sed -n 's/^AI_CENTER_KEY_VSCODE_CHAT=//p' "$CENTER/.env.tenants" 2>/dev/null)"
 [[ -n "$KEY" ]] || { echo "ask-local: 取不到 AI_CENTER_KEY_VSCODE_CHAT（$CENTER/.env.tenants）" >&2; exit 2; }
 
+PROMPT_PATH="${1:-}"
 PROMPT="$(cat "${1:-/dev/stdin}")"
 [[ -n "$PROMPT" ]] || { echo "ask-local: 提示为空" >&2; exit 2; }
 
+# 测试缝：ASK_LOCAL_FAKE_TEXT 指向一份现成正文时跳过网关。
+# fs-design.md 硬要求 2「每条分支必须能被测试强制进入」——判红那条分支此前进不去，
+# 于是「判红时把证据留下来」这件事没有任何东西验得了。
+if [[ -n "${ASK_LOCAL_FAKE_TEXT:-}" ]]; then
+  RESP="$(FAKE="$ASK_LOCAL_FAKE_TEXT" python3 -c 'import json,os;print(json.dumps({"choices":[{"message":{"content":open(os.environ["FAKE"],encoding="utf-8").read()}}]}))')"
+else
 REQ="$(PROMPT="$PROMPT" python3 -c 'import json,os;print(json.dumps({"model":"local","messages":[{"role":"user","content":os.environ["PROMPT"]}]}))')"
 
 RESP="$(curl -sS -m "$TIMEOUT" -H "X-Api-Key: $KEY" -H "Content-Type: application/json" -d "$REQ" "$URL")" \
   || { echo "ask-local: 请求失败（超时 ${TIMEOUT}s？）" >&2; exit 3; }
+fi
 
 # 读不到 ≠ 读到 0：空正文一律报错，不许当成「模型没话说」
 TXT="$(mktemp)"
@@ -50,6 +58,24 @@ print(c)
 rc=${PIPESTATUS[0]:-$?}
 [[ $rc -eq 0 ]] || exit $rc
 
+# 判红那一轮的正文必须留下来：tooling.md 的坏样本表就是靠这些文件撑着，
+# 而 $TXT 是 mktemp、退出时被 trap 删掉 —— 此前作废轮的原样输出全靠调用方记得重定向
+# stdout，一次没记得就没了（2026-09-07 实测丢了一份）。
+save_void() {
+  local dir base n
+  [[ -z "${VOID_SAVED:-}" ]] || return 0   # 两个检测器都判红时只留一份
+  if [[ -n "${PROMPT_PATH:-}" && -f "$PROMPT_PATH" ]]; then
+    dir="$(dirname "$PROMPT_PATH")"; base="$(basename "$PROMPT_PATH" .md)"; base="${base%-prompt}"
+  else
+    dir="${TMPDIR:-/tmp}"; base="ask-local-$(date +%Y%m%d-%H%M%S)"
+  fi
+  n=1
+  while [[ -e "$dir/$base-output-void$n.md" ]]; do n=$((n+1)); done
+  cp "$TXT" "$dir/$base-output-void$n.md"
+  VOID_SAVED=1
+  echo "ask-local: 作废轮的原样输出已留存 $dir/$base-output-void$n.md" >&2
+}
+
 # ── 字词损坏闸 ───────────────────────────────────────────────────────────
 # 本地腿是 4-bit 量化模型，中文输出会退化性复读（实测中文 4/5 判红、英文 0/5）。
 # **这条以前只是规则里的一句提醒，提醒句拦不住手敲命令**——做成会拒绝的检查才拦得住
@@ -66,6 +92,7 @@ if [[ -x "$CHECK" || -f "$CHECK" ]]; then
     1)
       echo "ask-local: 输出判定为字词损坏 —— 按 .claude/rules/three-way-inference.md 这一轮作废" >&2
       echo "$VERDICT" >&2
+      save_void
       echo "下一步：改用英文提示重跑（实测英文 0/5 损坏），或设 ASK_LOCAL_ALLOW_CORRUPT=1 强行采用" >&2
       [[ "${ASK_LOCAL_ALLOW_CORRUPT:-0}" == "1" ]] || exit 5
       ;;

@@ -218,6 +218,10 @@ name = "e91-ring-admission"
 path = "src/bin/e91_ring_admission.rs"
 
 [[bin]]
+name = "e92-reuse-requirement"
+path = "src/bin/e92_reuse_requirement.rs"
+
+[[bin]]
 name = "e93-aging-placement"
 path = "src/bin/e93_aging_placement.rs"
 
@@ -304,3 +308,31 @@ path = "src/bin/e114_pack_ledger.rs"
 [[bin]]
 name = "e115-superblock-completeness"
 path = "src/bin/e115_superblock_completeness.rs"
+
+[[bin]]
+name = "e116-pack-settle"
+path = "src/bin/e116_pack_settle.rs"
+
+[[bin]]
+name = "e117-reserved-header"
+path = "src/bin/e117_reserved_header.rs"
+
+[[bin]]
+name = "e119-slot-tiers"
+path = "src/bin/e119_slot_tiers.rs"
+
+[[bin]]
+name = "e118-single-disk-recovery"
+path = "src/bin/e118_single_disk_recovery.rs"
+
+[[bin]]
+name = "e120-tier-ratio"
+path = "src/bin/e120_tier_ratio.rs"
+
+[[bin]]
+name = "e121-cap-tiers"
+path = "src/bin/e121_cap_tiers.rs"
+
+[[bin]]
+name = "e122-dir-locality"
+path = "src/bin/e122_dir_locality.rs"

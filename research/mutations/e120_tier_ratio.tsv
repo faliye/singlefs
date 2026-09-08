@@ -1,0 +1,13 @@
+M1_容器头算成0	const PACK_HDR: u64 = 103;	const PACK_HDR: u64 = 0;
+M2_每槽额外算成0	const SLOT_EXTRA: u64 = 43;	const SLOT_EXTRA: u64 = 0;
+M3_地板抬到256	const W_MIN: u64 = 64;	const W_MIN: u64 = 256;
+M4_界线抬到8KiB	const LIMIT: u64 = 4096; // D27 已定项 2	const LIMIT: u64 = 8192; // D27 已定项 2
+M5_等比步进用向下取整	        let next = (w * r_milli).div_ceil(1000);	        let next = w * r_milli / 1000;
+M6_末档不钉死在界线	    v.push(LIMIT);\n    v.dedup();	    v.dedup();
+M7_档区间下界写错	        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };	        let lo = if i == 0 { 1 } else { ts[i - 1] };
+M8_容器数不上取整	        if n_t > 0 { total += n_t.div_ceil(cap_of(w).max(1)); }	        if n_t > 0 { total += n_t / cap_of(w).max(1); }
+M9_变长臂退回完美装填	            if room < need { cont += 1; room = NET; }	            if room < need { cont += 1; room = NET + room; }
+M10_地板那一档也算进最坏浪费	        if i == 0 { continue; } // 地板那一档另算	        if i == 99 { continue; } // 地板那一档另算
+M11_对数均匀退化成均匀	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }	        "logunif" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
+M12_取整误差丢对象	    c[last] += n - acc;	    let _ = last;
+M13_单元大小算错	const UNIT: u64 = 32768;	const UNIT: u64 = 16384;

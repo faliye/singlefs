@@ -1,0 +1,13 @@
+The contradiction is not real. No concrete sequence exists where two versions of the same class code 3 container, both readable and published, exist on disk within the same checkpoint.  
+
+The settled clauses define that commit-internal blocks are allocated from a clustered segment (D3 settled item 5), resulting in a fixed point that converges in 2 rounds (E81 measurement). In this configuration, all necessary blocks for metadata and data are allocated in the first round without writing any data. The second round writes all data containers exactly once. Since the container is written only once per checkpoint, there is never more than one version of the container in the checkpoint. The transaction number field (set to the largest transaction number allocated in the checkpoint per D18 settled item 7) is identical across writes, but no multiple writes occur. Therefore, the premise in I-1.8 that "a container is not guaranteed to be written only once per checkpoint" is false.  
+
+For question 1: No such sequence exists. The container is written exactly once per checkpoint due to clustered allocation. The tie-breaker is unnecessary.  
+
+For question 2: Arm C (fixed point converges in memory before writing) does not break. With clustered allocation, all allocations are resolved in memory before writing. A crash mid-publication leaves the allocation tree partially written but recoverable: blocks allocated but not written are marked as allocated in the allocation tree and freed during recovery. The 28-block chain (E81) ensures no unbounded metadata growth.  
+
+For question 3: Arm A (transaction number as fixed point round ordinal) does not cause misreading. Class code is part of the header; readers always check the class before interpreting fields. No path exists where a reader ignores the class code and misinterprets the field.  
+
+For question 4: Intermediate versions from earlier fixed point rounds are unreachable. The final root is written after all containers and references only the single written version of each container. Unreferenced intermediate versions are garbage and ignored during rebuild. The published predicate (I-1.2) includes them, but they are never referenced by the root, so they do not affect correctness. The tie-breaker question is moot.  
+
+No counterexamples exist for any arm. The contradiction is resolved by the clustered allocation implementation, which ensures one write per container per checkpoint. Arm D is valid by default.

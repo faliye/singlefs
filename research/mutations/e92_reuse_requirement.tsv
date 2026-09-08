@@ -1,0 +1,8 @@
+M1_违例不减K	let publishes = (scan_secs * publish_rate).floor() as i64;\n    (publishes - k as i64).max(0) as u64	let publishes = (scan_secs * publish_rate).floor() as i64;\n    let _ = k;\n    publishes.max(0) as u64
+M2_窗口不除发布率	fn window_seconds(k: u64, publish_rate: f64) -> f64 {\n    k as f64 / publish_rate\n}	fn window_seconds(k: u64, publish_rate: f64) -> f64 {\n    let _ = publish_rate;\n    k as f64\n}
+M3_扫描时长不除速率	fn scan_seconds(blocks_total: u64, blocks_per_sec: f64) -> f64 {\n    blocks_total as f64 / blocks_per_sec\n}	fn scan_seconds(blocks_total: u64, blocks_per_sec: f64) -> f64 {\n    let _ = blocks_per_sec;\n    blocks_total as f64\n}
+M4_择根回退需求塌成一代	pricing: Pricing::Generations, req_gens: Some(2) }	pricing: Pricing::Generations, req_gens: Some(1) }
+M5_模拟不判越界	if age > k {	if age > 0 {
+M6_空白当成零	source: "C88", pricing: Pricing::Blank, req_gens: None }	source: "C88", pricing: Pricing::Generations, req_gens: Some(0) }
+M7_清单出处重号	source: "E33", pricing: Pricing::Generations	source: "D22-item2", pricing: Pricing::Generations
+M8_发布率换档	const PUBLISH_RATE: f64 = 2785.0;	const PUBLISH_RATE: f64 = 1000.0;

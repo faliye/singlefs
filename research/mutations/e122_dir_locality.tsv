@@ -1,0 +1,12 @@
+M1_槽每单元算成1	const SLOTS_PER_UNIT: u64 = 32768 / GRAIN;	const SLOTS_PER_UNIT: u64 = 1;
+M2_段长表塌成一档	const SEGS: [u64; 3] = [32, 64, 128];	const SEGS: [u64; 3] = [32, 32, 32];
+M3_连续判据用相邻槽	        if w[1] != w[0] + SLOTS_PER_UNIT {	        if w[1] != w[0] + 1 {
+M4_空段判据取任一空	        .filter(|&g| (g * seg..(g + 1) * seg).all(|s| !live.contains(&s)))	        .filter(|&g| (g * seg..(g + 1) * seg).any(|s| !live.contains(&s)))
+M5_grouped不按目录连续	                    let unit = d * files + f;	                    let unit = f * dirs + d;
+M6_stride恒为1	            let s = stride.max(1);	            let s = 1;
+M7_被删目录不排除	        if i == victim {	        if i == usize::MAX {
+M8_runs起点算成0	    let mut n = 1;	    let mut n = 0;
+M9_粒度算成数据单元	const GRAIN: u64 = 16384;	const GRAIN: u64 = 32768;
+M10_random不去重	                        if used.insert(slot) {	                        if used.insert(slot) | true {
+M11_目录数与文件数对调	const DIRS: u64 = 16;	const DIRS: u64 = 32;
+M12_排序去掉	        v.sort_unstable();	        v.reverse();

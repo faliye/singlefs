@@ -59,6 +59,18 @@ use e7_index_bench::Emitter;
 const NODE_BYTES: u64 = 16384;
 /// E73 按 D18 已定项 7 重算过的三档基础节点头下界。
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
+/// D18 已定项 7 的两个预留位合计（nonce 代号 12 + MAC 16）。E117 的 `resv12` 臂同一个数。
+const RESERVED_HDR: u64 = 12 + 16;
+/// 写序（C113 定案 P1）。D18 已定项 7 补注：三档下界各加它。
+const WRITE_ORDER: u64 = 10;
+/// 今天成立的三档基础节点头。上面那组 58 / 67 / 76 是 E73 跑那天的下界，
+/// 此后两笔加宽从来没落到本实验的源码里，2026-09-07 一次补上（C89 ④ 与 C193）：
+/// 写序 10 + 预留位 28。两组都留着并逐格跑——删掉旧那组就看不出这次补账改了什么。
+const NODE_HEADERS_TODAY: [u64; 3] = [
+    NODE_HEADERS[0] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HDR,
+];
 /// D19 已定项 4（2026-09-03）：位置条目 14 ⇒ 树表单元指针 31 + 14 × 2 = 59。
 const CHILD_PTR: u64 = 59;
 /// D18 已定项 7：共同明文前缀 42 字节；数据单元头 91 字节初值。
@@ -276,7 +288,7 @@ fn main() {
     }
 
     // 判据 1 / 5：几何与爆炸半径。inode 树带不带 key 区间两种读法都算（D18 已定项 2 没说）
-    for &hdr in NODE_HEADERS.iter() {
+    for &hdr in NODE_HEADERS.iter().chain(NODE_HEADERS_TODAY.iter()) {
         for &disc in KEY_HEAD_DISCRIM_ARMS.iter() {
             let k = KEY_INODE + disc;
             for &with_range in [false, true].iter() {

@@ -1,0 +1,31 @@
+E7RESULT name=config publish_rate=2785 consumers=5 ks=5
+E7RESULT name=consumer id=c1_root_fallback source=D22-item2 pricing=generations req_gens=2
+E7RESULT name=consumer id=c2_replay_watermark source=D23-item14 pricing=generations req_gens=blank
+E7RESULT name=consumer id=c3_scrub_old_root source=D13 pricing=wallclock req_gens=blank
+E7RESULT name=consumer id=c4_timeline_discriminate source=C88 pricing=blank req_gens=blank
+E7RESULT name=consumer id=c5_pinning_phase source=E33 pricing=generations req_gens=blank
+E7RESULT name=gen_consumer id=c1_root_fallback k=1 req_gens=2 violations=1
+E7RESULT name=gen_consumer id=c1_root_fallback k=2 req_gens=2 violations=0
+E7RESULT name=gen_consumer id=c1_root_fallback k=3 req_gens=2 violations=0
+E7RESULT name=gen_consumer id=c1_root_fallback k=4 req_gens=2 violations=0
+E7RESULT name=gen_consumer id=c1_root_fallback k=8 req_gens=2 violations=0
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=1 scan_seconds=0.100000 window_seconds=0.000359066 exceeds=1 sim_violations=277 closed_violations=277 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=2 scan_seconds=0.100000 window_seconds=0.000718133 exceeds=1 sim_violations=276 closed_violations=276 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=3 scan_seconds=0.100000 window_seconds=0.001077199 exceeds=1 sim_violations=275 closed_violations=275 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=4 scan_seconds=0.100000 window_seconds=0.001436266 exceeds=1 sim_violations=274 closed_violations=274 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=8 scan_seconds=0.100000 window_seconds=0.002872531 exceeds=1 sim_violations=270 closed_violations=270 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=1 scan_seconds=10.000000 window_seconds=0.000359066 exceeds=1 sim_violations=27849 closed_violations=27849 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=2 scan_seconds=10.000000 window_seconds=0.000718133 exceeds=1 sim_violations=27848 closed_violations=27848 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=3 scan_seconds=10.000000 window_seconds=0.001077199 exceeds=1 sim_violations=27847 closed_violations=27847 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=4 scan_seconds=10.000000 window_seconds=0.001436266 exceeds=1 sim_violations=27846 closed_violations=27846 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=8 scan_seconds=10.000000 window_seconds=0.002872531 exceeds=1 sim_violations=27842 closed_violations=27842 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=1 scan_seconds=100.000000 window_seconds=0.000359066 exceeds=1 sim_violations=278499 closed_violations=278499 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=2 scan_seconds=100.000000 window_seconds=0.000718133 exceeds=1 sim_violations=278498 closed_violations=278498 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=3 scan_seconds=100.000000 window_seconds=0.001077199 exceeds=1 sim_violations=278497 closed_violations=278497 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=4 scan_seconds=100.000000 window_seconds=0.001436266 exceeds=1 sim_violations=278496 closed_violations=278496 agree=1
+E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=8 scan_seconds=100.000000 window_seconds=0.002872531 exceeds=1 sim_violations=278492 closed_violations=278492 agree=1
+E7RESULT name=verdict_unit wallclock_cells_exceeding_window=15 total_wallclock_cells=15 gens_unit_protects_wallclock_consumer=0
+E7RESULT name=poscontrol_fallback k1_violations=1 k2_violations=0 discriminates=1
+E7RESULT name=negcontrol_instant_scan violations=0 expect=0
+E7RESULT name=blank_cell id=c4_timeline_discriminate requirement=NA reason=consumer_not_implemented_C88
+E7RESULT name=done emitted=31

@@ -1,0 +1,21 @@
+E7RESULT name=hdr arm=bare reserved=0 data_hdr=105 packed_hdr=103 payload=32663
+E7RESULT name=node arm=bare tier=0 node_hdr=68 fanout54=302 fanout81=201
+E7RESULT name=node arm=bare tier=1 node_hdr=77 fanout54=301 fanout81=201
+E7RESULT name=node arm=bare tier=2 node_hdr=86 fanout54=301 fanout81=201
+E7RESULT name=packed arm=bare records=233
+E7RESULT name=poscontrol arm=bare fanout54=303 fanout81=202 records=234
+E7RESULT name=hdr arm=resv12 reserved=28 data_hdr=133 packed_hdr=131 payload=32635
+E7RESULT name=node arm=resv12 tier=0 node_hdr=96 fanout54=301 fanout81=201
+E7RESULT name=node arm=resv12 tier=1 node_hdr=105 fanout54=301 fanout81=200
+E7RESULT name=node arm=resv12 tier=2 node_hdr=114 fanout54=301 fanout81=200
+E7RESULT name=packed arm=resv12 records=233
+E7RESULT name=poscontrol arm=resv12 fanout54=303 fanout81=202 records=234
+E7RESULT name=hdr arm=resv4 reserved=20 data_hdr=125 packed_hdr=123 payload=32643
+E7RESULT name=node arm=resv4 tier=0 node_hdr=88 fanout54=301 fanout81=201
+E7RESULT name=node arm=resv4 tier=1 node_hdr=97 fanout54=301 fanout81=201
+E7RESULT name=node arm=resv4 tier=2 node_hdr=106 fanout54=301 fanout81=200
+E7RESULT name=packed arm=resv4 records=233
+E7RESULT name=poscontrol arm=resv4 fanout54=303 fanout81=202 records=234
+E7RESULT name=negcontrol fanout=0
+E7RESULT name=discriminate cells_differing=1
+E7RESULT name=done emitted=21

@@ -2,6 +2,14 @@
 resolver = "2"
 members = ["e7-index-bench"]
 
+# ⚠️ **`overflow-checks` 必须显式打开**：门禁跑的是 `cargo test --release`
+# （gate.d/15-research-build.sh），而 release 默认**关掉整数溢出检查**——
+# 溢出变成静默回绕，于是一整类失败在门禁里是隐形的。
+# 实测（2026-09-07）：`e97_entry_encoding.rs` 的闭式在 r = 0 时 `r * (r - 1)` 下溢，
+# debug 直接 panic、release 照样报绿，而门禁只跑 release
+# ⇒ 这条从写下那天起没有任何东西看见过它。打开之后 106 个测试批次全绿，
+# 爆炸半径只有那一处。对应 `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」。
 [profile.release]
 opt-level = 3
 debug = true
+overflow-checks = true

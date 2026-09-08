@@ -1,0 +1,9 @@
+1. Delete all objects in a container. Remove their entries from the central mapping. The container's location is no longer referenced by any central mapping entry. When the compactor runs, it scans all central mapping entries to collect unique container locations. Any container location not in this set is freed. There is no space leak because the compactor frees unreferenced containers during its scan.
+
+2. During compaction, the compactor writes a new container to disk and updates the central mapping entries to point to the new container. Before freeing the old container, the system crashes. A raw disk scanner reads the central mapping entries to determine current locations. The central mapping entries now point to the new container, so the scanner uses those entries to identify the current container. The old container is unreferenced and treated as garbage.
+
+3. A container holds 58 objects with central mapping entries pointing to it. If the compactor rewrites the container but fails to recalculate the message authentication code for the new container data, the stored MAC does not match the container contents. When reading, the MAC check fails. To avoid this, the compactor must recalculate the MAC for the new container during writing.
+
+4. Unpacked object read: 1. lookup five tuple in central mapping, 2. read unit at location. Packed object read: 1. lookup five tuple in central mapping, 2. read container, 3. search container for matching slot. The packed case requires one extra step (searching within the container).
+
+5. Tried storing a live slot count in the container header. This fails because updating the count requires in-place modification of the container, violating R1. Tried adding a separate container index. This fails because R2 prohibits new trees or indexes unless proven necessary, and the central mapping scan already identifies referenced containers without additional structures.

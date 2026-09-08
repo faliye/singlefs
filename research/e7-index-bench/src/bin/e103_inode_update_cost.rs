@@ -46,6 +46,22 @@ use e7_index_bench::Emitter;
 const NODE_BYTES: u64 = 16384;
 const UNIT_BYTES: u64 = 32768;
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
+/// 今天成立的三档基础节点头。上面那组 58 / 67 / 76 是 E73 跑那天的下界，
+/// 此后两笔加宽从来没落到本实验的源码里，2026-09-07 一次补上：
+/// ① D18 已定项 7 补注：三档各加**写序 10** 成 68 / 77 / 86；
+/// ② D18 已定项 7 逐字「v1 就预留 nonce 代号与 MAC 的字段位」，两个位在字段表**之外**——
+///    按 D18 已定项 14 臂甲（nonce 代号 = 完整 96 位 nonce 12）与 D9 已定项 2（MAC 满 128 位 16）
+///    共 **28 字节**，再各加一次成 96 / 105 / 114（E117 算的）。
+/// **两组都留着并逐格跑**：旧那组是这条结论此前站的地方，删掉就看不出这次补账改了什么。
+/// D18 已定项 7 的两个预留位合计（nonce 代号 12 + MAC 16）。E117 的 `resv12` 臂同一个数。
+const RESERVED_HDR: u64 = 12 + 16;
+/// 写序（C113 定案 P1）。D18 已定项 7 补注：三档下界各加它。
+const WRITE_ORDER: u64 = 10;
+const NODE_HEADERS_TODAY: [u64; 3] = [
+    NODE_HEADERS[0] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HDR,
+];
 /// D19 已定项 4 之后：31 + 14 × 2。
 const CHILD_PTR: u64 = 59;
 /// E98 的 inode 记录宽。
@@ -202,7 +218,7 @@ fn main() {
         per_publish_const()
     )));
 
-    for &hdr in NODE_HEADERS.iter() {
+    for &hdr in NODE_HEADERS.iter().chain(NODE_HEADERS_TODAY.iter()) {
         for &n in NS.iter() {
             let g = geometry(n, hdr);
             out.push(em.emit_raw(&format!(
@@ -297,6 +313,34 @@ mod tests {
         assert_eq!(JOURNAL_REC, 4096, "D23 已定项 12");
         assert_eq!(IDENT_VALUE, 8 + 2 + 8 + 8 + 1);
         assert_eq!(CONT_KEY, 8 + 2 + 8 + 8);
+    }
+
+    /// 两笔补账的算术钉死：58 / 67 / 76 各加写序 10 与预留 28 = 96 / 105 / 114。
+    /// **写成加法不写减法**——变异把常量改大时减法会编译期溢出、被记成无效变异。
+    #[test]
+    fn today_headers_are_absolute() {
+        assert_eq!(RESERVED_HDR, 28);
+        assert_eq!(WRITE_ORDER, 10);
+        assert_eq!(NODE_HEADERS_TODAY, [96, 105, 114]);
+        assert_eq!(NODE_HEADERS_TODAY[0], NODE_HEADERS[0] + 38);
+    }
+
+    /// 补账之后那一档（头 114）的绝对值：内部扇出确实掉一格，而结论一格不动。
+    /// ⚠️ **这不是「头宽不影响结论」**：内部扇出 243 → 242 是变了的，
+    /// 只是被树高的向上取整吸收掉（⌈8621 / 243⌉ = ⌈8621 / 242⌉ = 36）。
+    /// 按 `.claude/rules/mutation-sampling.md`，把它记成「不敏感」要有这条把中间量钉住的断言，
+    /// 否则下次有人改了扇出公式也不会有任何东西报警。
+    #[test]
+    fn geometry_at_today_header_is_absolute() {
+        let g58 = geometry(1_000_000, NODE_HEADERS[0]);
+        let g114 = geometry(1_000_000, NODE_HEADERS_TODAY[2]);
+        assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + CHILD_PTR), 243);
+        assert_eq!(fanout(NODE_BYTES, 114, INODE_KEY + CHILD_PTR), 242, "中间量掉一格");
+        assert_eq!(fanout(NODE_BYTES, 114, CONT_KEY + CHILD_PTR), 191, "(16384 − 114) / 85");
+        assert_eq!(g58.a_levels, g114.a_levels, "树高被向上取整吸收");
+        assert_eq!(g114.a_levels, vec![8621, 36, 1]);
+        assert_eq!(g114.b_containers, 4292);
+        assert_eq!(g114.b_per_container, 233);
     }
 
     /// 几何的绝对值（头 58）：与 E98 的 116 / 243 / 233 对得上，容器索引扇出 192。

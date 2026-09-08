@@ -1,0 +1,12 @@
+M1_MAC宽度算成0	const MAC_BYTES: u64 = 16;	const MAC_BYTES: u64 = 0;
+M2_预留位整个漏掉	            Arm::Resv12 => 12 + MAC_BYTES,	            Arm::Resv12 => 0,
+M3_共同前缀少一格	const COMMON_PREFIX: u64 = 42;	const COMMON_PREFIX: u64 = 41;
+M4_类身份段算错	const DATA_IDENTITY: u64 = 63;	const DATA_IDENTITY: u64 = 53;
+M5_打包头用旧值	const PACKED_HDR_BARE: u64 = 103;	const PACKED_HDR_BARE: u64 = 93;
+M6_三档基础头外推	const NODE_HDR_TIERS: [u64; 3] = [68, 77, 86];	const NODE_HDR_TIERS: [u64; 3] = [68, 68, 68];
+M7_扇出不减头	    (unit - header) / entry	    unit / entry
+M8_头装不下时返回1	        return 0;	        return 1;
+M9_D19条目宽算成E73	const D19_ENTRY: u64 = 22 + 59;	const D19_ENTRY: u64 = 54;
+M10_inode记录宽算错	const INODE_REC: u64 = 140;	const INODE_REC: u64 = 139;
+M11_resv4臂等同resv12	            Arm::Resv4 => 4 + MAC_BYTES,	            Arm::Resv4 => 12 + MAC_BYTES,
+M12_节点大小算成数据单元	const NODE_BYTES: u64 = 16384;	const NODE_BYTES: u64 = 32768;
