@@ -60,9 +60,10 @@
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
-| `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项，指不到的就是格式级空白 |
+| `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项、给具体的宽度与取值（未定的给预想值），指不到的就是格式级空白；每节标里程碑步号 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
 | `.claude/kb/verification-build.md` | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
+| `.claude/kb/milestone-first-txn.md` | 里程碑「第一个事务」的规划：八步，每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
@@ -107,6 +108,7 @@ bash .claude/gate.d/38-field-table-projection.sh # 决策里定的字段有没�
 bash .claude/gate.d/39-field-table-sum.sh # 字段表加出来的数：表后合计与 format-const 标记
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/41-pipefail-grepq.sh  # pipefail 下用 grep -q 收尾的管道（命中会被读成没命中）
+bash .claude/gate.d/42-first-txn-trio.sh   # 第一个事务的三份文件互相挂钩：字节表 / 里程碑 / 决策索引里判「是」的未定项
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
