@@ -9,6 +9,7 @@
 用法：
 
     quote-kb.py 出口.md '文件:12-30' '文件@#### 已定项 5' '文件~某个正则'
+    quote-kb.py --checklist 清单.md 出口.md 取法...   # 另核清单里标「抄」的每一节都真的抄进来了
 
 三种取法：
     文件:A-B     第 A 到第 B 行（1 起，含两端）
@@ -61,14 +62,32 @@ def pick(spec):
             sys.exit(f"quote-kb: {path} 只有 {len(L)} 行，取不到 {a}-{b}\n  → 先 grep -n 看行号")
         return path, a, L[a - 1:b]
     if kind == 'head':
-        hits = [i for i, l in enumerate(L) if l.startswith(arg)]
+        # 精确匹配优先，找不到再退回「前缀唯一」。只用前缀时，「### 已定项」这种
+        # 裸标题会把「### 已定项 1（…）」「### 已定项 2（…）」一起算进去（实测在 D8 里
+        # 命中 9 次），于是一个本来唯一的标题取不出来（2026-09-10）。
+        # 凡是以前能跑通的调用，结果不变：以前能跑通 ⇒ 前缀只命中一行。
+        hits = [i for i, l in enumerate(L) if l == arg]
+        if len(hits) != 1:
+            hits = [i for i, l in enumerate(L) if l.startswith(arg)]
         if len(hits) != 1:
             sys.exit(f"quote-kb: 标题「{arg}」在 {path} 命中 {len(hits)} 次，要唯一\n  → 把标题写全")
         i = hits[0]
         lvl = len(re.match(r'#*', L[i]).group(0))
-        j = i + 1
-        while j < len(L) and not (L[j].startswith('#') and
-                                  len(re.match(r'#*', L[j]).group(0)) <= lvl):
+        # ⚠️ 找节尾时要跳过代码栅栏：栅栏里一行 `# 注释` 会被当成一级标题，
+        # 整节在那里被截断——而回读比对拿产物去对这同一段截断的区间，**照样逐字节一致**。
+        # 实测（2026-09-10）：E131 正文的复跑命令块里有一行 `# 直接跑装置：`，
+        # `@## E131…` 只取到 15 行就停了，是 `--checklist` 第一次接上时抓到的。
+        j, fence = i + 1, None
+        while j < len(L):
+            fm = re.match(r'(`{3,}|~{3,})', L[j])
+            if fence is None and fm:
+                fence = (fm.group(1)[0], len(fm.group(1)))
+            elif fence is not None:
+                cm = re.fullmatch(r'(`{3,}|~{3,})\s*', L[j])
+                if cm and cm.group(1)[0] == fence[0] and len(cm.group(1)) >= fence[1]:
+                    fence = None
+            elif L[j].startswith('#') and len(re.match(r'#*', L[j]).group(0)) <= lvl:
+                break
             j += 1
         return path, i + 1, L[i:j]
     hits = [i for i, l in enumerate(L) if re.search(arg, l)]
@@ -112,11 +131,49 @@ def verify(specs, produced):
     return None
 
 
+def check_checklist(checklist, produced):
+    """清单里标「抄」的每一节，产物里必须真的有。返回缺的那几行（空表 = 对得上）。
+
+    清单与附录是两处分别生成的（清单由 kb-sections.py 生成、人逐行填；附录由本脚本抽），
+    此前没有任何东西绑住它们。实测（2026-09-10，D6 未定项 2 第二轮）：清单把 E130 的
+    「臂」那一节标成「抄」，附录里一个字都没有，而那一轮的枢纽结论正建立在把其中一条臂
+    读成另一个形态上（C262）。
+    """
+    lines = [l.replace('|', '/') for l in produced]
+    sources = []
+    for l in produced:
+        m = re.match(r'\*\*出处 `(.+):(\d+)-(\d+)`', l)
+        if m:
+            sources.append((m.group(1), int(m.group(2)), int(m.group(3))))
+    cur, missing = None, []
+    for row in open(checklist, encoding='utf-8').read().split('\n'):
+        m = re.match(r'### 小节清单：`([^`]+)`', row)
+        if m:
+            cur = m.group(1); continue
+        if not row.startswith('| ') or row.startswith('|---'):
+            continue
+        cells = [c.strip() for c in row.strip().strip('|').split('|')]
+        if len(cells) < 2 or cells[1] != '抄':
+            continue
+        title = cells[0]
+        if title.startswith('#'):
+            if title not in lines:
+                missing.append(f"{cur}：{title[:60]}")
+        else:
+            r = re.search(r'第 (\d+)-(\d+) 行', title)
+            if r and not any(src == cur and a <= int(r.group(1)) and b >= int(r.group(2))
+                             for src, a, b in sources):
+                missing.append(f"{cur}：{title[:60]}")
+    return missing
+
+
 def selftest():
     src = os.path.join(tempfile.mkdtemp(), 'sample.md')
     with open(src, 'w', encoding='utf-8') as f:
         f.write('# 头\n\n#### 已定项 5\n\n一\n二\n\n#### 已定项 6\n\n三\n\n'
-                '#### 带代码块的\n\n```\n判定(ptr):\n    birth = ptr.birth\n```\n')
+                '#### 带代码块的\n\n```\n判定(ptr):\n    birth = ptr.birth\n```\n'
+                '\n### 未定项\n\n裸标题下的表\n\n### 未定项 7（带括注的同前缀标题）\n\n四\n'
+                '\n#### 代码块里有井号\n\n```bash\n# 注释一行\necho hi\n```\n\n栅栏之后那一行\n')
     specs = [f'{src}:5-6', f'{src}@#### 已定项 5', f'{src}~^三$',
              f'{src}@#### 带代码块的']
     got = build(specs)
@@ -128,7 +185,26 @@ def selftest():
     del os.environ['QUOTE_KB_CORRUPT']
     if not bad:
         print("  ✗ 自检：抄漏一行时回读比对**没有**判红，这道闸是摆设"); return 1
+    ck = os.path.join(os.path.dirname(src), 'checklist.md')
+    with open(ck, 'w', encoding='utf-8') as f:
+        f.write(f"### 小节清单：`{src}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n"
+                "| #### 已定项 5 | 抄 | 样本 |\n| #### 已定项 6 | 抄 | 样本 |\n"
+                "| #### 带代码块的 | 不抄 | 样本 |\n")
+    two = [f'{src}@#### 已定项 5', f'{src}@#### 已定项 6']
+    if check_checklist(ck, build(two)):
+        print("  ✗ 自检：清单与附录对得上时竟然判红"); return 1
+    if not check_checklist(ck, build(two[:1])):
+        print("  ✗ 自检：清单标了抄而附录里没有，比对**没有**判红（C262 那个形态）"); return 1
+    _, _, bare = pick(f'{src}@### 未定项')
+    if bare != ['### 未定项', '', '裸标题下的表', '']:
+        print(f"  ✗ 自检：裸标题「### 未定项」取错了——{bare}"); return 1
     print("  ✓ 自检：三种取法（含带代码块的条款）都逐字节一致，且抄漏一行时判红")
+    print("  ✓ 自检：裸标题与同前缀的带括注标题并存时，精确匹配取到裸标题那一节")
+    _, _, fenced = pick(f'{src}@#### 代码块里有井号')
+    if '栅栏之后那一行' not in fenced:
+        print(f"  ✗ 自检：代码栅栏里的 `# 注释` 把整节截断了（只取到 {len(fenced)} 行）"); return 1
+    print("  ✓ 自检：代码栅栏里的 `#` 行不被当成标题，整节取全")
+    print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 
 
@@ -137,6 +213,11 @@ def main(argv):
         return selftest()
     if len(argv) < 2:
         print(__doc__); return 2
+    checklist = None
+    if argv[:1] == ['--checklist']:
+        if len(argv) < 4:
+            print(__doc__); return 2
+        checklist, argv = argv[1], argv[2:]
     dest, specs = argv[0], argv[1:]
     produced = build(specs)
     bad = verify(specs, produced)
@@ -144,9 +225,19 @@ def main(argv):
         print(f"quote-kb: 回读比对不通过——{bad}\n  → 别改产物，重跑一次；仍不通过就是脚本的问题",
               file=sys.stderr)
         return 3
+    if checklist:
+        miss = check_checklist(checklist, produced)
+        if miss:
+            print(f"quote-kb: 清单标了「抄」而附录里没有 {len(miss)} 节：", file=sys.stderr)
+            for m in miss:
+                print(f"    {m}", file=sys.stderr)
+            print("  → 把缺的那几节补进取法（优先用 文件@标题），或者把清单那一行改成「不抄」并写理由",
+                  file=sys.stderr)
+            return 4
     with open(dest, 'w', encoding='utf-8') as f:
         f.write('\n'.join(produced))
-    print(f"  ✓ {len(specs)} 段整抄进 {dest}，回读逐字节一致")
+    tail = f"，清单里标「抄」的每一节都在" if checklist else ""
+    print(f"  ✓ {len(specs)} 段整抄进 {dest}，回读逐字节一致{tail}")
     return 0
 
 

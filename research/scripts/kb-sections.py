@@ -28,13 +28,33 @@ import io, os, re, sys, tempfile
 HEAD = re.compile(r'^(#{2,6}) .*$')
 
 
+def fenced_lines(lines):
+    """返回落在代码栅栏里的行号集合（1 起）。栅栏里的 `## ` 不是标题。"""
+    inside, fence = set(), None
+    for i, l in enumerate(lines, 1):
+        fm = re.match(r'(`{3,}|~{3,})', l)
+        if fence is None and fm:
+            fence = (fm.group(1)[0], len(fm.group(1))); inside.add(i); continue
+        if fence is not None:
+            inside.add(i)
+            cm = re.fullmatch(r'(`{3,}|~{3,})\s*', l)
+            if cm and cm.group(1)[0] == fence[0] and len(cm.group(1)) >= fence[1]:
+                fence = None
+    return inside
+
+
+def is_head(i, l, fenced):
+    return i not in fenced and HEAD.match(l)
+
+
 def sections(path):
     """返回 [(标签, 首行号)]；开头那段正文单独占一行，紧跟在它所属的标题之后。"""
     lines = io.open(path, encoding='utf-8').read().split('\n')
-    heads = [i for i, l in enumerate(lines, 1) if HEAD.match(l)]
+    fenced = set() if os.environ.get('KB_SECTIONS_NO_FENCE') else fenced_lines(lines)
+    heads = [i for i, l in enumerate(lines, 1) if is_head(i, l, fenced)]
     out = []
     for i, l in enumerate(lines, 1):
-        if not HEAD.match(l):
+        if not is_head(i, l, fenced):
             continue
         out.append((l.replace('|', '/'), i))
         if os.environ.get('KB_SECTIONS_NO_PREAMBLE') or i != heads[0]:
@@ -73,7 +93,13 @@ def selftest():
             print('selftest: 关掉那条分支确认判红（清单里没有开头正文那一行）'); return 0
         if not has_pre:
             print('selftest: 清单里没有开头正文那一行 —— 正是本脚本要防的形态'); return 1
-        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行）')
+        g = os.path.join(d, 'fenced.md')
+        io.open(g, 'w', encoding='utf-8').write(
+            '## D98 样本 —— 已定\n\n### 甲节\n\n```bash\n## 这一行在栅栏里，不是标题\n```\n\n### 乙节\n')
+        frows = [t for t, _ in sections(g)]
+        if any('栅栏里' in r for r in frows):
+            print('selftest: 代码栅栏里的 `## ` 行被当成标题发了一行'); return 1
+        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题）')
         print('           证明会红：KB_SECTIONS_NO_PREAMBLE=1 再跑一遍，那一行必须消失')
         return 0
 

@@ -1,0 +1,70 @@
+E131 livelist 的两条载体，数值与代价
+判据写死在 research/prompts/e131-preregistration.md（写于本装置之前）
+口径：NODE_BYTES=16384 TREE_TABLE_PAYLOAD=16284 TREE_TABLE_ENTRY=121 每层=134 EVENT_ENTRY=24
+E7RESULT name=per_head heads=1 blocks_per_head=1024 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=1024 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=0.0
+E7RESULT name=per_head heads=1 blocks_per_head=65536 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=65536 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=0.1
+E7RESULT name=per_head heads=1 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=1048576 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=1.4
+E7RESULT name=per_head heads=4 blocks_per_head=1024 livelist_trees=4 tree_table_entries=8 tree_table_levels=1 entries_total=4096 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=0.0
+E7RESULT name=per_head heads=4 blocks_per_head=65536 livelist_trees=4 tree_table_entries=8 tree_table_levels=1 entries_total=262144 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=0.4
+E7RESULT name=per_head heads=4 blocks_per_head=1048576 livelist_trees=4 tree_table_entries=8 tree_table_levels=1 entries_total=4194304 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=5.8
+E7RESULT name=per_head heads=16 blocks_per_head=1024 livelist_trees=16 tree_table_entries=32 tree_table_levels=1 entries_total=16384 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=0.0
+E7RESULT name=per_head heads=16 blocks_per_head=65536 livelist_trees=16 tree_table_entries=32 tree_table_levels=1 entries_total=1048576 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=1.4
+E7RESULT name=per_head heads=16 blocks_per_head=1048576 livelist_trees=16 tree_table_entries=32 tree_table_levels=1 entries_total=16777216 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=23.0
+E7RESULT name=per_head heads=64 blocks_per_head=1024 livelist_trees=64 tree_table_entries=128 tree_table_levels=1 entries_total=65536 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=0.1
+E7RESULT name=per_head heads=64 blocks_per_head=65536 livelist_trees=64 tree_table_entries=128 tree_table_levels=1 entries_total=4194304 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=5.8
+E7RESULT name=per_head heads=64 blocks_per_head=1048576 livelist_trees=64 tree_table_entries=128 tree_table_levels=1 entries_total=67108864 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=92.2
+E7RESULT name=per_head heads=256 blocks_per_head=1024 livelist_trees=256 tree_table_entries=512 tree_table_levels=2 entries_total=262144 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=0.4
+E7RESULT name=per_head heads=256 blocks_per_head=65536 livelist_trees=256 tree_table_entries=512 tree_table_levels=2 entries_total=16777216 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=23.0
+E7RESULT name=per_head heads=256 blocks_per_head=1048576 livelist_trees=256 tree_table_entries=512 tree_table_levels=2 entries_total=268435456 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=368.7
+E7RESULT name=per_head heads=1024 blocks_per_head=1024 livelist_trees=1024 tree_table_entries=2048 tree_table_levels=2 entries_total=1048576 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=1.4
+E7RESULT name=per_head heads=1024 blocks_per_head=65536 livelist_trees=1024 tree_table_entries=2048 tree_table_levels=2 entries_total=67108864 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=92.2
+E7RESULT name=per_head heads=1024 blocks_per_head=1048576 livelist_trees=1024 tree_table_entries=2048 tree_table_levels=2 entries_total=1073741824 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=1474.7
+E7RESULT name=per_head heads=4096 blocks_per_head=1024 livelist_trees=4096 tree_table_entries=8192 tree_table_levels=2 entries_total=4194304 entry_bytes=24 descents=2 destroy_touch=1024 pre_reserve_range_scan=0 ppm=5.8
+E7RESULT name=per_head heads=4096 blocks_per_head=65536 livelist_trees=4096 tree_table_entries=8192 tree_table_levels=2 entries_total=268435456 entry_bytes=24 descents=2 destroy_touch=65536 pre_reserve_range_scan=0 ppm=368.7
+E7RESULT name=per_head heads=4096 blocks_per_head=1048576 livelist_trees=4096 tree_table_entries=8192 tree_table_levels=2 entries_total=4294967296 entry_bytes=24 descents=3 destroy_touch=1048576 pre_reserve_range_scan=0 ppm=5898.7
+E7RESULT name=shared heads=1 blocks_per_head=1024 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=1024 entry_bytes=32 descents=2 destroy_touch=1024 pre_reserve_range_scan=1 ppm=0.0
+E7RESULT name=shared heads=1 blocks_per_head=65536 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=65536 entry_bytes=32 descents=2 destroy_touch=65536 pre_reserve_range_scan=1 ppm=0.1
+E7RESULT name=shared heads=1 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=2 tree_table_levels=1 entries_total=1048576 entry_bytes=32 descents=3 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=1.9
+E7RESULT name=shared heads=4 blocks_per_head=1024 livelist_trees=1 tree_table_entries=5 tree_table_levels=1 entries_total=4096 entry_bytes=32 descents=2 destroy_touch=1024 pre_reserve_range_scan=1 ppm=0.0
+E7RESULT name=shared heads=4 blocks_per_head=65536 livelist_trees=1 tree_table_entries=5 tree_table_levels=1 entries_total=262144 entry_bytes=32 descents=3 destroy_touch=65536 pre_reserve_range_scan=1 ppm=0.5
+E7RESULT name=shared heads=4 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=5 tree_table_levels=1 entries_total=4194304 entry_bytes=32 descents=3 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=7.7
+E7RESULT name=shared heads=16 blocks_per_head=1024 livelist_trees=1 tree_table_entries=17 tree_table_levels=1 entries_total=16384 entry_bytes=32 descents=2 destroy_touch=1024 pre_reserve_range_scan=1 ppm=0.0
+E7RESULT name=shared heads=16 blocks_per_head=65536 livelist_trees=1 tree_table_entries=17 tree_table_levels=1 entries_total=1048576 entry_bytes=32 descents=3 destroy_touch=65536 pre_reserve_range_scan=1 ppm=1.9
+E7RESULT name=shared heads=16 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=17 tree_table_levels=1 entries_total=16777216 entry_bytes=32 descents=3 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=30.7
+E7RESULT name=shared heads=64 blocks_per_head=1024 livelist_trees=1 tree_table_entries=65 tree_table_levels=1 entries_total=65536 entry_bytes=32 descents=2 destroy_touch=1024 pre_reserve_range_scan=1 ppm=0.1
+E7RESULT name=shared heads=64 blocks_per_head=65536 livelist_trees=1 tree_table_entries=65 tree_table_levels=1 entries_total=4194304 entry_bytes=32 descents=3 destroy_touch=65536 pre_reserve_range_scan=1 ppm=7.7
+E7RESULT name=shared heads=64 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=65 tree_table_levels=1 entries_total=67108864 entry_bytes=32 descents=3 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=122.9
+E7RESULT name=shared heads=256 blocks_per_head=1024 livelist_trees=1 tree_table_entries=257 tree_table_levels=2 entries_total=262144 entry_bytes=32 descents=3 destroy_touch=1024 pre_reserve_range_scan=1 ppm=0.5
+E7RESULT name=shared heads=256 blocks_per_head=65536 livelist_trees=1 tree_table_entries=257 tree_table_levels=2 entries_total=16777216 entry_bytes=32 descents=3 destroy_touch=65536 pre_reserve_range_scan=1 ppm=30.7
+E7RESULT name=shared heads=256 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=257 tree_table_levels=2 entries_total=268435456 entry_bytes=32 descents=4 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=491.6
+E7RESULT name=shared heads=1024 blocks_per_head=1024 livelist_trees=1 tree_table_entries=1025 tree_table_levels=2 entries_total=1048576 entry_bytes=32 descents=3 destroy_touch=1024 pre_reserve_range_scan=1 ppm=1.9
+E7RESULT name=shared heads=1024 blocks_per_head=65536 livelist_trees=1 tree_table_entries=1025 tree_table_levels=2 entries_total=67108864 entry_bytes=32 descents=3 destroy_touch=65536 pre_reserve_range_scan=1 ppm=122.9
+E7RESULT name=shared heads=1024 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=1025 tree_table_levels=2 entries_total=1073741824 entry_bytes=32 descents=4 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=1966.2
+E7RESULT name=shared heads=4096 blocks_per_head=1024 livelist_trees=1 tree_table_entries=4097 tree_table_levels=2 entries_total=4194304 entry_bytes=32 descents=3 destroy_touch=1024 pre_reserve_range_scan=1 ppm=7.7
+E7RESULT name=shared heads=4096 blocks_per_head=65536 livelist_trees=1 tree_table_entries=4097 tree_table_levels=2 entries_total=268435456 entry_bytes=32 descents=4 destroy_touch=65536 pre_reserve_range_scan=1 ppm=491.6
+E7RESULT name=shared heads=4096 blocks_per_head=1048576 livelist_trees=1 tree_table_entries=4097 tree_table_levels=2 entries_total=4294967296 entry_bytes=32 descents=4 destroy_touch=1048576 pre_reserve_range_scan=1 ppm=7864.9
+E7RESULT name=criterion1 arm=per_head level=2 first_heads=256
+E7RESULT name=criterion1 arm=per_head level=3 first_heads=none_in_sweep
+E7RESULT name=criterion2 heads=1 blocks_per_head=1024 per_head_descents=2 shared_descents=2 delta=0
+E7RESULT name=criterion2 heads=1 blocks_per_head=65536 per_head_descents=2 shared_descents=2 delta=0
+E7RESULT name=criterion2 heads=1 blocks_per_head=1048576 per_head_descents=3 shared_descents=3 delta=0
+E7RESULT name=criterion2 heads=4 blocks_per_head=1024 per_head_descents=2 shared_descents=2 delta=0
+E7RESULT name=criterion2 heads=4 blocks_per_head=65536 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=4 blocks_per_head=1048576 per_head_descents=3 shared_descents=3 delta=0
+E7RESULT name=criterion2 heads=16 blocks_per_head=1024 per_head_descents=2 shared_descents=2 delta=0
+E7RESULT name=criterion2 heads=16 blocks_per_head=65536 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=16 blocks_per_head=1048576 per_head_descents=3 shared_descents=3 delta=0
+E7RESULT name=criterion2 heads=64 blocks_per_head=1024 per_head_descents=2 shared_descents=2 delta=0
+E7RESULT name=criterion2 heads=64 blocks_per_head=65536 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=64 blocks_per_head=1048576 per_head_descents=3 shared_descents=3 delta=0
+E7RESULT name=criterion2 heads=256 blocks_per_head=1024 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=256 blocks_per_head=65536 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=256 blocks_per_head=1048576 per_head_descents=3 shared_descents=4 delta=1
+E7RESULT name=criterion2 heads=1024 blocks_per_head=1024 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=1024 blocks_per_head=65536 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=1024 blocks_per_head=1048576 per_head_descents=3 shared_descents=4 delta=1
+E7RESULT name=criterion2 heads=4096 blocks_per_head=1024 per_head_descents=2 shared_descents=3 delta=1
+E7RESULT name=criterion2 heads=4096 blocks_per_head=65536 per_head_descents=2 shared_descents=4 delta=2
+E7RESULT name=criterion2 heads=4096 blocks_per_head=1048576 per_head_descents=3 shared_descents=4 delta=1
+E7RESULT name=positive_control arm=per_head tt_entries_h1=2 tt_entries_h4096=8192 ratio=4096
+E7RESULT name=done emitted=67

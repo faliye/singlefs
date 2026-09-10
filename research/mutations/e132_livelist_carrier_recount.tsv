@@ -1,0 +1,14 @@
+M1_每头只算一棵数据树	const DATA_TREES_PER_HEAD: u64 = 2;	const DATA_TREES_PER_HEAD: u64 = 1;
+M2_漏掉池级树	const POOL_TREES: u64 = 3;	const POOL_TREES: u64 = 0;
+M3_内部扇出等于叶扇出	const CHILD_PTR: u64 = 31 + 14 * 2;	const CHILD_PTR: u64 = 0;
+M4_树表净字节换成另一个口径	const TREE_TABLE_PAYLOAD: u64 = 16284;	const TREE_TABLE_PAYLOAD: u64 = 16320;
+M5_树表条目预留少算	const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 32;	const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 24;
+M6_共享臂不数那棵共享树	Arm::Shared => heads * DATA_TREES_PER_HEAD + POOL_TREES + 1,	Arm::Shared => heads * DATA_TREES_PER_HEAD + POOL_TREES,
+M7_每树一棵的臂只算一棵	Arm::PerHeadT => heads * (DATA_TREES_PER_HEAD + DATA_TREES_PER_HEAD) + POOL_TREES,	Arm::PerHeadT => heads * (DATA_TREES_PER_HEAD + 1) + POOL_TREES,
+M8_表层数把叶算成零	let mut lv = 1u32;\n    let mut cap = per_level;	let mut lv = 0u32;\n    let mut cap = per_level;
+M9_共享臂的key不加树ID	Arm::Shared => descents(heads * blocks, width + TREE_ID_BYTES),	Arm::Shared => descents(heads * blocks, width),
+M10_共享臂只在一个头里走	Arm::Shared => descents(heads * blocks, width + TREE_ID_BYTES),	Arm::Shared => descents(blocks, width + TREE_ID_BYTES),
+M11_每头臂按全池走	Arm::PerHead1 | Arm::PerHeadT => descents(blocks, width),	Arm::PerHead1 | Arm::PerHeadT => descents(heads * blocks, width),
+M12_内部扇出忘了加子指针	((NODE_BYTES - NODE_HDR) / (key + CHILD_PTR)).max(2)	((NODE_BYTES - NODE_HDR) / key).max(2)
+M13_门槛搜索差一	while table_levels(tree_table_entries(arm, h), tree_table_per_level()) < lv {	while table_levels(tree_table_entries(arm, h), tree_table_per_level()) <= lv {
+M14_叶层也用内部扇出	let mut nodes = n.div_ceil(leaf_fanout(key)).max(1);	let mut nodes = n.div_ceil(internal_fanout(key)).max(1);

@@ -25,8 +25,16 @@ use e7_index_bench::Emitter;
 
 /// 单元字节数，含头。D4（校验和位置） 已定项 3 / 已定项 7。
 const UNIT_BYTES: u64 = 32768;
-/// 一条分配记录条目的盘上宽度。D3（空间分配） 已定项 7。
-const ALLOC_REC_BYTES: u64 = 30;
+/// 一条分配记录条目的盘上宽度。D3（空间分配） 已定项 7 的字段表逐段相加：
+/// 设备身份 4 + 落点（16 KiB 槽号）6 + 跨度段 2 + 分配代 / 释放代 8。
+///
+/// ⚠️ **第一版写成 30，挂的却是 D3（空间分配） 的名字，2026-09-10 当天改正**：
+/// 30 是 D5（快照 / 空间记账机制） 已定项 5 的**记账**条目宽（key 22 + value 8），
+/// 不是分配记录的宽。跨装置闸当时确实写了、变异也抓得到、门禁全绿——
+/// **它只是钉在了另一条决策的数上**，正是 `show-me-test.md`
+/// 「修坑的人最容易在这里收手……不会再想一遍这条检查的射程有多远」说的那个形态。
+/// 是三方论证的正推腿逐段相加 D3（空间分配） 的字段表时抓到的，不是任何一条断言。
+const ALLOC_REC_BYTES: u64 = 20;
 /// 一条 livelist 条目：类型标签 2 + 物理指针 14（D19 已定项 4 的位置条目宽） + birth txg 8。
 const LIVELIST_ENTRY_BYTES: u64 = 2 + 14 + 8;
 /// 一批处理多少条 livelist 条目。判据 1 要证 worst_batch_bytes 只随它走。
@@ -279,8 +287,8 @@ mod tests {
             naive(&Load::new(8192, 4, 0.0)).worst_batch_bytes,
             BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES)
         );
-        assert_eq!(naive(&Load::new(8192, 4, 0.0)).worst_batch_bytes, 4096 * 54);
-        assert_eq!(4096 * 54, 221_184);
+        assert_eq!(naive(&Load::new(8192, 4, 0.0)).worst_batch_bytes, 4096 * 44);
+        assert_eq!(4096 * 44, 180_224);
     }
 
     // ── 判据 1：每批最坏空间需求只随 K 走 ──────────────────────────────
@@ -487,9 +495,23 @@ mod tests {
     }
 
     #[test]
-    fn alloc_record_matches_the_kb_constant() {
-        // D3 已定项 7 / D5 已定项 5：条目 30 字节。
-        assert_eq!(ALLOC_REC_BYTES, 30);
-        assert_eq!(ALLOC_REC_BYTES + 0, 22 + 8);
+    fn alloc_record_matches_the_kb_field_table_segment_by_segment() {
+        // 跨装置闸：钉的是 D3 已定项 7 那张字段表的**逐段**，不是一个总数——
+        // 只钉总数时，一个来自别条决策的同量级数字照样能让断言全绿（实测踩过）。
+        let dev = 4u64; // 设备身份，D19 已定项 4「同一个坐标系」
+        let slot = 6u64; // 落点，编码为 16 KiB 槽号
+        let span = 2u64; // 跨度段（含已释放标志位），初值
+        let gen = 8u64; // 分配代 / 释放代，与 checkpoint_txg 同宽
+        assert_eq!(ALLOC_REC_BYTES, dev + slot + span + gen);
+        assert_eq!(ALLOC_REC_BYTES, 20);
+    }
+
+    #[test]
+    fn the_allocation_record_width_is_not_the_ledger_entry_width() {
+        // 留档：第一版把这两个数搞混了。记账条目是 D5 已定项 5 的 key 22 + value 8 = 30，
+        // 与分配记录的 20 是两棵树上的两个量，差 10 字节。
+        let ledger_entry = 22u64 + 8;
+        assert_eq!(ledger_entry, 30);
+        assert_ne!(ALLOC_REC_BYTES, ledger_entry);
     }
 }

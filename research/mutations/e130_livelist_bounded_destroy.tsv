@@ -1,5 +1,5 @@
 M1_单元字节抄错	const UNIT_BYTES: u64 = 32768;	const UNIT_BYTES: u64 = 4096;
-M2_分配记录宽抄错	const ALLOC_REC_BYTES: u64 = 30;	const ALLOC_REC_BYTES: u64 = 29;
+M2_分配记录宽抄错	const ALLOC_REC_BYTES: u64 = 20;	const ALLOC_REC_BYTES: u64 = 19;
 M3_livelist条目少算指针宽	const LIVELIST_ENTRY_BYTES: u64 = 2 + 14 + 8;	const LIVELIST_ENTRY_BYTES: u64 = 2 + 13 + 8;
 M4_naive的每批最坏字节漏掉livelist那一半	worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        // 未 condense	worst_batch_bytes: BATCH_K * ALLOC_REC_BYTES,\n        // 未 condense
 M5_condense的每批最坏字节改成随活块数走	worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,	worst_batch_bytes: l.n * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,

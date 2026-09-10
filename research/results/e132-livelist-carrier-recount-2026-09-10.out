@@ -1,0 +1,149 @@
+E132 livelist 载体·按真实树数与内部扇出重算
+判据写死在 research/prompts/e132-preregistration.md（写于本装置之前）
+口径：树表每层=134 条目=121 子指针=59 每头数据树=2 池级树=3
+E7RESULT name=tree_table arm=per_head_1 heads=1 entries=6 levels=1
+E7RESULT name=tree_table arm=per_head_1 heads=4 entries=15 levels=1
+E7RESULT name=tree_table arm=per_head_1 heads=16 entries=51 levels=1
+E7RESULT name=tree_table arm=per_head_1 heads=64 entries=195 levels=2
+E7RESULT name=tree_table arm=per_head_1 heads=256 entries=771 levels=2
+E7RESULT name=tree_table arm=per_head_1 heads=1024 entries=3075 levels=2
+E7RESULT name=tree_table arm=per_head_1 heads=4096 entries=12291 levels=2
+E7RESULT name=criterion1 arm=per_head_1 level=2 first_heads=44
+E7RESULT name=criterion1 arm=per_head_1 level=3 first_heads=5985
+E7RESULT name=tree_table arm=per_head_t heads=1 entries=7 levels=1
+E7RESULT name=tree_table arm=per_head_t heads=4 entries=19 levels=1
+E7RESULT name=tree_table arm=per_head_t heads=16 entries=67 levels=1
+E7RESULT name=tree_table arm=per_head_t heads=64 entries=259 levels=2
+E7RESULT name=tree_table arm=per_head_t heads=256 entries=1027 levels=2
+E7RESULT name=tree_table arm=per_head_t heads=1024 entries=4099 levels=2
+E7RESULT name=tree_table arm=per_head_t heads=4096 entries=16387 levels=2
+E7RESULT name=criterion1 arm=per_head_t level=2 first_heads=33
+E7RESULT name=criterion1 arm=per_head_t level=3 first_heads=4489
+E7RESULT name=tree_table arm=shared heads=1 entries=6 levels=1
+E7RESULT name=tree_table arm=shared heads=4 entries=12 levels=1
+E7RESULT name=tree_table arm=shared heads=16 entries=36 levels=1
+E7RESULT name=tree_table arm=shared heads=64 entries=132 levels=1
+E7RESULT name=tree_table arm=shared heads=256 entries=516 levels=2
+E7RESULT name=tree_table arm=shared heads=1024 entries=2052 levels=2
+E7RESULT name=tree_table arm=shared heads=4096 entries=8196 levels=2
+E7RESULT name=criterion1 arm=shared level=2 first_heads=66
+E7RESULT name=criterion1 arm=shared level=3 first_heads=8977
+E7RESULT name=criterion2 width=24 heads=1 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=24 heads=1 blocks_per_head=65536 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=24 heads=1 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=24 heads=4 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=24 heads=4 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=4 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=24 heads=16 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=24 heads=16 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=16 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=24 heads=64 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=24 heads=64 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=64 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=24 heads=256 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=256 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=24 heads=256 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=24 heads=1024 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=1024 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=24 heads=1024 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=24 heads=4096 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=24 heads=4096 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=24 heads=4096 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2_summary width=24 cells=21 per_head_1_shallower=14 per_head_1_deeper=0
+E7RESULT name=criterion3_capacity_ratio width=24 shared_over_per_head_1=1.3333 judged=no
+E7RESULT name=criterion2 width=32 heads=1 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=32 heads=1 blocks_per_head=65536 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=32 heads=1 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=32 heads=4 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=32 heads=4 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=4 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=32 heads=16 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=32 heads=16 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=16 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=32 heads=64 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=32 heads=64 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=64 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=32 heads=256 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=256 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=32 heads=256 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=32 heads=1024 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=1024 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=32 heads=1024 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=32 heads=4096 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=32 heads=4096 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=32 heads=4096 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2_summary width=32 cells=21 per_head_1_shallower=14 per_head_1_deeper=0
+E7RESULT name=criterion3_capacity_ratio width=32 shared_over_per_head_1=1.2500 judged=no
+E7RESULT name=criterion2 width=40 heads=1 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=40 heads=1 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=1 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=40 heads=4 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=40 heads=4 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=4 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=40 heads=16 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=40 heads=16 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=16 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=40 heads=64 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=64 blocks_per_head=65536 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=64 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=40 heads=256 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=256 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=40 heads=256 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=40 heads=1024 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=1024 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=40 heads=1024 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=40 heads=4096 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=40 heads=4096 blocks_per_head=65536 per_head_1=2 shared=4
+E7RESULT name=criterion2 width=40 heads=4096 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2_summary width=40 cells=21 per_head_1_shallower=16 per_head_1_deeper=0
+E7RESULT name=criterion3_capacity_ratio width=40 shared_over_per_head_1=1.2000 judged=no
+E7RESULT name=criterion2 width=48 heads=1 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=48 heads=1 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=1 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=4 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=48 heads=4 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=4 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=16 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=48 heads=16 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=16 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=64 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=48 heads=64 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=48 heads=64 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=256 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=48 heads=256 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=256 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=1024 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=48 heads=1024 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=1024 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2 width=48 heads=4096 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=48 heads=4096 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=48 heads=4096 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2_summary width=48 cells=21 per_head_1_shallower=12 per_head_1_deeper=0
+E7RESULT name=criterion3_capacity_ratio width=48 shared_over_per_head_1=1.1667 judged=no
+E7RESULT name=criterion2 width=56 heads=1 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=56 heads=1 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=1 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=4 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=56 heads=4 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=4 blocks_per_head=1048576 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=16 blocks_per_head=1024 per_head_1=2 shared=2
+E7RESULT name=criterion2 width=56 heads=16 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=16 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=64 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=56 heads=64 blocks_per_head=65536 per_head_1=3 shared=3
+E7RESULT name=criterion2 width=56 heads=64 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=256 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=56 heads=256 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=256 blocks_per_head=1048576 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=1024 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=56 heads=1024 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=1024 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2 width=56 heads=4096 blocks_per_head=1024 per_head_1=2 shared=3
+E7RESULT name=criterion2 width=56 heads=4096 blocks_per_head=65536 per_head_1=3 shared=4
+E7RESULT name=criterion2 width=56 heads=4096 blocks_per_head=1048576 per_head_1=3 shared=5
+E7RESULT name=criterion2_summary width=56 cells=21 per_head_1_shallower=12 per_head_1_deeper=0
+E7RESULT name=criterion3_capacity_ratio width=56 shared_over_per_head_1=1.1429 judged=no
+E7RESULT name=positive_control arm=per_head_1 entries_h1=6 entries_h4096=12291
+E7RESULT name=positive_control arm=per_head_t entries_h1=7 entries_h4096=16387
+E7RESULT name=positive_control arm=shared entries_h1=6 entries_h4096=8196
+E7RESULT name=done emitted=146

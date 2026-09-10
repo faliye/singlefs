@@ -26,7 +26,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 没有文件 I/O、没有并发、没有随机源 ⇒ 同一个二进制跑 N 遍必然逐字节一致。
 **「N 轮一致」说明的是没有隐藏状态，不是统计上稳定**
 （`.claude/singlefs-ai-sop/rules/test-discipline.md`）。
-证据强度来自 **21 个单测 + 15 条变异全部被抓**，不来自轮数。
+证据强度来自 **22 个单测 + 15 条变异全部被抓**，不来自轮数。
 
 **不回答**：真实 I/O 次数、condense 自身的挂钟代价、崩溃一致性；
 「可续做」那半没有建模——它骑在 D8（核心索引结构） 已定项 5 的意图机制上，
@@ -53,7 +53,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 
 | 跑前写死的判据 | 产物 | 判 |
 |---|---|---|
-| 1. 每批最坏空间需求只随批大小走 | `name=criterion1 arm=naive distinct_worst_batch_bytes=1 value=221184`，`condense` 同值，`no_structure` 是 `122880`；三条臂各自扫遍 24 个负载格，取值集合大小都是 1 | **过**。221184 = 4096 × (30 + 24) |
+| 1. 每批最坏空间需求只随批大小走 | `name=criterion1 arm=naive distinct_worst_batch_bytes=1 value=180224`，`condense` 同值，`no_structure` 是 `81920`；三条臂各自扫遍 24 个负载格，取值集合大小都是 1 | **过**。180224 = 4096 × (20 + 24) |
 | 2. 批前预留算得出，且不读活树 | 单测 `livelist_pre_reserve_does_not_read_the_live_tree`：净活块数相同、活树规模差一倍的两格，两条 livelist 臂的 `pre_reserve_bytes` 相等，而 `no_structure` 的 `destroy_reads` 不等 | **过** |
 | 3. 高估比有没有上界 | `naive n=65536 churn=16` 逐字 `entries=2162688 net_alloc=65536 pre_reserve_bytes=36507222016 true_pending_bytes=2147483648 overestimate=17.0000`；`condense` 同格逐字 `entries=65536 ... overestimate=1.0000` | naive 随 churn 线性发散（C=16 时 17×），**condense 恒 1.0000** |
 | 4. 阳性对照 | `name=positive_control arm=naive n=8192 entries_c0=8192 entries_c16=270336 ratio=33` | **不触发作废**，装置分得出差别 |
@@ -88,6 +88,34 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 处置是把判据抽成 `condense_entries(raw, net)` 单独可测，
 补三个取样点（150/100、200/100、201/100），M8 当场被抓。
 负载族够不到那一段这件事本身由单测 `the_load_family_cannot_reach_the_sensitive_ratio` 留档。
+
+### 射程：只覆盖从没打过快照的头（2026-09-10 补）
+
+⚠️ **装置不建快照**：源码里 `snap` 出现 0 次，负载 `Load` 只有活块数、覆写轮数、继承率三个量。
+⇒ 结论里「condense 之后条目数恰好等于净活块数」「待删占用高估恒 1.0000」**只罩住从没打过快照的头**。
+按 C265（销毁可写头的释放边界写成了固定的克隆时刻） 的修补，打过快照的头 livelist 里会留着 `birth ≤ prev_snap_txg`、
+销毁时不放的条目，计数器对待删占用的高估这时没有上界——D6（快照实现模型） 未定项 2 三轮对抗第二轮反推腿指出，**推论，未量**。
+那批条目该落到哪本身也没定，见 C269（销毁可写头时留下的块没有去处）。
+
+### 当天改正过一处跨装置口径：闸写了，钉错了源头
+
+`ALLOC_REC_BYTES` 第一版写成 **30**，注释挂的是 D3（空间分配） 已定项 7，
+而 D3（空间分配） 已定项 7 的字段表逐段相加是 **4 + 6 + 2 + 8 = 20**；
+30 其实是 D5（快照 / 空间记账机制） 已定项 5 的**记账**条目宽（key 22 + value 8）。
+当时的跨装置闸写成 `assert_eq!(ALLOC_REC_BYTES + 0, 22 + 8)`——**它自己就把出处招了**，
+可断言自洽、M2 变异抓得到、门禁全绿，没有任何东西说这个数属于另一棵树。
+
+⇒ 正是 `.claude/singlefs-ai-sop/rules/show-me-test.md` 那句
+「修坑的人最容易在这里收手：他确实把坑做成了会红的检查，**证据齐全、门禁全绿**，
+所以不会再想一遍这条检查的射程有多远」。是三方论证的正推腿逐段相加 D3（空间分配）
+的字段表时抓到的，不是任何一条断言。
+
+**处置**：常量改 20；跨装置闸从「钉一个总数」改成**钉字段表的逐段**
+（`ALLOC_REC_BYTES == dev 4 + slot 6 + span 2 + gen 8`），
+另加一条 `the_allocation_record_width_is_not_the_ledger_entry_width` 把两棵树的两个量分开留档。
+**影响面**：只有 `worst_batch_bytes` 变（221184 → **180224**，`no_structure` 122880 → **81920**），
+条目数、高估比、阳性对照比值都与该常量无关 ⇒ **判据 1 / 3 / 4 / 5 的结论一个都没变**。
+产物已重跑替换，`replay.sh` 逐字节比对通过。
 
 ## 历史版本
 
