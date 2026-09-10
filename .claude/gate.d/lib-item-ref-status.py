@@ -53,7 +53,21 @@ for path in files:
         for m in re.finditer(r'(已定项|未定项)\s*(\d+)', line):
             k = int(m.group(2)); want = '已' if m.group(1) == '已定项' else '未'
             pre = line[:m.start()]; ds = re.findall(r'D(\d+)', pre)
-            owner = next((c for c in ('D' + ds[-1] if ds else None, self_d, hist, last)
+            named = 'D' + ds[-1] if ds else None
+            # ⚠️ 只有**紧挨着**分项引用的那个编号才算「指名」（仓里规范的引用形态是
+            # `D6（快照实现模型） 已定项 2`）。行内更早提到的编号不算：同一行里裸写的
+            # 「已定项 k」按文件自身的决策号解析，那是下面三级回退存在的理由。
+            adj = re.search(r'D(\d+)\s*(?:（[^）]*）)?\s*[*`]*\s*$', pre)
+            named = ('D' + adj.group(1)) if adj else None
+            # 指名道姓的那条决策，正文里没有第 k 条 ⇒ 当场判红，不许往下落到别的决策。
+            # 少了这一句，一个不存在的分项号会被静默改判到「刚好有第 k 条」的另一条决策
+            # 头上并判绿：2026-09-06 起 decisions-history 里的「D6 已定项 2」就这样绿了四天，
+            # 而 D6 从头到尾只有 1 个分项，同一个号在两份腿输出里还指着两样东西。
+            if named in MAP and k not in MAP[named]:
+                bad.append(f"{path}:{ln} 「{m.group(0)}」指名 {named}"
+                           f"（{NAME[named]}），而它正文里没有第 {k} 条：{line.strip()[:60]}")
+                continue
+            owner = next((c for c in (named, 'D' + ds[-1] if ds else None, self_d, hist, last)
                           if c in MAP and k in MAP[c]), None)
             if owner is None:
                 bad.append(f"{path}:{ln} 「{m.group(0)}」归属判不出：{line.strip()[:70]}")
@@ -66,6 +80,7 @@ if bad:
     print(f"  ✗ 分项引用与正文状态不一致 {len(bad)} 处")
     for b in bad[:40]: print("    ", b)
     print("     → 权威是各决策正文的「### 已定项 / ### 未定项」两张表；改引用处，或先改正文再改引用。")
+    print("     → 报「指名 Dn 而它没有第 k 条」的：那个编号引不到任何东西，去查它本来想指哪一条。")
     sys.exit(1)
 n = sum(len(v) for v in MAP.values())
 print(f"  ✓ 分项引用与正文状态一致（{len(MAP)} 条决策、{n} 个分项）")

@@ -1,0 +1,8 @@
+# E125 五轮复跑的逐轮 sha256（口径：同一台 null_blk 几何，每轮重建设备）
+# 生成命令：for r in 1..5; do bash research/scripts/e125-zoned-wp-probe.sh; done
+round=1 sha256=ecdbd12856905990b8de4eae5784fddedcd8fc4a624822ffa6169fa38ff496af
+round=2 sha256=ecdbd12856905990b8de4eae5784fddedcd8fc4a624822ffa6169fa38ff496af
+round=3 sha256=ecdbd12856905990b8de4eae5784fddedcd8fc4a624822ffa6169fa38ff496af
+round=4 sha256=ecdbd12856905990b8de4eae5784fddedcd8fc4a624822ffa6169fa38ff496af
+round=5 sha256=ecdbd12856905990b8de4eae5784fddedcd8fc4a624822ffa6169fa38ff496af
+distinct_hashes=1

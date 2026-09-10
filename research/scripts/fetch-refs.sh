@@ -38,7 +38,9 @@ while IFS='|' read -r name url who; do
       echo "  ✗ $name  下载失败：$url" >&2; rm -f "$path.part"; miss=$((miss+1)); continue
     fi
     # 下到一页 HTML 错误页也会是 200，所以认文件类型，不认退出码
-    if ! file -b "$path.part" | grep -qi pdf; then
+    # 末段不许是 `grep -q`（门禁阶段 41）：先落到变量再判。
+    ftype=$(file -b "$path.part" || true)
+    if ! grep -qi pdf <<<"$ftype"; then
       echo "  ✗ $name  下回来的不是 PDF（$(file -b "$path.part" | cut -c1-40)）：$url" >&2
       rm -f "$path.part"; miss=$((miss+1)); continue
     fi

@@ -1,0 +1,12 @@
+# E126 超级块槽宽四条候选的代价 —— 变异表
+# 每行三段：变异名<TAB>原文<TAB>替换文
+min_unit_bytes	const MIN_UNIT_BYTES: u64 = 16384;	const MIN_UNIT_BYTES: u64 = 4096;
+first_version_disks	const FIRST_VERSION_DISKS: u64 = 2;	const FIRST_VERSION_DISKS: u64 = 3;
+sector_width	const SECTOR: u64 = 512;	const SECTOR: u64 = 4096;
+misattributed_ptr	const MISATTRIBUTED_PTR: u64 = 59;	const MISATTRIBUTED_PTR: u64 = 14;
+arm_yi_max_to_min	Arm::ProbeMaxIoMin => pbs.max(io_min),	Arm::ProbeMaxIoMin => pbs.min(io_min),
+arm_ding_to_pbs	Arm::MinUnit => MIN_UNIT_BYTES,	Arm::MinUnit => pbs,
+fits_strict	record_bytes <= width	record_bytes < width
+iomin_flip	width >= io_min	width <= io_min
+footprint_no_disks	(width * slots, width * slots * disks)	(width * slots, width * slots)
+tear_sector_floor	let n = width.div_ceil(SECTOR) as u32;	let n = (width / SECTOR) as u32;

@@ -65,7 +65,15 @@ while read -r line; do
   [[ -n "$refs" ]] || continue
   c=$(git log -1 --format=%h -S"## $e " -- "$KB/experiments" "$KB/experiments.md" 2>/dev/null)
   [[ -n "$c" ]] || continue
-  if git show --stat --format= "$c" 2>/dev/null | grep -q "decisions.md"; then
+  # ⚠️ **不许写成 `git show ... | grep -q`**：本脚本开头是 `set -uo pipefail`，
+  # 而 `grep -q` 一命中就退出 ⇒ 前段还没写完就吃 SIGPIPE ⇒ 管道整体 141
+  # ⇒ 一次**命中**被读成「没动过 decisions.md」。
+  # 实测（2026-09-10）：整轮门禁（cargo 构建压着机器）里 E109 那一格判红一次，
+  # 同一份输入空载连跑 23 次全绿——两次的提交号与相邻那格逐字相同，只有这条管道的退出码翻了。
+  # 出路是 `.claude/singlefs-ai-sop/rules/command-safety.md` 自己写的那条：
+  # 先把输出落到变量，判完退出码再处理。
+  stat_out=$(git show --stat --format= "$c" 2>/dev/null || true)
+  if grep -q "decisions.md" <<<"$stat_out"; then
     ok "$e 已跑，其状态变动的提交 $c 同时动过 decisions.md"
   else
     bad "$e 已跑，但把它改成已跑的提交 $c **没有动 decisions.md**（decisions.md 第 $refs 行引用了它）"

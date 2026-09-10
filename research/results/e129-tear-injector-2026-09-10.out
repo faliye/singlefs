@@ -1,0 +1,25 @@
+E7RESULT name=config good_sectors=8 err_sectors=8 boundary=4096 rounds=5 sector=512
+E7RESULT name=device loop=/dev/loop0 backing=/tmp/singlefs-e129.sA3AmE/backing.img
+E7RESULT name=dm_table row=0 8 linear 7:0 0
+E7RESULT name=dm_table row=8 8 error 
+E7RESULT name=geometry field=logical_block_size value=512
+E7RESULT name=geometry field=physical_block_size value=512
+E7RESULT name=geometry field=minimum_io_size value=512
+E7RESULT name=geometry field=optimal_io_size value=0
+E7RESULT name=span round=1 write_rc=1 prefix_persisted=1 suffix_absent=1
+E7RESULT name=poscontrol round=1 write_rc=0 all_persisted=1
+E7RESULT name=negcontrol round=1 write_rc=1 nothing_persisted=1
+E7RESULT name=span round=2 write_rc=1 prefix_persisted=1 suffix_absent=1
+E7RESULT name=poscontrol round=2 write_rc=0 all_persisted=1
+E7RESULT name=negcontrol round=2 write_rc=1 nothing_persisted=1
+E7RESULT name=span round=3 write_rc=1 prefix_persisted=1 suffix_absent=1
+E7RESULT name=poscontrol round=3 write_rc=0 all_persisted=1
+E7RESULT name=negcontrol round=3 write_rc=1 nothing_persisted=1
+E7RESULT name=span round=4 write_rc=1 prefix_persisted=1 suffix_absent=1
+E7RESULT name=poscontrol round=4 write_rc=0 all_persisted=1
+E7RESULT name=negcontrol round=4 write_rc=1 nothing_persisted=1
+E7RESULT name=span round=5 write_rc=1 prefix_persisted=1 suffix_absent=1
+E7RESULT name=poscontrol round=5 write_rc=0 all_persisted=1
+E7RESULT name=negcontrol round=5 write_rc=1 nothing_persisted=1
+E7RESULT name=verdict poscontrol_bad=0 negcontrol_bad=0 span_torn_rounds=5/5
+E7RESULT name=done emitted=25

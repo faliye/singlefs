@@ -88,7 +88,11 @@ E89|e89-interval-frontier||e89-interval-frontier-2026-09-03.out|exact
 E90|e90-tree-aad||e90-tree-aad-2026-09-03.out|exact
 E91|e91-ring-admission||e91-ring-admission-2026-09-03.out|exact
 E92|e92-reuse-requirement||e92-reuse-requirement-2026-09-08.out|exact
+E123|e123-k-fork-cost||e123-k-fork-cost-2026-09-09.out|exact
+E124|e124-superblock-recompute||e124-superblock-recompute-2026-09-09.out|exact
+E126|e126-superblock-slot-width||e126-superblock-slot-width-2026-09-09.out|exact
 E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
+E95|e95-node-layout-arms||e95-node-layout-arms-2026-09-09.out|exact
 E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
 E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact
@@ -135,13 +139,17 @@ E16|e16-journal|bytes|e16-bytes-2026-09-03.out|exact
 E17|e17-merge||e17-merge-2026-08-29-repro.out|timing
 E20|e20-fanout||e20-poscontrol-2026-08-29.out|timing
 E21|e21-cpu|2048 5|e21-cpu-2026-08-28.out|timing
+E128|e128-pointer-birth-cost|2000000|e128-pointer-birth-cost-2026-09-10.out|timing
+E130|e130_livelist_bounded_destroy||e130-livelist-bounded-destroy-2026-09-10.out|exact
 TSV
 )
 
 # 计时字段：换机器、换负载就会变，比对时抹掉。抹掉的是**值**不是**字段名**——
 # 字段整个消失属于结构变化，仍然会被抓。
+# ⚠️ **判决字段一律不抹**：E128 那几行里 `verdict=` 与 `rounds_jia_slower=` 是结论不是计时，
+# 留着逐字比 ⇒ 结论翻向会被这一步当场抓住，不用等下面的区间断言。
 strip_timing() {
-  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
+  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|bing_median|jia_median|ratio_median|ratio_min|ratio_max|e128_median|deviation|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
 }
 
 # ── 结论区间断言 ──────────────────────────────────────────────────────────
@@ -193,6 +201,32 @@ check_claims() {
       printf '  ✓ %-5s %-46s 8K=%s > 4K=%s\n' E20 "8 KiB 的未解释拐点又复现一次" "$v8192" "$v4096"
     else
       printf '  ✗ %-5s %-46s 8K=%s ≤ 4K=%s ⇒ kb 记的「五轮稳定」不再成立\n' E20 "8 KiB 拐点这次没出现" "$v8192" "$v4096"; bad=1
+    fi ;;
+  E128)
+    # kb 的承重结论有两条，方向相反，所以两条都要钉——只钉一条会让「甲不慢」被读成
+    # 「甲哪儿都不慢」，而记账那一对是慢的。
+    ok67=$(grep 'name=xdev entry_bytes=67 ' "$f" | sed -n 's/.*ok=\([a-z]*\).*/\1/p')
+    ok111=$(grep 'name=xdev entry_bytes=111 ' "$f" | sed -n 's/.*ok=\([a-z]*\).*/\1/p')
+    if [[ "$ok67" == true && "$ok111" == true ]]; then
+      printf '  ✓ %-5s %-46s 67 与 111 两档都落回 E20 的数\n' E128 "跨装置闸仍然成立"
+    else
+      printf '  ✗ %-5s %-46s ok67=%s ok111=%s\n' E128 "跨装置闸破了：这套装置与 E20 报不同的数" "$ok67" "$ok111"; bad=1
+    fi
+    ri=$(grep 'name=verdict pair=inode ' "$f" | sed -n 's/.*ratio_median=\([0-9.]*\).*/\1/p')
+    rl=$(grep 'name=verdict pair=ledger ' "$f" | sed -n 's/.*ratio_median=\([0-9.]*\).*/\1/p')
+    # ⚠️ **inode 那一对不钉方向。** 2026-09-10 四整轮里三轮判 `0/5 jia_never_slower`、
+    # 第四轮判 `5/5 jia_slower_every_round`，方向相反 ⇒ kb 记的是「不稳定」，没有方向可钉。
+    # 钉任何一边都是把一条不稳定的观测写成断言。这里只把观测值打出来，不判绿也不判红。
+    # 真正兜着它的是上面那一步**逐字节结构比对**：`strip_timing` 有意不抹 `verdict=` 与
+    # `rounds_jia_slower=`（它们是结论不是计时）⇒ 判决再翻一次，那一步就判红。
+    # ⚠️ **E128 因此会间歇性判红，这是有意的。** 判红时该做的不是调宽容差，
+    # 是把新跑那一次的比值与判决添进 E128 正文「结论一」那张逐轮表，让它变成五轮、六轮。
+    # 每一次红都是一次新观测——对一格记着「不稳定」的实验，这正是复跑该有的行为。
+    printf '  ! %-5s %-46s 109/93 = %s（不判，kb 记「不稳定」）\n' E128 "inode 那一对四轮里翻过一次向" "$ri"
+    if awk -v r="$rl" 'BEGIN{exit !(r>1.00 && r<1.10)}'; then
+      printf '  ✓ %-5s %-46s 97/81 = %s\n' E128 "记账树上甲仍慢一点点，量级不变" "$rl"
+    else
+      printf '  ✗ %-5s %-46s 97/81 = %s 掉出 (1.00, 1.10)\n' E128 "记账树那一对的方向或量级变了" "$rl"; bad=1
     fi ;;
   E44)
     # 本机 fsync 率：换机器会变，但**量级**要稳住，否则寿命折算整个塌掉

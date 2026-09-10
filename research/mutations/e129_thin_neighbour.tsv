@@ -1,0 +1,6 @@
+# E129 判据 2 乙段（COW 被打断时邻居怎么坏）—— 变异表
+# 被测装置是 shell 探针 research/scripts/e129-thin-neighbour.sh。
+# 复跑方式：把「原文」换成「替换文」，跑一遍脚本，必须出现 name=fatal 且退出码非 0。
+M1_注入格其实没注入	if [ "$inject" = 1 ]; then	if [ "$inject" = 9 ]; then
+M2_边界挪到COW目标之外	GOOD_SECT=$(( 128 + 64 ))         # 数据设备前 96 KiB 好：块 0 整块 + 块 1 的前半	GOOD_SECT=$(( 128 * 64 ))         # 数据设备前 96 KiB 好：块 0 整块 + 块 1 的前半
+M3_读邻居读到了A的位置	S dd if="/dev/mapper/$TH" of="$W/b.bin" bs=512 count=1 skip=$((B_OFF/512)) iflag=direct status=none 2>/dev/null	S dd if="/dev/mapper/$TH" of="$W/b.bin" bs=512 count=1 skip=0 iflag=direct status=none 2>/dev/null

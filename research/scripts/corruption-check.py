@@ -65,6 +65,17 @@ LONG_DUP = re.compile(r"\b([A-Za-z][A-Za-z'-]{4,})\s+\1\b(?!\s*=)", re.I)
 def long_word_dups(text):
     return [m.group(1).lower() for m in LONG_DUP.finditer(text)]
 
+# 首字母缩写自己粘自己：`SCSISCSI` = `SCSI` + `SCSI`。**拼接类损坏的一种，而且它逃过了两个检测器**——
+# oov-check.py 的取词正则要求至少 9 个字母（`[A-Za-z][A-Za-z']{8,}`），`SCSISCSI` 只有 8，
+# 连生词都算不上，后面四条拼接规则一条都没机会跑；这里的 LONG_DUP 要求两次之间有空白，也切不开。
+# ⚠️ **实测代价**（2026-09-09，C228（字词损坏闸漏掉首字母缩写自粘)）：一份含 `SCSISCSI ZBC` 的本地腿输出
+# 被两个检测器一起判绿，当成干净证据用掉了——而同一段里还编了一个不存在的规范条号。
+# 判据不依赖词表：全大写连续串，长度 ≥ 4 且为偶数，前半段与后半段逐字相同，且半段长 ≥ 2。
+ACRO_DUP = re.compile(r"\b([A-Z]{2,})\1\b")
+
+def acronym_dups(text):
+    return [m.group(0) for m in ACRO_DUP.finditer(text)]
+
 def splice_marks(text):
     """成对标记落单 + 标点粘连——**丢字**的签名。
 
@@ -87,13 +98,16 @@ def check(text):
     words = len(WORD.findall(text))
     wbi = word_repeats(text, 2)
     ldup = long_word_dups(text)
+    adup = acronym_dups(text)
     return {
         'chars': len(text), 'cjk': c, 'words': words,
         'fffd': fffd, 'bigram': len(bi), 'trigram': len(tri),
-        'wbigram': len(wbi), 'longdup': len(ldup), **splice_marks(text),
+        'wbigram': len(wbi), 'longdup': len(ldup), 'acrodup': len(adup),
+        **splice_marks(text),
         'bigram_samples': bi[:6], 'trigram_samples': tri[:4],
         'wbigram_samples': wbi[:6],
         'longdup_samples': ldup[:6],
+        'acrodup_samples': adup[:6],
     }
 
 # 退出码：0 干净 / 1 判红 / 2 **检测器自己出错**。
@@ -129,16 +143,18 @@ if __name__ == '__main__':
         spliced = r['odd_tick'] or r['odd_bold'] or r['glue'] > 0
         red = (r['fffd'] > 0 or (r['bigram'] >= 2 and rate > 1.0)
                or (r['wbigram'] >= 2 and wrate > 1.0) or spliced
-               or r['longdup'] > 0)
+               or r['longdup'] > 0 or r['acrodup'] > 0)
         bad |= red
         print(f"{'红' if red else '绿'} {path}  cjk={r['cjk']} words={r['words']} fffd={r['fffd']} "
               f"汉字复读={r['bigram']}({rate:.2f}/千) 英文复读={r['wbigram']}({wrate:.2f}/千) "
               f"反引号落单={r['odd_tick']} 星号落单={r['odd_bold']} 粘连={r['glue']} "
-              f"实词自复读={r['longdup']}")
+              f"实词自复读={r['longdup']} 缩写自粘={r['acrodup']}")
         if r['bigram_samples']:
             print(f"     汉字复读样本: {' '.join(r['bigram_samples'])}")
         if r['wbigram_samples']:
             print(f"     英文复读样本: {' | '.join(r['wbigram_samples'])}")
         if r['longdup_samples']:
             print(f"     实词自复读: {' | '.join(r['longdup_samples'])}")
+        if r['acrodup_samples']:
+            print(f"     缩写自粘: {' | '.join(r['acrodup_samples'])}")
     sys.exit(EXIT_RED if bad else EXIT_CLEAN)

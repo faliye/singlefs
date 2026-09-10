@@ -49,7 +49,10 @@ while IFS= read -r f; do
   # 写成 '^\+#{2,4} .*(—— 已定|^\+### 已定)' 时，第二个分支里的 ^ 在组内永远匹配不上，
   # 于是 `### 已定（…）` 这种最常见的定案小节标题一个都抓不到，检查恒绿。
   # 合成仓双向验的时候当场红——**这就是「新增的检查必须先证明它会红」拦下来的那一次**。
-  if git diff "$BASE" -- "$f" | grep -qE '^\+#{2,4} .*—— 已定|^\+#{2,4} 已定[（(]'; then
+  # 同 10-kb-rot.sh 那条：pipefail + `grep -q` 提前退出 ⇒ 前段 SIGPIPE ⇒ 命中被读成没命中。
+  # `git diff` 的输出可以很大，这里比那条更容易撞上。
+  diff_out=$(git diff "$BASE" -- "$f" || true)
+  if grep -qE '^\+#{2,4} .*—— 已定|^\+#{2,4} 已定[（(]' <<<"$diff_out"; then
     settled_files+=("$f")
   fi
 done < <(git -c core.quotepath=false diff --name-only "$BASE" -- "$DEC" 2>/dev/null)
@@ -92,7 +95,9 @@ done
 # ── ② 索引页里还悬着、而本次一个都没碰的「待议」节 ──────────────
 if [[ -f "$IDX" ]]; then
   idx_touched=0
-  git -c core.quotepath=false diff --name-only "$BASE" -- "$IDX" 2>/dev/null | grep -q . && idx_touched=1
+  # 同上：`grep -q .` 在第一行就退出，前段 SIGPIPE 会让「动过」被读成「没动过」。
+  idx_names=$(git -c core.quotepath=false diff --name-only "$BASE" -- "$IDX" 2>/dev/null || true)
+  [[ -n "$idx_names" ]] && idx_touched=1
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
     grep -qE '已回收|已收摊|已并入' <<<"$text" && continue

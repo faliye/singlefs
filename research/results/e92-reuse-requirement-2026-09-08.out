@@ -1,31 +1,84 @@
-E7RESULT name=config publish_rate=2785 consumers=5 ks=5
+E7RESULT name=config publish_rate=2785 consumers=9 ks=5 durations=4
 E7RESULT name=consumer id=c1_root_fallback source=D22-item2 pricing=generations req_gens=2
 E7RESULT name=consumer id=c2_replay_watermark source=D23-item14 pricing=generations req_gens=blank
-E7RESULT name=consumer id=c3_scrub_old_root source=D13 pricing=wallclock req_gens=blank
+E7RESULT name=consumer id=c3_scrub_watermark source=D13-scrub pricing=generations req_gens=0
 E7RESULT name=consumer id=c4_timeline_discriminate source=C88 pricing=blank req_gens=blank
 E7RESULT name=consumer id=c5_pinning_phase source=E33 pricing=generations req_gens=blank
+E7RESULT name=consumer id=c6_i48_frozen_image source=I-4.8 pricing=generations req_gens=0
+E7RESULT name=consumer id=c7_record_verifier source=D13-verifier pricing=generations req_gens=0
+E7RESULT name=consumer id=c8_admin_rollback source=D23-item14 pricing=external_event req_gens=blank
+E7RESULT name=consumer id=c9_traversal_hop source=D4-parent-checksum pricing=wallclock req_gens=blank
+E7RESULT name=pricing_census generations=6 wallclock=1 external_event=1 blank=1 total=9
 E7RESULT name=gen_consumer id=c1_root_fallback k=1 req_gens=2 violations=1
 E7RESULT name=gen_consumer id=c1_root_fallback k=2 req_gens=2 violations=0
 E7RESULT name=gen_consumer id=c1_root_fallback k=3 req_gens=2 violations=0
 E7RESULT name=gen_consumer id=c1_root_fallback k=4 req_gens=2 violations=0
 E7RESULT name=gen_consumer id=c1_root_fallback k=8 req_gens=2 violations=0
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=1 scan_seconds=0.100000 window_seconds=0.000359066 exceeds=1 sim_violations=277 closed_violations=277 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=2 scan_seconds=0.100000 window_seconds=0.000718133 exceeds=1 sim_violations=276 closed_violations=276 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=3 scan_seconds=0.100000 window_seconds=0.001077199 exceeds=1 sim_violations=275 closed_violations=275 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=4 scan_seconds=0.100000 window_seconds=0.001436266 exceeds=1 sim_violations=274 closed_violations=274 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=small_1e4_at_1e5 k=8 scan_seconds=0.100000 window_seconds=0.002872531 exceeds=1 sim_violations=270 closed_violations=270 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=1 scan_seconds=10.000000 window_seconds=0.000359066 exceeds=1 sim_violations=27849 closed_violations=27849 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=2 scan_seconds=10.000000 window_seconds=0.000718133 exceeds=1 sim_violations=27848 closed_violations=27848 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=3 scan_seconds=10.000000 window_seconds=0.001077199 exceeds=1 sim_violations=27847 closed_violations=27847 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=4 scan_seconds=10.000000 window_seconds=0.001436266 exceeds=1 sim_violations=27846 closed_violations=27846 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=mid_1e6_at_1e5 k=8 scan_seconds=10.000000 window_seconds=0.002872531 exceeds=1 sim_violations=27842 closed_violations=27842 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=1 scan_seconds=100.000000 window_seconds=0.000359066 exceeds=1 sim_violations=278499 closed_violations=278499 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=2 scan_seconds=100.000000 window_seconds=0.000718133 exceeds=1 sim_violations=278498 closed_violations=278498 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=3 scan_seconds=100.000000 window_seconds=0.001077199 exceeds=1 sim_violations=278497 closed_violations=278497 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=4 scan_seconds=100.000000 window_seconds=0.001436266 exceeds=1 sim_violations=278496 closed_violations=278496 agree=1
-E7RESULT name=wallclock_consumer id=c3_scrub_old_root case=big_1e8_at_1e6 k=8 scan_seconds=100.000000 window_seconds=0.002872531 exceeds=1 sim_violations=278492 closed_violations=278492 agree=1
-E7RESULT name=verdict_unit wallclock_cells_exceeding_window=15 total_wallclock_cells=15 gens_unit_protects_wallclock_consumer=0
+E7RESULT name=gen_consumer id=c3_scrub_watermark k=1 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c3_scrub_watermark k=2 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c3_scrub_watermark k=3 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c3_scrub_watermark k=4 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c3_scrub_watermark k=8 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c6_i48_frozen_image k=1 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c6_i48_frozen_image k=2 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c6_i48_frozen_image k=3 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c6_i48_frozen_image k=4 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c6_i48_frozen_image k=8 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c7_record_verifier k=1 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c7_record_verifier k=2 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c7_record_verifier k=3 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c7_record_verifier k=4 req_gens=0 violations=0
+E7RESULT name=gen_consumer id=c7_record_verifier k=8 req_gens=0 violations=0
+E7RESULT name=window k=1 window_seconds=0.000359066 covers_up_to_seconds=0.000359066
+E7RESULT name=window k=2 window_seconds=0.000718133 covers_up_to_seconds=0.000718133
+E7RESULT name=window k=3 window_seconds=0.001077199 covers_up_to_seconds=0.001077199
+E7RESULT name=window k=4 window_seconds=0.001436266 covers_up_to_seconds=0.001436266
+E7RESULT name=window k=8 window_seconds=0.002872531 covers_up_to_seconds=0.002872531
+E7RESULT name=hypothetical_wallclock case=hop_100us k=1 duration_seconds=0.000100 window_seconds=0.000359066 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_100us k=2 duration_seconds=0.000100 window_seconds=0.000718133 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_100us k=3 duration_seconds=0.000100 window_seconds=0.001077199 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_100us k=4 duration_seconds=0.000100 window_seconds=0.001436266 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_100us k=8 duration_seconds=0.000100 window_seconds=0.002872531 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_1ms k=1 duration_seconds=0.001000 window_seconds=0.000359066 exceeds=1 sim_violations=1 closed_violations=1 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_1ms k=2 duration_seconds=0.001000 window_seconds=0.000718133 exceeds=1 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_1ms k=3 duration_seconds=0.001000 window_seconds=0.001077199 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_1ms k=4 duration_seconds=0.001000 window_seconds=0.001436266 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=hop_1ms k=8 duration_seconds=0.001000 window_seconds=0.002872531 exceeds=0 sim_violations=0 closed_violations=0 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_100ms k=1 duration_seconds=0.100000 window_seconds=0.000359066 exceeds=1 sim_violations=277 closed_violations=277 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_100ms k=2 duration_seconds=0.100000 window_seconds=0.000718133 exceeds=1 sim_violations=276 closed_violations=276 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_100ms k=3 duration_seconds=0.100000 window_seconds=0.001077199 exceeds=1 sim_violations=275 closed_violations=275 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_100ms k=4 duration_seconds=0.100000 window_seconds=0.001436266 exceeds=1 sim_violations=274 closed_violations=274 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_100ms k=8 duration_seconds=0.100000 window_seconds=0.002872531 exceeds=1 sim_violations=270 closed_violations=270 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_10s k=1 duration_seconds=10.000000 window_seconds=0.000359066 exceeds=1 sim_violations=27849 closed_violations=27849 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_10s k=2 duration_seconds=10.000000 window_seconds=0.000718133 exceeds=1 sim_violations=27848 closed_violations=27848 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_10s k=3 duration_seconds=10.000000 window_seconds=0.001077199 exceeds=1 sim_violations=27847 closed_violations=27847 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_10s k=4 duration_seconds=10.000000 window_seconds=0.001436266 exceeds=1 sim_violations=27846 closed_violations=27846 agree=1
+E7RESULT name=hypothetical_wallclock case=scan_10s k=8 duration_seconds=10.000000 window_seconds=0.002872531 exceeds=1 sim_violations=27842 closed_violations=27842 agree=1
+E7RESULT name=verdict_unit real_wallclock_consumers=1 hypothetical_cells_exceeding=12 hypothetical_cells_total=20
+E7RESULT name=admin_rollback s_per_region=1 ring_depth=3 k=1 promised_depth=3 usable_depth=1 fake_candidates=2
+E7RESULT name=admin_rollback s_per_region=1 ring_depth=3 k=2 promised_depth=3 usable_depth=2 fake_candidates=1
+E7RESULT name=admin_rollback s_per_region=1 ring_depth=3 k=3 promised_depth=3 usable_depth=3 fake_candidates=0
+E7RESULT name=admin_rollback s_per_region=2 ring_depth=6 k=1 promised_depth=6 usable_depth=1 fake_candidates=5
+E7RESULT name=admin_rollback s_per_region=2 ring_depth=6 k=2 promised_depth=6 usable_depth=2 fake_candidates=4
+E7RESULT name=admin_rollback s_per_region=2 ring_depth=6 k=3 promised_depth=6 usable_depth=3 fake_candidates=3
+E7RESULT name=admin_rollback s_per_region=2 ring_depth=6 k=4 promised_depth=6 usable_depth=4 fake_candidates=2
+E7RESULT name=admin_rollback s_per_region=4 ring_depth=12 k=1 promised_depth=12 usable_depth=1 fake_candidates=11
+E7RESULT name=admin_rollback s_per_region=4 ring_depth=12 k=2 promised_depth=12 usable_depth=2 fake_candidates=10
+E7RESULT name=admin_rollback s_per_region=4 ring_depth=12 k=3 promised_depth=12 usable_depth=3 fake_candidates=9
+E7RESULT name=admin_rollback s_per_region=4 ring_depth=12 k=4 promised_depth=12 usable_depth=4 fake_candidates=8
+E7RESULT name=admin_rollback s_per_region=4 ring_depth=12 k=8 promised_depth=12 usable_depth=8 fake_candidates=4
+E7RESULT name=admin_rollback s_per_region=8 ring_depth=24 k=1 promised_depth=24 usable_depth=1 fake_candidates=23
+E7RESULT name=admin_rollback s_per_region=8 ring_depth=24 k=2 promised_depth=24 usable_depth=2 fake_candidates=22
+E7RESULT name=admin_rollback s_per_region=8 ring_depth=24 k=3 promised_depth=24 usable_depth=3 fake_candidates=21
+E7RESULT name=admin_rollback s_per_region=8 ring_depth=24 k=4 promised_depth=24 usable_depth=4 fake_candidates=20
+E7RESULT name=admin_rollback s_per_region=8 ring_depth=24 k=8 promised_depth=24 usable_depth=8 fake_candidates=16
+E7RESULT name=admin_rollback s_per_region=16 ring_depth=48 k=1 promised_depth=48 usable_depth=1 fake_candidates=47
+E7RESULT name=admin_rollback s_per_region=16 ring_depth=48 k=2 promised_depth=48 usable_depth=2 fake_candidates=46
+E7RESULT name=admin_rollback s_per_region=16 ring_depth=48 k=3 promised_depth=48 usable_depth=3 fake_candidates=45
+E7RESULT name=admin_rollback s_per_region=16 ring_depth=48 k=4 promised_depth=48 usable_depth=4 fake_candidates=44
+E7RESULT name=admin_rollback s_per_region=16 ring_depth=48 k=8 promised_depth=48 usable_depth=8 fake_candidates=40
+E7RESULT name=verdict_rollback pairs=22 pairs_with_fake_candidates=21 k_must_equal_ring_depth=1
 E7RESULT name=poscontrol_fallback k1_violations=1 k2_violations=0 discriminates=1
-E7RESULT name=negcontrol_instant_scan violations=0 expect=0
+E7RESULT name=negcontrol_instant violations=0 expect=0
 E7RESULT name=blank_cell id=c4_timeline_discriminate requirement=NA reason=consumer_not_implemented_C88
-E7RESULT name=done emitted=31
+E7RESULT name=done emitted=84

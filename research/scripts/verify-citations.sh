@@ -151,7 +151,10 @@ ckdoc() { # ckdoc <决策> <说的是什么> <pdf 名> <ERE 模式>
   # 原文按栏排版，一句话常被折成多行、还会在断行处加连字符（per-\nformance）⇒
   # 先接行、去掉断行连字符、再把空白压成单空格。**只在这份规范化文本上匹配**，
   # 所以模式里不要指望能对上原文的换行。
-  if tr '\n' ' ' <"$txt" | sed -E 's/([a-z])- ([a-z])/\1\2/g' | tr -s ' ' | grep -qE "$pat"; then
+  # 末段不许是 `grep -q`（门禁阶段 41）：前段是整篇正文，输出大，最容易吃 SIGPIPE
+  # ⇒ 一条**能核实**的引用会被随机读成核不到。先落到变量再判。
+  flat=$(tr '\n' ' ' <"$txt" | sed -E 's/([a-z])- ([a-z])/\1\2/g' | tr -s ' ')
+  if grep -qE "$pat" <<<"$flat"; then
     printf '  ✓ %-6s %s\n' "$d" "$what"; pass=$((pass+1))
   else
     printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$name"; fail=$((fail+1))

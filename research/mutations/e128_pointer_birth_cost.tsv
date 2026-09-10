@@ -1,0 +1,14 @@
+M1_节点头常量抄错	const NODE_HDR: usize = 64;	const NODE_HDR: usize = 128;
+M2_inode条目身份引用少一字节	let inode_entry = 8 + 26 + child_ptr;	let inode_entry = 8 + 25 + child_ptr;
+M3_记账key宽抄错	let ledger_entry = 22 + child_ptr;	let ledger_entry = 21 + child_ptr;
+M4_根记录只算一个单元指针	let root_record = 194 - 59 * 2 + child_ptr * 2;	let root_record = 194 - 59 + child_ptr;
+M5_树表条目基数错	let tree_entry = 121 - 59 + child_ptr;	let tree_entry = 120 - 59 + child_ptr;
+M6_甲那条臂退回丙的宽度	("inode_jia", 109),	("inode_jia", 93),
+M7_key不按跨步写	let off = node * t.node_bytes + NODE_HDR + i * t.entry_bytes;	let off = node * t.node_bytes + NODE_HDR + i * 8;
+M8_二分比较方向反	if self.key_at(node, mid) < sk { lo = mid + 1; } else { hi = mid; }	if self.key_at(node, mid) <= sk { lo = mid + 1; } else { hi = mid; }
+M9_child读到key的位置	+ i * self.entry_bytes + 8;	+ i * self.entry_bytes;
+M10_树深起点错	let mut depth = 1;	let mut depth = 0;
+M11_跨装置基准抄错	(67, 466.99), (111, 547.50)	(67, 400.00), (111, 547.50)
+M12_median取均值	s[s.len() / 2]	s.iter().sum::<f64>() / s.len() as f64
+M13_槽数不减节点头	let slots = ((node_bytes - NODE_HDR) / entry_bytes).max(2);	let slots = (node_bytes / entry_bytes).max(2);
+M14_树表口径分母抄错	let repo = 16384 - 68 - 32;      // 22-单元原子性怎么合成.md:495 逐字	let repo = 16384 - 68;

@@ -1,0 +1,11 @@
+# E129 判据 2 甲段（块内 COW 放大）—— 变异表
+# 被测装置是 shell 探针 research/scripts/e129-thin-rmw.sh。
+# 复跑方式：把「原文」换成「替换文」，跑一遍脚本，必须出现 name=fatal 且退出码非 0。
+M1_共享格不建快照	if [ "$shared" = 1 ]; then	if [ "$shared" = 2 ]; then
+# ⚠️ 等价变异留档：把 BLK_SECT 从 128 改成 256（块 64 KiB → 128 KiB）**抓不到，而且不该抓**——
+#   BLK_BYTES 由 BLK_SECT 算出，io_min 断言跟着走，而本段的结论（块共享时一次 512 字节的写
+#   放大成整块）对块大小是尺度无关的 ⇒ 那是一个合法的别的配置，不是 bug。
+#   按 .claude/rules/mutation-sampling.md「判定为等价的，把等价性写成留档，再换一个真会改行为的补上」，
+#   换成下面这条 M2：让独占格也建快照，从另一侧考同一个判别子。
+M2_独占格也建快照	if [ "$shared" = 1 ]; then	if [ "$shared" != 9 ]; then
+M3_计数器读错字段	written_sectors() { awk '{print $7}' "/sys/block/$(basename "$1")/stat"; }	written_sectors() { awk '{print $1}' "/sys/block/$(basename "$1")/stat"; }

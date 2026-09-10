@@ -1,0 +1,14 @@
+M1_水位宽度算错	    NONCE_BITS / 8	    NONCE_BITS / 16
+M2_水位闸恒判一致	    (used == need, need.saturating_sub(used))	    (true, 0)
+M3_码3臂也要付devs	        if self.carries_record_count() { 0 } else { DEVS_BYTES }	        DEVS_BYTES
+M4_码2臂也不付devs	        if self.carries_record_count() { 0 } else { DEVS_BYTES }	        0
+M5_指针宽度错	const PTR_BYTES: u64 = 59;	const PTR_BYTES: u64 = 58;
+M6_根环区域数错	const RING_REGIONS: u64 = 3;	const RING_REGIONS: u64 = 4;
+M7_合并没省指针	        b -= (n - 1) * PTR_BYTES;	        b -= 0;
+M8_中央映射指针没算	        b += PTR_BYTES;	        b += 0;
+M9_缺项字节没加进总数	        + missing\n        + dev_unit.devs_bytes_in_slot();	        + dev_unit.devs_bytes_in_slot();
+M10_宽窄档取反	    MISSING_ROWS_WITHOUT_DEVS.iter().map(|&(_, a, b)| if wide { b } else { a }).sum()	    MISSING_ROWS_WITHOUT_DEVS.iter().map(|&(_, a, b)| if wide { a } else { b }).sum()
+M11_撕裂态少减一致态	    (1u64 << sectors).saturating_sub(2)	    1u64 << sectors
+M12_候选表某一行宽度错	    ("feature_bits", 96),	    ("feature_bits", 64),
+M13_nonce位数写错	const NONCE_BITS: u64 = 96;	const NONCE_BITS: u64 = 64;
+M14_码3记录数宽度错	const CODE3_RECORD_COUNT_BYTES: u64 = 2;	const CODE3_RECORD_COUNT_BYTES: u64 = 4;

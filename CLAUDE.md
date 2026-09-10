@@ -85,7 +85,7 @@ bash .claude/scripts/env.sh           # 环境自检
 bash .claude/gate.d/10-kb-rot.sh          # kb 腐化：引用悬空、结论悬空、条数对不上
 bash .claude/gate.d/15-research-build.sh  # research 构建与单测（共享门禁只看 crates/，而证据住在 research/）
 bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接、条数与标题相符
-bash .claude/gate.d/21-decision-items-sync.sh # 决策分项清单与正文同步（--write 重新生成）
+bash .claude/gate.d/21-decision-items-sync.sh # 决策分项清单与索引表状态列，与正文同步（--write 重新生成）
 bash .claude/gate.d/22-item-ref-status.sh # 分项引用写的状态与正文的两张索引表相符
 bash .claude/gate.d/23-link-targets.sh    # 相对链接与「第 N 节」指向到不到得了
 bash .claude/gate.d/24-status-redundancy.sh   # 分项状态在索引表与正文里重复标注
@@ -106,6 +106,7 @@ bash .claude/gate.d/37-decision-summary-width.sh # 决策索引结论列的宽�
 bash .claude/gate.d/38-field-table-projection.sh # 决策里定的字段有没有漏投影进第一个事务的表
 bash .claude/gate.d/39-field-table-sum.sh # 字段表加出来的数：表后合计与 format-const 标记
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
+bash .claude/gate.d/41-pipefail-grepq.sh  # pipefail 下用 grep -q 收尾的管道（命中会被读成没命中）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）

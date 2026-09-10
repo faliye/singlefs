@@ -1,0 +1,172 @@
+E7RESULT name=config min_unit=16384 disks=2 sector=512 arms=5 records=6 devices=3
+E7RESULT name=footprint dev=nvme_local arm=jia_probe_pbs pbs=512 io_min=512 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=nvme_local arm=jia_probe_pbs pbs=512 io_min=512 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=nvme_local arm=jia_probe_pbs pbs=512 io_min=512 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=nvme_local arm=jia_probe_pbs pbs=512 io_min=512 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=nvme_local arm=jia_probe_pbs width=512 io_min=512 honors=1 sectors=1 tear_states=0
+E7RESULT name=footprint dev=nvme_local arm=yi_probe_max_iomin pbs=512 io_min=512 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=nvme_local arm=yi_probe_max_iomin pbs=512 io_min=512 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=nvme_local arm=yi_probe_max_iomin pbs=512 io_min=512 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=nvme_local arm=yi_probe_max_iomin pbs=512 io_min=512 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=nvme_local arm=yi_probe_max_iomin width=512 io_min=512 honors=1 sectors=1 tear_states=0
+E7RESULT name=footprint dev=nvme_local arm=bing_const_512 pbs=512 io_min=512 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=nvme_local arm=bing_const_512 pbs=512 io_min=512 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=nvme_local arm=bing_const_512 pbs=512 io_min=512 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=nvme_local arm=bing_const_512 pbs=512 io_min=512 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=nvme_local arm=bing_const_512 width=512 io_min=512 honors=1 sectors=1 tear_states=0
+E7RESULT name=footprint dev=nvme_local arm=bing_const_4096 pbs=512 io_min=512 width=4096 slots=2 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=footprint dev=nvme_local arm=bing_const_4096 pbs=512 io_min=512 width=4096 slots=4 per_disk_bytes=16384 pool_bytes=32768
+E7RESULT name=footprint dev=nvme_local arm=bing_const_4096 pbs=512 io_min=512 width=4096 slots=8 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=nvme_local arm=bing_const_4096 pbs=512 io_min=512 width=4096 slots=16 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=iomin dev=nvme_local arm=bing_const_4096 width=4096 io_min=512 honors=1 sectors=8 tear_states=254
+E7RESULT name=footprint dev=nvme_local arm=ding_min_unit pbs=512 io_min=512 width=16384 slots=2 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=nvme_local arm=ding_min_unit pbs=512 io_min=512 width=16384 slots=4 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=footprint dev=nvme_local arm=ding_min_unit pbs=512 io_min=512 width=16384 slots=8 per_disk_bytes=131072 pool_bytes=262144
+E7RESULT name=footprint dev=nvme_local arm=ding_min_unit pbs=512 io_min=512 width=16384 slots=16 per_disk_bytes=262144 pool_bytes=524288
+E7RESULT name=iomin dev=nvme_local arm=ding_min_unit width=16384 io_min=512 honors=1 sectors=32 tear_states=4294967294
+E7RESULT name=footprint dev=common_4k arm=jia_probe_pbs pbs=4096 io_min=4096 width=4096 slots=2 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=footprint dev=common_4k arm=jia_probe_pbs pbs=4096 io_min=4096 width=4096 slots=4 per_disk_bytes=16384 pool_bytes=32768
+E7RESULT name=footprint dev=common_4k arm=jia_probe_pbs pbs=4096 io_min=4096 width=4096 slots=8 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=common_4k arm=jia_probe_pbs pbs=4096 io_min=4096 width=4096 slots=16 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=iomin dev=common_4k arm=jia_probe_pbs width=4096 io_min=4096 honors=1 sectors=8 tear_states=254
+E7RESULT name=footprint dev=common_4k arm=yi_probe_max_iomin pbs=4096 io_min=4096 width=4096 slots=2 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=footprint dev=common_4k arm=yi_probe_max_iomin pbs=4096 io_min=4096 width=4096 slots=4 per_disk_bytes=16384 pool_bytes=32768
+E7RESULT name=footprint dev=common_4k arm=yi_probe_max_iomin pbs=4096 io_min=4096 width=4096 slots=8 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=common_4k arm=yi_probe_max_iomin pbs=4096 io_min=4096 width=4096 slots=16 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=iomin dev=common_4k arm=yi_probe_max_iomin width=4096 io_min=4096 honors=1 sectors=8 tear_states=254
+E7RESULT name=footprint dev=common_4k arm=bing_const_512 pbs=4096 io_min=4096 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=common_4k arm=bing_const_512 pbs=4096 io_min=4096 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=common_4k arm=bing_const_512 pbs=4096 io_min=4096 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=common_4k arm=bing_const_512 pbs=4096 io_min=4096 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=common_4k arm=bing_const_512 width=512 io_min=4096 honors=0 sectors=1 tear_states=0
+E7RESULT name=footprint dev=common_4k arm=bing_const_4096 pbs=4096 io_min=4096 width=4096 slots=2 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=footprint dev=common_4k arm=bing_const_4096 pbs=4096 io_min=4096 width=4096 slots=4 per_disk_bytes=16384 pool_bytes=32768
+E7RESULT name=footprint dev=common_4k arm=bing_const_4096 pbs=4096 io_min=4096 width=4096 slots=8 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=common_4k arm=bing_const_4096 pbs=4096 io_min=4096 width=4096 slots=16 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=iomin dev=common_4k arm=bing_const_4096 width=4096 io_min=4096 honors=1 sectors=8 tear_states=254
+E7RESULT name=footprint dev=common_4k arm=ding_min_unit pbs=4096 io_min=4096 width=16384 slots=2 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=common_4k arm=ding_min_unit pbs=4096 io_min=4096 width=16384 slots=4 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=footprint dev=common_4k arm=ding_min_unit pbs=4096 io_min=4096 width=16384 slots=8 per_disk_bytes=131072 pool_bytes=262144
+E7RESULT name=footprint dev=common_4k arm=ding_min_unit pbs=4096 io_min=4096 width=16384 slots=16 per_disk_bytes=262144 pool_bytes=524288
+E7RESULT name=iomin dev=common_4k arm=ding_min_unit width=16384 io_min=4096 honors=1 sectors=32 tear_states=4294967294
+E7RESULT name=footprint dev=md_raid5 arm=jia_probe_pbs pbs=512 io_min=65536 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=md_raid5 arm=jia_probe_pbs pbs=512 io_min=65536 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=md_raid5 arm=jia_probe_pbs pbs=512 io_min=65536 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=md_raid5 arm=jia_probe_pbs pbs=512 io_min=65536 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=md_raid5 arm=jia_probe_pbs width=512 io_min=65536 honors=0 sectors=1 tear_states=0
+E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin pbs=512 io_min=65536 width=65536 slots=2 per_disk_bytes=131072 pool_bytes=262144
+E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin pbs=512 io_min=65536 width=65536 slots=4 per_disk_bytes=262144 pool_bytes=524288
+E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin pbs=512 io_min=65536 width=65536 slots=8 per_disk_bytes=524288 pool_bytes=1048576
+E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin pbs=512 io_min=65536 width=65536 slots=16 per_disk_bytes=1048576 pool_bytes=2097152
+E7RESULT name=iomin dev=md_raid5 arm=yi_probe_max_iomin width=65536 io_min=65536 honors=1 sectors=128 tear_states=2^128-2
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_512 pbs=512 io_min=65536 width=512 slots=2 per_disk_bytes=1024 pool_bytes=2048
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_512 pbs=512 io_min=65536 width=512 slots=4 per_disk_bytes=2048 pool_bytes=4096
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_512 pbs=512 io_min=65536 width=512 slots=8 per_disk_bytes=4096 pool_bytes=8192
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_512 pbs=512 io_min=65536 width=512 slots=16 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=iomin dev=md_raid5 arm=bing_const_512 width=512 io_min=65536 honors=0 sectors=1 tear_states=0
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_4096 pbs=512 io_min=65536 width=4096 slots=2 per_disk_bytes=8192 pool_bytes=16384
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_4096 pbs=512 io_min=65536 width=4096 slots=4 per_disk_bytes=16384 pool_bytes=32768
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_4096 pbs=512 io_min=65536 width=4096 slots=8 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=md_raid5 arm=bing_const_4096 pbs=512 io_min=65536 width=4096 slots=16 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=iomin dev=md_raid5 arm=bing_const_4096 width=4096 io_min=65536 honors=0 sectors=8 tear_states=254
+E7RESULT name=footprint dev=md_raid5 arm=ding_min_unit pbs=512 io_min=65536 width=16384 slots=2 per_disk_bytes=32768 pool_bytes=65536
+E7RESULT name=footprint dev=md_raid5 arm=ding_min_unit pbs=512 io_min=65536 width=16384 slots=4 per_disk_bytes=65536 pool_bytes=131072
+E7RESULT name=footprint dev=md_raid5 arm=ding_min_unit pbs=512 io_min=65536 width=16384 slots=8 per_disk_bytes=131072 pool_bytes=262144
+E7RESULT name=footprint dev=md_raid5 arm=ding_min_unit pbs=512 io_min=65536 width=16384 slots=16 per_disk_bytes=262144 pool_bytes=524288
+E7RESULT name=iomin dev=md_raid5 arm=ding_min_unit width=16384 io_min=65536 honors=0 sectors=32 tear_states=4294967294
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=jia_probe_pbs width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=yi_probe_max_iomin width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_512 width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=bing_const_4096 width=4096 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=nvme_local arm=ding_min_unit width=16384 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=jia_probe_pbs width=4096 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=yi_probe_max_iomin width=4096 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_512 width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=bing_const_4096 width=4096 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=common_4k arm=ding_min_unit width=16384 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=jia_probe_pbs width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=yi_probe_max_iomin width=65536 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=unmerged_w0_m1 bytes=566 fits=0 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=unmerged_w1_m0 bytes=536 fits=0 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=unmerged_w1_m1 bytes=595 fits=0 bytes_minus59=536 fits_minus59=0
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_512 width=512 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=bing_const_4096 width=4096 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=unmerged_w0_m0 bytes=507 fits=1 bytes_minus59=448 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=unmerged_w0_m1 bytes=566 fits=1 bytes_minus59=507 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=unmerged_w1_m0 bytes=536 fits=1 bytes_minus59=477 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=unmerged_w1_m1 bytes=595 fits=1 bytes_minus59=536 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=merged_w0 bytes=389 fits=1 bytes_minus59=330 fits_minus59=1
+E7RESULT name=fit dev=md_raid5 arm=ding_min_unit width=16384 record=merged_w1 bytes=477 fits=1 bytes_minus59=418 fits_minus59=1
+E7RESULT name=hetero arm=jia_probe_pbs distinct_widths=2 is_format_const=0
+E7RESULT name=hetero arm=yi_probe_max_iomin distinct_widths=2 is_format_const=0
+E7RESULT name=hetero arm=bing_const_512 distinct_widths=1 is_format_const=1
+E7RESULT name=hetero arm=bing_const_4096 distinct_widths=1 is_format_const=1
+E7RESULT name=hetero arm=ding_min_unit distinct_widths=1 is_format_const=1
+E7RESULT name=done emitted=172

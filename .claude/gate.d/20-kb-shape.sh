@@ -246,10 +246,12 @@ if [[ -n "$hit" ]]; then
 else ok "正文没有历史语气"; fi
 
 echo
-echo "── 7. 决策索引行的状态 vs 正文标题的状态 ──"
+echo "── 7. 决策索引表的状态列（分项计数）vs 正文实际分项数 ──"
 # ⚠️ 2026-08-30 实测踩过：给 D21 加了两个未定项、改了正文标题（两项→四项），
 # 而 decisions.md 的索引行还写「两项未定」。第 5 段只比「正文标题 vs 正文列表」，
 # 索引页在它的视野之外 ⇒ 这类不一致此前无人拦。
+# ⚠️ 本段**自己数正文**，不经过 gen-decision-items.py：写回索引页的是那个生成器，
+# 21 阶段拿它的输出与索引页逐字比对 ⇒ 生成器数错时两边一起错，只有本段会红。
 if python3 "$(dirname "$0")/lib-index-vs-body.py" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
 
 echo

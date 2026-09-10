@@ -1,0 +1,495 @@
+//! E130：每头一份 livelist 过不过 D6 判据 5「有界销毁」。
+//!
+//! D6 未定项 2 的第一轮三方（2026-09-10）把丙与乙判出局、丁的代价重估，
+//! 只剩甲（独立 livelist）存活；而反推腿自己明写「我的结论只到『乙过不了』，
+//! **不到『甲过得了』**」——甲有条目数，可「每批最坏空间需求」的算式与
+//! 「可 condense」的代价仓里一个数都没有。E130 补的就是这一格。
+//!
+//! **判据、阈值、作废条款、以及「结果反过来我接不接受」写在
+//! `research/prompts/e130-preregistration.md`，写于本文件之前。**
+//!
+//! ## 这是计数模型，不是实现
+//!
+//! 没有文件 I/O、没有并发、没有随机源 ⇒ 同一个二进制跑 N 遍必然逐字节一致。
+//! 「N 轮一致」说明的是没有隐藏状态，不是统计上稳定
+//! （`.claude/singlefs-ai-sop/rules/test-discipline.md`）。
+//! 证据强度来自变异测试与钉死绝对值的断言，不来自轮数。
+//!
+//! ## 跨装置闸：两个常量必须落回 kb
+//!
+//! 单元恒 32768 字节含头（D4 已定项 7 / 已定项 3），分配记录条目 30 字节
+//! （D3 已定项 7 与 D5 已定项 5 同宽口径）。这两个数不在本文件里自己发明，
+//! 对不上 kb 就是口径漂了（`show-me-test.md`「立在装置之间」）。
+
+use e7_index_bench::Emitter;
+
+/// 单元字节数，含头。D4（校验和位置） 已定项 3 / 已定项 7。
+const UNIT_BYTES: u64 = 32768;
+/// 一条分配记录条目的盘上宽度。D3（空间分配） 已定项 7。
+const ALLOC_REC_BYTES: u64 = 30;
+/// 一条 livelist 条目：类型标签 2 + 物理指针 14（D19 已定项 4 的位置条目宽） + birth txg 8。
+const LIVELIST_ENTRY_BYTES: u64 = 2 + 14 + 8;
+/// 一批处理多少条 livelist 条目。判据 1 要证 worst_batch_bytes 只随它走。
+const BATCH_K: u64 = 4096;
+/// condense 触发判据：结构膨胀到净活块数的几倍就抵消一次。
+///
+/// ⚠️ **跑前写死的第一版写反了，改在任何测量之前，理由留档**：原判据是
+/// 「FREE 条目占比 ≥ 1/2 就 condense」，而这族负载里
+/// `frees / (allocs + frees) = c / (1 + 2c) < 1/2` 对**任何有限 c** 成立
+/// ⇒ 前件恒假、condense 臂一次也不触发，等于 naive 的复制品。
+/// 那是 `test-discipline.md`「失败条款的前件可以写反，写反之后它永远不触发」的形态，
+/// 也是 `evidence-discipline.md` 点名的稻草人对照臂——一条永不触发的 condense
+/// 不是支持 livelist 的人会建的东西。
+/// 现判据 `entries > CONDENSE_RATIO × net_alloc`，在 c ≥ 1 的格上触发、c = 0 不触发。
+/// 写反那一版由单测 `the_first_condense_predicate_never_fires` 留档。
+const CONDENSE_RATIO: u64 = 2;
+
+/// 一条臂在一个负载格上的全部读数。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Reading {
+    /// 结构里现存的条目数。
+    entries: u64,
+    /// 净活块数（头自己出生、还没被释放的那批）。
+    net_alloc: u64,
+    /// 处理一批最坏要写的字节数。
+    worst_batch_bytes: u64,
+    /// 写意图那一刻算得出的待删占用上界。
+    pre_reserve_bytes: u64,
+    /// 真实待删字节。
+    true_pending_bytes: u64,
+    /// 销毁时要读的条目数（乙 读的是活树节点数）。
+    destroy_reads: u64,
+    /// 头里释放一个块，额外要预付几字节。
+    free_path_extra_bytes: u64,
+}
+
+/// 一个负载格。`inherited` 是从 origin 继承的块数，不进 livelist。
+#[derive(Debug, Clone, Copy)]
+struct Load {
+    n: u64,
+    churn: u64,
+    inherited: u64,
+}
+
+impl Load {
+    fn new(n: u64, churn: u64, share: f64) -> Self {
+        let inherited = (n as f64 * share).round() as u64;
+        Load { n, churn, inherited }
+    }
+    /// 头自己出生的块数（`birth > origin.txg`）。只有这些进 livelist。
+    fn own(&self) -> u64 {
+        self.n - self.inherited
+    }
+    /// ALLOC 事件数：初始写 own() 次，每轮覆写再写 own() 次。
+    fn allocs(&self) -> u64 {
+        self.own() * (1 + self.churn)
+    }
+    /// FREE 事件数：每次覆写释放一个旧块。
+    fn frees(&self) -> u64 {
+        self.own() * self.churn
+    }
+}
+
+/// 活树节点数：乙 销毁时要扫的对象。含继承来的那部分——乙 没有索引，分不出谁是谁。
+fn live_tree_nodes(l: &Load) -> u64 {
+    l.n
+}
+
+fn naive(l: &Load) -> Reading {
+    let entries = l.allocs() + l.frees();
+    let net = l.allocs() - l.frees();
+    Reading {
+        entries,
+        net_alloc: net,
+        worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),
+        // 未 condense 时只数得出条目总数里的 ALLOC 那一半，抵消关系还没算过。
+        pre_reserve_bytes: l.allocs() * UNIT_BYTES,
+        true_pending_bytes: net * UNIT_BYTES,
+        destroy_reads: entries,
+        free_path_extra_bytes: LIVELIST_ENTRY_BYTES,
+    }
+}
+
+/// condense 判据本身，单独拿出来是为了能在负载族**取不到**的取样点上验它。
+///
+/// ⚠️ 这族负载里 `raw / net = 1 + 2c`，只取得到 1、3、9、33，
+/// **取不到 `(1, 2]` 这一段**——而「判据恒触发」那条变异恰好只在那一段上
+/// 才与原式不同，于是它在全部负载格上都被判绿。
+/// 按 `.claude/rules/mutation-sampling.md` 第三类「取样点不敏感」，
+/// 处置是**补一个敏感的取样点**，不是记成等价变异留档。
+fn condense_entries(raw: u64, net: u64) -> u64 {
+    // 结构膨胀到净活块数的 CONDENSE_RATIO 倍就抵消一次，抵消后只剩净 ALLOC。
+    if raw > CONDENSE_RATIO * net {
+        net
+    } else {
+        raw
+    }
+}
+
+fn condense(l: &Load) -> Reading {
+    let raw = l.allocs() + l.frees();
+    let net = l.allocs() - l.frees();
+    let entries = condense_entries(raw, net);
+    Reading {
+        entries,
+        net_alloc: net,
+        worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),
+        pre_reserve_bytes: entries * UNIT_BYTES,
+        true_pending_bytes: net * UNIT_BYTES,
+        destroy_reads: entries,
+        free_path_extra_bytes: LIVELIST_ENTRY_BYTES,
+    }
+}
+
+fn no_structure(l: &Load) -> Reading {
+    let net = l.allocs() - l.frees();
+    Reading {
+        entries: 0,
+        net_alloc: net,
+        worst_batch_bytes: BATCH_K * ALLOC_REC_BYTES,
+        // 乙 在写意图那一刻给不出上界：能当上界用的每树字节总量
+        // 是 D5 已定项 4 第 8 / 9 项，2026-09-06 已撤回 ⇒ 报 0 表示「算不出」。
+        pre_reserve_bytes: 0,
+        true_pending_bytes: net * UNIT_BYTES,
+        destroy_reads: live_tree_nodes(l),
+        free_path_extra_bytes: 0,
+    }
+}
+
+const ARMS: [(&str, fn(&Load) -> Reading); 3] =
+    [("naive", naive), ("condense", condense), ("no_structure", no_structure)];
+
+const NS: [u64; 3] = [1024, 8192, 65536];
+const CHURNS: [u64; 4] = [0, 1, 4, 16];
+const SHARES: [f64; 2] = [0.0, 0.7];
+
+fn overestimate(r: &Reading) -> f64 {
+    if r.true_pending_bytes == 0 {
+        return f64::NAN;
+    }
+    r.pre_reserve_bytes as f64 / r.true_pending_bytes as f64
+}
+
+fn main() {
+    let mut e = Emitter::new();
+    println!("E130 每头一份 livelist 过不过 D6 判据 5「有界销毁」");
+    println!("判据写死在 research/prompts/e130-preregistration.md（写于本装置之前）");
+    println!(
+        "常量：UNIT_BYTES={UNIT_BYTES} ALLOC_REC_BYTES={ALLOC_REC_BYTES} \
+         LIVELIST_ENTRY_BYTES={LIVELIST_ENTRY_BYTES} BATCH_K={BATCH_K}"
+    );
+
+    for (name, f) in ARMS {
+        for &share in SHARES.iter() {
+            for &n in NS.iter() {
+                for &c in CHURNS.iter() {
+                    let l = Load::new(n, c, share);
+                    let r = f(&l);
+                    let over = overestimate(&r);
+                    let over_s = if over.is_nan() { "NA".to_string() } else { format!("{over:.4}") };
+                    println!(
+                        "{}",
+                        e.emit_raw(&format!(
+                            "name={name} n={n} churn={c} share={share:.1} \
+                             entries={} net_alloc={} worst_batch_bytes={} \
+                             pre_reserve_bytes={} true_pending_bytes={} \
+                             overestimate={over_s} destroy_reads={} free_path_extra_bytes={}",
+                            r.entries,
+                            r.net_alloc,
+                            r.worst_batch_bytes,
+                            r.pre_reserve_bytes,
+                            r.true_pending_bytes,
+                            r.destroy_reads,
+                            r.free_path_extra_bytes
+                        ))
+                    );
+                }
+            }
+        }
+    }
+
+    // 判据 1：worst_batch_bytes 只随 K 走。扫遍全部格，取值集合大小必须是 1。
+    for (name, f) in ARMS {
+        let mut set: Vec<u64> = Vec::new();
+        for &share in SHARES.iter() {
+            for &n in NS.iter() {
+                for &c in CHURNS.iter() {
+                    let v = f(&Load::new(n, c, share)).worst_batch_bytes;
+                    if !set.contains(&v) {
+                        set.push(v);
+                    }
+                }
+            }
+        }
+        println!(
+            "{}",
+            e.emit_raw(&format!(
+                "name=criterion1 arm={name} distinct_worst_batch_bytes={} value={}",
+                set.len(),
+                set[0]
+            ))
+        );
+    }
+
+    // 判据 4 的阳性对照：naive 在 churn 上必须随 C 线性长。
+    let base = naive(&Load::new(8192, 0, 0.0)).entries;
+    let hi = naive(&Load::new(8192, 16, 0.0)).entries;
+    println!(
+        "{}",
+        e.emit_raw(&format!(
+            "name=positive_control arm=naive n=8192 entries_c0={base} entries_c16={hi} ratio={}",
+            hi / base
+        ))
+    );
+
+    println!("{}", e.finish());
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── 钉绝对值的断言（防「所有臂一起错」）────────────────────────────
+
+    #[test]
+    fn naive_entries_at_zero_churn_no_share_is_exactly_n() {
+        // 跑前写死的作废条款 3：N 次 ALLOC、0 次 FREE。
+        assert_eq!(naive(&Load::new(1024, 0, 0.0)).entries, 1024);
+        assert_eq!(naive(&Load::new(65536, 0, 0.0)).entries, 65536);
+    }
+
+    #[test]
+    fn naive_entries_at_zero_churn_with_share_excludes_inherited() {
+        // 0.7 继承率下只有 own() 进 livelist：1024 − round(0.7×1024) = 1024 − 717 = 307。
+        assert_eq!(Load::new(1024, 0, 0.7).inherited, 717);
+        assert_eq!(naive(&Load::new(1024, 0, 0.7)).entries, 307);
+    }
+
+    #[test]
+    fn livelist_entry_is_twenty_four_bytes() {
+        // 2 + 14 + 8。14 逐字是 D19 已定项 4 的位置条目宽。
+        assert_eq!(LIVELIST_ENTRY_BYTES, 2 + 14 + 8);
+        assert_eq!(LIVELIST_ENTRY_BYTES, 24);
+    }
+
+    #[test]
+    fn worst_batch_bytes_for_livelist_is_batch_times_two_records() {
+        // 写成加法不是减法：变异把常量改大时不会编译期溢出。
+        assert_eq!(
+            naive(&Load::new(8192, 4, 0.0)).worst_batch_bytes,
+            BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES)
+        );
+        assert_eq!(naive(&Load::new(8192, 4, 0.0)).worst_batch_bytes, 4096 * 54);
+        assert_eq!(4096 * 54, 221_184);
+    }
+
+    // ── 判据 1：每批最坏空间需求只随 K 走 ──────────────────────────────
+
+    #[test]
+    fn worst_batch_bytes_is_constant_across_every_load_cell() {
+        for (_, f) in ARMS {
+            let mut seen: Option<u64> = None;
+            for &share in SHARES.iter() {
+                for &n in NS.iter() {
+                    for &c in CHURNS.iter() {
+                        let v = f(&Load::new(n, c, share)).worst_batch_bytes;
+                        match seen {
+                            None => seen = Some(v),
+                            Some(prev) => assert_eq!(
+                                v, prev,
+                                "worst_batch_bytes 随负载变了：n={n} churn={c} share={share}"
+                            ),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── 判据 4：阳性对照必须分得出差别 ─────────────────────────────────
+
+    #[test]
+    fn positive_control_naive_grows_linearly_with_churn() {
+        // 作废条款 1 的触发观测：C=0 与 C=16 相等 ⇒ 装置分不出差别。
+        let c0 = naive(&Load::new(8192, 0, 0.0)).entries;
+        let c16 = naive(&Load::new(8192, 16, 0.0)).entries;
+        assert_ne!(c0, c16, "阳性对照：naive 在 churn 上没长 ⇒ 整轮作废");
+        // 1 + 2×16 = 33 倍。
+        assert_eq!(c0, 8192);
+        assert_eq!(c16, 8192 * 33);
+    }
+
+    #[test]
+    fn positive_control_runs_on_every_arm_not_just_the_first() {
+        // 「阳性对照必须对每一条被测的臂都跑」——三条臂各自问一次
+        // 「C 从 0 到 16，这条臂的 entries 变不变」，并把各自的答案钉死。
+        assert_ne!(
+            naive(&Load::new(8192, 0, 0.0)).entries,
+            naive(&Load::new(8192, 16, 0.0)).entries
+        );
+        // condense 的判别力在「触发之后塌不塌得回净值」上：
+        // c=0 不触发 ⇒ entries 等于 raw；c=1 触发 ⇒ entries 等于净值。
+        assert_eq!(condense(&Load::new(8192, 0, 0.0)).entries, 8192);
+        assert_eq!(condense(&Load::new(8192, 1, 0.0)).entries, 8192);
+        assert_eq!(naive(&Load::new(8192, 1, 0.0)).entries, 8192 * 3);
+        // no_structure 恒 0 条目，它的判别力在 destroy_reads 上。
+        assert_eq!(no_structure(&Load::new(8192, 0, 0.0)).entries, 0);
+        assert_eq!(no_structure(&Load::new(8192, 16, 0.0)).entries, 0);
+        assert_eq!(no_structure(&Load::new(8192, 16, 0.0)).destroy_reads, 8192);
+    }
+
+    // ── 判据 5：condense 之后回不回得到 O(净活块数) ────────────────────
+
+    #[test]
+    fn condense_predicate_leaves_the_structure_alone_below_the_ratio() {
+        // 取样点不敏感的补丁：负载族取不到 raw/net ∈ (1, 2]，而那正是
+        // 「判据恒触发」与原式唯一不同的那一段。这三个点直接钉住它。
+        assert_eq!(condense_entries(150, 100), 150); // 1.5× ⇒ 不动
+        assert_eq!(condense_entries(200, 100), 200); // 恰好 2× ⇒ 不动（严格大于才动）
+        assert_eq!(condense_entries(201, 100), 100); // 越过 2× ⇒ 塌回净值
+    }
+
+    #[test]
+    fn the_load_family_cannot_reach_the_sensitive_ratio() {
+        // 留档：上面那条为什么非要绕开 Load 直接调判据。
+        for &c in CHURNS.iter() {
+            let l = Load::new(8192, c, 0.0);
+            let raw = l.allocs() + l.frees();
+            let net = l.allocs() - l.frees();
+            assert!(
+                raw == net || raw > CONDENSE_RATIO * net,
+                "负载族竟然取到了 (1, 2] 这一段：churn={c} raw={raw} net={net}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_first_condense_predicate_never_fires() {
+        // 留档：跑前写死的第一版判据是「FREE 占比 ≥ 1/2」，而这族负载里
+        // frees/(allocs+frees) = c/(1+2c)，对任何有限 c 都严格小于 1/2
+        // ⇒ 前件恒假，condense 臂会退化成 naive 的复制品。
+        for &c in CHURNS.iter() {
+            let l = Load::new(8192, c, 0.0);
+            let raw = l.allocs() + l.frees();
+            assert!(
+                l.frees() * 2 < raw,
+                "第一版判据在 churn={c} 上竟然触发了 —— 那这条留档写错了"
+            );
+        }
+    }
+
+    #[test]
+    fn condense_collapses_to_net_alloc_from_churn_one_upward() {
+        // 现判据 raw > 2 × net ⇔ 1 + 2c > 2 ⇔ c ≥ 1。
+        assert_eq!(condense(&Load::new(1024, 0, 0.0)).entries, 1024); // c=0 不触发
+        assert_eq!(condense(&Load::new(1024, 1, 0.0)).entries, 1024); // c=1 触发，塌回净值
+        assert_eq!(condense(&Load::new(1024, 16, 0.0)).entries, 1024);
+        // 而 naive 在同两格上是 3072 与 33792 —— 两条臂必须分得开。
+        assert_eq!(naive(&Load::new(1024, 1, 0.0)).entries, 3072);
+        assert_eq!(naive(&Load::new(1024, 16, 0.0)).entries, 33792);
+    }
+
+    #[test]
+    fn condense_never_reports_fewer_entries_than_net_alloc() {
+        // 作废条款 2 的触发观测：entries < allocs − frees ⇒ 结构装不下它该装的。
+        for &share in SHARES.iter() {
+            for &n in NS.iter() {
+                for &c in CHURNS.iter() {
+                    let l = Load::new(n, c, share);
+                    for (name, f) in [("naive", naive as fn(&Load) -> Reading), ("condense", condense)] {
+                        let r = f(&l);
+                        assert!(
+                            r.entries >= r.net_alloc,
+                            "{name} 报出的条目数少于净活块数：n={n} churn={c} share={share}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // ── 判据 3：高估比 ────────────────────────────────────────────────
+
+    #[test]
+    fn naive_overestimates_pending_bytes_without_bound_in_churn() {
+        // naive 数不出抵消关系 ⇒ 上界 = 全部 ALLOC，随 C 线性发散。
+        let a = overestimate(&naive(&Load::new(8192, 0, 0.0)));
+        let b = overestimate(&naive(&Load::new(8192, 16, 0.0)));
+        assert_eq!(a, 1.0);
+        assert_eq!(b, 17.0);
+        assert!(b > a);
+    }
+
+    #[test]
+    fn condense_overestimate_equals_entries_over_net() {
+        let l = Load::new(8192, 4, 0.0);
+        let r = condense(&l);
+        assert_eq!(r.pre_reserve_bytes, r.entries * UNIT_BYTES);
+        assert_eq!(overestimate(&r), r.entries as f64 / r.net_alloc as f64);
+    }
+
+    // ── 判据 2：上界算式里不许出现活树节点数 ───────────────────────────
+
+    #[test]
+    fn livelist_pre_reserve_does_not_read_the_live_tree() {
+        // 同一个净活块数、不同的活树规模（继承部分不同）下，
+        // livelist 两臂的 pre_reserve_bytes 必须只随自己的条目走。
+        let a = Load::new(1000, 0, 0.0); // own=1000, 活树 1000
+        let b = Load::new(2000, 0, 0.5); // own=1000, 活树 2000
+        assert_eq!(a.own(), b.own());
+        assert_eq!(naive(&a).pre_reserve_bytes, naive(&b).pre_reserve_bytes);
+        assert_eq!(condense(&a).pre_reserve_bytes, condense(&b).pre_reserve_bytes);
+        // 而乙 的 destroy_reads 随活树走 —— 这就是两者的分界。
+        assert_ne!(no_structure(&a).destroy_reads, no_structure(&b).destroy_reads);
+    }
+
+    #[test]
+    fn no_structure_cannot_produce_a_bound_at_intent_time() {
+        // 报 0 表示「算不出」，不是「不需要空间」——真实待删字节同时报出来做对照。
+        let r = no_structure(&Load::new(8192, 4, 0.0));
+        assert_eq!(r.pre_reserve_bytes, 0);
+        assert!(r.true_pending_bytes > 0);
+    }
+
+    // ── 判据 6：释放路径的额外预付 ────────────────────────────────────
+
+    #[test]
+    fn livelist_arms_charge_the_free_path_and_no_structure_does_not() {
+        assert_eq!(naive(&Load::new(1024, 1, 0.0)).free_path_extra_bytes, 24);
+        assert_eq!(condense(&Load::new(1024, 1, 0.0)).free_path_extra_bytes, 24);
+        assert_eq!(no_structure(&Load::new(1024, 1, 0.0)).free_path_extra_bytes, 0);
+    }
+
+    // ── 负载口径自身的断言 ────────────────────────────────────────────
+
+    #[test]
+    fn churn_counts_one_alloc_and_one_free_each_round() {
+        let l = Load::new(100, 3, 0.0);
+        assert_eq!(l.allocs(), 400);
+        assert_eq!(l.frees(), 300);
+        assert_eq!(l.allocs() - l.frees(), 100);
+    }
+
+    #[test]
+    fn inherited_blocks_never_enter_the_livelist() {
+        let l = Load::new(1000, 5, 0.7);
+        assert_eq!(l.inherited, 700);
+        assert_eq!(l.own(), 300);
+        assert_eq!(l.allocs(), 300 * 6);
+        assert_eq!(naive(&l).net_alloc, 300);
+    }
+
+    #[test]
+    fn unit_bytes_matches_the_kb_constant() {
+        // 跨装置闸：D4 已定项 3 / 已定项 7 钉死单元恒 32768 含头。
+        assert_eq!(UNIT_BYTES, 32768);
+        assert_eq!(UNIT_BYTES, 32 * 1024);
+    }
+
+    #[test]
+    fn alloc_record_matches_the_kb_constant() {
+        // D3 已定项 7 / D5 已定项 5：条目 30 字节。
+        assert_eq!(ALLOC_REC_BYTES, 30);
+        assert_eq!(ALLOC_REC_BYTES + 0, 22 + 8);
+    }
+}

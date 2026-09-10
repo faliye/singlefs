@@ -1,0 +1,25 @@
+E7RESULT name=config dev=/dev/e125a zone_bytes=67108864 nr_zones=4 nr_conv=1 pbs=4096 lbs=4096 backend=null_blk_memory
+E7RESULT name=neg_control zone=1 wptr=0x000000 zcond=1
+E7RESULT name=pos_control zone=1 records=8 slot=4096 wptr_sectors=64 wp_bytes=32768 expect_bytes=32768
+E7RESULT name=crit1_above_wp outcome=read_ok rc=0 bytes_requested=67076096 bytes_got=67076096 len=67076096 distinct=1 uniform_byte=0xff first_nonzero_off=0 first_nonzero_val=0xff
+E7RESULT name=crit2_after_reset rc=0 wptr_sectors=0 wp_bytes=0 zcond=1 len=32768 distinct=1 uniform_byte=0xff marker_found_at=-1
+E7RESULT name=crit5_zone_types types=1222 conv_zones=1 conv_bytes=67108864
+E7RESULT name=crit5_conv_unwritten distinct=1 uniform_byte=0x00
+E7RESULT name=crit5_coverage chunk=65536 point1=536805376 point2=1073610752 conv_bytes=67108864 p1_inside=no p2_inside=no
+E7RESULT name=crit5_coverage chunk=524288 point1=4294443008 point2=8588886016 conv_bytes=67108864 p1_inside=no p2_inside=no
+E7RESULT name=crit5_coverage chunk=4194304 point1=34355544064 point2=68711088128 conv_bytes=67108864 p1_inside=no p2_inside=no
+E7RESULT name=crit4_align chunk=65536 p_times_chunk=536805376 zone_size=67108864 remainder=67043328 quotient=7.999023 divides=no
+E7RESULT name=crit4_align chunk=65536 p_times_chunk=536805376 zone_size=134217728 remainder=134152192 quotient=3.999512 divides=no
+E7RESULT name=crit4_align chunk=65536 p_times_chunk=536805376 zone_size=268435456 remainder=268369920 quotient=1.999756 divides=no
+E7RESULT name=crit4_align chunk=524288 p_times_chunk=4294443008 zone_size=67108864 remainder=66584576 quotient=63.992188 divides=no
+E7RESULT name=crit4_align chunk=524288 p_times_chunk=4294443008 zone_size=134217728 remainder=133693440 quotient=31.996094 divides=no
+E7RESULT name=crit4_align chunk=524288 p_times_chunk=4294443008 zone_size=268435456 remainder=267911168 quotient=15.998047 divides=no
+E7RESULT name=crit4_align chunk=4194304 p_times_chunk=34355544064 zone_size=67108864 remainder=62914560 quotient=511.937500 divides=no
+E7RESULT name=crit4_align chunk=4194304 p_times_chunk=34355544064 zone_size=134217728 remainder=130023424 quotient=255.968750 divides=no
+E7RESULT name=crit4_align chunk=4194304 p_times_chunk=34355544064 zone_size=268435456 remainder=264241152 quotient=127.984375 divides=no
+E7RESULT name=crit3_zone_full zone=0 start_bytes=0 wp_bytes=67108864 cap_bytes=67108864 zcond=14 wp_eq_cap=yes
+E7RESULT name=crit3_zone_full zone=1 start_bytes=67108864 wp_bytes=67108864 cap_bytes=67108864 zcond=14 wp_eq_cap=yes
+E7RESULT name=crit3_zone_full zone=2 start_bytes=134217728 wp_bytes=67108864 cap_bytes=67108864 zcond=14 wp_eq_cap=yes
+E7RESULT name=crit3_zone_full zone=3 start_bytes=201326592 wp_bytes=67108864 cap_bytes=67108864 zcond=14 wp_eq_cap=yes
+E7RESULT name=crit3_verdict committed_bytes=0 wp_bytes=67108864 lead_constructed=yes
+E7RESULT name=count n=24

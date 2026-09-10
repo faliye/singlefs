@@ -1,0 +1,20 @@
+E7RESULT name=config r=3 arm2_k=2 blocks_per_fsync=13 stat_count=64 s_values=5
+E7RESULT name=cost arm=arm1_k_eq_depth s_per_region=1 ring_depth=3 protect_gens=3 pinned_blocks=39 accounting_keys=256 rollback_depth=3 escape_phases=2
+E7RESULT name=cost arm=arm2_rollback_le_k s_per_region=1 ring_depth=3 protect_gens=2 pinned_blocks=26 accounting_keys=192 rollback_depth=2 escape_phases=1
+E7RESULT name=cost arm=arm1_k_eq_depth s_per_region=2 ring_depth=6 protect_gens=6 pinned_blocks=78 accounting_keys=448 rollback_depth=6 escape_phases=5
+E7RESULT name=cost arm=arm2_rollback_le_k s_per_region=2 ring_depth=6 protect_gens=2 pinned_blocks=26 accounting_keys=192 rollback_depth=2 escape_phases=1
+E7RESULT name=cost arm=arm1_k_eq_depth s_per_region=4 ring_depth=12 protect_gens=12 pinned_blocks=156 accounting_keys=832 rollback_depth=12 escape_phases=11
+E7RESULT name=cost arm=arm2_rollback_le_k s_per_region=4 ring_depth=12 protect_gens=2 pinned_blocks=26 accounting_keys=192 rollback_depth=2 escape_phases=1
+E7RESULT name=cost arm=arm1_k_eq_depth s_per_region=8 ring_depth=24 protect_gens=24 pinned_blocks=312 accounting_keys=1600 rollback_depth=24 escape_phases=23
+E7RESULT name=cost arm=arm2_rollback_le_k s_per_region=8 ring_depth=24 protect_gens=2 pinned_blocks=26 accounting_keys=192 rollback_depth=2 escape_phases=1
+E7RESULT name=cost arm=arm1_k_eq_depth s_per_region=16 ring_depth=48 protect_gens=48 pinned_blocks=624 accounting_keys=3136 rollback_depth=48 escape_phases=47
+E7RESULT name=cost arm=arm2_rollback_le_k s_per_region=16 ring_depth=48 protect_gens=2 pinned_blocks=26 accounting_keys=192 rollback_depth=2 escape_phases=1
+E7RESULT name=discriminating s_total=5 pinned=5 accounting=5 rollback=5 phases=5
+E7RESULT name=poscontrol_s1 ring_depth=3 arm1_rollback=3 arm2_rollback=2 differs=1
+E7RESULT name=negcontrol_merged all_equal=1 expect=1
+E7RESULT name=delta s_per_region=1 ring_depth=3 extra_pinned_blocks=13 extra_accounting_keys=64 extra_rollback_gens=1 extra_escape_phases=1
+E7RESULT name=delta s_per_region=2 ring_depth=6 extra_pinned_blocks=52 extra_accounting_keys=256 extra_rollback_gens=4 extra_escape_phases=4
+E7RESULT name=delta s_per_region=4 ring_depth=12 extra_pinned_blocks=130 extra_accounting_keys=640 extra_rollback_gens=10 extra_escape_phases=10
+E7RESULT name=delta s_per_region=8 ring_depth=24 extra_pinned_blocks=286 extra_accounting_keys=1408 extra_rollback_gens=22 extra_escape_phases=22
+E7RESULT name=delta s_per_region=16 ring_depth=48 extra_pinned_blocks=598 extra_accounting_keys=2944 extra_rollback_gens=46 extra_escape_phases=46
+E7RESULT name=done emitted=20

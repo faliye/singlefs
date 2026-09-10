@@ -1,0 +1,11 @@
+M1_环深不乘R	fn ring_depth(s_per_region: u64) -> u64 {\n    R * s_per_region\n}	fn ring_depth(s_per_region: u64) -> u64 {\n    s_per_region\n}
+M2_扣块不乘每次写块数	fn pinned_blocks(protect_gens: u64) -> u64 {\n    protect_gens * BLOCKS_PER_FSYNC\n}	fn pinned_blocks(protect_gens: u64) -> u64 {\n    protect_gens\n}
+M3_记账保留代数不加一	fn accounting_keys(protect_gens: u64) -> u64 {\n    STAT_COUNT * (protect_gens + 1)\n}	fn accounting_keys(protect_gens: u64) -> u64 {\n    STAT_COUNT * protect_gens\n}
+M4_相位数不减一	fn escape_phases(protect_gens: u64) -> u64 {\n    protect_gens.saturating_sub(1)\n}	fn escape_phases(protect_gens: u64) -> u64 {\n    protect_gens\n}
+M5_臂二的K改成一	const ARM2_K: u64 = 2;	const ARM2_K: u64 = 1;
+M6_粗粒度块数算错	const BLOCKS_PER_FSYNC: u64 = 8 + 3 + 1 + 1;	const BLOCKS_PER_FSYNC: u64 = 8 + 3;
+M7_统计量数换档	const STAT_COUNT: u64 = 64;	const STAT_COUNT: u64 = 32;
+M8_R改成二	const R: u64 = 3;	const R: u64 = 2;
+M9_差价恒零	    let a = metrics(arm1_protect);\n    let b = metrics(arm2_protect);\n    (a.0 - b.0, a.1 - b.1, a.2 - b.2, a.3 - b.3)	    let _ = (arm1_protect, arm2_protect);\n    (0, 0, 0, 0)
+M10_差价把两臂弄反	    let a = metrics(arm1_protect);\n    let b = metrics(arm2_protect);	    let b = metrics(arm1_protect);\n    let a = metrics(arm2_protect);
+M11_S扫描漏掉最大那档	const SS: [u64; 5] = [1, 2, 4, 8, 16];	const SS: [u64; 5] = [1, 2, 4, 8, 8];

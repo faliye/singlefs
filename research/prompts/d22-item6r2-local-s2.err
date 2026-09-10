@@ -1,0 +1,6 @@
+ask-local: 输出判定为字词损坏 —— 按 .claude/rules/three-way-inference.md 这一轮作废
+红 /tmp/tmp.FIFibXVDeC  生词=2 拼接=1
+     拼接: substitutesaps(=substitute+saps)
+     生词: substitutesaps misreport
+ask-local: 作废轮的原样输出已留存 research/prompts/d22-item6r2-local-output-void2.md
+下一步：改用英文提示重跑（实测英文 0/5 损坏），或设 ASK_LOCAL_ALLOW_CORRUPT=1 强行采用

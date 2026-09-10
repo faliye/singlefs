@@ -8,8 +8,19 @@
 **每条决策的分项只有一套编号，分住两个小节**：`### 已定项` 与 `### 未定项`。
 状态由**它住在哪一节**决定，不由行内文字决定——正文里一句「与 D16（发布语义） 已定的
 checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把一条未定项判成已定。
+
+**两种输出**：
+
+| 怎么跑 | 打印什么 | 谁消费 |
+|---|---|---|
+| 不带参数 | 索引页那段 `<!-- gen:decision-items -->` 生成块 | `.claude/gate.d/21-decision-items-sync.sh` |
+| `--status-cells` | 每行 `D<n>\t<状态列该写什么>` | 同上，用来写回决策索引表的「状态」列 |
+
+**状态列写的是分项计数**（`已定 6 项 / 未定 0 项`），不是三态词——
+「这条决策有几个分项、其中几个还没定」看一眼就有数，而三态词看不出这个。
+三态词的权威记录仍是各正文首行 `## D<n> 简称 —— 状态`，索引列不再抄它一遍。
 """
-import re, glob
+import re, glob, sys
 
 def clip(text, n):
     """截到 n 个字符，**但不许留下没闭合的括注**。
@@ -83,7 +94,10 @@ def items_of(body):
     return res
 
 
-lines = []
+# `--status-cells`：只打印决策索引表「状态」列该写的那格，一行一条决策。
+cells_only = '--status-cells' in sys.argv[1:]
+
+lines, cells = [], []
 for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     s = open(f, encoding='utf-8').read()
     title = s.split('\n', 1)[0]
@@ -95,10 +109,15 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     body = s.split('\n## 历史版本')[0]
     its = items_of(body)
     open_n = sum(1 for _, _, st in its if '未定' in st)
-    st = re.match(r'(已定|半定|待定)', status)
-    head = f"- **{num}（{name}）** —— {st.group(1) if st else status[:6]}"
+    kind = re.match(r'(已定|半定|待定)', status)
+    kind = kind.group(1) if kind else status[:6]
+    head = f"- **{num}（{name}）** —— {kind}"
     head += f"（分项 {len(its)}，其中未定 {open_n}）" if its else "（无分项）"
     lines.append(head)
+    # 一条决策没有分项时，「已定 0 项 / 未定 0 项」会被读成「什么都没定」——
+    # 那一格改写成三态词，不含糊其辞。
+    cells.append(f"{num}\t" + (f"已定 {len(its) - open_n} 项 / 未定 {open_n} 项"
+                               if its else f"无分项 · 整条{kind}"))
     for n, nm, st in its:
         lines.append(f"  - {n}. {nm} —— {st}")
-print('\n'.join(lines))
+print('\n'.join(cells if cells_only else lines))

@@ -1,0 +1,13 @@
+E7RESULT name=config block_sectors=128 b_offset=32768 good_sectors=192 rounds=5
+E7RESULT name=neighbour round=1 inject=1 write_rc=1 read_rc=0 verdict=intact first_diff=-1 cow_sectors=64 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=1 inject=0 write_rc=0 read_rc=0 verdict=intact first_diff=-1 cow_sectors=129 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=2 inject=1 write_rc=1 read_rc=0 verdict=intact first_diff=-1 cow_sectors=64 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=2 inject=0 write_rc=0 read_rc=0 verdict=intact first_diff=-1 cow_sectors=129 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=3 inject=1 write_rc=1 read_rc=0 verdict=intact first_diff=-1 cow_sectors=64 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=3 inject=0 write_rc=0 read_rc=0 verdict=intact first_diff=-1 cow_sectors=129 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=4 inject=1 write_rc=1 read_rc=0 verdict=intact first_diff=-1 cow_sectors=64 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=4 inject=0 write_rc=0 read_rc=0 verdict=intact first_diff=-1 cow_sectors=129 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=5 inject=1 write_rc=1 read_rc=0 verdict=intact first_diff=-1 cow_sectors=64 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=neighbour round=5 inject=0 write_rc=0 read_rc=0 verdict=intact first_diff=-1 cow_sectors=129 pool_data_before=1/256 pool_data_after=2/256
+E7RESULT name=verdict inject_not_torn=0 negcontrol_damaged=0
+E7RESULT name=done emitted=13

@@ -218,6 +218,10 @@ name = "e91-ring-admission"
 path = "src/bin/e91_ring_admission.rs"
 
 [[bin]]
+name = "e123-k-fork-cost"
+path = "src/bin/e123_k_fork_cost.rs"
+
+[[bin]]
 name = "e92-reuse-requirement"
 path = "src/bin/e92_reuse_requirement.rs"
 
@@ -336,3 +340,19 @@ path = "src/bin/e121_cap_tiers.rs"
 [[bin]]
 name = "e122-dir-locality"
 path = "src/bin/e122_dir_locality.rs"
+
+[[bin]]
+name = "e124-superblock-recompute"
+path = "src/bin/e124_superblock_recompute.rs"
+
+[[bin]]
+name = "e95-node-layout-arms"
+path = "src/bin/e95_node_layout_arms.rs"
+
+[[bin]]
+name = "e126-superblock-slot-width"
+path = "src/bin/e126_superblock_slot_width.rs"
+
+[[bin]]
+name = "e128-pointer-birth-cost"
+path = "src/bin/e128_pointer_birth_cost.rs"

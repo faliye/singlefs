@@ -1,0 +1,3 @@
+exit=1
+want=以提前退出的 grep -q 收尾
+want=99-sample.sh:4

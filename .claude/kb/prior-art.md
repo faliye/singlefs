@@ -615,11 +615,11 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 `btree_write_buffer.{c,h}`、`btree_trans_commit.c`、`btree_gc.c`、`buckets.c`、`bcachefs_format.h`），
 2026-08-26 现拉并逐字比对。
 
-## 八、根环槽宽与「墙钟消费者走旧代根」这两件事，现役实现怎么做
+## 八、根环槽宽与「长时间消费者怎么跟发布赛跑」这两件事，现役实现怎么做
 
 **2026-09-08 在本机固定点 `/home/fy5090/code/fs-refs` 现查逐字抄出。均未在本项目验证。**
 它们回答的是 D2（RAID 条带策略） 未定项 15（「生命周期不同的对象」的通用判据）
-与 [checks-owed.md](checks-owed.md) C213（走旧代根的墙钟消费者没有承担者）。
+与 [checks-owed.md](checks-owed.md) C214（遍历跳的窗口余量没人守）。
 
 ### 8.1 ZFS：根环槽宽确实随设备粒度抬，但封顶 8 KiB，而且抬槽宽是减槽数不是多占地
 
@@ -656,7 +656,7 @@ ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock �
 I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ 「抬槽宽 = 减槽数」这个等式在本工程
 **要先把「区域大小固定」写成条款**才成立，而仓里今天没有这条。
 
-### 8.2 btrfs：墙钟消费者不靠拉长保护窗口，靠走 commit root + 可暂停
+### 8.2 btrfs：靠走 commit root + 可暂停，而这条路在本工程被两道独立的闸排除
 
 来源 `linux-6.17/fs/btrfs/`，2026-09-08 现查，逐字：
 
@@ -667,6 +667,18 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 | `transaction.c:190` / `:217` | `down_write(&fs_info->commit_root_sem);` / `up_write(&fs_info->commit_root_sem);` |
 | `ctree.c:1795` | `lockdep_assert_held_read(&lowest->fs_info->commit_root_sem);` |
 | `transaction.c:2360` | `btrfs_scrub_pause(fs_info);` |
+
+⚠️ **本工程用不了这条路，两道排除各自独立（2026-09-08 现查坐实）**：
+① **提交间隔差 8.3 万倍**——btrfs 默认提交间隔逐字
+`#define BTRFS_DEFAULT_COMMIT_INTERVAL	(30)`（`linux-6.17/fs/btrfs/fs.h:302`，30 秒），
+而本工程甲下发布间隔是 **0.36 毫秒**（2785 发布/秒）。btrfs 那套的隐含前提是
+「提交间隔远大于消费者的一段扫描」；搬过来的话 scrub 每秒要被停 2785 次，永远走不完一遍。
+**这条前提从没跟着那个做法一起被引用过。**
+② **checker 那一侧结构上拿不到那把锁**——D13（验证路线） 已定项 5 逐字
+「只共享一份从 kb 生成的常量模块；newtype、解析、校验和、遍历、记账一律各写一份」
+⇒ 独立 checker 不可能持有被测实现的 `commit_root_sem`。
+
+下面的三件套记下来是为了说清被排除的是什么，不是候选出路。
 
 ⇒ **三件套**：scrub 读的不是活树而是 **commit root**（上一个已提交事务的根）；
 提交路径切换 commit root 时拿 `commit_root_sem` 的**写锁**、遍历方拿读锁，两者互斥；

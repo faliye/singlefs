@@ -1,0 +1,6 @@
+ask-local: 输出判定为字词损坏 —— 按 .claude/rules/three-way-inference.md 这一轮作废
+红 /tmp/tmp.QoylRG9u1n  生词=6 拼接=1
+     拼接: rebuildability(=rebuild+ability)
+     生词: candidate's reconstruction overturned rebuildability falsifying
+ask-local: 作废轮的原样输出已留存 research/prompts/state-granularity-local-counterexample-output-void3.md
+下一步：改用英文提示重跑（实测英文 0/5 损坏），或设 ASK_LOCAL_ALLOW_CORRUPT=1 强行采用

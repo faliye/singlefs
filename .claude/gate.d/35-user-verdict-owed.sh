@@ -29,7 +29,10 @@ while IFS= read -r f; do
   d="D$(basename "$f" | sed 's/^0*//; s/-.*//')"
   checked=$((checked+1))
   # 未还的账：同一行里点名了这条决策、带着复核标记，且没标「已还」
-  if grep "$MARK" "$OWED" | grep -F "$d" | grep -qv "已还[^ |]*（20"; then continue; fi
+  # 末段不许是 `grep -q`：pipefail 下它一命中就退出，前段吃 SIGPIPE ⇒ 命中被读成没命中
+  # （门禁阶段 41 判这一条）。先落到变量再判。
+  hits=$(grep "$MARK" "$OWED" | grep -F "$d" || true)
+  if [[ -n "$hits" ]] && grep -qv "已还[^ |]*（20" <<<"$hits"; then continue; fi
   echo "  ✗ $d 的正文标着待用户复核，checks-owed.md 里却没有一笔**未还**的账点名它"
   echo "        正文：$(basename "$f")"
   echo "     → 怎么办： 在 checks-owed.md 立一笔账，点名是 $d 的哪一项、原定案是哪天由谁拍的、"

@@ -1,0 +1,13 @@
+E7RESULT name=config block_sectors=128 block_bytes=65536 data_mb=64 rounds=5
+E7RESULT name=cell round=1 shared=1 host_sectors=1 data_dev_sectors=129 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=1 shared=0 host_sectors=1 data_dev_sectors=1 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=2 shared=1 host_sectors=1 data_dev_sectors=129 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=2 shared=0 host_sectors=1 data_dev_sectors=1 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=3 shared=1 host_sectors=1 data_dev_sectors=129 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=3 shared=0 host_sectors=1 data_dev_sectors=1 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=4 shared=1 host_sectors=1 data_dev_sectors=129 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=4 shared=0 host_sectors=1 data_dev_sectors=1 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=5 shared=1 host_sectors=1 data_dev_sectors=129 thin_io_min=65536 thin_pbs=512
+E7RESULT name=cell round=5 shared=0 host_sectors=1 data_dev_sectors=1 thin_io_min=65536 thin_pbs=512
+E7RESULT name=verdict shared_not_amplified=0 exclusive_amplified=0 cells=10 cells_with_declared_iomin=10 declared_block_bytes=65536
+E7RESULT name=done emitted=13

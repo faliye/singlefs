@@ -1,0 +1,86 @@
+E7RESULT name=config l=8192 s=10240 g=64 d=64 t=2000 model=counting file_ops=0 seeds=5 budgets=32,128,256
+E7RESULT name=control arm=pol_compact scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=pol_neighbor scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_group_g2 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_group_g8 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_group_g32 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_gensep_16_128 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_gensep_64_512 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=fmt_gensep_256_1024 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_first_fit scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_seg scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_nb_r1 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_nb_r2 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_cp_b32 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_cp_b128 scatter_runs=8192 compact_runs=1
+E7RESULT name=control arm=e93_bump_cp_b256 scatter_runs=8192 compact_runs=1
+E7RESULT name=xfixture arm=first_fit load=uniform median=8186 e93_stored=8186
+E7RESULT name=xfixture arm=first_fit load=runs8 median=7997 e93_stored=7997
+E7RESULT name=xfixture arm=bump_seg load=uniform median=8186 e93_stored=8186
+E7RESULT name=xfixture arm=bump_seg load=runs8 median=7312 e93_stored=7312
+E7RESULT name=xfixture arm=bump_nb_r1 load=uniform median=5497 e93_stored=5497
+E7RESULT name=xfixture arm=bump_nb_r1 load=runs8 median=5181 e93_stored=5181
+E7RESULT name=xfixture arm=bump_nb_r2 load=uniform median=5460 e93_stored=5460
+E7RESULT name=xfixture arm=bump_nb_r2 load=runs8 median=5111 e93_stored=5111
+E7RESULT name=xfixture arm=bump_cp_b32 load=uniform median=7502 e93_stored=7502
+E7RESULT name=xfixture arm=bump_cp_b32 load=runs8 median=6073 e93_stored=6073
+E7RESULT name=xfixture arm=bump_cp_b128 load=uniform median=6095 e93_stored=6095
+E7RESULT name=xfixture arm=bump_cp_b128 load=runs8 median=3922 e93_stored=3922
+E7RESULT name=xfixture arm=bump_cp_b256 load=uniform median=4791 e93_stored=4791
+E7RESULT name=xfixture arm=bump_cp_b256 load=runs8 median=1339 e93_stored=1339
+E7RESULT name=grid budget=32 arm=pol_compact family=policy load=uniform runs_median=7502 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=88.1
+E7RESULT name=grid budget=32 arm=pol_compact family=policy load=runs8 runs_median=6073 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=83.7
+E7RESULT name=grid budget=32 arm=pol_neighbor family=policy load=uniform runs_median=7031 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=pol_neighbor family=policy load=runs8 runs_median=5146 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=59.0
+E7RESULT name=grid budget=32 arm=fmt_group_g2 family=format load=uniform runs_median=6128 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=fmt_group_g2 family=format load=runs8 runs_median=3548 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=fmt_group_g8 family=format load=uniform runs_median=7558 write_amp=1.436 budget_spent_pct=87.2 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=fmt_group_g8 family=format load=runs8 runs_median=1595 write_amp=1.500 budget_spent_pct=99.9 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=fmt_group_g32 family=format load=uniform runs_median=7819 write_amp=1.483 budget_spent_pct=96.5 fallback_pct=0.0
+E7RESULT name=grid budget=32 arm=fmt_group_g32 family=format load=runs8 runs_median=4370 write_amp=1.387 budget_spent_pct=77.3 fallback_pct=46.8
+E7RESULT name=grid budget=32 arm=fmt_gensep_16_128 family=format load=uniform runs_median=8121 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=76.4
+E7RESULT name=grid budget=32 arm=fmt_gensep_16_128 family=format load=runs8 runs_median=7103 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=76.9
+E7RESULT name=grid budget=32 arm=fmt_gensep_64_512 family=format load=uniform runs_median=7827 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=77.3
+E7RESULT name=grid budget=32 arm=fmt_gensep_64_512 family=format load=runs8 runs_median=6593 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=78.5
+E7RESULT name=grid budget=32 arm=fmt_gensep_256_1024 family=format load=uniform runs_median=8022 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=87.9
+E7RESULT name=grid budget=32 arm=fmt_gensep_256_1024 family=format load=runs8 runs_median=6503 write_amp=1.500 budget_spent_pct=100.0 fallback_pct=85.4
+E7RESULT name=grid budget=128 arm=pol_compact family=policy load=uniform runs_median=6095 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=73.5
+E7RESULT name=grid budget=128 arm=pol_compact family=policy load=runs8 runs_median=3922 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=65.1
+E7RESULT name=grid budget=128 arm=pol_neighbor family=policy load=uniform runs_median=5463 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=34.2
+E7RESULT name=grid budget=128 arm=pol_neighbor family=policy load=runs8 runs_median=4442 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=65.3
+E7RESULT name=grid budget=128 arm=fmt_group_g2 family=format load=uniform runs_median=3966 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=128 arm=fmt_group_g2 family=format load=runs8 runs_median=2575 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=128 arm=fmt_group_g8 family=format load=uniform runs_median=5797 write_amp=2.960 budget_spent_pct=98.0 fallback_pct=0.0
+E7RESULT name=grid budget=128 arm=fmt_group_g8 family=format load=runs8 runs_median=904 write_amp=3.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=128 arm=fmt_group_g32 family=format load=uniform runs_median=7249 write_amp=2.930 budget_spent_pct=96.5 fallback_pct=3.8
+E7RESULT name=grid budget=128 arm=fmt_group_g32 family=format load=runs8 runs_median=1969 write_amp=2.913 budget_spent_pct=95.6 fallback_pct=24.6
+E7RESULT name=grid budget=128 arm=fmt_gensep_16_128 family=format load=uniform runs_median=7956 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=78.7
+E7RESULT name=grid budget=128 arm=fmt_gensep_16_128 family=format load=runs8 runs_median=6672 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=77.0
+E7RESULT name=grid budget=128 arm=fmt_gensep_64_512 family=format load=uniform runs_median=7093 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=80.9
+E7RESULT name=grid budget=128 arm=fmt_gensep_64_512 family=format load=runs8 runs_median=4924 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=80.3
+E7RESULT name=grid budget=128 arm=fmt_gensep_256_1024 family=format load=uniform runs_median=6869 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=76.0
+E7RESULT name=grid budget=128 arm=fmt_gensep_256_1024 family=format load=runs8 runs_median=4130 write_amp=2.998 budget_spent_pct=99.9 fallback_pct=71.9
+E7RESULT name=grid budget=256 arm=pol_compact family=policy load=uniform runs_median=4791 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=49.6
+E7RESULT name=grid budget=256 arm=pol_compact family=policy load=runs8 runs_median=1339 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=31.4
+E7RESULT name=grid budget=256 arm=pol_neighbor family=policy load=uniform runs_median=5378 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=52.2
+E7RESULT name=grid budget=256 arm=pol_neighbor family=policy load=runs8 runs_median=3392 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=69.2
+E7RESULT name=grid budget=256 arm=fmt_group_g2 family=format load=uniform runs_median=3414 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=256 arm=fmt_group_g2 family=format load=runs8 runs_median=1139 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=256 arm=fmt_group_g8 family=format load=uniform runs_median=3669 write_amp=4.940 budget_spent_pct=98.5 fallback_pct=0.0
+E7RESULT name=grid budget=256 arm=fmt_group_g8 family=format load=runs8 runs_median=742 write_amp=5.000 budget_spent_pct=100.0 fallback_pct=0.0
+E7RESULT name=grid budget=256 arm=fmt_group_g32 family=format load=uniform runs_median=6567 write_amp=4.859 budget_spent_pct=96.5 fallback_pct=4.1
+E7RESULT name=grid budget=256 arm=fmt_group_g32 family=format load=runs8 runs_median=276 write_amp=4.940 budget_spent_pct=98.5 fallback_pct=0.0
+E7RESULT name=grid budget=256 arm=fmt_gensep_16_128 family=format load=uniform runs_median=7777 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=89.8
+E7RESULT name=grid budget=256 arm=fmt_gensep_16_128 family=format load=runs8 runs_median=6219 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=87.8
+E7RESULT name=grid budget=256 arm=fmt_gensep_64_512 family=format load=uniform runs_median=6039 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=81.4
+E7RESULT name=grid budget=256 arm=fmt_gensep_64_512 family=format load=runs8 runs_median=2834 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=79.9
+E7RESULT name=grid budget=256 arm=fmt_gensep_256_1024 family=format load=uniform runs_median=4347 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=62.2
+E7RESULT name=grid budget=256 arm=fmt_gensep_256_1024 family=format load=runs8 runs_median=1343 write_amp=4.995 budget_spent_pct=99.9 fallback_pct=55.7
+E7RESULT name=verdict budget=32 load=uniform best_policy=7031 best_format=6128 best_format_arm=fmt_group_g2 format_halves_policy=false
+E7RESULT name=verdict budget=32 load=runs8 best_policy=5146 best_format=1595 best_format_arm=fmt_group_g8 format_halves_policy=true
+E7RESULT name=verdict budget=128 load=uniform best_policy=5463 best_format=3966 best_format_arm=fmt_group_g2 format_halves_policy=false
+E7RESULT name=verdict budget=128 load=runs8 best_policy=3922 best_format=904 best_format_arm=fmt_group_g8 format_halves_policy=true
+E7RESULT name=verdict budget=256 load=uniform best_policy=4791 best_format=3414 best_format_arm=fmt_group_g2 format_halves_policy=false
+E7RESULT name=verdict budget=256 load=runs8 best_policy=1339 best_format=276 best_format_arm=fmt_group_g32 format_halves_policy=true
+E7RESULT name=answer any_cell_format_halves_policy=true criterion=E95_5
+E7RESULT name=done emitted=86

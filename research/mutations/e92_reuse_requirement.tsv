@@ -1,8 +1,13 @@
 M1_违例不减K	let publishes = (scan_secs * publish_rate).floor() as i64;\n    (publishes - k as i64).max(0) as u64	let publishes = (scan_secs * publish_rate).floor() as i64;\n    let _ = k;\n    publishes.max(0) as u64
 M2_窗口不除发布率	fn window_seconds(k: u64, publish_rate: f64) -> f64 {\n    k as f64 / publish_rate\n}	fn window_seconds(k: u64, publish_rate: f64) -> f64 {\n    let _ = publish_rate;\n    k as f64\n}
-M3_扫描时长不除速率	fn scan_seconds(blocks_total: u64, blocks_per_sec: f64) -> f64 {\n    blocks_total as f64 / blocks_per_sec\n}	fn scan_seconds(blocks_total: u64, blocks_per_sec: f64) -> f64 {\n    let _ = blocks_per_sec;\n    blocks_total as f64\n}
-M4_择根回退需求塌成一代	pricing: Pricing::Generations, req_gens: Some(2) }	pricing: Pricing::Generations, req_gens: Some(1) }
-M5_模拟不判越界	if age > k {	if age > 0 {
-M6_空白当成零	source: "C88", pricing: Pricing::Blank, req_gens: None }	source: "C88", pricing: Pricing::Generations, req_gens: Some(0) }
-M7_清单出处重号	source: "E33", pricing: Pricing::Generations	source: "D22-item2", pricing: Pricing::Generations
-M8_发布率换档	const PUBLISH_RATE: f64 = 2785.0;	const PUBLISH_RATE: f64 = 1000.0;
+M3_择根回退需求塌成一代	pricing: Pricing::Generations, req_gens: Some(2) }	pricing: Pricing::Generations, req_gens: Some(1) }
+M4_模拟不判越界	if age > k {	if age > 0 {
+M5_空白当成零	source: "C88", pricing: Pricing::Blank, req_gens: None }	source: "C88", pricing: Pricing::Generations, req_gens: Some(0) }
+M6_发布率换档	const PUBLISH_RATE: f64 = 2785.0;	const PUBLISH_RATE: f64 = 1000.0;
+M7_scrub退回稻草人形状	Consumer { id: "c3_scrub_watermark", source: "D13-scrub", pricing: Pricing::Generations, req_gens: Some(0) }	Consumer { id: "c3_scrub_watermark", source: "D13-scrub", pricing: Pricing::WallClock, req_gens: None }
+M8_管理员回退分类改掉	Consumer { id: "c8_admin_rollback", source: "D23-item14", pricing: Pricing::ExternalEvent, req_gens: None }	Consumer { id: "c8_admin_rollback", source: "D23-item14", pricing: Pricing::Generations, req_gens: None }
+M9_遍历跳被漏列	Consumer { id: "c9_traversal_hop", source: "D4-parent-checksum", pricing: Pricing::WallClock, req_gens: None },	Consumer { id: "c9_traversal_hop", source: "D4-parent-checksum", pricing: Pricing::Blank, req_gens: None },
+M10_冻结镜像消费者被当成有需求	Consumer { id: "c6_i48_frozen_image", source: "I-4.8", pricing: Pricing::Generations, req_gens: Some(0) }	Consumer { id: "c6_i48_frozen_image", source: "I-4.8", pricing: Pricing::Generations, req_gens: Some(3) }
+M11_假候选数不减K	fn fake_rollback_candidates(ring_depth: u64, k: u64) -> u64 {\n    ring_depth.saturating_sub(k)\n}	fn fake_rollback_candidates(ring_depth: u64, k: u64) -> u64 {\n    let _ = k;\n    ring_depth\n}
+M12_假候选恒零	fn fake_rollback_candidates(ring_depth: u64, k: u64) -> u64 {\n    ring_depth.saturating_sub(k)\n}	fn fake_rollback_candidates(ring_depth: u64, k: u64) -> u64 {\n    let _ = (ring_depth, k);\n    0\n}
+M13_环深表漏掉最大那档	const RING_DEPTHS: [(u64, u64); 5] = [(1, 3), (2, 6), (4, 12), (8, 24), (16, 48)];	const RING_DEPTHS: [(u64, u64); 5] = [(1, 3), (2, 6), (4, 12), (8, 24), (16, 24)];

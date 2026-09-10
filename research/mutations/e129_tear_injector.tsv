@@ -1,0 +1,6 @@
+# E129 判据 1（撕裂注入器）—— 变异表
+# 被测装置是 shell 探针 research/scripts/e129-tear-injector.sh（不是 Rust 二进制）。
+# 复跑方式：把「原文」换成「替换文」，跑一遍脚本，必须出现 name=fatal 且退出码非 0。
+M1_边界挪走使跨边界写不再跨界	GOOD_SECTORS=8          # 前段 8 扇区 = 4096 字节	GOOD_SECTORS=16          # 前段 8 扇区 = 4096 字节
+M2_阴性对照那格不清零	S dd if=/dev/zero of="$LOOP" bs=4096 count=2 oflag=direct status=none 2>/dev/null\n  local rc_err	local rc_err
+M3_阳性对照改写到错段	S dd if="$W/pattern.bin" of="$DM_DEV" bs=4096 count=1 oflag=direct status=none 2>/dev/null\n  rc_good=$?	S dd if="$W/pattern.bin" of="$DM_DEV" bs=4096 count=1 seek=1 oflag=direct status=none 2>/dev/null\n  rc_good=$?

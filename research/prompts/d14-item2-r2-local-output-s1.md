@@ -1,0 +1,11 @@
+1. Create a file in directory A with locality_id A. Move the file to directory B. Delete directory A. The moved file's data extent remains in the locality_id A region. When deleting directory A, the system cannot reclaim the space for the moved file because it is still in use but part of the locality_id A group. This causes unreclaimable space that counts against free space, leading to a premature out-of-space error. The cost appears at the deletion step of directory A.
+
+2. No such operation exists. Locality_id is set at file creation and never updated on rename or any other operation per fact 1.
+
+3. Create 16 directories each with 32 small files of 4096 bytes. Delete one directory. In arm F, the small files are packed in mapping key order (creation order), so each container holds files from multiple directories. Deleting one directory frees no containers because containers still contain files from other directories. The reclamation cost is 32768 bytes per container not freed. For 16 directories, each directory's files occupy 4 containers (32 files / 8 files per container). Deleting one directory should free 4 containers (131072 bytes) if grouped by directory, but arm F frees 0 bytes. The packing saves space (32 files in 4 containers instead of 1048576 bytes), but the reclamation loss (131072 bytes not freed per directory deletion) outweighs the packing benefit when directories are frequently created and deleted.
+
+4. Locality_id is part of encrypted metadata per fact 7, but using it for placement exposes it in the physical layout. Fact 7 states file names and path information must never be plaintext, but locality_id stored in plaintext in the inode record is visible in the raw device layout when used for placement, violating encryption requirements.
+
+5. The project loses the reclamation benefit measured in fact 5 (deleting a directory frees no space under arrival order) and the traversal benefit measured in fact 6 (cache miss ratio of 1.462 for locality keys vs inode keys drops to worse than inode keys after renames when placement does not use locality_id).
+
+6. Attack arm E because using locality order for packing groups stale locality_id files together, causing unreclaimable space during directory deletion as shown in the arm C-prime counterexample.

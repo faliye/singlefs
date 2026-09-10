@@ -1,0 +1,9 @@
+Consider a workload where dirty objects are isolated and not adjacent to each other. For example, in a single checkpoint, the 64 dirty objects are each separated by at least 100 clean objects (e.g., keys 0, 101, 202, 303, ..., 6300). Group size N=8. Budget extra=500 (total budget 564). 
+
+Format group arm: Each dirty object belongs to its own group. Since groups are fixed and non-overlapping, each dirty object triggers rewriting its entire group of 8 objects. For 64 dirty objects, this requires 64*8=512 writes. Leftover budget 564-512=52 allows rewriting 6 more groups (6*8=48 writes), totaling 560 writes. Each group is placed as a contiguous stretch, but since the original groups are widely separated, the new layout has 64+6=70 separate contiguous runs. 
+
+Policy compact arm: Rewrites 564 objects in key order as a single contiguous stretch. This creates one new run for the rewritten objects and leaves the rest of the layout as one run, totaling 2 runs. 
+
+The group arm's runs (70) are far worse than policy compact's (2). This happens because the group arm rewrites clean objects unnecessarily when dirty objects are isolated, creating excessive fragmentation. The advantage of group rewrite in the original test was due to the runs8 workload having contiguous stretches matching the group size. When stretches are isolated, the group arm's behavior becomes counterproductive.
+
+For the separate question: A group would need an identifier stored in the node header if group membership is not determined solely by the key's position. For example, if groups are dynamically resized based on access patterns, or if group boundaries are determined by a hash of the key (e.g., consistent hashing), then each node must store which group it belongs to. Fixed key-range grouping requires no stored identifier, but any dynamic or non-key-based grouping scheme would necessitate storing the group ID in the node header.

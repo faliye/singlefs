@@ -1,0 +1,11 @@
+Consider a workload where the dirty objects are uniformly random but with group size 1 for format group. For uniform workload with 64 dirty objects and a budget of 32:
+
+- Format group: each dirty object is a separate group of size 1. With 64 dirty objects, but only 32 budget, only 32 objects are rewritten. Each rewritten object is placed as a single contiguous stretch (since group size 1), resulting in 32 separate runs for these objects. The remaining 32 dirty objects stay in fragmented slots. Total runs increase significantly—e.g., from initial 1 to over 32.
+
+- Policy compact: rewrites 32 contiguous objects in key order, creating one large contiguous stretch. This reduces runs to 2 (the new block plus the rest of the key space).
+
+This shows format group performing worse than policy compact. The group size 1 causes pure waste: rewriting clean objects is irrelevant here since group size 1 means every object is its own group, but the budget only allows rewritingrewriting half the dirty objects, each as isolated runs. This increases fragmentation drastically compared to policy compact's single contiguous block.
+
+Another counterexample: high occupancy (99%) with group size 8. Free space is  into 102 single slots. Format group cannot find a contiguous block of 8 to rewrite any group, so it does nothing. Policy compact also cannot find a contiguous block of 32, but it might find smaller contiguous blocks for partial compaction. However, format group's inability to rewrite any groups leaves dirty objects fragmented, while policy compact might still consolidate some regions. But even if both fail, format group's design inherently fails at high occupancy with small free space due to its need for large contiguous blocks.
+
+For the separate question: a group identifier must be stored on disk if group assignment is not deterministic from the key (e.g., dynamic groups based on access patterns, object type, or content). For example, if groups are defined by object metadata (e.g., "all user data" vs "system data"), each node would need to store its group ID in the header. Fixed key-based grouping (like N*i to N*i+N-1) requires no stored identifier, but any non-key-based grouping strategy requires explicit storage of group membership.

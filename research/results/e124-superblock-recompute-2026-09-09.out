@@ -1,0 +1,41 @@
+E7RESULT name=watermark_gate decided_nonce_bits=96 required_bytes=12 e100_used=8 consistent=0 short_by=4
+E7RESULT name=watermark_gate_control fed=12 consistent=1 short_by=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=0 total=503 was=499 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=0 total=503 was=499 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=1 total=385 was=381 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=1 total=385 was=381 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=1 merge_ptrs=0 total=562 was=558 slot=512 fits=0 over_by=50 torn_states=2
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=1 merge_ptrs=0 total=562 was=558 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=1 merge_ptrs=1 total=385 was=381 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=1 merge_ptrs=1 total=385 was=381 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=0 merge_ptrs=0 total=532 was=528 slot=512 fits=0 over_by=20 torn_states=2
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=0 merge_ptrs=0 total=532 was=528 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=0 merge_ptrs=1 total=473 was=469 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=0 merge_ptrs=1 total=473 was=469 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=1 merge_ptrs=0 total=591 was=587 slot=512 fits=0 over_by=79 torn_states=2
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=1 merge_ptrs=0 total=591 was=587 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=1 merge_ptrs=1 total=473 was=469 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code3_packed wide=1 map_sep=1 merge_ptrs=1 total=473 was=469 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=0 merge_ptrs=0 total=507 was=503 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=0 merge_ptrs=0 total=507 was=503 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=0 merge_ptrs=1 total=389 was=385 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=0 merge_ptrs=1 total=389 was=385 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=1 merge_ptrs=0 total=566 was=562 slot=512 fits=0 over_by=54 torn_states=2
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=1 merge_ptrs=0 total=566 was=562 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=1 merge_ptrs=1 total=389 was=385 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=0 map_sep=1 merge_ptrs=1 total=389 was=385 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=0 merge_ptrs=0 total=536 was=532 slot=512 fits=0 over_by=24 torn_states=2
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=0 merge_ptrs=0 total=536 was=532 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=0 merge_ptrs=1 total=477 was=473 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=0 merge_ptrs=1 total=477 was=473 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=1 merge_ptrs=0 total=595 was=591 slot=512 fits=0 over_by=83 torn_states=2
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=1 merge_ptrs=0 total=595 was=591 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=1 merge_ptrs=1 total=477 was=473 slot=512 fits=1 over_by=0 torn_states=0
+E7RESULT name=budget dev_unit=code2_index wide=1 map_sep=1 merge_ptrs=1 total=477 was=473 slot=4096 fits=1 over_by=0 torn_states=0
+E7RESULT name=devs_arm wide=0 code3=385 code2=389 saved=4 record_count_bytes=2
+E7RESULT name=devs_arm wide=1 code3=473 code2=477 saved=4 record_count_bytes=2
+E7RESULT name=merge_cost unit_header=68 saved_in_slot=177 paid_in_unit=68
+E7RESULT name=merge_cost unit_header=77 saved_in_slot=177 paid_in_unit=77
+E7RESULT name=merge_cost unit_header=86 saved_in_slot=177 paid_in_unit=86
+E7RESULT name=e115_reconcile rows=24 candidate_bytes=361 plus_devtable_ptr=420 missing_narrow=83 missing_wide=112
+E7RESULT name=done emitted=41
