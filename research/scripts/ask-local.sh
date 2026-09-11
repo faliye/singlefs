@@ -53,7 +53,6 @@ if not c:
     sys.stderr.write("ask-local: 正文为空（thinking %d 字）——整轮作废，不当成 0\n"%len(m.get("reasoning") or ""))
     sys.exit(4)
 open(os.environ["TXT"],"w",encoding="utf-8").write(c)
-print(c)
 '
 rc=${PIPESTATUS[0]:-$?}
 [[ $rc -eq 0 ]] || exit $rc
@@ -108,3 +107,8 @@ else
   echo "ask-local: 找不到 $CHECK —— **没做**字词损坏检查，不是通过了" >&2
 fi
 done
+
+# 正文放到最后才打：此前 python 里先 print 再跑损坏闸，判红那一轮的正文已经进了调用方的重定向文件，
+# 一份作废输出顶着 `-output-s1.md` 这种合法名字落了盘（2026-09-12 实测，与 void 副本只差一个换行）。
+# 判红且没设 ASK_LOCAL_ALLOW_CORRUPT 时上面已经 exit 5，走不到这里。
+cat "$TXT"; echo   # 与原先 print(c) 一样补一个换行
