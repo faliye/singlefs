@@ -69,6 +69,8 @@
 | `.claude/kb/milestone-first-txn.md` | 里程碑「第一个事务」的规划：八步，每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
+| `research/scripts/stage-mine.py` | 几个会话共写一批文件时只暂存这一轮的块：插入段按标题行、表格行、replay 登记行切块，命中 `--match` 的进暂存区、其余留在工作区，进暂存区的块命中 `--foreign` 就拒绝；`--selftest` 自证会红 |
+| `research/scripts/check-staged.sh` | 在临时 worktree 上只拿「HEAD + 暂存区」跑 doc-lint 与快的 kb 阶段，别的会话没收尾的改动与未跟踪文件都不进来；`--selftest` 自证会红 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
 

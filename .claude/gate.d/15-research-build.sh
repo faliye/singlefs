@@ -43,3 +43,24 @@ if [[ -f "$OOV" ]]; then
   fi
   echo "$out" | sed 's/^  /  /'
 fi
+
+# ── 并发会话的两件暂存工具，它们自己会不会红 ──
+# stage-mine.py 挑错块，别的会话的半成品就被卷进这一次提交；check-staged.sh 把工作区原样拿去跑，别人的红就算到自己头上。
+STAGE_MINE="$R/scripts/stage-mine.py"
+if [[ -f "$STAGE_MINE" ]]; then
+  if ! out="$(python3 "$STAGE_MINE" --selftest 2>&1)"; then
+    echo "$out" | sed 's/^/  /'
+    echo "     → 怎么办：stage-mine.py 挑块挑错了样本，修切块或下滑的规则再跑。"
+    exit 1
+  fi
+  echo "  ✓ stage-mine.py $(tail -1 <<<"$out")"
+fi
+CHECK_STAGED="$R/scripts/check-staged.sh"
+if [[ -f "$CHECK_STAGED" ]]; then
+  if ! out="$(bash "$CHECK_STAGED" --selftest 2>&1)"; then
+    echo "$out" | sed 's/^/  /'
+    echo "     → 怎么办：check-staged.sh 把没暂存的改动算进来了、或暂存了的没判红，修 run_isolated 再跑。"
+    exit 1
+  fi
+  echo "  ✓ check-staged.sh $(tail -1 <<<"$out")"
+fi
