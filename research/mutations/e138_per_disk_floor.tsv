@@ -1,0 +1,9 @@
+M1_per_disk_activation_always_true	Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit => self.floor_written_on_every_surviving_disk(pending.value),	Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit => true,
+M2_retained_roots_three	const MINIMUM_RETAINED_ROOTS: usize = 4;	const MINIMUM_RETAINED_ROOTS: usize = 3;
+M3_floor_residue_formula_short	METADATA_BLOCKS_PER_PUBLICATION + (FLOOR_PER_DISK_PUBLICATION_BOUND - 2) * empty_publication_cost	METADATA_BLOCKS_PER_PUBLICATION + (FLOOR_PER_DISK_PUBLICATION_BOUND - 3) * empty_publication_cost
+M4_ring_push_one_short	Arm::RingPersisted => self.ring_depth - 1,	Arm::RingPersisted => self.ring_depth - 2,
+M5_df_guaranteed_ignores_residue	self.df_raw().saturating_sub(self.reserve_blocks + self.push_residue_blocks)	self.df_raw().saturating_sub(self.reserve_blocks)
+M6_recovery_settled_takes_max_disk	.min().unwrap_or(0).min(candidacy)	.max().unwrap_or(0).min(candidacy)
+M7_raise_before_cap_reaches_goal	if self.floor_carried < goal_txg && self.floor_upper_limit() >= goal_txg {	if self.floor_carried < goal_txg && self.floor_upper_limit() + 1 >= goal_txg {
+M8_candidacy_ignores_lost_disk_roots_floor	self.visible_roots().iter().map(|root| root.floor).max().unwrap_or(0)	self.valid_roots().iter().map(|root| root.floor).min().unwrap_or(0)
+M9_commit_skipped_in_pressure	if !self.commit_open_window(open_txg) {	if false && !self.commit_open_window(open_txg) {
