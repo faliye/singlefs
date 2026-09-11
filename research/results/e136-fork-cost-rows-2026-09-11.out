@@ -1,0 +1,159 @@
+E136 映射 key 岔路的代价行
+判据写死在 research/prompts/e136-preregistration.md（写于本装置之前，补记在第一次运行之前）；只报数、不判输赢
+口径：节点=16384 节点头(64 口径)=64 映射节点头=76 码2三档头=96/105/114 子指针今天=59 根槽=512 池=483183820
+—— all 配置 × 64 口径（跨装置闸 1：逐行等于 E134 的留存产物）
+E7RESULT name=widths arm=k1_seq data_pointer=109 node_pointer=75 extent_leaf_entry=133 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=79 map_entry_code23=n/a
+E7RESULT name=headers arm=k1_seq code1=133 code3=131 code2=96/105/114 slot_extra_over_e114_pack=8 slot_extra_over_five_tuple=18 livelist_identity_code1=51
+E7RESULT name=fanouts arm=k1_seq extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=206 map_internal=129 inode_leaf=233
+E7RESULT name=thresholds arm=k1_seq tree=extent l2=123 l3=20009 l4=3281313 l5=538135169
+E7RESULT name=thresholds arm=k1_seq tree=inode l2=234 l3=34718 l4=5172834 l5=770752118
+E7RESULT name=thresholds arm=k1_seq tree=ledger l2=545 l3=91393 l4=15353857 l5=2579447809
+E7RESULT name=thresholds arm=k1_seq tree=map l2=207 l3=26575 l4=3428047 l5=442217935
+E7RESULT name=map_at_pool arm=k1_seq data_units_levels=5 data_units_leaf_bytes=38429540352 with_index_levels=5 with_index_leaf_bytes=38752485376
+E7RESULT name=widths arm=k1_seq_class_reuse data_pointer=109 node_pointer=83 extent_leaf_entry=133 extent_internal_entry=107 inode_internal=117 ledger_internal=105 tree_table_entry=145 root_record=242 map_entry_code1=79 map_entry_code23=53
+E7RESULT name=headers arm=k1_seq_class_reuse code1=133 code3=135 code2=100/109/118 slot_extra_over_e114_pack=8 slot_extra_over_five_tuple=18 livelist_identity_code1=51
+E7RESULT name=fanouts arm=k1_seq_class_reuse extent_leaf=122 extent_internal=152 inode_internal=139 ledger_internal=155 tree_table_per_level=112 map_leaf=206 map_internal=121 inode_leaf=233
+E7RESULT name=thresholds arm=k1_seq_class_reuse tree=extent l2=123 l3=18545 l4=2818689 l5=428440577
+E7RESULT name=thresholds arm=k1_seq_class_reuse tree=inode l2=234 l3=32388 l4=4501794 l5=625749228
+E7RESULT name=thresholds arm=k1_seq_class_reuse tree=ledger l2=545 l3=84321 l4=13069601 l5=2025788001
+E7RESULT name=thresholds arm=k1_seq_class_reuse tree=map l2=207 l3=24927 l4=3016047 l5=364941567
+E7RESULT name=map_at_pool arm=k1_seq_class_reuse data_units_levels=5 data_units_leaf_bytes=38429540352 with_index_levels=5 with_index_leaf_bytes=38752485376
+E7RESULT name=widths arm=class_reuse_tagged data_pointer=85 node_pointer=83 extent_leaf_entry=109 extent_internal_entry=107 inode_internal=117 ledger_internal=105 tree_table_entry=145 root_record=242 map_entry_code1=55 map_entry_code23=53
+E7RESULT name=headers arm=class_reuse_tagged code1=133 code3=135 code2=100/109/118 slot_extra_over_e114_pack=9 slot_extra_over_five_tuple=19 livelist_identity_code1=27
+E7RESULT name=fanouts arm=class_reuse_tagged extent_leaf=149 extent_internal=152 inode_internal=139 ledger_internal=155 tree_table_per_level=112 map_leaf=296 map_internal=148 inode_leaf=233
+E7RESULT name=thresholds arm=class_reuse_tagged tree=extent l2=150 l3=22649 l4=3442497 l5=523259393
+E7RESULT name=thresholds arm=class_reuse_tagged tree=inode l2=234 l3=32388 l4=4501794 l5=625749228
+E7RESULT name=thresholds arm=class_reuse_tagged tree=ledger l2=545 l3=84321 l4=13069601 l5=2025788001
+E7RESULT name=thresholds arm=class_reuse_tagged tree=map l2=297 l3=43809 l4=6483585 l5=959570433
+E7RESULT name=map_at_pool arm=class_reuse_tagged data_units_levels=4 data_units_leaf_bytes=26744881152 with_index_levels=4 with_index_leaf_bytes=26969636864
+—— code1_only 配置 × 64 口径
+E7RESULT name=code1_only_widths arm=k1_seq data_pointer=109 node_pointer=75 extent_leaf_entry=133 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=79
+E7RESULT name=code1_only_headers arm=k1_seq code1=133 code3=131 code2=96/105/114
+E7RESULT name=code1_only_fanouts arm=k1_seq extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=206 map_internal=129 inode_leaf=233
+E7RESULT name=code1_only_thresholds arm=k1_seq tree=extent l2=123 l3=20009 l4=3281313 l5=538135169 l6=88254167553
+E7RESULT name=code1_only_thresholds arm=k1_seq tree=map l2=207 l3=26575 l4=3428047 l5=442217935 l6=57046113487
+E7RESULT name=code1_only_map_at_pool arm=k1_seq data_units_levels=5 data_units_leaf_bytes=38429540352
+E7RESULT name=code1_only_widths arm=k1_seq_class_reuse data_pointer=109 node_pointer=75 extent_leaf_entry=133 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=79
+E7RESULT name=code1_only_headers arm=k1_seq_class_reuse code1=133 code3=131 code2=96/105/114
+E7RESULT name=code1_only_fanouts arm=k1_seq_class_reuse extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=206 map_internal=129 inode_leaf=233
+E7RESULT name=code1_only_thresholds arm=k1_seq_class_reuse tree=extent l2=123 l3=20009 l4=3281313 l5=538135169 l6=88254167553
+E7RESULT name=code1_only_thresholds arm=k1_seq_class_reuse tree=map l2=207 l3=26575 l4=3428047 l5=442217935 l6=57046113487
+E7RESULT name=code1_only_map_at_pool arm=k1_seq_class_reuse data_units_levels=5 data_units_leaf_bytes=38429540352
+E7RESULT name=code1_only_widths arm=class_reuse_tagged data_pointer=85 node_pointer=75 extent_leaf_entry=109 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=55
+E7RESULT name=code1_only_headers arm=class_reuse_tagged code1=133 code3=131 code2=96/105/114
+E7RESULT name=code1_only_fanouts arm=class_reuse_tagged extent_leaf=149 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=296 map_internal=159 inode_leaf=233
+E7RESULT name=code1_only_thresholds arm=class_reuse_tagged tree=extent l2=150 l3=24437 l4=4007505 l5=657230657 l6=107785827585
+E7RESULT name=code1_only_thresholds arm=class_reuse_tagged tree=map l2=297 l3=47065 l4=7483177 l5=1189824985 l6=189182172457
+E7RESULT name=code1_only_map_at_pool arm=class_reuse_tagged data_units_levels=4 data_units_leaf_bytes=26744881152
+—— 码 2 三档头（加该配置下的增量）当节点头
+E7RESULT name=tier_fanouts arm=k1_seq config=all tier=96 node_header=96 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq config=all tier=105 node_header=105 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq config=all tier=114 node_header=114 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=205 map_internal=129 map_l2=206 map_l3=26446 map_l4=3411406 map_l5=440071246 map_l6=56769190606
+E7RESULT name=tier_fanouts arm=k1_seq config=code1_only tier=96 node_header=96 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq config=code1_only tier=105 node_header=105 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq config=code1_only tier=114 node_header=114 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=205 map_internal=129 map_l2=206 map_l3=26446 map_l4=3411406 map_l5=440071246 map_l6=56769190606
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=all tier=96 node_header=100 extent_leaf=122 extent_internal=152 inode_internal=139 ledger_internal=155 map_leaf=206 map_internal=121 map_l2=207 map_l3=24927 map_l4=3016047 map_l5=364941567 map_l6=44157929487
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=all tier=105 node_header=109 extent_leaf=122 extent_internal=152 inode_internal=139 ledger_internal=155 map_leaf=206 map_internal=121 map_l2=207 map_l3=24927 map_l4=3016047 map_l5=364941567 map_l6=44157929487
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=all tier=114 node_header=118 extent_leaf=122 extent_internal=152 inode_internal=139 ledger_internal=154 map_leaf=205 map_internal=121 map_l2=206 map_l3=24806 map_l4=3001406 map_l5=363170006 map_l6=43943570606
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=code1_only tier=96 node_header=96 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=code1_only tier=105 node_header=105 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=206 map_internal=129 map_l2=207 map_l3=26575 map_l4=3428047 map_l5=442217935 map_l6=57046113487
+E7RESULT name=tier_fanouts arm=k1_seq_class_reuse config=code1_only tier=114 node_header=114 extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=205 map_internal=129 map_l2=206 map_l3=26446 map_l4=3411406 map_l5=440071246 map_l6=56769190606
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=all tier=96 node_header=100 extent_leaf=149 extent_internal=152 inode_internal=139 ledger_internal=155 map_leaf=296 map_internal=148 map_l2=297 map_l3=43809 map_l4=6483585 map_l5=959570433 map_l6=142016423937
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=all tier=105 node_header=109 extent_leaf=149 extent_internal=152 inode_internal=139 ledger_internal=155 map_leaf=295 map_internal=147 map_l2=296 map_l3=43366 map_l4=6374656 map_l5=937074286 map_l6=137749919896
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=all tier=114 node_header=118 extent_leaf=149 extent_internal=152 inode_internal=139 ledger_internal=154 map_leaf=295 map_internal=147 map_l2=296 map_l3=43366 map_l4=6374656 map_l5=937074286 map_l6=137749919896
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=code1_only tier=96 node_header=96 extent_leaf=149 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=296 map_internal=159 map_l2=297 map_l3=47065 map_l4=7483177 map_l5=1189824985 map_l6=189182172457
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=code1_only tier=105 node_header=105 extent_leaf=149 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=295 map_internal=159 map_l2=296 map_l3=46906 map_l4=7457896 map_l5=1185805306 map_l6=188543043496
+E7RESULT name=tier_fanouts arm=class_reuse_tagged config=code1_only tier=114 node_header=114 extent_leaf=149 extent_internal=164 inode_internal=149 ledger_internal=167 map_leaf=295 map_internal=159 map_l2=296 map_l3=46906 map_l4=7457896 map_l5=1185805306 map_l6=188543043496
+—— 码 2 头的增量单独拿出来看：同一组条目宽，头取档本身与档 + 增量时的扇出（all 配置，只列加了出生序号的臂）
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=96 increment=4 without=122/152/139/155/206/121 with=122/152/139/155/206/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=105 increment=4 without=122/152/139/155/206/121 with=122/152/139/155/206/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=k1_seq_class_reuse tier=114 increment=4 without=122/152/139/154/205/121 with=122/152/139/154/205/121 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=96 increment=4 without=149/152/139/155/296/148 with=149/152/139/155/296/148 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=105 increment=4 without=149/152/139/155/295/147 with=149/152/139/155/295/147 dropped_cells=0
+E7RESULT name=code2_header_increment_effect arm=class_reuse_tagged tier=114 increment=4 without=149/152/139/154/295/147 with=149/152/139/154/295/147 dropped_cells=0
+—— 映射树层数不同的规模区间 [下沿, 上沿) 与叶层字节比值（池规模 483183820 落在哪一段）
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..43809,4:3428047..6483585,5:442217935..959570433,6:57046113487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..297,3:24927..43809,4:3016047..6483585,5:364941567..959570433,6:44157929487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=map_header_76 pair=k1_seq/k1_seq_class_reuse bands=3:24927..26575,4:3016047..3428047,5:364941567..442217935,6:44157929487..57046113487 pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=all basis=code2_tier_96 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..43809,4:3428047..6483585,5:442217935..959570433,6:57046113487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=code2_tier_96 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..297,3:24927..43809,4:3016047..6483585,5:364941567..959570433,6:44157929487..142016423937 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=all basis=code2_tier_96 pair=k1_seq/k1_seq_class_reuse bands=3:24927..26575,4:3016047..3428047,5:364941567..442217935,6:44157929487..57046113487 pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=all basis=code2_tier_105 pair=k1_seq/class_reuse_tagged bands=2:207..296,3:26575..43366,4:3428047..6374656,5:442217935..937074286,6:57046113487..137749919896 pool_in=5 leaf_bytes_ratio=1.43203
+E7RESULT name=map_level_bands config=all basis=code2_tier_105 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..296,3:24927..43366,4:3016047..6374656,5:364941567..937074286,6:44157929487..137749919896 pool_in=5 leaf_bytes_ratio=1.43203
+E7RESULT name=map_level_bands config=all basis=code2_tier_105 pair=k1_seq/k1_seq_class_reuse bands=3:24927..26575,4:3016047..3428047,5:364941567..442217935,6:44157929487..57046113487 pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=all basis=code2_tier_114 pair=k1_seq/class_reuse_tagged bands=2:206..296,3:26446..43366,4:3411406..6374656,5:440071246..937074286,6:56769190606..137749919896 pool_in=5 leaf_bytes_ratio=1.43902
+E7RESULT name=map_level_bands config=all basis=code2_tier_114 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:206..296,3:24806..43366,4:3001406..6374656,5:363170006..937074286,6:43943570606..137749919896 pool_in=5 leaf_bytes_ratio=1.43902
+E7RESULT name=map_level_bands config=all basis=code2_tier_114 pair=k1_seq/k1_seq_class_reuse bands=3:24806..26446,4:3001406..3411406,5:363170006..440071246,6:43943570606..56769190606 pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=code1_only basis=map_header_76 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..47065,4:3428047..7483177,5:442217935..1189824985,6:57046113487..189182172457 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=code1_only basis=map_header_76 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..297,3:26575..47065,4:3428047..7483177,5:442217935..1189824985,6:57046113487..189182172457 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=code1_only basis=map_header_76 pair=k1_seq/k1_seq_class_reuse bands=none pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_96 pair=k1_seq/class_reuse_tagged bands=2:207..297,3:26575..47065,4:3428047..7483177,5:442217935..1189824985,6:57046113487..189182172457 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_96 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..297,3:26575..47065,4:3428047..7483177,5:442217935..1189824985,6:57046113487..189182172457 pool_in=5 leaf_bytes_ratio=1.43689
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_96 pair=k1_seq/k1_seq_class_reuse bands=none pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_105 pair=k1_seq/class_reuse_tagged bands=2:207..296,3:26575..46906,4:3428047..7457896,5:442217935..1185805306,6:57046113487..188543043496 pool_in=5 leaf_bytes_ratio=1.43203
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_105 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:207..296,3:26575..46906,4:3428047..7457896,5:442217935..1185805306,6:57046113487..188543043496 pool_in=5 leaf_bytes_ratio=1.43203
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_105 pair=k1_seq/k1_seq_class_reuse bands=none pool_in=none leaf_bytes_ratio=1.00000
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_114 pair=k1_seq/class_reuse_tagged bands=2:206..296,3:26446..46906,4:3411406..7457896,5:440071246..1185805306,6:56769190606..188543043496 pool_in=5 leaf_bytes_ratio=1.43902
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_114 pair=k1_seq_class_reuse/class_reuse_tagged bands=2:206..296,3:26446..46906,4:3411406..7457896,5:440071246..1185805306,6:56769190606..188543043496 pool_in=5 leaf_bytes_ratio=1.43902
+E7RESULT name=map_level_bands config=code1_only basis=code2_tier_114 pair=k1_seq/k1_seq_class_reuse bands=none pool_in=none leaf_bytes_ratio=1.00000
+—— 搬一个码 2 / 码 3 节点（all：映射权威；code1_only：节点的位置条目回到权威）
+E7RESULT name=relocate_node config=all arm=k1_seq map_height=5 bytes=82432
+E7RESULT name=relocate_node config=all arm=k1_seq_class_reuse map_height=5 bytes=82432
+E7RESULT name=relocate_node config=all arm=class_reuse_tagged map_height=4 bytes=66048
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=1 bytes=49664 parent_reads=3
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=2 bytes=99328 parent_reads=6
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=4 bytes=198656 parent_reads=12
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=8 bytes=397312 parent_reads=24
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=0 k=16 bytes=794624 parent_reads=48
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=1 k=1 bytes=33280 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=1 k=2 bytes=66560 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=1 k=4 bytes=133120 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=1 k=8 bytes=266240 parent_reads=16
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=1 k=16 bytes=532480 parent_reads=32
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=2 k=1 bytes=16896 parent_reads=1
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=2 k=2 bytes=33792 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=2 k=4 bytes=67584 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=2 k=8 bytes=135168 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=k1_seq extent_height=4 level=2 k=16 bytes=270336 parent_reads=16
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=0 k=1 bytes=49664 parent_reads=3
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=0 k=2 bytes=99328 parent_reads=6
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=0 k=4 bytes=198656 parent_reads=12
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=0 k=8 bytes=397312 parent_reads=24
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=0 k=16 bytes=794624 parent_reads=48
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=1 k=1 bytes=33280 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=1 k=2 bytes=66560 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=1 k=4 bytes=133120 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=1 k=8 bytes=266240 parent_reads=16
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=1 k=16 bytes=532480 parent_reads=32
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=2 k=1 bytes=16896 parent_reads=1
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=2 k=2 bytes=33792 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=2 k=4 bytes=67584 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=2 k=8 bytes=135168 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=k1_seq_class_reuse extent_height=4 level=2 k=16 bytes=270336 parent_reads=16
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=0 k=1 bytes=49664 parent_reads=3
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=0 k=2 bytes=99328 parent_reads=6
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=0 k=4 bytes=198656 parent_reads=12
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=0 k=8 bytes=397312 parent_reads=24
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=0 k=16 bytes=794624 parent_reads=48
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=1 k=1 bytes=33280 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=1 k=2 bytes=66560 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=1 k=4 bytes=133120 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=1 k=8 bytes=266240 parent_reads=16
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=1 k=16 bytes=532480 parent_reads=32
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=2 k=1 bytes=16896 parent_reads=1
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=2 k=2 bytes=33792 parent_reads=2
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=2 k=4 bytes=67584 parent_reads=4
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=2 k=8 bytes=135168 parent_reads=8
+E7RESULT name=relocate_node config=code1_only arm=class_reuse_tagged extent_height=4 level=2 k=16 bytes=270336 parent_reads=16
+—— 派生树码 2 节点搬迁多读的节点数（all 配置，extent 树在池规模上的高）
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=0 reads=3
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=1 reads=2
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq extent_height=4 level=2 reads=1
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq_class_reuse extent_height=5 level=0 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq_class_reuse extent_height=5 level=1 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=k1_seq_class_reuse extent_height=5 level=2 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=class_reuse_tagged extent_height=4 level=0 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=class_reuse_tagged extent_height=4 level=1 reads=0
+E7RESULT name=derived_relocation_extra_reads config=all arm=class_reuse_tagged extent_height=4 level=2 reads=0
+E7RESULT name=cross_apparatus d18_308_entry54=301/301/301 d18_308_entry81=201/200/200 e109_move_ptr=66048/132096/264192/528384/1056768 e109_move_map=66048
+E7RESULT name=done emitted=149

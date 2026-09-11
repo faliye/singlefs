@@ -1,0 +1,24 @@
+M1_只装码1时节点指针多带8	const CODE1_ONLY_NODE_POINTER_EXTRA_BYTES: u64 = 8 + 8;	const CODE1_ONLY_NODE_POINTER_EXTRA_BYTES: u64 = 8 + 16;
+M2_只装码1时码2头仍加出生序号	            code23_header_extra_bytes: 0,	            code23_header_extra_bytes: arm.code23_header_extra_bytes,
+M3_只装码1时节点指针沿用全部进映射的宽	            node_pointer_extra_bytes: CODE1_ONLY_NODE_POINTER_EXTRA_BYTES,	            node_pointer_extra_bytes: arm.node_pointer_extra_bytes,
+M4_三档头不加增量	    tier_bytes + arm_under_scope(arm, map_scope).code23_header_extra_bytes	    tier_bytes + 0 * arm_under_scope(arm, map_scope).code23_header_extra_bytes
+M5_根槽算0	const ROOT_SLOT_BYTES: u64 = 512;	const ROOT_SLOT_BYTES: u64 = 0;
+M6_路径多算一个节点	    tree_height - 1 - node_level	    tree_height - node_level
+M7_搬迁不乘引用树数	    referencing_tree_count * (copy_on_write_path_node_count * NODE_BYTES + ROOT_SLOT_BYTES)	    (referencing_tree_count / referencing_tree_count.max(1)) * (copy_on_write_path_node_count * NODE_BYTES + ROOT_SLOT_BYTES)
+M8_多读那一次落到每条臂	        Some(_) => 0,	        Some(_) => copy_on_write_path_node_count_for_node(tree_height, node_level),
+M9_层数区间取反	first_threshold != second_threshold)	first_threshold == second_threshold)
+M10_三档头第三档抄错	const CODE2_HEADER_TIERS_TODAY: [u64; 3] = [96, 105, 114];	const CODE2_HEADER_TIERS_TODAY: [u64; 3] = [96, 105, 105];
+M11_映射value只算一份副本	const MAP_VALUE_BYTES: u64 = LOCATION_ENTRY_BYTES * REPLICA_COUNT;	const MAP_VALUE_BYTES: u64 = LOCATION_ENTRY_BYTES;
+M12_三档口径的映射叶沿用76头	        map_leaf_fanout_with_header(node_header_bytes, scoped.code1_key_bytes),	        map_leaf_fanout_with_header(MAP_NODE_HEADER_BYTES, scoped.code1_key_bytes),
+M13_三档口径的映射内部用数据指针	        map_internal_fanout_with_header(node_header_bytes, scoped.code1_key_bytes, node_child_pointer_bytes(&scoped)),	        map_internal_fanout_with_header(node_header_bytes, scoped.code1_key_bytes, data_child_pointer_bytes(&scoped)),
+M14_叶层字节比值倒过来	    first_leaf_bytes * RATIO_SCALE / second_leaf_bytes	    second_leaf_bytes * RATIO_SCALE / first_leaf_bytes
+M15_extent树高不看配置	    let (_, extent_leaf, extent_internal) = trees(&arm_under_scope(arm, map_scope))[0];	    let (_, extent_leaf, extent_internal) = trees(&arm_under_scope(arm, if map_scope == MapScope::Code1Only { MapScope::AllPointers } else { map_scope }))[0];
+M16_映射树高用extent的扇出	    let (map_leaf, map_internal) = map_fanouts_under(arm, map_scope, FanoutBasis::MapHeader76);	    let (_, map_leaf, map_internal) = trees(&arm_under_scope(arm, map_scope))[0];
+M17_池规模区间的开闭反了	*lower <= entry_count && entry_count < *upper	*lower < entry_count && entry_count <= *upper
+M18_门槛只报到5层	const HIGHEST_REPORTED_LEVEL_COUNT: u32 = 6;	const HIGHEST_REPORTED_LEVEL_COUNT: u32 = 5;
+M19_E134兼容行多报一层门槛	        let thresholds: Vec<String> = (2u32..=5)	        let thresholds: Vec<String> = (2u32..=6)
+M20_映射权威多算一个节点	    map_tree_height * NODE_BYTES + ROOT_SLOT_BYTES	    (map_tree_height + 1) * NODE_BYTES + ROOT_SLOT_BYTES
+M21_全部进映射时也按只装码1算	        MapScope::AllPointers => *arm,	        MapScope::AllPointers => arm_under_scope(arm, MapScope::Code1Only),
+M22_三档口径的extent内部用叶条目	        fanout_with_header(node_header_bytes, extent_internal_entry_bytes(&scoped)),	        fanout_with_header(node_header_bytes, extent_leaf_entry_bytes(&scoped)),
+M23_掉格计数不加增量	    let with_increment: Vec<u64> = entry_widths.iter().map(|entry_bytes| fanout_with_header(node_header_bytes + header_increment_bytes, *entry_bytes)).collect();	    let with_increment: Vec<u64> = entry_widths.iter().map(|entry_bytes| fanout_with_header(node_header_bytes + 0 * header_increment_bytes, *entry_bytes)).collect();
+M24_掉格计数数反了	.filter(|(before, after)| before != after).count();	.filter(|(before, after)| before == after).count();
