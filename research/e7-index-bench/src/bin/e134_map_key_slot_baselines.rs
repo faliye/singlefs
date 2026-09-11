@@ -109,7 +109,7 @@ const ARMS: [Arm; 14] = [
     Arm { name: "uuid16", data_pointer_extra_bytes: 32, node_pointer_extra_bytes: 32, code1_header_extra_bytes: 16, code23_header_extra_bytes: 16, code1_key_bytes: 16, code23_key_bytes: Some(16), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 16, slot_extra_over_five_tuple_bytes: 16 },
     // 本地腿 s2：出生落点 10 + 每槽版本号 2 当 key，指针另加版本号 2 + 出生树 8 + 出生 txg 8；每槽版本号那张持久表的代价不建模。
     Arm { name: "slotgen12", data_pointer_extra_bytes: 18, node_pointer_extra_bytes: 18, code1_header_extra_bytes: 12, code23_header_extra_bytes: 12, code1_key_bytes: 12, code23_key_bytes: Some(12), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 12, slot_extra_over_five_tuple_bytes: 12 },
-    // 按类复用写序键收严后的形态（D19 未定项 6 第三轮三步走）：key 以 1 字节类标签打头，码 1 27、码 2 / 3 25；
+    // 按类复用写序键收严后的形态（D19 已定项 6 第三轮三步走）：key 以 1 字节类标签打头，码 1 27、码 2 / 3 25；
     // 指针与头同 `class_reuse`（类标签由查找路径与单元头给出）；槽里的 key 带自己的类标签，不假设能复用五元组那 1 字节单元类型标签。
     Arm { name: "class_reuse_tagged", data_pointer_extra_bytes: 26, node_pointer_extra_bytes: 24, code1_header_extra_bytes: 0, code23_header_extra_bytes: 4, code1_key_bytes: 27, code23_key_bytes: Some(25), root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 9, slot_extra_over_five_tuple_bytes: 19 },
     // 第三轮反推腿的混合路（同样带类标签）：码 1 取逻辑身份 + 写序键的 51（五元组本来就以 1 字节单元类型标签打头），码 2 / 3 取收严后的 25。
@@ -338,7 +338,7 @@ mod tests {
         }
     }
 
-    /// 判据 3：映射叶扇出在 key 33 与 41 上复现 E109 / D27 已定项 6 的 267 与 D19 未定项 6 的 236。
+    /// 判据 3：映射叶扇出在 key 33 与 41 上复现 E109 / D27 已定项 6 的 267 与 D19 已定项 6 的 236。
     #[test]
     fn map_leaf_fanout_matches_e109_and_the_first_round_numbers() {
         assert_eq!(map_leaf_fanout(33), 267);
