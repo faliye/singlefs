@@ -38,12 +38,29 @@ else
   fi
 fi
 
-BAK="$(mktemp)"; cp "$SRC" "$BAK"
-restore() { cp "$BAK" "$SRC"; }
-trap restore EXIT
+# ⚠️ **变异只改副本，不碰工作区里的源文件**（2026-09-12 改）。此前是就地改 $SRC 再还原：一轮变异要几分钟，
+# 这几分钟里仓里那份源码是坏的——几个会话共写一个仓时，别的会话此刻跑门禁（15 号阶段会编译并跑 research 的全部单测）
+# 就编到被改坏的源码，红得莫名其妙、还可能当成自己改坏的；此刻有人整份提交这个文件，提交进去的就是变异。
+# ⇒ 把 research/ 里编译要用的部分（workspace、crate 源码、include_str! 读的 results/、data/）拷到临时目录，
+#   在那里改、在那里编；CARGO_TARGET_DIR 单独一份，不碰 research/target 里别人要用的二进制。跑完删掉副本。
+if [[ ! -f Cargo.toml ]] || ! grep -q '^\[workspace\]' Cargo.toml; then
+  echo "mutate: 要在 research/ 下跑（那里才有 workspace 的 Cargo.toml）" >&2; exit 2
+fi
+WORK="$(mktemp -d)"
+if ! rsync -a --exclude target --exclude prompts --exclude mutations --exclude scripts ./ "$WORK/"; then
+  echo "mutate: 拷副本失败" >&2; rm -rf "${WORK:?}"; exit 2
+fi
+WORK_SRC="$WORK/$SRC"
+MUTATE_TARGET="${MUTATE_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-mutate-target}"
+ORIGINAL_SUM="$(sha256sum "$SRC" | cut -d' ' -f1)"
+BAK="$(mktemp)"; cp "$WORK_SRC" "$BAK"
+restore() { cp "$BAK" "$WORK_SRC"; }
+cleanup() { rm -rf "${WORK:?}" "${BAK:?}"; }
+trap cleanup EXIT
+run_tests() { ( cd "$WORK" && CARGO_TARGET_DIR="$MUTATE_TARGET" cargo test --release --bin "$BIN" ); }
 
 # 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红
-if ! cargo test --release --bin "$BIN" >/dev/null 2>&1; then
+if ! run_tests >/dev/null 2>&1; then
   echo "mutate: 基线就是红的，先修好再来" >&2; exit 2
 fi
 echo "基线：全绿"
@@ -52,7 +69,7 @@ fail=0
 while IFS=$'\t' read -r name from to; do
   [[ -z "${name:-}" || "${name:0:1}" == "#" ]] && continue
   restore
-  NAME="$name" FROM="$from" TO="$to" SRC="$SRC" python3 - <<'PY' || { echo "mutate: [$name] 替换没命中，证明作废" >&2; exit 3; }
+  NAME="$name" FROM="$from" TO="$to" SRC="$WORK_SRC" python3 - <<'PY' || { echo "mutate: [$name] 替换没命中，证明作废" >&2; exit 3; }
 import os,sys
 src=os.environ["SRC"]; s=open(src).read()
 f=os.environ["FROM"].replace("\\n","\n"); t=os.environ["TO"].replace("\\n","\n")
@@ -67,7 +84,7 @@ PY
   # 实测踩过（2026-09-01，E73）：`tree_height` 的循环无界，变异把扇出下界的 guard 改松之后
   # 扇出为 1 时 `cap` 不增长，整轮挂死，只能靠 `kill` 收场。
   # ⇒ 每条变异单独限时。默认 120 秒——本仓最慢的单测不到 1 秒，撞到它就是真挂了。
-  out="$(timeout "${MUTATE_TIMEOUT:-120}" cargo test --release --bin "$BIN" 2>&1)"
+  out="$(cd "$WORK" && CARGO_TARGET_DIR="$MUTATE_TARGET" timeout "${MUTATE_TIMEOUT:-120}" cargo test --release --bin "$BIN" 2>&1)"
   if [[ $? -eq 124 ]]; then
     echo "⏱  [$name] ${MUTATE_TIMEOUT:-120} 秒没跑完 —— 这条破坏让被测代码不终止了，不是「没抓到」"
     fail=1
@@ -119,6 +136,11 @@ PY
 done < "$TABLE"
 
 restore
-cargo test --release --bin "$BIN" >/dev/null 2>&1 || { echo "mutate: 还原后没回到全绿" >&2; exit 4; }
+run_tests >/dev/null 2>&1 || { echo "mutate: 还原后没回到全绿" >&2; exit 4; }
 echo "已还原，基线仍全绿"
+# 这一轮量的是开跑时那一份源码：跑的这几分钟里有人改了工作区里的原件，结果就不算数，要重跑。
+if [[ "$(sha256sum "$SRC" | cut -d' ' -f1)" != "$ORIGINAL_SUM" ]]; then
+  echo "mutate: $SRC 在这一轮变异跑的时候被改过；上面的结果量的是开跑时那一份，改完之后重跑" >&2
+  exit 5
+fi
 exit $fail

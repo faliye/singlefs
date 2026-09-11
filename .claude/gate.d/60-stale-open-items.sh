@@ -16,6 +16,7 @@
 # 判别力在一次性合成仓里双向证过：D2 后定而 D22 的项没动 ⇒ rc=1；
 # 把那条项改写成「已定」之后 ⇒ rc=0。
 set -uo pipefail
+REVIEW_LIB="$(cd "$(dirname "$0")" && pwd)/lib-open-item-review.py"
 DEC=.claude/kb/decisions
 [[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 0; }
@@ -56,34 +57,27 @@ for f in "$DEC"/*.md; do
     # 这是假红，而假红压倒真红的检查等于没有检查
     # （`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
     # 判别力：改前在「工作区有未提交改动且条目上方插过行」时必红，改后转绿。
-    hln=$(git show "HEAD:$f" 2>/dev/null | grep -nxF "$text" | head -1 | cut -d: -f1)
-    if [[ -z "$hln" ]]; then
-      # HEAD 里找不到这一行 = 本条目是新加的或刚改过 ⇒ 它比任何决策都新，无从陈旧
-      continue
-    fi
-    end=$(git show "HEAD:$f" 2>/dev/null | awk -v s="$hln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}')
-    [[ -n "$end" ]] || end=$((hln+20))
-    # ⚠️ **未提交的复核也算复核。** 只看提交历史时，刚写下的复核看不见，
-    # 条目会一直红到提交为止——而复核恰恰是这道闸要的那个动作。
-    # ⇒ 条目块在工作区与 HEAD 之间有任何差异，就说明它刚被动过，不算陈旧。
-    wend=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}' "$f")
-    [[ -n "$wend" ]] || wend=$((ln+20))
-    if ! diff -q <(sed -n "${ln},${wend}p" "$f") \
-                 <(git show "HEAD:$f" 2>/dev/null | sed -n "${hln},${end}p") >/dev/null 2>&1; then
-      continue
-    fi
-    it=$(git log -1 --format=%ct -L "$hln,$end:$f" 2>/dev/null | head -1)
-    [[ -n "$it" ]] || continue
-    # 它点名的其它决策
-    for d in $(grep -oE 'D[0-9]+' <<<"$text" | sort -u); do
+    # ⚠️ **「条目块动过」不等于「复核过」**（2026-09-12 改）：此前拿条目块最后一次改动的时间当复核时间，
+    # 于是**任何**一次改动都能把红消掉——2026-09-11 往 D19 未定项 6 那一格补性能数（与 D16 无关），
+    # 它对 D16 状态变动的那一红就这样没了，D16 那两句还成不成立是事后手核的，门禁没逼。
+    # ⇒ 复核时间按「被点名的那条决策」逐条算：条目块历史里最近一次让它的点名次数变多的那次提交
+    #   （条目诞生那次也算）；工作区里条目块比 HEAD 多点了它一次，算刚复核过。
+    #   复核写一句「（YYYY-MM-DD 复核 Dn：……）」就满足；改别的地方不算。判据住在 lib-open-item-review.py。
+    deps=()
+    # ⚠️ D 编号前面要是非字母数字：「RAID5」里的「D5」不是在点名 D5（实测：D2 未定项 15 因此被报成依赖 D5，
+    # 改判据之前那一红被任何一次改动顺手消掉，改判据之后永远复核不掉）。
+    for d in $(grep -oE '(^|[^A-Za-z0-9])D[0-9]+' <<<"$text" | grep -oE 'D[0-9]+' | sort -u); do
       [[ "$d" == "$self" ]] && continue
       dt=${st_time[$d]:-0}
-      if (( dt > it )); then
-        echo "  ✗ $(basename "$f"):$ln 的未定项点名了 $d，而 $d 的状态行在它之后变过"
-        echo "     ⇒ 复核这一项是不是已经被 $d 定掉了。原文：${text:0:60}"
-        flagged=1
-      fi
+      (( dt > 0 )) && deps+=("$d:$dt")
     done
+    (( ${#deps[@]} > 0 )) || continue
+    while IFS= read -r d; do
+      [[ -n "$d" ]] || continue
+      echo "  ✗ $(basename "$f"):$ln 的未定项点名了 $d，而 $d 的状态行在它之后变过"
+      echo "     ⇒ 复核这一项是不是已经被 $d 定掉了；复核完在这一条里写一句点名 $d 的复核记录。原文：${text:0:60}"
+      flagged=1
+    done < <(python3 "$REVIEW_LIB" "$f" "$ln" "${deps[@]}")
   # ⚠️ **列表式未定项的行内不含「未定」二字**——那两个字在小节标题上。
   # 第一版按行内关键字过滤，把 D22 那三条陈旧项全滤掉了，于是检查恒绿。
   # 改成：取「### 未定项」小节内的条目行，再排掉已经标了「已定」的。

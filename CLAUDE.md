@@ -71,6 +71,8 @@
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
 | `research/scripts/stage-mine.py` | 几个会话共写一批文件时只暂存这一轮的块：插入段按标题行、表格行、replay 登记行切块，命中 `--match` 的进暂存区、其余留在工作区，进暂存区的块命中 `--foreign` 就拒绝；`--selftest` 自证会红 |
 | `research/scripts/check-staged.sh` | 在临时 worktree 上只拿「HEAD + 暂存区」跑 doc-lint 与快的 kb 阶段，别的会话没收尾的改动与未跟踪文件都不进来；`--selftest` 自证会红 |
+| `research/scripts/relabel-item.py` | 分项翻了状态之后按 22 号门禁的归属规则改写全仓引用（`D19 6 --dry-run` 先看），改完标签仍说它没定的句子列成「要人看」；`--selftest` 自证会红 |
+| `research/scripts/claim-experiment.sh` | 取实验号并当场占住：查号与建跑前登记在同一步，建文件用排他方式；`--next` 打印下一个空号；`--selftest` 自证会红 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
 
@@ -115,6 +117,8 @@ bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过
 bash .claude/gate.d/41-pipefail-grepq.sh  # pipefail 下用 grep -q 收尾的管道（命中会被读成没命中）
 bash .claude/gate.d/42-first-txn-trio.sh   # 第一个事务的三份文件互相挂钩：字节表 / 里程碑 / 决策索引里判「是」的未定项
 bash .claude/gate.d/43-owed-table-shape.sh  # 欠账表两张登记表的行形状：已还清那张不许混进六列的欠账行
+bash .claude/gate.d/44-settled-ref-says-open.sh # 引用写着「已定项」，紧跟着却说它没定（归属与 22 号同一份库）
+bash .claude/gate.d/45-script-modes.sh     # 脚本的执行位在暂存区里没丢（手工暂存写死 100644 的那一型）
 bash .claude/gate.d/46-write-hook.sh     # Write 覆盖未跟踪文件的 hook 注册着、而且会拒绝（几个会话共写一个仓）
 bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自证还会红（ask-local 判红分支、清单生成取法、机械整抄、小节清单）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等

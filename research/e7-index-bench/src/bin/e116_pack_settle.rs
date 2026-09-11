@@ -27,9 +27,9 @@
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
 //!
-//! - `SLOT_TABLE_ENTRY = 4`：槽表每条几字节，**全仓无出处**，D27 已定项 3 未定。
-//! - `LIVE_COUNT_ENTRY = 16`：每容器活槽计数条目，**D27 已定项 5 未定**。
-//! - `JOURNAL_PER_MOVE`：搬一个对象记不记 journal，**D27 已定项 6 未定**；两种都跑。
+//! - `SLOT_TABLE_ENTRY = 4`：槽表每条几字节，写这份装置时**全仓无出处**、D27 第 3 项还没定（今天是已定项 3）。
+//! - `LIVE_COUNT_ENTRY = 16`：每容器活槽计数条目，**写这份装置时 D27 第 5 项还没定**（今天是已定项 5：不设活槽计数）。
+//! - `JOURNAL_PER_MOVE`：搬一个对象记不记 journal，**写这份装置时 D27 第 6 项还没定**（今天是已定项 6）；两种都跑。
 //!
 //! ## 四条臂（失败条款逐条点名，覆盖每一条 —— C186）
 //!
@@ -85,7 +85,7 @@ const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度
 const JOURNAL_HDR: u64 = 78; // D23（journal 的角色与格式），登记名 JOURNAL_HDR
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
-const SLOT_TABLE_ENTRY: u64 = 4; // 假设：D27 已定项 3 未定
+const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
 const WRITE_SEQ: u64 = 10; // D18 已定项 7 写序
 const SLOT_EXTRA: u64 = MAP_KEY + WRITE_SEQ + SLOT_TABLE_ENTRY; // 47
 

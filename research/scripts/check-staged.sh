@@ -11,7 +11,7 @@
 # 再用 CHECK_STAGED_USE_WORKTREE=1 改成拿工作区原样去跑，确认没暂存的 BAD 也被算进来、selftest 判红。
 set -uo pipefail
 
-DEFAULT_STAGES=(doc 10 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 42 43 50 60 61 85 86)
+DEFAULT_STAGES=(doc 10 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 42 43 44 45 50 60 61 85 86)
 
 run_isolated() {
   local repo="$1"; shift

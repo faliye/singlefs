@@ -64,3 +64,21 @@ if [[ -f "$CHECK_STAGED" ]]; then
   fi
   echo "  ✓ check-staged.sh $(tail -1 <<<"$out")"
 fi
+RELABEL="$R/scripts/relabel-item.py"
+if [[ -f "$RELABEL" ]]; then
+  if ! out="$(python3 "$RELABEL" --selftest 2>&1)"; then
+    echo "$out" | sed 's/^/  /'
+    echo "     → 怎么办：relabel-item.py 改写之后 22 号的库复判不过，修它的归属或改写再跑。"
+    exit 1
+  fi
+  echo "  ✓ relabel-item.py $(tail -1 <<<"$out")"
+fi
+CLAIM="$R/scripts/claim-experiment.sh"
+if [[ -f "$CLAIM" ]]; then
+  if ! out="$(bash "$CLAIM" --selftest 2>&1)"; then
+    echo "$out" | sed 's/^/  /'
+    echo "     → 怎么办：claim-experiment.sh 放过了已用的号、或同一个号占了两次，修 used_numbers / claim 再跑。"
+    exit 1
+  fi
+  echo "  ✓ claim-experiment.sh $(tail -1 <<<"$out")"
+fi
