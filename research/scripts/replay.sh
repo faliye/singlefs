@@ -147,6 +147,7 @@ E133|e133_map_key_format_cost||e133-map-key-format-cost-2026-09-11.out|exact
 E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exact
 E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
+E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
 TSV
 )
 

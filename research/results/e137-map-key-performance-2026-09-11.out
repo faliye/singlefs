@@ -1,0 +1,388 @@
+E137 映射 key 形态的性能差距：每次 fsync 写几块、每次读几次 I/O
+判据写死在 research/prompts/e137-preregistration.md（写于本装置之前，补记在第一次运行之前）；只报数、不判输赢
+镜像：4096 文件 × 256 单元，16 条流轮流追加，每 64 次写一次 checkpoint；每条负载写 20000 次；种子 1 / 2 / 3
+—— 配置 all：镜像
+E7RESULT name=image config=all arm=k1_seq map_leaf_capacity=206 map_internal_fanout=129 extent_leaf_capacity=122 extent_internal_fanout=164 map_leaves=8342 extent_leaves=15642 total_nodes=24147
+E7RESULT name=image config=all arm=k1_seq_class_reuse map_leaf_capacity=206 map_internal_fanout=121 extent_leaf_capacity=122 extent_internal_fanout=152 map_leaves=8275 extent_leaves=15642 total_nodes=24091
+E7RESULT name=image config=all arm=class_reuse_tagged map_leaf_capacity=296 map_internal_fanout=148 extent_leaf_capacity=149 extent_internal_fanout=152 map_leaves=7128 extent_leaves=12032 total_nodes=19291
+—— 配置 all：每次 fsync 写几块（平均，含 1 根槽 + 1 记录）
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=seq_append batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+E7RESULT name=fsync config=all workload=seq_append batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.785 map_internal=3.002 blocks=10.803
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.785 map_internal=3.002 blocks=10.803
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.785 map_internal=3.002 blocks=10.803
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.010 map_internal=2.934 blocks=9.960
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.010 map_internal=2.934 blocks=9.960
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=2.010 map_internal=2.934 blocks=9.960
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=2.007 map_internal=2.230 blocks=9.250
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=2.007 map_internal=2.230 blocks=9.250
+E7RESULT name=fsync config=all workload=multistream_append batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=2.007 map_internal=2.230 blocks=9.250
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=12.439 map_internal=3.625 blocks=30.921
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=12.439 map_internal=3.625 blocks=30.921
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=12.439 map_internal=3.625 blocks=30.921
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=10.153 extent_internal=3.169 map_leaves=11.098 map_internal=3.575 blocks=29.995
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=10.153 extent_internal=3.169 map_leaves=11.098 map_internal=3.575 blocks=29.995
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=10.153 extent_internal=3.169 map_leaves=11.098 map_internal=3.575 blocks=29.995
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=10.126 extent_internal=3.089 map_leaves=2.069 map_internal=2.230 blocks=19.515
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=10.126 extent_internal=3.089 map_leaves=2.069 map_internal=2.230 blocks=19.515
+E7RESULT name=fsync config=all workload=multistream_append batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=10.126 extent_internal=3.089 map_leaves=2.069 map_internal=2.230 blocks=19.515
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.000 map_internal=3.000 blocks=11.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.000 map_internal=4.000 blocks=12.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.000 map_internal=4.000 blocks=12.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.000 map_internal=3.000 blocks=10.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.000 map_internal=3.000 blocks=10.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.000 map_internal=3.000 blocks=10.000
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.532 map_internal=2.288 blocks=9.820
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.529 map_internal=2.295 blocks=9.825
+E7RESULT name=fsync config=all workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.518 map_internal=2.299 blocks=9.817
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=3.878 extent_internal=2.000 map_leaves=4.389 map_internal=3.000 blocks=15.267
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=3.886 extent_internal=2.000 map_leaves=5.160 map_internal=4.000 blocks=17.046
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=4.262 extent_internal=2.000 map_leaves=4.848 map_internal=4.000 blocks=17.111
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=3.878 extent_internal=2.000 map_leaves=3.888 map_internal=3.000 blocks=14.766
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=3.886 extent_internal=2.000 map_leaves=3.063 map_internal=3.001 blocks=13.950
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=4.262 extent_internal=2.000 map_leaves=3.572 map_internal=3.000 blocks=14.835
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=3.215 extent_internal=2.000 map_leaves=4.253 map_internal=2.337 blocks=13.805
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=3.206 extent_internal=2.000 map_leaves=4.257 map_internal=2.342 blocks=13.806
+E7RESULT name=fsync config=all workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=3.273 extent_internal=2.000 map_leaves=4.202 map_internal=2.346 blocks=13.822
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.995 map_internal=3.416 blocks=11.411
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.993 map_internal=3.410 blocks=11.404
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.995 map_internal=3.417 blocks=11.412
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.557 map_internal=3.526 blocks=12.084
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.554 map_internal=3.529 blocks=12.083
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=3.555 map_internal=3.530 blocks=12.085
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=4.320 map_internal=3.581 blocks=12.902
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=4.318 map_internal=3.580 blocks=12.899
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=4.320 map_internal=3.581 blocks=12.901
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=9.998 extent_internal=10.571 map_leaves=20.673 map_internal=12.267 blocks=55.511
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=9.997 extent_internal=10.556 map_leaves=20.656 map_internal=12.261 blocks=55.470
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=9.997 extent_internal=10.531 map_leaves=20.639 map_internal=12.240 blocks=55.408
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=9.998 extent_internal=10.601 map_leaves=22.524 map_internal=12.685 blocks=57.809
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=9.997 extent_internal=10.581 map_leaves=22.534 map_internal=12.698 blocks=57.810
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=9.997 extent_internal=10.544 map_leaves=22.510 map_internal=12.680 blocks=57.732
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=9.999 extent_internal=10.474 map_leaves=22.189 map_internal=11.653 blocks=56.316
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=9.995 extent_internal=10.483 map_leaves=22.197 map_internal=11.652 blocks=56.328
+E7RESULT name=fsync config=all workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=9.996 extent_internal=10.442 map_leaves=22.228 map_internal=11.605 blocks=56.273
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=3.000 blocks=10.009
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.009 map_internal=2.615 blocks=9.624
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=2.006 map_internal=2.223 blocks=9.229
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.098 map_internal=3.001 blocks=10.164
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=2.097 map_internal=2.616 blocks=9.778
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+E7RESULT name=fsync config=all workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=2.067 map_internal=2.223 blocks=9.351
+—— 配置 all：后台负载，按每个单元摊的映射树块数
+E7RESULT name=background config=all workload=file_delete arm=k1_seq seed=1 units=65536 checkpoints=256 map_leaves=1276 map_internal=895 extent_leaves=1216 map_blocks_per_unit=0.033
+E7RESULT name=background config=all workload=file_delete arm=k1_seq seed=2 units=65536 checkpoints=256 map_leaves=1282 map_internal=875 extent_leaves=1206 map_blocks_per_unit=0.032
+E7RESULT name=background config=all workload=file_delete arm=k1_seq seed=3 units=65536 checkpoints=256 map_leaves=1280 map_internal=866 extent_leaves=1227 map_blocks_per_unit=0.032
+E7RESULT name=background config=all workload=file_delete arm=k1_seq_class_reuse seed=1 units=65536 checkpoints=256 map_leaves=1506 map_internal=902 extent_leaves=1216 map_blocks_per_unit=0.036
+E7RESULT name=background config=all workload=file_delete arm=k1_seq_class_reuse seed=2 units=65536 checkpoints=256 map_leaves=1513 map_internal=884 extent_leaves=1206 map_blocks_per_unit=0.036
+E7RESULT name=background config=all workload=file_delete arm=k1_seq_class_reuse seed=3 units=65536 checkpoints=256 map_leaves=1515 map_internal=872 extent_leaves=1227 map_blocks_per_unit=0.036
+E7RESULT name=background config=all workload=file_delete arm=class_reuse_tagged seed=1 units=65536 checkpoints=256 map_leaves=7993 map_internal=950 extent_leaves=1003 map_blocks_per_unit=0.136
+E7RESULT name=background config=all workload=file_delete arm=class_reuse_tagged seed=2 units=65536 checkpoints=256 map_leaves=7979 map_internal=929 extent_leaves=1003 map_blocks_per_unit=0.135
+E7RESULT name=background config=all workload=file_delete arm=class_reuse_tagged seed=3 units=65536 checkpoints=256 map_leaves=8014 map_internal=913 extent_leaves=1003 map_blocks_per_unit=0.136
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq seed=1 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq seed=2 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq seed=3 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq_class_reuse seed=1 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq_class_reuse seed=2 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=k1_seq_class_reuse seed=3 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=all workload=snapshot_delete arm=class_reuse_tagged seed=1 units=256 checkpoints=1 map_leaves=28 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.117
+E7RESULT name=background config=all workload=snapshot_delete arm=class_reuse_tagged seed=2 units=256 checkpoints=1 map_leaves=28 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.117
+E7RESULT name=background config=all workload=snapshot_delete arm=class_reuse_tagged seed=3 units=256 checkpoints=1 map_leaves=29 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.121
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq seed=1 units=19789 checkpoints=78 map_leaves=7895 map_internal=233 extent_leaves=0 map_blocks_per_unit=0.410
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq seed=2 units=19810 checkpoints=78 map_leaves=7958 map_internal=240 extent_leaves=0 map_blocks_per_unit=0.413
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq seed=3 units=19812 checkpoints=78 map_leaves=7947 map_internal=236 extent_leaves=0 map_blocks_per_unit=0.413
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq_class_reuse seed=1 units=19789 checkpoints=78 map_leaves=7913 map_internal=236 extent_leaves=0 map_blocks_per_unit=0.411
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq_class_reuse seed=2 units=19810 checkpoints=78 map_leaves=7918 map_internal=240 extent_leaves=0 map_blocks_per_unit=0.411
+E7RESULT name=background config=all workload=snapshot_delete_global arm=k1_seq_class_reuse seed=3 units=19812 checkpoints=78 map_leaves=7952 map_internal=241 extent_leaves=0 map_blocks_per_unit=0.413
+E7RESULT name=background config=all workload=snapshot_delete_global arm=class_reuse_tagged seed=1 units=19789 checkpoints=78 map_leaves=6760 map_internal=203 extent_leaves=0 map_blocks_per_unit=0.351
+E7RESULT name=background config=all workload=snapshot_delete_global arm=class_reuse_tagged seed=2 units=19810 checkpoints=78 map_leaves=6745 map_internal=203 extent_leaves=0 map_blocks_per_unit=0.350
+E7RESULT name=background config=all workload=snapshot_delete_global arm=class_reuse_tagged seed=3 units=19812 checkpoints=78 map_leaves=6727 map_internal=203 extent_leaves=0 map_blocks_per_unit=0.349
+E7RESULT name=background config=all workload=relocation arm=k1_seq seed=1 units=20000 checkpoints=79 map_leaves=1494 map_internal=189 extent_leaves=0 map_blocks_per_unit=0.084
+E7RESULT name=background config=all workload=relocation arm=k1_seq seed=2 units=20000 checkpoints=79 map_leaves=1493 map_internal=177 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=all workload=relocation arm=k1_seq seed=3 units=20000 checkpoints=79 map_leaves=1427 map_internal=182 extent_leaves=0 map_blocks_per_unit=0.080
+E7RESULT name=background config=all workload=relocation arm=k1_seq_class_reuse seed=1 units=20000 checkpoints=79 map_leaves=1483 map_internal=163 extent_leaves=0 map_blocks_per_unit=0.082
+E7RESULT name=background config=all workload=relocation arm=k1_seq_class_reuse seed=2 units=20000 checkpoints=79 map_leaves=1483 map_internal=177 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=all workload=relocation arm=k1_seq_class_reuse seed=3 units=20000 checkpoints=79 map_leaves=1432 map_internal=182 extent_leaves=0 map_blocks_per_unit=0.080
+E7RESULT name=background config=all workload=relocation arm=class_reuse_tagged seed=1 units=20000 checkpoints=79 map_leaves=214 map_internal=159 extent_leaves=0 map_blocks_per_unit=0.018
+E7RESULT name=background config=all workload=relocation arm=class_reuse_tagged seed=2 units=20000 checkpoints=79 map_leaves=214 map_internal=159 extent_leaves=0 map_blocks_per_unit=0.018
+E7RESULT name=background config=all workload=relocation arm=class_reuse_tagged seed=3 units=20000 checkpoints=79 map_leaves=214 map_internal=159 extent_leaves=0 map_blocks_per_unit=0.018
+—— 配置 all：均匀随机读，每次读的节点未命中数（缓存容量取逻辑身份 + 写序键同配置两棵树节点总数的千分比）
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=190 seed=1 reads=100000 misses=105365 misses_per_read=1.053
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=190 seed=2 reads=100000 misses=105653 misses_per_read=1.056
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=190 seed=3 reads=100000 misses=105734 misses_per_read=1.057
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=190 seed=1 reads=100000 misses=105490 misses_per_read=1.054
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=190 seed=2 reads=100000 misses=105755 misses_per_read=1.057
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=190 seed=3 reads=100000 misses=105798 misses_per_read=1.057
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=190 seed=1 reads=100000 misses=101393 misses_per_read=1.013
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=190 seed=2 reads=100000 misses=101617 misses_per_read=1.016
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=190 seed=3 reads=100000 misses=101625 misses_per_read=1.016
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=370 seed=1 reads=100000 misses=122804 misses_per_read=1.228
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=370 seed=2 reads=100000 misses=123309 misses_per_read=1.233
+E7RESULT name=read config=all arm=k1_seq cache_permille=100 cache_nodes=2414 stale_permille=370 seed=3 reads=100000 misses=123339 misses_per_read=1.233
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=370 seed=1 reads=100000 misses=122889 misses_per_read=1.228
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=370 seed=2 reads=100000 misses=123379 misses_per_read=1.233
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2414 stale_permille=370 seed=3 reads=100000 misses=123404 misses_per_read=1.234
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=370 seed=1 reads=100000 misses=119173 misses_per_read=1.191
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=370 seed=2 reads=100000 misses=119619 misses_per_read=1.196
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=100 cache_nodes=2414 stale_permille=370 seed=3 reads=100000 misses=119572 misses_per_read=1.195
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=190 seed=1 reads=100000 misses=77503 misses_per_read=0.775
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=190 seed=2 reads=100000 misses=77381 misses_per_read=0.773
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=190 seed=3 reads=100000 misses=77704 misses_per_read=0.777
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=190 seed=1 reads=100000 misses=77625 misses_per_read=0.776
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=190 seed=2 reads=100000 misses=77497 misses_per_read=0.774
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=190 seed=3 reads=100000 misses=77767 misses_per_read=0.777
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=190 seed=1 reads=100000 misses=66130 misses_per_read=0.661
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=190 seed=2 reads=100000 misses=66178 misses_per_read=0.661
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=190 seed=3 reads=100000 misses=66142 misses_per_read=0.661
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=370 seed=1 reads=100000 misses=93814 misses_per_read=0.938
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=370 seed=2 reads=100000 misses=93936 misses_per_read=0.939
+E7RESULT name=read config=all arm=k1_seq cache_permille=300 cache_nodes=7244 stale_permille=370 seed=3 reads=100000 misses=94134 misses_per_read=0.941
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=370 seed=1 reads=100000 misses=94002 misses_per_read=0.940
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=370 seed=2 reads=100000 misses=94036 misses_per_read=0.940
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7244 stale_permille=370 seed=3 reads=100000 misses=94229 misses_per_read=0.942
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=370 seed=1 reads=100000 misses=82851 misses_per_read=0.828
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=370 seed=2 reads=100000 misses=83196 misses_per_read=0.831
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=300 cache_nodes=7244 stale_permille=370 seed=3 reads=100000 misses=83277 misses_per_read=0.832
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=190 seed=1 reads=100000 misses=38448 misses_per_read=0.384
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=190 seed=2 reads=100000 misses=38331 misses_per_read=0.383
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=190 seed=3 reads=100000 misses=38602 misses_per_read=0.386
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=190 seed=1 reads=100000 misses=38619 misses_per_read=0.386
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=190 seed=2 reads=100000 misses=38500 misses_per_read=0.385
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=190 seed=3 reads=100000 misses=38691 misses_per_read=0.386
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=190 seed=1 reads=100000 misses=19490 misses_per_read=0.194
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=190 seed=2 reads=100000 misses=19698 misses_per_read=0.196
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=190 seed=3 reads=100000 misses=19653 misses_per_read=0.196
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=370 seed=1 reads=100000 misses=51396 misses_per_read=0.513
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=370 seed=2 reads=100000 misses=51455 misses_per_read=0.514
+E7RESULT name=read config=all arm=k1_seq cache_permille=600 cache_nodes=14488 stale_permille=370 seed=3 reads=100000 misses=51564 misses_per_read=0.515
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=370 seed=1 reads=100000 misses=51635 misses_per_read=0.516
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=370 seed=2 reads=100000 misses=51479 misses_per_read=0.514
+E7RESULT name=read config=all arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14488 stale_permille=370 seed=3 reads=100000 misses=51653 misses_per_read=0.516
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=370 seed=1 reads=100000 misses=30792 misses_per_read=0.307
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=370 seed=2 reads=100000 misses=30980 misses_per_read=0.309
+E7RESULT name=read config=all arm=class_reuse_tagged cache_permille=600 cache_nodes=14488 stale_permille=370 seed=3 reads=100000 misses=30806 misses_per_read=0.308
+—— 配置 all：阳性对照（缓存装得下全部节点 ⇒ 热身后 0 未命中；缓存 1 个节点 ⇒ 未命中数 = 走过的节点数）
+E7RESULT name=positive_control config=all arm=k1_seq all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+E7RESULT name=positive_control config=all arm=k1_seq_class_reuse all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+E7RESULT name=positive_control config=all arm=class_reuse_tagged all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+—— 配置 code1_only：镜像
+E7RESULT name=image config=code1_only arm=k1_seq map_leaf_capacity=206 map_internal_fanout=129 extent_leaf_capacity=122 extent_internal_fanout=164 map_leaves=8445 extent_leaves=15642 total_nodes=24251
+E7RESULT name=image config=code1_only arm=k1_seq_class_reuse map_leaf_capacity=206 map_internal_fanout=129 extent_leaf_capacity=122 extent_internal_fanout=164 map_leaves=8445 extent_leaves=15642 total_nodes=24251
+E7RESULT name=image config=code1_only arm=class_reuse_tagged map_leaf_capacity=296 map_internal_fanout=159 extent_leaf_capacity=149 extent_internal_fanout=164 map_leaves=3543 extent_leaves=12032 total_nodes=15674
+—— 配置 code1_only：每次 fsync 写几块（平均，含 1 根槽 + 1 记录）
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+E7RESULT name=fsync config=code1_only workload=seq_append batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.015 extent_internal=2.000 map_leaves=1.009 map_internal=2.000 blocks=8.024
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.012
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.012
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.012 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.012
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=10.153 extent_internal=2.703 map_leaves=10.090 map_internal=2.555 blocks=27.501
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=10.126 extent_internal=2.529 map_leaves=1.027 map_internal=2.000 blocks=17.683
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=10.126 extent_internal=2.529 map_leaves=1.027 map_internal=2.000 blocks=17.683
+E7RESULT name=fsync config=code1_only workload=multistream_append batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=10.126 extent_internal=2.529 map_leaves=1.027 map_internal=2.000 blocks=17.683
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.020 map_internal=2.012 blocks=8.033
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.020 map_internal=2.012 blocks=8.033
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.020 map_internal=2.012 blocks=8.033
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=3.878 extent_internal=2.000 map_leaves=2.624 map_internal=2.000 blocks=12.502
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=3.886 extent_internal=2.000 map_leaves=2.326 map_internal=2.000 blocks=12.212
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=4.262 extent_internal=2.000 map_leaves=2.443 map_internal=2.000 blocks=12.705
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=3.878 extent_internal=2.000 map_leaves=2.624 map_internal=2.000 blocks=12.502
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=3.886 extent_internal=2.000 map_leaves=2.326 map_internal=2.000 blocks=12.212
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=4.262 extent_internal=2.000 map_leaves=2.443 map_internal=2.000 blocks=12.705
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=3.215 extent_internal=2.000 map_leaves=1.142 map_internal=2.039 blocks=10.396
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=3.206 extent_internal=2.000 map_leaves=1.142 map_internal=2.034 blocks=10.383
+E7RESULT name=fsync config=code1_only workload=rand_overwrite batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=3.273 extent_internal=2.000 map_leaves=1.139 map_internal=2.034 blocks=10.447
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.999 map_internal=2.978 blocks=9.978
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.999 map_internal=2.976 blocks=9.976
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.999 map_internal=2.978 blocks=9.977
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=9.998 extent_internal=10.571 map_leaves=9.998 map_internal=10.363 blocks=42.931
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=9.997 extent_internal=10.556 map_leaves=9.995 map_internal=10.377 blocks=42.925
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=9.997 extent_internal=10.531 map_leaves=9.997 map_internal=10.323 blocks=42.849
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=9.998 extent_internal=10.571 map_leaves=9.998 map_internal=10.363 blocks=42.931
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=9.997 extent_internal=10.556 map_leaves=9.995 map_internal=10.377 blocks=42.925
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=9.997 extent_internal=10.531 map_leaves=9.997 map_internal=10.323 blocks=42.849
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=9.999 extent_internal=10.419 map_leaves=11.018 map_internal=10.058 blocks=43.494
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=9.995 extent_internal=10.422 map_leaves=11.018 map_internal=10.069 blocks=43.504
+E7RESULT name=fsync config=code1_only workload=rand_overwrite_global batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=9.996 extent_internal=10.415 map_leaves=11.014 map_internal=10.021 blocks=43.447
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=k1_seq_class_reuse seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=1 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=2 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=1 arm=class_reuse_tagged seed=3 fsyncs=20000 extent_leaves=1.000 extent_internal=2.000 map_leaves=1.000 map_internal=2.000 blocks=8.000
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=1 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=2 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=k1_seq_class_reuse seed=3 fsyncs=2000 extent_leaves=1.065 extent_internal=2.000 map_leaves=1.039 map_internal=2.000 blocks=8.104
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=1 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=2 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+E7RESULT name=fsync config=code1_only workload=metaheavy_create batch=10 arm=class_reuse_tagged seed=3 fsyncs=2000 extent_leaves=1.060 extent_internal=2.000 map_leaves=1.027 map_internal=2.000 blocks=8.088
+—— 配置 code1_only：后台负载，按每个单元摊的映射树块数
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq seed=1 units=65536 checkpoints=256 map_leaves=778 map_internal=513 extent_leaves=1216 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq seed=2 units=65536 checkpoints=256 map_leaves=783 map_internal=515 extent_leaves=1206 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq seed=3 units=65536 checkpoints=256 map_leaves=781 map_internal=518 extent_leaves=1227 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq_class_reuse seed=1 units=65536 checkpoints=256 map_leaves=778 map_internal=513 extent_leaves=1216 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq_class_reuse seed=2 units=65536 checkpoints=256 map_leaves=783 map_internal=515 extent_leaves=1206 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=k1_seq_class_reuse seed=3 units=65536 checkpoints=256 map_leaves=781 map_internal=518 extent_leaves=1227 map_blocks_per_unit=0.019
+E7RESULT name=background config=code1_only workload=file_delete arm=class_reuse_tagged seed=1 units=65536 checkpoints=256 map_leaves=3782 map_internal=539 extent_leaves=1003 map_blocks_per_unit=0.065
+E7RESULT name=background config=code1_only workload=file_delete arm=class_reuse_tagged seed=2 units=65536 checkpoints=256 map_leaves=3772 map_internal=542 extent_leaves=1003 map_blocks_per_unit=0.065
+E7RESULT name=background config=code1_only workload=file_delete arm=class_reuse_tagged seed=3 units=65536 checkpoints=256 map_leaves=3791 map_internal=530 extent_leaves=1003 map_blocks_per_unit=0.065
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq seed=1 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq seed=2 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq seed=3 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq_class_reuse seed=1 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq_class_reuse seed=2 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=k1_seq_class_reuse seed=3 units=256 checkpoints=1 map_leaves=5 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.027
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=class_reuse_tagged seed=1 units=256 checkpoints=1 map_leaves=14 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.062
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=class_reuse_tagged seed=2 units=256 checkpoints=1 map_leaves=15 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.066
+E7RESULT name=background config=code1_only workload=snapshot_delete arm=class_reuse_tagged seed=3 units=256 checkpoints=1 map_leaves=15 map_internal=2 extent_leaves=0 map_blocks_per_unit=0.066
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq seed=1 units=19789 checkpoints=78 map_leaves=8110 map_internal=235 extent_leaves=0 map_blocks_per_unit=0.421
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq seed=2 units=19810 checkpoints=78 map_leaves=8142 map_internal=234 extent_leaves=0 map_blocks_per_unit=0.422
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq seed=3 units=19812 checkpoints=78 map_leaves=8171 map_internal=239 extent_leaves=0 map_blocks_per_unit=0.424
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq_class_reuse seed=1 units=19789 checkpoints=78 map_leaves=8110 map_internal=235 extent_leaves=0 map_blocks_per_unit=0.421
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq_class_reuse seed=2 units=19810 checkpoints=78 map_leaves=8142 map_internal=234 extent_leaves=0 map_blocks_per_unit=0.422
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=k1_seq_class_reuse seed=3 units=19812 checkpoints=78 map_leaves=8171 map_internal=239 extent_leaves=0 map_blocks_per_unit=0.424
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=class_reuse_tagged seed=1 units=19789 checkpoints=78 map_leaves=3599 map_internal=177 extent_leaves=0 map_blocks_per_unit=0.190
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=class_reuse_tagged seed=2 units=19810 checkpoints=78 map_leaves=3596 map_internal=178 extent_leaves=0 map_blocks_per_unit=0.190
+E7RESULT name=background config=code1_only workload=snapshot_delete_global arm=class_reuse_tagged seed=3 units=19812 checkpoints=78 map_leaves=3594 map_internal=178 extent_leaves=0 map_blocks_per_unit=0.190
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq seed=1 units=20000 checkpoints=79 map_leaves=1498 map_internal=177 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq seed=2 units=20000 checkpoints=79 map_leaves=1481 map_internal=186 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq seed=3 units=20000 checkpoints=79 map_leaves=1442 map_internal=181 extent_leaves=0 map_blocks_per_unit=0.081
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq_class_reuse seed=1 units=20000 checkpoints=79 map_leaves=1498 map_internal=177 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq_class_reuse seed=2 units=20000 checkpoints=79 map_leaves=1481 map_internal=186 extent_leaves=0 map_blocks_per_unit=0.083
+E7RESULT name=background config=code1_only workload=relocation arm=k1_seq_class_reuse seed=3 units=20000 checkpoints=79 map_leaves=1442 map_internal=181 extent_leaves=0 map_blocks_per_unit=0.081
+E7RESULT name=background config=code1_only workload=relocation arm=class_reuse_tagged seed=1 units=20000 checkpoints=79 map_leaves=146 map_internal=158 extent_leaves=0 map_blocks_per_unit=0.015
+E7RESULT name=background config=code1_only workload=relocation arm=class_reuse_tagged seed=2 units=20000 checkpoints=79 map_leaves=146 map_internal=158 extent_leaves=0 map_blocks_per_unit=0.015
+E7RESULT name=background config=code1_only workload=relocation arm=class_reuse_tagged seed=3 units=20000 checkpoints=79 map_leaves=146 map_internal=158 extent_leaves=0 map_blocks_per_unit=0.015
+—— 配置 code1_only：均匀随机读，每次读的节点未命中数（缓存容量取逻辑身份 + 写序键同配置两棵树节点总数的千分比）
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=190 seed=1 reads=100000 misses=105397 misses_per_read=1.053
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=190 seed=2 reads=100000 misses=105644 misses_per_read=1.056
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=190 seed=3 reads=100000 misses=105731 misses_per_read=1.057
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=190 seed=1 reads=100000 misses=105397 misses_per_read=1.053
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=190 seed=2 reads=100000 misses=105644 misses_per_read=1.056
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=190 seed=3 reads=100000 misses=105731 misses_per_read=1.057
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=190 seed=1 reads=100000 misses=99928 misses_per_read=0.999
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=190 seed=2 reads=100000 misses=100265 misses_per_read=1.002
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=190 seed=3 reads=100000 misses=100182 misses_per_read=1.001
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=370 seed=1 reads=100000 misses=122861 misses_per_read=1.228
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=370 seed=2 reads=100000 misses=123338 misses_per_read=1.233
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=100 cache_nodes=2425 stale_permille=370 seed=3 reads=100000 misses=123417 misses_per_read=1.234
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=370 seed=1 reads=100000 misses=122861 misses_per_read=1.228
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=370 seed=2 reads=100000 misses=123338 misses_per_read=1.233
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=100 cache_nodes=2425 stale_permille=370 seed=3 reads=100000 misses=123417 misses_per_read=1.234
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=370 seed=1 reads=100000 misses=115452 misses_per_read=1.154
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=370 seed=2 reads=100000 misses=115933 misses_per_read=1.159
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=100 cache_nodes=2425 stale_permille=370 seed=3 reads=100000 misses=115857 misses_per_read=1.158
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=190 seed=1 reads=100000 misses=77512 misses_per_read=0.775
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=190 seed=2 reads=100000 misses=77397 misses_per_read=0.773
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=190 seed=3 reads=100000 misses=77634 misses_per_read=0.776
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=190 seed=1 reads=100000 misses=77512 misses_per_read=0.775
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=190 seed=2 reads=100000 misses=77397 misses_per_read=0.773
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=190 seed=3 reads=100000 misses=77634 misses_per_read=0.776
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=190 seed=1 reads=100000 misses=61621 misses_per_read=0.616
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=190 seed=2 reads=100000 misses=61723 misses_per_read=0.617
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=190 seed=3 reads=100000 misses=61689 misses_per_read=0.616
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=370 seed=1 reads=100000 misses=94056 misses_per_read=0.940
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=370 seed=2 reads=100000 misses=94067 misses_per_read=0.940
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=300 cache_nodes=7275 stale_permille=370 seed=3 reads=100000 misses=94359 misses_per_read=0.943
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=370 seed=1 reads=100000 misses=94056 misses_per_read=0.940
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=370 seed=2 reads=100000 misses=94067 misses_per_read=0.940
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=300 cache_nodes=7275 stale_permille=370 seed=3 reads=100000 misses=94359 misses_per_read=0.943
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=370 seed=1 reads=100000 misses=71934 misses_per_read=0.719
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=370 seed=2 reads=100000 misses=72211 misses_per_read=0.722
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=300 cache_nodes=7275 stale_permille=370 seed=3 reads=100000 misses=72202 misses_per_read=0.722
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=190 seed=1 reads=100000 misses=38491 misses_per_read=0.384
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=190 seed=2 reads=100000 misses=38447 misses_per_read=0.384
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=190 seed=3 reads=100000 misses=38609 misses_per_read=0.386
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=190 seed=1 reads=100000 misses=38491 misses_per_read=0.384
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=190 seed=2 reads=100000 misses=38447 misses_per_read=0.384
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=190 seed=3 reads=100000 misses=38609 misses_per_read=0.386
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=190 seed=1 reads=100000 misses=7510 misses_per_read=0.075
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=190 seed=2 reads=100000 misses=7503 misses_per_read=0.075
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=190 seed=3 reads=100000 misses=7462 misses_per_read=0.074
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=370 seed=1 reads=100000 misses=51769 misses_per_read=0.517
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=370 seed=2 reads=100000 misses=51793 misses_per_read=0.517
+E7RESULT name=read config=code1_only arm=k1_seq cache_permille=600 cache_nodes=14550 stale_permille=370 seed=3 reads=100000 misses=51979 misses_per_read=0.519
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=370 seed=1 reads=100000 misses=51769 misses_per_read=0.517
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=370 seed=2 reads=100000 misses=51793 misses_per_read=0.517
+E7RESULT name=read config=code1_only arm=k1_seq_class_reuse cache_permille=600 cache_nodes=14550 stale_permille=370 seed=3 reads=100000 misses=51979 misses_per_read=0.519
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=370 seed=1 reads=100000 misses=8941 misses_per_read=0.089
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=370 seed=2 reads=100000 misses=9187 misses_per_read=0.091
+E7RESULT name=read config=code1_only arm=class_reuse_tagged cache_permille=600 cache_nodes=14550 stale_permille=370 seed=3 reads=100000 misses=8901 misses_per_read=0.089
+—— 配置 code1_only：阳性对照（缓存装得下全部节点 ⇒ 热身后 0 未命中；缓存 1 个节点 ⇒ 未命中数 = 走过的节点数）
+E7RESULT name=positive_control config=code1_only arm=k1_seq all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+E7RESULT name=positive_control config=code1_only arm=k1_seq_class_reuse all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+E7RESULT name=positive_control config=code1_only arm=class_reuse_tagged all_cached_misses=0 one_node_cache_misses=60000 walked_nodes=60000
+—— 判别力对照：按类复用写序键的码 1 key 换成按文件的顺序（宽度不动），映射树叶数必须变
+E7RESULT name=discrimination_control multistream_map_leaves_own=2055 multistream_map_leaves_swapped=20129 file_delete_map_leaves_own=3782 file_delete_map_leaves_swapped=563
+E7RESULT name=done emitted=374

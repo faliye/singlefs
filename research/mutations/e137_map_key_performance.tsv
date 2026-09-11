@@ -1,0 +1,27 @@
+M1_最右追加也对半分	let appended_at_right_edge = is_rightmost_leaf && insertion_index + 1 == leaf_length;	let appended_at_right_edge = is_rightmost_leaf && insertion_index + 2 == leaf_length;
+M2_对半分改成切在末尾	let split_index = if appended_at_right_edge { leaf_length - 1 } else { leaf_length / 2 };	let split_index = if appended_at_right_edge { leaf_length - 1 } else { leaf_length - 1 };
+M3_对半分只报新叶	            vec![leaf_identifier, new_leaf_identifier]	            vec![new_leaf_identifier]
+M4_首键不随更小的键更新	        if key < self.first_keys[position] {	        if key < self.first_keys[position] && position > 0 {
+M5_内部层分组粗了一档	let distinct_groups: HashSet<usize> = touched_positions.iter().map(|position| position / group_size).collect();	let distinct_groups: HashSet<usize> = touched_positions.iter().map(|position| position / (group_size * internal_fanout)).collect();
+M6_根槽算0	const ROOT_SLOT_BLOCKS: u64 = 1;	const ROOT_SLOT_BLOCKS: u64 = 0;
+M7_记录算0	const JOURNAL_RECORD_BLOCKS: u64 = 1;	const JOURNAL_RECORD_BLOCKS: u64 = 0;
+M8_缓存逐出最新的	self.node_by_stamp.pop_first()	self.node_by_stamp.pop_last()
+M9_缓存容量少一个	if u64::try_from(self.stamp_by_node.len()).expect("缓存大小装得进 u64") > self.capacity {	if u64::try_from(self.stamp_by_node.len()).expect("缓存大小装得进 u64") >= self.capacity {
+M10_出生序键打头换成对象	Code1KeyOrder::BirthOrder => [CODE1_CLASS_TAG, TREE_IDENTIFIER, unit_version.birth_txg, INSTANCE_IDENTIFIER, unit_version.write_order, 0, 0],	Code1KeyOrder::BirthOrder => [CODE1_CLASS_TAG, TREE_IDENTIFIER, unit_version.object, INSTANCE_IDENTIFIER, unit_version.write_order, 0, 0],
+M11_文件序键偏移与诞生代号换位	unit_version.object_birth_txg, unit_version.offset, unit_version.birth_txg	unit_version.object_birth_txg, unit_version.birth_txg, unit_version.offset
+M12_混合路码1半取出生序	        Candidate::MixedPath => Code1KeyOrder::FileOrder,	        Candidate::MixedPath => Code1KeyOrder::BirthOrder,
+M13_混合路全部进映射时映射内部扇出取只装码1的	(Candidate::MixedPath, MapScope::AllPointers) => Geometry { map_leaf_capacity: 206, map_internal_fanout: 121,	(Candidate::MixedPath, MapScope::AllPointers) => Geometry { map_leaf_capacity: 206, map_internal_fanout: 129,
+M14_多流往新文件追加	FsyncWorkload::MultistreamAppend => (current_file_of_stream(shape, write_index % shape.stream_count), shape.units_per_file + write_index / shape.stream_count),	FsyncWorkload::MultistreamAppend => (NEW_OBJECT_BASE + 1 + write_index % shape.stream_count, write_index / shape.stream_count),
+M15_当前文件取成第一个	    stream + shape.stream_count * (files_per_stream - 1)	    stream
+M16_码2旧条目漏删	if let Some(old_key) = self.extent_node_map_keys.get(&identity).copied() {	if let Some(old_key) = self.extent_node_map_keys.get(&identity).copied().filter(|_| false) {
+M17_只装码1也刷码2条目	            MapScope::Code1Only => {}	            MapScope::Code1Only => self.refresh_extent_node_entries(),
+M18_搬迁也弄脏extent叶	        let touched_leaf = self.map.touch(&code1_map_key(self.code1_order, &version));	        let touched_leaf = self.map.touch(&code1_map_key(self.code1_order, &version));\n        self.touched_extent_leaves.insert(self.extent.touch(&[object, offset]));
+M19_千分位只留两位	format!("{}.{:03}", scaled / u128::from(PERMILLE), scaled % u128::from(PERMILLE))	format!("{}.{:02}", scaled / u128::from(PERMILLE), scaled % u128::from(PERMILLE))
+M20_过期提示也不走映射	let through_map = random.below(PERMILLE) < stale_permille;	let through_map = random.below(PERMILLE) < stale_permille.saturating_sub(PERMILLE);
+M21_总节点数漏了叶	    u64::try_from(leaf_count).expect("叶数装得进 u64") + touched_internal_node_count(&all_positions, leaf_count, internal_fanout)	    touched_internal_node_count(&all_positions, leaf_count, internal_fanout)
+M22_快照留住的判据写反	if old_version.birth_txg < snapshot_txg {	if old_version.birth_txg > snapshot_txg {
+M23_快照一个文件变全镜像	SnapshotOverwriteSpread::OneFile => Some(random.below(shape.file_count)),	SnapshotOverwriteSpread::OneFile => None,
+M24_删文件漏最后一个单元	for offset in 0..shape.units_per_file {	for offset in 0..shape.units_per_file - 1 {
+M25_搬迁跨度少一个	let chosen: Vec<(u64, u64)> = image.allocation_order[start..start + span_length].to_vec();	let chosen: Vec<(u64, u64)> = image.allocation_order[start..start + span_length - 1].to_vec();
+M26_发布后不清映射脏叶	        self.touched_map_leaves.clear();	        let _ = self.touched_map_leaves.len();
+M27_批的边界偏一	        if (write_index + 1) % batch == 0 {	        if (write_index + 1) % (batch + 1) == 0 {
