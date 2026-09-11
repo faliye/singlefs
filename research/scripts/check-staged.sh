@@ -8,10 +8,18 @@
 #
 # 规范副本 .claude/singlefs-ai-sop/ 不进 git，worktree 里没有它；有就原样拷进去，doc-lint 与链接检查才跑得起来。
 # 自证会红：--selftest 在临时仓里放一个「文件里有 BAD 就红」的阶段，确认工作区里没暂存的 BAD 不算、暂存了的 BAD 判红；
-# 再用 CHECK_STAGED_USE_WORKTREE=1 改成拿工作区原样去跑，确认没暂存的 BAD 也被算进来、selftest 判红。
+# 再用 CHECK_STAGED_USE_WORKTREE=1 改成拿工作区原样去跑，确认没暂存的 BAD 也被算进来、selftest 判红；
+# CHECK_STAGED_NO_TRAP=1 关掉打断时的清理，确认 selftest 判红（临时 worktree 留在仓里）。
 set -uo pipefail
 
 DEFAULT_STAGES=(doc 10 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 42 43 44 45 50 60 61 85 86)
+
+# 跑到一半被打断（Ctrl-C）或被杀时也要删掉临时 worktree：留下的会一直登记在仓里，下一次还得手工 git worktree prune。
+cleanup_isolated() {
+  if [[ -n "${ISOLATED_WORKTREE:-}" ]]; then git -C "$ISOLATED_REPO" worktree remove --force "$ISOLATED_WORKTREE" >/dev/null 2>&1; fi
+  if [[ -n "${ISOLATED_BASE:-}" ]]; then rm -rf "${ISOLATED_BASE:?}"; fi
+  ISOLATED_WORKTREE=""; ISOLATED_BASE=""
+}
 
 run_isolated() {
   local repo="$1"; shift
@@ -20,12 +28,17 @@ run_isolated() {
   base="$(mktemp -d)"; wt="$base/wt"; patch="$base/staged.patch"
   git -C "$repo" diff --cached --binary > "$patch" || { echo "  ✗ 取不到暂存区的 diff"; echo "    → 在仓里跑，并确认 git 可用"; rm -rf "${base:?}"; return 2; }
   git -C "$repo" worktree add --detach "$wt" HEAD >/dev/null 2>&1 || { echo "  ✗ 建临时 worktree 失败"; echo "    → git worktree prune 之后再试"; rm -rf "${base:?}"; return 2; }
+  ISOLATED_REPO="$repo"; ISOLATED_BASE="$base"; ISOLATED_WORKTREE="$wt"
+  if [[ "${CHECK_STAGED_NO_TRAP:-0}" != 1 ]]; then
+    trap 'cleanup_isolated; exit 130' INT
+    trap 'cleanup_isolated; exit 143' TERM
+  fi
   if [[ "${CHECK_STAGED_USE_WORKTREE:-0}" == 1 ]]; then
     (cd "$repo" && git ls-files -z) | while IFS= read -r -d '' tracked; do
       [[ -f "$repo/$tracked" ]] && mkdir -p "$wt/$(dirname "$tracked")" && cp "$repo/$tracked" "$wt/$tracked"
     done
   elif [[ -s "$patch" ]]; then
-    git -C "$wt" apply --index "$patch" || { echo "  ✗ 暂存区的 diff 套不上 HEAD"; echo "    → 先 git status 看暂存区是不是基于当前 HEAD"; git -C "$repo" worktree remove --force "$wt"; rm -rf "${base:?}"; return 2; }
+    git -C "$wt" apply --index "$patch" || { echo "  ✗ 暂存区的 diff 套不上 HEAD"; echo "    → 先 git status 看暂存区是不是基于当前 HEAD"; trap - INT TERM; cleanup_isolated; return 2; }
   fi
   if [[ -d "$repo/.claude/singlefs-ai-sop" && ! -d "$wt/.claude/singlefs-ai-sop" ]]; then
     cp -r "$repo/.claude/singlefs-ai-sop" "$wt/.claude/"
@@ -49,8 +62,8 @@ run_isolated() {
     done
     [[ $matched -eq 1 ]] || echo "  ! 阶段号 $stage 没有对应的 .claude/gate.d/$stage-*.sh（没跑）"
   done
-  git -C "$repo" worktree remove --force "$wt" >/dev/null 2>&1
-  rm -rf "${base:?}"
+  trap - INT TERM
+  cleanup_isolated
   if [[ $ran -eq 0 ]]; then
     echo "  ✗ 一个阶段都没跑到"
     echo "    → 阶段号写成 .claude/gate.d/ 下文件名的前缀（例：34），doc-lint 写 doc"
@@ -83,10 +96,33 @@ selftest() {
   fi
   echo "BAD（我的）" >> "$repo/kb/b.md" && git -C "$repo" add kb/b.md
   run_isolated "$repo" 20 >/dev/null; rc_bad=$?
+  # 跑到一半被打断：一个睡 20 秒的阶段，worktree 建起来之后给整组发 INT（Ctrl-C 的形态）；
+  # 打断之后仓里只许剩主工作区那一个登记。开 job control（set -m）是为了让后台那一组收得到 INT。
+  printf '#!/usr/bin/env bash\n# gate-stage: selftest-slow\nsleep 20\n' > "$repo/.claude/gate.d/30-slow.sh"
+  git -C "$repo" add .claude/gate.d/30-slow.sh
+  local registered_after_interrupt leftover
+  registered_after_interrupt="$(
+    set -m
+    ( run_isolated "$repo" 30 >/dev/null 2>&1 ) &
+    job="$!"
+    for _ in $(seq 1 100); do
+      [[ "$(git -C "$repo" worktree list --porcelain | grep -c '^worktree ')" -ge 2 ]] && break
+      sleep 0.1
+    done
+    kill -INT -- -"$job" 2>/dev/null; wait "$job" 2>/dev/null
+    git -C "$repo" worktree list --porcelain | grep -c '^worktree '
+  )"
+  while IFS= read -r leftover; do [[ -n "$leftover" ]] && rm -rf "${leftover:?}"; done \
+    < <(git -C "$repo" worktree list --porcelain | sed -n 's/^worktree //p' | tail -n +2)
   rm -rf "${repo:?}"
+  if [[ "${CHECK_STAGED_NO_TRAP:-0}" == 1 ]]; then
+    if [[ "$registered_after_interrupt" == 1 ]]; then echo "selftest: 关掉 trap 之后打断仍然没留下 worktree —— 检查坏了"; return 1; fi
+    echo "selftest: 关掉 trap 确认判红（打断之后临时 worktree 留在仓里）"; return 0
+  fi
+  if [[ "$registered_after_interrupt" != 1 ]]; then echo "selftest: 跑到一半被打断，临时 worktree 留在仓里（登记 $registered_after_interrupt 个）"; return 1; fi
   if [[ $rc_clean -ne 0 ]]; then echo "selftest: 只有工作区里没暂存的 BAD，却判红了 —— 别人的改动漏进来了"; return 1; fi
   if [[ $rc_bad -ne 1 ]]; then echo "selftest: 暂存了 BAD 却没判红"; return 1; fi
-  echo "selftest: 通过（没暂存的 BAD 不算、暂存了的 BAD 判红）"
+  echo "selftest: 通过（没暂存的 BAD 不算、暂存了的 BAD 判红、跑到一半被打断也清掉临时 worktree）"
   return 0
 }
 
