@@ -1,0 +1,8 @@
+M1_最旧根改按算术取	            Arm::RingPersisted => self.oldest_persisted_valid_txg(),	            Arm::RingPersisted => (self.newest_durable_txg + 1).saturating_sub(self.ring_depth),
+M2_去掉活化延迟	                Arm::Floor | Arm::FloorChosenRoot => MINIMUM_PROTECTED_GENERATIONS,	                Arm::Floor | Arm::FloorChosenRoot => 0,
+M3_候选下界只取最新根的F	            Arm::Floor | Arm::FloorNoDelay => self.visible_roots().iter().map(|root| root.floor).max().unwrap_or(0),\n            Arm::FloorChosenRoot => self.newest_valid_root()	            Arm::Floor | Arm::FloorNoDelay => self.newest_valid_root().map(|root| root.floor).unwrap_or(0),\n            Arm::FloorChosenRoot => self.newest_valid_root()
+M4_回退后复用不照被抛弃时间线记损坏	                    BlockState::Live { allocated_at } => Some((allocated_at, abandoned_newest_txg + 1)),	                    BlockState::Live { .. } => None,
+M5_扣块的比较改成大于等于	            BlockState::Freed { freed_at, .. } => *freed_at > bound,	            BlockState::Freed { freed_at, .. } => *freed_at >= bound,
+M6_假候选不看下界	        let candidates: Vec<RootRecord> = self.valid_roots().into_iter().filter(|root| root.txg >= floor).collect();	        let candidates: Vec<RootRecord> = self.valid_roots().into_iter().filter(|root| root.txg >= floor.min(0)).collect();
+M7_K_min改成2	const MINIMUM_PROTECTED_GENERATIONS: u64 = 3;	const MINIMUM_PROTECTED_GENERATIONS: u64 = 2;
+M8_回退不写回退行	        self.instance_rows.push((target.instance, target.txg));\n        for abandoned_instance	        for abandoned_instance
