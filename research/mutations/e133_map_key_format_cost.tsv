@@ -1,0 +1,19 @@
+M1_引用树节点头换成映射的口径	const NODE_HEADER_BYTES: u64 = 64;	const NODE_HEADER_BYTES: u64 = 76;
+M2_映射节点头换成引用树的口径	const MAP_NODE_HEADER_BYTES: u64 = 76;	const MAP_NODE_HEADER_BYTES: u64 = 64;
+M3_树表净字节换成另一个口径	const TREE_TABLE_PAYLOAD_BYTES: u64 = 16284;	const TREE_TABLE_PAYLOAD_BYTES: u64 = 16320;
+M4_位置条目漏掉密文校验和	const LOCATION_ENTRY_BYTES: u64 = 4 + 6 + 4;	const LOCATION_ENTRY_BYTES: u64 = 4 + 6;
+M5_副本数写成一份	const REPLICA_COUNT: u64 = 2;	const REPLICA_COUNT: u64 = 1;
+M6_inode内部条目漏掉身份引用	const INODE_INTERNAL_NON_POINTER_BYTES: u64 = 8 + 26;	const INODE_INTERNAL_NON_POINTER_BYTES: u64 = 8;
+M7_根记录只算一条指针	const ROOT_RECORD_POINTER_COUNT: u64 = 2;	const ROOT_RECORD_POINTER_COUNT: u64 = 1;
+M8_出生身份键漏算出生序号	name: "k3", data_pointer_extra_bytes: 20,	name: "k3", data_pointer_extra_bytes: 16,
+M9_代理流水号忘了根记录水位	root_record_extra_bytes: 8,	root_record_extra_bytes: 0,
+M10_映射内部扇出用叶条目宽	(NODE_BYTES - MAP_NODE_HEADER_BYTES) / (key_bytes + child_pointer)	(NODE_BYTES - MAP_NODE_HEADER_BYTES) / map_entry_bytes(key_bytes)
+M11_门槛少乘一层内部扇出	for _ in 1..level_count {	for _ in 2..level_count {
+M12_inode叶容量忘了扣容器头	(DATA_UNIT_BYTES - (CODE3_HEADER_BYTES_TODAY + arm.code23_header_extra_bytes)) / INODE_RECORD_BYTES	DATA_UNIT_BYTES / INODE_RECORD_BYTES
+M13_树表条目预留少算	const TREE_TABLE_NON_POINTER_BYTES: u64 = 2 + 2 + 2 + 8 + 8 + 8 + 32;	const TREE_TABLE_NON_POINTER_BYTES: u64 = 2 + 2 + 2 + 8 + 8 + 8 + 24;
+M14_extent键漏一段	const EXTENT_NON_POINTER_BYTES: u64 = 8 + 8 + 8;	const EXTENT_NON_POINTER_BYTES: u64 = 8 + 8;
+M15_出生落点键头增量漏掉设备段	code1_header_extra_bytes: 10, code23_header_extra_bytes: 10,	code1_header_extra_bytes: 6, code23_header_extra_bytes: 10,
+M16_根记录非指针段漏掉自证校验和	const ROOT_RECORD_NON_POINTER_BYTES: u64 = 4 + 16 + 4 + 4 + 8 + 8 + 32;	const ROOT_RECORD_NON_POINTER_BYTES: u64 = 4 + 16 + 4 + 4 + 8 + 8;
+M17_extent内部条目错用指向码1的指针	    EXTENT_NON_POINTER_BYTES + node_child_pointer_bytes(arm)	    EXTENT_NON_POINTER_BYTES + data_child_pointer_bytes(arm)
+M18_按类复用写序键漏掉码2码3头增量	code1_header_extra_bytes: 0, code23_header_extra_bytes: 4,	code1_header_extra_bytes: 0, code23_header_extra_bytes: 0,
+M19_逻辑身份最强形态把指向节点的指针也加宽	name: "k1_full", data_pointer_extra_bytes: 40, node_pointer_extra_bytes: 16,	name: "k1_full", data_pointer_extra_bytes: 40, node_pointer_extra_bytes: 40,

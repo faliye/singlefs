@@ -10,6 +10,12 @@
 ⇒ 本脚本给那段正文**单独发一行**，标出它的行区间，让它必须被单独判一次抄不抄。
 ⚠️ 射程只有开头这一段：别的标题的正文仍然由它自己那一行代表。
 
+**一级标题同样算标题**（2026-09-11 补）。此前只认二到六级，于是顶上是一级标题的文件——
+`checks-owed.md`、`invariants.md`、`first-txn-layout.md`——那个一级标题连同它下面、第一个
+下级标题之前的正文**一行都不发**。`checks-owed.md` 的整张欠账表（第 2-243 行）就住在那里，
+清单上根本看不见它，也就没有地方写「不抄，因为……」。实测是给 D19 未定项 6 第二轮备材料时
+逐行对清单才发现的。自证会红：`KB_SECTIONS_NO_H1=1` 强制走回旧行为，自检里那一行必须消失。
+
 实测（2026-09-10，D6（快照实现模型） 未定项 2 第一轮）：
 `.claude/kb/decisions/05-快照-空间记账机制.md` 的第 1-14 行是整个模型的定义段，
 逐字写着「销毁快照时把它的 deadlist 合并到下一个更新的那一侧……**不做全盘扫描**」。
@@ -25,7 +31,8 @@
 """
 import io, os, re, sys, tempfile
 
-HEAD = re.compile(r'^(#{2,6}) .*$')
+HEAD = re.compile(r'^(#{1,6}) .*$')
+HEAD_NO_H1 = re.compile(r'^(#{2,6}) .*$')
 
 
 def fenced_lines(lines):
@@ -44,7 +51,8 @@ def fenced_lines(lines):
 
 
 def is_head(i, l, fenced):
-    return i not in fenced and HEAD.match(l)
+    head = HEAD_NO_H1 if os.environ.get('KB_SECTIONS_NO_H1') else HEAD
+    return i not in fenced and head.match(l)
 
 
 def sections(path):
@@ -93,6 +101,17 @@ def selftest():
             print('selftest: 关掉那条分支确认判红（清单里没有开头正文那一行）'); return 0
         if not has_pre:
             print('selftest: 清单里没有开头正文那一行 —— 正是本脚本要防的形态'); return 1
+        h = os.path.join(d, 'h1.md')
+        io.open(h, 'w', encoding='utf-8').write(
+            '# 样本清单\n\n| C1 | 一整张表住在一级标题之下 |\n\n### 已还清\n\n正文。\n')
+        hrows = [t for t, _ in sections(h)]
+        has_h1 = any(r.startswith('（样本清单 标题之下') for r in hrows)
+        if os.environ.get('KB_SECTIONS_NO_H1'):
+            if has_h1:
+                print('selftest: 强制不认一级标题之后那一行仍然在 —— 检查坏了'); return 1
+            print('selftest: 关掉一级标题那条分支确认判红（一级标题下的正文没有自己的行）'); return 0
+        if not has_h1:
+            print('selftest: 一级标题之下的正文没有自己的行 —— 整张表会从清单上消失'); return 1
         g = os.path.join(d, 'fenced.md')
         io.open(g, 'w', encoding='utf-8').write(
             '## D98 样本 —— 已定\n\n### 甲节\n\n```bash\n## 这一行在栅栏里，不是标题\n```\n\n### 乙节\n')
@@ -100,7 +119,7 @@ def selftest():
         if any('栅栏里' in r for r in frows):
             print('selftest: 代码栅栏里的 `## ` 行被当成标题发了一行'); return 1
         print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题）')
-        print('           证明会红：KB_SECTIONS_NO_PREAMBLE=1 再跑一遍，那一行必须消失')
+        print('           证明会红：KB_SECTIONS_NO_PREAMBLE=1 / KB_SECTIONS_NO_H1=1 各再跑一遍，对应那一行必须消失')
         return 0
 
 

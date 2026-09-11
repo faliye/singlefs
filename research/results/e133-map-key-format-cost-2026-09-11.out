@@ -1,0 +1,102 @@
+E133 映射 key 各候选的格式代价
+判据写死在 research/prompts/e133-preregistration.md（写于本装置之前）；只报数、不判输赢
+口径：节点=16384 节点头=64 映射节点头=76 树表净字节=16284 子指针今天=59 池=483183820
+E7RESULT name=widths arm=bing data_pointer=59 node_pointer=59 extent_leaf_entry=83 extent_internal_entry=83 inode_internal=93 ledger_internal=81 tree_table_entry=121 root_record=194 map_entry_code1=61 map_entry_code23=n/a
+E7RESULT name=headers arm=bing code1=133 code3=131 code2=96/105/114 packed_slot_extra=0 livelist_identity_code1=33
+E7RESULT name=fanouts arm=bing extent_leaf=196 extent_internal=196 inode_internal=175 ledger_internal=201 tree_table_per_level=134 map_leaf=267 map_internal=177 inode_leaf=233
+E7RESULT name=thresholds arm=bing tree=extent l2=197 l3=38417 l4=7529537 l5=1475789057
+E7RESULT name=thresholds arm=bing tree=inode l2=234 l3=40776 l4=7135626 l5=1248734376
+E7RESULT name=thresholds arm=bing tree=ledger l2=545 l3=109345 l4=21978145 l5=4417606945
+E7RESULT name=thresholds arm=bing tree=map l2=268 l3=47260 l4=8364844 l5=1480577212
+E7RESULT name=map_at_pool arm=bing data_units_levels=4 data_units_leaf_bytes=29649764352 with_index_levels=4 with_index_leaf_bytes=29898915840
+E7RESULT name=widths arm=k1 data_pointer=75 node_pointer=75 extent_leaf_entry=99 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=69 map_entry_code23=n/a
+E7RESULT name=headers arm=k1 code1=133 code3=131 code2=96/105/114 packed_slot_extra=8 livelist_identity_code1=41
+E7RESULT name=fanouts arm=k1 extent_leaf=164 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=236 map_internal=140 inode_leaf=233
+E7RESULT name=thresholds arm=k1 tree=extent l2=165 l3=26897 l4=4410945 l5=723394817
+E7RESULT name=thresholds arm=k1 tree=inode l2=234 l3=34718 l4=5172834 l5=770752118
+E7RESULT name=thresholds arm=k1 tree=ledger l2=545 l3=91393 l4=15353857 l5=2579447809
+E7RESULT name=thresholds arm=k1 tree=map l2=237 l3=33041 l4=4625601 l5=647584001
+E7RESULT name=map_at_pool arm=k1 data_units_levels=4 data_units_leaf_bytes=33544437760 with_index_levels=4 with_index_leaf_bytes=33826324480
+E7RESULT name=widths arm=k1_full data_pointer=99 node_pointer=75 extent_leaf_entry=123 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=69 map_entry_code23=n/a
+E7RESULT name=headers arm=k1_full code1=133 code3=131 code2=96/105/114 packed_slot_extra=8 livelist_identity_code1=41
+E7RESULT name=fanouts arm=k1_full extent_leaf=132 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=236 map_internal=140 inode_leaf=233
+E7RESULT name=thresholds arm=k1_full tree=extent l2=133 l3=21649 l4=3550273 l5=582244609
+E7RESULT name=thresholds arm=k1_full tree=inode l2=234 l3=34718 l4=5172834 l5=770752118
+E7RESULT name=thresholds arm=k1_full tree=ledger l2=545 l3=91393 l4=15353857 l5=2579447809
+E7RESULT name=thresholds arm=k1_full tree=map l2=237 l3=33041 l4=4625601 l5=647584001
+E7RESULT name=map_at_pool arm=k1_full data_units_levels=4 data_units_leaf_bytes=33544437760 with_index_levels=4 with_index_leaf_bytes=33826324480
+E7RESULT name=widths arm=k1_seq data_pointer=109 node_pointer=75 extent_leaf_entry=133 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=79 map_entry_code23=n/a
+E7RESULT name=headers arm=k1_seq code1=133 code3=131 code2=96/105/114 packed_slot_extra=8 livelist_identity_code1=51
+E7RESULT name=fanouts arm=k1_seq extent_leaf=122 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=206 map_internal=129 inode_leaf=233
+E7RESULT name=thresholds arm=k1_seq tree=extent l2=123 l3=20009 l4=3281313 l5=538135169
+E7RESULT name=thresholds arm=k1_seq tree=inode l2=234 l3=34718 l4=5172834 l5=770752118
+E7RESULT name=thresholds arm=k1_seq tree=ledger l2=545 l3=91393 l4=15353857 l5=2579447809
+E7RESULT name=thresholds arm=k1_seq tree=map l2=207 l3=26575 l4=3428047 l5=442217935
+E7RESULT name=map_at_pool arm=k1_seq data_units_levels=5 data_units_leaf_bytes=38429540352 with_index_levels=5 with_index_leaf_bytes=38752485376
+E7RESULT name=widths arm=k2 data_pointer=83 node_pointer=83 extent_leaf_entry=107 extent_internal_entry=107 inode_internal=117 ledger_internal=105 tree_table_entry=145 root_record=250 map_entry_code1=36 map_entry_code23=36
+E7RESULT name=headers arm=k2 code1=141 code3=139 code2=104/113/122 packed_slot_extra=8 livelist_identity_code1=8
+E7RESULT name=fanouts arm=k2 extent_leaf=152 extent_internal=152 inode_internal=139 ledger_internal=155 tree_table_per_level=112 map_leaf=453 map_internal=179 inode_leaf=233
+E7RESULT name=thresholds arm=k2 tree=extent l2=153 l3=23105 l4=3511809 l5=533794817
+E7RESULT name=thresholds arm=k2 tree=inode l2=234 l3=32388 l4=4501794 l5=625749228
+E7RESULT name=thresholds arm=k2 tree=ledger l2=545 l3=84321 l4=13069601 l5=2025788001
+E7RESULT name=thresholds arm=k2 tree=map l2=454 l3=81088 l4=14514574 l5=2598108568
+E7RESULT name=map_at_pool arm=k2 data_units_levels=4 data_units_leaf_bytes=17475682304 with_index_levels=4 with_index_leaf_bytes=17622548480
+E7RESULT name=widths arm=k2_instance data_pointer=87 node_pointer=87 extent_leaf_entry=111 extent_internal_entry=111 inode_internal=121 ledger_internal=109 tree_table_entry=149 root_record=250 map_entry_code1=40 map_entry_code23=40
+E7RESULT name=headers arm=k2_instance code1=141 code3=139 code2=104/113/122 packed_slot_extra=8 livelist_identity_code1=12
+E7RESULT name=fanouts arm=k2_instance extent_leaf=147 extent_internal=147 inode_internal=134 ledger_internal=149 tree_table_per_level=109 map_leaf=407 map_internal=164 inode_leaf=233
+E7RESULT name=thresholds arm=k2_instance tree=extent l2=148 l3=21610 l4=3176524 l5=466948882
+E7RESULT name=thresholds arm=k2_instance tree=inode l2=234 l3=31223 l4=4183749 l5=560622233
+E7RESULT name=thresholds arm=k2_instance tree=ledger l2=545 l3=81057 l4=12077345 l5=1799524257
+E7RESULT name=thresholds arm=k2_instance tree=map l2=408 l3=66749 l4=10946673 l5=1795254209
+E7RESULT name=map_at_pool arm=k2_instance data_units_levels=4 data_units_leaf_bytes=19450822656 with_index_levels=4 with_index_leaf_bytes=19614285824
+E7RESULT name=widths arm=k3 data_pointer=79 node_pointer=79 extent_leaf_entry=103 extent_internal_entry=103 inode_internal=113 ledger_internal=101 tree_table_entry=141 root_record=234 map_entry_code1=48 map_entry_code23=48
+E7RESULT name=headers arm=k3 code1=137 code3=135 code2=100/109/118 packed_slot_extra=12 livelist_identity_code1=20
+E7RESULT name=fanouts arm=k3 extent_leaf=158 extent_internal=158 inode_internal=144 ledger_internal=161 tree_table_per_level=115 map_leaf=339 map_internal=164 inode_leaf=233
+E7RESULT name=thresholds arm=k3 tree=extent l2=159 l3=24965 l4=3944313 l5=623201297
+E7RESULT name=thresholds arm=k3 tree=inode l2=234 l3=33553 l4=4831489 l5=695734273
+E7RESULT name=thresholds arm=k3 tree=ledger l2=545 l3=87585 l4=14101025 l5=2270264865
+E7RESULT name=thresholds arm=k3 tree=map l2=340 l3=55597 l4=9117745 l5=1495310017
+E7RESULT name=map_at_pool arm=k3 data_units_levels=4 data_units_leaf_bytes=23352475648 with_index_levels=4 with_index_leaf_bytes=23548706816
+E7RESULT name=widths arm=k3_instance data_pointer=83 node_pointer=83 extent_leaf_entry=107 extent_internal_entry=107 inode_internal=117 ledger_internal=105 tree_table_entry=145 root_record=242 map_entry_code1=52 map_entry_code23=52
+E7RESULT name=headers arm=k3_instance code1=137 code3=135 code2=100/109/118 packed_slot_extra=12 livelist_identity_code1=24
+E7RESULT name=fanouts arm=k3_instance extent_leaf=152 extent_internal=152 inode_internal=139 ledger_internal=155 tree_table_per_level=112 map_leaf=313 map_internal=152 inode_leaf=233
+E7RESULT name=thresholds arm=k3_instance tree=extent l2=153 l3=23105 l4=3511809 l5=533794817
+E7RESULT name=thresholds arm=k3_instance tree=inode l2=234 l3=32388 l4=4501794 l5=625749228
+E7RESULT name=thresholds arm=k3_instance tree=ledger l2=545 l3=84321 l4=13069601 l5=2025788001
+E7RESULT name=thresholds arm=k3_instance tree=map l2=314 l3=47577 l4=7231553 l5=1099195905
+E7RESULT name=map_at_pool arm=k3_instance data_units_levels=4 data_units_leaf_bytes=25292292096 with_index_levels=4 with_index_leaf_bytes=25504825344
+E7RESULT name=widths arm=class_reuse data_pointer=85 node_pointer=83 extent_leaf_entry=109 extent_internal_entry=107 inode_internal=117 ledger_internal=105 tree_table_entry=145 root_record=242 map_entry_code1=54 map_entry_code23=52
+E7RESULT name=headers arm=class_reuse code1=133 code3=135 code2=100/109/118 packed_slot_extra=8 livelist_identity_code1=26
+E7RESULT name=fanouts arm=class_reuse extent_leaf=149 extent_internal=152 inode_internal=139 ledger_internal=155 tree_table_per_level=112 map_leaf=302 map_internal=149 inode_leaf=233
+E7RESULT name=thresholds arm=class_reuse tree=extent l2=150 l3=22649 l4=3442497 l5=523259393
+E7RESULT name=thresholds arm=class_reuse tree=inode l2=234 l3=32388 l4=4501794 l5=625749228
+E7RESULT name=thresholds arm=class_reuse tree=ledger l2=545 l3=84321 l4=13069601 l5=2025788001
+E7RESULT name=thresholds arm=class_reuse tree=map l2=303 l3=44999 l4=6704703 l5=999000599
+E7RESULT name=map_at_pool arm=class_reuse data_units_levels=4 data_units_leaf_bytes=26213531648 with_index_levels=4 with_index_leaf_bytes=26433814528
+E7RESULT name=widths arm=k4 data_pointer=75 node_pointer=75 extent_leaf_entry=99 extent_internal_entry=99 inode_internal=109 ledger_internal=97 tree_table_entry=137 root_record=226 map_entry_code1=46 map_entry_code23=46
+E7RESULT name=headers arm=k4 code1=143 code3=141 code2=106/115/124 packed_slot_extra=18 livelist_identity_code1=18
+E7RESULT name=fanouts arm=k4 extent_leaf=164 extent_internal=164 inode_internal=149 ledger_internal=168 tree_table_per_level=118 map_leaf=354 map_internal=175 inode_leaf=233
+E7RESULT name=thresholds arm=k4 tree=extent l2=165 l3=26897 l4=4410945 l5=723394817
+E7RESULT name=thresholds arm=k4 tree=inode l2=234 l3=34718 l4=5172834 l5=770752118
+E7RESULT name=thresholds arm=k4 tree=ledger l2=545 l3=91393 l4=15353857 l5=2579447809
+E7RESULT name=thresholds arm=k4 tree=map l2=355 l3=61951 l4=10841251 l5=1897218751
+E7RESULT name=map_at_pool arm=k4 data_units_levels=4 data_units_leaf_bytes=22362963968 with_index_levels=4 with_index_leaf_bytes=22550888448
+E7RESULT name=widths arm=uuid16 data_pointer=91 node_pointer=91 extent_leaf_entry=115 extent_internal_entry=115 inode_internal=125 ledger_internal=113 tree_table_entry=153 root_record=258 map_entry_code1=44 map_entry_code23=44
+E7RESULT name=headers arm=uuid16 code1=149 code3=147 code2=112/121/130 packed_slot_extra=16 livelist_identity_code1=16
+E7RESULT name=fanouts arm=uuid16 extent_leaf=141 extent_internal=141 inode_internal=130 ledger_internal=144 tree_table_per_level=106 map_leaf=370 map_internal=152 inode_leaf=233
+E7RESULT name=thresholds arm=uuid16 tree=extent l2=142 l3=19882 l4=2803222 l5=395254162
+E7RESULT name=thresholds arm=uuid16 tree=inode l2=234 l3=30291 l4=3937701 l5=511901001
+E7RESULT name=thresholds arm=uuid16 tree=ledger l2=545 l3=78337 l4=11280385 l5=1624375297
+E7RESULT name=thresholds arm=uuid16 tree=map l2=371 l3=56241 l4=8548481 l5=1299368961
+E7RESULT name=map_at_pool arm=uuid16 data_units_levels=4 data_units_leaf_bytes=21395914752 with_index_levels=4 with_index_leaf_bytes=21575712768
+E7RESULT name=widths arm=slotgen12 data_pointer=77 node_pointer=77 extent_leaf_entry=101 extent_internal_entry=101 inode_internal=111 ledger_internal=99 tree_table_entry=139 root_record=230 map_entry_code1=40 map_entry_code23=40
+E7RESULT name=headers arm=slotgen12 code1=145 code3=143 code2=108/117/126 packed_slot_extra=12 livelist_identity_code1=12
+E7RESULT name=fanouts arm=slotgen12 extent_leaf=161 extent_internal=161 inode_internal=147 ledger_internal=164 tree_table_per_level=117 map_leaf=407 map_internal=183 inode_leaf=233
+E7RESULT name=thresholds arm=slotgen12 tree=extent l2=162 l3=25922 l4=4173282 l5=671898242
+E7RESULT name=thresholds arm=slotgen12 tree=inode l2=234 l3=34252 l4=5034898 l5=740129860
+E7RESULT name=thresholds arm=slotgen12 tree=ledger l2=545 l3=89217 l4=14631425 l5=2399553537
+E7RESULT name=thresholds arm=slotgen12 tree=map l2=408 l3=74482 l4=13630024 l5=2494294210
+E7RESULT name=map_at_pool arm=slotgen12 data_units_levels=4 data_units_leaf_bytes=19450822656 with_index_levels=4 with_index_leaf_bytes=19614285824
+E7RESULT name=positive_control arms=12 violations=0
+E7RESULT name=cross_apparatus e109_map_leaf_at_33=267 e128_child_pointer_at_16=75
+E7RESULT name=done emitted=99

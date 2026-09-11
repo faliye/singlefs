@@ -2,3 +2,4 @@
 # 判据见 .claude/singlefs-ai-sop/rules/evidence-discipline.md 的「原样保存的证据不许事后改」。
 # 与 .claude/gate.d/26-number-name-sync.sh 排除 prompts/ 是同一条理由，别处不再抄第三份。
 research/prompts/  # 当时原样发给模型的提示，与 research/results/ 的产物一一对应；改提示只能连同重跑一起改
+.claude/gate.d/fixtures/43-owed-table-shape.sh/  # 门禁阶段「欠账表两张登记表的行形状」的判别力样本：故意造的登记表，与真表同号不同名，扫它只会报登记冲突

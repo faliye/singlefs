@@ -1,0 +1,11 @@
+1. For claim C1, multiple scenarios were tested including code 1 units written in the same checkpoint with different transaction numbers, code 3 units written multiple times in one checkpoint with increasing birth sequence numbers, and code 2 index nodes written in iterations of the fixed point. In all cases, scanning the unit headers correctly reconstructed the key using the birth tree, checkpoint, instance id, birth sequence (for code 2/3), or write order (for code 1). The referrer keys matched the rebuilt keys. No counterexample was found.
+
+2. For claim C2, a code 1 unit was created in tree A with instance id 1, checkpoint 1, and write order (1,1). A clone operation created a new version in tree B with instance id 2, checkpoint 1, and write order (2,1). Both versions share the same physical block X. The referrer in tree A uses key class tag 1 + tree A + checkpoint 1 + (instance 1, transaction 1). The referrer in tree B uses key class tag 1 + tree B + checkpoint 1 + (instance 2, transaction 1). These keys differ for the same physical block, violating C2.
+
+3. For claim C3, relocation of a code 2 unit was simulated. The unit header was copied byte for byte per G1. The birth tree, checkpoint, instance id, and birth sequence remained unchanged. Referrers continued to use the same key. No change to referrers was needed. No counterexample was found.
+
+4. For claim C4, dereference paths were tested using index nodes (code 2) pointing to code 1 units and container slots carrying the five-tuple. The class tag was derived from the index node's context or the slot's unit type tag. No extra read or tree lookup was required. No counterexample was found.
+
+5. For claim C5, the current key requires reopening the code 3 identity segment table to add the birth sequence field. A dominated candidate using the existing transaction number (present in code 3 headers per G2) would not need to reopen this table. Thus the current key's required reopened clauses are not a strict subset of this candidate's, violating C5.
+
+6. For claim C6, C6 would fail if the facts stated the map key is used as the AAD identity. The facts do not contain such text. G9 specifies the AAD identity as the five-tuple, and the map is derived state not part of authoritative state. Thus no counterexample exists.

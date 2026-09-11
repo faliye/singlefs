@@ -143,6 +143,8 @@ E128|e128-pointer-birth-cost|2000000|e128-pointer-birth-cost-2026-09-10.out|timi
 E130|e130_livelist_bounded_destroy||e130-livelist-bounded-destroy-2026-09-10.out|exact
 E131|e131_livelist_carrier||e131-livelist-carrier-2026-09-10.out|exact
 E132|e132_livelist_carrier_recount||e132-livelist-carrier-recount-2026-09-10.out|exact
+E133|e133_map_key_format_cost||e133-map-key-format-cost-2026-09-11.out|exact
+E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exact
 TSV
 )
 

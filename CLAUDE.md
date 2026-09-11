@@ -109,6 +109,7 @@ bash .claude/gate.d/39-field-table-sum.sh # 字段表加出来的数：表后合
 bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
 bash .claude/gate.d/41-pipefail-grepq.sh  # pipefail 下用 grep -q 收尾的管道（命中会被读成没命中）
 bash .claude/gate.d/42-first-txn-trio.sh   # 第一个事务的三份文件互相挂钩：字节表 / 里程碑 / 决策索引里判「是」的未定项
+bash .claude/gate.d/43-owed-table-shape.sh  # 欠账表两张登记表的行形状：已还清那张不许混进六列的欠账行
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）

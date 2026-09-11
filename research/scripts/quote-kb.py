@@ -10,6 +10,8 @@
 
     quote-kb.py 出口.md '文件:12-30' '文件@#### 已定项 5' '文件~某个正则'
     quote-kb.py --checklist 清单.md 出口.md 取法...   # 另核清单里标「抄」的每一节都真的抄进来了
+    quote-kb.py --checklist 清单.md --cited 正文.md 出口.md 取法...
+        # 再核正文里提到的每个 D / E / C / I 编号所在的 kb 文件都有一张小节清单（C234）
 
 三种取法：
     文件:A-B     第 A 到第 B 行（1 起，含两端）
@@ -20,7 +22,7 @@
 强制进入「抄漏一行」那条分支，确认回读比对判红（`.claude/rules/fs-design.md` 硬要求 2：
 每条分支必须能被测试强制进入）。
 """
-import os, re, sys, tempfile
+import glob, os, re, sys, tempfile
 
 FENCE = '```'
 
@@ -167,6 +169,34 @@ def check_checklist(checklist, produced):
     return missing
 
 
+def cited_kb_files(text, root):
+    """正文里提到的 kb 文件：显式路径，加上 D<n>（ / E<n>（ / C<n>（ / I-<n>.<m>（ 这几类编号所在的文件。
+
+    C234（三方材料的小节清单只覆盖被判那一项所在的文件）：清单只给被判那一项所在的文件做，
+    别的文件里那一半闸门问题就无声消失。2026-09-09 立账、写明了怎么拦，2026-09-11 又被打中一次
+    （D19 未定项 6 第二轮材料漏了 D23 / D16 / D1 三个文件，第 6 格的全部机制住在 D23）。
+    """
+    found = set(re.findall(r'\.claude/kb/[^\s`)（|]+\.md', text))
+    for letter, folder in (('D', 'decisions'), ('E', 'experiments')):
+        for number in set(re.findall(r'(?<![A-Za-z0-9-])' + letter + r'(\d+)（', text)):
+            hits = set()
+            for stem in (f'{int(number):02d}-', f'{int(number)}-'):
+                hits.update(glob.glob(os.path.join(root, '.claude/kb', folder, stem + '*.md')))
+            if len(hits) == 1:
+                found.add(os.path.relpath(hits.pop(), root))
+    if re.search(r'(?<![A-Za-z0-9-])C\d+（', text):
+        found.add('.claude/kb/checks-owed.md')
+    if re.search(r'(?<![A-Za-z0-9-])I-\d+\.\d+（', text):
+        found.add('.claude/kb/invariants.md')
+    return found
+
+
+def check_cited(checklist, cited_text, root):
+    """正文提到的 kb 文件里，清单没有给它做一张的那几个（空表 = 对得上）。"""
+    have = set(re.findall(r'### 小节清单：`([^`]+)`', open(checklist, encoding='utf-8').read()))
+    return sorted(f for f in cited_kb_files(cited_text, root) if f not in have)
+
+
 def selftest():
     src = os.path.join(tempfile.mkdtemp(), 'sample.md')
     with open(src, 'w', encoding='utf-8') as f:
@@ -204,6 +234,22 @@ def selftest():
     if '栅栏之后那一行' not in fenced:
         print(f"  ✗ 自检：代码栅栏里的 `# 注释` 把整节截断了（只取到 {len(fenced)} 行）"); return 1
     print("  ✓ 自检：代码栅栏里的 `#` 行不被当成标题，整节取全")
+    cited_root = tempfile.mkdtemp()
+    os.makedirs(os.path.join(cited_root, '.claude/kb/decisions'))
+    with open(os.path.join(cited_root, '.claude/kb/decisions/99-样本.md'), 'w', encoding='utf-8') as f:
+        f.write('## D99 样本 —— 已定\n')
+    cited_body = '这一轮要用 D99（样本） 与 C1（样本） 两处。\n'
+    cited_checklist = os.path.join(cited_root, 'checklist.md')
+    with open(cited_checklist, 'w', encoding='utf-8') as f:
+        f.write("### 小节清单：`.claude/kb/decisions/99-样本.md`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n"
+                "| ## D99 样本 —— 已定 | 不抄 | 样本 |\n")
+    lacking = check_cited(cited_checklist, cited_body, cited_root)
+    if lacking != ['.claude/kb/checks-owed.md']:
+        print(f"  ✗ 自检：正文提到 C1 而清单里没有 checks-owed.md，--cited 应当只报它一个，实报 {lacking}"); return 1
+    with open(cited_checklist, 'a', encoding='utf-8') as f:
+        f.write("\n### 小节清单：`.claude/kb/checks-owed.md`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n")
+    if check_cited(cited_checklist, cited_body, cited_root):
+        print("  ✗ 自检：清单补齐之后 --cited 仍然报缺"); return 1
     print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 
@@ -214,10 +260,15 @@ def main(argv):
     if len(argv) < 2:
         print(__doc__); return 2
     checklist = None
+    cited = None
     if argv[:1] == ['--checklist']:
         if len(argv) < 4:
             print(__doc__); return 2
         checklist, argv = argv[1], argv[2:]
+        if argv[:1] == ['--cited']:
+            if len(argv) < 3:
+                print(__doc__); return 2
+            cited, argv = argv[1], argv[2:]
     dest, specs = argv[0], argv[1:]
     produced = build(specs)
     bad = verify(specs, produced)
@@ -234,9 +285,20 @@ def main(argv):
             print("  → 把缺的那几节补进取法（优先用 文件@标题），或者把清单那一行改成「不抄」并写理由",
                   file=sys.stderr)
             return 4
+    if cited:
+        lacking = check_cited(checklist, open(cited, encoding='utf-8').read(), os.getcwd())
+        if lacking:
+            print(f"quote-kb: 正文提到了 {len(lacking)} 个 kb 文件，清单里没有它们的小节清单：", file=sys.stderr)
+            for m in lacking:
+                print(f"    {m}", file=sys.stderr)
+            print("  → 用 research/scripts/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）",
+                  file=sys.stderr)
+            return 5
     with open(dest, 'w', encoding='utf-8') as f:
         f.write('\n'.join(produced))
     tail = f"，清单里标「抄」的每一节都在" if checklist else ""
+    if cited:
+        tail += "，正文提到的每个 kb 文件都有清单"
     print(f"  ✓ {len(specs)} 段整抄进 {dest}，回读逐字节一致{tail}")
     return 0
 
