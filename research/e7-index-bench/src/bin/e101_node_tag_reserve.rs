@@ -43,7 +43,7 @@ use e7_index_bench::Emitter;
 const NODE_BYTES: u64 = 16384;
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
 /// D19 已定项 4 之后的树表单元指针。
-const CHILD_PTR: u64 = 59;
+const CHILD_POINTER_BYTES: u64 = 59;
 /// 三棵已定条目宽的树。inode 那一档取 E98 的 140。
 const TREES: [(&str, u64, u64); 3] = [
     ("acct", 30, 22),  // D5 已定项 5：条目 30、key 22
@@ -53,7 +53,7 @@ const TREES: [(&str, u64, u64); 3] = [
 /// 留位宽度四档。
 const TAG_WIDTHS: [u64; 4] = [0, 1, 2, 4];
 /// D22 已定项 2：K = 3S + 1，S ≤ 16 ⇒ K ≤ 49。
-const K_MAX: u64 = 49;
+const MAXIMUM_RETAINED_GENERATIONS: u64 = 49;
 
 /// E95 注册的两条臂。`distinct_values` = 它要多少个互不相同的标签值；
 /// `None` = **上界指不到任何已定条款**，不许估。
@@ -66,7 +66,7 @@ const ARMS: [Arm; 2] = [
     Arm {
         name: "generation_split",
         // 代际分离：要分开的代数就是保留代数 K，由 D22 已定项 2 给死。
-        distinct_values: Some(K_MAX),
+        distinct_values: Some(MAXIMUM_RETAINED_GENERATIONS),
         why: "D22-item2: K = 3S + 1, S<=16 => K<=49",
     },
     Arm {
@@ -81,83 +81,83 @@ fn fanout(node: u64, header: u64, range_field: u64, entry: u64) -> u64 {
     if entry == 0 {
         return 0;
     }
-    let o = header.saturating_add(range_field);
-    if node <= o {
+    let occupied_header_bytes = header.saturating_add(range_field);
+    if node <= occupied_header_bytes {
         return 0;
     }
-    (node - o) / entry
+    (node - occupied_header_bytes) / entry
 }
 
-fn tree_height(n: u64, leaf_f: u64, inner_f: u64) -> Option<u64> {
-    if leaf_f == 0 || inner_f < 2 {
+fn tree_height(record_count: u64, leaf_fanout: u64, inner_fanout: u64) -> Option<u64> {
+    if leaf_fanout == 0 || inner_fanout < 2 {
         return None;
     }
-    let mut h = 1u64;
-    let mut cap = leaf_f as u128;
-    while cap < n as u128 {
-        cap = cap.saturating_mul(inner_f as u128);
-        h += 1;
-        if h > 64 {
+    let mut height = 1u64;
+    let mut covered_records = leaf_fanout as u128;
+    while covered_records < record_count as u128 {
+        covered_records = covered_records.saturating_mul(inner_fanout as u128);
+        height += 1;
+        if height > 64 {
             return None;
         }
     }
-    Some(h)
+    Some(height)
 }
 
 /// **判据 2**：`w` 字节的标签装得下几个互不相同的值。
-fn tag_capacity(w: u64) -> u128 {
-    if w == 0 {
+fn tag_capacity(tag_bytes: u64) -> u128 {
+    if tag_bytes == 0 {
         return 1; // 0 字节只表达得了一个值 = 所有节点同组
     }
-    if w >= 16 {
+    if tag_bytes >= 16 {
         return u128::MAX;
     }
-    1u128 << (8 * w as u32)
+    1u128 << (8 * tag_bytes as u32)
 }
 
 /// **判据 4**：`groups` 个组塞进 `w` 字节的标签，被迫合并几个组。
 /// `groups` 未知（`None`）时返回 `None`——**读不到 ≠ 读到 0**。
-fn forced_merges(groups: Option<u64>, w: u64) -> Option<u64> {
-    let g = groups?;
-    let cap = tag_capacity(w);
-    if (g as u128) <= cap {
+fn forced_merges(groups: Option<u64>, tag_bytes: u64) -> Option<u64> {
+    let group_count = groups?;
+    let capacity = tag_capacity(tag_bytes);
+    if (group_count as u128) <= capacity {
         Some(0)
     } else {
-        Some(g - cap as u64)
+        Some(group_count - capacity as u64)
     }
 }
 
 /// **判据 3**：第一个事务写出的节点字节，在「将来选任何一条臂」下是否逐字节相同。
 /// 只有当**所有臂都装得进同一个已经定死的宽度**时才相同。
 /// 有一条臂的宽度需求取不到 ⇒ 定不出那个宽度 ⇒ 字节写不出来 ⇒ **翻转不成立**。
-fn first_txn_bytes_stable(w: u64) -> bool {
-    ARMS.iter().all(|a| matches!(forced_merges(a.distinct_values, w), Some(0)))
+fn first_transaction_bytes_stable(tag_bytes: u64) -> bool {
+    ARMS.iter().all(|arm| matches!(forced_merges(arm.distinct_values, tag_bytes), Some(0)))
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
-    out.push(em.emit_raw(&format!(
-        "name=config node_bytes={NODE_BYTES} child_ptr={CHILD_PTR} k_max={K_MAX} arms={}",
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=config node_bytes={NODE_BYTES} child_ptr={CHILD_POINTER_BYTES} k_max={MAXIMUM_RETAINED_GENERATIONS} arms={}",
         ARMS.len()
     )));
 
     // 判据 1：代价
-    for &w in TAG_WIDTHS.iter() {
-        for &hdr in NODE_HEADERS.iter() {
-            for &(t, entry, key) in TREES.iter() {
-                let h2 = hdr + w;
-                let leaf_f = fanout(NODE_BYTES, h2, 0, entry);
-                let inner_f = fanout(NODE_BYTES, h2, 0, key + CHILD_PTR);
-                let base_leaf = fanout(NODE_BYTES, hdr, 0, entry);
-                out.push(em.emit_raw(&format!(
-                    "name=cost tag_bytes={w} header={hdr} tree={t} entry={entry} \
-                     leaf_fanout={leaf_f} leaf_fanout_no_tag={base_leaf} lost={} \
-                     inner_fanout={inner_f} height_1e8={}",
-                    base_leaf.saturating_sub(leaf_f),
-                    tree_height(100_000_000, leaf_f, inner_f)
-                        .map(|v| v.to_string())
+    for &tag_bytes in TAG_WIDTHS.iter() {
+        for &node_header_bytes in NODE_HEADERS.iter() {
+            for &(tree_name, entry, key) in TREES.iter() {
+                let header_with_tag = node_header_bytes + tag_bytes;
+                let leaf_fanout = fanout(NODE_BYTES, header_with_tag, 0, entry);
+                let inner_fanout = fanout(NODE_BYTES, header_with_tag, 0, key + CHILD_POINTER_BYTES);
+                let leaf_fanout_without_tag = fanout(NODE_BYTES, node_header_bytes, 0, entry);
+                output_lines.push(emitter.emit_raw(&format!(
+                    "name=cost tag_bytes={tag_bytes} header={node_header_bytes} tree={tree_name} entry={entry} \
+                     leaf_fanout={leaf_fanout} leaf_fanout_no_tag={leaf_fanout_without_tag} lost={} \
+                     inner_fanout={inner_fanout} height_1e8={}",
+                    leaf_fanout_without_tag.saturating_sub(leaf_fanout),
+                    tree_height(100_000_000, leaf_fanout, inner_fanout)
+                        .map(|value| value.to_string())
                         .unwrap_or_else(|| "NA".into())
                 )));
             }
@@ -165,37 +165,37 @@ fn main() {
     }
 
     // 判据 2 / 4：表达力与冲突
-    for a in ARMS.iter() {
-        for &w in TAG_WIDTHS.iter() {
-            out.push(em.emit_raw(&format!(
-                "name=expressive arm={} tag_bytes={w} distinct_needed={} capacity={} \
+    for arm in ARMS.iter() {
+        for &tag_bytes in TAG_WIDTHS.iter() {
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=expressive arm={} tag_bytes={tag_bytes} distinct_needed={} capacity={} \
                  forced_merges={} why={}",
-                a.name,
-                a.distinct_values
-                    .map(|v| v.to_string())
+                arm.name,
+                arm.distinct_values
+                    .map(|value| value.to_string())
                     .unwrap_or_else(|| "UPPER_UNKNOWN".into()),
-                tag_capacity(w),
-                forced_merges(a.distinct_values, w)
-                    .map(|v| v.to_string())
+                tag_capacity(tag_bytes),
+                forced_merges(arm.distinct_values, tag_bytes)
+                    .map(|value| value.to_string())
                     .unwrap_or_else(|| "UNDECIDABLE".into()),
-                a.why
+                arm.why
             )));
         }
     }
 
     // 判据 3：翻转
-    for &w in TAG_WIDTHS.iter() {
-        out.push(em.emit_raw(&format!(
-            "name=flip tag_bytes={w} first_txn_bytes_stable={} verdict_can_flip_to_no={}",
-            u8::from(first_txn_bytes_stable(w)),
-            u8::from(first_txn_bytes_stable(w))
+    for &tag_bytes in TAG_WIDTHS.iter() {
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=flip tag_bytes={tag_bytes} first_txn_bytes_stable={} verdict_can_flip_to_no={}",
+            u8::from(first_transaction_bytes_stable(tag_bytes)),
+            u8::from(first_transaction_bytes_stable(tag_bytes))
         )));
     }
 
-    for l in &out {
-        println!("{l}");
+    for output_line in &output_lines {
+        println!("{output_line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -203,10 +203,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_constants_match_kb() {
+    fn format_constants_match_knowledge_base() {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
-        assert_eq!(CHILD_PTR, 59, "D19 已定项 4 之后");
-        assert_eq!(K_MAX, 49, "D22 已定项 2：3 × 16 + 1");
+        assert_eq!(CHILD_POINTER_BYTES, 59, "D19 已定项 4 之后");
+        assert_eq!(MAXIMUM_RETAINED_GENERATIONS, 49, "D22 已定项 2：3 × 16 + 1");
         assert_eq!(TREES[0].1, 30, "D5 已定项 5");
         assert_eq!(TREES[1].1, 20, "D3 已定项 7");
     }
@@ -239,8 +239,8 @@ mod tests {
         assert_eq!(tag_capacity(0), 1);
         assert_eq!(forced_merges(Some(49), 0), Some(48));
         // 节点组那条臂：任何宽度都判不出来，**不许退化成 0**
-        for &w in TAG_WIDTHS.iter() {
-            assert_eq!(forced_merges(None, w), None, "宽度 {w} 上仍然判不出来");
+        for &tag_bytes in TAG_WIDTHS.iter() {
+            assert_eq!(forced_merges(None, tag_bytes), None, "宽度 {tag_bytes} 上仍然判不出来");
         }
     }
 
@@ -248,14 +248,14 @@ mod tests {
     /// ⇒ **留位翻不了 D26 未定项 4 的「是」**。
     #[test]
     fn criterion3_reserving_cannot_flip_the_blocking_verdict() {
-        for &w in TAG_WIDTHS.iter() {
-            assert!(!first_txn_bytes_stable(w), "宽度 {w} 不该判成稳定");
+        for &tag_bytes in TAG_WIDTHS.iter() {
+            assert!(!first_transaction_bytes_stable(tag_bytes), "宽度 {tag_bytes} 不该判成稳定");
         }
         // 阳性对照：把两条臂都换成有上界的，翻转就成立——证明这一维真的进了模型
         assert!(matches!(forced_merges(Some(49), 1), Some(0)));
         assert!(matches!(forced_merges(Some(200), 1), Some(0)));
         // ⇒ 翻不了的原因**只有一个**：节点组那条臂的宽度需求取不到
-        assert_eq!(ARMS.iter().filter(|a| a.distinct_values.is_none()).count(), 1);
+        assert_eq!(ARMS.iter().filter(|arm| arm.distinct_values.is_none()).count(), 1);
     }
 
     /// **判据 4 + 阳性对照 / 阴性对照**。
@@ -278,15 +278,15 @@ mod tests {
     #[test]
     fn tag_width_does_not_move_tree_height() {
         for &(_, entry, key) in TREES.iter() {
-            let mut prev: Option<u64> = None;
-            for &w in TAG_WIDTHS.iter() {
-                let lf = fanout(NODE_BYTES, 58 + w, 0, entry);
-                let inf = fanout(NODE_BYTES, 58 + w, 0, key + CHILD_PTR);
-                let h = tree_height(100_000_000, lf, inf).unwrap();
-                if let Some(p) = prev {
-                    assert_eq!(h, p, "留位不该改树高");
+            let mut previous_height: Option<u64> = None;
+            for &tag_bytes in TAG_WIDTHS.iter() {
+                let leaf_fanout = fanout(NODE_BYTES, 58 + tag_bytes, 0, entry);
+                let inner_fanout = fanout(NODE_BYTES, 58 + tag_bytes, 0, key + CHILD_POINTER_BYTES);
+                let height = tree_height(100_000_000, leaf_fanout, inner_fanout).unwrap();
+                if let Some(previous) = previous_height {
+                    assert_eq!(height, previous, "留位不该改树高");
                 }
-                prev = Some(h);
+                previous_height = Some(height);
             }
         }
     }

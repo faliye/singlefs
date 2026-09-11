@@ -41,7 +41,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 | `no_structure` | 乙 的形态，**对照臂**（2026-09-10 已出局，放进来是给「甲多付了什么」一个减数）|
 
 ⚠️ **`condense` 的触发判据改过一次，改在任何测量跑起来之前**：第一版写「FREE 条目占比 ≥ 1/2」，
-而这族负载里 `frees / (allocs + frees) = c / (1 + 2c)` 对任何有限 `c` 都严格小于 1/2
+而这族负载里 `free_event_count / (allocation_event_count + free_event_count) = c / (1 + 2c)` 对任何有限 `c` 都严格小于 1/2
 ⇒ 前件恒假、该臂一次也不触发，等于 `naive` 的复制品——
 `.claude/singlefs-ai-sop/rules/evidence-discipline.md` 点名的**稻草人对照臂**，
 也是 `.claude/singlefs-ai-sop/rules/test-discipline.md`「失败条款的前件可以写反」的形态。
@@ -82,10 +82,10 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 
 ⚠️ **其中一条第一轮没被抓，按 `.claude/rules/mutation-sampling.md` 三分判为第三类
 「取样点不敏感」，补了取样点而不是记成等价变异**：M8（condense 判据放宽成恒触发）
-只在 `raw / net ∈ (1, 2]` 这一段上与原式不同，而这族负载里
-`raw / net = 1 + 2c` 只取得到 1、3、9、33，**取不到那一段**；
-`c = 0` 时 `raw` 与 `net` 同值，断言看不见差别。
-处置是把判据抽成 `condense_entries(raw, net)` 单独可测，
+只在 `raw_entry_count / net_allocated_block_count ∈ (1, 2]` 这一段上与原式不同，而这族负载里
+`raw_entry_count / net_allocated_block_count = 1 + 2c` 只取得到 1、3、9、33，**取不到那一段**；
+`c = 0` 时 `raw_entry_count` 与 `net_allocated_block_count` 同值，断言看不见差别。
+处置是把判据抽成 `condense_entries(raw_entry_count, net_allocated_block_count)` 单独可测，
 补三个取样点（150/100、200/100、201/100），M8 当场被抓。
 负载族够不到那一段这件事本身由单测 `the_load_family_cannot_reach_the_sensitive_ratio` 留档。
 
@@ -99,7 +99,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 
 ### 当天改正过一处跨装置口径：闸写了，钉错了源头
 
-`ALLOC_REC_BYTES` 第一版写成 **30**，注释挂的是 D3（空间分配） 已定项 7，
+`ALLOCATION_RECORD_BYTES` 第一版写成 **30**，注释挂的是 D3（空间分配） 已定项 7，
 而 D3（空间分配） 已定项 7 的字段表逐段相加是 **4 + 6 + 2 + 8 = 20**；
 30 其实是 D5（快照 / 空间记账机制） 已定项 5 的**记账**条目宽（key 22 + value 8）。
 当时的跨装置闸写成 `assert_eq!(ALLOC_REC_BYTES + 0, 22 + 8)`——**它自己就把出处招了**，
@@ -111,7 +111,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 的字段表时抓到的，不是任何一条断言。
 
 **处置**：常量改 20；跨装置闸从「钉一个总数」改成**钉字段表的逐段**
-（`ALLOC_REC_BYTES == dev 4 + slot 6 + span 2 + gen 8`），
+（`ALLOCATION_RECORD_BYTES == device_identity_bytes 4 + placement_slot_bytes 6 + span_segment_bytes 2 + allocation_and_free_generation_bytes 8`），
 另加一条 `the_allocation_record_width_is_not_the_ledger_entry_width` 把两棵树的两个量分开留档。
 **影响面**：只有 `worst_batch_bytes` 变（221184 → **180224**，`no_structure` 122880 → **81920**），
 条目数、高估比、阳性对照比值都与该常量无关 ⇒ **判据 1 / 3 / 4 / 5 的结论一个都没变**。

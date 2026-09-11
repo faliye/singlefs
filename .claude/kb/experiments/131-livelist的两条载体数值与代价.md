@@ -36,7 +36,7 @@ cd research && cargo run --release --bin e131_livelist_carrier
 节点 16384 字节、节点头 64；树表条目 121 字节（D8（核心索引结构） 已定项 8）；
 **树表每层装几棵的分母取 16284**（`22-单元原子性怎么合成.md` 的口径，C148（树表条目变宽把间接层门槛压到二层） 用的也是它），
 ⇒ 每层 **134** 棵。⚠️ 仓里另一个口径 16320 记在 C157（树表容量在两处按不同条目宽算），E131（livelist 的两条载体，数值与代价） 不采用；
-它在 121 这一档上恰好也给 134，单测 `the_other_denominator_in_the_repo_gives_a_different_answer_here` 把这一点留了档。
+它在 121 这一档上恰好也给 134，单测 `the_other_tree_table_denominator_in_the_repo_agrees_at_121_bytes_and_diverges_at_137` 把这一点留了档。
 扫的格：头数 ∈ {1, 4, 16, 64, 256, 1024, 4096} × 每头活块数 ∈ {1024, 65536, 1048576}。
 
 ### 结论：`per_head` 在跑前写死的五格上一格都没输
@@ -86,7 +86,7 @@ M13（占容量不随条目数缩放）是**第三类取样点不敏感**——�
 
 ⚠️ **结论表里的数是这份装置在一个错模型上的产物，现状以 E132（livelist 载体·按真实树数与内部扇出重算） 为准。**
 错在两处，都是 D6（快照实现模型） 未定项 2 三轮对抗第一轮的反推腿打中、主 agent 现查坐实的：
-① **树数**——`per_head` 臂写 `tt_entries = heads * 2`（每头一棵数据树 + 一棵 livelist）、`shared` 臂写 `heads + 1`，
+① **树数**——`per_head` 臂写 `tree_table_entry_count = heads * 2`（每头一棵数据树 + 一棵 livelist）、`shared` 臂写 `heads + 1`，
 都没有池级树；而已提交的 `first-txn-layout.md` 第 47 行预想「extent 树 1、inode 树 2、分配记录树 3、记账树 4、中央映射树 5」
 ⇒ 一个头至少两棵数据树，外加三棵池级树。改正后第二层门槛是 44 / 66 头，不是 68 / 134。
 ② **内部扇出**——`fanout()` 对所有层都用叶条目宽，而内部节点条目是 key 加 59 字节子指针。

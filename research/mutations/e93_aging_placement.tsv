@@ -1,11 +1,11 @@
-M1_邻接谓词判反	fn pair_broken(&self, k: usize) -> bool {\n        self.slot_of[k] != self.slot_of[k - 1] + 1\n    }	fn pair_broken(&self, k: usize) -> bool {\n        self.slot_of[k] == self.slot_of[k - 1] + 1\n    }
+M1_邻接谓词判反	fn pair_broken(&self, key: usize) -> bool {\n        self.slot_of[key] != self.slot_of[key - 1] + 1\n    }	fn pair_broken(&self, key: usize) -> bool {\n        self.slot_of[key] == self.slot_of[key - 1] + 1\n    }
 M2_审计从零起数	let mut runs = 1u64;	let mut runs = 0u64;
 M3_挪槽不加回新贡献	// 加回新贡献\n        if key >= 1 && self.pair_broken(key) {\n            self.broken += 1;\n        }	// 加回新贡献\n        if key >= 1 && false && self.pair_broken(key) {\n            self.broken += 1;\n        }
-M4_defer当场复用	let old = self.slot_of[key];\n        self.key_at[old as usize] = None;\n        self.deferred.push(old);	let old = self.slot_of[key];\n        self.key_at[old as usize] = None;\n        self.free.insert(old);\n        self.seg_free[old as usize / self.g] += 1;
-M5_空段判定放松	.find(|&i| self.seg_free[i] as usize == self.g && self.open_seg != Some(i))	.find(|&i| self.seg_free[i] as usize >= self.g / 2 && self.open_seg != Some(i))
-M6_回落不计数	for &k in keys {\n            self.fallback_allocs += 1;\n            let slot = self.alloc_first_fit();\n            self.move_key(k, slot);\n        }	for &k in keys {\n            let slot = self.alloc_first_fit();\n            self.move_key(k, slot);\n        }
-M7_free_run无视开放段	if self.open_seg == Some(s as usize / self.g) {\n                prev = None;\n                count = 0;\n                continue;\n            }	if false {\n                prev = None;\n                count = 0;\n                continue;\n            }
-M8_邻居只扩右侧	for k in (a.saturating_sub(r)..a).chain(b + 1..(b + 1 + r).min(l)) {	for k in (b + 1..(b + 1 + r).min(l)) {
-M9_整理批次不落盘	sim.place_run(&sweep_keys);	let _ = &sweep_keys;
-M10_runs不加一	fn runs_inc(&self) -> u64 {\n        self.broken + 1\n    }	fn runs_inc(&self) -> u64 {\n        self.broken\n    }
-M11_first_fit偷保留槽	.find(|&&s| self.open_seg != Some(s as usize / self.g))	.find(|&&s| { let _ = s; true })
+M4_defer当场复用	let old_slot = self.slot_of[key];\n        self.key_at[old_slot as usize] = None;\n        self.deferred.push(old_slot);	let old_slot = self.slot_of[key];\n        self.key_at[old_slot as usize] = None;\n        self.free.insert(old_slot);\n        self.free_slots_per_segment[old_slot as usize / self.slots_per_segment] += 1;
+M5_空段判定放松	.find(|&segment_index| self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment && self.open_segment != Some(segment_index))	.find(|&segment_index| self.free_slots_per_segment[segment_index] as usize >= self.slots_per_segment / 2 && self.open_segment != Some(segment_index))
+M6_回落不计数	for &key in keys {\n            self.fallback_allocation_count += 1;\n            let slot = self.allocate_first_fit();\n            self.move_key(key, slot);\n        }	for &key in keys {\n            let slot = self.allocate_first_fit();\n            self.move_key(key, slot);\n        }
+M7_free_run无视开放段	if self.open_segment == Some(slot as usize / self.slots_per_segment) {\n                previous_slot = None;\n                count = 0;\n                continue;\n            }	if false {\n                previous_slot = None;\n                count = 0;\n                continue;\n            }
+M8_邻居只扩右侧	for neighbor_key in (run_start.saturating_sub(radius)..run_start).chain(run_end + 1..(run_end + 1 + radius).min(object_count)) {	for neighbor_key in (run_end + 1..(run_end + 1 + radius).min(object_count)) {
+M9_整理批次不落盘	simulation.place_run(&sweep_keys);	let _ = &sweep_keys;
+M10_runs不加一	fn runs_incremental(&self) -> u64 {\n        self.broken + 1\n    }	fn runs_incremental(&self) -> u64 {\n        self.broken\n    }
+M11_first_fit偷保留槽	.find(|&&candidate_slot| self.open_segment != Some(candidate_slot as usize / self.slots_per_segment))	.find(|&&candidate_slot| { let _ = candidate_slot; true })

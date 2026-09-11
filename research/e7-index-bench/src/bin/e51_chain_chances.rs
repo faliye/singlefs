@@ -28,74 +28,74 @@ use e7_index_bench::Emitter;
 /// 一条记录。`origin` 是**真值标签**（哪条时间线），模型用它数「不同源」，
 /// **链检查本身不许读它**——那正是链要靠 hash 去分辨的东西。
 #[derive(Clone, Copy, Debug)]
-struct Rec {
+struct Record {
     jsn: u64,
     origin: u32,
-    prev_hash: u64,
+    previous_record_hash: u64,
 }
 
 /// 链值：由记录的内容算出。同源的前一条给出同一个输入 ⇒ 同一个值。
-fn chain_of(r: &Rec, bits: u32) -> u64 {
-    let mut h = 0xcbf29ce484222325u64;
-    for x in [r.jsn, r.origin as u64, r.prev_hash] {
-        h ^= x;
-        h = h.wrapping_mul(0x100000001b3);
-        h ^= h >> 29;
+fn chain_of(record: &Record, bits: u32) -> u64 {
+    let mut hash = 0xcbf29ce484222325u64;
+    for field_value in [record.jsn, record.origin as u64, record.previous_record_hash] {
+        hash ^= field_value;
+        hash = hash.wrapping_mul(0x100000001b3);
+        hash ^= hash >> 29;
     }
     if bits >= 64 {
-        h
+        hash
     } else {
-        h & ((1u64 << bits) - 1)
+        hash & ((1u64 << bits) - 1)
     }
 }
 
 /// 走一遍链，数两个计数器。返回 `(比较次数, 两侧不同源的比较次数)`。
-/// **链检查只看 `prev_hash` 与算出来的链值，不读 `origin`**；`origin` 只用来数真值。
-fn walk(records: &[Rec], bits: u32) -> (u64, u64) {
+/// **链检查只看 `previous_record_hash` 与算出来的链值，不读 `origin`**；`origin` 只用来数真值。
+fn walk(records: &[Record], bits: u32) -> (u64, u64) {
     let mut comparisons = 0u64;
     let mut cross_origin = 0u64;
-    for w in records.windows(2) {
-        let (prev, cur) = (&w[0], &w[1]);
+    for adjacent_pair in records.windows(2) {
+        let (previous_record, current_record) = (&adjacent_pair[0], &adjacent_pair[1]);
         comparisons += 1;
-        if prev.origin != cur.origin {
+        if previous_record.origin != current_record.origin {
             cross_origin += 1;
         }
-        let _ = (chain_of(prev, bits), cur.prev_hash); // 链检查本身
+        let _ = (chain_of(previous_record, bits), current_record.previous_record_hash); // 链检查本身
     }
     (comparisons, cross_origin)
 }
 
 /// 造一段日志。`stale_tail` > 0 时在末尾接上属于**另一条时间线**的残留记录。
-fn make_log(clean: u64, stale_tail: u64, bits: u32) -> Vec<Rec> {
-    let mut v: Vec<Rec> = Vec::new();
-    let mut prev_hash = 0u64;
-    for j in 0..clean {
-        let r = Rec { jsn: j, origin: 1, prev_hash };
-        prev_hash = chain_of(&r, bits);
-        v.push(r);
+fn make_log(clean_record_count: u64, stale_tail: u64, bits: u32) -> Vec<Record> {
+    let mut log: Vec<Record> = Vec::new();
+    let mut previous_record_hash = 0u64;
+    for clean_index in 0..clean_record_count {
+        let record = Record { jsn: clean_index, origin: 1, previous_record_hash };
+        previous_record_hash = chain_of(&record, bits);
+        log.push(record);
     }
     // 残留：另一条时间线（origin=0），它的链锚点与现行时间线无关
-    let mut sp = 0xdead_beefu64;
-    for k in 0..stale_tail {
-        let r = Rec { jsn: clean + k, origin: 0, prev_hash: sp };
-        sp = chain_of(&r, bits);
-        v.push(r);
+    let mut stale_chain_anchor = 0xdead_beefu64;
+    for stale_index in 0..stale_tail {
+        let record = Record { jsn: clean_record_count + stale_index, origin: 0, previous_record_hash: stale_chain_anchor };
+        stale_chain_anchor = chain_of(&record, bits);
+        log.push(record);
     }
-    v
+    log
 }
 
 /// 一圈时长（秒）= 环里记录数 ÷ fsync 率。**提出来是因为变异测试证明它在 `main` 里没人看得见。**
 fn lap_seconds(records: f64) -> f64 {
-    records / FSYNC_PER_SEC
+    records / FSYNC_PER_SECOND
 }
 
 /// 读法 A 的一生机会数：每对相邻比较都算。
-fn chances_reading_a(records: f64, passes: f64) -> f64 {
+fn chances_under_every_comparison_reading(records: f64, passes: f64) -> f64 {
     records * passes
 }
 
 /// 读法 B 的一生机会数：只算接缝 + 残留在被覆盖前被扫到的次数。
-fn chances_reading_b(incidents: f64, seams_per_incident: f64, scans_before_overwrite: f64) -> f64 {
+fn chances_under_seam_reading(incidents: f64, seams_per_incident: f64, scans_before_overwrite: f64) -> f64 {
     incidents * (seams_per_incident + scans_before_overwrite)
 }
 
@@ -106,66 +106,66 @@ fn at_least_once(expected: f64) -> f64 {
     1.0 - (-expected).exp()
 }
 /// 判据沿用 E49：一生至少出一次 < 1% 叫够用。
-fn enough(p: f64) -> bool {
-    p < 0.01
+fn enough(probability_at_least_once: f64) -> bool {
+    probability_at_least_once < 0.01
 }
 
 const INCIDENTS: f64 = 36_500.0; // 每天崩 10 次 × 十年，与 E49 / D23 已定项 9 同一个场景点
 const SEAMS_PER_INCIDENT: f64 = 1.0; // 一次事故留一个接缝
-const FSYNC_PER_SEC: f64 = 2785.0; // E44 本机实测
+const FSYNC_PER_SECOND: f64 = 2785.0; // E44 本机实测
 const RINGS: [u64; 3] = [10 * 1024 * 1024, 100 * 1024 * 1024, 2 * 1024 * 1024 * 1024];
-const REC_ON_DISK: [u64; 2] = [512, 4096];
+const RECORD_BYTES_ON_DISK: [u64; 2] = [512, 4096];
 const PASSES: [(&str, f64); 2] = [("weekly", 522.0), ("daily", 3650.0)];
 const BITS: [u32; 3] = [16, 32, 64];
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=config incidents={INCIDENTS} seams_per_incident={SEAMS_PER_INCIDENT} \
-             fsync_per_sec={FSYNC_PER_SEC}"
+             fsync_per_sec={FSYNC_PER_SECOND}"
         ))
     );
 
     // ── 量一：干净日志上，不同源比较恒为 0（阴性对照）──
-    for n in [10u64, 100, 20480] {
-        let log = make_log(n, 0, 32);
-        let (cmps, cross) = walk(&log, 32);
+    for record_count in [10u64, 100, 20480] {
+        let log = make_log(record_count, 0, 32);
+        let (comparisons, cross_origin_comparisons) = walk(&log, 32);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=clean_log records={n} comparisons={cmps} cross_origin={cross} expect_cross=0"
+            emitter.emit_raw(&format!(
+                "name=clean_log records={record_count} comparisons={comparisons} cross_origin={cross_origin_comparisons} expect_cross=0"
             ))
         );
     }
 
     // ── 量二：接上残留之后，不同源比较恰好等于接缝数（阳性对照）──
-    for stale in [1u64, 6, 20] {
-        let log = make_log(100, stale, 32);
-        let (cmps, cross) = walk(&log, 32);
+    for stale_record_count in [1u64, 6, 20] {
+        let log = make_log(100, stale_record_count, 32);
+        let (comparisons, cross_origin_comparisons) = walk(&log, 32);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=stale_log clean=100 stale={stale} comparisons={cmps} cross_origin={cross} \
+            emitter.emit_raw(&format!(
+                "name=stale_log clean=100 stale={stale_record_count} comparisons={comparisons} cross_origin={cross_origin_comparisons} \
                  expect_cross=1"
             ))
         );
     }
 
     // ── 量三：一圈时长与残留被扫到的次数 ──
-    for ring in RINGS {
-        for rec in REC_ON_DISK {
-            let records = (ring / rec) as f64;
-            let lap_sec = lap_seconds(records);
-            for (freq, passes) in PASSES {
-                let per_sec = passes / (10.0 * 365.25 * 86400.0);
-                let scans = per_sec * lap_sec;
+    for ring_bytes in RINGS {
+        for record_bytes in RECORD_BYTES_ON_DISK {
+            let records = (ring_bytes / record_bytes) as f64;
+            let lap_duration_seconds = lap_seconds(records);
+            for (scan_frequency, passes) in PASSES {
+                let scans_per_second = passes / (10.0 * 365.25 * 86400.0);
+                let scans_before_overwrite = scans_per_second * lap_duration_seconds;
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=lap ring={ring} rec_on_disk={rec} records={records:.0} \
-                         lap_seconds={lap_sec:.3} freq={freq} scans_before_overwrite={scans:.6e}"
+                    emitter.emit_raw(&format!(
+                        "name=lap ring={ring_bytes} rec_on_disk={record_bytes} records={records:.0} \
+                         lap_seconds={lap_duration_seconds:.3} freq={scan_frequency} scans_before_overwrite={scans_before_overwrite:.6e}"
                     ))
                 );
             }
@@ -173,27 +173,27 @@ fn main() {
     }
 
     // ── 量四：两种读法的一生机会数，逐位宽判够不够 ──
-    for ring in RINGS {
-        for rec in REC_ON_DISK {
-            let records = (ring / rec) as f64;
-            let lap_sec = lap_seconds(records);
-            for (freq, passes) in PASSES {
-                let per_sec = passes / (10.0 * 365.25 * 86400.0);
-                let chances_a = chances_reading_a(records, passes);
-                let chances_b = chances_reading_b(INCIDENTS, SEAMS_PER_INCIDENT, per_sec * lap_sec);
+    for ring_bytes in RINGS {
+        for record_bytes in RECORD_BYTES_ON_DISK {
+            let records = (ring_bytes / record_bytes) as f64;
+            let lap_duration_seconds = lap_seconds(records);
+            for (scan_frequency, passes) in PASSES {
+                let scans_per_second = passes / (10.0 * 365.25 * 86400.0);
+                let every_comparison_chances = chances_under_every_comparison_reading(records, passes);
+                let seam_chances = chances_under_seam_reading(INCIDENTS, SEAMS_PER_INCIDENT, scans_per_second * lap_duration_seconds);
                 for bits in BITS {
-                    let ea = expected_false_accepts(chances_a, bits);
-                    let eb = expected_false_accepts(chances_b, bits);
+                    let every_comparison_expected_false_accepts = expected_false_accepts(every_comparison_chances, bits);
+                    let seam_expected_false_accepts = expected_false_accepts(seam_chances, bits);
                     println!(
                         "{}",
-                        em.emit_raw(&format!(
-                            "name=readings ring={ring} rec_on_disk={rec} freq={freq} bits={bits} \
-                             chances_a={chances_a:.6e} at_least_once_a={:.6e} enough_a={} \
-                             chances_b={chances_b:.6e} at_least_once_b={:.6e} enough_b={}",
-                            at_least_once(ea),
-                            u8::from(enough(at_least_once(ea))),
-                            at_least_once(eb),
-                            u8::from(enough(at_least_once(eb))),
+                        emitter.emit_raw(&format!(
+                            "name=readings ring={ring_bytes} rec_on_disk={record_bytes} freq={scan_frequency} bits={bits} \
+                             chances_a={every_comparison_chances:.6e} at_least_once_a={:.6e} enough_a={} \
+                             chances_b={seam_chances:.6e} at_least_once_b={:.6e} enough_b={}",
+                            at_least_once(every_comparison_expected_false_accepts),
+                            u8::from(enough(at_least_once(every_comparison_expected_false_accepts))),
+                            at_least_once(seam_expected_false_accepts),
+                            u8::from(enough(at_least_once(seam_expected_false_accepts))),
                         ))
                     );
                 }
@@ -201,7 +201,7 @@ fn main() {
         }
     }
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -212,12 +212,12 @@ mod tests {
     /// 同一条前驱记录算两次，值必须相同；这不是概率，是同一个函数同一份输入。
     #[test]
     fn same_origin_chain_values_are_equal_by_construction() {
-        let r = Rec { jsn: 7, origin: 1, prev_hash: 42 };
-        assert_eq!(chain_of(&r, 32), chain_of(&r, 32));
-        // 造一段干净日志，逐对验证「存下来的 prev_hash == 算出来的链值」
+        let record = Record { jsn: 7, origin: 1, previous_record_hash: 42 };
+        assert_eq!(chain_of(&record, 32), chain_of(&record, 32));
+        // 造一段干净日志，逐对验证「存下来的 previous_record_hash == 算出来的链值」
         let log = make_log(50, 0, 32);
-        for w in log.windows(2) {
-            assert_eq!(w[1].prev_hash, chain_of(&w[0], 32));
+        for adjacent_pair in log.windows(2) {
+            assert_eq!(adjacent_pair[1].previous_record_hash, chain_of(&adjacent_pair[0], 32));
         }
     }
 
@@ -225,43 +225,43 @@ mod tests {
     /// 不钉这一条，「误接受 = 2⁻ⁿ」那条曲线在模型里根本没被实现。
     #[test]
     fn truncation_actually_narrows_the_value() {
-        let r = Rec { jsn: 12345, origin: 1, prev_hash: 999 };
+        let record = Record { jsn: 12345, origin: 1, previous_record_hash: 999 };
         for bits in [8u32, 16, 32] {
-            let v = chain_of(&r, bits);
-            assert!(v < (1u64 << bits), "bits={bits} v={v}");
+            let chain_value = chain_of(&record, bits);
+            assert!(chain_value < (1u64 << bits), "bits={bits} v={chain_value}");
         }
-        assert_eq!(chain_of(&r, 32), chain_of(&r, 64) & 0xffff_ffff);
+        assert_eq!(chain_of(&record, 32), chain_of(&record, 64) & 0xffff_ffff);
         // 至少有一条记录的 64 位值超出 32 位，否则上面那条是空的
-        let wide = (0..64u64)
-            .map(|j| chain_of(&Rec { jsn: j, origin: 1, prev_hash: j }, 64))
-            .any(|v| v > u32::MAX as u64);
-        assert!(wide, "64 位那一档必须真的用到高位");
+        let uses_high_bits = (0..64u64)
+            .map(|record_index| chain_of(&Record { jsn: record_index, origin: 1, previous_record_hash: record_index }, 64))
+            .any(|chain_value| chain_value > u32::MAX as u64);
+        assert!(uses_high_bits, "64 位那一档必须真的用到高位");
     }
 
     /// **链值必须依赖前一条**——不依赖的话链就不是链，而两种读法的分辨也塌了。
-    /// 同 `jsn`、同 `origin`、只差 `prev_hash` 的两条记录，链值必须不同。
+    /// 同 `jsn`、同 `origin`、只差 `previous_record_hash` 的两条记录，链值必须不同。
     #[test]
     fn the_chain_value_depends_on_the_predecessor() {
-        let a = Rec { jsn: 7, origin: 1, prev_hash: 1 };
-        let b = Rec { jsn: 7, origin: 1, prev_hash: 2 };
-        assert_ne!(chain_of(&a, 64), chain_of(&b, 64));
-        assert_ne!(chain_of(&a, 32), chain_of(&b, 32));
-        // 干净日志里每一条的 prev_hash 都真的是前一条算出来的，改一位就对不上
+        let record_with_predecessor_one = Record { jsn: 7, origin: 1, previous_record_hash: 1 };
+        let record_with_predecessor_two = Record { jsn: 7, origin: 1, previous_record_hash: 2 };
+        assert_ne!(chain_of(&record_with_predecessor_one, 64), chain_of(&record_with_predecessor_two, 64));
+        assert_ne!(chain_of(&record_with_predecessor_one, 32), chain_of(&record_with_predecessor_two, 32));
+        // 干净日志里每一条的 previous_record_hash 都真的是前一条算出来的，改一位就对不上
         let log = make_log(20, 0, 32);
         let mut tampered = log[5];
-        tampered.prev_hash ^= 1;
+        tampered.previous_record_hash ^= 1;
         assert_ne!(chain_of(&tampered, 32), chain_of(&log[5], 32));
     }
 
     /// **两个读法的机会数各自的公式，逐个钉绝对值**（变异 M4 打的就是它）。
     #[test]
     fn the_two_chance_formulas_are_not_the_same_function() {
-        assert_eq!(chances_reading_a(20480.0, 522.0), 20480.0 * 522.0);
-        assert_eq!(chances_reading_b(36500.0, 1.0, 0.0), 36500.0);
-        assert_eq!(chances_reading_b(36500.0, 1.0, 1.0), 73000.0);
+        assert_eq!(chances_under_every_comparison_reading(20480.0, 522.0), 20480.0 * 522.0);
+        assert_eq!(chances_under_seam_reading(36500.0, 1.0, 0.0), 36500.0);
+        assert_eq!(chances_under_seam_reading(36500.0, 1.0, 1.0), 73000.0);
         // 读法 B 与记录数、遍数**无关**；读法 A 与事故次数无关
-        assert_eq!(chances_reading_b(36500.0, 1.0, 0.0), chances_reading_b(36500.0, 1.0, 0.0));
-        assert!(chances_reading_a(20480.0, 522.0) > 290.0 * chances_reading_b(36500.0, 1.0, 3.2e-4));
+        assert_eq!(chances_under_seam_reading(36500.0, 1.0, 0.0), chances_under_seam_reading(36500.0, 1.0, 0.0));
+        assert!(chances_under_every_comparison_reading(20480.0, 522.0) > 290.0 * chances_under_seam_reading(36500.0, 1.0, 3.2e-4));
     }
 
     /// **一圈时长的公式**（变异 M5 打的就是它）：记录数 ÷ fsync 率，绝对值钉死。
@@ -274,11 +274,11 @@ mod tests {
 
     /// **阴性对照的绝对值**：干净日志上不同源比较恒为 0，比较次数恰好是 n−1。
     #[test]
-    fn a_clean_log_has_no_cross_origin_comparison() {
-        for n in [2u64, 10, 100, 20480] {
-            let (cmps, cross) = walk(&make_log(n, 0, 32), 32);
-            assert_eq!(cmps, n - 1, "n={n}");
-            assert_eq!(cross, 0, "n={n}");
+    fn clean_log_has_no_cross_origin_comparison() {
+        for record_count in [2u64, 10, 100, 20480] {
+            let (comparisons, cross_origin_comparisons) = walk(&make_log(record_count, 0, 32), 32);
+            assert_eq!(comparisons, record_count - 1, "n={record_count}");
+            assert_eq!(cross_origin_comparisons, 0, "n={record_count}");
         }
     }
 
@@ -286,10 +286,10 @@ mod tests {
     /// （只有接缝那一对跨时间线，残留内部仍是同源）。
     #[test]
     fn stale_tail_adds_exactly_one_seam() {
-        for stale in [1u64, 6, 20, 100] {
-            let (cmps, cross) = walk(&make_log(100, stale, 32), 32);
-            assert_eq!(cmps, 100 + stale - 1, "stale={stale}");
-            assert_eq!(cross, 1, "stale={stale} —— 接缝只有一个");
+        for stale_record_count in [1u64, 6, 20, 100] {
+            let (comparisons, cross_origin_comparisons) = walk(&make_log(100, stale_record_count, 32), 32);
+            assert_eq!(comparisons, 100 + stale_record_count - 1, "stale={stale_record_count}");
+            assert_eq!(cross_origin_comparisons, 1, "stale={stale_record_count} —— 接缝只有一个");
         }
     }
 
@@ -300,36 +300,36 @@ mod tests {
     fn the_two_readings_differ_by_orders_of_magnitude() {
         let records = (10 * 1024 * 1024u64 / 512) as f64;
         assert_eq!(records, 20480.0);
-        let a = records * 522.0;
-        assert!((a - 1.069056e7).abs() < 1.0);
-        let lap = records / FSYNC_PER_SEC;
-        assert!((lap - 7.3537).abs() < 1e-3, "一圈 {lap} 秒");
-        let per_sec = 522.0 / (10.0 * 365.25 * 86400.0);
-        let b = INCIDENTS * (1.0 + per_sec * lap);
-        assert!((b - 36500.0).abs() < 1.0, "b={b}");
-        assert!(a / b > 290.0);
+        let every_comparison_chances = records * 522.0;
+        assert!((every_comparison_chances - 1.069056e7).abs() < 1.0);
+        let lap_duration_seconds = records / FSYNC_PER_SECOND;
+        assert!((lap_duration_seconds - 7.3537).abs() < 1e-3, "一圈 {lap_duration_seconds} 秒");
+        let scans_per_second = 522.0 / (10.0 * 365.25 * 86400.0);
+        let seam_chances = INCIDENTS * (1.0 + scans_per_second * lap_duration_seconds);
+        assert!((seam_chances - 36500.0).abs() < 1.0, "b={seam_chances}");
+        assert!(every_comparison_chances / seam_chances > 290.0);
     }
 
     /// **读法 B 下 32 位够用，16 位不够用**——绝对值，且两侧各取一点。
     #[test]
-    fn under_reading_b_thirty_two_bits_is_enough() {
-        let b = INCIDENTS * 1.000_001;
-        let e32 = expected_false_accepts(b, 32);
-        assert!(enough(at_least_once(e32)), "32 位够用");
-        assert!((at_least_once(e32) - 8.4983e-6).abs() < 1e-9);
-        let e16 = expected_false_accepts(b, 16);
-        assert!(!enough(at_least_once(e16)), "16 位不够用");
-        assert!((at_least_once(e16) - 0.4270).abs() < 1e-3);
+    fn under_seam_reading_thirty_two_bits_is_enough() {
+        let seam_chances = INCIDENTS * 1.000_001;
+        let expected_false_accepts_at_32_bits = expected_false_accepts(seam_chances, 32);
+        assert!(enough(at_least_once(expected_false_accepts_at_32_bits)), "32 位够用");
+        assert!((at_least_once(expected_false_accepts_at_32_bits) - 8.4983e-6).abs() < 1e-9);
+        let expected_false_accepts_at_16_bits = expected_false_accepts(seam_chances, 16);
+        assert!(!enough(at_least_once(expected_false_accepts_at_16_bits)), "16 位不够用");
+        assert!((at_least_once(expected_false_accepts_at_16_bits) - 0.4270).abs() < 1e-3);
     }
 
     /// **读法 A 下最重那档 32 位不够用**——保留 E49 的那个结论，证明本实验没把它算没了。
     #[test]
-    fn under_reading_a_the_heaviest_bucket_still_breaks_thirty_two() {
+    fn under_every_comparison_reading_the_heaviest_bucket_still_breaks_thirty_two() {
         let records = (2 * 1024 * 1024 * 1024u64 / 512) as f64;
-        let a = records * 3650.0;
-        let e32 = expected_false_accepts(a, 32);
-        assert!(!enough(at_least_once(e32)));
-        assert!(at_least_once(e32) > 0.97);
+        let every_comparison_chances = records * 3650.0;
+        let expected_false_accepts_at_32_bits = expected_false_accepts(every_comparison_chances, 32);
+        assert!(!enough(at_least_once(expected_false_accepts_at_32_bits)));
+        assert!(at_least_once(expected_false_accepts_at_32_bits) > 0.97);
     }
 
     /// **一圈时长的绝对值**：10 MiB 环 / 512 B ⇒ 20480 条 ÷ 2785 次每秒 = 7.354 秒；
@@ -337,17 +337,17 @@ mod tests {
     /// ⇒ **残留在被覆盖前，每周一次的核对器扫到它的期望次数是 10⁻⁵ 量级**。
     #[test]
     fn lap_time_is_seconds_not_years() {
-        let lap_small = (10 * 1024 * 1024u64 / 512) as f64 / FSYNC_PER_SEC;
+        let lap_small = (10 * 1024 * 1024u64 / 512) as f64 / FSYNC_PER_SECOND;
         assert!((lap_small - 7.3537).abs() < 1e-3);
-        let lap_big = (2 * 1024 * 1024 * 1024u64 / 4096) as f64 / FSYNC_PER_SEC;
+        let lap_big = (2 * 1024 * 1024 * 1024u64 / 4096) as f64 / FSYNC_PER_SECOND;
         assert!((lap_big - 188.25).abs() < 0.05, "{lap_big}");
         // 绝对值：每周一次 ⇒ 1.654e-6 次/秒；最大的那个环一圈 188.25 秒
         // ⇒ 残留在被覆盖前被扫到的期望次数 = 3.11e-4，**远小于 1**
-        let per_sec = 522.0 / (10.0 * 365.25 * 86400.0);
-        assert!((per_sec - 1.6541e-6f64).abs() < 1e-9, "{per_sec}");
-        let scans = per_sec * lap_big;
-        assert!((scans - 3.1138e-4f64).abs() < 1e-7, "{scans}");
-        assert!(scans < 1e-3, "扫到的期望次数远小于 1");
+        let scans_per_second = 522.0 / (10.0 * 365.25 * 86400.0);
+        assert!((scans_per_second - 1.6541e-6f64).abs() < 1e-9, "{scans_per_second}");
+        let scans_before_overwrite = scans_per_second * lap_big;
+        assert!((scans_before_overwrite - 3.1138e-4f64).abs() < 1e-7, "{scans_before_overwrite}");
+        assert!(scans_before_overwrite < 1e-3, "扫到的期望次数远小于 1");
     }
 
     /// **够用判据的阈值**（沿用 E49 的 1%），两侧各取一点。

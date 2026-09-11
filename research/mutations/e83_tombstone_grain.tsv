@@ -1,5 +1,5 @@
-M1_打包容量忘了扣单元头	(UNIT - UNIT_HDR) / TOMB_REC	UNIT / TOMB_REC
-M2_物理系数丢了副本	(units, units * UNIT * PHYS_FACTOR)	(units, units * UNIT)
-M3_perobject按extent算	RecordGrain::PerObject => load.objects,	RecordGrain::PerObject => load.objects * load.extents_per_obj,
+M1_打包容量忘了扣单元头	(UNIT_BYTES - UNIT_HEADER_BYTES) / TOMBSTONE_RECORD_BYTES	UNIT_BYTES / TOMBSTONE_RECORD_BYTES
+M2_物理系数丢了副本	(units, units * UNIT_BYTES * PHYSICAL_COPIES_PER_UNIT)	(units, units * UNIT_BYTES)
+M3_perobject按extent算	RecordGrain::PerObject => load.objects,	RecordGrain::PerObject => load.objects * load.extents_per_object,
 M4_打包向下取整	records.div_ceil(packed_capacity())	records / packed_capacity()
 M5_独占载体也打包	Carrier::DedicatedUnit => records,	Carrier::DedicatedUnit => records.div_ceil(packed_capacity()),

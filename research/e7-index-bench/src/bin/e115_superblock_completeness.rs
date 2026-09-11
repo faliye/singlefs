@@ -35,7 +35,7 @@ use e7_index_bench::Emitter;
 const SLOT_WIDTHS: [u64; 2] = [512, 4096];
 
 /// D22 已定项 7 的树表单元指针宽度，间接层一个指针的口径。
-const PTR_BYTES: u64 = 59;
+const POINTER_BYTES: u64 = 59;
 
 /// D22 已定项 2：根环区域数 R = 3。
 const RING_REGIONS: u64 = 3;
@@ -126,21 +126,21 @@ const MISSING_WIDTHS: [(&str, u64, u64); 9] = [
     ("MAC 长度声明", 1, 1),
     ("设备数 devs", 4, 4),
     // 主密钥槽两条臂：走间接层一个指针 vs 内联（D22 未定项 9 登记的估计「约 80 字节」）
-    ("主密钥槽", PTR_BYTES, 80),
+    ("主密钥槽", POINTER_BYTES, 80),
 ];
 
 /// 判据 1：候选表覆盖不了的必需项。
 fn missing_items() -> Vec<&'static str> {
-    REQUIRED.iter().filter(|(_, _, c)| c.is_none()).map(|(n, _, _)| *n).collect()
+    REQUIRED.iter().filter(|(_, _, covered_by)| covered_by.is_none()).map(|(required_name, _, _)| *required_name).collect()
 }
 
 fn candidate_bytes() -> u64 {
-    CANDIDATE.iter().map(|x| x.1).sum()
+    CANDIDATE.iter().map(|candidate_row| candidate_row.1).sum()
 }
 
 /// 缺项补齐要加的字节。`wide` = 每一项取第二档口径。
 fn missing_bytes(wide: bool) -> u64 {
-    MISSING_WIDTHS.iter().map(|&(_, a, b)| if wide { b } else { a }).sum()
+    MISSING_WIDTHS.iter().map(|&(_, narrow_width, wide_width)| if wide { wide_width } else { narrow_width }).sum()
 }
 
 /// 槽里一共几个间接指针。
@@ -152,21 +152,21 @@ fn pointer_count(key_slot_indirect: bool, map_sep: bool) -> u64 {
 /// 槽的总字节。
 /// - `wide`：缺项取宽口径（含主密钥槽内联 80）
 /// - `map_sep`：中央映射树根单占一个指针（否则它借树表的一行，槽里 0 字节）
-/// - `merge_ptrs`：把全部间接指针合成一个「间接目录单元」，槽里只留 1 个指针
-fn slot_bytes(wide: bool, map_sep: bool, merge_ptrs: bool) -> u64 {
+/// - `merge_pointers`：把全部间接指针合成一个「间接目录单元」，槽里只留 1 个指针
+fn slot_bytes(wide: bool, map_sep: bool, merge_pointers: bool) -> u64 {
     // 候选表已含设备表指针之外的一切；设备表走间接层要再加一个指针（E100 出路臂）
-    let base = candidate_bytes() + PTR_BYTES + missing_bytes(wide);
+    let base = candidate_bytes() + POINTER_BYTES + missing_bytes(wide);
     let key_slot_indirect = !wide; // 宽口径那一档是内联 80，不占指针
-    let n = pointer_count(key_slot_indirect, map_sep);
-    let mut b = base;
+    let pointer_total = pointer_count(key_slot_indirect, map_sep);
+    let mut slot_total_bytes = base;
     if map_sep {
-        b += PTR_BYTES;
+        slot_total_bytes += POINTER_BYTES;
     }
-    if merge_ptrs {
+    if merge_pointers {
         // n 个指针换成 1 个
-        b -= (n - 1) * PTR_BYTES;
+        slot_total_bytes -= (pointer_total - 1) * POINTER_BYTES;
     }
-    b
+    slot_total_bytes
 }
 
 /// E100 判据 4 同式：跨 n 个扇区时有几种可读但不一致的状态。
@@ -179,37 +179,37 @@ fn torn_states(total: u64, slot: u64) -> u64 {
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
     // 判据 1：完备性闸
-    let miss = missing_items();
-    out.push(em.emit_raw(&format!(
+    let missing = missing_items();
+    output_lines.push(emitter.emit_raw(&format!(
         "name=completeness required={} candidate_rows={} missing={}",
         REQUIRED.len(),
         CANDIDATE.len(),
-        miss.len()
+        missing.len()
     )));
-    for (i, m) in miss.iter().enumerate() {
-        let src = REQUIRED.iter().find(|(n, _, _)| n == m).map(|(_, s, _)| *s).unwrap_or("?");
-        out.push(em.emit_raw(&format!("name=missing idx={i} item={m} source={src}")));
+    for (missing_index, missing_item) in missing.iter().enumerate() {
+        let source_clause = REQUIRED.iter().find(|(required_name, _, _)| required_name == missing_item).map(|(_, source, _)| *source).unwrap_or("?");
+        output_lines.push(emitter.emit_raw(&format!("name=missing idx={missing_index} item={missing_item} source={source_clause}")));
     }
 
     // 判据 2 / 3 / 4：补齐后的字节预算
     for &wide in [false, true].iter() {
         for &map_sep in [false, true].iter() {
             for &merge in [false, true].iter() {
-                let t = slot_bytes(wide, map_sep, merge);
+                let slot_total_bytes = slot_bytes(wide, map_sep, merge);
                 for &slot in SLOT_WIDTHS.iter() {
-                    out.push(em.emit_raw(&format!(
-                        "name=budget wide={} map_sep={} merge_ptrs={} total={t} slot={slot} \
+                    output_lines.push(emitter.emit_raw(&format!(
+                        "name=budget wide={} map_sep={} merge_ptrs={} total={slot_total_bytes} slot={slot} \
                          fits={} over_by={} torn_states={}",
                         u8::from(wide),
                         u8::from(map_sep),
                         u8::from(merge),
-                        u8::from(t <= slot),
-                        t.saturating_sub(slot),
-                        torn_states(t, slot)
+                        u8::from(slot_total_bytes <= slot),
+                        slot_total_bytes.saturating_sub(slot),
+                        torn_states(slot_total_bytes, slot)
                     )));
                 }
             }
@@ -217,24 +217,24 @@ fn main() {
     }
 
     // 判据 4 的另一半：合并臂新增那一级间接要付的单元头
-    for &h in UNIT_HEADERS.iter() {
-        out.push(em.emit_raw(&format!(
-            "name=merge_cost unit_header={h} saved_in_slot={} paid_in_unit={h}",
-            3 * PTR_BYTES
+    for &unit_header_bytes in UNIT_HEADERS.iter() {
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=merge_cost unit_header={unit_header_bytes} saved_in_slot={} paid_in_unit={unit_header_bytes}",
+            3 * POINTER_BYTES
         )));
     }
 
     // 基线：E100 那 420，用同一段代码复算一次（跨装置对同一个量的对账）
-    out.push(em.emit_raw(&format!(
+    output_lines.push(emitter.emit_raw(&format!(
         "name=e100_baseline candidate_bytes={} plus_devtable_ptr={}",
         candidate_bytes(),
-        candidate_bytes() + PTR_BYTES
+        candidate_bytes() + POINTER_BYTES
     )));
 
-    for l in &out {
-        println!("{l}");
+    for line in &output_lines {
+        println!("{line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -246,13 +246,13 @@ mod tests {
     #[test]
     fn candidate_table_reproduces_e100_420() {
         assert_eq!(candidate_bytes(), 361, "E100 的四段固定开销");
-        assert_eq!(candidate_bytes() + PTR_BYTES, 420, "E100 判据 3 的出路臂恒 420");
+        assert_eq!(candidate_bytes() + POINTER_BYTES, 420, "E100 判据 3 的出路臂恒 420");
     }
 
     #[test]
-    fn format_constants_match_kb() {
+    fn format_constants_match_knowledge_base() {
         assert_eq!(SLOT_WIDTHS, [512, 4096]);
-        assert_eq!(PTR_BYTES, 59, "D22 已定项 7 的树表单元指针");
+        assert_eq!(POINTER_BYTES, 59, "D22 已定项 7 的树表单元指针");
         assert_eq!(RING_REGIONS, 3, "D22 已定项 2：R = 3");
         assert_eq!(UNIT_HEADERS, [68, 77, 86], "D18 已定项 7 三档头");
     }
@@ -262,13 +262,13 @@ mod tests {
     fn criterion1_missing_count_is_absolute() {
         assert_eq!(REQUIRED.len(), 31);
         assert_eq!(CANDIDATE.len(), 24);
-        let m = missing_items();
-        assert_eq!(m.len(), 9, "候选表覆盖不了的必需项条数");
-        assert!(m.contains(&"条带宽度上界 w_max"));
-        assert!(m.contains(&"组大小 g"));
-        assert!(m.contains(&"主密钥槽"));
-        assert!(m.contains(&"根环逐区域设备身份"));
-        assert!(m.contains(&"journal 最坏占用与 F"));
+        let missing = missing_items();
+        assert_eq!(missing.len(), 9, "候选表覆盖不了的必需项条数");
+        assert!(missing.contains(&"条带宽度上界 w_max"));
+        assert!(missing.contains(&"组大小 g"));
+        assert!(missing.contains(&"主密钥槽"));
+        assert!(missing.contains(&"根环逐区域设备身份"));
+        assert!(missing.contains(&"journal 最坏占用与 F"));
     }
 
     /// **阳性对照**：从必需项里去掉一个，闸必须少数出一项并且不再点名它。
@@ -276,7 +276,7 @@ mod tests {
     #[test]
     fn criterion1_positive_control_gate_notices_a_removed_item() {
         let full = missing_items();
-        let pruned: Vec<&str> = full.iter().copied().filter(|n| *n != "条带宽度上界 w_max").collect();
+        let pruned: Vec<&str> = full.iter().copied().filter(|missing_name| *missing_name != "条带宽度上界 w_max").collect();
         assert_eq!(pruned.len(), full.len() - 1, "删一项就必须少一项");
         assert!(!pruned.contains(&"条带宽度上界 w_max"));
     }
@@ -284,10 +284,10 @@ mod tests {
     /// **阴性对照**：候选表里已覆盖的项一个都不许出现在缺项清单里。
     #[test]
     fn criterion1_negative_control_covered_items_never_reported_missing() {
-        let m = missing_items();
-        for (name, _, cov) in REQUIRED.iter() {
-            if cov.is_some() {
-                assert!(!m.contains(name), "{name} 已被候选表覆盖，不该报缺");
+        let missing = missing_items();
+        for (name, _, covered_by) in REQUIRED.iter() {
+            if covered_by.is_some() {
+                assert!(!missing.contains(name), "{name} 已被候选表覆盖，不该报缺");
             }
         }
     }
@@ -296,9 +296,9 @@ mod tests {
     #[test]
     fn every_coverage_target_exists_in_candidate_table() {
         let mut checked = 0usize;
-        for (name, _, cov) in REQUIRED.iter() {
-            if let Some(c) = cov {
-                assert!(CANDIDATE.iter().any(|(n, _)| n == c), "{name} 指向的 {c} 不在候选表里");
+        for (name, _, covered_by) in REQUIRED.iter() {
+            if let Some(covered_field_name) = covered_by {
+                assert!(CANDIDATE.iter().any(|(candidate_name, _)| candidate_name == covered_field_name), "{name} 指向的 {covered_field_name} 不在候选表里");
                 checked += 1;
             }
         }
@@ -335,12 +335,12 @@ mod tests {
     fn criterion4_merging_pointers_is_absolute() {
         // 窄档有 4 个指针（设备表 / 树表 / 主密钥槽 / 中央映射），合成 1 个省 3 × 59 = 177
         assert_eq!(pointer_count(true, true), 4);
-        assert_eq!(slot_bytes(false, true, false) - slot_bytes(false, true, true), 3 * PTR_BYTES);
+        assert_eq!(slot_bytes(false, true, false) - slot_bytes(false, true, true), 3 * POINTER_BYTES);
         assert_eq!(slot_bytes(false, true, true), 385);
         assert!(slot_bytes(false, true, true) <= 512);
         // 宽档主密钥槽内联，指针只有 3 个，合成 1 个省 2 × 59 = 118
         assert_eq!(pointer_count(false, true), 3);
-        assert_eq!(slot_bytes(true, true, false) - slot_bytes(true, true, true), 2 * PTR_BYTES);
+        assert_eq!(slot_bytes(true, true, false) - slot_bytes(true, true, true), 2 * POINTER_BYTES);
         assert_eq!(slot_bytes(true, true, true), 473);
         assert!(slot_bytes(true, true, true) <= 512);
     }
@@ -350,7 +350,7 @@ mod tests {
     fn criterion4_merge_pays_a_unit_header() {
         assert_eq!(UNIT_HEADERS.iter().copied().max().unwrap(), 86);
         // 槽里省 177，单元里最多付 86 ⇒ 净省至少 91
-        assert_eq!(3 * PTR_BYTES - 86, 91);
+        assert_eq!(3 * POINTER_BYTES - 86, 91);
     }
 
     /// 撕裂态：512 槽上一旦超出就不是 0，4096 上全部为 0。
@@ -360,9 +360,9 @@ mod tests {
         assert_eq!(torn_states(562, 512), 2, "跨 2 个扇区 ⇒ 2² − 2 = 2 种");
         assert_eq!(torn_states(591, 512), 2);
         for &wide in [false, true].iter() {
-            for &ms in [false, true].iter() {
-                for &mg in [false, true].iter() {
-                    assert_eq!(torn_states(slot_bytes(wide, ms, mg), 4096), 0, "4096 槽恒 0");
+            for &map_sep in [false, true].iter() {
+                for &merge in [false, true].iter() {
+                    assert_eq!(torn_states(slot_bytes(wide, map_sep, merge), 4096), 0, "4096 槽恒 0");
                 }
             }
         }
@@ -370,7 +370,7 @@ mod tests {
 
     /// E62 与 D19 已定项 4 对「一个 dev id 多宽」给了两个不同的数，本实验把两档都算出来。
     #[test]
-    fn ring_dev_id_width_has_two_conflicting_conventions() {
+    fn ring_device_identity_width_has_two_conflicting_conventions() {
         let (_, narrow, wide) = MISSING_WIDTHS[1];
         assert_eq!(narrow, 4, "E62 逐字：4 字节（4 区域 × 1 字节）");
         assert_eq!(wide, 12, "D19 已定项 4 的 4 字节 dev id × R=3");

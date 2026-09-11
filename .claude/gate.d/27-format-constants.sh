@@ -17,7 +17,7 @@
 #
 # `stale=` 列的是**旧值的字面串**（`|` 分隔，可省）。它们不许再出现在 kb 正文与
 # 实验源码/产物里——但**允许出现在「## 历史版本」之后与 *-history.md 里**，
-# 那正是 `.claude/singlefs-ai-sop/rules/doc-discipline.md`「正文只写现状，历史进文末」
+# 那正是 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「正文只写现状，历史进文末」
 # 给旧值留的位置。
 #
 # ⚠️ **它管得了哪一半**：只检查**已经登记了标记**的常量。一个新加的、没登记标记的
@@ -39,7 +39,7 @@ def body_of(text):
 
 # ⚠️ `*-history.md` **不是登记位**：变更史里会原样引用标记（记「本轮加了哪个标记」），
 # 那是历史陈述，不是第二处权威记录。与旧值字面串的豁免同一条理由
-# （`doc-discipline.md`「正文只写现状，历史进文末」）。
+# （`writing-discipline.md`「正文只写现状，历史进文末」）。
 kb_all = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
 kb_files = [f for f in kb_all if not f.endswith('-history.md')]
 
@@ -67,13 +67,18 @@ srcs = sorted(glob.glob('research/**/*.rs', recursive=True))
 seen_in_src = set()
 for f in srcs:
     for i, line in enumerate(open(f, encoding='utf-8', errors='ignore'), 1):
-        m = re.match(r'\s*(?:pub\s+)?const\s+(\w+)\s*:\s*\w+\s*=\s*(-?\d+)', line)
-        if not m:
+        # 值要读到分号为止：只取开头那段数字时，`16384 * 2` 读成 16384 判通过（静默放行），
+        # `16 * 1024` 与 `16_384` 读成 16 判红（2026-09-11 改名回扫时实测）。
+        m = re.match(r'\s*(?:pub\s+)?const\s+(\w+)\s*:\s*\w+\s*=\s*([^;]+);', line)
+        if not m or m.group(1) not in marks:
             continue
-        name, val = m.group(1), int(m.group(2))
-        if name not in marks:
-            continue
+        name, rhs = m.group(1), m.group(2).strip()
+        literal = re.fullmatch(r'(-?[0-9][0-9_]*)(?:[iu](?:8|16|32|64|128|size))?', rhs)
         seen_in_src.add(name)
+        if not literal:
+            bad.append(f'{f}:{i}  const {name} 的值写成了「{rhs}」，门禁读不出它等于几 → 写成整数字面量（可带 _ 分隔）')
+            continue
+        val = int(literal.group(1).replace('_', ''))
         kbf, want, _ = marks[name]
         if val != want:
             bad.append(f'{f}:{i}  const {name} = {val}，而 {kbf} 定的现行值是 {want}')

@@ -56,7 +56,7 @@ enum Arm {
     CohortBound,
 }
 impl Arm {
-    fn tag(self) -> &'static str {
+    fn output_label(self) -> &'static str {
         match self {
             Arm::AppendOrder => "append_order",
             Arm::CohortBound => "cohort_bound",
@@ -65,64 +65,64 @@ impl Arm {
 }
 
 /// 一个墓碑单元：里面每条记录记它归属的代际。
-struct TombUnit {
+struct TombstoneUnit {
     cohorts: Vec<u64>,
-    sealed: bool,
+    is_sealed: bool,
 }
 
-struct Sim {
-    cap: usize,
-    units: Vec<TombUnit>,
-    open: Option<usize>,
+struct Simulation {
+    records_per_unit: usize,
+    units: Vec<TombstoneUnit>,
+    open_unit: Option<usize>,
     /// 已整单元回收的记录数（独立计数器）。
     reclaimed_records: u64,
 }
 
-impl Sim {
-    fn new(cap: usize) -> Sim {
-        Sim { cap, units: Vec::new(), open: None, reclaimed_records: 0 }
+impl Simulation {
+    fn new(records_per_unit: usize) -> Simulation {
+        Simulation { records_per_unit, units: Vec::new(), open_unit: None, reclaimed_records: 0 }
     }
     fn push(&mut self, cohort: u64) {
-        let idx = match self.open {
-            Some(i) if self.units[i].cohorts.len() < self.cap => i,
+        let target_unit = match self.open_unit {
+            Some(open_index) if self.units[open_index].cohorts.len() < self.records_per_unit => open_index,
             _ => {
-                self.units.push(TombUnit { cohorts: Vec::new(), sealed: false });
-                let i = self.units.len() - 1;
-                self.open = Some(i);
-                i
+                self.units.push(TombstoneUnit { cohorts: Vec::new(), is_sealed: false });
+                let new_unit_index = self.units.len() - 1;
+                self.open_unit = Some(new_unit_index);
+                new_unit_index
             }
         };
-        self.units[idx].cohorts.push(cohort);
-        if self.units[idx].cohorts.len() == self.cap {
-            self.units[idx].sealed = true;
-            self.open = None;
+        self.units[target_unit].cohorts.push(cohort);
+        if self.units[target_unit].cohorts.len() == self.records_per_unit {
+            self.units[target_unit].is_sealed = true;
+            self.open_unit = None;
         }
     }
     /// 代际边界：cohort_bound 臂强制关掉开放单元。
     fn seal_open(&mut self) {
-        if let Some(i) = self.open.take() {
-            self.units[i].sealed = true;
+        if let Some(open_index) = self.open_unit.take() {
+            self.units[open_index].is_sealed = true;
         }
     }
-    /// 代际 `dead_upto`（含）以前的记录全部可回收；整单元都可回收才真的回收。
-    fn reclaim(&mut self, dead_upto: u64) {
-        for u in &mut self.units {
-            if !u.cohorts.is_empty() && u.sealed && u.cohorts.iter().all(|&c| c <= dead_upto) {
-                self.reclaimed_records += u.cohorts.len() as u64;
-                u.cohorts.clear();
+    /// 代际 `last_destroyed_cohort`（含）以前的记录全部可回收；整单元都可回收才真的回收。
+    fn reclaim(&mut self, last_destroyed_cohort: u64) {
+        for unit in &mut self.units {
+            if !unit.cohorts.is_empty() && unit.is_sealed && unit.cohorts.iter().all(|&cohort| cohort <= last_destroyed_cohort) {
+                self.reclaimed_records += unit.cohorts.len() as u64;
+                unit.cohorts.clear();
             }
         }
     }
     /// 收尾审计：对全部单元逐条重算 stuck / live / 空单元。与运行计数器不共享自增点。
-    fn audit(&self, dead_upto: u64) -> (u64, u64, u64) {
+    fn audit(&self, last_destroyed_cohort: u64) -> (u64, u64, u64) {
         let (mut stuck, mut live, mut alive_units) = (0u64, 0u64, 0u64);
-        for u in &self.units {
-            if u.cohorts.is_empty() {
+        for unit in &self.units {
+            if unit.cohorts.is_empty() {
                 continue;
             }
             alive_units += 1;
-            for &c in &u.cohorts {
-                if c <= dead_upto {
+            for &cohort in &unit.cohorts {
+                if cohort <= last_destroyed_cohort {
                     stuck += 1; // 可回收却还躺在活单元里
                 } else {
                     live += 1;
@@ -134,55 +134,55 @@ impl Sim {
 }
 
 /// 跑 `pubs` 次发布。返回 (sim, 最后一个已销毁代际, 记录总数)。
-fn run(arm: Arm, cap: usize, del_per_pub: u64, snap_every: u64, k_snap: u64, pubs: u64) -> (Sim, u64, u64) {
-    let mut sim = Sim::new(cap);
-    let mut total = 0u64;
-    let mut dead_upto = 0u64; // 代际号从 1 起；0 = 还没销毁过
-    for p in 1..=pubs {
-        let cohort = p.div_ceil(snap_every); // 当前代际
-        for _ in 0..del_per_pub {
-            sim.push(cohort);
-            total += 1;
+fn run(arm: Arm, records_per_unit: usize, deletions_per_publish: u64, publishes_per_snapshot: u64, retained_snapshot_cohorts: u64, publish_count: u64) -> (Simulation, u64, u64) {
+    let mut simulation = Simulation::new(records_per_unit);
+    let mut total_records = 0u64;
+    let mut last_destroyed_cohort = 0u64; // 代际号从 1 起；0 = 还没销毁过
+    for publish in 1..=publish_count {
+        let cohort = publish.div_ceil(publishes_per_snapshot); // 当前代际
+        for _ in 0..deletions_per_publish {
+            simulation.push(cohort);
+            total_records += 1;
         }
         // 代际边界：立快照 + 可能销毁最旧的
-        if p % snap_every == 0 {
+        if publish % publishes_per_snapshot == 0 {
             if arm == Arm::CohortBound {
-                sim.seal_open();
+                simulation.seal_open();
             }
-            if cohort > k_snap {
-                dead_upto = cohort - k_snap;
-                sim.reclaim(dead_upto);
+            if cohort > retained_snapshot_cohorts {
+                last_destroyed_cohort = cohort - retained_snapshot_cohorts;
+                simulation.reclaim(last_destroyed_cohort);
             }
         }
     }
-    (sim, dead_upto, total)
+    (simulation, last_destroyed_cohort, total_records)
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw("name=config cap=583 snap_every=10 k_snap=8 pubs=4000 model=counting file_ops=0")
+        emitter.emit_raw("name=config cap=583 snap_every=10 k_snap=8 pubs=4000 model=counting file_ops=0")
     );
     // 主扫描：每代际记录数 = del_per_pub × snap_every，扫四档相对 CAP 的比例
-    for del_per_pub in [1u64, 6, 60, 600] {
+    for deletions_per_publish in [1u64, 6, 60, 600] {
         for arm in [Arm::AppendOrder, Arm::CohortBound] {
-            let (sim, dead_upto, total) = run(arm, 583, del_per_pub, 10, 8, 4000);
-            let (stuck, live, units_alive) = sim.audit(dead_upto);
-            assert_eq!(stuck + live + sim.reclaimed_records, total, "分类必须完备");
-            let per_cohort = del_per_pub * 10;
+            let (simulation, last_destroyed_cohort, total_records) = run(arm, 583, deletions_per_publish, 10, 8, 4000);
+            let (stuck, live, units_alive) = simulation.audit(last_destroyed_cohort);
+            assert_eq!(stuck + live + simulation.reclaimed_records, total_records, "分类必须完备");
+            let records_per_cohort = deletions_per_publish * 10;
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=pinning arm={} per_cohort={per_cohort} total={total} reclaimed={} stuck={stuck} live={live} units_alive={units_alive} stuck_pct_of_resident={:.1}",
-                    arm.tag(),
-                    sim.reclaimed_records,
+                emitter.emit_raw(&format!(
+                    "name=pinning arm={} per_cohort={records_per_cohort} total={total_records} reclaimed={} stuck={stuck} live={live} units_alive={units_alive} stuck_pct_of_resident={:.1}",
+                    arm.output_label(),
+                    simulation.reclaimed_records,
                     100.0 * stuck as f64 / (stuck + live).max(1) as f64
                 ))
             );
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -191,30 +191,30 @@ mod tests {
 
     /// **判据 1 手算锚点**：CAP=8、每发布 1 条、SNAP_EVERY=2（每代际 2 条）、K_SNAP=2、20 次发布。
     /// 手算：单元 0 装代际 1..4（8 条），单元 1 装代际 5..8，单元 2 装 9..10（开放，4 条）。
-    /// 跑到 p=20：当前代际 10，dead_upto = 8。
-    /// 单元 0（代际 ≤ 4）在 dead_upto ≥ 4 时整体回收 ⇒ reclaimed = 8；
+    /// 跑到 p=20：当前代际 10，last_destroyed_cohort = 8。
+    /// 单元 0（代际 ≤ 4）在 last_destroyed_cohort ≥ 4 时整体回收 ⇒ reclaimed = 8；
     /// 单元 1 的代际 5..8 全部 ≤ 8 ⇒ 也整体回收 ⇒ reclaimed = 16；
     /// 开放单元装代际 9、10（各 2 条）都还活 ⇒ stuck = 0, live = 4。
     #[test]
     fn absolute_hand_case_append() {
-        let (sim, dead_upto, total) = run(Arm::AppendOrder, 8, 1, 2, 2, 20);
-        assert_eq!(total, 20);
-        assert_eq!(dead_upto, 8);
-        assert_eq!(sim.reclaimed_records, 16);
-        let (stuck, live, units) = sim.audit(dead_upto);
-        assert_eq!((stuck, live, units), (0, 4, 1));
+        let (simulation, last_destroyed_cohort, total_records) = run(Arm::AppendOrder, 8, 1, 2, 2, 20);
+        assert_eq!(total_records, 20);
+        assert_eq!(last_destroyed_cohort, 8);
+        assert_eq!(simulation.reclaimed_records, 16);
+        let (stuck, live, alive_units) = simulation.audit(last_destroyed_cohort);
+        assert_eq!((stuck, live, alive_units), (0, 4, 1));
     }
 
-    /// **判据 1 的钉住形态**：同参数但 K_SNAP=3、18 次发布 ⇒ dead_upto = 6。
+    /// **判据 1 的钉住形态**：同参数但 K_SNAP=3、18 次发布 ⇒ last_destroyed_cohort = 6。
     /// 单元 0（代际 1..4）全 ≤ 6 ⇒ 回收；单元 1 装代际 5..8：5、6 已死而 7、8 还活
     /// ⇒ **4 条可回收记录被钉住**；开放单元代际 9（2 条）活。
     #[test]
     fn absolute_hand_case_append_stuck() {
-        let (sim, dead_upto, total) = run(Arm::AppendOrder, 8, 1, 2, 3, 18);
-        assert_eq!(total, 18);
-        assert_eq!(dead_upto, 6);
-        assert_eq!(sim.reclaimed_records, 8, "只有单元 0 整体死透");
-        let (stuck, live, _) = sim.audit(dead_upto);
+        let (simulation, last_destroyed_cohort, total_records) = run(Arm::AppendOrder, 8, 1, 2, 3, 18);
+        assert_eq!(total_records, 18);
+        assert_eq!(last_destroyed_cohort, 6);
+        assert_eq!(simulation.reclaimed_records, 8, "只有单元 0 整体死透");
+        let (stuck, live, _) = simulation.audit(last_destroyed_cohort);
         assert_eq!(stuck, 4, "代际 5、6 的 4 条被 7、8 钉在单元 1 里");
         assert_eq!(live, 6);
     }
@@ -223,23 +223,23 @@ mod tests {
     /// 一个单元只装同代际记录 ⇒ 代际死单元死，没有死活混装。
     #[test]
     fn cohort_bound_never_sticks() {
-        for del in [1u64, 6, 60, 600] {
-            for (se, k) in [(10u64, 8u64), (2, 2), (5, 3)] {
-                let (sim, dead_upto, _) = run(Arm::CohortBound, 583, del, se, k, 4000);
-                let (stuck, _, _) = sim.audit(dead_upto);
-                assert_eq!(stuck, 0, "del={del} snap_every={se} k={k}");
+        for deletions_per_publish in [1u64, 6, 60, 600] {
+            for (publishes_per_snapshot, retained_snapshot_cohorts) in [(10u64, 8u64), (2, 2), (5, 3)] {
+                let (simulation, last_destroyed_cohort, _) = run(Arm::CohortBound, 583, deletions_per_publish, publishes_per_snapshot, retained_snapshot_cohorts, 4000);
+                let (stuck, _, _) = simulation.audit(last_destroyed_cohort);
+                assert_eq!(stuck, 0, "del={deletions_per_publish} snap_every={publishes_per_snapshot} k={retained_snapshot_cohorts}");
             }
         }
     }
 
-    /// **判据 2 审计守恒**：分类完备（stuck + live + reclaimed == total），两条臂全格。
+    /// **判据 2 审计守恒**：分类完备（stuck + live + reclaimed == total_records），两条臂全格。
     #[test]
     fn audit_conservation() {
         for arm in [Arm::AppendOrder, Arm::CohortBound] {
-            for del in [1u64, 60, 600] {
-                let (sim, dead_upto, total) = run(arm, 583, del, 10, 8, 4000);
-                let (stuck, live, _) = sim.audit(dead_upto);
-                assert_eq!(stuck + live + sim.reclaimed_records, total, "{arm:?} del={del}");
+            for deletions_per_publish in [1u64, 60, 600] {
+                let (simulation, last_destroyed_cohort, total_records) = run(arm, 583, deletions_per_publish, 10, 8, 4000);
+                let (stuck, live, _) = simulation.audit(last_destroyed_cohort);
+                assert_eq!(stuck + live + simulation.reclaimed_records, total_records, "{arm:?} del={deletions_per_publish}");
             }
         }
     }
@@ -248,13 +248,13 @@ mod tests {
     /// 上升而下降（分母口径的修订记录见源码头部）。
     #[test]
     fn append_stuck_shrinks_with_cohort_size() {
-        let mut prev = f64::MAX;
-        for del in [1u64, 6, 60, 600] {
-            let (sim, dead_upto, _) = run(Arm::AppendOrder, 583, del, 10, 8, 4000);
-            let (stuck, live, _) = sim.audit(dead_upto);
-            let pct = stuck as f64 / (stuck + live).max(1) as f64;
-            assert!(pct <= prev + 1e-9, "del={del}: {pct} > {prev}");
-            prev = pct;
+        let mut previous_share = f64::MAX;
+        for deletions_per_publish in [1u64, 6, 60, 600] {
+            let (simulation, last_destroyed_cohort, _) = run(Arm::AppendOrder, 583, deletions_per_publish, 10, 8, 4000);
+            let (stuck, live, _) = simulation.audit(last_destroyed_cohort);
+            let stuck_share = stuck as f64 / (stuck + live).max(1) as f64;
+            assert!(stuck_share <= previous_share + 1e-9, "del={deletions_per_publish}: {stuck_share} > {previous_share}");
+            previous_share = stuck_share;
         }
     }
 
@@ -263,8 +263,8 @@ mod tests {
     /// cohort_bound 同参数为 0。这一格就是「装载纪律买到什么」的判决格。
     #[test]
     fn sparse_deletes_are_the_worst_case() {
-        let (sim, dead_upto, _) = run(Arm::AppendOrder, 583, 1, 10, 8, 4000);
-        let (stuck, live, _) = sim.audit(dead_upto);
+        let (simulation, last_destroyed_cohort, _) = run(Arm::AppendOrder, 583, 1, 10, 8, 4000);
+        let (stuck, live, _) = simulation.audit(last_destroyed_cohort);
         assert!(stuck + live > 0);
         assert!(
             stuck as f64 / (stuck + live) as f64 > 0.8,
@@ -281,39 +281,39 @@ mod tests {
     /// 删除流停了、代际继续销毁，开放单元里 3 条全死 ⇒ 必须一条都不回收、审计记 3 条 stuck。
     #[test]
     fn paused_stream_open_unit_stays() {
-        let mut sim = Sim::new(8);
+        let mut simulation = Simulation::new(8);
         for _ in 0..3 {
-            sim.push(1);
+            simulation.push(1);
         }
-        sim.reclaim(5);
-        assert_eq!(sim.reclaimed_records, 0, "未封单元不许回收");
-        let (stuck, live, units) = sim.audit(5);
-        assert_eq!((stuck, live, units), (3, 0, 1));
+        simulation.reclaim(5);
+        assert_eq!(simulation.reclaimed_records, 0, "未封单元不许回收");
+        let (stuck, live, alive_units) = simulation.audit(5);
+        assert_eq!((stuck, live, alive_units), (3, 0, 1));
     }
 
     /// 审计的判别力：往一个已回收单元里塞回一条死记录，审计必须多数出一条 stuck。
     #[test]
     fn audit_has_teeth() {
-        let (mut sim, dead_upto, _) = run(Arm::AppendOrder, 8, 1, 2, 2, 20);
-        let (stuck0, _, _) = sim.audit(dead_upto);
-        sim.units[0].cohorts.push(1); // 塞回一条早已死透的
-        let (stuck1, _, _) = sim.audit(dead_upto);
-        assert_eq!(stuck1, stuck0 + 1);
+        let (mut simulation, last_destroyed_cohort, _) = run(Arm::AppendOrder, 8, 1, 2, 2, 20);
+        let (stuck_before, _, _) = simulation.audit(last_destroyed_cohort);
+        simulation.units[0].cohorts.push(1); // 塞回一条早已死透的
+        let (stuck_after, _, _) = simulation.audit(last_destroyed_cohort);
+        assert_eq!(stuck_after, stuck_before + 1);
     }
 
     /// 开放单元不参与回收（没 seal 的单元即使全死也不收）——回收粒度是单元的体现。
     #[test]
     fn open_unit_is_not_reclaimed() {
         // 6 条同代际记录进 CAP=8 的开放单元，代际随后死掉：单元未封 ⇒ 不回收 ⇒ 6 条全 stuck
-        let (sim, dead_upto, total) = run(Arm::AppendOrder, 8, 3, 2, 2, 8);
-        // p=1..8, cohort = ceil(p/2) ∈ 1..4，dead_upto = 2
-        assert_eq!(total, 24);
-        assert_eq!(dead_upto, 2);
-        let (stuck, live, _) = sim.audit(dead_upto);
+        let (simulation, last_destroyed_cohort, total_records) = run(Arm::AppendOrder, 8, 3, 2, 2, 8);
+        // p=1..8, cohort = ceil(p/2) ∈ 1..4，last_destroyed_cohort = 2
+        assert_eq!(total_records, 24);
+        assert_eq!(last_destroyed_cohort, 2);
+        let (stuck, live, _) = simulation.audit(last_destroyed_cohort);
         // 单元 0..2 各 8 条：单元 0 装代际 1(6条)+2(2条) 全 ≤2 ⇒ 回收；
         // 单元 1 装代际 2(4条)+3(4条) ⇒ 4 条 stuck；单元 2 装代际 3(2条)+4(6条) 活；
         // 开放单元 0 条。
-        assert_eq!(sim.reclaimed_records, 8);
+        assert_eq!(simulation.reclaimed_records, 8);
         assert_eq!(stuck, 4);
         assert_eq!(live, 12);
     }

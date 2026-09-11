@@ -1,6 +1,6 @@
-M1_活槽表按每槽一条算	    let live_bitmap = slots(cap).div_ceil(8);	    let live_bitmap = slots(cap) * 8;
-M2_成员表不随宽度涨	    let member = live_slots(cap) * MEMBER_KEY * (w - 1);	    let member = live_slots(cap) * MEMBER_KEY;
-M3_上锁只写不读	    let per_lock = signed_total(cap, w) * w * 2; // 写出 + 读回，各带 w 份	    let per_lock = signed_total(cap, w) * w;
-M4_映射表漏掉副本维	fn map_resident(cap: u64, w: u64) -> u64 { identities(cap) * w * MAP_ENTRY }	fn map_resident(cap: u64, _w: u64) -> u64 { identities(cap) * MAP_ENTRY }
-M5_每次发布漏掉树路径	    (UNIT + (h - 1) * NODE) * w	    (UNIT) * w
-M6_填充率当成满	fn live_slots(cap: u64) -> u64 { slots(cap) * FILL_NUM / FILL_DEN }	fn live_slots(cap: u64) -> u64 { slots(cap) }
+M1_活槽表按每槽一条算	    let live_bitmap_bytes = slot_count(capacity_bytes).div_ceil(8);	    let live_bitmap_bytes = slot_count(capacity_bytes) * 8;
+M2_成员表不随宽度涨	    let member_snapshot_bytes = live_slots(capacity_bytes) * MEMBER_KEY_BYTES * (stripe_width - 1);	    let member_snapshot_bytes = live_slots(capacity_bytes) * MEMBER_KEY_BYTES;
+M3_上锁只写不读	    let bytes_per_lock_cycle = signed_total(capacity_bytes, stripe_width) * stripe_width * 2; // 写出 + 读回，各带 stripe_width 份	    let bytes_per_lock_cycle = signed_total(capacity_bytes, stripe_width) * stripe_width;
+M4_映射表漏掉副本维	fn map_resident(capacity_bytes: u64, stripe_width: u64) -> u64 { identity_count(capacity_bytes) * stripe_width * MAP_ENTRY_BYTES }	fn map_resident(capacity_bytes: u64, _w: u64) -> u64 { identity_count(capacity_bytes) * MAP_ENTRY_BYTES }
+M5_每次发布漏掉树路径	    (UNIT_BYTES + (height - 1) * NODE_BYTES) * stripe_width	    (UNIT_BYTES) * stripe_width
+M6_填充率当成满	fn live_slots(capacity_bytes: u64) -> u64 { slot_count(capacity_bytes) * FILL_NUMERATOR / FILL_DENOMINATOR }	fn live_slots(capacity_bytes: u64) -> u64 { slot_count(capacity_bytes) }

@@ -1,6 +1,6 @@
-M1_跨区轮转退化成区内连续	fn placement(gen: u64, regions: u64, slots: u64) -> (u64, u64) {\n    (gen % regions, (gen / regions) % slots)\n}	fn placement(gen: u64, regions: u64, slots: u64) -> (u64, u64) {\n    ((gen / slots) % regions, gen % slots)\n}
-M2_CRC不参与判定	if crc32(&buf[0..16]) != want {\n        return None;\n    }	if false {\n        return None;\n    }
-M3_magic不参与判定	if u32::from_le_bytes(buf[0..4].try_into().ok()?) != MAGIC {\n        return None;\n    }	if false {\n        return None;\n    }
-M4_槽偏移不乘槽宽	REGION_OFF + slot_in_region * SLOT_BYTES	REGION_OFF + slot_in_region
-M5_CRC多项式写错	crc = (crc >> 1) ^ (0xEDB8_8320 & m);	crc = (crc >> 1) ^ (0xEDB8_8321 & m);
+M1_跨区轮转退化成区内连续	fn placement_of_generation(generation: u64, region_count: u64, slots_per_region: u64) -> (u64, u64) {\n    (generation % region_count, (generation / region_count) % slots_per_region)\n}	fn placement_of_generation(generation: u64, region_count: u64, slots_per_region: u64) -> (u64, u64) {\n    ((generation / slots_per_region) % region_count, generation % slots_per_region)\n}
+M2_CRC不参与判定	if cyclic_redundancy_check_32(&buffer[0..16]) != expected_checksum {\n        return None;\n    }	if false {\n        return None;\n    }
+M3_magic不参与判定	if u32::from_le_bytes(buffer[0..4].try_into().ok()?) != MAGIC {\n        return None;\n    }	if false {\n        return None;\n    }
+M4_槽偏移不乘槽宽	REGION_OFFSET_BYTES + slot_in_region * SLOT_BYTES	REGION_OFFSET_BYTES + slot_in_region
+M5_CRC多项式写错	checksum_state = (checksum_state >> 1) ^ (0xEDB8_8320 & mask);	checksum_state = (checksum_state >> 1) ^ (0xEDB8_8321 & mask);
 M6_代数不够转三圈	const GENERATIONS: u64 = 24;	const GENERATIONS: u64 = 8;

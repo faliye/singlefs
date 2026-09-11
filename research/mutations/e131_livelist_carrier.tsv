@@ -1,15 +1,15 @@
 M1_树表净字节改成另一个口径	const TREE_TABLE_PAYLOAD: u64 = 16284;	const TREE_TABLE_PAYLOAD: u64 = 16320;
 M2_树表条目宽抄错	const TREE_TABLE_ENTRY: u64 = 121;	const TREE_TABLE_ENTRY: u64 = 120;
-M3_事件条目少算位置条目一字节	const EVENT_ENTRY: u64 = 2 + 14 + 8;	const EVENT_ENTRY: u64 = 2 + 13 + 8;
-M4_树ID宽抄错	const TREE_ID_BYTES: u64 = 8;	const TREE_ID_BYTES: u64 = 4;
-M5_每头只算一条树表条目	let tt_entries = heads * 2;	let tt_entries = heads;
-M6_共享臂也按每头算树表	let tt_entries = heads + 1;	let tt_entries = heads * 2;
-M7_共享臂的点查只在一个头里走	descents: levels(heads * per_head_blocks, fanout(entry)),	descents: levels(per_head_blocks, fanout(entry)),
-M8_每头臂的点查按全池算	descents: levels(per_head_blocks, fanout(entry)),	descents: levels(heads * per_head_blocks, fanout(entry)),
+M3_事件条目少算位置条目一字节	const EVENT_ENTRY_BYTES: u64 = 2 + 14 + 8;	const EVENT_ENTRY_BYTES: u64 = 2 + 13 + 8;
+M4_树ID宽抄错	const TREE_IDENTIFIER_BYTES: u64 = 8;	const TREE_IDENTIFIER_BYTES: u64 = 4;
+M5_每头只算一条树表条目	let tree_table_entry_count = heads * 2;	let tree_table_entry_count = heads;
+M6_共享臂也按每头算树表	let tree_table_entry_count = heads + 1;	let tree_table_entry_count = heads * 2;
+M7_共享臂的点查只在一个头里走	descents: tree_level_count(heads * blocks_per_head, fanout(entry_bytes)),	descents: tree_level_count(blocks_per_head, fanout(entry_bytes)),
+M8_每头臂的点查按全池算	descents: tree_level_count(blocks_per_head, fanout(entry_bytes)),	descents: tree_level_count(heads * blocks_per_head, fanout(entry_bytes)),
 M9_共享臂假装不用范围计数	pre_reserve_needs_range_scan: 1,	pre_reserve_needs_range_scan: 0,
-M10_层数把叶算成零	let mut lv = 1u32;	let mut lv = 0u32;
-M11_扇出忘了减节点头	((NODE_BYTES - NODE_HDR) / entry_bytes).max(2)	(NODE_BYTES / entry_bytes).max(2)
-M12_占容量的每字节系数抄错	const PPM_PER_BYTE_AT_E97: f64 = 27.65;	const PPM_PER_BYTE_AT_E97: f64 = 25.00;
-M13_占容量不随条目数缩放	PPM_PER_BYTE_AT_E97 * r.entry_bytes as f64 * (r.entries_total as f64 / E97_ENTRIES)	PPM_PER_BYTE_AT_E97 * r.entry_bytes as f64
-M14_条目总数漏掉头数	entries_total: heads * per_head_blocks,\n        entry_bytes: entry,\n        // 点查只在自己那棵树里走。	entries_total: per_head_blocks,\n        entry_bytes: entry,\n        // 点查只在自己那棵树里走。
-M15_共享臂的条目不加树ID	let entry = EVENT_ENTRY + TREE_ID_BYTES;	let entry = EVENT_ENTRY;
+M10_层数把叶算成零	let mut level_count = 1u32;	let mut level_count = 0u32;
+M11_扇出忘了减节点头	((NODE_BYTES - NODE_HEADER_BYTES) / entry_bytes).max(2)	(NODE_BYTES / entry_bytes).max(2)
+M12_占容量的每字节系数抄错	const CAPACITY_PARTS_PER_MILLION_PER_ENTRY_BYTE_AT_E97: f64 = 27.65;	const CAPACITY_PARTS_PER_MILLION_PER_ENTRY_BYTE_AT_E97: f64 = 25.00;
+M13_占容量不随条目数缩放	CAPACITY_PARTS_PER_MILLION_PER_ENTRY_BYTE_AT_E97 * reading.entry_bytes as f64 * (reading.entries_total as f64 / E97_ENTRIES)	CAPACITY_PARTS_PER_MILLION_PER_ENTRY_BYTE_AT_E97 * reading.entry_bytes as f64
+M14_条目总数漏掉头数	entries_total: heads * blocks_per_head,\n        entry_bytes,\n        // 点查只在自己那棵树里走。	entries_total: blocks_per_head,\n        entry_bytes,\n        // 点查只在自己那棵树里走。
+M15_共享臂的条目不加树ID	let entry_bytes = EVENT_ENTRY_BYTES + TREE_IDENTIFIER_BYTES;	let entry_bytes = EVENT_ENTRY_BYTES;

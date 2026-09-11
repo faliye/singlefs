@@ -38,11 +38,11 @@ fn checkpoint_demand(shape: Shape, ckpt_cost: u64, journal_blocks_per_window: u6
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct RunOutcome {
     ckpt_stall: u64,
-    ckpts_done: u64,
+    checkpoints_done: u64,
     normal_denied: u64,
-    min_free_seen: u64,
+    minimum_free_blocks_seen: u64,
 }
 
 /// 跑一轮。`fill` = 起始占用率（0..100）。
@@ -53,79 +53,79 @@ struct Out {
 /// 加上 D22（单元原子性怎么合成）的根环 K 代扣住 —— 那部分空间在窗口内拿不回来。
 const LEAK_PER_WINDOW: u64 = 8;
 
-fn run(shape: Shape, reserve: u64, capacity: u64, fill_pct: u64,
-       ops: u64, ckpt_every: u64, ckpt_cost: u64, blocks_per_op: u64) -> Out {
-    let mut o = Out { min_free_seen: capacity, ..Default::default() };
+fn simulate_reserve_run(shape: Shape, reserve: u64, capacity: u64, fill_percent: u64,
+       operation_count: u64, checkpoint_every: u64, ckpt_cost: u64, blocks_per_operation: u64) -> RunOutcome {
+    let mut outcome = RunOutcome { minimum_free_blocks_seen: capacity, ..Default::default() };
     // 起始：盘被填到 fill_pct，剩下的是自由空间
-    let mut free = capacity - capacity * fill_pct / 100;
-    let journal_per_window = ckpt_every * blocks_per_op;
+    let mut free_blocks = capacity - capacity * fill_percent / 100;
+    let journal_blocks_per_window = checkpoint_every * blocks_per_operation;
 
-    for i in 1..=ops {
+    for operation_index in 1..=operation_count {
         // 普通分配（写数据/元数据）：**不许动保留池**
-        let want = blocks_per_op;
-        if free.saturating_sub(reserve) >= want {
-            free -= want;
+        let wanted_blocks = blocks_per_operation;
+        if free_blocks.saturating_sub(reserve) >= wanted_blocks {
+            free_blocks -= wanted_blocks;
         } else {
-            o.normal_denied += 1;
+            outcome.normal_denied += 1;
         }
         // 链式：journal 块也是普通分配，同样不许动保留池
-        if shape == Shape::Chain && free.saturating_sub(reserve) >= blocks_per_op {
-            free -= blocks_per_op;
+        if shape == Shape::Chain && free_blocks.saturating_sub(reserve) >= blocks_per_operation {
+            free_blocks -= blocks_per_operation;
         } else if shape == Shape::Chain {
-            o.normal_denied += 1;
+            outcome.normal_denied += 1;
         }
-        o.min_free_seen = o.min_free_seen.min(free);
+        outcome.minimum_free_blocks_seen = outcome.minimum_free_blocks_seen.min(free_blocks);
 
-        if i % ckpt_every == 0 {
-            let need = checkpoint_demand(shape, ckpt_cost, journal_per_window);
+        if operation_index % checkpoint_every == 0 {
+            let checkpoint_needed_blocks = checkpoint_demand(shape, ckpt_cost, journal_blocks_per_window);
             // checkpoint **可以**动保留池——那正是保留池存在的理由
-            if free >= need {
-                free -= need;
-                o.ckpts_done += 1;
+            if free_blocks >= checkpoint_needed_blocks {
+                free_blocks -= checkpoint_needed_blocks;
+                outcome.checkpoints_done += 1;
                 // 回收本窗口搅动的空间，**减去被扣住的那部分**
-                let recycled = ckpt_every * blocks_per_op
-                      + if shape == Shape::Chain { journal_per_window } else { 0 }
-                      + need;
-                free += recycled.saturating_sub(LEAK_PER_WINDOW);
+                let recycled_blocks = checkpoint_every * blocks_per_operation
+                      + if shape == Shape::Chain { journal_blocks_per_window } else { 0 }
+                      + checkpoint_needed_blocks;
+                free_blocks += recycled_blocks.saturating_sub(LEAK_PER_WINDOW);
             } else {
-                o.ckpt_stall += 1;
+                outcome.ckpt_stall += 1;
             }
         }
     }
-    o
+    outcome
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let (capacity, ops, ckpt_every, ckpt_cost, bpo) = (100_000u64, 20_000u64, 100u64, 64u64, 1u64);
-    let journal_per_window = ckpt_every * bpo;
-    println!("{}", em.emit_raw(&format!(
-        "name=config capacity={capacity} ops={ops} ckpt_every={ckpt_every} \
-         ckpt_cost={ckpt_cost} blocks_per_op={bpo} journal_per_window={journal_per_window}")));
+    let mut emitter = Emitter::new();
+    let (capacity, operation_count, checkpoint_every, ckpt_cost, blocks_per_operation) = (100_000u64, 20_000u64, 100u64, 64u64, 1u64);
+    let journal_blocks_per_window = checkpoint_every * blocks_per_operation;
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config capacity={capacity} ops={operation_count} ckpt_every={checkpoint_every} \
+         ckpt_cost={ckpt_cost} blocks_per_op={blocks_per_operation} journal_per_window={journal_blocks_per_window}")));
 
-    for fill in [95u64, 99] {
+    for fill_percent in [95u64, 99] {
         for shape in [Shape::Ring, Shape::Chain] {
             for reserve in [0u64, 32, 64, 100, 128, 164, 256, 512] {
-                let o = run(shape, reserve, capacity, fill, ops, ckpt_every, ckpt_cost, bpo);
-                println!("{}", em.emit_raw(&format!(
-                    "name=cell fill={fill} shape={} reserve={reserve} \
+                let cell_outcome = simulate_reserve_run(shape, reserve, capacity, fill_percent, operation_count, checkpoint_every, ckpt_cost, blocks_per_operation);
+                println!("{}", emitter.emit_raw(&format!(
+                    "name=cell fill={fill_percent} shape={} reserve={reserve} \
                      ckpt_stall={} ckpts_done={} normal_denied={} min_free={}",
-                    shape.label(), o.ckpt_stall, o.ckpts_done, o.normal_denied, o.min_free_seen)));
+                    shape.label(), cell_outcome.ckpt_stall, cell_outcome.checkpoints_done, cell_outcome.normal_denied, cell_outcome.minimum_free_blocks_seen)));
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const CAP: u64 = 100_000;
-    const OPS: u64 = 20_000;
-    const EVERY: u64 = 100;
-    const COST: u64 = 64;
-    const BPO: u64 = 1;
+    const TEST_CAPACITY_BLOCKS: u64 = 100_000;
+    const TEST_OPERATION_COUNT: u64 = 20_000;
+    const TEST_CHECKPOINT_EVERY: u64 = 100;
+    const TEST_CHECKPOINT_COST: u64 = 64;
+    const TEST_BLOCKS_PER_OPERATION: u64 = 1;
 
     /// **被测命题的绝对值，逐条钉死**，不是「链比环要得多」这种相对判断。
     #[test]
@@ -140,25 +140,25 @@ mod tests {
     /// 这条是 C30 要还的那个量：环 64、链 164。
     #[test]
     fn stall_hits_zero_exactly_at_the_predicted_reserve() {
-        let cases = [(Shape::Ring, COST), (Shape::Chain, COST + EVERY * BPO)];
-        for (shape, need) in cases {
-            let below = run(shape, need - 1, CAP, 99, OPS, EVERY, COST, BPO);
-            let at = run(shape, need, CAP, 99, OPS, EVERY, COST, BPO);
-            assert!(below.ckpt_stall > 0,
-                "{shape:?}：reserve={} 时本该还有卡死", need - 1);
-            assert_eq!(at.ckpt_stall, 0,
-                "{shape:?}：reserve={need} 时卡死本该归零，实测 {}", at.ckpt_stall);
+        let cases = [(Shape::Ring, TEST_CHECKPOINT_COST), (Shape::Chain, TEST_CHECKPOINT_COST + TEST_CHECKPOINT_EVERY * TEST_BLOCKS_PER_OPERATION)];
+        for (shape, needed_reserve) in cases {
+            let outcome_one_block_below_need = simulate_reserve_run(shape, needed_reserve - 1, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+            let outcome_at_need = simulate_reserve_run(shape, needed_reserve, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+            assert!(outcome_one_block_below_need.ckpt_stall > 0,
+                "{shape:?}：reserve={} 时本该还有卡死", needed_reserve - 1);
+            assert_eq!(outcome_at_need.ckpt_stall, 0,
+                "{shape:?}：reserve={needed_reserve} 时卡死本该归零，实测 {}", outcome_at_need.ckpt_stall);
         }
     }
 
     /// **链的需求恰好比环多一个窗口的 journal 块**，绝对值。
     #[test]
     fn chain_needs_exactly_one_window_of_journal_blocks_more() {
-        let ring_need = COST;
-        let chain_need = COST + EVERY * BPO;
-        assert_eq!(chain_need - ring_need, EVERY * BPO);
+        let ring_need = TEST_CHECKPOINT_COST;
+        let chain_need = TEST_CHECKPOINT_COST + TEST_CHECKPOINT_EVERY * TEST_BLOCKS_PER_OPERATION;
+        assert_eq!(chain_need - ring_need, TEST_CHECKPOINT_EVERY * TEST_BLOCKS_PER_OPERATION);
         // 而且在环够用的那一档上，链**必须**还在卡
-        let chain_at_ring_need = run(Shape::Chain, ring_need, CAP, 99, OPS, EVERY, COST, BPO);
+        let chain_at_ring_need = simulate_reserve_run(Shape::Chain, ring_need, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
         assert!(chain_at_ring_need.ckpt_stall > 0,
             "链在环够用的那一档上本该还在卡死");
     }
@@ -168,9 +168,9 @@ mod tests {
     #[test]
     fn with_a_roomy_disk_neither_shape_stalls_even_at_zero_reserve() {
         for shape in [Shape::Ring, Shape::Chain] {
-            let o = run(shape, 0, CAP, 50, OPS, EVERY, COST, BPO);
-            assert_eq!(o.ckpt_stall, 0, "{shape:?}：盘只用一半却卡死了");
-            assert_eq!(o.ckpts_done, OPS / EVERY, "{shape:?}：checkpoint 次数不对");
+            let outcome = simulate_reserve_run(shape, 0, TEST_CAPACITY_BLOCKS, 50, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+            assert_eq!(outcome.ckpt_stall, 0, "{shape:?}：盘只用一半却卡死了");
+            assert_eq!(outcome.checkpoints_done, TEST_OPERATION_COUNT / TEST_CHECKPOINT_EVERY, "{shape:?}：checkpoint 次数不对");
         }
     }
 
@@ -183,8 +183,8 @@ mod tests {
     /// **保留池已经大到不卡死**。前提之外它的符号是反的。
     #[test]
     fn within_the_no_stall_range_a_bigger_reserve_denies_more() {
-        let at_need = run(Shape::Ring, COST, CAP, 99, OPS, EVERY, COST, BPO);
-        let much_bigger = run(Shape::Ring, 512, CAP, 99, OPS, EVERY, COST, BPO);
+        let at_need = simulate_reserve_run(Shape::Ring, TEST_CHECKPOINT_COST, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+        let much_bigger = simulate_reserve_run(Shape::Ring, 512, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
         assert_eq!(at_need.ckpt_stall, 0, "两侧都必须在不卡死的区间里");
         assert_eq!(much_bigger.ckpt_stall, 0);
         assert!(much_bigger.normal_denied > at_need.normal_denied,
@@ -194,20 +194,20 @@ mod tests {
     /// **卡死区间里的符号是反的**，这一格必须显式钉住，否则上一条的前提是隐含的。
     #[test]
     fn inside_the_stalling_range_a_smaller_reserve_denies_far_more() {
-        let starved = run(Shape::Ring, 0, CAP, 99, OPS, EVERY, COST, BPO);
-        let ok = run(Shape::Ring, COST, CAP, 99, OPS, EVERY, COST, BPO);
+        let starved = simulate_reserve_run(Shape::Ring, 0, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+        let outcome_at_cost_reserve = simulate_reserve_run(Shape::Ring, TEST_CHECKPOINT_COST, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
         assert!(starved.ckpt_stall > 0, "reserve=0 本该卡死");
-        assert_eq!(ok.ckpt_stall, 0);
-        assert!(starved.normal_denied > ok.normal_denied * 5,
+        assert_eq!(outcome_at_cost_reserve.ckpt_stall, 0);
+        assert!(starved.normal_denied > outcome_at_cost_reserve.normal_denied * 5,
             "卡死时拒绝数本该被卡死支配，远高于不卡死那档");
     }
 
     /// checkpoint 次数必须与 ops/ckpt_every 一致（没卡死时），否则计数本身错了。
     #[test]
     fn checkpoints_are_counted_correctly_when_nothing_stalls() {
-        let o = run(Shape::Ring, COST, CAP, 99, OPS, EVERY, COST, BPO);
-        assert_eq!(o.ckpt_stall, 0);
-        assert_eq!(o.ckpts_done, OPS / EVERY);
-        assert_eq!(o.ckpts_done, 200);
+        let outcome = simulate_reserve_run(Shape::Ring, TEST_CHECKPOINT_COST, TEST_CAPACITY_BLOCKS, 99, TEST_OPERATION_COUNT, TEST_CHECKPOINT_EVERY, TEST_CHECKPOINT_COST, TEST_BLOCKS_PER_OPERATION);
+        assert_eq!(outcome.ckpt_stall, 0);
+        assert_eq!(outcome.checkpoints_done, TEST_OPERATION_COUNT / TEST_CHECKPOINT_EVERY);
+        assert_eq!(outcome.checkpoints_done, 200);
     }
 }

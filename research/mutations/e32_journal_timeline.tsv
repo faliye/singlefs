@@ -1,7 +1,7 @@
-M1_断号即止被摘掉	        if r.jsn != expected {\n            break;\n        }	        let _ = expected;
-M2_反向链不看了	if arm.checks_back_chain() && r.prev_hash != prev {	if false && r.prev_hash != prev {
-M3_作废残留成了空操作	for j in from_jsn..from_jsn + count {	for j in from_jsn..from_jsn {
-M4_残留计数漏掉时间线	r.timeline == TIMELINE_A && r.jsn >= hole	r.timeline == TIMELINE_A && r.jsn >= hole + 1000
-M5_撕裂记录照样接受	        if !r.csum_ok {	        if false && !r.csum_ok {
-M6_丢失的新记录不计数	o.lost_new = new_after - replayed_new;	o.lost_new = 0;
-M7_稳态布景被拿掉	    for jsn in 1..=slots as u64 {	    for jsn in 1..=0u64 {
+M1_断号即止被摘掉	        if record.journal_sequence_number != expected {\n            break;\n        }	        let _ = expected;
+M2_反向链不看了	if arm.checks_back_chain() && record.previous_record_hash != chain_hash {	if false && record.previous_record_hash != chain_hash {
+M3_作废残留成了空操作	for erased_journal_sequence_number in from_journal_sequence_number..from_journal_sequence_number + count {	for erased_journal_sequence_number in from_journal_sequence_number..from_journal_sequence_number {
+M4_残留计数漏掉时间线	record.timeline == TIMELINE_BEFORE_FIRST_CRASH && record.journal_sequence_number >= hole	record.timeline == TIMELINE_BEFORE_FIRST_CRASH && record.journal_sequence_number >= hole + 1000
+M5_撕裂记录照样接受	        if !record.is_checksum_valid {	        if false && !record.is_checksum_valid {
+M6_丢失的新记录不计数	arm_outcome.lost_new = new_after - replayed_new;	arm_outcome.lost_new = 0;
+M7_稳态布景被拿掉	    for journal_sequence_number in 1..=slots as u64 {	    for journal_sequence_number in 1..=0u64 {

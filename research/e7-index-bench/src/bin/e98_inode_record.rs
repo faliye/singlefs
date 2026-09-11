@@ -60,19 +60,19 @@ const NODE_BYTES: u64 = 16384;
 /// E73 按 D18 已定项 7 重算过的三档基础节点头下界。
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
 /// D18 已定项 7 的两个预留位合计（nonce 代号 12 + MAC 16）。E117 的 `resv12` 臂同一个数。
-const RESERVED_HDR: u64 = 12 + 16;
+const RESERVED_HEADER_BYTES: u64 = 12 + 16;
 /// 写序（C113 定案 P1）。D18 已定项 7 补注：三档下界各加它。
 const WRITE_ORDER: u64 = 10;
 /// 今天成立的三档基础节点头。上面那组 58 / 67 / 76 是 E73 跑那天的下界，
 /// 此后两笔加宽从来没落到本实验的源码里，2026-09-07 一次补上（C89 ④ 与 C193）：
 /// 写序 10 + 预留位 28。两组都留着并逐格跑——删掉旧那组就看不出这次补账改了什么。
 const NODE_HEADERS_TODAY: [u64; 3] = [
-    NODE_HEADERS[0] + WRITE_ORDER + RESERVED_HDR,
-    NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HDR,
-    NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HDR,
+    NODE_HEADERS[0] + WRITE_ORDER + RESERVED_HEADER_BYTES,
+    NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HEADER_BYTES,
+    NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HEADER_BYTES,
 ];
 /// D19 已定项 4（2026-09-03）：位置条目 14 ⇒ 树表单元指针 31 + 14 × 2 = 59。
-const CHILD_PTR: u64 = 59;
+const CHILD_POINTER_BYTES: u64 = 59;
 /// D18 已定项 7：共同明文前缀 42 字节；数据单元头 91 字节初值。
 const COMMON_PREFIX: u64 = 42;
 const DATA_UNIT_HEADER: u64 = 91;
@@ -108,24 +108,24 @@ fn triggers_hard_constraint_6(shape: Shape, non_recomputable_fields: usize) -> b
 /// 「永久」= 重算不回来。只有当 14 个字段全都能从权威态重算时，损失才是可恢复的（0）。
 /// ⚠️ E29（坏一个节点的爆炸半径）实测索引节点的永久损失**恒 0**，靠的正是「索引可从单元重建」；
 /// inode 记录不满足那个前提 ⇒ **两种形态的永久损失都不是 0**。
-fn permanent_loss_per_container(shape: Shape, header: u64, rec: u64, non_recomputable: usize) -> u64 {
+fn permanent_loss_per_container(shape: Shape, header: u64, record_width_bytes: u64, non_recomputable: usize) -> u64 {
     if non_recomputable == 0 {
         return 0; // 全都算得回来 ⇒ 与 E29 的索引节点同形，永久损失恒 0
     }
-    records_per_container(shape, header, rec)
+    records_per_container(shape, header, record_width_bytes)
 }
 
 /// 一个容器装几条记录。
-fn records_per_container(shape: Shape, header: u64, rec: u64) -> u64 {
-    if rec == 0 {
+fn records_per_container(shape: Shape, header: u64, record_width_bytes: u64) -> u64 {
+    if record_width_bytes == 0 {
         return 0;
     }
     match shape {
         Shape::BtreeValue => {
-            if NODE_BYTES <= header { 0 } else { (NODE_BYTES - header) / rec }
+            if NODE_BYTES <= header { 0 } else { (NODE_BYTES - header) / record_width_bytes }
         }
         Shape::PackedUnit => {
-            if UNIT_BYTES <= DATA_UNIT_HEADER { 0 } else { (UNIT_BYTES - DATA_UNIT_HEADER) / rec }
+            if UNIT_BYTES <= DATA_UNIT_HEADER { 0 } else { (UNIT_BYTES - DATA_UNIT_HEADER) / record_width_bytes }
         }
     }
 }
@@ -177,7 +177,7 @@ const KEY_HEAD_DISCRIM_ARMS: [u64; 2] = [0, 2];
 const KEY_HEAD_DISCRIM: u64 = KEY_HEAD_DISCRIM_ARMS[0];
 
 fn record_bytes() -> u64 {
-    FIELDS.iter().map(|f| f.bytes).sum::<u64>() + RESERVED
+    FIELDS.iter().map(|field| field.bytes).sum::<u64>() + RESERVED
 }
 
 /// **判据 2**：不能只从权威态重算的字段数。
@@ -186,123 +186,123 @@ fn non_recomputable(assume_all_recomputable: bool) -> usize {
     if assume_all_recomputable {
         return 0;
     }
-    FIELDS.iter().filter(|f| !f.recomputable).count()
+    FIELDS.iter().filter(|field| !field.recomputable).count()
 }
 
-fn fanout(node: u64, header: u64, range_field: u64, entry: u64) -> u64 {
-    if entry == 0 {
+fn fanout(node_bytes: u64, header: u64, range_field: u64, entry_bytes: u64) -> u64 {
+    if entry_bytes == 0 {
         return 0;
     }
-    let o = header.saturating_add(range_field);
-    if node <= o {
+    let header_and_range_bytes = header.saturating_add(range_field);
+    if node_bytes <= header_and_range_bytes {
         return 0;
     }
-    (node - o) / entry
+    (node_bytes - header_and_range_bytes) / entry_bytes
 }
 
-fn tree_height(n: u64, leaf_f: u64, inner_f: u64) -> Option<u64> {
-    if leaf_f == 0 || inner_f < 2 {
+fn tree_height(record_count: u64, leaf_fanout: u64, inner_fanout: u64) -> Option<u64> {
+    if leaf_fanout == 0 || inner_fanout < 2 {
         return None;
     }
-    let mut h = 1u64;
-    let mut cap = leaf_f as u128;
-    while cap < n as u128 {
-        cap = cap.saturating_mul(inner_f as u128);
-        h += 1;
-        if h > 64 {
+    let mut height_levels = 1u64;
+    let mut reachable_records = leaf_fanout as u128;
+    while reachable_records < record_count as u128 {
+        reachable_records = reachable_records.saturating_mul(inner_fanout as u128);
+        height_levels += 1;
+        if height_levels > 64 {
             return None;
         }
     }
-    Some(h)
+    Some(height_levels)
 }
 
-/// **判据 3**：`locality_id` 对照。`n` 个对象里 `bad` 个的记录与 extent key 首段不一致。
+/// **判据 3**：`locality_id` 对照。`object_count` 个对象里 `mismatched_object_count` 个的记录与 extent key 首段不一致。
 /// 返回 (抓到的, 静默读成空洞的)。`with_check` 是那条不变量在不在。
-fn locality_mismatch(n: u64, bad: u64, with_check: bool) -> (u64, u64) {
-    let bad = bad.min(n);
+fn locality_mismatch(object_count: u64, mismatched_object_count: u64, with_check: bool) -> (u64, u64) {
+    let mismatched_object_count = mismatched_object_count.min(object_count);
     if with_check {
-        (bad, 0)
+        (mismatched_object_count, 0)
     } else {
-        (0, bad)
+        (0, mismatched_object_count)
     }
 }
 
-/// **判据 4**：同一个 checkpoint 内对同一个 inode 改 `k` 次，改动计数取 `checkpoint_txg`
+/// **判据 4**：同一个 checkpoint 内对同一个 inode 改 `updates_in_window` 次，改动计数取 `checkpoint_txg`
 /// ⇒ k 条记录同号 ⇒ 两两之间排不出先后。返回排不出先后的对数。
-/// `window_seq_bits` > 0 时窗口内序号能分开它们，返回 0。
-fn unordered_pairs(k: u64, window_seq_bits: u32) -> u64 {
-    if window_seq_bits > 0 && (k as u128) <= (1u128 << window_seq_bits) {
+/// `window_sequence_bits` > 0 时窗口内序号能分开它们，返回 0。
+fn unordered_pairs(updates_in_window: u64, window_sequence_bits: u32) -> u64 {
+    if window_sequence_bits > 0 && (updates_in_window as u128) <= (1u128 << window_sequence_bits) {
         return 0;
     }
-    k * k.saturating_sub(1) / 2
+    updates_in_window * updates_in_window.saturating_sub(1) / 2
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
-    let rec = record_bytes();
-    let key = KEY_INODE + KEY_HEAD_DISCRIM;
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
+    let record_width_bytes = record_bytes();
+    let key_bytes = KEY_INODE + KEY_HEAD_DISCRIM;
 
-    out.push(em.emit_raw(&format!(
-        "name=config node_bytes={NODE_BYTES} common_prefix={COMMON_PREFIX} child_ptr={CHILD_PTR} \
-         record_bytes={rec} reserved={RESERVED} key_bytes={key} fields={}",
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=config node_bytes={NODE_BYTES} common_prefix={COMMON_PREFIX} child_ptr={CHILD_POINTER_BYTES} \
+         record_bytes={record_width_bytes} reserved={RESERVED} key_bytes={key_bytes} fields={}",
         FIELDS.len()
     )));
 
     // 判据 2：逐字段的态别
-    for f in FIELDS.iter() {
-        out.push(em.emit_raw(&format!(
+    for field in FIELDS.iter() {
+        output_lines.push(emitter.emit_raw(&format!(
             "name=field name_of={} bytes={} recomputable={} why={}",
-            f.name,
-            f.bytes,
-            u8::from(f.recomputable),
-            f.why
+            field.name,
+            field.bytes,
+            u8::from(field.recomputable),
+            field.why
         )));
     }
-    for &assume in [false, true].iter() {
-        out.push(em.emit_raw(&format!(
+    for &assume_all_recomputable in [false, true].iter() {
+        output_lines.push(emitter.emit_raw(&format!(
             "name=state_class assume_all_recomputable={} non_recomputable={} total_fields={}",
-            u8::from(assume),
-            non_recomputable(assume),
+            u8::from(assume_all_recomputable),
+            non_recomputable(assume_all_recomputable),
             FIELDS.len()
         )));
     }
 
     // **形态判据**：两种形态各自触不触发 D21 硬约束 6、各装几条、丢一个容器永久损失几条
     for &shape in [Shape::BtreeValue, Shape::PackedUnit].iter() {
-        for &assume in [false, true].iter() {
-            let nr = non_recomputable(assume);
-            let loss = permanent_loss_per_container(shape, 58, rec, nr);
-            out.push(em.emit_raw(&format!(
-                "name=shape shape={:?} assume_all_recomputable={} non_recomputable={nr} \
+        for &assume_all_recomputable in [false, true].iter() {
+            let non_recomputable_field_count = non_recomputable(assume_all_recomputable);
+            let permanent_loss = permanent_loss_per_container(shape, 58, record_width_bytes, non_recomputable_field_count);
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=shape shape={:?} assume_all_recomputable={} non_recomputable={non_recomputable_field_count} \
                  triggers_hc6={} records_per_container={} container_bytes={} \
-                 permanent_loss_per_container={loss} needs_redundancy_clause={}",
+                 permanent_loss_per_container={permanent_loss} needs_redundancy_clause={}",
                 shape,
-                u8::from(assume),
-                u8::from(triggers_hard_constraint_6(shape, nr)),
-                records_per_container(shape, 58, rec),
+                u8::from(assume_all_recomputable),
+                u8::from(triggers_hard_constraint_6(shape, non_recomputable_field_count)),
+                records_per_container(shape, 58, record_width_bytes),
                 match shape { Shape::BtreeValue => NODE_BYTES, Shape::PackedUnit => UNIT_BYTES },
-                u8::from(loss > 0),
+                u8::from(permanent_loss > 0),
             )));
         }
     }
 
     // 判据 1 / 5：几何与爆炸半径。inode 树带不带 key 区间两种读法都算（D18 已定项 2 没说）
-    for &hdr in NODE_HEADERS.iter().chain(NODE_HEADERS_TODAY.iter()) {
-        for &disc in KEY_HEAD_DISCRIM_ARMS.iter() {
-            let k = KEY_INODE + disc;
+    for &node_header_bytes in NODE_HEADERS.iter().chain(NODE_HEADERS_TODAY.iter()) {
+        for &head_discriminator_bytes in KEY_HEAD_DISCRIM_ARMS.iter() {
+            let arm_key_bytes = KEY_INODE + head_discriminator_bytes;
             for &with_range in [false, true].iter() {
-                let rf = if with_range { 2 * k } else { 0 };
-                let leaf_f = fanout(NODE_BYTES, hdr, rf, rec);
-                let inner_f = fanout(NODE_BYTES, hdr, rf, k + CHILD_PTR);
-                for &n in [1_000_000u64, 100_000_000, 1_000_000_000].iter() {
-                    let h = tree_height(n, leaf_f, inner_f);
-                    out.push(em.emit_raw(&format!(
-                        "name=geom header={hdr} head_discrim={disc} key={k} with_range={} \
-                         inodes={n} record={rec} leaf_fanout={leaf_f} inner_fanout={inner_f} \
-                         height={} records_lost_per_leaf={leaf_f}",
+                let range_field_bytes = if with_range { 2 * arm_key_bytes } else { 0 };
+                let leaf_fanout = fanout(NODE_BYTES, node_header_bytes, range_field_bytes, record_width_bytes);
+                let inner_fanout = fanout(NODE_BYTES, node_header_bytes, range_field_bytes, arm_key_bytes + CHILD_POINTER_BYTES);
+                for &inode_count in [1_000_000u64, 100_000_000, 1_000_000_000].iter() {
+                    let height_levels = tree_height(inode_count, leaf_fanout, inner_fanout);
+                    output_lines.push(emitter.emit_raw(&format!(
+                        "name=geom header={node_header_bytes} head_discrim={head_discriminator_bytes} key={arm_key_bytes} with_range={} \
+                         inodes={inode_count} record={record_width_bytes} leaf_fanout={leaf_fanout} inner_fanout={inner_fanout} \
+                         height={} records_lost_per_leaf={leaf_fanout}",
                         u8::from(with_range),
-                        h.map(|v| v.to_string()).unwrap_or_else(|| "NA".into()),
+                        height_levels.map(|height| height.to_string()).unwrap_or_else(|| "NA".into()),
                     )));
                 }
             }
@@ -310,30 +310,30 @@ fn main() {
     }
 
     // 判据 3：locality 对照的判别力（含阳性对照）
-    for &(n, bad) in [(1_000_000u64, 1_000u64), (1_000_000, 100_000)].iter() {
-        for &chk in [true, false].iter() {
-            let (caught, silent) = locality_mismatch(n, bad, chk);
-            out.push(em.emit_raw(&format!(
-                "name=locality objects={n} mismatched={bad} with_check={} caught={caught} silent_holes={silent}",
-                u8::from(chk)
+    for &(object_count, mismatched_object_count) in [(1_000_000u64, 1_000u64), (1_000_000, 100_000)].iter() {
+        for &with_check in [true, false].iter() {
+            let (caught, silent) = locality_mismatch(object_count, mismatched_object_count, with_check);
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=locality objects={object_count} mismatched={mismatched_object_count} with_check={} caught={caught} silent_holes={silent}",
+                u8::from(with_check)
             )));
         }
     }
 
     // 判据 4：改动计数的排序力
-    for &k in [1u64, 2, 8, 64].iter() {
-        for &bits in [0u32, 8, 16].iter() {
-            out.push(em.emit_raw(&format!(
-                "name=change_order updates_in_window={k} window_seq_bits={bits} unordered_pairs={}",
-                unordered_pairs(k, bits)
+    for &updates_in_window in [1u64, 2, 8, 64].iter() {
+        for &window_sequence_bits in [0u32, 8, 16].iter() {
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=change_order updates_in_window={updates_in_window} window_seq_bits={window_sequence_bits} unordered_pairs={}",
+                unordered_pairs(updates_in_window, window_sequence_bits)
             )));
         }
     }
 
-    for l in &out {
-        println!("{l}");
+    for line in &output_lines {
+        println!("{line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -341,26 +341,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_constants_match_kb() {
+    fn format_constants_match_knowledge_base() {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
         assert_eq!(COMMON_PREFIX, 42, "D18 已定项 7");
-        assert_eq!(CHILD_PTR, 59, "D19 已定项 4 之后：31 + 14 × 2");
+        assert_eq!(CHILD_POINTER_BYTES, 59, "D19 已定项 4 之后：31 + 14 × 2");
     }
 
     /// **判据 1 的绝对值**：字段表逐段加起来是 140 字节，扇出在三档头上都是 116。
     #[test]
     fn criterion1_record_and_fanout_are_absolute() {
         // 手算：身份段 8+8+8 = 24；属性段 4+4+4+4+8+8+8+12+12+12+8 = 84；预留 32
-        let ident: u64 = FIELDS[0..3].iter().map(|f| f.bytes).sum();
-        let attr: u64 = FIELDS[3..].iter().map(|f| f.bytes).sum();
-        assert_eq!(ident, 24);
-        assert_eq!(attr, 84);
+        let identity_segment_bytes: u64 = FIELDS[0..3].iter().map(|field| field.bytes).sum();
+        let attribute_segment_bytes: u64 = FIELDS[3..].iter().map(|field| field.bytes).sum();
+        assert_eq!(identity_segment_bytes, 24);
+        assert_eq!(attribute_segment_bytes, 84);
         assert_eq!(record_bytes(), 140);
         // 手算：(16384 − 58) / 140 = 16326 / 140 = 116.6… ⇒ 116
         assert_eq!(fanout(NODE_BYTES, 58, 0, 140), 116);
         // 三档头逐档相同 ⇒ 结论不依赖节点头
-        for &h in NODE_HEADERS.iter() {
-            assert_eq!(fanout(NODE_BYTES, h, 0, 140), 116, "头 {h} 那一档");
+        for &node_header_bytes in NODE_HEADERS.iter() {
+            assert_eq!(fanout(NODE_BYTES, node_header_bytes, 0, 140), 116, "头 {node_header_bytes} 那一档");
         }
     }
 
@@ -370,8 +370,8 @@ mod tests {
         assert_eq!(FIELDS.len(), 14);
         assert_eq!(non_recomputable(false), 11);
         // 能重算的恰好三个，且都指得到 D18 已定项 3 的五元组或数单元
-        let ok: Vec<&str> = FIELDS.iter().filter(|f| f.recomputable).map(|f| f.name).collect();
-        assert_eq!(ok, vec!["inode", "obj_birth", "blocks"]);
+        let recomputable_names: Vec<&str> = FIELDS.iter().filter(|field| field.recomputable).map(|field| field.name).collect();
+        assert_eq!(recomputable_names, vec!["inode", "obj_birth", "blocks"]);
         // 阳性对照：假设全都能重算时必须算成 0，否则这一维根本没进模型
         assert_eq!(non_recomputable(true), 0);
         // ⇒ 按 D21 的判据，inode 记录不是派生态
@@ -381,10 +381,10 @@ mod tests {
     /// **判据 3 的绝对值 + 阳性对照**：带对照全抓、不带对照全漏。
     #[test]
     fn criterion3_locality_check_is_the_only_thing_between_data_and_silent_holes() {
-        let (c, s) = locality_mismatch(1_000_000, 1_000, true);
-        assert_eq!((c, s), (1_000, 0), "带对照：全抓，零静默");
-        let (c2, s2) = locality_mismatch(1_000_000, 1_000, false);
-        assert_eq!((c2, s2), (0, 1_000), "不带对照：全漏，全部静默读空洞");
+        let (caught, silent) = locality_mismatch(1_000_000, 1_000, true);
+        assert_eq!((caught, silent), (1_000, 0), "带对照：全抓，零静默");
+        let (caught_without_check, silent_without_check) = locality_mismatch(1_000_000, 1_000, false);
+        assert_eq!((caught_without_check, silent_without_check), (0, 1_000), "不带对照：全漏，全部静默读空洞");
         // 阴性对照：没有不一致时两条臂都必须是 0
         assert_eq!(locality_mismatch(1_000_000, 0, true), (0, 0));
         assert_eq!(locality_mismatch(1_000_000, 0, false), (0, 0));
@@ -409,11 +409,11 @@ mod tests {
     /// **判据 5 的绝对值**：丢一个叶节点丢掉的是整叶的记录，不是一条。
     #[test]
     fn criterion5_blast_radius_is_a_whole_leaf() {
-        let leaf_f = fanout(NODE_BYTES, 58, 0, record_bytes());
-        assert_eq!(leaf_f, 116);
+        let leaf_fanout = fanout(NODE_BYTES, 58, 0, record_bytes());
+        assert_eq!(leaf_fanout, 116);
         // 1e6 个 inode ⇒ 8621 个叶；丢一个叶 = 丢 116 条记录 = 0.0116%
-        assert_eq!(1_000_000u64.div_ceil(leaf_f), 8621);
-        assert_eq!(leaf_f * 1_000_000 / 1_000_000, 116);
+        assert_eq!(1_000_000u64.div_ceil(leaf_fanout), 8621);
+        assert_eq!(leaf_fanout * 1_000_000 / 1_000_000, 116);
     }
 
     /// **树高由两级扇出各自算**，不是拿叶扇出一路乘上去（E74 踩过这个）。
@@ -425,35 +425,35 @@ mod tests {
         assert_eq!(KEY_HEAD_DISCRIM, 0, "D6 已定项 1：每头一棵自己的树");
         assert_eq!(KEY_HEAD_DISCRIM_ARMS, [0, 2]);
         // 手算：(16384−58)/(8+59) = 16326/67 = 243.6 ⇒ 243
-        assert_eq!(fanout(NODE_BYTES, 58, 0, 8 + CHILD_PTR), 243);
+        assert_eq!(fanout(NODE_BYTES, 58, 0, 8 + CHILD_POINTER_BYTES), 243);
         // 带 2 字节判别位：16326/69 = 236.6 ⇒ 236，白付 7 格扇出
-        assert_eq!(fanout(NODE_BYTES, 58, 0, 10 + CHILD_PTR), 236);
+        assert_eq!(fanout(NODE_BYTES, 58, 0, 10 + CHILD_POINTER_BYTES), 236);
         assert_eq!(243 - 236, 7);
     }
 
     #[test]
     fn tree_height_uses_two_fanouts() {
-        let key = KEY_INODE + 2; // 带判别位那条臂
-        assert_eq!(key, 10);
-        let leaf_f = fanout(NODE_BYTES, 58, 0, record_bytes());
-        let inner_f = fanout(NODE_BYTES, 58, 0, key + CHILD_PTR);
-        assert_eq!(inner_f, 236, "手算 (16384−58)/69 = 16326/69 = 236.6 ⇒ 236");
-        assert_eq!(tree_height(1_000_000, leaf_f, inner_f), Some(3));
+        let key_bytes = KEY_INODE + 2; // 带判别位那条臂
+        assert_eq!(key_bytes, 10);
+        let leaf_fanout = fanout(NODE_BYTES, 58, 0, record_bytes());
+        let inner_fanout = fanout(NODE_BYTES, 58, 0, key_bytes + CHILD_POINTER_BYTES);
+        assert_eq!(inner_fanout, 236, "手算 (16384−58)/69 = 16326/69 = 236.6 ⇒ 236");
+        assert_eq!(tree_height(1_000_000, leaf_fanout, inner_fanout), Some(3));
         // 手算：116 × 236 = 27376；×236 = 6 460 736；×236 = 1.52e9 ≥ 1e9 ⇒ 4 层
-        assert_eq!(tree_height(1_000_000_000, leaf_f, inner_f), Some(4));
+        assert_eq!(tree_height(1_000_000_000, leaf_fanout, inner_fanout), Some(4));
         // 拿叶扇出一路乘会少算：116^3 = 1.56e6 ⇒ 会误报 1e6 只要 3 层里的 2 层
-        assert!(tree_height(1_000_000, leaf_f, leaf_f) <= tree_height(1_000_000, leaf_f, inner_f));
+        assert!(tree_height(1_000_000, leaf_fanout, leaf_fanout) <= tree_height(1_000_000, leaf_fanout, inner_fanout));
     }
 
     /// **形态判据的绝对值**：只有「打包进单元」这条形态不触发 D21 硬约束 6。
     #[test]
     fn only_the_packed_unit_shape_avoids_widening_the_authoritative_state() {
-        let nr = non_recomputable(false);
-        assert_eq!(nr, 11);
+        let non_recomputable_field_count = non_recomputable(false);
+        assert_eq!(non_recomputable_field_count, 11);
         // 甲：住索引节点的 value ⇒ 把 11 个算不出来的权威值放进可重建的容器 ⇒ 触发
-        assert!(triggers_hard_constraint_6(Shape::BtreeValue, nr));
+        assert!(triggers_hard_constraint_6(Shape::BtreeValue, non_recomputable_field_count));
         // 乙：打包进单元 ⇒ 容器就在权威态清单第一项里 ⇒ 不触发
-        assert!(!triggers_hard_constraint_6(Shape::PackedUnit, nr));
+        assert!(!triggers_hard_constraint_6(Shape::PackedUnit, non_recomputable_field_count));
         // 阳性对照：假设全都能重算时，两种形态都不该触发——
         // 这证明触发与否真的由「算不算得出来」驱动，不是由形态标签驱动
         assert!(!triggers_hard_constraint_6(Shape::BtreeValue, 0));
@@ -463,17 +463,17 @@ mod tests {
     /// **密度的绝对值**：打包进 32 KiB 单元比塞进 16 KiB 叶装得多一倍。
     #[test]
     fn packed_unit_holds_twice_as_many_records() {
-        let rec = record_bytes();
-        assert_eq!(rec, 140);
+        let record_width_bytes = record_bytes();
+        assert_eq!(record_width_bytes, 140);
         // 手算：(16384 − 58) / 140 = 16326 / 140 = 116.6 ⇒ 116
-        assert_eq!(records_per_container(Shape::BtreeValue, 58, rec), 116);
+        assert_eq!(records_per_container(Shape::BtreeValue, 58, record_width_bytes), 116);
         // 手算：(32768 − 91) / 140 = 32677 / 140 = 233.4 ⇒ 233
-        assert_eq!(records_per_container(Shape::PackedUnit, 58, rec), 233);
+        assert_eq!(records_per_container(Shape::PackedUnit, 58, record_width_bytes), 233);
         assert_eq!(DATA_UNIT_HEADER, 91, "D18 已定项 7 的数据单元头初值");
         assert_eq!(UNIT_BYTES, 32768, "D4 已定项 5");
         // 打包形态的容器更大，装的更多——但爆炸半径也更大，两个数都要报
-        assert!(records_per_container(Shape::PackedUnit, 58, rec)
-            > records_per_container(Shape::BtreeValue, 58, rec));
+        assert!(records_per_container(Shape::PackedUnit, 58, record_width_bytes)
+            > records_per_container(Shape::BtreeValue, 58, record_width_bytes));
         // 不合法输入：记录宽 0 时报 0，不许除零
         assert_eq!(records_per_container(Shape::PackedUnit, 58, 0), 0);
     }
@@ -483,18 +483,18 @@ mod tests {
     /// 真正被这一维暴露的是「两种形态都要一条冗余 / 可检出条款」。
     #[test]
     fn criterion5_both_shapes_lose_records_permanently() {
-        let rec = record_bytes();
-        let nr = non_recomputable(false);
-        let a = permanent_loss_per_container(Shape::BtreeValue, 58, rec, nr);
-        let b = permanent_loss_per_container(Shape::PackedUnit, 58, rec, nr);
-        assert_eq!(a, 116, "丢一个 16 KiB 索引叶 = 永久丢 116 条");
-        assert_eq!(b, 233, "丢一个 32 KiB 打包单元 = 永久丢 233 条");
-        assert!(a > 0 && b > 0, "两种形态都不是 0 ⇒ 都要冗余 / 可检出条款");
-        assert_eq!(b * 100 / a, 200, "打包形态的永久损失恰好是另一种的 2.00 倍");
+        let record_width_bytes = record_bytes();
+        let non_recomputable_field_count = non_recomputable(false);
+        let btree_value_loss = permanent_loss_per_container(Shape::BtreeValue, 58, record_width_bytes, non_recomputable_field_count);
+        let packed_unit_loss = permanent_loss_per_container(Shape::PackedUnit, 58, record_width_bytes, non_recomputable_field_count);
+        assert_eq!(btree_value_loss, 116, "丢一个 16 KiB 索引叶 = 永久丢 116 条");
+        assert_eq!(packed_unit_loss, 233, "丢一个 32 KiB 打包单元 = 永久丢 233 条");
+        assert!(btree_value_loss > 0 && packed_unit_loss > 0, "两种形态都不是 0 ⇒ 都要冗余 / 可检出条款");
+        assert_eq!(packed_unit_loss * 100 / btree_value_loss, 200, "打包形态的永久损失恰好是另一种的 2.00 倍");
         // **阳性对照**：假设 14 个字段全都能从权威态重算，两种形态的永久损失必须都归 0——
         // 那正是 E29（坏一个节点的爆炸半径）在索引节点上量到的形态
-        assert_eq!(permanent_loss_per_container(Shape::BtreeValue, 58, rec, 0), 0);
-        assert_eq!(permanent_loss_per_container(Shape::PackedUnit, 58, rec, 0), 0);
+        assert_eq!(permanent_loss_per_container(Shape::BtreeValue, 58, record_width_bytes, 0), 0);
+        assert_eq!(permanent_loss_per_container(Shape::PackedUnit, 58, record_width_bytes, 0), 0);
     }
 
     /// 不合法几何一律 None / 0，不许退化成一个数。

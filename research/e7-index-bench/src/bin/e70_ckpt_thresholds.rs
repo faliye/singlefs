@@ -36,99 +36,100 @@
 
 use e7_index_bench::Emitter;
 
-const REC_HEADER: u64 = 78;
-const NODE: u64 = 16 * 1024;
+const RECORD_HEADER_BYTES: u64 = 78;
+const NODE_SIZE_BYTES: u64 = 16 * 1024;
 const ENTRY: u64 = 32; // 一个带设备身份的位置条目，D19 已定项 1
-const FSYNC_PER_SEC: u64 = 2785;
+const FSYNC_PER_SECOND: u64 = 2785;
 const ABSURD_DIRTY_BYTES: u64 = 1024 * 1024 * 1024 * 1024; // 1 TiB 荒谬线
 
 /// I-8.1 反解：一次 checkpoint 允许的最大脏字节数。
-fn t_dirty_upper(ring_bytes: u64, f: u64, entry: u64, node: u64) -> u64 {
-    let budget = ring_bytes / f;
-    if budget <= REC_HEADER {
+fn dirty_bytes_threshold_upper_bound(ring_bytes: u64, ring_safety_factor: u64, entry_bytes: u64, node_bytes: u64) -> u64 {
+    let journal_bytes_budget_per_checkpoint = ring_bytes / ring_safety_factor;
+    if journal_bytes_budget_per_checkpoint <= RECORD_HEADER_BYTES {
         return 0;
     }
-    (budget - REC_HEADER) * node / entry
+    (journal_bytes_budget_per_checkpoint - RECORD_HEADER_BYTES) * node_bytes / entry_bytes
 }
 
 /// E16 两点（ckpt=100 / 1000）对数线性插值：给定预算，反解 checkpoint 要盖住多少次操作。
-fn ops_for_budget(a100: f64, a1000: f64, budget: f64) -> f64 {
-    // a(n) = a100 * (n/100)^k，k = ln(a1000/a100)/ln(10)
-    let k = (a1000 / a100).ln() / 10f64.ln();
-    100.0 * (budget / a100).powf(1.0 / k)
+fn operations_per_checkpoint_for_budget(blocks_per_operation_at_checkpoint_100: f64, blocks_per_operation_at_checkpoint_1000: f64, budget_blocks_per_operation: f64) -> f64 {
+    // 代价(操作数) = blocks_per_operation_at_checkpoint_100 × (操作数/100)^power_law_exponent，
+    // power_law_exponent = ln(blocks_per_operation_at_checkpoint_1000 / blocks_per_operation_at_checkpoint_100) / ln(10)
+    let power_law_exponent = (blocks_per_operation_at_checkpoint_1000 / blocks_per_operation_at_checkpoint_100).ln() / 10f64.ln();
+    100.0 * (budget_blocks_per_operation / blocks_per_operation_at_checkpoint_100).powf(1.0 / power_law_exponent)
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config rec_header={REC_HEADER} node={NODE} entry={ENTRY} \
-             fsync_per_sec={FSYNC_PER_SEC} model=arithmetic file_ops=0"
+        emitter.emit_raw(&format!(
+            "name=config rec_header={RECORD_HEADER_BYTES} node={NODE_SIZE_BYTES} entry={ENTRY} \
+             fsync_per_sec={FSYNC_PER_SECOND} model=arithmetic file_ops=0"
         ))
     );
 
-    for ring_mib in [16u64, 64, 256, 1024] {
-        for f in [2u64, 3] {
-            let t = t_dirty_upper(ring_mib * 1024 * 1024, f, ENTRY, NODE);
+    for ring_size_mebibytes in [16u64, 64, 256, 1024] {
+        for ring_safety_factor in [2u64, 3] {
+            let dirty_upper_bound_bytes = dirty_bytes_threshold_upper_bound(ring_size_mebibytes * 1024 * 1024, ring_safety_factor, ENTRY, NODE_SIZE_BYTES);
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=t_dirty ring_mib={ring_mib} f={f} upper_bytes={t} \
+                emitter.emit_raw(&format!(
+                    "name=t_dirty ring_mib={ring_size_mebibytes} f={ring_safety_factor} upper_bytes={dirty_upper_bound_bytes} \
                      upper_gib={} absurd={}",
-                    t / (1024 * 1024 * 1024),
-                    u8::from(t > ABSURD_DIRTY_BYTES)
+                    dirty_upper_bound_bytes / (1024 * 1024 * 1024),
+                    u8::from(dirty_upper_bound_bytes > ABSURD_DIRTY_BYTES)
                 ))
             );
         }
     }
 
-    for (load, a100, a1000) in [
+    for (workload_name, blocks_per_operation_at_checkpoint_100, blocks_per_operation_at_checkpoint_1000) in [
         ("multistream", 0.4966f64, 0.0567f64),
         ("seq", 0.0126, 0.0083),
     ] {
-        for budget in [0.2f64, 0.1, 0.05] {
-            let raw = ops_for_budget(a100, a1000, budget);
+        for budget_blocks_per_operation in [0.2f64, 0.1, 0.05] {
+            let interpolated_operations = operations_per_checkpoint_for_budget(blocks_per_operation_at_checkpoint_100, blocks_per_operation_at_checkpoint_1000, budget_blocks_per_operation);
             // 预算已经宽于 ckpt=100 那一点 ⇒ 这条负载在 100 上就满足，没有下界
-            let already_ok = budget >= a100;
-            let ops = if already_ok { 0.0 } else { raw };
-            let ms = ops / FSYNC_PER_SEC as f64 * 1000.0;
-            let extrap = !already_ok && !(100.0..=1000.0).contains(&ops);
+            let is_budget_met_at_checkpoint_100 = budget_blocks_per_operation >= blocks_per_operation_at_checkpoint_100;
+            let operations_needed = if is_budget_met_at_checkpoint_100 { 0.0 } else { interpolated_operations };
+            let time_threshold_milliseconds = operations_needed / FSYNC_PER_SECOND as f64 * 1000.0;
+            let is_extrapolated = !is_budget_met_at_checkpoint_100 && !(100.0..=1000.0).contains(&operations_needed);
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=t_time load={load} budget_x1000={} ops_needed={} \
+                emitter.emit_raw(&format!(
+                    "name=t_time load={workload_name} budget_x1000={} ops_needed={} \
                      t_time_ms_x10={} extrapolated={} already_ok={}",
-                    (budget * 1000.0) as u64,
-                    ops as u64,
-                    (ms * 10.0) as u64,
-                    u8::from(extrap),
-                    u8::from(already_ok)
+                    (budget_blocks_per_operation * 1000.0) as u64,
+                    operations_needed as u64,
+                    (time_threshold_milliseconds * 10.0) as u64,
+                    u8::from(is_extrapolated),
+                    u8::from(is_budget_met_at_checkpoint_100)
                 ))
             );
         }
     }
 
     // 阳性对照：F 加倍 ⇒ 上界减半。
-    let a = t_dirty_upper(64 * 1024 * 1024, 2, ENTRY, NODE);
-    let b = t_dirty_upper(64 * 1024 * 1024, 4, ENTRY, NODE);
+    let upper_bound_with_factor_2 = dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 2, ENTRY, NODE_SIZE_BYTES);
+    let upper_bound_with_factor_4 = dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 4, ENTRY, NODE_SIZE_BYTES);
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=positive_control_f_doubles a={a} b={b} halved={}",
-            u8::from(a / 2 - b <= REC_HEADER * (NODE / ENTRY) / 2)
+        emitter.emit_raw(&format!(
+            "name=positive_control_f_doubles a={upper_bound_with_factor_2} b={upper_bound_with_factor_4} halved={}",
+            u8::from(upper_bound_with_factor_2 / 2 - upper_bound_with_factor_4 <= RECORD_HEADER_BYTES * (NODE_SIZE_BYTES / ENTRY) / 2)
         ))
     );
     // 阴性对照：条目字节 = 节点大小 ⇒ 没有放大。
-    let c = t_dirty_upper(64 * 1024 * 1024, 2, NODE, NODE);
+    let upper_bound_with_entry_as_large_as_node = dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 2, NODE_SIZE_BYTES, NODE_SIZE_BYTES);
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=negative_control_no_amplification bytes={c} expect={}",
-            64 * 1024 * 1024 / 2 - REC_HEADER
+        emitter.emit_raw(&format!(
+            "name=negative_control_no_amplification bytes={upper_bound_with_entry_as_large_as_node} expect={}",
+            64 * 1024 * 1024 / 2 - RECORD_HEADER_BYTES
         ))
     );
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -138,45 +139,45 @@ mod tests {
     /// **绝对值断言**：64 MiB 环、F=2、16 KiB 节点、32 B 条目
     /// ⇒ 上界 = (33554432/2 − 78) × 512 字节。
     #[test]
-    fn absolute_t_dirty_upper() {
-        let want = (64u64 * 1024 * 1024 / 2 - REC_HEADER) * (NODE / ENTRY);
-        assert_eq!(t_dirty_upper(64 * 1024 * 1024, 2, ENTRY, NODE), want);
-        assert_eq!(NODE / ENTRY, 512, "放大倍数就是节点/条目");
-        assert_eq!(want, 17_179_829_248, "64 MiB 环、F=2 的上界是 16 GiB 量级");
+    fn absolute_dirty_threshold_upper_bound_for_64_mebibyte_ring() {
+        let expected_upper_bound_bytes = (64u64 * 1024 * 1024 / 2 - RECORD_HEADER_BYTES) * (NODE_SIZE_BYTES / ENTRY);
+        assert_eq!(dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 2, ENTRY, NODE_SIZE_BYTES), expected_upper_bound_bytes);
+        assert_eq!(NODE_SIZE_BYTES / ENTRY, 512, "放大倍数就是节点/条目");
+        assert_eq!(expected_upper_bound_bytes, 17_179_829_248, "64 MiB 环、F=2 的上界是 16 GiB 量级");
     }
 
     /// **阳性对照**：F 加倍 ⇒ 上界减半（差一个头字节的取整）。
     #[test]
-    fn positive_control_f_doubles_halves_bound() {
-        let a = t_dirty_upper(64 * 1024 * 1024, 2, ENTRY, NODE);
-        let b = t_dirty_upper(64 * 1024 * 1024, 4, ENTRY, NODE);
-        // 差恰好是头字节被多扣了一次：REC_HEADER × 节点/条目 ÷ 2
-        let slack = REC_HEADER * (NODE / ENTRY) / 2;
-        assert!(a / 2 - b <= slack, "a/2={} b={b} slack={slack}", a / 2);
+    fn positive_control_doubling_safety_factor_halves_bound() {
+        let upper_bound_with_factor_2 = dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 2, ENTRY, NODE_SIZE_BYTES);
+        let upper_bound_with_factor_4 = dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 4, ENTRY, NODE_SIZE_BYTES);
+        // 差恰好是头字节被多扣了一次：RECORD_HEADER_BYTES × 节点/条目 ÷ 2
+        let header_rounding_slack_bytes = RECORD_HEADER_BYTES * (NODE_SIZE_BYTES / ENTRY) / 2;
+        assert!(upper_bound_with_factor_2 / 2 - upper_bound_with_factor_4 <= header_rounding_slack_bytes, "a/2={} b={upper_bound_with_factor_4} slack={header_rounding_slack_bytes}", upper_bound_with_factor_2 / 2);
     }
 
     /// **阴性对照**：条目字节 = 节点大小 ⇒ 放大倍数 1。
     #[test]
     fn negative_control_no_amplification() {
         assert_eq!(
-            t_dirty_upper(64 * 1024 * 1024, 2, NODE, NODE),
-            64 * 1024 * 1024 / 2 - REC_HEADER
+            dirty_bytes_threshold_upper_bound(64 * 1024 * 1024, 2, NODE_SIZE_BYTES, NODE_SIZE_BYTES),
+            64 * 1024 * 1024 / 2 - RECORD_HEADER_BYTES
         );
     }
 
     /// 环小到装不下一个记录头 ⇒ 上界必须是 0，不许下溢绕回（变异审计补的：
-    /// 此前没有任何测试走过 `budget <= REC_HEADER` 的护栏）。
+    /// 此前没有任何测试走过 `journal_bytes_budget_per_checkpoint <= RECORD_HEADER_BYTES` 的护栏）。
     #[test]
     fn tiny_ring_yields_zero_not_underflow() {
-        assert_eq!(t_dirty_upper(100, 2, ENTRY, NODE), 0);
-        assert_eq!(t_dirty_upper(REC_HEADER * 2, 2, ENTRY, NODE), 0, "预算恰等于头也该是 0");
+        assert_eq!(dirty_bytes_threshold_upper_bound(100, 2, ENTRY, NODE_SIZE_BYTES), 0);
+        assert_eq!(dirty_bytes_threshold_upper_bound(RECORD_HEADER_BYTES * 2, 2, ENTRY, NODE_SIZE_BYTES), 0, "预算恰等于头也该是 0");
     }
 
     /// 插值自证：喂 E16 的两个点回去，必须还原出 100 与 1000。
     #[test]
     fn interpolation_reproduces_measured_points() {
-        let (a100, a1000) = (0.4966f64, 0.0567f64);
-        assert!((ops_for_budget(a100, a1000, a100) - 100.0).abs() < 1.0);
-        assert!((ops_for_budget(a100, a1000, a1000) - 1000.0).abs() < 5.0);
+        let (blocks_per_operation_at_checkpoint_100, blocks_per_operation_at_checkpoint_1000) = (0.4966f64, 0.0567f64);
+        assert!((operations_per_checkpoint_for_budget(blocks_per_operation_at_checkpoint_100, blocks_per_operation_at_checkpoint_1000, blocks_per_operation_at_checkpoint_100) - 100.0).abs() < 1.0);
+        assert!((operations_per_checkpoint_for_budget(blocks_per_operation_at_checkpoint_100, blocks_per_operation_at_checkpoint_1000, blocks_per_operation_at_checkpoint_1000) - 1000.0).abs() < 5.0);
     }
 }

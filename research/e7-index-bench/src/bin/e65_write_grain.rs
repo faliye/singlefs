@@ -46,116 +46,116 @@ use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::time::Instant;
 
-const O_DIRECT: i32 = 0o40000;
-const ALIGN: usize = 4096;
+const O_DIRECT: i32 = 0o40000; // naming-lint:external Linux open(2) 标志名，取自 <fcntl.h>，名字不归我们定
+const ALIGNMENT_BYTES: usize = 4096;
 /// 用户一次写多少。与 E58 的读侧同口径，两个实验的倍数才可比。
 const USER_WRITE: u64 = 4096;
 const GRAINS: [usize; 6] = [4096, 8192, 16384, 32768, 65536, 131072];
 /// D4 已定项 1 定的数据单元。`pad` 那一臂拿它当默认档。
 const DATA_UNIT_BYTES: usize = 32768;
-const SEQ_IO: usize = 1024 * 1024;
+const SEQUENTIAL_FILL_CHUNK_BYTES: usize = 1024 * 1024;
 
-struct Aligned { ptr: *mut u8, len: usize, layout: Layout }
+struct Aligned { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl Aligned {
-    fn new(len: usize) -> Self {
-        let layout = Layout::from_size_align(len, ALIGN).expect("对齐参数非法");
-        let ptr = unsafe { alloc(layout) };
-        assert!(!ptr.is_null(), "分配失败");
-        unsafe { std::ptr::write_bytes(ptr, 0xA5, len) };
-        Self { ptr, len, layout }
+    fn new(length_in_bytes: usize) -> Self {
+        let layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).expect("对齐参数非法");
+        let pointer = unsafe { alloc(layout) };
+        assert!(!pointer.is_null(), "分配失败");
+        unsafe { std::ptr::write_bytes(pointer, 0xA5, length_in_bytes) };
+        Self { pointer, length_in_bytes, layout }
     }
-    fn as_slice(&self) -> &[u8] { unsafe { std::slice::from_raw_parts(self.ptr, self.len) } }
-    fn as_mut_slice(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) } }
+    fn as_slice(&self) -> &[u8] { unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) } }
+    fn as_mut_slice(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
 }
 impl Drop for Aligned {
-    fn drop(&mut self) { unsafe { dealloc(self.ptr, self.layout) } }
+    fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } }
 }
 
-fn next_rand(state: &mut u64) -> u64 {
-    let mut x = *state;
-    x ^= x >> 12; x ^= x << 25; x ^= x >> 27;
-    *state = x;
-    x.wrapping_mul(0x2545_F491_4F6C_DD1D)
+fn next_random_word(state: &mut u64) -> u64 {
+    let mut xorshift_state = *state;
+    xorshift_state ^= xorshift_state >> 12; xorshift_state ^= xorshift_state << 25; xorshift_state ^= xorshift_state >> 27;
+    *state = xorshift_state;
+    xorshift_state.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
-fn proc_io(key: &str) -> Option<u64> {
-    let t = std::fs::read_to_string("/proc/self/io").ok()?;
-    for line in t.lines() {
-        if let Some(v) = line.strip_prefix(key) {
-            return v.trim().parse().ok();
+fn read_process_input_output_counter(key: &str) -> Option<u64> {
+    let counter_file_text = std::fs::read_to_string("/proc/self/io").ok()?;
+    for line in counter_file_text.lines() {
+        if let Some(value_text) = line.strip_prefix(key) {
+            return value_text.trim().parse().ok();
         }
     }
     None
 }
 
 /// 写放大：写 4 KiB 用户数据实际要写的倍数。补齐之后它是恒等式。
-fn write_amp(g: usize) -> f64 { g as f64 / USER_WRITE as f64 }
+fn write_amplification(grain_bytes: usize) -> f64 { grain_bytes as f64 / USER_WRITE as f64 }
 
-/// D4 已定项 2 的空间放大：一个 `size` 字节的 extent 补齐到 `g` 之后占多少倍。
-fn pad_amp(size: u64, g: usize) -> f64 {
-    let used = size.div_ceil(g as u64) * g as u64;
-    used as f64 / size.max(1) as f64
+/// D4 已定项 2 的空间放大：一个 `size` 字节的 extent 补齐到 `grain_bytes` 之后占多少倍。
+fn padding_amplification(size: u64, grain_bytes: usize) -> f64 {
+    let padded_bytes = size.div_ceil(grain_bytes as u64) * grain_bytes as u64;
+    padded_bytes as f64 / size.max(1) as f64
 }
 
-struct Arm { elapsed_ns: u64, verify_ns: u64, ops: u64, sink: u64 }
+struct Arm { elapsed_nanoseconds: u64, verify_nanoseconds: u64, operation_count: u64, sink: u64 }
 
 fn open(path: &str) -> std::fs::File {
     OpenOptions::new().read(true).write(true).custom_flags(O_DIRECT).open(path)
-        .unwrap_or_else(|e| { eprintln!("打不开 {path}：{e}"); std::process::exit(3) })
+        .unwrap_or_else(|error| { eprintln!("打不开 {path}：{error}"); std::process::exit(3) })
 }
 
 /// `rmw` / `full` / `rmwsync` 三条臂共用一段：`read_old` 决定读不读、`sync` 决定同不同步。
-fn write_arm(path: &str, g: usize, units: u64, ops: u64, seed: u64, read_old: bool, sync: bool) -> Arm {
-    let f = open(path);
-    let c = Aes256Gcm::new_from_slice(&[0x42u8; 32]).unwrap();
+fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, seed: u64, read_old: bool, sync: bool) -> Arm {
+    let file = open(path);
+    let cipher = Aes256Gcm::new_from_slice(&[0x42u8; 32]).unwrap();
     let nonce = Nonce::from_slice(&[0u8; 12]);
-    let mut buf = Aligned::new(g);
-    let mut st = seed | 1;
-    let (mut sink, mut verify_ns) = (0u64, 0u64);
+    let mut unit_buffer = Aligned::new(grain_bytes);
+    let mut random_state = seed | 1;
+    let (mut sink, mut verify_nanoseconds) = (0u64, 0u64);
     // COW 游标：新单元往前推，不原地覆盖。
     let mut cursor = 0u64;
-    let t0 = Instant::now();
-    for _ in 0..ops {
+    let start_instant = Instant::now();
+    for _ in 0..operation_count {
         if read_old {
-            let unit = next_rand(&mut st) % units;
-            f.read_exact_at(&mut buf.as_mut_slice()[..g], unit * g as u64).expect("RMW 读失败");
-            let tv = Instant::now();
+            let old_unit_index = next_random_word(&mut random_state) % units;
+            file.read_exact_at(&mut unit_buffer.as_mut_slice()[..grain_bytes], old_unit_index * grain_bytes as u64).expect("RMW 读失败");
+            let verify_start = Instant::now();
             // 读回来的旧单元先验一遍：D4 的 Merkle 要求改之前先确认它没坏
             sink = sink.wrapping_add(
-                c.encrypt_in_place_detached(nonce, b"", &mut buf.as_mut_slice()[..g])
+                cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
                     .expect("验旧单元失败")[0] as u64);
-            verify_ns += tv.elapsed().as_nanos() as u64;
+            verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
         }
         // 改掉其中 4 KiB
-        let w = next_rand(&mut st);
-        for (i, b) in buf.as_mut_slice()[..USER_WRITE as usize].iter_mut().enumerate() {
-            *b = (w >> (i % 8 * 8)) as u8;
+        let random_word = next_random_word(&mut random_state);
+        for (byte_index, byte) in unit_buffer.as_mut_slice()[..USER_WRITE as usize].iter_mut().enumerate() {
+            *byte = (random_word >> (byte_index % 8 * 8)) as u8;
         }
-        let tv = Instant::now();
+        let verify_start = Instant::now();
         sink = sink.wrapping_add(
-            c.encrypt_in_place_detached(nonce, b"", &mut buf.as_mut_slice()[..g])
+            cipher.encrypt_in_place_detached(nonce, b"", &mut unit_buffer.as_mut_slice()[..grain_bytes])
                 .expect("算新 MAC 失败")[0] as u64);
-        verify_ns += tv.elapsed().as_nanos() as u64;
-        f.write_all_at(buf.as_slice(), cursor * g as u64).expect("写失败");
-        if sync { f.sync_data().expect("fdatasync 失败"); }
+        verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+        file.write_all_at(unit_buffer.as_slice(), cursor * grain_bytes as u64).expect("写失败");
+        if sync { file.sync_data().expect("fdatasync 失败"); }
         cursor = (cursor + 1) % units;
     }
-    Arm { elapsed_ns: t0.elapsed().as_nanos() as u64, verify_ns, ops, sink }
+    Arm { elapsed_nanoseconds: start_instant.elapsed().as_nanos() as u64, verify_nanoseconds, operation_count, sink }
 }
 
 fn fill(path: &str, region: u64) {
-    let mut f = OpenOptions::new().read(true).write(true).create(true).truncate(false)
+    let mut file = OpenOptions::new().read(true).write(true).create(true).truncate(false)
         .custom_flags(O_DIRECT).open(path)
-        .unwrap_or_else(|e| { eprintln!("建不了测试区 {path}：{e}"); std::process::exit(3) });
-    if f.seek(SeekFrom::End(0)).expect("取不到大小") >= region { return; }
+        .unwrap_or_else(|error| { eprintln!("建不了测试区 {path}：{error}"); std::process::exit(3) });
+    if file.seek(SeekFrom::End(0)).expect("取不到大小") >= region { return; }
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
-    let mut buf = Aligned::new(SEQ_IO);
-    for (i, b) in buf.as_mut_slice().iter_mut().enumerate() {
-        *b = (i as u8).wrapping_mul(31).wrapping_add(7);
+    let mut fill_buffer = Aligned::new(SEQUENTIAL_FILL_CHUNK_BYTES);
+    for (byte_index, byte) in fill_buffer.as_mut_slice().iter_mut().enumerate() {
+        *byte = (byte_index as u8).wrapping_mul(31).wrapping_add(7);
     }
-    f.seek(SeekFrom::Start(0)).expect("seek 失败");
-    for _ in 0..(region / SEQ_IO as u64) { f.write_all(buf.as_slice()).expect("填充失败"); }
-    f.sync_all().expect("sync 失败");
+    file.seek(SeekFrom::Start(0)).expect("seek 失败");
+    for _ in 0..(region / SEQUENTIAL_FILL_CHUNK_BYTES as u64) { file.write_all(fill_buffer.as_slice()).expect("填充失败"); }
+    file.sync_all().expect("sync 失败");
 }
 
 fn main() {
@@ -163,50 +163,50 @@ fn main() {
         eprintln!("用法：e65-write-grain <块设备或文件> [种子] [ops] [区域 MiB]");
         std::process::exit(2)
     });
-    let seed: u64 = std::env::args().nth(2).and_then(|x| x.parse().ok()).unwrap_or(0x6161_1234);
-    let ops: u64 = std::env::args().nth(3).and_then(|x| x.parse().ok()).unwrap_or(2048);
-    let region_mb: u64 = std::env::args().nth(4).and_then(|x| x.parse().ok()).unwrap_or(8192);
-    let mut region = region_mb * 1024 * 1024;
+    let seed: u64 = std::env::args().nth(2).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(0x6161_1234);
+    let operation_count: u64 = std::env::args().nth(3).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(2048);
+    let region_mebibytes: u64 = std::env::args().nth(4).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(8192);
+    let mut region = region_mebibytes * 1024 * 1024;
 
-    if std::fs::metadata(&path).map(|m| m.is_file()).unwrap_or(true) { fill(&path, region); }
+    if std::fs::metadata(&path).map(|file_metadata| file_metadata.is_file()).unwrap_or(true) { fill(&path, region); }
     let size = open(&path).seek(SeekFrom::End(0)).expect("取不到大小");
     if size == 0 { eprintln!("大小为 0 —— 判定不明，整轮作废"); std::process::exit(5); }
     region = region.min(size);
 
-    let mut em = Emitter::new();
-    println!("{}", em.emit_raw(&format!(
-        "name=config dev={path} size={size} region={region} ops={ops} user_write={USER_WRITE} \
+    let mut emitter = Emitter::new();
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config dev={path} size={size} region={region} ops={operation_count} user_write={USER_WRITE} \
          data_unit={DATA_UNIT_BYTES} seed={seed} grains={GRAINS:?}")));
 
-    for &g in GRAINS.iter() {
-        let units = region / g as u64;
+    for &grain_bytes in GRAINS.iter() {
+        let units = region / grain_bytes as u64;
         for (arm, read_old, sync) in [("rmw", true, false), ("full", false, false), ("rmwsync", true, true)] {
-            let (r0, w0) = (proc_io("read_bytes:"), proc_io("write_bytes:"));
-            let a = write_arm(&path, g, units, ops, seed, read_old, sync);
-            let (r1, w1) = (proc_io("read_bytes:"), proc_io("write_bytes:"));
-            let d = |x: Option<u64>, y: Option<u64>| match (x, y) {
-                (Some(x), Some(y)) => format!("{}", y.saturating_sub(x)),
+            let (read_bytes_before, write_bytes_before) = (read_process_input_output_counter("read_bytes:"), read_process_input_output_counter("write_bytes:"));
+            let arm_result = write_arm(&path, grain_bytes, units, operation_count, seed, read_old, sync);
+            let (read_bytes_after, write_bytes_after) = (read_process_input_output_counter("read_bytes:"), read_process_input_output_counter("write_bytes:"));
+            let counter_delta = |before: Option<u64>, after: Option<u64>| match (before, after) {
+                (Some(before), Some(after)) => format!("{}", after.saturating_sub(before)),
                 _ => "NA".into(),
             };
-            let want = a.ops * g as u64;
-            let wr = match (w0, w1) {
-                (Some(x), Some(y)) => format!("{:.4}", y.saturating_sub(x) as f64 / want as f64),
+            let expected_device_write_bytes = arm_result.operation_count * grain_bytes as u64;
+            let write_ratio = match (write_bytes_before, write_bytes_after) {
+                (Some(before), Some(after)) => format!("{:.4}", after.saturating_sub(before) as f64 / expected_device_write_bytes as f64),
                 _ => "NA".into(),
             };
-            println!("{}", em.emit_raw(&format!(
-                "name={arm}_g{g} grain={g} ops={} user_bytes={} dev_write_bytes={want} \
+            println!("{}", emitter.emit_raw(&format!(
+                "name={arm}_g{grain_bytes} grain={grain_bytes} ops={} user_bytes={} dev_write_bytes={expected_device_write_bytes} \
                  elapsed_ns={} verify_ns={} ns_per_op={:.1} write_amp={:.4} \
-                 proc_read_bytes={} proc_write_bytes={} pw_over_want={wr} sink={}",
-                a.ops, a.ops * USER_WRITE, a.elapsed_ns, a.verify_ns,
-                a.elapsed_ns as f64 / a.ops.max(1) as f64, write_amp(g),
-                d(r0, r1), d(w0, w1), a.sink)));
+                 proc_read_bytes={} proc_write_bytes={} pw_over_want={write_ratio} sink={}",
+                arm_result.operation_count, arm_result.operation_count * USER_WRITE, arm_result.elapsed_nanoseconds, arm_result.verify_nanoseconds,
+                arm_result.elapsed_nanoseconds as f64 / arm_result.operation_count.max(1) as f64, write_amplification(grain_bytes),
+                counter_delta(read_bytes_before, read_bytes_after), counter_delta(write_bytes_before, write_bytes_after), arm_result.sink)));
         }
-        println!("{}", em.emit_raw(&format!(
-            "name=pad_g{g} grain={g} write_amp={:.4} pad_amp_1k={:.4} pad_amp_4k={:.4} \
+        println!("{}", emitter.emit_raw(&format!(
+            "name=pad_g{grain_bytes} grain={grain_bytes} write_amp={:.4} pad_amp_1k={:.4} pad_amp_4k={:.4} \
              pad_amp_g_minus_one={:.6}",
-            write_amp(g), pad_amp(1024, g), pad_amp(4096, g), pad_amp(g as u64 - 1, g))));
+            write_amplification(grain_bytes), padding_amplification(1024, grain_bytes), padding_amplification(4096, grain_bytes), padding_amplification(grain_bytes as u64 - 1, grain_bytes))));
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -219,48 +219,48 @@ mod tests {
         assert_eq!(GRAINS, [4096, 8192, 16384, 32768, 65536, 131072]);
         assert_eq!(USER_WRITE, 4096);
         assert_eq!(DATA_UNIT_BYTES, 32768, "D4 已定项 1 定的数据单元");
-        assert_eq!(SEQ_IO, 1048576);
+        assert_eq!(SEQUENTIAL_FILL_CHUNK_BYTES, 1048576);
     }
 
     /// **绝对值断言 2：写放大恰为 G/4096，逐档钉死。**
     #[test]
-    fn write_amplification_is_exactly_grain_over_four_k() {
-        assert_eq!(write_amp(4096), 1.0);
-        assert_eq!(write_amp(16384), 4.0);
-        assert_eq!(write_amp(32768), 8.0);
-        assert_eq!(write_amp(131072), 32.0);
+    fn write_amplification_is_exactly_grain_over_four_kibibytes() {
+        assert_eq!(write_amplification(4096), 1.0);
+        assert_eq!(write_amplification(16384), 4.0);
+        assert_eq!(write_amplification(32768), 8.0);
+        assert_eq!(write_amplification(131072), 32.0);
     }
 
     /// **绝对值断言 3：D4 已定项 2 的空间放大。**
     /// 32 KiB 单元下：1 KiB 文件占 32 倍、4 KiB 占 8 倍；恰好 1 字节不足时是最坏点。
     #[test]
     fn padding_amplification_at_the_settled_unit() {
-        assert_eq!(pad_amp(1024, 32768), 32.0);
-        assert_eq!(pad_amp(4096, 32768), 8.0);
-        assert_eq!(pad_amp(32768, 32768), 1.0);
+        assert_eq!(padding_amplification(1024, 32768), 32.0);
+        assert_eq!(padding_amplification(4096, 32768), 8.0);
+        assert_eq!(padding_amplification(32768, 32768), 1.0);
         // 32769 字节要占 2 个单元 = 65536，倍数 65536/32769 = 1.99994（不是恰好 2）
-        assert!((pad_amp(32769, 32768) - 1.9999390).abs() < 1e-6, "{}", pad_amp(32769, 32768));
+        assert!((padding_amplification(32769, 32768) - 1.9999390).abs() < 1e-6, "{}", padding_amplification(32769, 32768));
         // 最坏浪费：单元大小减一
-        let worst = pad_amp(32767, 32768);
-        assert!((worst - 1.0000305).abs() < 1e-5, "{worst}");
+        let worst_case_amplification = padding_amplification(32767, 32768);
+        assert!((worst_case_amplification - 1.0000305).abs() < 1e-5, "{worst_case_amplification}");
     }
 
     /// **16 KiB 与 32 KiB 在小文件上的差，绝对值。**
     /// 一个 1 KiB 文件：16 KiB 单元占 16 倍、32 KiB 占 32 倍 —— 差恰好一倍。
     #[test]
     fn thirty_two_doubles_the_small_file_waste_versus_sixteen() {
-        assert_eq!(pad_amp(1024, 16384), 16.0);
-        assert_eq!(pad_amp(1024, 32768), 32.0);
-        assert_eq!(pad_amp(1024, 32768) / pad_amp(1024, 16384), 2.0);
+        assert_eq!(padding_amplification(1024, 16384), 16.0);
+        assert_eq!(padding_amplification(1024, 32768), 32.0);
+        assert_eq!(padding_amplification(1024, 32768) / padding_amplification(1024, 16384), 2.0);
     }
 
     #[test]
-    fn prng_is_deterministic() {
-        let (mut a, mut b) = (999u64, 999u64);
-        let xs: Vec<u64> = (0..8).map(|_| next_rand(&mut a)).collect();
-        let ys: Vec<u64> = (0..8).map(|_| next_rand(&mut b)).collect();
-        assert_eq!(xs, ys);
-        assert_eq!(xs.len(), 8);
-        assert!(xs.windows(2).all(|w| w[0] != w[1]));
+    fn pseudo_random_generator_is_deterministic() {
+        let (mut first_state, mut second_state) = (999u64, 999u64);
+        let first_sequence: Vec<u64> = (0..8).map(|_| next_random_word(&mut first_state)).collect();
+        let second_sequence: Vec<u64> = (0..8).map(|_| next_random_word(&mut second_state)).collect();
+        assert_eq!(first_sequence, second_sequence);
+        assert_eq!(first_sequence.len(), 8);
+        assert!(first_sequence.windows(2).all(|adjacent_pair| adjacent_pair[0] != adjacent_pair[1]));
     }
 }

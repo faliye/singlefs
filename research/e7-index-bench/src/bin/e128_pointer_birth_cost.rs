@@ -19,7 +19,7 @@
 //!
 //! ## 这份模型是 E20 那份的手抄件，靠跨装置闸兜着
 //!
-//! `Tree` / `gen_keys` / `bench` 三段与 `e20_fanout.rs` 同源。没有并成一份的理由是：
+//! `Tree` / `generate_lookup_keys` / `bench` 三段与 `e20_fanout.rs` 同源。没有并成一份的理由是：
 //! E20 的变异表按**原文匹配**改它自己那个文件，移走那三段会让 E20 已入库的
 //! 5 条变异证明当场失配。⇒ 代价是手抄，兜底是**跨装置闸**：
 //! 67 与 111 两档必须落回 E20 产物里那两个数（`show-me-test.md`「立在装置之间」）。
@@ -28,124 +28,124 @@
 use e7_index_bench::Emitter;
 use std::time::Instant;
 
-const NODE_HDR: usize = 64;
+const NODE_HEADER_BYTES: usize = 64;
 const NODE_BYTES: usize = 16384; // D8 已定项 2 钉死的常量，本实验不扫节点档
 
 /// 跨装置闸的两个基准，逐字取自 `research/results/e20-sweep-2026-08-29.out`
 /// 的 `node_bytes=16384 keys=8388608` 两行。
-const XDEV_REF: [(usize, f64); 2] = [(67, 466.99), (111, 547.50)];
-const XDEV_TOL: f64 = 0.15;
+const CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP: [(usize, f64); 2] = [(67, 466.99), (111, 547.50)];
+const CROSS_APPARATUS_RELATIVE_TOLERANCE: f64 = 0.15;
 
 struct Tree {
-    buf: Vec<u8>,
+    buffer: Vec<u8>,
     entry_bytes: usize,
     node_bytes: usize,
     slots: usize,
     depth: usize,
-    n_nodes: usize,
+    node_count: usize,
 }
 
 impl Tree {
-    fn new(n_keys: usize, entry_bytes: usize, node_bytes: usize) -> Self {
-        let slots = ((node_bytes - NODE_HDR) / entry_bytes).max(2);
-        let mut level_nodes = n_keys.div_ceil(slots).max(1);
+    fn new(key_count: usize, entry_bytes: usize, node_bytes: usize) -> Self {
+        let slots = ((node_bytes - NODE_HEADER_BYTES) / entry_bytes).max(2);
+        let mut level_nodes = key_count.div_ceil(slots).max(1);
         let mut depth = 1;
-        let mut total = level_nodes;
+        let mut total_nodes = level_nodes;
         while level_nodes > 1 {
             level_nodes = level_nodes.div_ceil(slots);
-            total += level_nodes;
+            total_nodes += level_nodes;
             depth += 1;
         }
-        let mut t = Tree {
-            buf: vec![0u8; total * node_bytes],
-            entry_bytes, node_bytes, slots, depth, n_nodes: total,
+        let mut tree = Tree {
+            buffer: vec![0u8; total_nodes * node_bytes],
+            entry_bytes, node_bytes, slots, depth, node_count: total_nodes,
         };
-        for node in 0..total {
-            for i in 0..slots {
-                let k = i as u64;
-                let mix = (node as u64) * (slots as u64) + i as u64;
-                let off = node * t.node_bytes + NODE_HDR + i * t.entry_bytes;
-                t.buf[off..off + 8].copy_from_slice(&k.to_le_bytes());
-                let child = (mix.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 17) % (total as u64);
-                if t.entry_bytes >= 16 {
-                    t.buf[off + 8..off + 16].copy_from_slice(&child.to_le_bytes());
+        for node in 0..total_nodes {
+            for slot_index in 0..slots {
+                let key = slot_index as u64;
+                let child_scatter_seed = (node as u64) * (slots as u64) + slot_index as u64;
+                let offset = node * tree.node_bytes + NODE_HEADER_BYTES + slot_index * tree.entry_bytes;
+                tree.buffer[offset..offset + 8].copy_from_slice(&key.to_le_bytes());
+                let child = (child_scatter_seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 17) % (total_nodes as u64);
+                if tree.entry_bytes >= 16 {
+                    tree.buffer[offset + 8..offset + 16].copy_from_slice(&child.to_le_bytes());
                 }
             }
         }
-        t
+        tree
     }
 
     #[inline(always)]
-    fn child_at(&self, node: usize, i: usize) -> usize {
-        let off = node * self.node_bytes + NODE_HDR + i * self.entry_bytes + 8;
-        u64::from_le_bytes(self.buf[off..off + 8].try_into().unwrap()) as usize
+    fn child_at(&self, node: usize, slot_index: usize) -> usize {
+        let offset = node * self.node_bytes + NODE_HEADER_BYTES + slot_index * self.entry_bytes + 8;
+        u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap()) as usize
     }
 
     #[inline(always)]
-    fn key_at(&self, node: usize, i: usize) -> u64 {
-        let off = node * self.node_bytes + NODE_HDR + i * self.entry_bytes;
-        u64::from_le_bytes(self.buf[off..off + 8].try_into().unwrap())
+    fn key_at(&self, node: usize, slot_index: usize) -> u64 {
+        let offset = node * self.node_bytes + NODE_HEADER_BYTES + slot_index * self.entry_bytes;
+        u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap())
     }
 
     #[inline(never)]
     fn lookup(&self, key: u64) -> usize {
         let mut node = 0usize;
         let mut slot = 0usize;
-        let bits = (self.slots as f64).log2().ceil() as u32;
-        for lvl in 0..self.depth {
-            let sk = (key >> (lvl as u32 * bits)) % (self.slots as u64);
-            let (mut lo, mut hi) = (0usize, self.slots);
-            while lo < hi {
-                let mid = (lo + hi) / 2;
-                if self.key_at(node, mid) < sk { lo = mid + 1; } else { hi = mid; }
+        let bits_per_level = (self.slots as f64).log2().ceil() as u32;
+        for level in 0..self.depth {
+            let level_search_key = (key >> (level as u32 * bits_per_level)) % (self.slots as u64);
+            let (mut lower_bound, mut upper_bound) = (0usize, self.slots);
+            while lower_bound < upper_bound {
+                let midpoint = (lower_bound + upper_bound) / 2;
+                if self.key_at(node, midpoint) < level_search_key { lower_bound = midpoint + 1; } else { upper_bound = midpoint; }
             }
-            slot = lo.min(self.slots - 1);
-            if lvl + 1 < self.depth {
-                node = self.child_at(node, slot) % self.n_nodes;
+            slot = lower_bound.min(self.slots - 1);
+            if level + 1 < self.depth {
+                node = self.child_at(node, slot) % self.node_count;
             }
         }
         slot
     }
 
-    fn footprint(&self) -> usize { self.buf.len() }
+    fn footprint(&self) -> usize { self.buffer.len() }
 }
 
-fn gen_keys(t: &Tree, iters: usize, seed: u64) -> Vec<u64> {
-    let mut s = seed | 1;
-    let span = (t.slots * t.n_nodes) as u64;
-    (0..iters).map(|_| {
-        s ^= s >> 12; s ^= s << 25; s ^= s >> 27;
-        s.wrapping_mul(0x2545_F491_4F6C_DD1D) % span
+fn generate_lookup_keys(tree: &Tree, lookup_count: usize, seed: u64) -> Vec<u64> {
+    let mut random_state = seed | 1;
+    let key_span = (tree.slots * tree.node_count) as u64;
+    (0..lookup_count).map(|_| {
+        random_state ^= random_state >> 12; random_state ^= random_state << 25; random_state ^= random_state >> 27;
+        random_state.wrapping_mul(0x2545_F491_4F6C_DD1D) % key_span
     }).collect()
 }
 
-fn bench(t: &Tree, keys: &[u64]) -> u64 {
-    let mut prev = 0usize;
-    let span = (t.slots * t.n_nodes) as u64;
-    let t0 = Instant::now();
-    for &k in keys {
-        let kk = (k ^ (prev as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)) % span;
-        prev = t.lookup(kk);
+fn bench(tree: &Tree, keys: &[u64]) -> u64 {
+    let mut previous_slot = 0usize;
+    let key_span = (tree.slots * tree.node_count) as u64;
+    let start_time = Instant::now();
+    for &key in keys {
+        let chained_key = (key ^ (previous_slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)) % key_span;
+        previous_slot = tree.lookup(chained_key);
     }
-    let ns = t0.elapsed().as_nanos() as u64;
-    std::hint::black_box(prev);
-    ns
+    let elapsed_nanoseconds = start_time.elapsed().as_nanos() as u64;
+    std::hint::black_box(previous_slot);
+    elapsed_nanoseconds
 }
 
 /// 甲把子指针 59 → 75 之后，仓里几个已登记的派生数各变成什么。
 /// **纯算术**，与计时无关；单测逐个钉死绝对值。
 /// ⚠️ **不报「树表每层几棵」**，只报条目宽。那个数的分母仓里有两个口径：
 /// `22-单元原子性怎么合成.md:495` 逐字「(16384−68−32)/67 = 16284/67 = 243」用 16284，
-/// 而这里的 `NODE_BYTES - NODE_HDR` 是 16320。两者在 121 上都给 134、**只在 137 上差 1**
+/// 而这里的 `NODE_BYTES - NODE_HEADER_BYTES` 是 16320。两者在 121 上都给 134、**只在 137 上差 1**
 /// （118 与 119）——`.claude/rules/mutation-sampling.md` 说的第三类：
 /// 在选定的取样点上恰好同值，基线那一格对上了就没人会去查另一格。
 /// E128 不挑口径，把这一格留给 C157（树表容量在两处按不同条目宽算）。
 /// 条目宽本身两个口径一致（纯字段表求和），所以照报。
-fn derived(child_ptr: usize) -> (usize, usize, usize, usize) {
-    let inode_entry = 8 + 26 + child_ptr;          // 分隔 key 8 + 身份引用 26 + 子指针
-    let ledger_entry = 22 + child_ptr;             // 记账 key 22 + 子指针
-    let root_record = 194 - 59 * 2 + child_ptr * 2; // 树表单元指针 + 实例表单元指针各一份
-    let tree_entry = 121 - 59 + child_ptr;         // D8 已定项 8 的 121 字节条目
+fn derived_widths_for_child_pointer(child_pointer_bytes: usize) -> (usize, usize, usize, usize) {
+    let inode_entry = 8 + 26 + child_pointer_bytes;          // 分隔 key 8 + 身份引用 26 + 子指针
+    let ledger_entry = 22 + child_pointer_bytes;             // 记账 key 22 + 子指针
+    let root_record = 194 - 59 * 2 + child_pointer_bytes * 2; // 树表单元指针 + 实例表单元指针各一份
+    let tree_entry = 121 - 59 + child_pointer_bytes;         // D8 已定项 8 的 121 字节条目
     (inode_entry, ledger_entry, root_record, tree_entry)
 }
 
@@ -157,108 +157,108 @@ const ARMS: [(&str, usize); 6] = [
 const KEY_TIERS: [usize; 4] = [1 << 11, 1 << 15, 1 << 19, 1 << 23];
 
 fn main() {
-    let iters: usize = std::env::args().nth(1).and_then(|x| x.parse().ok()).unwrap_or(2_000_000);
+    let lookup_count: usize = std::env::args().nth(1).and_then(|argument| argument.parse().ok()).unwrap_or(2_000_000);
     let rounds = 5usize;
-    let inner = 3usize;
-    let mut em = Emitter::new();
-    let mut out = String::new();
-    let mut say = |s: String| { out.push_str(&s); out.push('\n'); };
+    let timed_repetitions_per_round = 3usize;
+    let mut emitter = Emitter::new();
+    let mut output = String::new();
+    let mut say = |line: String| { output.push_str(&line); output.push('\n'); };
 
-    say(em.emit_raw(&format!(
-        "name=config iters={iters} rounds={rounds} inner={inner} node_bytes={NODE_BYTES} node_hdr={NODE_HDR}")));
+    say(emitter.emit_raw(&format!(
+        "name=config iters={lookup_count} rounds={rounds} inner={timed_repetitions_per_round} node_bytes={NODE_BYTES} node_hdr={NODE_HEADER_BYTES}")));
 
     // ── 纯算术那一半：甲 / 丙 各自的派生数 ──
-    for (arm, ptr) in [("bing", 59usize), ("jia", 75)] {
-        let (ie, le, rr, te) = derived(ptr);
-        say(em.emit_raw(&format!(
-            "name=derived arm={arm} child_ptr={ptr} inode_entry={ie} ledger_entry={le} \
-root_record={rr} tree_entry={te}")));
+    for (arm, child_pointer_bytes) in [("bing", 59usize), ("jia", 75)] {
+        let (inode_entry, ledger_entry, root_record, tree_entry) = derived_widths_for_child_pointer(child_pointer_bytes);
+        say(emitter.emit_raw(&format!(
+            "name=derived arm={arm} child_ptr={child_pointer_bytes} inode_entry={inode_entry} ledger_entry={ledger_entry} \
+root_record={root_record} tree_entry={tree_entry}")));
     }
 
     // ── 阳性对照：每条臂各跑一遍（判据 1）──
-    let mut bad = 0;
-    for (arm, w) in ARMS {
-        let small = Tree::new(KEY_TIERS[0], w, NODE_BYTES);
-        let big = Tree::new(KEY_TIERS[3], w, NODE_BYTES);
-        let ks = gen_keys(&small, iters / 8, 100);
-        let kb = gen_keys(&big, iters / 8, 100);
-        let ns_s = (0..inner).map(|_| bench(&small, &ks)).min().unwrap();
-        let ns_b = (0..inner).map(|_| bench(&big, &kb)).min().unwrap();
-        let ratio = ns_b as f64 / ns_s as f64;
-        let ok = ratio >= 2.0;
-        if !ok { bad += 1; }
-        say(em.emit_raw(&format!(
-            "name=poscontrol arm={arm} entry_bytes={w} slots={} depth_small={} depth_big={} \
-ns_small={ns_s} ns_big={ns_b} ratio={ratio:.2} ok={ok}", big.slots, small.depth, big.depth)));
+    let mut failed_positive_control_count = 0;
+    for (arm, entry_bytes) in ARMS {
+        let small = Tree::new(KEY_TIERS[0], entry_bytes, NODE_BYTES);
+        let big = Tree::new(KEY_TIERS[3], entry_bytes, NODE_BYTES);
+        let small_keys = generate_lookup_keys(&small, lookup_count / 8, 100);
+        let big_keys = generate_lookup_keys(&big, lookup_count / 8, 100);
+        let small_nanoseconds = (0..timed_repetitions_per_round).map(|_| bench(&small, &small_keys)).min().unwrap();
+        let big_nanoseconds = (0..timed_repetitions_per_round).map(|_| bench(&big, &big_keys)).min().unwrap();
+        let ratio = big_nanoseconds as f64 / small_nanoseconds as f64;
+        let passes_ratio_threshold = ratio >= 2.0;
+        if !passes_ratio_threshold { failed_positive_control_count += 1; }
+        say(emitter.emit_raw(&format!(
+            "name=poscontrol arm={arm} entry_bytes={entry_bytes} slots={} depth_small={} depth_big={} \
+ns_small={small_nanoseconds} ns_big={big_nanoseconds} ratio={ratio:.2} ok={passes_ratio_threshold}", big.slots, small.depth, big.depth)));
     }
-    if bad > 0 {
-        say(em.finish()); print!("{out}");
-        eprintln!("E128: {bad} 条臂的 L1 档与 DRAM 档差不到 2 倍 —— 那些臂没在量缓存，本轮作废");
+    if failed_positive_control_count > 0 {
+        say(emitter.finish()); print!("{output}");
+        eprintln!("E128: {failed_positive_control_count} 条臂的 L1 档与 DRAM 档差不到 2 倍 —— 那些臂没在量缓存，本轮作废");
         std::process::exit(4);
     }
 
     // ── 主扫描：5 轮 × 6 臂 × 4 档工作集 ──
-    let mut dram: Vec<(String, usize, Vec<f64>)> = Vec::new();
-    for (arm, w) in ARMS {
-        let mut per_round_dram = Vec::new();
-        for &nk in &KEY_TIERS {
-            let t = Tree::new(nk, w, NODE_BYTES);
-            let ks = gen_keys(&t, iters, 7);
-            for r in 0..rounds {
-                let ns = (0..inner).map(|_| bench(&t, &ks)).min().unwrap();
-                let per = ns as f64 / iters as f64;
-                if nk == KEY_TIERS[3] { per_round_dram.push(per); }
-                say(em.emit_raw(&format!(
-                    "name=e128 arm={arm} entry_bytes={w} keys={nk} round={r} slots={} depth={} \
-nodes={} footprint_bytes={} ns_per_lookup={per:.2}",
-                    t.slots, t.depth, t.n_nodes, t.footprint())));
+    let mut dram_tier_nanoseconds_per_lookup_by_arm: Vec<(String, usize, Vec<f64>)> = Vec::new();
+    for (arm, entry_bytes) in ARMS {
+        let mut dram_nanoseconds_per_lookup_per_round = Vec::new();
+        for &key_count in &KEY_TIERS {
+            let tree = Tree::new(key_count, entry_bytes, NODE_BYTES);
+            let lookup_keys = generate_lookup_keys(&tree, lookup_count, 7);
+            for round in 0..rounds {
+                let elapsed_nanoseconds = (0..timed_repetitions_per_round).map(|_| bench(&tree, &lookup_keys)).min().unwrap();
+                let nanoseconds_per_lookup = elapsed_nanoseconds as f64 / lookup_count as f64;
+                if key_count == KEY_TIERS[3] { dram_nanoseconds_per_lookup_per_round.push(nanoseconds_per_lookup); }
+                say(emitter.emit_raw(&format!(
+                    "name=e128 arm={arm} entry_bytes={entry_bytes} keys={key_count} round={round} slots={} depth={} \
+nodes={} footprint_bytes={} ns_per_lookup={nanoseconds_per_lookup:.2}",
+                    tree.slots, tree.depth, tree.node_count, tree.footprint())));
             }
         }
-        dram.push((arm.to_string(), w, per_round_dram));
+        dram_tier_nanoseconds_per_lookup_by_arm.push((arm.to_string(), entry_bytes, dram_nanoseconds_per_lookup_per_round));
     }
 
     // ── 跨装置闸（判据 2）：67 与 111 必须落回 E20 产物那两个数 ──
-    let mut xbad = 0;
-    for (w, refv) in XDEV_REF {
-        let mine = dram.iter().find(|(_, ww, _)| *ww == w).expect("臂缺失");
-        let med = median(&mine.2);
-        let dev = (med - refv).abs() / refv;
-        let ok = dev <= XDEV_TOL;
-        if !ok { xbad += 1; }
-        say(em.emit_raw(&format!(
-            "name=xdev entry_bytes={w} e20_ref={refv:.2} e128_median={med:.2} \
-deviation={dev:.4} tol={XDEV_TOL} ok={ok}")));
+    let mut failed_cross_apparatus_count = 0;
+    for (entry_bytes, e20_reference_nanoseconds_per_lookup) in CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP {
+        let this_apparatus_arm = dram_tier_nanoseconds_per_lookup_by_arm.iter().find(|(_, arm_entry_bytes, _)| *arm_entry_bytes == entry_bytes).expect("臂缺失");
+        let this_apparatus_median_nanoseconds_per_lookup = median(&this_apparatus_arm.2);
+        let relative_deviation = (this_apparatus_median_nanoseconds_per_lookup - e20_reference_nanoseconds_per_lookup).abs() / e20_reference_nanoseconds_per_lookup;
+        let is_within_tolerance = relative_deviation <= CROSS_APPARATUS_RELATIVE_TOLERANCE;
+        if !is_within_tolerance { failed_cross_apparatus_count += 1; }
+        say(emitter.emit_raw(&format!(
+            "name=xdev entry_bytes={entry_bytes} e20_ref={e20_reference_nanoseconds_per_lookup:.2} e128_median={this_apparatus_median_nanoseconds_per_lookup:.2} \
+deviation={relative_deviation:.4} tol={CROSS_APPARATUS_RELATIVE_TOLERANCE} ok={is_within_tolerance}")));
     }
-    if xbad > 0 {
-        say(em.finish()); print!("{out}");
-        eprintln!("E128: 跨装置闸 {xbad} 格超差 —— 这套装置与 E20 对同一个量报不同的数，本轮作废");
+    if failed_cross_apparatus_count > 0 {
+        say(emitter.finish()); print!("{output}");
+        eprintln!("E128: 跨装置闸 {failed_cross_apparatus_count} 格超差 —— 这套装置与 E20 对同一个量报不同的数，本轮作废");
         std::process::exit(5);
     }
 
     // ── 结论那一格：逐轮比，5 轮同向才下结论（判据 4）──
-    for (a, b, label) in [("inode_bing", "inode_jia", "inode"), ("ledger_bing", "ledger_jia", "ledger")] {
-        let x = &dram.iter().find(|(n, _, _)| n == a).unwrap().2;
-        let y = &dram.iter().find(|(n, _, _)| n == b).unwrap().2;
-        let slower = (0..rounds).filter(|&i| y[i] > x[i]).count();
-        let ratios: Vec<f64> = (0..rounds).map(|i| y[i] / x[i]).collect();
-        let verdict = if slower == rounds { "jia_slower_every_round" }
-            else if slower == 0 { "jia_never_slower" } else { "unstable" };
-        say(em.emit_raw(&format!(
-            "name=verdict pair={label} bing_median={:.2} jia_median={:.2} ratio_median={:.4} \
-ratio_min={:.4} ratio_max={:.4} rounds_jia_slower={slower}/{rounds} verdict={verdict}",
-            median(x), median(y), median(&ratios),
-            ratios.iter().cloned().fold(f64::INFINITY, f64::min),
-            ratios.iter().cloned().fold(f64::NEG_INFINITY, f64::max))));
+    for (bing_arm_label, jia_arm_label, pair_label) in [("inode_bing", "inode_jia", "inode"), ("ledger_bing", "ledger_jia", "ledger")] {
+        let bing_dram_per_round = &dram_tier_nanoseconds_per_lookup_by_arm.iter().find(|(arm_label, _, _)| arm_label == bing_arm_label).unwrap().2;
+        let jia_dram_per_round = &dram_tier_nanoseconds_per_lookup_by_arm.iter().find(|(arm_label, _, _)| arm_label == jia_arm_label).unwrap().2;
+        let rounds_jia_slower = (0..rounds).filter(|&round| jia_dram_per_round[round] > bing_dram_per_round[round]).count();
+        let jia_to_bing_ratio_per_round: Vec<f64> = (0..rounds).map(|round| jia_dram_per_round[round] / bing_dram_per_round[round]).collect();
+        let verdict = if rounds_jia_slower == rounds { "jia_slower_every_round" }
+            else if rounds_jia_slower == 0 { "jia_never_slower" } else { "unstable" };
+        say(emitter.emit_raw(&format!(
+            "name=verdict pair={pair_label} bing_median={:.2} jia_median={:.2} ratio_median={:.4} \
+ratio_min={:.4} ratio_max={:.4} rounds_jia_slower={rounds_jia_slower}/{rounds} verdict={verdict}",
+            median(bing_dram_per_round), median(jia_dram_per_round), median(&jia_to_bing_ratio_per_round),
+            jia_to_bing_ratio_per_round.iter().cloned().fold(f64::INFINITY, f64::min),
+            jia_to_bing_ratio_per_round.iter().cloned().fold(f64::NEG_INFINITY, f64::max))));
     }
 
-    say(em.finish());
-    print!("{out}");
+    say(emitter.finish());
+    print!("{output}");
 }
 
-fn median(v: &[f64]) -> f64 {
-    let mut s = v.to_vec();
-    s.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    s[s.len() / 2]
+fn median(values: &[f64]) -> f64 {
+    let mut sorted_values = values.to_vec();
+    sorted_values.sort_by(|left, right| left.partial_cmp(right).unwrap());
+    sorted_values[sorted_values.len() / 2]
 }
 
 #[cfg(test)]
@@ -266,29 +266,29 @@ mod tests {
     use super::*;
 
     /// **绝对值断言（判据 3）**：槽数逐档钉死。
-    /// 只让六条臂互相比，测不出「六条一起错」——比如 NODE_HDR 抄错。
+    /// 只让六条臂互相比，测不出「六条一起错」——比如 NODE_HEADER_BYTES 抄错。
     #[test]
     fn slots_are_pinned_per_width() {
-        for (w, want) in [(93usize, 175usize), (109, 149), (81, 201), (97, 168), (67, 243), (111, 147)] {
-            let t = Tree::new(1 << 20, w, NODE_BYTES);
-            assert_eq!(t.slots, want, "entry_bytes={w}");
+        for (entry_bytes, expected_slots) in [(93usize, 175usize), (109, 149), (81, 201), (97, 168), (67, 243), (111, 147)] {
+            let tree = Tree::new(1 << 20, entry_bytes, NODE_BYTES);
+            assert_eq!(tree.slots, expected_slots, "entry_bytes={entry_bytes}");
         }
     }
 
-    /// 本工程两处已登记的扇出必须由同一个 NODE_HDR 复现出来：
+    /// 本工程两处已登记的扇出必须由同一个 NODE_HEADER_BYTES 复现出来：
     /// D8 已定项 6 的 inode 树 175、D18 的记账树 201。对不上说明节点头常量抄错了。
     #[test]
     fn published_fanouts_come_out_of_the_same_header_constant() {
-        assert_eq!((NODE_BYTES - NODE_HDR) / 93, 175);
-        assert_eq!((NODE_BYTES - NODE_HDR) / 81, 201);
+        assert_eq!((NODE_BYTES - NODE_HEADER_BYTES) / 93, 175);
+        assert_eq!((NODE_BYTES - NODE_HEADER_BYTES) / 81, 201);
     }
 
     /// **绝对值断言（判据 3）**：2²³ key 上的树深逐档钉死。
     #[test]
     fn depth_at_dram_tier_is_pinned() {
-        for (w, want) in [(93usize, 4usize), (109, 4), (81, 4), (97, 4), (67, 3), (111, 4)] {
-            let t = Tree::new(1 << 23, w, NODE_BYTES);
-            assert_eq!(t.depth, want, "entry_bytes={w}");
+        for (entry_bytes, expected_depth) in [(93usize, 4usize), (109, 4), (81, 4), (97, 4), (67, 3), (111, 4)] {
+            let tree = Tree::new(1 << 23, entry_bytes, NODE_BYTES);
+            assert_eq!(tree.depth, expected_depth, "entry_bytes={entry_bytes}");
         }
     }
 
@@ -296,92 +296,92 @@ mod tests {
     /// 这条一旦不成立，整个「甲多付多少」的读法要改。
     #[test]
     fn inode_pair_is_compared_at_equal_depth() {
-        let a = Tree::new(1 << 23, 93, NODE_BYTES);
-        let b = Tree::new(1 << 23, 109, NODE_BYTES);
-        assert_eq!(a.depth, b.depth, "两条臂树深不同，差值里掺了跳深");
+        let bing_inode_tree = Tree::new(1 << 23, 93, NODE_BYTES);
+        let jia_inode_tree = Tree::new(1 << 23, 109, NODE_BYTES);
+        assert_eq!(bing_inode_tree.depth, jia_inode_tree.depth, "两条臂树深不同，差值里掺了跳深");
     }
 
     /// **绝对值断言**：派生数逐个钉死，不靠「甲比丙大」这种互比。
     /// 写成加法不写减法：常量变异改大时减法会编译期溢出，被记成无效变异。
     #[test]
     fn derived_widths_are_pinned() {
-        let (ie, le, rr, te) = derived(59);
-        assert_eq!(ie, 93);
-        assert_eq!(le, 81);
-        assert_eq!(rr, 194);
-        assert_eq!(te, 121);
-        let (ie2, le2, rr2, te2) = derived(75);
-        assert_eq!(ie2, 109);
-        assert_eq!(le2, 97);
-        assert_eq!(rr2, 226);
-        assert_eq!(te2, 137);
+        let (bing_inode_entry, bing_ledger_entry, bing_root_record, bing_tree_entry) = derived_widths_for_child_pointer(59);
+        assert_eq!(bing_inode_entry, 93);
+        assert_eq!(bing_ledger_entry, 81);
+        assert_eq!(bing_root_record, 194);
+        assert_eq!(bing_tree_entry, 121);
+        let (jia_inode_entry, jia_ledger_entry, jia_root_record, jia_tree_entry) = derived_widths_for_child_pointer(75);
+        assert_eq!(jia_inode_entry, 109);
+        assert_eq!(jia_ledger_entry, 97);
+        assert_eq!(jia_root_record, 226);
+        assert_eq!(jia_tree_entry, 137);
     }
 
     /// 甲多出来的那 16 字节要正好落在每一条含子指针的条目上，一处不多一处不少。
     #[test]
     fn jia_adds_exactly_sixteen_per_child_pointer() {
-        let (ie, le, rr, te) = derived(59);
-        let (ie2, le2, rr2, te2) = derived(75);
-        assert_eq!(ie2, ie + 16);
-        assert_eq!(le2, le + 16);
-        assert_eq!(rr2, rr + 32); // 根记录里有两个单元指针
-        assert_eq!(te2, te + 16);
+        let (bing_inode_entry, bing_ledger_entry, bing_root_record, bing_tree_entry) = derived_widths_for_child_pointer(59);
+        let (jia_inode_entry, jia_ledger_entry, jia_root_record, jia_tree_entry) = derived_widths_for_child_pointer(75);
+        assert_eq!(jia_inode_entry, bing_inode_entry + 16);
+        assert_eq!(jia_ledger_entry, bing_ledger_entry + 16);
+        assert_eq!(jia_root_record, bing_root_record + 32); // 根记录里有两个单元指针
+        assert_eq!(jia_tree_entry, bing_tree_entry + 16);
     }
 
     /// key 必须按 entry_bytes 跨步写——读错位置会取到 0。
     #[test]
     fn keys_are_laid_out_at_stride() {
-        let t = Tree::new(1 << 12, 93, NODE_BYTES);
-        for i in 0..t.slots { assert_eq!(t.key_at(3, i), i as u64); }
+        let tree = Tree::new(1 << 12, 93, NODE_BYTES);
+        for slot_index in 0..tree.slots { assert_eq!(tree.key_at(3, slot_index), slot_index as u64); }
     }
 
     /// 查找必须散开：全落一处说明布局或搜索键取法错了。
     #[test]
     fn lookups_spread_across_nodes() {
-        let t = Tree::new(1 << 20, 93, NODE_BYTES);
-        let mut seen = std::collections::BTreeSet::new();
-        let mut s = 12345u64;
+        let tree = Tree::new(1 << 20, 93, NODE_BYTES);
+        let mut distinct_slots = std::collections::BTreeSet::new();
+        let mut random_state = 12345u64;
         for _ in 0..2000 {
-            s ^= s >> 12; s ^= s << 25; s ^= s >> 27;
-            seen.insert(t.lookup(s.wrapping_mul(0x2545_F491_4F6C_DD1D)));
+            random_state ^= random_state >> 12; random_state ^= random_state << 25; random_state ^= random_state >> 27;
+            distinct_slots.insert(tree.lookup(random_state.wrapping_mul(0x2545_F491_4F6C_DD1D)));
         }
-        assert!(seen.len() > 50, "2000 次查找只落到 {} 个不同 slot 上", seen.len());
+        assert!(distinct_slots.len() > 50, "2000 次查找只落到 {} 个不同 slot 上", distinct_slots.len());
     }
 
     /// 节点内二分必须命中恰好等于搜索键的那个槽。
     #[test]
     fn binary_search_lands_exactly_on_the_search_key() {
-        let t = Tree::new(100, 93, NODE_BYTES);
-        assert_eq!(t.depth, 1);
-        for k in 0..t.slots as u64 {
-            assert_eq!(t.lookup(k), (k as usize) % t.slots, "key={k}");
+        let tree = Tree::new(100, 93, NODE_BYTES);
+        assert_eq!(tree.depth, 1);
+        for key in 0..tree.slots as u64 {
+            assert_eq!(tree.lookup(key), (key as usize) % tree.slots, "key={key}");
         }
     }
 
     /// 子指针不许与 key 重叠——重叠了指针追逐读的是 key，整条依赖链是假的。
     #[test]
     fn child_pointers_live_beside_keys_not_on_top_of_them() {
-        let t = Tree::new(1 << 16, 93, NODE_BYTES);
-        assert!((0..t.slots).any(|i| t.child_at(5, i) as u64 != t.key_at(5, i)),
+        let tree = Tree::new(1 << 16, 93, NODE_BYTES);
+        assert!((0..tree.slots).any(|slot_index| tree.child_at(5, slot_index) as u64 != tree.key_at(5, slot_index)),
             "每个条目的子指针都等于它的 key——child_at 读到了 key 的位置");
     }
 
     /// 条目变宽必须让扇出降、工作集涨。不变说明没按 entry_bytes 跨步。
     #[test]
     fn wider_entries_shrink_fanout_and_grow_footprint() {
-        let a = Tree::new(1 << 16, 93, NODE_BYTES);
-        let b = Tree::new(1 << 16, 109, NODE_BYTES);
-        assert!(b.slots < a.slots, "扇出没降：{} -> {}", a.slots, b.slots);
-        assert!(b.footprint() > a.footprint(), "工作集没涨");
+        let bing_inode_tree = Tree::new(1 << 16, 93, NODE_BYTES);
+        let jia_inode_tree = Tree::new(1 << 16, 109, NODE_BYTES);
+        assert!(jia_inode_tree.slots < bing_inode_tree.slots, "扇出没降：{} -> {}", bing_inode_tree.slots, jia_inode_tree.slots);
+        assert!(jia_inode_tree.footprint() > bing_inode_tree.footprint(), "工作集没涨");
     }
 
     /// 跨装置闸的两个基准是常量，抄错了这条会红。
     #[test]
-    fn cross_device_reference_matches_the_stored_e20_artifact() {
-        assert_eq!(XDEV_REF[0].0, 67);
-        assert_eq!(XDEV_REF[1].0, 111);
-        assert!((XDEV_REF[0].1 - 466.99).abs() < 1e-9);
-        assert!((XDEV_REF[1].1 - 547.50).abs() < 1e-9);
+    fn cross_apparatus_reference_matches_the_stored_e20_artifact() {
+        assert_eq!(CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP[0].0, 67);
+        assert_eq!(CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP[1].0, 111);
+        assert!((CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP[0].1 - 466.99).abs() < 1e-9);
+        assert!((CROSS_APPARATUS_E20_REFERENCE_NANOSECONDS_PER_LOOKUP[1].1 - 547.50).abs() < 1e-9);
     }
 
     /// 六条臂就是本工程真实的条目宽，改一条就等于换了被测对象。
@@ -401,14 +401,14 @@ mod tests {
     /// 免得后来的人以为「树表每层几棵」在仓里只有一个数。
     #[test]
     fn the_two_tree_table_denominators_agree_at_121_and_disagree_at_137() {
-        let repo = 16384 - 68 - 32;      // 22-单元原子性怎么合成.md:495 逐字
-        let here = NODE_BYTES - NODE_HDR;
-        assert_eq!(repo, 16284);
-        assert_eq!(here, 16320);
-        assert_eq!(repo / 121, here / 121);            // 丙那一臂：两个口径同值
-        assert_eq!(repo / 137 + 1, here / 137);        // 甲那一臂：差 1
-        assert_eq!(repo / 137, 118);
-        assert_eq!(here / 137, 119);
+        let unit_atomicity_decision_tree_table_denominator = 16384 - 68 - 32;      // 22-单元原子性怎么合成.md:495 逐字
+        let this_experiment_tree_table_denominator = NODE_BYTES - NODE_HEADER_BYTES;
+        assert_eq!(unit_atomicity_decision_tree_table_denominator, 16284);
+        assert_eq!(this_experiment_tree_table_denominator, 16320);
+        assert_eq!(unit_atomicity_decision_tree_table_denominator / 121, this_experiment_tree_table_denominator / 121);            // 丙那一臂：两个口径同值
+        assert_eq!(unit_atomicity_decision_tree_table_denominator / 137 + 1, this_experiment_tree_table_denominator / 137);        // 甲那一臂：差 1
+        assert_eq!(unit_atomicity_decision_tree_table_denominator / 137, 118);
+        assert_eq!(this_experiment_tree_table_denominator / 137, 119);
     }
 
     /// median 取中位不取均值——一次异常慢的轮次不许把结论拉走。

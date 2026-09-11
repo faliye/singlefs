@@ -1,0 +1,3 @@
+# 缩写登记表（.claude/singlefs-ai-sop/rules/code-discipline.md「缩写登记表」）。一行一条，# 后面写全称与含义。
+# 这里是每个缩写唯一的权威定义；单字母不许登记，项目自己的编号按「字母<数字>」整类登记。
+e<数字>  # 实验编号：e57 指 .claude/kb/experiments.md 里登记的 E57。research/ 下的实验二进制按「编号_简称」命名，kb 的复跑命令按这个名字调用

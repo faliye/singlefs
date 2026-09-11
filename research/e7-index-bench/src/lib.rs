@@ -6,51 +6,51 @@
 /// 一轮 I/O 的原始观测。时间用纳秒，避免毫秒取整把快的那档抹平。
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Sample {
-    pub ops: u64,
-    pub bytes_per_op: u64,
-    pub elapsed_ns: u64,
+    pub operation_count: u64,
+    pub bytes_per_operation: u64,
+    pub elapsed_nanoseconds: u64,
 }
 
 impl Sample {
     pub fn total_bytes(&self) -> u64 {
-        self.ops.saturating_mul(self.bytes_per_op)
+        self.operation_count.saturating_mul(self.bytes_per_operation)
     }
 
     /// MiB/s。耗时为 0 时返回 None——**读不到 ≠ 读到 0**：
     /// 除零如果悄悄返回 0 或 inf，会被当成一个真实测量值参与判定。
-    pub fn mib_per_sec(&self) -> Option<f64> {
-        if self.elapsed_ns == 0 {
+    pub fn mebibytes_per_second(&self) -> Option<f64> {
+        if self.elapsed_nanoseconds == 0 {
             return None;
         }
-        let secs = self.elapsed_ns as f64 / 1e9;
-        Some((self.total_bytes() as f64 / (1024.0 * 1024.0)) / secs)
+        let elapsed_seconds = self.elapsed_nanoseconds as f64 / 1e9;
+        Some((self.total_bytes() as f64 / (1024.0 * 1024.0)) / elapsed_seconds)
     }
 
     /// 每秒操作数。同样在耗时为 0 时返回 None。
     pub fn iops(&self) -> Option<f64> {
-        if self.elapsed_ns == 0 {
+        if self.elapsed_nanoseconds == 0 {
             return None;
         }
-        Some(self.ops as f64 / (self.elapsed_ns as f64 / 1e9))
+        Some(self.operation_count as f64 / (self.elapsed_nanoseconds as f64 / 1e9))
     }
 }
 
 /// 一条给宿主解析的结果行。前缀是 harness 的抓取锚点，改它要同时改 vm-bench.sh。
-pub fn result_line(name: &str, s: &Sample) -> String {
-    let mib = s
-        .mib_per_sec()
-        .map(|v| format!("{v:.3}"))
+pub fn result_line(name: &str, sample: &Sample) -> String {
+    let mebibytes_per_second_text = sample
+        .mebibytes_per_second()
+        .map(|mebibytes_per_second| format!("{mebibytes_per_second:.3}"))
         .unwrap_or_else(|| "NA".into());
-    let iops = s
+    let iops = sample
         .iops()
-        .map(|v| format!("{v:.1}"))
+        .map(|operations_per_second| format!("{operations_per_second:.1}"))
         .unwrap_or_else(|| "NA".into());
     format!(
-        "E7RESULT name={name} ops={} bytes_per_op={} elapsed_ns={} total_bytes={} mib_per_s={mib} iops={iops}",
-        s.ops,
-        s.bytes_per_op,
-        s.elapsed_ns,
-        s.total_bytes()
+        "E7RESULT name={name} ops={} bytes_per_op={} elapsed_ns={} total_bytes={} mib_per_s={mebibytes_per_second_text} iops={iops}",
+        sample.operation_count,
+        sample.bytes_per_operation,
+        sample.elapsed_nanoseconds,
+        sample.total_bytes()
     )
 }
 
@@ -69,9 +69,9 @@ impl Emitter {
     }
 
     /// 发一条结果，返回该打印的整行。
-    pub fn emit(&mut self, name: &str, s: &Sample) -> String {
+    pub fn emit(&mut self, name: &str, sample: &Sample) -> String {
         self.emitted += 1;
-        result_line(name, s)
+        result_line(name, sample)
     }
 
     /// 发一条自由格式的结果（非 Sample 形态，例如设备大小）。
@@ -92,50 +92,50 @@ mod tests {
     use super::*;
 
     #[test]
-    fn total_bytes_is_ops_times_size() {
-        let s = Sample {
-            ops: 256,
-            bytes_per_op: 4096,
-            elapsed_ns: 1,
+    fn total_bytes_is_operation_count_times_bytes_per_operation() {
+        let sample = Sample {
+            operation_count: 256,
+            bytes_per_operation: 4096,
+            elapsed_nanoseconds: 1,
         };
-        assert_eq!(s.total_bytes(), 1_048_576);
+        assert_eq!(sample.total_bytes(), 1_048_576);
     }
 
     #[test]
-    fn one_mib_in_one_second_is_one_mib_per_sec() {
-        let s = Sample {
-            ops: 1,
-            bytes_per_op: 1024 * 1024,
-            elapsed_ns: 1_000_000_000,
+    fn one_mebibyte_in_one_second_is_one_mebibyte_per_second() {
+        let sample = Sample {
+            operation_count: 1,
+            bytes_per_operation: 1024 * 1024,
+            elapsed_nanoseconds: 1_000_000_000,
         };
-        assert_eq!(s.mib_per_sec(), Some(1.0));
-        assert_eq!(s.iops(), Some(1.0));
+        assert_eq!(sample.mebibytes_per_second(), Some(1.0));
+        assert_eq!(sample.iops(), Some(1.0));
     }
 
     /// 耗时为 0 必须报 None，不许退化成 0 或 inf ——
     /// 一个悄悄变成 0 的吞吐会被当成「测到了，很慢」，而真相是「没测到」。
     #[test]
     fn zero_elapsed_is_not_a_measurement() {
-        let s = Sample {
-            ops: 10,
-            bytes_per_op: 4096,
-            elapsed_ns: 0,
+        let sample = Sample {
+            operation_count: 10,
+            bytes_per_operation: 4096,
+            elapsed_nanoseconds: 0,
         };
-        assert_eq!(s.mib_per_sec(), None);
-        assert_eq!(s.iops(), None);
-        assert!(result_line("x", &s).contains("mib_per_s=NA"));
-        assert!(result_line("x", &s).contains("iops=NA"));
+        assert_eq!(sample.mebibytes_per_second(), None);
+        assert_eq!(sample.iops(), None);
+        assert!(result_line("x", &sample).contains("mib_per_s=NA"));
+        assert!(result_line("x", &sample).contains("iops=NA"));
     }
 
     /// 结果行必须带 harness 认的锚点前缀，否则宿主一条都抓不到。
     #[test]
     fn result_line_carries_the_anchor_prefix() {
-        let s = Sample {
-            ops: 2,
-            bytes_per_op: 512,
-            elapsed_ns: 1_000_000,
+        let sample = Sample {
+            operation_count: 2,
+            bytes_per_operation: 512,
+            elapsed_nanoseconds: 1_000_000,
         };
-        let line = result_line("seq_write", &s);
+        let line = result_line("seq_write", &sample);
         assert!(line.starts_with("E7RESULT "), "锚点前缀丢了：{line}");
         assert!(line.contains("name=seq_write"));
         assert!(line.contains("total_bytes=1024"));
@@ -144,41 +144,41 @@ mod tests {
     /// 收尾行报的条数必须**含它自己**，否则宿主的比对会永远差一。
     #[test]
     fn done_count_includes_itself() {
-        let s = Sample {
-            ops: 1,
-            bytes_per_op: 1,
-            elapsed_ns: 1,
+        let sample = Sample {
+            operation_count: 1,
+            bytes_per_operation: 1,
+            elapsed_nanoseconds: 1,
         };
-        let mut e = Emitter::new();
-        let _ = e.emit_raw("name=device_size bytes=1");
-        let _ = e.emit("a", &s);
-        let _ = e.emit("b", &s);
-        assert_eq!(e.finish(), "E7RESULT name=done emitted=4");
+        let mut emitter = Emitter::new();
+        let _ = emitter.emit_raw("name=device_size bytes=1");
+        let _ = emitter.emit("a", &sample);
+        let _ = emitter.emit("b", &sample);
+        assert_eq!(emitter.finish(), "E7RESULT name=done emitted=4");
     }
 
     /// 每一条发出去的行都必须带锚点，收尾行也不例外。
     #[test]
     fn every_emitted_line_carries_the_anchor() {
-        let s = Sample {
-            ops: 1,
-            bytes_per_op: 1,
-            elapsed_ns: 1,
+        let sample = Sample {
+            operation_count: 1,
+            bytes_per_operation: 1,
+            elapsed_nanoseconds: 1,
         };
-        let mut e = Emitter::new();
-        for line in [e.emit_raw("name=x"), e.emit("y", &s), e.finish()] {
+        let mut emitter = Emitter::new();
+        for line in [emitter.emit_raw("name=x"), emitter.emit("y", &sample), emitter.finish()] {
             assert!(line.starts_with("E7RESULT "), "锚点丢了：{line}");
         }
     }
 
     /// ops 极大时不许 panic —— 溢出要饱和，不要在实验跑到一半炸掉。
     #[test]
-    fn huge_ops_saturate_instead_of_panicking() {
-        let s = Sample {
-            ops: u64::MAX,
-            bytes_per_op: 4096,
-            elapsed_ns: 1_000_000_000,
+    fn huge_operation_count_saturates_instead_of_panicking() {
+        let sample = Sample {
+            operation_count: u64::MAX,
+            bytes_per_operation: 4096,
+            elapsed_nanoseconds: 1_000_000_000,
         };
-        assert_eq!(s.total_bytes(), u64::MAX);
+        assert_eq!(sample.total_bytes(), u64::MAX);
     }
 }
 
@@ -195,11 +195,11 @@ pub struct IoCounters {
 impl IoCounters {
     /// 每次操作平均触发多少次设备 I/O。ops 为 0 时返回 None——
     /// 除零悄悄返回 0 会被当成「测到了，很省」，而真相是「没测」。
-    pub fn io_per_op(&self, ops: u64) -> Option<f64> {
-        if ops == 0 {
+    pub fn io_per_op(&self, operation_count: u64) -> Option<f64> {
+        if operation_count == 0 {
             return None;
         }
-        Some((self.reads + self.writes) as f64 / ops as f64)
+        Some((self.reads + self.writes) as f64 / operation_count as f64)
     }
 }
 
@@ -212,20 +212,20 @@ pub fn page_of(block: u64, per_page: u64) -> u64 {
 /// 定容 LRU。`touch` 返回被逐出的页号（若有）。
 /// 它是本实验判别力的来源：**缓存边界不生效，整个实验就测不出东西**。
 pub struct Lru {
-    cap: usize,
+    capacity_in_pages: usize,
     order: std::collections::VecDeque<u64>,
     dirty: std::collections::HashSet<u64>,
 }
 
 impl Lru {
-    pub fn new(cap: usize) -> Self {
-        assert!(cap > 0, "缓存容量必须为正");
-        Self { cap, order: std::collections::VecDeque::with_capacity(cap), dirty: Default::default() }
+    pub fn new(capacity_in_pages: usize) -> Self {
+        assert!(capacity_in_pages > 0, "缓存容量必须为正");
+        Self { capacity_in_pages, order: std::collections::VecDeque::with_capacity(capacity_in_pages), dirty: Default::default() }
     }
     pub fn contains(&self, page: u64) -> bool {
         self.order.contains(&page)
     }
-    pub fn len(&self) -> usize {
+    pub fn resident_page_count(&self) -> usize {
         self.order.len()
     }
     pub fn is_empty(&self) -> bool {
@@ -240,12 +240,12 @@ impl Lru {
     /// 访问一页：已在缓存则提到最近端并返回 None；不在则插入，
     /// 满了就逐出最久未用的那一页并返回它。
     pub fn touch(&mut self, page: u64) -> Option<u64> {
-        if let Some(pos) = self.order.iter().position(|&p| p == page) {
-            self.order.remove(pos);
+        if let Some(position_in_recency_order) = self.order.iter().position(|&cached_page| cached_page == page) {
+            self.order.remove(position_in_recency_order);
             self.order.push_back(page);
             return None;
         }
-        let evicted = if self.order.len() >= self.cap { self.order.pop_front() } else { None };
+        let evicted = if self.order.len() >= self.capacity_in_pages { self.order.pop_front() } else { None };
         self.order.push_back(page);
         evicted
     }
@@ -253,9 +253,9 @@ impl Lru {
         self.dirty.remove(&page)
     }
     pub fn drain_dirty(&mut self) -> Vec<u64> {
-        let mut v: Vec<u64> = self.dirty.drain().collect();
-        v.sort_unstable();
-        v
+        let mut dirty_pages: Vec<u64> = self.dirty.drain().collect();
+        dirty_pages.sort_unstable();
+        dirty_pages
     }
 }
 
@@ -265,15 +265,15 @@ mod e12_tests {
 
     #[test]
     fn io_per_op_counts_both_directions() {
-        let c = IoCounters { reads: 3, writes: 1, bytes_read: 0, bytes_written: 0 };
-        assert_eq!(c.io_per_op(2), Some(2.0));
+        let counters = IoCounters { reads: 3, writes: 1, bytes_read: 0, bytes_written: 0 };
+        assert_eq!(counters.io_per_op(2), Some(2.0));
     }
 
     /// 零操作不是「零 I/O」，是「没测」。
     #[test]
-    fn zero_ops_is_not_a_measurement() {
-        let c = IoCounters { reads: 5, writes: 5, bytes_read: 0, bytes_written: 0 };
-        assert_eq!(c.io_per_op(0), None);
+    fn zero_operations_is_not_a_measurement() {
+        let counters = IoCounters { reads: 5, writes: 5, bytes_read: 0, bytes_written: 0 };
+        assert_eq!(counters.io_per_op(0), None);
     }
 
     #[test]
@@ -287,32 +287,32 @@ mod e12_tests {
     /// 整个 E12 会测出「引用计数免费」这个错误结论。
     #[test]
     fn lru_evicts_least_recently_used() {
-        let mut l = Lru::new(2);
-        assert_eq!(l.touch(1), None);
-        assert_eq!(l.touch(2), None);
-        assert_eq!(l.touch(1), None); // 1 变成最近使用
-        assert_eq!(l.touch(3), Some(2), "该逐出的是最久未用的 2");
-        assert!(l.contains(1) && l.contains(3) && !l.contains(2));
-        assert_eq!(l.len(), 2);
+        let mut cache = Lru::new(2);
+        assert_eq!(cache.touch(1), None);
+        assert_eq!(cache.touch(2), None);
+        assert_eq!(cache.touch(1), None); // 1 变成最近使用
+        assert_eq!(cache.touch(3), Some(2), "该逐出的是最久未用的 2");
+        assert!(cache.contains(1) && cache.contains(3) && !cache.contains(2));
+        assert_eq!(cache.resident_page_count(), 2);
     }
 
     /// 容量以内不许逐出，否则会虚报随机读。
     #[test]
     fn lru_does_not_evict_within_capacity() {
-        let mut l = Lru::new(4);
-        for p in 0..4 {
-            assert_eq!(l.touch(p), None);
+        let mut cache = Lru::new(4);
+        for page in 0..4 {
+            assert_eq!(cache.touch(page), None);
         }
-        assert_eq!(l.len(), 4);
+        assert_eq!(cache.resident_page_count(), 4);
     }
 
     #[test]
     fn dirty_pages_are_tracked_and_drained_once() {
-        let mut l = Lru::new(4);
-        l.touch(7);
-        l.mark_dirty(7);
-        assert!(l.is_dirty(7));
-        assert_eq!(l.drain_dirty(), vec![7]);
-        assert!(!l.is_dirty(7), "drain 之后不该还是脏的");
+        let mut cache = Lru::new(4);
+        cache.touch(7);
+        cache.mark_dirty(7);
+        assert!(cache.is_dirty(7));
+        assert_eq!(cache.drain_dirty(), vec![7]);
+        assert!(!cache.is_dirty(7), "drain 之后不该还是脏的");
     }
 }

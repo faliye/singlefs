@@ -1,6 +1,6 @@
-M1_真值不看链上删除	!b.deaths.keys().any(|d| chain.contains(d))	true
-M2_真值不查诞生链	if !chain.contains(&b.birth) { return false; }         // 不在这条链上诞生	if false { return false; }         // 不在这条链上诞生
-M3_保守死亡不等全分支	if covered == n_branches {	if covered >= 1 {
-M4_区间左边界写严	b.birth <= root_txg && root_txg < d	b.birth < root_txg && root_txg < d
-M5_最早死亡不记账	blocks[i].deaths.insert(t, ());\n                blocks[i].d5_death_min = blocks[i].d5_death_min.min(t);	blocks[i].deaths.insert(t, ());
-M6_两个方向装反	if i && !t { fp += 1; }\n            if !i && t { fn_ += 1; }	if i && !t { fn_ += 1; }\n            if !i && t { fp += 1; }
+M1_真值不看链上删除	!block.deaths.keys().any(|death_txg| ancestor_chain.contains(death_txg))	true
+M2_真值不查诞生链	if !ancestor_chain.contains(&block.birth) { return false; }         // 不在这条链上诞生	if false { return false; }         // 不在这条链上诞生
+M3_保守死亡不等全分支	if deleting_branch_count == branch_count {	if deleting_branch_count >= 1 {
+M4_区间左边界写严	block.birth <= root_txg && root_txg < recorded_death	block.birth < root_txg && root_txg < recorded_death
+M5_最早死亡不记账	blocks[victim_block_index].deaths.insert(deleting_commit_txg, ());\n                blocks[victim_block_index].single_value_death_earliest = blocks[victim_block_index].single_value_death_earliest.min(deleting_commit_txg);	blocks[victim_block_index].deaths.insert(deleting_commit_txg, ());
+M6_两个方向装反	if is_interval_reachable && !is_truly_reachable { false_positives += 1; }\n            if !is_interval_reachable && is_truly_reachable { false_negatives += 1; }	if is_interval_reachable && !is_truly_reachable { false_negatives += 1; }\n            if !is_interval_reachable && is_truly_reachable { false_positives += 1; }

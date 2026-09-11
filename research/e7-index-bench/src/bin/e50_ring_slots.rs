@@ -20,8 +20,8 @@
 use e7_index_bench::Emitter;
 
 /// 一圈时长（秒）= 槽总数 ÷ fsync 率。每次 fsync 发一次根（D23 轴一已定）。
-fn lap_seconds(slots: u64, fsync_per_sec: f64) -> f64 {
-    slots as f64 / fsync_per_sec
+fn lap_seconds(slots: u64, fsync_per_second: f64) -> f64 {
+    slots as f64 / fsync_per_second
 }
 
 /// I-7.4 扣住的块数 = 槽总数 × 每次 fsync 写的块数。
@@ -43,15 +43,15 @@ const PINNED_MATTERS: u64 = 1000;
 const COARSE_BLOCKS: u64 = 8 + 3 + 1 + 1;
 const SCATTERED_BLOCKS: u64 = 8 + 8 * 3 + 1 + 1;
 
-const NS: [u64; 8] = [2, 4, 8, 16, 32, 64, 256, 1024];
+const TOTAL_SLOT_COUNTS_SCANNED: [u64; 8] = [2, 4, 8, 16, 32, 64, 256, 1024];
 const FSYNC_RATES: [(&str, f64); 2] = [("local_2785", 2785.0), ("enterprise_1e5", 100_000.0)];
-const GEOMS: [(u64, u64); 6] = [(2, 1), (2, 2), (2, 4), (3, 2), (3, 4), (4, 2)];
+const REGION_GEOMETRIES: [(u64, u64); 6] = [(2, 1), (2, 2), (2, 4), (3, 2), (3, 4), (4, 2)];
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=config pinned_matters={PINNED_MATTERS} coarse_blocks={COARSE_BLOCKS} \
              scattered_blocks={SCATTERED_BLOCKS}"
         ))
@@ -60,49 +60,49 @@ fn main() {
     // ── 量一 + 量二：逐 N ──
     let mut first_matter_coarse: Option<u64> = None;
     let mut first_matter_scattered: Option<u64> = None;
-    for n in NS {
-        let pc = pinned_blocks(n, COARSE_BLOCKS);
-        let ps = pinned_blocks(n, SCATTERED_BLOCKS);
-        if pc >= PINNED_MATTERS && first_matter_coarse.is_none() {
-            first_matter_coarse = Some(n);
+    for total_slot_count in TOTAL_SLOT_COUNTS_SCANNED {
+        let pinned_coarse_blocks = pinned_blocks(total_slot_count, COARSE_BLOCKS);
+        let pinned_scattered_blocks = pinned_blocks(total_slot_count, SCATTERED_BLOCKS);
+        if pinned_coarse_blocks >= PINNED_MATTERS && first_matter_coarse.is_none() {
+            first_matter_coarse = Some(total_slot_count);
         }
-        if ps >= PINNED_MATTERS && first_matter_scattered.is_none() {
-            first_matter_scattered = Some(n);
+        if pinned_scattered_blocks >= PINNED_MATTERS && first_matter_scattered.is_none() {
+            first_matter_scattered = Some(total_slot_count);
         }
-        for (label, rate) in FSYNC_RATES {
+        for (fsync_rate_label, fsync_per_second) in FSYNC_RATES {
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=slots n={n} fsync={label} lap_seconds={:.6} pinned_coarse={pc} \
-                     pinned_scattered={ps} coarse_matters={} scattered_matters={}",
-                    lap_seconds(n, rate),
-                    u8::from(pc >= PINNED_MATTERS),
-                    u8::from(ps >= PINNED_MATTERS),
+                emitter.emit_raw(&format!(
+                    "name=slots n={total_slot_count} fsync={fsync_rate_label} lap_seconds={:.6} pinned_coarse={pinned_coarse_blocks} \
+                     pinned_scattered={pinned_scattered_blocks} coarse_matters={} scattered_matters={}",
+                    lap_seconds(total_slot_count, fsync_per_second),
+                    u8::from(pinned_coarse_blocks >= PINNED_MATTERS),
+                    u8::from(pinned_scattered_blocks >= PINNED_MATTERS),
                 ))
             );
         }
     }
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=upper_bound first_matter_coarse={} first_matter_scattered={} \
              max_n_scanned={}",
-            first_matter_coarse.map(|v| v.to_string()).unwrap_or_else(|| "none".into()),
-            first_matter_scattered.map(|v| v.to_string()).unwrap_or_else(|| "none".into()),
-            NS[NS.len() - 1],
+            first_matter_coarse.map(|total_slot_count| total_slot_count.to_string()).unwrap_or_else(|| "none".into()),
+            first_matter_scattered.map(|total_slot_count| total_slot_count.to_string()).unwrap_or_else(|| "none".into()),
+            TOTAL_SLOT_COUNTS_SCANNED[TOTAL_SLOT_COUNTS_SCANNED.len() - 1],
         ))
     );
 
     // ── 量三：下界 —— 丢一个失败域之后还剩几个槽 ──
-    for (r, s) in GEOMS {
-        let surv = surviving_slots(r, s);
+    for (region_count, slots_per_region) in REGION_GEOMETRIES {
+        let surviving_slot_count = surviving_slots(region_count, slots_per_region);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=lower_bound regions={r} slots_per_region={s} total={} \
-                 surviving_after_one_domain={surv} meets_k2={}",
-                r * s,
-                u8::from(r * s >= 2 && surv >= 1),
+            emitter.emit_raw(&format!(
+                "name=lower_bound regions={region_count} slots_per_region={slots_per_region} total={} \
+                 surviving_after_one_domain={surviving_slot_count} meets_k2={}",
+                region_count * slots_per_region,
+                u8::from(region_count * slots_per_region >= 2 && surviving_slot_count >= 1),
             ))
         );
     }
@@ -110,7 +110,7 @@ fn main() {
     // ── 对照 ──
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=poscontrol_linear n8={} n16={} doubled={}",
             pinned_blocks(8, COARSE_BLOCKS),
             pinned_blocks(16, COARSE_BLOCKS),
@@ -119,13 +119,13 @@ fn main() {
     );
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=negcontrol_zero_blocks pinned={} expect=0",
             pinned_blocks(1024, 0)
         ))
     );
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -135,11 +135,11 @@ mod tests {
     /// **一圈时长的绝对值**：8 槽 ÷ 2785 次每秒 = 2.873 毫秒；企业盘那一档 80 微秒。
     /// ⇒ **根环一圈是毫秒级，不是秒级。**
     #[test]
-    fn a_lap_is_milliseconds_not_seconds() {
-        let l = lap_seconds(8, 2785.0);
-        assert!((l - 0.0028725).abs() < 1e-6, "{l}");
-        let e = lap_seconds(8, 100_000.0);
-        assert!((e - 0.00008).abs() < 1e-9, "{e}");
+    fn one_lap_is_milliseconds_not_seconds() {
+        let local_disk_lap_seconds = lap_seconds(8, 2785.0);
+        assert!((local_disk_lap_seconds - 0.0028725).abs() < 1e-6, "{local_disk_lap_seconds}");
+        let enterprise_disk_lap_seconds = lap_seconds(8, 100_000.0);
+        assert!((enterprise_disk_lap_seconds - 0.00008).abs() < 1e-9, "{enterprise_disk_lap_seconds}");
         // 1024 槽也只有 0.368 秒
         assert!((lap_seconds(1024, 2785.0) - 0.36769).abs() < 1e-4);
     }
@@ -147,8 +147,8 @@ mod tests {
     /// **两档 fsync 率必须给出不同的一圈时长**（这一维不是死的）。
     #[test]
     fn the_two_rates_are_not_the_same_thing() {
-        for n in NS {
-            assert_ne!(lap_seconds(n, 2785.0), lap_seconds(n, 100_000.0), "n={n}");
+        for total_slot_count in TOTAL_SLOT_COUNTS_SCANNED {
+            assert_ne!(lap_seconds(total_slot_count, 2785.0), lap_seconds(total_slot_count, 100_000.0), "n={total_slot_count}");
         }
         assert!((lap_seconds(8, 2785.0) / lap_seconds(8, 100_000.0) - 35.91).abs() < 0.01);
     }
@@ -170,10 +170,10 @@ mod tests {
     fn the_upper_bound_is_far_above_any_sane_slot_count() {
         assert!(pinned_blocks(64, COARSE_BLOCKS) < PINNED_MATTERS, "64 槽只扣 832 块");
         assert!(pinned_blocks(256, COARSE_BLOCKS) >= PINNED_MATTERS);
-        let first_coarse = NS.into_iter().find(|&n| pinned_blocks(n, COARSE_BLOCKS) >= PINNED_MATTERS);
+        let first_coarse = TOTAL_SLOT_COUNTS_SCANNED.into_iter().find(|&total_slot_count| pinned_blocks(total_slot_count, COARSE_BLOCKS) >= PINNED_MATTERS);
         assert_eq!(first_coarse, Some(256));
         let first_scattered =
-            NS.into_iter().find(|&n| pinned_blocks(n, SCATTERED_BLOCKS) >= PINNED_MATTERS);
+            TOTAL_SLOT_COUNTS_SCANNED.into_iter().find(|&total_slot_count| pinned_blocks(total_slot_count, SCATTERED_BLOCKS) >= PINNED_MATTERS);
         assert_eq!(first_scattered, Some(32));
     }
 
@@ -192,31 +192,31 @@ mod tests {
 
     /// **判据 1 的合取**：N ≥ 2 且丢一个域后至少剩 1 个 ⇒ **S = 1 就已经满足**（只要 R ≥ 2）。
     #[test]
-    fn s_equals_one_already_satisfies_the_lower_bound() {
-        for r in [2u64, 3, 4] {
-            let n = r * 1;
-            assert!(n >= 2);
-            assert!(surviving_slots(r, 1) >= 1, "R={r}");
+    fn one_slot_per_region_already_satisfies_the_lower_bound() {
+        for region_count in [2u64, 3, 4] {
+            let total_slot_count = region_count * 1;
+            assert!(total_slot_count >= 2);
+            assert!(surviving_slots(region_count, 1) >= 1, "R={region_count}");
         }
         // R=1 无论 S 多大都不满足
-        for s in [1u64, 4, 8] {
-            assert_eq!(surviving_slots(1, s), 0);
+        for slots_per_region in [1u64, 4, 8] {
+            assert_eq!(surviving_slots(1, slots_per_region), 0);
         }
     }
 
     /// **阳性对照**：N 翻倍 ⇒ 扣住的块数翻倍。
     #[test]
     fn positive_control_pinned_is_linear_in_slots() {
-        for n in [2u64, 8, 64] {
-            assert_eq!(pinned_blocks(2 * n, COARSE_BLOCKS), 2 * pinned_blocks(n, COARSE_BLOCKS));
+        for total_slot_count in [2u64, 8, 64] {
+            assert_eq!(pinned_blocks(2 * total_slot_count, COARSE_BLOCKS), 2 * pinned_blocks(total_slot_count, COARSE_BLOCKS));
         }
     }
 
     /// **阴性对照**：每次写 0 块 ⇒ 扣住恒 0。
     #[test]
     fn negative_control_zero_blocks_pins_nothing() {
-        for n in NS {
-            assert_eq!(pinned_blocks(n, 0), 0, "n={n}");
+        for total_slot_count in TOTAL_SLOT_COUNTS_SCANNED {
+            assert_eq!(pinned_blocks(total_slot_count, 0), 0, "n={total_slot_count}");
         }
     }
 }

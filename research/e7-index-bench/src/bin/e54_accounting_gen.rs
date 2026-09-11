@@ -26,27 +26,27 @@
 use e7_index_bench::Emitter;
 
 /// 甲：代 = checkpoint 号，不丢 ⇒ 每个 checkpoint 给每个统计量留一条。
-fn keys_scheme_a(stats: u64, checkpoints: u64) -> u64 {
-    stats * checkpoints
+fn keys_when_generation_never_discarded(statistic_count: u64, checkpoint_count: u64) -> u64 {
+    statistic_count * checkpoint_count
 }
 
-/// 丙：只保留最近 K 代 ⇒ 恒定。`k = 0` 表示 K = ∞（阳性对照用，退化成甲）。
-fn keys_scheme_c(stats: u64, checkpoints: u64, k: u64) -> u64 {
-    if k == 0 {
-        keys_scheme_a(stats, checkpoints)
+/// 丙：只保留最近 K 代 ⇒ 恒定。`kept_generations = 0` 表示 K = ∞（阳性对照用，退化成甲）。
+fn keys_when_keeping_recent_generations(statistic_count: u64, checkpoint_count: u64, kept_generations: u64) -> u64 {
+    if kept_generations == 0 {
+        keys_when_generation_never_discarded(statistic_count, checkpoint_count)
     } else {
-        stats * checkpoints.min(k)
+        statistic_count * checkpoint_count.min(kept_generations)
     }
 }
 
 /// **丢弃一代要触及多少条 key**。丙：每个统计量一次点删——`(统计量, 维度, 代)` 里
 /// 「代」是 key 的一段，要丢的那一代**算得出来**（当前代 − K），不用找。
 /// ⇒ 代价 = 统计量数，**与盘容量、与 key 总数都无关**。
-fn discard_touched(stats: u64, k: u64, checkpoints: u64) -> u64 {
-    if k == 0 || checkpoints <= k {
+fn keys_touched_per_discard(statistic_count: u64, kept_generations: u64, checkpoint_count: u64) -> u64 {
+    if kept_generations == 0 || checkpoint_count <= kept_generations {
         0 // 还没满 K 代，没有可丢的
     } else {
-        stats
+        statistic_count
     }
 }
 
@@ -57,45 +57,45 @@ fn discard_depends_on_capacity() -> bool {
 }
 
 /// 每个 checkpoint 的记账写次数：甲只写；丙写 + 删。
-fn writes_per_checkpoint(stats: u64, k: u64, checkpoints: u64) -> u64 {
-    stats + discard_touched(stats, k, checkpoints)
+fn writes_per_checkpoint(statistic_count: u64, kept_generations: u64, checkpoint_count: u64) -> u64 {
+    statistic_count + keys_touched_per_discard(statistic_count, kept_generations, checkpoint_count)
 }
 
 /// 甲 + 一条增量丢弃规则（丢掉代号 < 当前 − K 的那些）之后的 key 数。
-fn keys_scheme_a_with_discard(stats: u64, checkpoints: u64, k: u64) -> u64 {
-    keys_scheme_c(stats, checkpoints, k)
+fn keys_when_never_discarded_plus_incremental_discard(statistic_count: u64, checkpoint_count: u64, kept_generations: u64) -> u64 {
+    keys_when_keeping_recent_generations(statistic_count, checkpoint_count, kept_generations)
 }
 
-const STATS: [u64; 4] = [0, 8, 64, 512];
-const CHECKPOINTS: [u64; 5] = [1, 10, 100, 10_000, 1_000_000];
-const KS: [u64; 3] = [2, 8, 32];
+const STATISTIC_COUNTS: [u64; 4] = [0, 8, 64, 512];
+const CHECKPOINT_COUNTS: [u64; 5] = [1, 10, 100, 10_000, 1_000_000];
+const KEPT_GENERATION_COUNTS: [u64; 3] = [2, 8, 32];
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw("name=config note=counting_model_only file_ops=0")
+        emitter.emit_raw("name=config note=counting_model_only file_ops=0")
     );
 
-    let mut same_all = true;
-    for stats in STATS {
-        for cps in CHECKPOINTS {
-            let a = keys_scheme_a(stats, cps);
-            for k in KS {
-                let c = keys_scheme_c(stats, cps, k);
-                let ad = keys_scheme_a_with_discard(stats, cps, k);
-                if c != ad {
-                    same_all = false;
+    let mut is_identical_everywhere = true;
+    for statistic_count in STATISTIC_COUNTS {
+        for checkpoint_count in CHECKPOINT_COUNTS {
+            let keys_never_discarded = keys_when_generation_never_discarded(statistic_count, checkpoint_count);
+            for kept_generations in KEPT_GENERATION_COUNTS {
+                let keys_recent_generations = keys_when_keeping_recent_generations(statistic_count, checkpoint_count, kept_generations);
+                let keys_never_discarded_with_discard = keys_when_never_discarded_plus_incremental_discard(statistic_count, checkpoint_count, kept_generations);
+                if keys_recent_generations != keys_never_discarded_with_discard {
+                    is_identical_everywhere = false;
                 }
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=keys stats={stats} checkpoints={cps} k={k} \
-                         scheme_a={a} scheme_c={c} a_with_discard={ad} same={} \
+                    emitter.emit_raw(&format!(
+                        "name=keys stats={statistic_count} checkpoints={checkpoint_count} k={kept_generations} \
+                         scheme_a={keys_never_discarded} scheme_c={keys_recent_generations} a_with_discard={keys_never_discarded_with_discard} same={} \
                          discard_touched={} writes_per_cp={}",
-                        u8::from(c == ad),
-                        discard_touched(stats, k, cps),
-                        writes_per_checkpoint(stats, k, cps),
+                        u8::from(keys_recent_generations == keys_never_discarded_with_discard),
+                        keys_touched_per_discard(statistic_count, kept_generations, checkpoint_count),
+                        writes_per_checkpoint(statistic_count, kept_generations, checkpoint_count),
                     ))
                 );
             }
@@ -103,16 +103,16 @@ fn main() {
     }
 
     // ── 斜率：key 数对 checkpoint 数的增量 ──
-    for stats in [8u64, 64, 512] {
-        let slope_a = keys_scheme_a(stats, 1001) - keys_scheme_a(stats, 1000);
-        let slope_c = keys_scheme_c(stats, 1001, 8) - keys_scheme_c(stats, 1000, 8);
+    for statistic_count in [8u64, 64, 512] {
+        let slope_never_discarded = keys_when_generation_never_discarded(statistic_count, 1001) - keys_when_generation_never_discarded(statistic_count, 1000);
+        let slope_recent_generations = keys_when_keeping_recent_generations(statistic_count, 1001, 8) - keys_when_keeping_recent_generations(statistic_count, 1000, 8);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=slope stats={stats} slope_a={slope_a} slope_c={slope_c} \
+            emitter.emit_raw(&format!(
+                "name=slope stats={statistic_count} slope_a={slope_never_discarded} slope_c={slope_recent_generations} \
                  a_grows={} c_flat={}",
-                u8::from(slope_a == stats),
-                u8::from(slope_c == 0),
+                u8::from(slope_never_discarded == statistic_count),
+                u8::from(slope_recent_generations == 0),
             ))
         );
     }
@@ -120,7 +120,7 @@ fn main() {
     // ── 第一格判据：丢弃代价依不依赖盘容量 ──
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=first_cell discard_depends_on_capacity={} verdict_ok={}",
             u8::from(discard_depends_on_capacity()),
             u8::from(!discard_depends_on_capacity()),
@@ -128,46 +128,46 @@ fn main() {
     );
 
     // ── K 的下界：由「根最多能回退几代」给 ──
-    for (src, back) in [("e53_measured_worst_rollback", 1u64), ("e50_ring_slots_n", 8)] {
+    for (bound_source, rollback_depth) in [("e53_measured_worst_rollback", 1u64), ("e50_ring_slots_n", 8)] {
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=k_lower_bound source={src} rollback_depth={back} k_min={} \
+            emitter.emit_raw(&format!(
+                "name=k_lower_bound source={bound_source} rollback_depth={rollback_depth} k_min={} \
                  keys_at_64_stats={}",
-                back + 1,
-                keys_scheme_c(64, 1_000_000, back + 1),
+                rollback_depth + 1,
+                keys_when_keeping_recent_generations(64, 1_000_000, rollback_depth + 1),
             ))
         );
     }
 
     // ── 阳性对照：K = ∞ 时丙退化成甲 ──
-    let inf_c = keys_scheme_c(64, 1_000_000, 0);
+    let keys_recent_generations_with_infinite_kept_generations = keys_when_keeping_recent_generations(64, 1_000_000, 0);
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=poscontrol_k_infinite scheme_c={inf_c} scheme_a={} degenerates={}",
-            keys_scheme_a(64, 1_000_000),
-            u8::from(inf_c == keys_scheme_a(64, 1_000_000)),
+        emitter.emit_raw(&format!(
+            "name=poscontrol_k_infinite scheme_c={keys_recent_generations_with_infinite_kept_generations} scheme_a={} degenerates={}",
+            keys_when_generation_never_discarded(64, 1_000_000),
+            u8::from(keys_recent_generations_with_infinite_kept_generations == keys_when_generation_never_discarded(64, 1_000_000)),
         ))
     );
     // ── 阴性对照：统计量 0 ⇒ 两者恒 0 ──
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=negcontrol_zero_stats a={} c={} expect=0",
-            keys_scheme_a(0, 1_000_000),
-            keys_scheme_c(0, 1_000_000, 8),
+            keys_when_generation_never_discarded(0, 1_000_000),
+            keys_when_keeping_recent_generations(0, 1_000_000, 8),
         ))
     );
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=verdict a_and_c_identical_with_discard={}",
-            u8::from(same_all)
+            u8::from(is_identical_everywhere)
         ))
     );
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -176,29 +176,29 @@ mod tests {
 
     /// **甲的 key 数是乘法**：64 个统计量 × 100 万个 checkpoint = 6400 万条。
     #[test]
-    fn scheme_a_grows_without_bound() {
-        assert_eq!(keys_scheme_a(64, 1_000_000), 64_000_000);
-        assert_eq!(keys_scheme_a(8, 10), 80);
+    fn never_discarded_scheme_grows_without_bound() {
+        assert_eq!(keys_when_generation_never_discarded(64, 1_000_000), 64_000_000);
+        assert_eq!(keys_when_generation_never_discarded(8, 10), 80);
         // 斜率恰好等于统计量数
-        assert_eq!(keys_scheme_a(64, 1001) - keys_scheme_a(64, 1000), 64);
+        assert_eq!(keys_when_generation_never_discarded(64, 1001) - keys_when_generation_never_discarded(64, 1000), 64);
     }
 
     /// **丙的 key 数封顶在 统计量数 × K**：K=8、64 个统计量 ⇒ **512 条，与跑多久无关**。
     #[test]
-    fn scheme_c_is_bounded_by_stats_times_k() {
-        assert_eq!(keys_scheme_c(64, 1_000_000, 8), 512);
-        assert_eq!(keys_scheme_c(64, 10, 8), 512);
-        assert_eq!(keys_scheme_c(64, 3, 8), 192, "还没满 K 代时按实际代数算");
+    fn recent_generations_scheme_is_bounded_by_statistics_times_kept_generations() {
+        assert_eq!(keys_when_keeping_recent_generations(64, 1_000_000, 8), 512);
+        assert_eq!(keys_when_keeping_recent_generations(64, 10, 8), 512);
+        assert_eq!(keys_when_keeping_recent_generations(64, 3, 8), 192, "还没满 K 代时按实际代数算");
         // 斜率为 0
-        assert_eq!(keys_scheme_c(64, 1001, 8) - keys_scheme_c(64, 1000, 8), 0);
+        assert_eq!(keys_when_keeping_recent_generations(64, 1001, 8) - keys_when_keeping_recent_generations(64, 1000, 8), 0);
     }
 
     /// **丢弃代价 = 统计量数，且式子里没有盘容量**——这是第一格的判据。
     #[test]
     fn discard_is_incremental_and_capacity_free() {
-        assert_eq!(discard_touched(64, 8, 1_000_000), 64);
-        assert_eq!(discard_touched(64, 8, 1_000_000), discard_touched(64, 8, 10), );
-        assert_eq!(discard_touched(64, 8, 3), 0, "还没满 K 代时无可丢");
+        assert_eq!(keys_touched_per_discard(64, 8, 1_000_000), 64);
+        assert_eq!(keys_touched_per_discard(64, 8, 1_000_000), keys_touched_per_discard(64, 8, 10), );
+        assert_eq!(keys_touched_per_discard(64, 8, 3), 0, "还没满 K 代时无可丢");
         assert!(!discard_depends_on_capacity());
     }
 
@@ -212,14 +212,14 @@ mod tests {
 
     /// **甲 + 增量丢弃 与 丙 逐格相同**——若成立，它们不是两个候选。
     #[test]
-    fn scheme_a_with_discard_is_scheme_c() {
-        for stats in STATS {
-            for cps in CHECKPOINTS {
-                for k in KS {
+    fn never_discarded_plus_discard_equals_recent_generations_scheme() {
+        for statistic_count in STATISTIC_COUNTS {
+            for checkpoint_count in CHECKPOINT_COUNTS {
+                for kept_generations in KEPT_GENERATION_COUNTS {
                     assert_eq!(
-                        keys_scheme_a_with_discard(stats, cps, k),
-                        keys_scheme_c(stats, cps, k),
-                        "stats={stats} cps={cps} k={k}"
+                        keys_when_never_discarded_plus_incremental_discard(statistic_count, checkpoint_count, kept_generations),
+                        keys_when_keeping_recent_generations(statistic_count, checkpoint_count, kept_generations),
+                        "stats={statistic_count} cps={checkpoint_count} k={kept_generations}"
                     );
                 }
             }
@@ -228,30 +228,30 @@ mod tests {
 
     /// **阳性对照**：K = ∞ ⇒ 丙退化成甲。
     #[test]
-    fn positive_control_k_infinite_degenerates_to_a() {
-        for stats in [8u64, 64, 512] {
-            for cps in [10u64, 10_000, 1_000_000] {
-                assert_eq!(keys_scheme_c(stats, cps, 0), keys_scheme_a(stats, cps));
+    fn positive_control_infinite_kept_generations_degenerates_to_never_discarded() {
+        for statistic_count in [8u64, 64, 512] {
+            for checkpoint_count in [10u64, 10_000, 1_000_000] {
+                assert_eq!(keys_when_keeping_recent_generations(statistic_count, checkpoint_count, 0), keys_when_generation_never_discarded(statistic_count, checkpoint_count));
             }
         }
     }
 
     /// **阴性对照**：统计量 0 ⇒ 两者恒 0。
     #[test]
-    fn negative_control_zero_stats() {
-        for cps in CHECKPOINTS {
-            assert_eq!(keys_scheme_a(0, cps), 0);
-            assert_eq!(keys_scheme_c(0, cps, 8), 0);
-            assert_eq!(discard_touched(0, 8, cps), 0);
+    fn negative_control_zero_statistics() {
+        for checkpoint_count in CHECKPOINT_COUNTS {
+            assert_eq!(keys_when_generation_never_discarded(0, checkpoint_count), 0);
+            assert_eq!(keys_when_keeping_recent_generations(0, checkpoint_count, 8), 0);
+            assert_eq!(keys_touched_per_discard(0, 8, checkpoint_count), 0);
         }
     }
 
     /// **K 的下界**：E53 实测最坏回退 1 ⇒ K ≥ 2；E50 的槽总数 8 ⇒ 保守取 K ≥ 9。
     /// 64 个统计量下分别是 128 条与 576 条——**两个下界差 4.5 倍，但都是常数**。
     #[test]
-    fn k_lower_bounds_from_measured_rollback() {
-        assert_eq!(keys_scheme_c(64, 1_000_000, 1 + 1), 128);
-        assert_eq!(keys_scheme_c(64, 1_000_000, 8 + 1), 576);
+    fn kept_generations_lower_bounds_from_measured_rollback() {
+        assert_eq!(keys_when_keeping_recent_generations(64, 1_000_000, 1 + 1), 128);
+        assert_eq!(keys_when_keeping_recent_generations(64, 1_000_000, 8 + 1), 576);
         assert!(576 < 64_000_000, "两个下界都远小于甲");
     }
 }

@@ -45,14 +45,14 @@
 
 use e7_index_bench::Emitter;
 
-const UNIT: u64 = 32768;
-const UNIT_HDR: u64 = 91;
-const TOMB_REC: u64 = 56;
+const UNIT_BYTES: u64 = 32768;
+const UNIT_HEADER_BYTES: u64 = 91;
+const TOMBSTONE_RECORD_BYTES: u64 = 56;
 /// 第一版 2 盘恒 w=2：每个单元物理两份。
-const PHYS_FACTOR: u64 = 2;
+const PHYSICAL_COPIES_PER_UNIT: u64 = 2;
 
 fn packed_capacity() -> u64 {
-    (UNIT - UNIT_HDR) / TOMB_REC
+    (UNIT_BYTES - UNIT_HEADER_BYTES) / TOMBSTONE_RECORD_BYTES
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -70,53 +70,53 @@ enum Carrier {
 struct Load {
     name: &'static str,
     objects: u64,
-    extents_per_obj: u64,
+    extents_per_object: u64,
 }
 
 /// 该组合下的墓碑单元数与物理字节。
 fn cost(load: &Load, grain: RecordGrain, carrier: Carrier) -> (u64, u64) {
     let records = match grain {
-        RecordGrain::PerExtent => load.objects * load.extents_per_obj,
+        RecordGrain::PerExtent => load.objects * load.extents_per_object,
         RecordGrain::PerObject => load.objects,
     };
     let units = match carrier {
         Carrier::DedicatedUnit => records,
         Carrier::PackedShared => records.div_ceil(packed_capacity()),
     };
-    (units, units * UNIT * PHYS_FACTOR)
+    (units, units * UNIT_BYTES * PHYSICAL_COPIES_PER_UNIT)
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config unit={UNIT} hdr={UNIT_HDR} rec={TOMB_REC} packed_cap={} phys_factor={PHYS_FACTOR} model=arithmetic file_ops=0",
+        emitter.emit_raw(&format!(
+            "name=config unit={UNIT_BYTES} hdr={UNIT_HEADER_BYTES} rec={TOMBSTONE_RECORD_BYTES} packed_cap={} phys_factor={PHYSICAL_COPIES_PER_UNIT} model=arithmetic file_ops=0",
             packed_capacity()
         ))
     );
     let loads = [
-        Load { name: "unlink_one", objects: 1, extents_per_obj: 1 },
-        Load { name: "rm_rf_1k", objects: 1000, extents_per_obj: 1 },
-        Load { name: "rm_rf_1m", objects: 1_000_000, extents_per_obj: 1 },
-        Load { name: "truncate_4096ext", objects: 1, extents_per_obj: 4096 },
+        Load { name: "unlink_one", objects: 1, extents_per_object: 1 },
+        Load { name: "rm_rf_1k", objects: 1000, extents_per_object: 1 },
+        Load { name: "rm_rf_1m", objects: 1_000_000, extents_per_object: 1 },
+        Load { name: "truncate_4096ext", objects: 1, extents_per_object: 4096 },
     ];
     for load in &loads {
         for grain in [RecordGrain::PerExtent, RecordGrain::PerObject] {
             for carrier in [Carrier::DedicatedUnit, Carrier::PackedShared] {
                 let (units, bytes) = cost(load, grain, carrier);
-                let g = match grain {
+                let grain_label = match grain {
                     RecordGrain::PerExtent => "per_extent",
                     RecordGrain::PerObject => "per_object",
                 };
-                let c = match carrier {
+                let carrier_label = match carrier {
                     Carrier::DedicatedUnit => "dedicated",
                     Carrier::PackedShared => "packed",
                 };
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=cost load={} grain={g} carrier={c} units={units} phys_bytes={bytes} phys_mib={:.1}",
+                    emitter.emit_raw(&format!(
+                        "name=cost load={} grain={grain_label} carrier={carrier_label} units={units} phys_bytes={bytes} phys_mib={:.1}",
                         load.name,
                         bytes as f64 / (1024.0 * 1024.0)
                     ))
@@ -124,7 +124,7 @@ fn main() {
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -141,26 +141,26 @@ mod tests {
     /// 打包 = 同样 1 单元（583 容量装 1 条）。
     #[test]
     fn absolute_unlink_one() {
-        let l = Load { name: "u", objects: 1, extents_per_obj: 1 };
-        assert_eq!(cost(&l, RecordGrain::PerExtent, Carrier::DedicatedUnit), (1, 65536));
-        assert_eq!(cost(&l, RecordGrain::PerExtent, Carrier::PackedShared), (1, 65536));
+        let load = Load { name: "u", objects: 1, extents_per_object: 1 };
+        assert_eq!(cost(&load, RecordGrain::PerExtent, Carrier::DedicatedUnit), (1, 65536));
+        assert_eq!(cost(&load, RecordGrain::PerExtent, Carrier::PackedShared), (1, 65536));
     }
 
     /// **绝对值锚点（判据 2 点名的那格）**：rm -rf 1M 单 extent 文件、每条记录独占单元
     /// ⇒ 1M 单元 × 64 KiB = 61.04 GiB 物理写。打包 ⇒ ⌈1e6/583⌉ = 1716 单元 ≈ 107.25 MiB。
     #[test]
     fn absolute_rm_rf_1m() {
-        let l = Load { name: "m", objects: 1_000_000, extents_per_obj: 1 };
-        let (u_ded, b_ded) = cost(&l, RecordGrain::PerExtent, Carrier::DedicatedUnit);
-        assert_eq!(u_ded, 1_000_000);
-        assert_eq!(b_ded, 65_536_000_000);
-        let (u_pack, b_pack) = cost(&l, RecordGrain::PerExtent, Carrier::PackedShared);
-        assert_eq!(u_pack, 1716);
-        assert_eq!(b_pack, 1716 * 65536);
+        let load = Load { name: "m", objects: 1_000_000, extents_per_object: 1 };
+        let (dedicated_unit_count, dedicated_physical_bytes) = cost(&load, RecordGrain::PerExtent, Carrier::DedicatedUnit);
+        assert_eq!(dedicated_unit_count, 1_000_000);
+        assert_eq!(dedicated_physical_bytes, 65_536_000_000);
+        let (packed_unit_count, packed_physical_bytes) = cost(&load, RecordGrain::PerExtent, Carrier::PackedShared);
+        assert_eq!(packed_unit_count, 1716);
+        assert_eq!(packed_physical_bytes, 1716 * 65536);
         // 单 extent 文件下 per_object 与 per_extent 逐格相同
         assert_eq!(
-            cost(&l, RecordGrain::PerObject, Carrier::PackedShared),
-            (u_pack, b_pack)
+            cost(&load, RecordGrain::PerObject, Carrier::PackedShared),
+            (packed_unit_count, packed_physical_bytes)
         );
     }
 
@@ -168,30 +168,30 @@ mod tests {
     /// per_object 恒 1 单元（区间记录）。粒度在多 extent 对象上差 4096 倍（独占载体）。
     #[test]
     fn absolute_truncate() {
-        let l = Load { name: "t", objects: 1, extents_per_obj: 4096 };
-        assert_eq!(cost(&l, RecordGrain::PerExtent, Carrier::PackedShared).0, 8);
-        assert_eq!(cost(&l, RecordGrain::PerObject, Carrier::DedicatedUnit).0, 1);
-        assert_eq!(cost(&l, RecordGrain::PerExtent, Carrier::DedicatedUnit).0, 4096);
+        let load = Load { name: "t", objects: 1, extents_per_object: 4096 };
+        assert_eq!(cost(&load, RecordGrain::PerExtent, Carrier::PackedShared).0, 8);
+        assert_eq!(cost(&load, RecordGrain::PerObject, Carrier::DedicatedUnit).0, 1);
+        assert_eq!(cost(&load, RecordGrain::PerExtent, Carrier::DedicatedUnit).0, 4096);
     }
 
     /// 打包容量对记录宽度的敏感性自检：宽度翻倍容量约减半（口径变了数字跟着变的那类）。
     #[test]
     fn capacity_scales_with_record_width() {
-        assert_eq!((UNIT - UNIT_HDR) / (TOMB_REC * 2), 291);
+        assert_eq!((UNIT_BYTES - UNIT_HEADER_BYTES) / (TOMBSTONE_RECORD_BYTES * 2), 291);
     }
 
     /// 物理系数：w=2 恒双份——公式里少了它，全表数字砍半。
     #[test]
-    fn phys_factor_is_applied() {
-        let l = Load { name: "u", objects: 1, extents_per_obj: 1 };
-        let (_, bytes) = cost(&l, RecordGrain::PerExtent, Carrier::DedicatedUnit);
-        assert_eq!(bytes, UNIT * 2);
+    fn physical_copy_factor_is_applied() {
+        let load = Load { name: "u", objects: 1, extents_per_object: 1 };
+        let (_, bytes) = cost(&load, RecordGrain::PerExtent, Carrier::DedicatedUnit);
+        assert_eq!(bytes, UNIT_BYTES * 2);
     }
 
     /// div_ceil 不许写成整除：585 条要 2 个单元。
     #[test]
     fn ceil_not_floor() {
-        let l = Load { name: "x", objects: 585, extents_per_obj: 1 };
-        assert_eq!(cost(&l, RecordGrain::PerExtent, Carrier::PackedShared).0, 2);
+        let load = Load { name: "x", objects: 585, extents_per_object: 1 };
+        assert_eq!(cost(&load, RecordGrain::PerExtent, Carrier::PackedShared).0, 2);
     }
 }

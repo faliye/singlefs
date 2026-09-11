@@ -52,23 +52,23 @@ const RING_REGIONS: u64 = 3;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SlotWidth {
     /// D22 已定项 2 已定的取法：等于探测到的 `physical_block_size`。
-    SettledPbs,
+    SettledPhysicalBlockSize,
     /// E34 建议的取法：`max(physical_block_size, io_min)`，每槽独占一个 `io_min` 单元。
     /// **同时是判据要的阳性对照。**
-    SuggestedIoMin,
+    SuggestedMinimumInputOutputSize,
 }
 
 impl SlotWidth {
-    fn bytes(self, pbs: u64, io_min: u64) -> u64 {
+    fn bytes(self, physical_block_size: u64, io_min: u64) -> u64 {
         match self {
-            SlotWidth::SettledPbs => pbs,
-            SlotWidth::SuggestedIoMin => pbs.max(io_min),
+            SlotWidth::SettledPhysicalBlockSize => physical_block_size,
+            SlotWidth::SuggestedMinimumInputOutputSize => physical_block_size.max(io_min),
         }
     }
     fn tag(self) -> &'static str {
         match self {
-            SlotWidth::SettledPbs => "settled_pbs",
-            SlotWidth::SuggestedIoMin => "suggested_iomin",
+            SlotWidth::SettledPhysicalBlockSize => "settled_pbs",
+            SlotWidth::SuggestedMinimumInputOutputSize => "suggested_iomin",
         }
     }
 }
@@ -77,60 +77,60 @@ impl SlotWidth {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Placement {
     /// D22 已定项 2：区域 r 落在 `r × P × chunk`，P 素数且 `P > devs`，chunk 取 `io_min`。
-    PrimeStride { p: u64 },
+    PrimeStride { prime_stride_factor: u64 },
     /// 已被换掉的候选形态：整个根环连续摆放（2048 字节那种）。**对照臂**，
     /// 没有它就分不出「主张 2 不成立」是几何挡住的、还是模型根本没在算跨区。
     Contiguous,
 }
 
 /// 区域 r 的起始字节偏移。
-fn region_offset(pl: Placement, r: u64, chunk: u64, slots: u64, slot_w: u64) -> u64 {
-    match pl {
-        Placement::PrimeStride { p } => r * p * chunk,
-        Placement::Contiguous => r * slots * slot_w,
+fn region_offset(placement: Placement, region_index: u64, chunk: u64, slots_per_region: u64, slot_width_bytes: u64) -> u64 {
+    match placement {
+        Placement::PrimeStride { prime_stride_factor } => region_index * prime_stride_factor * chunk,
+        Placement::Contiguous => region_index * slots_per_region * slot_width_bytes,
     }
 }
 
 /// **绝对值算术**：一个 `io_min` 单元里落得下几个槽。
 /// 由 `(槽宽, 单元宽)` 直接算，不查任何被测结构。
-fn slots_per_unit(slot_w: u64, io_min: u64) -> u64 {
-    if slot_w >= io_min {
+fn slots_per_unit(slot_width_bytes: u64, io_min: u64) -> u64 {
+    if slot_width_bytes >= io_min {
         1
     } else {
-        io_min / slot_w
+        io_min / slot_width_bytes
     }
 }
 
 /// 一次写（打掉一个 `io_min` 单元）最多打掉几个槽。
 /// 区域内槽是连续的 ⇒ 上限是该区域的槽数。
-fn slots_hit_by_one_write(slot_w: u64, io_min: u64, slots_per_region: u64) -> u64 {
-    slots_per_unit(slot_w, io_min).min(slots_per_region)
+fn slots_hit_by_one_write(slot_width_bytes: u64, io_min: u64, slots_per_region: u64) -> u64 {
+    slots_per_unit(slot_width_bytes, io_min).min(slots_per_region)
 }
 
 /// 一个 `io_min` 单元能不能同时盖住两个区域。
 /// 盖得住 ⇒ 主张 2（一次写打掉全部槽）在这个几何上成立。
 fn one_unit_spans_two_regions(
-    pl: Placement,
+    placement: Placement,
     io_min: u64,
     chunk: u64,
-    slots: u64,
-    slot_w: u64,
+    slots_per_region: u64,
+    slot_width_bytes: u64,
 ) -> bool {
     // 相邻两个区域的起点间距；间距 < io_min 就可能挤进同一个单元。
-    let a = region_offset(pl, 0, chunk, slots, slot_w);
-    let b = region_offset(pl, 1, chunk, slots, slot_w);
-    b - a < io_min
+    let first_region_offset = region_offset(placement, 0, chunk, slots_per_region, slot_width_bytes);
+    let second_region_offset = region_offset(placement, 1, chunk, slots_per_region, slot_width_bytes);
+    second_region_offset - first_region_offset < io_min
 }
 
 /// 一次写打掉的槽数占全环槽数的比例够不够「全部」。
-fn wipes_whole_ring(pl: Placement, io_min: u64, chunk: u64, slots: u64, slot_w: u64) -> bool {
+fn wipes_whole_ring(placement: Placement, io_min: u64, chunk: u64, slots_per_region: u64, slot_width_bytes: u64) -> bool {
     // 整环连续摆放时，环总字节 = R × slots × slot_w；单元盖得住它就等于全打掉。
-    match pl {
-        Placement::Contiguous => RING_REGIONS * slots * slot_w <= io_min,
+    match placement {
+        Placement::Contiguous => RING_REGIONS * slots_per_region * slot_width_bytes <= io_min,
         Placement::PrimeStride { .. } => {
             // 素数步长下相邻区域间距 = P × chunk ≥ 3 × chunk；盖不住两个区域就盖不住全环。
-            one_unit_spans_two_regions(pl, io_min, chunk, slots, slot_w)
-                && RING_REGIONS * slots * slot_w <= io_min
+            one_unit_spans_two_regions(placement, io_min, chunk, slots_per_region, slot_width_bytes)
+                && RING_REGIONS * slots_per_region * slot_width_bytes <= io_min
         }
     }
 }
@@ -141,54 +141,54 @@ fn wipes_whole_ring(pl: Placement, io_min: u64, chunk: u64, slots: u64, slot_w: 
 fn rollback_after_losing_region(regions: u64, wiped: u64) -> u64 {
     (0..regions)
         .map(|newest| {
-            let mut back = 0;
+            let mut generations_back = 0;
             // 往回走，直到找到一个不在被抹区域里的 txg
-            while (newest + regions - back % regions) % regions == wiped % regions {
-                back += 1;
-                if back > regions {
+            while (newest + regions - generations_back % regions) % regions == wiped % regions {
+                generations_back += 1;
+                if generations_back > regions {
                     break;
                 }
             }
-            back
+            generations_back
         })
         .max()
         .unwrap_or(0)
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=config ring_regions={RING_REGIONS} model=geometry file_ops=0 \
              host_pbs=512 host_io_min=512"
         ))
     );
 
     // ── 主扫：两种槽宽取法 × 两种放置 × (pbs, io_min, S) ──────────────────
-    for pbs in [512u64, 4096] {
+    for physical_block_size in [512u64, 4096] {
         for io_min in [512u64, 4096, 65536] {
-            if io_min < pbs {
+            if io_min < physical_block_size {
                 continue; // 内核里 physical_block_size ≤ io_min 恒成立
             }
-            for s in [1u64, 4, 8, 16] {
-                for sw in [SlotWidth::SettledPbs, SlotWidth::SuggestedIoMin] {
-                    let slot_w = sw.bytes(pbs, io_min);
-                    for (pl_tag, pl) in [
-                        ("prime_stride", Placement::PrimeStride { p: 11 }),
+            for slots_per_region in [1u64, 4, 8, 16] {
+                for slot_width_rule in [SlotWidth::SettledPhysicalBlockSize, SlotWidth::SuggestedMinimumInputOutputSize] {
+                    let slot_width_bytes = slot_width_rule.bytes(physical_block_size, io_min);
+                    for (placement_tag, placement) in [
+                        ("prime_stride", Placement::PrimeStride { prime_stride_factor: 11 }),
                         ("contiguous", Placement::Contiguous),
                     ] {
-                        let hit = slots_hit_by_one_write(slot_w, io_min, s);
-                        let whole = wipes_whole_ring(pl, io_min, io_min, s, slot_w);
+                        let slots_hit = slots_hit_by_one_write(slot_width_bytes, io_min, slots_per_region);
+                        let whole_ring_wiped = wipes_whole_ring(placement, io_min, io_min, slots_per_region, slot_width_bytes);
                         println!(
                             "{}",
-                            em.emit_raw(&format!(
-                                "name=exposure pbs={pbs} io_min={io_min} slots_per_region={s} \
-                                 slot_width_rule={} slot_width={slot_w} placement={pl_tag} \
-                                 slots_hit={hit} claim1_ge2={} claim2_whole_ring={}",
-                                sw.tag(),
-                                u8::from(hit >= 2),
-                                u8::from(whole)
+                            emitter.emit_raw(&format!(
+                                "name=exposure pbs={physical_block_size} io_min={io_min} slots_per_region={slots_per_region} \
+                                 slot_width_rule={} slot_width={slot_width_bytes} placement={placement_tag} \
+                                 slots_hit={slots_hit} claim1_ge2={} claim2_whole_ring={}",
+                                slot_width_rule.tag(),
+                                u8::from(slots_hit >= 2),
+                                u8::from(whole_ring_wiped)
                             ))
                         );
                     }
@@ -201,7 +201,7 @@ fn main() {
     for wiped in 0..RING_REGIONS {
         println!(
             "{}",
-            em.emit_raw(&format!(
+            emitter.emit_raw(&format!(
                 "name=rollback regions={RING_REGIONS} wiped_region={wiped} \
                  worst_rollback_generations={}",
                 rollback_after_losing_region(RING_REGIONS, wiped)
@@ -211,33 +211,33 @@ fn main() {
 
     // ── 阳性对照：槽宽 ≥ io_min 且每槽独占一个单元 ⇒ 两个量都必须降到 1 ────
     for io_min in [512u64, 4096, 65536] {
-        let slot_w = SlotWidth::SuggestedIoMin.bytes(512, io_min);
-        let hit = slots_hit_by_one_write(slot_w, io_min, 16);
-        let whole = wipes_whole_ring(Placement::PrimeStride { p: 11 }, io_min, io_min, 16, slot_w);
+        let slot_width_bytes = SlotWidth::SuggestedMinimumInputOutputSize.bytes(512, io_min);
+        let slots_hit = slots_hit_by_one_write(slot_width_bytes, io_min, 16);
+        let whole_ring_wiped = wipes_whole_ring(Placement::PrimeStride { prime_stride_factor: 11 }, io_min, io_min, 16, slot_width_bytes);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=positive_control io_min={io_min} slot_width={slot_w} slots_hit={hit} \
+            emitter.emit_raw(&format!(
+                "name=positive_control io_min={io_min} slot_width={slot_width_bytes} slots_hit={slots_hit} \
                  whole_ring={} both_are_one={}",
-                u8::from(whole),
-                u8::from(hit == 1 && !whole)
+                u8::from(whole_ring_wiped),
+                u8::from(slots_hit == 1 && !whole_ring_wiped)
             ))
         );
     }
 
     // ── 已被换掉的候选形态，留一格做对照：2 区 × 4 槽 × 256 字节 = 2048 B ──
-    let dead_hit = slots_hit_by_one_write(256, 65536, 4);
-    let dead_whole = 2 * 4 * 256 <= 65536;
+    let dead_candidate_slots_hit = slots_hit_by_one_write(256, 65536, 4);
+    let dead_candidate_whole_ring_wiped = 2 * 4 * 256 <= 65536;
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=dead_candidate slot_width=256 io_min=65536 regions=2 slots=4 \
-             slots_hit={dead_hit} whole_ring={} note=replaced_by_d22_item2",
-            u8::from(dead_whole)
+             slots_hit={dead_candidate_slots_hit} whole_ring={} note=replaced_by_d22_item2",
+            u8::from(dead_candidate_whole_ring_wiped)
         ))
     );
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -260,19 +260,19 @@ mod tests {
     /// 一次写打掉 **≥ 2 个槽**。S=16、pbs=512、io_min=64 KiB ⇒ 打掉全部 16 个。
     #[test]
     fn claim1_settled_slot_width_exposes_multiple_slots() {
-        let slot_w = SlotWidth::SettledPbs.bytes(512, 65536);
-        assert_eq!(slot_w, 512);
-        assert_eq!(slots_hit_by_one_write(slot_w, 65536, 16), 16, "整个区域");
-        assert_eq!(slots_hit_by_one_write(slot_w, 4096, 16), 8);
-        assert!(slots_hit_by_one_write(slot_w, 65536, 16) >= 2, "主张 1 成立");
+        let slot_width_bytes = SlotWidth::SettledPhysicalBlockSize.bytes(512, 65536);
+        assert_eq!(slot_width_bytes, 512);
+        assert_eq!(slots_hit_by_one_write(slot_width_bytes, 65536, 16), 16, "整个区域");
+        assert_eq!(slots_hit_by_one_write(slot_width_bytes, 4096, 16), 8);
+        assert!(slots_hit_by_one_write(slot_width_bytes, 65536, 16) >= 2, "主张 1 成立");
     }
 
     /// **本机上主张 1 不成立**——`io_min == physical_block_size == 512`
     /// ⇒ 一次写只打掉 1 个槽。这正是 E34 正文说的「本机无法证伪」。
     #[test]
     fn claim1_does_not_hold_on_this_host() {
-        let slot_w = SlotWidth::SettledPbs.bytes(512, 512);
-        assert_eq!(slots_hit_by_one_write(slot_w, 512, 16), 1);
+        let slot_width_bytes = SlotWidth::SettledPhysicalBlockSize.bytes(512, 512);
+        assert_eq!(slots_hit_by_one_write(slot_width_bytes, 512, 16), 1);
     }
 
     /// **判据的主张 2**：素数步长放置下，一个单元盖不住两个区域 ⇒ 打不掉全环。
@@ -281,9 +281,9 @@ mod tests {
     fn claim2_holds_for_the_dead_candidate_but_not_for_the_settled_placement() {
         // 已定几何：区域间距 = 11 × 65536 = 720896 ≫ 65536
         assert!(!one_unit_spans_two_regions(
-            Placement::PrimeStride { p: 11 }, 65536, 65536, 16, 512
+            Placement::PrimeStride { prime_stride_factor: 11 }, 65536, 65536, 16, 512
         ));
-        assert!(!wipes_whole_ring(Placement::PrimeStride { p: 11 }, 65536, 65536, 16, 512));
+        assert!(!wipes_whole_ring(Placement::PrimeStride { prime_stride_factor: 11 }, 65536, 65536, 16, 512));
         // 已被换掉的候选：2 区 × 4 槽 × 256 = 2048 B，整个装得进一个 64 KiB 单元
         assert!(2 * 4 * 256 <= 65536);
         assert!(wipes_whole_ring(Placement::Contiguous, 65536, 65536, 4, 256));
@@ -293,13 +293,13 @@ mod tests {
     /// **阳性对照**：槽宽 = `max(pbs, io_min)` ⇒ 两个量都降到 1。
     /// 降不到 1 说明模型没在按单元算，整轮作废。
     #[test]
-    fn positive_control_iomin_slot_width_drops_both_to_one() {
+    fn positive_control_minimum_input_output_size_slot_width_drops_both_to_one() {
         for io_min in [512u64, 4096, 65536] {
-            let slot_w = SlotWidth::SuggestedIoMin.bytes(512, io_min);
-            assert_eq!(slot_w, io_min.max(512));
-            assert_eq!(slots_hit_by_one_write(slot_w, io_min, 16), 1, "io_min={io_min}");
+            let slot_width_bytes = SlotWidth::SuggestedMinimumInputOutputSize.bytes(512, io_min);
+            assert_eq!(slot_width_bytes, io_min.max(512));
+            assert_eq!(slots_hit_by_one_write(slot_width_bytes, io_min, 16), 1, "io_min={io_min}");
             assert!(!wipes_whole_ring(
-                Placement::PrimeStride { p: 11 }, io_min, io_min, 16, slot_w
+                Placement::PrimeStride { prime_stride_factor: 11 }, io_min, io_min, 16, slot_width_bytes
             ));
         }
     }
@@ -318,9 +318,9 @@ mod tests {
     /// 区域偏移由放置规则直接算出，不从别处读。
     #[test]
     fn absolute_region_offsets() {
-        assert_eq!(region_offset(Placement::PrimeStride { p: 11 }, 0, 65536, 16, 512), 0);
+        assert_eq!(region_offset(Placement::PrimeStride { prime_stride_factor: 11 }, 0, 65536, 16, 512), 0);
         assert_eq!(
-            region_offset(Placement::PrimeStride { p: 11 }, 1, 65536, 16, 512),
+            region_offset(Placement::PrimeStride { prime_stride_factor: 11 }, 1, 65536, 16, 512),
             720_896
         );
         assert_eq!(region_offset(Placement::Contiguous, 1, 65536, 4, 256), 1024);

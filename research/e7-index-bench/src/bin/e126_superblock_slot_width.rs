@@ -39,48 +39,48 @@
 use e7_index_bench::Emitter;
 
 /// D18 已定项 9（用户定案）：池内最小单元大小，第一版 16384。
-const MIN_UNIT_BYTES: u64 = 16384;
+const MINIMUM_UNIT_BYTES: u64 = 16384;
 /// D2 已定项 9（用户定案）：第一个可运行目标跑 2 块盘。
 const FIRST_VERSION_DISKS: u64 = 2;
 /// 撕裂判定的扇区宽度。E115 数「跨 n 扇区 ⇒ 2ⁿ − 2 种可读但不一致的态」用的就是它。
-const SECTOR: u64 = 512;
+const SECTOR_BYTES: u64 = 512;
 /// C231：树表单元指针那 59 字节的出处引的是 D22 已定项 7（**根记录**的字段表）。
-const MISATTRIBUTED_PTR: u64 = 59;
+const MISATTRIBUTED_POINTER_BYTES: u64 = 59;
 
 /// 四条候选。**跑前写死，跑完不许改。**
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
     /// 甲：= physical_block_size（探测值，跟根槽走）
-    ProbePbs,
+    ProbePhysicalBlockSize,
     /// 乙：= max(physical_block_size, io_min)（探测值）
-    ProbeMaxIoMin,
+    ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize,
     /// 丙：= 一个格式常量（与探测解绑）
-    FormatConst(u64),
+    FormatConstant(u64),
     /// 丁：= 池内最小单元大小 ⇒ 超级块槽就是一个单元
-    MinUnit,
+    MinimumUnit,
 }
 
 impl Arm {
     fn name(self) -> String {
         match self {
-            Arm::ProbePbs => "jia_probe_pbs".to_string(),
-            Arm::ProbeMaxIoMin => "yi_probe_max_iomin".to_string(),
-            Arm::FormatConst(n) => format!("bing_const_{n}"),
-            Arm::MinUnit => "ding_min_unit".to_string(),
+            Arm::ProbePhysicalBlockSize => "jia_probe_pbs".to_string(),
+            Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize => "yi_probe_max_iomin".to_string(),
+            Arm::FormatConstant(constant_slot_width) => format!("bing_const_{constant_slot_width}"),
+            Arm::MinimumUnit => "ding_min_unit".to_string(),
         }
     }
-    /// 在一台 (pbs, io_min) 的设备上，这条候选取到的槽宽。
-    fn width(self, pbs: u64, io_min: u64) -> u64 {
+    /// 在一台 (physical_block_size, io_min) 的设备上，这条候选取到的槽宽。
+    fn width(self, physical_block_size: u64, io_min: u64) -> u64 {
         match self {
-            Arm::ProbePbs => pbs,
-            Arm::ProbeMaxIoMin => pbs.max(io_min),
-            Arm::FormatConst(n) => n,
-            Arm::MinUnit => MIN_UNIT_BYTES,
+            Arm::ProbePhysicalBlockSize => physical_block_size,
+            Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize => physical_block_size.max(io_min),
+            Arm::FormatConstant(constant_slot_width) => constant_slot_width,
+            Arm::MinimumUnit => MINIMUM_UNIT_BYTES,
         }
     }
     /// 是不是格式常量（不随设备变）。
-    fn is_format_const(self) -> bool {
-        matches!(self, Arm::FormatConst(_) | Arm::MinUnit)
+    fn is_format_constant(self) -> bool {
+        matches!(self, Arm::FormatConstant(_) | Arm::MinimumUnit)
     }
 }
 
@@ -95,7 +95,7 @@ fn fits(width: u64, record_bytes: u64) -> bool {
 }
 
 /// 判据 3：D2 已定硬要求 1 合规——一次槽写是否 ≥ io_min。
-fn honors_io_min(width: u64, io_min: u64) -> bool {
+fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
     width >= io_min
 }
 
@@ -108,30 +108,30 @@ fn honors_io_min(width: u64, io_min: u64) -> bool {
 /// 三点上 n ≤ 32 全都不溢出；跑起来在候选乙的 65536（n = 128）上当场 panic。
 /// 这正是 `.claude/rules/mutation-sampling.md` 说的**取样点不敏感**，不是等价变异。
 fn tear_states(width: u64) -> (u32, Option<u64>) {
-    let n = width.div_ceil(SECTOR) as u32;
+    let sector_count = width.div_ceil(SECTOR_BYTES) as u32;
     // n = 1 时 2¹ − 2 = 0：一个扇区内不存在「部分可读」的中间态。
-    let states = if n <= 63 { Some((1u64 << n) - 2) } else { None };
-    (n, states)
+    let readable_inconsistent_state_count = if sector_count <= 63 { Some((1u64 << sector_count) - 2) } else { None };
+    (sector_count, readable_inconsistent_state_count)
 }
 
 /// 判据 5：在一个异构池上，这条候选取到几个不同的槽宽值。
 fn distinct_widths(arm: Arm, pool: &[(u64, u64)]) -> usize {
-    let mut v: Vec<u64> = pool.iter().map(|&(p, m)| arm.width(p, m)).collect();
-    v.sort_unstable();
-    v.dedup();
-    v.len()
+    let mut slot_widths: Vec<u64> = pool.iter().map(|&(physical_block_size, io_min)| arm.width(physical_block_size, io_min)).collect();
+    slot_widths.sort_unstable();
+    slot_widths.dedup();
+    slot_widths.len()
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
     let arms = [
-        Arm::ProbePbs,
-        Arm::ProbeMaxIoMin,
-        Arm::FormatConst(512),
-        Arm::FormatConst(4096),
-        Arm::MinUnit,
+        Arm::ProbePhysicalBlockSize,
+        Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize,
+        Arm::FormatConstant(512),
+        Arm::FormatConstant(4096),
+        Arm::MinimumUnit,
     ];
     // E115 / E124 的四格 + 合并臂两格。**两组一起报**：原值与「减 59」（C231 未修）。
     let records: [(&str, u64); 6] = [
@@ -149,8 +149,8 @@ fn main() {
         ("md_raid5", 512, 65536),
     ];
 
-    out.push(em.emit_raw(&format!(
-        "name=config min_unit={MIN_UNIT_BYTES} disks={FIRST_VERSION_DISKS} sector={SECTOR} \
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=config min_unit={MINIMUM_UNIT_BYTES} disks={FIRST_VERSION_DISKS} sector={SECTOR_BYTES} \
          arms={} records={} devices={}",
         arms.len(),
         records.len(),
@@ -158,62 +158,62 @@ fn main() {
     )));
 
     // ── 判据 1 + 3 + 4：逐设备逐候选 ──
-    for (dname, pbs, io_min) in devices {
+    for (device_name, physical_block_size, io_min) in devices {
         for arm in arms {
-            let w = arm.width(pbs, io_min);
-            let (n_sect, states) = tear_states(w);
+            let slot_width = arm.width(physical_block_size, io_min);
+            let (sector_count, readable_inconsistent_state_count) = tear_states(slot_width);
             for slots in [2u64, 4, 8, 16] {
-                let (per_disk, pool) = footprint(w, slots, FIRST_VERSION_DISKS);
-                out.push(em.emit_raw(&format!(
-                    "name=footprint dev={dname} arm={} pbs={pbs} io_min={io_min} width={w} \
-                     slots={slots} per_disk_bytes={per_disk} pool_bytes={pool}",
+                let (per_disk_bytes, pool_bytes) = footprint(slot_width, slots, FIRST_VERSION_DISKS);
+                output_lines.push(emitter.emit_raw(&format!(
+                    "name=footprint dev={device_name} arm={} pbs={physical_block_size} io_min={io_min} width={slot_width} \
+                     slots={slots} per_disk_bytes={per_disk_bytes} pool_bytes={pool_bytes}",
                     arm.name()
                 )));
             }
-            out.push(em.emit_raw(&format!(
-                "name=iomin dev={dname} arm={} width={w} io_min={io_min} honors={} \
-                 sectors={n_sect} tear_states={}",
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=iomin dev={device_name} arm={} width={slot_width} io_min={io_min} honors={} \
+                 sectors={sector_count} tear_states={}",
                 arm.name(),
-                u8::from(honors_io_min(w, io_min)),
-                states.map_or_else(|| format!("2^{n_sect}-2"), |v| v.to_string())
+                u8::from(honors_minimum_input_output_size(slot_width, io_min)),
+                readable_inconsistent_state_count.map_or_else(|| format!("2^{sector_count}-2"), |tear_state_count| tear_state_count.to_string())
             )));
         }
     }
 
     // ── 判据 2：装不装得下，两组（原值 / 减 59）──
-    for (dname, pbs, io_min) in devices {
+    for (device_name, physical_block_size, io_min) in devices {
         for arm in arms {
-            let w = arm.width(pbs, io_min);
-            for (rname, rb) in records {
-                let cut = rb - MISATTRIBUTED_PTR;
-                out.push(em.emit_raw(&format!(
-                    "name=fit dev={dname} arm={} width={w} record={rname} bytes={rb} \
-                     fits={} bytes_minus59={cut} fits_minus59={}",
+            let slot_width = arm.width(physical_block_size, io_min);
+            for (record_name, record_bytes) in records {
+                let record_bytes_minus_misattributed_pointer = record_bytes - MISATTRIBUTED_POINTER_BYTES;
+                output_lines.push(emitter.emit_raw(&format!(
+                    "name=fit dev={device_name} arm={} width={slot_width} record={record_name} bytes={record_bytes} \
+                     fits={} bytes_minus59={record_bytes_minus_misattributed_pointer} fits_minus59={}",
                     arm.name(),
-                    u8::from(fits(w, rb)),
-                    u8::from(fits(w, cut))
+                    u8::from(fits(slot_width, record_bytes)),
+                    u8::from(fits(slot_width, record_bytes_minus_misattributed_pointer))
                 )));
             }
         }
     }
 
-    // ── 判据 5：异构池（pbs 512 与 4096 混合）上取到几个不同值 ──
-    let hetero: [(u64, u64); 2] = [(512, 512), (4096, 4096)];
+    // ── 判据 5：异构池（physical_block_size 512 与 4096 混合）上取到几个不同值 ──
+    let heterogeneous_pool: [(u64, u64); 2] = [(512, 512), (4096, 4096)];
     for arm in arms {
-        out.push(em.emit_raw(&format!(
+        output_lines.push(emitter.emit_raw(&format!(
             "name=hetero arm={} distinct_widths={} is_format_const={}",
             arm.name(),
-            distinct_widths(arm, &hetero),
-            u8::from(arm.is_format_const())
+            distinct_widths(arm, &heterogeneous_pool),
+            u8::from(arm.is_format_constant())
         )));
     }
 
     // 收尾行走 Emitter::finish()：`name=done emitted=N`，N 计入自身。
     // replay.sh 的完整性闸 2 认的就是这一行；第一版手写了 `name=count n=…`
     // 且没把自己算进去（171 vs 实际 172）⇒ 那样注册进 replay 会当场判红。
-    out.push(em.finish());
-    for l in &out {
-        println!("{l}");
+    output_lines.push(emitter.finish());
+    for output_line in &output_lines {
+        println!("{output_line}");
     }
 }
 
@@ -225,12 +225,12 @@ mod tests {
     #[test]
     fn arm_widths_absolute() {
         // 甲在本机盘上就是 512
-        assert_eq!(Arm::ProbePbs.width(512, 512), 512);
-        // 乙在 E34 真阵列（pbs 512 / io_min 65536）上被抬到 65536
-        assert_eq!(Arm::ProbeMaxIoMin.width(512, 65536), 65536);
+        assert_eq!(Arm::ProbePhysicalBlockSize.width(512, 512), 512);
+        // 乙在 E34 真阵列（physical_block_size 512 / io_min 65536）上被抬到 65536
+        assert_eq!(Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize.width(512, 65536), 65536);
         // 丁恒等于池内最小单元大小
-        assert_eq!(Arm::MinUnit.width(512, 65536), 16384);
-        assert_eq!(MIN_UNIT_BYTES, 16384);
+        assert_eq!(Arm::MinimumUnit.width(512, 65536), 16384);
+        assert_eq!(MINIMUM_UNIT_BYTES, 16384);
     }
 
     /// **阳性对照**（失败条款）：槽宽 512 那一档必须复现 E124 已入库的判决。
@@ -246,9 +246,9 @@ mod tests {
 
     /// **阴性对照**（失败条款）：16384 那一档六格必须全部装得下。
     #[test]
-    fn negative_control_all_fit_at_min_unit() {
-        for b in [507u64, 566, 536, 595, 389, 477] {
-            assert!(fits(MIN_UNIT_BYTES, b), "16384 槽装不下 {b}，口径读错了");
+    fn negative_control_all_fit_at_minimum_unit() {
+        for record_bytes in [507u64, 566, 536, 595, 389, 477] {
+            assert!(fits(MINIMUM_UNIT_BYTES, record_bytes), "16384 槽装不下 {record_bytes}，口径读错了");
         }
     }
 
@@ -267,15 +267,15 @@ mod tests {
 
     /// D2 已定硬要求 1 合规的绝对判定。
     #[test]
-    fn io_min_compliance() {
+    fn minimum_input_output_size_compliance() {
         // 甲在 E34 真阵列上违规：512 < 65536
-        assert!(!honors_io_min(512, 65536));
+        assert!(!honors_minimum_input_output_size(512, 65536));
         // 乙恒合规
-        assert!(honors_io_min(65536, 65536));
+        assert!(honors_minimum_input_output_size(65536, 65536));
         // 丁在真阵列上仍然违规：16384 < 65536
-        assert!(!honors_io_min(16384, 65536));
+        assert!(!honors_minimum_input_output_size(16384, 65536));
         // 丁在 4K 盘上合规
-        assert!(honors_io_min(16384, 4096));
+        assert!(honors_minimum_input_output_size(16384, 4096));
     }
 
     /// 撕裂暴露面：跨扇区数与态数的绝对值。
@@ -316,25 +316,25 @@ mod tests {
 
     /// 异构池上取到几个值：格式常量恒 1。
     #[test]
-    fn hetero_distinct() {
+    fn heterogeneous_pool_distinct_widths() {
         let pool = [(512u64, 512u64), (4096, 4096)];
-        assert_eq!(distinct_widths(Arm::ProbePbs, &pool), 2);
-        assert_eq!(distinct_widths(Arm::ProbeMaxIoMin, &pool), 2);
-        assert_eq!(distinct_widths(Arm::MinUnit, &pool), 1);
-        assert_eq!(distinct_widths(Arm::FormatConst(4096), &pool), 1);
+        assert_eq!(distinct_widths(Arm::ProbePhysicalBlockSize, &pool), 2);
+        assert_eq!(distinct_widths(Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize, &pool), 2);
+        assert_eq!(distinct_widths(Arm::MinimumUnit, &pool), 1);
+        assert_eq!(distinct_widths(Arm::FormatConstant(4096), &pool), 1);
     }
 
     /// C231 的「减 59」那一组：507 − 59 = 448，装得下 512。
     #[test]
     fn minus_59_group() {
-        assert_eq!(507 - MISATTRIBUTED_PTR, 448);
-        assert_eq!(536 - MISATTRIBUTED_PTR, 477);
+        assert_eq!(507 - MISATTRIBUTED_POINTER_BYTES, 448);
+        assert_eq!(536 - MISATTRIBUTED_POINTER_BYTES, 477);
         assert!(fits(512, 448));
         assert!(fits(512, 477));
         // 而 566 / 595 减 59 之后仍然爆
-        assert_eq!(566 - MISATTRIBUTED_PTR, 507);
+        assert_eq!(566 - MISATTRIBUTED_POINTER_BYTES, 507);
         assert!(fits(512, 507));
-        assert_eq!(595 - MISATTRIBUTED_PTR, 536);
+        assert_eq!(595 - MISATTRIBUTED_POINTER_BYTES, 536);
         assert!(!fits(512, 536));
     }
 }

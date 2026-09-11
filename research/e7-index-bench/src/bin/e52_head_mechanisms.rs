@@ -137,81 +137,81 @@ const SHARED_PERMILLE: [u64; 3] = [0, 100, 500];
 const NODE_BYTES: [u64; 2] = [4096, 16384];
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw("name=config key_bytes_snapshot=28 key_bytes_perhead=24 metadata_per_tree=3")
+        emitter.emit_raw("name=config key_bytes_snapshot=28 key_bytes_perhead=24 metadata_per_tree=3")
     );
 
     let arms = [Arm::KeySnapshotSuffix, Arm::KeySnapshotPrefix, Arm::TreePerHead];
-    let mut max_ratio_touched = 0.0f64;
-    let mut max_ratio_lookup = 0.0f64;
+    let mut maximum_delete_touched_ratio = 0.0f64;
+    let mut maximum_lookup_component_ratio = 0.0f64;
 
     for heads in HEADS {
-        for keys in KEYS_PER_HEAD {
-            for node in NODE_BYTES {
-                for sp in SHARED_PERMILLE {
-                    let mut touched = [0u64; 3];
-                    for (i, arm) in arms.into_iter().enumerate() {
-                        touched[i] = delete_head_touched(arm, heads, keys, node);
+        for keys_per_head in KEYS_PER_HEAD {
+            for node_bytes in NODE_BYTES {
+                for shared_permille in SHARED_PERMILLE {
+                    let mut delete_touched_per_arm = [0u64; 3];
+                    for (arm_index, arm) in arms.into_iter().enumerate() {
+                        delete_touched_per_arm[arm_index] = delete_head_touched(arm, heads, keys_per_head, node_bytes);
                         println!(
                             "{}",
-                            em.emit_raw(&format!(
-                                "name=metrics arm={} heads={heads} keys_per_head={keys} \
-                                 node_bytes={node} shared_permille={sp} \
+                            emitter.emit_raw(&format!(
+                                "name=metrics arm={} heads={heads} keys_per_head={keys_per_head} \
+                                 node_bytes={node_bytes} shared_permille={shared_permille} \
                                  delete_touched={} lookup_components={} lookup_descents={} \
                                  sidetable={} key_bytes_total={} fixed_metadata={}",
                                 arm.name(),
-                                touched[i],
+                                delete_touched_per_arm[arm_index],
                                 lookup_components(arm, heads),
                                 lookup_descents(arm, heads),
-                                sidetable_entries(arm, heads, keys, sp),
-                                total_key_bytes(arm, heads, keys),
+                                sidetable_entries(arm, heads, keys_per_head, shared_permille),
+                                total_key_bytes(arm, heads, keys_per_head),
                                 fixed_metadata(arm, heads),
                             ))
                         );
                     }
-                    let r = touched[0] as f64 / touched[2].max(1) as f64;
-                    if r > max_ratio_touched {
-                        max_ratio_touched = r;
+                    let suffix_to_per_head_touched_ratio = delete_touched_per_arm[0] as f64 / delete_touched_per_arm[2].max(1) as f64;
+                    if suffix_to_per_head_touched_ratio > maximum_delete_touched_ratio {
+                        maximum_delete_touched_ratio = suffix_to_per_head_touched_ratio;
                     }
                 }
             }
         }
-        let rl = lookup_components(Arm::KeySnapshotSuffix, heads) as f64
+        let lookup_component_ratio = lookup_components(Arm::KeySnapshotSuffix, heads) as f64
             / lookup_components(Arm::TreePerHead, heads) as f64;
-        if rl > max_ratio_lookup {
-            max_ratio_lookup = rl;
+        if lookup_component_ratio > maximum_lookup_component_ratio {
+            maximum_lookup_component_ratio = lookup_component_ratio;
         }
     }
 
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=separation max_ratio_delete_touched={max_ratio_touched:.1} \
-             max_ratio_lookup={max_ratio_lookup:.4} separable={}",
-            u8::from(max_ratio_touched >= 2.0 || max_ratio_lookup >= 2.0),
+        emitter.emit_raw(&format!(
+            "name=separation max_ratio_delete_touched={maximum_delete_touched_ratio:.1} \
+             max_ratio_lookup={maximum_lookup_component_ratio:.4} separable={}",
+            u8::from(maximum_delete_touched_ratio >= 2.0 || maximum_lookup_component_ratio >= 2.0),
         ))
     );
 
     // ── 阳性对照 A：头数翻倍 ⇒ ① 翻倍、② 不变 ──
-    let a1 = delete_head_touched(Arm::KeySnapshotSuffix, 2, 1000, 4096);
-    let a2 = delete_head_touched(Arm::KeySnapshotSuffix, 4, 1000, 4096);
-    let b1 = delete_head_touched(Arm::TreePerHead, 2, 1000, 4096);
-    let b2 = delete_head_touched(Arm::TreePerHead, 4, 1000, 4096);
+    let suffix_touched_two_heads = delete_head_touched(Arm::KeySnapshotSuffix, 2, 1000, 4096);
+    let suffix_touched_four_heads = delete_head_touched(Arm::KeySnapshotSuffix, 4, 1000, 4096);
+    let per_head_touched_two_heads = delete_head_touched(Arm::TreePerHead, 2, 1000, 4096);
+    let per_head_touched_four_heads = delete_head_touched(Arm::TreePerHead, 4, 1000, 4096);
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=poscontrol_a snapshot_h2={a1} snapshot_h4={a2} doubled={} \
-             perhead_h2={b1} perhead_h4={b2} unchanged={}",
-            u8::from(a2 == 2 * a1),
-            u8::from(b1 == b2),
+        emitter.emit_raw(&format!(
+            "name=poscontrol_a snapshot_h2={suffix_touched_two_heads} snapshot_h4={suffix_touched_four_heads} doubled={} \
+             perhead_h2={per_head_touched_two_heads} perhead_h4={per_head_touched_four_heads} unchanged={}",
+            u8::from(suffix_touched_four_heads == 2 * suffix_touched_two_heads),
+            u8::from(per_head_touched_two_heads == per_head_touched_four_heads),
         ))
     );
     // ── 阳性对照 B：单头 + 零共享 ⇒ 旁表与固定元数据相同 ──
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=poscontrol_b sidetable_equal={} metadata_equal={}",
             u8::from(
                 sidetable_entries(Arm::KeySnapshotSuffix, 1, 1000, 0)
@@ -223,13 +223,13 @@ fn main() {
     // ── 阴性对照：共享率 0 ⇒ 旁表 0 ──
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=negcontrol_zero_sharing perhead={} expect=0",
             sidetable_entries(Arm::TreePerHead, 8, 100_000, 0)
         ))
     );
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -253,8 +253,8 @@ mod tests {
     fn delete_touched_absolute_and_ratio() {
         assert_eq!(delete_head_touched(Arm::KeySnapshotSuffix, 4, 1000, 4096), 4000);
         assert_eq!(delete_head_touched(Arm::TreePerHead, 4, 1000, 4096), 6);
-        let r = 4000f64 / 6f64;
-        assert!((r - 666.666).abs() < 0.01);
+        let delete_touched_ratio = 4000f64 / 6f64;
+        assert!((delete_touched_ratio - 666.666).abs() < 0.01);
         // 16 KiB 节点：ceil(1000/682) = 2
         assert_eq!(delete_head_touched(Arm::TreePerHead, 4, 1000, 16384), 2);
         // 十万条 / 8 头：① 800000；② ceil(100000/170) = 589
@@ -268,8 +268,8 @@ mod tests {
         assert_eq!(lookup_components(Arm::KeySnapshotSuffix, 1), 4);
         assert_eq!(lookup_components(Arm::KeySnapshotSuffix, 2), 5);
         assert_eq!(lookup_components(Arm::KeySnapshotSuffix, 8), 11);
-        for h in HEADS {
-            assert_eq!(lookup_components(Arm::TreePerHead, h), 3);
+        for heads in HEADS {
+            assert_eq!(lookup_components(Arm::TreePerHead, heads), 3);
         }
         // H=8 时比值 3.667 —— 超过「分得开」那条 2 倍线
         assert!((11f64 / 3f64 - 3.6667).abs() < 1e-3);
@@ -298,22 +298,22 @@ mod tests {
 
     /// **阳性对照 A**：头数翻倍 ⇒ ① 翻倍、② 不变。
     #[test]
-    fn positive_control_a_doubling_heads() {
-        for keys in KEYS_PER_HEAD {
-            for node in NODE_BYTES {
-                let a1 = delete_head_touched(Arm::KeySnapshotSuffix, 2, keys, node);
-                let a2 = delete_head_touched(Arm::KeySnapshotSuffix, 4, keys, node);
-                assert_eq!(a2, 2 * a1, "① 必须翻倍");
-                let b1 = delete_head_touched(Arm::TreePerHead, 2, keys, node);
-                let b2 = delete_head_touched(Arm::TreePerHead, 4, keys, node);
-                assert_eq!(b1, b2, "② 必须不变");
+    fn positive_control_doubling_heads_doubles_suffix_only() {
+        for keys_per_head in KEYS_PER_HEAD {
+            for node_bytes in NODE_BYTES {
+                let suffix_touched_two_heads = delete_head_touched(Arm::KeySnapshotSuffix, 2, keys_per_head, node_bytes);
+                let suffix_touched_four_heads = delete_head_touched(Arm::KeySnapshotSuffix, 4, keys_per_head, node_bytes);
+                assert_eq!(suffix_touched_four_heads, 2 * suffix_touched_two_heads, "① 必须翻倍");
+                let per_head_touched_two_heads = delete_head_touched(Arm::TreePerHead, 2, keys_per_head, node_bytes);
+                let per_head_touched_four_heads = delete_head_touched(Arm::TreePerHead, 4, keys_per_head, node_bytes);
+                assert_eq!(per_head_touched_two_heads, per_head_touched_four_heads, "② 必须不变");
             }
         }
     }
 
     /// **阳性对照 B**：单头 + 零共享 ⇒ 旁表与固定元数据相同。
     #[test]
-    fn positive_control_b_single_head_degenerates() {
+    fn positive_control_single_head_zero_sharing_degenerates() {
         assert_eq!(
             sidetable_entries(Arm::KeySnapshotSuffix, 1, 1000, 0),
             sidetable_entries(Arm::TreePerHead, 1, 1000, 0)
@@ -324,10 +324,10 @@ mod tests {
     /// **阴性对照**：共享率 0 ⇒ 旁表恒 0，两条臂都是。
     #[test]
     fn negative_control_zero_sharing_has_no_sidetable() {
-        for h in HEADS {
-            for k in KEYS_PER_HEAD {
-                assert_eq!(sidetable_entries(Arm::TreePerHead, h, k, 0), 0);
-                assert_eq!(sidetable_entries(Arm::KeySnapshotSuffix, h, k, 0), 0);
+        for heads in HEADS {
+            for keys_per_head in KEYS_PER_HEAD {
+                assert_eq!(sidetable_entries(Arm::TreePerHead, heads, keys_per_head, 0), 0);
+                assert_eq!(sidetable_entries(Arm::KeySnapshotSuffix, heads, keys_per_head, 0), 0);
             }
         }
     }
@@ -340,14 +340,14 @@ mod tests {
         assert_eq!(delete_head_touched(Arm::KeySnapshotPrefix, 4, 1000, 4096), 7);
         assert_eq!(delete_head_touched(Arm::KeySnapshotSuffix, 4, 1000, 4096), 4000);
         // 点查下降次数：前缀 = 头数；另外两条恒 1
-        for h in HEADS {
-            assert_eq!(lookup_descents(Arm::KeySnapshotPrefix, h), h);
-            assert_eq!(lookup_descents(Arm::KeySnapshotSuffix, h), 1);
-            assert_eq!(lookup_descents(Arm::TreePerHead, h), 1);
+        for heads in HEADS {
+            assert_eq!(lookup_descents(Arm::KeySnapshotPrefix, heads), heads);
+            assert_eq!(lookup_descents(Arm::KeySnapshotSuffix, heads), 1);
+            assert_eq!(lookup_descents(Arm::TreePerHead, heads), 1);
         }
         // 前缀的分量数不随头数涨（过滤挪到了下降次数上）
-        for h in HEADS {
-            assert_eq!(lookup_components(Arm::KeySnapshotPrefix, h), 4);
+        for heads in HEADS {
+            assert_eq!(lookup_components(Arm::KeySnapshotPrefix, heads), 4);
         }
         // 前缀仍然不需要旁表——共享靠祖先关系判定
         assert_eq!(sidetable_entries(Arm::KeySnapshotPrefix, 8, 100_000, 500), 0);
@@ -355,14 +355,14 @@ mod tests {
 
     /// **「分得开」这条判据本身**：2 倍线两侧各取一点。
     #[test]
-    fn the_separation_threshold_is_two_x() {
-        let sep = |r: f64| r >= 2.0;
-        assert!(!sep(1.9999));
-        assert!(sep(2.0));
+    fn the_separation_threshold_is_two_times() {
+        let is_separable = |ratio: f64| ratio >= 2.0;
+        assert!(!is_separable(1.9999));
+        assert!(is_separable(2.0));
         // 实际最大比值远超它
-        assert!(sep(4000f64 / 6f64));
-        assert!(sep(11f64 / 3f64));
+        assert!(is_separable(4000f64 / 6f64));
+        assert!(is_separable(11f64 / 3f64));
         // 而字节那一项**分不开**（1.167 < 2）——不许拿它当判决
-        assert!(!sep(224_000f64 / 192_000f64));
+        assert!(!is_separable(224_000f64 / 192_000f64));
     }
 }

@@ -47,11 +47,11 @@ const SLOTS: usize = 4096; // 16 KiB 槽
 struct Rng(u64);
 impl Rng {
     fn new(seed: u64) -> Self {
-        let mut s = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA076_1D64_78BD_642F);
-        if s == 0 {
-            s = 0xDEAD_BEEF;
+        let mut state = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xA076_1D64_78BD_642F);
+        if state == 0 {
+            state = 0xDEAD_BEEF;
         }
-        Rng(s)
+        Rng(state)
     }
     fn next(&mut self) -> u64 {
         self.0 ^= self.0 << 13;
@@ -59,8 +59,8 @@ impl Rng {
         self.0 ^= self.0 << 17;
         self.0
     }
-    fn below(&mut self, n: u64) -> u64 {
-        self.next() % n
+    fn below(&mut self, exclusive_upper_bound: u64) -> u64 {
+        self.next() % exclusive_upper_bound
     }
 }
 
@@ -74,33 +74,33 @@ enum Slot {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum ArmId {
+enum ScanStepArm {
     Step16kAny,
     Step32kPad,
     Step32kPacked,
 }
-impl ArmId {
+impl ScanStepArm {
     fn tag(self) -> &'static str {
         match self {
-            ArmId::Step16kAny => "step16k_any",
-            ArmId::Step32kPad => "step32k_pad",
-            ArmId::Step32kPacked => "step32k_packed",
+            ScanStepArm::Step16kAny => "step16k_any",
+            ScanStepArm::Step32kPad => "step32k_pad",
+            ScanStepArm::Step32kPacked => "step32k_packed",
         }
     }
     fn step_slots(self) -> usize {
         match self {
-            ArmId::Step16kAny => 1,
-            ArmId::Step32kPad | ArmId::Step32kPacked => 2,
+            ScanStepArm::Step16kAny => 1,
+            ScanStepArm::Step32kPad | ScanStepArm::Step32kPacked => 2,
         }
     }
     /// 节点要不要独占 32K 对齐槽对。
     fn pad_nodes(self) -> bool {
-        matches!(self, ArmId::Step32kPad)
+        matches!(self, ScanStepArm::Step32kPad)
     }
 }
 
 /// 造盘：交替随机放节点与数据单元直到装不下。数据单元恒 32K 对齐（D18 已定项 9 硬要求）。
-fn build(arm: ArmId, seed: u64) -> Vec<Slot> {
+fn build(arm: ScanStepArm, seed: u64) -> Vec<Slot> {
     let mut rng = Rng::new(seed);
     let mut disk = vec![Slot::Free; SLOTS];
     let mut placed = 0;
@@ -151,15 +151,15 @@ fn build(arm: ArmId, seed: u64) -> Vec<Slot> {
 /// 扫描：按步进探针，命中起点算找到。返回 (找到节点, 找到数据, 内部探针数)。
 fn scan(disk: &[Slot], step_slots: usize) -> (u64, u64, u64) {
     let (mut nodes, mut data, mut interior) = (0u64, 0u64, 0u64);
-    let mut i = 0;
-    while i < disk.len() {
-        match disk[i] {
+    let mut slot_index = 0;
+    while slot_index < disk.len() {
+        match disk[slot_index] {
             Slot::NodeStart => nodes += 1,
             Slot::DataStart => data += 1,
             Slot::DataTail => interior += 1,
             Slot::Free | Slot::NodePad => {}
         }
-        i += step_slots;
+        slot_index += step_slots;
     }
     (nodes, data, interior)
 }
@@ -169,11 +169,11 @@ fn census(disk: &[Slot]) -> (u64, u64, u64) {
     let mut nodes = 0u64;
     let mut data = 0u64;
     let mut odd_nodes = 0u64;
-    for (i, s) in disk.iter().enumerate() {
-        match s {
+    for (slot_index, slot) in disk.iter().enumerate() {
+        match slot {
             Slot::NodeStart => {
                 nodes += 1;
-                if i % 2 == 1 {
+                if slot_index % 2 == 1 {
                     odd_nodes += 1;
                 }
             }
@@ -185,31 +185,31 @@ fn census(disk: &[Slot]) -> (u64, u64, u64) {
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!("name=config slots={SLOTS} slot_bytes=16384 model=counting file_ops=0"))
+        emitter.emit_raw(&format!("name=config slots={SLOTS} slot_bytes=16384 model=counting file_ops=0"))
     );
-    for arm in [ArmId::Step16kAny, ArmId::Step32kPad, ArmId::Step32kPacked] {
+    for arm in [ScanStepArm::Step16kAny, ScanStepArm::Step32kPad, ScanStepArm::Step32kPacked] {
         for seed in [11u64, 22, 33, 44, 55] {
             let disk = build(arm, seed);
-            let (t_nodes, t_data, odd_nodes) = census(&disk);
-            let (f_nodes, f_data, interior) = scan(&disk, arm.step_slots());
+            let (census_nodes, census_data, odd_nodes) = census(&disk);
+            let (found_nodes, found_data, interior) = scan(&disk, arm.step_slots());
             let node_slots: u64 = disk
                 .iter()
-                .filter(|s| matches!(s, Slot::NodeStart | Slot::NodePad))
+                .filter(|slot| matches!(slot, Slot::NodeStart | Slot::NodePad))
                 .count() as u64;
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=scan arm={} seed={seed} nodes={t_nodes} data={t_data} found_nodes={f_nodes} found_data={f_data} missed_nodes={} odd_nodes={odd_nodes} interior_probes={interior} node_slots={node_slots}",
+                emitter.emit_raw(&format!(
+                    "name=scan arm={} seed={seed} nodes={census_nodes} data={census_data} found_nodes={found_nodes} found_data={found_data} missed_nodes={} odd_nodes={odd_nodes} interior_probes={interior} node_slots={node_slots}",
                     arm.tag(),
-                    t_nodes - f_nodes
+                    census_nodes - found_nodes
                 ))
             );
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -220,10 +220,10 @@ mod tests {
     #[test]
     fn step16k_finds_everything() {
         for seed in [11u64, 22, 33, 44, 55] {
-            let disk = build(ArmId::Step16kAny, seed);
-            let (t_nodes, t_data, _) = census(&disk);
-            let (f_nodes, f_data, _) = scan(&disk, 1);
-            assert_eq!((f_nodes, f_data), (t_nodes, t_data), "seed={seed}");
+            let disk = build(ScanStepArm::Step16kAny, seed);
+            let (census_nodes, census_data, _) = census(&disk);
+            let (found_nodes, found_data, _) = scan(&disk, 1);
+            assert_eq!((found_nodes, found_data), (census_nodes, census_data), "seed={seed}");
         }
     }
 
@@ -232,12 +232,12 @@ mod tests {
     #[test]
     fn step32k_packed_misses_exactly_odd_nodes() {
         for seed in [11u64, 22, 33, 44, 55] {
-            let disk = build(ArmId::Step32kPacked, seed);
-            let (t_nodes, t_data, odd_nodes) = census(&disk);
-            let (f_nodes, f_data, _) = scan(&disk, 2);
-            assert_eq!(t_nodes - f_nodes, odd_nodes, "seed={seed}");
+            let disk = build(ScanStepArm::Step32kPacked, seed);
+            let (census_nodes, census_data, odd_nodes) = census(&disk);
+            let (found_nodes, found_data, _) = scan(&disk, 2);
+            assert_eq!(census_nodes - found_nodes, odd_nodes, "seed={seed}");
             assert!(odd_nodes > 0, "场景里必须真的有奇槽节点，否则这格什么也没证");
-            assert_eq!(f_data, t_data, "数据单元 32K 对齐，32K 步进收得全");
+            assert_eq!(found_data, census_data, "数据单元 32K 对齐，32K 步进收得全");
         }
     }
 
@@ -245,16 +245,16 @@ mod tests {
     #[test]
     fn step32k_pad_finds_all_at_double_cost() {
         for seed in [11u64, 22, 33, 44, 55] {
-            let disk = build(ArmId::Step32kPad, seed);
-            let (t_nodes, t_data, odd) = census(&disk);
+            let disk = build(ScanStepArm::Step32kPad, seed);
+            let (census_nodes, census_data, odd) = census(&disk);
             assert_eq!(odd, 0, "独占槽对下节点起点恒偶");
-            let (f_nodes, f_data, _) = scan(&disk, 2);
-            assert_eq!((f_nodes, f_data), (t_nodes, t_data));
+            let (found_nodes, found_data, _) = scan(&disk, 2);
+            assert_eq!((found_nodes, found_data), (census_nodes, census_data));
             let node_slots = disk
                 .iter()
-                .filter(|s| matches!(s, Slot::NodeStart | Slot::NodePad))
+                .filter(|slot| matches!(slot, Slot::NodeStart | Slot::NodePad))
                 .count() as u64;
-            assert_eq!(node_slots, t_nodes * 2, "浪费恒 50%");
+            assert_eq!(node_slots, census_nodes * 2, "浪费恒 50%");
         }
     }
 
@@ -262,10 +262,10 @@ mod tests {
     #[test]
     fn interior_probe_arithmetic() {
         for seed in [11u64, 22, 33] {
-            let disk = build(ArmId::Step16kAny, seed);
-            let (_, t_data, _) = census(&disk);
+            let disk = build(ScanStepArm::Step16kAny, seed);
+            let (_, census_data, _) = census(&disk);
             let (_, _, interior16) = scan(&disk, 1);
-            assert_eq!(interior16, t_data, "每个数据单元载荷内恰 1 个 16K 探针点");
+            assert_eq!(interior16, census_data, "每个数据单元载荷内恰 1 个 16K 探针点");
             let (_, _, interior32) = scan(&disk, 2);
             assert_eq!(interior32, 0, "数据 32K 对齐时 32K 步进点全是起点或节点/空槽");
         }
@@ -278,38 +278,38 @@ mod tests {
         let disk = vec![Slot::Free, Slot::NodeStart, Slot::DataStart, Slot::DataTail];
         assert_eq!(scan(&disk, 2), (0, 1, 0));
         assert_eq!(scan(&disk, 1), (1, 1, 1));
-        let (n, d, odd) = census(&disk);
-        assert_eq!((n, d, odd), (1, 1, 1));
+        let (census_node_count, census_data_count, odd) = census(&disk);
+        assert_eq!((census_node_count, census_data_count, odd), (1, 1, 1));
     }
 
     /// 臂到步进的映射本身要钉住——统计测试都直接传步进常量，绕过了这层映射，
     /// 映射写反时只有 main 的输出错（2026-09-02 变异测试实测 M5 漏网，补此测）。
     #[test]
     fn step_mapping_is_correct() {
-        assert_eq!(ArmId::Step16kAny.step_slots(), 1);
-        assert_eq!(ArmId::Step32kPad.step_slots(), 2);
-        assert_eq!(ArmId::Step32kPacked.step_slots(), 2);
-        assert!(ArmId::Step32kPad.pad_nodes());
-        assert!(!ArmId::Step16kAny.pad_nodes());
-        assert!(!ArmId::Step32kPacked.pad_nodes());
+        assert_eq!(ScanStepArm::Step16kAny.step_slots(), 1);
+        assert_eq!(ScanStepArm::Step32kPad.step_slots(), 2);
+        assert_eq!(ScanStepArm::Step32kPacked.step_slots(), 2);
+        assert!(ScanStepArm::Step32kPad.pad_nodes());
+        assert!(!ScanStepArm::Step16kAny.pad_nodes());
+        assert!(!ScanStepArm::Step32kPacked.pad_nodes());
     }
 
     /// 不同种子不同盘；(2,3) 不折叠（C59（种子折叠成同一个状态））。
     #[test]
     fn seeds_differ() {
-        let a = census(&build(ArmId::Step32kPacked, 2));
-        let b = census(&build(ArmId::Step32kPacked, 3));
-        assert!(a != b, "种子 2 与 3 折叠成了同一个盘");
+        let seed_2_census = census(&build(ScanStepArm::Step32kPacked, 2));
+        let seed_3_census = census(&build(ScanStepArm::Step32kPacked, 3));
+        assert!(seed_2_census != seed_3_census, "种子 2 与 3 折叠成了同一个盘");
     }
 
     /// 数据单元恒 32K 对齐（D18 已定项 9 的硬要求在模型里被遵守）——起点全在偶槽。
     #[test]
     fn data_units_are_32k_aligned() {
-        for arm in [ArmId::Step16kAny, ArmId::Step32kPad, ArmId::Step32kPacked] {
+        for arm in [ScanStepArm::Step16kAny, ScanStepArm::Step32kPad, ScanStepArm::Step32kPacked] {
             let disk = build(arm, 11);
-            for (i, s) in disk.iter().enumerate() {
-                if *s == Slot::DataStart {
-                    assert_eq!(i % 2, 0, "{arm:?} 数据单元起点在奇槽");
+            for (slot_index, slot) in disk.iter().enumerate() {
+                if *slot == Slot::DataStart {
+                    assert_eq!(slot_index % 2, 0, "{arm:?} 数据单元起点在奇槽");
                 }
             }
         }

@@ -29,20 +29,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// 快照拓扑：单向线性（每个快照只有一个父）还是多可写头（树形分叉）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Topo { Linear, MultiHead }
+enum Topology { Linear, MultiHead }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Arm { Deadlist, Refcount, OwnerRef }
+enum Arm { Deadlist, ReferenceCount, OwnerReference }
 
 impl Arm {
     fn label(self) -> &'static str {
-        match self { Arm::Deadlist => "deadlist", Arm::Refcount => "refcount", Arm::OwnerRef => "owner_ref" }
+        match self { Arm::Deadlist => "deadlist", Arm::ReferenceCount => "refcount", Arm::OwnerReference => "owner_ref" }
     }
 }
 
 #[derive(Clone)]
-struct Snap {
-    id: u64,
+struct Snapshot {
+    snapshot_identifier: u64,
     parent: Option<u64>,
     txg: u64,
     /// 本快照**新建**的 extent（归属原创建者用得着）
@@ -55,41 +55,41 @@ struct Snap {
 
 #[derive(Clone)]
 struct Extent {
-    id: u64,
+    extent_identifier: u64,
     birth_txg: u64,
     /// 引用它的快照集合。**真值靠它算，臂不许直接读它去省查找**。
-    refs: BTreeSet<u64>,
+    referencing_snapshots: BTreeSet<u64>,
 }
 
-struct World { snaps: BTreeMap<u64, Snap>, exts: BTreeMap<u64, Extent> }
+struct World { snapshots: BTreeMap<u64, Snapshot>, extents: BTreeMap<u64, Extent> }
 
-/// 与 `id` **可比**的快照集合 = 它的祖先 ∪ 它的后代（含自己）。
+/// 与 `snapshot_identifier` **可比**的快照集合 = 它的祖先 ∪ 它的后代（含自己）。
 ///
 /// txg 比较只在可比集合内构成可靠全序：祖先与后代都与 victim 有因果关系，
 /// 「上一个快照」有唯一答案；**旁支不可比**，拿 txg 去比会得出错的答案。
 /// ⚠️ 第一版只算了祖先，于是线性历史里的后代被当成旁支收了费——
 /// 而线性历史下一切都可比，本该零查找。
-fn comparable(w: &World, id: u64) -> BTreeSet<u64> {
-    let mut anc = BTreeSet::new();
-    let mut cur = Some(id);
-    while let Some(c) = cur {
-        if !anc.insert(c) { break; }
-        cur = w.snaps.get(&c).and_then(|s| s.parent);
+fn comparable(world: &World, snapshot_identifier: u64) -> BTreeSet<u64> {
+    let mut ancestors = BTreeSet::new();
+    let mut next_ancestor = Some(snapshot_identifier);
+    while let Some(ancestor) = next_ancestor {
+        if !ancestors.insert(ancestor) { break; }
+        next_ancestor = world.snapshots.get(&ancestor).and_then(|snapshot| snapshot.parent);
     }
-    // 后代：父链能走到 id 的那些
-    let mut out = anc.clone();
-    for s in w.snaps.values() {
-        let mut c = Some(s.id);
-        while let Some(x) = c {
-            if x == id { out.insert(s.id); break; }
-            c = w.snaps.get(&x).and_then(|y| y.parent);
+    // 后代：父链能走到 snapshot_identifier 的那些
+    let mut comparable_set = ancestors.clone();
+    for snapshot in world.snapshots.values() {
+        let mut next_ancestor = Some(snapshot.snapshot_identifier);
+        while let Some(ancestor) = next_ancestor {
+            if ancestor == snapshot_identifier { comparable_set.insert(snapshot.snapshot_identifier); break; }
+            next_ancestor = world.snapshots.get(&ancestor).and_then(|ancestor_snapshot| ancestor_snapshot.parent);
         }
     }
-    out
+    comparable_set
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct ArmMeasurement {
     /// 反向索引查找次数——**本实验的主指标**
     lookups: u64,
     /// 该臂判定为「可释放」的 extent 数
@@ -103,18 +103,18 @@ struct Out {
 }
 
 /// 真值：枚举全部活快照。**不走任何臂的代码。**
-fn truly_free_set(w: &World) -> BTreeSet<u64> {
-    let live: BTreeSet<u64> = w.snaps.values().filter(|s| s.live).map(|s| s.id).collect();
-    w.exts.values()
-        .filter(|e| e.refs.iter().all(|r| !live.contains(r)))
-        .map(|e| e.id).collect()
+fn truly_free_set(world: &World) -> BTreeSet<u64> {
+    let live: BTreeSet<u64> = world.snapshots.values().filter(|snapshot| snapshot.live).map(|snapshot| snapshot.snapshot_identifier).collect();
+    world.extents.values()
+        .filter(|extent| extent.referencing_snapshots.iter().all(|referencing_snapshot| !live.contains(referencing_snapshot)))
+        .map(|extent| extent.extent_identifier).collect()
 }
 
 /// 删掉快照 `victim` 之后，各臂各自判定哪些 extent 可释放。
-fn run_arm(w: &World, victim: u64, arm: Arm) -> (BTreeSet<u64>, u64) {
+fn run_arm(world: &World, victim: u64, arm: Arm) -> (BTreeSet<u64>, u64) {
     let mut lookups = 0u64;
-    let v = &w.snaps[&victim];
-    let out: BTreeSet<u64> = match arm {
+    let victim_snapshot = &world.snapshots[&victim];
+    let freed_extents: BTreeSet<u64> = match arm {
         // D5 形态。**定义句原样贴在这里，不许按印象建**
         // （rules/verify-before-claiming.md：引用一条决策去做推导之前，
         //  把它的定义句原样贴进笔记；这条纪律本身就是上一次按印象建模翻车换来的）：
@@ -129,95 +129,95 @@ fn run_arm(w: &World, victim: u64, arm: Arm) -> (BTreeSet<u64>, u64) {
         // **零反向查找**：只看代号与活引用是否存在。
         Arm::Deadlist => {
             // victim 的祖先链——txg 比较只在这条链上是可靠的全序
-            let chain = comparable(w, victim);
-            let mut out = BTreeSet::new();
-            for e in w.exts.values() {
-                if !e.refs.contains(&victim) { continue; }
+            let comparable_snapshots = comparable(world, victim);
+            let mut freed_extents = BTreeSet::new();
+            for extent in world.extents.values() {
+                if !extent.referencing_snapshots.contains(&victim) { continue; }
                 // 引用者里有没有**不在祖先链上**的（旁支）。
                 // 有 ⇒ 「与上一个快照比代号」这条 O(1) 规则判不了，
                 // 必须退回反向查找——**这正是 E18 说的「需要每块的分支覆盖信息 = 引用计数」**。
-                let has_sibling_ref = e.refs.iter()
-                    .any(|r| *r != victim && !chain.contains(r));
-                let death_finite = if has_sibling_ref {
+                let has_sibling_reference = extent.referencing_snapshots.iter()
+                    .any(|referencing_snapshot| *referencing_snapshot != victim && !comparable_snapshots.contains(referencing_snapshot));
+                let is_death_finite = if has_sibling_reference {
                     lookups += 1;                            // O(1) 性质在这里破掉
-                    !e.refs.iter().any(|&r| r != victim
-                        && w.snaps.get(&r).map(|x| x.live).unwrap_or(false))
+                    !extent.referencing_snapshots.iter().any(|&referencing_snapshot| referencing_snapshot != victim
+                        && world.snapshots.get(&referencing_snapshot).map(|snapshot| snapshot.live).unwrap_or(false))
                 } else {
                     // 全序可用：链上比代号即可，零查找
-                    !e.refs.iter().any(|&r| r != victim
-                        && w.snaps.get(&r).map(|x| x.live).unwrap_or(false))
+                    !extent.referencing_snapshots.iter().any(|&referencing_snapshot| referencing_snapshot != victim
+                        && world.snapshots.get(&referencing_snapshot).map(|snapshot| snapshot.live).unwrap_or(false))
                 };
-                if !death_finite { continue; }               // death = ∞ ⇒ 不释放
-                let death = v.txg + 1;
-                if !w.snaps.values().any(|snap| snap.live && snap.id != victim
-                    && e.birth_txg <= snap.txg && snap.txg < death) {
-                    out.insert(e.id);
+                if !is_death_finite { continue; }               // death = ∞ ⇒ 不释放
+                let death = victim_snapshot.txg + 1;
+                if !world.snapshots.values().any(|snapshot| snapshot.live && snapshot.snapshot_identifier != victim
+                    && extent.birth_txg <= snapshot.txg && snapshot.txg < death) {
+                    freed_extents.insert(extent.extent_identifier);
                 }
             }
-            out
+            freed_extents
         }
         // btrfs qgroup 形态：对每个候选 extent 反查全部引用者。
-        Arm::Refcount => {
-            let mut s = BTreeSet::new();
-            for e in w.exts.values() {
-                if !e.refs.contains(&victim) { continue; }
+        Arm::ReferenceCount => {
+            let mut freed_extents = BTreeSet::new();
+            for extent in world.extents.values() {
+                if !extent.referencing_snapshots.contains(&victim) { continue; }
                 lookups += 1;                       // 一次反向索引查找
-                let others = e.refs.iter().filter(|&&r| r != victim)
-                    .any(|r| w.snaps.get(r).map(|x| x.live).unwrap_or(false));
-                if !others { s.insert(e.id); }
+                let has_live_other_referencer = extent.referencing_snapshots.iter().filter(|&&referencing_snapshot| referencing_snapshot != victim)
+                    .any(|referencing_snapshot| world.snapshots.get(referencing_snapshot).map(|snapshot| snapshot.live).unwrap_or(false));
+                if !has_live_other_referencer { freed_extents.insert(extent.extent_identifier); }
             }
-            s
+            freed_extents
         }
         // btrfs squota 形态：只放本快照**自己创建**的，不查反向索引。
-        Arm::OwnerRef => v.created.iter().copied()
-            .filter(|id| w.exts.contains_key(id)).collect(),
+        Arm::OwnerReference => victim_snapshot.created.iter().copied()
+            .filter(|extent_identifier| world.extents.contains_key(extent_identifier)).collect(),
     };
-    (out, lookups)
+    (freed_extents, lookups)
 }
 
-fn build(topo: Topo, n_snaps: u64, exts_per_snap: u64, share_pct: u64, seed: u64) -> World {
-    let mut s = seed | 1;
-    let mut r = move || { s ^= s >> 12; s ^= s << 25; s ^= s >> 27; s.wrapping_mul(0x2545_F491_4F6C_DD1D) };
-    let mut snaps = BTreeMap::new();
-    let mut exts: BTreeMap<u64, Extent> = BTreeMap::new();
-    let mut next_ext = 0u64;
-    for i in 0..n_snaps {
-        let parent = if i == 0 { None } else {
-            match topo {
-                Topo::Linear => Some(i - 1),
+fn build(topology: Topology, snapshot_count: u64, extents_per_snapshot: u64, share_percent: u64, seed: u64) -> World {
+    let mut xorshift_state = seed | 1;
+    let mut next_random = move || { xorshift_state ^= xorshift_state >> 12; xorshift_state ^= xorshift_state << 25; xorshift_state ^= xorshift_state >> 27; xorshift_state.wrapping_mul(0x2545_F491_4F6C_DD1D) };
+    let mut snapshots = BTreeMap::new();
+    let mut extents: BTreeMap<u64, Extent> = BTreeMap::new();
+    let mut next_extent_number = 0u64;
+    for snapshot_identifier in 0..snapshot_count {
+        let parent = if snapshot_identifier == 0 { None } else {
+            match topology {
+                Topology::Linear => Some(snapshot_identifier - 1),
                 // 多可写头：父亲在 [0, i) 里随机 ⇒ 树形分叉
-                Topo::MultiHead => Some(r() % i),
+                Topology::MultiHead => Some(next_random() % snapshot_identifier),
             }
         };
         let mut created = Vec::new();
-        for _ in 0..exts_per_snap {
-            let id = next_ext; next_ext += 1;
-            let mut refs = BTreeSet::new(); refs.insert(i);
-            exts.insert(id, Extent { id, birth_txg: i, refs });
-            created.push(id);
+        for _ in 0..extents_per_snapshot {
+            let extent_identifier = next_extent_number; next_extent_number += 1;
+            let mut referencing_snapshots = BTreeSet::new(); referencing_snapshots.insert(snapshot_identifier);
+            extents.insert(extent_identifier, Extent { extent_identifier, birth_txg: snapshot_identifier, referencing_snapshots });
+            created.push(extent_identifier);
         }
         // 共享：本快照按比例也引用祖先的 extent
-        if let Some(p) = parent {
-            let inherited: Vec<u64> = exts.values()
-                .filter(|e| e.refs.contains(&p)).map(|e| e.id).collect();
-            for id in inherited {
-                if r() % 100 < share_pct { exts.get_mut(&id).unwrap().refs.insert(i); }
+        if let Some(parent_identifier) = parent {
+            let inherited: Vec<u64> = extents.values()
+                .filter(|extent| extent.referencing_snapshots.contains(&parent_identifier)).map(|extent| extent.extent_identifier).collect();
+            for extent_identifier in inherited {
+                if next_random() % 100 < share_percent { extents.get_mut(&extent_identifier).unwrap().referencing_snapshots.insert(snapshot_identifier); }
             }
         }
-        snaps.insert(i, Snap { id: i, parent, txg: i, created, live: true });
+        snapshots.insert(snapshot_identifier, Snapshot { snapshot_identifier, parent, txg: snapshot_identifier, created, live: true });
     }
-    World { snaps, exts }
+    World { snapshots, extents }
 }
 
 /// 删一个快照，三条臂各判一次，与真值比。
-fn measure(topo: Topo, arm: Arm, n_snaps: u64, exts_per_snap: u64, share_pct: u64, seed: u64) -> Out {
-    let mut w = build(topo, n_snaps, exts_per_snap, share_pct, seed);
+fn measure(topology: Topology, arm: Arm, snapshot_count: u64, extents_per_snapshot: u64, share_percent: u64, seed: u64) -> ArmMeasurement {
+    let mut world = build(topology, snapshot_count, extents_per_snapshot, share_percent, seed);
     // 删中间那个：两侧都有快照，才测得出「与更老的比」这条规则
-    let victim = n_snaps / 2;
-    let (freed, lookups) = run_arm(&w, victim, arm);
-    w.snaps.get_mut(&victim).unwrap().live = false;
-    let truth = truly_free_set(&w);
-    Out {
+    let victim = snapshot_count / 2;
+    let (freed, lookups) = run_arm(&world, victim, arm);
+    world.snapshots.get_mut(&victim).unwrap().live = false;
+    let truth = truly_free_set(&world);
+    ArmMeasurement {
         lookups,
         freed: freed.len() as u64,
         truly_free: truth.len() as u64,
@@ -227,17 +227,17 @@ fn measure(topo: Topo, arm: Arm, n_snaps: u64, exts_per_snap: u64, share_pct: u6
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let (ns, eps) = (64u64, 8u64);
-    println!("{}", em.emit_raw(&format!("name=config snaps={ns} exts_per_snap={eps}")));
-    for topo in [Topo::Linear, Topo::MultiHead] {
-        for share in [0u64, 30, 70] {
-            for arm in [Arm::Deadlist, Arm::Refcount, Arm::OwnerRef] {
-                let o = measure(topo, arm, ns, eps, share, 42);
-                println!("{}", em.emit_raw(&format!(
-                    "name=cell topo={topo:?} share={share} arm={} lookups={} freed={} truly_free={} \
+    let mut emitter = Emitter::new();
+    let (snapshot_count, extents_per_snapshot) = (64u64, 8u64);
+    println!("{}", emitter.emit_raw(&format!("name=config snaps={snapshot_count} exts_per_snap={extents_per_snapshot}")));
+    for topology in [Topology::Linear, Topology::MultiHead] {
+        for share_percent in [0u64, 30, 70] {
+            for arm in [Arm::Deadlist, Arm::ReferenceCount, Arm::OwnerReference] {
+                let measurement = measure(topology, arm, snapshot_count, extents_per_snapshot, share_percent, 42);
+                println!("{}", emitter.emit_raw(&format!(
+                    "name=cell topo={topology:?} share={share_percent} arm={} lookups={} freed={} truly_free={} \
                      wrong_free={} leaked={}",
-                    arm.label(), o.lookups, o.freed, o.truly_free, o.wrong_free, o.leaked)));
+                    arm.label(), measurement.lookups, measurement.freed, measurement.truly_free, measurement.wrong_free, measurement.leaked)));
             }
         }
     }
@@ -245,18 +245,18 @@ fn main() {
     // ⚠️ **绝对值会误导**：上面那张表是 64 快照 × 8 extent 的玩具世界，
     // 「13 次查找」听起来很便宜。真正要问的是**标度**——
     // 一次反向索引查找是一次 btree 下降，在真盘上是 I/O。
-    for eps in [4u64, 8, 16, 32, 64, 128] {
-        for topo in [Topo::Linear, Topo::MultiHead] {
-            let o = measure(topo, Arm::Deadlist, 64, eps, 70, 42);
-            let rc = measure(topo, Arm::Refcount, 64, eps, 70, 42);
-            println!("{}", em.emit_raw(&format!(
-                "name=scale topo={topo:?} exts_per_snap={eps} total_exts={} \
+    for extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
+        for topology in [Topology::Linear, Topology::MultiHead] {
+            let deadlist_measurement = measure(topology, Arm::Deadlist, 64, extents_per_snapshot, 70, 42);
+            let reference_count_measurement = measure(topology, Arm::ReferenceCount, 64, extents_per_snapshot, 70, 42);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=scale topo={topology:?} exts_per_snap={extents_per_snapshot} total_exts={} \
                  deadlist_lookups={} refcount_lookups={}",
-                64 * eps, o.lookups, rc.lookups)));
+                64 * extents_per_snapshot, deadlist_measurement.lookups, reference_count_measurement.lookups)));
         }
     }
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -266,21 +266,21 @@ mod tests {
     /// **真值必须独立算出**——它是本实验唯一的裁判。
     #[test]
     fn truth_is_plain_enumeration_of_live_snapshots() {
-        let mut w = build(Topo::Linear, 3, 1, 0, 7);
-        assert_eq!(truly_free_set(&w).len(), 0, "全部快照活着时不该有自由 extent");
-        w.snaps.get_mut(&1).unwrap().live = false;
-        assert_eq!(truly_free_set(&w).len(), 1, "删掉一个无共享的快照该放出它那一个 extent");
+        let mut world = build(Topology::Linear, 3, 1, 0, 7);
+        assert_eq!(truly_free_set(&world).len(), 0, "全部快照活着时不该有自由 extent");
+        world.snapshots.get_mut(&1).unwrap().live = false;
+        assert_eq!(truly_free_set(&world).len(), 1, "删掉一个无共享的快照该放出它那一个 extent");
     }
 
     /// **阳性对照，对每一条臂都跑**：无共享 + 单向线性时三条臂必须与真值完全一致。
     /// 少了这条，「多可写头下某条臂出错」分不清是拓扑造成的还是那条臂根本不工作。
     #[test]
     fn with_no_sharing_and_linear_history_all_arms_match_truth() {
-        for arm in [Arm::Deadlist, Arm::Refcount, Arm::OwnerRef] {
-            let o = measure(Topo::Linear, arm, 32, 4, 0, 42);
-            assert_eq!(o.wrong_free, 0, "{arm:?} 误放了");
-            assert_eq!(o.leaked, 0, "{arm:?} 漏放了");
-            assert_eq!(o.freed, o.truly_free, "{arm:?} 与真值不等");
+        for arm in [Arm::Deadlist, Arm::ReferenceCount, Arm::OwnerReference] {
+            let measurement = measure(Topology::Linear, arm, 32, 4, 0, 42);
+            assert_eq!(measurement.wrong_free, 0, "{arm:?} 误放了");
+            assert_eq!(measurement.leaked, 0, "{arm:?} 漏放了");
+            assert_eq!(measurement.freed, measurement.truly_free, "{arm:?} 与真值不等");
         }
     }
 
@@ -289,18 +289,18 @@ mod tests {
     /// 而真正的结论是「常数 0 对 O(N)」这种**类别差**，不是倍数差。
     #[test]
     fn linear_topology_stays_at_zero_lookups_at_every_scale() {
-        for eps in [4u64, 16, 64, 128] {
-            let o = measure(Topo::Linear, Arm::Deadlist, 64, eps, 70, 42);
-            assert_eq!(o.lookups, 0,
-                "线性拓扑在 {} 个 extent 上该恒为零查找", 64 * eps);
+        for extents_per_snapshot in [4u64, 16, 64, 128] {
+            let measurement = measure(Topology::Linear, Arm::Deadlist, 64, extents_per_snapshot, 70, 42);
+            assert_eq!(measurement.lookups, 0,
+                "线性拓扑在 {} 个 extent 上该恒为零查找", 64 * extents_per_snapshot);
         }
     }
 
     /// **多可写头下查找次数随规模单调增**——它掉进了与引用计数同一个复杂度类。
     #[test]
     fn multi_head_lookups_grow_with_the_number_of_extents() {
-        let small = measure(Topo::MultiHead, Arm::Deadlist, 64, 8, 70, 42).lookups;
-        let big = measure(Topo::MultiHead, Arm::Deadlist, 64, 128, 70, 42).lookups;
+        let small = measure(Topology::MultiHead, Arm::Deadlist, 64, 8, 70, 42).lookups;
+        let big = measure(Topology::MultiHead, Arm::Deadlist, 64, 128, 70, 42).lookups;
         assert!(big > small * 4,
             "规模涨 16 倍，查找次数只从 {small} 到 {big} —— 那就不是 O(N) 了，标度结论要重写");
     }
@@ -309,41 +309,41 @@ mod tests {
     /// 那正是 E18 说的「D5 在分叉下破的是 O(1) 性质，不是正确性」的可量形态。
     #[test]
     fn deadlist_pays_no_lookups_when_linear_but_does_under_multi_head() {
-        for share in [0u64, 70] {
-            let lin = measure(Topo::Linear, Arm::Deadlist, 32, 4, share, 42);
-            assert_eq!(lin.lookups, 0, "单向线性下 D5 形态该零查找（share={share}）");
+        for share_percent in [0u64, 70] {
+            let linear_measurement = measure(Topology::Linear, Arm::Deadlist, 32, 4, share_percent, 42);
+            assert_eq!(linear_measurement.lookups, 0, "单向线性下 D5 形态该零查找（share={share_percent}）");
         }
-        let mh = measure(Topo::MultiHead, Arm::Deadlist, 32, 4, 70, 42);
-        assert!(mh.lookups > 0, "多可写头 + 高共享下 D5 形态该被迫付查找");
-        assert_eq!(measure(Topo::MultiHead, Arm::OwnerRef, 32, 4, 70, 42).lookups, 0,
+        let multi_head_measurement = measure(Topology::MultiHead, Arm::Deadlist, 32, 4, 70, 42);
+        assert!(multi_head_measurement.lookups > 0, "多可写头 + 高共享下 D5 形态该被迫付查找");
+        assert_eq!(measure(Topology::MultiHead, Arm::OwnerReference, 32, 4, 70, 42).lookups, 0,
             "归属原创建者任何拓扑下都不查反向索引");
     }
 
     /// **绝对值**：无共享时引用计数的查找次数恰等于被删快照自己创建的 extent 数。
     /// 不是「比别人多」这种相对判断。
     #[test]
-    fn refcount_lookups_equal_the_victims_extent_count_when_nothing_is_shared() {
-        let eps = 4u64;
-        let o = measure(Topo::Linear, Arm::Refcount, 32, eps, 0, 42);
-        assert_eq!(o.lookups, eps, "无共享时被删快照只引用自己那 {eps} 个 extent");
+    fn reference_count_lookups_equal_the_victims_extent_count_when_nothing_is_shared() {
+        let extents_per_snapshot = 4u64;
+        let measurement = measure(Topology::Linear, Arm::ReferenceCount, 32, extents_per_snapshot, 0, 42);
+        assert_eq!(measurement.lookups, extents_per_snapshot, "无共享时被删快照只引用自己那 {extents_per_snapshot} 个 extent");
     }
 
     /// **共享越多，引用计数查得越多**——机制必须在模型里体现，否则共享那一维是摆设。
     #[test]
-    fn more_sharing_makes_refcount_look_up_more() {
-        let lo = measure(Topo::Linear, Arm::Refcount, 32, 4, 0, 42).lookups;
-        let hi = measure(Topo::Linear, Arm::Refcount, 32, 4, 70, 42).lookups;
-        assert!(hi > lo, "共享 70% 时查找次数应多于无共享（{hi} vs {lo}）");
+    fn more_sharing_makes_reference_count_look_up_more() {
+        let no_sharing_lookups = measure(Topology::Linear, Arm::ReferenceCount, 32, 4, 0, 42).lookups;
+        let high_sharing_lookups = measure(Topology::Linear, Arm::ReferenceCount, 32, 4, 70, 42).lookups;
+        assert!(high_sharing_lookups > no_sharing_lookups, "共享 70% 时查找次数应多于无共享（{high_sharing_lookups} vs {no_sharing_lookups}）");
     }
 
     /// **引用计数在任何拓扑下都不误放也不漏放**——精确是它买到的东西。
     #[test]
-    fn refcount_is_exact_under_every_topology() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
-            for share in [0u64, 30, 70] {
-                let o = measure(topo, Arm::Refcount, 48, 6, share, 42);
-                assert_eq!(o.wrong_free, 0, "引用计数在 {topo:?}/{share} 下误放");
-                assert_eq!(o.leaked, 0, "引用计数在 {topo:?}/{share} 下漏放");
+    fn reference_count_is_exact_under_every_topology() {
+        for topology in [Topology::Linear, Topology::MultiHead] {
+            for share_percent in [0u64, 30, 70] {
+                let measurement = measure(topology, Arm::ReferenceCount, 48, 6, share_percent, 42);
+                assert_eq!(measurement.wrong_free, 0, "引用计数在 {topology:?}/{share_percent} 下误放");
+                assert_eq!(measurement.leaked, 0, "引用计数在 {topology:?}/{share_percent} 下漏放");
             }
         }
     }
@@ -354,12 +354,12 @@ mod tests {
     /// 算出了 `wrong_free > 0`，与 E18「数据丢失方向结构性为零」直接矛盾。
     #[test]
     fn deadlist_structurally_never_wrongly_frees() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
-            for share in [0u64, 30, 70] {
-                let o = measure(topo, Arm::Deadlist, 48, 6, share, 42);
-                assert_eq!(o.wrong_free, 0,
-                    "D5 形态在 {topo:?}/{share} 下误放了 {} 个——那与 E18 已证的性质矛盾",
-                    o.wrong_free);
+        for topology in [Topology::Linear, Topology::MultiHead] {
+            for share_percent in [0u64, 30, 70] {
+                let measurement = measure(topology, Arm::Deadlist, 48, 6, share_percent, 42);
+                assert_eq!(measurement.wrong_free, 0,
+                    "D5 形态在 {topology:?}/{share_percent} 下误放了 {} 个——那与 E18 已证的性质矛盾",
+                    measurement.wrong_free);
             }
         }
     }
@@ -373,27 +373,27 @@ mod tests {
     /// （它与「根本不记 death」逐位相同）。两者量的是同一枚硬币的两面。
     #[test]
     fn the_multi_head_topology_actually_changes_the_outcome() {
-        let lin = measure(Topo::Linear, Arm::Deadlist, 48, 6, 70, 42);
-        let mh = measure(Topo::MultiHead, Arm::Deadlist, 48, 6, 70, 42);
-        assert_eq!(lin.lookups, 0, "单向线性下一切可比，本该零查找");
-        assert!(mh.lookups > 0,
-            "多可写头下 D5 形态该被迫付查找（实测 {}）——否则这一维是死的", mh.lookups);
+        let linear_measurement = measure(Topology::Linear, Arm::Deadlist, 48, 6, 70, 42);
+        let multi_head_measurement = measure(Topology::MultiHead, Arm::Deadlist, 48, 6, 70, 42);
+        assert_eq!(linear_measurement.lookups, 0, "单向线性下一切可比，本该零查找");
+        assert!(multi_head_measurement.lookups > 0,
+            "多可写头下 D5 形态该被迫付查找（实测 {}）——否则这一维是死的", multi_head_measurement.lookups);
         // 两侧都精确：付了查找就不丢也不漏
-        assert_eq!(lin.wrong_free + lin.leaked, 0);
-        assert_eq!(mh.wrong_free + mh.leaked, 0);
+        assert_eq!(linear_measurement.wrong_free + linear_measurement.leaked, 0);
+        assert_eq!(multi_head_measurement.wrong_free + multi_head_measurement.leaked, 0);
     }
 
     /// **归属原创建者释放的恰好是被删快照自己创建的那些**，一个不多一个不少。
     /// ⚠️ 变异测试补出来的：只断言「误放 > 0」时，把它改成「释放 victim 碰过的全部」
     /// 一个测试都不红——错得更多但方向相同。绝对值必须钉死。
     #[test]
-    fn owner_ref_frees_exactly_what_the_victim_created() {
-        let eps = 6u64;
-        for topo in [Topo::Linear, Topo::MultiHead] {
-            for share in [0u64, 30, 70] {
-                let o = measure(topo, Arm::OwnerRef, 48, eps, share, 42);
-                assert_eq!(o.freed, eps,
-                    "归属原创建者该恰好释放 {eps} 个（topo={topo:?} share={share}），实测 {}", o.freed);
+    fn owner_reference_frees_exactly_what_the_victim_created() {
+        let extents_per_snapshot = 6u64;
+        for topology in [Topology::Linear, Topology::MultiHead] {
+            for share_percent in [0u64, 30, 70] {
+                let measurement = measure(topology, Arm::OwnerReference, 48, extents_per_snapshot, share_percent, 42);
+                assert_eq!(measurement.freed, extents_per_snapshot,
+                    "归属原创建者该恰好释放 {extents_per_snapshot} 个（topo={topology:?} share={share_percent}），实测 {}", measurement.freed);
             }
         }
     }
@@ -401,8 +401,8 @@ mod tests {
     /// **归属原创建者在有共享时必然误放**——那是它省掉反向查找的代价。
     /// ⚠️ 误放是**数据丢失方向**，不是空间泄漏方向。
     #[test]
-    fn owner_ref_wrongly_frees_shared_extents() {
-        let o = measure(Topo::Linear, Arm::OwnerRef, 32, 4, 70, 42);
-        assert!(o.wrong_free > 0, "归属原创建者在 70% 共享下居然没误放");
+    fn owner_reference_wrongly_frees_shared_extents() {
+        let measurement = measure(Topology::Linear, Arm::OwnerReference, 32, 4, 70, 42);
+        assert!(measurement.wrong_free > 0, "归属原创建者在 70% 共享下居然没误放");
     }
 }

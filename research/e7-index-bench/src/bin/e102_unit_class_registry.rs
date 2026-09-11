@@ -57,8 +57,8 @@
 
 use e7_index_bench::Emitter;
 
-const UNIT: u64 = 32768;
-const COMMON_PREFIX: u64 = 42;
+const UNIT_BYTES: u64 = 32768;
+const COMMON_PREFIX_BYTES: u64 = 42;
 /// D18 已定项 7 数据单元头（kb 里 `format-const: UNIT_HDR_DATA`）。
 const UNIT_HDR_DATA: u64 = 105;
 /// 提案 P4（第三版）：打包记录单元类身份段 = 单元类型标签 1（偏移 6 的密文侧副本）+ 出生树 ID 8 +
@@ -68,11 +68,11 @@ const UNIT_HDR_DATA: u64 = 105;
 /// 头校验和按 D18 已定项 7 逐字只是「头完整性唯一防线」——E76 实测「头落了、载荷只落一半」
 /// 对只有头校验和的形态 distinguishable=0。记录宽在头里再抄一份：不认识记录类型的读者才判得了
 /// 「记录数 × 记录宽 ≤ 声明长度」这条头合法性条件（D23 已定项 1 的 B 条同形）。
-const PACKED_BODY: u64 = 61;
+const PACKED_BODY_BYTES: u64 = 61;
 /// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`）；单测钉它 == 前缀 + 类身份段。
 const UNIT_HDR_PACKED: u64 = 103;
 /// E83 的墓碑区间记录量级假设；E98 的 inode 记录。
-const TOMB_REC: u64 = 56;
+const TOMBSTONE_RECORD_BYTES: u64 = 56;
 const INODE_REC: u64 = 140;
 /// 标签 1 字节。
 const TAG_VALUES: u64 = 256;
@@ -81,7 +81,7 @@ const TAG_VALUES: u64 = 256;
 enum Kind {
     Invalid,
     Content,
-    SelfCert,
+    SelfCertifying,
 }
 
 /// 提案 P2 的登记表。
@@ -90,9 +90,9 @@ const REGISTRY: [(u8, &str, Kind); 7] = [
     (1, "data_unit", Kind::Content),
     (2, "index_node", Kind::Content),
     (3, "packed_record_unit", Kind::Content),
-    (16, "root_record", Kind::SelfCert),
-    (17, "journal_record", Kind::SelfCert),
-    (18, "superblock_slot", Kind::SelfCert),
+    (16, "root_record", Kind::SelfCertifying),
+    (17, "journal_record", Kind::SelfCertifying),
+    (18, "superblock_slot", Kind::SelfCertifying),
 ];
 
 /// 仓里四处清单 + D18 已定项 8 用到的类名（来源, 名字）。
@@ -138,31 +138,31 @@ fn is_umbrella(name: &str) -> bool {
 
 /// **判据 1**：映不到的名字数、一名多码的名字数、映到未登记码的名字数。
 fn coverage(registry: &[(u8, &str, Kind)], names: &[(&str, &str)]) -> (u64, u64, u64) {
-    let registered = |c: u8| registry.iter().any(|r| r.0 == c && r.2 != Kind::Invalid);
+    let registered = |code: u8| registry.iter().any(|registry_entry| registry_entry.0 == code && registry_entry.2 != Kind::Invalid);
     let mut unmapped = 0u64;
-    let mut multi = 0u64;
+    let mut multi_code = 0u64;
     let mut unregistered = 0u64;
-    for &(_, n) in names {
-        let cs = codes_for(n);
-        if cs.is_empty() {
+    for &(_, name) in names {
+        let candidate_codes = codes_for(name);
+        if candidate_codes.is_empty() {
             unmapped += 1;
             continue;
         }
-        if cs.len() > 1 && !is_umbrella(n) {
-            multi += 1;
+        if candidate_codes.len() > 1 && !is_umbrella(name) {
+            multi_code += 1;
         }
-        if cs.iter().any(|&c| !registered(c)) {
+        if candidate_codes.iter().any(|&code| !registered(code)) {
             unregistered += 1;
         }
     }
-    (unmapped, multi, unregistered)
+    (unmapped, multi_code, unregistered)
 }
 
 /// 阳性对照用：把 D9 那一行的四个名字当登记表——只登记码 1 / 2 / 16。
-const D9_ONLY: [(u8, &str, Kind); 3] = [
+const REGISTRY_FROM_DECISION_NINE_ROW: [(u8, &str, Kind); 3] = [
     (1, "data_unit", Kind::Content),
     (2, "index_node", Kind::Content),
-    (16, "root_record", Kind::SelfCert),
+    (16, "root_record", Kind::SelfCertifying),
 ];
 
 /// AAD 规范编码的形状：标签（可无）+ 身体字节数。
@@ -174,20 +174,20 @@ struct AadShape {
 
 /// **判据 2**：两条编码能不能字节相同——标签相同（或都没有）且身体等长。
 /// AEAD 隐式认证 assoclen（D9 已定项 6 引 `chacha20poly1305.c:184-185`），所以不等长的永不相同。
-fn can_collide(a: AadShape, b: AadShape) -> bool {
-    a.tag == b.tag && a.body == b.body
+fn can_collide(first_shape: AadShape, second_shape: AadShape) -> bool {
+    first_shape.tag == second_shape.tag && first_shape.body == second_shape.body
 }
 
 fn colliding_pairs(shapes: &[AadShape]) -> u64 {
-    let mut n = 0;
-    for i in 0..shapes.len() {
-        for j in (i + 1)..shapes.len() {
-            if can_collide(shapes[i], shapes[j]) {
-                n += 1;
+    let mut collision_count = 0;
+    for first_index in 0..shapes.len() {
+        for second_index in (first_index + 1)..shapes.len() {
+            if can_collide(shapes[first_index], shapes[second_index]) {
+                collision_count += 1;
             }
         }
     }
-    n
+    collision_count
 }
 
 /// 已定的两个 AAD 身体：数据单元（树 8 + 对象 8 + 出生代 8 + 锚点 8 = 32）、
@@ -198,38 +198,38 @@ const AAD_PACKED_BODY: u64 = 26;
 const AAD_SYNTHETIC_BODY: u64 = 32;
 
 fn aad_shapes(with_tag: bool, include_synthetic: bool) -> Vec<AadShape> {
-    let t = |c: u8| if with_tag { Some(c) } else { None };
-    let mut v = vec![
-        AadShape { tag: t(1), body: AAD_DATA_BODY },
-        AadShape { tag: t(3), body: AAD_PACKED_BODY },
+    let tag_if_enabled = |code: u8| if with_tag { Some(code) } else { None };
+    let mut shapes = vec![
+        AadShape { tag: tag_if_enabled(1), body: AAD_DATA_BODY },
+        AadShape { tag: tag_if_enabled(3), body: AAD_PACKED_BODY },
     ];
     if include_synthetic {
-        v.push(AadShape { tag: t(4), body: AAD_SYNTHETIC_BODY });
+        shapes.push(AadShape { tag: tag_if_enabled(4), body: AAD_SYNTHETIC_BODY });
     }
-    v
+    shapes
 }
 
 /// **判据 3**：打包容量。
-fn capacity(hdr: u64, rec: u64) -> u64 {
-    if rec == 0 || hdr >= UNIT {
+fn capacity(header_bytes: u64, record_bytes: u64) -> u64 {
+    if record_bytes == 0 || header_bytes >= UNIT_BYTES {
         return 0;
     }
-    (UNIT - hdr) / rec
+    (UNIT_BYTES - header_bytes) / record_bytes
 }
 
-/// 容量恰为 `cap` 时头宽的闭区间 [lo, hi]。
-fn header_interval_for(cap: u64, rec: u64) -> (u64, u64) {
-    let hi = UNIT - cap * rec;
-    let lo = UNIT - (cap + 1) * rec + 1;
-    (lo, hi)
+/// 容量恰为 `target_capacity` 时头宽的闭区间 [lo, hi]。
+fn header_interval_for(target_capacity: u64, record_bytes: u64) -> (u64, u64) {
+    let highest_header_bytes = UNIT_BYTES - target_capacity * record_bytes;
+    let lowest_header_bytes = UNIT_BYTES - (target_capacity + 1) * record_bytes + 1;
+    (lowest_header_bytes, highest_header_bytes)
 }
 
 /// **判据 4**：用五元组指认一个装 n 条的单元，指认不到几条；用类身份段 + 解析枚举则为 0。
-fn unnamed_by_five_tuple(n: u64) -> u64 {
-    n.saturating_sub(1)
+fn unnamed_by_five_tuple(record_count: u64) -> u64 {
+    record_count.saturating_sub(1)
 }
-fn unnamed_by_packed_identity(n: u64, parsed: u64) -> u64 {
-    n.saturating_sub(parsed)
+fn unnamed_by_packed_identity(record_count: u64, parsed: u64) -> u64 {
+    record_count.saturating_sub(parsed)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -239,28 +239,28 @@ enum Parse {
 }
 
 /// **判据 5**：定宽解析。只认头里的三个数。
-fn parse_packed(count: u64, width: u64, declared_len: u64) -> Parse {
-    if width == 0 || count.saturating_mul(width).saturating_add(UNIT_HDR_PACKED) > declared_len {
+fn parse_packed(count: u64, width: u64, declared_length: u64) -> Parse {
+    if width == 0 || count.saturating_mul(width).saturating_add(UNIT_HDR_PACKED) > declared_length {
         return Parse::Corrupt;
     }
     Parse::Records(count)
 }
 
-fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {
-        a
+fn greatest_common_divisor(first_value: u64, second_value: u64) -> u64 {
+    if second_value == 0 {
+        first_value
     } else {
-        gcd(b, a % b)
+        greatest_common_divisor(second_value, first_value % second_value)
     }
 }
 
-/// 混装：先 `n_a` 条宽 `a`，再 `n_b` 条宽 `b`，按宽 `a` 解析。
+/// 混装：先 `first_count` 条宽 `first_width`，再 `second_count` 条宽 `second_width`，按宽 `first_width` 解析。
 /// 错分 = 宽 b 的记录里起点不落在 a 的倍数上的条数。独立算术：起点 n_a·a + i·b，
 /// 落在 a 的倍数上 ⇔ i·b ≡ 0 (mod a) ⇔ i 是 a/gcd(a,b) 的倍数。
-fn misparsed_when_mixed(a: u64, n_a: u64, b: u64, n_b: u64) -> u64 {
-    let _ = n_a; // 前段全对齐，只影响起点，不影响后段的对齐判定
-    let period = a / gcd(a, b);
-    (0..n_b).filter(|i| i % period != 0).count() as u64
+fn misparsed_when_mixed(first_width: u64, first_count: u64, second_width: u64, second_count: u64) -> u64 {
+    let _ = first_count; // 前段全对齐，只影响起点，不影响后段的对齐判定
+    let period = first_width / greatest_common_divisor(first_width, second_width);
+    (0..second_count).filter(|second_record_index| second_record_index % period != 0).count() as u64
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -275,14 +275,14 @@ struct MountOutcome {
     silent_missed: u64,
 }
 
-/// **判据 6（第一级）**：镜像里 `k` 个未登记单元类。
-fn mount_with_unknown_class(k: u64, policy: UnknownClassPolicy) -> Result<MountOutcome, &'static str> {
-    if k == 0 {
+/// **判据 6（第一级）**：镜像里 `unknown_class_unit_count` 个未登记单元类。
+fn mount_with_unknown_class(unknown_class_unit_count: u64, policy: UnknownClassPolicy) -> Result<MountOutcome, &'static str> {
+    if unknown_class_unit_count == 0 {
         return Ok(MountOutcome { mount_ok: true, silent_missed: 0 });
     }
     match policy {
         UnknownClassPolicy::Incompat => Ok(MountOutcome { mount_ok: false, silent_missed: 0 }),
-        UnknownClassPolicy::Skip => Ok(MountOutcome { mount_ok: true, silent_missed: k }),
+        UnknownClassPolicy::Skip => Ok(MountOutcome { mount_ok: true, silent_missed: unknown_class_unit_count }),
     }
 }
 
@@ -294,12 +294,12 @@ struct RecordTypeOutcome {
     reclaim_allowed: bool,
 }
 
-/// **判据 6（第二级）**：`m` 个容器的记录类型未登记，但容器头给了记录数 × 记录宽。
-fn mount_with_unknown_record_type(m: u64) -> RecordTypeOutcome {
+/// **判据 6（第二级）**：`unknown_record_type_container_count` 个容器的记录类型未登记，但容器头给了记录数 × 记录宽。
+fn mount_with_unknown_record_type(unknown_record_type_container_count: u64) -> RecordTypeOutcome {
     RecordTypeOutcome {
-        containers_verified: m,
+        containers_verified: unknown_record_type_container_count,
         records_applied: 0,
-        read_only: m > 0,
+        read_only: unknown_record_type_container_count > 0,
         reclaim_allowed: false,
     }
 }
@@ -310,121 +310,121 @@ fn free_codes(registry: &[(u8, &str, Kind)]) -> u64 {
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
-    out.push(em.emit_raw(&format!(
-        "name=config unit={UNIT} common_prefix={COMMON_PREFIX} data_hdr={UNIT_HDR_DATA} packed_body={PACKED_BODY} packed_hdr={UNIT_HDR_PACKED} \
-         tomb_rec={TOMB_REC} inode_rec={INODE_REC} tag_values={TAG_VALUES} registry={} used_names={} \
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=config unit={UNIT_BYTES} common_prefix={COMMON_PREFIX_BYTES} data_hdr={UNIT_HDR_DATA} packed_body={PACKED_BODY_BYTES} packed_hdr={UNIT_HDR_PACKED} \
+         tomb_rec={TOMBSTONE_RECORD_BYTES} inode_rec={INODE_REC} tag_values={TAG_VALUES} registry={} used_names={} \
          model=arithmetic file_ops=0",
         REGISTRY.len(),
         USED_NAMES.len()
     )));
 
     // 判据 1：覆盖
-    let (u, m, r) = coverage(&REGISTRY, &USED_NAMES);
-    out.push(em.emit_raw(&format!(
-        "name=coverage registry=proposal unmapped={u} multi_code={m} unregistered={r}"
+    let (unmapped_name_count, multi_code_name_count, unregistered_name_count) = coverage(&REGISTRY, &USED_NAMES);
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=coverage registry=proposal unmapped={unmapped_name_count} multi_code={multi_code_name_count} unregistered={unregistered_name_count}"
     )));
-    let (u, m, r) = coverage(&D9_ONLY, &USED_NAMES);
-    out.push(em.emit_raw(&format!(
-        "name=coverage registry=d9_only unmapped={u} multi_code={m} unregistered={r} \
+    let (unmapped_name_count, multi_code_name_count, unregistered_name_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &USED_NAMES);
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=coverage registry=d9_only unmapped={unmapped_name_count} multi_code={multi_code_name_count} unregistered={unregistered_name_count} \
          note=positive_control_tombstone_missing"
     )));
 
     // 判据 2：域分隔
-    for (with_tag, synth) in [(false, false), (true, false), (false, true), (true, true)] {
-        let s = aad_shapes(with_tag, synth);
-        out.push(em.emit_raw(&format!(
+    for (with_tag, include_synthetic) in [(false, false), (true, false), (false, true), (true, true)] {
+        let shapes = aad_shapes(with_tag, include_synthetic);
+        output_lines.push(emitter.emit_raw(&format!(
             "name=aad_domain with_tag={} synthetic_class={} classes={} colliding_pairs={}",
             u8::from(with_tag),
-            u8::from(synth),
-            s.len(),
-            colliding_pairs(&s)
+            u8::from(include_synthetic),
+            shapes.len(),
+            colliding_pairs(&shapes)
         )));
     }
-    out.push(em.emit_raw(&format!(
+    output_lines.push(emitter.emit_raw(&format!(
         "name=aad_domain with_tag=0 synthetic_class=0 classes=1 colliding_pairs={} note=negative_control",
         colliding_pairs(&aad_shapes(false, false)[..1])
     )));
 
     // 判据 3：容量与头宽区间
-    for &rec in [TOMB_REC, INODE_REC].iter() {
-        for &h in [64u64, 65, 76, UNIT_HDR_DATA, UNIT_HDR_PACKED, 120, 121, 148, 149].iter() {
-            out.push(em.emit_raw(&format!(
-                "name=capacity rec={rec} hdr={h} cap={}",
-                capacity(h, rec)
+    for &record_bytes in [TOMBSTONE_RECORD_BYTES, INODE_REC].iter() {
+        for &header_bytes in [64u64, 65, 76, UNIT_HDR_DATA, UNIT_HDR_PACKED, 120, 121, 148, 149].iter() {
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=capacity rec={record_bytes} hdr={header_bytes} cap={}",
+                capacity(header_bytes, record_bytes)
             )));
         }
-        let c = capacity(UNIT_HDR_PACKED, rec);
-        let (lo, hi) = header_interval_for(c, rec);
-        out.push(em.emit_raw(&format!(
-            "name=capacity_interval rec={rec} cap_at_packed_hdr={c} hdr_lo={lo} hdr_hi={hi} \
+        let packed_header_capacity = capacity(UNIT_HDR_PACKED, record_bytes);
+        let (lowest_header_bytes, highest_header_bytes) = header_interval_for(packed_header_capacity, record_bytes);
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=capacity_interval rec={record_bytes} cap_at_packed_hdr={packed_header_capacity} hdr_lo={lowest_header_bytes} hdr_hi={highest_header_bytes} \
              cap_at_lo_minus_1={} cap_at_hi_plus_1={}",
-            capacity(lo - 1, rec),
-            capacity(hi + 1, rec)
+            capacity(lowest_header_bytes - 1, record_bytes),
+            capacity(highest_header_bytes + 1, record_bytes)
         )));
     }
 
     // 判据 4：指认力
-    let n = capacity(UNIT_HDR_PACKED, TOMB_REC);
-    out.push(em.emit_raw(&format!(
-        "name=identity records={n} unnamed_by_five_tuple={} unnamed_by_packed_identity={}",
-        unnamed_by_five_tuple(n),
-        unnamed_by_packed_identity(n, match parse_packed(n, TOMB_REC, UNIT) {
-            Parse::Records(k) => k,
+    let packed_record_count = capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES);
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=identity records={packed_record_count} unnamed_by_five_tuple={} unnamed_by_packed_identity={}",
+        unnamed_by_five_tuple(packed_record_count),
+        unnamed_by_packed_identity(packed_record_count, match parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES) {
+            Parse::Records(parsed_count) => parsed_count,
             Parse::Corrupt => 0,
         })
     )));
 
     // 判据 5：解析与混装
-    out.push(em.emit_raw(&format!(
-        "name=parse count={n} width={TOMB_REC} declared={UNIT} result={:?}",
-        parse_packed(n, TOMB_REC, UNIT)
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=parse count={packed_record_count} width={TOMBSTONE_RECORD_BYTES} declared={UNIT_BYTES} result={:?}",
+        parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES)
     )));
-    out.push(em.emit_raw(&format!(
-        "name=parse count={} width={TOMB_REC} declared={UNIT} result={:?} note=one_too_many",
-        n + 1,
-        parse_packed(n + 1, TOMB_REC, UNIT)
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=parse count={} width={TOMBSTONE_RECORD_BYTES} declared={UNIT_BYTES} result={:?} note=one_too_many",
+        packed_record_count + 1,
+        parse_packed(packed_record_count + 1, TOMBSTONE_RECORD_BYTES, UNIT_BYTES)
     )));
-    out.push(em.emit_raw(&format!(
-        "name=mixing a={TOMB_REC} n_a=10 b={INODE_REC} n_b=10 misparsed={}",
-        misparsed_when_mixed(TOMB_REC, 10, INODE_REC, 10)
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=mixing a={TOMBSTONE_RECORD_BYTES} n_a=10 b={INODE_REC} n_b=10 misparsed={}",
+        misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_REC, 10)
     )));
-    out.push(em.emit_raw(&format!(
-        "name=mixing a={TOMB_REC} n_a=10 b={TOMB_REC} n_b=10 misparsed={} note=unmixed",
-        misparsed_when_mixed(TOMB_REC, 10, TOMB_REC, 10)
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=mixing a={TOMBSTONE_RECORD_BYTES} n_a=10 b={TOMBSTONE_RECORD_BYTES} n_b=10 misparsed={} note=unmixed",
+        misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, TOMBSTONE_RECORD_BYTES, 10)
     )));
 
     // 判据 6：两级政策
-    for &(k, p) in [(7u64, UnknownClassPolicy::Incompat), (7, UnknownClassPolicy::Skip), (0, UnknownClassPolicy::Incompat)].iter() {
-        let o = mount_with_unknown_class(k, p).expect("policy model");
-        out.push(em.emit_raw(&format!(
-            "name=unknown_class k={k} policy={p:?} mount_ok={} silent_missed={}",
-            u8::from(o.mount_ok),
-            o.silent_missed
+    for &(unknown_class_unit_count, policy) in [(7u64, UnknownClassPolicy::Incompat), (7, UnknownClassPolicy::Skip), (0, UnknownClassPolicy::Incompat)].iter() {
+        let mount_outcome = mount_with_unknown_class(unknown_class_unit_count, policy).expect("policy model");
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=unknown_class k={unknown_class_unit_count} policy={policy:?} mount_ok={} silent_missed={}",
+            u8::from(mount_outcome.mount_ok),
+            mount_outcome.silent_missed
         )));
     }
-    let o = mount_with_unknown_record_type(3);
-    out.push(em.emit_raw(&format!(
+    let record_type_outcome = mount_with_unknown_record_type(3);
+    output_lines.push(emitter.emit_raw(&format!(
         "name=unknown_record_type m=3 containers_verified={} records_applied={} read_only={} reclaim_allowed={}",
-        o.containers_verified,
-        o.records_applied,
-        u8::from(o.read_only),
-        u8::from(o.reclaim_allowed)
+        record_type_outcome.containers_verified,
+        record_type_outcome.records_applied,
+        u8::from(record_type_outcome.read_only),
+        u8::from(record_type_outcome.reclaim_allowed)
     )));
 
     // 判据 7：余量
-    out.push(em.emit_raw(&format!(
+    output_lines.push(emitter.emit_raw(&format!(
         "name=headroom tag_values={TAG_VALUES} registered={} free={} flags_high_bits_free=8",
         REGISTRY.len(),
         free_codes(&REGISTRY)
     )));
 
-    for l in &out {
-        println!("{l}");
+    for line in &output_lines {
+        println!("{line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -432,14 +432,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_constants_match_kb() {
-        assert_eq!(UNIT, 32768, "D4 已定项 7");
-        assert_eq!(COMMON_PREFIX, 42, "D18 已定项 7");
+    fn format_constants_match_knowledge_base() {
+        assert_eq!(UNIT_BYTES, 32768, "D4 已定项 7");
+        assert_eq!(COMMON_PREFIX_BYTES, 42, "D18 已定项 7");
         assert_eq!(UNIT_HDR_DATA, 105, "D18 已定项 7：42 + 33 + 8 + 8 + 写序 10 + 载荷 CRC 4（C113 定案，2026-09-05）");
         assert_eq!(UNIT_HDR_PACKED, 103, "D18 已定项 11：42 + 61");
-        assert_eq!(UNIT_HDR_PACKED, COMMON_PREFIX + PACKED_BODY, "头 = 共同前缀 + 类身份段");
+        assert_eq!(UNIT_HDR_PACKED, COMMON_PREFIX_BYTES + PACKED_BODY_BYTES, "头 = 共同前缀 + 类身份段");
         assert_eq!(AAD_PACKED_BODY, 26, "树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8");
-        assert_eq!(TOMB_REC, 56, "E83 量级假设");
+        assert_eq!(TOMBSTONE_RECORD_BYTES, 56, "E83 量级假设");
         assert_eq!(INODE_REC, 140, "E98");
     }
 
@@ -449,15 +449,15 @@ mod tests {
     fn criterion1_every_used_name_maps_to_exactly_one_registered_code() {
         assert_eq!(coverage(&REGISTRY, &USED_NAMES), (0, 0, 0));
         // 阳性对照：D9 那四个名字当登记表 ⇒ 墓碑（码 3）未登记
-        let (unmapped, multi, unregistered) = coverage(&D9_ONLY, &USED_NAMES);
-        assert_eq!(unmapped, 0, "名字都映得到码，缺的是登记位");
-        assert_eq!(multi, 0);
+        let (unmapped_name_count, multi_code_name_count, unregistered_name_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &USED_NAMES);
+        assert_eq!(unmapped_name_count, 0, "名字都映得到码，缺的是登记位");
+        assert_eq!(multi_code_name_count, 0);
         // 映到未登记码的名字：tombstone（3）、metadata_class（罩 3）、journal_record（17）、
         // superblock_slot（18）、self_cert_unit（罩 17/18）= 5
-        assert_eq!(unregistered, 5);
+        assert_eq!(unregistered_name_count, 5);
         // 单独钉墓碑这一条：它是 D18 已定项 8 在用的那个值
-        let (_, _, tomb_only) = coverage(&D9_ONLY, &[("D18-item8", "tombstone")]);
-        assert_eq!(tomb_only, 1, "墓碑在 D9 那张清单里没有登记位");
+        let (_, _, tombstone_only_unregistered_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &[("D18-item8", "tombstone")]);
+        assert_eq!(tombstone_only_unregistered_count, 1, "墓碑在 D9 那张清单里没有登记位");
     }
 
     /// **判据 2 的绝对值 + 阳性 / 阴性对照**。
@@ -482,14 +482,14 @@ mod tests {
     /// **判据 3 的绝对值 + 反向接受条款**：103 字节头下 583 / 233 不动（93 时同值），区间两端各多 1 字节掉 1 格。
     #[test]
     fn criterion3_downstream_capacities_do_not_move_under_the_packed_header() {
-        assert_eq!(capacity(UNIT_HDR_PACKED, TOMB_REC), 583, "E83 / E84 的 583");
-        assert_eq!(capacity(UNIT_HDR_DATA, TOMB_REC), 583);
+        assert_eq!(capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES), 583, "E83 / E84 的 583");
+        assert_eq!(capacity(UNIT_HDR_DATA, TOMBSTONE_RECORD_BYTES), 583);
         assert_eq!(capacity(UNIT_HDR_PACKED, INODE_REC), 233, "E98 的 233");
         assert_eq!(capacity(UNIT_HDR_DATA, INODE_REC), 233);
         // 583 成立的头宽闭区间 [65, 120]
-        assert_eq!(header_interval_for(583, TOMB_REC), (65, 120));
-        assert_eq!(capacity(64, TOMB_REC), 584);
-        assert_eq!(capacity(121, TOMB_REC), 582);
+        assert_eq!(header_interval_for(583, TOMBSTONE_RECORD_BYTES), (65, 120));
+        assert_eq!(capacity(64, TOMBSTONE_RECORD_BYTES), 584);
+        assert_eq!(capacity(121, TOMBSTONE_RECORD_BYTES), 582);
         // 233 成立的头宽闭区间 [9, 148]
         assert_eq!(header_interval_for(233, INODE_REC), (9, 148));
         assert_eq!(capacity(8, INODE_REC), 234);
@@ -499,51 +499,51 @@ mod tests {
     /// **判据 4 的绝对值**：五元组指认不到 582 条；打包类身份段 + 解析恰 0。
     #[test]
     fn criterion4_five_tuple_names_one_object_packed_identity_names_all() {
-        let n = capacity(UNIT_HDR_PACKED, TOMB_REC);
-        assert_eq!(unnamed_by_five_tuple(n), 582);
+        let packed_record_count = capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES);
+        assert_eq!(unnamed_by_five_tuple(packed_record_count), 582);
         assert_eq!(unnamed_by_five_tuple(1), 0, "装 1 条时五元组刚好够——已定项 8 原话成立的唯一情形");
-        let parsed = match parse_packed(n, TOMB_REC, UNIT) {
-            Parse::Records(k) => k,
+        let parsed = match parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES) {
+            Parse::Records(parsed_count) => parsed_count,
             Parse::Corrupt => 0,
         };
-        assert_eq!(unnamed_by_packed_identity(n, parsed), 0);
+        assert_eq!(unnamed_by_packed_identity(packed_record_count, parsed), 0);
     }
 
     /// **判据 5 的绝对值 + 阳性 / 阴性对照**：多一条即损坏；混装错分 5；不混装 0。
     #[test]
     fn criterion5_fixed_width_parsing_rejects_overflow_and_counts_mixing_errors() {
-        assert_eq!(parse_packed(583, TOMB_REC, UNIT), Parse::Records(583));
-        assert_eq!(parse_packed(584, TOMB_REC, UNIT), Parse::Corrupt, "584 × 56 + 103 = 32807 > 32768");
-        assert_eq!(parse_packed(1, 0, UNIT), Parse::Corrupt, "宽 0 不是记录");
+        assert_eq!(parse_packed(583, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Records(583));
+        assert_eq!(parse_packed(584, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Corrupt, "584 × 56 + 103 = 32807 > 32768");
+        assert_eq!(parse_packed(1, 0, UNIT_BYTES), Parse::Corrupt, "宽 0 不是记录");
         // 声明长度可以小于单元：声明 1000 时最多 (1000 − 103) / 56 = 16 条
-        assert_eq!(parse_packed(16, TOMB_REC, 1000), Parse::Records(16));
-        assert_eq!(parse_packed(17, TOMB_REC, 1000), Parse::Corrupt);
+        assert_eq!(parse_packed(16, TOMBSTONE_RECORD_BYTES, 1000), Parse::Records(16));
+        assert_eq!(parse_packed(17, TOMBSTONE_RECORD_BYTES, 1000), Parse::Corrupt);
         // 阳性对照：56 / 140 混装各 10 条，period = 56 / gcd(56,140) = 56 / 28 = 2 ⇒ 错分 5
-        assert_eq!(misparsed_when_mixed(TOMB_REC, 10, INODE_REC, 10), 5);
+        assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_REC, 10), 5);
         // 互素宽度全错：56 与 57，period 56 ⇒ 10 条里只有 i=0 对齐 ⇒ 错 9
         assert_eq!(misparsed_when_mixed(56, 10, 57, 10), 9);
         // 阴性对照：不混装恒 0
-        assert_eq!(misparsed_when_mixed(TOMB_REC, 10, TOMB_REC, 10), 0);
+        assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, TOMBSTONE_RECORD_BYTES, 10), 0);
         assert_eq!(misparsed_when_mixed(INODE_REC, 3, INODE_REC, 300), 0);
     }
 
     /// **判据 6 的绝对值**：incompat 静默漏 0 且拒挂；跳过政策静默漏恰 k；未登记记录类型可验不可用。
     #[test]
     fn criterion6_unknown_class_refuses_mount_and_unknown_record_type_is_read_only() {
-        let inc = mount_with_unknown_class(7, UnknownClassPolicy::Incompat).unwrap();
-        assert_eq!(inc, MountOutcome { mount_ok: false, silent_missed: 0 });
-        let skip = mount_with_unknown_class(7, UnknownClassPolicy::Skip).unwrap();
-        assert_eq!(skip, MountOutcome { mount_ok: true, silent_missed: 7 });
+        let incompat_outcome = mount_with_unknown_class(7, UnknownClassPolicy::Incompat).unwrap();
+        assert_eq!(incompat_outcome, MountOutcome { mount_ok: false, silent_missed: 0 });
+        let skip_outcome = mount_with_unknown_class(7, UnknownClassPolicy::Skip).unwrap();
+        assert_eq!(skip_outcome, MountOutcome { mount_ok: true, silent_missed: 7 });
         // 阴性对照：没有未登记类时两种政策都正常挂、漏 0
-        for p in [UnknownClassPolicy::Incompat, UnknownClassPolicy::Skip] {
+        for policy in [UnknownClassPolicy::Incompat, UnknownClassPolicy::Skip] {
             assert_eq!(
-                mount_with_unknown_class(0, p).unwrap(),
+                mount_with_unknown_class(0, policy).unwrap(),
                 MountOutcome { mount_ok: true, silent_missed: 0 }
             );
         }
-        let rt = mount_with_unknown_record_type(3);
+        let record_type_outcome = mount_with_unknown_record_type(3);
         assert_eq!(
-            rt,
+            record_type_outcome,
             RecordTypeOutcome { containers_verified: 3, records_applied: 0, read_only: true, reclaim_allowed: false }
         );
         assert!(!mount_with_unknown_record_type(0).read_only);
@@ -554,9 +554,9 @@ mod tests {
     fn criterion7_headroom_is_counted_not_estimated() {
         assert_eq!(REGISTRY.len(), 7);
         assert_eq!(free_codes(&REGISTRY), 249);
-        assert_eq!(free_codes(&D9_ONLY), 253);
+        assert_eq!(free_codes(&REGISTRY_FROM_DECISION_NINE_ROW), 253);
         // 登记表里码不重复、0 恒无效
-        let mut codes: Vec<u8> = REGISTRY.iter().map(|r| r.0).collect();
+        let mut codes: Vec<u8> = REGISTRY.iter().map(|registry_entry| registry_entry.0).collect();
         codes.sort_unstable();
         codes.dedup();
         assert_eq!(codes.len(), REGISTRY.len());
@@ -566,8 +566,8 @@ mod tests {
     /// 不合法几何一律 0 / Corrupt，不许当成测量值。
     #[test]
     fn illegal_geometry_is_not_a_measurement() {
-        assert_eq!(capacity(UNIT, TOMB_REC), 0);
+        assert_eq!(capacity(UNIT_BYTES, TOMBSTONE_RECORD_BYTES), 0);
         assert_eq!(capacity(UNIT_HDR_PACKED, 0), 0);
-        assert_eq!(parse_packed(1, TOMB_REC, 10), Parse::Corrupt);
+        assert_eq!(parse_packed(1, TOMBSTONE_RECORD_BYTES, 10), Parse::Corrupt);
     }
 }

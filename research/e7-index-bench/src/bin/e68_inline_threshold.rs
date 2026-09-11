@@ -33,15 +33,15 @@
 
 use e7_index_bench::Emitter;
 
-const NODE: u64 = 16 * 1024;
-const BLOCK: u64 = 4096;
+const NODE_SIZE_BYTES: u64 = 16 * 1024;
+const BLOCK_BYTES: u64 = 4096;
 /// 一条 inode 记录不含内联数据时的字节：key 16 + 头 40 + 一个带设备身份的位置条目 8。
-const REC_BASE: u64 = 64;
+const RECORD_BASE_BYTES: u64 = 64;
 const THRESHOLDS: [u64; 8] = [0, 256, 512, 1024, 2048, 3072, 3584, 4096];
-const FILES: u64 = 100_000;
+const FILE_COUNT: u64 = 100_000;
 
-struct Lcg(u64);
-impl Lcg {
+struct LinearCongruentialGenerator(u64);
+impl LinearCongruentialGenerator {
     fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         self.0 >> 33
@@ -49,58 +49,58 @@ impl Lcg {
 }
 
 /// 一个文件在给定阈值下占的（数据设备字节, 记录字节）。
-fn per_file(size: u64, thr: u64) -> (u64, u64) {
-    if size <= thr {
-        (0, REC_BASE + size) // 内联：不占数据块，记录变长
+fn data_and_record_bytes_for_file(file_size_bytes: u64, inline_threshold_bytes: u64) -> (u64, u64) {
+    if file_size_bytes <= inline_threshold_bytes {
+        (0, RECORD_BASE_BYTES + file_size_bytes) // 内联：不占数据块，记录变长
     } else {
-        (size.div_ceil(BLOCK) * BLOCK, REC_BASE) // 走 extent：整块分配
+        (file_size_bytes.div_ceil(BLOCK_BYTES) * BLOCK_BYTES, RECORD_BASE_BYTES) // 走 extent：整块分配
     }
 }
 
 /// 真实一点的大小分布：80% 小文件（≤4 KiB），20% 大文件。
-fn size_of(rng: &mut Lcg) -> u64 {
-    if rng.next() % 100 < 80 {
-        1 + rng.next() % 4096
+fn draw_file_size_bytes(random_number_generator: &mut LinearCongruentialGenerator) -> u64 {
+    if random_number_generator.next() % 100 < 80 {
+        1 + random_number_generator.next() % 4096
     } else {
-        4096 + rng.next() % (1024 * 1024)
+        4096 + random_number_generator.next() % (1024 * 1024)
     }
 }
 
-struct Out {
+struct ThresholdRunTotals {
     data_bytes: u64,
     meta_bytes: u64,
     leaves: u64,
-    inlined: u64,
+    inlined_file_count: u64,
 }
 
-fn run(thr: u64, seed: u64) -> Out {
-    let mut rng = Lcg(seed.wrapping_mul(0x9E3779B97F4A7C15) | 1);
-    let (mut data, mut rec, mut inlined) = (0u64, 0u64, 0u64);
-    for _ in 0..FILES {
-        let s = size_of(&mut rng);
-        let (d, r) = per_file(s, thr);
-        if s <= thr {
-            inlined += 1;
+fn simulate_files_at_threshold(inline_threshold_bytes: u64, seed: u64) -> ThresholdRunTotals {
+    let mut random_number_generator = LinearCongruentialGenerator(seed.wrapping_mul(0x9E3779B97F4A7C15) | 1);
+    let (mut data_bytes_total, mut record_bytes_total, mut inlined_file_count) = (0u64, 0u64, 0u64);
+    for _ in 0..FILE_COUNT {
+        let sampled_file_size_bytes = draw_file_size_bytes(&mut random_number_generator);
+        let (data_bytes_for_file, record_bytes_for_file) = data_and_record_bytes_for_file(sampled_file_size_bytes, inline_threshold_bytes);
+        if sampled_file_size_bytes <= inline_threshold_bytes {
+            inlined_file_count += 1;
         }
-        data += d;
-        rec += r;
+        data_bytes_total += data_bytes_for_file;
+        record_bytes_total += record_bytes_for_file;
     }
     // 叶节点：记录按字节装进 16 KiB 的叶（不跨叶，按平均装填算上界）
-    let leaves = rec.div_ceil(NODE);
-    Out { data_bytes: data, meta_bytes: leaves * NODE, leaves, inlined }
+    let leaves = record_bytes_total.div_ceil(NODE_SIZE_BYTES);
+    ThresholdRunTotals { data_bytes: data_bytes_total, meta_bytes: leaves * NODE_SIZE_BYTES, leaves, inlined_file_count }
 }
 
 /// 读一个文件要碰几次设备：走到叶（树高）+ 数据块。
-/// 树高由叶数定，扇出 = NODE / 24（key 16 + 指针 8）。
-fn read_ops(o: &Out, avg_data_blocks: u64) -> u64 {
-    let fanout = NODE / 24;
-    let mut h = 1u64;
-    let mut n = o.leaves.max(1);
-    while n > 1 {
-        n = n.div_ceil(fanout);
-        h += 1;
+/// 树高由叶数定，扇出 = NODE_SIZE_BYTES / 24（key 16 + 指针 8）。
+fn device_reads_per_file_read(totals: &ThresholdRunTotals, average_data_blocks_per_file: u64) -> u64 {
+    let fanout = NODE_SIZE_BYTES / 24;
+    let mut tree_height = 1u64;
+    let mut nodes_at_level = totals.leaves.max(1);
+    while nodes_at_level > 1 {
+        nodes_at_level = nodes_at_level.div_ceil(fanout);
+        tree_height += 1;
     }
-    h + avg_data_blocks
+    tree_height + average_data_blocks_per_file
 }
 
 
@@ -109,68 +109,68 @@ fn read_ops(o: &Out, avg_data_blocks: u64) -> u64 {
 /// 一次随机点查的设备读次数 = 叶未命中（1 − 命中率）+ 数据块读（内联的文件为 0）。
 /// 内层节点假定常驻（它们只占叶数的 1/682）。
 /// 命中率按均匀随机取 `min(1, 缓存能装的叶数 / 叶总数)`。
-fn reads_per_lookup(o: &Out, cache_bytes: u64) -> (u64, u64) {
-    let cache_leaves = cache_bytes / NODE;
-    let hit_ppm = (cache_leaves * 1_000_000 / o.leaves.max(1)).min(1_000_000);
-    let leaf_miss_ppm = 1_000_000 - hit_ppm;
-    let inlined_ppm = o.inlined * 1_000_000 / FILES;
-    let data_read_ppm = 1_000_000 - inlined_ppm; // 非内联的文件要多读一个数据块
-    (leaf_miss_ppm + data_read_ppm, o.leaves * NODE)
+fn reads_per_lookup(totals: &ThresholdRunTotals, cache_bytes: u64) -> (u64, u64) {
+    let cache_leaves = cache_bytes / NODE_SIZE_BYTES;
+    let hit_rate_parts_per_million = (cache_leaves * 1_000_000 / totals.leaves.max(1)).min(1_000_000);
+    let leaf_miss_parts_per_million = 1_000_000 - hit_rate_parts_per_million;
+    let inlined_parts_per_million = totals.inlined_file_count * 1_000_000 / FILE_COUNT;
+    let data_read_parts_per_million = 1_000_000 - inlined_parts_per_million; // 非内联的文件要多读一个数据块
+    (leaf_miss_parts_per_million + data_read_parts_per_million, totals.leaves * NODE_SIZE_BYTES)
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config node={NODE} block={BLOCK} rec_base={REC_BASE} files={FILES} \
+        emitter.emit_raw(&format!(
+            "name=config node={NODE_SIZE_BYTES} block={BLOCK_BYTES} rec_base={RECORD_BASE_BYTES} files={FILE_COUNT} \
              model=counting file_ops=0"
         ))
     );
-    for &thr in THRESHOLDS.iter() {
+    for &inline_threshold_bytes in THRESHOLDS.iter() {
         for seed in 1..=5u64 {
-            let o = run(thr, seed);
-            let total = o.data_bytes + o.meta_bytes;
+            let totals = simulate_files_at_threshold(inline_threshold_bytes, seed);
+            let total_bytes = totals.data_bytes + totals.meta_bytes;
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=arm thr={thr} seed={seed} total_bytes_per_file={} \
+                emitter.emit_raw(&format!(
+                    "name=arm thr={inline_threshold_bytes} seed={seed} total_bytes_per_file={} \
                      data_per_file={} meta_per_file={} leaves={} inlined_pct_ppm={} \
                      read_ops_x1000={}",
-                    total / FILES,
-                    o.data_bytes / FILES,
-                    o.meta_bytes / FILES,
-                    o.leaves,
-                    o.inlined * 1_000_000 / FILES,
-                    read_ops(&o, 1) * 1000,
+                    total_bytes / FILE_COUNT,
+                    totals.data_bytes / FILE_COUNT,
+                    totals.meta_bytes / FILE_COUNT,
+                    totals.leaves,
+                    totals.inlined_file_count * 1_000_000 / FILE_COUNT,
+                    device_reads_per_file_read(&totals, 1) * 1000,
                 ))
             );
         }
     }
     // 第二轮：带缓存的读模型，扫缓存大小 × 阈值。
-    for cache_mib in [1u64, 4, 16, 64, 256] {
-        for &thr in THRESHOLDS.iter() {
-            let o = run(thr, 1);
-            let (reads_ppm, working_set) = reads_per_lookup(&o, cache_mib * 1024 * 1024);
+    for cache_size_mebibytes in [1u64, 4, 16, 64, 256] {
+        for &inline_threshold_bytes in THRESHOLDS.iter() {
+            let totals = simulate_files_at_threshold(inline_threshold_bytes, 1);
+            let (reads_per_lookup_parts_per_million, working_set_bytes) = reads_per_lookup(&totals, cache_size_mebibytes * 1024 * 1024);
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=cached_read cache_mib={cache_mib} thr={thr} \
-                     reads_per_lookup_ppm={reads_ppm} meta_working_set_bytes={working_set}"
+                emitter.emit_raw(&format!(
+                    "name=cached_read cache_mib={cache_size_mebibytes} thr={inline_threshold_bytes} \
+                     reads_per_lookup_ppm={reads_per_lookup_parts_per_million} meta_working_set_bytes={working_set_bytes}"
                 ))
             );
         }
     }
 
     // 阴性对照：文件全都是 1 MiB ⇒ 所有阈值档逐格相同。
-    for &thr in THRESHOLDS.iter() {
-        let (d, r) = per_file(1024 * 1024, thr);
+    for &inline_threshold_bytes in THRESHOLDS.iter() {
+        let (data_bytes_for_file, record_bytes_for_file) = data_and_record_bytes_for_file(1024 * 1024, inline_threshold_bytes);
         println!(
             "{}",
-            em.emit_raw(&format!("name=negative_control_huge thr={thr} data={d} rec={r}"))
+            emitter.emit_raw(&format!("name=negative_control_huge thr={inline_threshold_bytes} data={data_bytes_for_file} rec={record_bytes_for_file}"))
         );
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -181,26 +181,26 @@ mod tests {
     #[test]
     fn positive_control_zero_threshold_equals_never_inline() {
         for seed in 1..=5u64 {
-            let o = run(0, seed);
-            assert_eq!(o.inlined, 0, "T=0 却内联了");
-            assert_eq!(o.meta_bytes, (FILES * REC_BASE).div_ceil(NODE) * NODE);
+            let totals = simulate_files_at_threshold(0, seed);
+            assert_eq!(totals.inlined_file_count, 0, "T=0 却内联了");
+            assert_eq!(totals.meta_bytes, (FILE_COUNT * RECORD_BASE_BYTES).div_ceil(NODE_SIZE_BYTES) * NODE_SIZE_BYTES);
         }
     }
 
     /// **阴性对照**：1 MiB 文件在任何阈值下都走 extent，逐格相同。
     #[test]
     fn negative_control_huge_file_same_everywhere() {
-        let base = per_file(1024 * 1024, 0);
-        for &thr in THRESHOLDS.iter() {
-            assert_eq!(per_file(1024 * 1024, thr), base);
+        let bytes_at_threshold_zero = data_and_record_bytes_for_file(1024 * 1024, 0);
+        for &inline_threshold_bytes in THRESHOLDS.iter() {
+            assert_eq!(data_and_record_bytes_for_file(1024 * 1024, inline_threshold_bytes), bytes_at_threshold_zero);
         }
     }
 
     /// **绝对值断言**：一个 100 B 文件不内联时占整块 4096；内联时占 0 数据字节、记录 164。
     #[test]
     fn absolute_single_file_accounting() {
-        assert_eq!(per_file(100, 0), (4096, 64));
-        assert_eq!(per_file(100, 256), (0, 164));
+        assert_eq!(data_and_record_bytes_for_file(100, 0), (4096, 64));
+        assert_eq!(data_and_record_bytes_for_file(100, 256), (0, 164));
         // 内联省下 4096 − 100 = 3996 字节的块内碎片，付出 100 字节的记录膨胀
         assert_eq!(4096 - 100, 3996);
     }
@@ -208,19 +208,19 @@ mod tests {
     /// **绝对值断言**：阈值恰好等于文件大小时算内联（`<=` 不是 `<`）。
     #[test]
     fn absolute_boundary_is_inclusive() {
-        assert_eq!(per_file(512, 512), (0, REC_BASE + 512));
-        assert_eq!(per_file(513, 512), (BLOCK, REC_BASE));
+        assert_eq!(data_and_record_bytes_for_file(512, 512), (0, RECORD_BASE_BYTES + 512));
+        assert_eq!(data_and_record_bytes_for_file(513, 512), (BLOCK_BYTES, RECORD_BASE_BYTES));
     }
 
-    /// 内联计数必须与 per_file 的判定同一条边界——`run` 与 `per_file` 各写一遍
+    /// 内联计数必须与 data_and_record_bytes_for_file 的判定同一条边界——`simulate_files_at_threshold` 与 `data_and_record_bytes_for_file` 各写一遍
     /// `<=`，只对总量断言的话两处漂移不会被任何测试看见（变异审计补的）。
     #[test]
     fn inlined_counter_agrees_with_an_independent_recount() {
-        for &thr in THRESHOLDS.iter() {
-            let o = run(thr, 3);
-            let mut rng = Lcg(3u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
-            let expect = (0..FILES).filter(|_| size_of(&mut rng) <= thr).count() as u64;
-            assert_eq!(o.inlined, expect, "thr={thr}: 内联计数与独立重算不等");
+        for &inline_threshold_bytes in THRESHOLDS.iter() {
+            let totals = simulate_files_at_threshold(inline_threshold_bytes, 3);
+            let mut random_number_generator = LinearCongruentialGenerator(3u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
+            let expected_inlined_file_count = (0..FILE_COUNT).filter(|_| draw_file_size_bytes(&mut random_number_generator) <= inline_threshold_bytes).count() as u64;
+            assert_eq!(totals.inlined_file_count, expected_inlined_file_count, "thr={inline_threshold_bytes}: 内联计数与独立重算不等");
         }
     }
 
@@ -229,34 +229,34 @@ mod tests {
     /// 零缓存 ⇒ 叶未命中恰为 100%。
     #[test]
     fn cached_read_model_pins_full_and_zero_cache() {
-        let o = run(512, 1);
-        let inlined_ppm = o.inlined * 1_000_000 / FILES;
-        let (reads_full, ws) = reads_per_lookup(&o, 1 << 40);
-        assert_eq!(reads_full, 1_000_000 - inlined_ppm, "全缓存时读数应恰为非内联占比");
-        assert_eq!(ws, o.leaves * NODE);
-        let (reads_zero, _) = reads_per_lookup(&o, 0);
-        assert_eq!(reads_zero, 1_000_000 + (1_000_000 - inlined_ppm),
+        let totals = simulate_files_at_threshold(512, 1);
+        let inlined_parts_per_million = totals.inlined_file_count * 1_000_000 / FILE_COUNT;
+        let (reads_with_full_cache, working_set_bytes) = reads_per_lookup(&totals, 1 << 40);
+        assert_eq!(reads_with_full_cache, 1_000_000 - inlined_parts_per_million, "全缓存时读数应恰为非内联占比");
+        assert_eq!(working_set_bytes, totals.leaves * NODE_SIZE_BYTES);
+        let (reads_with_zero_cache, _) = reads_per_lookup(&totals, 0);
+        assert_eq!(reads_with_zero_cache, 1_000_000 + (1_000_000 - inlined_parts_per_million),
             "零缓存时叶未命中应恰为 100%");
     }
 
-    /// read_ops 的树高算术钉死：扇出 682（16 KiB / 24）下 682 叶高 2、683 叶高 3。
+    /// device_reads_per_file_read 的树高算术钉死：扇出 682（16 KiB / 24）下 682 叶高 2、683 叶高 3。
     /// 683 这一格同时钉住扇出常数——扇出算错一档它就变 2。
     #[test]
-    fn read_ops_pins_height_and_fanout_arithmetic() {
-        let mk = |leaves| Out { data_bytes: 0, meta_bytes: 0, leaves, inlined: 0 };
-        assert_eq!(read_ops(&mk(1), 0), 1, "单叶树高 1");
-        assert_eq!(read_ops(&mk(682), 0), 2, "682 叶恰好一层内节点");
-        assert_eq!(read_ops(&mk(683), 0), 3, "683 叶要两层");
-        assert_eq!(read_ops(&mk(400), 1), 3, "高 2 加一个数据块");
+    fn read_count_pins_tree_height_and_fanout_arithmetic() {
+        let totals_with_leaf_count = |leaves| ThresholdRunTotals { data_bytes: 0, meta_bytes: 0, leaves, inlined_file_count: 0 };
+        assert_eq!(device_reads_per_file_read(&totals_with_leaf_count(1), 0), 1, "单叶树高 1");
+        assert_eq!(device_reads_per_file_read(&totals_with_leaf_count(682), 0), 2, "682 叶恰好一层内节点");
+        assert_eq!(device_reads_per_file_read(&totals_with_leaf_count(683), 0), 3, "683 叶要两层");
+        assert_eq!(device_reads_per_file_read(&totals_with_leaf_count(400), 1), 3, "高 2 加一个数据块");
     }
 
     /// 大小分布必须两峰都在：≤4 KiB 与 >4 KiB 都要出现，
     /// 否则「大文件把所有阈值档拉平」的阴性对照空转。
     #[test]
     fn size_distribution_has_both_modes() {
-        let mut rng = Lcg(1u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
-        let sizes: Vec<u64> = (0..10_000).map(|_| size_of(&mut rng)).collect();
-        assert!(sizes.iter().any(|&s| s <= 4096), "没有小文件");
-        assert!(sizes.iter().any(|&s| s > 4096), "没有大文件——阴性对照那一维空转");
+        let mut random_number_generator = LinearCongruentialGenerator(1u64.wrapping_mul(0x9E3779B97F4A7C15) | 1);
+        let file_sizes: Vec<u64> = (0..10_000).map(|_| draw_file_size_bytes(&mut random_number_generator)).collect();
+        assert!(file_sizes.iter().any(|&file_size_bytes| file_size_bytes <= 4096), "没有小文件");
+        assert!(file_sizes.iter().any(|&file_size_bytes| file_size_bytes > 4096), "没有大文件——阴性对照那一维空转");
     }
 }

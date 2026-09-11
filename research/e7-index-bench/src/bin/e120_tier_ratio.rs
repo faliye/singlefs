@@ -24,7 +24,7 @@
 //!
 //! ## 两个假设（不是条款 —— C187）
 //!
-//! - `SLOT_EXTRA = 43`：五元组 33（D18 已定项 3）+ 写序 10（D18 已定项 7）；定宽下不要槽目录条目。
+//! - `SLOT_EXTRA_BYTES = 43`：五元组 33（D18 已定项 3）+ 写序 10（D18 已定项 7）；定宽下不要槽目录条目。
 //! - **对象大小分布**：全仓无实测（C174）。三个分布全部报出，**不挑代表**；
 //!   而 E120 的主结论（最坏浪费闭式）**不依赖分布**，这正是它相对 E119 的改进。
 //!
@@ -63,81 +63,81 @@
 
 use e7_index_bench::Emitter;
 
-const UNIT: u64 = 32768;
-const PACK_HDR: u64 = 103;
-const NET: u64 = UNIT - PACK_HDR; // 32665
-const SLOT_EXTRA: u64 = 43;
-const LIMIT: u64 = 4096; // D27 已定项 2
-const W_MIN: u64 = 64;
-const N: u64 = 100_000;
+const UNIT_BYTES: u64 = 32768;
+const PACKED_UNIT_HEADER_BYTES: u64 = 103;
+const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32665
+const SLOT_EXTRA_BYTES: u64 = 43;
+const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2
+const MINIMUM_SLOT_WIDTH: u64 = 64;
+const OBJECT_COUNT: u64 = 100_000;
 /// 公比按千分之一为单位存成整数，避免浮点当键：1125 = 1.125
 const RATIOS: [u64; 4] = [1125, 1250, 1500, 2000];
 
-fn cap_of(w: u64) -> u64 { NET / (w + SLOT_EXTRA) }
+fn slots_per_container(slot_width: u64) -> u64 { UNIT_PAYLOAD_BYTES / (slot_width + SLOT_EXTRA_BYTES) }
 
-/// 等比档表：`W_min · r^k`，向上取整到整数字节，去重，最后一档钉死为 LIMIT。
-fn geo_tiers(r_milli: u64) -> Vec<u64> {
-    let mut v = Vec::new();
-    let mut w = W_MIN;
+/// 等比档表：`W_min · r^k`，向上取整到整数字节，去重，最后一档钉死为 PACKING_LIMIT_BYTES。
+fn geometric_tiers(ratio_in_thousandths: u64) -> Vec<u64> {
+    let mut tier_widths = Vec::new();
+    let mut slot_width = MINIMUM_SLOT_WIDTH;
     loop {
-        if w >= LIMIT { break; }
-        v.push(w);
-        let next = (w * r_milli).div_ceil(1000);
-        if next <= w { break; } // 防呆：公比 ≤ 1 时不许死循环
-        w = next;
+        if slot_width >= PACKING_LIMIT_BYTES { break; }
+        tier_widths.push(slot_width);
+        let next_slot_width = (slot_width * ratio_in_thousandths).div_ceil(1000);
+        if next_slot_width <= slot_width { break; } // 防呆：公比 ≤ 1 时不许死循环
+        slot_width = next_slot_width;
     }
-    v.push(LIMIT);
-    v.dedup();
-    v
+    tier_widths.push(PACKING_LIMIT_BYTES);
+    tier_widths.dedup();
+    tier_widths
 }
 
-fn weights(dist: &str) -> Vec<u64> {
-    let mut w = vec![0u64; (LIMIT + 1) as usize];
-    match dist {
-        "uniform" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
-        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }
-        "discrete" => { for s in [512u64, 1024, 4096] { w[s as usize] = 1; } }
+fn weights(distribution: &str) -> Vec<u64> {
+    let mut weight_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    match distribution {
+        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[object_size as usize] = 1; } }
+        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[object_size as usize] = PACKING_LIMIT_BYTES / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[object_size as usize] = 1; } }
         _ => {}
     }
-    w
+    weight_by_object_size
 }
 
-fn counts(dist: &str, n: u64) -> Vec<u64> {
-    let w = weights(dist);
-    let total: u64 = w.iter().sum();
-    if total == 0 || n == 0 { return vec![0u64; (LIMIT + 1) as usize]; }
-    let mut c = vec![0u64; (LIMIT + 1) as usize];
-    let (mut acc, mut last) = (0u64, 0usize);
-    for s in 1..=LIMIT as usize {
-        if w[s] == 0 { continue; }
-        c[s] = n * w[s] / total; acc += c[s]; last = s;
+fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
+    let weight_by_object_size = weights(distribution);
+    let total_weight: u64 = weight_by_object_size.iter().sum();
+    if total_weight == 0 || object_count == 0 { return vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize]; }
+    let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    let (mut assigned_object_count, mut last_nonzero_object_size) = (0u64, 0usize);
+    for object_size in 1..=PACKING_LIMIT_BYTES as usize {
+        if weight_by_object_size[object_size] == 0 { continue; }
+        count_by_object_size[object_size] = object_count * weight_by_object_size[object_size] / total_weight; assigned_object_count += count_by_object_size[object_size]; last_nonzero_object_size = object_size;
     }
-    c[last] += n - acc;
-    c
+    count_by_object_size[last_nonzero_object_size] += object_count - assigned_object_count;
+    count_by_object_size
 }
 
-fn containers_tiered(ts: &[u64], c: &[u64]) -> u64 {
-    let mut total = 0u64;
-    for (i, &w) in ts.iter().enumerate() {
-        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };
-        let n_t: u64 = (lo..=w).map(|s| c[s as usize]).sum();
-        if n_t > 0 { total += n_t.div_ceil(cap_of(w).max(1)); }
+fn containers_tiered(tier_widths: &[u64], count_by_object_size: &[u64]) -> u64 {
+    let mut total_containers = 0u64;
+    for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
+        let tier_smallest_object_size = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
+        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[object_size as usize]).sum();
+        if objects_in_tier > 0 { total_containers += objects_in_tier.div_ceil(slots_per_container(slot_width).max(1)); }
     }
-    total
+    total_containers
 }
 
-fn containers_var(c: &[u64]) -> u64 {
-    let (mut cont, mut room) = (0u64, 0u64);
-    for s in 1..=LIMIT {
-        let need = s + SLOT_EXTRA;
-        let mut left = c[s as usize];
-        while left > 0 {
-            if room < need { cont += 1; room = NET; }
-            let fit = (room / need).min(left);
-            room -= fit * need; left -= fit;
+fn containers_variable_length(count_by_object_size: &[u64]) -> u64 {
+    let (mut container_count, mut remaining_payload_bytes) = (0u64, 0u64);
+    for object_size in 1..=PACKING_LIMIT_BYTES {
+        let bytes_per_slot = object_size + SLOT_EXTRA_BYTES;
+        let mut objects_left = count_by_object_size[object_size as usize];
+        while objects_left > 0 {
+            if remaining_payload_bytes < bytes_per_slot { container_count += 1; remaining_payload_bytes = UNIT_PAYLOAD_BYTES; }
+            let objects_fitting = (remaining_payload_bytes / bytes_per_slot).min(objects_left);
+            remaining_payload_bytes -= objects_fitting * bytes_per_slot; objects_left -= objects_fitting;
         }
     }
-    cont
+    container_count
 }
 
 /// 最坏相对浪费，**只看 `W_min` 以上**。
@@ -146,88 +146,88 @@ fn containers_var(c: &[u64]) -> u64 {
 /// 一个 1 字节的对象补到 64 就浪费 98.44%，四个公比上这个数**完全相同**——
 /// 它是 `W_min` 那个地板造成的，不是公比造成的。登记的式子只在 `W_min` 以上成立。
 /// 地板那一段的代价该按**绝对字节**看：每个对象至多浪费 `W_min − 1` = 63 字节。
-fn worst_waste_above_floor(ts: &[u64]) -> f64 {
-    let mut worst = 0.0f64;
-    for (i, &w) in ts.iter().enumerate() {
-        if i == 0 { continue; } // 地板那一档另算
-        let lo = ts[i - 1] + 1;
-        let waste = 1.0 - (lo as f64) / (w as f64);
-        if waste > worst { worst = waste; }
+fn worst_waste_above_floor(tier_widths: &[u64]) -> f64 {
+    let mut worst_waste = 0.0f64;
+    for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
+        if tier_index == 0 { continue; } // 地板那一档另算
+        let tier_smallest_object_size = tier_widths[tier_index - 1] + 1;
+        let waste = 1.0 - (tier_smallest_object_size as f64) / (slot_width as f64);
+        if waste > worst_waste { worst_waste = waste; }
     }
-    worst
+    worst_waste
 }
 
 /// 地板那一档的绝对代价：落在 1..=`W_min` 的对象每个至多浪费这么多字节。
-fn floor_waste_bytes() -> u64 { W_MIN - 1 }
+fn floor_waste_bytes() -> u64 { MINIMUM_SLOT_WIDTH - 1 }
 
 fn main() {
-    let mut em = Emitter::new();
-    println!("{}", em.emit_raw(&format!(
-        "name=config unit={UNIT} pack_hdr={PACK_HDR} net={NET} slot_extra={SLOT_EXTRA} \
-         limit={LIMIT} w_min={W_MIN} n={N} ratios={RATIOS:?}")));
+    let mut emitter = Emitter::new();
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config unit={UNIT_BYTES} pack_hdr={PACKED_UNIT_HEADER_BYTES} net={UNIT_PAYLOAD_BYTES} slot_extra={SLOT_EXTRA_BYTES} \
+         limit={PACKING_LIMIT_BYTES} w_min={MINIMUM_SLOT_WIDTH} n={OBJECT_COUNT} ratios={RATIOS:?}")));
 
     // 阳性对照：对象恰好等于某档宽 ⇒ 该臂与 var 逐字节相同
-    for &r in RATIOS.iter() {
-        let ts = geo_tiers(r);
-        for &w in ts.iter() {
-            let mut c = vec![0u64; (LIMIT + 1) as usize];
-            c[w as usize] = N;
-            let v = containers_var(&c);
-            let t = containers_tiered(&ts, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=positive_exact r={r} tier={w} var={v} tiered={t} same={}", v == t)));
+    for &ratio_in_thousandths in RATIOS.iter() {
+        let tier_widths = geometric_tiers(ratio_in_thousandths);
+        for &slot_width in tier_widths.iter() {
+            let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+            count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+            let variable_length_containers = containers_variable_length(&count_by_object_size);
+            let tiered_containers = containers_tiered(&tier_widths, &count_by_object_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=positive_exact r={ratio_in_thousandths} tier={slot_width} var={variable_length_containers} tiered={tiered_containers} same={}", variable_length_containers == tiered_containers)));
         }
     }
 
     // 判别力：两个极端公比在同一分布上必须不同
     {
-        let c = counts("uniform", N);
-        let a = containers_tiered(&geo_tiers(1125), &c);
-        let b = containers_tiered(&geo_tiers(2000), &c);
-        println!("{}", em.emit_raw(&format!(
-            "name=discrimination r1125={a} r2000={b} differ={}", a != b)));
+        let count_by_object_size = counts("uniform", OBJECT_COUNT);
+        let ratio_1125_containers = containers_tiered(&geometric_tiers(1125), &count_by_object_size);
+        let ratio_2000_containers = containers_tiered(&geometric_tiers(2000), &count_by_object_size);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=discrimination r1125={ratio_1125_containers} r2000={ratio_2000_containers} differ={}", ratio_1125_containers != ratio_2000_containers)));
     }
 
     // 阴性对照
     {
-        let c = counts("uniform", 0);
-        println!("{}", em.emit_raw(&format!("name=negative arm=var containers={}", containers_var(&c))));
-        for &r in RATIOS.iter() {
-            println!("{}", em.emit_raw(&format!(
-                "name=negative r={r} containers={}", containers_tiered(&geo_tiers(r), &c))));
+        let count_by_object_size = counts("uniform", 0);
+        println!("{}", emitter.emit_raw(&format!("name=negative arm=var containers={}", containers_variable_length(&count_by_object_size))));
+        for &ratio_in_thousandths in RATIOS.iter() {
+            println!("{}", emitter.emit_raw(&format!(
+                "name=negative r={ratio_in_thousandths} containers={}", containers_tiered(&geometric_tiers(ratio_in_thousandths), &count_by_object_size))));
         }
     }
 
     // 闭式与档数
-    for &r in RATIOS.iter() {
-        let ts = geo_tiers(r);
-        let closed = 1.0 - 1000.0 / r as f64;
-        println!("{}", em.emit_raw(&format!(
-            "name=closed r={r} tiers={} worst_waste_above_floor={:.6} closed_form={:.6} \
+    for &ratio_in_thousandths in RATIOS.iter() {
+        let tier_widths = geometric_tiers(ratio_in_thousandths);
+        let closed_form_worst_waste = 1.0 - 1000.0 / ratio_in_thousandths as f64;
+        println!("{}", emitter.emit_raw(&format!(
+            "name=closed r={ratio_in_thousandths} tiers={} worst_waste_above_floor={:.6} closed_form={:.6} \
              floor_waste_bytes={} max_tier={} cap_max_tier={} min_tier={} cap_min_tier={}",
-            ts.len(), worst_waste_above_floor(&ts), closed, floor_waste_bytes(),
-            ts.last().unwrap(), cap_of(*ts.last().unwrap()),
-            ts[0], cap_of(ts[0]))));
+            tier_widths.len(), worst_waste_above_floor(&tier_widths), closed_form_worst_waste, floor_waste_bytes(),
+            tier_widths.last().unwrap(), slots_per_container(*tier_widths.last().unwrap()),
+            tier_widths[0], slots_per_container(tier_widths[0]))));
     }
 
     // 实测
-    for dist in ["uniform", "logunif", "discrete"] {
-        let c = counts(dist, N);
-        let v = containers_var(&c);
-        println!("{}", em.emit_raw(&format!(
-            "name=main dist={dist} arm=var containers={v} gain={:.4} loss=0.0000 tiers=0",
-            (N * UNIT) as f64 / (v * UNIT) as f64)));
-        for &r in RATIOS.iter() {
-            let ts = geo_tiers(r);
-            let t = containers_tiered(&ts, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=main dist={dist} r={r} containers={t} gain={:.4} loss={:.4} tiers={}",
-                (N * UNIT) as f64 / (t * UNIT) as f64,
-                (t as f64 - v as f64) / v as f64, ts.len())));
+    for distribution in ["uniform", "logunif", "discrete"] {
+        let count_by_object_size = counts(distribution, OBJECT_COUNT);
+        let variable_length_containers = containers_variable_length(&count_by_object_size);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=main dist={distribution} arm=var containers={variable_length_containers} gain={:.4} loss=0.0000 tiers=0",
+            (OBJECT_COUNT * UNIT_BYTES) as f64 / (variable_length_containers * UNIT_BYTES) as f64)));
+        for &ratio_in_thousandths in RATIOS.iter() {
+            let tier_widths = geometric_tiers(ratio_in_thousandths);
+            let tiered_containers = containers_tiered(&tier_widths, &count_by_object_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=main dist={distribution} r={ratio_in_thousandths} containers={tiered_containers} gain={:.4} loss={:.4} tiers={}",
+                (OBJECT_COUNT * UNIT_BYTES) as f64 / (tiered_containers * UNIT_BYTES) as f64,
+                (tiered_containers as f64 - variable_length_containers as f64) / variable_length_containers as f64, tier_widths.len())));
         }
     }
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -236,14 +236,14 @@ mod tests {
 
     /// 阳性对照：对象恰好等于档宽时，等比档与变长逐字节相同。
     #[test]
-    fn positive_control_exact_tier_matches_var() {
-        for &r in RATIOS.iter() {
-            let ts = geo_tiers(r);
-            for &w in ts.iter() {
-                let mut c = vec![0u64; (LIMIT + 1) as usize];
-                c[w as usize] = N;
-                assert_eq!(containers_tiered(&ts, &c), containers_var(&c),
-                           "r={r} 档宽={w}");
+    fn positive_control_exact_tier_matches_variable_length() {
+        for &ratio_in_thousandths in RATIOS.iter() {
+            let tier_widths = geometric_tiers(ratio_in_thousandths);
+            for &slot_width in tier_widths.iter() {
+                let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+                count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+                assert_eq!(containers_tiered(&tier_widths, &count_by_object_size), containers_variable_length(&count_by_object_size),
+                           "r={ratio_in_thousandths} 档宽={slot_width}");
             }
         }
     }
@@ -251,20 +251,20 @@ mod tests {
     /// 判别力：公比真的被建模了。
     #[test]
     fn discrimination_ratio_matters() {
-        let c = counts("uniform", N);
-        let a = containers_tiered(&geo_tiers(1125), &c);
-        let b = containers_tiered(&geo_tiers(2000), &c);
-        assert!(a < b, "r 越小该越省：r=1.125 {a}，r=2.0 {b}");
-        assert_eq!(a, 7378);
-        assert_eq!(b, 9463);
+        let count_by_object_size = counts("uniform", OBJECT_COUNT);
+        let ratio_1125_containers = containers_tiered(&geometric_tiers(1125), &count_by_object_size);
+        let ratio_2000_containers = containers_tiered(&geometric_tiers(2000), &count_by_object_size);
+        assert!(ratio_1125_containers < ratio_2000_containers, "r 越小该越省：r=1.125 {ratio_1125_containers}，r=2.0 {ratio_2000_containers}");
+        assert_eq!(ratio_1125_containers, 7378);
+        assert_eq!(ratio_2000_containers, 9463);
     }
 
     /// 阴性：N = 0 全 0。
     #[test]
     fn negative_control_zero() {
-        let c = counts("uniform", 0);
-        assert_eq!(containers_var(&c), 0);
-        for &r in RATIOS.iter() { assert_eq!(containers_tiered(&geo_tiers(r), &c), 0, "r={r}"); }
+        let count_by_object_size = counts("uniform", 0);
+        assert_eq!(containers_variable_length(&count_by_object_size), 0);
+        for &ratio_in_thousandths in RATIOS.iter() { assert_eq!(containers_tiered(&geometric_tiers(ratio_in_thousandths), &count_by_object_size), 0, "r={ratio_in_thousandths}"); }
     }
 
     /// 闭式：`W_min` 以上的最坏相对浪费 ≤ 1 − 1/r + 取整余量，且这一条与分布无关。
@@ -276,13 +276,13 @@ mod tests {
     ///    ⇒ 上界要放宽到 r + 1/W_min。两条都不许回头改登记的式子。
     #[test]
     fn worst_waste_matches_closed_form() {
-        for &r in RATIOS.iter() {
-            let ts = geo_tiers(r);
-            let closed = 1.0 - 1000.0 / r as f64;
-            let slack = 1.0 - 1.0 / (r as f64 / 1000.0 + 1.0 / W_MIN as f64);
-            let got = worst_waste_above_floor(&ts);
-            assert!(got <= slack + 1e-9,
-                    "r={r}：W_min 以上最坏浪费 {got} 超过含取整余量的上界 {slack}（闭式 {closed}）");
+        for &ratio_in_thousandths in RATIOS.iter() {
+            let tier_widths = geometric_tiers(ratio_in_thousandths);
+            let closed_form_worst_waste = 1.0 - 1000.0 / ratio_in_thousandths as f64;
+            let slack = 1.0 - 1.0 / (ratio_in_thousandths as f64 / 1000.0 + 1.0 / MINIMUM_SLOT_WIDTH as f64);
+            let measured_worst_waste = worst_waste_above_floor(&tier_widths);
+            assert!(measured_worst_waste <= slack + 1e-9,
+                    "r={ratio_in_thousandths}：W_min 以上最坏浪费 {measured_worst_waste} 超过含取整余量的上界 {slack}（闭式 {closed_form_worst_waste}）");
         }
         // 地板那一段按绝对字节算，与公比无关
         assert_eq!(floor_waste_bytes(), 63);
@@ -293,36 +293,36 @@ mod tests {
 
     /// 档数与每档的 cap 钉绝对值。
     #[test]
-    fn tier_counts_and_caps_absolute() {
-        assert_eq!(geo_tiers(1125).len(), 36);
-        assert_eq!(geo_tiers(1250).len(), 20);
-        assert_eq!(geo_tiers(1500).len(), 12);
-        assert_eq!(geo_tiers(2000).len(), 7);
-        for &r in RATIOS.iter() {
-            let ts = geo_tiers(r);
-            assert_eq!(ts[0], W_MIN, "r={r} 最细一档该是 W_min");
-            assert_eq!(*ts.last().unwrap(), LIMIT, "r={r} 最粗一档该钉死在界线上");
-            for &w in ts.iter() {
-                assert!(cap_of(w) >= 4, "r={r} 档宽={w} 的 cap={} < 4", cap_of(w));
+    fn tier_counts_and_objects_per_container_absolute() {
+        assert_eq!(geometric_tiers(1125).len(), 36);
+        assert_eq!(geometric_tiers(1250).len(), 20);
+        assert_eq!(geometric_tiers(1500).len(), 12);
+        assert_eq!(geometric_tiers(2000).len(), 7);
+        for &ratio_in_thousandths in RATIOS.iter() {
+            let tier_widths = geometric_tiers(ratio_in_thousandths);
+            assert_eq!(tier_widths[0], MINIMUM_SLOT_WIDTH, "r={ratio_in_thousandths} 最细一档该是 W_min");
+            assert_eq!(*tier_widths.last().unwrap(), PACKING_LIMIT_BYTES, "r={ratio_in_thousandths} 最粗一档该钉死在界线上");
+            for &slot_width in tier_widths.iter() {
+                assert!(slots_per_container(slot_width) >= 4, "r={ratio_in_thousandths} 档宽={slot_width} 的 cap={} < 4", slots_per_container(slot_width));
             }
         }
-        assert_eq!(cap_of(LIMIT), 7);
-        assert_eq!(cap_of(W_MIN), 305);
+        assert_eq!(slots_per_container(PACKING_LIMIT_BYTES), 7);
+        assert_eq!(slots_per_container(MINIMUM_SLOT_WIDTH), 305);
     }
 
     /// 单调：r 越大档数越少、容器越多（同一分布上）。互比，与上面钉绝对值的配对。
     #[test]
     fn larger_ratio_fewer_tiers_more_containers() {
-        for dist in ["uniform", "logunif"] {
-            let c = counts(dist, N);
-            let mut prev_t = usize::MAX;
-            let mut prev_c = 0u64;
-            for &r in RATIOS.iter() {
-                let ts = geo_tiers(r);
-                let cont = containers_tiered(&ts, &c);
-                assert!(ts.len() < prev_t, "dist={dist} r={r}：档数该递减");
-                assert!(cont >= prev_c, "dist={dist} r={r}：容器数该不减");
-                prev_t = ts.len(); prev_c = cont;
+        for distribution in ["uniform", "logunif"] {
+            let count_by_object_size = counts(distribution, OBJECT_COUNT);
+            let mut previous_tier_count = usize::MAX;
+            let mut previous_container_count = 0u64;
+            for &ratio_in_thousandths in RATIOS.iter() {
+                let tier_widths = geometric_tiers(ratio_in_thousandths);
+                let container_count = containers_tiered(&tier_widths, &count_by_object_size);
+                assert!(tier_widths.len() < previous_tier_count, "dist={distribution} r={ratio_in_thousandths}：档数该递减");
+                assert!(container_count >= previous_container_count, "dist={distribution} r={ratio_in_thousandths}：容器数该不减");
+                previous_tier_count = tier_widths.len(); previous_container_count = container_count;
             }
         }
     }
@@ -330,34 +330,34 @@ mod tests {
     /// 主判据的绝对值：三个分布 × 四个公比逐个钉住。
     #[test]
     fn main_absolute() {
-        let u = counts("uniform", N);
-        assert_eq!(containers_var(&u), 6814);
-        assert_eq!(containers_tiered(&geo_tiers(1125), &u), 7378);
-        assert_eq!(containers_tiered(&geo_tiers(1250), &u), 7675);
-        assert_eq!(containers_tiered(&geo_tiers(1500), &u), 8101);
-        assert_eq!(containers_tiered(&geo_tiers(2000), &u), 9463);
+        let uniform_counts = counts("uniform", OBJECT_COUNT);
+        assert_eq!(containers_variable_length(&uniform_counts), 6814);
+        assert_eq!(containers_tiered(&geometric_tiers(1125), &uniform_counts), 7378);
+        assert_eq!(containers_tiered(&geometric_tiers(1250), &uniform_counts), 7675);
+        assert_eq!(containers_tiered(&geometric_tiers(1500), &uniform_counts), 8101);
+        assert_eq!(containers_tiered(&geometric_tiers(2000), &uniform_counts), 9463);
 
-        let l = counts("logunif", N);
-        assert_eq!(containers_var(&l), 1592);
-        assert_eq!(containers_tiered(&geo_tiers(1125), &l), 1771);
-        assert_eq!(containers_tiered(&geo_tiers(1250), &l), 1820);
-        assert_eq!(containers_tiered(&geo_tiers(1500), &l), 1903);
+        let log_uniform_counts = counts("logunif", OBJECT_COUNT);
+        assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
+        assert_eq!(containers_tiered(&geometric_tiers(1125), &log_uniform_counts), 1771);
+        assert_eq!(containers_tiered(&geometric_tiers(1250), &log_uniform_counts), 1820);
+        assert_eq!(containers_tiered(&geometric_tiers(1500), &log_uniform_counts), 1903);
         // ⚠️ discrete 那个分布不中立：它的三个取样点 512 / 1024 / 4096 全是 2 的幂，
         // 所以 r = 2.0 在它上面只多 1 个容器（0.02%），而 r = 1.125 多 1.91%。
         // 只看那个分布会得出「公比越大越好」这个与另两个分布相反的结论。
-        assert_eq!(containers_tiered(&geo_tiers(2000), &l), 2099);
+        assert_eq!(containers_tiered(&geometric_tiers(2000), &log_uniform_counts), 2099);
 
-        let d = counts("discrete", N);
-        assert_eq!(containers_var(&d), 6448);
-        assert_eq!(containers_tiered(&geo_tiers(2000), &d), 6449);
+        let discrete_counts = counts("discrete", OBJECT_COUNT);
+        assert_eq!(containers_variable_length(&discrete_counts), 6448);
+        assert_eq!(containers_tiered(&geometric_tiers(2000), &discrete_counts), 6449);
     }
 
     /// 分布展开守恒。
     #[test]
     fn counts_conserve_objects() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            let c: u64 = counts(dist, N).iter().sum();
-            assert_eq!(c, N, "dist={dist}");
+        for distribution in ["uniform", "logunif", "discrete"] {
+            let total_objects: u64 = counts(distribution, OBJECT_COUNT).iter().sum();
+            assert_eq!(total_objects, OBJECT_COUNT, "dist={distribution}");
         }
     }
 }

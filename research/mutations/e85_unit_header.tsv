@@ -1,5 +1,5 @@
-M1_covered把all写成any	req.needs.iter().all(|f| set.contains(f))	req.needs.iter().any(|f| set.contains(f))
-M2_修补集漏掉fsid	v.extend([Field::Magic, Field::FmtVer, Field::Flags, Field::Fsid, Field::BlockBirth, Field::HdrCsum]);	v.extend([Field::Magic, Field::FmtVer, Field::Flags, Field::BlockBirth, Field::HdrCsum]);
+M1_covered把all写成any	requirement.needs.iter().all(|field| set.contains(field))	requirement.needs.iter().any(|field| set.contains(field))
+M2_修补集漏掉fsid	fields.extend([Field::Magic, Field::FormatVersion, Field::Flags, Field::Fsid, Field::BlockBirth, Field::HeaderChecksum]);	fields.extend([Field::Magic, Field::FormatVersion, Field::Flags, Field::BlockBirth, Field::HeaderChecksum]);
 M3_块birth宽度写错	Field::BlockBirth => 8,	Field::BlockBirth => 4,
-M4_白名单冲突把白名单本身也算进去	set_b_repair().into_iter().filter(|f| !wl.contains(f)).collect()	set_b_repair().into_iter().collect()
-M5_扫描重建需求退化成只要树ID	Req { name: "D18_3_scan_rebuild", needs: FIVE_TUPLE.to_vec() },	Req { name: "D18_3_scan_rebuild", needs: vec![Field::TreeId] },
+M4_白名单冲突把白名单本身也算进去	repair_field_set().into_iter().filter(|field| !whitelist.contains(field)).collect()	repair_field_set().into_iter().collect()
+M5_扫描重建需求退化成只要树ID	Requirement { name: "D18_3_scan_rebuild", needs: FIVE_TUPLE.to_vec() },	Requirement { name: "D18_3_scan_rebuild", needs: vec![Field::TreeIdentifier] },

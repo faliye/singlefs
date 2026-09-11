@@ -1,13 +1,13 @@
-M1_溢出不开新容器	let containers = (f + records).div_ceil(per).max(1);	let containers = 1u64;
-M2_容器占用不跨轮累积	        f = (f + records) % per;	        f = 0;
-M3_条带表不镜像	let table = (containers * DATA_UNIT + CIDX_LAYERS * NODE) * 2;	let table = containers * DATA_UNIT + CIDX_LAYERS * NODE;
-M4_parity格不计入记录	let records = leaves + sd + spine + sm;	let records = leaves + spine;
-M5_丙臂只翻倍数据	(leaves * DATA_UNIT + SPINE_NODES * NODE) * 2 + JOURNAL_REC + ROOT_SLOT	leaves * DATA_UNIT * 2 + SPINE_NODES * NODE + JOURNAL_REC + ROOT_SLOT
-M6_容器容量按整单元算	(DATA_UNIT - PACKED_HDR) / STRIPE_REC	DATA_UNIT / STRIPE_REC
-M7_元数据桶不算parity	let parity = sd * DATA_UNIT + sm * NODE;	let parity = sd * DATA_UNIT;
-M8_条带数按宽度算	cells.div_ceil(w - 1)	cells.div_ceil(w)
-M9_容器索引层不计	let table = (containers * DATA_UNIT + CIDX_LAYERS * NODE) * 2;	let table = (containers * DATA_UNIT) * 2;
-M10_空发布也计费	    if leaves == 0 {\n        return (0, 0, 0);\n    }\n    let spine	    let spine
-M11_混合负载退化成单一叶数	fn mixed_leaves(r: u64) -> u64 {\n    match r % 3 {\n        0 => 1,\n        1 => 8,\n        _ => 64,\n    }\n}	fn mixed_leaves(_r: u64) -> u64 {\n    8\n}
-M12_w上界失效	(cells + 1).clamp(W_MIN, W_MAX).min(devices).max(W_MIN)	(cells + 1).max(W_MIN).min(devices).max(W_MIN)
-M13_甲更省的轮数方向反了	        if a < c {\n            a_cheaper += 1;\n        }	        if a > c {\n            a_cheaper += 1;\n        }
+M1_溢出不开新容器	let containers = (occupied_container_slots + member_records).div_ceil(container_capacity_records).max(1);	let containers = 1u64;
+M2_容器占用不跨轮累积	        occupied_container_slots = (occupied_container_slots + member_records) % container_capacity_records;	        occupied_container_slots = 0;
+M3_条带表不镜像	let stripe_table_bytes = (containers * DATA_UNIT_SIZE_BYTES + CONTAINER_INDEX_LAYERS * NODE_SIZE_BYTES) * 2;	let stripe_table_bytes = containers * DATA_UNIT_SIZE_BYTES + CONTAINER_INDEX_LAYERS * NODE_SIZE_BYTES;
+M4_parity格不计入记录	let member_records = leaves + data_stripe_count + spine_nodes + spine_stripe_count;	let member_records = leaves + spine_nodes;
+M5_丙臂只翻倍数据	(leaves * DATA_UNIT_SIZE_BYTES + SPINE_NODES * NODE_SIZE_BYTES) * 2 + JOURNAL_RECORD_BYTES + ROOT_SLOT_BYTES	leaves * DATA_UNIT_SIZE_BYTES * 2 + SPINE_NODES * NODE_SIZE_BYTES + JOURNAL_RECORD_BYTES + ROOT_SLOT_BYTES
+M6_容器容量按整单元算	(DATA_UNIT_SIZE_BYTES - PACKED_CONTAINER_HEADER_BYTES) / STRIPE_RECORD_BYTES	DATA_UNIT_SIZE_BYTES / STRIPE_RECORD_BYTES
+M7_元数据桶不算parity	let parity_bytes = data_stripe_count * DATA_UNIT_SIZE_BYTES + spine_stripe_count * NODE_SIZE_BYTES;	let parity_bytes = data_stripe_count * DATA_UNIT_SIZE_BYTES;
+M8_条带数按宽度算	cells.div_ceil(stripe_width - 1)	cells.div_ceil(stripe_width)
+M9_容器索引层不计	let stripe_table_bytes = (containers * DATA_UNIT_SIZE_BYTES + CONTAINER_INDEX_LAYERS * NODE_SIZE_BYTES) * 2;	let stripe_table_bytes = (containers * DATA_UNIT_SIZE_BYTES) * 2;
+M10_空发布也计费	    if leaves == 0 {\n        return (0, 0, 0);\n    }\n    let spine_nodes	    let spine_nodes
+M11_混合负载退化成单一叶数	fn mixed_leaves(round_index: u64) -> u64 {\n    match round_index % 3 {\n        0 => 1,\n        1 => 8,\n        _ => 64,\n    }\n}	fn mixed_leaves(_round_index: u64) -> u64 {\n    8\n}
+M12_w上界失效	(cells + 1).clamp(STRIPE_WIDTH_MINIMUM, STRIPE_WIDTH_MAXIMUM).min(devices).max(STRIPE_WIDTH_MINIMUM)	(cells + 1).max(STRIPE_WIDTH_MINIMUM).min(devices).max(STRIPE_WIDTH_MINIMUM)
+M13_甲更省的轮数方向反了	        if stripe_table_arm_bytes < full_mirror_arm_bytes {\n            rounds_where_stripe_table_arm_cheaper += 1;\n        }	        if stripe_table_arm_bytes > full_mirror_arm_bytes {\n            rounds_where_stripe_table_arm_cheaper += 1;\n        }

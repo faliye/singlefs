@@ -23,19 +23,19 @@ use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::time::Instant;
 
-const O_DIRECT: i32 = 0o40000;
-const ALIGN: usize = 4096;
-const BLK: usize = 4096;
+const O_DIRECT: i32 = 0o40000; // naming-lint:external Linux open(2) 标志名
+const DIRECT_INPUT_OUTPUT_ALIGNMENT_BYTES: usize = 4096;
+const BLOCK_BYTES: usize = 4096;
 
-struct Aligned { ptr: *mut u8, len: usize, lay: Layout }
-impl Aligned {
-    fn new(len: usize) -> Self {
-        let lay = Layout::from_size_align(len, ALIGN).unwrap();
-        Aligned { ptr: unsafe { alloc(lay) }, len, lay }
+struct AlignedBuffer { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
+impl AlignedBuffer {
+    fn new(length_in_bytes: usize) -> Self {
+        let layout = Layout::from_size_align(length_in_bytes, DIRECT_INPUT_OUTPUT_ALIGNMENT_BYTES).unwrap();
+        AlignedBuffer { pointer: unsafe { alloc(layout) }, length_in_bytes, layout }
     }
-    fn as_mut(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) } }
+    fn as_mut(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
 }
-impl Drop for Aligned { fn drop(&mut self) { unsafe { dealloc(self.ptr, self.lay) } } }
+impl Drop for AlignedBuffer { fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } } }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Arm {
@@ -55,149 +55,149 @@ impl Arm {
             Arm::NoSync => 1,
         }
     }
-    fn syncs(self) -> bool { !matches!(self, Arm::NoSync) }
+    fn issues_fdatasync(self) -> bool { !matches!(self, Arm::NoSync) }
 }
 
 /// 跑一轮，返回 (fsync 次数, 耗时纳秒)。**耗时为 0 返回 None**——读不到 ≠ 读到 0。
-fn one_round(path: &str, arm: Arm, syncs: u64, file_blocks: u64) -> std::io::Result<Option<(u64, u128)>> {
-    let mut f = std::fs::OpenOptions::new().read(true).write(true)
+fn one_round(path: &str, arm: Arm, sync_count: u64, file_block_count: u64) -> std::io::Result<Option<(u64, u128)>> {
+    let mut device_file = std::fs::OpenOptions::new().read(true).write(true)
         .custom_flags(O_DIRECT).open(path)?;
-    let mut buf = Aligned::new(BLK);
-    for (i, b) in buf.as_mut().iter_mut().enumerate() { *b = (i % 251) as u8; }
-    let mut x: u64 = 0x2545_F491_4F6C_DD1D;
-    let t0 = Instant::now();
-    for _ in 0..syncs {
+    let mut block_buffer = AlignedBuffer::new(BLOCK_BYTES);
+    for (byte_index, byte) in block_buffer.as_mut().iter_mut().enumerate() { *byte = (byte_index % 251) as u8; }
+    let mut xorshift_state: u64 = 0x2545_F491_4F6C_DD1D;
+    let start_instant = Instant::now();
+    for _ in 0..sync_count {
         for _ in 0..arm.writes_per_sync() {
-            x ^= x << 13; x ^= x >> 7; x ^= x << 17;      // xorshift64
-            let blk = x % file_blocks;
-            f.seek(SeekFrom::Start(blk * BLK as u64))?;
-            f.write_all(buf.as_mut())?;
+            xorshift_state ^= xorshift_state << 13; xorshift_state ^= xorshift_state >> 7; xorshift_state ^= xorshift_state << 17;      // xorshift64
+            let block_index = xorshift_state % file_block_count;
+            device_file.seek(SeekFrom::Start(block_index * BLOCK_BYTES as u64))?;
+            device_file.write_all(block_buffer.as_mut())?;
         }
-        if arm.syncs() { f.sync_data()?; }
+        if arm.issues_fdatasync() { device_file.sync_data()?; }
     }
-    let ns = t0.elapsed().as_nanos();
-    Ok(measurement(syncs, ns))
+    let elapsed_nanoseconds = start_instant.elapsed().as_nanos();
+    Ok(measurement(sync_count, elapsed_nanoseconds))
 }
 
 /// 把「读不到 ≠ 读到 0」这一条抽成纯函数，**否则它只活在 I/O 路径里、没有任何单测看得见**。
 /// 耗时为 0 一律返回 None，让调用方整轮作废。
-fn measurement(syncs: u64, ns: u128) -> Option<(u64, u128)> {
-    if ns == 0 { None } else { Some((syncs, ns)) }
+fn measurement(sync_count: u64, elapsed_nanoseconds: u128) -> Option<(u64, u128)> {
+    if elapsed_nanoseconds == 0 { None } else { Some((sync_count, elapsed_nanoseconds)) }
 }
 
 /// 每秒多少次 fsync。整数千分之一，避免浮点在产物里抖。
-fn per_sec_milli(syncs: u64, ns: u128) -> u64 {
-    ((syncs as u128) * 1_000_000_000_000 / ns) as u64
+fn rate_in_thousandths_per_second(sync_count: u64, elapsed_nanoseconds: u128) -> u64 {
+    ((sync_count as u128) * 1_000_000_000_000 / elapsed_nanoseconds) as u64
 }
 
 // ── B 段：字节账 ──────────────────────────────────────────────────────
 /// E23 已定的头部 84 字节里，`jsn` 占 8 字节。把它换成 `jsn_bytes` 之后的头部。
-const HDR_BASE: u64 = 84;
-const JSN_BASE: u64 = 8;
+const BASE_RECORD_HEADER_BYTES: u64 = 84;
+const BASE_RECORD_JSN_BYTES: u64 = 8;
 /// D23 已定项 7 定案新增：事务号 8 + 提交标记 1。
-const TXN_BYTES: u64 = 9;
+const TRANSACTION_FIELD_BYTES: u64 = 9;
 /// D23 已定项 8 方向已定的反向链，按 32 位算。
-const CHAIN_BYTES: u64 = 4;
+const BACK_CHAIN_BYTES: u64 = 4;
 /// E23 的点名项宽度。
-const ITEM_BYTES: u64 = 56;
+const NAMED_ITEM_BYTES: u64 = 56;
 
-fn header_bytes(jsn_bytes: u64) -> u64 { HDR_BASE - JSN_BASE + jsn_bytes + TXN_BYTES + CHAIN_BYTES }
+fn header_bytes(jsn_bytes: u64) -> u64 { BASE_RECORD_HEADER_BYTES - BASE_RECORD_JSN_BYTES + jsn_bytes + TRANSACTION_FIELD_BYTES + BACK_CHAIN_BYTES }
 
 /// 一条记录在盘上真的占几字节：向上取整到原子单元。
-fn on_disk(jsn_bytes: u64, items: u64, unit: u64) -> u64 {
-    (header_bytes(jsn_bytes) + items * ITEM_BYTES).div_ceil(unit) * unit
+fn on_disk_record_bytes(jsn_bytes: u64, item_count: u64, atomic_unit_bytes: u64) -> u64 {
+    (header_bytes(jsn_bytes) + item_count * NAMED_ITEM_BYTES).div_ceil(atomic_unit_bytes) * atomic_unit_bytes
 }
 
 /// 一个原子单元装得下几个点名项。
-fn items_per_unit(jsn_bytes: u64, unit: u64) -> u64 {
-    unit.saturating_sub(header_bytes(jsn_bytes)) / ITEM_BYTES
+fn items_per_unit(jsn_bytes: u64, atomic_unit_bytes: u64) -> u64 {
+    atomic_unit_bytes.saturating_sub(header_bytes(jsn_bytes)) / NAMED_ITEM_BYTES
 }
 
-/// 在 `0..=max_items` 这些点名项数里，加宽 `jsn` 会多占一个原子单元的**有几个**。
+/// 在 `0..=largest_item_count` 这些点名项数里，加宽 `jsn` 会多占一个原子单元的**有几个**。
 /// 这才是代价的完整形状：不是「零」，是「零点几个百分点的项数上会多一个单元」。
-fn item_counts_that_cost_a_unit(from: u64, to: u64, unit: u64, max_items: u64) -> u64 {
-    (0..=max_items).filter(|&n| on_disk(to, n, unit) > on_disk(from, n, unit)).count() as u64
+fn item_counts_that_cost_a_unit(narrow_jsn_bytes: u64, wide_jsn_bytes: u64, atomic_unit_bytes: u64, largest_item_count: u64) -> u64 {
+    (0..=largest_item_count).filter(|&item_count| on_disk_record_bytes(wide_jsn_bytes, item_count, atomic_unit_bytes) > on_disk_record_bytes(narrow_jsn_bytes, item_count, atomic_unit_bytes)).count() as u64
 }
 
-/// 计数器撑多少年：`2^bits ÷ 速率`。速率单位是「每秒千分之一次」。
-fn years(bits: u32, per_sec_milli: u64) -> u64 {
-    if per_sec_milli == 0 { return u64::MAX }
-    let cap = if bits >= 64 { u128::from(u64::MAX) } else { 1u128 << bits };
-    (cap * 1000 / per_sec_milli as u128 / 31_557_600) as u64
+/// 计数器撑多少年：`2^counter_bits ÷ 速率`。速率单位是「每秒千分之一次」。
+fn counter_lifetime_years(counter_bits: u32, rate_in_thousandths_per_second: u64) -> u64 {
+    if rate_in_thousandths_per_second == 0 { return u64::MAX }
+    let counter_value_space = if counter_bits >= 64 { u128::from(u64::MAX) } else { 1u128 << counter_bits };
+    (counter_value_space * 1000 / rate_in_thousandths_per_second as u128 / 31_557_600) as u64
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     let path = std::env::args().nth(1).unwrap_or_else(|| {
         eprintln!("用法: e44_jsn_width <镜像路径>（落临时目录，不进仓库）"); std::process::exit(2)
     });
-    let file_blocks = 16_384u64;       // 64 MiB
-    let syncs = 2_000u64;
-    let rounds = 5;
-    println!("{}", em.emit_raw(&format!(
-        "name=config file_blocks={file_blocks} block={BLK} syncs_per_round={syncs} rounds={rounds}")));
+    let file_block_count = 16_384u64;       // 64 MiB
+    let syncs_per_round = 2_000u64;
+    let round_count = 5;
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config file_blocks={file_block_count} block={BLOCK_BYTES} syncs_per_round={syncs_per_round} rounds={round_count}")));
 
-    let mut medians = std::collections::BTreeMap::new();
+    let mut median_rate_by_arm = std::collections::BTreeMap::new();
     for arm in [Arm::Sync1, Arm::Sync8, Arm::NoSync] {
         // ⚠️ **第一轮是冷的，显式跑一轮预热并把它报出来、不计入**。
         // 实测：不预热时第 0 轮耗时是其余轮的 2 倍，五轮离散 49.7%，
         // 按本实验自己的失败条款（离散 > ±20% 报「不稳定」）就下不了结论。
         // 预热要**可见**——藏起来等于偷偷把最慢那轮删掉。
-        match one_round(&path, arm, syncs, file_blocks) {
-            Ok(Some((n, ns))) => println!("{}", em.emit_raw(&format!(
-                "name=warmup arm={arm:?} syncs={n} elapsed_ns={ns} counted=false"))),
+        match one_round(&path, arm, syncs_per_round, file_block_count) {
+            Ok(Some((sync_count, elapsed_nanoseconds))) => println!("{}", emitter.emit_raw(&format!(
+                "name=warmup arm={arm:?} syncs={sync_count} elapsed_ns={elapsed_nanoseconds} counted=false"))),
             Ok(None) => { eprintln!("e45: {arm:?} 预热轮耗时读数为 0，整轮作废"); std::process::exit(3) }
-            Err(e) => { eprintln!("e45: {arm:?} 预热轮出错：{e}"); std::process::exit(4) }
+            Err(error) => { eprintln!("e45: {arm:?} 预热轮出错：{error}"); std::process::exit(4) }
         }
-        let mut v = Vec::new();
-        for r in 0..rounds {
-            match one_round(&path, arm, syncs, file_blocks) {
-                Ok(Some((n, ns))) => {
-                    let ps = per_sec_milli(n, ns);
-                    println!("{}", em.emit_raw(&format!(
-                        "name=round arm={arm:?} round={r} syncs={n} elapsed_ns={ns} per_sec_milli={ps}")));
-                    v.push(ps);
+        let mut rates_per_round = Vec::new();
+        for round_index in 0..round_count {
+            match one_round(&path, arm, syncs_per_round, file_block_count) {
+                Ok(Some((sync_count, elapsed_nanoseconds))) => {
+                    let rate_in_thousandths_per_second = rate_in_thousandths_per_second(sync_count, elapsed_nanoseconds);
+                    println!("{}", emitter.emit_raw(&format!(
+                        "name=round arm={arm:?} round={round_index} syncs={sync_count} elapsed_ns={elapsed_nanoseconds} per_sec_milli={rate_in_thousandths_per_second}")));
+                    rates_per_round.push(rate_in_thousandths_per_second);
                 }
                 // 读不到 ≠ 读到 0：耗时为 0 整轮作废，不许当成一个测量值
-                Ok(None) => { eprintln!("e45: {arm:?} 第 {r} 轮耗时读数为 0，整轮作废"); std::process::exit(3) }
-                Err(e) => { eprintln!("e45: {arm:?} 第 {r} 轮出错：{e}"); std::process::exit(4) }
+                Ok(None) => { eprintln!("e45: {arm:?} 第 {round_index} 轮耗时读数为 0，整轮作废"); std::process::exit(3) }
+                Err(error) => { eprintln!("e45: {arm:?} 第 {round_index} 轮出错：{error}"); std::process::exit(4) }
             }
         }
-        v.sort_unstable();
-        let med = v[v.len() / 2];
-        let spread = (v[v.len() - 1] - v[0]) * 10_000 / med.max(1);   // 万分之一
-        println!("{}", em.emit_raw(&format!(
-            "name=arm arm={arm:?} median_per_sec_milli={med} spread_bp={spread} \
-             min={} max={}", v[0], v[v.len() - 1])));
-        medians.insert(format!("{arm:?}"), med);
+        rates_per_round.sort_unstable();
+        let median_rate = rates_per_round[rates_per_round.len() / 2];
+        let spread_basis_points = (rates_per_round[rates_per_round.len() - 1] - rates_per_round[0]) * 10_000 / median_rate.max(1);   // 万分之一
+        println!("{}", emitter.emit_raw(&format!(
+            "name=arm arm={arm:?} median_per_sec_milli={median_rate} spread_bp={spread_basis_points} \
+             min={} max={}", rates_per_round[0], rates_per_round[rates_per_round.len() - 1])));
+        median_rate_by_arm.insert(format!("{arm:?}"), median_rate);
     }
 
     // 阳性对照：不 fsync 必须显著更快，否则 fdatasync 根本没到设备
-    let s1 = medians["Sync1"];
-    let ns_ = medians["NoSync"];
-    println!("{}", em.emit_raw(&format!(
-        "name=poscontrol sync1_per_sec_milli={s1} nosync_per_sec_milli={ns_} ratio_bp={} ok={}",
-        ns_ * 10_000 / s1.max(1), ns_ > s1 * 2)));
+    let sync1_median_rate = median_rate_by_arm["Sync1"];
+    let nosync_median_rate = median_rate_by_arm["NoSync"];
+    println!("{}", emitter.emit_raw(&format!(
+        "name=poscontrol sync1_per_sec_milli={sync1_median_rate} nosync_per_sec_milli={nosync_median_rate} ratio_bp={} ok={}",
+        nosync_median_rate * 10_000 / sync1_median_rate.max(1), nosync_median_rate > sync1_median_rate * 2)));
 
     // A 段折算：本机最坏臂（Sync1）下各位宽撑多少年
-    for bits in [48u32, 56, 64] {
-        println!("{}", em.emit_raw(&format!(
-            "name=lifetime bits={bits} years_at_sync1={} years_at_sync8={}",
-            years(bits, s1), years(bits, medians["Sync8"]))));
+    for counter_bits in [48u32, 56, 64] {
+        println!("{}", emitter.emit_raw(&format!(
+            "name=lifetime bits={counter_bits} years_at_sync1={} years_at_sync8={}",
+            counter_lifetime_years(counter_bits, sync1_median_rate), counter_lifetime_years(counter_bits, median_rate_by_arm["Sync8"]))));
     }
 
     // B 段：加宽 jsn 的代价
-    for unit in [512u64, 4096] {
-        for jsn in [8u64, 10, 12, 16] {
-            println!("{}", em.emit_raw(&format!(
-                "name=width unit={unit} jsn_bytes={jsn} header={} on_disk_items1={} \
+    for atomic_unit_bytes in [512u64, 4096] {
+        for jsn_bytes in [8u64, 10, 12, 16] {
+            println!("{}", emitter.emit_raw(&format!(
+                "name=width unit={atomic_unit_bytes} jsn_bytes={jsn_bytes} header={} on_disk_items1={} \
                  on_disk_items12={} items_per_unit={} cost_unit_count_0_100={}",
-                header_bytes(jsn), on_disk(jsn, 1, unit), on_disk(jsn, 12, unit),
-                items_per_unit(jsn, unit),
-                item_counts_that_cost_a_unit(8, jsn, unit, 100))));
+                header_bytes(jsn_bytes), on_disk_record_bytes(jsn_bytes, 1, atomic_unit_bytes), on_disk_record_bytes(jsn_bytes, 12, atomic_unit_bytes),
+                items_per_unit(jsn_bytes, atomic_unit_bytes),
+                item_counts_that_cost_a_unit(8, jsn_bytes, atomic_unit_bytes, 100))));
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -231,7 +231,7 @@ mod tests {
         assert_eq!(Arm::Sync1.writes_per_sync(), 1);
         assert_eq!(Arm::Sync8.writes_per_sync(), 8, "粗粒度那一臂该是 8 次写一次 fsync");
         assert_eq!(Arm::NoSync.writes_per_sync(), 1);
-        assert!(Arm::Sync1.syncs() && Arm::Sync8.syncs() && !Arm::NoSync.syncs());
+        assert!(Arm::Sync1.issues_fdatasync() && Arm::Sync8.issues_fdatasync() && !Arm::NoSync.issues_fdatasync());
     }
 
     /// **「读不到 ≠ 读到 0」要能被单测看见。**
@@ -242,32 +242,32 @@ mod tests {
     }
 
     /// **阳性对照要真的跑一次 I/O**，否则「fdatasync 有没有到设备」只活在产物里、
-    /// 没有任何检查看得见（变异 M1 实测：把 `if arm.syncs()` 改成 `if false`，一个测试都不红）。
+    /// 没有任何检查看得见（变异 M1 实测：把 `if arm.issues_fdatasync()` 改成 `if false`，一个测试都不红）。
     #[test]
     fn fdatasync_actually_reaches_the_device() {
         // ⚠️ **这是计时断言，跑在与整个 workspace 并行的测试进程里**：60 轮的样本
         // 在负载高时会被调度噪声盖过（2026-08-31 实测：单跑 3/3 过，全量套件里 1 过 1 红）。
         // ⇒ 最多试 3 次，任意一次拿到 ≥2× 就算过；三次都拿不到才判红。
-        // **判别力不受影响**：`if arm.syncs()` 被改成 `if false` 时三次都不可能出现那个差距。
-        let p = std::env::temp_dir().join(format!("e44-selftest-{}.img", std::process::id()));
-        let path = p.to_string_lossy().to_string();
-        std::fs::File::create(&p).unwrap().set_len(8 * 1024 * 1024).unwrap();
-        let _ = one_round(&path, Arm::Sync1, 20, 2048);          // 预热
-        let mut seen = Vec::new();
-        let mut ok = false;
+        // **判别力不受影响**：`if arm.issues_fdatasync()` 被改成 `if false` 时三次都不可能出现那个差距。
+        let image_file_path = std::env::temp_dir().join(format!("e44-selftest-{}.img", std::process::id()));
+        let image_file_path_text = image_file_path.to_string_lossy().to_string();
+        std::fs::File::create(&image_file_path).unwrap().set_len(8 * 1024 * 1024).unwrap();
+        let _ = one_round(&image_file_path_text, Arm::Sync1, 20, 2048);          // 预热
+        let mut observed_rate_pairs = Vec::new();
+        let mut is_nosync_at_least_twice_as_fast = false;
         for _ in 0..3 {
-            let (n1, t1) = one_round(&path, Arm::Sync1, 60, 2048).unwrap().unwrap();
-            let (n0, t0) = one_round(&path, Arm::NoSync, 60, 2048).unwrap().unwrap();
-            let (sync_rate, nosync_rate) = (per_sec_milli(n1, t1), per_sec_milli(n0, t0));
-            seen.push((nosync_rate, sync_rate));
+            let (sync_arm_sync_count, sync_arm_nanoseconds) = one_round(&image_file_path_text, Arm::Sync1, 60, 2048).unwrap().unwrap();
+            let (nosync_arm_sync_count, nosync_arm_nanoseconds) = one_round(&image_file_path_text, Arm::NoSync, 60, 2048).unwrap().unwrap();
+            let (sync_rate, nosync_rate) = (rate_in_thousandths_per_second(sync_arm_sync_count, sync_arm_nanoseconds), rate_in_thousandths_per_second(nosync_arm_sync_count, nosync_arm_nanoseconds));
+            observed_rate_pairs.push((nosync_rate, sync_rate));
             if nosync_rate > sync_rate * 2 {
-                ok = true;
+                is_nosync_at_least_twice_as_fast = true;
                 break;
             }
         }
-        let _ = std::fs::remove_file(&p);
-        assert!(ok,
-            "不 fdatasync 该至少快一倍，否则 fdatasync 根本没到设备（三次都没拿到：{seen:?}）");
+        let _ = std::fs::remove_file(&image_file_path);
+        assert!(is_nosync_at_least_twice_as_fast,
+            "不 fdatasync 该至少快一倍，否则 fdatasync 根本没到设备（三次都没拿到：{observed_rate_pairs:?}）");
     }
 
     /// **代价不是「零」，是「零点几个百分点的项数上会多一个单元」。**
@@ -284,39 +284,39 @@ mod tests {
         assert!(item_counts_that_cost_a_unit(8, 500, 512, 100) > 50,
             "加宽 492 字节该在大量项数上多占单元——扫描没在扫整个区间");
         // 而典型的那两档一格都不多
-        for unit in [512u64, 4096] {
-            for items in [1u64, 7, 12] {
-                assert_eq!(on_disk(8, items, unit), on_disk(12, items, unit),
-                    "jsn 8 → 12 在 {unit} 单元、{items} 项上该不多占");
+        for atomic_unit_bytes in [512u64, 4096] {
+            for item_count in [1u64, 7, 12] {
+                assert_eq!(on_disk_record_bytes(8, item_count, atomic_unit_bytes), on_disk_record_bytes(12, item_count, atomic_unit_bytes),
+                    "jsn 8 → 12 在 {atomic_unit_bytes} 单元、{item_count} 项上该不多占");
             }
         }
     }
 
     /// **绝对值断言**：计数器寿命由 `2^位宽 ÷ 速率` 独立算出。
-    /// 10⁶/秒 ⇒ per_sec_milli = 10⁹。
+    /// 10⁶/秒 ⇒ rate_in_thousandths_per_second = 10⁹。
     #[test]
     fn counter_lifetime_matches_independently_computed_arithmetic() {
-        let rate = 1_000_000_000u64;                    // 10⁶ 次/秒
+        let rate_of_one_million_per_second = 1_000_000_000u64;                    // 10⁶ 次/秒
         // 2^48 / 1e6 / 31557600 秒每年 ≈ 8.9 年
-        assert_eq!(years(48, rate), (1u128 << 48) as u64 / 1_000_000 / 31_557_600);
-        assert_eq!(years(48, rate), 8);
-        assert!(years(56, rate) > 2000);
+        assert_eq!(counter_lifetime_years(48, rate_of_one_million_per_second), (1u128 << 48) as u64 / 1_000_000 / 31_557_600);
+        assert_eq!(counter_lifetime_years(48, rate_of_one_million_per_second), 8);
+        assert!(counter_lifetime_years(56, rate_of_one_million_per_second) > 2000);
     }
 
     /// **速率换算是双射**：同样的次数、耗时翻倍 ⇒ 速率减半。
     #[test]
     fn rate_halves_when_elapsed_doubles() {
-        let a = per_sec_milli(1000, 1_000_000_000);
-        let b = per_sec_milli(1000, 2_000_000_000);
-        assert_eq!(a, 1_000_000, "1000 次 / 1 秒 = 每秒 1000 次 = 1_000_000 千分之一");
-        assert_eq!(b, a / 2);
+        let rate_over_one_second = rate_in_thousandths_per_second(1000, 1_000_000_000);
+        let rate_over_two_seconds = rate_in_thousandths_per_second(1000, 2_000_000_000);
+        assert_eq!(rate_over_one_second, 1_000_000, "1000 次 / 1 秒 = 每秒 1000 次 = 1_000_000 千分之一");
+        assert_eq!(rate_over_two_seconds, rate_over_one_second / 2);
     }
 
     /// **耗时读到 0 必须是 None**，不许当成一个测量值参与判定。
     #[test]
     fn zero_elapsed_is_not_a_measurement() {
         // one_round 在 ns == 0 时返回 None；这里直接验那个分支的算术前提
-        assert_eq!(per_sec_milli(1, 1), 1_000_000_000_000);
+        assert_eq!(rate_in_thousandths_per_second(1, 1), 1_000_000_000_000);
     }
 
     /// **阳性对照的判据本身要有意义**：不 fsync 必须至少快一倍才算「到了设备」。

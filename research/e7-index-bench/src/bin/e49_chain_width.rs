@@ -32,24 +32,24 @@ use e7_index_bench::Emitter;
 const ITEM_BYTES: u64 = 56;
 
 /// 一条记录在盘上占几个原子单元。`base` 是**不含链**的记录头总字节。
-fn units_on_disk(base: u64, chain: u64, items: u64, unit: u64) -> u64 {
-    let sz = base + chain + items * ITEM_BYTES;
-    sz.div_ceil(unit)
+fn units_on_disk(base: u64, chain_bytes: u64, items: u64, unit: u64) -> u64 {
+    let record_bytes_before_rounding = base + chain_bytes + items * ITEM_BYTES;
+    record_bytes_before_rounding.div_ceil(unit)
 }
 
-/// 两个链宽在给定 `base` / `unit` 下，0..=`max_items` 里有多少个项数上占的单元数不同。
-fn divergences(base: u64, a: u64, b: u64, unit: u64, max_items: u64) -> (u64, Option<u64>) {
-    let mut n = 0u64;
-    let mut first = None;
-    for items in 0..=max_items {
-        if units_on_disk(base, a, items, unit) != units_on_disk(base, b, items, unit) {
-            n += 1;
-            if first.is_none() {
-                first = Some(items);
+/// 两个链宽在给定 `base` / `unit` 下，0..=`largest_item_count` 里有多少个项数上占的单元数不同。
+fn divergences(base: u64, narrow_chain_bytes: u64, wide_chain_bytes: u64, unit: u64, largest_item_count: u64) -> (u64, Option<u64>) {
+    let mut divergent_item_count = 0u64;
+    let mut first_divergent_items = None;
+    for items in 0..=largest_item_count {
+        if units_on_disk(base, narrow_chain_bytes, items, unit) != units_on_disk(base, wide_chain_bytes, items, unit) {
+            divergent_item_count += 1;
+            if first_divergent_items.is_none() {
+                first_divergent_items = Some(items);
             }
         }
     }
-    (n, first)
+    (divergent_item_count, first_divergent_items)
 }
 
 /// 误接受期望次数 = 机会数 × 2⁻ⁿ。
@@ -58,13 +58,13 @@ fn expected_false_accepts(chances: f64, bits: u32) -> f64 {
 }
 
 /// 「一生至少出一次」的概率。泊松近似：1 − e^(−λ)。
-fn at_least_once(expected: f64) -> f64 {
-    1.0 - (-expected).exp()
+fn at_least_once(expected_false_accept_count: f64) -> f64 {
+    1.0 - (-expected_false_accept_count).exp()
 }
 
 /// 判据 1：「n 位够用」= 一生至少出一次的概率 < 1%。**阈值写死在这里，跑前定的。**
-fn enough(at_least_once_p: f64) -> bool {
-    at_least_once_p < 0.01
+fn enough(at_least_once_probability: f64) -> bool {
+    at_least_once_probability < 0.01
 }
 
 /// 仓里出现过的记录头候选（不含链）：
@@ -73,46 +73,46 @@ fn enough(at_least_once_p: f64) -> bool {
 const BASES: [u64; 6] = [78, 84, 86, 93, 95, 99];
 const CHAINS: [u64; 3] = [2, 4, 8];
 const UNITS: [u64; 2] = [512, 4096];
-const MAX_ITEMS: u64 = 2000;
+const LARGEST_ITEM_COUNT: u64 = 2000;
 const BITS: [u32; 4] = [8, 16, 32, 64];
 
 const INCIDENT_CHANCES: f64 = 36_500.0; // D-事故：每天崩 10 次 × 十年
 const RINGS: [u64; 3] = [10 * 1024 * 1024, 100 * 1024 * 1024, 2 * 1024 * 1024 * 1024];
-const REC_ON_DISK: [u64; 2] = [512, 4096];
+const RECORD_ON_DISK_BYTES: [u64; 2] = [512, 4096];
 const PASSES: [(&str, f64); 2] = [("weekly", 522.0), ("daily", 3650.0)];
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config item_bytes={ITEM_BYTES} max_items={MAX_ITEMS} \
+        emitter.emit_raw(&format!(
+            "name=config item_bytes={ITEM_BYTES} max_items={LARGEST_ITEM_COUNT} \
              incident_chances={INCIDENT_CHANCES}"
         ))
     );
 
     // ── 代价：扫遍定义域 ──
-    let mut free_24 = 0u64;
-    let mut free_48 = 0u64;
-    let mut cells = 0u64;
+    let mut free_cell_count_2_versus_4 = 0u64;
+    let mut free_cell_count_4_versus_8 = 0u64;
+    let mut cell_count = 0u64;
     for base in BASES {
         for unit in UNITS {
-            let (d24, f24) = divergences(base, 2, 4, unit, MAX_ITEMS);
-            let (d48, f48) = divergences(base, 4, 8, unit, MAX_ITEMS);
-            cells += 1;
-            if d24 == 0 {
-                free_24 += 1;
+            let (divergent_count_2_versus_4, first_divergent_items_2_versus_4) = divergences(base, 2, 4, unit, LARGEST_ITEM_COUNT);
+            let (divergent_count_4_versus_8, first_divergent_items_4_versus_8) = divergences(base, 4, 8, unit, LARGEST_ITEM_COUNT);
+            cell_count += 1;
+            if divergent_count_2_versus_4 == 0 {
+                free_cell_count_2_versus_4 += 1;
             }
-            if d48 == 0 {
-                free_48 += 1;
+            if divergent_count_4_versus_8 == 0 {
+                free_cell_count_4_versus_8 += 1;
             }
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=cost base={base} unit={unit} div_2v4={d24} first_2v4={} \
-                     div_4v8={d48} first_4v8={} cap_items={}",
-                    f24.map(|v| v.to_string()).unwrap_or_else(|| "NA".into()),
-                    f48.map(|v| v.to_string()).unwrap_or_else(|| "NA".into()),
+                emitter.emit_raw(&format!(
+                    "name=cost base={base} unit={unit} div_2v4={divergent_count_2_versus_4} first_2v4={} \
+                     div_4v8={divergent_count_4_versus_8} first_4v8={} cap_items={}",
+                    first_divergent_items_2_versus_4.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                    first_divergent_items_4_versus_8.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
                     unit.saturating_sub(base + 8) / ITEM_BYTES,
                 ))
             );
@@ -120,41 +120,41 @@ fn main() {
     }
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=cost_summary cells={cells} free_2v4={free_24} free_4v8={free_48}"
+        emitter.emit_raw(&format!(
+            "name=cost_summary cells={cell_count} free_2v4={free_cell_count_2_versus_4} free_4v8={free_cell_count_4_versus_8}"
         ))
     );
 
     // ── 收益一：D-事故 ──
     for bits in BITS {
-        let e = expected_false_accepts(INCIDENT_CHANCES, bits);
+        let expected_false_accept_count = expected_false_accepts(INCIDENT_CHANCES, bits);
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=risk_incident bits={bits} chances={INCIDENT_CHANCES} expected={e:.6e} \
+            emitter.emit_raw(&format!(
+                "name=risk_incident bits={bits} chances={INCIDENT_CHANCES} expected={expected_false_accept_count:.6e} \
                  at_least_once={:.6e} enough={}",
-                at_least_once(e),
-                u8::from(enough(at_least_once(e))),
+                at_least_once(expected_false_accept_count),
+                u8::from(enough(at_least_once(expected_false_accept_count))),
             ))
         );
     }
 
     // ── 收益二：D-遍历 ──
-    for ring in RINGS {
-        for rec in REC_ON_DISK {
-            for (freq, passes) in PASSES {
-                let pairs_per_pass = (ring / rec) as f64;
-                let chances = pairs_per_pass * passes;
+    for ring_bytes in RINGS {
+        for record_on_disk_bytes in RECORD_ON_DISK_BYTES {
+            for (pass_frequency, lifetime_pass_count) in PASSES {
+                let pairs_per_pass = (ring_bytes / record_on_disk_bytes) as f64;
+                let chances = pairs_per_pass * lifetime_pass_count;
                 for bits in BITS {
-                    let e = expected_false_accepts(chances, bits);
+                    let expected_false_accept_count = expected_false_accepts(chances, bits);
                     println!(
                         "{}",
-                        em.emit_raw(&format!(
-                            "name=risk_traversal ring={ring} rec_on_disk={rec} freq={freq} \
+                        emitter.emit_raw(&format!(
+                            "name=risk_traversal ring={ring_bytes} rec_on_disk={record_on_disk_bytes} freq={pass_frequency} \
                              pairs_per_pass={pairs_per_pass:.0} chances={chances:.6e} bits={bits} \
-                             expected={e:.6e} at_least_once={:.6e} enough={}",
-                            at_least_once(e),
-                            u8::from(enough(at_least_once(e))),
+                             expected={expected_false_accept_count:.6e} at_least_once={:.6e} enough={}",
+                            at_least_once(expected_false_accept_count),
+                            u8::from(enough(at_least_once(expected_false_accept_count))),
                         ))
                     );
                 }
@@ -163,24 +163,24 @@ fn main() {
     }
 
     // ── 阳性对照 ──
-    let e8 = expected_false_accepts(INCIDENT_CHANCES, 8);
+    let expected_at_eight_bits = expected_false_accepts(INCIDENT_CHANCES, 8);
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=poscontrol_8bit_incident at_least_once={:.6} expect_near_one=1",
-            at_least_once(e8)
+            at_least_once(expected_at_eight_bits)
         ))
     );
-    let (d, f) = divergences(93, 2, 4, 512, MAX_ITEMS);
+    let (base93_divergent_count, base93_first_divergent_items) = divergences(93, 2, 4, 512, LARGEST_ITEM_COUNT);
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=poscontrol_base93_diverges div={d} first={} expect_first=44",
-            f.map(|v| v.to_string()).unwrap_or_else(|| "NA".into())
+        emitter.emit_raw(&format!(
+            "name=poscontrol_base93_diverges div={base93_divergent_count} first={} expect_first=44",
+            base93_first_divergent_items.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into())
         ))
     );
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -195,9 +195,9 @@ mod tests {
         assert_eq!(93 + 4 + 44 * 56, 2561);
         assert_eq!(units_on_disk(93, 2, 44, 512), 5);
         assert_eq!(units_on_disk(93, 4, 44, 512), 6);
-        let (n, first) = divergences(93, 2, 4, 512, 2000);
-        assert_eq!(first, Some(44));
-        assert!(n >= 19, "0..2000 里至少 19 处（0..1200 内已数出 19）");
+        let (divergent_count, first_divergent_items) = divergences(93, 2, 4, 512, 2000);
+        assert_eq!(first_divergent_items, Some(44));
+        assert!(divergent_count >= 19, "0..2000 里至少 19 处（0..1200 内已数出 19）");
     }
 
     /// **`jsn` 加宽之后（base 95）2 与 4 不再分岔**——同一段算术，独立钉死。
@@ -213,10 +213,10 @@ mod tests {
     #[test]
     fn whether_four_versus_eight_is_free_depends_on_the_base() {
         // 分岔的：base 84（首个 items=35）与 base 99（首个 items=53），各 31 处 / 512 单元
-        for (base, first) in [(84u64, 35u64), (99, 53)] {
-            let (n, f) = divergences(base, 4, 8, 512, 2000);
-            assert_eq!(n, 31, "base={base}");
-            assert_eq!(f, Some(first));
+        for (base, expected_first_divergent_items) in [(84u64, 35u64), (99, 53)] {
+            let (divergent_count, first_divergent_items) = divergences(base, 4, 8, 512, 2000);
+            assert_eq!(divergent_count, 31, "base={base}");
+            assert_eq!(first_divergent_items, Some(expected_first_divergent_items));
             assert_eq!(divergences(base, 4, 8, 4096, 2000).0, 4);
         }
         // 不分岔的：78 / 86 / 93 / 95
@@ -231,10 +231,10 @@ mod tests {
     fn only_the_current_base_is_free_on_both_sides() {
         let both_free: Vec<u64> = BASES
             .into_iter()
-            .filter(|&b| {
+            .filter(|&candidate_base| {
                 UNITS
                     .iter()
-                    .all(|&u| divergences(b, 2, 4, u, 2000).0 == 0 && divergences(b, 4, 8, u, 2000).0 == 0)
+                    .all(|&candidate_unit| divergences(candidate_base, 2, 4, candidate_unit, 2000).0 == 0 && divergences(candidate_base, 4, 8, candidate_unit, 2000).0 == 0)
             })
             .collect();
         assert_eq!(both_free, vec![95]);
@@ -244,9 +244,9 @@ mod tests {
     #[test]
     fn capacity_per_unit_is_the_same_for_four_and_eight() {
         for base in BASES {
-            let c4 = (512u64).saturating_sub(base + 4) / ITEM_BYTES;
-            let c8 = (512u64).saturating_sub(base + 8) / ITEM_BYTES;
-            assert_eq!(c4, c8, "base={base}");
+            let items_per_unit_with_four_byte_chain = (512u64).saturating_sub(base + 4) / ITEM_BYTES;
+            let items_per_unit_with_eight_byte_chain = (512u64).saturating_sub(base + 8) / ITEM_BYTES;
+            assert_eq!(items_per_unit_with_four_byte_chain, items_per_unit_with_eight_byte_chain, "base={base}");
         }
         assert_eq!((512u64 - 95 - 8) / 56, 7);
     }
@@ -255,21 +255,21 @@ mod tests {
     /// 32 位期望 8.499e-6、至少一次 8.499e-6。
     #[test]
     fn incident_risk_absolute_values() {
-        let e16 = expected_false_accepts(36_500.0, 16);
-        assert!((e16 - 0.556946).abs() < 1e-5, "{e16}");
-        assert!((at_least_once(e16) - 0.427).abs() < 1e-3);
-        let e32 = expected_false_accepts(36_500.0, 32);
-        assert!((e32 - 8.4983e-6).abs() < 1e-9, "{e32}");
-        assert!(at_least_once(e32) < 0.01, "32 位在事故分母下够用");
-        assert!(at_least_once(e16) > 0.01, "16 位不够用");
+        let expected_at_sixteen_bits = expected_false_accepts(36_500.0, 16);
+        assert!((expected_at_sixteen_bits - 0.556946).abs() < 1e-5, "{expected_at_sixteen_bits}");
+        assert!((at_least_once(expected_at_sixteen_bits) - 0.427).abs() < 1e-3);
+        let expected_at_thirty_two_bits = expected_false_accepts(36_500.0, 32);
+        assert!((expected_at_thirty_two_bits - 8.4983e-6).abs() < 1e-9, "{expected_at_thirty_two_bits}");
+        assert!(at_least_once(expected_at_thirty_two_bits) < 0.01, "32 位在事故分母下够用");
+        assert!(at_least_once(expected_at_sixteen_bits) > 0.01, "16 位不够用");
     }
 
     /// **阳性对照**：8 位在事故分母下必须几乎必然出事。
     #[test]
     fn positive_control_eight_bits_is_a_certainty() {
-        let e8 = expected_false_accepts(36_500.0, 8);
-        assert!(e8 > 100.0, "{e8}");
-        assert!(at_least_once(e8) > 0.999_999);
+        let expected_at_eight_bits = expected_false_accepts(36_500.0, 8);
+        assert!(expected_at_eight_bits > 100.0, "{expected_at_eight_bits}");
+        assert!(at_least_once(expected_at_eight_bits) > 0.999_999);
     }
 
     /// **遍历分母的绝对值**：10 MiB 环 / 每条 512 B ⇒ 每遍 20 480 对；每周 × 十年 = 522 遍
@@ -277,15 +277,15 @@ mod tests {
     /// 64 位期望 5.79e-13。
     #[test]
     fn traversal_risk_absolute_values() {
-        let pairs = (10 * 1024 * 1024u64 / 512) as f64;
-        assert_eq!(pairs, 20480.0);
-        let chances = pairs * 522.0;
+        let pairs_per_pass = (10 * 1024 * 1024u64 / 512) as f64;
+        assert_eq!(pairs_per_pass, 20480.0);
+        let chances = pairs_per_pass * 522.0;
         assert!((chances - 1.069056e7).abs() < 1.0, "{chances}");
-        let e32 = expected_false_accepts(chances, 32);
-        assert!((e32 - 2.4888e-3).abs() < 1e-6, "{e32}");
-        assert!(at_least_once(e32) < 0.01, "32 位在这一档仍够用");
-        let e64 = expected_false_accepts(chances, 64);
-        assert!(e64 < 1e-12);
+        let expected_at_thirty_two_bits = expected_false_accepts(chances, 32);
+        assert!((expected_at_thirty_two_bits - 2.4888e-3).abs() < 1e-6, "{expected_at_thirty_two_bits}");
+        assert!(at_least_once(expected_at_thirty_two_bits) < 0.01, "32 位在这一档仍够用");
+        let expected_at_sixty_four_bits = expected_false_accepts(chances, 64);
+        assert!(expected_at_sixty_four_bits < 1e-12);
     }
 
     /// **最恶劣的那一档遍历分母**：2 GiB 环 / 每条 512 B / 每天 × 十年
@@ -294,15 +294,15 @@ mod tests {
     /// **这一档就是 64 位买到东西的地方。**
     #[test]
     fn the_worst_traversal_bucket_breaks_thirty_two_bits() {
-        let pairs = (2 * 1024 * 1024 * 1024u64 / 512) as f64;
-        assert_eq!(pairs, 4_194_304.0);
-        let chances = pairs * 3650.0;
+        let pairs_per_pass = (2 * 1024 * 1024 * 1024u64 / 512) as f64;
+        assert_eq!(pairs_per_pass, 4_194_304.0);
+        let chances = pairs_per_pass * 3650.0;
         assert!((chances - 1.53092e10).abs() < 1e6, "{chances}");
-        let e32 = expected_false_accepts(chances, 32);
-        assert!((e32 - 3.5645).abs() < 1e-3, "{e32}");
-        assert!(at_least_once(e32) > 0.97, "32 位在这一档几乎必然出事");
-        let e64 = expected_false_accepts(chances, 64);
-        assert!(at_least_once(e64) < 1e-8, "64 位够用");
+        let expected_at_thirty_two_bits = expected_false_accepts(chances, 32);
+        assert!((expected_at_thirty_two_bits - 3.5645).abs() < 1e-3, "{expected_at_thirty_two_bits}");
+        assert!(at_least_once(expected_at_thirty_two_bits) > 0.97, "32 位在这一档几乎必然出事");
+        let expected_at_sixty_four_bits = expected_false_accepts(chances, 64);
+        assert!(at_least_once(expected_at_sixty_four_bits) < 1e-8, "64 位够用");
     }
 
     /// **够用判据的阈值本身**：1% 那条线钉死，且两侧各取一点。

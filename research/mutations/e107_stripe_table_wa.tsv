@@ -1,14 +1,14 @@
-M1_条带数按宽度算不按数据列	let data_cols = w - 1;	let data_cols = w;
-M2_parity格不计入成员记录	let records = p.leaves + s_data + p.spine + s_meta;	let records = p.leaves + p.spine;
-M3_条带表不镜像	table_component * 2	table_component
-M4_容器容量按整单元算	(DATA_UNIT - PACKED_HDR) / STRIPE_REC	DATA_UNIT / STRIPE_REC
-M5_丙臂只翻倍数据不翻倍索引	(p.leaves * DATA_UNIT + p.spine * NODE) * 2	p.leaves * DATA_UNIT * 2 + p.spine * NODE
-M6_w的上界失效	let w = (cells + 1).clamp(W_MIN, W_MAX);	let w = (cells + 1).max(W_MIN);
-M7_容器索引层不计字节	+ u64::from(cidx_layers) * NODE	+ 0 * NODE
-M8_容器溢出不开新容器	let containers_touched = (f + records).div_ceil(per).max(1);	let containers_touched = 1u64;
-M9_元数据桶不算parity	let parity = s_data * DATA_UNIT + s_meta * NODE;	let parity = s_data * DATA_UNIT;
-M10_基线漏掉根槽	self.leaves * DATA_UNIT + self.spine * NODE + JOURNAL_REC + ROOT_SLOT	self.leaves * DATA_UNIT + self.spine * NODE + JOURNAL_REC
-M11_容器索引扇出按整节点	(NODE - CIDX_HDR) / CIDX_ENTRY	NODE / CIDX_ENTRY
-M12_空发布也带脊柱	spine: if leaves == 0 { 0 } else { SPINE_NODES },	spine: SPINE_NODES,
-M13_成员记录宽度改小	const STRIPE_REC: u64 = 56;	const STRIPE_REC: u64 = 48;
-M14_按设备数夹的那一步去掉	w.min(devices).max(W_MIN)	w.max(W_MIN)
+M1_条带数按宽度算不按数据列	let data_columns = stripe_width - 1;	let data_columns = stripe_width;
+M2_parity格不计入成员记录	let member_record_count = publish.leaf_count + data_stripe_count + publish.spine_node_count + spine_stripe_count;	let member_record_count = publish.leaf_count + publish.spine_node_count;
+M3_条带表不镜像	table_component_bytes * 2	table_component_bytes
+M4_容器容量按整单元算	(DATA_UNIT_SIZE_BYTES - PACKED_CONTAINER_HEADER_BYTES) / STRIPE_RECORD_BYTES	DATA_UNIT_SIZE_BYTES / STRIPE_RECORD_BYTES
+M5_丙臂只翻倍数据不翻倍索引	(publish.leaf_count * DATA_UNIT_SIZE_BYTES + publish.spine_node_count * NODE_SIZE_BYTES) * 2	publish.leaf_count * DATA_UNIT_SIZE_BYTES * 2 + publish.spine_node_count * NODE_SIZE_BYTES
+M6_w的上界失效	let stripe_width = (cells + 1).clamp(STRIPE_WIDTH_MINIMUM, STRIPE_WIDTH_MAXIMUM);	let stripe_width = (cells + 1).max(STRIPE_WIDTH_MINIMUM);
+M7_容器索引层不计字节	+ u64::from(container_index_layers) * NODE_SIZE_BYTES	+ 0 * NODE_SIZE_BYTES
+M8_容器溢出不开新容器	let containers_touched = (occupied_slots_in_open_container + member_record_count).div_ceil(container_capacity_records).max(1);	let containers_touched = 1u64;
+M9_元数据桶不算parity	let parity_bytes = data_stripe_count * DATA_UNIT_SIZE_BYTES + spine_stripe_count * NODE_SIZE_BYTES;	let parity_bytes = data_stripe_count * DATA_UNIT_SIZE_BYTES;
+M10_基线漏掉根槽	self.leaf_count * DATA_UNIT_SIZE_BYTES + self.spine_node_count * NODE_SIZE_BYTES + JOURNAL_RECORD_BYTES + ROOT_SLOT_BYTES	self.leaf_count * DATA_UNIT_SIZE_BYTES + self.spine_node_count * NODE_SIZE_BYTES + JOURNAL_RECORD_BYTES
+M11_容器索引扇出按整节点	(NODE_SIZE_BYTES - CONTAINER_INDEX_HEADER_BYTES) / CONTAINER_INDEX_ENTRY_BYTES	NODE_SIZE_BYTES / CONTAINER_INDEX_ENTRY_BYTES
+M12_空发布也带脊柱	spine_node_count: if leaf_count == 0 { 0 } else { SPINE_NODES },	spine_node_count: SPINE_NODES,
+M13_成员记录宽度改小	const STRIPE_RECORD_BYTES: u64 = 56;	const STRIPE_RECORD_BYTES: u64 = 48;
+M14_按设备数夹的那一步去掉	stripe_width.min(devices).max(STRIPE_WIDTH_MINIMUM)	stripe_width.max(STRIPE_WIDTH_MINIMUM)

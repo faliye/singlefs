@@ -52,10 +52,10 @@ impl Reading {
     }
     /// 根环规则扣住几次 fsync 的释放量。**与相位无关**——
     /// 环里留的是最近 K 代根，它跨越 checkpoint 边界，不因刚 checkpoint 过就变短。
-    fn root_ring_events(self, k: u64) -> u64 {
+    fn root_ring_events(self, root_ring_depth: u64) -> u64 {
         match self {
-            Reading::Invariant => k.saturating_sub(1),
-            Reading::Prose => k,
+            Reading::Invariant => root_ring_depth.saturating_sub(1),
+            Reading::Prose => root_ring_depth,
         }
     }
 }
@@ -64,26 +64,26 @@ impl Reading {
 ///
 /// 重放窗口规则扣住「本 checkpoint 窗口内释放的块」，即最近 `p + 1` 次 fsync；
 /// tail 只在 checkpoint 持久之后推进，所以窗口在相位 0 处塌成一格。
-fn pinned_events(reading: Reading, k: u64, phase: u64, ckpt_interval: u64) -> u64 {
-    let root_ring = reading.root_ring_events(k);
-    let replay_window = (phase + 1).min(ckpt_interval);
+fn pinned_events(reading: Reading, root_ring_depth: u64, phase: u64, checkpoint_interval: u64) -> u64 {
+    let root_ring = reading.root_ring_events(root_ring_depth);
+    let replay_window = (phase + 1).min(checkpoint_interval);
     root_ring.max(replay_window) // 并集：两条规则都要满足
 }
 
 /// 只被根环规则扣住、重放窗口规则扣不住的部分——**这才是调小 K 能动的那些块**。
-fn k_only_events(reading: Reading, k: u64, phase: u64, ckpt_interval: u64) -> u64 {
-    let replay_window = (phase + 1).min(ckpt_interval);
-    reading.root_ring_events(k).saturating_sub(replay_window)
+fn events_pinned_only_by_root_ring(reading: Reading, root_ring_depth: u64, phase: u64, checkpoint_interval: u64) -> u64 {
+    let replay_window = (phase + 1).min(checkpoint_interval);
+    reading.root_ring_events(root_ring_depth).saturating_sub(replay_window)
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct PinnedSpaceMeasurement {
     /// 一个周期里，调小 K 到下限 2 能腾出的块数：最大值
-    max_freed: u64,
+    maximum_freed: u64,
     /// 同上：整周期总和
     total_freed: u64,
     /// 有多少个相位上「调小 K」腾得出哪怕一块
-    phases_where_k_helps: u64,
+    phases_where_lowering_root_ring_depth_helps: u64,
     /// 周期长度（相位数）
     phases: u64,
     /// 对照量：同一周期里重放窗口规则平均扣住多少块
@@ -91,66 +91,66 @@ struct Out {
     /// 两条规则并集平均扣住多少块——「盘快满时被扣住的空间」总量就是它
     mean_pinned_total: u64,
     /// ⚠️ **同相位对照**：在逃生口真正存在的那个相位（p = 0）上，此刻合起来扣住多少块。
-    /// 拿它跟 `max_freed` 比才是同一时刻的比较；拿整周期均值去比是**跨相位比较**，
+    /// 拿它跟 `maximum_freed` 比才是同一时刻的比较；拿整周期均值去比是**跨相位比较**，
     /// 会把「逃生口存在时也杯水车薪」说得比实际强。
     pinned_at_phase0: u64,
 }
 
-fn measure(reading: Reading, k: u64, ckpt_interval: u64) -> Out {
-    let mut o = Out { phases: ckpt_interval, ..Default::default() };
-    let mut win_sum = 0u64;
-    let mut tot_sum = 0u64;
-    for phase in 0..ckpt_interval {
-        let freed = (k_only_events(reading, k, phase, ckpt_interval)
-            .saturating_sub(k_only_events(reading, 2, phase, ckpt_interval)))
+fn measure(reading: Reading, root_ring_depth: u64, checkpoint_interval: u64) -> PinnedSpaceMeasurement {
+    let mut measurement = PinnedSpaceMeasurement { phases: checkpoint_interval, ..Default::default() };
+    let mut window_pinned_sum = 0u64;
+    let mut total_pinned_sum = 0u64;
+    for phase in 0..checkpoint_interval {
+        let freed = (events_pinned_only_by_root_ring(reading, root_ring_depth, phase, checkpoint_interval)
+            .saturating_sub(events_pinned_only_by_root_ring(reading, 2, phase, checkpoint_interval)))
             * FREED_PER_FSYNC;
-        o.max_freed = o.max_freed.max(freed);
-        o.total_freed += freed;
+        measurement.maximum_freed = measurement.maximum_freed.max(freed);
+        measurement.total_freed += freed;
         if freed > 0 {
-            o.phases_where_k_helps += 1;
+            measurement.phases_where_lowering_root_ring_depth_helps += 1;
         }
-        win_sum += (phase + 1).min(ckpt_interval) * FREED_PER_FSYNC;
-        tot_sum += pinned_events(reading, k, phase, ckpt_interval) * FREED_PER_FSYNC;
+        window_pinned_sum += (phase + 1).min(checkpoint_interval) * FREED_PER_FSYNC;
+        total_pinned_sum += pinned_events(reading, root_ring_depth, phase, checkpoint_interval) * FREED_PER_FSYNC;
     }
-    o.mean_pinned_by_window = win_sum / ckpt_interval;
-    o.mean_pinned_total = tot_sum / ckpt_interval;
-    o.pinned_at_phase0 = pinned_events(reading, k, 0, ckpt_interval) * FREED_PER_FSYNC;
-    o
+    measurement.mean_pinned_by_window = window_pinned_sum / checkpoint_interval;
+    measurement.mean_pinned_total = total_pinned_sum / checkpoint_interval;
+    measurement.pinned_at_phase0 = pinned_events(reading, root_ring_depth, 0, checkpoint_interval) * FREED_PER_FSYNC;
+    measurement
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=config note=调小K能腾出多少 freed_per_fsync={FREED_PER_FSYNC} \
              rule1=最近K次fsync rule2=本checkpoint窗口"
         ))
     );
     for reading in [Reading::Invariant, Reading::Prose] {
-        for ckpt in [1u64, 8, 100, 1000] {
-            for k in [2u64, 4, 8, 16] {
-                let o = measure(reading, k, ckpt);
+        for checkpoint_interval in [1u64, 8, 100, 1000] {
+            for root_ring_depth in [2u64, 4, 8, 16] {
+                let measurement = measure(reading, root_ring_depth, checkpoint_interval);
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=cell reading={} ckpt_interval={ckpt} k={k} max_freed={} \
+                    emitter.emit_raw(&format!(
+                        "name=cell reading={} ckpt_interval={checkpoint_interval} k={root_ring_depth} max_freed={} \
                          total_freed={} phases_where_k_helps={} phases={} \
                          mean_pinned_by_window={} mean_pinned_total={} pinned_at_phase0={}",
                         reading.name(),
-                        o.max_freed,
-                        o.total_freed,
-                        o.phases_where_k_helps,
-                        o.phases,
-                        o.mean_pinned_by_window,
-                        o.mean_pinned_total,
-                        o.pinned_at_phase0
+                        measurement.maximum_freed,
+                        measurement.total_freed,
+                        measurement.phases_where_lowering_root_ring_depth_helps,
+                        measurement.phases,
+                        measurement.mean_pinned_by_window,
+                        measurement.mean_pinned_total,
+                        measurement.pinned_at_phase0
                     ))
                 );
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -166,15 +166,15 @@ mod tests {
     /// ⇒ 有帮助的相位是 `p ∈ [0, root_ring(K) − 2]`。
     /// **两种读法只差一个相位，结论不依赖选哪一种**——这正是两种都跑的理由。
     #[test]
-    fn lowering_k_helps_in_a_phase_count_that_does_not_depend_on_the_interval() {
+    fn lowering_root_ring_depth_helps_in_a_phase_count_that_does_not_depend_on_the_interval() {
         for reading in READINGS {
-            for ckpt in [100u64, 1000] {
-                for k in [4u64, 8, 16] {
-                    let want = reading.root_ring_events(k) - 1;
-                    let o = measure(reading, k, ckpt);
+            for checkpoint_interval in [100u64, 1000] {
+                for root_ring_depth in [4u64, 8, 16] {
+                    let expected_helpful_phase_count = reading.root_ring_events(root_ring_depth) - 1;
+                    let measurement = measure(reading, root_ring_depth, checkpoint_interval);
                     assert_eq!(
-                        o.phases_where_k_helps, want,
-                        "{} ckpt={ckpt} k={k}：有帮助的相位数该是 {want}",
+                        measurement.phases_where_lowering_root_ring_depth_helps, expected_helpful_phase_count,
+                        "{} ckpt={checkpoint_interval} k={root_ring_depth}：有帮助的相位数该是 {expected_helpful_phase_count}",
                         reading.name()
                     );
                 }
@@ -184,22 +184,22 @@ mod tests {
 
     /// **同相位对照：在逃生口真正存在的那个相位上，调小 K 腾出的量不是杯水车薪。**
     ///
-    /// ⚠️ 这条测试是本实验最容易被写错的地方。拿「相位 0 才存在的 `max_freed`」
+    /// ⚠️ 这条测试是本实验最容易被写错的地方。拿「相位 0 才存在的 `maximum_freed`」
     /// 去比「整周期均值 `mean_pinned_by_window`」是**跨相位比较**，会得出一个
     /// 好看但不诚实的倍数（间隔 1000 时 250 倍，间隔 8 时只有约 2 倍）。
     /// 同一时刻的比较结果相反：相位 0 上根环恰恰是被扣空间的大头。
     #[test]
     fn at_the_phase_where_the_escape_hatch_exists_it_is_not_negligible() {
         for reading in READINGS {
-            let o = measure(reading, 8, 1000);
-            assert!(o.max_freed > 0, "{}：相位 0 上该腾得出东西", reading.name());
+            let measurement = measure(reading, 8, 1000);
+            assert!(measurement.maximum_freed > 0, "{}：相位 0 上该腾得出东西", reading.name());
             assert!(
-                o.max_freed * 2 >= o.pinned_at_phase0,
+                measurement.maximum_freed * 2 >= measurement.pinned_at_phase0,
                 "{}：相位 0 上腾出 {} 块、此刻共扣 {} 块——它不是杯水车薪，\
                  「250 倍」那种说法是跨相位比较，不许用",
                 reading.name(),
-                o.max_freed,
-                o.pinned_at_phase0
+                measurement.maximum_freed,
+                measurement.pinned_at_phase0
             );
         }
     }
@@ -212,16 +212,16 @@ mod tests {
             let wide = measure(reading, 4, 1000);
             let narrow = measure(reading, 4, 8);
             assert_eq!(
-                wide.phases_where_k_helps, narrow.phases_where_k_helps,
+                wide.phases_where_lowering_root_ring_depth_helps, narrow.phases_where_lowering_root_ring_depth_helps,
                 "{}：相位数不该随间隔变", reading.name()
             );
-            if narrow.max_freed > 0 && wide.max_freed > 0 {
-                let r_wide = wide.mean_pinned_by_window / wide.max_freed;
-                let r_narrow = narrow.mean_pinned_by_window / narrow.max_freed;
+            if narrow.maximum_freed > 0 && wide.maximum_freed > 0 {
+                let window_to_freed_ratio_wide = wide.mean_pinned_by_window / wide.maximum_freed;
+                let window_to_freed_ratio_narrow = narrow.mean_pinned_by_window / narrow.maximum_freed;
                 assert!(
-                    r_wide > r_narrow * 10,
+                    window_to_freed_ratio_wide > window_to_freed_ratio_narrow * 10,
                     "{}：倍数该随间隔显著变（宽 {} vs 窄 {}）",
-                    reading.name(), r_wide, r_narrow
+                    reading.name(), window_to_freed_ratio_wide, window_to_freed_ratio_narrow
                 );
             }
         }
@@ -230,30 +230,30 @@ mod tests {
     /// **阳性对照：checkpoint 间隔 = 1 时 K 成为唯一约束，调小 K 必须腾出可观的量。**
     /// 少了它，「腾出 0」分不清是结论如此还是度量根本不动。
     #[test]
-    fn with_a_checkpoint_every_fsync_lowering_k_really_does_free_space() {
+    fn with_a_checkpoint_every_fsync_lowering_root_ring_depth_really_does_free_space() {
         for reading in READINGS {
-            for k in [4u64, 8, 16] {
-                let o = measure(reading, k, 1);
+            for root_ring_depth in [4u64, 8, 16] {
+                let measurement = measure(reading, root_ring_depth, 1);
                 // 间隔 1 ⇒ 只有相位 0，窗口恒扣 1 次 fsync
                 // ⇒ 腾出 = (根环(K) − 根环(2)) 次 fsync。**两种读法在这一格给同一个数。**
-                let want = (reading.root_ring_events(k) - reading.root_ring_events(2))
+                let expected_freed_blocks = (reading.root_ring_events(root_ring_depth) - reading.root_ring_events(2))
                     * FREED_PER_FSYNC;
                 assert_eq!(
-                    o.max_freed, want,
-                    "{} k={k}：每次 fsync 都 checkpoint 时该腾出 {want} 块",
+                    measurement.maximum_freed, expected_freed_blocks,
+                    "{} k={root_ring_depth}：每次 fsync 都 checkpoint 时该腾出 {expected_freed_blocks} 块",
                     reading.name()
                 );
-                assert_eq!(o.phases_where_k_helps, 1);
+                assert_eq!(measurement.phases_where_lowering_root_ring_depth_helps, 1);
             }
         }
     }
 
     /// **K = 2 是下限，调不动**（D22 已定「下限 ≥ 2」）⇒ 腾出恒为 0。
     #[test]
-    fn k_at_its_floor_frees_nothing_by_construction() {
+    fn root_ring_depth_at_its_floor_frees_nothing_by_construction() {
         for reading in READINGS {
-            for ckpt in [1u64, 8, 100, 1000] {
-                assert_eq!(measure(reading, 2, ckpt).total_freed, 0);
+            for checkpoint_interval in [1u64, 8, 100, 1000] {
+                assert_eq!(measure(reading, 2, checkpoint_interval).total_freed, 0);
             }
         }
     }
@@ -262,10 +262,10 @@ mod tests {
     #[test]
     fn the_total_pinned_set_is_the_union_of_both_rules() {
         for reading in READINGS {
-            for k in [2u64, 4, 8, 16] {
-                let want = reading.root_ring_events(k).max(1) * FREED_PER_FSYNC;
-                assert_eq!(measure(reading, k, 1).mean_pinned_total, want,
-                           "{} k={k}", reading.name());
+            for root_ring_depth in [2u64, 4, 8, 16] {
+                let expected_mean_pinned_total = reading.root_ring_events(root_ring_depth).max(1) * FREED_PER_FSYNC;
+                assert_eq!(measure(reading, root_ring_depth, 1).mean_pinned_total, expected_mean_pinned_total,
+                           "{} k={root_ring_depth}", reading.name());
             }
         }
     }
@@ -275,11 +275,11 @@ mod tests {
     #[test]
     fn the_two_rules_pin_different_sets() {
         for reading in READINGS {
-            let rr = reading.root_ring_events(8);
-            assert_eq!(pinned_events(reading, 8, 0, 1000), rr, "刚 checkpoint 完，根环规则更大");
+            let root_ring_pinned_events = reading.root_ring_events(8);
+            assert_eq!(pinned_events(reading, 8, 0, 1000), root_ring_pinned_events, "刚 checkpoint 完，根环规则更大");
             assert_eq!(pinned_events(reading, 8, 99, 1000), 100, "相位 99 时重放窗口规则更大");
-            assert_eq!(k_only_events(reading, 8, 0, 1000), rr - 1);
-            assert_eq!(k_only_events(reading, 8, 99, 1000), 0, "相位 99 时根环规则一点也不多扣");
+            assert_eq!(events_pinned_only_by_root_ring(reading, 8, 0, 1000), root_ring_pinned_events - 1);
+            assert_eq!(events_pinned_only_by_root_ring(reading, 8, 99, 1000), 0, "相位 99 时根环规则一点也不多扣");
         }
     }
 
@@ -296,10 +296,10 @@ mod tests {
         assert_eq!(Reading::Prose.root_ring_events(4), 4);
         assert_eq!(Reading::Invariant.root_ring_events(16), 15);
         assert_eq!(Reading::Prose.root_ring_events(16), 16);
-        for k in [4u64, 8, 16] {
-            let a = measure(Reading::Invariant, k, 1000).phases_where_k_helps;
-            let b = measure(Reading::Prose, k, 1000).phases_where_k_helps;
-            assert_eq!(a + 1, b, "k={k}：两支的相位数该恰好差一，实测 {a} 与 {b}");
+        for root_ring_depth in [4u64, 8, 16] {
+            let invariant_reading_phase_count = measure(Reading::Invariant, root_ring_depth, 1000).phases_where_lowering_root_ring_depth_helps;
+            let prose_reading_phase_count = measure(Reading::Prose, root_ring_depth, 1000).phases_where_lowering_root_ring_depth_helps;
+            assert_eq!(invariant_reading_phase_count + 1, prose_reading_phase_count, "k={root_ring_depth}：两支的相位数该恰好差一，实测 {invariant_reading_phase_count} 与 {prose_reading_phase_count}");
         }
     }
 
@@ -309,15 +309,15 @@ mod tests {
     #[test]
     fn the_root_ring_reaches_back_across_the_checkpoint_boundary() {
         for reading in READINGS {
-            let rr = reading.root_ring_events(8);
+            let root_ring_pinned_events = reading.root_ring_events(8);
             for phase in [0u64, 1, 7, 50, 999] {
                 assert_eq!(
-                    pinned_events(reading, 8, phase, 1000).max(rr),
+                    pinned_events(reading, 8, phase, 1000).max(root_ring_pinned_events),
                     pinned_events(reading, 8, phase, 1000),
                     "{} 相位 {phase}：根环扣住的量不该被相位截短", reading.name()
                 );
             }
-            assert_eq!(pinned_events(reading, 8, 0, 1000), rr,
+            assert_eq!(pinned_events(reading, 8, 0, 1000), root_ring_pinned_events,
                        "{}：相位 0 上扣住的就是根环那一段，不是 1", reading.name());
         }
     }

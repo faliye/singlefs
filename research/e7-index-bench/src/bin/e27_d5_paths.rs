@@ -38,39 +38,39 @@ impl Rule {
         match self { Rule::Correct => "correct", Rule::StrictBirth => "strict_birth", Rule::ClosedDeath => "closed_death" }
     }
     /// 快照 S 引不引用块 b。
-    fn refs(self, birth: u64, death: u64, s_txg: u64) -> bool {
+    fn snapshot_references_block(self, birth: u64, death: u64, snapshot_txg: u64) -> bool {
         match self {
-            Rule::Correct     => birth <= s_txg && s_txg < death,
-            Rule::StrictBirth => birth <  s_txg && s_txg < death,
-            Rule::ClosedDeath => birth <= s_txg && s_txg <= death,
+            Rule::Correct     => birth <= snapshot_txg && snapshot_txg < death,
+            Rule::StrictBirth => birth <  snapshot_txg && snapshot_txg < death,
+            Rule::ClosedDeath => birth <= snapshot_txg && snapshot_txg <= death,
         }
     }
 }
 
 /// 三个边界各构造一个块。`death = u64::MAX` 表示仍在活树里（∞）。
-fn boundary_cases(s_txg: u64) -> Vec<(&'static str, u64, u64, bool)> {
+fn boundary_cases(snapshot_txg: u64) -> Vec<(&'static str, u64, u64, bool)> {
     vec![
         // (名字, birth, death, D5 正文规定的判定)
-        ("birth==S.txg", s_txg,     s_txg + 5, true),   // S 引用它
-        ("death==S.txg", s_txg - 5, s_txg,     false),  // S 不引用
-        ("birth==death", s_txg,     s_txg,     false),  // 任何快照都不引用
+        ("birth==S.txg", snapshot_txg,     snapshot_txg + 5, true),   // S 引用它
+        ("death==S.txg", snapshot_txg - 5, snapshot_txg,     false),  // S 不引用
+        ("birth==death", snapshot_txg,     snapshot_txg,     false),  // 任何快照都不引用
     ]
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct P1 { data_loss: u64, leak: u64, agree: u64 }
+struct Path1Outcome { data_loss: u64, leak: u64, agree: u64 }
 
-fn path1(rule: Rule, s_txg: u64) -> P1 {
-    let mut o = P1::default();
-    for (_, birth, death, expect) in boundary_cases(s_txg) {
-        let got = rule.refs(birth, death, s_txg);
-        match (expect, got) {
-            (true, false) => o.data_loss += 1,  // 该引用却判不引用 ⇒ 立即释放 ⇒ 数据丢失
-            (false, true) => o.leak += 1,       // 不该引用却判引用 ⇒ 挂在不需要它的快照上 ⇒ 泄漏
-            _ => o.agree += 1,
+fn path1(rule: Rule, snapshot_txg: u64) -> Path1Outcome {
+    let mut outcome = Path1Outcome::default();
+    for (_, birth, death, expect) in boundary_cases(snapshot_txg) {
+        let actual_reference = rule.snapshot_references_block(birth, death, snapshot_txg);
+        match (expect, actual_reference) {
+            (true, false) => outcome.data_loss += 1,  // 该引用却判不引用 ⇒ 立即释放 ⇒ 数据丢失
+            (false, true) => outcome.leak += 1,       // 不该引用却判引用 ⇒ 挂在不需要它的快照上 ⇒ 泄漏
+            _ => outcome.agree += 1,
         }
     }
-    o
+    outcome
 }
 
 // ─────────────────── 路径 2：销毁快照的级联合并代价 ───────────────────
@@ -83,15 +83,15 @@ fn path2_merge_cost(entries: &[u64], target_txg: u64, bucketed: bool, bucket_spa
         return entries.len() as u64;                    // 逐条看
     }
     let mut examined = 0u64;
-    let mut i = 0usize;
-    while i < entries.len() {
-        let bucket_hi = entries[i] / bucket_span * bucket_span + bucket_span - 1;
+    let mut entry_index = 0usize;
+    while entry_index < entries.len() {
+        let bucket_last_txg = entries[entry_index] / bucket_span * bucket_span + bucket_span - 1;
         // 整桶都比 target 老 ⇒ 整桶跳过，只付一次桶头检查
-        if bucket_hi < target_txg {
+        if bucket_last_txg < target_txg {
             examined += 1;
-            while i < entries.len() && entries[i] <= bucket_hi { i += 1; }
+            while entry_index < entries.len() && entries[entry_index] <= bucket_last_txg { entry_index += 1; }
         } else {
-            while i < entries.len() && entries[i] <= bucket_hi { examined += 1; i += 1; }
+            while entry_index < entries.len() && entries[entry_index] <= bucket_last_txg { examined += 1; entry_index += 1; }
         }
     }
     examined
@@ -101,70 +101,70 @@ fn path2_merge_cost(entries: &[u64], target_txg: u64, bucketed: bool, bucket_spa
 
 /// D16 新规则 2：checkpoint C 中产生的一切释放，在 C 被发布之前不得进入可分配集合。
 /// ⇒ 本该「立即释放」的那一半也要先进 defer 队列，那是额外的持久化写。
-/// 量的是**额外写入的条目数与 I/O 次数**（每 `per_block` 条打包成一次写）。
-fn path4_defer_cost(immediate_frees: u64, per_block: u64) -> (u64, u64) {
+/// 量的是**额外写入的条目数与 I/O 次数**（每 `entries_per_block` 条打包成一次写）。
+fn path4_defer_cost(immediate_frees: u64, entries_per_block: u64) -> (u64, u64) {
     let entries = immediate_frees;
-    let ios = entries.div_ceil(per_block.max(1));
-    (entries, ios)
+    let packed_write_count = entries.div_ceil(entries_per_block.max(1));
+    (entries, packed_write_count)
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let s_txg = 100u64;
-    println!("{}", em.emit_raw(&format!("name=config s_txg={s_txg}")));
+    let mut emitter = Emitter::new();
+    let snapshot_txg = 100u64;
+    println!("{}", emitter.emit_raw(&format!("name=config s_txg={snapshot_txg}")));
 
     // 路径 1
     for rule in [Rule::Correct, Rule::StrictBirth, Rule::ClosedDeath] {
-        let o = path1(rule, s_txg);
-        println!("{}", em.emit_raw(&format!(
+        let outcome = path1(rule, snapshot_txg);
+        println!("{}", emitter.emit_raw(&format!(
             "name=p1 rule={} data_loss={} leak={} agree={}",
-            rule.label(), o.data_loss, o.leak, o.agree)));
+            rule.label(), outcome.data_loss, outcome.leak, outcome.agree)));
     }
 
     // 路径 2：deadlist 条目按 birth 均匀分布，目标快照在中位
-    for n in [64u64, 256, 1024, 4096] {
-        let entries: Vec<u64> = (0..n).collect();
-        let target = n / 2;
-        let plain = path2_merge_cost(&entries, target, false, 64);
-        for span in [16u64, 64, 256] {
-            let bucketed = path2_merge_cost(&entries, target, true, span);
-            println!("{}", em.emit_raw(&format!(
-                "name=p2 entries={n} bucket_span={span} plain={plain} bucketed={bucketed}")));
+    for entry_count in [64u64, 256, 1024, 4096] {
+        let entries: Vec<u64> = (0..entry_count).collect();
+        let target = entry_count / 2;
+        let plain_merge_cost = path2_merge_cost(&entries, target, false, 64);
+        for bucket_span in [16u64, 64, 256] {
+            let bucketed = path2_merge_cost(&entries, target, true, bucket_span);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=p2 entries={entry_count} bucket_span={bucket_span} plain={plain_merge_cost} bucketed={bucketed}")));
         }
     }
 
     // 路径 4
     for frees in [64u64, 1024, 16384] {
-        for per_block in [128u64, 512] {
-            let (e, io) = path4_defer_cost(frees, per_block);
-            println!("{}", em.emit_raw(&format!(
-                "name=p4 immediate_frees={frees} per_block={per_block} defer_entries={e} defer_ios={io}")));
+        for entries_per_block in [128u64, 512] {
+            let (defer_entries, defer_write_count) = path4_defer_cost(frees, entries_per_block);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=p4 immediate_frees={frees} per_block={entries_per_block} defer_entries={defer_entries} defer_ios={defer_write_count}")));
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    const S: u64 = 100;
+    const SNAPSHOT_TXG: u64 = 100;
 
     /// **正确规则在三个边界上必须逐条给出 D5 正文规定的答案。**
     #[test]
     fn the_correct_rule_matches_the_documented_verdict_on_every_boundary() {
-        let o = path1(Rule::Correct, S);
-        assert_eq!(o.agree, 3, "正确规则该在三个边界上全对");
-        assert_eq!(o.data_loss, 0);
-        assert_eq!(o.leak, 0);
+        let outcome = path1(Rule::Correct, SNAPSHOT_TXG);
+        assert_eq!(outcome.agree, 3, "正确规则该在三个边界上全对");
+        assert_eq!(outcome.data_loss, 0);
+        assert_eq!(outcome.leak, 0);
     }
 
     /// **左边界写严 ⇒ 恰好一次数据丢失，零泄漏。** 方向必须对得上 D5 正文那张表。
     /// ⚠️ 这条是本实验的理由：只验正确规则等于什么都没验。
     #[test]
     fn writing_the_birth_bound_strict_causes_exactly_one_data_loss() {
-        let o = path1(Rule::StrictBirth, S);
-        assert_eq!(o.data_loss, 1, "birth==S.txg 那一格该判成数据丢失");
-        assert_eq!(o.leak, 0, "写严左边界不该造成泄漏");
+        let outcome = path1(Rule::StrictBirth, SNAPSHOT_TXG);
+        assert_eq!(outcome.data_loss, 1, "birth==S.txg 那一格该判成数据丢失");
+        assert_eq!(outcome.leak, 0, "写严左边界不该造成泄漏");
     }
 
     /// **右边界写闭 ⇒ 两次泄漏，零数据丢失。**
@@ -176,38 +176,38 @@ mod tests {
     /// 实际上同一个笔误同时命中两行。** 这一条已回写 D5。
     #[test]
     fn writing_the_death_bound_closed_leaks_on_two_boundaries_not_one() {
-        let o = path1(Rule::ClosedDeath, S);
-        assert_eq!(o.leak, 2, "写闭右边界该在 death==S.txg 与 birth==death 两格上都泄漏");
-        assert_eq!(o.data_loss, 0, "写闭右边界不该造成数据丢失");
-        assert_eq!(o.agree, 1, "只剩 birth==S.txg 那一格仍然对");
+        let outcome = path1(Rule::ClosedDeath, SNAPSHOT_TXG);
+        assert_eq!(outcome.leak, 2, "写闭右边界该在 death==S.txg 与 birth==death 两格上都泄漏");
+        assert_eq!(outcome.data_loss, 0, "写闭右边界不该造成数据丢失");
+        assert_eq!(outcome.agree, 1, "只剩 birth==S.txg 那一格仍然对");
     }
 
     /// **两种取错的后果必须不同**——D5 正文说它们不对称，模型里也必须不对称。
     #[test]
     fn the_two_wrong_variants_fail_in_opposite_directions() {
-        let sb = path1(Rule::StrictBirth, S);
-        let cd = path1(Rule::ClosedDeath, S);
-        assert!(sb.data_loss > 0 && sb.leak == 0);
-        assert!(cd.leak > 0 && cd.data_loss == 0);
+        let strict_birth_outcome = path1(Rule::StrictBirth, SNAPSHOT_TXG);
+        let closed_death_outcome = path1(Rule::ClosedDeath, SNAPSHOT_TXG);
+        assert!(strict_birth_outcome.data_loss > 0 && strict_birth_outcome.leak == 0);
+        assert!(closed_death_outcome.leak > 0 && closed_death_outcome.data_loss == 0);
     }
 
     /// **`birth == death` 那一格三条规则里只有写闭右边界会判错**——
     /// 它是「任何快照都不引用」，而 `birth ≤ S ≤ death` 在 birth==death==S 时为真。
     #[test]
     fn the_birth_equals_death_case_is_only_broken_by_the_closed_death_rule() {
-        assert!(!Rule::Correct.refs(S, S, S), "birth==death 时正确规则该判不引用");
-        assert!(!Rule::StrictBirth.refs(S, S, S));
-        assert!(Rule::ClosedDeath.refs(S, S, S), "写闭右边界在 birth==death 时会误判为引用");
+        assert!(!Rule::Correct.snapshot_references_block(SNAPSHOT_TXG, SNAPSHOT_TXG, SNAPSHOT_TXG), "birth==death 时正确规则该判不引用");
+        assert!(!Rule::StrictBirth.snapshot_references_block(SNAPSHOT_TXG, SNAPSHOT_TXG, SNAPSHOT_TXG));
+        assert!(Rule::ClosedDeath.snapshot_references_block(SNAPSHOT_TXG, SNAPSHOT_TXG, SNAPSHOT_TXG), "写闭右边界在 birth==death 时会误判为引用");
     }
 
     /// **分桶必须真的省事**，否则路径 2 这一维是摆设。
     #[test]
     fn bucketing_examines_strictly_fewer_entries() {
         let entries: Vec<u64> = (0..1024).collect();
-        let plain = path2_merge_cost(&entries, 512, false, 64);
+        let plain_merge_cost = path2_merge_cost(&entries, 512, false, 64);
         let bucketed = path2_merge_cost(&entries, 512, true, 64);
-        assert_eq!(plain, 1024, "不分桶就是逐条看，绝对值钉死");
-        assert!(bucketed < plain, "分桶该更省（{bucketed} vs {plain}）");
+        assert_eq!(plain_merge_cost, 1024, "不分桶就是逐条看，绝对值钉死");
+        assert!(bucketed < plain_merge_cost, "分桶该更省（{bucketed} vs {plain_merge_cost}）");
     }
 
     /// **桶越大越省，但省的是可跳过的那一半**——绝对值算得出来：
@@ -222,7 +222,7 @@ mod tests {
 
     /// **defer 的 I/O 次数是条目数按打包宽度向上取整**，绝对值钉死。
     #[test]
-    fn defer_io_count_is_the_ceiling_of_entries_over_pack_width() {
+    fn defer_write_count_is_the_ceiling_of_entries_over_pack_width() {
         assert_eq!(path4_defer_cost(1024, 128), (1024, 8));
         assert_eq!(path4_defer_cost(1025, 128), (1025, 9));
         assert_eq!(path4_defer_cost(0, 128), (0, 0));
@@ -230,10 +230,10 @@ mod tests {
 
     /// **打包越宽 I/O 越少，但条目数不变**——写入量与 I/O 次数是两个指标，不许混。
     #[test]
-    fn wider_packing_cuts_ios_but_not_entries() {
-        let (e1, io1) = path4_defer_cost(16384, 128);
-        let (e2, io2) = path4_defer_cost(16384, 512);
-        assert_eq!(e1, e2, "条目数与打包宽度无关");
-        assert!(io2 < io1, "打包越宽 I/O 越少");
+    fn wider_packing_cuts_writes_but_not_entries() {
+        let (entries_packed_by_128, writes_packed_by_128) = path4_defer_cost(16384, 128);
+        let (entries_packed_by_512, writes_packed_by_512) = path4_defer_cost(16384, 512);
+        assert_eq!(entries_packed_by_128, entries_packed_by_512, "条目数与打包宽度无关");
+        assert!(writes_packed_by_512 < writes_packed_by_128, "打包越宽 I/O 越少");
     }
 }

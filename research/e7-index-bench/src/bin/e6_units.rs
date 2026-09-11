@@ -46,80 +46,80 @@ const TOTAL_MIB: usize = 256;
 const UNITS: [usize; 4] = [4096, 16384, 65536, 262144];
 
 #[derive(Clone, Copy, PartialEq)]
-enum Alg {
+enum CipherAlgorithm {
     Aes,
     Chacha,
 }
 
-impl Alg {
+impl CipherAlgorithm {
     fn name(self) -> &'static str {
         match self {
             // 没有 `_ =>` —— 新增算法不补这里就编译不过
-            Alg::Aes => "aes256gcm",
-            Alg::Chacha => "chacha20poly1305",
+            CipherAlgorithm::Aes => "aes256gcm",
+            CipherAlgorithm::Chacha => "chacha20poly1305",
         }
     }
 }
 
-/// 原地加密 `buf` 一整遍，按 `unit` 分块。返回 (处理字节数, 标签首字节之和)。
+/// 原地加密 `buffer` 一整遍，按 `unit` 分块。返回 (处理字节数, 标签首字节之和)。
 ///
 /// `tagchk` 不是装饰：它让「两档跑的是不是同一份计算」变成可比对的事实。
 /// 只报吞吐的话，一档悄悄少算了一半也看不出来——它只会显得更快。
-fn seal(alg: Alg, buf: &mut [u8], unit: usize) -> (usize, u64) {
+fn seal(alg: CipherAlgorithm, buffer: &mut [u8], unit: usize) -> (usize, u64) {
     let key = [7u8; 32];
     let nonce = Nonce::from_slice(&[0u8; 12]);
     let mut tagchk = 0u64;
-    let n = buf.len();
+    let byte_count = buffer.len();
     match alg {
-        Alg::Aes => {
-            let c = Aes256Gcm::new_from_slice(&key).unwrap();
-            for ch in buf.chunks_mut(unit) {
-                let t = c.encrypt_in_place_detached(nonce, b"", ch).unwrap();
-                tagchk += t[0] as u64;
+        CipherAlgorithm::Aes => {
+            let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+            for unit_chunk in buffer.chunks_mut(unit) {
+                let tag = cipher.encrypt_in_place_detached(nonce, b"", unit_chunk).unwrap();
+                tagchk += tag[0] as u64;
             }
         }
-        Alg::Chacha => {
-            let c = ChaCha20Poly1305::new_from_slice(&key).unwrap();
-            for ch in buf.chunks_mut(unit) {
-                let t = c.encrypt_in_place_detached(nonce, b"", ch).unwrap();
-                tagchk += t[0] as u64;
+        CipherAlgorithm::Chacha => {
+            let cipher = ChaCha20Poly1305::new_from_slice(&key).unwrap();
+            for unit_chunk in buffer.chunks_mut(unit) {
+                let tag = cipher.encrypt_in_place_detached(nonce, b"", unit_chunk).unwrap();
+                tagchk += tag[0] as u64;
             }
         }
     }
-    (n, tagchk)
+    (byte_count, tagchk)
 }
 
 /// 跑一档，返回 (最好一轮的纳秒, 字节数, tagchk, 轮间离散万分比)。
 ///
 /// ⚠️ **缓冲必须逐页预热**：`vec![0u8; n]` 给的是惰性映射的零页，
 /// 不预热就是在计时区里缺页——E6 多核档实测那样单核只有 2154 MiB/s（差 45%）。
-fn run(alg: Alg, unit: usize, rounds: usize) -> (u64, usize, u64, u64) {
+fn run(alg: CipherAlgorithm, unit: usize, rounds: usize) -> (u64, usize, u64, u64) {
     let bytes = TOTAL_MIB * 1024 * 1024;
-    let mut buf = vec![0u8; bytes];
-    for p in buf.chunks_mut(4096) {
-        p[0] = 1;
+    let mut buffer = vec![0u8; bytes];
+    for page in buffer.chunks_mut(4096) {
+        page[0] = 1;
     }
-    let (mut best, mut worst, mut nb, mut chk) = (u64::MAX, 0u64, 0usize, 0u64);
+    let (mut best, mut worst, mut best_round_bytes, mut last_tagchk) = (u64::MAX, 0u64, 0usize, 0u64);
     for _ in 0..rounds {
-        let t0 = Instant::now();
-        let (n, c) = seal(alg, &mut buf, unit);
-        let ns = t0.elapsed().as_nanos() as u64;
-        std::hint::black_box(&buf);
-        if ns < best {
-            best = ns;
-            nb = n;
+        let round_start = Instant::now();
+        let (byte_count, round_tagchk) = seal(alg, &mut buffer, unit);
+        let elapsed_nanoseconds = round_start.elapsed().as_nanos() as u64;
+        std::hint::black_box(&buffer);
+        if elapsed_nanoseconds < best {
+            best = elapsed_nanoseconds;
+            best_round_bytes = byte_count;
         }
-        if ns > worst {
-            worst = ns;
+        if elapsed_nanoseconds > worst {
+            worst = elapsed_nanoseconds;
         }
-        chk = c;
+        last_tagchk = round_tagchk;
     }
     let spread = if best == 0 {
         0
     } else {
         (worst - best) * 10_000 / best
     };
-    (best, nb, chk, spread)
+    (best, best_round_bytes, last_tagchk, spread)
 }
 
 /// **已知答案测试**：拿一个外部实现算出的期望值钉住「这台机器今天算的是不是 AES-256-GCM」。
@@ -134,44 +134,44 @@ const KAT_KEY: [u8; 32] = [7u8; 32];
 const KAT_AES_TAG: &str = "62d27233cdaa1703b440830408c9d14d";
 const KAT_CHACHA_TAG: &str = "5ad7622fdcef10e164b2b6878c3300eb";
 
-fn kat(alg: Alg) -> String {
+fn kat(alg: CipherAlgorithm) -> String {
     let nonce = Nonce::from_slice(&[0u8; 12]);
-    let mut buf = [0u8; 32];
-    let t = match alg {
-        Alg::Aes => Aes256Gcm::new_from_slice(&KAT_KEY)
+    let mut buffer = [0u8; 32];
+    let tag = match alg {
+        CipherAlgorithm::Aes => Aes256Gcm::new_from_slice(&KAT_KEY)
             .unwrap()
-            .encrypt_in_place_detached(nonce, b"", &mut buf)
+            .encrypt_in_place_detached(nonce, b"", &mut buffer)
             .unwrap(),
-        Alg::Chacha => ChaCha20Poly1305::new_from_slice(&KAT_KEY)
+        CipherAlgorithm::Chacha => ChaCha20Poly1305::new_from_slice(&KAT_KEY)
             .unwrap()
-            .encrypt_in_place_detached(nonce, b"", &mut buf)
+            .encrypt_in_place_detached(nonce, b"", &mut buffer)
             .unwrap(),
     };
-    t.iter().map(|b| format!("{b:02x}")).collect()
+    tag.iter().map(|tag_byte| format!("{tag_byte:02x}")).collect()
 }
 
-fn kat_expected(alg: Alg) -> &'static str {
+fn kat_expected(alg: CipherAlgorithm) -> &'static str {
     match alg {
-        Alg::Aes => KAT_AES_TAG,
-        Alg::Chacha => KAT_CHACHA_TAG,
+        CipherAlgorithm::Aes => KAT_AES_TAG,
+        CipherAlgorithm::Chacha => KAT_CHACHA_TAG,
     }
 }
 
-fn mibs(bytes: usize, ns: u64) -> f64 {
-    if ns == 0 {
+fn mibs(bytes: usize, elapsed_nanoseconds: u64) -> f64 {
+    if elapsed_nanoseconds == 0 {
         return f64::NAN;
     }
-    bytes as f64 / (1024.0 * 1024.0) / (ns as f64 / 1e9)
+    bytes as f64 / (1024.0 * 1024.0) / (elapsed_nanoseconds as f64 / 1e9)
 }
 
 /// 来宾看不看得见 AES-NI。**报出来，不猜**——外层脚本靠它把两档配对，
 /// 猜错档位会让「屏蔽生效了没有」这个判定失去意义。
 fn cpu_has_aes() -> bool {
     std::fs::read_to_string("/proc/cpuinfo")
-        .map(|s| {
-            s.lines()
-                .filter(|l| l.starts_with("flags"))
-                .any(|l| l.split_whitespace().any(|f| f == "aes"))
+        .map(|cpuinfo_text| {
+            cpuinfo_text.lines()
+                .filter(|line| line.starts_with("flags"))
+                .any(|line| line.split_whitespace().any(|flag| flag == "aes"))
         })
         .unwrap_or(false)
 }
@@ -180,48 +180,48 @@ fn main() {
     // vm-bench.sh 把盘路径当前缀参数塞进来，本实验不碰盘，跳过它们。
     let rounds: usize = std::env::args()
         .skip(1)
-        .find(|a| !a.starts_with("/dev/"))
-        .and_then(|x| x.parse().ok())
+        .find(|argument| !argument.starts_with("/dev/"))
+        .and_then(|argument_text| argument_text.parse().ok())
         .unwrap_or(5);
-    let mut em = Emitter::new();
-    let mut out = String::new();
-    let mut say = |s: String| {
-        out.push_str(&s);
-        out.push('\n');
+    let mut emitter = Emitter::new();
+    let mut output_buffer = String::new();
+    let mut say = |line: String| {
+        output_buffer.push_str(&line);
+        output_buffer.push('\n');
     };
 
     let aes_ni = cpu_has_aes();
-    say(em.emit_raw(&format!(
+    say(emitter.emit_raw(&format!(
         "name=config total_mib={TOTAL_MIB} rounds={rounds} cpu_aes={aes_ni}"
     )));
 
     // ── 已知答案测试：先判「算的对不对」，再谈「算得快不快」 ──
     // 算错的那一档，它的吞吐数字一个字都不能用。
     let mut kat_ok = true;
-    for alg in [Alg::Aes, Alg::Chacha] {
+    for alg in [CipherAlgorithm::Aes, CipherAlgorithm::Chacha] {
         let got = kat(alg);
         let want = kat_expected(alg);
         let ok = got == want;
         kat_ok &= ok;
-        say(em.emit_raw(&format!(
+        say(emitter.emit_raw(&format!(
             "name=kat cpu_aes={aes_ni} alg={} tag={got} want={want} ok={ok}",
             alg.name()
         )));
     }
 
     for unit in UNITS {
-        for alg in [Alg::Aes, Alg::Chacha] {
-            let (ns, nb, chk, spread) = run(alg, unit, rounds);
-            let m = mibs(nb, ns);
-            say(em.emit_raw(&format!(
-                "name=unit cpu_aes={aes_ni} alg={} unit={unit} mibs={m:.2} \
-                 bytes={nb} elapsed_ns={ns} tagchk={chk} spread_bp={spread}",
+        for alg in [CipherAlgorithm::Aes, CipherAlgorithm::Chacha] {
+            let (elapsed_nanoseconds, best_round_bytes, last_tagchk, spread) = run(alg, unit, rounds);
+            let mebibytes_per_second = mibs(best_round_bytes, elapsed_nanoseconds);
+            say(emitter.emit_raw(&format!(
+                "name=unit cpu_aes={aes_ni} alg={} unit={unit} mibs={mebibytes_per_second:.2} \
+                 bytes={best_round_bytes} elapsed_ns={elapsed_nanoseconds} tagchk={last_tagchk} spread_bp={spread}",
                 alg.name()
             )));
         }
     }
-    say(em.finish());
-    print!("{out}");
+    say(emitter.finish());
+    print!("{output_buffer}");
     if !kat_ok {
         eprintln!("E6U: 已知答案测试不通过 —— 这台机器这一档算的不是 AES-256-GCM / ChaCha20-Poly1305，整轮作废");
         std::process::exit(5);
@@ -236,9 +236,9 @@ mod tests {
     /// 这条是本实验唯一一条不靠自洽性的检查——别的检查都只能说「前后一致」。
     #[test]
     fn known_answer_matches_an_independent_implementation() {
-        assert_eq!(kat(Alg::Aes), KAT_AES_TAG, "AES-256-GCM 的标签与外部实现对不上");
+        assert_eq!(kat(CipherAlgorithm::Aes), KAT_AES_TAG, "AES-256-GCM 的标签与外部实现对不上");
         assert_eq!(
-            kat(Alg::Chacha),
+            kat(CipherAlgorithm::Chacha),
             KAT_CHACHA_TAG,
             "ChaCha20-Poly1305 的标签与外部实现对不上"
         );
@@ -247,12 +247,12 @@ mod tests {
     /// 加密必须真的改变缓冲——否则量到的是一个空循环，而它会显得很快。
     #[test]
     fn seal_actually_transforms_the_buffer() {
-        for alg in [Alg::Aes, Alg::Chacha] {
-            let mut b = vec![0u8; 4096 * 4];
-            let before = b.clone();
-            let (n, _) = seal(alg, &mut b, 4096);
-            assert_eq!(n, 4096 * 4);
-            assert_ne!(b, before, "{} 没有改变缓冲，测的是空循环", alg.name());
+        for alg in [CipherAlgorithm::Aes, CipherAlgorithm::Chacha] {
+            let mut buffer = vec![0u8; 4096 * 4];
+            let before = buffer.clone();
+            let (byte_count, _) = seal(alg, &mut buffer, 4096);
+            assert_eq!(byte_count, 4096 * 4);
+            assert_ne!(buffer, before, "{} 没有改变缓冲，测的是空循环", alg.name());
         }
     }
 
@@ -260,14 +260,14 @@ mod tests {
     /// 互比测不出「两条臂一起只加密了首块」——两边都会一起变快。
     #[test]
     fn every_unit_is_covered() {
-        for alg in [Alg::Aes, Alg::Chacha] {
+        for alg in [CipherAlgorithm::Aes, CipherAlgorithm::Chacha] {
             for unit in [4096usize, 16384] {
-                let mut b = vec![0u8; unit * 3];
-                seal(alg, &mut b, unit);
-                for (i, ch) in b.chunks(unit).enumerate() {
+                let mut buffer = vec![0u8; unit * 3];
+                seal(alg, &mut buffer, unit);
+                for (unit_index, ch) in buffer.chunks(unit).enumerate() {
                     assert!(
-                        ch.iter().any(|&x| x != 0),
-                        "{} 的第 {i} 个 {unit} 单元没被加密",
+                        ch.iter().any(|&byte| byte != 0),
+                        "{} 的第 {unit_index} 个 {unit} 单元没被加密",
                         alg.name()
                     );
                 }
@@ -279,9 +279,9 @@ mod tests {
     #[test]
     fn billed_bytes_equal_the_stated_workload() {
         let bytes = TOTAL_MIB * 1024 * 1024;
-        let mut b = vec![0u8; 4096 * 8];
-        let (n, _) = seal(Alg::Aes, &mut b, 4096);
-        assert_eq!(n, b.len(), "计费字节不等于缓冲长度");
+        let mut buffer = vec![0u8; 4096 * 8];
+        let (byte_count, _) = seal(CipherAlgorithm::Aes, &mut buffer, 4096);
+        assert_eq!(byte_count, buffer.len(), "计费字节不等于缓冲长度");
         // 绝对值由独立算术给出（256 × 1024 × 1024），不从被测代码读回来。
         assert_eq!(bytes, 268_435_456);
         // 4 KiB 档的分块数同样钉死：256 MiB ÷ 4 KiB。
@@ -291,10 +291,10 @@ mod tests {
     /// 两种算法必须产出不同的密文——否则枚举分派串了，一条臂在冒充另一条。
     #[test]
     fn the_two_algorithms_differ() {
-        let (mut a, mut c) = (vec![0u8; 4096], vec![0u8; 4096]);
-        seal(Alg::Aes, &mut a, 4096);
-        seal(Alg::Chacha, &mut c, 4096);
-        assert_ne!(a, c, "两种算法产出相同密文，分派串了");
+        let (mut aes_ciphertext, mut chacha_ciphertext) = (vec![0u8; 4096], vec![0u8; 4096]);
+        seal(CipherAlgorithm::Aes, &mut aes_ciphertext, 4096);
+        seal(CipherAlgorithm::Chacha, &mut chacha_ciphertext, 4096);
+        assert_ne!(aes_ciphertext, chacha_ciphertext, "两种算法产出相同密文，分派串了");
     }
 
     /// `tagchk` 必须随单元数变化——它要能分辨「少算了一半」，
@@ -303,18 +303,18 @@ mod tests {
     fn tagchk_tracks_the_number_of_units() {
         let mut small = vec![0u8; 4096 * 2];
         let mut big = vec![0u8; 4096 * 8];
-        let (_, c_small) = seal(Alg::Aes, &mut small, 4096);
-        let (_, c_big) = seal(Alg::Aes, &mut big, 4096);
-        assert_ne!(c_small, c_big, "tagchk 与单元数无关 ⇒ 分不出漏算");
+        let (_, small_buffer_tagchk) = seal(CipherAlgorithm::Aes, &mut small, 4096);
+        let (_, big_buffer_tagchk) = seal(CipherAlgorithm::Aes, &mut big, 4096);
+        assert_ne!(small_buffer_tagchk, big_buffer_tagchk, "tagchk 与单元数无关 ⇒ 分不出漏算");
     }
 
     /// 单元大小必须真的改变分块数——否则「单元大小」这个自变量根本没在动。
     #[test]
     fn unit_size_changes_the_chunking() {
-        let mut a = vec![0u8; 65536];
-        let mut b = vec![0u8; 65536];
-        let (_, c4k) = seal(Alg::Aes, &mut a, 4096);
-        let (_, c64k) = seal(Alg::Aes, &mut b, 65536);
-        assert_ne!(c4k, c64k, "换单元大小之后分块没变，自变量没在动");
+        let mut buffer_sealed_with_4096_byte_units = vec![0u8; 65536];
+        let mut buffer_sealed_with_65536_byte_units = vec![0u8; 65536];
+        let (_, tagchk_with_4096_byte_units) = seal(CipherAlgorithm::Aes, &mut buffer_sealed_with_4096_byte_units, 4096);
+        let (_, tagchk_with_65536_byte_units) = seal(CipherAlgorithm::Aes, &mut buffer_sealed_with_65536_byte_units, 65536);
+        assert_ne!(tagchk_with_4096_byte_units, tagchk_with_65536_byte_units, "换单元大小之后分块没变，自变量没在动");
     }
 }

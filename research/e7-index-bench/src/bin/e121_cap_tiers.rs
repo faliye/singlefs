@@ -62,145 +62,145 @@
 
 use e7_index_bench::Emitter;
 
-const UNIT: u64 = 32768;
-const PACK_HDR: u64 = 103;
-const NET: u64 = UNIT - PACK_HDR; // 32665
+const UNIT_BYTES: u64 = 32768;
+const PACKED_UNIT_HEADER_BYTES: u64 = 103;
+const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32665
 const SLOT_EXTRA: u64 = 43;
 const LIMIT: u64 = 4096;
-const N: u64 = 100_000;
+const OBJECT_COUNT: u64 = 100_000;
 
-fn cap_of(w: u64) -> u64 { NET / (w + SLOT_EXTRA) }
+fn objects_per_container_for_slot_width(slot_width: u64) -> u64 { UNIT_PAYLOAD_BYTES / (slot_width + SLOT_EXTRA) }
 
 /// 给定 `cap`，能达到这个 `cap` 的最大槽宽（同 `cap` 里浪费最小的那个选择）。
-fn widest_for_cap(c: u64, w_min: u64) -> Option<u64> {
-    if c == 0 { return None; }
-    let w = (NET / c).saturating_sub(SLOT_EXTRA);
-    let w = w.min(LIMIT);
-    if w < w_min || cap_of(w) != c { None } else { Some(w) }
+fn widest_slot_width_for_objects_per_container(objects_per_container: u64, minimum_slot_width: u64) -> Option<u64> {
+    if objects_per_container == 0 { return None; }
+    let slot_width = (UNIT_PAYLOAD_BYTES / objects_per_container).saturating_sub(SLOT_EXTRA);
+    let slot_width = slot_width.min(LIMIT);
+    if slot_width < minimum_slot_width || objects_per_container_for_slot_width(slot_width) != objects_per_container { None } else { Some(slot_width) }
 }
 
 /// 按 `W` 等比（E120 那张表）。
-fn wgeo_tiers(r_milli: u64, w_min: u64) -> Vec<u64> {
-    let mut v = Vec::new();
-    let mut w = w_min;
-    while w < LIMIT {
-        v.push(w);
-        let next = (w * r_milli).div_ceil(1000);
-        if next <= w { break; }
-        w = next;
+fn wgeo_tiers(ratio_in_thousandths: u64, minimum_slot_width: u64) -> Vec<u64> {
+    let mut tier_widths = Vec::new();
+    let mut slot_width = minimum_slot_width;
+    while slot_width < LIMIT {
+        tier_widths.push(slot_width);
+        let next = (slot_width * ratio_in_thousandths).div_ceil(1000);
+        if next <= slot_width { break; }
+        slot_width = next;
     }
-    v.push(LIMIT);
-    v.dedup();
-    v
+    tier_widths.push(LIMIT);
+    tier_widths.dedup();
+    tier_widths
 }
 
 /// 按 `cap` 去重：同 `cap` 的几档只留最大的那个 `W`。
-fn dedup_by_cap(ts: &[u64]) -> Vec<u64> {
-    let mut out: Vec<u64> = Vec::new();
-    for &w in ts {
-        if let Some(&last) = out.last() {
-            if cap_of(last) == cap_of(w) { out.pop(); }
+fn deduplicate_by_objects_per_container(tier_widths: &[u64]) -> Vec<u64> {
+    let mut deduplicated_tier_widths: Vec<u64> = Vec::new();
+    for &slot_width in tier_widths {
+        if let Some(&last) = deduplicated_tier_widths.last() {
+            if objects_per_container_for_slot_width(last) == objects_per_container_for_slot_width(slot_width) { deduplicated_tier_widths.pop(); }
         }
-        out.push(w);
+        deduplicated_tier_widths.push(slot_width);
     }
-    out
+    deduplicated_tier_widths
 }
 
-/// 按 `cap` 等比：`cap` 从 4096 那档的 7 起，乘 `q` 往上走，直到超过 `w_min` 能给的最大 `cap`。
-fn capgeo_tiers(q_milli: u64, w_min: u64) -> Vec<u64> {
-    let cap_top = cap_of(w_min); // 最细档给出的最大 cap
-    let mut caps = Vec::new();
-    let mut c = cap_of(LIMIT);
-    while c <= cap_top {
-        caps.push(c);
-        let next = (c * q_milli).div_ceil(1000);
-        if next <= c { break; }
-        c = next;
+/// 按 `cap` 等比：`cap` 从 4096 那档的 7 起，乘 `q` 往上走，直到超过 `minimum_slot_width` 能给的最大 `cap`。
+fn capgeo_tiers(ratio_in_thousandths: u64, minimum_slot_width: u64) -> Vec<u64> {
+    let largest_objects_per_container = objects_per_container_for_slot_width(minimum_slot_width); // 最细档给出的最大 cap
+    let mut objects_per_container_steps = Vec::new();
+    let mut objects_per_container = objects_per_container_for_slot_width(LIMIT);
+    while objects_per_container <= largest_objects_per_container {
+        objects_per_container_steps.push(objects_per_container);
+        let next = (objects_per_container * ratio_in_thousandths).div_ceil(1000);
+        if next <= objects_per_container { break; }
+        objects_per_container = next;
     }
-    let mut ts: Vec<u64> = caps.iter().filter_map(|&c| widest_for_cap(c, w_min)).collect();
-    ts.push(LIMIT);
-    ts.sort_unstable();
-    ts.dedup();
-    ts
+    let mut tier_widths: Vec<u64> = objects_per_container_steps.iter().filter_map(|&objects_per_container| widest_slot_width_for_objects_per_container(objects_per_container, minimum_slot_width)).collect();
+    tier_widths.push(LIMIT);
+    tier_widths.sort_unstable();
+    tier_widths.dedup();
+    tier_widths
 }
 
 /// 每个可达 `cap` 一档（最细的无冗余表）。
-fn capall_tiers(w_min: u64) -> Vec<u64> {
-    let mut ts: Vec<u64> = (cap_of(LIMIT)..=cap_of(w_min))
-        .filter_map(|c| widest_for_cap(c, w_min)).collect();
-    ts.push(LIMIT);
-    ts.sort_unstable();
-    ts.dedup();
-    ts
+fn capall_tiers(minimum_slot_width: u64) -> Vec<u64> {
+    let mut tier_widths: Vec<u64> = (objects_per_container_for_slot_width(LIMIT)..=objects_per_container_for_slot_width(minimum_slot_width))
+        .filter_map(|objects_per_container| widest_slot_width_for_objects_per_container(objects_per_container, minimum_slot_width)).collect();
+    tier_widths.push(LIMIT);
+    tier_widths.sort_unstable();
+    tier_widths.dedup();
+    tier_widths
 }
 
-fn weights(dist: &str) -> Vec<u64> {
-    let mut w = vec![0u64; (LIMIT + 1) as usize];
-    match dist {
-        "uniform" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
-        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }
-        "discrete" => { for s in [512u64, 1024, 4096] { w[s as usize] = 1; } }
+fn weights(distribution: &str) -> Vec<u64> {
+    let mut weight_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+    match distribution {
+        "uniform" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = 1; } }
+        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = LIMIT / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[object_size as usize] = 1; } }
         _ => {}
     }
-    w
+    weight_by_object_size
 }
 
-fn counts(dist: &str, n: u64) -> Vec<u64> {
-    let w = weights(dist);
-    let total: u64 = w.iter().sum();
-    if total == 0 || n == 0 { return vec![0u64; (LIMIT + 1) as usize]; }
-    let mut c = vec![0u64; (LIMIT + 1) as usize];
-    let (mut acc, mut last) = (0u64, 0usize);
-    for s in 1..=LIMIT as usize {
-        if w[s] == 0 { continue; }
-        c[s] = n * w[s] / total; acc += c[s]; last = s;
+fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
+    let weight_by_object_size = weights(distribution);
+    let total: u64 = weight_by_object_size.iter().sum();
+    if total == 0 || object_count == 0 { return vec![0u64; (LIMIT + 1) as usize]; }
+    let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+    let (mut assigned_object_count, mut last_nonzero_object_size) = (0u64, 0usize);
+    for object_size in 1..=LIMIT as usize {
+        if weight_by_object_size[object_size] == 0 { continue; }
+        count_by_object_size[object_size] = object_count * weight_by_object_size[object_size] / total; assigned_object_count += count_by_object_size[object_size]; last_nonzero_object_size = object_size;
     }
-    c[last] += n - acc;
-    c
+    count_by_object_size[last_nonzero_object_size] += object_count - assigned_object_count;
+    count_by_object_size
 }
 
-fn containers_tiered(ts: &[u64], c: &[u64]) -> u64 {
+fn containers_tiered(tier_widths: &[u64], count_by_object_size: &[u64]) -> u64 {
     let mut total = 0u64;
-    for (i, &w) in ts.iter().enumerate() {
-        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };
-        let n_t: u64 = (lo..=w).map(|s| c[s as usize]).sum();
-        if n_t > 0 { total += n_t.div_ceil(cap_of(w).max(1)); }
+    for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
+        let tier_smallest_object_size = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
+        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[object_size as usize]).sum();
+        if objects_in_tier > 0 { total += objects_in_tier.div_ceil(objects_per_container_for_slot_width(slot_width).max(1)); }
     }
     total
 }
 
-fn containers_var(c: &[u64]) -> u64 {
-    let (mut cont, mut room) = (0u64, 0u64);
-    for s in 1..=LIMIT {
-        let need = s + SLOT_EXTRA;
-        let mut left = c[s as usize];
+fn containers_variable_length(count_by_object_size: &[u64]) -> u64 {
+    let (mut container_count, mut room) = (0u64, 0u64);
+    for object_size in 1..=LIMIT {
+        let need = object_size + SLOT_EXTRA;
+        let mut left = count_by_object_size[object_size as usize];
         while left > 0 {
-            if room < need { cont += 1; room = NET; }
+            if room < need { container_count += 1; room = UNIT_PAYLOAD_BYTES; }
             let fit = (room / need).min(left);
             room -= fit * need; left -= fit;
         }
     }
-    cont
+    container_count
 }
 
-fn worst_waste_above_floor(ts: &[u64]) -> f64 {
+fn worst_waste_above_floor(tier_widths: &[u64]) -> f64 {
     let mut worst = 0.0f64;
-    for (i, &w) in ts.iter().enumerate() {
-        if i == 0 { continue; }
-        let waste = 1.0 - ((ts[i - 1] + 1) as f64) / (w as f64);
+    for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
+        if tier_index == 0 { continue; }
+        let waste = 1.0 - ((tier_widths[tier_index - 1] + 1) as f64) / (slot_width as f64);
         if waste > worst { worst = waste; }
     }
     worst
 }
 
-fn arm_tiers(arm: &str, w_min: u64) -> Vec<u64> {
+fn arm_tiers(arm: &str, minimum_slot_width: u64) -> Vec<u64> {
     match arm {
-        "wgeo" => wgeo_tiers(1125, w_min),
-        "wgeo_dedup" => dedup_by_cap(&wgeo_tiers(1125, w_min)),
-        "capgeo125" => capgeo_tiers(1250, w_min),
-        "capgeo150" => capgeo_tiers(1500, w_min),
-        "capgeo200" => capgeo_tiers(2000, w_min),
-        "capall" => capall_tiers(w_min),
+        "wgeo" => wgeo_tiers(1125, minimum_slot_width),
+        "wgeo_dedup" => deduplicate_by_objects_per_container(&wgeo_tiers(1125, minimum_slot_width)),
+        "capgeo125" => capgeo_tiers(1250, minimum_slot_width),
+        "capgeo150" => capgeo_tiers(1500, minimum_slot_width),
+        "capgeo200" => capgeo_tiers(2000, minimum_slot_width),
+        "capall" => capall_tiers(minimum_slot_width),
         _ => vec![],
     }
 }
@@ -208,83 +208,83 @@ fn arm_tiers(arm: &str, w_min: u64) -> Vec<u64> {
 const ARMS: [&str; 6] = ["wgeo", "wgeo_dedup", "capgeo125", "capgeo150", "capgeo200", "capall"];
 
 fn main() {
-    let mut em = Emitter::new();
-    println!("{}", em.emit_raw(&format!(
-        "name=config unit={UNIT} pack_hdr={PACK_HDR} net={NET} slot_extra={SLOT_EXTRA} \
-         limit={LIMIT} n={N} arms={ARMS:?}")));
+    let mut emitter = Emitter::new();
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config unit={UNIT_BYTES} pack_hdr={PACKED_UNIT_HEADER_BYTES} net={UNIT_PAYLOAD_BYTES} slot_extra={SLOT_EXTRA} \
+         limit={LIMIT} n={OBJECT_COUNT} arms={ARMS:?}")));
 
     // 阳性对照
     for &arm in ARMS.iter() {
-        let ts = arm_tiers(arm, 64);
-        for &w in ts.iter() {
-            let mut c = vec![0u64; (LIMIT + 1) as usize];
-            c[w as usize] = N;
-            let (v, t) = (containers_var(&c), containers_tiered(&ts, &c));
-            if v != t {
-                println!("{}", em.emit_raw(&format!(
-                    "name=positive_exact arm={arm} tier={w} var={v} tiered={t} same=false")));
+        let tier_widths = arm_tiers(arm, 64);
+        for &slot_width in tier_widths.iter() {
+            let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+            count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+            let (variable_length_containers, tiered_containers) = (containers_variable_length(&count_by_object_size), containers_tiered(&tier_widths, &count_by_object_size));
+            if variable_length_containers != tiered_containers {
+                println!("{}", emitter.emit_raw(&format!(
+                    "name=positive_exact arm={arm} tier={slot_width} var={variable_length_containers} tiered={tiered_containers} same=false")));
             }
         }
-        println!("{}", em.emit_raw(&format!(
-            "name=positive_exact_summary arm={arm} tiers={} all_same=true", ts.len())));
+        println!("{}", emitter.emit_raw(&format!(
+            "name=positive_exact_summary arm={arm} tiers={} all_same=true", tier_widths.len())));
     }
 
     // 判别力
     {
-        let c = counts("uniform", N);
-        let a = containers_tiered(&arm_tiers("capgeo200", 64), &c);
-        let b = containers_tiered(&arm_tiers("capall", 64), &c);
-        println!("{}", em.emit_raw(&format!(
-            "name=discrimination capgeo200={a} capall={b} differ={}", a != b)));
+        let count_by_object_size = counts("uniform", OBJECT_COUNT);
+        let capgeo200_containers = containers_tiered(&arm_tiers("capgeo200", 64), &count_by_object_size);
+        let capall_containers = containers_tiered(&arm_tiers("capall", 64), &count_by_object_size);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=discrimination capgeo200={capgeo200_containers} capall={capall_containers} differ={}", capgeo200_containers != capall_containers)));
     }
 
     // 阴性
     {
-        let c = counts("uniform", 0);
-        println!("{}", em.emit_raw(&format!("name=negative arm=var containers={}", containers_var(&c))));
+        let count_by_object_size = counts("uniform", 0);
+        println!("{}", emitter.emit_raw(&format!("name=negative arm=var containers={}", containers_variable_length(&count_by_object_size))));
         for &arm in ARMS.iter() {
-            println!("{}", em.emit_raw(&format!(
-                "name=negative arm={arm} containers={}", containers_tiered(&arm_tiers(arm, 64), &c))));
+            println!("{}", emitter.emit_raw(&format!(
+                "name=negative arm={arm} containers={}", containers_tiered(&arm_tiers(arm, 64), &count_by_object_size))));
         }
     }
 
     // 档表本身
     for &arm in ARMS.iter() {
-        let ts = arm_tiers(arm, 64);
-        let min_cap = ts.iter().map(|&w| cap_of(w)).min().unwrap_or(0);
-        println!("{}", em.emit_raw(&format!(
+        let tier_widths = arm_tiers(arm, 64);
+        let smallest_objects_per_container = tier_widths.iter().map(|&slot_width| objects_per_container_for_slot_width(slot_width)).min().unwrap_or(0);
+        println!("{}", emitter.emit_raw(&format!(
             "name=table arm={arm} tiers={} worst_waste={:.6} min_cap={} min_tier={} max_tier={}",
-            ts.len(), worst_waste_above_floor(&ts), min_cap, ts[0], ts.last().unwrap())));
+            tier_widths.len(), worst_waste_above_floor(&tier_widths), smallest_objects_per_container, tier_widths[0], tier_widths.last().unwrap())));
     }
 
     // 主判据
-    for dist in ["uniform", "logunif", "discrete"] {
-        let c = counts(dist, N);
-        let v = containers_var(&c);
-        println!("{}", em.emit_raw(&format!("name=main dist={dist} arm=var containers={v} loss=0.0000")));
+    for distribution in ["uniform", "logunif", "discrete"] {
+        let count_by_object_size = counts(distribution, OBJECT_COUNT);
+        let variable_length_containers = containers_variable_length(&count_by_object_size);
+        println!("{}", emitter.emit_raw(&format!("name=main dist={distribution} arm=var containers={variable_length_containers} loss=0.0000")));
         for &arm in ARMS.iter() {
-            let t = containers_tiered(&arm_tiers(arm, 64), &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=main dist={dist} arm={arm} containers={t} loss={:.4} tiers={}",
-                (t as f64 - v as f64) / v as f64, arm_tiers(arm, 64).len())));
+            let tiered_containers = containers_tiered(&arm_tiers(arm, 64), &count_by_object_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=main dist={distribution} arm={arm} containers={tiered_containers} loss={:.4} tiers={}",
+                (tiered_containers as f64 - variable_length_containers as f64) / variable_length_containers as f64, arm_tiers(arm, 64).len())));
         }
     }
 
     // W_min 扫描，只对 capgeo150
-    for &w_min in [32u64, 64, 128].iter() {
-        let ts = arm_tiers("capgeo150", w_min);
-        for dist in ["uniform", "logunif"] {
-            let c = counts(dist, N);
-            let v = containers_var(&c);
-            let t = containers_tiered(&ts, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=wmin arm=capgeo150 w_min={w_min} dist={dist} tiers={} containers={t} \
+    for &minimum_slot_width in [32u64, 64, 128].iter() {
+        let tier_widths = arm_tiers("capgeo150", minimum_slot_width);
+        for distribution in ["uniform", "logunif"] {
+            let count_by_object_size = counts(distribution, OBJECT_COUNT);
+            let variable_length_containers = containers_variable_length(&count_by_object_size);
+            let tiered_containers = containers_tiered(&tier_widths, &count_by_object_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=wmin arm=capgeo150 w_min={minimum_slot_width} dist={distribution} tiers={} containers={tiered_containers} \
                  loss={:.4} floor_waste_bytes={}",
-                ts.len(), (t as f64 - v as f64) / v as f64, w_min - 1)));
+                tier_widths.len(), (tiered_containers as f64 - variable_length_containers as f64) / variable_length_containers as f64, minimum_slot_width - 1)));
         }
     }
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -294,23 +294,23 @@ mod tests {
     /// 跑前写死的那条预测：按 `cap` 去重之后容器数只减不增。
     #[test]
     fn dedup_never_increases_containers() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            let c = counts(dist, N);
-            let a = containers_tiered(&arm_tiers("wgeo", 64), &c);
-            let b = containers_tiered(&arm_tiers("wgeo_dedup", 64), &c);
-            assert!(b <= a, "dist={dist}：去重后 {b} 该 ≤ 去重前 {a}");
+        for distribution in ["uniform", "logunif", "discrete"] {
+            let count_by_object_size = counts(distribution, OBJECT_COUNT);
+            let wgeo_containers = containers_tiered(&arm_tiers("wgeo", 64), &count_by_object_size);
+            let deduplicated_containers = containers_tiered(&arm_tiers("wgeo_dedup", 64), &count_by_object_size);
+            assert!(deduplicated_containers <= wgeo_containers, "dist={distribution}：去重后 {deduplicated_containers} 该 ≤ 去重前 {wgeo_containers}");
         }
     }
 
     /// 阳性对照：对象恰好等于档宽时与变长逐字节相同。
     #[test]
-    fn positive_control_exact_tier_matches_var() {
+    fn positive_control_exact_tier_matches_variable_length() {
         for &arm in ARMS.iter() {
-            let ts = arm_tiers(arm, 64);
-            for &w in ts.iter() {
-                let mut c = vec![0u64; (LIMIT + 1) as usize];
-                c[w as usize] = N;
-                assert_eq!(containers_tiered(&ts, &c), containers_var(&c), "arm={arm} 档宽={w}");
+            let tier_widths = arm_tiers(arm, 64);
+            for &slot_width in tier_widths.iter() {
+                let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+                count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+                assert_eq!(containers_tiered(&tier_widths, &count_by_object_size), containers_variable_length(&count_by_object_size), "arm={arm} 档宽={slot_width}");
             }
         }
     }
@@ -318,19 +318,19 @@ mod tests {
     /// 判别力：档表真的被建模了。
     #[test]
     fn discrimination_table_matters() {
-        let c = counts("uniform", N);
-        let a = containers_tiered(&arm_tiers("capgeo200", 64), &c);
-        let b = containers_tiered(&arm_tiers("capall", 64), &c);
-        assert!(b < a, "capall 该比 capgeo200 省：capall={b} capgeo200={a}");
+        let count_by_object_size = counts("uniform", OBJECT_COUNT);
+        let capgeo200_containers = containers_tiered(&arm_tiers("capgeo200", 64), &count_by_object_size);
+        let capall_containers = containers_tiered(&arm_tiers("capall", 64), &count_by_object_size);
+        assert!(capall_containers < capgeo200_containers, "capall 该比 capgeo200 省：capall={capall_containers} capgeo200={capgeo200_containers}");
     }
 
     /// 阴性：N = 0 全 0。
     #[test]
     fn negative_control_zero() {
-        let c = counts("uniform", 0);
-        assert_eq!(containers_var(&c), 0);
+        let count_by_object_size = counts("uniform", 0);
+        assert_eq!(containers_variable_length(&count_by_object_size), 0);
         for &arm in ARMS.iter() {
-            assert_eq!(containers_tiered(&arm_tiers(arm, 64), &c), 0, "arm={arm}");
+            assert_eq!(containers_tiered(&arm_tiers(arm, 64), &count_by_object_size), 0, "arm={arm}");
         }
     }
 
@@ -340,14 +340,14 @@ mod tests {
     /// 两个数都留着：`r` = 1.125 去重前后 36 / 36；`r` = 1.01 去重前后 370 / 208。
     #[test]
     fn dedup_is_a_noop_at_this_ratio_but_bites_on_finer_ones() {
-        let a = arm_tiers("wgeo", 64);
-        let b = arm_tiers("wgeo_dedup", 64);
-        assert_eq!(a.len(), 36);
-        assert_eq!(b.len(), 36, "r = 1.125 这张表没有同 cap 的冗余档");
+        let wgeo_tier_widths = arm_tiers("wgeo", 64);
+        let wgeo_dedup_tier_widths = arm_tiers("wgeo_dedup", 64);
+        assert_eq!(wgeo_tier_widths.len(), 36);
+        assert_eq!(wgeo_dedup_tier_widths.len(), 36, "r = 1.125 这张表没有同 cap 的冗余档");
         // 换一张比 cap 分辨率还细的表，去重当场砍掉 44%
         let fine = wgeo_tiers(1010, 64);
         assert_eq!(fine.len(), 370);
-        assert_eq!(dedup_by_cap(&fine).len(), 208);
+        assert_eq!(deduplicate_by_objects_per_container(&fine).len(), 208);
     }
 
     /// **档数不是越多越好**：档越多补齐越少，但**没装满的尾容器也越多**。
@@ -356,52 +356,52 @@ mod tests {
     /// 这一条是 E121 的主结论，必须有断言守着。
     #[test]
     fn more_tiers_is_not_always_better() {
-        let u = counts("uniform", N);
-        let l = counts("logunif", N);
-        let (wg, ca) = (arm_tiers("wgeo", 64), arm_tiers("capall", 64));
-        assert_eq!(wg.len(), 36);
-        assert_eq!(ca.len(), 248);
+        let uniform_counts = counts("uniform", OBJECT_COUNT);
+        let log_uniform_counts = counts("logunif", OBJECT_COUNT);
+        let (wgeo_tier_widths, capall_tier_widths) = (arm_tiers("wgeo", 64), arm_tiers("capall", 64));
+        assert_eq!(wgeo_tier_widths.len(), 36);
+        assert_eq!(capall_tier_widths.len(), 248);
         // uniform：档多的赢
-        assert!(containers_tiered(&ca, &u) < containers_tiered(&wg, &u));
+        assert!(containers_tiered(&capall_tier_widths, &uniform_counts) < containers_tiered(&wgeo_tier_widths, &uniform_counts));
         // logunif：档多的输
-        assert!(containers_tiered(&ca, &l) > containers_tiered(&wg, &l));
+        assert!(containers_tiered(&capall_tier_widths, &log_uniform_counts) > containers_tiered(&wgeo_tier_widths, &log_uniform_counts));
         // 尾容器那笔账钉绝对值：logunif 上 capall 的容器数 1788，其中档数 248
-        assert_eq!(containers_tiered(&ca, &l), 1788);
-        assert_eq!(containers_var(&l), 1592);
+        assert_eq!(containers_tiered(&capall_tier_widths, &log_uniform_counts), 1788);
+        assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
     }
 
-    /// 等价性留档（变异 M10）：`capall_tiers` 末尾那句 `ts.push(LIMIT)` 是**冗余**的——
+    /// 等价性留档（变异 M10）：`capall_tiers` 末尾那句 `tier_widths.push(LIMIT)` 是**冗余**的——
     /// `cap` = 7 那一档算出来的最大槽宽本来就是 4096（`32665/7 − 43 = 4623`，被界线截到 4096，
-    /// 而 `cap_of(4096)` 恰好还是 7）。去掉那句在所有输入上同值 ⇒ 按
+    /// 而 `objects_per_container_for_slot_width(4096)` 恰好还是 7）。去掉那句在所有输入上同值 ⇒ 按
     /// `.claude/rules/mutation-sampling.md` 判**等价变异**，不是盲区，把等价性写成这条测试留档。
     #[test]
     fn capall_contains_limit_without_the_explicit_push() {
-        assert_eq!(widest_for_cap(cap_of(LIMIT), 64), Some(LIMIT));
-        assert_eq!(cap_of(LIMIT), 7);
-        assert_eq!(NET / 7 - SLOT_EXTRA, 4623); // 未截断前
+        assert_eq!(widest_slot_width_for_objects_per_container(objects_per_container_for_slot_width(LIMIT), 64), Some(LIMIT));
+        assert_eq!(objects_per_container_for_slot_width(LIMIT), 7);
+        assert_eq!(UNIT_PAYLOAD_BYTES / 7 - SLOT_EXTRA, 4623); // 未截断前
     }
 
     /// 界线截断真的在起作用：去掉 `.min(LIMIT)` 会让档宽越过 D27 已定项 2 的 4 KiB。
     #[test]
     fn limit_clamp_is_load_bearing() {
         for &arm in ARMS.iter() {
-            for w in arm_tiers(arm, 64) {
-                assert!(w <= LIMIT, "arm={arm} 档宽 {w} 越过界线 {LIMIT}");
+            for slot_width in arm_tiers(arm, 64) {
+                assert!(slot_width <= LIMIT, "arm={arm} 档宽 {slot_width} 越过界线 {LIMIT}");
             }
         }
         // cap = 7 那一档若不截断会算出 4623 > 4096
-        assert!(NET / cap_of(LIMIT) - SLOT_EXTRA > LIMIT);
+        assert!(UNIT_PAYLOAD_BYTES / objects_per_container_for_slot_width(LIMIT) - SLOT_EXTRA > LIMIT);
     }
 
     /// 每一档 `cap` ≥ 4（E116 的回本闸）。
     #[test]
     fn every_tier_pays_back() {
         for &arm in ARMS.iter() {
-            for w in arm_tiers(arm, 64) {
-                assert!(cap_of(w) >= 4, "arm={arm} 档宽={w} 的 cap={}", cap_of(w));
+            for slot_width in arm_tiers(arm, 64) {
+                assert!(objects_per_container_for_slot_width(slot_width) >= 4, "arm={arm} 档宽={slot_width} 的 cap={}", objects_per_container_for_slot_width(slot_width));
             }
         }
-        assert_eq!(cap_of(LIMIT), 7);
+        assert_eq!(objects_per_container_for_slot_width(LIMIT), 7);
     }
 
     /// 档表规模钉绝对值。
@@ -411,33 +411,33 @@ mod tests {
         assert_eq!(arm_tiers("capgeo150", 64).len(), 10);
         assert_eq!(arm_tiers("capgeo200", 64).len(), 5);
         assert_eq!(arm_tiers("capall", 64).len(), 248);
-        assert_eq!(cap_of(64), 305);
+        assert_eq!(objects_per_container_for_slot_width(64), 305);
     }
 
     /// 主判据绝对值。
     #[test]
     fn main_absolute() {
-        let u = counts("uniform", N);
-        assert_eq!(containers_var(&u), 6814);
-        assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &u), 7378);
-        assert_eq!(containers_tiered(&arm_tiers("wgeo_dedup", 64), &u), 7378);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo125", 64), &u), 7455);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo150", 64), &u), 8180);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo200", 64), &u), 9116);
-        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &u), 6977);
+        let uniform_counts = counts("uniform", OBJECT_COUNT);
+        assert_eq!(containers_variable_length(&uniform_counts), 6814);
+        assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &uniform_counts), 7378);
+        assert_eq!(containers_tiered(&arm_tiers("wgeo_dedup", 64), &uniform_counts), 7378);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo125", 64), &uniform_counts), 7455);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo150", 64), &uniform_counts), 8180);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo200", 64), &uniform_counts), 9116);
+        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &uniform_counts), 6977);
 
-        let l = counts("logunif", N);
-        assert_eq!(containers_var(&l), 1592);
-        assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &l), 1771);
-        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &l), 1788);
+        let log_uniform_counts = counts("logunif", OBJECT_COUNT);
+        assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
+        assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &log_uniform_counts), 1771);
+        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &log_uniform_counts), 1788);
     }
 
     /// 分布守恒。
     #[test]
     fn counts_conserve_objects() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            let c: u64 = counts(dist, N).iter().sum();
-            assert_eq!(c, N, "dist={dist}");
+        for distribution in ["uniform", "logunif", "discrete"] {
+            let total_objects: u64 = counts(distribution, OBJECT_COUNT).iter().sum();
+            assert_eq!(total_objects, OBJECT_COUNT, "dist={distribution}");
         }
     }
 }

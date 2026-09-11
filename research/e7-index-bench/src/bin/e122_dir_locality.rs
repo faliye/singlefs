@@ -37,8 +37,8 @@
 //!    写完一个目录再写下一个，两者本来就是同一个落点序列。任一格不等 ⇒ 整轮作废。
 //!    ⚠️ **跑前登记把参数标反了，留档不改**：登记写的是「`stride = 1` 时」，
 //!    而 `stride` 的语义是「一个目录连着放几个再换下一个」⇒ `stride = 1` 是**完全轮转**、
-//!    交错最厉害那一格，`stride = files` 才是没有交错。判据的**意思**没变，
-//!    错的是主 agent 登记时给参数贴的标签。实测：`stride = 32 = files` 时两条臂都给 16。
+//!    交错最厉害那一格，`stride = files_per_directory` 才是没有交错。判据的**意思**没变，
+//!    错的是主 agent 登记时给参数贴的标签。实测：`stride = 32 = files_per_directory` 时两条臂都给 16。
 //! 4. **阴性对照**：每目录 0 个文件 ⇒ 三条臂的连续段数都是 0。
 //! 5. **判别力**：三条臂在至少一格上给出不同的数。
 //! 6. **失败条款**：若 `grouped` 与 `arrival` 在**两个**指标上都逐格相同，
@@ -59,12 +59,12 @@ const SLOTS_PER_UNIT: u64 = 32768 / GRAIN;
 /// ⚠️ 第一版只取了 128 一个值，而一个目录（32 个文件 × 2 槽）正好占 64 槽
 /// ⇒ 三条臂的全空段数**全是 0**，那一格分不开任何东西。
 /// 按 `.claude/rules/mutation-sampling.md`，这是取样点不敏感，处置是**补取样点**不是留档。
-const SEGS: [u64; 3] = [32, 64, 128];
+const SEGMENT_LENGTHS_IN_SLOTS: [u64; 3] = [32, 64, 128];
 /// 负载规模。**做成常量而不是 `main` 里的局部变量**：变异测试发现
-/// 「把 `main` 里的 `dirs` 改掉」一个测试都没红——单测各自硬写 16 / 32，
+/// 「把 `main` 里的 `directory_count` 改掉」一个测试都没红——单测各自硬写 16 / 32，
 /// 没有任何东西钉住产物实际用的那组参数（真盲区，不是取样点不敏感）。
-const DIRS: u64 = 16;
-const FILES: u64 = 32;
+const DIRECTORY_COUNT: u64 = 16;
+const FILES_PER_DIRECTORY: u64 = 32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
@@ -84,156 +84,156 @@ impl Arm {
 }
 
 /// 伪随机：确定性 LCG，**不引入外部随机源**，复跑逐字节一致。
-fn lcg(x: u64) -> u64 {
-    x.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407)
+fn next_linear_congruential(state: u64) -> u64 {
+    state.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1_442_695_040_888_963_407)
 }
 
 /// 返回每个目录的槽号列表（已排序）。
-/// `dirs` 个目录、每目录 `files` 个文件、交错步长 `stride`
+/// `directory_count` 个目录、每目录 `files_per_directory` 个文件、交错步长 `stride`
 /// （每次从一个目录连着放 `stride` 个文件再换下一个目录）。
-fn place(arm: Arm, dirs: u64, files: u64, stride: u64) -> Vec<Vec<u64>> {
-    let mut out: Vec<Vec<u64>> = vec![Vec::new(); dirs as usize];
-    let total = dirs * files;
+fn place(arm: Arm, directory_count: u64, files_per_directory: u64, stride: u64) -> Vec<Vec<u64>> {
+    let mut slots_by_directory: Vec<Vec<u64>> = vec![Vec::new(); directory_count as usize];
+    let total = directory_count * files_per_directory;
     match arm {
         Arm::Grouped => {
             // 同目录连续
-            for d in 0..dirs {
-                for f in 0..files {
-                    let unit = d * files + f;
-                    out[d as usize].push(unit * SLOTS_PER_UNIT);
+            for directory_index in 0..directory_count {
+                for file_index in 0..files_per_directory {
+                    let unit = directory_index * files_per_directory + file_index;
+                    slots_by_directory[directory_index as usize].push(unit * SLOTS_PER_UNIT);
                 }
             }
         }
         Arm::Arrival => {
             // 到达顺序：每个目录连着放 stride 个，再换下一个目录
-            let s = stride.max(1);
-            let mut placed = vec![0u64; dirs as usize];
+            let files_per_turn = stride.max(1);
+            let mut placed = vec![0u64; directory_count as usize];
             let mut unit = 0u64;
-            'outer: loop {
-                for d in 0..dirs {
-                    for _ in 0..s {
-                        if placed[d as usize] >= files {
+            'placement: loop {
+                for directory_index in 0..directory_count {
+                    for _ in 0..files_per_turn {
+                        if placed[directory_index as usize] >= files_per_directory {
                             break;
                         }
-                        out[d as usize].push(unit * SLOTS_PER_UNIT);
-                        placed[d as usize] += 1;
+                        slots_by_directory[directory_index as usize].push(unit * SLOTS_PER_UNIT);
+                        placed[directory_index as usize] += 1;
                         unit += 1;
                         if unit >= total {
-                            break 'outer;
+                            break 'placement;
                         }
                     }
                 }
-                if placed.iter().all(|&p| p >= files) {
+                if placed.iter().all(|&placed_count| placed_count >= files_per_directory) {
                     break;
                 }
             }
         }
         Arm::Random => {
-            let mut x = 0x5eed_1234u64;
-            let mut used = std::collections::BTreeSet::new();
-            for d in 0..dirs {
-                for _ in 0..files {
+            let mut linear_congruential_state = 0x5eed_1234u64;
+            let mut used_slots = std::collections::BTreeSet::new();
+            for directory_index in 0..directory_count {
+                for _ in 0..files_per_directory {
                     let mut slot;
                     loop {
-                        x = lcg(x);
-                        slot = (x % total) * SLOTS_PER_UNIT;
-                        if used.insert(slot) {
+                        linear_congruential_state = next_linear_congruential(linear_congruential_state);
+                        slot = (linear_congruential_state % total) * SLOTS_PER_UNIT;
+                        if used_slots.insert(slot) {
                             break;
                         }
                     }
-                    out[d as usize].push(slot);
+                    slots_by_directory[directory_index as usize].push(slot);
                 }
             }
         }
     }
-    for v in out.iter_mut() {
-        v.sort_unstable();
+    for directory_slots in slots_by_directory.iter_mut() {
+        directory_slots.sort_unstable();
     }
-    out
+    slots_by_directory
 }
 
 /// 一个目录的槽排序之后有多少个连续段。每个单元占 `SLOTS_PER_UNIT` 个槽。
-fn runs(slots: &[u64]) -> u64 {
+fn count_contiguous_runs(slots: &[u64]) -> u64 {
     if slots.is_empty() {
         return 0;
     }
-    let mut n = 1;
-    for w in slots.windows(2) {
-        if w[1] != w[0] + SLOTS_PER_UNIT {
-            n += 1;
+    let mut run_count = 1;
+    for slot_pair in slots.windows(2) {
+        if slot_pair[1] != slot_pair[0] + SLOTS_PER_UNIT {
+            run_count += 1;
         }
     }
-    n
+    run_count
 }
 
 /// 删掉第 `victim` 个目录之后，全空的段有多少个。
-fn empty_segs(all: &[Vec<u64>], victim: usize, seg: u64) -> u64 {
-    let mut live = std::collections::BTreeSet::new();
-    for (i, v) in all.iter().enumerate() {
-        if i == victim {
+fn empty_segments_after_deleting_directory(slots_by_directory: &[Vec<u64>], victim: usize, segment_slots: u64) -> u64 {
+    let mut live_slots = std::collections::BTreeSet::new();
+    for (directory_index, directory_slots) in slots_by_directory.iter().enumerate() {
+        if directory_index == victim {
             continue;
         }
-        for &s in v {
-            for k in 0..SLOTS_PER_UNIT {
-                live.insert(s + k);
+        for &slot in directory_slots {
+            for slot_offset in 0..SLOTS_PER_UNIT {
+                live_slots.insert(slot + slot_offset);
             }
         }
     }
-    let max_slot = all
+    let end_slot_exclusive = slots_by_directory
         .iter()
         .flatten()
         .copied()
         .max()
-        .map(|m| m + SLOTS_PER_UNIT)
+        .map(|highest_slot| highest_slot + SLOTS_PER_UNIT)
         .unwrap_or(0);
-    let segs = max_slot.div_ceil(seg);
-    (0..segs)
-        .filter(|&g| (g * seg..(g + 1) * seg).all(|s| !live.contains(&s)))
+    let segment_count = end_slot_exclusive.div_ceil(segment_slots);
+    (0..segment_count)
+        .filter(|&segment_index| (segment_index * segment_slots..(segment_index + 1) * segment_slots).all(|slot| !live_slots.contains(&slot)))
         .count() as u64
 }
 
 fn main() {
-    let mut em = e7_index_bench::Emitter::new();
-    let dirs = DIRS;
-    let files = FILES;
+    let mut emitter = e7_index_bench::Emitter::new();
+    let directory_count = DIRECTORY_COUNT;
+    let files_per_directory = FILES_PER_DIRECTORY;
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config grain={GRAIN} slots_per_unit={SLOTS_PER_UNIT} segs={SEGS:?} dirs={dirs} files={files}"
+        emitter.emit_raw(&format!(
+            "name=config grain={GRAIN} slots_per_unit={SLOTS_PER_UNIT} segs={SEGMENT_LENGTHS_IN_SLOTS:?} dirs={directory_count} files={files_per_directory}"
         ))
     );
     for &stride in [1u64, 2, 4, 8, 32].iter() {
         for arm in [Arm::Grouped, Arm::Arrival, Arm::Random] {
-            let all = place(arm, dirs, files, stride);
-            let total_runs: u64 = all.iter().map(|v| runs(v)).sum();
-            let worst = all.iter().map(|v| runs(v)).max().unwrap_or(0);
-            let es: Vec<String> = SEGS
+            let slots_by_directory = place(arm, directory_count, files_per_directory, stride);
+            let total_runs: u64 = slots_by_directory.iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum();
+            let worst_directory_runs = slots_by_directory.iter().map(|directory_slots| count_contiguous_runs(directory_slots)).max().unwrap_or(0);
+            let empty_segment_fields: Vec<String> = SEGMENT_LENGTHS_IN_SLOTS
                 .iter()
-                .map(|&sg| format!("empty_segs_at_{sg}={}", empty_segs(&all, 0, sg)))
+                .map(|&segment_slots| format!("empty_segs_at_{segment_slots}={}", empty_segments_after_deleting_directory(&slots_by_directory, 0, segment_slots)))
                 .collect();
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=walk arm={} stride={stride} total_runs={total_runs} worst_dir_runs={worst} {}",
+                emitter.emit_raw(&format!(
+                    "name=walk arm={} stride={stride} total_runs={total_runs} worst_dir_runs={worst_directory_runs} {}",
                     arm.name(),
-                    es.join(" ")
+                    empty_segment_fields.join(" ")
                 ))
             );
         }
     }
     // 阴性对照：每目录 0 个文件
     for arm in [Arm::Grouped, Arm::Arrival, Arm::Random] {
-        let all = place(arm, dirs, 0, 1);
+        let slots_by_directory = place(arm, directory_count, 0, 1);
         println!(
             "{}",
-            em.emit_raw(&format!(
+            emitter.emit_raw(&format!(
                 "name=negcontrol arm={} total_runs={}",
                 arm.name(),
-                all.iter().map(|v| runs(v)).sum::<u64>()
+                slots_by_directory.iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum::<u64>()
             ))
         );
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -242,104 +242,104 @@ mod tests {
 
     /// 判据 1：`grouped` 的每目录连续段数恒为 1。不是 1 说明模型建错了。
     #[test]
-    fn t01_grouped_is_one_run_per_dir() {
+    fn grouped_is_one_run_per_directory() {
         for &stride in [1u64, 2, 8, 32].iter() {
-            let all = place(Arm::Grouped, 16, 32, stride);
-            for (d, v) in all.iter().enumerate() {
-                assert_eq!(runs(v), 1, "dir {d} stride {stride}");
+            let slots_by_directory = place(Arm::Grouped, 16, 32, stride);
+            for (directory_index, directory_slots) in slots_by_directory.iter().enumerate() {
+                assert_eq!(count_contiguous_runs(directory_slots), 1, "dir {directory_index} stride {stride}");
             }
         }
     }
 
     /// 判据 3：**阳性对照逐臂跑**——没有交错时 `arrival` 必须逐格等于 `grouped`。
     /// ⚠️ 跑前登记把这一格标成 `stride = 1`，而那是完全轮转那一格；
-    /// 没有交错的是 `stride = files`。登记那个标签留在这里，不改成对的。
+    /// 没有交错的是 `stride = files_per_directory`。登记那个标签留在这里，不改成对的。
     #[test]
-    fn t02_positive_control_每条臂() {
-        const PREREG_STRIDE: u64 = 1; // 登记时写的，标反了
-        const NO_INTERLEAVE_STRIDE: u64 = 32; // files，真正没有交错的那一格
-        assert_ne!(PREREG_STRIDE, NO_INTERLEAVE_STRIDE);
-        let g = place(Arm::Grouped, 16, 32, NO_INTERLEAVE_STRIDE);
-        let a = place(Arm::Arrival, 16, 32, NO_INTERLEAVE_STRIDE);
-        assert_eq!(g, a, "写完一个目录再写下一个，两条臂本来就是同一个落点序列");
-        let r = place(Arm::Random, 16, 32, NO_INTERLEAVE_STRIDE);
-        assert_eq!(r.len(), g.len());
-        assert_eq!(r.iter().map(|v| v.len()).sum::<usize>(), 16 * 32);
+    fn positive_control_on_every_arm_without_interleave() {
+        const PREREGISTERED_STRIDE: u64 = 1; // 登记时写的，标反了
+        const NO_INTERLEAVE_STRIDE: u64 = 32; // files_per_directory，真正没有交错的那一格
+        assert_ne!(PREREGISTERED_STRIDE, NO_INTERLEAVE_STRIDE);
+        let grouped_slots = place(Arm::Grouped, 16, 32, NO_INTERLEAVE_STRIDE);
+        let arrival_slots = place(Arm::Arrival, 16, 32, NO_INTERLEAVE_STRIDE);
+        assert_eq!(grouped_slots, arrival_slots, "写完一个目录再写下一个，两条臂本来就是同一个落点序列");
+        let random_slots = place(Arm::Random, 16, 32, NO_INTERLEAVE_STRIDE);
+        assert_eq!(random_slots.len(), grouped_slots.len());
+        assert_eq!(random_slots.iter().map(|directory_slots| directory_slots.len()).sum::<usize>(), 16 * 32);
     }
 
     /// 判据 4：阴性对照——每目录 0 个文件，三条臂的连续段数都是 0。
     #[test]
-    fn t03_negative_control_每条臂() {
+    fn negative_control_on_every_arm() {
         for arm in [Arm::Grouped, Arm::Arrival, Arm::Random] {
-            let all = place(arm, 16, 0, 1);
-            assert_eq!(all.iter().map(|v| runs(v)).sum::<u64>(), 0, "{}", arm.name());
+            let slots_by_directory = place(arm, 16, 0, 1);
+            assert_eq!(slots_by_directory.iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum::<u64>(), 0, "{}", arm.name());
         }
     }
 
     /// 判据 1 的绝对值：完全轮转时 `arrival` 每目录 32 段（每个文件各成一段）。
     #[test]
-    fn t04_walk_runs_are_absolute() {
+    fn walk_runs_are_pinned_to_absolute_values() {
         // grouped 与 stride 无关，恒 16（16 个目录各 1 段）
-        for &st in [1u64, 2, 4, 8, 32].iter() {
-            let g: u64 = place(Arm::Grouped, 16, 32, st).iter().map(|v| runs(v)).sum();
-            assert_eq!(g, 16, "stride {st}");
+        for &stride in [1u64, 2, 4, 8, 32].iter() {
+            let grouped_runs: u64 = place(Arm::Grouped, 16, 32, stride).iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum();
+            assert_eq!(grouped_runs, 16, "stride {stride}");
         }
         // arrival 的闭式：总段数 = 目录数 × 文件数 / stride = 512 / stride
-        for &(st, want) in [(1u64, 512u64), (2, 256), (4, 128), (8, 64), (32, 16)].iter() {
-            let a: u64 = place(Arm::Arrival, 16, 32, st).iter().map(|v| runs(v)).sum();
-            assert_eq!(a, want, "stride {st}");
-            assert_eq!(a * st, 512, "闭式：段数 × stride 恒等于对象总数");
+        for &(stride, expected_runs) in [(1u64, 512u64), (2, 256), (4, 128), (8, 64), (32, 16)].iter() {
+            let arrival_runs: u64 = place(Arm::Arrival, 16, 32, stride).iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum();
+            assert_eq!(arrival_runs, expected_runs, "stride {stride}");
+            assert_eq!(arrival_runs * stride, 512, "闭式：段数 × stride 恒等于对象总数");
         }
     }
 
     /// 判据 2 的绝对值：删掉一个目录之后的全空段数。
     #[test]
-    fn t05_empty_segs_are_absolute() {
-        let g = place(Arm::Grouped, 16, 32, 2);
-        let a = place(Arm::Arrival, 16, 32, 2);
+    fn empty_segments_are_pinned_to_absolute_values() {
+        let grouped_slots = place(Arm::Grouped, 16, 32, 2);
+        let arrival_slots = place(Arm::Arrival, 16, 32, 2);
         // 一个目录 = 32 个文件 × 2 槽 = 64 槽
-        assert_eq!(empty_segs(&g, 0, 32), 2, "段长 32：被删目录正好腾出两个整段");
-        assert_eq!(empty_segs(&g, 0, 64), 1, "段长 64：正好一个整段");
-        assert_eq!(empty_segs(&g, 0, 128), 0, "段长 128：只腾出半个段 ⇒ 0");
-        for &sg in SEGS.iter() {
-            assert_eq!(empty_segs(&a, 0, sg), 0, "arrival 交错之后一个整段都空不出来（段长 {sg}）");
+        assert_eq!(empty_segments_after_deleting_directory(&grouped_slots, 0, 32), 2, "段长 32：被删目录正好腾出两个整段");
+        assert_eq!(empty_segments_after_deleting_directory(&grouped_slots, 0, 64), 1, "段长 64：正好一个整段");
+        assert_eq!(empty_segments_after_deleting_directory(&grouped_slots, 0, 128), 0, "段长 128：只腾出半个段 ⇒ 0");
+        for &segment_slots in SEGMENT_LENGTHS_IN_SLOTS.iter() {
+            assert_eq!(empty_segments_after_deleting_directory(&arrival_slots, 0, segment_slots), 0, "arrival 交错之后一个整段都空不出来（段长 {segment_slots}）");
         }
     }
 
     /// 判据 5：判别力——三条臂在 stride = 2 那格必须给出不止一种结果。
     #[test]
-    fn t06_discriminating() {
-        let mut set = std::collections::BTreeSet::new();
+    fn three_arms_are_discriminated() {
+        let mut distinct_run_totals = std::collections::BTreeSet::new();
         for arm in [Arm::Grouped, Arm::Arrival, Arm::Random] {
-            let all = place(arm, 16, 32, 2);
-            set.insert(all.iter().map(|v| runs(v)).sum::<u64>());
+            let slots_by_directory = place(arm, 16, 32, 2);
+            distinct_run_totals.insert(slots_by_directory.iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum::<u64>());
         }
-        assert!(set.len() >= 2, "三条臂全同 ⇒ 装置分不开它们");
+        assert!(distinct_run_totals.len() >= 2, "三条臂全同 ⇒ 装置分不开它们");
     }
 
     /// 几何常量钉死。
     #[test]
-    fn t07_constants() {
+    fn geometry_and_workload_constants_are_pinned() {
         assert_eq!(GRAIN, 16384);
         assert_eq!(SLOTS_PER_UNIT, 2);
-        assert_eq!(SEGS, [32, 64, 128]);
-        assert_eq!(DIRS, 16);
-        assert_eq!(FILES, 32);
-        assert_eq!(DIRS * FILES, 512, "产物里的对象总数");
+        assert_eq!(SEGMENT_LENGTHS_IN_SLOTS, [32, 64, 128]);
+        assert_eq!(DIRECTORY_COUNT, 16);
+        assert_eq!(FILES_PER_DIRECTORY, 32);
+        assert_eq!(DIRECTORY_COUNT * FILES_PER_DIRECTORY, 512, "产物里的对象总数");
     }
 
     /// 落点不重叠：三条臂都不许把两个单元放到同一个槽。
     #[test]
-    fn t08_no_overlap() {
+    fn no_two_units_share_a_slot() {
         for arm in [Arm::Grouped, Arm::Arrival, Arm::Random] {
-            let all = place(arm, 16, 32, 4);
-            let mut seen = std::collections::BTreeSet::new();
-            for v in &all {
-                for &s in v {
-                    assert!(seen.insert(s), "{} 落点撞了 {}", arm.name(), s);
+            let slots_by_directory = place(arm, 16, 32, 4);
+            let mut seen_slots = std::collections::BTreeSet::new();
+            for directory_slots in &slots_by_directory {
+                for &slot in directory_slots {
+                    assert!(seen_slots.insert(slot), "{} 落点撞了 {}", arm.name(), slot);
                 }
             }
-            assert_eq!(seen.len(), 16 * 32);
+            assert_eq!(seen_slots.len(), 16 * 32);
         }
     }
 
@@ -350,23 +350,23 @@ mod tests {
     /// 按 `.claude/rules/mutation-sampling.md` 三分，这是**取样点不敏感**不是等价变异：
     /// 换成非 2 的幂（15 × 32 = 480）当场碰撞 172 次。
     #[test]
-    fn t10_random_dedup_needs_a_non_power_of_two_size() {
-        let all = place(Arm::Random, 15, 32, 4);
-        let mut seen = std::collections::BTreeSet::new();
-        for v in &all {
-            for &s in v {
-                assert!(seen.insert(s), "非 2 的幂规模下落点撞了 {s}");
+    fn random_deduplication_needs_a_non_power_of_two_size() {
+        let slots_by_directory = place(Arm::Random, 15, 32, 4);
+        let mut seen_slots = std::collections::BTreeSet::new();
+        for directory_slots in &slots_by_directory {
+            for &slot in directory_slots {
+                assert!(seen_slots.insert(slot), "非 2 的幂规模下落点撞了 {slot}");
             }
         }
-        assert_eq!(seen.len(), 15 * 32);
+        assert_eq!(seen_slots.len(), 15 * 32);
         assert_ne!((15u64 * 32).count_ones(), 1, "取样点必须不是 2 的幂，否则这条测不出东西");
     }
 
     /// `random` 是判别力下界，不是候选：它的连续段数必须**不优于** `arrival`。
     #[test]
-    fn t09_random_is_the_floor() {
-        let a: u64 = place(Arm::Arrival, 16, 32, 2).iter().map(|v| runs(v)).sum();
-        let r: u64 = place(Arm::Random, 16, 32, 2).iter().map(|v| runs(v)).sum();
-        assert!(r >= a, "random={r} arrival={a}");
+    fn random_is_the_floor() {
+        let arrival_runs: u64 = place(Arm::Arrival, 16, 32, 2).iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum();
+        let random_runs: u64 = place(Arm::Random, 16, 32, 2).iter().map(|directory_slots| count_contiguous_runs(directory_slots)).sum();
+        assert!(random_runs >= arrival_runs, "random={random_runs} arrival={arrival_runs}");
     }
 }

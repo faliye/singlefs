@@ -158,7 +158,7 @@ GPU 侧 50.3 / 56.69 / 28.5 GB/s 来自 Python（`e21-transfer.py`）。
 E21（GPU 卸载的净收益）的两个单测钉的是「折叠与顺序无关」「分块是一个划分」，**都是结构性质**。
 
 补了一条绝对值断言 `throughput_unit_is_decimal_gigabytes_per_second`：
-`gbps(10⁹ 字节, 10⁹ 纳秒) == 1.0`，且 `2 GiB / 1 s` 必须算成 **2.147…** 而不是 2.0。
+`decimal_gigabytes_per_second(10⁹ 字节, 10⁹ 纳秒) == 1.0`，且 `2 GiB / 1 s` 必须算成 **2.147…** 而不是 2.0。
 变异表存在 `research/mutations/e21_cpu.tsv`，三条变异（换 GiB 口径、分块用 floor、末块不截）全被杀。
 
 ### 口径与代码

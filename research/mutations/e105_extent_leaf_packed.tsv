@@ -1,5 +1,5 @@
-M1_扇出按节点算容器	    let per_container = fanout(unit_bytes, unit_hdr, rec);	    let per_container = fanout(NODE_BYTES, unit_hdr, rec);
-M2_树高少算一层	    while count > 1 {	    while count > 1 && levels.len() < 2 {
-M3_碰到的节点数不饱和	    lf * (1.0 - (1.0 - 1.0 / lf).powi(k as i32))	    (k as f64).min(lf * 1e9)
-M4_码3侧漏掉内部层	    touched(g.b_containers, k) * (unit_bytes * W) as f64 + cow_nodes(&g.b_internal, k) * (NODE_BYTES * W) as f64	    touched(g.b_containers, k) * (unit_bytes * W) as f64
-M5_点查漏掉那次单元读	    (h + 1, h * NODE_BYTES + UNIT_BYTES)	    (h + 1, h * NODE_BYTES)
+M1_扇出按节点算容器	    let records_per_container = fanout(unit_bytes, unit_header_bytes, record_bytes);	    let records_per_container = fanout(NODE_BYTES, unit_header_bytes, record_bytes);
+M2_树高少算一层	    while level_node_count > 1 {	    while level_node_count > 1 && levels.len() < 2 {
+M3_碰到的节点数不饱和	    level_node_count_float * (1.0 - (1.0 - 1.0 / level_node_count_float).powi(update_count as i32))	    (update_count as f64).min(level_node_count_float * 1e9)
+M4_码3侧漏掉内部层	    touched(tree_geometry.container_count, update_count) * (unit_bytes * STRIPE_WIDTH) as f64 + copy_on_write_nodes(&tree_geometry.packed_internal_levels, update_count) * (NODE_BYTES * STRIPE_WIDTH) as f64	    touched(tree_geometry.container_count, update_count) * (unit_bytes * STRIPE_WIDTH) as f64
+M5_点查漏掉那次单元读	    (packed_internal_height + 1, packed_internal_height * NODE_BYTES + UNIT_BYTES)	    (packed_internal_height + 1, packed_internal_height * NODE_BYTES)

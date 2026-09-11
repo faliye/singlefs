@@ -50,10 +50,10 @@
 //! 确定性模型，**跑 N 轮说明的是没有隐藏状态，不是统计上稳定**。
 
 /// D3 已定项 7：落点粒度 16384 字节。
-const GRAIN: u64 = 16384;
+const GRAIN_BYTES: u64 = 16384;
 /// D4 已定项 1：元数据侧 16 KiB、数据侧 32 KiB。数据单元占两个槽。
-const META_UNIT: u64 = 16384;
-const DATA_UNIT: u64 = 32768;
+const META_UNIT_BYTES: u64 = 16384;
+const DATA_UNIT_BYTES: u64 = 32768;
 /// 4 GiB 盘 = 262144 个 16 KiB 槽。
 const DISK_SLOTS: u64 = 262_144;
 /// 同批链：前后邻居各一个槽号 6 字节。
@@ -63,7 +63,7 @@ const DITTO_SPREAD: u64 = DISK_SLOTS / 8;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
-    None,
+    NoRedundancy,
     Ditto,
     Chain,
 }
@@ -71,17 +71,17 @@ enum Arm {
 impl Arm {
     fn name(self) -> &'static str {
         match self {
-            Arm::None => "none",
+            Arm::NoRedundancy => "none",
             Arm::Ditto => "ditto",
             Arm::Chain => "chain",
         }
     }
     /// 一个元数据单元有几份。**没有通配臂**：加一种臂编译器会报。
-    fn meta_copies(self, pool_wide: bool) -> u64 {
+    fn meta_copies(self, is_pool_wide: bool) -> u64 {
         match self {
-            Arm::None | Arm::Chain => 1,
+            Arm::NoRedundancy | Arm::Chain => 1,
             Arm::Ditto => {
-                if pool_wide {
+                if is_pool_wide {
                     3
                 } else {
                     2
@@ -92,24 +92,24 @@ impl Arm {
     /// 数据单元恒 1 份（ZFS 的 ditto 也只罩元数据）。
     fn data_copies(self) -> u64 {
         match self {
-            Arm::None | Arm::Chain | Arm::Ditto => 1,
+            Arm::NoRedundancy | Arm::Chain | Arm::Ditto => 1,
         }
     }
 }
 
-/// 第 `i` 份副本落在哪个槽：第 0 份在原位，其后每份再隔 1/8 盘。
-fn copy_slot(base: u64, i: u64) -> u64 {
-    (base + i * DITTO_SPREAD) % DISK_SLOTS
+/// 第 `copy_index` 份副本落在哪个槽：第 0 份在原位，其后每份再隔 1/8 盘。
+fn copy_slot(base_slot: u64, copy_index: u64) -> u64 {
+    (base_slot + copy_index * DITTO_SPREAD) % DISK_SLOTS
 }
 
 /// 故障形态。**连续区间对链臂是最不利的取样点**（前后邻居一起死），
-/// 只用它比对等于给链臂设了个稻草人故障模型 ⇒ 另加散点一档，每 `k` 个槽毁一个。
+/// 只用它比对等于给链臂设了个稻草人故障模型 ⇒ 另加散点一档，每 `period_in_slots` 个槽毁一个。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Fault {
     /// 一段连续区间整个毁掉（对齐 ZFS 那次「抹掉分区前 1 GB」）。
-    Span { start: u64, len: u64 },
-    /// 每 `k` 个槽毁一个，毁掉的总数与同规模的 Span 相同。
-    Scatter { k: u64 },
+    Span { start_slot: u64, length_in_slots: u64 },
+    /// 每 `period_in_slots` 个槽毁一个，毁掉的总数与同规模的 Span 相同。
+    Scatter { period_in_slots: u64 },
 }
 
 impl Fault {
@@ -119,10 +119,10 @@ impl Fault {
             Fault::Scatter { .. } => "scatter",
         }
     }
-    fn destroyed(self, s: u64) -> bool {
+    fn destroyed(self, slot: u64) -> bool {
         match self {
-            Fault::Span { start, len } => s >= start && s < start + len,
-            Fault::Scatter { k } => k != 0 && s % k == 0,
+            Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot < start_slot + length_in_slots,
+            Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots == 0,
         }
     }
 }
@@ -130,22 +130,22 @@ impl Fault {
 struct Layout {
     /// 元数据单元的基准槽（全池元数据在前）。
     meta_base: Vec<u64>,
-    pool_wide: usize,
+    pool_wide_count: usize,
     data_base: Vec<u64>,
 }
 
 /// 元数据占比 `meta_permille`（千分比）、全池元数据占元数据的 `pool_permille`。
-fn layout(meta_permille: u64, pool_permille: u64) -> Layout {
+fn build_layout(meta_permille: u64, pool_permille: u64) -> Layout {
     // 盘上先铺元数据槽，再铺数据槽（数据单元占两个槽）。
     let meta_slots = DISK_SLOTS * meta_permille / 1000;
     let data_slots = DISK_SLOTS - meta_slots;
-    let n_meta = meta_slots;
-    let n_data = data_slots / 2;
-    let pool_wide = (n_meta * pool_permille / 1000) as usize;
+    let meta_unit_count = meta_slots;
+    let data_unit_count = data_slots / 2;
+    let pool_wide_count = (meta_unit_count * pool_permille / 1000) as usize;
     Layout {
-        meta_base: (0..n_meta).collect(),
-        pool_wide,
-        data_base: (0..n_data).map(|i| meta_slots + i * 2).collect(),
+        meta_base: (0..meta_unit_count).collect(),
+        pool_wide_count,
+        data_base: (0..data_unit_count).map(|data_index| meta_slots + data_index * 2).collect(),
     }
 }
 
@@ -157,37 +157,37 @@ struct Outcome {
     overhead_bytes: u64,
 }
 
-fn run(arm: Arm, l: &Layout, f: Fault) -> Outcome {
+fn run_arm_under_fault(arm: Arm, layout: &Layout, fault: Fault) -> Outcome {
     let mut recovered_meta = 0;
-    for (i, &b) in l.meta_base.iter().enumerate() {
-        let copies = arm.meta_copies(i < l.pool_wide);
-        if (0..copies).any(|c| !f.destroyed(copy_slot(b, c))) {
+    for (meta_index, &base_slot) in layout.meta_base.iter().enumerate() {
+        let copies = arm.meta_copies(meta_index < layout.pool_wide_count);
+        if (0..copies).any(|copy_index| !fault.destroyed(copy_slot(base_slot, copy_index))) {
             recovered_meta += 1;
         }
     }
     let mut recovered_data = 0;
     let mut detected_only = 0;
-    for (i, &b) in l.data_base.iter().enumerate() {
-        let alive = (0..arm.data_copies()).any(|c| !f.destroyed(copy_slot(b, c)));
-        if alive {
+    for (data_index, &base_slot) in layout.data_base.iter().enumerate() {
+        let has_live_copy = (0..arm.data_copies()).any(|copy_index| !fault.destroyed(copy_slot(base_slot, copy_index)));
+        if has_live_copy {
             recovered_data += 1;
         } else if arm == Arm::Chain {
             // 同批链：前后邻居任一存活即指认得出这个单元存在过。
-            let prev_alive = i > 0 && !f.destroyed(l.data_base[i - 1]);
-            let next_alive = i + 1 < l.data_base.len() && !f.destroyed(l.data_base[i + 1]);
-            if prev_alive || next_alive {
+            let previous_neighbour_alive = data_index > 0 && !fault.destroyed(layout.data_base[data_index - 1]);
+            let next_neighbour_alive = data_index + 1 < layout.data_base.len() && !fault.destroyed(layout.data_base[data_index + 1]);
+            if previous_neighbour_alive || next_neighbour_alive {
                 detected_only += 1;
             }
         }
     }
-    let n_meta = l.meta_base.len() as u64;
-    let n_data = l.data_base.len() as u64;
+    let meta_unit_count = layout.meta_base.len() as u64;
+    let data_unit_count = layout.data_base.len() as u64;
     let overhead_bytes = match arm {
-        Arm::None => 0,
-        Arm::Chain => (n_meta + n_data) * CHAIN_BYTES,
+        Arm::NoRedundancy => 0,
+        Arm::Chain => (meta_unit_count + data_unit_count) * CHAIN_BYTES,
         Arm::Ditto => {
-            let pw = l.pool_wide as u64;
-            (pw * 2 + (n_meta - pw)) * META_UNIT
+            let pool_wide_count = layout.pool_wide_count as u64;
+            (pool_wide_count * 2 + (meta_unit_count - pool_wide_count)) * META_UNIT_BYTES
         }
     };
     Outcome {
@@ -198,162 +198,162 @@ fn run(arm: Arm, l: &Layout, f: Fault) -> Outcome {
     }
 }
 
-fn total_bytes(l: &Layout) -> u64 {
-    l.meta_base.len() as u64 * META_UNIT + l.data_base.len() as u64 * DATA_UNIT
+fn total_bytes(layout: &Layout) -> u64 {
+    layout.meta_base.len() as u64 * META_UNIT_BYTES + layout.data_base.len() as u64 * DATA_UNIT_BYTES
 }
 
 fn main() {
-    let mut em = e7_index_bench::Emitter::new();
-    let l = layout(20, 100); // 元数据 2%，其中全池元数据占 10%
-    let n_meta = l.meta_base.len() as u64;
-    let n_data = l.data_base.len() as u64;
+    let mut emitter = e7_index_bench::Emitter::new();
+    let layout = build_layout(20, 100); // 元数据 2%，其中全池元数据占 10%
+    let meta_unit_count = layout.meta_base.len() as u64;
+    let data_unit_count = layout.data_base.len() as u64;
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config disk_slots={DISK_SLOTS} grain={GRAIN} meta_units={n_meta} data_units={n_data} \
+        emitter.emit_raw(&format!(
+            "name=config disk_slots={DISK_SLOTS} grain={GRAIN_BYTES} meta_units={meta_unit_count} data_units={data_unit_count} \
              ditto_spread={DITTO_SPREAD} chain_bytes={CHAIN_BYTES} total_bytes={}",
-            total_bytes(&l)
+            total_bytes(&layout)
         ))
     );
-    let arms = [Arm::None, Arm::Ditto, Arm::Chain];
+    let arms = [Arm::NoRedundancy, Arm::Ditto, Arm::Chain];
     // 故障长度扫描：0（阳性对照）、1/64、1/16、1/8、1/4 盘、整盘（阴性对照）
-    let lens = [0u64, DISK_SLOTS / 64, DISK_SLOTS / 16, DISK_SLOTS / 8, DISK_SLOTS / 4, DISK_SLOTS];
-    for &start in [0u64, DISK_SLOTS / 2].iter() {
-        for &len in lens.iter() {
-            for a in arms {
-                let o = run(a, &l, Fault::Span { start, len });
+    let span_lengths = [0u64, DISK_SLOTS / 64, DISK_SLOTS / 16, DISK_SLOTS / 8, DISK_SLOTS / 4, DISK_SLOTS];
+    for &start_slot in [0u64, DISK_SLOTS / 2].iter() {
+        for &span_length in span_lengths.iter() {
+            for arm in arms {
+                let outcome = run_arm_under_fault(arm, &layout, Fault::Span { start_slot, length_in_slots: span_length });
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=recover arm={} start={start} len={len} rec_meta={} rec_data={} \
+                    emitter.emit_raw(&format!(
+                        "name=recover arm={} start={start_slot} len={span_length} rec_meta={} rec_data={} \
                          detected_only={} overhead_bytes={} overhead_ppm={}",
-                        a.name(),
-                        o.recovered_meta,
-                        o.recovered_data,
-                        o.detected_only,
-                        o.overhead_bytes,
-                        o.overhead_bytes * 1_000_000 / total_bytes(&l)
+                        arm.name(),
+                        outcome.recovered_meta,
+                        outcome.recovered_data,
+                        outcome.detected_only,
+                        outcome.overhead_bytes,
+                        outcome.overhead_bytes * 1_000_000 / total_bytes(&layout)
                     ))
                 );
             }
         }
     }
-    // 散点故障：每 k 个槽毁一个，毁掉的比例与同规模的 Span 相同。
+    // 散点故障：每 period_in_slots 个槽毁一个，毁掉的比例与同规模的 Span 相同。
     // **这一档是给链臂的公平取样点**——连续区间会把前后邻居一起毁掉。
     // 前四个是 2 的幂、整除 DITTO_SPREAD（2^15）⇒ 与副本偏移**共振**；后四个是奇数，不共振。
-    for &k in [64u64, 16, 8, 4, 63, 17, 9, 5].iter() {
-        for a in arms {
-            let o = run(a, &l, Fault::Scatter { k });
+    for &period_in_slots in [64u64, 16, 8, 4, 63, 17, 9, 5].iter() {
+        for arm in arms {
+            let outcome = run_arm_under_fault(arm, &layout, Fault::Scatter { period_in_slots });
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=recover arm={} fault={} k={k} rec_meta={} rec_data={} \
+                emitter.emit_raw(&format!(
+                    "name=recover arm={} fault={} k={period_in_slots} rec_meta={} rec_data={} \
                      detected_only={} overhead_ppm={}",
-                    a.name(),
-                    Fault::Scatter { k }.name(),
-                    o.recovered_meta,
-                    o.recovered_data,
-                    o.detected_only,
-                    o.overhead_bytes * 1_000_000 / total_bytes(&l)
+                    arm.name(),
+                    Fault::Scatter { period_in_slots }.name(),
+                    outcome.recovered_meta,
+                    outcome.recovered_data,
+                    outcome.detected_only,
+                    outcome.overhead_bytes * 1_000_000 / total_bytes(&layout)
                 ))
             );
         }
     }
     // 举证 5：链臂毁掉恰好一个单元
-    let one = run(Arm::Chain, &l, Fault::Span { start: l.data_base[10], len: 2 });
-    let zero = run(Arm::Chain, &l, Fault::Span { start: 0, len: 0 });
+    let one_unit_gone = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: layout.data_base[10], length_in_slots: 2 });
+    let intact = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 });
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=blastradius rec_data_intact={} rec_data_one_gone={} delta={}",
-            zero.recovered_data,
-            one.recovered_data,
-            zero.recovered_data - one.recovered_data
+            intact.recovered_data,
+            one_unit_gone.recovered_data,
+            intact.recovered_data - one_unit_gone.recovered_data
         ))
     );
     // 判别力：三条臂在 1/8 盘那格给的恢复数
-    let mut set = std::collections::BTreeSet::new();
-    for a in arms {
-        let o = run(a, &l, Fault::Span { start: 0, len: DISK_SLOTS / 8 });
-        set.insert((o.recovered_meta, o.recovered_data));
+    let mut distinct_outcomes = std::collections::BTreeSet::new();
+    for arm in arms {
+        let outcome = run_arm_under_fault(arm, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS / 8 });
+        distinct_outcomes.insert((outcome.recovered_meta, outcome.recovered_data));
     }
     println!(
         "{}",
-        em.emit_raw(&format!("name=discriminate distinct_outcomes={}", set.len()))
+        emitter.emit_raw(&format!("name=discriminate distinct_outcomes={}", distinct_outcomes.len()))
     );
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn l() -> Layout {
-        layout(20, 100)
+    fn standard_layout() -> Layout {
+        build_layout(20, 100)
     }
 
     /// 判据 2：**阳性对照逐臂跑**——故障长度 0 时三条臂都必须全恢复。
     #[test]
-    fn t01_positive_control_每条臂() {
-        let l = l();
-        for a in [Arm::None, Arm::Ditto, Arm::Chain] {
-            let o = run(a, &l, Fault::Span { start: 0, len: 0 });
-            assert_eq!(o.recovered_meta, l.meta_base.len() as u64, "{}", a.name());
-            assert_eq!(o.recovered_data, l.data_base.len() as u64, "{}", a.name());
-            assert_eq!(o.detected_only, 0, "{}", a.name());
+    fn positive_control_recovers_everything_on_every_arm() {
+        let layout = standard_layout();
+        for arm in [Arm::NoRedundancy, Arm::Ditto, Arm::Chain] {
+            let outcome = run_arm_under_fault(arm, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 });
+            assert_eq!(outcome.recovered_meta, layout.meta_base.len() as u64, "{}", arm.name());
+            assert_eq!(outcome.recovered_data, layout.data_base.len() as u64, "{}", arm.name());
+            assert_eq!(outcome.detected_only, 0, "{}", arm.name());
         }
     }
 
     /// 判据 3：阴性对照——整盘毁掉，三条臂都恢复 0。
     #[test]
-    fn t02_negative_control_每条臂() {
-        let l = l();
-        for a in [Arm::None, Arm::Ditto, Arm::Chain] {
-            let o = run(a, &l, Fault::Span { start: 0, len: DISK_SLOTS });
-            assert_eq!(o.recovered_meta, 0, "{}", a.name());
-            assert_eq!(o.recovered_data, 0, "{}", a.name());
+    fn negative_control_recovers_nothing_on_every_arm() {
+        let layout = standard_layout();
+        for arm in [Arm::NoRedundancy, Arm::Ditto, Arm::Chain] {
+            let outcome = run_arm_under_fault(arm, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS });
+            assert_eq!(outcome.recovered_meta, 0, "{}", arm.name());
+            assert_eq!(outcome.recovered_data, 0, "{}", arm.name());
         }
     }
 
     /// 判据 4 / 举证 5：链臂毁掉恰好一个单元 ⇒ 恢复数恰好少 1。
     /// **写成加法不写减法**：变异把常量改大时减法会编译期溢出、被记成无效变异。
     #[test]
-    fn t03_blast_radius_is_exactly_one() {
-        let l = l();
-        let intact = run(Arm::Chain, &l, Fault::Span { start: 0, len: 0 }).recovered_data;
-        let one_gone = run(Arm::Chain, &l, Fault::Span { start: l.data_base[10], len: 2 }).recovered_data;
+    fn chain_blast_radius_is_exactly_one_unit() {
+        let layout = standard_layout();
+        let intact = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 }).recovered_data;
+        let one_gone = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: layout.data_base[10], length_in_slots: 2 }).recovered_data;
         assert_eq!(intact, one_gone + 1, "断一节只该少一个单元，不该「断点之后全丢」");
     }
 
     /// 几何的绝对值：布局逐格钉死。
     #[test]
-    fn t04_layout_is_absolute() {
-        let l = l();
+    fn layout_geometry_is_pinned() {
+        let layout = standard_layout();
         assert_eq!(DISK_SLOTS, 262_144);
-        assert_eq!(l.meta_base.len(), 5242);
-        assert_eq!(l.pool_wide, 524);
-        assert_eq!(l.data_base.len(), 128_451);
+        assert_eq!(layout.meta_base.len(), 5242);
+        assert_eq!(layout.pool_wide_count, 524);
+        assert_eq!(layout.data_base.len(), 128_451);
         assert_eq!(DITTO_SPREAD, 32_768);
     }
 
     /// 判据 6：判别力——三条臂在 1/8 盘那格必须给出不止一种结果。
     #[test]
-    fn t05_discriminating() {
-        let l = l();
-        let mut set = std::collections::BTreeSet::new();
-        for a in [Arm::None, Arm::Ditto, Arm::Chain] {
-            let o = run(a, &l, Fault::Span { start: 0, len: DISK_SLOTS / 8 });
-            set.insert((o.recovered_meta, o.recovered_data));
+    fn arms_give_distinct_outcomes_at_one_eighth_disk() {
+        let layout = standard_layout();
+        let mut distinct_outcomes = std::collections::BTreeSet::new();
+        for arm in [Arm::NoRedundancy, Arm::Ditto, Arm::Chain] {
+            let outcome = run_arm_under_fault(arm, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS / 8 });
+            distinct_outcomes.insert((outcome.recovered_meta, outcome.recovered_data));
         }
-        assert!(set.len() >= 2, "三条臂全同 ⇒ 装置分不开它们");
+        assert!(distinct_outcomes.len() >= 2, "三条臂全同 ⇒ 装置分不开它们");
     }
 
     /// 举证 2 的可见形态：链臂在数据侧买到的是**检测**不是恢复。
     #[test]
-    fn t06_chain_buys_detection_not_recovery() {
-        let l = l();
-        let none = run(Arm::None, &l, Fault::Span { start: 0, len: DISK_SLOTS / 8 });
-        let chain = run(Arm::Chain, &l, Fault::Span { start: 0, len: DISK_SLOTS / 8 });
+    fn chain_buys_detection_not_recovery() {
+        let layout = standard_layout();
+        let none = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS / 8 });
+        let chain = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS / 8 });
         assert_eq!(chain.recovered_data, none.recovered_data, "恢复数一模一样");
         assert_eq!(chain.detected_only, 1, "只有被毁区边界那一个单元的邻居还活着");
         assert_eq!(none.detected_only, 0);
@@ -363,10 +363,10 @@ mod tests {
     /// 链臂能指认出的单元数应该远多于连续区间那一档。
     /// ⚠️ 但**恢复数仍然等于无冗余臂**——这正是举证 2 要看的那个净增量。
     #[test]
-    fn t11_chain_under_scatter_still_recovers_nothing_extra() {
-        let l = l();
-        let none = run(Arm::None, &l, Fault::Scatter { k: 8 });
-        let chain = run(Arm::Chain, &l, Fault::Scatter { k: 8 });
+    fn chain_under_scatter_still_recovers_nothing_extra() {
+        let layout = standard_layout();
+        let none = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Scatter { period_in_slots: 8 });
+        let chain = run_arm_under_fault(Arm::Chain, &layout, Fault::Scatter { period_in_slots: 8 });
         assert_eq!(chain.recovered_data, none.recovered_data, "恢复数一模一样");
         assert_eq!(chain.recovered_meta, none.recovered_meta);
         assert!(
@@ -378,7 +378,7 @@ mod tests {
     }
 
     /// **散点故障下的恢复数钉绝对值**。
-    /// ⚠️ 这条是变异测试逼出来的：`M4_散点周期判反`（把 `s % k == 0` 改成 `!= 0`，
+    /// ⚠️ 这条是变异测试逼出来的：`M4_散点周期判反`（把 `slot % period_in_slots == 0` 改成 `!= 0`，
     /// 于是毁掉的从 1/k 变成 (k−1)/k）**一个测试都没红**——
     /// 因为此前散点那几条断言**全是臂间互比**，没有一条钉绝对值，
     /// 三条臂一起错时互比仍然相等（`.claude/singlefs-ai-sop/rules/test-discipline.md`
@@ -386,19 +386,19 @@ mod tests {
     /// `.claude/rules/mutation-sampling.md` 三分，这是**真盲区**不是取样点不敏感：
     /// 反转之后任何取样点上的绝对值都变。
     #[test]
-    fn t14_scatter_counts_are_absolute() {
-        let l = l();
-        let n9 = run(Arm::None, &l, Fault::Scatter { k: 9 });
-        assert_eq!(n9.recovered_meta, 4659);
-        assert_eq!(n9.recovered_data, 114_179);
-        let d9 = run(Arm::Ditto, &l, Fault::Scatter { k: 9 });
-        assert_eq!(d9.recovered_meta, 5242, "不共振时 ditto 全恢复");
-        assert_eq!(d9.recovered_data, 114_179, "数据侧 ditto 不加份，与无冗余臂同");
-        let c9 = run(Arm::Chain, &l, Fault::Scatter { k: 9 });
-        assert_eq!(c9.detected_only, 14_272);
-        let n8 = run(Arm::None, &l, Fault::Scatter { k: 8 });
-        assert_eq!(n8.recovered_meta, 4586);
-        assert_eq!(n8.recovered_data, 96_339);
+    fn scatter_recovery_counts_are_pinned_to_absolute_values() {
+        let layout = standard_layout();
+        let no_redundancy_period_9 = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Scatter { period_in_slots: 9 });
+        assert_eq!(no_redundancy_period_9.recovered_meta, 4659);
+        assert_eq!(no_redundancy_period_9.recovered_data, 114_179);
+        let ditto_period_9 = run_arm_under_fault(Arm::Ditto, &layout, Fault::Scatter { period_in_slots: 9 });
+        assert_eq!(ditto_period_9.recovered_meta, 5242, "不共振时 ditto 全恢复");
+        assert_eq!(ditto_period_9.recovered_data, 114_179, "数据侧 ditto 不加份，与无冗余臂同");
+        let chain_period_9 = run_arm_under_fault(Arm::Chain, &layout, Fault::Scatter { period_in_slots: 9 });
+        assert_eq!(chain_period_9.detected_only, 14_272);
+        let no_redundancy_period_8 = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Scatter { period_in_slots: 8 });
+        assert_eq!(no_redundancy_period_8.recovered_meta, 4586);
+        assert_eq!(no_redundancy_period_8.recovered_data, 96_339);
     }
 
     /// **一条实测出来的结构性结论**：`至少隔 1/8 盘` 这个放置政策，
@@ -408,68 +408,68 @@ mod tests {
     /// ⚠️ **周期性故障是本实验自己造的形态**，真实坏道不是周期的；
     /// 这一格说明的是「放置偏移取 2 的幂有共振风险」，不是「ditto 在散点下没用」。
     #[test]
-    fn t13_ditto_resonates_with_power_of_two_periods() {
-        let l = l();
+    fn ditto_resonates_with_power_of_two_periods() {
+        let layout = standard_layout();
         // 共振：周期 8 整除 32768 ⇒ ditto 与无冗余臂逐格相同
-        let n8 = run(Arm::None, &l, Fault::Scatter { k: 8 });
-        let d8 = run(Arm::Ditto, &l, Fault::Scatter { k: 8 });
-        assert_eq!(d8.recovered_meta, n8.recovered_meta, "2 的幂周期下三份副本同余");
+        let no_redundancy_period_8 = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Scatter { period_in_slots: 8 });
+        let ditto_period_8 = run_arm_under_fault(Arm::Ditto, &layout, Fault::Scatter { period_in_slots: 8 });
+        assert_eq!(ditto_period_8.recovered_meta, no_redundancy_period_8.recovered_meta, "2 的幂周期下三份副本同余");
         // 不共振：周期 9 不整除 32768 ⇒ ditto 必须严格更好
-        let n9 = run(Arm::None, &l, Fault::Scatter { k: 9 });
-        let d9 = run(Arm::Ditto, &l, Fault::Scatter { k: 9 });
-        assert!(d9.recovered_meta > n9.recovered_meta, "d9={} n9={}", d9.recovered_meta, n9.recovered_meta);
+        let no_redundancy_period_9 = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Scatter { period_in_slots: 9 });
+        let ditto_period_9 = run_arm_under_fault(Arm::Ditto, &layout, Fault::Scatter { period_in_slots: 9 });
+        assert!(ditto_period_9.recovered_meta > no_redundancy_period_9.recovered_meta, "d9={} n9={}", ditto_period_9.recovered_meta, no_redundancy_period_9.recovered_meta);
         assert_eq!(DITTO_SPREAD % 8, 0);
         assert_ne!(DITTO_SPREAD % 9, 0);
     }
 
     /// 散点与连续两种故障在同一毁坏比例下给的恢复数不同 ⇒ 故障形态本身有判别力。
     #[test]
-    fn t12_fault_shape_matters() {
-        let l = l();
-        let span = run(Arm::Ditto, &l, Fault::Span { start: 0, len: DISK_SLOTS / 8 });
-        let scat = run(Arm::Ditto, &l, Fault::Scatter { k: 8 });
+    fn fault_shape_matters() {
+        let layout = standard_layout();
+        let span_outcome = run_arm_under_fault(Arm::Ditto, &layout, Fault::Span { start_slot: 0, length_in_slots: DISK_SLOTS / 8 });
+        let scatter_outcome = run_arm_under_fault(Arm::Ditto, &layout, Fault::Scatter { period_in_slots: 8 });
         assert_ne!(
-            (span.recovered_meta, span.recovered_data),
-            (scat.recovered_meta, scat.recovered_data),
+            (span_outcome.recovered_meta, span_outcome.recovered_data),
+            (scatter_outcome.recovered_meta, scatter_outcome.recovered_data),
             "两种故障形态给同一条臂的结果若逐格相同，说明装置分不开它们"
         );
     }
 
     /// ditto 臂的开销闭式：元数据 2% 且全池占 10% ⇒ 额外 = (524×2 + 4718) 个 16 KiB 单元。
     #[test]
-    fn t07_ditto_overhead_is_absolute() {
-        let l = l();
-        let o = run(Arm::Ditto, &l, Fault::Span { start: 0, len: 0 });
-        assert_eq!(o.overhead_bytes, (524 * 2 + 4718) * META_UNIT);
+    fn ditto_overhead_is_absolute() {
+        let layout = standard_layout();
+        let outcome = run_arm_under_fault(Arm::Ditto, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 });
+        assert_eq!(outcome.overhead_bytes, (524 * 2 + 4718) * META_UNIT_BYTES);
         // 与 ZFS 自陈的「总开销约 2%」同量级：这里 ppm 值落在 [15000, 30000]
-        let ppm = o.overhead_bytes * 1_000_000 / total_bytes(&l);
-        assert!((15_000..=30_000).contains(&ppm), "ppm={ppm}");
+        let overhead_parts_per_million = outcome.overhead_bytes * 1_000_000 / total_bytes(&layout);
+        assert!((15_000..=30_000).contains(&overhead_parts_per_million), "ppm={overhead_parts_per_million}");
     }
 
     /// 链臂的开销闭式：每个单元 12 字节。
     #[test]
-    fn t08_chain_overhead_is_absolute() {
-        let l = l();
-        let o = run(Arm::Chain, &l, Fault::Span { start: 0, len: 0 });
-        assert_eq!(o.overhead_bytes, (5242 + 128_451) * 12);
+    fn chain_overhead_is_absolute() {
+        let layout = standard_layout();
+        let outcome = run_arm_under_fault(Arm::Chain, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 });
+        assert_eq!(outcome.overhead_bytes, (5242 + 128_451) * 12);
         assert_eq!(CHAIN_BYTES, 12);
     }
 
     /// 无冗余臂开销恒 0，且它在任何故障下的恢复数都不高于 ditto 臂。
     #[test]
-    fn t09_none_is_the_floor() {
-        let l = l();
-        assert_eq!(run(Arm::None, &l, Fault::Span { start: 0, len: 0 }).overhead_bytes, 0);
-        for &len in [DISK_SLOTS / 64, DISK_SLOTS / 16, DISK_SLOTS / 8].iter() {
-            let n = run(Arm::None, &l, Fault::Span { start: 0, len: len });
-            let d = run(Arm::Ditto, &l, Fault::Span { start: 0, len: len });
-            assert!(d.recovered_meta >= n.recovered_meta, "len={len}");
+    fn no_redundancy_is_the_floor() {
+        let layout = standard_layout();
+        assert_eq!(run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Span { start_slot: 0, length_in_slots: 0 }).overhead_bytes, 0);
+        for &span_length in [DISK_SLOTS / 64, DISK_SLOTS / 16, DISK_SLOTS / 8].iter() {
+            let no_redundancy_outcome = run_arm_under_fault(Arm::NoRedundancy, &layout, Fault::Span { start_slot: 0, length_in_slots: span_length });
+            let ditto_outcome = run_arm_under_fault(Arm::Ditto, &layout, Fault::Span { start_slot: 0, length_in_slots: span_length });
+            assert!(ditto_outcome.recovered_meta >= no_redundancy_outcome.recovered_meta, "len={span_length}");
         }
     }
 
     /// 副本落点的算术：第 1 份隔 1/8 盘，第 2 份隔 2/8。
     #[test]
-    fn t10_copy_placement() {
+    fn copy_placement_arithmetic() {
         assert_eq!(copy_slot(0, 0), 0);
         assert_eq!(copy_slot(0, 1), 32_768);
         assert_eq!(copy_slot(0, 2), 65_536);

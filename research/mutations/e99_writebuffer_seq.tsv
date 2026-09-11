@@ -1,10 +1,10 @@
-M1_位宽账不减txg	    total.checked_sub(txg_bits)	    Some(total)
-M2_窗口需求按字节不按条目	    T_DIRTY / ACCT_ENTRY_BYTES	    T_DIRTY
-M3_回绕期没乘一千	    wrap_publishes(txg_bits_kept) * 1000 / PUBLISH_PER_SEC as u128	    wrap_publishes(txg_bits_kept) / PUBLISH_PER_SEC as u128
+M1_位宽账不减txg	    total_bits.checked_sub(txg_bits)	    Some(total_bits)
+M2_窗口需求按字节不按条目	    DIRTY_THRESHOLD_BYTES / ACCOUNTING_ENTRY_BYTES	    DIRTY_THRESHOLD_BYTES
+M3_回绕期没乘一千	    wrap_publishes(txg_bits_kept) * 1000 / PUBLISHES_PER_SECOND as u128	    wrap_publishes(txg_bits_kept) / PUBLISHES_PER_SECOND as u128
 M4_并列不算未定义	        if winners.len() > 1 {	        if winners.len() > 99 {
-M5_墙钟被压成常数	    Arm::WallClock => Some(u.wall as u128),	    Arm::WallClock => Some(0),
-M6_打乱没生效	        if k % 2 == 0 {\n            sub.reverse();	        if k % 2 == 2 {\n            sub.reverse();
-M7_key含代被当成不含	        KeyShape::WithGeneration => Some(win_bytes),	        KeyShape::WithGeneration => None,
-M8_窗口位没向上取整	    let win_bytes = (window_bits_needed as u64).div_ceil(8);	    let win_bytes = (window_bits_needed as u64) / 8;
-M9_错误合并没数	    r * c2(q + 1) + (m - r) * c2(q)	    0
-M10_模类数算成发布数	    let q = publishes / m;	    let q = publishes;
+M5_墙钟被压成常数	    Arm::WallClock => Some(update.wall_clock_reading as u128),	    Arm::WallClock => Some(0),
+M6_打乱没生效	        if key % 2 == 0 {\n            updates_of_key.reverse();	        if key % 2 == 2 {\n            updates_of_key.reverse();
+M7_key含代被当成不含	        KeyShape::WithGeneration => Some(window_bytes),	        KeyShape::WithGeneration => None,
+M8_窗口位没向上取整	    let window_bytes = (window_bits_needed as u64).div_ceil(8);	    let window_bytes = (window_bits_needed as u64) / 8;
+M9_错误合并没数	    classes_with_one_extra * pair_count(checkpoints_per_class + 1) + (residue_class_count - classes_with_one_extra) * pair_count(checkpoints_per_class)	    0
+M10_模类数算成发布数	    let checkpoints_per_class = publish_count / residue_class_count;	    let checkpoints_per_class = publish_count;

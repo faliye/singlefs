@@ -26,22 +26,22 @@ use std::collections::BTreeMap;
 /// 单元的自描述头。D20（承重面：单元的原子性与自包含）要求任一单元单独捡起来能回答
 /// 「我是谁、我属于谁、我是第几代」。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct SelfDesc { obj: u64, tree: u64, gen: u64 }
+struct SelfDescription { object_number: u64, tree: u64, generation: u64 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Kind { Meta, Data }
+enum UnitClass { Metadata, Data }
 
 /// 单元。⚠️ **这里不再存 `kind`**：单元是元数据还是数据这件事只在 `build` 返回的
-/// 那张分类表里记一份——存两份会漂移，而扫描重建只看得到 `desc`。
+/// 那张分类表里记一份——存两份会漂移，而扫描重建只看得到 `self_description`。
 #[derive(Clone)]
 struct Unit {
-    pba: u64,                 // 物理地址
+    physical_address: u64,                 // 物理地址
     /// 自描述头。**数据块今天是 None**——那正是 D20 点名的承重面上的洞。
-    desc: Option<SelfDesc>,
+    self_description: Option<SelfDescription>,
 }
 
 /// 明文映射层：逻辑身份 → 物理地址。
-type Map = BTreeMap<(u64, u64, u64), u64>;
+type PlaintextMap = BTreeMap<(u64, u64, u64), u64>;
 
 /// 返回 `(单元表, 明文映射, 每个 key 是元数据还是数据)`。
 ///
@@ -49,92 +49,92 @@ type Map = BTreeMap<(u64, u64, u64), u64>;
 /// 所以「缺的那一条是元数据还是数据」只能从这里查。
 /// 曾经靠 `对象号 >= 10_000` 这个约定去分类，而 `Unit.kind` 同时也记着同一件事，
 /// 编译器为此一直报 `kind` 从没被读过——**两份表示会漂移**，现在只留一份。
-fn build(n_meta: u64, n_data: u64, data_self_desc: bool) -> (Vec<Unit>, Map, BTreeMap<(u64, u64, u64), Kind>) {
+fn build(metadata_unit_count: u64, data_unit_count: u64, data_units_carry_self_description: bool) -> (Vec<Unit>, PlaintextMap, BTreeMap<(u64, u64, u64), UnitClass>) {
     let mut units = Vec::new();
-    let mut map = Map::new();
-    let mut kinds: BTreeMap<(u64, u64, u64), Kind> = BTreeMap::new();
-    let mut pba = 1000u64;
-    for i in 0..n_meta {
-        let d = SelfDesc { obj: i, tree: i % 4, gen: 1 };
-        units.push(Unit { pba, desc: Some(d) });
-        map.insert((d.tree, d.obj, d.gen), pba);
-        kinds.insert((d.tree, d.obj, d.gen), Kind::Meta);
-        pba += 1;
+    let mut plaintext_map = PlaintextMap::new();
+    let mut unit_classes: BTreeMap<(u64, u64, u64), UnitClass> = BTreeMap::new();
+    let mut physical_address = 1000u64;
+    for metadata_index in 0..metadata_unit_count {
+        let unit_description = SelfDescription { object_number: metadata_index, tree: metadata_index % 4, generation: 1 };
+        units.push(Unit { physical_address, self_description: Some(unit_description) });
+        plaintext_map.insert((unit_description.tree, unit_description.object_number, unit_description.generation), physical_address);
+        unit_classes.insert((unit_description.tree, unit_description.object_number, unit_description.generation), UnitClass::Metadata);
+        physical_address += 1;
     }
-    for i in 0..n_data {
-        let d = SelfDesc { obj: 10_000 + i, tree: i % 4, gen: 1 };
-        units.push(Unit { pba, desc: if data_self_desc { Some(d) } else { None } });
-        map.insert((d.tree, d.obj, d.gen), pba);
-        kinds.insert((d.tree, d.obj, d.gen), Kind::Data);
-        pba += 1;
+    for data_index in 0..data_unit_count {
+        let unit_description = SelfDescription { object_number: 10_000 + data_index, tree: data_index % 4, generation: 1 };
+        units.push(Unit { physical_address, self_description: if data_units_carry_self_description { Some(unit_description) } else { None } });
+        plaintext_map.insert((unit_description.tree, unit_description.object_number, unit_description.generation), physical_address);
+        unit_classes.insert((unit_description.tree, unit_description.object_number, unit_description.generation), UnitClass::Data);
+        physical_address += 1;
     }
-    (units, map, kinds)
+    (units, plaintext_map, unit_classes)
 }
 
 /// 只扫单元头重建映射。**没有自描述头的单元贡献不了任何条目。**
-fn rebuild(units: &[Unit]) -> Map {
-    let mut m = Map::new();
-    for u in units {
-        if let Some(d) = u.desc { m.insert((d.tree, d.obj, d.gen), u.pba); }
+fn rebuild(units: &[Unit]) -> PlaintextMap {
+    let mut rebuilt_map = PlaintextMap::new();
+    for unit in units {
+        if let Some(unit_description) = unit.self_description { rebuilt_map.insert((unit_description.tree, unit_description.object_number, unit_description.generation), unit.physical_address); }
     }
-    m
+    rebuilt_map
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct RebuildTally {
     total: u64,
     rebuilt: u64,
     /// 原表里有、重建表里没有（重建不出来）
     missing: u64,
     /// 重建表里有、但指向了不同的物理地址（重建错了）
     wrong: u64,
-    missing_meta: u64,
+    missing_metadata: u64,
     missing_data: u64,
 }
 
-fn measure(n_meta: u64, n_data: u64, data_self_desc: bool) -> Out {
-    measure_with_moved(n_meta, n_data, data_self_desc, 0)
+fn measure(metadata_unit_count: u64, data_unit_count: u64, data_units_carry_self_description: bool) -> RebuildTally {
+    measure_with_moved(metadata_unit_count, data_unit_count, data_units_carry_self_description, 0)
 }
 
-/// `moved` = 有几个单元被搬走了（物理地址变了、自描述不动）。
+/// `moved_unit_count` = 有几个单元被搬走了（物理地址变了、自描述不动）。
 /// 搬运正是本工程要支持的事（D1），所以「重建出的地址跟着搬」是**正确行为**；
 /// 本参数用来喂那条「判据必须逐条比地址、不能只比条数」的测试。
-fn measure_with_moved(n_meta: u64, n_data: u64, data_self_desc: bool, moved: usize) -> Out {
-    let (mut units, orig, kinds) = build(n_meta, n_data, data_self_desc);
-    for u in units.iter_mut().take(moved) { u.pba += 999_000; }
-    let re = rebuild(&units);
-    let mut o = Out { total: orig.len() as u64, rebuilt: re.len() as u64, ..Default::default() };
-    for (k, v) in &orig {
-        match re.get(k) {
+fn measure_with_moved(metadata_unit_count: u64, data_unit_count: u64, data_units_carry_self_description: bool, moved_unit_count: usize) -> RebuildTally {
+    let (mut units, original_map, unit_classes) = build(metadata_unit_count, data_unit_count, data_units_carry_self_description);
+    for unit in units.iter_mut().take(moved_unit_count) { unit.physical_address += 999_000; }
+    let rebuilt_map = rebuild(&units);
+    let mut tally = RebuildTally { total: original_map.len() as u64, rebuilt: rebuilt_map.len() as u64, ..Default::default() };
+    for (key, original_address) in &original_map {
+        match rebuilt_map.get(key) {
             None => {
-                o.missing += 1;
-                match kinds.get(k) {
+                tally.missing += 1;
+                match unit_classes.get(key) {
                     // 没有 `_ =>` —— 新增单元类不补这里就编译不过
-                    Some(Kind::Data) => o.missing_data += 1,
-                    Some(Kind::Meta) => o.missing_meta += 1,
+                    Some(UnitClass::Data) => tally.missing_data += 1,
+                    Some(UnitClass::Metadata) => tally.missing_metadata += 1,
                     None => unreachable!("原表里的 key 必须有单元类"),
                 }
             }
-            Some(p) if p != v => o.wrong += 1,
+            Some(rebuilt_address) if rebuilt_address != original_address => tally.wrong += 1,
             _ => {}
         }
     }
-    o
+    tally
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    println!("{}", em.emit_raw("name=config note=只扫单元头重建明文映射"));
-    for (nm, nd) in [(64u64, 256u64), (256, 1024), (1024, 4096)] {
-        for sd in [false, true] {
-            let o = measure(nm, nd, sd);
-            println!("{}", em.emit_raw(&format!(
-                "name=cell meta={nm} data={nd} data_self_desc={sd} total={} rebuilt={} \
+    let mut emitter = Emitter::new();
+    println!("{}", emitter.emit_raw("name=config note=只扫单元头重建明文映射"));
+    for (metadata_unit_count, data_unit_count) in [(64u64, 256u64), (256, 1024), (1024, 4096)] {
+        for data_units_carry_self_description in [false, true] {
+            let tally = measure(metadata_unit_count, data_unit_count, data_units_carry_self_description);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=cell meta={metadata_unit_count} data={data_unit_count} data_self_desc={data_units_carry_self_description} total={} rebuilt={} \
                  missing={} wrong={} missing_meta={} missing_data={}",
-                o.total, o.rebuilt, o.missing, o.wrong, o.missing_meta, o.missing_data)));
+                tally.total, tally.rebuilt, tally.missing, tally.wrong, tally.missing_metadata, tally.missing_data)));
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -145,10 +145,10 @@ mod tests {
     /// 这条证实 D21（权威态与派生态的分界）与 I-6.10（可从权威侧重建）在元数据上成立。
     #[test]
     fn metadata_rebuilds_exactly_because_units_are_self_describing() {
-        for (nm, nd) in [(64u64, 256u64), (1024, 4096)] {
-            let o = measure(nm, nd, false);
-            assert_eq!(o.missing_meta, 0, "元数据侧本该一条都不缺");
-            assert_eq!(o.wrong, 0, "重建出的地址本该逐条相同");
+        for (metadata_unit_count, data_unit_count) in [(64u64, 256u64), (1024, 4096)] {
+            let tally = measure(metadata_unit_count, data_unit_count, false);
+            assert_eq!(tally.missing_metadata, 0, "元数据侧本该一条都不缺");
+            assert_eq!(tally.wrong, 0, "重建出的地址本该逐条相同");
         }
     }
 
@@ -156,29 +156,29 @@ mod tests {
     /// 这是 D20（承重面：单元的原子性与自包含）点名的那个洞的可量形态，也是 D9 已定项 7 定案的未满足前置。
     #[test]
     fn data_blocks_rebuild_nothing_when_they_carry_no_self_description() {
-        let o = measure(64, 256, false);
-        assert_eq!(o.missing_data, 256, "数据块零自描述时本该一条都重建不出来");
-        assert_eq!(o.missing, 256, "缺的应当恰好是数据块那些");
-        assert_eq!(o.rebuilt, 64, "重建出的只有元数据那 64 条");
+        let tally = measure(64, 256, false);
+        assert_eq!(tally.missing_data, 256, "数据块零自描述时本该一条都重建不出来");
+        assert_eq!(tally.missing, 256, "缺的应当恰好是数据块那些");
+        assert_eq!(tally.rebuilt, 64, "重建出的只有元数据那 64 条");
     }
 
     /// **阳性对照：给数据块加上自描述之后，缺口必须归零。**
     /// 少了这条，「数据块重建不出来」分不清是缺自描述还是重建代码根本不工作。
     #[test]
     fn giving_data_blocks_self_description_closes_the_gap_completely() {
-        for (nm, nd) in [(64u64, 256u64), (256, 1024), (1024, 4096)] {
-            let o = measure(nm, nd, true);
-            assert_eq!(o.missing, 0, "加了自描述之后本该一条都不缺");
-            assert_eq!(o.wrong, 0);
-            assert_eq!(o.rebuilt, o.total, "重建条数应等于原表条数");
+        for (metadata_unit_count, data_unit_count) in [(64u64, 256u64), (256, 1024), (1024, 4096)] {
+            let tally = measure(metadata_unit_count, data_unit_count, true);
+            assert_eq!(tally.missing, 0, "加了自描述之后本该一条都不缺");
+            assert_eq!(tally.wrong, 0);
+            assert_eq!(tally.rebuilt, tally.total, "重建条数应等于原表条数");
         }
     }
 
     /// **绝对值：缺口恰好等于数据块数**，不是「有缺口」这种相对判断。
     #[test]
     fn the_gap_equals_exactly_the_number_of_data_blocks() {
-        for nd in [256u64, 1024, 4096] {
-            assert_eq!(measure(64, nd, false).missing, nd);
+        for data_unit_count in [256u64, 1024, 4096] {
+            assert_eq!(measure(64, data_unit_count, false).missing, data_unit_count);
         }
     }
 
@@ -189,12 +189,12 @@ mod tests {
     /// 现在走 `measure_with_moved`，判的是被测代码给出的那个数。
     #[test]
     fn the_verdict_compares_addresses_not_just_counts() {
-        for moved in [1usize, 3, 7] {
-            let o = measure_with_moved(16, 16, true, moved);
-            assert_eq!(o.rebuilt, o.total, "搬运不改变条数");
-            assert_eq!(o.wrong as usize, moved,
-                "搬走 {moved} 个单元，逐条比对该报出 {moved} 处地址不同，实测 {}", o.wrong);
-            assert_eq!(o.missing, 0, "搬运不该造成缺条");
+        for moved_unit_count in [1usize, 3, 7] {
+            let tally = measure_with_moved(16, 16, true, moved_unit_count);
+            assert_eq!(tally.rebuilt, tally.total, "搬运不改变条数");
+            assert_eq!(tally.wrong as usize, moved_unit_count,
+                "搬走 {moved_unit_count} 个单元，逐条比对该报出 {moved_unit_count} 处地址不同，实测 {}", tally.wrong);
+            assert_eq!(tally.missing, 0, "搬运不该造成缺条");
         }
     }
 }

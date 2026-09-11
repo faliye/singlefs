@@ -1,12 +1,12 @@
 M1_副本不分散	const DITTO_SPREAD: u64 = DISK_SLOTS / 8;	const DITTO_SPREAD: u64 = 0;
 M2_链臂开销算成0	const CHAIN_BYTES: u64 = 6 + 6;	const CHAIN_BYTES: u64 = 0;
-M3_区间右边界多算一格	Fault::Span { start, len } => s >= start && s < start + len,	Fault::Span { start, len } => s >= start && s <= start + len,
-M4_散点周期判反	Fault::Scatter { k } => k != 0 && s % k == 0,	Fault::Scatter { k } => k != 0 && s % k != 0,
+M3_区间右边界多算一格	Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot < start_slot + length_in_slots,	Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot <= start_slot + length_in_slots,
+M4_散点周期判反	Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots == 0,	Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots != 0,
 M5_元数据占比算错	    let meta_slots = DISK_SLOTS * meta_permille / 1000;	    let meta_slots = DISK_SLOTS * meta_permille / 500;
-M6_数据单元占一个槽	        data_base: (0..n_data).map(|i| meta_slots + i * 2).collect(),	        data_base: (0..n_data).map(|i| meta_slots + i).collect(),
-M7_邻居只看前不看后	            if prev_alive || next_alive {	            if prev_alive {
-M8_元数据单元大小算错	const META_UNIT: u64 = 16384;	const META_UNIT: u64 = 32768;
-M9_ditto开销少算全池那份	            (pw * 2 + (n_meta - pw)) * META_UNIT	            (pw + (n_meta - pw)) * META_UNIT
-M10_副本落点不取模	    (base + i * DITTO_SPREAD) % DISK_SLOTS	    base + i * DITTO_SPREAD
-M11_全池元数据占比算错	    let pool_wide = (n_meta * pool_permille / 1000) as usize;	    let pool_wide = (n_meta * pool_permille / 100) as usize;
+M6_数据单元占一个槽	        data_base: (0..data_unit_count).map(|data_index| meta_slots + data_index * 2).collect(),	        data_base: (0..data_unit_count).map(|data_index| meta_slots + data_index).collect(),
+M7_邻居只看前不看后	            if previous_neighbour_alive || next_neighbour_alive {	            if previous_neighbour_alive {
+M8_元数据单元大小算错	const META_UNIT_BYTES: u64 = 16384;	const META_UNIT_BYTES: u64 = 32768;
+M9_ditto开销少算全池那份	            (pool_wide_count * 2 + (meta_unit_count - pool_wide_count)) * META_UNIT_BYTES	            (pool_wide_count + (meta_unit_count - pool_wide_count)) * META_UNIT_BYTES
+M10_副本落点不取模	    (base_slot + copy_index * DITTO_SPREAD) % DISK_SLOTS	    base_slot + copy_index * DITTO_SPREAD
+M11_全池元数据占比算错	    let pool_wide_count = (meta_unit_count * pool_permille / 1000) as usize;	    let pool_wide_count = (meta_unit_count * pool_permille / 100) as usize;
 M12_盘容量算错	const DISK_SLOTS: u64 = 262_144;	const DISK_SLOTS: u64 = 131_072;

@@ -1,9 +1,9 @@
-M1_内联边界改开	if size <= thr {	if size < thr {
-M2_内联仍占数据块	(0, REC_BASE + size) // 内联：不占数据块，记录变长	(BLOCK, REC_BASE + size) // 内联：不占数据块，记录变长
-M3_extent不整块取整	(size.div_ceil(BLOCK) * BLOCK, REC_BASE) // 走 extent：整块分配	(size, REC_BASE) // 走 extent：整块分配
-M4_计数边界漂移	if s <= thr {	if s < thr {
-M5_命中率方向反	let leaf_miss_ppm = 1_000_000 - hit_ppm;	let leaf_miss_ppm = hit_ppm;
-M6_读数漏掉数据块	h + avg_data_blocks	h + avg_data_blocks * 0
-M7_扇出常数错	let fanout = NODE / 24;	let fanout = NODE / 32;
-M8_meta按记录字节不按叶	meta_bytes: leaves * NODE	meta_bytes: rec
-M9_大文件分布消失	if rng.next() % 100 < 80 {	if rng.next() % 100 < 100 {
+M1_内联边界改开	if file_size_bytes <= inline_threshold_bytes {	if file_size_bytes < inline_threshold_bytes {
+M2_内联仍占数据块	(0, RECORD_BASE_BYTES + file_size_bytes) // 内联：不占数据块，记录变长	(BLOCK_BYTES, RECORD_BASE_BYTES + file_size_bytes) // 内联：不占数据块，记录变长
+M3_extent不整块取整	(file_size_bytes.div_ceil(BLOCK_BYTES) * BLOCK_BYTES, RECORD_BASE_BYTES) // 走 extent：整块分配	(file_size_bytes, RECORD_BASE_BYTES) // 走 extent：整块分配
+M4_计数边界漂移	if sampled_file_size_bytes <= inline_threshold_bytes {	if sampled_file_size_bytes < inline_threshold_bytes {
+M5_命中率方向反	let leaf_miss_parts_per_million = 1_000_000 - hit_rate_parts_per_million;	let leaf_miss_parts_per_million = hit_rate_parts_per_million;
+M6_读数漏掉数据块	tree_height + average_data_blocks_per_file	tree_height + average_data_blocks_per_file * 0
+M7_扇出常数错	let fanout = NODE_SIZE_BYTES / 24;	let fanout = NODE_SIZE_BYTES / 32;
+M8_meta按记录字节不按叶	meta_bytes: leaves * NODE_SIZE_BYTES	meta_bytes: record_bytes_total
+M9_大文件分布消失	if random_number_generator.next() % 100 < 80 {	if random_number_generator.next() % 100 < 100 {

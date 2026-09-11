@@ -1,12 +1,12 @@
 M1_槽每单元算成1	const SLOTS_PER_UNIT: u64 = 32768 / GRAIN;	const SLOTS_PER_UNIT: u64 = 1;
-M2_段长表塌成一档	const SEGS: [u64; 3] = [32, 64, 128];	const SEGS: [u64; 3] = [32, 32, 32];
-M3_连续判据用相邻槽	        if w[1] != w[0] + SLOTS_PER_UNIT {	        if w[1] != w[0] + 1 {
-M4_空段判据取任一空	        .filter(|&g| (g * seg..(g + 1) * seg).all(|s| !live.contains(&s)))	        .filter(|&g| (g * seg..(g + 1) * seg).any(|s| !live.contains(&s)))
-M5_grouped不按目录连续	                    let unit = d * files + f;	                    let unit = f * dirs + d;
-M6_stride恒为1	            let s = stride.max(1);	            let s = 1;
-M7_被删目录不排除	        if i == victim {	        if i == usize::MAX {
-M8_runs起点算成0	    let mut n = 1;	    let mut n = 0;
+M2_段长表塌成一档	const SEGMENT_LENGTHS_IN_SLOTS: [u64; 3] = [32, 64, 128];	const SEGMENT_LENGTHS_IN_SLOTS: [u64; 3] = [32, 32, 32];
+M3_连续判据用相邻槽	        if slot_pair[1] != slot_pair[0] + SLOTS_PER_UNIT {	        if slot_pair[1] != slot_pair[0] + 1 {
+M4_空段判据取任一空	        .filter(|&segment_index| (segment_index * segment_slots..(segment_index + 1) * segment_slots).all(|slot| !live_slots.contains(&slot)))	        .filter(|&segment_index| (segment_index * segment_slots..(segment_index + 1) * segment_slots).any(|slot| !live_slots.contains(&slot)))
+M5_grouped不按目录连续	                    let unit = directory_index * files_per_directory + file_index;	                    let unit = file_index * directory_count + directory_index;
+M6_stride恒为1	            let files_per_turn = stride.max(1);	            let files_per_turn = 1;
+M7_被删目录不排除	        if directory_index == victim {	        if directory_index == usize::MAX {
+M8_runs起点算成0	    let mut run_count = 1;	    let mut run_count = 0;
 M9_粒度算成数据单元	const GRAIN: u64 = 16384;	const GRAIN: u64 = 32768;
-M10_random不去重	                        if used.insert(slot) {	                        if used.insert(slot) | true {
-M11_目录数与文件数对调	const DIRS: u64 = 16;	const DIRS: u64 = 32;
-M12_排序去掉	        v.sort_unstable();	        v.reverse();
+M10_random不去重	                        if used_slots.insert(slot) {	                        if used_slots.insert(slot) | true {
+M11_目录数与文件数对调	const DIRECTORY_COUNT: u64 = 16;	const DIRECTORY_COUNT: u64 = 32;
+M12_排序去掉	        directory_slots.sort_unstable();	        directory_slots.reverse();

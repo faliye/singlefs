@@ -1,9 +1,9 @@
-M1_带树维统计量数归零	const R_TREE_DIM: u64 = 1;	const R_TREE_DIM: u64 = 0;
-M2_保留代数大到永不丢弃	const K_KEEP: u64 = 4;	const K_KEEP: u64 = 100;
-M3_不搬运臂也不丢行	                        H_NEW * R_TREE_DIM	                        0
-M4_自以为认识的臂不误读	            misread_records: T_NEW * RECORDS_PER_NEW_TREE,	            misread_records: 0,
+M1_带树维统计量数归零	const TREE_DIMENSION_ROWS_PER_HEAD: u64 = 1;	const TREE_DIMENSION_ROWS_PER_HEAD: u64 = 0;
+M2_保留代数大到永不丢弃	const KEPT_GENERATIONS: u64 = 4;	const KEPT_GENERATIONS: u64 = 100;
+M3_不搬运臂也不丢行	                        UNKNOWN_WRITABLE_HEAD_COUNT * TREE_DIMENSION_ROWS_PER_HEAD	                        0
+M4_自以为认识的臂不误读	            misread_records: UNKNOWN_TREE_COUNT * RECORDS_PER_NEW_TREE,	            misread_records: 0,
 M5_未实现的不变量当成会抓	                caught_today: false,	                caught_today: lost > 0,
-M6_闭式不看代数	    if f != FlagsPolicy::Skip || c != CarryPolicy::NoCarry || gens <= K_KEEP {	    if f != FlagsPolicy::Skip || c != CarryPolicy::NoCarry {
-M7_搬运臂不含不认识的头	            CarryPolicy::Carry => R_POOL + (H_KNOWN + H_NEW) * R_TREE_DIM,	            CarryPolicy::Carry => R_POOL + H_KNOWN * R_TREE_DIM,
+M6_闭式不看代数	    if flags_policy != FlagsPolicy::Skip || carry_policy != CarryPolicy::NoCarry || generation_count <= KEPT_GENERATIONS {	    if flags_policy != FlagsPolicy::Skip || carry_policy != CarryPolicy::NoCarry {
+M7_搬运臂不含不认识的头	            CarryPolicy::Carry => POOL_LEVEL_ROWS + (KNOWN_WRITABLE_HEAD_COUNT + UNKNOWN_WRITABLE_HEAD_COUNT) * TREE_DIMENSION_ROWS_PER_HEAD,	            CarryPolicy::Carry => POOL_LEVEL_ROWS + KNOWN_WRITABLE_HEAD_COUNT * TREE_DIMENSION_ROWS_PER_HEAD,
 M8_拒绝挂载臂其实挂上了	            mount_ok: false,	            mount_ok: true,
-M9_不认识的可写头数归零	const H_NEW: u64 = 2;	const H_NEW: u64 = 0;
+M9_不认识的可写头数归零	const UNKNOWN_WRITABLE_HEAD_COUNT: u64 = 2;	const UNKNOWN_WRITABLE_HEAD_COUNT: u64 = 0;

@@ -1,20 +1,20 @@
-M1_邻接判据反了	        self.slot_of[k] != self.slot_of[k - 1] + 1	        self.slot_of[k] == self.slot_of[k - 1] + 1
+M1_邻接判据反了	        self.slot_of[key] != self.slot_of[key - 1] + 1	        self.slot_of[key] == self.slot_of[key - 1] + 1
 M2_审计起点写成0	        let mut runs = 1u64;	        let mut runs = 0u64;
 M3_增量runs少加一	        self.broken + 1	        self.broken
-M4_老化代边界写成闭区间	    if age < h1 {	    if age <= h1 {
-M5_老化代温冷对调	    } else if age < h2 {\n        1\n    } else {\n        2\n    }	    } else if age < h2 {\n        2\n    } else {\n        1\n    }
-M6_邻居预算内层闸没了	                if k < l && spent < budget && set.insert(k) {	                if k < l && set.insert(k) {
-M7_三代共用热代的开放段	    let gi = gen as usize;	    let gi = 0usize;
+M4_老化代边界写成闭区间	    if age < hot_age_threshold {	    if age <= hot_age_threshold {
+M5_老化代温冷对调	    } else if age < warm_age_threshold {\n        1\n    } else {\n        2\n    }	    } else if age < warm_age_threshold {\n        2\n    } else {\n        1\n    }
+M6_邻居预算内层闸没了	                if key < object_count && spent < budget && set.insert(key) {	                if key < object_count && set.insert(key) {
+M7_三代共用热代的开放段	    let generation_index = generation as usize;	    let generation_index = 0usize;
 M8_跨装置表里一个数错	    ("bump_cp_b256", "runs8", 1339),	    ("bump_cp_b256", "runs8", 1340),
 M9_写次数不计	        self.total_writes += 1;	        self.total_writes += 0;
-M10_空段判据放宽	            .find(|&i| self.seg_free[i] as usize == self.g && self.open_seg != Some(i))	            .find(|&i| self.seg_free[i] as usize >= 1 && self.open_seg != Some(i))
-M11_free_run长度判据差一	            if count >= len {	            if count + 1 >= len {
-M12_初始空槽少一个	        let free: BTreeSet<u32> = (l as u32..s as u32).collect();	        let free: BTreeSet<u32> = ((l + 1) as u32..s as u32).collect();
-M13_中位取成最小	    v.sort_unstable();\n    v[2]	    v.sort_unstable();\n    v[0]
+M10_空段判据放宽	            .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment && self.open_segment != Some(segment_index))	            .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize >= 1 && self.open_segment != Some(segment_index))
+M11_free_run长度判据差一	            if count >= run_length_in_slots {	            if count + 1 >= run_length_in_slots {
+M12_初始空槽少一个	        let free: BTreeSet<u32> = (object_count as u32..slot_count as u32).collect();	        let free: BTreeSet<u32> = ((object_count + 1) as u32..slot_count as u32).collect();
+M13_中位取成最小	    values.sort_unstable();\n    values[2]	    values.sort_unstable();\n    values[0]
 M14_节点组只落脏的	        let keys: Vec<usize> = if clean <= remaining {	        let keys: Vec<usize> = if false {
-M15_代际回落不计数	                        self.fallback_allocs += 1;\n                        let slot = self.alloc_first_fit_gen();	                        let slot = self.alloc_first_fit_gen();
-M16_组不去重	    let mut touched: Vec<usize> = dirty.iter().map(|&k| k / g).collect();\n    touched.dedup();	    let mut touched: Vec<usize> = dirty.iter().map(|&k| k / g).collect();
-M17_整理不挑热代	        if !dirty_set_.contains(&key) && sim.obj_gen[key] == 0 {	        if !dirty_set_.contains(&key) {
-M18_剩余预算不轮转	    while remaining >= g && scanned < groups {	    while false {
-M19_组大小写死成常量	    // 被脏集碰到的组，按 key 序：预算够就整组重落，不够就只落脏的那几个\n    let mut touched: Vec<usize> = dirty.iter().map(|&k| k / g).collect();	    // 被脏集碰到的组，按 key 序：预算够就整组重落，不够就只落脏的那几个\n    let mut touched: Vec<usize> = dirty.iter().map(|&k| k / 8).collect();
-M20_老化阈值写死	        let gen = age_gen(t - sim.last_write[k], h1, h2);	        let gen = age_gen(t - sim.last_write[k], 16, 128);
+M15_代际回落不计数	                        self.fallback_allocations += 1;\n                        let slot = self.allocate_first_fit_outside_open_generation_segments();	                        let slot = self.allocate_first_fit_outside_open_generation_segments();
+M16_组不去重	    let mut touched: Vec<usize> = dirty.iter().map(|&key| key / group_size).collect();\n    touched.dedup();	    let mut touched: Vec<usize> = dirty.iter().map(|&key| key / group_size).collect();
+M17_整理不挑热代	        if !dirty_key_set.contains(&key) && sim.object_generation[key] == 0 {	        if !dirty_key_set.contains(&key) {
+M18_剩余预算不轮转	    while remaining >= group_size && scanned < groups {	    while false {
+M19_组大小写死成常量	    // 被脏集碰到的组，按 key 序：预算够就整组重落，不够就只落脏的那几个\n    let mut touched: Vec<usize> = dirty.iter().map(|&key| key / group_size).collect();	    // 被脏集碰到的组，按 key 序：预算够就整组重落，不够就只落脏的那几个\n    let mut touched: Vec<usize> = dirty.iter().map(|&key| key / 8).collect();
+M20_老化阈值写死	        let generation = generation_for_age(checkpoint - sim.last_write[key], hot_age_threshold, warm_age_threshold);	        let generation = generation_for_age(checkpoint - sim.last_write[key], 16, 128);

@@ -103,35 +103,35 @@ fn compose(epoch: u64, counter: u64) -> u64 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Rec {
+struct JournalRecord {
     jsn: u64,
     timeline: u32,
-    csum_ok: bool,
+    is_checksum_valid: bool,
 }
 
-const TIMELINE_PREV_LAP: u32 = 0;
-const TIMELINE_A: u32 = 1;
-const TIMELINE_B: u32 = 2;
+const TIMELINE_PREVIOUS_LAP: u32 = 0;
+const TIMELINE_BEFORE_RECOVERY: u32 = 1;
+const TIMELINE_AFTER_RECOVERY: u32 = 2;
 
 struct Ring {
-    slot: Vec<Option<Rec>>,
+    slot: Vec<Option<JournalRecord>>,
 }
 
 impl Ring {
-    fn new(n: usize) -> Self {
-        Ring { slot: vec![None; n] }
+    fn new(slot_count: usize) -> Self {
+        Ring { slot: vec![None; slot_count] }
     }
     /// 槽位由**低位计数器**决定，不由整个 `jsn` 决定——
     /// 否则换个 epoch 会把整个环的落点平移，那是另一个设计，不是本条出路。
-    fn idx(&self, jsn: u64) -> usize {
+    fn slot_index_of(&self, jsn: u64) -> usize {
         ((jsn & ((1u64 << COUNTER_BITS) - 1)) as usize) % self.slot.len()
     }
-    fn put(&mut self, r: Rec) {
-        let i = self.idx(r.jsn);
-        self.slot[i] = Some(r);
+    fn put(&mut self, record: JournalRecord) {
+        let slot_index = self.slot_index_of(record.jsn);
+        self.slot[slot_index] = Some(record);
     }
-    fn get(&self, jsn: u64) -> Option<Rec> {
-        self.slot[self.idx(jsn)]
+    fn get(&self, jsn: u64) -> Option<JournalRecord> {
+        self.slot[self.slot_index_of(jsn)]
     }
 }
 
@@ -139,36 +139,36 @@ impl Ring {
 ///
 /// `accept_epoch_bump = false` 时是 D23（journal 的角色与格式）已定的那套，一个字没改。
 /// 为 true 时额外接受「代号恰好 +1 且计数器接着走」——**那是对已定规则的修改**。
-fn recover(ring: &Ring, tail_jsn: u64, accept_epoch_bump: bool) -> Vec<Rec> {
-    let mut out = Vec::new();
+fn recover(ring: &Ring, tail_jsn: u64, accept_epoch_bump: bool) -> Vec<JournalRecord> {
+    let mut accepted_prefix = Vec::new();
     let mut expected = tail_jsn;
-    while out.len() < ring.slot.len() {
-        let r = match ring.get(expected) {
-            Some(r) => r,
+    while accepted_prefix.len() < ring.slot.len() {
+        let record = match ring.get(expected) {
+            Some(record) => record,
             None => break,
         };
-        if !r.csum_ok {
+        if !record.is_checksum_valid {
             break;
         }
-        if r.jsn != expected {
+        if record.jsn != expected {
             // 已定规则到此为止；带 epoch 感知时再看一眼「代号 +1、计数器不变」
             let bumped = compose(
                 (expected >> EPOCH_SHIFT) + 1,
                 expected & ((1u64 << COUNTER_BITS) - 1),
             );
-            if !(accept_epoch_bump && r.jsn == bumped) {
+            if !(accept_epoch_bump && record.jsn == bumped) {
                 break;
             }
             expected = bumped;
         }
-        out.push(r);
+        accepted_prefix.push(record);
         expected += 1;
     }
-    out
+    accepted_prefix
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct RecoveryOutcome {
     first_prefix: u64,
     stale_replayed: u64,
     lost_new: u64,
@@ -178,49 +178,49 @@ const SLOTS: usize = 64;
 const SETTLED: u64 = 20;
 const EPOCH0: u64 = 3;
 
-fn run(arm: Arm, stale: u64, new_after: u64) -> Out {
+fn run(arm: Arm, stale: u64, new_after: u64) -> RecoveryOutcome {
     let mut ring = Ring::new(SLOTS);
 
     // 稳态布景：上一圈铺满环
-    for c in 1..=SLOTS as u64 {
-        ring.put(Rec { jsn: compose(EPOCH0, c), timeline: TIMELINE_PREV_LAP, csum_ok: true });
+    for previous_lap_counter in 1..=SLOTS as u64 {
+        ring.put(JournalRecord { jsn: compose(EPOCH0, previous_lap_counter), timeline: TIMELINE_PREVIOUS_LAP, is_checksum_valid: true });
     }
 
     let tail_counter = SLOTS as u64 + 1;
     let tail_jsn = compose(EPOCH0, tail_counter);
 
     // 时间线 A：安定段
-    for i in 0..SETTLED {
-        ring.put(Rec {
-            jsn: compose(EPOCH0, tail_counter + i),
-            timeline: TIMELINE_A,
-            csum_ok: true,
+    for settled_index in 0..SETTLED {
+        ring.put(JournalRecord {
+            jsn: compose(EPOCH0, tail_counter + settled_index),
+            timeline: TIMELINE_BEFORE_RECOVERY,
+            is_checksum_valid: true,
         });
     }
     let hole_counter = tail_counter + SETTLED;
     // 空洞那条没写成；后面几条落盘了
-    for k in 0..stale {
-        ring.put(Rec {
-            jsn: compose(EPOCH0, hole_counter + 1 + k),
-            timeline: TIMELINE_A,
-            csum_ok: true,
+    for stale_index in 0..stale {
+        ring.put(JournalRecord {
+            jsn: compose(EPOCH0, hole_counter + 1 + stale_index),
+            timeline: TIMELINE_BEFORE_RECOVERY,
+            is_checksum_valid: true,
         });
     }
 
     // 第一次恢复
-    let acc1 = recover(&ring, tail_jsn, arm.recovery_accepts_epoch_bump());
-    let mut o = Out { first_prefix: acc1.len() as u64, ..Default::default() };
+    let first_recovery_prefix = recover(&ring, tail_jsn, arm.recovery_accepts_epoch_bump());
+    let mut outcome = RecoveryOutcome { first_prefix: first_recovery_prefix.len() as u64, ..Default::default() };
 
     // 恢复之后：实例代号怎么走，是本实验的分歧点
     let new_epoch = arm.epoch_after_recovery(EPOCH0);
     // 计数器一律接前缀末 + 1（本实验不测续写策略那一维，E32 已测过）
     let resume_counter = hole_counter;
 
-    for k in 0..new_after {
-        ring.put(Rec {
-            jsn: compose(new_epoch, resume_counter + k),
-            timeline: TIMELINE_B,
-            csum_ok: true,
+    for new_record_index in 0..new_after {
+        ring.put(JournalRecord {
+            jsn: compose(new_epoch, resume_counter + new_record_index),
+            timeline: TIMELINE_AFTER_RECOVERY,
+            is_checksum_valid: true,
         });
     }
 
@@ -228,46 +228,46 @@ fn run(arm: Arm, stale: u64, new_after: u64) -> Out {
     // ⚠️ **tail 也要跟着实例代号走**——否则新时间线的记录连第一条都接不上。
     // 这正是这条出路的隐藏成本：tail 与 epoch 必须一起持久、一起回滚或一起不回滚。
     let tail2 = compose(EPOCH0, tail_counter);
-    let acc2 = recover(&ring, tail2, arm.recovery_accepts_epoch_bump());
-    o.stale_replayed = acc2
+    let second_recovery_prefix = recover(&ring, tail2, arm.recovery_accepts_epoch_bump());
+    outcome.stale_replayed = second_recovery_prefix
         .iter()
-        .filter(|r| r.timeline == TIMELINE_A && (r.jsn & ((1u64 << COUNTER_BITS) - 1)) >= hole_counter)
+        .filter(|record| record.timeline == TIMELINE_BEFORE_RECOVERY && (record.jsn & ((1u64 << COUNTER_BITS) - 1)) >= hole_counter)
         .count() as u64;
-    let replayed_new = acc2.iter().filter(|r| r.timeline == TIMELINE_B).count() as u64;
-    o.lost_new = new_after - replayed_new;
-    o
+    let replayed_new = second_recovery_prefix.iter().filter(|record| record.timeline == TIMELINE_AFTER_RECOVERY).count() as u64;
+    outcome.lost_new = new_after - replayed_new;
+    outcome
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
+        emitter.emit_raw(&format!(
             "name=config slots={SLOTS} settled={SETTLED} epoch_bits={EPOCH_BITS} \
              counter_bits={COUNTER_BITS} note=日志实例代号"
         ))
     );
     for arm in ARMS {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let o = run(arm, stale, new_after);
-            let pass = o.stale_replayed == 0 && o.lost_new == 0;
+            let outcome = run(arm, stale, new_after);
+            let pass = outcome.stale_replayed == 0 && outcome.lost_new == 0;
             println!(
                 "{}",
-                em.emit_raw(&format!(
+                emitter.emit_raw(&format!(
                     "name=cell arm={} stale={} new_after={} first_prefix={} \
                      stale_replayed={} lost_new={} pass={}",
                     arm.name(),
                     stale,
                     new_after,
-                    o.first_prefix,
-                    o.stale_replayed,
-                    o.lost_new,
+                    outcome.first_prefix,
+                    outcome.stale_replayed,
+                    outcome.lost_new,
                     pass
                 ))
             );
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -280,9 +280,9 @@ mod tests {
     fn the_baseline_reproduces_what_e33_measured() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
             let want = stale.saturating_sub(new_after - 1);
-            let o = run(Arm::Baseline, stale, new_after);
+            let outcome = run(Arm::Baseline, stale, new_after);
             assert_eq!(
-                o.stale_replayed, want,
+                outcome.stale_replayed, want,
                 "baseline 该复现 E32 的式子：残留 {stale}、新写 {new_after} ⇒ 重放 {want}"
             );
         }
@@ -296,10 +296,10 @@ mod tests {
     #[test]
     fn an_epoch_without_an_epoch_aware_recovery_loses_every_new_record() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let o = run(Arm::Epoch, stale, new_after);
-            assert_eq!(o.stale_replayed, 0, "残留确实挡住了（残留 {stale}）");
+            let outcome = run(Arm::Epoch, stale, new_after);
+            assert_eq!(outcome.stale_replayed, 0, "残留确实挡住了（残留 {stale}）");
             assert_eq!(
-                o.lost_new, new_after,
+                outcome.lost_new, new_after,
                 "而新写的 {new_after} 条全丢——与 skip_hole 同病"
             );
         }
@@ -309,9 +309,9 @@ mod tests {
     #[test]
     fn only_an_epoch_aware_recovery_satisfies_both_criteria() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let o = run(Arm::EpochAwareRecovery, stale, new_after);
-            assert_eq!(o.stale_replayed, 0, "残留 {stale}、新写 {new_after}");
-            assert_eq!(o.lost_new, 0, "残留 {stale}、新写 {new_after}");
+            let outcome = run(Arm::EpochAwareRecovery, stale, new_after);
+            assert_eq!(outcome.stale_replayed, 0, "残留 {stale}、新写 {new_after}");
+            assert_eq!(outcome.lost_new, 0, "残留 {stale}、新写 {new_after}");
         }
     }
 
@@ -319,7 +319,7 @@ mod tests {
     /// ⇒ 这条出路的正确性**全押在「代号不许回滚」上**，
     /// 与 D9（加密）已定项 8 对 nonce 水位的要求同型。
     #[test]
-    fn a_rolled_back_epoch_degrades_all_the_way_to_the_baseline() {
+    fn rolled_back_epoch_degrades_all_the_way_to_the_baseline() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
             let rolled = run(Arm::EpochRolledBack, stale, new_after);
             let base = run(Arm::Baseline, stale, new_after);
@@ -335,8 +335,8 @@ mod tests {
     #[test]
     fn the_first_recovery_stops_at_the_hole_in_every_arm() {
         for arm in ARMS {
-            let o = run(arm, 3, 1);
-            assert_eq!(o.first_prefix, SETTLED, "{} 没停在空洞处", arm.name());
+            let outcome = run(arm, 3, 1);
+            assert_eq!(outcome.first_prefix, SETTLED, "{} 没停在空洞处", arm.name());
         }
     }
 
@@ -358,10 +358,10 @@ mod tests {
     #[test]
     fn the_slot_is_chosen_by_the_counter_not_by_the_whole_sequence_number() {
         let ring = Ring::new(SLOTS);
-        for c in [1u64, 5, 63, 64, 65] {
+        for counter in [1u64, 5, 63, 64, 65] {
             assert_eq!(
-                ring.idx(compose(3, c)),
-                ring.idx(compose(9, c)),
+                ring.slot_index_of(compose(3, counter)),
+                ring.slot_index_of(compose(9, counter)),
                 "同一个计数器在不同代号下该落在同一个槽"
             );
         }
@@ -371,13 +371,13 @@ mod tests {
         // （变异 M3 实测：把掩码摘掉，只有这几格时一个测试都不红）。
         // ⇒ 用一个**非 2 的幂**的环把「掩码这一步真的在起作用」钉住。
         let odd = Ring::new(60);
-        let a = odd.idx(compose(3, 7));
-        let b = odd.idx(compose(9, 7));
-        assert_eq!(a, b, "掩码之后，同一计数器在不同代号下仍落同一槽");
-        let unmasked_a = (compose(3, 7) as usize) % 60;
-        let unmasked_b = (compose(9, 7) as usize) % 60;
+        let masked_slot_under_epoch_3 = odd.slot_index_of(compose(3, 7));
+        let masked_slot_under_epoch_9 = odd.slot_index_of(compose(9, 7));
+        assert_eq!(masked_slot_under_epoch_3, masked_slot_under_epoch_9, "掩码之后，同一计数器在不同代号下仍落同一槽");
+        let unmasked_slot_under_epoch_3 = (compose(3, 7) as usize) % 60;
+        let unmasked_slot_under_epoch_9 = (compose(9, 7) as usize) % 60;
         assert_ne!(
-            unmasked_a, unmasked_b,
+            unmasked_slot_under_epoch_3, unmasked_slot_under_epoch_9,
             "不掩码的话它们会落到不同的槽——这正是掩码在挡的事"
         );
     }

@@ -1,15 +1,15 @@
 M1_单元字节抄错	const UNIT_BYTES: u64 = 32768;	const UNIT_BYTES: u64 = 4096;
-M2_分配记录宽抄错	const ALLOC_REC_BYTES: u64 = 20;	const ALLOC_REC_BYTES: u64 = 19;
+M2_分配记录宽抄错	const ALLOCATION_RECORD_BYTES: u64 = 20;	const ALLOCATION_RECORD_BYTES: u64 = 19;
 M3_livelist条目少算指针宽	const LIVELIST_ENTRY_BYTES: u64 = 2 + 14 + 8;	const LIVELIST_ENTRY_BYTES: u64 = 2 + 13 + 8;
-M4_naive的每批最坏字节漏掉livelist那一半	worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        // 未 condense	worst_batch_bytes: BATCH_K * ALLOC_REC_BYTES,\n        // 未 condense
-M5_condense的每批最坏字节改成随活块数走	worst_batch_bytes: BATCH_K * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,	worst_batch_bytes: l.n * (ALLOC_REC_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,
-M6_覆写不记FREE	self.own() * self.churn	self.own() * 0
-M7_继承块也进livelist	self.n - self.inherited	self.n
-M8_condense判据放宽成恒触发	if raw > CONDENSE_RATIO * net {\n        net\n    } else {\n        raw\n    }	net
-M9_condense判据收紧成恒不触发	if raw > CONDENSE_RATIO * net {\n        net\n    } else {\n        raw\n    }	raw
-M10_naive的上界改成只算净值	pre_reserve_bytes: l.allocs() * UNIT_BYTES,	pre_reserve_bytes: (l.allocs() - l.frees()) * UNIT_BYTES,
-M11_乙的上界假装算得出	pre_reserve_bytes: 0,	pre_reserve_bytes: net * UNIT_BYTES,
-M12_乙的销毁读数不随活树走	destroy_reads: live_tree_nodes(l),	destroy_reads: net,
+M4_naive的每批最坏字节漏掉livelist那一半	worst_batch_bytes: ENTRIES_PER_BATCH * (ALLOCATION_RECORD_BYTES + LIVELIST_ENTRY_BYTES),\n        // 未 condense	worst_batch_bytes: ENTRIES_PER_BATCH * ALLOCATION_RECORD_BYTES,\n        // 未 condense
+M5_condense的每批最坏字节改成随活块数走	worst_batch_bytes: ENTRIES_PER_BATCH * (ALLOCATION_RECORD_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,	worst_batch_bytes: load.live_block_count * (ALLOCATION_RECORD_BYTES + LIVELIST_ENTRY_BYTES),\n        pre_reserve_bytes: entries * UNIT_BYTES,
+M6_覆写不记FREE	self.self_born_block_count() * self.churn	self.self_born_block_count() * 0
+M7_继承块也进livelist	self.live_block_count - self.inherited_block_count	self.live_block_count
+M8_condense判据放宽成恒触发	if raw_entry_count > CONDENSE_RATIO * net_allocated_block_count {\n        net_allocated_block_count\n    } else {\n        raw_entry_count\n    }	net_allocated_block_count
+M9_condense判据收紧成恒不触发	if raw_entry_count > CONDENSE_RATIO * net_allocated_block_count {\n        net_allocated_block_count\n    } else {\n        raw_entry_count\n    }	raw_entry_count
+M10_naive的上界改成只算净值	pre_reserve_bytes: load.allocation_event_count() * UNIT_BYTES,	pre_reserve_bytes: (load.allocation_event_count() - load.free_event_count()) * UNIT_BYTES,
+M11_乙的上界假装算得出	pre_reserve_bytes: 0,	pre_reserve_bytes: net_allocated_block_count * UNIT_BYTES,
+M12_乙的销毁读数不随活树走	destroy_reads: live_tree_nodes(load),	destroy_reads: net_allocated_block_count,
 M13_naive的释放路径不收预付	free_path_extra_bytes: LIVELIST_ENTRY_BYTES,\n    }\n}\n\n/// condense	free_path_extra_bytes: 0,\n    }\n}\n\n/// condense
-M14_ALLOC次数漏掉初始那一轮	self.own() * (1 + self.churn)	self.own() * self.churn
-M15_继承率取整方向改成截断	(n as f64 * share).round() as u64	(n as f64 * share) as u64
+M14_ALLOC次数漏掉初始那一轮	self.self_born_block_count() * (1 + self.churn)	self.self_born_block_count() * self.churn
+M15_继承率取整方向改成截断	(live_block_count as f64 * share).round() as u64	(live_block_count as f64 * share) as u64

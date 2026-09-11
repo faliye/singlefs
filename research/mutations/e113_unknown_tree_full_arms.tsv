@@ -1,10 +1,10 @@
-M1_误释放公式去掉窗口	    BLOCKS_PER_GEN * w_gens	    BLOCKS_PER_GEN * 0
-M2_跳过臂不再误释放	    let blocks = if eff == Flags::Skip && writable_gens > 0 {	    let blocks = if false && writable_gens > 0 {
-M3_自以为认识不再违反只读	        (T_NEW_RDONLY * writable_gens, T_NEW_DEAD)	        (0, 0)
-M4_只读挂载其实能写	    let writable_gens = if eff == Flags::ReadOnly { 0 } else { G_GENS };	    let writable_gens = G_GENS;
-M5_拒收条目也认错邻居	    let blocks = if eff == Flags::Skip && writable_gens > 0 {	    let blocks = if (eff == Flags::Skip || eff == Flags::RejectEntry) && writable_gens > 0 {
-M6_字典序把丢数据排到最后	        o.blocks_freed_while_referenced,             // 1 不许丢数据	        0,             // 1 不许丢数据
-M7_豁免点删其实照样丢	        Acct::Exempt => (0, own),	        Acct::Exempt => (p.h_new * R_TREE_DIM, own),
-M8_按位分档不看登记数	    if p.trees_with_registered_bit >= T_NEW {	    if true {
-M9_保留代数边界差一	            let lost = if writable_gens > p.k_keep { theirs } else { 0 };	            let lost = if writable_gens >= p.k_keep { theirs } else { 0 };
-M10_可写代数不进字典序	        G_GENS - o.writable_gens,                    // 5 可写代数最多	        0,                    // 5 可写代数最多
+M1_误释放公式去掉窗口	    BLOCKS_BORN_PER_GENERATION * invisible_window_generations	    BLOCKS_BORN_PER_GENERATION * 0
+M2_跳过臂不再误释放	    let blocks_freed_while_referenced = if effective_flags_policy == UnknownFlagsPolicy::Skip && writable_generations > 0 {	    let blocks_freed_while_referenced = if false && writable_generations > 0 {
+M3_自以为认识不再违反只读	        (UNKNOWN_READ_ONLY_TREE_COUNT * writable_generations, UNKNOWN_HALF_DELETED_TREE_COUNT)	        (0, 0)
+M4_只读挂载其实能写	    let writable_generations = if effective_flags_policy == UnknownFlagsPolicy::ReadOnly { 0 } else { PUBLISHED_GENERATIONS };	    let writable_generations = PUBLISHED_GENERATIONS;
+M5_拒收条目也认错邻居	    let blocks_freed_while_referenced = if effective_flags_policy == UnknownFlagsPolicy::Skip && writable_generations > 0 {	    let blocks_freed_while_referenced = if (effective_flags_policy == UnknownFlagsPolicy::Skip || effective_flags_policy == UnknownFlagsPolicy::RejectEntry) && writable_generations > 0 {
+M6_字典序把丢数据排到最后	        outcome.blocks_freed_while_referenced,             // 1 不许丢数据	        0,             // 1 不许丢数据
+M7_豁免点删其实照样丢	        AccountingPolicy::Exempt => (0, own_rows),	        AccountingPolicy::Exempt => (parameters.unknown_writable_head_count * TREE_DIMENSION_ROWS_PER_HEAD, own_rows),
+M8_按位分档不看登记数	    if parameters.trees_with_registered_bit >= UNKNOWN_TREE_COUNT {	    if true {
+M9_保留代数边界差一	            let lost_rows = if writable_generations > parameters.retained_generations { unknown_tree_rows } else { 0 };	            let lost_rows = if writable_generations >= parameters.retained_generations { unknown_tree_rows } else { 0 };
+M10_可写代数不进字典序	        PUBLISHED_GENERATIONS - outcome.writable_generations,                    // 5 可写代数最多	        0,                    // 5 可写代数最多

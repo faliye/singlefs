@@ -14,14 +14,14 @@ use e7_index_bench::Emitter;
 
 // ── 已定常量（各自的出处在 kb 正文引用条款一节）─────────────────────────────
 const RECORD_BYTES: u64 = 4096; // D23 已定项 12
-const REC_HDR: u64 = 78; // D23 已定项 4（现行头宽）
+const RECORD_HEADER_BYTES: u64 = 78; // D23 已定项 4（现行头宽）
 const ENTRY_BYTES: u64 = 56; // 点名项含校验和
 const OLD_ENTRY_BYTES: u64 = 32; // D16 已定项 5 推导用的旧口径（E70 的 ENTRY）
 const NODE_BYTES: u64 = 16384;
-const T_DIRTY: u64 = 2 * 1024 * 1024 * 1024; // 2 GiB
-const T_TIME_MS: u64 = 5000; // D16 已定项 5 取区间上端
-const FSYNC_PER_SEC: u64 = 2785; // E44 本机实测
-const CKPT_COST_BLOCKS: u64 = 64; // E19 口径
+const DIRTY_THRESHOLD_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GiB
+const TIME_THRESHOLD_MILLISECONDS: u64 = 5000; // D16 已定项 5 取区间上端
+const FSYNC_PER_SECOND: u64 = 2785; // E44 本机实测
+const CHECKPOINT_COST_BLOCKS: u64 = 64; // E19 口径
 /// 目标负载：一次 fsync 8 叶 + 1 脊柱 = 12 项（D25 / E75 同一格）
 const TARGET_ITEMS_PER_FSYNC: u64 = 12;
 /// 搅动量，微块/操作（E16 实测：4.0000 与 0.0567 块/操作）
@@ -29,7 +29,7 @@ const CHURN_JIA_MICRO: u64 = 4_000_000;
 const CHURN_DEFER_MICRO: u64 = 56_700;
 
 fn items_per_record() -> u64 {
-    (RECORD_BYTES - REC_HDR) / ENTRY_BYTES
+    (RECORD_BYTES - RECORD_HEADER_BYTES) / ENTRY_BYTES
 }
 
 fn records_for_items(items: u64) -> u64 {
@@ -37,23 +37,23 @@ fn records_for_items(items: u64) -> u64 {
 }
 
 /// 一个事务的 journal 占用（字节）：记录数 × 定长记录。
-fn txn_occupancy_bytes(items: u64) -> u64 {
+fn transaction_occupancy_bytes(items: u64) -> u64 {
     records_for_items(items) * RECORD_BYTES
 }
 
 /// I-8.1 的环下界：F × 最坏事务占用。
-fn ring_bound_bytes(items: u64, f: u64) -> u64 {
-    f * txn_occupancy_bytes(items)
+fn ring_bound_bytes(items: u64, worst_transaction_multiple: u64) -> u64 {
+    worst_transaction_multiple * transaction_occupancy_bytes(items)
 }
 
 /// D16 已定项 5 的旧口径复现：每个脏 16 KiB 节点占一个 32 B 条目 ⇒ 占用 = T_dirty / 512。
 fn old_caliber_occupancy_bytes() -> u64 {
-    T_DIRTY / (NODE_BYTES / OLD_ENTRY_BYTES)
+    DIRTY_THRESHOLD_BYTES / (NODE_BYTES / OLD_ENTRY_BYTES)
 }
 
 /// T_dirty 满窗的点名项数：每个脏节点一项。
-fn t_dirty_items() -> u64 {
-    T_DIRTY / NODE_BYTES
+fn dirty_threshold_window_items() -> u64 {
+    DIRTY_THRESHOLD_BYTES / NODE_BYTES
 }
 
 // ── 账二：保留时长模拟（水位语义）────────────────────────────────────────────
@@ -66,8 +66,8 @@ fn t_dirty_items() -> u64 {
 struct Retention {
     peak_live_records: u64,
     peak_live_bytes: u64,
-    /// 单条记录最长存活（拍数；一拍 = 1/FSYNC_PER_SEC 秒）
-    max_lifetime_ticks: u64,
+    /// 单条记录最长存活（拍数；一拍 = 1/FSYNC_PER_SECOND 秒）
+    maximum_lifetime_ticks: u64,
     publishes: u64,
 }
 
@@ -75,39 +75,39 @@ fn simulate_retention(publish_every_fsync: bool, ticks: u64) -> Retention {
     let mut live: u64 = 0;
     let mut peak: u64 = 0;
     let mut dirty_bytes: u64 = 0;
-    let mut ticks_since_pub: u64 = 0;
-    let mut max_life: u64 = 0;
+    let mut ticks_since_publish: u64 = 0;
+    let mut maximum_lifetime_ticks: u64 = 0;
     let mut publishes: u64 = 0;
     for _ in 0..ticks {
         live += 1; // 本拍的记录进环（记录数按目标负载恰 1 条）
         dirty_bytes += TARGET_ITEMS_PER_FSYNC * NODE_BYTES;
-        ticks_since_pub += 1;
+        ticks_since_publish += 1;
         peak = peak.max(live);
         // 触发判据：时间那支按拍换算（T_time 秒 × 拍/秒），脏量那支按字节。取先到。
-        let time_ticks = T_TIME_MS * FSYNC_PER_SEC / 1000;
+        let time_ticks = TIME_THRESHOLD_MILLISECONDS * FSYNC_PER_SECOND / 1000;
         let should_publish = publish_every_fsync
-            || ticks_since_pub >= time_ticks
-            || dirty_bytes >= T_DIRTY;
+            || ticks_since_publish >= time_ticks
+            || dirty_bytes >= DIRTY_THRESHOLD_BYTES;
         if should_publish {
-            max_life = max_life.max(ticks_since_pub);
+            maximum_lifetime_ticks = maximum_lifetime_ticks.max(ticks_since_publish);
             live = 0; // 水位推进：所选根之下的记录全死（D23 已定项 14）
             dirty_bytes = 0;
-            ticks_since_pub = 0;
+            ticks_since_publish = 0;
             publishes += 1;
         }
     }
     Retention {
         peak_live_records: peak,
         peak_live_bytes: peak * RECORD_BYTES,
-        max_lifetime_ticks: max_life,
+        maximum_lifetime_ticks,
         publishes,
     }
 }
 
 /// 闭式：延后形态的窗口拍数 = min(T_time 拍数, ceil(T_dirty / 每拍脏量))。
 fn deferred_window_ticks() -> u64 {
-    let time_ticks = T_TIME_MS * FSYNC_PER_SEC / 1000;
-    let dirty_ticks = T_DIRTY.div_ceil(TARGET_ITEMS_PER_FSYNC * NODE_BYTES);
+    let time_ticks = TIME_THRESHOLD_MILLISECONDS * FSYNC_PER_SECOND / 1000;
+    let dirty_ticks = DIRTY_THRESHOLD_BYTES.div_ceil(TARGET_ITEMS_PER_FSYNC * NODE_BYTES);
     time_ticks.min(dirty_ticks)
 }
 
@@ -116,19 +116,19 @@ fn deferred_window_ticks() -> u64 {
 // D23 准入规则逐字：「剩余空间必须 > 每 checkpoint 搅动量 × (延迟代数 + 1) + 一次
 // checkpoint 的开销」。搅动量 = 每窗操作数 × 每操作搅动块。
 
-fn admission_bound_blocks(churn_micro: u64, ops_per_ckpt: u64, delay: u64) -> u64 {
-    churn_micro * ops_per_ckpt / 1_000_000 * (delay + 1) + CKPT_COST_BLOCKS
+fn admission_bound_blocks(churn_micro: u64, operations_per_checkpoint: u64, delay: u64) -> u64 {
+    churn_micro * operations_per_checkpoint / 1_000_000 * (delay + 1) + CHECKPOINT_COST_BLOCKS
 }
 
 /// E19 形态的 pending 队列模拟：常数搅动下稳态被扣块数的峰值。
 /// 独立路线——不用上面的闭式，逐窗推队列。
-fn simulate_held_peak(churn_micro: u64, ops_per_ckpt: u64, delay: u64, windows: u64) -> u64 {
-    let per_window = churn_micro * ops_per_ckpt / 1_000_000;
+fn simulate_held_peak(churn_micro: u64, operations_per_checkpoint: u64, delay: u64, windows: u64) -> u64 {
+    let blocks_freed_per_window = churn_micro * operations_per_checkpoint / 1_000_000;
     let mut pending: Vec<u64> = vec![0; delay as usize];
     let mut freeing_now: u64;
     let mut peak: u64 = 0;
     for _ in 0..windows {
-        freeing_now = per_window; // 本窗内逐操作释放，窗末达到 per_window
+        freeing_now = blocks_freed_per_window; // 本窗内逐操作释放，窗末达到 blocks_freed_per_window
         let held: u64 = pending.iter().sum::<u64>() + freeing_now;
         peak = peak.max(held);
         // checkpoint：本窗释放入队，队首到期
@@ -139,66 +139,66 @@ fn simulate_held_peak(churn_micro: u64, ops_per_ckpt: u64, delay: u64, windows: 
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out = String::new();
-    let mut say = |s: String| {
-        out.push_str(&s);
-        out.push('\n');
+    let mut emitter = Emitter::new();
+    let mut output_text = String::new();
+    let mut append_output_line = |output_line: String| {
+        output_text.push_str(&output_line);
+        output_text.push('\n');
     };
-    say(em.emit_raw(&format!(
-        "name=config record={RECORD_BYTES} hdr={REC_HDR} entry={ENTRY_BYTES} old_entry={OLD_ENTRY_BYTES} \
-         node={NODE_BYTES} t_dirty={T_DIRTY} t_time_ms={T_TIME_MS} fsync_per_sec={FSYNC_PER_SEC} \
+    append_output_line(emitter.emit_raw(&format!(
+        "name=config record={RECORD_BYTES} hdr={RECORD_HEADER_BYTES} entry={ENTRY_BYTES} old_entry={OLD_ENTRY_BYTES} \
+         node={NODE_BYTES} t_dirty={DIRTY_THRESHOLD_BYTES} t_time_ms={TIME_THRESHOLD_MILLISECONDS} fsync_per_sec={FSYNC_PER_SECOND} \
          items_per_record={}", items_per_record())));
 
     // ── 账一：三个已发表数字各按其口径复现 + 已定口径的约束值 ──
-    say(em.emit_raw(&format!(
+    append_output_line(emitter.emit_raw(&format!(
         "name=bound caliber=e75_target items=12 records={} occupancy_bytes={} f2_bound_kib={}",
-        records_for_items(12), txn_occupancy_bytes(12), ring_bound_bytes(12, 2) / 1024)));
-    say(em.emit_raw(&format!(
+        records_for_items(12), transaction_occupancy_bytes(12), ring_bound_bytes(12, 2) / 1024)));
+    append_output_line(emitter.emit_raw(&format!(
         "name=bound caliber=e75_worst items=62000 records={} occupancy_bytes={} f2_bound_kib={}",
-        records_for_items(62_000), txn_occupancy_bytes(62_000), ring_bound_bytes(62_000, 2) / 1024)));
-    say(em.emit_raw(&format!(
+        records_for_items(62_000), transaction_occupancy_bytes(62_000), ring_bound_bytes(62_000, 2) / 1024)));
+    append_output_line(emitter.emit_raw(&format!(
         "name=bound caliber=d16_item5_old_entry occupancy_mib={} f2_bound_mib={}",
         old_caliber_occupancy_bytes() / (1024 * 1024),
         2 * old_caliber_occupancy_bytes() / (1024 * 1024))));
-    say(em.emit_raw(&format!(
+    append_output_line(emitter.emit_raw(&format!(
         "name=bound caliber=settled_t_dirty items={} records={} occupancy_kib={} \
          f2_bound_kib={} f3_bound_kib={}",
-        t_dirty_items(), records_for_items(t_dirty_items()),
-        txn_occupancy_bytes(t_dirty_items()) / 1024,
-        ring_bound_bytes(t_dirty_items(), 2) / 1024,
-        ring_bound_bytes(t_dirty_items(), 3) / 1024)));
+        dirty_threshold_window_items(), records_for_items(dirty_threshold_window_items()),
+        transaction_occupancy_bytes(dirty_threshold_window_items()) / 1024,
+        ring_bound_bytes(dirty_threshold_window_items(), 2) / 1024,
+        ring_bound_bytes(dirty_threshold_window_items(), 3) / 1024)));
 
     // ── 账二：保留时长 ──
     let ticks = 40_000;
     let jia = simulate_retention(true, ticks);
-    let def = simulate_retention(false, ticks);
-    say(em.emit_raw(&format!(
+    let deferred = simulate_retention(false, ticks);
+    append_output_line(emitter.emit_raw(&format!(
         "name=retention arm=jia peak_records={} peak_bytes={} max_lifetime_ticks={} publishes={}",
-        jia.peak_live_records, jia.peak_live_bytes, jia.max_lifetime_ticks, jia.publishes)));
-    say(em.emit_raw(&format!(
+        jia.peak_live_records, jia.peak_live_bytes, jia.maximum_lifetime_ticks, jia.publishes)));
+    append_output_line(emitter.emit_raw(&format!(
         "name=retention arm=deferred peak_records={} peak_mib={} max_lifetime_ticks={} \
          lifetime_ms={} publishes={} closed_form_window={}",
-        def.peak_live_records, def.peak_live_bytes / (1024 * 1024),
-        def.max_lifetime_ticks,
-        def.max_lifetime_ticks * 1000 / FSYNC_PER_SEC,
-        def.publishes, deferred_window_ticks())));
+        deferred.peak_live_records, deferred.peak_live_bytes / (1024 * 1024),
+        deferred.maximum_lifetime_ticks,
+        deferred.maximum_lifetime_ticks * 1000 / FSYNC_PER_SECOND,
+        deferred.publishes, deferred_window_ticks())));
 
     // ── 账三：准入水位 ──
     for (arm, churn) in [("jia_4.0", CHURN_JIA_MICRO), ("defer_0.0567", CHURN_DEFER_MICRO)] {
-        for ops in [547u64, 2785, 13925] {
+        for operations_per_checkpoint in [547u64, 2785, 13925] {
             for delay in [2u64, 4, 8, 16] {
-                let bound = admission_bound_blocks(churn, ops, delay);
-                let sim = simulate_held_peak(churn, ops, delay, 200) + CKPT_COST_BLOCKS;
-                say(em.emit_raw(&format!(
-                    "name=admission arm={arm} ops_per_ckpt={ops} delay={delay} \
-                     bound_blocks={bound} bound_mib={} sim_blocks={sim} agree={}",
-                    bound * 4096 / (1024 * 1024), bound == sim)));
+                let closed_form_bound_blocks = admission_bound_blocks(churn, operations_per_checkpoint, delay);
+                let simulated_bound_blocks = simulate_held_peak(churn, operations_per_checkpoint, delay, 200) + CHECKPOINT_COST_BLOCKS;
+                append_output_line(emitter.emit_raw(&format!(
+                    "name=admission arm={arm} ops_per_ckpt={operations_per_checkpoint} delay={delay} \
+                     bound_blocks={closed_form_bound_blocks} bound_mib={} sim_blocks={simulated_bound_blocks} agree={}",
+                    closed_form_bound_blocks * 4096 / (1024 * 1024), closed_form_bound_blocks == simulated_bound_blocks)));
             }
         }
     }
-    say(em.finish());
-    print!("{out}");
+    append_output_line(emitter.finish());
+    print!("{output_text}");
 }
 
 #[cfg(test)]
@@ -228,7 +228,7 @@ mod tests {
 
     /// 判据 2 之三：D16 已定项 5 的旧口径逐字复现——T_dirty/512 = 4 MiB，F=2 ⇒ 8 MiB。
     #[test]
-    fn d16_item5_old_caliber_reproduces() {
+    fn decision_16_item_5_old_caliber_reproduces() {
         assert_eq!(old_caliber_occupancy_bytes(), 4 * 1024 * 1024);
         assert_eq!(2 * old_caliber_occupancy_bytes(), 8 * 1024 * 1024);
         // 旧口径的放大倍数确实是 512（16 KiB 节点 / 32 B 条目）
@@ -239,10 +239,10 @@ mod tests {
     /// 占用 7388 KiB、F=2 环下界 14776 KiB ≈ 14.4 MiB。
     #[test]
     fn settled_caliber_bound_is_pinned() {
-        assert_eq!(t_dirty_items(), 131_072);
+        assert_eq!(dirty_threshold_window_items(), 131_072);
         assert!(71 * 1846 < 131_072 && 131_072 <= 71 * 1847, "记录数该恰为 1847");
         assert_eq!(records_for_items(131_072), 1847);
-        assert_eq!(txn_occupancy_bytes(131_072) / 1024, 1847 * 4);
+        assert_eq!(transaction_occupancy_bytes(131_072) / 1024, 1847 * 4);
         assert_eq!(ring_bound_bytes(131_072, 2) / 1024, 14_776);
         assert_eq!(ring_bound_bytes(131_072, 3) / 1024, 22_164);
     }
@@ -251,47 +251,47 @@ mod tests {
     /// 同一个 T_dirty 满窗，56 B/项 + 4 KiB 定长记录的占用比 32 B/条目多。
     #[test]
     fn settled_and_old_calibers_disagree() {
-        let settled = txn_occupancy_bytes(t_dirty_items());
-        let old = old_caliber_occupancy_bytes();
-        assert!(settled > old,
-            "已定口径 {settled} 该大于旧口径 {old}——记录头与 56 B/项都比 32 B/条目贵");
+        let settled_caliber_bytes = transaction_occupancy_bytes(dirty_threshold_window_items());
+        let old_caliber_bytes = old_caliber_occupancy_bytes();
+        assert!(settled_caliber_bytes > old_caliber_bytes,
+            "已定口径 {settled_caliber_bytes} 该大于旧口径 {old_caliber_bytes}——记录头与 56 B/项都比 32 B/条目贵");
         // 差异幅度也钉住：7388 KiB vs 4096 KiB
-        assert_eq!(settled / 1024, 7388);
-        assert_eq!(old / 1024, 4096);
+        assert_eq!(settled_caliber_bytes / 1024, 7388);
+        assert_eq!(old_caliber_bytes / 1024, 4096);
     }
 
     /// 判据 3（账二）：延后形态的模拟峰值与闭式窗口恰等；取先到的是脏量那支
     /// （T_dirty/每拍 192 KiB = 10923 拍 < T_time 的 13925 拍）。
     #[test]
-    fn deferred_retention_matches_closed_form_and_t_dirty_wins() {
-        let time_ticks = T_TIME_MS * FSYNC_PER_SEC / 1000;
+    fn deferred_retention_matches_closed_form_and_dirty_threshold_wins() {
+        let time_ticks = TIME_THRESHOLD_MILLISECONDS * FSYNC_PER_SECOND / 1000;
         assert_eq!(time_ticks, 13_925);
-        let dirty_ticks = T_DIRTY.div_ceil(TARGET_ITEMS_PER_FSYNC * NODE_BYTES);
+        let dirty_ticks = DIRTY_THRESHOLD_BYTES.div_ceil(TARGET_ITEMS_PER_FSYNC * NODE_BYTES);
         assert_eq!(dirty_ticks, 10_923, "2 GiB / 192 KiB 向上取整");
         assert_eq!(deferred_window_ticks(), 10_923, "取先到该是脏量那支");
-        let r = simulate_retention(false, 40_000);
-        assert_eq!(r.peak_live_records, deferred_window_ticks(), "模拟峰值与闭式窗口不等");
-        assert_eq!(r.max_lifetime_ticks, deferred_window_ticks());
+        let retention = simulate_retention(false, 40_000);
+        assert_eq!(retention.peak_live_records, deferred_window_ticks(), "模拟峰值与闭式窗口不等");
+        assert_eq!(retention.maximum_lifetime_ticks, deferred_window_ticks());
     }
 
     /// 判据 4 阳性对照（账二退化档）：每次发布即截断 ⇒ 峰值恰塌到单事务的 1 条记录。
     #[test]
     fn per_fsync_publish_collapses_peak_to_one_record() {
-        let r = simulate_retention(true, 40_000);
-        assert_eq!(r.peak_live_records, 1);
-        assert_eq!(r.max_lifetime_ticks, 1);
-        assert_eq!(r.publishes, 40_000, "每拍都该发布");
+        let retention = simulate_retention(true, 40_000);
+        assert_eq!(retention.peak_live_records, 1);
+        assert_eq!(retention.maximum_lifetime_ticks, 1);
+        assert_eq!(retention.publishes, 40_000, "每拍都该发布");
     }
 
     /// 判据 3（账三）：pending 队列模拟的稳态峰值 + 开销与闭式逐格恰等。
     #[test]
     fn admission_sim_agrees_with_closed_form_everywhere() {
         for churn in [CHURN_JIA_MICRO, CHURN_DEFER_MICRO] {
-            for ops in [547u64, 2785, 13925] {
+            for operations_per_checkpoint in [547u64, 2785, 13925] {
                 for delay in [2u64, 4, 8, 16] {
-                    let bound = admission_bound_blocks(churn, ops, delay);
-                    let sim = simulate_held_peak(churn, ops, delay, 200) + CKPT_COST_BLOCKS;
-                    assert_eq!(bound, sim, "churn={churn} ops={ops} delay={delay}");
+                    let closed_form_bound_blocks = admission_bound_blocks(churn, operations_per_checkpoint, delay);
+                    let simulated_bound_blocks = simulate_held_peak(churn, operations_per_checkpoint, delay, 200) + CHECKPOINT_COST_BLOCKS;
+                    assert_eq!(closed_form_bound_blocks, simulated_bound_blocks, "churn={churn} ops={operations_per_checkpoint} delay={delay}");
                 }
             }
         }
@@ -304,30 +304,30 @@ mod tests {
         let jia = admission_bound_blocks(CHURN_JIA_MICRO, 13_925, 8);
         assert_eq!(jia, 4 * 13_925 * 9 + 64);
         assert_eq!(jia, 501_364);
-        let def = admission_bound_blocks(CHURN_DEFER_MICRO, 13_925, 8);
+        let deferred = admission_bound_blocks(CHURN_DEFER_MICRO, 13_925, 8);
         // 0.0567 块/操作 × 13925 = 789.55 → 微块整除后 789
-        assert_eq!(def, 789 * 9 + 64);
+        assert_eq!(deferred, 789 * 9 + 64);
     }
 
     /// E19 原参数形状复现（判据 4 阳性对照）：churn=4 块/操作 × 200 操作、延迟 d ⇒
     /// 稳态被扣峰值恰 800×(d+1)——与 E19 的 pending 队列同构。
     #[test]
     fn e19_shape_reproduces_under_its_own_parameters() {
-        for d in [1u64, 2, 4, 8, 16] {
-            let sim = simulate_held_peak(4_000_000, 200, d, 100);
-            assert_eq!(sim, 800 * (d + 1), "delay={d}");
+        for delay in [1u64, 2, 4, 8, 16] {
+            let simulated_held_peak_blocks = simulate_held_peak(4_000_000, 200, delay, 100);
+            assert_eq!(simulated_held_peak_blocks, 800 * (delay + 1), "delay={delay}");
         }
     }
 
     /// 甲与延后的水位比值必须等于搅动量之比（同式两次代入的守恒，防止某一臂被单独改错）。
     #[test]
     fn watermark_ratio_tracks_the_churn_ratio() {
-        let ops = 13_925u64;
-        let d = 8u64;
-        let jia = admission_bound_blocks(CHURN_JIA_MICRO, ops, d) - CKPT_COST_BLOCKS;
-        let def = admission_bound_blocks(CHURN_DEFER_MICRO, ops, d) - CKPT_COST_BLOCKS;
+        let operations_per_checkpoint = 13_925u64;
+        let delay = 8u64;
+        let jia = admission_bound_blocks(CHURN_JIA_MICRO, operations_per_checkpoint, delay) - CHECKPOINT_COST_BLOCKS;
+        let deferred = admission_bound_blocks(CHURN_DEFER_MICRO, operations_per_checkpoint, delay) - CHECKPOINT_COST_BLOCKS;
         // 4.0/0.0567 = 70.55…；整数截断后按块数比对（55700/789 = 70.6）
-        let ratio_x10 = jia * 10 / def;
-        assert!((700..=712).contains(&ratio_x10), "比值 ×10 = {ratio_x10}，该在 70.0–71.2");
+        let ratio_times_ten = jia * 10 / deferred;
+        assert!((700..=712).contains(&ratio_times_ten), "比值 ×10 = {ratio_times_ten}，该在 70.0–71.2");
     }
 }

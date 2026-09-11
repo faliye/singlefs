@@ -55,16 +55,16 @@ use e7_index_bench::Emitter;
 /// D22 已定项 7：`checkpoint_txg` 8 字节 = 64 位。
 const TXG_BITS: u32 = 64;
 /// E44 本机实测：2785 发布/秒。
-const PUBLISH_PER_SEC: u64 = 2785;
+const PUBLISHES_PER_SECOND: u64 = 2785;
 /// D16 已定项 5：`T_dirty` = 2 GiB。D5 已定项 5：记账条目 30 字节。
-const T_DIRTY: u64 = 2 * 1024 * 1024 * 1024;
-const ACCT_ENTRY_BYTES: u64 = 30;
+const DIRTY_THRESHOLD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const ACCOUNTING_ENTRY_BYTES: u64 = 30;
 
 /// **判据 1**：`seq` 取 `w` 字节时，装完 `txg_bits` 位的 txg 之后还剩几位给窗口序号。
 /// 装不下时返回 `None`——**读不到 ≠ 读到 0**，不许退化成 0 位。
-fn window_bits(seq_bytes: u64, txg_bits: u32) -> Option<u32> {
-    let total = seq_bytes.checked_mul(8)? as u32;
-    total.checked_sub(txg_bits)
+fn window_bits(sequence_bytes: u64, txg_bits: u32) -> Option<u32> {
+    let total_bits = sequence_bytes.checked_mul(8)? as u32;
+    total_bits.checked_sub(txg_bits)
 }
 
 /// **判据 4**：把 txg 截到 `w` 位，多少次发布之后回绕。
@@ -72,28 +72,28 @@ fn wrap_publishes(txg_bits_kept: u32) -> u128 {
     1u128 << txg_bits_kept
 }
 
-/// **判据 4**：把 key 里的「代」段截到 `bits` 位，跑 `publishes` 次发布之后，
+/// **判据 4**：把 key 里的「代」段截到 `generation_bits_kept` 位，跑 `publish_count` 次发布之后，
 /// 有多少对**本属不同 checkpoint 的条目塌成了同一个 key**（因而被错误合并）。
 /// 代按 D5 已定项 5 在 key 里，所以截断它撞的不是排序，是**键的同一性**。
-fn wrongly_merged_pairs(publishes: u64, bits: u32) -> u64 {
-    if bits >= 64 {
+fn wrongly_merged_pairs(publish_count: u64, generation_bits_kept: u32) -> u64 {
+    if generation_bits_kept >= 64 {
         return 0;
     }
-    let m = 1u64 << bits;
-    if publishes <= m {
+    let residue_class_count = 1u64 << generation_bits_kept;
+    if publish_count <= residue_class_count {
         return 0; // 还没绕完一圈
     }
     // 第 i 个模类里有 q_i 个 checkpoint，塌成同一个 key 的对数是 C(q_i, 2)
-    let q = publishes / m;
-    let r = publishes % m;
-    // r 个模类各有 q+1 个，其余 m-r 个各有 q 个
-    let c2 = |n: u64| n * n.saturating_sub(1) / 2;
-    r * c2(q + 1) + (m - r) * c2(q)
+    let checkpoints_per_class = publish_count / residue_class_count;
+    let classes_with_one_extra = publish_count % residue_class_count;
+    // classes_with_one_extra 个模类各有 checkpoints_per_class + 1 个，其余 residue_class_count − classes_with_one_extra 个各有 checkpoints_per_class 个
+    let pair_count = |member_count: u64| member_count * member_count.saturating_sub(1) / 2;
+    classes_with_one_extra * pair_count(checkpoints_per_class + 1) + (residue_class_count - classes_with_one_extra) * pair_count(checkpoints_per_class)
 }
 
 /// 回绕期（毫秒），按 E44 的发布率。
 fn wrap_millis(txg_bits_kept: u32) -> u128 {
-    wrap_publishes(txg_bits_kept) * 1000 / PUBLISH_PER_SEC as u128
+    wrap_publishes(txg_bits_kept) * 1000 / PUBLISHES_PER_SECOND as u128
 }
 
 /// 一条 write buffer 条目：同一个 key 的第几次更新、它属于哪个发布窗口、
@@ -110,25 +110,25 @@ enum KeyShape {
 /// **判据 6**：给定 key 形态，seq 需要携带哪几段、合起来几字节。
 /// key 里含代 ⇒ 只要窗口序号；不含或不知道 ⇒ 要 txg + 窗口序号。
 /// `Unknown` 报 `None`——**读不到 ≠ 读到 0**，不许替没定的树选一个答案。
-fn seq_bytes_needed(shape: KeyShape, window_bits_needed: u32) -> Option<u64> {
-    let win_bytes = (window_bits_needed as u64).div_ceil(8);
+fn sequence_bytes_needed(shape: KeyShape, window_bits_needed: u32) -> Option<u64> {
+    let window_bytes = (window_bits_needed as u64).div_ceil(8);
     match shape {
-        KeyShape::WithGeneration => Some(win_bytes),
+        KeyShape::WithGeneration => Some(window_bytes),
         KeyShape::Unknown => None,
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Upd {
+struct Update {
     key: u32,
     /// 真值：这是该 key 的第几次更新（越大越新）。模型用它判「胜者对不对」。
     truth: u64,
     /// 产生它的那次发布。
     txg: u64,
     /// 该发布窗口内的第几次。
-    within: u64,
+    index_within_window: u64,
     /// 墙上时钟读数（非单调：模型让它在某些点回拨）。
-    wall: u64,
+    wall_clock_reading: u64,
     /// 每次挂载归零的计数器。
     mount_local: u64,
 }
@@ -142,13 +142,13 @@ enum Arm {
     TxgPlusWindow,
 }
 
-fn order_key(a: Arm, u: &Upd) -> Option<u128> {
-    match a {
+fn order_key(arm: Arm, update: &Update) -> Option<u128> {
+    match arm {
         Arm::NoSeq => None,
-        Arm::WallClock => Some(u.wall as u128),
-        Arm::MountLocal => Some(u.mount_local as u128),
+        Arm::WallClock => Some(update.wall_clock_reading as u128),
+        Arm::MountLocal => Some(update.mount_local as u128),
         // 两段拼起来：高位 txg、低位窗口序号。位宽够不够是判据 1 的事。
-        Arm::TxgPlusWindow => Some(((u.txg as u128) << 32) | u.within as u128),
+        Arm::TxgPlusWindow => Some(((update.txg as u128) << 32) | update.index_within_window as u128),
     }
 }
 
@@ -162,68 +162,68 @@ fn order_key(a: Arm, u: &Upd) -> Option<u128> {
 /// **相对次序未定义**」。两条条目的序号一样大时，结果取决于实现挑了哪一边
 /// ⇒ **模型不许替它挑一边**，单独数出来。第一版拿 `>=`（后到的赢）挑了一边，
 /// 于是「每次挂载归零」那条臂只错一半——那一半是被 tie-break 救回来的，不是它对。
-fn wrong_winners(ups: &[Upd], arm: Arm) -> (u64, u64) {
+fn wrong_winners(updates: &[Update], arm: Arm) -> (u64, u64) {
     use std::collections::HashMap;
     // key -> (最大序号, 取到该序号的 truth 集合)
-    let mut best: HashMap<u32, (Option<u128>, Vec<u64>)> = HashMap::new();
-    for u in ups {
-        let ok = order_key(arm, u);
-        let e = best.entry(u.key).or_insert((ok, Vec::new()));
-        match (ok, e.0) {
-            (Some(a), Some(b)) => {
-                if a > b {
-                    *e = (ok, vec![u.truth]);
-                } else if a == b {
-                    e.1.push(u.truth);
+    let mut best_by_key: HashMap<u32, (Option<u128>, Vec<u64>)> = HashMap::new();
+    for update in updates {
+        let update_order = order_key(arm, update);
+        let entry = best_by_key.entry(update.key).or_insert((update_order, Vec::new()));
+        match (update_order, entry.0) {
+            (Some(new_order), Some(best_order)) => {
+                if new_order > best_order {
+                    *entry = (update_order, vec![update.truth]);
+                } else if new_order == best_order {
+                    entry.1.push(update.truth);
                 }
             }
             // 无序（无 seq）：所有条目并列，胜者完全未定义
             _ => {
-                e.0 = None;
-                e.1.push(u.truth);
+                entry.0 = None;
+                entry.1.push(update.truth);
             }
         }
     }
-    let mut truth_max: HashMap<u32, u64> = HashMap::new();
-    for u in ups {
-        let t = truth_max.entry(u.key).or_insert(0);
-        if u.truth > *t {
-            *t = u.truth;
+    let mut truth_maximum_by_key: HashMap<u32, u64> = HashMap::new();
+    for update in updates {
+        let truth_maximum = truth_maximum_by_key.entry(update.key).or_insert(0);
+        if update.truth > *truth_maximum {
+            *truth_maximum = update.truth;
         }
     }
-    let mut wrong = 0u64;
-    let mut undef = 0u64;
-    for (k, (_, winners)) in best.iter() {
-        let tm = truth_max.get(k).copied().unwrap_or(0);
+    let mut wrong_winner_count = 0u64;
+    let mut undefined_winner_count = 0u64;
+    for (key, (_, winners)) in best_by_key.iter() {
+        let true_latest_truth = truth_maximum_by_key.get(key).copied().unwrap_or(0);
         if winners.len() > 1 {
-            undef += 1;
-        } else if winners.first().copied().unwrap_or(0) != tm {
-            wrong += 1;
+            undefined_winner_count += 1;
+        } else if winners.first().copied().unwrap_or(0) != true_latest_truth {
+            wrong_winner_count += 1;
         }
     }
-    (wrong, undef)
+    (wrong_winner_count, undefined_winner_count)
 }
 
-/// 造一串更新：`keys` 个 key，每个更新 `per_key` 次；`remount_at` 处插一次挂载
-/// （挂载之后 `mount_local` 归零、`wall` 回拨）。次序被打乱，模拟「排序丢掉时间序」。
-fn make_updates(keys: u32, per_key: u64, remount_at: Option<u64>) -> Vec<Upd> {
-    let mut v = Vec::new();
+/// 造一串更新：`key_count` 个 key，每个更新 `updates_per_key` 次；`remount_at` 处插一次挂载
+/// （挂载之后 `mount_local` 归零、`wall_clock_reading` 回拨）。次序被打乱，模拟「排序丢掉时间序」。
+fn make_updates(key_count: u32, updates_per_key: u64, remount_at: Option<u64>) -> Vec<Update> {
+    let mut updates_in_arrival_order = Vec::new();
     let mut mount_local = 0u64;
-    let mut wall = 1_000_000u64;
-    for i in 0..per_key {
-        if Some(i) == remount_at {
+    let mut wall_clock_reading = 1_000_000u64;
+    for update_round in 0..updates_per_key {
+        if Some(update_round) == remount_at {
             mount_local = 0;
-            wall = wall.saturating_sub(500_000); // 挂载时钟回拨
+            wall_clock_reading = wall_clock_reading.saturating_sub(500_000); // 挂载时钟回拨
         }
-        for k in 0..keys {
+        for key in 0..key_count {
             mount_local += 1;
-            wall += 1;
-            v.push(Upd {
-                key: k,
-                truth: i + 1,
-                txg: 100 + i,
-                within: 0,
-                wall,
+            wall_clock_reading += 1;
+            updates_in_arrival_order.push(Update {
+                key,
+                truth: update_round + 1,
+                txg: 100 + update_round,
+                index_within_window: 0,
+                wall_clock_reading,
                 mount_local,
             });
         }
@@ -231,97 +231,97 @@ fn make_updates(keys: u32, per_key: u64, remount_at: Option<u64>) -> Vec<Upd> {
     // **打乱要真的打乱**：按 key 排序之后到达顺序不再可用，残留次序是任意的。
     // 确定性地把**偶数 key** 的子序列翻转、奇数 key 保持——
     // 于是「拿残留次序当序」那条臂在一半的 key 上必然选错，这个数是可预期的绝对值。
-    let mut out: Vec<Upd> = Vec::with_capacity(v.len());
-    for k in 0..keys {
-        let mut sub: Vec<Upd> = v.iter().copied().filter(|u| u.key == k).collect();
-        if k % 2 == 0 {
-            sub.reverse();
+    let mut shuffled_updates: Vec<Update> = Vec::with_capacity(updates_in_arrival_order.len());
+    for key in 0..key_count {
+        let mut updates_of_key: Vec<Update> = updates_in_arrival_order.iter().copied().filter(|update| update.key == key).collect();
+        if key % 2 == 0 {
+            updates_of_key.reverse();
         }
-        out.extend(sub);
+        shuffled_updates.extend(updates_of_key);
     }
-    out
+    shuffled_updates
 }
 
 /// **判据 5**：一次发布窗口内同一个 key 最多写几次的上界——
 /// `T_dirty` 全用来装记账条目时的条目数。
-fn max_updates_per_window() -> u64 {
-    T_DIRTY / ACCT_ENTRY_BYTES
+fn maximum_updates_per_window() -> u64 {
+    DIRTY_THRESHOLD_BYTES / ACCOUNTING_ENTRY_BYTES
 }
 
-fn bits_needed(n: u64) -> u32 {
-    64 - n.leading_zeros()
+fn bits_needed(value_to_represent: u64) -> u32 {
+    64 - value_to_represent.leading_zeros()
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
-    out.push(em.emit_raw(&format!(
-        "name=config txg_bits={TXG_BITS} publish_per_sec={PUBLISH_PER_SEC} \
-         t_dirty={T_DIRTY} acct_entry={ACCT_ENTRY_BYTES}"
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=config txg_bits={TXG_BITS} publish_per_sec={PUBLISHES_PER_SECOND} \
+         t_dirty={DIRTY_THRESHOLD_BYTES} acct_entry={ACCOUNTING_ENTRY_BYTES}"
     )));
 
     // 判据 1：位宽账
-    for &w in [8u64, 10, 12, 16].iter() {
-        out.push(em.emit_raw(&format!(
-            "name=seq_width seq_bytes={w} txg_bits={TXG_BITS} window_bits={}",
-            window_bits(w, TXG_BITS)
-                .map(|v| v.to_string())
+    for &sequence_bytes in [8u64, 10, 12, 16].iter() {
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=seq_width seq_bytes={sequence_bytes} txg_bits={TXG_BITS} window_bits={}",
+            window_bits(sequence_bytes, TXG_BITS)
+                .map(|window_bit_count| window_bit_count.to_string())
                 .unwrap_or_else(|| "DOES_NOT_FIT".into())
         )));
     }
     // 判据 5：窗口序号要多宽
-    let m = max_updates_per_window();
-    let wb = bits_needed(m);
-    out.push(em.emit_raw(&format!(
-        "name=window_need max_updates_per_window={m} bits_needed={wb}"
+    let maximum_updates = maximum_updates_per_window();
+    let window_bits_needed = bits_needed(maximum_updates);
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=window_need max_updates_per_window={maximum_updates} bits_needed={window_bits_needed}"
     )));
     // 判据 6：key 里有没有「代」，决定 seq 要不要重复携带 txg
     for &shape in [KeyShape::WithGeneration, KeyShape::Unknown].iter() {
-        out.push(em.emit_raw(&format!(
-            "name=seq_need key_shape={:?} window_bits_needed={wb} seq_bytes_needed={} \
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=seq_need key_shape={:?} window_bits_needed={window_bits_needed} seq_bytes_needed={} \
              txg_is_duplicate_of_key_segment={}",
             shape,
-            seq_bytes_needed(shape, wb)
-                .map(|v| v.to_string())
+            sequence_bytes_needed(shape, window_bits_needed)
+                .map(|sequence_byte_count| sequence_byte_count.to_string())
                 .unwrap_or_else(|| "NOT_APPLICABLE".into()),
             u8::from(shape == KeyShape::WithGeneration),
         )));
     }
 
     // 判据 4：截断的代价——回绕期 **加上一个可数的违例**
-    for &keep in [8u32, 16, 32, 48].iter() {
-        for &pubs in [1_000u64, 100_000, 10_000_000].iter() {
-            out.push(em.emit_raw(&format!(
-                "name=truncate gen_bits_kept={keep} publishes={pubs} wrap_publishes={} \
+    for &generation_bits_kept in [8u32, 16, 32, 48].iter() {
+        for &publish_count in [1_000u64, 100_000, 10_000_000].iter() {
+            output_lines.push(emitter.emit_raw(&format!(
+                "name=truncate gen_bits_kept={generation_bits_kept} publishes={publish_count} wrap_publishes={} \
                  wrap_millis={} wrongly_merged_pairs={}",
-                wrap_publishes(keep),
-                wrap_millis(keep),
-                wrongly_merged_pairs(pubs, keep)
+                wrap_publishes(generation_bits_kept),
+                wrap_millis(generation_bits_kept),
+                wrongly_merged_pairs(publish_count, generation_bits_kept)
             )));
         }
     }
 
     // 判据 2 / 3：四条臂 × 插不插挂载
-    for &(keys, per_key) in [(1000u32, 1u64), (1000, 8)].iter() {
+    for &(key_count, updates_per_key) in [(1000u32, 1u64), (1000, 8)].iter() {
         for &remount in [None, Some(4u64)].iter() {
-            let ups = make_updates(keys, per_key, remount);
+            let updates = make_updates(key_count, updates_per_key, remount);
             for &arm in [Arm::NoSeq, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
-                let (wrong, undef) = wrong_winners(&ups, arm);
-                out.push(em.emit_raw(&format!(
-                    "name=dedup keys={keys} per_key={per_key} remount={} arm={:?} \
-                     wrong_winners={wrong} undefined_winners={undef}",
-                    remount.map(|v| v.to_string()).unwrap_or_else(|| "none".into()),
+                let (wrong_winner_count, undefined_winner_count) = wrong_winners(&updates, arm);
+                output_lines.push(emitter.emit_raw(&format!(
+                    "name=dedup keys={key_count} per_key={updates_per_key} remount={} arm={:?} \
+                     wrong_winners={wrong_winner_count} undefined_winners={undefined_winner_count}",
+                    remount.map(|remount_round| remount_round.to_string()).unwrap_or_else(|| "none".into()),
                     arm,
                 )));
             }
         }
     }
 
-    for l in &out {
-        println!("{l}");
+    for output_line in &output_lines {
+        println!("{output_line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -329,10 +329,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_constants_match_kb() {
+    fn format_constants_match_knowledge_base() {
         assert_eq!(TXG_BITS, 64, "D22 已定项 7：checkpoint_txg 8 字节");
-        assert_eq!(PUBLISH_PER_SEC, 2785, "E44 本机实测");
-        assert_eq!(ACCT_ENTRY_BYTES, 30, "D5 已定项 5");
+        assert_eq!(PUBLISHES_PER_SECOND, 2785, "E44 本机实测");
+        assert_eq!(ACCOUNTING_ENTRY_BYTES, 30, "D5 已定项 5");
     }
 
     /// **判据 1 的绝对值**：8 字节一个位都不剩给窗口序号。
@@ -350,26 +350,26 @@ mod tests {
     /// ⇒ 同一个 key 的待去重条目必然同窗口 ⇒ seq 只要 **4 字节**，
     /// 而在 seq 里再放一份 txg 是把 key 里已有的段抄第二遍。
     #[test]
-    fn criterion6_the_generation_is_already_in_the_key_so_seq_need_not_repeat_it() {
-        let wb = bits_needed(max_updates_per_window());
-        assert_eq!(wb, 27);
+    fn criterion6_the_generation_is_already_in_the_key_so_sequence_need_not_repeat_it() {
+        let window_bits_needed = bits_needed(maximum_updates_per_window());
+        assert_eq!(window_bits_needed, 27);
         // 27 位 ⇒ 4 字节（向上取整）
-        assert_eq!(seq_bytes_needed(KeyShape::WithGeneration, wb), Some(4));
+        assert_eq!(sequence_bytes_needed(KeyShape::WithGeneration, window_bits_needed), Some(4));
         // key 布局没定的树：报「不适用」，**不许替它选一个数**
-        assert_eq!(seq_bytes_needed(KeyShape::Unknown, wb), None);
+        assert_eq!(sequence_bytes_needed(KeyShape::Unknown, window_bits_needed), None);
         // 对照：若真要在 seq 里重复携带 64 位 txg，那就是 8 + 4 = 12 字节
         assert_eq!(window_bits(12, 64), Some(32));
-        assert!(32 >= wb, "12 字节那条路也够，只是多抄了一遍 key 里已有的段");
+        assert!(32 >= window_bits_needed, "12 字节那条路也够，只是多抄了一遍 key 里已有的段");
         // 阳性对照：窗口需求变大时，要的字节数必须跟着变
-        assert_eq!(seq_bytes_needed(KeyShape::WithGeneration, 8), Some(1));
-        assert_eq!(seq_bytes_needed(KeyShape::WithGeneration, 33), Some(5));
+        assert_eq!(sequence_bytes_needed(KeyShape::WithGeneration, 8), Some(1));
+        assert_eq!(sequence_bytes_needed(KeyShape::WithGeneration, 33), Some(5));
     }
 
     /// **判据 5 的绝对值**：一个窗口内最多 71 582 788 条 ⇒ 窗口段至少 27 位。
     #[test]
     fn criterion5_window_counter_needs_at_least_27_bits() {
         // 手算：2 GiB / 30 = 2147483648 / 30 = 71582788（整除取下）
-        assert_eq!(max_updates_per_window(), 71_582_788);
+        assert_eq!(maximum_updates_per_window(), 71_582_788);
         assert_eq!(bits_needed(71_582_788), 27, "2^26 = 67108864 < 71582788 ≤ 2^27");
         // ⇒ 8 字节（0 位）与 10 字节（16 位）都不够，12 字节（32 位）够
         assert!(window_bits(8, 64).unwrap() < 27);
@@ -388,13 +388,13 @@ mod tests {
         // ⇒ 232 × C(4,2) + 24 × C(3,2) = 232×6 + 24×3 = 1392 + 72 = 1464
         assert_eq!(wrongly_merged_pairs(1_000, 8), 1464);
         // 16 位跑 10 000 000 次：手算 65536 × 152 = 9 961 472 ⇒ q = 152、r = 38 528
-        let q = 10_000_000u64 / 65536;
-        let r = 10_000_000u64 % 65536;
-        assert_eq!((q, r), (152, 38_528));
-        let c2 = |n: u64| n * n.saturating_sub(1) / 2;
-        assert_eq!(c2(153), 11_628);
-        assert_eq!(c2(152), 11_476);
-        assert_eq!(wrongly_merged_pairs(10_000_000, 16), r * c2(q + 1) + (65536 - r) * c2(q));
+        let checkpoints_per_class = 10_000_000u64 / 65536;
+        let classes_with_one_extra = 10_000_000u64 % 65536;
+        assert_eq!((checkpoints_per_class, classes_with_one_extra), (152, 38_528));
+        let pair_count = |member_count: u64| member_count * member_count.saturating_sub(1) / 2;
+        assert_eq!(pair_count(153), 11_628);
+        assert_eq!(pair_count(152), 11_476);
+        assert_eq!(wrongly_merged_pairs(10_000_000, 16), classes_with_one_extra * pair_count(checkpoints_per_class + 1) + (65536 - classes_with_one_extra) * pair_count(checkpoints_per_class));
         // 手算：38528 × 11628 + 27008 × 11476 = 448 003 584 + 309 943 808
         assert_eq!(wrongly_merged_pairs(10_000_000, 16), 757_947_392);
         // 48 位（已定的下界）跑一千万次发布：一对都不合并
@@ -405,20 +405,20 @@ mod tests {
         assert!(wrongly_merged_pairs(1_000_000, 8) > wrongly_merged_pairs(1_000_000, 16));
     }
 
-    /// **等价变异留档**：`publishes <= m` 换成 `publishes < m`，在**所有输入上**同结果。
-    /// 边界那一格 `publishes == m` 走下去时 q = 1、r = 0
+    /// **等价变异留档**：`publish_count <= m` 换成 `publish_count < m`，在**所有输入上**同结果。
+    /// 边界那一格 `publish_count == m` 走下去时 q = 1、r = 0
     /// ⇒ `0 × C(2,2) + m × C(1,2)` 而 `C(1,2) = 0` ⇒ 仍是 0。**这不算盲区，是等价。**
     #[test]
     fn equivalent_mutation_wrap_boundary_off_by_one() {
-        let c2 = |n: u64| n * n.saturating_sub(1) / 2;
-        for &bits in [8u32, 16].iter() {
-            let m = 1u64 << bits;
+        let pair_count = |member_count: u64| member_count * member_count.saturating_sub(1) / 2;
+        for &generation_bits_kept in [8u32, 16].iter() {
+            let residue_class_count = 1u64 << generation_bits_kept;
             // 原式在边界上早退返回 0；换成严格小于时会走下去，手算也是 0
-            let q = m / m;
-            let r = m % m;
-            assert_eq!((q, r), (1, 0));
-            assert_eq!(r * c2(q + 1) + (m - r) * c2(q), 0, "走下去也是 0 ⇒ 两种写法等价");
-            assert_eq!(wrongly_merged_pairs(m, bits), 0);
+            let checkpoints_per_class = residue_class_count / residue_class_count;
+            let classes_with_one_extra = residue_class_count % residue_class_count;
+            assert_eq!((checkpoints_per_class, classes_with_one_extra), (1, 0));
+            assert_eq!(classes_with_one_extra * pair_count(checkpoints_per_class + 1) + (residue_class_count - classes_with_one_extra) * pair_count(checkpoints_per_class), 0, "走下去也是 0 ⇒ 两种写法等价");
+            assert_eq!(wrongly_merged_pairs(residue_class_count, generation_bits_kept), 0);
         }
     }
 
@@ -436,28 +436,28 @@ mod tests {
 
     /// **判据 2 + 阳性对照**：无 seq 必须错得最多，txg+窗口必须恒 0。
     #[test]
-    fn criterion2_only_a_monotone_seq_picks_the_right_winner() {
-        let ups = make_updates(1000, 8, None);
+    fn criterion2_only_a_monotone_sequence_picks_the_right_winner() {
+        let updates = make_updates(1000, 8, None);
         // 无 seq：1000 个 key 全部**未定义**（不是「选错」——它根本没有序）
-        assert_eq!(wrong_winners(&ups, Arm::NoSeq), (0, 1000));
+        assert_eq!(wrong_winners(&updates, Arm::NoSeq), (0, 1000));
         // 不插挂载时墙钟与挂载计数器都单调 ⇒ 全对
-        assert_eq!(wrong_winners(&ups, Arm::WallClock), (0, 0));
-        assert_eq!(wrong_winners(&ups, Arm::MountLocal), (0, 0));
-        assert_eq!(wrong_winners(&ups, Arm::TxgPlusWindow), (0, 0), "txg + 窗口序号：恒 0");
+        assert_eq!(wrong_winners(&updates, Arm::WallClock), (0, 0));
+        assert_eq!(wrong_winners(&updates, Arm::MountLocal), (0, 0));
+        assert_eq!(wrong_winners(&updates, Arm::TxgPlusWindow), (0, 0), "txg + 窗口序号：恒 0");
         // 阳性对照：无 seq 那条臂的「未定义」数必须是全部
-        let (w, u) = wrong_winners(&ups, Arm::NoSeq);
-        assert_eq!(w + u, 1000, "1000 个 key 一个都不落下");
+        let (wrong_winner_count, undefined_winner_count) = wrong_winners(&updates, Arm::NoSeq);
+        assert_eq!(wrong_winner_count + undefined_winner_count, 1000, "1000 个 key 一个都不落下");
     }
 
     /// **判据 3 + 阳性对照**：插一次挂载之后，归零计数器与回拨的墙钟必须变差，txg 臂必须不动。
     #[test]
     fn criterion3_a_remount_breaks_wall_clock_and_mount_local_but_not_txg() {
-        let with = make_updates(1000, 8, Some(4));
-        assert_eq!(wrong_winners(&with, Arm::TxgPlusWindow), (0, 0), "txg + 窗口：插挂载也恒 0");
+        let updates_with_remount = make_updates(1000, 8, Some(4));
+        assert_eq!(wrong_winners(&updates_with_remount, Arm::TxgPlusWindow), (0, 0), "txg + 窗口：插挂载也恒 0");
         // 墙钟回拨 ⇒ 最大读数落在回拨之前 ⇒ 1000 个 key 全选错（且不是未定义，是明确选错）
-        assert_eq!(wrong_winners(&with, Arm::WallClock), (1000, 0));
+        assert_eq!(wrong_winners(&updates_with_remount, Arm::WallClock), (1000, 0));
         // 挂载归零 ⇒ 回绕之后新旧条目**序号相等** ⇒ 胜者未定义，不是「选错」
-        assert_eq!(wrong_winners(&with, Arm::MountLocal), (0, 1000));
+        assert_eq!(wrong_winners(&updates_with_remount, Arm::MountLocal), (0, 1000));
         // 阳性对照：不插挂载时这两条臂全对 ⇒ 这一维真的进了模型
         assert_eq!(wrong_winners(&make_updates(1000, 8, None), Arm::WallClock), (0, 0));
         assert_eq!(wrong_winners(&make_updates(1000, 8, None), Arm::MountLocal), (0, 0));
@@ -466,9 +466,9 @@ mod tests {
     /// **阴性对照**：同 key 只写一次时四条臂必须全对。
     #[test]
     fn negative_control_single_update_per_key_is_unambiguous() {
-        let ups = make_updates(1000, 1, None);
+        let updates = make_updates(1000, 1, None);
         for &arm in [Arm::NoSeq, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
-            assert_eq!(wrong_winners(&ups, arm), (0, 0), "{arm:?} 在无歧义输入上就该全对");
+            assert_eq!(wrong_winners(&updates, arm), (0, 0), "{arm:?} 在无歧义输入上就该全对");
         }
     }
 
@@ -478,41 +478,41 @@ mod tests {
     /// 变异表里那一条已换成一个真会改行为的（把墙钟压成常数）。
     #[test]
     fn equivalent_mutation_noseq_as_constant_order_key() {
-        for &(keys, per_key) in [(4u32, 1u64), (4, 4), (1000, 8)].iter() {
-            let ups = make_updates(keys, per_key, None);
+        for &(key_count, updates_per_key) in [(4u32, 1u64), (4, 4), (1000, 8)].iter() {
+            let updates = make_updates(key_count, updates_per_key, None);
             // 原式：None
-            let a = wrong_winners(&ups, Arm::NoSeq);
+            let original_result = wrong_winners(&updates, Arm::NoSeq);
             // 等价写法：所有条目同一个常数 ⇒ 全并列 ⇒ 同样判未定义
-            let b = {
+            let equivalent_result = {
                 use std::collections::HashMap;
-                let mut m: HashMap<u32, Vec<u64>> = HashMap::new();
-                for u in &ups {
-                    m.entry(u.key).or_default().push(u.truth);
+                let mut truths_by_key: HashMap<u32, Vec<u64>> = HashMap::new();
+                for update in &updates {
+                    truths_by_key.entry(update.key).or_default().push(update.truth);
                 }
-                let mut w = 0u64;
-                let mut und = 0u64;
-                for (_, v) in m.iter() {
-                    if v.len() > 1 { und += 1 } else { w += 0 }
+                let mut wrong_winner_count = 0u64;
+                let mut undefined_winner_count = 0u64;
+                for (_, truths) in truths_by_key.iter() {
+                    if truths.len() > 1 { undefined_winner_count += 1 } else { wrong_winner_count += 0 }
                 }
-                (w, und)
+                (wrong_winner_count, undefined_winner_count)
             };
-            assert_eq!(a, b, "keys={keys} per_key={per_key} 上两种写法同结果");
+            assert_eq!(original_result, equivalent_result, "keys={key_count} per_key={updates_per_key} 上两种写法同结果");
         }
     }
 
     /// 造出来的更新串本身要有歧义，否则判据 2 测的是空气。
     #[test]
     fn the_input_is_actually_shuffled() {
-        let ups = make_updates(4, 4, None);
-        assert_eq!(ups.len(), 16);
+        let updates = make_updates(4, 4, None);
+        assert_eq!(updates.len(), 16);
         // 打乱之后，至少有一个 key 的最后一条不是它 truth 最大的那条
-        let last_of_key0 = ups.iter().filter(|u| u.key == 0).last().unwrap().truth;
-        let max_of_key0 = ups.iter().filter(|u| u.key == 0).map(|u| u.truth).max().unwrap();
-        assert_eq!(max_of_key0, 4);
+        let last_of_key0 = updates.iter().filter(|update| update.key == 0).last().unwrap().truth;
+        let maximum_of_key0 = updates.iter().filter(|update| update.key == 0).map(|update| update.truth).max().unwrap();
+        assert_eq!(maximum_of_key0, 4);
         assert_eq!(last_of_key0, 1, "偶数 key 的子序列被翻转 ⇒ 残留次序的最后一条是最旧的");
-        assert_ne!(last_of_key0, max_of_key0, "输入没被打乱，判据 2 就没有对象");
+        assert_ne!(last_of_key0, maximum_of_key0, "输入没被打乱，判据 2 就没有对象");
         // 奇数 key 不翻转 ⇒ 残留次序的最后一条恰好是最新的
-        let last_of_key1 = ups.iter().filter(|u| u.key == 1).last().unwrap().truth;
+        let last_of_key1 = updates.iter().filter(|update| update.key == 1).last().unwrap().truth;
         assert_eq!(last_of_key1, 4);
     }
 }

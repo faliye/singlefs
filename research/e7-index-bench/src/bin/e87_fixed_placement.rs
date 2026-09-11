@@ -50,58 +50,58 @@
 
 use e7_index_bench::Emitter;
 
-const DEVS: usize = 2;
-const R: usize = 3;
+const DEVICE_COUNT: usize = 2;
+const RING_REGION_COUNT: usize = 3;
 
 /// mkfs 轮转指派：区域 r → 盘 r mod 2（逐区域存身份，掉盘不重算）。
-fn region_dev(r: usize) -> usize {
-    r % DEVS
+fn device_of_region(region: usize) -> usize {
+    region % DEVICE_COUNT
 }
 
 /// 发布 g 落区域 g mod R（D16 已定项 6 的逐发布计数）。
-fn region_of(g: u64) -> usize {
-    (g % R as u64) as usize
+fn region_of(generation: u64) -> usize {
+    (generation % RING_REGION_COUNT as u64) as usize
 }
 
-/// 掉 `dead_dev` 后，从代 g 往回找幸存区域里最新的代；返回回退了几代。
+/// 掉 `dead_device` 后，从代 g 往回找幸存区域里最新的代；返回回退了几代。
 /// **mkfs 把第 0 代根种进全部区域**（试跑时发现的前置：不种的话第一次发布落在
 /// 某盘、掉那盘就没有任何根——见 `fallback_unseeded` 与对应单测）。
-fn fallback(g: u64, dead_dev: usize) -> u64 {
-    let mut back = 0;
+fn fallback(generation: u64, dead_device: usize) -> u64 {
+    let mut generations_back = 0;
     loop {
-        let cand = g - back;
-        if cand == 0 {
-            return back; // 第 0 代在全部区域都有种子 ⇒ 任何盘上都找得到
+        let candidate_generation = generation - generations_back;
+        if candidate_generation == 0 {
+            return generations_back; // 第 0 代在全部区域都有种子 ⇒ 任何盘上都找得到
         }
-        if region_dev(region_of(cand)) != dead_dev {
-            return back;
+        if device_of_region(region_of(candidate_generation)) != dead_device {
+            return generations_back;
         }
-        back += 1;
+        generations_back += 1;
     }
 }
 
 /// 未种子的变体：mkfs 不写任何初始根（发布从 g=1 开始才有根）。用来钉「不种会全灭」这个洞。
-fn fallback_unseeded(g: u64, dead_dev: usize) -> u64 {
-    let mut back = 0;
+fn fallback_unseeded(generation: u64, dead_device: usize) -> u64 {
+    let mut generations_back = 0;
     loop {
-        let cand = g - back;
-        if cand == 0 {
+        let candidate_generation = generation - generations_back;
+        if candidate_generation == 0 {
             return u64::MAX; // 没有第 0 代根可退
         }
-        if region_dev(region_of(cand)) != dead_dev {
-            return back;
+        if device_of_region(region_of(candidate_generation)) != dead_device {
+            return generations_back;
         }
-        back += 1;
+        generations_back += 1;
     }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum SbArm {
+enum SuperblockArm {
     Single,
-    PerDev,
+    PerDevice,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum JArm {
+enum JournalArm {
     Single,
     Mirror,
 }
@@ -114,56 +114,56 @@ struct Cell {
     journal_writes_per_record: u64,
 }
 
-fn judge(sb: SbArm, j: JArm, dead_dev: usize) -> Cell {
-    let sb_survives = match sb {
-        SbArm::Single => dead_dev != 0,
-        SbArm::PerDev => true,
+fn judge(superblock_arm: SuperblockArm, journal_arm: JournalArm, dead_device: usize) -> Cell {
+    let superblock_survives = match superblock_arm {
+        SuperblockArm::Single => dead_device != 0,
+        SuperblockArm::PerDevice => true,
     };
     // 根：R=3 轮转下任何单盘失效都至少剩一个区域 ⇒ 根总有幸存者
-    let worst_fallback = (1..=12u64).map(|g| fallback(g, dead_dev)).max().unwrap();
-    let window_lost = match j {
-        JArm::Single => dead_dev == 0,
-        JArm::Mirror => false,
+    let worst_fallback = (1..=12u64).map(|generation| fallback(generation, dead_device)).max().unwrap();
+    let window_lost = match journal_arm {
+        JournalArm::Single => dead_device == 0,
+        JournalArm::Mirror => false,
     };
     Cell {
-        mountable: sb_survives, // 根恒有幸存者，成不成只看超级块
+        mountable: superblock_survives, // 根恒有幸存者，成不成只看超级块
         worst_fallback,
         window_lost,
-        journal_writes_per_record: match j {
-            JArm::Single => 1,
-            JArm::Mirror => 2,
+        journal_writes_per_record: match journal_arm {
+            JournalArm::Single => 1,
+            JournalArm::Mirror => 2,
         },
     }
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config devs={DEVS} ring_regions={R} region_dev_map=0:0,1:1,2:0 model=arithmetic file_ops=0"
+        emitter.emit_raw(&format!(
+            "name=config devs={DEVICE_COUNT} ring_regions={RING_REGION_COUNT} region_dev_map=0:0,1:1,2:0 model=arithmetic file_ops=0"
         ))
     );
-    for sb in [SbArm::Single, SbArm::PerDev] {
-        for j in [JArm::Single, JArm::Mirror] {
-            for dead in 0..DEVS {
-                let c = judge(sb, j, dead);
+    for superblock_arm in [SuperblockArm::Single, SuperblockArm::PerDevice] {
+        for journal_arm in [JournalArm::Single, JournalArm::Mirror] {
+            for dead_device in 0..DEVICE_COUNT {
+                let cell = judge(superblock_arm, journal_arm, dead_device);
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=cell sb={} journal={} dead_dev={dead} mountable={} worst_root_fallback={} replay_window_lost={} journal_writes_per_record={}",
-                        match sb { SbArm::Single => "single", SbArm::PerDev => "per_dev" },
-                        match j { JArm::Single => "single", JArm::Mirror => "mirror" },
-                        u8::from(c.mountable),
-                        c.worst_fallback,
-                        u8::from(c.window_lost),
-                        c.journal_writes_per_record
+                    emitter.emit_raw(&format!(
+                        "name=cell sb={} journal={} dead_dev={dead_device} mountable={} worst_root_fallback={} replay_window_lost={} journal_writes_per_record={}",
+                        match superblock_arm { SuperblockArm::Single => "single", SuperblockArm::PerDevice => "per_dev" },
+                        match journal_arm { JournalArm::Single => "single", JournalArm::Mirror => "mirror" },
+                        u8::from(cell.mountable),
+                        cell.worst_fallback,
+                        u8::from(cell.window_lost),
+                        cell.journal_writes_per_record
                     ))
                 );
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -174,11 +174,11 @@ mod tests {
     /// 每盘一份 ⇒ 全部 8 格可挂。
     #[test]
     fn single_superblock_is_a_single_point_of_failure() {
-        for j in [JArm::Single, JArm::Mirror] {
-            assert!(!judge(SbArm::Single, j, 0).mountable);
-            assert!(judge(SbArm::Single, j, 1).mountable);
-            for dead in 0..DEVS {
-                assert!(judge(SbArm::PerDev, j, dead).mountable);
+        for journal_arm in [JournalArm::Single, JournalArm::Mirror] {
+            assert!(!judge(SuperblockArm::Single, journal_arm, 0).mountable);
+            assert!(judge(SuperblockArm::Single, journal_arm, 1).mountable);
+            for dead_device in 0..DEVICE_COUNT {
+                assert!(judge(SuperblockArm::PerDevice, journal_arm, dead_device).mountable);
             }
         }
     }
@@ -189,8 +189,8 @@ mod tests {
     /// g ≡ 0 (mod 3) 时区域 1 里最新的是 g−2 ⇒ 最坏 2。
     #[test]
     fn absolute_fallback_arithmetic() {
-        assert_eq!((1..=12u64).map(|g| fallback(g, 1)).max().unwrap(), 1);
-        assert_eq!((1..=12u64).map(|g| fallback(g, 0)).max().unwrap(), 2);
+        assert_eq!((1..=12u64).map(|generation| fallback(generation, 1)).max().unwrap(), 1);
+        assert_eq!((1..=12u64).map(|generation| fallback(generation, 0)).max().unwrap(), 2);
         // 具体代逐个钉：g=3（区域 0，盘 0）掉盘 0 ⇒ 退到 g=1（区域 1）= 2 代
         assert_eq!(fallback(3, 0), 2);
         // g=4（区域 1，盘 1）掉盘 0 ⇒ 自己就幸存，0 代
@@ -203,9 +203,9 @@ mod tests {
     /// 任何代都找得到根。这是「挂得上只看超级块」那半句的前提。
     #[test]
     fn roots_always_survive_single_disk_loss() {
-        for dead in 0..DEVS {
-            for g in 1..=24u64 {
-                assert_ne!(fallback(g, dead), u64::MAX, "g={g} dead={dead}");
+        for dead_device in 0..DEVICE_COUNT {
+            for generation in 1..=24u64 {
+                assert_ne!(fallback(generation, dead_device), u64::MAX, "g={generation} dead={dead_device}");
             }
         }
     }
@@ -232,27 +232,27 @@ mod tests {
     /// **判据 3**：journal 单份掉盘 0 丢重放窗口；镜像全格不丢；镜像代价恰每条 ×2。
     #[test]
     fn journal_mirroring_arithmetic() {
-        assert!(judge(SbArm::PerDev, JArm::Single, 0).window_lost);
-        assert!(!judge(SbArm::PerDev, JArm::Single, 1).window_lost);
-        for dead in 0..DEVS {
-            let c = judge(SbArm::PerDev, JArm::Mirror, dead);
-            assert!(!c.window_lost);
-            assert_eq!(c.journal_writes_per_record, 2);
+        assert!(judge(SuperblockArm::PerDevice, JournalArm::Single, 0).window_lost);
+        assert!(!judge(SuperblockArm::PerDevice, JournalArm::Single, 1).window_lost);
+        for dead_device in 0..DEVICE_COUNT {
+            let cell = judge(SuperblockArm::PerDevice, JournalArm::Mirror, dead_device);
+            assert!(!cell.window_lost);
+            assert_eq!(cell.journal_writes_per_record, 2);
         }
-        assert_eq!(judge(SbArm::PerDev, JArm::Single, 1).journal_writes_per_record, 1);
+        assert_eq!(judge(SuperblockArm::PerDevice, JournalArm::Single, 1).journal_writes_per_record, 1);
     }
 
     /// 区域指派自检：逐区域存身份的映射恒为 {0:0, 1:1, 2:0}——两盘上 R=3 必有一盘背两个区域。
     #[test]
     fn region_assignment_is_pinned() {
-        assert_eq!((0..R).map(region_dev).collect::<Vec<_>>(), vec![0, 1, 0]);
+        assert_eq!((0..RING_REGION_COUNT).map(device_of_region).collect::<Vec<_>>(), vec![0, 1, 0]);
     }
 
     /// 发布代到区域的映射用的是逐发布计数（D16 已定项 6）——相邻代必落不同区域。
     #[test]
     fn consecutive_generations_hit_different_regions() {
-        for g in 1..=24u64 {
-            assert_ne!(region_of(g), region_of(g + 1));
+        for generation in 1..=24u64 {
+            assert_ne!(region_of(generation), region_of(generation + 1));
         }
     }
 }

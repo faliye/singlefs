@@ -55,9 +55,9 @@ impl Journal {
         Self { ring: vec![None; ring_blocks], next_jsn: 1, tail_persisted: 1, tail_true: 1 }
     }
     fn write(&mut self, ckpt: u64) {
-        let j = self.next_jsn;
-        let n = self.ring.len();
-        self.ring[(j as usize) % n] = Some(Record { jsn: j, ckpt });
+        let written_jsn = self.next_jsn;
+        let ring_slot_count = self.ring.len();
+        self.ring[(written_jsn as usize) % ring_slot_count] = Some(Record { jsn: written_jsn, ckpt });
         self.next_jsn += 1;
     }
     /// checkpoint 完成：真实 tail 推到最新，但**持久 tail 只有在真的写了才动**。
@@ -69,37 +69,37 @@ impl Journal {
     }
 
     /// 恢复：返回重放出来的 jsn 集合（升序）。
-    fn recover(&self, how: Recovery) -> Vec<u64> {
-        let n = self.ring.len();
-        match how {
+    fn recover(&self, recovery_algorithm: Recovery) -> Vec<u64> {
+        let ring_slot_count = self.ring.len();
+        match recovery_algorithm {
             Recovery::TrustTail => {
-                let mut out = Vec::new();
-                let mut expect = self.tail_persisted;
+                let mut replayed_jsns = Vec::new();
+                let mut expected_jsn = self.tail_persisted;
                 loop {
-                    match self.ring[(expect as usize) % n] {
-                        Some(r) if r.jsn == expect => { out.push(r.jsn); expect += 1; }
+                    match self.ring[(expected_jsn as usize) % ring_slot_count] {
+                        Some(slot_record) if slot_record.jsn == expected_jsn => { replayed_jsns.push(slot_record.jsn); expected_jsn += 1; }
                         // 断号即止 —— D23 已定的前缀规则
                         _ => break,
                     }
                 }
-                out
+                replayed_jsns
             }
             Recovery::ScanAll => {
                 // 先逐个验证全部槽，再择**最长合法前缀**：
                 // 取环里最大的 jsn，向下找连续段，段的下界不低于持久 tail。
-                let max = self.ring.iter().flatten().map(|r| r.jsn).max();
-                let Some(max) = max else { return Vec::new() };
+                let highest_jsn = self.ring.iter().flatten().map(|slot_record| slot_record.jsn).max();
+                let Some(highest_jsn) = highest_jsn else { return Vec::new() };
                 // ⚠️ 环里最大的 jsn 也可能低于持久 tail（刚 checkpoint 完、还没写新记录）。
                 // 那时一条都不该重放。漏掉这个判断会多重放一条 —— 由健康场景的测试抓到。
-                if max < self.tail_persisted { return Vec::new(); }
-                let mut lo = max;
-                while lo > self.tail_persisted {
-                    match self.ring[((lo - 1) as usize) % n] {
-                        Some(r) if r.jsn == lo - 1 => lo -= 1,
+                if highest_jsn < self.tail_persisted { return Vec::new(); }
+                let mut lowest_replayed_jsn = highest_jsn;
+                while lowest_replayed_jsn > self.tail_persisted {
+                    match self.ring[((lowest_replayed_jsn - 1) as usize) % ring_slot_count] {
+                        Some(slot_record) if slot_record.jsn == lowest_replayed_jsn - 1 => lowest_replayed_jsn -= 1,
                         _ => break,
                     }
                 }
-                (lo..=max).collect()
+                (lowest_replayed_jsn..=highest_jsn).collect()
             }
         }
     }
@@ -125,45 +125,45 @@ struct Outcome { missed: usize, replayed: usize, needed: usize, spurious: usize 
 ///
 /// `gap` = checkpoint 之后又写了几条记录才崩。`gap == 0` 表示 tail 写和
 /// checkpoint 同时生效（无窗口）。
-fn run_one(ring_blocks: usize, warmup: u64, gap: u64, how: Recovery) -> Outcome {
-    run_with(ring_blocks, warmup, gap, how, false)
+fn run_one(ring_blocks: usize, warmup: u64, gap: u64, recovery_algorithm: Recovery) -> Outcome {
+    run_with(ring_blocks, warmup, gap, recovery_algorithm, false)
 }
 
 /// `persist_tail = true` 是**健康场景**：checkpoint 之后 tail 真的写出去了。
 /// ⚠️ **它必须被测**——只测陈旧场景时 `tail_persisted` 恒为 1，
 /// `ScanAll` 的下界永远不起作用，把下界删掉一个测试都不红（变异测试实测）。
-fn run_with(ring_blocks: usize, warmup: u64, gap: u64, how: Recovery, persist_tail: bool) -> Outcome {
-    let mut j = Journal::new(ring_blocks);
+fn run_with(ring_blocks: usize, warmup: u64, gap: u64, recovery_algorithm: Recovery, persist_tail: bool) -> Outcome {
+    let mut journal = Journal::new(ring_blocks);
     // 先写满一圈以上，保证陈旧 tail 指向的槽真的被覆盖过
-    for _ in 0..warmup { j.write(0); }
-    j.checkpoint(persist_tail);
+    for _ in 0..warmup { journal.write(0); }
+    journal.checkpoint(persist_tail);
     // 窗口内继续写记录
-    for _ in 0..gap { j.write(1); }
-    let got = j.recover(how);
-    let need = must_replay(j.tail_true, j.next_jsn);
-    let missed = need.iter().filter(|x| !got.contains(x)).count();
+    for _ in 0..gap { journal.write(1); }
+    let recovered_jsns = journal.recover(recovery_algorithm);
+    let needed_jsns = must_replay(journal.tail_true, journal.next_jsn);
+    let missed = needed_jsns.iter().filter(|needed_jsn| !recovered_jsns.contains(needed_jsn)).count();
     // 多重放：恢复出的记录里，jsn 低于真实 tail 的那些 —— 它们已经 checkpoint 过了
-    let spurious = got.iter().filter(|&&x| x < j.tail_true).count();
-    Outcome { missed, replayed: got.len(), needed: need.len(), spurious }
+    let spurious = recovered_jsns.iter().filter(|&&recovered_jsn| recovered_jsn < journal.tail_true).count();
+    Outcome { missed, replayed: recovered_jsns.len(), needed: needed_jsns.len(), spurious }
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let ring = 64usize;
-    println!("{}", em.emit_raw(&format!("name=config ring_blocks={ring}")));
+    let mut emitter = Emitter::new();
+    let ring_block_count = 64usize;
+    println!("{}", emitter.emit_raw(&format!("name=config ring_blocks={ring_block_count}")));
 
     for warmup in [200u64, 1000] {
         for gap in [0u64, 1, 5, 20, 63, 100] {
-            for how in [Recovery::TrustTail, Recovery::ScanAll] {
-                let o = run_one(ring, warmup, gap, how);
-                println!("{}", em.emit_raw(&format!(
-                    "name=cell warmup={warmup} gap={gap} algo={how:?} \
+            for recovery_algorithm in [Recovery::TrustTail, Recovery::ScanAll] {
+                let cell_outcome = run_one(ring_block_count, warmup, gap, recovery_algorithm);
+                println!("{}", emitter.emit_raw(&format!(
+                    "name=cell warmup={warmup} gap={gap} algo={recovery_algorithm:?} \
                      missed={} replayed={} needed={} spurious={}",
-                    o.missed, o.replayed, o.needed, o.spurious)));
+                    cell_outcome.missed, cell_outcome.replayed, cell_outcome.needed, cell_outcome.spurious)));
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -174,24 +174,24 @@ mod tests {
     /// 这条测试就是那个条件的可执行形式——它必须**证明窗口存在**。
     #[test]
     fn trust_tail_really_loses_records_inside_the_window() {
-        let o = run_one(64, 200, 5, Recovery::TrustTail);
-        assert!(o.needed > 0, "窗口里没有需要重放的记录，这个场景没建对");
-        assert_eq!(o.missed, o.needed,
+        let outcome = run_one(64, 200, 5, Recovery::TrustTail);
+        assert!(outcome.needed > 0, "窗口里没有需要重放的记录，这个场景没建对");
+        assert_eq!(outcome.missed, outcome.needed,
             "先信 tail 的算法本该一条都恢复不出来（断号即止），实测漏 {} / 需 {}",
-            o.missed, o.needed);
+            outcome.missed, outcome.needed);
     }
 
     /// **判红条件二**：窗口**不超过环**时，若 `ScanAll` 也漏，
     /// 「陈旧 tail 只是多做功」整条作废。
     #[test]
     fn scan_all_loses_nothing_while_the_window_fits_in_the_ring() {
-        let ring = 64usize;
+        let ring_block_count = 64usize;
         for warmup in [200u64, 1000] {
             for gap in [0u64, 1, 5, 20, 63] {
-                assert!(gap < ring as u64, "本测试只覆盖窗口装得下的情形");
-                let o = run_one(ring, warmup, gap, Recovery::ScanAll);
-                assert_eq!(o.missed, 0,
-                    "全环扫描在 warmup={warmup} gap={gap} 处漏了 {} 条", o.missed);
+                assert!(gap < ring_block_count as u64, "本测试只覆盖窗口装得下的情形");
+                let outcome = run_one(ring_block_count, warmup, gap, Recovery::ScanAll);
+                assert_eq!(outcome.missed, 0,
+                    "全环扫描在 warmup={warmup} gap={gap} 处漏了 {} 条", outcome.missed);
             }
         }
     }
@@ -205,17 +205,17 @@ mod tests {
     /// 把这一格写成会红的测试，是为了不让它以后被当成「恢复算法的缺陷」去改错地方。
     #[test]
     fn when_the_window_overflows_the_ring_both_algorithms_lose() {
-        let ring = 64usize;
+        let ring_block_count = 64usize;
         let gap = 100u64;
-        assert!(gap > ring as u64, "本测试要的正是窗口装不下的情形");
-        for how in [Recovery::TrustTail, Recovery::ScanAll] {
-            let o = run_one(ring, 200, gap, how);
-            assert!(o.missed > 0, "{how:?} 在窗口撑爆环时本该丢记录");
+        assert!(gap > ring_block_count as u64, "本测试要的正是窗口装不下的情形");
+        for recovery_algorithm in [Recovery::TrustTail, Recovery::ScanAll] {
+            let outcome = run_one(ring_block_count, 200, gap, recovery_algorithm);
+            assert!(outcome.missed > 0, "{recovery_algorithm:?} 在窗口撑爆环时本该丢记录");
         }
         // 绝对值：全环扫描最多只能恢复出环装得下的那些
-        let s = run_one(ring, 200, gap, Recovery::ScanAll);
-        assert_eq!(s.replayed, ring, "全环扫描恢复出的条数上界就是环的槽数");
-        assert_eq!(s.missed as u64, gap - ring as u64, "漏的恰是溢出的那部分");
+        let scan_all_outcome = run_one(ring_block_count, 200, gap, Recovery::ScanAll);
+        assert_eq!(scan_all_outcome.replayed, ring_block_count, "全环扫描恢复出的条数上界就是环的槽数");
+        assert_eq!(scan_all_outcome.missed as u64, gap - ring_block_count as u64, "漏的恰是溢出的那部分");
     }
 
     /// **绝对值断言，不是臂间互比**（rules/test-discipline.md：
@@ -224,10 +224,10 @@ mod tests {
     #[test]
     fn missed_count_equals_records_written_inside_the_window() {
         for gap in [1u64, 5, 20, 63] {
-            let o = run_one(64, 200, gap, Recovery::TrustTail);
-            assert_eq!(o.missed as u64, gap,
+            let outcome = run_one(64, 200, gap, Recovery::TrustTail);
+            assert_eq!(outcome.missed as u64, gap,
                 "gap={gap}：漏掉的条数应恰等于窗口内写入的条数");
-            assert_eq!(o.needed as u64, gap);
+            assert_eq!(outcome.needed as u64, gap);
         }
     }
 
@@ -235,24 +235,24 @@ mod tests {
     /// 少了这条，「TrustTail 会漏」分不清是窗口造成的还是算法根本就不工作。
     #[test]
     fn with_no_window_both_algorithms_lose_nothing() {
-        for how in [Recovery::TrustTail, Recovery::ScanAll] {
-            let o = run_one(64, 200, 0, how);
-            assert_eq!(o.missed, 0, "{how:?} 在无窗口时不该漏");
-            assert_eq!(o.needed, 0, "无窗口时本来就没有要重放的记录");
+        for recovery_algorithm in [Recovery::TrustTail, Recovery::ScanAll] {
+            let outcome = run_one(64, 200, 0, recovery_algorithm);
+            assert_eq!(outcome.missed, 0, "{recovery_algorithm:?} 在无窗口时不该漏");
+            assert_eq!(outcome.needed, 0, "无窗口时本来就没有要重放的记录");
         }
     }
 
     /// **环必须真的绕回来**，否则陈旧 tail 指向的槽没被覆盖，整个场景不成立。
     #[test]
     fn the_ring_actually_wraps_so_stale_slots_are_overwritten() {
-        let ring = 64usize;
-        let mut j = Journal::new(ring);
-        for _ in 0..200 { j.write(0); }
+        let ring_block_count = 64usize;
+        let mut journal = Journal::new(ring_block_count);
+        for _ in 0..200 { journal.write(0); }
         // 持久 tail 停在 1；1 号槽此刻装的应当是后来某条记录，不是 jsn=1
-        assert_eq!(j.tail_persisted, 1);
-        let slot = j.ring[1 % ring].expect("槽应当被写过");
+        assert_eq!(journal.tail_persisted, 1);
+        let slot = journal.ring[1 % ring_block_count].expect("槽应当被写过");
         assert_ne!(slot.jsn, 1, "环没绕回来，陈旧 tail 的槽还是原记录——场景不成立");
-        assert!(slot.jsn > ring as u64, "槽里应当是绕回之后写的记录");
+        assert!(slot.jsn > ring_block_count as u64, "槽里应当是绕回之后写的记录");
     }
 
     /// **全环扫描不丢数据，但它会把陈旧 tail 以来的记录全部重放一遍。**
@@ -269,11 +269,11 @@ mod tests {
     /// 环满时就是环的槽数减去窗口内的新记录数。
     #[test]
     fn scan_all_replays_everything_back_to_the_stale_tail() {
-        let ring = 64usize;
+        let ring_block_count = 64usize;
         for gap in [0u64, 1, 5, 20, 63] {
-            let o = run_one(ring, 200, gap, Recovery::ScanAll);
-            assert_eq!(o.missed, 0, "全环扫描不该丢");
-            assert_eq!(o.spurious, ring - gap as usize,
+            let outcome = run_one(ring_block_count, 200, gap, Recovery::ScanAll);
+            assert_eq!(outcome.missed, 0, "全环扫描不该丢");
+            assert_eq!(outcome.spurious, ring_block_count - gap as usize,
                 "gap={gap}：多重放的条数应是环槽数减去窗口内新记录数");
         }
     }
@@ -283,9 +283,9 @@ mod tests {
     #[test]
     fn trust_tail_never_over_replays_because_it_recovers_nothing() {
         for gap in [1u64, 5, 20, 63] {
-            let o = run_one(64, 200, gap, Recovery::TrustTail);
-            assert_eq!(o.spurious, 0);
-            assert_eq!(o.replayed, 0, "断号即止 ⇒ 一条都恢复不出来");
+            let outcome = run_one(64, 200, gap, Recovery::TrustTail);
+            assert_eq!(outcome.spurious, 0);
+            assert_eq!(outcome.replayed, 0, "断号即止 ⇒ 一条都恢复不出来");
         }
     }
 
@@ -294,12 +294,12 @@ mod tests {
     /// 把已 checkpoint 的记录全部多重放（变异测试已证本测试会红）。
     #[test]
     fn with_a_fresh_tail_scan_all_replays_exactly_what_is_needed() {
-        let ring = 64usize;
+        let ring_block_count = 64usize;
         for gap in [0u64, 1, 5, 20, 63] {
-            let o = run_with(ring, 200, gap, Recovery::ScanAll, true);
-            assert_eq!(o.missed, 0, "gap={gap}：健康场景不该丢");
-            assert_eq!(o.spurious, 0, "gap={gap}：健康场景不该多重放");
-            assert_eq!(o.replayed as u64, gap, "gap={gap}：恢复出的条数应恰等于窗口内的新记录数");
+            let outcome = run_with(ring_block_count, 200, gap, Recovery::ScanAll, true);
+            assert_eq!(outcome.missed, 0, "gap={gap}：健康场景不该丢");
+            assert_eq!(outcome.spurious, 0, "gap={gap}：健康场景不该多重放");
+            assert_eq!(outcome.replayed as u64, gap, "gap={gap}：恢复出的条数应恰等于窗口内的新记录数");
         }
     }
 
@@ -307,11 +307,11 @@ mod tests {
     #[test]
     fn with_a_fresh_tail_both_algorithms_agree() {
         for gap in [0u64, 1, 5, 20, 63] {
-            let t = run_with(64, 200, gap, Recovery::TrustTail, true);
-            let s = run_with(64, 200, gap, Recovery::ScanAll, true);
-            assert_eq!(t.missed, 0, "gap={gap}：健康场景下先信 tail 也不该丢");
-            assert_eq!(t.replayed, s.replayed, "gap={gap}：健康场景下两条臂该一致");
-            assert_eq!(t.spurious, 0);
+            let trust_tail_outcome = run_with(64, 200, gap, Recovery::TrustTail, true);
+            let scan_all_outcome = run_with(64, 200, gap, Recovery::ScanAll, true);
+            assert_eq!(trust_tail_outcome.missed, 0, "gap={gap}：健康场景下先信 tail 也不该丢");
+            assert_eq!(trust_tail_outcome.replayed, scan_all_outcome.replayed, "gap={gap}：健康场景下两条臂该一致");
+            assert_eq!(trust_tail_outcome.spurious, 0);
         }
     }
 
@@ -325,10 +325,10 @@ mod tests {
     /// 两条臂在窗口内必须**分开**——这是本实验存在的理由。
     #[test]
     fn the_two_algorithms_diverge_inside_the_window() {
-        let t = run_one(64, 200, 5, Recovery::TrustTail);
-        let s = run_one(64, 200, 5, Recovery::ScanAll);
-        assert!(t.missed > s.missed, "两条臂没分开，实验归零");
-        assert_eq!(s.missed, 0);
-        assert_eq!(t.missed, 5);
+        let trust_tail_outcome = run_one(64, 200, 5, Recovery::TrustTail);
+        let scan_all_outcome = run_one(64, 200, 5, Recovery::ScanAll);
+        assert!(trust_tail_outcome.missed > scan_all_outcome.missed, "两条臂没分开，实验归零");
+        assert_eq!(scan_all_outcome.missed, 0);
+        assert_eq!(trust_tail_outcome.missed, 5);
     }
 }

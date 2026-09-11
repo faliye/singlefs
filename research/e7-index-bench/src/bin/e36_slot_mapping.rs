@@ -78,85 +78,85 @@ impl Resume {
     }
 }
 
-/// 一条记录。`len` = 它占几个位置（jbd2 的一个事务占描述块 + 数据块 + 提交块）。
+/// 一条记录。`length_in_positions` = 它占几个位置（jbd2 的一个事务占描述块 + 数据块 + 提交块）。
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct Rec {
+struct Record {
     jsn: u64,
     timeline: u32,
-    len: usize,
-    csum_ok: bool,
+    length_in_positions: usize,
+    is_checksum_valid: bool,
 }
 
-const TIMELINE_PREV_LAP: u32 = 0;
-const TIMELINE_A: u32 = 1;
-const TIMELINE_B: u32 = 2;
+const TIMELINE_PREVIOUS_LAP: u32 = 0;
+const TIMELINE_BEFORE_CRASH: u32 = 1;
+const TIMELINE_AFTER_RECOVERY: u32 = 2;
 
 /// 环：每个位置放一条记录的**起始标记**（`Some`）或续块（`None` 表示被前一条占着）。
 /// 为了让「起始位置」可判，续块用 `Filler` 标出来。
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Cell {
     Empty,
-    Start(Rec),
+    Start(Record),
     /// 被前一条记录占用的续位
     Filler,
 }
 
 struct Ring {
-    cell: Vec<Cell>,
+    cells: Vec<Cell>,
 }
 
 impl Ring {
     fn new(slots: usize) -> Self {
-        Ring { cell: vec![Cell::Empty; slots] }
+        Ring { cells: vec![Cell::Empty; slots] }
     }
-    fn n(&self) -> usize {
-        self.cell.len()
+    fn slot_count(&self) -> usize {
+        self.cells.len()
     }
-    /// 在位置 `pos` 起写一条占 `len` 位的记录，返回下一个可写位置。
-    fn write_at(&mut self, pos: usize, r: Rec) -> usize {
-        let n = self.n();
-        self.cell[pos % n] = Cell::Start(r);
-        for k in 1..r.len {
-            self.cell[(pos + k) % n] = Cell::Filler;
+    /// 在位置 `position` 起写一条占 `length_in_positions` 位的记录，返回下一个可写位置。
+    fn write_at(&mut self, position: usize, record: Record) -> usize {
+        let slot_count = self.slot_count();
+        self.cells[position % slot_count] = Cell::Start(record);
+        for continuation_offset in 1..record.length_in_positions {
+            self.cells[(position + continuation_offset) % slot_count] = Cell::Filler;
         }
-        (pos + r.len) % n
+        (position + record.length_in_positions) % slot_count
     }
-    fn start_at(&self, pos: usize) -> Option<Rec> {
-        match self.cell[pos % self.n()] {
+    fn start_at(&self, position: usize) -> Option<Record> {
+        match self.cells[position % self.slot_count()] {
             // 没有 `_ =>`
-            Cell::Start(r) => Some(r),
+            Cell::Start(record) => Some(record),
             Cell::Empty | Cell::Filler => None,
         }
     }
 }
 
-/// 恢复：从 `tail_pos` 起，按位置顺序走，逐条验证，择最长合法前缀。
+/// 恢复：从 `tail_position` 起，按位置顺序走，逐条验证，择最长合法前缀。
 ///
 /// **两种槽位映射共用这一段**——差别只在写侧位置怎么定，不在读侧怎么走。
 /// 这正是「解耦不改变读侧对齐」那句推理的可执行形式。
-fn recover(ring: &Ring, tail_pos: usize, first_expected: u64) -> Vec<Rec> {
-    let mut out = Vec::new();
-    let mut pos = tail_pos;
+fn recover(ring: &Ring, tail_position: usize, first_expected: u64) -> Vec<Record> {
+    let mut accepted_records = Vec::new();
+    let mut position = tail_position;
     let mut expected = first_expected;
-    let mut steps = 0;
-    while steps < ring.n() {
-        let r = match ring.start_at(pos) {
-            Some(r) => r,
+    let mut positions_walked = 0;
+    while positions_walked < ring.slot_count() {
+        let record = match ring.start_at(position) {
+            Some(record) => record,
             None => break,
         };
-        if !r.csum_ok || r.jsn != expected {
+        if !record.is_checksum_valid || record.jsn != expected {
             break;
         }
-        out.push(r);
-        pos = (pos + r.len) % ring.n();
+        accepted_records.push(record);
+        position = (position + record.length_in_positions) % ring.slot_count();
         expected += 1;
-        steps += r.len;
+        positions_walked += record.length_in_positions;
     }
-    out
+    accepted_records
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct RecoveryOutcome {
     first_prefix: u64,
     stale_replayed: u64,
     lost_new: u64,
@@ -169,144 +169,144 @@ struct Out {
 /// * `settled` —— 崩溃前安定下来的记录条数
 /// * `stale` —— 断点之后时间线 A 留下的、校验和完好的记录条数
 /// * `new_after` —— 恢复之后时间线 B 写成的记录条数
-/// * `old_len` / `new_len` —— 旧 / 新记录各占几个位置
+/// * `old_record_length` / `new_record_length` —— 旧 / 新记录各占几个位置
 fn run(
-    map: SlotMap,
+    slot_map: SlotMap,
     resume: Resume,
     slots: usize,
     settled: u64,
     stale: u64,
     new_after: u64,
-    old_len: usize,
-    new_len: usize,
-) -> Out {
+    old_record_length: usize,
+    new_record_length: usize,
+) -> RecoveryOutcome {
     let mut ring = Ring::new(slots);
 
     // 稳态布景：上一圈的记录铺满环（等长，占位与旧记录相同）
-    let mut p = 0usize;
+    let mut lap_position = 0usize;
     let mut lap_jsn = 1u64;
-    while p + old_len <= slots {
-        let r = Rec { jsn: lap_jsn, timeline: TIMELINE_PREV_LAP, len: old_len, csum_ok: true };
-        p = ring.write_at(p, r);
+    while lap_position + old_record_length <= slots {
+        let record = Record { jsn: lap_jsn, timeline: TIMELINE_PREVIOUS_LAP, length_in_positions: old_record_length, is_checksum_valid: true };
+        lap_position = ring.write_at(lap_position, record);
         lap_jsn += 1;
-        if p == 0 {
+        if lap_position == 0 {
             break;
         }
     }
 
     let tail_jsn = 1000u64; // 本圈第一条的序号，远离上一圈
-    let tail_pos = 0usize;
+    let tail_position = 0usize;
 
     // 时间线 A：安定段
-    let mut pos = tail_pos;
-    for i in 0..settled {
-        let r = Rec { jsn: tail_jsn + i, timeline: TIMELINE_A, len: old_len, csum_ok: true };
-        pos = ring.write_at(pos, r);
+    let mut position = tail_position;
+    for settled_index in 0..settled {
+        let record = Record { jsn: tail_jsn + settled_index, timeline: TIMELINE_BEFORE_CRASH, length_in_positions: old_record_length, is_checksum_valid: true };
+        position = ring.write_at(position, record);
     }
     let hole_jsn = tail_jsn + settled;
-    let hole_pos = pos;
+    let hole_position = position;
     // 空洞那条没写成 ⇒ 它的位置上还是上一圈的东西；后面几条落盘了
-    let mut spos = (hole_pos + old_len) % slots;
-    for k in 0..stale {
-        let r = Rec { jsn: hole_jsn + 1 + k, timeline: TIMELINE_A, len: old_len, csum_ok: true };
-        spos = ring.write_at(spos, r);
+    let mut stale_position = (hole_position + old_record_length) % slots;
+    for stale_index in 0..stale {
+        let record = Record { jsn: hole_jsn + 1 + stale_index, timeline: TIMELINE_BEFORE_CRASH, length_in_positions: old_record_length, is_checksum_valid: true };
+        stale_position = ring.write_at(stale_position, record);
     }
 
     // 第一次恢复
-    let acc1 = recover(&ring, tail_pos, tail_jsn);
-    let mut o = Out { first_prefix: acc1.len() as u64, ..Default::default() };
+    let first_recovery = recover(&ring, tail_position, tail_jsn);
+    let mut outcome = RecoveryOutcome { first_prefix: first_recovery.len() as u64, ..Default::default() };
 
     // 恢复之后接着写：位置与序号各自怎么定
     let resume_jsn = match resume {
         // 没有 `_ =>`
-        Resume::AtPrefix => acc1.last().map(|r| r.jsn + 1).unwrap_or(tail_jsn),
+        Resume::AtPrefix => first_recovery.last().map(|record| record.jsn + 1).unwrap_or(tail_jsn),
         Resume::SkipHole => {
             // 号跳过断点：跳到「见过的最大合法序号 + 1」
-            let mut m = acc1.last().map(|r| r.jsn).unwrap_or(tail_jsn);
-            for i in 0..slots {
-                if let Some(r) = ring.start_at(i) {
-                    if r.csum_ok && r.jsn > m && r.jsn >= tail_jsn {
-                        m = r.jsn;
+            let mut highest_valid_jsn = first_recovery.last().map(|record| record.jsn).unwrap_or(tail_jsn);
+            for slot_index in 0..slots {
+                if let Some(record) = ring.start_at(slot_index) {
+                    if record.is_checksum_valid && record.jsn > highest_valid_jsn && record.jsn >= tail_jsn {
+                        highest_valid_jsn = record.jsn;
                     }
                 }
             }
-            m + 1
+            highest_valid_jsn + 1
         }
     };
-    let resume_pos = match map {
+    let resume_position = match slot_map {
         // 没有 `_ =>`
         // 位置是序号的函数 ⇒ 由 resume_jsn 决定
-        SlotMap::ByJsn => ((resume_jsn - tail_jsn) as usize * old_len) % slots,
+        SlotMap::ByJsn => ((resume_jsn - tail_jsn) as usize * old_record_length) % slots,
         // 位置由游标顺序推进 ⇒ 回退到断点位置（jbd2 的 `j_head = info.head_block`）
-        SlotMap::Decoupled => hole_pos,
+        SlotMap::Decoupled => hole_position,
     };
 
     // 时间线 B 写 new_after 条
-    let mut bpos = resume_pos;
-    for k in 0..new_after {
-        let r = Rec { jsn: resume_jsn + k, timeline: TIMELINE_B, len: new_len, csum_ok: true };
-        bpos = ring.write_at(bpos, r);
+    let mut new_timeline_position = resume_position;
+    for new_record_index in 0..new_after {
+        let record = Record { jsn: resume_jsn + new_record_index, timeline: TIMELINE_AFTER_RECOVERY, length_in_positions: new_record_length, is_checksum_valid: true };
+        new_timeline_position = ring.write_at(new_timeline_position, record);
     }
 
     // 新时间线盖掉了几条残留
-    let survived = (0..slots)
-        .filter_map(|i| ring.start_at(i))
-        .filter(|r| r.timeline == TIMELINE_A && r.jsn >= hole_jsn)
+    let surviving_stale_count = (0..slots)
+        .filter_map(|slot_index| ring.start_at(slot_index))
+        .filter(|record| record.timeline == TIMELINE_BEFORE_CRASH && record.jsn >= hole_jsn)
         .count() as u64;
-    o.stale_overwritten = stale - survived.min(stale);
+    outcome.stale_overwritten = stale - surviving_stale_count.min(stale);
 
     // 第二次恢复
-    let acc2 = recover(&ring, tail_pos, tail_jsn);
-    o.stale_replayed = acc2
+    let second_recovery = recover(&ring, tail_position, tail_jsn);
+    outcome.stale_replayed = second_recovery
         .iter()
-        .filter(|r| r.timeline == TIMELINE_A && r.jsn >= hole_jsn)
+        .filter(|record| record.timeline == TIMELINE_BEFORE_CRASH && record.jsn >= hole_jsn)
         .count() as u64;
-    let replayed_new = acc2.iter().filter(|r| r.timeline == TIMELINE_B).count() as u64;
-    o.lost_new = new_after - replayed_new;
-    o
+    let replayed_new = second_recovery.iter().filter(|record| record.timeline == TIMELINE_AFTER_RECOVERY).count() as u64;
+    outcome.lost_new = new_after - replayed_new;
+    outcome
 }
 
 const SLOTS: usize = 256;
 const SETTLED: u64 = 20;
-const OLD_LEN: usize = 2;
+const OLD_RECORD_LENGTH: usize = 2;
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config slots={SLOTS} settled={SETTLED} old_len={OLD_LEN} note=槽位映射那一维"
+        emitter.emit_raw(&format!(
+            "name=config slots={SLOTS} settled={SETTLED} old_len={OLD_RECORD_LENGTH} note=槽位映射那一维"
         ))
     );
-    for map in [SlotMap::ByJsn, SlotMap::Decoupled] {
+    for slot_map in [SlotMap::ByJsn, SlotMap::Decoupled] {
         for resume in [Resume::AtPrefix, Resume::SkipHole] {
-            for new_len in [OLD_LEN, OLD_LEN + 1] {
+            for new_record_length in [OLD_RECORD_LENGTH, OLD_RECORD_LENGTH + 1] {
                 for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-                    let o = run(map, resume, SLOTS, SETTLED, stale, new_after, OLD_LEN, new_len);
-                    let pass = o.stale_replayed == 0 && o.lost_new == 0;
+                    let outcome = run(slot_map, resume, SLOTS, SETTLED, stale, new_after, OLD_RECORD_LENGTH, new_record_length);
+                    let passes_both_criteria = outcome.stale_replayed == 0 && outcome.lost_new == 0;
                     println!(
                         "{}",
-                        em.emit_raw(&format!(
+                        emitter.emit_raw(&format!(
                             "name=cell map={} resume={} new_len={} stale={} new_after={} \
                              first_prefix={} stale_replayed={} lost_new={} \
                              stale_overwritten={} pass={}",
-                            map.name(),
+                            slot_map.name(),
                             resume.name(),
-                            new_len,
+                            new_record_length,
                             stale,
                             new_after,
-                            o.first_prefix,
-                            o.stale_replayed,
-                            o.lost_new,
-                            o.stale_overwritten,
-                            pass
+                            outcome.first_prefix,
+                            outcome.stale_replayed,
+                            outcome.lost_new,
+                            outcome.stale_overwritten,
+                            passes_both_criteria
                         ))
                     );
                 }
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -318,13 +318,13 @@ mod tests {
     /// 且条数服从 E32（上一条时间线的残留）测出的那条式子。
     /// 对不上说明本实验的模型跑偏了。
     #[test]
-    fn the_by_jsn_arm_reproduces_what_e33_measured() {
+    fn the_by_jsn_arm_reproduces_what_e32_measured() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let want = stale.saturating_sub(new_after - 1);
-            let o = run(SlotMap::ByJsn, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_LEN, OLD_LEN);
+            let expected_stale_replayed = stale.saturating_sub(new_after - 1);
+            let outcome = run(SlotMap::ByJsn, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
             assert_eq!(
-                o.stale_replayed, want,
-                "by_jsn 该复现 E32 的式子：残留 {stale}、新写 {new_after} ⇒ 重放 {want}"
+                outcome.stale_replayed, expected_stale_replayed,
+                "by_jsn 该复现 E32 的式子：残留 {stale}、新写 {new_after} ⇒ 重放 {expected_stale_replayed}"
             );
         }
     }
@@ -334,24 +334,24 @@ mod tests {
     #[test]
     fn decoupling_alone_does_not_help_when_record_lengths_match() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let a = run(SlotMap::ByJsn, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_LEN, OLD_LEN);
-            let b = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_LEN, OLD_LEN);
+            let by_jsn_outcome = run(SlotMap::ByJsn, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
+            let decoupled_outcome = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
             assert_eq!(
-                a.stale_replayed, b.stale_replayed,
+                by_jsn_outcome.stale_replayed, decoupled_outcome.stale_replayed,
                 "等长时两种槽位映射该给同一个数（残留 {stale}、新写 {new_after}）"
             );
-            assert!(b.stale_replayed > 0, "解耦这一支等长时照样重放");
+            assert!(decoupled_outcome.stale_replayed > 0, "解耦这一支等长时照样重放");
         }
     }
 
     /// **真正打散对齐的是记录长度不同。**
     /// 新记录多占一位 ⇒ 后续残留整体错位 ⇒ 恢复走到那里序号对不上。
     #[test]
-    fn a_different_record_length_is_what_breaks_the_alignment() {
+    fn different_record_length_is_what_breaks_the_alignment() {
         for (stale, new_after) in [(3u64, 1u64), (3, 3), (7, 1)] {
-            let o = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_LEN, OLD_LEN + 1);
+            let outcome = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, stale, new_after, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH + 1);
             assert_eq!(
-                o.stale_replayed, 0,
+                outcome.stale_replayed, 0,
                 "长度不同时残留该被错位挡住（残留 {stale}、新写 {new_after}）"
             );
         }
@@ -361,8 +361,8 @@ mod tests {
     /// ⇒ 「解耦槽位」买到的是概率，不是结构性免疫。
     #[test]
     fn the_protection_from_length_is_a_coincidence_not_a_guarantee() {
-        let protected = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, 7, 1, OLD_LEN, OLD_LEN + 1);
-        let exposed = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, 7, 1, OLD_LEN, OLD_LEN);
+        let protected = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, 7, 1, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH + 1);
+        let exposed = run(SlotMap::Decoupled, Resume::AtPrefix, SLOTS, SETTLED, 7, 1, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
         assert_eq!(protected.stale_replayed, 0);
         assert_eq!(exposed.stale_replayed, 7, "同一条臂，只把新记录长度改回等长就全数重放");
     }
@@ -370,10 +370,10 @@ mod tests {
     /// **判别力：第一次恢复必须真的停在空洞处。**
     #[test]
     fn the_first_recovery_stops_at_the_hole_in_every_configuration() {
-        for map in [SlotMap::ByJsn, SlotMap::Decoupled] {
+        for slot_map in [SlotMap::ByJsn, SlotMap::Decoupled] {
             for resume in [Resume::AtPrefix, Resume::SkipHole] {
-                let o = run(map, resume, SLOTS, SETTLED, 3, 1, OLD_LEN, OLD_LEN);
-                assert_eq!(o.first_prefix, SETTLED, "{} / {} 没停在空洞处", map.name(), resume.name());
+                let outcome = run(slot_map, resume, SLOTS, SETTLED, 3, 1, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
+                assert_eq!(outcome.first_prefix, SETTLED, "{} / {} 没停在空洞处", slot_map.name(), resume.name());
             }
         }
     }
@@ -381,10 +381,10 @@ mod tests {
     /// **号跳过断点那一支照样有病，只是方向相反**——新写的记录接不上前缀。
     #[test]
     fn skipping_the_hole_loses_the_new_records_under_both_mappings() {
-        for map in [SlotMap::ByJsn, SlotMap::Decoupled] {
-            let o = run(map, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_LEN, OLD_LEN);
-            assert_eq!(o.stale_replayed, 0, "{}", map.name());
-            assert_eq!(o.lost_new, 2, "{} 跳过断点后新写的两条都够不到", map.name());
+        for slot_map in [SlotMap::ByJsn, SlotMap::Decoupled] {
+            let outcome = run(slot_map, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
+            assert_eq!(outcome.stale_replayed, 0, "{}", slot_map.name());
+            assert_eq!(outcome.lost_new, 2, "{} 跳过断点后新写的两条都够不到", slot_map.name());
         }
     }
 
@@ -395,12 +395,12 @@ mod tests {
     /// ⚠️ 没有这条，「解耦」这一维在度量上不可见（变异 M1）。
     #[test]
     fn the_two_mappings_put_the_bytes_in_different_places() {
-        let dec = run(SlotMap::Decoupled, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_LEN, OLD_LEN);
-        let by = run(SlotMap::ByJsn, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_LEN, OLD_LEN);
+        let decoupled_outcome = run(SlotMap::Decoupled, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
+        let by_jsn_outcome = run(SlotMap::ByJsn, Resume::SkipHole, SLOTS, SETTLED, 3, 2, OLD_RECORD_LENGTH, OLD_RECORD_LENGTH);
         // 第一条新记录填的是**空洞那个位置**本身，所以盖掉的是「新写条数 − 1」条残留
         // ——与 E32（上一条时间线的残留）那条式子同源。
-        assert_eq!(dec.stale_overwritten, 1, "解耦：新写 2 条落在断点位置，该盖掉 2−1 = 1 条残留");
-        assert_eq!(by.stale_overwritten, 0, "按序号：新写的落在残留之后，一条也盖不掉");
+        assert_eq!(decoupled_outcome.stale_overwritten, 1, "解耦：新写 2 条落在断点位置，该盖掉 2−1 = 1 条残留");
+        assert_eq!(by_jsn_outcome.stale_overwritten, 0, "按序号：新写的落在残留之后，一条也盖不掉");
     }
 
     /// **绝对值：环几何与布景由构造给出。**
@@ -408,12 +408,12 @@ mod tests {
     #[test]
     fn the_ring_geometry_is_pinned_by_construction() {
         let ring = Ring::new(SLOTS);
-        assert_eq!(ring.n(), 256);
-        let mut r = Ring::new(8);
-        let next = r.write_at(0, Rec { jsn: 1, timeline: TIMELINE_A, len: 2, csum_ok: true });
-        assert_eq!(next, 2, "占 2 位的记录写完，下一个可写位置该是 2");
-        assert!(matches!(r.cell[0], Cell::Start(_)));
-        assert_eq!(r.cell[1], Cell::Filler, "续位该被标成 Filler");
-        assert_eq!(r.start_at(1), None, "续位上取不到记录起始");
+        assert_eq!(ring.slot_count(), 256);
+        let mut small_ring = Ring::new(8);
+        let next_position = small_ring.write_at(0, Record { jsn: 1, timeline: TIMELINE_BEFORE_CRASH, length_in_positions: 2, is_checksum_valid: true });
+        assert_eq!(next_position, 2, "占 2 位的记录写完，下一个可写位置该是 2");
+        assert!(matches!(small_ring.cells[0], Cell::Start(_)));
+        assert_eq!(small_ring.cells[1], Cell::Filler, "续位该被标成 Filler");
+        assert_eq!(small_ring.start_at(1), None, "续位上取不到记录起始");
     }
 }

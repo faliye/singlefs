@@ -40,17 +40,17 @@
 use e7_index_bench::Emitter;
 
 const SEEDS: [u64; 5] = [1, 2, 3, 4, 5];
-const DEVS: u64 = 8;
-const OPS: u64 = 20_000;
+const DEVICE_COUNT: u64 = 8;
+const WRITES_PER_RUN: u64 = 20_000;
 /// 小写占比（千分之），扫四档
-const SMALL_PCT: [u64; 4] = [0, 250, 500, 900];
+const SMALL_WRITE_PER_MILLE: [u64; 4] = [0, 250, 500, 900];
 const BATCH: u64 = 16;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Rule {
     /// 恒取全宽。
     AlwaysFull,
-    /// 贴合写入量：`w = min(DEVS, payload + 1)`，至少 2。
+    /// 贴合写入量：`w = min(DEVICE_COUNT, payload + 1)`，至少 2。
     FitPayload,
     /// 固定窄宽度。
     Fixed(u64),
@@ -70,85 +70,85 @@ impl Lcg {
 
 fn width_for(rule: Rule, payload: u64) -> u64 {
     match rule {
-        Rule::AlwaysFull | Rule::BatchThenFull => DEVS,
-        Rule::BatchThenCapped(cap) => cap.clamp(2, DEVS),
-        Rule::FitPayload => (payload + 1).clamp(2, DEVS),
-        Rule::Fixed(w) => w.clamp(2, DEVS),
+        Rule::AlwaysFull | Rule::BatchThenFull => DEVICE_COUNT,
+        Rule::BatchThenCapped(width_upper_bound) => width_upper_bound.clamp(2, DEVICE_COUNT),
+        Rule::FitPayload => (payload + 1).clamp(2, DEVICE_COUNT),
+        Rule::Fixed(fixed_width) => fixed_width.clamp(2, DEVICE_COUNT),
     }
 }
 
-/// 任取两块盘同时坏，一条 `w` 宽条带被打中两格的概率（parity=1 ⇒ 打中两格即丢数据）。
+/// 任取两块盘同时坏，一条 `width` 宽条带被打中两格的概率（parity=1 ⇒ 打中两格即丢数据）。
 /// 分子分母都是组合数，独立于本实验其余部分。
-fn two_disk_hit_ppm(w: u64) -> u64 {
-    let c2 = |n: u64| n * (n - 1) / 2;
-    c2(w) * 1_000_000 / c2(DEVS)
+fn two_disk_hit_ppm(width: u64) -> u64 {
+    let choose_two = |item_count: u64| item_count * (item_count - 1) / 2;
+    choose_two(width) * 1_000_000 / choose_two(DEVICE_COUNT)
 }
 
 #[derive(Default)]
-struct Out {
+struct RunTotals {
     data: u64,
-    phys: u64,
+    physical_cells: u64,
     stripes: u64,
     width_sum: u64,
     hit_ppm_weighted: u64,
 }
 
-fn run(rule: Rule, seed: u64, small_pct: u64) -> Out {
+fn run(rule: Rule, seed: u64, small_write_per_mille: u64) -> RunTotals {
     let mut rng = Lcg(seed.wrapping_mul(0x9E3779B97F4A7C15) | 1);
-    let mut o = Out::default();
+    let mut totals = RunTotals::default();
     let mut pending = 0u64; // 攒批用
     let mut batched = 0u64;
-    let emit = |o: &mut Out, payload: u64| {
+    let emit = |totals: &mut RunTotals, payload: u64| {
         if payload == 0 {
             return;
         }
-        let w = width_for(rule, payload);
-        let per = w - 1;
-        let stripes = payload.div_ceil(per);
-        o.data += payload;
-        o.phys += stripes * w;
-        o.stripes += stripes;
-        o.width_sum += stripes * w;
-        o.hit_ppm_weighted += stripes * two_disk_hit_ppm(w);
+        let width = width_for(rule, payload);
+        let data_cells_per_stripe = width - 1;
+        let stripes = payload.div_ceil(data_cells_per_stripe);
+        totals.data += payload;
+        totals.physical_cells += stripes * width;
+        totals.stripes += stripes;
+        totals.width_sum += stripes * width;
+        totals.hit_ppm_weighted += stripes * two_disk_hit_ppm(width);
     };
-    for _ in 0..OPS {
+    for _ in 0..WRITES_PER_RUN {
         // 小写 = 1 格；大写 = 8..15 格
-        let payload = if rng.next() % 1000 < small_pct { 1 } else { 8 + rng.next() % 8 };
+        let payload = if rng.next() % 1000 < small_write_per_mille { 1 } else { 8 + rng.next() % 8 };
         if matches!(rule, Rule::BatchThenFull | Rule::BatchThenCapped(_)) {
             pending += payload;
             batched += 1;
             if batched == BATCH {
-                emit(&mut o, pending);
+                emit(&mut totals, pending);
                 pending = 0;
                 batched = 0;
             }
         } else {
-            emit(&mut o, payload);
+            emit(&mut totals, payload);
         }
     }
     if pending > 0 {
-        emit(&mut o, pending);
+        emit(&mut totals, pending);
     }
-    o
+    totals
 }
 
-fn ppm(a: u64, b: u64) -> u64 {
-    if b == 0 { 0 } else { a * 1_000_000 / b }
+fn ppm(numerator: u64, denominator: u64) -> u64 {
+    if denominator == 0 { 0 } else { numerator * 1_000_000 / denominator }
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config devs={DEVS} ops={OPS} batch={BATCH} parity_per_stripe=1 \
+        emitter.emit_raw(&format!(
+            "name=config devs={DEVICE_COUNT} ops={WRITES_PER_RUN} batch={BATCH} parity_per_stripe=1 \
              model=counting file_ops=0"
         ))
     );
-    for w in 2..=DEVS {
+    for width in 2..=DEVICE_COUNT {
         println!(
             "{}",
-            em.emit_raw(&format!("name=two_disk_hit width={w} hit_ppm={}", two_disk_hit_ppm(w)))
+            emitter.emit_raw(&format!("name=two_disk_hit width={width} hit_ppm={}", two_disk_hit_ppm(width)))
         );
     }
 
@@ -160,49 +160,49 @@ fn main() {
         ("batch_then_cap4", Rule::BatchThenCapped(4)),
         ("batch_then_cap6", Rule::BatchThenCapped(6)),
     ];
-    for &small in SMALL_PCT.iter() {
+    for &small_write_per_mille in SMALL_WRITE_PER_MILLE.iter() {
         for &seed in SEEDS.iter() {
             for (label, rule) in rules {
-                let o = run(rule, seed, small);
+                let totals = run(rule, seed, small_write_per_mille);
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=arm small_pct={small} seed={seed} rule={label} data={} phys={} \
+                    emitter.emit_raw(&format!(
+                        "name=arm small_pct={small_write_per_mille} seed={seed} rule={label} data={} phys={} \
                          phys_per_data_ppm={} stripes={} mean_width_ppm={} mean_hit_ppm={}",
-                        o.data,
-                        o.phys,
-                        ppm(o.phys, o.data),
-                        o.stripes,
-                        ppm(o.width_sum, o.stripes),
-                        if o.stripes == 0 { 0 } else { o.hit_ppm_weighted / o.stripes },
+                        totals.data,
+                        totals.physical_cells,
+                        ppm(totals.physical_cells, totals.data),
+                        totals.stripes,
+                        ppm(totals.width_sum, totals.stripes),
+                        if totals.stripes == 0 { 0 } else { totals.hit_ppm_weighted / totals.stripes },
                     ))
                 );
             }
         }
     }
     // 阳性对照，对每一条臂都跑：payload 恰好等于该臂的 w−1（填满一条带）⇒ 浪费为 0。
-    // ⚠️ 第一版这里对所有臂都喂 DEVS−1，而 fixed3 的 w−1 是 2 ⇒ 对照自己写错了，
+    // ⚠️ 第一版这里对所有臂都喂 DEVICE_COUNT−1，而 fixed3 的 w−1 是 2 ⇒ 对照自己写错了，
     // 判红的是对照不是臂。修的是实现，不是判据。
     for (label, rule) in rules {
         // 先用一个探针 payload 取到该臂的宽度，再按 w−1 喂它
-        let w = width_for(rule, DEVS - 1);
-        let o = {
-            let mut o = Out::default();
-            o.data = w - 1;
-            o.phys = w;
-            o
+        let width = width_for(rule, DEVICE_COUNT - 1);
+        let totals = {
+            let mut totals = RunTotals::default();
+            totals.data = width - 1;
+            totals.physical_cells = width;
+            totals
         };
         println!(
             "{}",
-            em.emit_raw(&format!(
-                "name=positive_control_exact_fill rule={label} width={w} \
+            emitter.emit_raw(&format!(
+                "name=positive_control_exact_fill rule={label} width={width} \
                  phys_per_data_ppm={} expect_ppm={}",
-                ppm(o.phys, o.data),
-                ppm(w, w - 1)
+                ppm(totals.physical_cells, totals.data),
+                ppm(width, width - 1)
             ))
         );
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -216,18 +216,18 @@ mod tests {
         assert_eq!(two_disk_hit_ppm(4), 6 * 1_000_000 / 28);
         assert_eq!(two_disk_hit_ppm(8), 1_000_000);
         // 单调上升 —— 判据 2
-        for w in 3..=DEVS {
-            assert!(two_disk_hit_ppm(w) > two_disk_hit_ppm(w - 1));
+        for width in 3..=DEVICE_COUNT {
+            assert!(two_disk_hit_ppm(width) > two_disk_hit_ppm(width - 1));
         }
     }
 
     /// **绝对值断言**：payload 恰好填满时开销恰好 w/(w−1)。
     #[test]
     fn absolute_exact_fill_overhead() {
-        for w in [2u64, 3, 5, 8] {
-            let data = w - 1;
-            let phys = w;
-            assert_eq!(ppm(phys, data), ppm(w, w - 1));
+        for width in [2u64, 3, 5, 8] {
+            let data_cells = width - 1;
+            let physical_cells = width;
+            assert_eq!(ppm(physical_cells, data_cells), ppm(width, width - 1));
         }
         assert_eq!(ppm(8, 7), 1_142_857);
     }
@@ -235,19 +235,19 @@ mod tests {
     /// **阴性对照**：payload 恒 1、w=2 ⇒ 物理/数据恰好 2.000。
     #[test]
     fn negative_control_single_unit_width_two() {
-        let o = run(Rule::Fixed(2), 1, 1000);
-        assert_eq!(ppm(o.phys, o.data), 2_000_000);
+        let totals = run(Rule::Fixed(2), 1, 1000);
+        assert_eq!(ppm(totals.physical_cells, totals.data), 2_000_000);
     }
 
     /// **阳性对照，对每一条臂都跑**：全大写（小写占比 0）时贴合臂必须等于全宽臂。
-    /// 大写 8..15 ≥ DEVS−1 ⇒ 两条臂都取全宽，逐格相同；不同说明宽度选择写错了。
+    /// 大写 8..15 ≥ DEVICE_COUNT−1 ⇒ 两条臂都取全宽，逐格相同；不同说明宽度选择写错了。
     #[test]
     fn positive_control_no_small_writes_arms_agree() {
         for seed in SEEDS {
-            let a = run(Rule::AlwaysFull, seed, 0);
-            let b = run(Rule::FitPayload, seed, 0);
-            assert_eq!(a.phys, b.phys, "seed={seed}");
-            assert_eq!(a.data, b.data);
+            let always_full_totals = run(Rule::AlwaysFull, seed, 0);
+            let fit_payload_totals = run(Rule::FitPayload, seed, 0);
+            assert_eq!(always_full_totals.physical_cells, fit_payload_totals.physical_cells, "seed={seed}");
+            assert_eq!(always_full_totals.data, fit_payload_totals.data);
         }
     }
 
@@ -256,12 +256,12 @@ mod tests {
     /// ⚠️ 变异测试实测：没有这一条时「条带按 w 格计数据、不扣 parity」这个变异**没人抓得到**。
     #[test]
     fn golden_small500_seed1() {
-        let a = run(Rule::AlwaysFull, 1, 500);
-        assert_eq!((a.data, a.phys, a.stripes), (124346, 249280, 31160));
-        let f = run(Rule::FitPayload, 1, 500);
-        assert_eq!((f.data, f.phys, f.stripes), (124346, 189094, 31160));
-        let b = run(Rule::BatchThenFull, 1, 500);
-        assert_eq!((b.data, b.phys, b.stripes), (124346, 146376, 18297));
+        let always_full_totals = run(Rule::AlwaysFull, 1, 500);
+        assert_eq!((always_full_totals.data, always_full_totals.physical_cells, always_full_totals.stripes), (124346, 249280, 31160));
+        let fit_payload_totals = run(Rule::FitPayload, 1, 500);
+        assert_eq!((fit_payload_totals.data, fit_payload_totals.physical_cells, fit_payload_totals.stripes), (124346, 189094, 31160));
+        let batch_then_full_totals = run(Rule::BatchThenFull, 1, 500);
+        assert_eq!((batch_then_full_totals.data, batch_then_full_totals.physical_cells, batch_then_full_totals.stripes), (124346, 146376, 18297));
     }
 
     /// 攒批必须真的在攒：同一负载下条带数必须少于不攒批。
@@ -269,18 +269,18 @@ mod tests {
     #[test]
     fn batching_actually_batches() {
         for seed in SEEDS {
-            let b = run(Rule::BatchThenFull, seed, 900);
-            let a = run(Rule::AlwaysFull, seed, 900);
-            assert!(b.stripes < a.stripes, "seed={seed}：攒批没减少条带数");
+            let batch_then_full_totals = run(Rule::BatchThenFull, seed, 900);
+            let always_full_totals = run(Rule::AlwaysFull, seed, 900);
+            assert!(batch_then_full_totals.stripes < always_full_totals.stripes, "seed={seed}：攒批没减少条带数");
         }
     }
 
     /// 宽度下界：任何规则都不许给出 w<2。
     #[test]
     fn width_never_below_two() {
-        for p in [0u64, 1, 2, 100] {
-            for r in [Rule::AlwaysFull, Rule::FitPayload, Rule::Fixed(1), Rule::BatchThenFull] {
-                assert!(width_for(r, p) >= 2);
+        for payload in [0u64, 1, 2, 100] {
+            for rule in [Rule::AlwaysFull, Rule::FitPayload, Rule::Fixed(1), Rule::BatchThenFull] {
+                assert!(width_for(rule, payload) >= 2);
             }
         }
     }

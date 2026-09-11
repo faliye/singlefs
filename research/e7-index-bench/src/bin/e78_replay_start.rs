@@ -70,7 +70,7 @@ use e7_index_bench::Emitter;
 use std::collections::VecDeque;
 
 /// 逻辑对象数。
-const L: u64 = 4;
+const LOGICAL_OBJECT_COUNT: u64 = 4;
 /// journal 环槽数。窗口必须 ≤ RING，否则残留是 E32（上一条时间线的残留）的射程，不是本实验的。
 const RING: u64 = 64;
 
@@ -92,66 +92,66 @@ struct World {
     root_map: Vec<u64>,
     root_watermark: u64,
     tail: u64,
-    m: u64,
+    last_publish: u64,
     /// 独立的重分配追踪：block → 它被重新分配出去时的发布号列表。
     /// **只给审计与闭式对照用，不给任何恢复算法用。**
-    realloc_at: Vec<Vec<u64>>,
+    reallocated_at_publishes: Vec<Vec<u64>>,
     /// torn 场景：环里多一条 M+1 的记录，其单元没落盘。
     torn_record: Option<Record>,
 }
 
-fn build_world(m: u64, pin: u64, tail_every: u64, torn: bool) -> World {
-    assert!(m - (m / tail_every) * tail_every < RING, "窗口必须落在环内");
+fn build_world(last_publish: u64, pin: u64, tail_every: u64, torn: bool) -> World {
+    assert!(last_publish - (last_publish / tail_every) * tail_every < RING, "窗口必须落在环内");
     let mut content: Vec<u64> = vec![0; 4096];
     let mut ring: Vec<Option<Record>> = vec![None; RING as usize];
-    let mut map: Vec<u64> = (0..L).collect(); // 对象 i 初始占块 i，内容标签 0
-    let mut next_fresh = L;
+    let mut block_of_object: Vec<u64> = (0..LOGICAL_OBJECT_COUNT).collect(); // 对象 i 初始占块 i，内容标签 0
+    let mut next_fresh = LOGICAL_OBJECT_COUNT;
     let mut defer: VecDeque<(u64, u64)> = VecDeque::new(); // (freed_at, block)
     let mut pool: VecDeque<u64> = VecDeque::new();
-    let mut realloc_at: Vec<Vec<u64>> = vec![Vec::new(); 4096];
+    let mut reallocated_at_publishes: Vec<Vec<u64>> = vec![Vec::new(); 4096];
 
-    for p in 1..=m {
+    for publish in 1..=last_publish {
         // defer 到期进池（I-7.4 的 PIN 窗口）
-        while let Some(&(f, b)) = defer.front() {
-            if f + pin <= p {
-                pool.push_back(b);
+        while let Some(&(freed_at, freed_block)) = defer.front() {
+            if freed_at + pin <= publish {
+                pool.push_back(freed_block);
                 defer.pop_front();
             } else {
                 break;
             }
         }
-        let o = (p % L) as usize;
-        let nb = if let Some(b) = pool.pop_front() {
-            realloc_at[b as usize].push(p);
-            b
+        let object = (publish % LOGICAL_OBJECT_COUNT) as usize;
+        let new_block = if let Some(reused_block) = pool.pop_front() {
+            reallocated_at_publishes[reused_block as usize].push(publish);
+            reused_block
         } else {
             next_fresh += 1;
             next_fresh - 1
         };
-        content[nb as usize] = p;
-        defer.push_back((p, map[o]));
-        map[o] = nb;
-        ring[(p % RING) as usize] = Some(Record { jsn: p, object: o as u64, block: nb, tag: p });
+        content[new_block as usize] = publish;
+        defer.push_back((publish, block_of_object[object]));
+        block_of_object[object] = new_block;
+        ring[(publish % RING) as usize] = Some(Record { jsn: publish, object: object as u64, block: new_block, tag: publish });
     }
     let torn_record = if torn {
-        let p = m + 1;
-        let o = (p % L) as usize;
+        let torn_publish = last_publish + 1;
+        let object = (torn_publish % LOGICAL_OBJECT_COUNT) as usize;
         // 记录落了环，单元没落盘：点一个池外新块，内容保持旧垃圾（0xdead 标签用 u64::MAX 代替）。
-        let nb = next_fresh;
-        let r = Record { jsn: p, object: o as u64, block: nb, tag: p };
-        ring[(p % RING) as usize] = Some(r);
-        Some(r)
+        let new_block = next_fresh;
+        let record = Record { jsn: torn_publish, object: object as u64, block: new_block, tag: torn_publish };
+        ring[(torn_publish % RING) as usize] = Some(record);
+        Some(record)
     } else {
         None
     };
     World {
         content,
         ring,
-        root_map: map,
-        root_watermark: m,
-        tail: (m / tail_every) * tail_every,
-        m,
-        realloc_at,
+        root_map: block_of_object,
+        root_watermark: last_publish,
+        tail: (last_publish / tail_every) * tail_every,
+        last_publish,
+        reallocated_at_publishes,
         torn_record,
     }
 }
@@ -171,114 +171,114 @@ struct Run {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Algo {
-    A1AbortOnMismatch,
-    A2SkipOnMismatch,
-    BWatermark,
-    CBlindThenWalk,
+enum RecoveryAlgorithm {
+    AbortOnMismatch,
+    SkipOnMismatch,
+    ReplayAboveWatermark,
+    BlindReplayThenWalk,
 }
 
-impl Algo {
-    fn tag(self) -> &'static str {
+impl RecoveryAlgorithm {
+    fn output_label(self) -> &'static str {
         match self {
-            Algo::A1AbortOnMismatch => "a1_abort",
-            Algo::A2SkipOnMismatch => "a2_skip",
-            Algo::BWatermark => "b_watermark",
-            Algo::CBlindThenWalk => "c_blind_walk",
+            RecoveryAlgorithm::AbortOnMismatch => "a1_abort",
+            RecoveryAlgorithm::SkipOnMismatch => "a2_skip",
+            RecoveryAlgorithm::ReplayAboveWatermark => "b_watermark",
+            RecoveryAlgorithm::BlindReplayThenWalk => "c_blind_walk",
         }
     }
 }
 
 /// 取从 `start`（不含）起的 jsn 严格连续前缀（断号即止，D23 已定的前缀判定）。
-fn continuous_prefix(w: &World, start: u64) -> Vec<Record> {
-    let mut out = Vec::new();
-    let mut expect = start + 1;
+fn continuous_prefix(world: &World, start: u64) -> Vec<Record> {
+    let mut prefix = Vec::new();
+    let mut expected_jsn = start + 1;
     loop {
-        match w.ring[(expect % RING) as usize] {
-            Some(r) if r.jsn == expect => {
-                out.push(r);
-                expect += 1;
+        match world.ring[(expected_jsn % RING) as usize] {
+            Some(record) if record.jsn == expected_jsn => {
+                prefix.push(record);
+                expected_jsn += 1;
             }
             _ => break,
         }
     }
-    out
+    prefix
 }
 
-fn recover(w: &World, algo: Algo) -> Run {
-    let mut run = Run { final_map: w.root_map.clone(), ..Default::default() };
-    let start = match algo {
-        Algo::BWatermark => w.root_watermark,
-        Algo::A1AbortOnMismatch | Algo::A2SkipOnMismatch | Algo::CBlindThenWalk => w.tail,
+fn recover(world: &World, algorithm: RecoveryAlgorithm) -> Run {
+    let mut run = Run { final_map: world.root_map.clone(), ..Default::default() };
+    let start = match algorithm {
+        RecoveryAlgorithm::ReplayAboveWatermark => world.root_watermark,
+        RecoveryAlgorithm::AbortOnMismatch | RecoveryAlgorithm::SkipOnMismatch | RecoveryAlgorithm::BlindReplayThenWalk => world.tail,
     };
-    let prefix = continuous_prefix(w, start);
-    match algo {
-        Algo::A1AbortOnMismatch | Algo::A2SkipOnMismatch | Algo::BWatermark => {
-            for r in &prefix {
-                let valid = w.content[r.block as usize] == r.tag;
-                if valid {
-                    run.final_map[r.object as usize] = r.block;
+    let prefix = continuous_prefix(world, start);
+    match algorithm {
+        RecoveryAlgorithm::AbortOnMismatch | RecoveryAlgorithm::SkipOnMismatch | RecoveryAlgorithm::ReplayAboveWatermark => {
+            for record in &prefix {
+                let is_content_valid = world.content[record.block as usize] == record.tag;
+                if is_content_valid {
+                    run.final_map[record.object as usize] = record.block;
                     run.replayed += 1;
                 } else {
                     run.mismatches += 1;
-                    match algo {
-                        Algo::A1AbortOnMismatch => {
+                    match algorithm {
+                        RecoveryAlgorithm::AbortOnMismatch => {
                             // 把失配当损坏，恢复中止。
                             run.aborted = true;
                             return run;
                         }
-                        Algo::A2SkipOnMismatch => {
+                        RecoveryAlgorithm::SkipOnMismatch => {
                             run.skipped += 1;
                         }
-                        Algo::BWatermark => {
+                        RecoveryAlgorithm::ReplayAboveWatermark => {
                             // 只可能是 > 水位的记录 ⇒ 在飞窗口内 ⇒ 判撕裂，丢弃到此为止。
                             run.torn_flagged = true;
                             break;
                         }
-                        Algo::CBlindThenWalk => unreachable!(),
+                        RecoveryAlgorithm::BlindReplayThenWalk => unreachable!(),
                     }
                 }
             }
             run.completed = true;
         }
-        Algo::CBlindThenWalk => {
+        RecoveryAlgorithm::BlindReplayThenWalk => {
             // 盲放全前缀，收尾走读；失败就删掉最尾一条重来（尾删有界：最多前缀长度轮）。
-            let mut keep = prefix.len();
+            let mut kept_record_count = prefix.len();
             loop {
-                let mut map = w.root_map.clone();
-                for r in &prefix[..keep] {
-                    map[r.object as usize] = r.block;
+                let mut candidate_map = world.root_map.clone();
+                for record in &prefix[..kept_record_count] {
+                    candidate_map[record.object as usize] = record.block;
                 }
                 // 收尾走读：逐对象验证映射指向的块内容（不复用施加代码的判定）。
-                let walk_ok = (0..L as usize).all(|o| {
-                    let b = map[o];
+                let walk_succeeded = (0..LOGICAL_OBJECT_COUNT as usize).all(|object| {
+                    let mapped_block = candidate_map[object];
                     // 找出该块应有的标签：真值是「最后写它的发布」，走读只有校验和 ⇒
                     // 模型里等价于「内容标签 == 施加进映射的那条记录的 tag 或根快照」。
                     // 用记录集合推期望值，不查 content 之外的真值。
-                    let expect = prefix[..keep]
+                    let expected_tag = prefix[..kept_record_count]
                         .iter()
                         .rev()
-                        .find(|r| r.object as usize == o)
-                        .map(|r| r.tag);
-                    match expect {
-                        Some(t) => w.content[b as usize] == t,
+                        .find(|record| record.object as usize == object)
+                        .map(|record| record.tag);
+                    match expected_tag {
+                        Some(expected) => world.content[mapped_block as usize] == expected,
                         None => true, // 根快照自带一致性（上次发布已验过）
                     }
                 });
-                if walk_ok {
-                    run.final_map = map;
-                    run.replayed = keep as u64;
+                if walk_succeeded {
+                    run.final_map = candidate_map;
+                    run.replayed = kept_record_count as u64;
                     run.completed = true;
-                    if keep < prefix.len() {
+                    if kept_record_count < prefix.len() {
                         run.torn_flagged = true;
                     }
                     break;
                 }
-                if keep == 0 {
+                if kept_record_count == 0 {
                     run.aborted = true;
                     break;
                 }
-                keep -= 1;
+                kept_record_count -= 1;
                 run.retries += 1;
             }
         }
@@ -287,76 +287,76 @@ fn recover(w: &World, algo: Algo) -> Run {
 }
 
 /// 独立审计：终态映射必须与真值逐格相等。真值 = torn 丢弃后的 M 状态。
-fn audit_final(w: &World, run: &Run) -> bool {
+fn audit_final(world: &World, run: &Run) -> bool {
     if !run.completed {
         return false;
     }
-    run.final_map == w.root_map
+    run.final_map == world.root_map
 }
 
 /// 闭式：healthy 下重放窗口里失配的记录数（稳态 FIFO 池）。
-fn closed_form_mismatches(m: u64, pin: u64, tail: u64) -> u64 {
-    (m.saturating_sub(L + pin)).saturating_sub(tail)
+fn closed_form_mismatches(last_publish: u64, pin: u64, tail: u64) -> u64 {
+    (last_publish.saturating_sub(LOGICAL_OBJECT_COUNT + pin)).saturating_sub(tail)
 }
 
 /// 第二条路径：用重分配追踪器数「窗口内点名块在 M 前被重新分配过」的记录数。
 /// 不共享 recover 的任何代码。
-fn tracker_mismatches(w: &World) -> u64 {
-    let mut n = 0;
-    for p in (w.tail + 1)..=w.m {
-        let r = w.ring[(p % RING) as usize].expect("窗口在环内");
-        assert_eq!(r.jsn, p);
-        if w.realloc_at[r.block as usize].iter().any(|&q| q > p && q <= w.m) {
-            n += 1;
+fn tracker_mismatches(world: &World) -> u64 {
+    let mut mismatch_count = 0;
+    for publish in (world.tail + 1)..=world.last_publish {
+        let record = world.ring[(publish % RING) as usize].expect("窗口在环内");
+        assert_eq!(record.jsn, publish);
+        if world.reallocated_at_publishes[record.block as usize].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish) {
+            mismatch_count += 1;
         }
     }
-    n
+    mismatch_count
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!("name=config objects={L} ring={RING} model=counting file_ops=0"))
+        emitter.emit_raw(&format!("name=config objects={LOGICAL_OBJECT_COUNT} ring={RING} model=counting file_ops=0"))
     );
 
     // 主格 + 边界格：tail 陈旧程度 × PIN。
-    for (m, pin, tail_every) in [(23u64, 1u64, 16u64), (13, 1, 8), (23, 2, 16), (37, 1, 32)] {
+    for (last_publish, pin, tail_every) in [(23u64, 1u64, 16u64), (13, 1, 8), (23, 2, 16), (37, 1, 32)] {
         for torn in [false, true] {
-            let w = build_world(m, pin, tail_every, torn);
-            let cf = closed_form_mismatches(m, pin, w.tail);
-            let tr = tracker_mismatches(&w);
+            let world = build_world(last_publish, pin, tail_every, torn);
+            let closed_form = closed_form_mismatches(last_publish, pin, world.tail);
+            let tracker = tracker_mismatches(&world);
             println!(
                 "{}",
-                em.emit_raw(&format!(
-                    "name=world m={m} pin={pin} tail={} torn={} closed_form={cf} tracker={tr}",
-                    w.tail,
+                emitter.emit_raw(&format!(
+                    "name=world m={last_publish} pin={pin} tail={} torn={} closed_form={closed_form} tracker={tracker}",
+                    world.tail,
                     u8::from(torn)
                 ))
             );
-            for algo in [Algo::A1AbortOnMismatch, Algo::A2SkipOnMismatch, Algo::BWatermark, Algo::CBlindThenWalk] {
-                let r = recover(&w, algo);
+            for algorithm in [RecoveryAlgorithm::AbortOnMismatch, RecoveryAlgorithm::SkipOnMismatch, RecoveryAlgorithm::ReplayAboveWatermark, RecoveryAlgorithm::BlindReplayThenWalk] {
+                let recovery_run = recover(&world, algorithm);
                 println!(
                     "{}",
-                    em.emit_raw(&format!(
-                        "name=recover m={m} pin={pin} tail={} torn={} algo={} completed={} aborted={} replayed={} mismatches={} skipped={} retries={} torn_flagged={} final_ok={}",
-                        w.tail,
+                    emitter.emit_raw(&format!(
+                        "name=recover m={last_publish} pin={pin} tail={} torn={} algo={} completed={} aborted={} replayed={} mismatches={} skipped={} retries={} torn_flagged={} final_ok={}",
+                        world.tail,
                         u8::from(torn),
-                        algo.tag(),
-                        u8::from(r.completed),
-                        u8::from(r.aborted),
-                        r.replayed,
-                        r.mismatches,
-                        r.skipped,
-                        r.retries,
-                        u8::from(r.torn_flagged),
-                        u8::from(audit_final(&w, &r))
+                        algorithm.output_label(),
+                        u8::from(recovery_run.completed),
+                        u8::from(recovery_run.aborted),
+                        recovery_run.replayed,
+                        recovery_run.mismatches,
+                        recovery_run.skipped,
+                        recovery_run.retries,
+                        u8::from(recovery_run.torn_flagged),
+                        u8::from(audit_final(&world, &recovery_run))
                     ))
                 );
             }
         }
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -367,33 +367,33 @@ mod tests {
     /// 手算：r9 点名的块在 p13 才被释放、p14 才会复用，窗口里没有一条被复用。
     #[test]
     fn absolute_anchor_no_mismatch() {
-        let w = build_world(13, 1, 8, false);
-        assert_eq!(w.tail, 8);
+        let world = build_world(13, 1, 8, false);
+        assert_eq!(world.tail, 8);
         assert_eq!(closed_form_mismatches(13, 1, 8), 0);
-        assert_eq!(tracker_mismatches(&w), 0);
-        let r = recover(&w, Algo::A1AbortOnMismatch);
-        assert!(r.completed && !r.aborted);
+        assert_eq!(tracker_mismatches(&world), 0);
+        let recovery_run = recover(&world, RecoveryAlgorithm::AbortOnMismatch);
+        assert!(recovery_run.completed && !recovery_run.aborted);
     }
 
     /// **判据 1 绝对值锚点二**：(M=23, L=4, PIN=1, TAIL_EVERY=16) ⇒ tail=16，失配恰 2
     /// （p=17、18 两条：块在 p+4 释放、p+5 复用，都 ≤ 23）。
     #[test]
     fn absolute_anchor_two_mismatches() {
-        let w = build_world(23, 1, 16, false);
-        assert_eq!(w.tail, 16);
+        let world = build_world(23, 1, 16, false);
+        assert_eq!(world.tail, 16);
         assert_eq!(closed_form_mismatches(23, 1, 16), 2);
-        assert_eq!(tracker_mismatches(&w), 2);
+        assert_eq!(tracker_mismatches(&world), 2);
     }
 
     /// **判据 1**：闭式与追踪器在全部主格上逐格相等（两条不共享代码的路径）。
     #[test]
     fn closed_form_equals_tracker_everywhere() {
-        for (m, pin, te) in [(23u64, 1u64, 16u64), (13, 1, 8), (23, 2, 16), (37, 1, 32)] {
-            let w = build_world(m, pin, te, false);
+        for (last_publish, pin, tail_every) in [(23u64, 1u64, 16u64), (13, 1, 8), (23, 2, 16), (37, 1, 32)] {
+            let world = build_world(last_publish, pin, tail_every, false);
             assert_eq!(
-                closed_form_mismatches(m, pin, w.tail),
-                tracker_mismatches(&w),
-                "m={m} pin={pin} te={te}"
+                closed_form_mismatches(last_publish, pin, world.tail),
+                tracker_mismatches(&world),
+                "m={last_publish} pin={pin} te={tail_every}"
             );
         }
     }
@@ -401,83 +401,83 @@ mod tests {
     /// **判据 2 阳性对照**：失配 > 0 的格上，A1 在健康镜像上必须中止。
     /// 不中止 ⇒ 模型没有判别力 ⇒ 整轮作废。
     #[test]
-    fn positive_control_a1_aborts_on_healthy() {
-        let w = build_world(23, 1, 16, false);
-        let r = recover(&w, Algo::A1AbortOnMismatch);
-        assert!(r.aborted, "健康镜像 + 陈旧 tail ⇒ A1 必须把失配当损坏中止");
-        assert!(!audit_final(&w, &r));
+    fn positive_control_abort_on_mismatch_aborts_on_healthy_image() {
+        let world = build_world(23, 1, 16, false);
+        let recovery_run = recover(&world, RecoveryAlgorithm::AbortOnMismatch);
+        assert!(recovery_run.aborted, "健康镜像 + 陈旧 tail ⇒ A1 必须把失配当损坏中止");
+        assert!(!audit_final(&world, &recovery_run));
     }
 
     /// A2 在健康镜像上悄悄跳过恰好闭式那么多条，终态仍对。
     #[test]
-    fn a2_skips_exactly_closed_form() {
-        let w = build_world(23, 1, 16, false);
-        let r = recover(&w, Algo::A2SkipOnMismatch);
-        assert!(r.completed);
-        assert_eq!(r.skipped, 2);
-        assert!(audit_final(&w, &r), "跳过式的终态必须与真值逐格相等");
+    fn skip_on_mismatch_skips_exactly_closed_form() {
+        let world = build_world(23, 1, 16, false);
+        let recovery_run = recover(&world, RecoveryAlgorithm::SkipOnMismatch);
+        assert!(recovery_run.completed);
+        assert_eq!(recovery_run.skipped, 2);
+        assert!(audit_final(&world, &recovery_run), "跳过式的终态必须与真值逐格相等");
     }
 
     /// **判据 3**：torn 场景下 A2 的旗标必须为 0——它分不出「陈旧失配」与「真撕裂」。
     #[test]
-    fn a2_cannot_flag_torn() {
-        let w = build_world(23, 1, 16, true);
-        let r = recover(&w, Algo::A2SkipOnMismatch);
-        assert!(r.completed);
-        assert!(!r.torn_flagged, "A2 把撕裂当成又一条陈旧失配吞掉");
-        assert_eq!(r.skipped, 3, "2 条陈旧 + 1 条撕裂，同一个计数器");
-        assert!(audit_final(&w, &r));
+    fn skip_on_mismatch_cannot_flag_torn() {
+        let world = build_world(23, 1, 16, true);
+        let recovery_run = recover(&world, RecoveryAlgorithm::SkipOnMismatch);
+        assert!(recovery_run.completed);
+        assert!(!recovery_run.torn_flagged, "A2 把撕裂当成又一条陈旧失配吞掉");
+        assert_eq!(recovery_run.skipped, 3, "2 条陈旧 + 1 条撕裂，同一个计数器");
+        assert!(audit_final(&world, &recovery_run));
     }
 
     /// **判据 3**：B 在健康镜像上一条都不重放；torn 场景旗标 1、终态 M。
     #[test]
-    fn b_watermark_replays_nothing_healthy_flags_torn() {
+    fn replay_above_watermark_replays_nothing_healthy_flags_torn() {
         let healthy = build_world(23, 1, 16, false);
-        let r = recover(&healthy, Algo::BWatermark);
-        assert!(r.completed);
-        assert_eq!(r.replayed, 0);
-        assert_eq!(r.mismatches, 0);
-        assert!(audit_final(&healthy, &r));
+        let recovery_run = recover(&healthy, RecoveryAlgorithm::ReplayAboveWatermark);
+        assert!(recovery_run.completed);
+        assert_eq!(recovery_run.replayed, 0);
+        assert_eq!(recovery_run.mismatches, 0);
+        assert!(audit_final(&healthy, &recovery_run));
 
         let torn = build_world(23, 1, 16, true);
-        let r = recover(&torn, Algo::BWatermark);
-        assert!(r.completed);
-        assert!(r.torn_flagged);
-        assert!(audit_final(&torn, &r));
+        let recovery_run = recover(&torn, RecoveryAlgorithm::ReplayAboveWatermark);
+        assert!(recovery_run.completed);
+        assert!(recovery_run.torn_flagged);
+        assert!(audit_final(&torn, &recovery_run));
     }
 
     /// **判据 3**：C 在健康镜像上零重试；torn 场景恰一轮尾删、旗标 1、终态 M。
     #[test]
-    fn c_blind_walk_healthy_and_torn() {
+    fn blind_replay_then_walk_healthy_and_torn() {
         let healthy = build_world(23, 1, 16, false);
-        let r = recover(&healthy, Algo::CBlindThenWalk);
-        assert!(r.completed);
-        assert_eq!(r.retries, 0, "盲放 + 收尾走读在健康镜像上一轮过");
-        assert!(audit_final(&healthy, &r));
+        let recovery_run = recover(&healthy, RecoveryAlgorithm::BlindReplayThenWalk);
+        assert!(recovery_run.completed);
+        assert_eq!(recovery_run.retries, 0, "盲放 + 收尾走读在健康镜像上一轮过");
+        assert!(audit_final(&healthy, &recovery_run));
 
         let torn = build_world(23, 1, 16, true);
-        let r = recover(&torn, Algo::CBlindThenWalk);
-        assert!(r.completed);
-        assert_eq!(r.retries, 1, "撕裂 ⇒ 恰一轮尾删");
-        assert_eq!(r.replayed, 7, "尾删只许删掉撕裂那一条，窗口里其余 7 条要保住");
-        assert!(r.torn_flagged);
-        assert!(audit_final(&torn, &r));
+        let recovery_run = recover(&torn, RecoveryAlgorithm::BlindReplayThenWalk);
+        assert!(recovery_run.completed);
+        assert_eq!(recovery_run.retries, 1, "撕裂 ⇒ 恰一轮尾删");
+        assert_eq!(recovery_run.replayed, 7, "尾删只许删掉撕裂那一条，窗口里其余 7 条要保住");
+        assert!(recovery_run.torn_flagged);
+        assert!(audit_final(&torn, &recovery_run));
     }
 
     /// **失败条款那条构造不变量**：窗口内被复用块的记录，其对象必有更晚的记录在窗口内。
     /// 违反它 C 的尾删会误删好记录，模型作废。
     #[test]
     fn reused_record_object_has_later_record() {
-        let w = build_world(23, 1, 16, false);
-        for p in (w.tail + 1)..=w.m {
-            let r = w.ring[(p % RING) as usize].unwrap();
-            let reused = w.realloc_at[r.block as usize].iter().any(|&q| q > p && q <= w.m);
-            if reused {
-                let later = ((p + 1)..=w.m).any(|q| {
-                    let r2 = w.ring[(q % RING) as usize].unwrap();
-                    r2.object == r.object
+        let world = build_world(23, 1, 16, false);
+        for publish in (world.tail + 1)..=world.last_publish {
+            let record = world.ring[(publish % RING) as usize].unwrap();
+            let is_block_reused = world.reallocated_at_publishes[record.block as usize].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish);
+            if is_block_reused {
+                let has_later_record = ((publish + 1)..=world.last_publish).any(|later_publish| {
+                    let later_record = world.ring[(later_publish % RING) as usize].unwrap();
+                    later_record.object == record.object
                 });
-                assert!(later, "p={p} 的块被复用而对象没有更晚记录");
+                assert!(has_later_record, "p={publish} 的块被复用而对象没有更晚记录");
             }
         }
     }
@@ -486,21 +486,21 @@ mod tests {
     /// 这正是「bug 只在 tail 足够陈旧时咬人」的形状——测试常绿不代表没事。
     #[test]
     fn fresh_tail_hides_the_problem() {
-        let w = build_world(13, 1, 8, false);
-        for algo in [Algo::A1AbortOnMismatch, Algo::A2SkipOnMismatch, Algo::BWatermark, Algo::CBlindThenWalk] {
-            let r = recover(&w, algo);
-            assert!(r.completed && !r.aborted, "{algo:?}");
-            assert!(audit_final(&w, &r), "{algo:?}");
+        let world = build_world(13, 1, 8, false);
+        for algorithm in [RecoveryAlgorithm::AbortOnMismatch, RecoveryAlgorithm::SkipOnMismatch, RecoveryAlgorithm::ReplayAboveWatermark, RecoveryAlgorithm::BlindReplayThenWalk] {
+            let recovery_run = recover(&world, algorithm);
+            assert!(recovery_run.completed && !recovery_run.aborted, "{algorithm:?}");
+            assert!(audit_final(&world, &recovery_run), "{algorithm:?}");
         }
     }
 
     /// PIN 加大把失配数压小：闭式对 PIN 单调。I-7.4 的窗口每多扣一代，陈旧重放少撞一条。
     #[test]
     fn bigger_pin_fewer_mismatches() {
-        let w1 = build_world(23, 1, 16, false);
-        let w2 = build_world(23, 2, 16, false);
-        assert_eq!(tracker_mismatches(&w1), 2);
-        assert_eq!(tracker_mismatches(&w2), 1);
+        let world_pin_one = build_world(23, 1, 16, false);
+        let world_pin_two = build_world(23, 2, 16, false);
+        assert_eq!(tracker_mismatches(&world_pin_one), 2);
+        assert_eq!(tracker_mismatches(&world_pin_two), 1);
     }
 
     /// tail 更陈旧失配更多：M=37 / TAIL_EVERY=32 ⇒ tail=32，窗口 5，闭式 0；
@@ -515,18 +515,18 @@ mod tests {
     /// 撕裂记录的构造自检：环里有 M+1、其单元内容不等于标签。
     #[test]
     fn torn_construction_is_really_torn() {
-        let w = build_world(23, 1, 16, true);
-        let r = w.torn_record.expect("torn 场景必须有那条记录");
-        assert_eq!(r.jsn, 24);
-        assert_ne!(w.content[r.block as usize], r.tag, "单元真的没落盘");
+        let world = build_world(23, 1, 16, true);
+        let torn_record = world.torn_record.expect("torn 场景必须有那条记录");
+        assert_eq!(torn_record.jsn, 24);
+        assert_ne!(world.content[torn_record.block as usize], torn_record.tag, "单元真的没落盘");
     }
 
     /// 环槽映射自检：窗口内每条 jsn 都能在 slot = jsn % RING 找到自己。
     #[test]
     fn ring_holds_the_window() {
-        let w = build_world(37, 1, 32, false);
-        for p in (w.tail + 1)..=w.m {
-            assert_eq!(w.ring[(p % RING) as usize].unwrap().jsn, p);
+        let world = build_world(37, 1, 32, false);
+        for publish in (world.tail + 1)..=world.last_publish {
+            assert_eq!(world.ring[(publish % RING) as usize].unwrap().jsn, publish);
         }
     }
 
@@ -536,10 +536,10 @@ mod tests {
     /// （2026-09-02 变异测试实测：M8 一个测试都没红，正是这个洞）。
     #[test]
     fn prefix_stops_at_wrong_jsn() {
-        let mut w = build_world(23, 1, 16, false);
+        let mut world = build_world(23, 1, 16, false);
         let slot = (20 % RING) as usize;
-        w.ring[slot] = Some(Record { jsn: 999, object: 0, block: 0, tag: 0 });
-        let prefix = continuous_prefix(&w, w.tail);
+        world.ring[slot] = Some(Record { jsn: 999, object: 0, block: 0, tag: 0 });
+        let prefix = continuous_prefix(&world, world.tail);
         assert_eq!(prefix.len(), 3, "17、18、19 之后必须断号即止");
         assert_eq!(prefix.last().unwrap().jsn, 19);
     }
@@ -547,10 +547,10 @@ mod tests {
     /// 审计的判别力：把终态映射改动一格，审计必须翻红。
     #[test]
     fn audit_has_teeth() {
-        let w = build_world(13, 1, 8, false);
-        let mut r = recover(&w, Algo::BWatermark);
-        assert!(audit_final(&w, &r));
-        r.final_map[0] = 9999;
-        assert!(!audit_final(&w, &r));
+        let world = build_world(13, 1, 8, false);
+        let mut recovery_run = recover(&world, RecoveryAlgorithm::ReplayAboveWatermark);
+        assert!(audit_final(&world, &recovery_run));
+        recovery_run.final_map[0] = 9999;
+        assert!(!audit_final(&world, &recovery_run));
     }
 }

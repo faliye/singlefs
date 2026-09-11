@@ -29,11 +29,11 @@ use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Topo { Linear, MultiHead }
+enum Topology { Linear, MultiHead }
 
 #[derive(Clone)]
-struct Snap {
-    id: u64,
+struct Snapshot {
+    snapshot_identifier: u64,
     parent: Option<u64>,
     txg: u64,
     live: bool,
@@ -45,7 +45,7 @@ struct Snap {
 
 #[derive(Clone)]
 struct Extent {
-    id: u64,
+    extent_identifier: u64,
     /// 创建它的快照节点（E26 的 birth_txg 同义：本模型里 txg = 快照 id）
     birth: u64,
     /// 删除前沿：继承没发生的那一步就地记下的节点（记账是事务的副产品，无事后扫描）。
@@ -57,67 +57,67 @@ struct Extent {
 
 /// 候选臂看得到的那一份：**没有 refs 字段**。
 /// 想抄真值答案就编译不过（machine-first：用类型让非法状态无法表示）。
-struct CandExtent {
-    id: u64,
+struct CandidateExtent {
+    extent_identifier: u64,
     birth: u64,
     frontier: Vec<u64>,
 }
 
-struct World { snaps: BTreeMap<u64, Snap>, exts: BTreeMap<u64, Extent> }
+struct World { snaps: BTreeMap<u64, Snapshot>, extents: BTreeMap<u64, Extent> }
 
-fn xorshift(s: &mut u64) -> u64 {
-    *s ^= *s >> 12; *s ^= *s << 25; *s ^= *s >> 27;
-    s.wrapping_mul(0x2545_F491_4F6C_DD1D)
+fn xorshift(state: &mut u64) -> u64 {
+    *state ^= *state >> 12; *state ^= *state << 25; *state ^= *state >> 27;
+    state.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
 /// 与 E26 的一处**故意**差别：拓扑与共享各用一条独立 RNG 流（同种子派生），
 /// 让树形状在规模扫描里保持不变——判据 2 要在固定的树上扫 extent 数。
-fn build(topo: Topo, n_snaps: u64, exts_per_snap: u64, share_pct: u64, seed: u64) -> World {
-    let mut topo_s = (seed | 1) ^ 0x9E37_79B9_7F4A_7C15;
-    let mut share_s = (seed | 1).wrapping_mul(0xBF58_476D_1CE4_E5B9) | 1;
+fn build(topology: Topology, snapshot_count: u64, extents_per_snapshot: u64, share_percent: u64, seed: u64) -> World {
+    let mut topology_random_state = (seed | 1) ^ 0x9E37_79B9_7F4A_7C15;
+    let mut share_random_state = (seed | 1).wrapping_mul(0xBF58_476D_1CE4_E5B9) | 1;
     let mut snaps = BTreeMap::new();
-    let mut exts: BTreeMap<u64, Extent> = BTreeMap::new();
-    let mut next_ext = 0u64;
-    for i in 0..n_snaps {
-        let parent = if i == 0 { None } else {
-            match topo {
-                Topo::Linear => Some(i - 1),
-                Topo::MultiHead => Some(xorshift(&mut topo_s) % i),
+    let mut extents: BTreeMap<u64, Extent> = BTreeMap::new();
+    let mut next_extent_identifier = 0u64;
+    for snapshot_index in 0..snapshot_count {
+        let parent = if snapshot_index == 0 { None } else {
+            match topology {
+                Topology::Linear => Some(snapshot_index - 1),
+                Topology::MultiHead => Some(xorshift(&mut topology_random_state) % snapshot_index),
             }
         };
-        for _ in 0..exts_per_snap {
-            let id = next_ext; next_ext += 1;
-            let mut refs = BTreeSet::new(); refs.insert(i);
-            exts.insert(id, Extent { id, birth: i, frontier: Vec::new(), refs });
+        for _ in 0..extents_per_snapshot {
+            let extent_identifier = next_extent_identifier; next_extent_identifier += 1;
+            let mut refs = BTreeSet::new(); refs.insert(snapshot_index);
+            extents.insert(extent_identifier, Extent { extent_identifier, birth: snapshot_index, frontier: Vec::new(), refs });
         }
         // 共享：本快照按比例继承父亲引用的 extent；**没继承的那一步就地记进前沿**
-        if let Some(p) = parent {
-            let inherited: Vec<u64> = exts.values()
-                .filter(|e| e.refs.contains(&p)).map(|e| e.id).collect();
-            for id in inherited {
-                let e = exts.get_mut(&id).unwrap();
-                if xorshift(&mut share_s) % 100 < share_pct {
-                    e.refs.insert(i);
+        if let Some(parent_identifier) = parent {
+            let inherited: Vec<u64> = extents.values()
+                .filter(|extent| extent.refs.contains(&parent_identifier)).map(|extent| extent.extent_identifier).collect();
+            for inherited_identifier in inherited {
+                let extent = extents.get_mut(&inherited_identifier).unwrap();
+                if xorshift(&mut share_random_state) % 100 < share_percent {
+                    extent.refs.insert(snapshot_index);
                 } else {
-                    e.frontier.push(i);
+                    extent.frontier.push(snapshot_index);
                 }
             }
         }
-        snaps.insert(i, Snap { id: i, parent, txg: i, live: true, pre: 0, post: 0 });
+        snaps.insert(snapshot_index, Snapshot { snapshot_identifier: snapshot_index, parent, txg: snapshot_index, live: true, pre: 0, post: 0 });
     }
     label(&mut snaps);
-    World { snaps, exts }
+    World { snaps, extents }
 }
 
 /// 建完树一次性编 preorder 区间。标号维护（树增长时的 order-maintenance）不在射程内，
 /// 见 kb 正文「口径与已知局限」。
-fn label(snaps: &mut BTreeMap<u64, Snap>) {
+fn label(snaps: &mut BTreeMap<u64, Snapshot>) {
     let mut children: BTreeMap<u64, Vec<u64>> = BTreeMap::new();
     let mut root = None;
-    for s in snaps.values() {
-        match s.parent {
-            Some(p) => children.entry(p).or_default().push(s.id),
-            None => root = Some(s.id),
+    for snapshot in snaps.values() {
+        match snapshot.parent {
+            Some(parent_identifier) => children.entry(parent_identifier).or_default().push(snapshot.snapshot_identifier),
+            None => root = Some(snapshot.snapshot_identifier),
         }
     }
     let root = root.expect("树必须有根");
@@ -125,99 +125,99 @@ fn label(snaps: &mut BTreeMap<u64, Snap>) {
     let mut next_pre = 0u64;
     let mut stack = vec![root];
     let mut order: Vec<u64> = Vec::new();
-    while let Some(u) = stack.pop() {
-        let s = snaps.get_mut(&u).unwrap();
-        s.pre = next_pre; next_pre += 1;
-        order.push(u);
-        if let Some(cs) = children.get(&u) {
+    while let Some(visiting) = stack.pop() {
+        let snapshot = snaps.get_mut(&visiting).unwrap();
+        snapshot.pre = next_pre; next_pre += 1;
+        order.push(visiting);
+        if let Some(child_list) = children.get(&visiting) {
             // 倒序进栈 ⇒ 按 id 升序访问，确定性
-            for &c in cs.iter().rev() { stack.push(c); }
+            for &child in child_list.iter().rev() { stack.push(child); }
         }
     }
-    let mut size: BTreeMap<u64, u64> = snaps.keys().map(|&k| (k, 1u64)).collect();
-    for &u in order.iter().rev() {
-        if let Some(p) = snaps[&u].parent {
-            let su = size[&u];
-            *size.get_mut(&p).unwrap() += su;
+    let mut size: BTreeMap<u64, u64> = snaps.keys().map(|&snapshot_key| (snapshot_key, 1u64)).collect();
+    for &visited in order.iter().rev() {
+        if let Some(parent_identifier) = snaps[&visited].parent {
+            let subtree_size = size[&visited];
+            *size.get_mut(&parent_identifier).unwrap() += subtree_size;
         }
     }
-    for (&u, s) in snaps.iter_mut() {
-        s.post = s.pre + size[&u] - 1;
+    for (&snapshot_key, snapshot) in snaps.iter_mut() {
+        snapshot.post = snapshot.pre + size[&snapshot_key] - 1;
     }
 }
 
-fn in_subtree(snaps: &BTreeMap<u64, Snap>, anc: u64, v: u64) -> bool {
-    let a = &snaps[&anc];
-    let pv = snaps[&v].pre;
-    a.pre <= pv && pv <= a.post
+fn in_subtree(snaps: &BTreeMap<u64, Snapshot>, ancestor: u64, candidate: u64) -> bool {
+    let ancestor_snapshot = &snaps[&ancestor];
+    let candidate_preorder = snaps[&candidate].pre;
+    ancestor_snapshot.pre <= candidate_preorder && candidate_preorder <= ancestor_snapshot.post
 }
 
-/// 与 `id` 可比的快照集合 = 祖先 ∪ 后代（含自己）。E26 同构。
-fn comparable(w: &World, id: u64) -> BTreeSet<u64> {
-    let mut anc = BTreeSet::new();
-    let mut cur = Some(id);
-    while let Some(c) = cur {
-        if !anc.insert(c) { break; }
-        cur = w.snaps.get(&c).and_then(|s| s.parent);
+/// 与 `snapshot_identifier` 可比的快照集合 = 祖先 ∪ 后代（含自己）。E26 同构。
+fn comparable(world: &World, snapshot_identifier: u64) -> BTreeSet<u64> {
+    let mut ancestors = BTreeSet::new();
+    let mut ancestor_walk_next = Some(snapshot_identifier);
+    while let Some(ancestor_walk_current) = ancestor_walk_next {
+        if !ancestors.insert(ancestor_walk_current) { break; }
+        ancestor_walk_next = world.snaps.get(&ancestor_walk_current).and_then(|snapshot| snapshot.parent);
     }
-    let mut out = anc.clone();
-    for s in w.snaps.values() {
-        let mut c = Some(s.id);
-        while let Some(x) = c {
-            if x == id { out.insert(s.id); break; }
-            c = w.snaps.get(&x).and_then(|y| y.parent);
+    let mut comparable_set = ancestors.clone();
+    for snapshot in world.snaps.values() {
+        let mut descendant_check_next = Some(snapshot.snapshot_identifier);
+        while let Some(descendant_check_current) = descendant_check_next {
+            if descendant_check_current == snapshot_identifier { comparable_set.insert(snapshot.snapshot_identifier); break; }
+            descendant_check_next = world.snaps.get(&descendant_check_current).and_then(|parent_snapshot| parent_snapshot.parent);
         }
     }
-    out
+    comparable_set
 }
 
 /// 真值：枚举全部活快照。**不走任何臂的代码。**
-fn truly_free_set(w: &World) -> BTreeSet<u64> {
-    let live: BTreeSet<u64> = w.snaps.values().filter(|s| s.live).map(|s| s.id).collect();
-    w.exts.values()
-        .filter(|e| e.refs.iter().all(|r| !live.contains(r)))
-        .map(|e| e.id).collect()
+fn truly_free_set(world: &World) -> BTreeSet<u64> {
+    let live: BTreeSet<u64> = world.snaps.values().filter(|snapshot| snapshot.live).map(|snapshot| snapshot.snapshot_identifier).collect();
+    world.extents.values()
+        .filter(|extent| extent.refs.iter().all(|referrer| !live.contains(referrer)))
+        .map(|extent| extent.extent_identifier).collect()
 }
 
 /// 基线臂（付查找）：E26 的 deadlist 臂同构。定义句原样贴
 /// （verify-before-claiming：引用决策去推导之前先贴定义）：
 ///   「块 b 被快照 S 引用 ⟺ birth(b) ≤ S.txg < death(b)，左闭右开」
 ///   「death(b) = 最后一个活引用被摘掉且被发布的 checkpoint 号；仍在活树里则为 ∞」
-fn paylookup_arm(w: &World, victim: u64) -> (BTreeSet<u64>, u64) {
+fn paylookup_arm(world: &World, victim: u64) -> (BTreeSet<u64>, u64) {
     let mut lookups = 0u64;
-    let v = &w.snaps[&victim];
-    let chain = comparable(w, victim);
-    let mut out = BTreeSet::new();
-    for e in w.exts.values() {
-        if !e.refs.contains(&victim) { continue; }
-        let has_sibling_ref = e.refs.iter().any(|r| *r != victim && !chain.contains(r));
+    let victim_snapshot = &world.snaps[&victim];
+    let chain = comparable(world, victim);
+    let mut freed_extents = BTreeSet::new();
+    for extent in world.extents.values() {
+        if !extent.refs.contains(&victim) { continue; }
+        let has_sibling_ref = extent.refs.iter().any(|referrer| *referrer != victim && !chain.contains(referrer));
         let death_finite = if has_sibling_ref {
             lookups += 1;                            // O(1) 性质在这里破掉
-            !e.refs.iter().any(|&r| r != victim
-                && w.snaps.get(&r).map(|x| x.live).unwrap_or(false))
+            !extent.refs.iter().any(|&referrer| referrer != victim
+                && world.snaps.get(&referrer).map(|referrer_snapshot| referrer_snapshot.live).unwrap_or(false))
         } else {
-            !e.refs.iter().any(|&r| r != victim
-                && w.snaps.get(&r).map(|x| x.live).unwrap_or(false))
+            !extent.refs.iter().any(|&referrer| referrer != victim
+                && world.snaps.get(&referrer).map(|referrer_snapshot| referrer_snapshot.live).unwrap_or(false))
         };
         if !death_finite { continue; }
-        let death = v.txg + 1;
-        if !w.snaps.values().any(|snap| snap.live && snap.id != victim
-            && e.birth <= snap.txg && snap.txg < death) {
-            out.insert(e.id);
+        let death = victim_snapshot.txg + 1;
+        if !world.snaps.values().any(|snap| snap.live && snap.snapshot_identifier != victim
+            && extent.birth <= snap.txg && snap.txg < death) {
+            freed_extents.insert(extent.extent_identifier);
         }
     }
-    (out, lookups)
+    (freed_extents, lookups)
 }
 
 /// 候选臂的观测量。
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct CandCost {
+struct CandidateCost {
     /// 反向索引查找——判据 2 要求恒为 0
     lookups: u64,
     /// 快照表探查次数 = Σ（1 + 前沿大小），只对被删快照可见的 extent 计
-    snap_checks: u64,
+    snapshot_table_checks: u64,
     /// 被检查的 extent 里最大的前沿
-    max_frontier: u64,
+    maximum_frontier: u64,
 }
 
 /// 候选臂：只拿得到（诞生节点，前沿）与快照树标号——**refs 不在入参里**。
@@ -225,73 +225,73 @@ struct CandCost {
 ///   剩余活引用 = 诞生子树内活快照数 − Σ 前沿子树内活快照数 − 1（victim 自己）。
 /// 前沿子树互不相交且都在诞生子树内（反链）⇒ 容斥恰好一层。
 fn frontier_arm(
-    snaps: &BTreeMap<u64, Snap>,
+    snaps: &BTreeMap<u64, Snapshot>,
     live_pre: &BTreeSet<u64>,
-    exts: &[CandExtent],
+    extents: &[CandidateExtent],
     victim: u64,
-) -> (BTreeSet<u64>, CandCost) {
-    let mut cost = CandCost::default();
-    let mut out = BTreeSet::new();
-    for e in exts {
-        let victim_sees = in_subtree(snaps, e.birth, victim)
-            && !e.frontier.iter().any(|&d| in_subtree(snaps, d, victim));
+) -> (BTreeSet<u64>, CandidateCost) {
+    let mut cost = CandidateCost::default();
+    let mut freed_extents = BTreeSet::new();
+    for extent in extents {
+        let victim_sees = in_subtree(snaps, extent.birth, victim)
+            && !extent.frontier.iter().any(|&frontier_node| in_subtree(snaps, frontier_node, victim));
         if !victim_sees { continue; }
-        cost.snap_checks += 1 + e.frontier.len() as u64;
-        cost.max_frontier = cost.max_frontier.max(e.frontier.len() as u64);
-        let b = &snaps[&e.birth];
-        let total = live_pre.range(b.pre..=b.post).count() as u64;
-        let shadowed: u64 = e.frontier.iter().map(|&d| {
-            let ds = &snaps[&d];
-            live_pre.range(ds.pre..=ds.post).count() as u64
+        cost.snapshot_table_checks += 1 + extent.frontier.len() as u64;
+        cost.maximum_frontier = cost.maximum_frontier.max(extent.frontier.len() as u64);
+        let birth_snapshot = &snaps[&extent.birth];
+        let total = live_pre.range(birth_snapshot.pre..=birth_snapshot.post).count() as u64;
+        let shadowed: u64 = extent.frontier.iter().map(|&frontier_node| {
+            let frontier_snapshot = &snaps[&frontier_node];
+            live_pre.range(frontier_snapshot.pre..=frontier_snapshot.post).count() as u64
         }).sum();
         // victim 可见 ⇒ victim 在诞生子树内且不在任何前沿子树内 ⇒ 恰好被 total 数进一次
         let remaining = total - shadowed - 1;
-        if remaining == 0 { out.insert(e.id); }
+        if remaining == 0 { freed_extents.insert(extent.extent_identifier); }
     }
-    (out, cost)
+    (freed_extents, cost)
 }
 
-fn cand_view(w: &World) -> (Vec<CandExtent>, BTreeSet<u64>) {
-    let exts = w.exts.values()
-        .map(|e| CandExtent { id: e.id, birth: e.birth, frontier: e.frontier.clone() })
+fn candidate_view(world: &World) -> (Vec<CandidateExtent>, BTreeSet<u64>) {
+    let extents = world.extents.values()
+        .map(|extent| CandidateExtent { extent_identifier: extent.extent_identifier, birth: extent.birth, frontier: extent.frontier.clone() })
         .collect();
-    let live_pre = w.snaps.values().filter(|s| s.live).map(|s| s.pre).collect();
-    (exts, live_pre)
+    let live_pre = world.snaps.values().filter(|snapshot| snapshot.live).map(|snapshot| snapshot.pre).collect();
+    (extents, live_pre)
 }
 
 /// 结构自证 ①：由（诞生节点，前沿）重算的可见集必须与生成时的 refs 逐 extent 相等。
-fn frontier_visibility_matches_refs(w: &World) -> bool {
-    w.exts.values().all(|e| {
-        w.snaps.keys().all(|&v| {
-            let derived = in_subtree(&w.snaps, e.birth, v)
-                && !e.frontier.iter().any(|&d| in_subtree(&w.snaps, d, v));
-            derived == e.refs.contains(&v)
+fn frontier_visibility_matches_refs(world: &World) -> bool {
+    world.extents.values().all(|extent| {
+        world.snaps.keys().all(|&snapshot_key| {
+            let derived = in_subtree(&world.snaps, extent.birth, snapshot_key)
+                && !extent.frontier.iter().any(|&frontier_node| in_subtree(&world.snaps, frontier_node, snapshot_key));
+            derived == extent.refs.contains(&snapshot_key)
         })
     })
 }
 
 /// 结构自证 ②：前沿必须是反链（任两个前沿节点无祖先关系）。
-fn frontier_is_antichain(w: &World) -> bool {
-    w.exts.values().all(|e| {
-        e.frontier.iter().all(|&a| e.frontier.iter().all(|&b|
-            a == b || !in_subtree(&w.snaps, a, b)))
+fn frontier_is_antichain(world: &World) -> bool {
+    world.extents.values().all(|extent| {
+        extent.frontier.iter().all(|&first_node| extent.frontier.iter().all(|&second_node|
+            first_node == second_node || !in_subtree(&world.snaps, first_node, second_node)))
     })
 }
 
 /// 全世界的前沿画像（存储侧口径：对全部 extent，不只对被检查的）。均值用千分位整数，
 /// 避免浮点格式抖动破坏逐字节比对。
-fn frontier_profile(w: &World) -> (u64, u64) {
-    let max = w.exts.values().map(|e| e.frontier.len() as u64).max().unwrap_or(0);
-    let total: u64 = w.exts.values().map(|e| e.frontier.len() as u64).sum();
-    let mean_milli = if w.exts.is_empty() { 0 } else { total * 1000 / w.exts.len() as u64 };
-    (max, mean_milli)
+fn frontier_profile(world: &World) -> (u64, u64) {
+    let maximum_frontier_length = world.extents.values().map(|extent| extent.frontier.len() as u64).max().unwrap_or(0);
+    let total: u64 = world.extents.values().map(|extent| extent.frontier.len() as u64).sum();
+    let mean_milli = if world.extents.is_empty() { 0 } else { total * 1000 / world.extents.len() as u64 };
+    (maximum_frontier_length, mean_milli)
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct MeasuredOutcome {
     lookups: u64,
-    snap_checks: u64,
-    max_frontier: u64,
+    snapshot_table_checks: u64,
+    maximum_frontier: u64,
     freed: u64,
     truly_free: u64,
     wrong_free: u64,
@@ -307,28 +307,28 @@ impl Arm {
     }
 }
 
-fn measure(topo: Topo, arm: Arm, n_snaps: u64, eps: u64, share: u64, seed: u64) -> Out {
-    let mut w = build(topo, n_snaps, eps, share, seed);
+fn measure(topology: Topology, arm: Arm, snapshot_count: u64, extents_per_snapshot: u64, share: u64, seed: u64) -> MeasuredOutcome {
+    let mut world = build(topology, snapshot_count, extents_per_snapshot, share, seed);
     // 结构自证不过 ⇒ 记账错了，整轮作废（失败条款）
-    assert!(frontier_visibility_matches_refs(&w), "前沿可见性与 refs 不等——记账错，整轮作废");
-    assert!(frontier_is_antichain(&w), "前沿不是反链——记账错，整轮作废");
-    let victim = n_snaps / 2;
+    assert!(frontier_visibility_matches_refs(&world), "前沿可见性与 refs 不等——记账错，整轮作废");
+    assert!(frontier_is_antichain(&world), "前沿不是反链——记账错，整轮作废");
+    let victim = snapshot_count / 2;
     let (freed, cost) = match arm {
         Arm::PayLookup => {
-            let (f, l) = paylookup_arm(&w, victim);
-            (f, CandCost { lookups: l, snap_checks: 0, max_frontier: 0 })
+            let (freed_set, lookup_count) = paylookup_arm(&world, victim);
+            (freed_set, CandidateCost { lookups: lookup_count, snapshot_table_checks: 0, maximum_frontier: 0 })
         }
         Arm::Frontier => {
-            let (exts, live_pre) = cand_view(&w);
-            frontier_arm(&w.snaps, &live_pre, &exts, victim)
+            let (extents, live_pre) = candidate_view(&world);
+            frontier_arm(&world.snaps, &live_pre, &extents, victim)
         }
     };
-    w.snaps.get_mut(&victim).unwrap().live = false;
-    let truth = truly_free_set(&w);
-    Out {
+    world.snaps.get_mut(&victim).unwrap().live = false;
+    let truth = truly_free_set(&world);
+    MeasuredOutcome {
         lookups: cost.lookups,
-        snap_checks: cost.snap_checks,
-        max_frontier: cost.max_frontier,
+        snapshot_table_checks: cost.snapshot_table_checks,
+        maximum_frontier: cost.maximum_frontier,
         freed: freed.len() as u64,
         truly_free: truth.len() as u64,
         wrong_free: freed.difference(&truth).count() as u64,
@@ -337,52 +337,52 @@ fn measure(topo: Topo, arm: Arm, n_snaps: u64, eps: u64, share: u64, seed: u64) 
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let (ns, eps) = (64u64, 8u64);
-    println!("{}", em.emit_raw(&format!("name=config snaps={ns} exts_per_snap={eps} victim=middle seed=42")));
+    let mut emitter = Emitter::new();
+    let (snapshot_count, extents_per_snapshot) = (64u64, 8u64);
+    println!("{}", emitter.emit_raw(&format!("name=config snaps={snapshot_count} exts_per_snap={extents_per_snapshot} victim=middle seed=42")));
     // ── 网格：拓扑 × 共享率 × 两臂，精度与代价 ──
-    for topo in [Topo::Linear, Topo::MultiHead] {
+    for topology in [Topology::Linear, Topology::MultiHead] {
         for share in [0u64, 30, 70] {
             for arm in [Arm::PayLookup, Arm::Frontier] {
-                let o = measure(topo, arm, ns, eps, share, 42);
-                println!("{}", em.emit_raw(&format!(
-                    "name=cell topo={topo:?} share={share} arm={} lookups={} snap_checks={} \
+                let outcome = measure(topology, arm, snapshot_count, extents_per_snapshot, share, 42);
+                println!("{}", emitter.emit_raw(&format!(
+                    "name=cell topo={topology:?} share={share} arm={} lookups={} snap_checks={} \
                      max_frontier={} freed={} truly_free={} wrong_free={} leaked={}",
-                    arm.label(), o.lookups, o.snap_checks, o.max_frontier,
-                    o.freed, o.truly_free, o.wrong_free, o.leaked)));
+                    arm.label(), outcome.lookups, outcome.snapshot_table_checks, outcome.maximum_frontier,
+                    outcome.freed, outcome.truly_free, outcome.wrong_free, outcome.leaked)));
             }
         }
     }
     // ── 规模扫描（判据 2）：固定树（拓扑流不动），extent 数 ×32，谁在长 ──
-    for eps in [4u64, 8, 16, 32, 64, 128] {
-        let p = measure(Topo::MultiHead, Arm::PayLookup, ns, eps, 70, 42);
-        let f = measure(Topo::MultiHead, Arm::Frontier, ns, eps, 70, 42);
-        println!("{}", em.emit_raw(&format!(
+    for extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
+        let paylookup_outcome = measure(Topology::MultiHead, Arm::PayLookup, snapshot_count, extents_per_snapshot, 70, 42);
+        let frontier_outcome = measure(Topology::MultiHead, Arm::Frontier, snapshot_count, extents_per_snapshot, 70, 42);
+        println!("{}", emitter.emit_raw(&format!(
             "name=scale total_exts={} paylookup_lookups={} frontier_lookups={} \
              frontier_snap_checks={} frontier_max={}",
-            ns * eps, p.lookups, f.lookups, f.snap_checks, f.max_frontier)));
+            snapshot_count * extents_per_snapshot, paylookup_outcome.lookups, frontier_outcome.lookups, frontier_outcome.snapshot_table_checks, frontier_outcome.maximum_frontier)));
     }
     // ── 分支扫描：候选臂的结构规模跟着快照数走，不跟 extent 总数走 ──
-    for n in [16u64, 32, 64, 128] {
-        let f = measure(Topo::MultiHead, Arm::Frontier, n, 8, 70, 42);
-        let w = build(Topo::MultiHead, n, 8, 70, 42);
-        let (fmax, fmean) = frontier_profile(&w);
-        println!("{}", em.emit_raw(&format!(
-            "name=branch snaps={n} table_size={n} lookups={} max_frontier_world={fmax} \
-             mean_frontier_milli={fmean} wrong_free={} leaked={}",
-            f.lookups, f.wrong_free, f.leaked)));
+    for swept_snapshot_count in [16u64, 32, 64, 128] {
+        let frontier_outcome = measure(Topology::MultiHead, Arm::Frontier, swept_snapshot_count, 8, 70, 42);
+        let world = build(Topology::MultiHead, swept_snapshot_count, 8, 70, 42);
+        let (maximum_frontier_in_world, mean_frontier_milli_in_world) = frontier_profile(&world);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=branch snaps={swept_snapshot_count} table_size={swept_snapshot_count} lookups={} max_frontier_world={maximum_frontier_in_world} \
+             mean_frontier_milli={mean_frontier_milli_in_world} wrong_free={} leaked={}",
+            frontier_outcome.lookups, frontier_outcome.wrong_free, frontier_outcome.leaked)));
     }
     // ── 碎删除档（D6 待验优化的限度 ①）：低共享 = 删得碎，前沿画像如实报 ──
     for share in [10u64, 30, 70, 90] {
-        let w = build(Topo::MultiHead, ns, 32, share, 42);
-        let (fmax, fmean) = frontier_profile(&w);
-        let f = measure(Topo::MultiHead, Arm::Frontier, ns, 32, share, 42);
-        println!("{}", em.emit_raw(&format!(
-            "name=frag share={share} max_frontier_world={fmax} mean_frontier_milli={fmean} \
+        let world = build(Topology::MultiHead, snapshot_count, 32, share, 42);
+        let (maximum_frontier_in_world, mean_frontier_milli_in_world) = frontier_profile(&world);
+        let frontier_outcome = measure(Topology::MultiHead, Arm::Frontier, snapshot_count, 32, share, 42);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=frag share={share} max_frontier_world={maximum_frontier_in_world} mean_frontier_milli={mean_frontier_milli_in_world} \
              wrong_free={} leaked={}",
-            f.wrong_free, f.leaked)));
+            frontier_outcome.wrong_free, frontier_outcome.leaked)));
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -392,23 +392,23 @@ mod tests {
     /// 真值必须是活快照的朴素枚举——它是唯一的裁判。
     #[test]
     fn truth_is_plain_enumeration_of_live_snapshots() {
-        let mut w = build(Topo::Linear, 3, 1, 0, 7);
-        assert_eq!(truly_free_set(&w).len(), 0, "全部快照活着时不该有自由 extent");
-        w.snaps.get_mut(&1).unwrap().live = false;
-        assert_eq!(truly_free_set(&w).len(), 1, "删掉一个无共享快照该放出它那一个 extent");
+        let mut world = build(Topology::Linear, 3, 1, 0, 7);
+        assert_eq!(truly_free_set(&world).len(), 0, "全部快照活着时不该有自由 extent");
+        world.snaps.get_mut(&1).unwrap().live = false;
+        assert_eq!(truly_free_set(&world).len(), 1, "删掉一个无共享快照该放出它那一个 extent");
     }
 
     /// **阳性对照，对每条臂都跑**：Linear + 零共享下两臂都必须与真值完全一致。
     #[test]
     fn positive_control_both_arms_match_truth_when_linear_and_unshared() {
         for arm in [Arm::PayLookup, Arm::Frontier] {
-            let o = measure(Topo::Linear, arm, 32, 4, 0, 42);
-            assert_eq!(o.wrong_free, 0, "{arm:?} 误放了");
-            assert_eq!(o.leaked, 0, "{arm:?} 漏放了");
-            assert_eq!(o.freed, o.truly_free, "{arm:?} 与真值不等");
+            let outcome = measure(Topology::Linear, arm, 32, 4, 0, 42);
+            assert_eq!(outcome.wrong_free, 0, "{arm:?} 误放了");
+            assert_eq!(outcome.leaked, 0, "{arm:?} 漏放了");
+            assert_eq!(outcome.freed, outcome.truly_free, "{arm:?} 与真值不等");
             // 钉绝对值：零共享时该放的恰是 victim 自己那 4 个 extent。
             // 只断言「与真值相等」的话，共享语义整个反转两边会一起错。
-            assert_eq!(o.freed, 4, "{arm:?} 零共享下该恰放 victim 的 4 个 extent");
+            assert_eq!(outcome.freed, 4, "{arm:?} 零共享下该恰放 victim 的 4 个 extent");
         }
     }
 
@@ -416,8 +416,8 @@ mod tests {
     /// 规模 ×16 时查找 > 4×。不中 ⇒ 这套测量分不出「随 N 长」，整轮作废。
     #[test]
     fn baseline_reproduces_e26_growth_under_multi_head() {
-        let small = measure(Topo::MultiHead, Arm::PayLookup, 64, 8, 70, 42).lookups;
-        let big = measure(Topo::MultiHead, Arm::PayLookup, 64, 128, 70, 42).lookups;
+        let small = measure(Topology::MultiHead, Arm::PayLookup, 64, 8, 70, 42).lookups;
+        let big = measure(Topology::MultiHead, Arm::PayLookup, 64, 128, 70, 42).lookups;
         assert!(small > 0, "小规模就该有旁支查找（实测 {small}）");
         assert!(big > small * 4,
             "规模 ×16 查找只从 {small} 到 {big}——基线没复现 O(N)，测量无判别力");
@@ -426,11 +426,11 @@ mod tests {
     /// **判据 2 钉绝对值**：候选臂反向索引查找在每个规模、每种拓扑下恒为 0。
     #[test]
     fn candidate_pays_zero_reverse_lookups_at_every_scale_and_topology() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
-            for eps in [4u64, 16, 64, 128] {
-                let o = measure(topo, Arm::Frontier, 64, eps, 70, 42);
-                assert_eq!(o.lookups, 0,
-                    "候选臂在 {topo:?}/{} extent 上付了 {} 次反向查找", 64 * eps, o.lookups);
+        for topology in [Topology::Linear, Topology::MultiHead] {
+            for extents_per_snapshot in [4u64, 16, 64, 128] {
+                let outcome = measure(topology, Arm::Frontier, 64, extents_per_snapshot, 70, 42);
+                assert_eq!(outcome.lookups, 0,
+                    "候选臂在 {topology:?}/{} extent 上付了 {} 次反向查找", 64 * extents_per_snapshot, outcome.lookups);
             }
         }
     }
@@ -438,14 +438,14 @@ mod tests {
     /// **判据 1**：候选臂在全部格子上误放与漏放都为 0（对着同一个真值）。
     #[test]
     fn candidate_is_exact_on_every_grid_cell() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
+        for topology in [Topology::Linear, Topology::MultiHead] {
             for share in [0u64, 10, 30, 70, 90] {
-                for (n, eps) in [(16u64, 4u64), (48, 6), (64, 32)] {
-                    let o = measure(topo, Arm::Frontier, n, eps, share, 42);
-                    assert_eq!(o.wrong_free, 0,
-                        "候选臂在 {topo:?}/share={share}/n={n}/eps={eps} 误放 {}", o.wrong_free);
-                    assert_eq!(o.leaked, 0,
-                        "候选臂在 {topo:?}/share={share}/n={n}/eps={eps} 漏放 {}", o.leaked);
+                for (snapshot_count, extents_per_snapshot) in [(16u64, 4u64), (48, 6), (64, 32)] {
+                    let outcome = measure(topology, Arm::Frontier, snapshot_count, extents_per_snapshot, share, 42);
+                    assert_eq!(outcome.wrong_free, 0,
+                        "候选臂在 {topology:?}/share={share}/n={snapshot_count}/eps={extents_per_snapshot} 误放 {}", outcome.wrong_free);
+                    assert_eq!(outcome.leaked, 0,
+                        "候选臂在 {topology:?}/share={share}/n={snapshot_count}/eps={extents_per_snapshot} 漏放 {}", outcome.leaked);
                 }
             }
         }
@@ -455,11 +455,11 @@ mod tests {
     /// 本模型的基线不精确就是移植错了。
     #[test]
     fn baseline_is_exact_too() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
+        for topology in [Topology::Linear, Topology::MultiHead] {
             for share in [0u64, 30, 70] {
-                let o = measure(topo, Arm::PayLookup, 48, 6, share, 42);
-                assert_eq!(o.wrong_free + o.leaked, 0,
-                    "基线臂在 {topo:?}/{share} 不精确——与 E26 已证性质矛盾");
+                let outcome = measure(topology, Arm::PayLookup, 48, 6, share, 42);
+                assert_eq!(outcome.wrong_free + outcome.leaked, 0,
+                    "基线臂在 {topology:?}/{share} 不精确——与 E26 已证性质矛盾");
             }
         }
     }
@@ -469,11 +469,11 @@ mod tests {
     #[test]
     fn linear_topology_degenerates_to_the_constant_form() {
         for share in [0u64, 30, 70] {
-            let w = build(Topo::Linear, 64, 8, share, 42);
-            let (fmax, _) = frontier_profile(&w);
-            assert!(fmax <= 1, "Linear 下前沿该 ≤ 1（share={share}，实测 {fmax}）");
-            let o = measure(Topo::Linear, Arm::Frontier, 64, 8, share, 42);
-            assert_eq!(o.lookups, 0, "Linear 下候选臂该零查找");
+            let world = build(Topology::Linear, 64, 8, share, 42);
+            let (maximum_frontier_in_world, _) = frontier_profile(&world);
+            assert!(maximum_frontier_in_world <= 1, "Linear 下前沿该 ≤ 1（share={share}，实测 {maximum_frontier_in_world}）");
+            let outcome = measure(Topology::Linear, Arm::Frontier, 64, 8, share, 42);
+            assert_eq!(outcome.lookups, 0, "Linear 下候选臂该零查找");
         }
     }
 
@@ -481,11 +481,11 @@ mod tests {
     /// 记账与真值两条路子对同一世界给同一个答案，这一步不过整轮作废。
     #[test]
     fn frontier_visibility_equals_generated_refs() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
+        for topology in [Topology::Linear, Topology::MultiHead] {
             for share in [0u64, 30, 70] {
-                let w = build(topo, 48, 6, share, 42);
-                assert!(frontier_visibility_matches_refs(&w),
-                    "{topo:?}/{share} 下前沿可见性与 refs 不等");
+                let world = build(topology, 48, 6, share, 42);
+                assert!(frontier_visibility_matches_refs(&world),
+                    "{topology:?}/{share} 下前沿可见性与 refs 不等");
             }
         }
     }
@@ -493,10 +493,10 @@ mod tests {
     /// **结构自证 ②**：前沿是反链。
     #[test]
     fn frontier_is_an_antichain_in_every_world() {
-        for topo in [Topo::Linear, Topo::MultiHead] {
+        for topology in [Topology::Linear, Topology::MultiHead] {
             for share in [0u64, 10, 70] {
-                let w = build(topo, 64, 8, share, 42);
-                assert!(frontier_is_antichain(&w), "{topo:?}/{share} 下前沿不是反链");
+                let world = build(topology, 64, 8, share, 42);
+                assert!(frontier_is_antichain(&world), "{topology:?}/{share} 下前沿不是反链");
             }
         }
     }
@@ -504,19 +504,19 @@ mod tests {
     /// **判据 2 的上界**：前沿是快照树节点的反链 ⇒ 大小 ≤ 快照数，与 extent 总数无关。
     #[test]
     fn frontier_bound_is_snapshot_count_not_extent_count() {
-        for eps in [8u64, 128] {
-            let w = build(Topo::MultiHead, 64, eps, 70, 42);
-            let (fmax, _) = frontier_profile(&w);
-            assert!(fmax <= 64, "前沿 {fmax} 超过快照数 64——反链上界破了");
+        for extents_per_snapshot in [8u64, 128] {
+            let world = build(Topology::MultiHead, 64, extents_per_snapshot, 70, 42);
+            let (maximum_frontier_in_world, _) = frontier_profile(&world);
+            assert!(maximum_frontier_in_world <= 64, "前沿 {maximum_frontier_in_world} 超过快照数 64——反链上界破了");
         }
     }
 
     /// **碎删除那一维必须真的动结果**（低共享 ⇒ 前沿 > 1），否则它是死代码。
     #[test]
     fn fragmented_deletion_makes_frontier_grow_beyond_one() {
-        let w = build(Topo::MultiHead, 64, 32, 10, 42);
-        let (fmax, _) = frontier_profile(&w);
-        assert!(fmax > 1, "碎删除档前沿最大值 {fmax} 没超过 1——退化那一维没被测到");
+        let world = build(Topology::MultiHead, 64, 32, 10, 42);
+        let (maximum_frontier_in_world, _) = frontier_profile(&world);
+        assert!(maximum_frontier_in_world > 1, "碎删除档前沿最大值 {maximum_frontier_in_world} 没超过 1——退化那一维没被测到");
     }
 
     /// **手搭小世界，逐格钉绝对值**（防「所有臂一起错」）：
@@ -526,49 +526,49 @@ mod tests {
     #[test]
     fn hand_built_world_pins_every_absolute_value() {
         let mut snaps = BTreeMap::new();
-        snaps.insert(0, Snap { id: 0, parent: None, txg: 0, live: true, pre: 0, post: 0 });
-        snaps.insert(1, Snap { id: 1, parent: Some(0), txg: 1, live: true, pre: 0, post: 0 });
-        snaps.insert(2, Snap { id: 2, parent: Some(0), txg: 2, live: true, pre: 0, post: 0 });
+        snaps.insert(0, Snapshot { snapshot_identifier: 0, parent: None, txg: 0, live: true, pre: 0, post: 0 });
+        snaps.insert(1, Snapshot { snapshot_identifier: 1, parent: Some(0), txg: 1, live: true, pre: 0, post: 0 });
+        snaps.insert(2, Snapshot { snapshot_identifier: 2, parent: Some(0), txg: 2, live: true, pre: 0, post: 0 });
         label(&mut snaps);
-        let mut exts = BTreeMap::new();
-        exts.insert(0, Extent { id: 0, birth: 0, frontier: vec![2],
+        let mut extents = BTreeMap::new();
+        extents.insert(0, Extent { extent_identifier: 0, birth: 0, frontier: vec![2],
             refs: [0u64, 1].into_iter().collect() });
-        exts.insert(1, Extent { id: 1, birth: 1, frontier: vec![],
+        extents.insert(1, Extent { extent_identifier: 1, birth: 1, frontier: vec![],
             refs: [1u64].into_iter().collect() });
-        exts.insert(2, Extent { id: 2, birth: 0, frontier: vec![],
+        extents.insert(2, Extent { extent_identifier: 2, birth: 0, frontier: vec![],
             refs: [0u64, 1, 2].into_iter().collect() });
-        let w = World { snaps, exts };
-        assert!(frontier_visibility_matches_refs(&w), "手搭世界的前沿与 refs 不等");
+        let world = World { snaps, extents };
+        assert!(frontier_visibility_matches_refs(&world), "手搭世界的前沿与 refs 不等");
 
-        let (pl_freed, pl_lookups) = paylookup_arm(&w, 1);
-        assert_eq!(pl_freed.iter().copied().collect::<Vec<_>>(), vec![1], "基线该恰好放 B");
+        let (paylookup_freed, paylookup_lookups) = paylookup_arm(&world, 1);
+        assert_eq!(paylookup_freed.iter().copied().collect::<Vec<_>>(), vec![1], "基线该恰好放 B");
         // C 的 refs 里有旁支 2（不在 victim=1 的可比链 {0,1} 里）⇒ 基线恰付 1 次查找。
         // A（refs {0,1}）与 B（refs {1}）全在链上，零查找。
-        assert_eq!(pl_lookups, 1, "基线该恰为 C 付 1 次旁支查找");
+        assert_eq!(paylookup_lookups, 1, "基线该恰为 C 付 1 次旁支查找");
 
-        let (exts_v, live_pre) = cand_view(&w);
-        let (fr_freed, cost) = frontier_arm(&w.snaps, &live_pre, &exts_v, 1);
-        assert_eq!(fr_freed.iter().copied().collect::<Vec<_>>(), vec![1], "候选该恰好放 B");
+        let (candidate_extents, live_pre) = candidate_view(&world);
+        let (frontier_freed, cost) = frontier_arm(&world.snaps, &live_pre, &candidate_extents, 1);
+        assert_eq!(frontier_freed.iter().copied().collect::<Vec<_>>(), vec![1], "候选该恰好放 B");
         assert_eq!(cost.lookups, 0);
         // victim=1 可见的是 A(前沿 1 项)、B(0 项)、C(0 项) ⇒ 探查 = 2 + 1 + 1
-        assert_eq!(cost.snap_checks, 4, "快照表探查该恰为 4");
-        assert_eq!(cost.max_frontier, 1);
+        assert_eq!(cost.snapshot_table_checks, 4, "快照表探查该恰为 4");
+        assert_eq!(cost.maximum_frontier, 1);
     }
 
     /// preorder 区间标号本身要对：子树判定与父链爬升逐对相等。
     #[test]
     fn interval_labels_agree_with_parent_chain_walk() {
-        let w = build(Topo::MultiHead, 32, 2, 50, 42);
-        for &a in w.snaps.keys() {
-            for &v in w.snaps.keys() {
-                let mut cur = Some(v);
-                let mut walk = false;
-                while let Some(x) = cur {
-                    if x == a { walk = true; break; }
-                    cur = w.snaps[&x].parent;
+        let world = build(Topology::MultiHead, 32, 2, 50, 42);
+        for &ancestor in world.snaps.keys() {
+            for &candidate in world.snaps.keys() {
+                let mut next_to_visit = Some(candidate);
+                let mut found_by_parent_walk = false;
+                while let Some(current) = next_to_visit {
+                    if current == ancestor { found_by_parent_walk = true; break; }
+                    next_to_visit = world.snaps[&current].parent;
                 }
-                assert_eq!(in_subtree(&w.snaps, a, v), walk,
-                    "区间判定与父链爬升在 ({a},{v}) 上不等");
+                assert_eq!(in_subtree(&world.snaps, ancestor, candidate), found_by_parent_walk,
+                    "区间判定与父链爬升在 ({ancestor},{candidate}) 上不等");
             }
         }
     }

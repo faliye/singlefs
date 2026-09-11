@@ -20,7 +20,7 @@
 //!
 //! ## 两个假设（不是条款，标出来 —— C187）
 //!
-//! - `SLOT_EXTRA = 43`：每槽自描述 = 逻辑身份五元组 33（D18 已定项 3）+ 写序 10（D18 已定项 7）。
+//! - `SLOT_EXTRA_BYTES = 43`：每槽自描述 = 逻辑身份五元组 33（D18 已定项 3）+ 写序 10（D18 已定项 7）。
 //!   **定宽之下不需要槽目录条目**（D27 已定项 8 ④ 逐字），所以比 E114 / E116 用的 47 少 4。
 //! - **对象大小分布**：全仓没有任何实测分布（D25 的 smallfile 那一行三列全「未测」，C174）。
 //!   E119 自定三个分布并全部报出来，**不挑一个当代表**。
@@ -56,7 +56,7 @@
 //! 那一档存在的每条定宽臂必须与 `var` 逐字节相同。任一臂不同 ⇒ 整轮作废。
 //! **判别力对照**：`single`（单档 4096）在全 512 字节的分布上，每对象占用必须正好是
 //! `var` 的 `(4096+43)/(512+43)` 倍。不成立 ⇒ 补齐没被建模，整轮作废。
-//! **阴性对照**：N = 0 时六条臂的所有字节恰好 0。
+//! **阴性对照**：OBJECTS_PER_DISTRIBUTION = 0 时六条臂的所有字节恰好 0。
 //!
 //! ## 反向接受条款（跑前写死，逐臂点名）
 //!
@@ -77,20 +77,20 @@
 
 use e7_index_bench::Emitter;
 
-const UNIT: u64 = 32768; // D4 已定项 5
-const PACK_HDR: u64 = 103; // D18 已定项 11
-const W_REPL: u64 = 2; // D2 已定项 9
-const SLOT_EXTRA: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
-const LIMIT: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB
-const N: u64 = 100_000;
-const NET: u64 = UNIT - PACK_HDR; // 容器净荷 32665
+const UNIT_BYTES: u64 = 32768; // D4 已定项 5
+const PACKED_UNIT_HEADER_BYTES: u64 = 103; // D18 已定项 11
+const REPLICATION_WIDTH: u64 = 2; // D2 已定项 9
+const SLOT_EXTRA_BYTES: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
+const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB
+const OBJECTS_PER_DISTRIBUTION: u64 = 100_000;
+const CONTAINER_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 容器净荷 32665
 
-fn cap_of(w: u64) -> u64 { NET / (w + SLOT_EXTRA) }
+fn slots_per_container(tier_width: u64) -> u64 { CONTAINER_PAYLOAD_BYTES / (tier_width + SLOT_EXTRA_BYTES) }
 
 fn tiers(arm: &str) -> Vec<u64> {
     match arm {
-        "gran64" => (1..=64).map(|i| i * 64).collect(),
-        "gran256" => (1..=16).map(|i| i * 256).collect(),
+        "gran64" => (1..=64).map(|tier_number| tier_number * 64).collect(),
+        "gran256" => (1..=16).map(|tier_number| tier_number * 256).collect(),
         "pow2" => vec![64, 128, 256, 512, 1024, 2048, 4096],
         "tier4" => vec![512, 1024, 2048, 4096],
         "single" => vec![4096],
@@ -98,35 +98,35 @@ fn tiers(arm: &str) -> Vec<u64> {
     }
 }
 
-/// 权重表：下标 s（1..=LIMIT）上的对象个数。三个分布都按整数权重展开，不用随机源。
-fn weights(dist: &str) -> Vec<u64> {
-    let mut w = vec![0u64; (LIMIT + 1) as usize];
-    match dist {
-        "uniform" => { for s in 1..=LIMIT { w[s as usize] = 1; } }
-        // 权重 ∝ 1/s，用整数近似：LIMIT / s，保证 s 小的权重大
-        "logunif" => { for s in 1..=LIMIT { w[s as usize] = LIMIT / s; } }
-        "discrete" => { for s in [512u64, 1024, 4096] { w[s as usize] = 1; } }
+/// 权重表：下标 s（1..=PACKING_LIMIT_BYTES）上的对象个数。三个分布都按整数权重展开，不用随机源。
+fn weights(distribution: &str) -> Vec<u64> {
+    let mut weight_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    match distribution {
+        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[object_size as usize] = 1; } }
+        // 权重 ∝ 1/s，用整数近似：PACKING_LIMIT_BYTES / s，保证 s 小的权重大
+        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[object_size as usize] = PACKING_LIMIT_BYTES / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_size[object_size as usize] = 1; } }
         _ => {}
     }
-    w
+    weight_by_size
 }
 
-/// 按权重把 N 个对象摊到各个大小上（最后一格吸收取整误差）。
-fn counts(dist: &str, n: u64) -> Vec<u64> {
-    let w = weights(dist);
-    let total: u64 = w.iter().sum();
-    if total == 0 || n == 0 { return vec![0u64; (LIMIT + 1) as usize]; }
-    let mut c = vec![0u64; (LIMIT + 1) as usize];
-    let mut acc = 0u64;
-    let mut last = 0usize;
-    for s in 1..=LIMIT as usize {
-        if w[s] == 0 { continue; }
-        c[s] = n * w[s] / total;
-        acc += c[s];
-        last = s;
+/// 按权重把 OBJECTS_PER_DISTRIBUTION 个对象摊到各个大小上（最后一格吸收取整误差）。
+fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
+    let weight_by_size = weights(distribution);
+    let total_weight: u64 = weight_by_size.iter().sum();
+    if total_weight == 0 || object_count == 0 { return vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize]; }
+    let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    let mut assigned_count = 0u64;
+    let mut last_nonzero_size = 0usize;
+    for object_size in 1..=PACKING_LIMIT_BYTES as usize {
+        if weight_by_size[object_size] == 0 { continue; }
+        count_by_size[object_size] = object_count * weight_by_size[object_size] / total_weight;
+        assigned_count += count_by_size[object_size];
+        last_nonzero_size = object_size;
     }
-    c[last] += n - acc; // 取整误差全给最后一格，总数恒为 n
-    c
+    count_by_size[last_nonzero_size] += object_count - assigned_count; // 取整误差全给最后一格，总数恒为 n
+    count_by_size
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -134,129 +134,129 @@ struct Arm {
     containers: u64,
     occupancy: u64,
     tiers: u64,
-    min_cap: u64,
+    minimum_slots_per_container: u64,
 }
 
-fn run_tiered(arm: &str, c: &[u64]) -> Arm {
-    let ts = tiers(arm);
+fn run_tiered(arm: &str, count_by_size: &[u64]) -> Arm {
+    let tier_widths = tiers(arm);
     let mut containers = 0u64;
-    let mut min_cap = u64::MAX;
-    for (i, &w) in ts.iter().enumerate() {
-        let lo = if i == 0 { 1 } else { ts[i - 1] + 1 };
-        let n_t: u64 = (lo..=w).map(|s| c[s as usize]).sum();
-        let cap = cap_of(w);
-        if cap < min_cap { min_cap = cap; }
-        if n_t > 0 { containers += n_t.div_ceil(cap.max(1)); }
+    let mut minimum_slots_per_container = u64::MAX;
+    for (tier_index, &tier_width) in tier_widths.iter().enumerate() {
+        let smallest_size_in_tier = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
+        let objects_in_tier: u64 = (smallest_size_in_tier..=tier_width).map(|object_size| count_by_size[object_size as usize]).sum();
+        let tier_slots_per_container = slots_per_container(tier_width);
+        if tier_slots_per_container < minimum_slots_per_container { minimum_slots_per_container = tier_slots_per_container; }
+        if objects_in_tier > 0 { containers += objects_in_tier.div_ceil(tier_slots_per_container.max(1)); }
     }
-    Arm { containers, occupancy: containers * UNIT, tiers: ts.len() as u64, min_cap }
+    Arm { containers, occupancy: containers * UNIT_BYTES, tiers: tier_widths.len() as u64, minimum_slots_per_container }
 }
 
 /// `var` 臂：变长槽，按对象大小升序**贪心装填**（同一容器内槽长可以各异，装不下就换一个容器）。
 /// 这是可实现的装法，不是「完美装填」——⚠️ 早先按 Σ 槽长 ÷ 净荷上取整算过一版，
 /// 那等于允许一个槽跨容器，**阳性对照当场判否**（全 512 字节时它给 1700，而 58 槽 × 1725 = 100050，
 /// 正确答案是 1725）。两个模型都记在这里，登记的那个不许回头改。
-fn run_var(c: &[u64]) -> Arm {
+fn run_variable_length_arm(count_by_size: &[u64]) -> Arm {
     let mut containers = 0u64;
-    let mut room = 0u64; // 当前容器剩余净荷；0 表示还没开容器
-    for s in 1..=LIMIT {
-        let need = s + SLOT_EXTRA;
-        let mut left = c[s as usize];
-        while left > 0 {
-            if room < need {
+    let mut remaining_payload_bytes = 0u64; // 当前容器剩余净荷；0 表示还没开容器
+    for object_size in 1..=PACKING_LIMIT_BYTES {
+        let bytes_per_slot = object_size + SLOT_EXTRA_BYTES;
+        let mut objects_left = count_by_size[object_size as usize];
+        while objects_left > 0 {
+            if remaining_payload_bytes < bytes_per_slot {
                 containers += 1;
-                room = NET;
+                remaining_payload_bytes = CONTAINER_PAYLOAD_BYTES;
             }
-            let fit = (room / need).min(left);
-            room -= fit * need;
-            left -= fit;
+            let objects_fitting = (remaining_payload_bytes / bytes_per_slot).min(objects_left);
+            remaining_payload_bytes -= objects_fitting * bytes_per_slot;
+            objects_left -= objects_fitting;
         }
     }
-    Arm { containers, occupancy: containers * UNIT, tiers: 0, min_cap: cap_of(LIMIT) }
+    Arm { containers, occupancy: containers * UNIT_BYTES, tiers: 0, minimum_slots_per_container: slots_per_container(PACKING_LIMIT_BYTES) }
 }
 
-fn total_objects(c: &[u64]) -> u64 { c.iter().sum() }
+fn total_objects(count_by_size: &[u64]) -> u64 { count_by_size.iter().sum() }
 
 fn main() {
-    let mut em = Emitter::new();
-    println!("{}", em.emit_raw(&format!(
-        "name=config unit={UNIT} pack_hdr={PACK_HDR} net={NET} w={W_REPL} \
-         slot_extra={SLOT_EXTRA} limit={LIMIT} n={N}")));
+    let mut emitter = Emitter::new();
+    println!("{}", emitter.emit_raw(&format!(
+        "name=config unit={UNIT_BYTES} pack_hdr={PACKED_UNIT_HEADER_BYTES} net={CONTAINER_PAYLOAD_BYTES} w={REPLICATION_WIDTH} \
+         slot_extra={SLOT_EXTRA_BYTES} limit={PACKING_LIMIT_BYTES} n={OBJECTS_PER_DISTRIBUTION}")));
 
     let arms = ["gran64", "gran256", "pow2", "tier4", "single"];
 
     // 阳性对照：所有对象恰好等于某一档宽 ⇒ 有那一档的定宽臂必须与 var 逐字节相同
-    for &w in [512u64, 1024, 2048, 4096].iter() {
-        let mut c = vec![0u64; (LIMIT + 1) as usize];
-        c[w as usize] = N;
-        let v = run_var(&c);
+    for &tier_width in [512u64, 1024, 2048, 4096].iter() {
+        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+        count_by_size[tier_width as usize] = OBJECTS_PER_DISTRIBUTION;
+        let variable_length_result = run_variable_length_arm(&count_by_size);
         for &arm in arms.iter() {
-            if !tiers(arm).contains(&w) { continue; }
-            let a = run_tiered(arm, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=positive_exact tier_width={w} arm={arm} var_occ={} arm_occ={} same={}",
-                v.occupancy, a.occupancy, v.occupancy == a.occupancy)));
+            if !tiers(arm).contains(&tier_width) { continue; }
+            let tiered_result = run_tiered(arm, &count_by_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=positive_exact tier_width={tier_width} arm={arm} var_occ={} arm_occ={} same={}",
+                variable_length_result.occupancy, tiered_result.occupancy, variable_length_result.occupancy == tiered_result.occupancy)));
         }
     }
 
     // 判别力：single 在全 512 的分布上，每对象占用应是 var 的 (4096+43)/(512+43) 倍
     {
-        let mut c = vec![0u64; (LIMIT + 1) as usize];
-        c[512] = N;
-        let v = run_var(&c);
-        let s = run_tiered("single", &c);
-        println!("{}", em.emit_raw(&format!(
+        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+        count_by_size[512] = OBJECTS_PER_DISTRIBUTION;
+        let variable_length_result = run_variable_length_arm(&count_by_size);
+        let single_result = run_tiered("single", &count_by_size);
+        println!("{}", emitter.emit_raw(&format!(
             "name=discrimination var_containers={} single_containers={} ratio={:.6} expect={:.6}",
-            v.containers, s.containers,
-            s.occupancy as f64 / v.occupancy as f64,
-            (4096.0 + SLOT_EXTRA as f64) / (512.0 + SLOT_EXTRA as f64))));
+            variable_length_result.containers, single_result.containers,
+            single_result.occupancy as f64 / variable_length_result.occupancy as f64,
+            (4096.0 + SLOT_EXTRA_BYTES as f64) / (512.0 + SLOT_EXTRA_BYTES as f64))));
     }
 
     // 阴性对照
     {
-        let c = counts("uniform", 0);
-        let v = run_var(&c);
-        println!("{}", em.emit_raw(&format!(
-            "name=negative arm=var containers={} occ={}", v.containers, v.occupancy)));
+        let count_by_size = counts("uniform", 0);
+        let variable_length_result = run_variable_length_arm(&count_by_size);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=negative arm=var containers={} occ={}", variable_length_result.containers, variable_length_result.occupancy)));
         for &arm in arms.iter() {
-            let a = run_tiered(arm, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=negative arm={arm} containers={} occ={}", a.containers, a.occupancy)));
+            let tiered_result = run_tiered(arm, &count_by_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=negative arm={arm} containers={} occ={}", tiered_result.containers, tiered_result.occupancy)));
         }
     }
 
     // 主判据
-    for dist in ["uniform", "logunif", "discrete"] {
-        let c = counts(dist, N);
-        let n = total_objects(&c);
-        let pad_occ = n * UNIT;
-        let v = run_var(&c);
-        println!("{}", em.emit_raw(&format!(
-            "name=main dist={dist} arm=var n={n} containers={} occ={} gain={:.4} \
+    for distribution in ["uniform", "logunif", "discrete"] {
+        let count_by_size = counts(distribution, OBJECTS_PER_DISTRIBUTION);
+        let object_count = total_objects(&count_by_size);
+        let padded_occupancy = object_count * UNIT_BYTES;
+        let variable_length_result = run_variable_length_arm(&count_by_size);
+        println!("{}", emitter.emit_raw(&format!(
+            "name=main dist={distribution} arm=var n={object_count} containers={} occ={} gain={:.4} \
              per_obj={:.2} loss_vs_var=0.0000 tiers=0 min_cap={}",
-            v.containers, v.occupancy, pad_occ as f64 / v.occupancy as f64,
-            v.occupancy as f64 / n as f64, v.min_cap)));
+            variable_length_result.containers, variable_length_result.occupancy, padded_occupancy as f64 / variable_length_result.occupancy as f64,
+            variable_length_result.occupancy as f64 / object_count as f64, variable_length_result.minimum_slots_per_container)));
         for &arm in arms.iter() {
-            let a = run_tiered(arm, &c);
-            println!("{}", em.emit_raw(&format!(
-                "name=main dist={dist} arm={arm} n={n} containers={} occ={} gain={:.4} \
+            let tiered_result = run_tiered(arm, &count_by_size);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=main dist={distribution} arm={arm} n={object_count} containers={} occ={} gain={:.4} \
                  per_obj={:.2} loss_vs_var={:.4} tiers={} min_cap={}",
-                a.containers, a.occupancy, pad_occ as f64 / a.occupancy as f64,
-                a.occupancy as f64 / n as f64,
-                (a.occupancy as f64 - v.occupancy as f64) / v.occupancy as f64,
-                a.tiers, a.min_cap)));
+                tiered_result.containers, tiered_result.occupancy, padded_occupancy as f64 / tiered_result.occupancy as f64,
+                tiered_result.occupancy as f64 / object_count as f64,
+                (tiered_result.occupancy as f64 - variable_length_result.occupancy as f64) / variable_length_result.occupancy as f64,
+                tiered_result.tiers, tiered_result.minimum_slots_per_container)));
         }
     }
 
     // 回本闸：逐臂逐档报 cap，标出 cap < 4 的档
     for &arm in arms.iter() {
-        for w in tiers(arm) {
-            let cap = cap_of(w);
-            println!("{}", em.emit_raw(&format!(
-                "name=capgate arm={arm} tier={w} cap={cap} pays_back={}", cap >= 4)));
+        for tier_width in tiers(arm) {
+            let tier_slots_per_container = slots_per_container(tier_width);
+            println!("{}", emitter.emit_raw(&format!(
+                "name=capgate arm={arm} tier={tier_width} cap={tier_slots_per_container} pays_back={}", tier_slots_per_container >= 4)));
         }
     }
 
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -265,15 +265,15 @@ mod tests {
 
     /// 阳性对照：对象恰好等于档宽时，定宽与变长必须逐字节相同。
     #[test]
-    fn positive_control_exact_tier_matches_var() {
-        for &w in [512u64, 1024, 2048, 4096].iter() {
-            let mut c = vec![0u64; (LIMIT + 1) as usize];
-            c[w as usize] = N;
-            let v = run_var(&c);
+    fn positive_control_exact_tier_matches_variable_length() {
+        for &tier_width in [512u64, 1024, 2048, 4096].iter() {
+            let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+            count_by_size[tier_width as usize] = OBJECTS_PER_DISTRIBUTION;
+            let variable_length_result = run_variable_length_arm(&count_by_size);
             for &arm in ["gran64", "gran256", "pow2", "tier4", "single"].iter() {
-                if !tiers(arm).contains(&w) { continue; }
-                assert_eq!(run_tiered(arm, &c).occupancy, v.occupancy,
-                           "arm={arm} 档宽={w}：对象恰好等于档宽时该与变长相同");
+                if !tiers(arm).contains(&tier_width) { continue; }
+                assert_eq!(run_tiered(arm, &count_by_size).occupancy, variable_length_result.occupancy,
+                           "arm={arm} 档宽={tier_width}：对象恰好等于档宽时该与变长相同");
             }
         }
     }
@@ -281,95 +281,95 @@ mod tests {
     /// 判别力：补齐真的被建模了 —— single 在全 512 上比 var 差，且差得正好是那个比。
     #[test]
     fn discrimination_padding_is_modeled() {
-        let mut c = vec![0u64; (LIMIT + 1) as usize];
-        c[512] = N;
-        let v = run_var(&c);
-        let s = run_tiered("single", &c);
-        assert!(s.occupancy > v.occupancy, "single 该比 var 差");
-        assert_eq!(v.containers, 1725);
-        assert_eq!(s.containers, 14286);
-        let ratio = s.occupancy as f64 / v.occupancy as f64;
+        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+        count_by_size[512] = OBJECTS_PER_DISTRIBUTION;
+        let variable_length_result = run_variable_length_arm(&count_by_size);
+        let single_result = run_tiered("single", &count_by_size);
+        assert!(single_result.occupancy > variable_length_result.occupancy, "single 该比 var 差");
+        assert_eq!(variable_length_result.containers, 1725);
+        assert_eq!(single_result.containers, 14286);
+        let ratio = single_result.occupancy as f64 / variable_length_result.occupancy as f64;
         assert!((ratio - 8.2818).abs() < 0.001, "实测比 {ratio}");
         // 每对象占用之比正好是 (4096+43)/(512+43) 的上取整效应：58 槽 vs 7 槽
-        assert_eq!(cap_of(512), 58);
-        assert_eq!(cap_of(4096), 7);
+        assert_eq!(slots_per_container(512), 58);
+        assert_eq!(slots_per_container(4096), 7);
     }
 
-    /// 阴性：N = 0 时六条臂全 0。
+    /// 阴性：OBJECTS_PER_DISTRIBUTION = 0 时六条臂全 0。
     #[test]
     fn negative_control_zero() {
-        let c = counts("uniform", 0);
-        assert_eq!(run_var(&c).occupancy, 0);
+        let count_by_size = counts("uniform", 0);
+        assert_eq!(run_variable_length_arm(&count_by_size).occupancy, 0);
         for &arm in ["gran64", "gran256", "pow2", "tier4", "single"].iter() {
-            let a = run_tiered(arm, &c);
-            assert_eq!((a.containers, a.occupancy), (0, 0), "arm={arm}");
+            let tiered_result = run_tiered(arm, &count_by_size);
+            assert_eq!((tiered_result.containers, tiered_result.occupancy), (0, 0), "arm={arm}");
         }
     }
 
     /// 容量钉绝对值，含跨整数边界的取样点（rules/mutation-sampling.md）。
     #[test]
-    fn cap_absolute() {
-        assert_eq!(NET, UNIT - 103);
-        assert_eq!(NET, 32665);
-        assert_eq!(cap_of(512), 58);
-        assert_eq!(cap_of(1024), 30);
-        assert_eq!(cap_of(2048), 15);
-        assert_eq!(cap_of(4096), 7);
-        assert_eq!(cap_of(64), 305);
+    fn slots_per_container_absolute() {
+        assert_eq!(CONTAINER_PAYLOAD_BYTES, UNIT_BYTES - 103);
+        assert_eq!(CONTAINER_PAYLOAD_BYTES, 32665);
+        assert_eq!(slots_per_container(512), 58);
+        assert_eq!(slots_per_container(1024), 30);
+        assert_eq!(slots_per_container(2048), 15);
+        assert_eq!(slots_per_container(4096), 7);
+        assert_eq!(slots_per_container(64), 305);
         // 跨整数边界：cap = 8 的档宽区间是 [3587, 4040]，抬到 4041 就掉成 7。
-        assert_eq!(cap_of(4040), 8);
-        assert_eq!(cap_of(4041), 7);
+        assert_eq!(slots_per_container(4040), 8);
+        assert_eq!(slots_per_container(4041), 7);
     }
 
     /// 每一档都要 cap ≥ 4（E116 闭式 w/(cap−1) < 1 的充要条件）。
     #[test]
     fn every_tier_pays_back() {
         for &arm in ["gran64", "gran256", "pow2", "tier4", "single"].iter() {
-            for w in tiers(arm) {
-                assert!(cap_of(w) >= 4, "arm={arm} 档宽={w} 的 cap={} < 4，回不了本",
-                        cap_of(w));
+            for tier_width in tiers(arm) {
+                assert!(slots_per_container(tier_width) >= 4, "arm={arm} 档宽={tier_width} 的 cap={} < 4，回不了本",
+                        slots_per_container(tier_width));
             }
         }
         // 钉住边界：cap = 4 的最大档宽
-        assert_eq!(cap_of(8123), 4);
-        assert_eq!(cap_of(8124), 3);
+        assert_eq!(slots_per_container(8123), 4);
+        assert_eq!(slots_per_container(8124), 3);
     }
 
-    /// 分布展开之后对象总数恒等于 N —— 取整误差不许漏对象。
+    /// 分布展开之后对象总数恒等于 OBJECTS_PER_DISTRIBUTION —— 取整误差不许漏对象。
     #[test]
     fn counts_conserve_objects() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            assert_eq!(total_objects(&counts(dist, N)), N, "dist={dist}");
+        for distribution in ["uniform", "logunif", "discrete"] {
+            assert_eq!(total_objects(&counts(distribution, OBJECTS_PER_DISTRIBUTION)), OBJECTS_PER_DISTRIBUTION, "dist={distribution}");
         }
     }
 
     /// var 是上界：任何定宽臂的占用都不小于它。且 var 自己钉绝对值。
     #[test]
-    fn var_is_upper_bound() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            let c = counts(dist, N);
-            let v = run_var(&c);
+    fn variable_length_is_upper_bound() {
+        for distribution in ["uniform", "logunif", "discrete"] {
+            let count_by_size = counts(distribution, OBJECTS_PER_DISTRIBUTION);
+            let variable_length_result = run_variable_length_arm(&count_by_size);
             for &arm in ["gran64", "gran256", "pow2", "tier4", "single"].iter() {
-                assert!(run_tiered(arm, &c).occupancy >= v.occupancy,
-                        "dist={dist} arm={arm}");
+                assert!(run_tiered(arm, &count_by_size).occupancy >= variable_length_result.occupancy,
+                        "dist={distribution} arm={arm}");
             }
         }
         // uniform 下 var 的绝对值：Σ (s+43)，s 从 1 到 4096 各 24 个（100000/4096=24 余 1696）
-        let c = counts("uniform", N);
-        let bytes: u64 = (1..=LIMIT).map(|s| c[s as usize] * (s + SLOT_EXTRA)).sum();
-        assert_eq!(bytes, 212_622_560);
-        assert_eq!(run_var(&c).containers, 6814);
+        let count_by_size = counts("uniform", OBJECTS_PER_DISTRIBUTION);
+        let total_slot_bytes: u64 = (1..=PACKING_LIMIT_BYTES).map(|object_size| count_by_size[object_size as usize] * (object_size + SLOT_EXTRA_BYTES)).sum();
+        assert_eq!(total_slot_bytes, 212_622_560);
+        assert_eq!(run_variable_length_arm(&count_by_size).containers, 6814);
     }
 
     /// 主判据的绝对值：uniform 下四条候选臂的容器数逐个钉住。
     #[test]
     fn main_absolute_uniform() {
-        let c = counts("uniform", N);
-        assert_eq!(run_tiered("gran64", &c).containers, 6935);
-        assert_eq!(run_tiered("gran256", &c).containers, 7271);
-        assert_eq!(run_tiered("pow2", &c).containers, 9463);
-        assert_eq!(run_tiered("tier4", &c).containers, 9525);
-        assert_eq!(run_tiered("single", &c).containers, 14286);
+        let count_by_size = counts("uniform", OBJECTS_PER_DISTRIBUTION);
+        assert_eq!(run_tiered("gran64", &count_by_size).containers, 6935);
+        assert_eq!(run_tiered("gran256", &count_by_size).containers, 7271);
+        assert_eq!(run_tiered("pow2", &count_by_size).containers, 9463);
+        assert_eq!(run_tiered("tier4", &count_by_size).containers, 9525);
+        assert_eq!(run_tiered("single", &count_by_size).containers, 14286);
     }
 
     /// `logunif` 与 `discrete` 两个分布的绝对值 —— 变异 M8（把对数均匀退化成均匀）
@@ -378,24 +378,24 @@ mod tests {
     /// 是**真盲区**——`logunif` 这一整个分布上没有任何断言。而结论最重的那个数正在它上面。
     #[test]
     fn main_absolute_logunif_and_discrete() {
-        let c = counts("logunif", N);
-        assert_eq!(run_var(&c).containers, 1592);
-        assert_eq!(run_tiered("gran64", &c).containers, 1745);
-        assert_eq!(run_tiered("gran256", &c).containers, 2186);
-        assert_eq!(run_tiered("pow2", &c).containers, 2099);
-        assert_eq!(run_tiered("tier4", &c).containers, 3038);
-        assert_eq!(run_tiered("single", &c).containers, 14286);
+        let count_by_size = counts("logunif", OBJECTS_PER_DISTRIBUTION);
+        assert_eq!(run_variable_length_arm(&count_by_size).containers, 1592);
+        assert_eq!(run_tiered("gran64", &count_by_size).containers, 1745);
+        assert_eq!(run_tiered("gran256", &count_by_size).containers, 2186);
+        assert_eq!(run_tiered("pow2", &count_by_size).containers, 2099);
+        assert_eq!(run_tiered("tier4", &count_by_size).containers, 3038);
+        assert_eq!(run_tiered("single", &count_by_size).containers, 14286);
         // 小端密的档表（pow2，7 档）在这个分布上胜过等距的 gran256（16 档）——
         // 档要在小端密，不是等距。这一条是结论，必须有断言守着。
-        assert!(run_tiered("pow2", &c).containers < run_tiered("gran256", &c).containers);
+        assert!(run_tiered("pow2", &count_by_size).containers < run_tiered("gran256", &count_by_size).containers);
 
-        let d = counts("discrete", N);
-        assert_eq!(run_var(&d).containers, 6448);
+        let discrete_count_by_size = counts("discrete", OBJECTS_PER_DISTRIBUTION);
+        assert_eq!(run_variable_length_arm(&discrete_count_by_size).containers, 6448);
         for &arm in ["gran64", "gran256", "pow2", "tier4"].iter() {
-            assert_eq!(run_tiered(arm, &d).containers, 6449,
+            assert_eq!(run_tiered(arm, &discrete_count_by_size).containers, 6449,
                        "arm={arm}：三个取样点都恰好落在档宽上，定宽只多 1 个容器");
         }
-        assert_eq!(run_tiered("single", &d).containers, 14286);
+        assert_eq!(run_tiered("single", &discrete_count_by_size).containers, 14286);
     }
 
     /// 档数就是同时开着的容器数（除以树数）—— 钉绝对值。
@@ -414,17 +414,17 @@ mod tests {
     /// 单调：档越细，占用越小（同一分布上）。这一条是互比，上面几条钉绝对值的与它配对。
     #[test]
     fn finer_tiers_never_worse() {
-        for dist in ["uniform", "logunif", "discrete"] {
-            let c = counts(dist, N);
-            let g64 = run_tiered("gran64", &c).occupancy;
-            let g256 = run_tiered("gran256", &c).occupancy;
-            let p2 = run_tiered("pow2", &c).occupancy;
-            let t4 = run_tiered("tier4", &c).occupancy;
-            let s1 = run_tiered("single", &c).occupancy;
-            assert!(g64 <= g256, "dist={dist}: gran64={g64} gran256={g256}");
-            assert!(g256 <= t4, "dist={dist}: gran256={g256} tier4={t4}");
-            assert!(t4 <= s1, "dist={dist}: tier4={t4} single={s1}");
-            assert!(p2 <= s1, "dist={dist}: pow2={p2} single={s1}");
+        for distribution in ["uniform", "logunif", "discrete"] {
+            let count_by_size = counts(distribution, OBJECTS_PER_DISTRIBUTION);
+            let gran64_occupancy = run_tiered("gran64", &count_by_size).occupancy;
+            let gran256_occupancy = run_tiered("gran256", &count_by_size).occupancy;
+            let pow2_occupancy = run_tiered("pow2", &count_by_size).occupancy;
+            let tier4_occupancy = run_tiered("tier4", &count_by_size).occupancy;
+            let single_occupancy = run_tiered("single", &count_by_size).occupancy;
+            assert!(gran64_occupancy <= gran256_occupancy, "dist={distribution}: gran64={gran64_occupancy} gran256={gran256_occupancy}");
+            assert!(gran256_occupancy <= tier4_occupancy, "dist={distribution}: gran256={gran256_occupancy} tier4={tier4_occupancy}");
+            assert!(tier4_occupancy <= single_occupancy, "dist={distribution}: tier4={tier4_occupancy} single={single_occupancy}");
+            assert!(pow2_occupancy <= single_occupancy, "dist={distribution}: pow2={pow2_occupancy} single={single_occupancy}");
         }
     }
 }

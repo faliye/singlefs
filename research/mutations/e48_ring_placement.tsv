@@ -1,8 +1,8 @@
-M1_落盘不取模设备数	(lba / chunk) % devs	(lba / chunk)
-M2_素数步长退化成相邻	Placement::PrimeStride => r * PRIME * chunk,	Placement::PrimeStride => r * region_bytes,
+M1_落盘不取模设备数	(logical_block_address / chunk) % device_count	(logical_block_address / chunk)
+M2_素数步长退化成相邻	Placement::PrimeStride => region_index * PRIME * chunk,	Placement::PrimeStride => region_index * region_bytes,
 M3_素数换成2的幂	const PRIME: u64 = 8191;	const PRIME: u64 = 8192;
-M4_跨区轮转退化成区内连续	SlotOrder::AcrossRegions => txg % regions,	SlotOrder::AcrossRegions => (txg % (regions * slots)) / slots,
-M5_可行判据不看可用性	gap_ok && cells_ge_r > 0 && mount_ok == cells_ge_r && usable_ok == cells_ge_r	gap_ok && cells_ge_r > 0 && mount_ok == cells_ge_r
-M6_间距不减区域字节	w[1].saturating_sub(w[0] + region_bytes)	w[1].saturating_sub(w[0])
-M7_鸽笼判据反了	if devs < regions {\n                continue; // 判据 d：鸽笼，不作要求\n            }	if devs > regions {\n                continue; // 判据 d：鸽笼，不作要求\n            }
-M8_对相位不取最坏	for phase in 0..ring {	for phase in 0..1 {
+M4_跨区轮转退化成区内连续	SlotOrder::AcrossRegions => transaction_group % regions,	SlotOrder::AcrossRegions => (transaction_group % (regions * slots)) / slots,
+M5_可行判据不看可用性	gap_is_sufficient && cells_with_enough_devices > 0 && mountable_cells == cells_with_enough_devices && usable_cells == cells_with_enough_devices	gap_is_sufficient && cells_with_enough_devices > 0 && mountable_cells == cells_with_enough_devices
+M6_间距不减区域字节	adjacent_positions[1].saturating_sub(adjacent_positions[0] + region_bytes)	adjacent_positions[1].saturating_sub(adjacent_positions[0])
+M7_鸽笼判据反了	if device_count < regions {\n                continue; // 判据 d：鸽笼，不作要求\n            }	if device_count > regions {\n                continue; // 判据 d：鸽笼，不作要求\n            }
+M8_对相位不取最坏	for phase in 0..ring_slot_count {	for phase in 0..1 {

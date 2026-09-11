@@ -1,13 +1,13 @@
-M1_parity格不计入条目	let parity_cells = total_cells / w;	let parity_cells = 0u64;
-M2_parity按w−1算不按w	let parity_cells = total_cells / w;	let parity_cells = total_cells / (w - 1);
-M3_w等于2也写记录	    if w < 3 {\n        // w = 2 全镜像，一条条带记录都不写（D2 已定项 12 的射程）\n        return (0, 0, 0);\n    }	    if false {\n        return (0, 0, 0);\n    }
-M4_容器不镜像	let bytes = containers * DATA_UNIT * 2;	let bytes = containers * DATA_UNIT;
-M5_容器容量按整单元算	    let per = (DATA_UNIT - PACKED_HDR) / STRIPE_REC;\n    let containers = entries.div_ceil(per);	    let per = DATA_UNIT / STRIPE_REC;\n    let containers = entries.div_ceil(per);
-M6_落点key漏掉设备身份	const SLOT_KEY: u64 = 4 + 6;	const SLOT_KEY: u64 = 6;
-M7_扇出不计value	(NODE - NODE_HDR) / (k + 8)	(NODE - NODE_HDR) / k
-M8_扇出不计节点头	(NODE - NODE_HDR) / (k + 8)	NODE / (k + 8)
-M9_树高少算一层	    let mut h = 1u32;\n    let mut cap = f;	    let mut h = 0u32;\n    let mut cap = f;
+M1_parity格不计入条目	let parity_cells = total_cells / stripe_width;	let parity_cells = 0u64;
+M2_parity按w−1算不按w	let parity_cells = total_cells / stripe_width;	let parity_cells = total_cells / (stripe_width - 1);
+M3_w等于2也写记录	    if stripe_width < 3 {\n        // w = 2 全镜像，一条条带记录都不写（D2 已定项 12 的射程）\n        return (0, 0, 0);\n    }	    if false {\n        return (0, 0, 0);\n    }
+M4_容器不镜像	let tree_bytes = container_count * DATA_UNIT_BYTES * 2;	let tree_bytes = container_count * DATA_UNIT_BYTES;
+M5_容器容量按整单元算	    let records_per_container = (DATA_UNIT_BYTES - PACKED_HEADER_BYTES) / STRIPE_RECORD_BYTES;\n    let container_count = entries.div_ceil(records_per_container);	    let records_per_container = DATA_UNIT_BYTES / STRIPE_RECORD_BYTES;\n    let container_count = entries.div_ceil(records_per_container);
+M6_落点key漏掉设备身份	const SLOT_KEY_BYTES: u64 = 4 + 6;	const SLOT_KEY_BYTES: u64 = 6;
+M7_扇出不计value	(NODE_BYTES - NODE_HEADER_BYTES) / (key_bytes + 8)	(NODE_BYTES - NODE_HEADER_BYTES) / key_bytes
+M8_扇出不计节点头	(NODE_BYTES - NODE_HEADER_BYTES) / (key_bytes + 8)	NODE_BYTES / (key_bytes + 8)
+M9_树高少算一层	    let mut levels = 1u32;\n    let mut capacity_at_height = fanout_per_node;	    let mut levels = 0u32;\n    let mut capacity_at_height = fanout_per_node;
 M10_条带号臂也答得出落点查询	        matches!(self, Arm::Slot)	        !matches!(self, Arm::None)
-M11_格数按16KiB槽算不按单元算	let total_cells = usable / DATA_UNIT;	let total_cells = usable / SLOT;
-M12_填充率当满算	    let usable = CAP / FILL_DEN * FILL_NUM;\n    // 这笔预算总共切出多少个格	    let usable = CAP;\n    // 这笔预算总共切出多少个格
+M11_格数按16KiB槽算不按单元算	let total_cells = usable_bytes / DATA_UNIT_BYTES;	let total_cells = usable_bytes / SLOT_BYTES;
+M12_填充率当满算	    let usable_bytes = POOL_CAPACITY_BYTES / FILL_DENOMINATOR * FILL_NUMERATOR;\n    // 这笔预算总共切出多少个格	    let usable_bytes = POOL_CAPACITY_BYTES;\n    // 这笔预算总共切出多少个格
 M13_parity加在预算之上	    (data_cells, parity_cells, total_cells)	    (total_cells, parity_cells, total_cells + parity_cells)

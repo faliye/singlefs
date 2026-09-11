@@ -44,7 +44,7 @@ use std::collections::BTreeMap;
 /// 两个可写头。**由构造给出，不从被测代码读回来。**
 const HEADS: usize = 2;
 /// 明文长度，异或恒等式按它逐字节比。
-const PT_LEN: usize = 64;
+const PLAINTEXT_LENGTH_BYTES: usize = 64;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
@@ -107,24 +107,24 @@ impl Ident {
 /// 同一个逻辑身份必须现算出同一个 nonce，否则读者算不出来。
 /// 重写同一个 key 时要靠一个版本号来避开复用，而**版本号是每个头各自递增的**，
 /// 两个头第一次写各自的版本号都是 1 ⇒ 救不了本实验这一格。
-fn derive_nonce(id: &Ident, ver: u64) -> [u8; 12] {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let mut mix = |x: u64| {
-        for b in x.to_le_bytes() {
-            h ^= b as u64;
-            h = h.wrapping_mul(0x0000_0100_0000_01b3);
+fn derive_nonce(identity: &Ident, version: u64) -> [u8; 12] {
+    let mut hash_state: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut mix = |value: u64| {
+        for byte in value.to_le_bytes() {
+            hash_state ^= byte as u64;
+            hash_state = hash_state.wrapping_mul(0x0000_0100_0000_01b3);
         }
     };
-    mix(id.tree);
-    mix(id.locality);
-    mix(id.inode);
-    mix(id.offset);
-    mix(id.snapshot as u64);
-    mix(ver);
-    let mut n = [0u8; 12];
-    n[..8].copy_from_slice(&h.to_le_bytes());
-    n[8..].copy_from_slice(&(h.rotate_left(17) as u32).to_le_bytes());
-    n
+    mix(identity.tree);
+    mix(identity.locality);
+    mix(identity.inode);
+    mix(identity.offset);
+    mix(identity.snapshot as u64);
+    mix(version);
+    let mut nonce_bytes = [0u8; 12];
+    nonce_bytes[..8].copy_from_slice(&hash_state.to_le_bytes());
+    nonce_bytes[8..].copy_from_slice(&(hash_state.rotate_left(17) as u32).to_le_bytes());
+    nonce_bytes
 }
 
 fn cipher() -> ChaCha20Poly1305 {
@@ -132,32 +132,32 @@ fn cipher() -> ChaCha20Poly1305 {
 }
 
 /// 一次写：返回 (nonce, 密文不含 tag, tag)。
-fn seal(id: &Ident, ver: u64, pt: &[u8]) -> ([u8; 12], Vec<u8>, [u8; 16]) {
-    let nonce = derive_nonce(id, ver);
+fn seal(identity: &Ident, version: u64, plaintext: &[u8]) -> ([u8; 12], Vec<u8>, [u8; 16]) {
+    let nonce = derive_nonce(identity, version);
     let sealed = cipher()
-        .encrypt(&Nonce::from(nonce), Payload { msg: pt, aad: b"" })
+        .encrypt(&Nonce::from(nonce), Payload { msg: plaintext, aad: b"" })
         .expect("加密不该失败");
-    let (ct, tag) = sealed.split_at(sealed.len() - 16);
-    let mut t = [0u8; 16];
-    t.copy_from_slice(tag);
-    (nonce, ct.to_vec(), t)
+    let (ciphertext, tag) = sealed.split_at(sealed.len() - 16);
+    let mut tag_bytes = [0u8; 16];
+    tag_bytes.copy_from_slice(tag);
+    (nonce, ciphertext.to_vec(), tag_bytes)
 }
 
-fn open(id: &Ident, ver: u64, ct: &[u8], tag: &[u8; 16]) -> Option<Vec<u8>> {
-    let nonce = derive_nonce(id, ver);
-    let mut blob = ct.to_vec();
+fn open(identity: &Ident, version: u64, ciphertext: &[u8], tag: &[u8; 16]) -> Option<Vec<u8>> {
+    let nonce = derive_nonce(identity, version);
+    let mut blob = ciphertext.to_vec();
     blob.extend_from_slice(tag);
     cipher()
         .decrypt(&Nonce::from(nonce), Payload { msg: &blob, aad: b"" })
         .ok()
 }
 
-fn xor(a: &[u8], b: &[u8]) -> Vec<u8> {
-    a.iter().zip(b).map(|(x, y)| x ^ y).collect()
+fn xor(left: &[u8], right: &[u8]) -> Vec<u8> {
+    left.iter().zip(right).map(|(left_byte, right_byte)| left_byte ^ right_byte).collect()
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
-struct Out {
+struct ArmMeasurement {
     /// 两个头写同一位置时，用上同一个 (密钥, nonce) 的对数。判据一：必须为 0
     keystream_reuse_pairs: u64,
     /// 恒等式「两段密文异或 == 两段明文异或」成立的对数。
@@ -174,49 +174,49 @@ struct Out {
 const INODE: u64 = 42;
 const OFFSET: u64 = 0;
 
-fn measure(arm: Arm) -> Out {
-    let mut o = Out::default();
+fn measure(arm: Arm) -> ArmMeasurement {
+    let mut measurement = ArmMeasurement::default();
 
     // 两个可写头各写一次同一个 (inode, offset)，内容不同
     let mut store: BTreeMap<Ident, (Vec<u8>, [u8; 16])> = BTreeMap::new();
     let mut nonces: Vec<([u8; 12], Vec<u8>, Vec<u8>)> = Vec::new(); // (nonce, 明文, 密文)
     for head in 0..HEADS as u32 {
-        let id = Ident::of(arm, head, INODE, OFFSET);
+        let identity = Ident::of(arm, head, INODE, OFFSET);
         // 两个头各自是第一次写这个位置 ⇒ 各自的版本号都是 1
-        let pt: Vec<u8> = (0..PT_LEN).map(|i| (i as u8).wrapping_add(head as u8 * 31)).collect();
-        let (nonce, ct, tag) = seal(&id, 1, &pt);
-        nonces.push((nonce, pt.clone(), ct.clone()));
-        store.insert(id, (ct, tag));
+        let plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(head as u8 * 31)).collect();
+        let (nonce, ciphertext, tag) = seal(&identity, 1, &plaintext);
+        nonces.push((nonce, plaintext.clone(), ciphertext.clone()));
+        store.insert(identity, (ciphertext, tag));
     }
 
     // 判据一：有没有两次写用上同一个 nonce 而明文不同
-    for i in 0..nonces.len() {
-        for j in (i + 1)..nonces.len() {
-            if nonces[i].0 == nonces[j].0 && nonces[i].1 != nonces[j].1 {
-                o.keystream_reuse_pairs += 1;
+    for first_write in 0..nonces.len() {
+        for second_write in (first_write + 1)..nonces.len() {
+            if nonces[first_write].0 == nonces[second_write].0 && nonces[first_write].1 != nonces[second_write].1 {
+                measurement.keystream_reuse_pairs += 1;
             }
             // ⚠️ **这一条无条件判，不套在「已经判定复用」的分支里。**
             // 套进去的话它只能等于复用数，就不再是独立佐证了
             // （变异 M5 实测：把它改成恒真，一个测试都不红）。
-            if xor(&nonces[i].2, &nonces[j].2) == xor(&nonces[i].1, &nonces[j].1) {
-                o.xor_identity_holds += 1;
+            if xor(&nonces[first_write].2, &nonces[second_write].2) == xor(&nonces[first_write].1, &nonces[second_write].1) {
+                measurement.xor_identity_holds += 1;
             }
         }
     }
 
     // 判据二：各头读回自己那一份
     for head in 0..HEADS as u32 {
-        let id = Ident::of(arm, head, INODE, OFFSET);
-        let want: Vec<u8> = (0..PT_LEN).map(|i| (i as u8).wrapping_add(head as u8 * 31)).collect();
-        if let Some((ct, tag)) = store.get(&id) {
-            if open(&id, 1, ct, tag).as_deref() == Some(want.as_slice()) {
-                o.own_reads_ok += 1;
+        let identity = Ident::of(arm, head, INODE, OFFSET);
+        let want: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(head as u8 * 31)).collect();
+        if let Some((ciphertext, tag)) = store.get(&identity) {
+            if open(&identity, 1, ciphertext, tag).as_deref() == Some(want.as_slice()) {
+                measurement.own_reads_ok += 1;
             }
         }
     }
 
     // 运营侧的两个量，供两种形态对照
-    o.ranges_to_drop_a_head = match arm {
+    measurement.ranges_to_drop_a_head = match arm {
         // 没有 `_ =>`
         // 三段 key 无快照维：两个头共用同一个 key 槽，「删一个头」没有对象可指
         Arm::Key3Derived => 0,
@@ -226,47 +226,47 @@ fn measure(arm: Arm) -> Out {
         // 每头一棵树：删一个头 = 丢一棵树，一个区间
         Arm::ClonePerHead => 1,
     };
-    o.key_compare_fields = if arm.key_has_snapshot() { 4 } else { 3 };
-    o
+    measurement.key_compare_fields = if arm.key_has_snapshot() { 4 } else { 3 };
+    measurement
 }
 
 fn main() {
-    let mut em = Emitter::new();
+    let mut emitter = Emitter::new();
     println!(
         "{}",
-        em.emit_raw(&format!(
-            "name=config heads={HEADS} pt_len={PT_LEN} aead=chacha20poly1305 note=多可写头两种形态"
+        emitter.emit_raw(&format!(
+            "name=config heads={HEADS} pt_len={PLAINTEXT_LENGTH_BYTES} aead=chacha20poly1305 note=多可写头两种形态"
         ))
     );
     let mut bad_control = 0;
     for arm in ARMS {
-        let o = measure(arm);
+        let measurement = measure(arm);
         // 阳性对照：出事那条臂的异或恒等式必须成立，否则度量本身没在看 keystream
-        if o.keystream_reuse_pairs != o.xor_identity_holds {
+        if measurement.keystream_reuse_pairs != measurement.xor_identity_holds {
             bad_control += 1;
         }
-        let pass = o.keystream_reuse_pairs == 0 && o.own_reads_ok == HEADS as u64;
+        let pass = measurement.keystream_reuse_pairs == 0 && measurement.own_reads_ok == HEADS as u64;
         println!(
             "{}",
-            em.emit_raw(&format!(
+            emitter.emit_raw(&format!(
                 "name=arm arm={} keystream_reuse_pairs={} xor_identity_holds={} own_reads_ok={} \
                  ranges_to_drop_a_head={} key_compare_fields={} pass={}",
                 arm.name(),
-                o.keystream_reuse_pairs,
-                o.xor_identity_holds,
-                o.own_reads_ok,
-                o.ranges_to_drop_a_head,
-                o.key_compare_fields,
+                measurement.keystream_reuse_pairs,
+                measurement.xor_identity_holds,
+                measurement.own_reads_ok,
+                measurement.ranges_to_drop_a_head,
+                measurement.key_compare_fields,
                 pass
             ))
         );
     }
     if bad_control > 0 {
-        println!("{}", em.finish());
+        println!("{}", emitter.finish());
         eprintln!("E35：有 {bad_control} 条臂的复用计数与异或恒等式对不上——度量作废");
         std::process::exit(4);
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -277,10 +277,10 @@ mod tests {
     /// 绝对值：两个头 ⇒ 恰好 1 对，不是「大于零」。
     #[test]
     fn the_settled_three_segment_key_with_derived_nonce_reuses_the_keystream() {
-        let o = measure(Arm::Key3Derived);
-        assert_eq!(o.keystream_reuse_pairs, 1, "两个头写同一位置，该恰好 1 对复用");
+        let measurement = measure(Arm::Key3Derived);
+        assert_eq!(measurement.keystream_reuse_pairs, 1, "两个头写同一位置，该恰好 1 对复用");
         assert_eq!(
-            o.xor_identity_holds, 1,
+            measurement.xor_identity_holds, 1,
             "复用是真的：两段密文异或该等于两段明文异或"
         );
     }
@@ -290,9 +290,9 @@ mod tests {
     #[test]
     fn the_other_two_arms_do_not_reuse_and_the_identity_fails_there() {
         for arm in [Arm::Key4Derived, Arm::ClonePerHead] {
-            let o = measure(arm);
-            assert_eq!(o.keystream_reuse_pairs, 0, "{} 不该有复用", arm.name());
-            assert_eq!(o.xor_identity_holds, 0, "{} 上那条恒等式不该成立", arm.name());
+            let measurement = measure(arm);
+            assert_eq!(measurement.keystream_reuse_pairs, 0, "{} 不该有复用", arm.name());
+            assert_eq!(measurement.xor_identity_holds, 0, "{} 上那条恒等式不该成立", arm.name());
         }
     }
 
@@ -300,9 +300,9 @@ mod tests {
     #[test]
     fn both_alternatives_satisfy_both_criteria() {
         for arm in [Arm::Key4Derived, Arm::ClonePerHead] {
-            let o = measure(arm);
-            assert_eq!(o.keystream_reuse_pairs, 0, "{}", arm.name());
-            assert_eq!(o.own_reads_ok, HEADS as u64, "{} 两个头都该读回自己的", arm.name());
+            let measurement = measure(arm);
+            assert_eq!(measurement.keystream_reuse_pairs, 0, "{}", arm.name());
+            assert_eq!(measurement.own_reads_ok, HEADS as u64, "{} 两个头都该读回自己的", arm.name());
         }
     }
 
@@ -311,9 +311,9 @@ mod tests {
     /// ⚠️ 这条独立于加密：**就算不加密，这条臂也已经错了。**
     #[test]
     fn under_the_three_segment_key_the_two_heads_collide_on_one_slot() {
-        let o = measure(Arm::Key3Derived);
+        let measurement = measure(Arm::Key3Derived);
         assert_eq!(
-            o.own_reads_ok, 1,
+            measurement.own_reads_ok, 1,
             "两个头共用一个 key 槽 ⇒ 只有后写的那个读得回自己"
         );
         // 构造自证：两个头算出的逻辑身份逐字段相同
@@ -328,38 +328,38 @@ mod tests {
     /// 若它对身份不敏感，全部三条臂都会复用，结论就是假的。
     #[test]
     fn the_derived_nonce_actually_depends_on_the_identity() {
-        let a = Ident::of(Arm::Key4Derived, 0, INODE, OFFSET);
-        let b = Ident::of(Arm::Key4Derived, 1, INODE, OFFSET);
-        let c = Ident::of(Arm::ClonePerHead, 0, INODE, OFFSET);
-        let d = Ident::of(Arm::ClonePerHead, 1, INODE, OFFSET);
-        assert_ne!(derive_nonce(&a, 1), derive_nonce(&b, 1), "只差快照维，nonce 必须变");
-        assert_ne!(derive_nonce(&c, 1), derive_nonce(&d, 1), "只差树 ID，nonce 必须变");
-        assert_ne!(derive_nonce(&a, 1), derive_nonce(&a, 2), "只差版本号，nonce 必须变");
+        let head0_snapshot_identity = Ident::of(Arm::Key4Derived, 0, INODE, OFFSET);
+        let head1_snapshot_identity = Ident::of(Arm::Key4Derived, 1, INODE, OFFSET);
+        let head0_clone_identity = Ident::of(Arm::ClonePerHead, 0, INODE, OFFSET);
+        let head1_clone_identity = Ident::of(Arm::ClonePerHead, 1, INODE, OFFSET);
+        assert_ne!(derive_nonce(&head0_snapshot_identity, 1), derive_nonce(&head1_snapshot_identity, 1), "只差快照维，nonce 必须变");
+        assert_ne!(derive_nonce(&head0_clone_identity, 1), derive_nonce(&head1_clone_identity, 1), "只差树 ID，nonce 必须变");
+        assert_ne!(derive_nonce(&head0_snapshot_identity, 1), derive_nonce(&head0_snapshot_identity, 2), "只差版本号，nonce 必须变");
     }
 
     /// **版本号救不了这一格**：两个头各自都是第一次写，版本号都是 1。
     /// ⚠️ 这条挡住一种自然的辩解（「加个版本号就好了」）。
     #[test]
-    fn a_per_head_version_counter_does_not_save_the_three_segment_key() {
-        let a = Ident::of(Arm::Key3Derived, 0, INODE, OFFSET);
-        let b = Ident::of(Arm::Key3Derived, 1, INODE, OFFSET);
-        assert_eq!(derive_nonce(&a, 1), derive_nonce(&b, 1), "各自第一次写 ⇒ 同一个 nonce");
+    fn per_head_version_counter_does_not_save_the_three_segment_key() {
+        let head0_identity = Ident::of(Arm::Key3Derived, 0, INODE, OFFSET);
+        let head1_identity = Ident::of(Arm::Key3Derived, 1, INODE, OFFSET);
+        assert_eq!(derive_nonce(&head0_identity, 1), derive_nonce(&head1_identity, 1), "各自第一次写 ⇒ 同一个 nonce");
     }
 
     /// **异或恒等式本身要有判别力**：不同 nonce 下它必须不成立。
     /// 少了这条，`xor_identity_holds` 可能恒真而没人发现。
     #[test]
     fn the_xor_identity_is_not_vacuous() {
-        let pt1: Vec<u8> = (0..PT_LEN).map(|i| i as u8).collect();
-        let pt2: Vec<u8> = (0..PT_LEN).map(|i| (i as u8).wrapping_add(31)).collect();
-        let a = Ident::of(Arm::Key4Derived, 0, INODE, OFFSET);
-        let b = Ident::of(Arm::Key4Derived, 1, INODE, OFFSET);
-        let (_, c1, _) = seal(&a, 1, &pt1);
-        let (_, c2, _) = seal(&b, 1, &pt2);
-        assert_ne!(xor(&c1, &c2), xor(&pt1, &pt2), "不同 nonce 下恒等式不该成立");
+        let first_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| byte_index as u8).collect();
+        let second_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(31)).collect();
+        let head0_identity = Ident::of(Arm::Key4Derived, 0, INODE, OFFSET);
+        let head1_identity = Ident::of(Arm::Key4Derived, 1, INODE, OFFSET);
+        let (_, first_ciphertext_distinct_nonces, _) = seal(&head0_identity, 1, &first_plaintext);
+        let (_, second_ciphertext_distinct_nonces, _) = seal(&head1_identity, 1, &second_plaintext);
+        assert_ne!(xor(&first_ciphertext_distinct_nonces, &second_ciphertext_distinct_nonces), xor(&first_plaintext, &second_plaintext), "不同 nonce 下恒等式不该成立");
         // 同 nonce 下必须成立
-        let (_, d1, _) = seal(&a, 1, &pt1);
-        let (_, d2, _) = seal(&a, 1, &pt2);
-        assert_eq!(xor(&d1, &d2), xor(&pt1, &pt2), "同 nonce 下恒等式该成立");
+        let (_, first_ciphertext_same_nonce, _) = seal(&head0_identity, 1, &first_plaintext);
+        let (_, second_ciphertext_same_nonce, _) = seal(&head0_identity, 1, &second_plaintext);
+        assert_eq!(xor(&first_ciphertext_same_nonce, &second_ciphertext_same_nonce), xor(&first_plaintext, &second_plaintext), "同 nonce 下恒等式该成立");
     }
 }

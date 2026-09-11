@@ -49,9 +49,9 @@ const COMMON_PREFIX: u64 = 42;
 /// D18 已定项 7 数据单元类身份段：五元组 33 + 诞生代号 8 + fsid 8 + 写序 10 + 载荷 CRC 4。
 const DATA_IDENTITY: u64 = 63;
 /// D18 已定项 11：打包记录单元头（表内部分）。
-const PACKED_HDR_BARE: u64 = 103;
+const PACKED_HEADER_BARE_BYTES: u64 = 103;
 /// D18 已定项 7 补注：码 2 三档基础头（58 / 67 / 76 各加写序 10）。
-const NODE_HDR_TIERS: [u64; 3] = [68, 77, 86];
+const NODE_HEADER_BYTES_BY_TIER: [u64; 3] = [68, 77, 86];
 /// D9 已定项 2：MAC 满 128 位不截断。
 const MAC_BYTES: u64 = 16;
 /// E98 的 format-const：inode 记录定长。
@@ -59,32 +59,32 @@ const INODE_REC: u64 = 140;
 /// E73 自己的条目宽：key 22 + 子指针 32。
 const E73_ENTRY: u64 = 54;
 /// 按 D19 已定项 4 更新后的条目宽：key 22 + 指针 59。
-const D19_ENTRY: u64 = 22 + 59;
+const UPDATED_POINTER_ENTRY_BYTES: u64 = 22 + 59;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
     /// 头不含预留位——今天四个下游实验用的口径。
     Bare,
     /// 含预留位，nonce 代号 12（D18 已定项 14 臂甲）。
-    Resv12,
+    ReservedTwelveByteNonceCode,
     /// 含预留位，nonce 代号 4——**判别力对照臂，不是候选**。
-    Resv4,
+    ReservedFourByteNonceCode,
 }
 
 impl Arm {
     fn name(self) -> &'static str {
         match self {
             Arm::Bare => "bare",
-            Arm::Resv12 => "resv12",
-            Arm::Resv4 => "resv4",
+            Arm::ReservedTwelveByteNonceCode => "resv12",
+            Arm::ReservedFourByteNonceCode => "resv4",
         }
     }
     /// 预留位一共多少字节。**没有通配臂**：加一种臂编译器会报。
     fn reserved(self) -> u64 {
         match self {
             Arm::Bare => 0,
-            Arm::Resv12 => 12 + MAC_BYTES,
-            Arm::Resv4 => 4 + MAC_BYTES,
+            Arm::ReservedTwelveByteNonceCode => 12 + MAC_BYTES,
+            Arm::ReservedFourByteNonceCode => 4 + MAC_BYTES,
         }
     }
 }
@@ -97,55 +97,55 @@ fn fanout(unit: u64, header: u64, entry: u64) -> u64 {
     (unit - header) / entry
 }
 
-fn data_hdr(a: Arm) -> u64 {
-    COMMON_PREFIX + DATA_IDENTITY + a.reserved()
+fn data_unit_header_bytes(arm: Arm) -> u64 {
+    COMMON_PREFIX + DATA_IDENTITY + arm.reserved()
 }
-fn packed_hdr(a: Arm) -> u64 {
-    PACKED_HDR_BARE + a.reserved()
+fn packed_header_bytes(arm: Arm) -> u64 {
+    PACKED_HEADER_BARE_BYTES + arm.reserved()
 }
-fn node_hdr(a: Arm, tier: usize) -> u64 {
-    NODE_HDR_TIERS[tier] + a.reserved()
+fn node_header_bytes(arm: Arm, tier: usize) -> u64 {
+    NODE_HEADER_BYTES_BY_TIER[tier] + arm.reserved()
 }
 
 fn main() {
     // 结果行必须带 E7RESULT 前缀并以 `name=done emitted=N` 收尾——
     // 抓取方按这个数比对条数，对不上整轮作废（command-safety.md「结果抓取要有完整性闸」）。
-    let mut em = e7_index_bench::Emitter::new();
-    let arms = [Arm::Bare, Arm::Resv12, Arm::Resv4];
-    let mut line = |s: String| {
-        println!("{}", em.emit_raw(&s));
+    let mut emitter = e7_index_bench::Emitter::new();
+    let arms = [Arm::Bare, Arm::ReservedTwelveByteNonceCode, Arm::ReservedFourByteNonceCode];
+    let mut line = |result_line: String| {
+        println!("{}", emitter.emit_raw(&result_line));
     };
 
-    for a in arms {
+    for arm in arms {
         line(format!(
             "name=hdr arm={} reserved={} data_hdr={} packed_hdr={} payload={}",
-            a.name(),
-            a.reserved(),
-            data_hdr(a),
-            packed_hdr(a),
-            DATA_UNIT_BYTES - data_hdr(a)
+            arm.name(),
+            arm.reserved(),
+            data_unit_header_bytes(arm),
+            packed_header_bytes(arm),
+            DATA_UNIT_BYTES - data_unit_header_bytes(arm)
         ));
-        for (i, _) in NODE_HDR_TIERS.iter().enumerate() {
+        for (tier, _) in NODE_HEADER_BYTES_BY_TIER.iter().enumerate() {
             line(format!(
                 "name=node arm={} tier={} node_hdr={} fanout54={} fanout81={}",
-                a.name(),
-                i,
-                node_hdr(a, i),
-                fanout(NODE_BYTES, node_hdr(a, i), E73_ENTRY),
-                fanout(NODE_BYTES, node_hdr(a, i), D19_ENTRY)
+                arm.name(),
+                tier,
+                node_header_bytes(arm, tier),
+                fanout(NODE_BYTES, node_header_bytes(arm, tier), E73_ENTRY),
+                fanout(NODE_BYTES, node_header_bytes(arm, tier), UPDATED_POINTER_ENTRY_BYTES)
             ));
         }
         line(format!(
             "name=packed arm={} records={}",
-            a.name(),
-            fanout(DATA_UNIT_BYTES, packed_hdr(a), INODE_REC)
+            arm.name(),
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_REC)
         ));
         // 阳性对照，逐臂跑：头强制为 0
         line(format!(
             "name=poscontrol arm={} fanout54={} fanout81={} records={}",
-            a.name(),
+            arm.name(),
             fanout(NODE_BYTES, 0, E73_ENTRY),
-            fanout(NODE_BYTES, 0, D19_ENTRY),
+            fanout(NODE_BYTES, 0, UPDATED_POINTER_ENTRY_BYTES),
             fanout(DATA_UNIT_BYTES, 0, INODE_REC)
         ));
     }
@@ -155,27 +155,27 @@ fn main() {
         fanout(NODE_BYTES, 100, NODE_BYTES)
     ));
     // 判别力：resv12 与 resv4 有没有一格不同
-    let mut diff = 0u64;
-    for (i, _) in NODE_HDR_TIERS.iter().enumerate() {
-        if fanout(NODE_BYTES, node_hdr(Arm::Resv12, i), E73_ENTRY)
-            != fanout(NODE_BYTES, node_hdr(Arm::Resv4, i), E73_ENTRY)
+    let mut differing_cells = 0u64;
+    for (tier, _) in NODE_HEADER_BYTES_BY_TIER.iter().enumerate() {
+        if fanout(NODE_BYTES, node_header_bytes(Arm::ReservedTwelveByteNonceCode, tier), E73_ENTRY)
+            != fanout(NODE_BYTES, node_header_bytes(Arm::ReservedFourByteNonceCode, tier), E73_ENTRY)
         {
-            diff += 1;
+            differing_cells += 1;
         }
-        if fanout(NODE_BYTES, node_hdr(Arm::Resv12, i), D19_ENTRY)
-            != fanout(NODE_BYTES, node_hdr(Arm::Resv4, i), D19_ENTRY)
+        if fanout(NODE_BYTES, node_header_bytes(Arm::ReservedTwelveByteNonceCode, tier), UPDATED_POINTER_ENTRY_BYTES)
+            != fanout(NODE_BYTES, node_header_bytes(Arm::ReservedFourByteNonceCode, tier), UPDATED_POINTER_ENTRY_BYTES)
         {
-            diff += 1;
+            differing_cells += 1;
         }
     }
-    if fanout(DATA_UNIT_BYTES, packed_hdr(Arm::Resv12), INODE_REC)
-        != fanout(DATA_UNIT_BYTES, packed_hdr(Arm::Resv4), INODE_REC)
+    if fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_REC)
+        != fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_REC)
     {
-        diff += 1;
+        differing_cells += 1;
     }
-    line(format!("name=discriminate cells_differing={diff}"));
+    line(format!("name=discriminate cells_differing={differing_cells}"));
     drop(line);
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -185,21 +185,21 @@ mod tests {
     /// 判据 1：头宽逐类钉绝对值。**写成加法不写减法**——变异把常量改大时
     /// 减法会编译期溢出、被记成无效变异（test-discipline 那条坑）。
     #[test]
-    fn t01_head_widths_absolute() {
+    fn head_widths_absolute() {
         assert_eq!(COMMON_PREFIX + DATA_IDENTITY, 105);
-        assert_eq!(data_hdr(Arm::Bare), 105);
-        assert_eq!(data_hdr(Arm::Resv12), 105 + 28);
-        assert_eq!(data_hdr(Arm::Resv4), 105 + 20);
-        assert_eq!(packed_hdr(Arm::Bare), 103);
-        assert_eq!(packed_hdr(Arm::Resv12), 103 + 28);
+        assert_eq!(data_unit_header_bytes(Arm::Bare), 105);
+        assert_eq!(data_unit_header_bytes(Arm::ReservedTwelveByteNonceCode), 105 + 28);
+        assert_eq!(data_unit_header_bytes(Arm::ReservedFourByteNonceCode), 105 + 20);
+        assert_eq!(packed_header_bytes(Arm::Bare), 103);
+        assert_eq!(packed_header_bytes(Arm::ReservedTwelveByteNonceCode), 103 + 28);
     }
 
     /// 判据 1：预留位的构成钉死。
     #[test]
-    fn t02_reserved_composition() {
+    fn reserved_composition() {
         assert_eq!(Arm::Bare.reserved(), 0);
-        assert_eq!(Arm::Resv12.reserved(), 12 + 16);
-        assert_eq!(Arm::Resv4.reserved(), 4 + 16);
+        assert_eq!(Arm::ReservedTwelveByteNonceCode.reserved(), 12 + 16);
+        assert_eq!(Arm::ReservedFourByteNonceCode.reserved(), 4 + 16);
         assert_eq!(MAC_BYTES, 16);
     }
 
@@ -212,68 +212,68 @@ mod tests {
     /// E73 自己的说法是「三档结论一致（掉 0 或 1 格）」，与实测不冲突；
     /// 冲突的是本实验跑前那句更强的登记。
     #[test]
-    fn t03_node_fanout_e73_entry() {
-        let f = |a: Arm, t: usize| fanout(NODE_BYTES, node_hdr(a, t), E73_ENTRY);
+    fn node_fanout_e73_entry() {
+        let node_fanout_for = |arm: Arm, tier: usize| fanout(NODE_BYTES, node_header_bytes(arm, tier), E73_ENTRY);
         const PREREG_BARE: [u64; 3] = [302, 302, 302];
         const MEASURED_BARE: [u64; 3] = [302, 301, 301];
         assert_ne!(PREREG_BARE, MEASURED_BARE, "跑前登记若与实测相等，上面那段注释就该删掉");
-        for (t, want) in MEASURED_BARE.iter().enumerate() {
-            assert_eq!(f(Arm::Bare, t), *want, "bare tier {t}");
+        for (tier, expected) in MEASURED_BARE.iter().enumerate() {
+            assert_eq!(node_fanout_for(Arm::Bare, tier), *expected, "bare tier {tier}");
         }
-        for (t, want) in [301u64, 301, 301].iter().enumerate() {
-            assert_eq!(f(Arm::Resv12, t), *want, "resv12 tier {t}");
+        for (tier, expected) in [301u64, 301, 301].iter().enumerate() {
+            assert_eq!(node_fanout_for(Arm::ReservedTwelveByteNonceCode, tier), *expected, "resv12 tier {tier}");
         }
     }
 
     /// 判据 2：按 D19 已定项 4 的指针宽度重算（条目 81）。
     /// **这一格才是有判别力的那一格**——见 t09。
     #[test]
-    fn t04_node_fanout_d19_entry() {
-        let f = |a: Arm, t: usize| fanout(NODE_BYTES, node_hdr(a, t), D19_ENTRY);
-        assert_eq!(D19_ENTRY, 81);
-        for (t, want) in [201u64, 201, 201].iter().enumerate() {
-            assert_eq!(f(Arm::Bare, t), *want, "bare tier {t}");
+    fn node_fanout_at_updated_pointer_entry() {
+        let node_fanout_for = |arm: Arm, tier: usize| fanout(NODE_BYTES, node_header_bytes(arm, tier), UPDATED_POINTER_ENTRY_BYTES);
+        assert_eq!(UPDATED_POINTER_ENTRY_BYTES, 81);
+        for (tier, expected) in [201u64, 201, 201].iter().enumerate() {
+            assert_eq!(node_fanout_for(Arm::Bare, tier), *expected, "bare tier {tier}");
         }
-        for (t, want) in [201u64, 200, 200].iter().enumerate() {
-            assert_eq!(f(Arm::Resv12, t), *want, "resv12 tier {t}");
+        for (tier, expected) in [201u64, 200, 200].iter().enumerate() {
+            assert_eq!(node_fanout_for(Arm::ReservedTwelveByteNonceCode, tier), *expected, "resv12 tier {tier}");
         }
-        for (t, want) in [201u64, 201, 200].iter().enumerate() {
-            assert_eq!(f(Arm::Resv4, t), *want, "resv4 tier {t}");
+        for (tier, expected) in [201u64, 201, 200].iter().enumerate() {
+            assert_eq!(node_fanout_for(Arm::ReservedFourByteNonceCode, tier), *expected, "resv4 tier {tier}");
         }
     }
 
     /// 判据 3：码 3 每容器记录数逐格钉绝对值。
     #[test]
-    fn t05_packed_records_absolute() {
-        let r = |a: Arm| fanout(DATA_UNIT_BYTES, packed_hdr(a), INODE_REC);
-        assert_eq!(r(Arm::Bare), 233);
-        assert_eq!(r(Arm::Resv12), 233);
-        assert_eq!(r(Arm::Resv4), 233);
+    fn packed_records_absolute() {
+        let records_per_container_for = |arm: Arm| fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_REC);
+        assert_eq!(records_per_container_for(Arm::Bare), 233);
+        assert_eq!(records_per_container_for(Arm::ReservedTwelveByteNonceCode), 233);
+        assert_eq!(records_per_container_for(Arm::ReservedFourByteNonceCode), 233);
     }
 
     /// 判据 4：码 1 净荷逐格钉绝对值。
     #[test]
-    fn t06_payload_absolute() {
-        assert_eq!(DATA_UNIT_BYTES, data_hdr(Arm::Bare) + 32663);
-        assert_eq!(DATA_UNIT_BYTES, data_hdr(Arm::Resv12) + 32635);
+    fn payload_absolute() {
+        assert_eq!(DATA_UNIT_BYTES, data_unit_header_bytes(Arm::Bare) + 32663);
+        assert_eq!(DATA_UNIT_BYTES, data_unit_header_bytes(Arm::ReservedTwelveByteNonceCode) + 32635);
     }
 
     /// 判据 6：阳性对照，**三条臂各跑一遍**——头为 0 时扇出必须等于闭式值。
     #[test]
-    fn t07_positive_control_每条臂() {
-        for a in [Arm::Bare, Arm::Resv12, Arm::Resv4] {
-            assert_eq!(fanout(NODE_BYTES, 0, E73_ENTRY), 303, "{}", a.name());
-            assert_eq!(fanout(NODE_BYTES, 0, D19_ENTRY), 202, "{}", a.name());
-            assert_eq!(fanout(DATA_UNIT_BYTES, 0, INODE_REC), 234, "{}", a.name());
+    fn positive_control_on_every_arm() {
+        for arm in [Arm::Bare, Arm::ReservedTwelveByteNonceCode, Arm::ReservedFourByteNonceCode] {
+            assert_eq!(fanout(NODE_BYTES, 0, E73_ENTRY), 303, "{}", arm.name());
+            assert_eq!(fanout(NODE_BYTES, 0, UPDATED_POINTER_ENTRY_BYTES), 202, "{}", arm.name());
+            assert_eq!(fanout(DATA_UNIT_BYTES, 0, INODE_REC), 234, "{}", arm.name());
         }
     }
 
     /// 判据 7：阴性对照——条目宽大于可用字节时返回 0，且头装不下时也返回 0。
     #[test]
-    fn t08_negative_control() {
+    fn negative_control() {
         assert_eq!(fanout(NODE_BYTES, 100, NODE_BYTES), 0);
         assert_eq!(fanout(NODE_BYTES, NODE_BYTES, E73_ENTRY), 0);
-        assert_eq!(fanout(NODE_BYTES, node_hdr(Arm::Bare, 0), 0), 0);
+        assert_eq!(fanout(NODE_BYTES, node_header_bytes(Arm::Bare, 0), 0), 0);
     }
 
     /// 判据 5：判别力——resv12 与 resv4 必须至少在一格上不同。
@@ -281,45 +281,45 @@ mod tests {
     /// 而在按 D19 已定项 4 更新后的条目宽 81 上**第二档就分开**：resv12 给 200、resv4 给 201。
     /// ⇒ 判据 5 由这一格满足，不必造人造取样点。
     #[test]
-    fn t09_discriminating_sample_point() {
-        assert_eq!(node_hdr(Arm::Resv12, 1), 105);
-        assert_eq!(node_hdr(Arm::Resv4, 1), 97);
-        assert_eq!(fanout(NODE_BYTES, node_hdr(Arm::Resv12, 1), D19_ENTRY), 200);
-        assert_eq!(fanout(NODE_BYTES, node_hdr(Arm::Resv4, 1), D19_ENTRY), 201);
+    fn discriminating_sample_point() {
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 1), 105);
+        assert_eq!(node_header_bytes(Arm::ReservedFourByteNonceCode, 1), 97);
+        assert_eq!(fanout(NODE_BYTES, node_header_bytes(Arm::ReservedTwelveByteNonceCode, 1), UPDATED_POINTER_ENTRY_BYTES), 200);
+        assert_eq!(fanout(NODE_BYTES, node_header_bytes(Arm::ReservedFourByteNonceCode, 1), UPDATED_POINTER_ENTRY_BYTES), 201);
     }
 
     /// 判据 5 的反面：在 **E73 的条目宽 54** 上两条臂逐格相同。
     /// 这不是「预留位不影响几何」，是**取样点不敏感**
     /// （`.claude/rules/mutation-sampling.md` 第三类）——判别力靠 t09 那一格。
     #[test]
-    fn t10_sampling_insensitive_at_e73_entry() {
-        for (i, _) in NODE_HDR_TIERS.iter().enumerate() {
+    fn sampling_insensitive_at_e73_entry() {
+        for (tier, _) in NODE_HEADER_BYTES_BY_TIER.iter().enumerate() {
             assert_eq!(
-                fanout(NODE_BYTES, node_hdr(Arm::Resv12, i), E73_ENTRY),
-                fanout(NODE_BYTES, node_hdr(Arm::Resv4, i), E73_ENTRY),
-                "tier {i}"
+                fanout(NODE_BYTES, node_header_bytes(Arm::ReservedTwelveByteNonceCode, tier), E73_ENTRY),
+                fanout(NODE_BYTES, node_header_bytes(Arm::ReservedFourByteNonceCode, tier), E73_ENTRY),
+                "tier {tier}"
             );
         }
         assert_eq!(
-            fanout(DATA_UNIT_BYTES, packed_hdr(Arm::Resv12), INODE_REC),
-            fanout(DATA_UNIT_BYTES, packed_hdr(Arm::Resv4), INODE_REC)
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_REC),
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_REC)
         );
     }
 
     /// 格式常量必须与 kb 的 format-const 标记一致。
     #[test]
-    fn t11_format_constants() {
+    fn format_constants() {
         assert_eq!(NODE_BYTES, 16384);
         assert_eq!(DATA_UNIT_BYTES, 32768);
         assert_eq!(INODE_REC, 140);
-        assert_eq!(PACKED_HDR_BARE, 103);
+        assert_eq!(PACKED_HEADER_BARE_BYTES, 103);
     }
 
     /// 三档基础头就是 D18 已定项 7 补注那三个数。
     #[test]
-    fn t12_node_tiers() {
-        assert_eq!(NODE_HDR_TIERS, [68, 77, 86]);
-        assert_eq!(node_hdr(Arm::Resv12, 0), 96);
-        assert_eq!(node_hdr(Arm::Resv12, 2), 114);
+    fn node_tiers() {
+        assert_eq!(NODE_HEADER_BYTES_BY_TIER, [68, 77, 86]);
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 0), 96);
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 2), 114);
     }
 }

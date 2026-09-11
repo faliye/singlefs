@@ -8,16 +8,19 @@
 
 ## 规则（始终生效）
 
+@.claude/singlefs-ai-sop/rules/engineering-philosophy.md
+@.claude/singlefs-ai-sop/rules/sop-first.md
 @.claude/singlefs-ai-sop/rules/show-me-test.md
 @.claude/singlefs-ai-sop/rules/machine-first.md
-@.claude/singlefs-ai-sop/rules/doc-discipline.md
+@.claude/singlefs-ai-sop/rules/code-discipline.md
+@.claude/singlefs-ai-sop/rules/writing-discipline.md
 @.claude/singlefs-ai-sop/rules/design-doc-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
 @.claude/singlefs-ai-sop/rules/test-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
+@.claude/singlefs-ai-sop/rules/pushback-discipline.md
 @.claude/singlefs-ai-sop/rules/command-safety.md
-@.claude/singlefs-ai-sop/rules/writing-economy.md
 @.claude/singlefs-ai-sop/rules/session-wrapup.md
 
 ## 规范从哪来

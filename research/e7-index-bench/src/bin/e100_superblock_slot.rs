@@ -50,10 +50,10 @@ const SLOT_WIDTHS: [u64; 2] = [512, 4096];
 /// D15 逐字：三个 bitmap 各 256 位 ⇒ 96 字节。
 const FEATURE_BITS_BYTES: u64 = 3 * 256 / 8;
 /// E72：设备描述符表的条目宽度**仓里没定过**，三档。
-const DEV_ENTRY_WIDTHS: [u64; 3] = [24, 40, 64];
+const DEVICE_ENTRY_WIDTHS: [u64; 3] = [24, 40, 64];
 
 /// 段一：自举头。**每个字段都指得到一条已定条款**（见文件头）。
-const SEC1: [(&str, u64); 7] = [
+const SECTION_ONE_BOOTSTRAP_FIELDS: [(&str, u64); 7] = [
     ("magic", 4),
     ("format_version", 2),
     ("feature_bits", FEATURE_BITS_BYTES), // D15：三个 256 位 bitmap
@@ -64,10 +64,10 @@ const SEC1: [(&str, u64); 7] = [
 ];
 
 /// D9 的 day-1 预留（D15 止损规则：第 1、2 层冻结前必须已包含 D9 全部四项预留）。
-const SEC1_CRYPTO: [(&str, u64); 2] = [("sb_mac", 16), ("nonce_watermark", 8)];
+const SECTION_ONE_CRYPTO_FIELDS: [(&str, u64); 2] = [("sb_mac", 16), ("nonce_watermark", 8)];
 
 /// 段二：几何。设备表另算（它是唯一随规模长的）。
-const SEC2_FIXED: [(&str, u64); 8] = [
+const SECTION_TWO_FIXED_GEOMETRY_FIELDS: [(&str, u64); 8] = [
     ("node_bytes", 4),
     ("unit_bytes", 4),
     ("alloc_grain", 4),      // D3 已定项 7
@@ -79,7 +79,7 @@ const SEC2_FIXED: [(&str, u64); 8] = [
 ];
 
 /// 段三：可调值。D16 已定项 5 + D26（后台整理与放置回收） 已定项 1 的三个水位。
-const SEC3: [(&str, u64); 5] = [
+const SECTION_THREE_TUNABLE_FIELDS: [(&str, u64); 5] = [
     ("t_time", 4),
     ("t_dirty", 8),
     ("compact_lo", 8),
@@ -90,27 +90,27 @@ const SEC3: [(&str, u64); 5] = [
 /// 第四类：**运行时由系统改的水位 / 代号 / 纪元**。
 /// 第一版提案的三段轴收不了它们——tail 槽每个 checkpoint 改一次，
 /// 既非永不改、非 mkfs 只读、也非人调的可调值。
-const SEC4_RUNTIME: [(&str, u64); 2] = [
+const SECTION_FOUR_RUNTIME_FIELDS: [(&str, u64); 2] = [
     ("journal_tail", 8),     // D23 已定项 3：tail 住超级块槽
     ("journal_instance", 4), // D23 已定项 9 的实例代号
 ];
 
-fn sum(t: &[(&str, u64)]) -> u64 {
-    t.iter().map(|x| x.1).sum()
+fn section_bytes(fields: &[(&str, u64)]) -> u64 {
+    fields.iter().map(|field_entry| field_entry.1).sum()
 }
 
 /// 三段 + 第四类 + 设备表 的总字节。`inline_devtable` = 设备表在不在槽里。
-fn total_bytes(devs: u64, dev_entry: u64, inline_devtable: bool, with_crypto: bool) -> u64 {
-    let mut b = sum(&SEC1) + sum(&SEC2_FIXED) + sum(&SEC3) + sum(&SEC4_RUNTIME);
+fn total_bytes(device_count: u64, device_entry_bytes: u64, inline_devtable: bool, with_crypto: bool) -> u64 {
+    let mut slot_bytes = section_bytes(&SECTION_ONE_BOOTSTRAP_FIELDS) + section_bytes(&SECTION_TWO_FIXED_GEOMETRY_FIELDS) + section_bytes(&SECTION_THREE_TUNABLE_FIELDS) + section_bytes(&SECTION_FOUR_RUNTIME_FIELDS);
     if with_crypto {
-        b += sum(&SEC1_CRYPTO);
+        slot_bytes += section_bytes(&SECTION_ONE_CRYPTO_FIELDS);
     }
     if inline_devtable {
-        b += devs * dev_entry;
+        slot_bytes += device_count * device_entry_bytes;
     } else {
-        b += 59; // 指向设备表单元的指针，同 D22 已定项 7 的树表单元指针宽度
+        slot_bytes += 59; // 指向设备表单元的指针，同 D22 已定项 7 的树表单元指针宽度
     }
-    b
+    slot_bytes
 }
 
 /// **判据 4**：一个槽跨 `n` 个扇区时，撕裂点上有几种可读但不一致的状态。
@@ -128,45 +128,45 @@ fn torn_states(total: u64, slot: u64) -> u64 {
 
 /// **判据 5**：解析器读到第几字节才判得出某个字段。段一按声明次序排布。
 fn bytes_to_reach(field: &str) -> Option<u64> {
-    let mut off = 0u64;
-    for (n, w) in SEC1.iter() {
-        off += w;
-        if *n == field {
-            return Some(off);
+    let mut offset_in_bytes = 0u64;
+    for (field_name, field_width_bytes) in SECTION_ONE_BOOTSTRAP_FIELDS.iter() {
+        offset_in_bytes += field_width_bytes;
+        if *field_name == field {
+            return Some(offset_in_bytes);
         }
     }
     None
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out: Vec<String> = Vec::new();
+    let mut emitter = Emitter::new();
+    let mut output_lines: Vec<String> = Vec::new();
 
-    out.push(em.emit_raw(&format!(
+    output_lines.push(emitter.emit_raw(&format!(
         "name=config sec1={} sec1_crypto={} sec2_fixed={} sec3={} sec4_runtime={} feature_bits={}",
-        sum(&SEC1),
-        sum(&SEC1_CRYPTO),
-        sum(&SEC2_FIXED),
-        sum(&SEC3),
-        sum(&SEC4_RUNTIME),
+        section_bytes(&SECTION_ONE_BOOTSTRAP_FIELDS),
+        section_bytes(&SECTION_ONE_CRYPTO_FIELDS),
+        section_bytes(&SECTION_TWO_FIXED_GEOMETRY_FIELDS),
+        section_bytes(&SECTION_THREE_TUNABLE_FIELDS),
+        section_bytes(&SECTION_FOUR_RUNTIME_FIELDS),
         FEATURE_BITS_BYTES
     )));
 
     // 判据 1 / 2 / 3：装得下装不下
-    for &inline in [true, false].iter() {
-        for &crypto in [false, true].iter() {
-            for &dw in DEV_ENTRY_WIDTHS.iter() {
-                for &devs in [1u64, 2, 8, 64, 256].iter() {
-                    let t = total_bytes(devs, dw, inline, crypto);
+    for &inline_device_table in [true, false].iter() {
+        for &with_crypto_reservation in [false, true].iter() {
+            for &device_entry_bytes in DEVICE_ENTRY_WIDTHS.iter() {
+                for &device_count in [1u64, 2, 8, 64, 256].iter() {
+                    let slot_total_bytes = total_bytes(device_count, device_entry_bytes, inline_device_table, with_crypto_reservation);
                     for &slot in SLOT_WIDTHS.iter() {
-                        let over = t.saturating_sub(slot);
-                        out.push(em.emit_raw(&format!(
-                            "name=fit inline_devtable={} with_crypto={} dev_entry={dw} devs={devs} \
-                             total={t} slot={slot} fits={} over_by={over} torn_states={}",
-                            u8::from(inline),
-                            u8::from(crypto),
-                            u8::from(t <= slot),
-                            torn_states(t, slot)
+                        let overflow_bytes = slot_total_bytes.saturating_sub(slot);
+                        output_lines.push(emitter.emit_raw(&format!(
+                            "name=fit inline_devtable={} with_crypto={} dev_entry={device_entry_bytes} devs={device_count} \
+                             total={slot_total_bytes} slot={slot} fits={} over_by={overflow_bytes} torn_states={}",
+                            u8::from(inline_device_table),
+                            u8::from(with_crypto_reservation),
+                            u8::from(slot_total_bytes <= slot),
+                            torn_states(slot_total_bytes, slot)
                         )));
                     }
                 }
@@ -175,17 +175,17 @@ fn main() {
     }
 
     // 判据 5：自举顺序
-    for f in ["magic", "format_version", "feature_bits", "fsid", "this_dev_id"].iter() {
-        out.push(em.emit_raw(&format!(
-            "name=bootstrap field={f} bytes_to_reach={}",
-            bytes_to_reach(f).map(|v| v.to_string()).unwrap_or_else(|| "NA".into())
+    for field_name in ["magic", "format_version", "feature_bits", "fsid", "this_dev_id"].iter() {
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=bootstrap field={field_name} bytes_to_reach={}",
+            bytes_to_reach(field_name).map(|byte_count| byte_count.to_string()).unwrap_or_else(|| "NA".into())
         )));
     }
 
-    for l in &out {
-        println!("{l}");
+    for output_line in &output_lines {
+        println!("{output_line}");
     }
-    println!("{}", em.finish());
+    println!("{}", emitter.finish());
 }
 
 #[cfg(test)]
@@ -193,25 +193,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn format_constants_match_kb() {
+    fn format_constants_match_knowledge_base() {
         assert_eq!(FEATURE_BITS_BYTES, 96, "D15：三个 256 位 bitmap");
         assert_eq!(SLOT_WIDTHS, [512, 4096], "D20 推论三：探测到的 physical_block_size");
-        assert_eq!(DEV_ENTRY_WIDTHS, [24, 40, 64], "E72 的三档假设");
+        assert_eq!(DEVICE_ENTRY_WIDTHS, [24, 40, 64], "E72 的三档假设");
     }
 
     /// **判据 1 的绝对值**：段一光 feature bit 就 96 字节，整段 162。
     #[test]
     fn criterion1_section_sizes_are_absolute() {
         // 手算：4 + 2 + 96 + 16 + 4 + 8 + 32 = 162
-        assert_eq!(sum(&SEC1), 162);
-        assert_eq!(sum(&SEC1_CRYPTO), 24, "D9 的 MAC 16 + nonce 水位 8");
+        assert_eq!(section_bytes(&SECTION_ONE_BOOTSTRAP_FIELDS), 162);
+        assert_eq!(section_bytes(&SECTION_ONE_CRYPTO_FIELDS), 24, "D9 的 MAC 16 + nonce 水位 8");
         // 手算：4+4+4+4+24+4+59+24 = 127
-        assert_eq!(sum(&SEC2_FIXED), 127);
-        assert_eq!(sum(&SEC3), 36);
-        assert_eq!(sum(&SEC4_RUNTIME), 12);
+        assert_eq!(section_bytes(&SECTION_TWO_FIXED_GEOMETRY_FIELDS), 127);
+        assert_eq!(section_bytes(&SECTION_THREE_TUNABLE_FIELDS), 36);
+        assert_eq!(section_bytes(&SECTION_FOUR_RUNTIME_FIELDS), 12);
         // 不含设备表的固定开销：162+24+127+36+12 = 361
         assert_eq!(
-            sum(&SEC1) + sum(&SEC1_CRYPTO) + sum(&SEC2_FIXED) + sum(&SEC3) + sum(&SEC4_RUNTIME),
+            section_bytes(&SECTION_ONE_BOOTSTRAP_FIELDS) + section_bytes(&SECTION_ONE_CRYPTO_FIELDS) + section_bytes(&SECTION_TWO_FIXED_GEOMETRY_FIELDS) + section_bytes(&SECTION_THREE_TUNABLE_FIELDS) + section_bytes(&SECTION_FOUR_RUNTIME_FIELDS),
             361
         );
     }
@@ -221,10 +221,10 @@ mod tests {
     /// 3–7 台一格没跑 ⇒ 表里读不出上限。这条测试把三档上限直接钉住，正文再漂就会红。
     #[test]
     fn criterion2_inline_capacity_per_entry_width_is_absolute() {
-        let cap = |e: u64| (1u64..40).filter(|d| total_bytes(*d, e, true, true) <= 512).max().unwrap();
-        assert_eq!(cap(24), 6, "24 字节条目：6 台装得下、7 台爆");
-        assert_eq!(cap(40), 3, "40 字节条目（E72 的假设档）：3 台");
-        assert_eq!(cap(64), 2, "64 字节条目：2 台");
+        let inline_device_capacity = |entry_width_bytes: u64| (1u64..40).filter(|device_count| total_bytes(*device_count, entry_width_bytes, true, true) <= 512).max().unwrap();
+        assert_eq!(inline_device_capacity(24), 6, "24 字节条目：6 台装得下、7 台爆");
+        assert_eq!(inline_device_capacity(40), 3, "40 字节条目（E72 的假设档）：3 台");
+        assert_eq!(inline_device_capacity(64), 2, "64 字节条目：2 台");
         // 临界处的绝对字节数，防止三档一起错
         assert_eq!(total_bytes(6, 24, true, true), 505);
         assert_eq!(total_bytes(3, 40, true, true), 481);
@@ -250,13 +250,13 @@ mod tests {
     /// **判据 3 的绝对值**：移出去之后与设备数无关，两档槽宽都装得下。
     #[test]
     fn criterion3_indirection_makes_it_constant_and_it_fits() {
-        let a = total_bytes(1, 24, false, true);
-        let b = total_bytes(256, 64, false, true);
-        assert_eq!(a, b, "移出槽之后与设备数、条目宽都无关");
+        let one_narrow_device_total = total_bytes(1, 24, false, true);
+        let many_wide_devices_total = total_bytes(256, 64, false, true);
+        assert_eq!(one_narrow_device_total, many_wide_devices_total, "移出槽之后与设备数、条目宽都无关");
         // 手算：361 + 59（设备表单元指针）= 420
-        assert_eq!(a, 420);
-        assert!(a <= 512, "512 字节槽装得下");
-        assert!(a <= 4096);
+        assert_eq!(one_narrow_device_total, 420);
+        assert!(one_narrow_device_total <= 512, "512 字节槽装得下");
+        assert!(one_narrow_device_total <= 4096);
         // 阳性对照的另一半：inline 时同样的格子必须爆
         assert!(total_bytes(256, 64, true, true) > 512);
     }
@@ -293,10 +293,10 @@ mod tests {
 
     /// 第四类不是可有可无的：三段轴收不了 tail 槽这种「每个 checkpoint 改一次」的字段。
     #[test]
-    fn a_fourth_class_is_needed_for_runtime_watermarks() {
-        assert_eq!(SEC4_RUNTIME.len(), 2);
-        assert_eq!(sum(&SEC4_RUNTIME), 12);
+    fn fourth_class_is_needed_for_runtime_watermarks() {
+        assert_eq!(SECTION_FOUR_RUNTIME_FIELDS.len(), 2);
+        assert_eq!(section_bytes(&SECTION_FOUR_RUNTIME_FIELDS), 12);
         // 把它们塞进段一（「永不改」）会让段一每个 checkpoint 都变 ⇒ 段一的定义作废
-        assert!(sum(&SEC4_RUNTIME) > 0, "有对象，不是空类");
+        assert!(section_bytes(&SECTION_FOUR_RUNTIME_FIELDS) > 0, "有对象，不是空类");
     }
 }

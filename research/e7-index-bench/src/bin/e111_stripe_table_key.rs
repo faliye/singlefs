@@ -36,26 +36,26 @@
 use e7_index_bench::{Emitter, Sample};
 
 /// 数据单元 32768（D4 已定项 1 / 已定项 5）。
-const DATA_UNIT: u64 = 32768;
+const DATA_UNIT_BYTES: u64 = 32768;
 /// 索引节点 16384（D8 已定项 2）。
-const NODE: u64 = 16384;
+const NODE_BYTES: u64 = 16384;
 /// 16 KiB 槽（D3 已定项 7 的落点粒度）。
-const SLOT: u64 = 16384;
+const SLOT_BYTES: u64 = 16384;
 /// 条带成员记录定长 56（E106 已钉）。
-const STRIPE_REC: u64 = 56;
+const STRIPE_RECORD_BYTES: u64 = 56;
 /// 码 3 容器头 103（D18 已定项 11）。
-const PACKED_HDR: u64 = 103;
+const PACKED_HEADER_BYTES: u64 = 103;
 /// 落点 key：设备身份 4 + 16 KiB 槽号 6（D19 已定项 4 / D3 已定项 7 同坐标系）。
-const SLOT_KEY: u64 = 4 + 6;
+const SLOT_KEY_BYTES: u64 = 4 + 6;
 /// 条带号 key：条带诞生代 8 + 条带序号 4。
-const STRIPE_KEY: u64 = 8 + 4;
+const STRIPE_KEY_BYTES: u64 = 8 + 4;
 /// 索引节点头，与 E97 / E106 同口径。
-const NODE_HDR: u64 = 76;
+const NODE_HEADER_BYTES: u64 = 76;
 /// 16 TiB。
-const CAP: u64 = 16 * 1024 * 1024 * 1024 * 1024;
+const POOL_CAPACITY_BYTES: u64 = 16 * 1024 * 1024 * 1024 * 1024;
 /// 与 E97 / E106 同口径的填充率。
-const FILL_NUM: u64 = 9;
-const FILL_DEN: u64 = 10;
+const FILL_NUMERATOR: u64 = 9;
+const FILL_DENOMINATOR: u64 = 10;
 /// E97 已入库的分配记录树三个数，拿来做同尺交叉校验。
 const E97_ENTRIES: u64 = 483_183_820;
 const E97_HEIGHT: u32 = 4;
@@ -82,44 +82,44 @@ impl Arm {
     }
 }
 
-/// 装得下 `n` 个条目、扇出 `f` 的树有几层。
-fn height(n: u64, f: u64) -> u32 {
-    if n <= 1 {
+/// 装得下 `entry_count` 个条目、扇出 `fanout_per_node` 的树有几层。
+fn height(entry_count: u64, fanout_per_node: u64) -> u32 {
+    if entry_count <= 1 {
         return 1;
     }
-    let mut h = 1u32;
-    let mut cap = f;
-    while cap < n {
-        cap = cap.saturating_mul(f);
-        h += 1;
+    let mut levels = 1u32;
+    let mut capacity_at_height = fanout_per_node;
+    while capacity_at_height < entry_count {
+        capacity_at_height = capacity_at_height.saturating_mul(fanout_per_node);
+        levels += 1;
     }
-    h
+    levels
 }
 
-/// 一个 16384 节点、key 宽 `k`、value 是容器身份（8 字节）时的扇出。
-fn fanout(k: u64) -> u64 {
-    (NODE - NODE_HDR) / (k + 8)
+/// 一个 16384 节点、key 宽 `key_bytes`、value 是容器身份（8 字节）时的扇出。
+fn fanout(key_bytes: u64) -> u64 {
+    (NODE_BYTES - NODE_HEADER_BYTES) / (key_bytes + 8)
 }
 
 /// 池里 90% 那笔预算切成多少个格（32768 一格），其中多少是数据格、多少是 parity 格。
 /// 口径与 E106（条带成员表的载体） 同：**16 TiB × 90% 是数据格与 parity 格一起花的一笔预算**，
-/// 一条 `w` 列的条带占 `w` 个格、其中 1 个是 parity ⇒ 条目数（一格一条）恒等于这笔预算的格数，
-/// **与 `w` 无关**；`w` 只改这笔预算里有多少是用户数据。
+/// 一条 `stripe_width` 列的条带占 `stripe_width` 个格、其中 1 个是 parity ⇒ 条目数（一格一条）恒等于这笔预算的格数，
+/// **与 `stripe_width` 无关**；`stripe_width` 只改这笔预算里有多少是用户数据。
 ///
 /// ⚠️ **不许把 483 183 820 当成数据格数再往上加 parity。** 那样 `w = 3` 会往一块 16 TiB 的盘上
 /// 摆 724 775 730 个 32 KiB 格 = 135% 的盘。E106（条带成员表的载体） 第一版正是这个错（126.3%），
 /// 当日已修并留了会红的断言；E111（条带表的 key 与它的几何） 第一版重犯了一次，
 /// 现在由 `cells_never_overfill_the_pool` 挡住。
-fn cells(w: u64) -> (u64, u64, u64) {
-    if w < 3 {
+fn cells(stripe_width: u64) -> (u64, u64, u64) {
+    if stripe_width < 3 {
         // w = 2 全镜像，一条条带记录都不写（D2 已定项 12 的射程）
         return (0, 0, 0);
     }
-    let usable = CAP / FILL_DEN * FILL_NUM;
+    let usable_bytes = POOL_CAPACITY_BYTES / FILL_DENOMINATOR * FILL_NUMERATOR;
     // 这笔预算总共切出多少个格 —— 数据格与 parity 格都从这里出
-    let total_cells = usable / DATA_UNIT;
+    let total_cells = usable_bytes / DATA_UNIT_BYTES;
     // parity 格：每条 w 列的条带一格
-    let parity_cells = total_cells / w;
+    let parity_cells = total_cells / stripe_width;
     let data_cells = total_cells - parity_cells;
     (data_cells, parity_cells, total_cells)
 }
@@ -130,77 +130,77 @@ fn tree_ppm(entries: u64) -> u64 {
     if entries == 0 {
         return 0;
     }
-    let per = (DATA_UNIT - PACKED_HDR) / STRIPE_REC;
-    let containers = entries.div_ceil(per);
-    let bytes = containers * DATA_UNIT * 2;
-    bytes * 1_000_000 / CAP
+    let records_per_container = (DATA_UNIT_BYTES - PACKED_HEADER_BYTES) / STRIPE_RECORD_BYTES;
+    let container_count = entries.div_ceil(records_per_container);
+    let tree_bytes = container_count * DATA_UNIT_BYTES * 2;
+    tree_bytes * 1_000_000 / POOL_CAPACITY_BYTES
 }
 
 fn main() {
-    let mut em = Emitter::new();
-    let mut out = String::new();
+    let mut emitter = Emitter::new();
+    let mut output = String::new();
 
     // 阴性对照：w = 2 ⇒ 三条臂条目数恒 0
-    let (_, _, z) = cells(2);
-    out.push_str(&em.emit_raw(&format!(
-        "name=negative_control w=2 entries={z} verdict={}",
-        if z == 0 { "pass" } else { "VOID" }
+    let (_, _, negative_control_entries) = cells(2);
+    output.push_str(&emitter.emit_raw(&format!(
+        "name=negative_control w=2 entries={negative_control_entries} verdict={}",
+        if negative_control_entries == 0 { "pass" } else { "VOID" }
     )));
-    out.push('\n');
+    output.push('\n');
 
     // 同尺交叉校验：分配记录树按 16 KiB 槽数算，必须落回 E97 已入库的那三个数
-    let slots = CAP / FILL_DEN * FILL_NUM / SLOT;
-    out.push_str(&em.emit_raw(&format!(
-        "name=e97_crosscheck slots={slots} e97_entries={E97_ENTRIES} e97_height={E97_HEIGHT} e97_ppm={E97_PPM}"
+    let slot_count = POOL_CAPACITY_BYTES / FILL_DENOMINATOR * FILL_NUMERATOR / SLOT_BYTES;
+    output.push_str(&emitter.emit_raw(&format!(
+        "name=e97_crosscheck slots={slot_count} e97_entries={E97_ENTRIES} e97_height={E97_HEIGHT} e97_ppm={E97_PPM}"
     )));
-    out.push('\n');
+    output.push('\n');
 
-    for &w in &[2u64, 3, 4] {
-        let (dc, pc, total) = cells(w);
+    for &stripe_width in &[2u64, 3, 4] {
+        let (data_cells, parity_cells, total_cells) = cells(stripe_width);
         for arm in [Arm::Slot, Arm::Stripe, Arm::None] {
-            let k = match arm {
-                Arm::Slot => SLOT_KEY,
-                Arm::Stripe => STRIPE_KEY,
+            let key_bytes = match arm {
+                Arm::Slot => SLOT_KEY_BYTES,
+                Arm::Stripe => STRIPE_KEY_BYTES,
                 Arm::None => 0,
             };
-            let f = if k == 0 { 0 } else { fanout(k) };
-            let h = if total == 0 || k == 0 { 0 } else { height(total, f) };
-            out.push_str(&em.emit_raw(&format!(
-                "name=tree w={w} arm={} data_cells={dc} parity_cells={pc} entries={total} \
-                 key_bytes={k} fanout={f} height={h} tree_ppm={} answers_slot_lookup={}",
+            let fanout_per_node = if key_bytes == 0 { 0 } else { fanout(key_bytes) };
+            let tree_height = if total_cells == 0 || key_bytes == 0 { 0 } else { height(total_cells, fanout_per_node) };
+            output.push_str(&emitter.emit_raw(&format!(
+                "name=tree w={stripe_width} arm={} data_cells={data_cells} parity_cells={parity_cells} entries={total_cells} \
+                 key_bytes={key_bytes} fanout={fanout_per_node} height={tree_height} tree_ppm={} answers_slot_lookup={}",
                 arm.name(),
-                tree_ppm(total),
+                tree_ppm(total_cells),
                 arm.answers_slot_lookup()
             )));
-            out.push('\n');
+            output.push('\n');
         }
     }
 
     // 阳性对照：把 key 宽度换成分配记录树那一档，扇出必须跟着变
-    out.push_str(&em.emit_raw(&format!(
+    output.push_str(&emitter.emit_raw(&format!(
         "name=positive_control fanout_slot_key={} fanout_stripe_key={} verdict={}",
-        fanout(SLOT_KEY),
-        fanout(STRIPE_KEY),
-        if fanout(SLOT_KEY) != fanout(STRIPE_KEY) {
+        fanout(SLOT_KEY_BYTES),
+        fanout(STRIPE_KEY_BYTES),
+        if fanout(SLOT_KEY_BYTES) != fanout(STRIPE_KEY_BYTES) {
             "pass"
         } else {
             "VOID"
         }
     )));
-    out.push('\n');
+    output.push('\n');
 
-    let (_, _, t3) = cells(3);
-    out.push_str(&em.emit(
+    let (_, _, width_three_total_cells) = cells(3);
+    output.push_str(&emitter.emit(
         "w3_entries",
         &Sample {
-            ops: 1,
-            bytes_per_op: t3,
-            elapsed_ns: 1,
+            operation_count: 1,
+            bytes_per_operation: width_three_total_cells,
+            elapsed_nanoseconds: 1,
         },
     ));
-    out.push('\n');
-    out.push_str(&em.finish());
-    println!("{out}");
+    output.push('\n');
+    output.push_str(&emitter.finish());
+    println!("{output}");
 }
 
 #[cfg(test)]
@@ -220,13 +220,13 @@ mod tests {
     /// 数据格比它少一个 parity 的份额（`w = 3` 时少 161 061 273）。
     #[test]
     fn total_cell_count_matches_e97_entry_count() {
-        let (dc, pc, total) = cells(3);
-        assert_eq!(total, 483_183_820);
-        assert_eq!(total, E97_ENTRIES);
-        assert_eq!(CAP / FILL_DEN * FILL_NUM / DATA_UNIT, 483_183_820);
-        assert_eq!(dc, 322_122_547);
-        assert_eq!(pc, 161_061_273);
-        assert!(dc < E97_ENTRIES);
+        let (data_cells, parity_cells, total_cells) = cells(3);
+        assert_eq!(total_cells, 483_183_820);
+        assert_eq!(total_cells, E97_ENTRIES);
+        assert_eq!(POOL_CAPACITY_BYTES / FILL_DENOMINATOR * FILL_NUMERATOR / DATA_UNIT_BYTES, 483_183_820);
+        assert_eq!(data_cells, 322_122_547);
+        assert_eq!(parity_cells, 161_061_273);
+        assert!(data_cells < E97_ENTRIES);
     }
 
     /// **摆进去的格不许超过 90% 那笔预算。**
@@ -235,51 +235,51 @@ mod tests {
     /// 这条断言就是那个坑的会红形态——它自己的判别力在最后两行。
     #[test]
     fn cells_never_overfill_the_pool() {
-        let usable = CAP / FILL_DEN * FILL_NUM;
-        for w in [2u64, 3, 4] {
-            let (dc, pc, total) = cells(w);
-            assert_eq!(total, dc + pc, "w={w}: 总格数不等于两类之和");
+        let usable_bytes = POOL_CAPACITY_BYTES / FILL_DENOMINATOR * FILL_NUMERATOR;
+        for stripe_width in [2u64, 3, 4] {
+            let (data_cells, parity_cells, total_cells) = cells(stripe_width);
+            assert_eq!(total_cells, data_cells + parity_cells, "w={stripe_width}: 总格数不等于两类之和");
             assert!(
-                total * DATA_UNIT <= usable,
-                "w={w}: 摆了 {} 字节，90% 预算只有 {usable}",
-                total * DATA_UNIT
+                total_cells * DATA_UNIT_BYTES <= usable_bytes,
+                "w={stripe_width}: 摆了 {} 字节，90% 预算只有 {usable_bytes}",
+                total_cells * DATA_UNIT_BYTES
             );
         }
         // 判别力：第一版那种写法（预算当数据格、parity 加在上面）必须被这条判据判红
-        let v1 = E97_ENTRIES + E97_ENTRIES.div_ceil(2);
-        assert_eq!(v1, 724_775_730);
-        assert!(v1 * DATA_UNIT > usable, "这条断言分不出差别，等于没写");
+        let first_version_cells = E97_ENTRIES + E97_ENTRIES.div_ceil(2);
+        assert_eq!(first_version_cells, 724_775_730);
+        assert!(first_version_cells * DATA_UNIT_BYTES > usable_bytes, "这条断言分不出差别，等于没写");
     }
 
     /// parity 格：一条 `w` 列的条带一格 ⇒ `w = 3` 占预算的 1/3、`w = 4` 占 1/4。
     /// **条目数与 `w` 无关**——这是换口径之后最反直觉的一条，所以单独钉住。
     #[test]
     fn parity_cell_count_is_pinned() {
-        let (dc, pc, total) = cells(3);
-        assert_eq!(pc, total / 3);
-        assert_eq!(pc, 161_061_273);
-        assert_eq!(total, 483_183_820);
-        let (dc4, pc4, total4) = cells(4);
-        assert_eq!(pc4, total4 / 4);
-        assert_eq!(pc4, 120_795_955);
-        assert_eq!(total4, dc4 + pc4);
+        let (data_cells, parity_cells, total_cells) = cells(3);
+        assert_eq!(parity_cells, total_cells / 3);
+        assert_eq!(parity_cells, 161_061_273);
+        assert_eq!(total_cells, 483_183_820);
+        let (data_cells_width_four, parity_cells_width_four, total_cells_width_four) = cells(4);
+        assert_eq!(parity_cells_width_four, total_cells_width_four / 4);
+        assert_eq!(parity_cells_width_four, 120_795_955);
+        assert_eq!(total_cells_width_four, data_cells_width_four + parity_cells_width_four);
         // w 越大 parity 越少、数据格越多，而**总格数一格不变**
-        assert!(pc4 < pc);
-        assert!(dc4 > dc);
-        assert_eq!(total4, total);
+        assert!(parity_cells_width_four < parity_cells);
+        assert!(data_cells_width_four > data_cells);
+        assert_eq!(total_cells_width_four, total_cells);
     }
 
     /// **这个实验要回答的那个数**：按落点排的那棵树有多大。
     /// 扇出 (16384 − 76) / (10 + 8) = 906；483 183 820 条 ⇒ 906² = 820 836 < 条目数 ≤ 906³ = 743 677 416 ⇒ 高 3。
     #[test]
     fn slot_keyed_tree_geometry_is_pinned() {
-        assert_eq!(SLOT_KEY, 10);
-        assert_eq!(fanout(SLOT_KEY), 906);
+        assert_eq!(SLOT_KEY_BYTES, 10);
+        assert_eq!(fanout(SLOT_KEY_BYTES), 906);
         assert_eq!(906u64.pow(2), 820_836);
         assert_eq!(906u64.pow(3), 743_677_416);
-        let (_, _, total) = cells(3);
-        assert!(906u64.pow(2) < total && total <= 906u64.pow(3));
-        assert_eq!(height(total, fanout(SLOT_KEY)), 3);
+        let (_, _, total_cells) = cells(3);
+        assert!(906u64.pow(2) < total_cells && total_cells <= 906u64.pow(3));
+        assert_eq!(height(total_cells, fanout(SLOT_KEY_BYTES)), 3);
     }
 
     /// 这棵树自己占多少（手算，逐步列出来）：
@@ -293,16 +293,16 @@ mod tests {
     /// 这是换口径之后才出现的交叉校验；旧口径下 E111 报 4631、E106 报 3087.5，谁也没去对。
     #[test]
     fn tree_ppm_is_pinned_and_comparable_to_e97() {
-        let (_, _, total) = cells(3);
-        let per = (DATA_UNIT - PACKED_HDR) / STRIPE_REC;
-        assert_eq!(per, 583);
-        assert_eq!(per * 828_788, 483_183_404);
-        assert!(per * 828_788 < total);
-        assert_eq!(total.div_ceil(per), 828_789);
-        assert_eq!(828_789u64 * DATA_UNIT * 2, 54_315_515_904);
-        assert_eq!(tree_ppm(total), 3087);
+        let (_, _, total_cells) = cells(3);
+        let records_per_container = (DATA_UNIT_BYTES - PACKED_HEADER_BYTES) / STRIPE_RECORD_BYTES;
+        assert_eq!(records_per_container, 583);
+        assert_eq!(records_per_container * 828_788, 483_183_404);
+        assert!(records_per_container * 828_788 < total_cells);
+        assert_eq!(total_cells.div_ceil(records_per_container), 828_789);
+        assert_eq!(828_789u64 * DATA_UNIT_BYTES * 2, 54_315_515_904);
+        assert_eq!(tree_ppm(total_cells), 3087);
         // 它比分配记录树贵将近七倍——这是判据要看的那个对比
-        assert!(tree_ppm(total) > E97_PPM * 6 && tree_ppm(total) < E97_PPM * 8);
+        assert!(tree_ppm(total_cells) > E97_PPM * 6 && tree_ppm(total_cells) < E97_PPM * 8);
     }
 
     /// **三条臂里只有一条答得出那句话。** 这是这个实验的承重结论，
@@ -317,9 +317,9 @@ mod tests {
     /// 阳性对照：换 key 宽度扇出必须跟着变（证明这个模型看得见 key 宽度）。
     #[test]
     fn positive_control_fanout_depends_on_key_width() {
-        assert_eq!(fanout(SLOT_KEY), 906);
-        assert_eq!(fanout(STRIPE_KEY), 815);
-        assert_ne!(fanout(SLOT_KEY), fanout(STRIPE_KEY));
+        assert_eq!(fanout(SLOT_KEY_BYTES), 906);
+        assert_eq!(fanout(STRIPE_KEY_BYTES), 815);
+        assert_ne!(fanout(SLOT_KEY_BYTES), fanout(STRIPE_KEY_BYTES));
     }
 
     /// 树高的算法与 E97 同：装不下就多一层，`n <= 1` 时 1 层。
