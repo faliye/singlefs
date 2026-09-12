@@ -1,0 +1,11 @@
+1. I cannot construct a sequence breaking B-prime under criterion 1. I tested scenarios involving instance transitions, rollback rows, journal record ordering, and (instance txg) comparison orders. All cases comply with B-prime rules: global txg ensures consistent ordering, previous_hash checks prevent invalid records, and published predicate logic correctly handles data units. No case where wrong records are applied or lost writes revived was found.
+
+2. I cannot construct a sequence breaking B-prime around rollback. I scenarios where rollback journal records are durable before new root durability, abandoned roots in the ring, and intermediate instance crossings during replay. F6 ensures rollback has no durable effect until new root is durable, preventing inconsistent states. Journal replay correctly applies rollback operations without reviving lost writes or misapplying records.
+
+3. I cannot construct a sequence breaking A-prime under criterion 2 with one fault. I tested disk failures during warm-up and after completion. Warm-up ensures roots cover both disks before fsync returns. Post-warm-up failures (e.g., disk loss) still leave readable roots on the other disk. Journal mirroring preserves records. No acknowledged publication is lost with one fault.
+
+4. Counter should continue across instances. Restarting would break previous_hash validation across instances (e.g., instance 1 counter 100, instance 2 counter 0 would fail hash check). Continuing ensures journal chain continuity and prevents replay gaps. Restarting offers no practical benefit and violates B-prime's counter increment rule.
+
+5. No sequence exists where instance-first and txg-first comparison differ. Txg increments globally per publication, and instance numbers increase monotonically with each mount. Higher instance always implies higher txg, making both comparison orders equivalent. No scenario can produce conflicting orderings.
+
+6. Recommend A-prime. It ensures new instance roots are durable on two disks before acknowledging fsync, meeting criterion 2 durability requirements with minimal overhead. B-prime incorrectly states rollback takes effect on journal record durability (contradicting F6), and A lacks warm-up protection against single-disk faults.

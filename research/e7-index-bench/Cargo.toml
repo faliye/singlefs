@@ -360,3 +360,19 @@ path = "src/bin/e128_pointer_birth_cost.rs"
 [[bin]]
 name = "e140-header-alignment"
 path = "src/bin/e140_header_alignment.rs"
+
+[[bin]]
+name = "e142-first-txn-dry-run"
+path = "src/bin/e142_first_transaction_dry_run.rs"
+
+[[bin]]
+name = "e143-one-unit-per-txn-journal"
+path = "src/bin/e143_one_unit_per_transaction_journal.rs"
+
+[[bin]]
+name = "e144-header-checksum-cost"
+path = "src/bin/e144_header_checksum_cost.rs"
+
+[[bin]]
+name = "e145-self-describing-node-header"
+path = "src/bin/e145_self_describing_node_header.rs"

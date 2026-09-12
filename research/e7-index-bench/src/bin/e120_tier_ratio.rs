@@ -17,7 +17,7 @@
 //! ## 被引用条款逐字贴在这里
 //!
 //! - **D4 已定项 5**：单元恒 32768 含头。**D18 已定项 11**：打包记录单元头 107。
-//! - **D2 已定项 9**：第一版 2 盘恒 `w` = 2。**D27 已定项 2**：界线 ≤ 4 KiB。
+//! - **D2 已定项 9**：第一版 2 盘恒 `w` = 2。**D27 未定项 2**：界线 ≤ 4 KiB。
 //! - **D27 已定项 8 ④**：槽定宽，对象补齐到槽宽，槽 `i` 起点 = 头 + `i × W`。
 //! - **E116 的闭式**：回本比下界 = `w / (cap − 1)` ⇒ 要 `cap ≥ 4`（`w` = 2）。
 //! - **E119 的结论**：档要在小端密，不按等距切。
@@ -67,7 +67,7 @@ const UNIT_BYTES: u64 = 32768;
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32661
 const SLOT_EXTRA_BYTES: u64 = 43;
-const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2
+const PACKING_LIMIT_BYTES: u64 = 4096; // D27 未定项 2
 const MINIMUM_SLOT_WIDTH: u64 = 64;
 const OBJECT_COUNT: u64 = 100_000;
 /// 公比按千分之一为单位存成整数，避免浮点当键：1125 = 1.125

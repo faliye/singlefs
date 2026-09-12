@@ -1,0 +1,10 @@
+M1_capacity_header_78	    (JOURNAL_RECORD_BYTES - header_bytes) / item_bytes	    (JOURNAL_RECORD_BYTES - 78) / item_bytes
+M2_multi_item_56	const ITEM_BYTES_WITH_TRANSACTION: u64 = 64;	const ITEM_BYTES_WITH_TRANSACTION: u64 = 56;
+M3_jia_ancestors_extra_record	                load.leaves + last_record_items.div_ceil(self.items_per_record()) - 1	                load.leaves + last_record_items.div_ceil(self.items_per_record())
+M4_seq_batch1_twelve_leaves	    Load { name: "seq", batch: 1, leaves: 8, ancestors: 4 },	    Load { name: "seq", batch: 1, leaves: 12, ancestors: 4 },
+M5_devices_one	const DEVICES: u64 = 2;	const DEVICES: u64 = 1;
+M6_e91_anchor_units_not_nodes	            Arm::OneTransactionPerFsync => (T_DIRTY_BYTES / NODE_BYTES).div_ceil(self.items_per_record()),	            Arm::OneTransactionPerFsync => (T_DIRTY_BYTES / DATA_UNIT_BYTES).div_ceil(self.items_per_record()),
+M7_safety_factor_two	const SAFETY_FACTOR: u64 = 3;	const SAFETY_FACTOR: u64 = 2;
+M8_ring_128_mib	const RING_BYTES: u64 = 64 << 20;	const RING_BYTES: u64 = 128 << 20;
+M9_bing_transactions_per_unit	        Arm::OneTransactionPerFsync => 1,	        Arm::OneTransactionPerFsync => load.leaves,
+M10_t_dirty_one_gib	const T_DIRTY_BYTES: u64 = 2 << 30;	const T_DIRTY_BYTES: u64 = 1 << 30;

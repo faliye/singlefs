@@ -1,0 +1,26 @@
+W=42  T_pub=100  birth of in-flight units=101
+rebuilt pointer layer references (>=1000): [1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011]
+allocator sees free               (>=1000): [1012, 1013]
+published-predicate says KEEP            : [1000, 1001, 1002, 1003]
+published-predicate says REWRITE         : [1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011]
+CONTRADICTION (keep AND free)            : []  count=0
+redo needs 10 slots, allocator hands out [1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021]
+redo OVERWRITES still-referenced published slots: []  count=0
+redo slots taken beyond the failed checkpoint's own footprint: [1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021]  count=8
+MODEL A OK under the other reading: 0 contradictions, but 8 FRESH slots needed (exactly the metadata the published predicate orders the recovery instance to rewrite)
+
+records per page = (32768 - 135) // 64 = 509
+first row count where the two disagree: r=1017 (jia=2 pages, literal=3 pages)
+rows0=    0  jia=  12 blocks   literal=  12 blocks
+rows0=  508  jia=  24 blocks   literal=  24 blocks
+rows0= 1016  jia=  32 blocks   literal=  36 blocks
+rows0= 4064  jia=  96 blocks   literal= 108 blocks
+C304 recompute: kind=1 record = 1+1+83+3 = 88 bytes > 64; if the row widens to 88, records/page = 370, rows/page = 369
+
+one checkpoint full window = 7388 KiB (1847 records, 131072 named items)
+in ring during ONE switch  = 22164 KiB = 1.50x ring(F=2), 1.00x ring(F=3)
+in ring after N_switch=3    = 36940 KiB = 2.50x ring(F=2), 1.67x ring(F=3)
+
+reserve pool sized for ONE checkpoint = 64 blocks; 3 consecutive redos with no publish in between need 192 blocks
+pool-scalar admission: free=200 >= reserve=12 -> PASS
+per-device truth     : dev0 free=200, dev1 free=0, each mirror leg needs 6 -> dev1 SHORT by 6

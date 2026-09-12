@@ -1,0 +1,18 @@
+基线：全绿
+✅ [M1_容器头算成0] 红：capacity_absolute
+✅ [M2_元数据节点当成数据单元] 红：bg_key_move_write_absolute,fill_converges_to_key_order,leaf_capacity_absolute,payback_fill_b1_absolute
+✅ [M3_副本数算成1] 红：bg_key_move_write_absolute,fill_converges_to_key_order,ideal_is_upper_bound,ideal_payback_is_w_over_cap_minus_one,journal_is_an_assumption,leaf_capacity_absolute,payback_key_absolute,payback_fill_b1_absolute
+✅ [M4_映射条目少算位置条目] 红：bg_key_move_write_absolute,fill_converges_to_key_order,journal_is_an_assumption,leaf_capacity_absolute,payback_fill_b1_absolute,payback_key_absolute
+✅ [M5_分配记录条目算错] 红：bg_key_move_write_absolute,fill_converges_to_key_order,leaf_capacity_absolute,payback_key_absolute
+✅ [M6_节点头当成0] 红：bg_key_move_write_absolute,fill_converges_to_key_order,leaf_capacity_absolute,payback_key_absolute
+✅ [M7_pad不补齐] 红：blast_equals_gain,discrimination_pad_pads,ideal_is_upper_bound,ideal_payback_is_w_over_cap_minus_one,payback_fill_b1_absolute,payback_key_absolute,positive_control_cap1_matches_pad
+✅ [M8_key序也按散布算] 红：bg_key_move_write_absolute,fill_converges_to_key_order,payback_key_absolute
+✅ [M9_搬迁写漏掉分配记录] 红：bg_key_move_write_absolute,fill_converges_to_key_order,payback_fill_b1_absolute,payback_key_absolute
+✅ [M10_搬迁写漏掉中央映射] 红：bg_key_move_write_absolute,fill_converges_to_key_order,payback_key_absolute,payback_fill_b1_absolute
+✅ [M11_上界臂也记元数据写] 红：ideal_is_upper_bound,ideal_payback_is_w_over_cap_minus_one
+✅ [M12_搬迁读只读对象不读整单元] 红：move_read_absolute
+✅ [M13_爆炸半径算成1] 红：blast_equals_gain
+✅ [M14_死槽全死概率算反] 红：death_uniform_absolute
+✅ [M15_批量散布模型退化成常数] 红：payback_fill_b1_absolute
+✅ [M16_journal记录头算错] 红：bg_key_move_write_absolute,fill_converges_to_key_order,journal_is_an_assumption,payback_fill_b1_absolute,payback_key_absolute
+已还原，基线仍全绿

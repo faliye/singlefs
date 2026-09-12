@@ -1,0 +1,129 @@
+E7RESULT name=config widths=95/105/107/250/413 random_trials_per_width=200000 probe_trials=1000000 cost_rounds=7 cost_iterations=200000
+E7RESULT name=single_bit arm=sha256 width=95 positions=760 missed=0
+E7RESULT name=random arm=sha256 width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=sha256 width=105 positions=840 missed=0
+E7RESULT name=random arm=sha256 width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=sha256 width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=sha256 width=107 positions=856 missed=0
+E7RESULT name=random arm=sha256 width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=sha256 width=250 positions=2000 missed=0
+E7RESULT name=random arm=sha256 width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=sha256 width=413 positions=3304 missed=0
+E7RESULT name=random arm=sha256 width=413 trials=200000 missed=0
+E7RESULT name=probe arm=sha256 trials=1000000 bytes_used=32 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=blake2s width=95 positions=760 missed=0
+E7RESULT name=random arm=blake2s width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=blake2s width=105 positions=840 missed=0
+E7RESULT name=random arm=blake2s width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=blake2s width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=blake2s width=107 positions=856 missed=0
+E7RESULT name=random arm=blake2s width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=blake2s width=250 positions=2000 missed=0
+E7RESULT name=random arm=blake2s width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=blake2s width=413 positions=3304 missed=0
+E7RESULT name=random arm=blake2s width=413 trials=200000 missed=0
+E7RESULT name=probe arm=blake2s trials=1000000 bytes_used=32 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=xxh64x4 width=95 positions=760 missed=0
+E7RESULT name=random arm=xxh64x4 width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64x4 width=105 positions=840 missed=0
+E7RESULT name=random arm=xxh64x4 width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=xxh64x4 width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=xxh64x4 width=107 positions=856 missed=0
+E7RESULT name=random arm=xxh64x4 width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64x4 width=250 positions=2000 missed=0
+E7RESULT name=random arm=xxh64x4 width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64x4 width=413 positions=3304 missed=0
+E7RESULT name=random arm=xxh64x4 width=413 trials=200000 missed=0
+E7RESULT name=probe arm=xxh64x4 trials=1000000 bytes_used=32 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=xxh64 width=95 positions=760 missed=0
+E7RESULT name=random arm=xxh64 width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64 width=105 positions=840 missed=0
+E7RESULT name=random arm=xxh64 width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=xxh64 width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=xxh64 width=107 positions=856 missed=0
+E7RESULT name=random arm=xxh64 width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64 width=250 positions=2000 missed=0
+E7RESULT name=random arm=xxh64 width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=xxh64 width=413 positions=3304 missed=0
+E7RESULT name=random arm=xxh64 width=413 trials=200000 missed=0
+E7RESULT name=probe arm=xxh64 trials=1000000 bytes_used=8 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=crc64 width=95 positions=760 missed=0
+E7RESULT name=random arm=crc64 width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc64 width=105 positions=840 missed=0
+E7RESULT name=random arm=crc64 width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=crc64 width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=crc64 width=107 positions=856 missed=0
+E7RESULT name=random arm=crc64 width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc64 width=250 positions=2000 missed=0
+E7RESULT name=random arm=crc64 width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc64 width=413 positions=3304 missed=0
+E7RESULT name=random arm=crc64 width=413 trials=200000 missed=0
+E7RESULT name=probe arm=crc64 trials=1000000 bytes_used=8 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=crc32c width=95 positions=760 missed=0
+E7RESULT name=random arm=crc32c width=95 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc32c width=105 positions=840 missed=0
+E7RESULT name=random arm=crc32c width=105 trials=200000 missed=0
+E7RESULT name=double_bit arm=crc32c width=105 pairs=170236 missed=0
+E7RESULT name=single_bit arm=crc32c width=107 positions=856 missed=0
+E7RESULT name=random arm=crc32c width=107 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc32c width=250 positions=2000 missed=0
+E7RESULT name=random arm=crc32c width=250 trials=200000 missed=0
+E7RESULT name=single_bit arm=crc32c width=413 positions=3304 missed=0
+E7RESULT name=random arm=crc32c width=413 trials=200000 missed=0
+E7RESULT name=probe arm=crc32c trials=1000000 bytes_used=4 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=0
+E7RESULT name=single_bit arm=sum8 width=95 positions=760 missed=0
+E7RESULT name=random arm=sum8 width=95 trials=200000 missed=690
+E7RESULT name=single_bit arm=sum8 width=105 positions=840 missed=0
+E7RESULT name=random arm=sum8 width=105 trials=200000 missed=702
+E7RESULT name=double_bit arm=sum8 width=105 pairs=170236 missed=11892
+E7RESULT name=single_bit arm=sum8 width=107 positions=856 missed=0
+E7RESULT name=random arm=sum8 width=107 trials=200000 missed=683
+E7RESULT name=single_bit arm=sum8 width=250 positions=2000 missed=0
+E7RESULT name=random arm=sum8 width=250 trials=200000 missed=702
+E7RESULT name=single_bit arm=sum8 width=413 positions=3304 missed=0
+E7RESULT name=random arm=sum8 width=413 trials=200000 missed=676
+E7RESULT name=probe arm=sum8 trials=1000000 bytes_used=1 accepted_with_magic=0 accepted_full_field=0 accepted_used_bytes_only=3919
+E7RESULT name=cost arm=sha256 width=95 ns_per_op=676 spread_bp=44
+E7RESULT name=cost arm=sha256 width=105 ns_per_op=676 spread_bp=0
+E7RESULT name=cost arm=sha256 width=107 ns_per_op=676 spread_bp=0
+E7RESULT name=cost arm=sha256 width=250 ns_per_op=1653 spread_bp=36
+E7RESULT name=cost arm=sha256 width=413 ns_per_op=2296 spread_bp=30
+E7RESULT name=cost arm=blake2s width=95 ns_per_op=168 spread_bp=119
+E7RESULT name=cost arm=blake2s width=105 ns_per_op=167 spread_bp=59
+E7RESULT name=cost arm=blake2s width=107 ns_per_op=167 spread_bp=299
+E7RESULT name=cost arm=blake2s width=250 ns_per_op=307 spread_bp=32
+E7RESULT name=cost arm=blake2s width=413 ns_per_op=518 spread_bp=19
+E7RESULT name=cost arm=xxh64x4 width=95 ns_per_op=42 spread_bp=0
+E7RESULT name=cost arm=xxh64x4 width=105 ns_per_op=34 spread_bp=294
+E7RESULT name=cost arm=xxh64x4 width=107 ns_per_op=39 spread_bp=0
+E7RESULT name=cost arm=xxh64x4 width=250 ns_per_op=66 spread_bp=0
+E7RESULT name=cost arm=xxh64x4 width=413 ns_per_op=94 spread_bp=106
+E7RESULT name=cost arm=xxh64 width=95 ns_per_op=12 spread_bp=0
+E7RESULT name=cost arm=xxh64 width=105 ns_per_op=10 spread_bp=0
+E7RESULT name=cost arm=xxh64 width=107 ns_per_op=11 spread_bp=0
+E7RESULT name=cost arm=xxh64 width=250 ns_per_op=18 spread_bp=0
+E7RESULT name=cost arm=xxh64 width=413 ns_per_op=25 spread_bp=0
+E7RESULT name=cost arm=crc64 width=95 ns_per_op=116 spread_bp=86
+E7RESULT name=cost arm=crc64 width=105 ns_per_op=131 spread_bp=0
+E7RESULT name=cost arm=crc64 width=107 ns_per_op=133 spread_bp=0
+E7RESULT name=cost arm=crc64 width=250 ns_per_op=335 spread_bp=0
+E7RESULT name=cost arm=crc64 width=413 ns_per_op=566 spread_bp=17
+E7RESULT name=cost arm=crc32c width=95 ns_per_op=27 spread_bp=0
+E7RESULT name=cost arm=crc32c width=105 ns_per_op=26 spread_bp=0
+E7RESULT name=cost arm=crc32c width=107 ns_per_op=27 spread_bp=370
+E7RESULT name=cost arm=crc32c width=250 ns_per_op=73 spread_bp=136
+E7RESULT name=cost arm=crc32c width=413 ns_per_op=125 spread_bp=160
+E7RESULT name=cost arm=sum8 width=95 ns_per_op=4 spread_bp=0
+E7RESULT name=cost arm=sum8 width=105 ns_per_op=3 spread_bp=0
+E7RESULT name=cost arm=sum8 width=107 ns_per_op=3 spread_bp=0
+E7RESULT name=cost arm=sum8 width=250 ns_per_op=4 spread_bp=0
+E7RESULT name=cost arm=sum8 width=413 ns_per_op=5 spread_bp=0
+E7RESULT name=fsync_share arm=sha256 headers_per_fsync=14 ns_per_op=676 fsync_ns=359000 fsync_ratio_bp=263
+E7RESULT name=fsync_share arm=blake2s headers_per_fsync=14 ns_per_op=167 fsync_ns=359000 fsync_ratio_bp=65
+E7RESULT name=fsync_share arm=xxh64x4 headers_per_fsync=14 ns_per_op=34 fsync_ns=359000 fsync_ratio_bp=13
+E7RESULT name=fsync_share arm=xxh64 headers_per_fsync=14 ns_per_op=10 fsync_ns=359000 fsync_ratio_bp=3
+E7RESULT name=fsync_share arm=crc64 headers_per_fsync=14 ns_per_op=131 fsync_ns=359000 fsync_ratio_bp=51
+E7RESULT name=fsync_share arm=crc32c headers_per_fsync=14 ns_per_op=26 fsync_ns=359000 fsync_ratio_bp=10
+E7RESULT name=fsync_share arm=sum8 headers_per_fsync=14 ns_per_op=3 fsync_ns=359000 fsync_ratio_bp=1
+E7RESULT name=verdict formal_single_bit_missed=0 formal_double_bit_missed=0 formal_random_missed=0 control_double_bit_missed=11892 control_has_teeth=true sha256_over_crc32c_ratio_bp=260000
+E7RESULT name=done emitted=129

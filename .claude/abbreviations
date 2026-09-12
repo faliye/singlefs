@@ -3,3 +3,4 @@
 e<数字>  # 实验编号：e57 指 .claude/kb/experiments.md 里登记的 E57。research/ 下的实验二进制按「编号_简称」命名，kb 的复跑命令按这个名字调用
 txg  # transaction group：事务组号。D16（发布语义）采纳 checkpoint 之后一个 checkpoint 一个号，块的 birth / death 与 checkpoint_txg 都按它记；叫法沿用 ZFS
 jsn  # journal sequence number：journal 记录序号，每条记录一个、全局单调，字段定义在 D23（journal 的角色与格式）的记录头字段表
+crc  # cyclic redundancy check：循环冗余校验。D19（块指针的结构与宽度预算） 已定项 2 与 D23（journal 的角色与格式） 已定项 11 定的都是完整 32 位 CRC32C（Castagnoli 多项式），名字里的 crc32 指它

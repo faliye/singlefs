@@ -1,0 +1,16 @@
+M1_root_record_242	const ROOT_RECORD_BYTES: u64 = 250;	const ROOT_RECORD_BYTES: u64 = 242;
+M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 1 mod 3 的槽 0。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 1 mod 3 的槽 0。
+M3_oracle_ignores_walk_failure	        RecoveryOutcome::Failed { reason, .. } => Some(format!("走读失败：{reason}")),	        RecoveryOutcome::Failed { .. } => None,
+M4_accept_unit_without_checksum	        if castagnoli_crc32(&bytes) == location.unit_checksum {	        if true {
+M5_wide_checksum_misses_last_byte	    let mut covered = bytes[..cover_end].to_vec();	    let mut covered = bytes[..cover_end - 1].to_vec();
+M6_data_pointer_83	const DATA_POINTER_BYTES: u64 = 85;	const DATA_POINTER_BYTES: u64 = 83;
+M7_mkfs_seeds_two_regions	    for region in 0..RING_REGIONS {\n        pool.write(	    for region in 0..RING_REGIONS - 1 {\n        pool.write(
+M8_payload_checksum_outside_header_checksum	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES as usize - 4, JOURNAL_HEADER_CHECKSUM_OFFSET);
+M9_node_mapping_key_drops_birth_tree	    writer.put_u64(pointer.head.birth_tree.0);	    writer.put_u64(0);
+M10_instance_table_span_one	        (SLOT_INSTANCE_TABLE, 2, 0),	        (SLOT_INSTANCE_TABLE, 1, 0),
+M11_allocated_bytes_short_one_slot	value: allocated_slots * SLOT_BYTES	value: (allocated_slots - 1) * SLOT_BYTES
+M12_enumeration_skips_empty_subset	        for mask in 0..full_mask {	        for mask in 1..full_mask {
+M13_fua_never_a_boundary	                if fua_is_boundary && is_fua {	                if false {
+M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
+M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIFIER_MAPPING + 1,	        tree_identifier_watermark: TREE_IDENTIFIER_MAPPING,
+M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {

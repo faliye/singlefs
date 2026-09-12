@@ -13,7 +13,7 @@
 //!
 //! - **D4 已定项 5**：单元恒 32768 含头。**已定项 2**：短 extent 补齐到整单元。
 //! - **D18 已定项 11**：打包记录单元头 107。**D2 已定项 9**：第一版 2 盘恒 w = 2。
-//! - **D27 已定项 2**：界线 ≤ 4 KiB 的对象才进容器。
+//! - **D27 未定项 2**：界线 ≤ 4 KiB 的对象才进容器。
 //! - **D27 已定项 8 ④**：槽定宽，对象补齐到槽宽；槽 `i` 起点 = 头 + `i × W`，不需要槽目录。
 //! - **E116 的闭式**：回本比下界 = `w / (cap − 1)` ⇒ 回得了本当且仅当 `cap > w + 1`；
 //!   `w` = 2 ⇒ 要 `cap ≥ 4`。
@@ -81,7 +81,7 @@ const UNIT_BYTES: u64 = 32768; // D4 已定项 5
 const PACKED_UNIT_HEADER_BYTES: u64 = 107; // D18 已定项 11
 const REPLICATION_WIDTH: u64 = 2; // D2 已定项 9
 const SLOT_EXTRA_BYTES: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
-const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB
+const PACKING_LIMIT_BYTES: u64 = 4096; // D27 未定项 2：界线 ≤ 4 KiB
 const OBJECTS_PER_DISTRIBUTION: u64 = 100_000;
 const CONTAINER_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 容器净荷 32661
 

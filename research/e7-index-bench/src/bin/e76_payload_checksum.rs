@@ -49,8 +49,8 @@
 
 use e7_index_bench::Emitter;
 
-/// D23 已定项 4 的现行头部字节数。**格式常量**，与 kb 的 format-const 标记绑定。
-const JOURNAL_HEADER_BYTES: u64 = 78;
+/// D23 已定项 4 的十个字段合计 78 字节（三笔已定增量不在里面，头是 95）。**格式常量**，与 kb 的 format-const 标记绑定。
+const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 /// 已定项 7 的事务号 + 提交标记。
 const ADDED_TRANSACTION_BOUNDARY_BYTES: u64 = 9;
 /// 已定项 8 的反向链，32 位。
@@ -58,7 +58,7 @@ const ADDED_BACK_CHAIN_BYTES: u64 = 4;
 /// 已定项 13 的载荷校验和，CRC32C 32 位。
 const ADDED_PAYLOAD_CHECKSUM_BYTES: u64 = 4;
 /// 三笔增量落地后的头部宽度，E75 已量。
-const HEADER_BYTES: usize = (JOURNAL_HEADER_BYTES + ADDED_TRANSACTION_BOUNDARY_BYTES + ADDED_BACK_CHAIN_BYTES + ADDED_PAYLOAD_CHECKSUM_BYTES) as usize;
+const HEADER_BYTES: usize = (JOURNAL_HEADER_TEN_FIELD_BYTES + ADDED_TRANSACTION_BOUNDARY_BYTES + ADDED_BACK_CHAIN_BYTES + ADDED_PAYLOAD_CHECKSUM_BYTES) as usize;
 /// E23 字段表的点名项宽度。
 const NAMED_ITEM_BYTES: usize = 56;
 
@@ -555,7 +555,7 @@ mod tests {
     /// 格式常量必须与 kb 的 format-const 标记一致。
     #[test]
     fn format_constants_match_knowledge_base() {
-        assert_eq!(JOURNAL_HEADER_BYTES, 78, "D23 已定项 4 的 format-const 标记");
+        assert_eq!(JOURNAL_HEADER_TEN_FIELD_BYTES, 78, "D23 已定项 4 的 format-const 标记 JOURNAL_HEADER_TEN_FIELD_BYTES");
         assert_eq!(ADDED_TRANSACTION_BOUNDARY_BYTES + ADDED_BACK_CHAIN_BYTES + ADDED_PAYLOAD_CHECKSUM_BYTES, 17);
     }
 }

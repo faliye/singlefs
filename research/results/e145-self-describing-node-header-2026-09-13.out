@@ -1,0 +1,57 @@
+E7RESULT name=config node_bytes=16384 reserved=28 header_without_key_range=81 data_units_in_pool=335544320 nodes_per_data_units=8
+E7RESULT name=header tree=inode arm=A_today key_width=8 header_bytes=97 with_reserved=125
+E7RESULT name=fanout tree=inode arm=A_today payload_bytes=16255 leaf_entry_bytes=117 leaf_fanout=138 internal_fanout=178
+E7RESULT name=height tree=inode arm=A_today leaf_entries=41943040 height=4
+E7RESULT name=header tree=inode arm=B_self_describing key_width=8 header_bytes=102 with_reserved=130
+E7RESULT name=fanout tree=inode arm=B_self_describing payload_bytes=16254 leaf_entry_bytes=117 leaf_fanout=138 internal_fanout=178
+E7RESULT name=height tree=inode arm=B_self_describing leaf_entries=41943040 height=4
+E7RESULT name=header tree=inode arm=C_fixed_key_range key_width=8 header_bytes=150 with_reserved=178
+E7RESULT name=fanout tree=inode arm=C_fixed_key_range payload_bytes=16206 leaf_entry_bytes=117 leaf_fanout=138 internal_fanout=178
+E7RESULT name=height tree=inode arm=C_fixed_key_range leaf_entries=41943040 height=4
+E7RESULT name=header tree=allocation arm=A_today key_width=12 header_bytes=105 with_reserved=133
+E7RESULT name=fanout tree=allocation arm=A_today payload_bytes=16247 leaf_entry_bytes=20 leaf_fanout=812 internal_fanout=171
+E7RESULT name=height tree=allocation arm=A_today leaf_entries=335544320 height=4
+E7RESULT name=header tree=allocation arm=B_self_describing key_width=12 header_bytes=110 with_reserved=138
+E7RESULT name=fanout tree=allocation arm=B_self_describing payload_bytes=16246 leaf_entry_bytes=20 leaf_fanout=812 internal_fanout=171
+E7RESULT name=height tree=allocation arm=B_self_describing leaf_entries=335544320 height=4
+E7RESULT name=header tree=allocation arm=C_fixed_key_range key_width=12 header_bytes=150 with_reserved=178
+E7RESULT name=fanout tree=allocation arm=C_fixed_key_range payload_bytes=16206 leaf_entry_bytes=20 leaf_fanout=810 internal_fanout=170
+E7RESULT name=height tree=allocation arm=C_fixed_key_range leaf_entries=335544320 height=4
+E7RESULT name=header tree=accounting arm=A_today key_width=22 header_bytes=125 with_reserved=153
+E7RESULT name=fanout tree=accounting arm=A_today payload_bytes=16227 leaf_entry_bytes=34 leaf_fanout=477 internal_fanout=154
+E7RESULT name=height tree=accounting arm=A_today leaf_entries=1000000 height=3
+E7RESULT name=header tree=accounting arm=B_self_describing key_width=22 header_bytes=130 with_reserved=158
+E7RESULT name=fanout tree=accounting arm=B_self_describing payload_bytes=16226 leaf_entry_bytes=34 leaf_fanout=477 internal_fanout=154
+E7RESULT name=height tree=accounting arm=B_self_describing leaf_entries=1000000 height=3
+E7RESULT name=header tree=accounting arm=C_fixed_key_range key_width=22 header_bytes=150 with_reserved=178
+E7RESULT name=fanout tree=accounting arm=C_fixed_key_range payload_bytes=16206 leaf_entry_bytes=34 leaf_fanout=476 internal_fanout=154
+E7RESULT name=height tree=accounting arm=C_fixed_key_range leaf_entries=1000000 height=3
+E7RESULT name=header tree=extent arm=A_today key_width=24 header_bytes=129 with_reserved=157
+E7RESULT name=fanout tree=extent arm=A_today payload_bytes=16223 leaf_entry_bytes=109 leaf_fanout=148 internal_fanout=151
+E7RESULT name=height tree=extent arm=A_today leaf_entries=335544320 height=4
+E7RESULT name=header tree=extent arm=B_self_describing key_width=24 header_bytes=134 with_reserved=162
+E7RESULT name=fanout tree=extent arm=B_self_describing payload_bytes=16222 leaf_entry_bytes=109 leaf_fanout=148 internal_fanout=151
+E7RESULT name=height tree=extent arm=B_self_describing leaf_entries=335544320 height=4
+E7RESULT name=header tree=extent arm=C_fixed_key_range key_width=24 header_bytes=150 with_reserved=178
+E7RESULT name=fanout tree=extent arm=C_fixed_key_range payload_bytes=16206 leaf_entry_bytes=109 leaf_fanout=148 internal_fanout=151
+E7RESULT name=height tree=extent arm=C_fixed_key_range leaf_entries=335544320 height=4
+E7RESULT name=header tree=mapping arm=A_today key_width=27 header_bytes=135 with_reserved=163
+E7RESULT name=fanout tree=mapping arm=A_today payload_bytes=16217 leaf_entry_bytes=55 leaf_fanout=294 internal_fanout=147
+E7RESULT name=height tree=mapping arm=A_today leaf_entries=377487360 height=4
+E7RESULT name=header tree=mapping arm=B_self_describing key_width=27 header_bytes=140 with_reserved=168
+E7RESULT name=fanout tree=mapping arm=B_self_describing payload_bytes=16216 leaf_entry_bytes=55 leaf_fanout=294 internal_fanout=147
+E7RESULT name=height tree=mapping arm=B_self_describing leaf_entries=377487360 height=4
+E7RESULT name=header tree=mapping arm=C_fixed_key_range key_width=27 header_bytes=150 with_reserved=178
+E7RESULT name=fanout tree=mapping arm=C_fixed_key_range payload_bytes=16206 leaf_entry_bytes=55 leaf_fanout=294 internal_fanout=147
+E7RESULT name=height tree=mapping arm=C_fixed_key_range leaf_entries=377487360 height=4
+E7RESULT name=scan arm=A_today registered_nodes=1000 resolved=1000 unresolved=0 ambiguous=0 unregistered_nodes=200 unregistered_resolved=0 unregistered_unresolved=200
+E7RESULT name=scan arm=B_self_describing registered_nodes=1000 resolved=1000 unresolved=0 ambiguous=0 unregistered_nodes=200 unregistered_resolved=200 unregistered_unresolved=0
+E7RESULT name=scan arm=C_fixed_key_range registered_nodes=1000 resolved=1000 unresolved=0 ambiguous=0 unregistered_nodes=200 unregistered_resolved=200 unregistered_unresolved=0
+E7RESULT name=mapping arm=a_pad_to_27 data_entry_bytes=55 node_entry_bytes=55 tree_table_entries=1 tree_table_bytes=145 data_leaf_fanout=294 node_leaf_fanout=294
+E7RESULT name=mapping_height arm=a_pad_to_27 data_height=4 node_height=4 reads_per_data_lookup=4
+E7RESULT name=mapping arm=b_two_trees data_entry_bytes=55 node_entry_bytes=53 tree_table_entries=2 tree_table_bytes=290 data_leaf_fanout=294 node_leaf_fanout=306
+E7RESULT name=mapping_height arm=b_two_trees data_height=4 node_height=4 reads_per_data_lookup=4
+E7RESULT name=mapping arm=c_self_describing_entries data_entry_bytes=58 node_entry_bytes=56 tree_table_entries=1 tree_table_bytes=145 data_leaf_fanout=284 node_leaf_fanout=284
+E7RESULT name=mapping_height arm=c_self_describing_entries data_height=4 node_height=4 reads_per_data_lookup=4
+E7RESULT name=verdict trees_with_height_difference=0 today_resolves_registered=1000 today_resolves_unregistered=0 today_ambiguous=0 self_describing_resolves_all=true
+E7RESULT name=done emitted=57

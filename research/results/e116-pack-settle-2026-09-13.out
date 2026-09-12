@@ -1,0 +1,306 @@
+E7RESULT name=config unit=32768 node=16384 pack_hdr=107 node_hdr=86 w=2 map_entry=61 map_leaf_cap=267 alloc_entry=18 alloc_leaf_cap=905 journal_hdr=95 slot_extra=47 n=100000 sizes=[512, 1024, 4096, 8192, 16384] batches=[1, 8, 64, 512, 4096, 100000]
+E7RESULT name=positive_cap1 size=512 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=512 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=512 arm=bg_ideal pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=1024 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=1024 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=1024 arm=bg_ideal pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=4096 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=4096 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=4096 arm=bg_ideal pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=8192 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=8192 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=8192 arm=bg_ideal pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=16384 arm=bg_key pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=16384 arm=bg_fill pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=positive_cap1 size=16384 arm=bg_ideal pad_occ=3276800000 pack_occ=3276800000 same=true
+E7RESULT name=discrimination pad512=3276800000 pad16k=3276800000 same=true
+E7RESULT name=negative arm=bg_key occ=0 mw=0 mr=0 blast=0
+E7RESULT name=negative arm=bg_fill occ=0 mw=0 mr=0 blast=0
+E7RESULT name=negative arm=bg_ideal occ=0 mw=0 mr=0 blast=0
+E7RESULT name=payback_key size=512 cap=58 journal=true pad_occ=3276800000 pack_occ=56524800 saved=3220275200 move_write=144640384 move_read=3276800000 payback=0.044916 ideal_write=113049600 ideal_payback=0.035106
+E7RESULT name=payback_fill size=512 cap=58 b=1 journal=true move_write=6738774400 payback=2.092608
+E7RESULT name=payback_fill size=512 cap=58 b=8 journal=true move_write=6607014272 payback=2.051692
+E7RESULT name=payback_fill size=512 cap=58 b=64 journal=true move_write=5699963264 payback=1.770024
+E7RESULT name=payback_fill size=512 cap=58 b=512 journal=true move_write=2652440960 payback=0.823669
+E7RESULT name=payback_fill size=512 cap=58 b=4096 journal=true move_write=528419200 payback=0.164091
+E7RESULT name=payback_fill size=512 cap=58 b=100000 journal=true move_write=148343168 payback=0.046065
+E7RESULT name=payback_key size=512 cap=58 journal=false pad_occ=3276800000 pack_occ=56524800 saved=3220275200 move_write=129040384 move_read=3276800000 payback=0.040071 ideal_write=113049600 ideal_payback=0.035106
+E7RESULT name=payback_fill size=512 cap=58 b=1 journal=false move_write=6723174400 payback=2.087764
+E7RESULT name=payback_fill size=512 cap=58 b=8 journal=false move_write=6591414272 payback=2.046848
+E7RESULT name=payback_fill size=512 cap=58 b=64 journal=false move_write=5684363264 payback=1.765179
+E7RESULT name=payback_fill size=512 cap=58 b=512 journal=false move_write=2636840960 payback=0.818825
+E7RESULT name=payback_fill size=512 cap=58 b=4096 journal=false move_write=512819200 payback=0.159247
+E7RESULT name=payback_fill size=512 cap=58 b=100000 journal=false move_write=132743168 payback=0.041221
+E7RESULT name=payback_key size=1024 cap=30 journal=true pad_occ=3276800000 pack_occ=109248512 saved=3167551488 move_write=250153344 move_read=3276800000 payback=0.078974 ideal_write=218497024 ideal_payback=0.068980
+E7RESULT name=payback_fill size=1024 cap=30 b=1 journal=true move_write=6896945536 payback=2.177374
+E7RESULT name=payback_fill size=1024 cap=30 b=8 journal=true move_write=6765316480 payback=2.135819
+E7RESULT name=payback_fill size=1024 cap=30 b=64 journal=true move_write=5857085824 payback=1.849089
+E7RESULT name=payback_fill size=1024 cap=30 b=512 journal=true move_write=2781317504 payback=0.878065
+E7RESULT name=payback_fill size=1024 cap=30 b=4096 journal=true move_write=639273344 payback=0.201819
+E7RESULT name=payback_fill size=1024 cap=30 b=100000 journal=true move_write=253921664 payback=0.080163
+E7RESULT name=payback_key size=1024 cap=30 journal=false pad_occ=3276800000 pack_occ=109248512 saved=3167551488 move_write=234553344 move_read=3276800000 payback=0.074049 ideal_write=218497024 ideal_payback=0.068980
+E7RESULT name=payback_fill size=1024 cap=30 b=1 journal=false move_write=6881345536 payback=2.172449
+E7RESULT name=payback_fill size=1024 cap=30 b=8 journal=false move_write=6749716480 payback=2.130894
+E7RESULT name=payback_fill size=1024 cap=30 b=64 journal=false move_write=5841485824 payback=1.844164
+E7RESULT name=payback_fill size=1024 cap=30 b=512 journal=false move_write=2765717504 payback=0.873141
+E7RESULT name=payback_fill size=1024 cap=30 b=4096 journal=false move_write=623673344 payback=0.196894
+E7RESULT name=payback_fill size=1024 cap=30 b=100000 journal=false move_write=238321664 payback=0.075238
+E7RESULT name=payback_key size=4096 cap=7 journal=true pad_occ=3276800000 pack_occ=468123648 saved=2808676352 move_write=968296832 move_read=3276800000 payback=0.344752 ideal_write=936247296 ideal_payback=0.333341
+E7RESULT name=payback_fill size=4096 cap=7 b=1 journal=true move_write=7973570944 payback=2.838907
+E7RESULT name=payback_fill size=4096 cap=7 b=8 journal=true move_write=7841614208 payback=2.791925
+E7RESULT name=payback_fill size=4096 cap=7 b=64 journal=true move_write=6920046976 payback=2.463811
+E7RESULT name=payback_fill size=4096 cap=7 b=512 journal=true move_write=3662449024 payback=1.303977
+E7RESULT name=payback_fill size=4096 cap=7 b=4096 journal=true move_write=1375570304 payback=0.489757
+E7RESULT name=payback_fill size=4096 cap=7 b=100000 journal=true move_write=972458368 payback=0.346234
+E7RESULT name=payback_key size=4096 cap=7 journal=false pad_occ=3276800000 pack_occ=468123648 saved=2808676352 move_write=952696832 move_read=3276800000 payback=0.339198 ideal_write=936247296 ideal_payback=0.333341
+E7RESULT name=payback_fill size=4096 cap=7 b=1 journal=false move_write=7957970944 payback=2.833353
+E7RESULT name=payback_fill size=4096 cap=7 b=8 journal=false move_write=7826014208 payback=2.786371
+E7RESULT name=payback_fill size=4096 cap=7 b=64 journal=false move_write=6904446976 payback=2.458257
+E7RESULT name=payback_fill size=4096 cap=7 b=512 journal=false move_write=3646849024 payback=1.298423
+E7RESULT name=payback_fill size=4096 cap=7 b=4096 journal=false move_write=1359970304 payback=0.484203
+E7RESULT name=payback_fill size=4096 cap=7 b=100000 journal=false move_write=956858368 payback=0.340679
+E7RESULT name=payback_key size=8192 cap=3 journal=true pad_occ=3276800000 pack_occ=1092288512 saved=2184511488 move_write=2217314688 move_read=3276800000 payback=1.015016 ideal_write=2184577024 ideal_payback=1.000030
+E7RESULT name=payback_fill size=8192 cap=3 b=1 journal=true move_write=9846065536 payback=4.507216
+E7RESULT name=payback_fill size=8192 cap=3 b=8 journal=true move_write=9713781120 payback=4.446661
+E7RESULT name=payback_fill size=8192 cap=3 b=64 journal=true move_write=8775043456 payback=4.016936
+E7RESULT name=payback_fill size=8192 cap=3 b=512 journal=true move_write=5221288320 payback=2.390140
+E7RESULT name=payback_fill size=8192 cap=3 b=4096 journal=true move_write=2667415936 payback=1.221058
+E7RESULT name=payback_fill size=8192 cap=3 b=100000 journal=true move_write=2222164352 payback=1.017236
+E7RESULT name=payback_key size=8192 cap=3 journal=false pad_occ=3276800000 pack_occ=1092288512 saved=2184511488 move_write=2201714688 move_read=3276800000 payback=1.007875 ideal_write=2184577024 ideal_payback=1.000030
+E7RESULT name=payback_fill size=8192 cap=3 b=1 journal=false move_write=9830465536 payback=4.500075
+E7RESULT name=payback_fill size=8192 cap=3 b=8 journal=false move_write=9698181120 payback=4.439519
+E7RESULT name=payback_fill size=8192 cap=3 b=64 journal=false move_write=8759443456 payback=4.009795
+E7RESULT name=payback_fill size=8192 cap=3 b=512 journal=false move_write=5205688320 payback=2.382999
+E7RESULT name=payback_fill size=8192 cap=3 b=4096 journal=false move_write=2651815936 payback=1.213917
+E7RESULT name=payback_fill size=8192 cap=3 b=100000 journal=false move_write=2206564352 payback=1.010095
+E7RESULT name=payback_key size=16384 cap=1 journal=true pad_occ=3276800000 pack_occ=3276800000 saved=0 move_write=6588729728 move_read=3276800000 payback=inf ideal_write=6553600000 ideal_payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=1 journal=true move_write=16399600000 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=8 journal=true move_write=16266332544 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=64 journal=true move_write=15287421312 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=512 journal=true move_write=10917710208 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=4096 journal=true move_write=7231244672 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=100000 journal=true move_write=6595971456 payback=inf
+E7RESULT name=payback_key size=16384 cap=1 journal=false pad_occ=3276800000 pack_occ=3276800000 saved=0 move_write=6573129728 move_read=3276800000 payback=inf ideal_write=6553600000 ideal_payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=1 journal=false move_write=16384000000 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=8 journal=false move_write=16250732544 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=64 journal=false move_write=15271821312 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=512 journal=false move_write=10902110208 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=4096 journal=false move_write=7215644672 payback=inf
+E7RESULT name=payback_fill size=16384 cap=1 b=100000 journal=false move_write=6580371456 payback=inf
+E7RESULT name=death size=512 correlated=false d=0.00 pad_occ=3276800000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.05 pad_occ=3112960000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.10 pad_occ=2949120000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.15 pad_occ=2785280000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.20 pad_occ=2621440000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.25 pad_occ=2457600000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.30 pad_occ=2293760000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.35 pad_occ=2129920000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.40 pad_occ=1966080000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.45 pad_occ=1802240000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.50 pad_occ=1638400000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.55 pad_occ=1474560000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.60 pad_occ=1310720000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.65 pad_occ=1146880000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.70 pad_occ=983040000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.75 pad_occ=819200000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.80 pad_occ=655360000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.85 pad_occ=491520000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.90 pad_occ=327680000 pack_occ=56393728 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=0.95 pad_occ=163840000 pack_occ=53641216 pack_worse=false
+E7RESULT name=death size=512 correlated=false d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.00 pad_occ=3276800000 pack_occ=56524800 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.05 pad_occ=3112960000 pack_occ=53706752 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.10 pad_occ=2949120000 pack_occ=50888704 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.15 pad_occ=2785280000 pack_occ=48037888 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.20 pad_occ=2621440000 pack_occ=45219840 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.25 pad_occ=2457600000 pack_occ=42401792 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.30 pad_occ=2293760000 pack_occ=39583744 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.35 pad_occ=2129920000 pack_occ=36732928 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.40 pad_occ=1966080000 pack_occ=33914880 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.45 pad_occ=1802240000 pack_occ=31096832 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.50 pad_occ=1638400000 pack_occ=28278784 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.55 pad_occ=1474560000 pack_occ=25427968 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.60 pad_occ=1310720000 pack_occ=22609920 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.65 pad_occ=1146880000 pack_occ=19791872 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.70 pad_occ=983040000 pack_occ=16973824 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.75 pad_occ=819200000 pack_occ=14123008 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.80 pad_occ=655360000 pack_occ=11304960 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.85 pad_occ=491520000 pack_occ=8486912 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.90 pad_occ=327680000 pack_occ=5636096 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=0.95 pad_occ=163840000 pack_occ=2818048 pack_worse=false
+E7RESULT name=death size=512 correlated=true d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.00 pad_occ=3276800000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.05 pad_occ=3112960000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.10 pad_occ=2949120000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.15 pad_occ=2785280000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.20 pad_occ=2621440000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.25 pad_occ=2457600000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.30 pad_occ=2293760000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.35 pad_occ=2129920000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.40 pad_occ=1966080000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.45 pad_occ=1802240000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.50 pad_occ=1638400000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.55 pad_occ=1474560000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.60 pad_occ=1310720000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.65 pad_occ=1146880000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.70 pad_occ=983040000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.75 pad_occ=819200000 pack_occ=109215744 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.80 pad_occ=655360000 pack_occ=109117440 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.85 pad_occ=491520000 pack_occ=108429312 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.90 pad_occ=327680000 pack_occ=104628224 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=0.95 pad_occ=163840000 pack_occ=85786624 pack_worse=false
+E7RESULT name=death size=1024 correlated=false d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.00 pad_occ=3276800000 pack_occ=109248512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.05 pad_occ=3112960000 pack_occ=103776256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.10 pad_occ=2949120000 pack_occ=98336768 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.15 pad_occ=2785280000 pack_occ=92864512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.20 pad_occ=2621440000 pack_occ=87392256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.25 pad_occ=2457600000 pack_occ=81952768 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.30 pad_occ=2293760000 pack_occ=76480512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.35 pad_occ=2129920000 pack_occ=71008256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.40 pad_occ=1966080000 pack_occ=65536000 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.45 pad_occ=1802240000 pack_occ=60096512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.50 pad_occ=1638400000 pack_occ=54624256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.55 pad_occ=1474560000 pack_occ=49152000 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.60 pad_occ=1310720000 pack_occ=43712512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.65 pad_occ=1146880000 pack_occ=38240256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.70 pad_occ=983040000 pack_occ=32768000 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.75 pad_occ=819200000 pack_occ=27328512 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.80 pad_occ=655360000 pack_occ=21856256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.85 pad_occ=491520000 pack_occ=16384000 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.90 pad_occ=327680000 pack_occ=10911744 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=0.95 pad_occ=163840000 pack_occ=5472256 pack_worse=false
+E7RESULT name=death size=1024 correlated=true d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.00 pad_occ=3276800000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.05 pad_occ=3112960000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.10 pad_occ=2949120000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.15 pad_occ=2785280000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.20 pad_occ=2621440000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.25 pad_occ=2457600000 pack_occ=468090880 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.30 pad_occ=2293760000 pack_occ=468025344 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.35 pad_occ=2129920000 pack_occ=467828736 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.40 pad_occ=1966080000 pack_occ=467369984 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.45 pad_occ=1802240000 pack_occ=466386944 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.50 pad_occ=1638400000 pack_occ=464453632 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.55 pad_occ=1474560000 pack_occ=461012992 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.60 pad_occ=1310720000 pack_occ=455016448 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.65 pad_occ=1146880000 pack_occ=445186048 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.70 pad_occ=983040000 pack_occ=429555712 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.75 pad_occ=819200000 pack_occ=405635072 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.80 pad_occ=655360000 pack_occ=369950720 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.85 pad_occ=491520000 pack_occ=318046208 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.90 pad_occ=327680000 pack_occ=244219904 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=0.95 pad_occ=163840000 pack_occ=141230080 pack_worse=false
+E7RESULT name=death size=4096 correlated=false d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.00 pad_occ=3276800000 pack_occ=468123648 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.05 pad_occ=3112960000 pack_occ=444727296 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.10 pad_occ=2949120000 pack_occ=421298176 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.15 pad_occ=2785280000 pack_occ=397901824 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.20 pad_occ=2621440000 pack_occ=374505472 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.25 pad_occ=2457600000 pack_occ=351109120 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.30 pad_occ=2293760000 pack_occ=327680000 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.35 pad_occ=2129920000 pack_occ=304283648 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.40 pad_occ=1966080000 pack_occ=280887296 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.45 pad_occ=1802240000 pack_occ=257458176 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.50 pad_occ=1638400000 pack_occ=234061824 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.55 pad_occ=1474560000 pack_occ=210665472 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.60 pad_occ=1310720000 pack_occ=187236352 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.65 pad_occ=1146880000 pack_occ=163840000 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.70 pad_occ=983040000 pack_occ=140443648 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.75 pad_occ=819200000 pack_occ=117047296 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.80 pad_occ=655360000 pack_occ=93618176 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.85 pad_occ=491520000 pack_occ=70221824 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.90 pad_occ=327680000 pack_occ=46825472 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=0.95 pad_occ=163840000 pack_occ=23396352 pack_worse=false
+E7RESULT name=death size=4096 correlated=true d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.00 pad_occ=3276800000 pack_occ=1092288512 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.05 pad_occ=3112960000 pack_occ=1092157440 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.10 pad_occ=2949120000 pack_occ=1091207168 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.15 pad_occ=2785280000 pack_occ=1088585728 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.20 pad_occ=2621440000 pack_occ=1083539456 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.25 pad_occ=2457600000 pack_occ=1075216384 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.30 pad_occ=2293760000 pack_occ=1062797312 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.35 pad_occ=2129920000 pack_occ=1045463040 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.40 pad_occ=1966080000 pack_occ=1022394368 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.45 pad_occ=1802240000 pack_occ=992739328 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.50 pad_occ=1638400000 pack_occ=955744256 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.55 pad_occ=1474560000 pack_occ=910557184 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.60 pad_occ=1310720000 pack_occ=856358912 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.65 pad_occ=1146880000 pack_occ=792330240 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.70 pad_occ=983040000 pack_occ=717619200 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.75 pad_occ=819200000 pack_occ=631472128 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.80 pad_occ=655360000 pack_occ=533037056 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.85 pad_occ=491520000 pack_occ=421494784 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.90 pad_occ=327680000 pack_occ=296026112 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=0.95 pad_occ=163840000 pack_occ=155779072 pack_worse=false
+E7RESULT name=death size=8192 correlated=false d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.00 pad_occ=3276800000 pack_occ=1092288512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.05 pad_occ=3112960000 pack_occ=1037664256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.10 pad_occ=2949120000 pack_occ=983072768 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.15 pad_occ=2785280000 pack_occ=928448512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.20 pad_occ=2621440000 pack_occ=873824256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.25 pad_occ=2457600000 pack_occ=819232768 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.30 pad_occ=2293760000 pack_occ=764608512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.35 pad_occ=2129920000 pack_occ=709984256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.40 pad_occ=1966080000 pack_occ=655360000 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.45 pad_occ=1802240000 pack_occ=600768512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.50 pad_occ=1638400000 pack_occ=546144256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.55 pad_occ=1474560000 pack_occ=491520000 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.60 pad_occ=1310720000 pack_occ=436928512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.65 pad_occ=1146880000 pack_occ=382304256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.70 pad_occ=983040000 pack_occ=327680000 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.75 pad_occ=819200000 pack_occ=273088512 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.80 pad_occ=655360000 pack_occ=218464256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.85 pad_occ=491520000 pack_occ=163840000 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.90 pad_occ=327680000 pack_occ=109215744 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=0.95 pad_occ=163840000 pack_occ=54624256 pack_worse=false
+E7RESULT name=death size=8192 correlated=true d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.00 pad_occ=3276800000 pack_occ=3276800000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.05 pad_occ=3112960000 pack_occ=3112960000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.10 pad_occ=2949120000 pack_occ=2949120000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.15 pad_occ=2785280000 pack_occ=2785280000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.20 pad_occ=2621440000 pack_occ=2621440000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.25 pad_occ=2457600000 pack_occ=2457600000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.30 pad_occ=2293760000 pack_occ=2293760000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.35 pad_occ=2129920000 pack_occ=2129920000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.40 pad_occ=1966080000 pack_occ=1966080000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.45 pad_occ=1802240000 pack_occ=1802240000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.50 pad_occ=1638400000 pack_occ=1638400000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.55 pad_occ=1474560000 pack_occ=1474560000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.60 pad_occ=1310720000 pack_occ=1310720000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.65 pad_occ=1146880000 pack_occ=1146880000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.70 pad_occ=983040000 pack_occ=983040000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.75 pad_occ=819200000 pack_occ=819200000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.80 pad_occ=655360000 pack_occ=655360000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.85 pad_occ=491520000 pack_occ=491520000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.90 pad_occ=327680000 pack_occ=327680000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=0.95 pad_occ=163840000 pack_occ=163840000 pack_worse=false
+E7RESULT name=death size=16384 correlated=false d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.00 pad_occ=3276800000 pack_occ=3276800000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.05 pad_occ=3112960000 pack_occ=3112960000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.10 pad_occ=2949120000 pack_occ=2949120000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.15 pad_occ=2785280000 pack_occ=2785280000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.20 pad_occ=2621440000 pack_occ=2621440000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.25 pad_occ=2457600000 pack_occ=2457600000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.30 pad_occ=2293760000 pack_occ=2293760000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.35 pad_occ=2129920000 pack_occ=2129920000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.40 pad_occ=1966080000 pack_occ=1966080000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.45 pad_occ=1802240000 pack_occ=1802240000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.50 pad_occ=1638400000 pack_occ=1638400000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.55 pad_occ=1474560000 pack_occ=1474560000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.60 pad_occ=1310720000 pack_occ=1310720000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.65 pad_occ=1146880000 pack_occ=1146880000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.70 pad_occ=983040000 pack_occ=983040000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.75 pad_occ=819200000 pack_occ=819200000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.80 pad_occ=655360000 pack_occ=655360000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.85 pad_occ=491520000 pack_occ=491520000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.90 pad_occ=327680000 pack_occ=327680000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=0.95 pad_occ=163840000 pack_occ=163840000 pack_worse=false
+E7RESULT name=death size=16384 correlated=true d=1.00 pad_occ=0 pack_occ=0 pack_worse=false
+E7RESULT name=blast size=512 gain=57.9710 blast=58 pad_blast=1 ratio=0.9995
+E7RESULT name=blast size=1024 gain=29.9940 blast=30 pad_blast=1 ratio=0.9998
+E7RESULT name=blast size=4096 gain=6.9999 blast=7 pad_blast=1 ratio=1.0000
+E7RESULT name=blast size=8192 gain=2.9999 blast=3 pad_blast=1 ratio=1.0000
+E7RESULT name=blast size=16384 gain=1.0000 blast=1 pad_blast=1 ratio=1.0000
+E7RESULT name=done emitted=306

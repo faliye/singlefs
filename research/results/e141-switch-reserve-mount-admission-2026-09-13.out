@@ -1,0 +1,62 @@
+E7RESULT name=reserve rows_at_mount=0 row_bytes=64 records_per_page=509 rows_per_page=508 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=0 row_bytes=64 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=0 row_bytes=64 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=0 row_bytes=64 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=366 row_bytes=64 records_per_page=509 rows_per_page=508 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=366 row_bytes=64 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=366 row_bytes=64 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=366 row_bytes=64 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=367 row_bytes=64 records_per_page=509 rows_per_page=508 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=367 row_bytes=64 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=367 row_bytes=64 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=367 row_bytes=64 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=505 row_bytes=64 records_per_page=509 rows_per_page=508 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=505 row_bytes=64 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=505 row_bytes=64 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=505 row_bytes=64 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=506 row_bytes=64 records_per_page=509 rows_per_page=508 pages=2 total_blocks=24 share_per_device_blocks=12 expected_total_blocks=24
+E7RESULT name=flip rows_at_mount=506 row_bytes=64 tight_device=0 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=506 row_bytes=64 tight_device=1 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=506 row_bytes=64 device_zero_free=62 device_one_free=11 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=1014 row_bytes=64 records_per_page=509 rows_per_page=508 pages=3 total_blocks=36 share_per_device_blocks=18 expected_total_blocks=36
+E7RESULT name=flip rows_at_mount=1014 row_bytes=64 tight_device=0 share_per_device_blocks=18 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=1014 row_bytes=64 tight_device=1 share_per_device_blocks=18 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=1014 row_bytes=64 device_zero_free=68 device_one_free=17 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=4064 row_bytes=64 records_per_page=509 rows_per_page=508 pages=9 total_blocks=108 share_per_device_blocks=54 expected_total_blocks=108
+E7RESULT name=flip rows_at_mount=4064 row_bytes=64 tight_device=0 share_per_device_blocks=54 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=4064 row_bytes=64 tight_device=1 share_per_device_blocks=54 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=4064 row_bytes=64 device_zero_free=104 device_one_free=53 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=0 row_bytes=88 records_per_page=370 rows_per_page=369 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=0 row_bytes=88 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=0 row_bytes=88 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=0 row_bytes=88 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=366 row_bytes=88 records_per_page=370 rows_per_page=369 pages=1 total_blocks=12 share_per_device_blocks=6 expected_total_blocks=12
+E7RESULT name=flip rows_at_mount=366 row_bytes=88 tight_device=0 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=366 row_bytes=88 tight_device=1 share_per_device_blocks=6 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=366 row_bytes=88 device_zero_free=56 device_one_free=5 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=367 row_bytes=88 records_per_page=370 rows_per_page=369 pages=2 total_blocks=24 share_per_device_blocks=12 expected_total_blocks=24
+E7RESULT name=flip rows_at_mount=367 row_bytes=88 tight_device=0 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=367 row_bytes=88 tight_device=1 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=367 row_bytes=88 device_zero_free=62 device_one_free=11 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=505 row_bytes=88 records_per_page=370 rows_per_page=369 pages=2 total_blocks=24 share_per_device_blocks=12 expected_total_blocks=24
+E7RESULT name=flip rows_at_mount=505 row_bytes=88 tight_device=0 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=505 row_bytes=88 tight_device=1 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=505 row_bytes=88 device_zero_free=62 device_one_free=11 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=506 row_bytes=88 records_per_page=370 rows_per_page=369 pages=2 total_blocks=24 share_per_device_blocks=12 expected_total_blocks=24
+E7RESULT name=flip rows_at_mount=506 row_bytes=88 tight_device=0 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=506 row_bytes=88 tight_device=1 share_per_device_blocks=12 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=506 row_bytes=88 device_zero_free=62 device_one_free=11 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=1014 row_bytes=88 records_per_page=370 rows_per_page=369 pages=3 total_blocks=36 share_per_device_blocks=18 expected_total_blocks=36
+E7RESULT name=flip rows_at_mount=1014 row_bytes=88 tight_device=0 share_per_device_blocks=18 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=1014 row_bytes=88 tight_device=1 share_per_device_blocks=18 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=1014 row_bytes=88 device_zero_free=68 device_one_free=17 settled=read_only pool_scalar=writable
+E7RESULT name=reserve rows_at_mount=4064 row_bytes=88 records_per_page=370 rows_per_page=369 pages=12 total_blocks=144 share_per_device_blocks=72 expected_total_blocks=144
+E7RESULT name=flip rows_at_mount=4064 row_bytes=88 tight_device=0 share_per_device_blocks=72 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=flip rows_at_mount=4064 row_bytes=88 tight_device=1 share_per_device_blocks=72 at_share=writable below_share=read_only control_at_share=writable control_below_share=writable
+E7RESULT name=device_dimension rows_at_mount=4064 row_bytes=88 device_zero_free=122 device_one_free=71 settled=read_only pool_scalar=writable
+E7RESULT name=sensitivity form=first_round_candidate points=14 agreeing_points=6 first_difference=506:64:settled=24:wrong=16
+E7RESULT name=sensitivity form=no_chain_pointer_per_page points=14 agreeing_points=9 first_difference=506:64:settled=24:wrong=12
+E7RESULT name=sensitivity form=fixed_row_width points=14 agreeing_points=11 first_difference=367:88:settled=24:wrong=12
+E7RESULT name=sensitivity form=summed_instead_of_worst_times_switches points=14 agreeing_points=11 first_difference=506:64:settled=24:wrong=16
+E7RESULT name=verdict crit1_bad_pairs=0 crit2_control_failures=0 crit3_settled_writable=0 crit3_scalar_read_only=0 crit4_mismatches=0 crit5_blind_forms=0
+E7RESULT name=done emitted=62

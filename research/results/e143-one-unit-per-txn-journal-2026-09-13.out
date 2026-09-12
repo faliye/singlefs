@@ -1,0 +1,34 @@
+E7RESULT name=config record_bytes=4096 header_today=95 header_multi=102 item_today=56 item_multi=64 devices=2 t_dirty_bytes=2147483648 ring_bytes=67108864 safety_factor=3 fsync_per_second=2785
+E7RESULT name=capacity arm=jia items_per_record=71
+E7RESULT name=capacity arm=yi items_per_record=62
+E7RESULT name=capacity arm=bing items_per_record=71
+E7RESULT name=fsync load=rand batch=1 leaves=1 ancestors=4 arm=jia transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=rand batch=1 leaves=1 ancestors=4 arm=yi transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=rand batch=1 leaves=1 ancestors=4 arm=bing transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=multistream batch=1 leaves=1 ancestors=4 arm=jia transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=multistream batch=1 leaves=1 ancestors=4 arm=yi transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=multistream batch=1 leaves=1 ancestors=4 arm=bing transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=65536 journal_over_data_bp=1250 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=seq batch=1 leaves=8 ancestors=4 arm=jia transactions=8 records=8 journal_bytes_two_devices=65536 data_bytes_two_devices=524288 journal_over_data_bp=1250 records_per_second=22280 journal_kib_per_second=178240
+E7RESULT name=fsync load=seq batch=1 leaves=8 ancestors=4 arm=yi transactions=8 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=524288 journal_over_data_bp=156 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=seq batch=1 leaves=8 ancestors=4 arm=bing transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=524288 journal_over_data_bp=156 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=metaheavy batch=1 leaves=2 ancestors=6 arm=jia transactions=2 records=2 journal_bytes_two_devices=16384 data_bytes_two_devices=131072 journal_over_data_bp=1250 records_per_second=5570 journal_kib_per_second=44560
+E7RESULT name=fsync load=metaheavy batch=1 leaves=2 ancestors=6 arm=yi transactions=2 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=131072 journal_over_data_bp=625 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=metaheavy batch=1 leaves=2 ancestors=6 arm=bing transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=131072 journal_over_data_bp=625 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=seq batch=10 leaves=80 ancestors=4 arm=jia transactions=80 records=80 journal_bytes_two_devices=655360 data_bytes_two_devices=5242880 journal_over_data_bp=1250 records_per_second=222800 journal_kib_per_second=1782400
+E7RESULT name=fsync load=seq batch=10 leaves=80 ancestors=4 arm=yi transactions=80 records=2 journal_bytes_two_devices=16384 data_bytes_two_devices=5242880 journal_over_data_bp=31 records_per_second=5570 journal_kib_per_second=44560
+E7RESULT name=fsync load=seq batch=10 leaves=80 ancestors=4 arm=bing transactions=1 records=2 journal_bytes_two_devices=16384 data_bytes_two_devices=5242880 journal_over_data_bp=31 records_per_second=5570 journal_kib_per_second=44560
+E7RESULT name=fsync load=multistream batch=10 leaves=10 ancestors=31 arm=jia transactions=10 records=10 journal_bytes_two_devices=81920 data_bytes_two_devices=655360 journal_over_data_bp=1250 records_per_second=27850 journal_kib_per_second=222800
+E7RESULT name=fsync load=multistream batch=10 leaves=10 ancestors=31 arm=yi transactions=10 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=655360 journal_over_data_bp=125 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=fsync load=multistream batch=10 leaves=10 ancestors=31 arm=bing transactions=1 records=1 journal_bytes_two_devices=8192 data_bytes_two_devices=655360 journal_over_data_bp=125 records_per_second=2785 journal_kib_per_second=22280
+E7RESULT name=window arm=jia records=65536 bytes_kib=262144 ring_kib=65536 window_over_ring_milli=4000
+E7RESULT name=window arm=yi records=1058 bytes_kib=4232 ring_kib=65536 window_over_ring_milli=64
+E7RESULT name=window arm=bing records=1847 bytes_kib=7388 ring_kib=65536 window_over_ring_milli=112
+E7RESULT name=ring arm=jia worst_transaction_bytes=4096 lower_bound_any_transaction_kib=12 lower_bound_dirty_window_kib=786432
+E7RESULT name=ring arm=yi worst_transaction_bytes=4096 lower_bound_any_transaction_kib=12 lower_bound_dirty_window_kib=12696
+E7RESULT name=ring arm=bing worst_transaction_bytes=4096 lower_bound_any_transaction_kib=12 lower_bound_dirty_window_kib=22164
+E7RESULT name=ring_cap arm=jia ring_kib=65536 safety_factor=3 dirty_bytes_allowed=178946048 dirty_kib_allowed=174752
+E7RESULT name=keys load=seq batch=1 arm=jia data_units=8 distinct_write_orders=8
+E7RESULT name=keys load=seq batch=1 arm=yi data_units=8 distinct_write_orders=8
+E7RESULT name=keys load=seq batch=1 arm=bing data_units=8 distinct_write_orders=1
+E7RESULT name=verdict jia_records_seq_batch1=8 jia_journal_over_data_bp_seq_batch1=1250 bing_window_records=1847 bing_window_kib=7388 e91_anchor_holds=true jia_window_over_ring_milli=4000
+E7RESULT name=done emitted=34

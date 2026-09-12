@@ -22,7 +22,7 @@
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
-//! - **D23（journal 的角色与格式）**：journal 记录头 78，登记名 JOURNAL_HEADER_BYTES。
+//! - **D23（journal 的角色与格式）**：journal 记录头 95（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17），登记名 JOURNAL_HEADER_BYTES。
 //! - **D2 已定项 9**：第一版 2 盘恒 w = 2。
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
@@ -57,7 +57,7 @@
 //! ## 反向接受条款（跑前写死，逐臂点名）
 //!
 //! - 若 **`bg_key` 的回本比 ≥ 1**（沿映射 key 序走仍然写得比省得多）⇒ 结论写
-//!   「后台整理形态在最有利的策略下也不省，D27 已定项 1 该退回未定」，不许回头改口径。
+//!   「后台整理形态在最有利的策略下也不省，D27 未定项 1 该退回未定」，不许回头改口径。
 //! - 若 **`bg_fill` 在 b 取到实现可达上界时回本比仍 ≥ 1** ⇒ 结论写「凑满序不可用，整理必须按映射 key 序」。
 //! - 若 **`bg_ideal` 的回本比 ≥ 1**（连元数据写记 0 都回不了本）⇒ 结论写「数据侧本身不成立，提案放弃」。
 //! - 若**打包形态的稳态占用在任何 `d` 上超过 `pad`** ⇒ 结论写「空间收益要等回收定案才成立」。
@@ -82,7 +82,7 @@ const MAP_KEY: u64 = 33; // D18 已定项 3
 const LOC_ENTRY: u64 = 14; // D19 已定项 4
 const ALLOC_ENTRY: u64 = 18; // D3 已定项 7
 const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度
-const JOURNAL_HEADER_BYTES: u64 = 78; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
+const JOURNAL_HEADER_BYTES: u64 = 95; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
 const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
@@ -337,10 +337,10 @@ mod tests {
         assert_eq!(alloc_leaves, 113);
         assert_eq!(alloc_leaves * NODE * W, 3_702_784);
         let journal_w = N * (JOURNAL_HEADER_BYTES + MAP_ENTRY);
-        assert_eq!(journal_w, 13_900_000);
+        assert_eq!(journal_w, 15_600_000);
         let l = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true);
-        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 13_900_000);
-        assert_eq!(l.move_write, 142_940_384);
+        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 15_600_000);
+        assert_eq!(l.move_write, 144_640_384);
     }
 
     /// 反向接受条款要判的那个符号：bg_key 的回本比，逐档钉住。
@@ -351,7 +351,7 @@ mod tests {
         let saved = pad.occupancy - l.occupancy;
         assert_eq!(saved, 3_220_275_200);
         let p = payback(&pad, &l);
-        assert!((p - 0.044388).abs() < 1e-6, "512 B 档回本比实测 {p}");
+        assert!((p - 0.044916).abs() < 1e-6, "512 B 档回本比实测 {p}");
         // 16 KiB 档 cap = 1 ⇒ 一点不省 ⇒ 回本比无穷
         let l16 = pack_ledger(N, 16384, SLOT_EXTRA, 0, 1, true);
         assert!(payback(&pad, &l16).is_infinite());
@@ -371,7 +371,7 @@ mod tests {
         // 三个数都留在这里，不许回头改前两个：跑前登记值 1.058893；
         // 第一版实测 3.127186（分配记录按落点算，一个单元记 2 条 —— 建模错）；
         // 改成 D3 已定项 7 逐字「一条记一个单元」之后 2.092080。
-        assert!((p - 2.092080).abs() < 1e-5, "实测 {p}");
+        assert!((p - 2.092608).abs() < 1e-5, "实测 {p}");
     }
 
     /// bg_ideal 是上界：它的回本比必须严格小于另外两条臂。
@@ -430,8 +430,8 @@ mod tests {
         assert_eq!(leaves_touched_scattered(alloc_changed, alloc_changed.div_ceil(alloc_leaf_cap()), N), 226);
         let key = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let fill_n = pack_ledger(N, 512, SLOT_EXTRA, 1, N, true).move_write;
-        assert_eq!(key, 142_940_384);
-        assert_eq!(fill_n, 146_643_168);
+        assert_eq!(key, 144_640_384);
+        assert_eq!(fill_n, 148_343_168);
     }
 
     /// 稳态占用：均匀独立死亡下，打包形态在任何 d 上都不比 pad 差。
@@ -497,6 +497,6 @@ mod tests {
     fn journal_is_an_assumption() {
         let with = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let without = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, false).move_write;
-        assert_eq!(with, without + 13_900_000);
+        assert_eq!(with, without + 15_600_000);
     }
 }

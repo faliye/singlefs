@@ -124,6 +124,7 @@ bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自�
 bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）
 bash .claude/gate.d/49-history-brief.sh # 决策变更史的快查与原文同步（每条原文标题下两行快查；--write 重新生成按决策的汇总）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
+bash .claude/gate.d/51-admission-terms-covered.sh # 准入不等式的每一项都有人维护：被维护的统计量，或写明的例外
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
 bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（55 条承重引用，源码树不在也判红）

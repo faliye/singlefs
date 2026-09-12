@@ -1,0 +1,11 @@
+M1_header_base_80	const HEADER_WITHOUT_KEY_RANGE: u64 = 81;	const HEADER_WITHOUT_KEY_RANGE: u64 = 80;
+M2_self_describing_extra_4	const SELF_DESCRIBING_EXTRA_BYTES: u64 = 5;	const SELF_DESCRIBING_EXTRA_BYTES: u64 = 4;
+M3_fixed_range_16	const FIXED_KEY_RANGE_KEY_BYTES: u64 = 32;	const FIXED_KEY_RANGE_KEY_BYTES: u64 = 16;
+M4_arm_a_forgets_payload_count	            HeaderArm::Today => after_header - PAYLOAD_INTERNAL_COUNT_BYTES,	            HeaderArm::Today => after_header,
+M5_height_starts_at_zero	    let mut height = 1;\n    while nodes > 1 {	    let mut height = 0;\n    while nodes > 1 {
+M6_registered_widths_drop_27	const REGISTERED_KEY_WIDTHS: [u64; 5] = [8, 12, 22, 24, 27];	const REGISTERED_KEY_WIDTHS: [u64; 5] = [8, 12, 22, 24, 26];
+M7_scanner_a_tries_only_four_widths	            let passing: Vec<u64> = REGISTERED_KEY_WIDTHS.iter().copied()	            let passing: Vec<u64> = REGISTERED_KEY_WIDTHS[..4].iter().copied()
+M8_self_describing_scanner_trusts_byte	            header_checksum_holds(node, arm.header_bytes(key_width) as usize).then_some(key_width)	            Some(key_width)
+M9_mapping_pad_entry_53	            MappingArm::PadTo27 => (MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES, MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES, 1),	            MappingArm::PadTo27 => (MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES, MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES, 1),
+M10_two_trees_one_table_entry	            MappingArm::TwoTrees => (MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES, MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES, 2),	            MappingArm::TwoTrees => (MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES, MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES, 1),
+M11_self_describing_entries_no_offset_table	            MappingArm::SelfDescribingEntries => (1 + MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES + 2, 1 + MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES + 2, 1),	            MappingArm::SelfDescribingEntries => (1 + MAPPING_KEY_DATA + LOCATION_ENTRY_PAIR_BYTES, 1 + MAPPING_KEY_NODE + LOCATION_ENTRY_PAIR_BYTES, 1),

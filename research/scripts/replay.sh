@@ -56,7 +56,7 @@ E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
 E42|e42_transaction_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
-E43|e43_extension_point_budget||e43-ext-budget-2026-09-06.out|exact
+E43|e43_extension_point_budget||e43-ext-budget-2026-09-13.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
@@ -70,7 +70,7 @@ E114|e114-pack-ledger||e114-pack-ledger-2026-09-12.out|exact
 E117|e117-reserved-header||e117-reserved-header-2026-09-12.out|exact
 E118|e118-single-disk-recovery||e118-single-disk-recovery-2026-09-07.out|exact
 E122|e122-directory-locality||e122-dir-locality-2026-09-07.out|exact
-E116|e116-pack-settle||e116-pack-settle-2026-09-12.out|exact
+E116|e116-pack-settle||e116-pack-settle-2026-09-13.out|exact
 E119|e119-slot-tiers||e119-slot-tiers-2026-09-12.out|exact
 E120|e120-tier-ratio||e120-tier-ratio-2026-09-12.out|exact
 E121|e121-capacity-tiers||e121-cap-tiers-2026-09-12.out|exact
@@ -148,6 +148,11 @@ E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exa
 E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
+E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13.out|exact
+E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13.out|exact
+E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
+E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-13.out|exact
+E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
 TSV
@@ -210,6 +215,21 @@ check_claims() {
       printf '  ✓ %-5s %-46s 8K=%s > 4K=%s\n' E20 "8 KiB 的未解释拐点又复现一次" "$v8192" "$v4096"
     else
       printf '  ✗ %-5s %-46s 8K=%s ≤ 4K=%s ⇒ kb 记的「五轮稳定」不再成立\n' E20 "8 KiB 拐点这次没出现" "$v8192" "$v4096"; bad=1
+    fi ;;
+  E144)
+    # kb 记的是本机软件实现在 105 字节头上的纳秒数：crc32c 28、sha256 676（7 轮取最小）。留 ±30% 给机器状态波动，
+    # 超出就是该改 kb 那个区间了；比值那一行由这两个数夹住，不另钉。
+    v=$(grep 'name=cost arm=crc32c width=105 ' "$f" | sed -n 's/.*ns_per_op=\([0-9]*\).*/\1/p')
+    claim E144 "CRC32C 算一个 105 字节头（ns）" "$v" 19 37 || bad=1
+    w=$(grep 'name=cost arm=sha256 width=105 ' "$f" | sed -n 's/.*ns_per_op=\([0-9]*\).*/\1/p')
+    claim E144 "SHA-256 算一个 105 字节头（ns）" "$w" 473 879 || bad=1
+    # 判别力那一半是确定性的：阳性对照必须还漏得出双比特翻转，正式臂一个都不许漏。
+    x=$(grep 'name=verdict' "$f" | sed -n 's/.*control_has_teeth=\([a-z]*\).*/\1/p')
+    y=$(grep 'name=verdict' "$f" | sed -n 's/.*formal_double_bit_missed=\([0-9]*\).*/\1/p')
+    if [[ "$x" == true && "$y" == 0 ]]; then
+      printf '  ✓ %-5s %-46s 对照漏得出、正式臂零漏\n' E144 "判别力测试仍分得出差别"
+    else
+      printf '  ✗ %-5s %-46s control_has_teeth=%s formal_double_bit_missed=%s\n' E144 "判别力测试失去判别力" "$x" "$y"; bad=1
     fi ;;
   E128)
     # kb 的承重结论有两条，方向相反，所以两条都要钉——只钉一条会让「甲不慢」被读成
