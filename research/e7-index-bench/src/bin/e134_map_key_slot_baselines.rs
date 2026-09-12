@@ -24,7 +24,7 @@ const NODE_HEADER_BYTES: u64 = 64;
 const MAP_NODE_HEADER_BYTES: u64 = 76;
 /// 树表单元装条目的净字节，`22-单元原子性怎么合成.md` 的口径（C157 另记 16320，不采用）。
 const TREE_TABLE_PAYLOAD_BYTES: u64 = 16284;
-/// 指针头部：MAC 16 + nonce 12 + 算法类型 1 + extent 偏移 2（D21 正文，D19 未定项 7 那一格整句引）。
+/// 指针头部：MAC 16 + nonce 12 + 算法类型 1 + extent 偏移 2（D21 正文，D19 已定项 7 那一格整句引）。
 const POINTER_HEAD_BYTES_TODAY: u64 = 16 + 12 + 1 + 2;
 /// 位置条目：设备 4 + 16 KiB 槽号 6 + 密文校验和 4（D19 已定项 4）。
 const LOCATION_ENTRY_BYTES: u64 = 4 + 6 + 4;
@@ -87,7 +87,7 @@ struct Arm {
 const ARMS: [Arm; 14] = [
     // 今天：指针里没有出生身份；映射 key 按第一轮之前的预想取五元组 33。只当基准。
     Arm { name: "bing", data_pointer_extra_bytes: 0, node_pointer_extra_bytes: 0, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 33, code23_key_bytes: None, root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 0, slot_extra_over_five_tuple_bytes: 0 },
-    // 逻辑身份键按背景材料的字面：每条指针只加出生树 + 出生 txg（= D19 未定项 7 的甲）；槽缺诞生代号 8。
+    // 逻辑身份键按背景材料的字面：每条指针只加出生树 + 出生 txg（= D19 已定项 7 的甲）；槽缺诞生代号 8。
     Arm { name: "k1", data_pointer_extra_bytes: 16, node_pointer_extra_bytes: 16, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 41, code23_key_bytes: None, root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 8, slot_extra_over_five_tuple_bytes: 8 },
     // 逻辑身份键最强形态：指向码 1 的指针另带对象 ID 8 + 对象出生代 8 + 锚点偏移 8；指向码 2 / 3 的只带甲的 16（层级与 key 区间下界由查找路径给）。
     Arm { name: "k1_full", data_pointer_extra_bytes: 40, node_pointer_extra_bytes: 16, code1_header_extra_bytes: 0, code23_header_extra_bytes: 0, code1_key_bytes: 41, code23_key_bytes: None, root_record_extra_bytes: 0, slot_extra_over_e114_pack_bytes: 8, slot_extra_over_five_tuple_bytes: 8 },
@@ -316,14 +316,14 @@ mod tests {
         let bing = arm_named("bing");
         assert_eq!(data_child_pointer_bytes(&bing), 59, "子指针 59：D22 已定项 7");
         assert_eq!(node_child_pointer_bytes(&bing), 59, "子指针 59：D22 已定项 7");
-        assert_eq!(inode_internal_entry_bytes(&bing), 93, "inode 内部条目 93：D19 未定项 7");
-        assert_eq!(ledger_internal_entry_bytes(&bing), 81, "记账内部条目 81：D19 未定项 7");
-        assert_eq!(extent_leaf_entry_bytes(&bing), 83, "extent 叶记录 83：D19 未定项 7");
+        assert_eq!(inode_internal_entry_bytes(&bing), 93, "inode 内部条目 93：D19 已定项 7");
+        assert_eq!(ledger_internal_entry_bytes(&bing), 81, "记账内部条目 81：D19 已定项 7");
+        assert_eq!(extent_leaf_entry_bytes(&bing), 83, "extent 叶记录 83：D19 已定项 7");
         assert_eq!(tree_table_entry_bytes(&bing), 121, "树表条目 121：D8 已定项 8");
         assert_eq!(root_record_bytes(&bing), 194, "根记录 194：D22 已定项 7");
     }
 
-    /// 判据 2（跨装置闸）：两种指针都加 16 的两臂必须落到 E128 与 D19 未定项 7 甲那一格的同一组数。
+    /// 判据 2（跨装置闸）：两种指针都加 16 的两臂必须落到 E128 与 D19 已定项 7 甲那一格的同一组数。
     #[test]
     fn pointer_plus_sixteen_arms_match_e128_and_option_jia_segment_by_segment() {
         for name in ["k1", "k4"] {
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(map_leaf_fanout(41), 236);
     }
 
-    /// 判据 4：extent 叶扇出在 83 与 99 上复现 D19 未定项 7 那一格的 196 与 164。
+    /// 判据 4：extent 叶扇出在 83 与 99 上复现 D19 已定项 7 那一格的 196 与 164。
     #[test]
     fn extent_leaf_fanout_matches_the_block_pointer_open_item_seven_numbers() {
         assert_eq!(node_fanout(83), 196);
