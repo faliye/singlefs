@@ -15,9 +15,9 @@
 ## 硬约束
 
 - 改格式**必须同步更新** `.claude/kb/invariants.md` 和 checker。三者不同步的 commit 一律不收。
-- 决策变更**必须记进** `.claude/kb/decisions-history.md`，含推翻依据；正文改 `.claude/kb/decisions/` 下对应文件。
+- 决策变更**必须记进**决策变更史（当月的 `.claude/kb/<年-月>-decisions-history.md`，说明与月份表在 `.claude/kb/decisions-history.md`），含推翻依据；正文改 `.claude/kb/decisions/` 下对应文件。
 - 一旦有外部用户，本文作废，改为严格兼容——那时直接改本文，
-  并把推翻依据写进 `.claude/kb/decisions-history.md`。
+  并把推翻依据写进当月的决策变更史。
 
 ## 让格式永久化的那个动作，触发点必须与拦它的闸在同一条时间线上
 

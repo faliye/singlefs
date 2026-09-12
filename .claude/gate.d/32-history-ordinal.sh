@@ -15,7 +15,10 @@
 # ⚠️ 因此**存量撞号不判红，只如实报数**——把它读成「存量是干净的」是错的。
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
-HIST=(.claude/kb/decisions-history.md .claude/kb/experiments-history.md)
+# 决策变更史 2026-09-12 起按月拆档（<年-月>-decisions-history.md），几份都要查
+shopt -s nullglob
+HIST=(.claude/kb/*decisions-history.md .claude/kb/experiments-history.md)
+shopt -u nullglob
 bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
@@ -24,6 +27,11 @@ howto() { printf '     → %s\n' "$*"; }
 key_of() { grep -o '^### 20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]（其[^）]*）'; }
 
 hits=(); legacy=0; checked=0
+# HEAD 里各份变更史已有的条目标题（整行）。按月拆档时条目整份搬进 HEAD 里还没有的新文件，
+# 搬过去的不是新取的号——不排掉的话，存量撞号会在搬家那一次被当成新撞号判红。
+# ⚠️ 按整行比，不按「日期（其 N）」比：新写的一条若又取了已有的号，钥匙与 HEAD 里那条相同，
+# 按钥匙排会把它一起排掉，这一路就永远不红（2026-09-12 写这段时实测）。
+head_headings="$(for f in "${HIST[@]}"; do git show "HEAD:$f" 2>/dev/null; done | grep '^### 20' || true)"
 for f in "${HIST[@]}"; do
   [[ -f "$f" ]] || continue
   checked=$((checked + 1))
@@ -33,7 +41,12 @@ for f in "${HIST[@]}"; do
     legacy=$((legacy + n))
   fi
   # 本次新增的条目标题
-  mapfile -t added < <(git diff HEAD -- "$f" 2>/dev/null | sed -n 's/^+//p' | key_of)
+  if git cat-file -e "HEAD:$f" 2>/dev/null; then
+    mapfile -t added < <(git diff HEAD -- "$f" 2>/dev/null | sed -n 's/^+//p' | key_of)
+  else
+    # HEAD 里还没有的新文件（暂存了没暂存都算）：HEAD 里哪一份变更史都没有的标题，才是本次新写的条目
+    mapfile -t added < <(grep '^### 20' "$f" | grep -vxF -f <(printf '%s\n' "$head_headings") | key_of || true)
+  fi
   ((${#added[@]})) || continue
   # 撞号有两种：与文件里已有的条目撞，或本次新增的两条自己撞
   all="$(key_of < "$f")"

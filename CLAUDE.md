@@ -55,7 +55,7 @@
 |---|---|
 | `.claude/kb/decisions.md` | **决策索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/decisions/` | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
-| `.claude/kb/decisions-history.md` | 全部决策的变更史：每条写改前、改后、依据 |
+| `.claude/kb/decisions-history.md` | 决策变更史的说明与月份表；条目按月住在 `.claude/kb/<年-月>-decisions-history.md`，每条写改前、改后、依据 |
 | `.claude/kb/experiments.md` | **实验索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/experiments/` | 每个实验一个文件（`NN-简称.md`），正文与口径都在这里 |
 | `.claude/kb/experiments-history.md` | 全部实验的变更史 |
@@ -102,7 +102,7 @@ bash .claude/gate.d/26-number-name-sync.sh    # 编号简称在 doc-lint 够不�
 bash .claude/gate.d/27-format-constants.sh    # 格式常量在 kb 与实验源码之间同步
 bash .claude/gate.d/28-cross-decision-status.sh # 说某条决策未定，而它已经定了
 bash .claude/gate.d/29-settled-item-self-open.sh # 已定分项的正文里说自己还没定
-bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在 decisions-history.md 留条目
+bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在当月的变更史里留条目
 bash .claude/gate.d/31-blocking-verdict.sh # 每个未定项有没有判过改不改第一个事务的字节
 bash .claude/gate.d/32-history-ordinal.sh # 本次新增的历史条目有没有撞号（并发会话共写一个仓）
 bash .claude/gate.d/32-first-txn-fields.sh # 第一个事务的每个字段都指到一条真实存在的分项
@@ -121,6 +121,7 @@ bash .claude/gate.d/44-settled-ref-says-open.sh # 引用写着「已定项」，
 bash .claude/gate.d/45-script-modes.sh     # 脚本的执行位在暂存区里没丢（手工暂存写死 100644 的那一型）
 bash .claude/gate.d/46-write-hook.sh     # Write 覆盖未跟踪文件的 hook 注册着、而且会拒绝（几个会话共写一个仓）
 bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自证还会红（ask-local 判红分支、清单生成取法、机械整抄、小节清单）
+bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）

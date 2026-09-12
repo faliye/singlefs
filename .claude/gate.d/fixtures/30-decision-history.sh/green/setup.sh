@@ -20,4 +20,5 @@ git add -A && git commit -qm base
 # 改决策正文 —— 超过「小改动」的 4 行阈值
 sed -i 's/^第一行。/第一行（改过）。\n新增一行。\n再新增一行。/' .claude/kb/decisions/01-样本决策.md
 sed -i 's/^第三行。/第三行（也改过）。\n又一行。/' .claude/kb/decisions/01-样本决策.md
-printf '\n### 2026-08-29\n- 曾经 X / 现在 Y / 依据 Z\n' >> .claude/kb/decisions-history.md
+# 条目写进还没进 git 的月份文件：git diff HEAD 看不见它，本阶段要自己去数
+printf '# 决策变更史 · 2026-08\n\n## 历史版本\n\n### 2026-08-29\n- 曾经 X / 现在 Y / 依据 Z\n' > .claude/kb/2026-08-decisions-history.md
