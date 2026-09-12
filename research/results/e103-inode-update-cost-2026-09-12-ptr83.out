@@ -1,0 +1,131 @@
+E7RESULT name=config node_bytes=16384 unit_bytes=32768 packed_hdr=107 inode_rec=140 child_ptr=83 w=2 per_publish_const=9216 ident_value=27 cont_key=26 internal_entry=117 leaf_records=233 model=arithmetic file_ops=0
+E7RESULT name=geom header=58 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=58 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=58 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=58 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=58 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=58 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=58 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=58 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=58 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=58 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=58 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=58 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=58 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=58 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=58 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4817, 27, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=58 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=58 inodes=100000000 k=10 a_bytes=965946 b_bytes=1278262 b_over_a=1.323 a_per_update=96595 b_per_update=127826 c_bytes=1285789 c_over_a=1.331 const_per_publish=9216
+E7RESULT name=write header=58 inodes=100000000 k=100 a_bytes=7417157 b_bytes=10458225 b_over_a=1.410 a_per_update=74172 b_per_update=104582 c_bytes=10555257 c_over_a=1.423 const_per_publish=9216
+E7RESULT name=write header=58 inodes=100000000 k=1000 a_bytes=63259643 b_bytes=93837648 b_over_a=1.483 a_per_update=63260 b_per_update=93838 c_bytes=94241561 c_over_a=1.490 const_per_publish=9216
+E7RESULT name=write_clustered header=58 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=58 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=geom header=67 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=67 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=67 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=67 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=67 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=67 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=67 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=67 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=67 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=67 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=67 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=67 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=67 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=67 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=67 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4817, 27, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=67 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=67 inodes=100000000 k=10 a_bytes=965946 b_bytes=1278262 b_over_a=1.323 a_per_update=96595 b_per_update=127826 c_bytes=1285789 c_over_a=1.331 const_per_publish=9216
+E7RESULT name=write header=67 inodes=100000000 k=100 a_bytes=7417157 b_bytes=10458225 b_over_a=1.410 a_per_update=74172 b_per_update=104582 c_bytes=10555257 c_over_a=1.423 const_per_publish=9216
+E7RESULT name=write header=67 inodes=100000000 k=1000 a_bytes=63259643 b_bytes=93837648 b_over_a=1.483 a_per_update=63260 b_per_update=93838 c_bytes=94241561 c_over_a=1.490 const_per_publish=9216
+E7RESULT name=write_clustered header=67 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=67 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=geom header=76 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=76 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=76 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=76 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=76 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=76 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=76 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=76 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=76 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=76 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=76 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=76 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=76 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=76 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=76 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4817, 27, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=76 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=76 inodes=100000000 k=10 a_bytes=965946 b_bytes=1278262 b_over_a=1.323 a_per_update=96595 b_per_update=127826 c_bytes=1285789 c_over_a=1.331 const_per_publish=9216
+E7RESULT name=write header=76 inodes=100000000 k=100 a_bytes=7417157 b_bytes=10458225 b_over_a=1.410 a_per_update=74172 b_per_update=104582 c_bytes=10555257 c_over_a=1.423 const_per_publish=9216
+E7RESULT name=write header=76 inodes=100000000 k=1000 a_bytes=63259643 b_bytes=93837648 b_over_a=1.483 a_per_update=63260 b_per_update=93838 c_bytes=94241561 c_over_a=1.490 const_per_publish=9216
+E7RESULT name=write_clustered header=76 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=76 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=geom header=96 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=96 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=96 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=96 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=96 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=96 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=96 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=96 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=96 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=96 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=96 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=96 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=96 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=96 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=96 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4844, 28, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=96 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=96 inodes=100000000 k=10 a_bytes=967554 b_bytes=1278262 b_over_a=1.321 a_per_update=96755 b_per_update=127826 c_bytes=1285789 c_over_a=1.329 const_per_publish=9216
+E7RESULT name=write header=96 inodes=100000000 k=100 a_bytes=7446259 b_bytes=10458225 b_over_a=1.404 a_per_update=74463 b_per_update=104582 c_bytes=10555257 c_over_a=1.418 const_per_publish=9216
+E7RESULT name=write header=96 inodes=100000000 k=1000 a_bytes=63308934 b_bytes=93837648 b_over_a=1.482 a_per_update=63309 b_per_update=93838 c_bytes=94241561 c_over_a=1.489 const_per_publish=9216
+E7RESULT name=write_clustered header=96 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=96 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=geom header=105 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=105 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=105 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=105 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=105 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=105 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=105 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=105 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=105 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=105 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=105 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=105 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=105 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=105 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=105 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4844, 28, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=105 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=105 inodes=100000000 k=10 a_bytes=967554 b_bytes=1278262 b_over_a=1.321 a_per_update=96755 b_per_update=127826 c_bytes=1285789 c_over_a=1.329 const_per_publish=9216
+E7RESULT name=write header=105 inodes=100000000 k=100 a_bytes=7446259 b_bytes=10458225 b_over_a=1.404 a_per_update=74463 b_per_update=104582 c_bytes=10555257 c_over_a=1.418 const_per_publish=9216
+E7RESULT name=write header=105 inodes=100000000 k=1000 a_bytes=63308934 b_bytes=93837648 b_over_a=1.482 a_per_update=63309 b_per_update=93838 c_bytes=94241561 c_over_a=1.489 const_per_publish=9216
+E7RESULT name=write_clustered header=105 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=105 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=geom header=114 inodes=10000 a_leaf_fanout=116 a_height=2 a_levels=[87, 1] b_per_container=233 b_containers=43 b_index_height=1 b_index_levels=[1] b_inode_height=2
+E7RESULT name=write header=114 inodes=10000 k=1 a_bytes=65536 b_bytes=98304 b_over_a=1.500 a_per_update=65536 b_per_update=98304 c_bytes=98304 c_over_a=1.500 const_per_publish=9216
+E7RESULT name=write header=114 inodes=10000 k=10 a_bytes=344008 b_bytes=623629 b_over_a=1.813 a_per_update=34401 b_per_update=62363 c_bytes=623629 c_over_a=1.813 const_per_publish=9216
+E7RESULT name=write header=114 inodes=10000 k=100 a_bytes=1986384 b_bytes=2582880 b_over_a=1.300 a_per_update=19864 b_per_update=25829 c_bytes=2582880 c_over_a=1.300 const_per_publish=9216
+E7RESULT name=write header=114 inodes=10000 k=1000 a_bytes=2883557 b_bytes=2850816 b_over_a=0.989 a_per_update=2884 b_per_update=2851 c_bytes=2850816 c_over_a=0.989 const_per_publish=9216
+E7RESULT name=write_clustered header=114 inodes=10000 a_bytes=65536 b_bytes=98304 b_over_a=1.500
+E7RESULT name=stat header=114 inodes=10000 a_reads=2 a_bytes=32768 b_reads=4 b_bytes=81920 b_over_a=2.500 c_reads=2 c_bytes=49152 c_over_a=1.500 c_internal_height=1
+E7RESULT name=geom header=114 inodes=1000000 a_leaf_fanout=116 a_height=3 a_levels=[8621, 49, 1] b_per_container=233 b_containers=4292 b_index_height=2 b_index_levels=[29, 1] b_inode_height=3
+E7RESULT name=write header=114 inodes=1000000 k=1 a_bytes=98304 b_bytes=131072 b_over_a=1.333 a_per_update=98304 b_per_update=131072 c_bytes=131072 c_over_a=1.333 const_per_publish=9216
+E7RESULT name=write header=114 inodes=1000000 k=10 a_bytes=659445 b_bytes=968679 b_over_a=1.469 a_per_update=65944 b_per_update=96868 c_bytes=971424 c_over_a=1.473 const_per_publish=9216
+E7RESULT name=write header=114 inodes=1000000 k=100 a_bytes=4692207 b_bytes=7433194 b_over_a=1.584 a_per_update=46922 b_per_update=74332 c_bytes=7488903 c_over_a=1.596 const_per_publish=9216
+E7RESULT name=write header=114 inodes=1000000 k=1000 a_bytes=32579017 b_bytes=59450369 b_over_a=1.825 a_per_update=32579 b_per_update=59450 c_bytes=59515905 c_over_a=1.827 const_per_publish=9216
+E7RESULT name=write_clustered header=114 inodes=1000000 a_bytes=98304 b_bytes=131072 b_over_a=1.333
+E7RESULT name=stat header=114 inodes=1000000 a_reads=3 a_bytes=49152 b_reads=6 b_bytes=114688 b_over_a=2.333 c_reads=3 c_bytes=65536 c_over_a=1.333 c_internal_height=2
+E7RESULT name=geom header=114 inodes=100000000 a_leaf_fanout=116 a_height=4 a_levels=[862069, 4844, 28, 1] b_per_container=233 b_containers=429185 b_index_height=3 b_index_levels=[2881, 20, 1] b_inode_height=4
+E7RESULT name=write header=114 inodes=100000000 k=1 a_bytes=131072 b_bytes=163840 b_over_a=1.250 a_per_update=131072 b_per_update=163840 c_bytes=163840 c_over_a=1.250 const_per_publish=9216
+E7RESULT name=write header=114 inodes=100000000 k=10 a_bytes=967554 b_bytes=1278262 b_over_a=1.321 a_per_update=96755 b_per_update=127826 c_bytes=1285789 c_over_a=1.329 const_per_publish=9216
+E7RESULT name=write header=114 inodes=100000000 k=100 a_bytes=7446259 b_bytes=10458225 b_over_a=1.404 a_per_update=74463 b_per_update=104582 c_bytes=10555257 c_over_a=1.418 const_per_publish=9216
+E7RESULT name=write header=114 inodes=100000000 k=1000 a_bytes=63308934 b_bytes=93837648 b_over_a=1.482 a_per_update=63309 b_per_update=93838 c_bytes=94241561 c_over_a=1.489 const_per_publish=9216
+E7RESULT name=write_clustered header=114 inodes=100000000 a_bytes=131072 b_bytes=163840 b_over_a=1.250
+E7RESULT name=stat header=114 inodes=100000000 a_reads=4 a_bytes=65536 b_reads=8 b_bytes=147456 b_over_a=2.250 c_reads=4 c_bytes=81920 c_over_a=1.250 c_internal_height=3
+E7RESULT name=blast a_records_per_leaf=116 b_records_per_container=233 b_over_a=2.009
+E7RESULT name=prior_estimate claimed=3.0 measured_single_update_ratio_1e6=1.333 claim_holds=0
+E7RESULT name=controls positive_same_ruler=1 negative_k0_a=0 negative_k0_b=0 saturation_1e6_leaf_k_huge=8621.0 leaf_count=8621
+E7RESULT name=done emitted=131

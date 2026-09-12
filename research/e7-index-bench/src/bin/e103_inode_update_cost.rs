@@ -10,7 +10,7 @@
 //! - **D18 已定项 11**：打包记录单元头 107（2026-09-05 C113 定案加写序 10 之前是 93，2026-09-12 C288 ① 加出生序号 4 之前是 103，叶容量 233 都不变）；容器索引是物理指针唯一持有者，别的树按身份
 //!   （出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）引用容器；更新一个容器 = COW 它 + 改容器索引一条。
 //! - **D8 已定项 2**：节点 16384。**D4 已定项 7**：单元 32768。**D2 已定项 9**：第一版 2 盘恒 w = 2。
-//! - **D19 已定项 4**：子指针 59。**E98**：inode 记录 140、住索引叶时叶扇出 116（头 58）、内部扇出 243。
+//! - **D19 已定项 4 / 7 / 8**：子指针 83（头部 47 + 位置条目 14 × 2 + 实例代号 4 + 出生序号 4；2026-09-12 C288 ③ 之前是 59）。**E98**：inode 记录 140、住索引叶时叶扇出 116（头 58）；内部扇出按子指针 83 是 179（E98 那一版按 59 是 243）。
 //! - **D23 已定项 12**：journal 记录 4 KiB。**E79**：根槽 512（本机 `physical_block_size`）。
 //!
 //! ## 判据（跑前写死，跑完不许改）
@@ -22,9 +22,9 @@
 //! 3. **stat 的读代价**：住索引叶 = 树高次节点读；打包 = inode 树高 + 容器索引树高次节点读 + 1 次 32 KiB 单元读。
 //!    **第三臂「叶即容器」（2026-09-05 第一轮论证后加）**：inode 树的叶就是码 3 容器、内部节点就是容器索引
 //!    ⇒ 写 = 容器 + 内部层的节点；读 = 内部层次数 + 1 次 32 KiB 单元读。
-//!    内部节点条目 = 分隔 key 8 + 身份引用 26（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8，D18 已定项 11 给别的树引用容器的那 26 字节）+ 子指针 59 = 93
+//!    内部节点条目 = 分隔 key 8 + 身份引用 26（出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8，D18 已定项 11 给别的树引用容器的那 26 字节）+ 子指针 83 = 117
 //!    （第四版：类型段 0 表示子节点是码 2 索引节点、2 表示码 3 容器，读者由此知道读几个槽、AAD 期望值全部来自条目；出生树逐条目携带是因为克隆头共享 origin 的叶）。
-//!    基础节点头三档 58 / 67 / 76 是 E73 的**不带 key 区间**下界；inode 树内部节点带 16 字节区间后是 74 / 83 / 92，扇出仍 175（单测钉住 92，以及 109 / 110 那道边）。
+//!    基础节点头三档 58 / 67 / 76 是 E73 的**不带 key 区间**下界；inode 树内部节点带 16 字节区间后是 74 / 83 / 92，扇出 139；码 2 头按 D18 已定项 14 含预留位 100 / 109 / 118、再加区间是 116 / 125 / 134，扇出 139 / 138 / 138（单测钉住 116，以及 121 / 122 那道边）。
 //! 4. **爆炸半径**：丢一个容器丢多少条，两条形态各一个数（沿用 E98 的口径）。
 //! 5. **判先前估算**：第二轮正推腿写的「≈ 3 倍」按判据 1 的单次更新比核——实测 ≥ 3 则估算成立，< 3 则估算作废并如实写。
 //!
@@ -62,8 +62,8 @@ const NODE_HEADERS_TODAY: [u64; 3] = [
     NODE_HEADERS[1] + WRITE_ORDER + RESERVED_HEADER_BYTES,
     NODE_HEADERS[2] + WRITE_ORDER + RESERVED_HEADER_BYTES,
 ];
-/// D19 已定项 4 之后：31 + 14 × 2。
-const CHILD_POINTER_BYTES: u64 = 59;
+/// D19 已定项 7 / 8 之后指向码 2 / 码 3 的节点指针：头部 47 + 位置条目 14 × 2 + 实例代号 4 + 出生序号 4。
+const CHILD_POINTER_BYTES: u64 = 83;
 /// E98 的 inode 记录宽。
 const INODE_RECORD_BYTES: u64 = 140;
 /// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`）。
@@ -78,9 +78,9 @@ const IDENTITY_VALUE_BYTES: u64 = 27;
 const INODE_KEY: u64 = 8;
 /// 容器索引的 key：出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8。
 const CONTAINER_KEY_BYTES: u64 = 26;
-/// 第三臂：inode 树内部节点的条目 = 分隔 key 8 + 身份引用 26（与 CONTAINER_KEY_BYTES 同一段）+ 子指针 59 = 93。
+/// 第三臂：inode 树内部节点的条目 = 分隔 key 8 + 身份引用 26（与 CONTAINER_KEY_BYTES 同一段）+ 子指针 83 = 117。
 /// 写成字面量是给 27 号门禁（format-const）钉的；与推导式的相等由单测守。
-const INODE_INTERNAL_ENTRY: u64 = 93;
+const INODE_INTERNAL_ENTRY: u64 = 117;
 /// 一个类型 2 容器装几条记录 = ⌊(32768 − 107) / 140⌋ = 233（93、103 时也是 233）；字面量同样为 27 号门禁，与 fanout() 的相等由单测守。
 const INODE_LEAF_RECORDS: u64 = 233;
 
@@ -308,7 +308,8 @@ mod tests {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
         assert_eq!(UNIT_BYTES, 32768, "D4 已定项 7");
         assert_eq!(PACKED_UNIT_HEADER_BYTES, 107, "D18 已定项 11（C113 定案 2026-09-05 加写序 10；C288 ① 2026-09-12 加出生序号 4）");
-        assert_eq!(CHILD_POINTER_BYTES, 59, "D19 已定项 4");
+        assert_eq!(CHILD_POINTER_BYTES, 47 + 14 * 2 + 4 + 4, "D19 已定项 7 / 8：节点指针 83");
+        assert_eq!(CHILD_POINTER_BYTES, 83);
         assert_eq!(COLUMNS_PER_WRITE, 2, "D2 已定项 9");
         assert_eq!(JOURNAL_RECORD_BYTES, 4096, "D23 已定项 12");
         assert_eq!(IDENTITY_VALUE_BYTES, 8 + 2 + 8 + 8 + 1);
@@ -326,37 +327,37 @@ mod tests {
     }
 
     /// 补账之后那一档（头 114）的绝对值：内部扇出确实掉一格，而结论一格不动。
-    /// ⚠️ **这不是「头宽不影响结论」**：内部扇出 243 → 242 是变了的，
-    /// 只是被树高的向上取整吸收掉（⌈8621 / 243⌉ = ⌈8621 / 242⌉ = 36）。
+    /// ⚠️ **这不是「头宽不影响结论」**：内部扇出 179 → 178 是变了的，
+    /// 只是被树高的向上取整吸收掉（⌈8621 / 179⌉ = ⌈8621 / 178⌉ = 49）。
     /// 按 `.claude/rules/mutation-sampling.md`，把它记成「不敏感」要有这条把中间量钉住的断言，
     /// 否则下次有人改了扇出公式也不会有任何东西报警。
     #[test]
     fn geometry_at_today_header_is_absolute() {
         let geometry_header_58 = geometry(1_000_000, NODE_HEADERS[0]);
         let geometry_header_114 = geometry(1_000_000, NODE_HEADERS_TODAY[2]);
-        assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + CHILD_POINTER_BYTES), 243);
-        assert_eq!(fanout(NODE_BYTES, 114, INODE_KEY + CHILD_POINTER_BYTES), 242, "中间量掉一格");
-        assert_eq!(fanout(NODE_BYTES, 114, CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES), 191, "(16384 − 114) / 85");
+        assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + CHILD_POINTER_BYTES), 179);
+        assert_eq!(fanout(NODE_BYTES, 114, INODE_KEY + CHILD_POINTER_BYTES), 178, "中间量掉一格");
+        assert_eq!(fanout(NODE_BYTES, 114, CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES), 149, "(16384 − 114) / 109");
         assert_eq!(geometry_header_58.in_leaf_tree_levels, geometry_header_114.in_leaf_tree_levels, "树高被向上取整吸收");
-        assert_eq!(geometry_header_114.in_leaf_tree_levels, vec![8621, 36, 1]);
+        assert_eq!(geometry_header_114.in_leaf_tree_levels, vec![8621, 49, 1]);
         assert_eq!(geometry_header_114.packed_container_count, 4292);
         assert_eq!(geometry_header_114.packed_records_per_container, 233);
     }
 
-    /// 几何的绝对值（头 58）：与 E98 的 116 / 243 / 233 对得上，容器索引扇出 192。
+    /// 几何的绝对值（头 58）：叶扇出 116 与容量 233 与 E98 对得上；子指针 83 时内部扇出 179（E98 按 59 是 243），容器索引扇出 149。
     #[test]
     fn geometry_is_absolute() {
         let tree_geometry = geometry(1_000_000, 58);
         assert_eq!(tree_geometry.in_leaf_records_per_leaf, 116, "E98");
         assert_eq!(tree_geometry.packed_records_per_container, 233, "E98 / E102");
-        assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + CHILD_POINTER_BYTES), 243, "E98 内部扇出");
-        assert_eq!(fanout(NODE_BYTES, 58, CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES), 192, "(16384 − 58) / 85");
+        assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + CHILD_POINTER_BYTES), 179, "(16384 − 58) / 91，E98 那一版按子指针 59 是 243");
+        assert_eq!(fanout(NODE_BYTES, 58, CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES), 149, "(16384 − 58) / 109");
         assert_eq!(fanout(NODE_BYTES, 58, INODE_KEY + IDENTITY_VALUE_BYTES), 466, "(16384 − 58) / 35");
         // 1e6：住索引叶 8621 叶 → 36 → 1（高 3）；打包 4292 容器，索引 23 叶 → 1（高 2）
-        assert_eq!(tree_geometry.in_leaf_tree_levels, vec![8621, 36, 1]);
+        assert_eq!(tree_geometry.in_leaf_tree_levels, vec![8621, 49, 1]);
         assert_eq!(tree_geometry.packed_container_count, 4292);
-        assert_eq!(tree_geometry.packed_container_index_levels, vec![23, 1]);
-        assert_eq!(tree_geometry.packed_inode_tree_levels, vec![2146, 9, 1]);
+        assert_eq!(tree_geometry.packed_container_index_levels, vec![29, 1]);
+        assert_eq!(tree_geometry.packed_inode_tree_levels, vec![2146, 12, 1]);
     }
 
     /// **判据 1 的绝对值**：单次更新，三个 N 逐格钉死（头 58），比值 1.5 / 1.333 / 1.25。
@@ -448,19 +449,20 @@ mod tests {
     /// 读少了 inode 树那一趟：1e6 是 2 次内部 + 1 次单元 = 65536 字节（1.333 倍），1e8 是 81920（1.25 倍）。
     #[test]
     fn third_arm_leaf_as_container_is_pinned() {
-        assert_eq!(INODE_INTERNAL_ENTRY, 93);
-        assert_eq!(INODE_INTERNAL_ENTRY, INODE_KEY + CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES, "93 = 8 + 26 + 59");
+        assert_eq!(INODE_INTERNAL_ENTRY, 117);
+        assert_eq!(INODE_INTERNAL_ENTRY, INODE_KEY + CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES, "117 = 8 + 26 + 83");
         assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), "233 = ⌊(32768 − 107) / 140⌋");
-        assert_eq!(fanout(NODE_BYTES, 58, INODE_INTERNAL_ENTRY), 175, "(16384 − 58) / 93");
-        assert_eq!(fanout(NODE_BYTES, 76, INODE_INTERNAL_ENTRY), 175, "基础头三档（E73 的不带区间下界）里最大的 76");
-        assert_eq!(fanout(NODE_BYTES, 92, INODE_INTERNAL_ENTRY), 175, "基础头 76 加 16 字节 key 区间 = 92，扇出仍不掉格");
-        assert_eq!(fanout(NODE_BYTES, 109, INODE_INTERNAL_ENTRY), 175, "头到 109 仍是 175");
-        assert_eq!(fanout(NODE_BYTES, 110, INODE_INTERNAL_ENTRY), 174, "头 110 才掉一格");
+        assert_eq!(fanout(NODE_BYTES, 58, INODE_INTERNAL_ENTRY), 139, "(16384 − 58) / 117");
+        assert_eq!(fanout(NODE_BYTES, 76, INODE_INTERNAL_ENTRY), 139, "基础头三档（E73 的不带区间下界）里最大的 76");
+        assert_eq!(fanout(NODE_BYTES, 92, INODE_INTERNAL_ENTRY), 139, "基础头 76 加 16 字节 key 区间 = 92，扇出仍不掉格");
+        assert_eq!(fanout(NODE_BYTES, 116, INODE_INTERNAL_ENTRY), 139, "码 2 头 100（D18 已定项 14，含预留位）加 key 区间 16 = 116，仍是 139");
+        assert_eq!(fanout(NODE_BYTES, 121, INODE_INTERNAL_ENTRY), 139, "头到 121 仍是 139");
+        assert_eq!(fanout(NODE_BYTES, 122, INODE_INTERNAL_ENTRY), 138, "头 122 才掉一格：码 2 另两档 109 / 118 加 key 区间是 125 / 134，扇出 138");
         let geometry_million_inodes = geometry(1_000_000, 58);
-        assert_eq!(geometry_million_inodes.leaf_as_container_internal_levels, vec![25, 1]);
+        assert_eq!(geometry_million_inodes.leaf_as_container_internal_levels, vec![31, 1]);
         assert_eq!(write_leaf_as_container_bytes(&geometry_million_inodes, 1), 131072.0);
         assert_eq!(file_status_reads_leaf_as_container(&geometry_million_inodes), (3, 65536));
-        // k ≥ 10 时第三臂比路 ① 贵的正好是内部层多出来的节点：[25, 1] 对容器索引的 [23, 1]，多 2 个节点 × 16384 × 2
+        // k ≥ 10 时第三臂比路 ① 贵的正好是内部层多出来的节点：[31, 1] 对容器索引的 [29, 1]，多 2 个节点 × 16384 × 2
         let extra_bytes_of_leaf_as_container = write_leaf_as_container_bytes(&geometry_million_inodes, 1000) - write_packed_bytes(&geometry_million_inodes, 1000, UNIT_BYTES, true);
         assert!((extra_bytes_of_leaf_as_container - 65536.0).abs() < 1.0, "第三臂多出的字节应恰为 2 个节点，实得 {extra_bytes_of_leaf_as_container}");
         let geometry_ten_thousand_inodes = geometry(10_000, 58);
@@ -468,7 +470,7 @@ mod tests {
         assert_eq!(write_leaf_as_container_bytes(&geometry_ten_thousand_inodes, 1), 98304.0);
         assert_eq!(file_status_reads_leaf_as_container(&geometry_ten_thousand_inodes), (2, 49152));
         let geometry_hundred_million_inodes = geometry(100_000_000, 58);
-        assert_eq!(geometry_hundred_million_inodes.leaf_as_container_internal_levels, vec![2453, 15, 1]);
+        assert_eq!(geometry_hundred_million_inodes.leaf_as_container_internal_levels, vec![3088, 23, 1]);
         assert_eq!(write_leaf_as_container_bytes(&geometry_hundred_million_inodes, 1), 163840.0);
         assert_eq!(file_status_reads_leaf_as_container(&geometry_hundred_million_inodes), (4, 81920));
         // 与路 ① 的写逐格相同，读少一趟

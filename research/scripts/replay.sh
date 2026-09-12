@@ -101,7 +101,7 @@ E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-12.out|exact
-E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-12.out|exact
+E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-12-ptr83.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-12.out|exact
 E106|e106-stripe-member-table||e106-stripe-member-table-2026-09-12.out|exact
