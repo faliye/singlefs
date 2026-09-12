@@ -106,6 +106,7 @@ LWN、XFS 文档与论文摘要。**未在本工程验证，也未 clone/编译/
 
 28 棵树里 **10 棵是 write-buffered**：`lru`、`need_discard`、`backpointers`、
 `deleted_inodes`、`accounting`、`stripe_backpointers`、四棵 `reconcile_*`。
+⚠️ 28 / 10 是 Principles of Operation Rev 1.39.2 文档里的数；2026-08-29 现查 linux-6.17 源码 `BCH_BTREE_IDS()` 是 21 棵、5 棵走 write buffer，以 D8（核心索引结构） 正文为准。
 
 **write buffer 的代价（原文明写）**：更新是**无序且最终一致**的——
 btree 在下次 flush 前看不到待处理更新；flush 按 key 位置排序，**丢弃时间序**；

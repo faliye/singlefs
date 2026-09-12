@@ -1,0 +1,16 @@
+M1_per_disk_activation_always_true	Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit | Arm::TightenedRoots | Arm::TightenedStates | Arm::TightenedRootsAtMount => {\n                    self.floor_written_on_every_surviving_disk(pending.value)\n                }	Arm::FloorPerDisk | Arm::FloorPerDiskTxgUpperLimit | Arm::TightenedRoots | Arm::TightenedStates | Arm::TightenedRootsAtMount => true,
+M2_retained_three	const MINIMUM_RETAINED_ROOTS: usize = 4;	const MINIMUM_RETAINED_ROOTS: usize = 3;
+M3_residue_formula_short	METADATA_BLOCKS_PER_PUBLICATION + (self.publication_bound(ring_depth) - 2) * formula_cost	METADATA_BLOCKS_PER_PUBLICATION + (self.publication_bound(ring_depth) - 3) * formula_cost
+M4_ring_push_one_short	Arm::RingPersisted => self.ring_depth - 1,	Arm::RingPersisted => self.ring_depth - 2,
+M5_df_ignores_residue	.saturating_sub(self.reserve_blocks + self.push_residue_blocks + self.lag_blocks())	.saturating_sub(self.reserve_blocks + self.lag_blocks())
+M6_recovery_settled_takes_max_disk	.min().unwrap_or(0).min(candidacy)	.max().unwrap_or(0).min(candidacy)
+M7_raise_before_cap_reaches_target	if self.floor_carried < target && self.floor_upper_limit() >= target {	if self.floor_carried < target && self.floor_upper_limit() + 1 >= target {
+M8_candidacy_ignores_lost_disk_roots_floor	self.visible_roots().iter().map(|root| root.floor).max().unwrap_or(0)	self.valid_roots().iter().map(|root| root.floor).min().unwrap_or(0)
+M9_commit_skipped_in_pressure	if !self.commit_open_window(open_txg) {	if false && !self.commit_open_window(open_txg) {
+M10_no_live_metadata_credit	if self.arm.is_tightened() { self.pool.metadata.len() as u64 } else { 0 }	if self.arm.is_tightened() { 0 } else { 0 }
+M11_lag_counts_empty_publication_frees	BlockState::Freed { freed_at, .. } => *freed_at > bound && !self.empty_txgs.contains(freed_at),	BlockState::Freed { freed_at, .. } => *freed_at > bound,
+M12_admission_not_charged	if self.arm.is_tightened() { plain.min(self.df_arm()) } else { plain }	if self.arm.is_tightened() { plain } else { plain }
+M13_states_cap_counts_all_roots	self.fourth_newest_nonempty_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())	self.fourth_newest_valid_txg().min(self.newest_valid_txg_on_every_surviving_disk())
+M14_skip_then_raise_fails_region_two_instead	if Simulation::region_of_txg(simulation.next_txg) == 1 {	if Simulation::region_of_txg(simulation.next_txg) == 2 {
+M15_no_margin_per_failure	const PUBLICATIONS_PER_TOLERATED_FAILURE: u64 = 2;	const PUBLICATIONS_PER_TOLERATED_FAILURE: u64 = 0;
+M16_lag_counts_empty_publication_frees	BlockState::Freed { freed_at, .. } => *freed_at > bound && !self.empty_txgs.contains(freed_at),	BlockState::Freed { freed_at, .. } => *freed_at > bound,

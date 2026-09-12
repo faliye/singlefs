@@ -1,0 +1,11 @@
+M1_补齐臂少一字节	const PADDED_PAYLOAD_BYTES: usize = 28672;	const PADDED_PAYLOAD_BYTES: usize = 28671;
+M2_含预留位头写错	const HEADER_WITH_RESERVE_BYTES: usize = 133;	const HEADER_WITH_RESERVE_BYTES: usize = 132;
+M3_闭式漏减gcd	(PAGE_BYTES - page_gcd(payload)) as f64 / payload as f64	PAGE_BYTES as f64 / payload as f64
+M4_gcd恒为1	PAGE_BYTES.min(1usize << payload.trailing_zeros().min(12))	1usize
+M5_页到单元按单元大小除	(file_offset / payload as u64, (file_offset % payload as u64) as usize)	(file_offset / UNIT_BYTES as u64, (file_offset % UNIT_BYTES as u64) as usize)
+M6_设备字节比取反	UNIT_BYTES as f64 / payload as f64	payload as f64 / UNIT_BYTES as f64
+M7_期望单元数做减法	1.0 + straddle_fraction(payload)	1.0 - straddle_fraction(payload)
+M8_跨单元判据松一格	locate_page(page_index, payload).1 + PAGE_BYTES > payload	locate_page(page_index, payload).1 + PAGE_BYTES >= payload
+M9_交叉点分母漏一项	Some(sequential_gap / (random_gap + sequential_gap))	Some(sequential_gap / random_gap)
+M10_单元大小改成64K	const UNIT_BYTES: usize = 32768;	const UNIT_BYTES: usize = 65536;
+M11_一GiB单元数向下取整	(user_bytes + payload as u64 - 1) / payload as u64	user_bytes / payload as u64

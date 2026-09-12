@@ -356,3 +356,7 @@ path = "src/bin/e126_superblock_slot_width.rs"
 [[bin]]
 name = "e128-pointer-birth-cost"
 path = "src/bin/e128_pointer_birth_cost.rs"
+
+[[bin]]
+name = "e140-header-alignment"
+path = "src/bin/e140_header_alignment.rs"

@@ -1,0 +1,764 @@
+**出处 `.claude/kb/decisions/16-发布语义.md:77-103`（整段抄，未转述）**
+
+```markdown
+### D16（发布语义）连带定死的两条新规则（2026-08-26，来自生命周期条件的推导）
+
+**新规则 1：快照发布点必须与 checkpoint 边界对齐，且位置钉死在「本 checkpoint 全部数据变更之后」。**
+快照不许出现在 checkpoint 中间。
+理由是机制性的：`birth` 的分辨率只到 checkpoint，**块无法表达「我生在本 checkpoint 里
+快照点之前还是之后」**。不钉死它，D5（快照 / 空间记账机制） 那张边界表里 `birth == S.txg` 与 `death == S.txg`
+两行会同时失去确定答案——而它们一个是**数据丢失**、一个是**空间泄漏**。
+（同一 checkpoint 内建两个快照是允许的：它们捕获同一状态、其间 deadlist 为空；
+但 checker 里的「上一个快照」要用 `(txg, 快照 id)` 打破并列。）
+
+**新规则 2：checkpoint C 中产生的一切释放，在 C 被发布之前不得进入可分配集合。**
+两个理由，第二个是 D16（发布语义）独有且更严的：
+
+1. 回滚：崩溃后可能回到 C−1 的根，而生于 C 之前、死于 C 的块在那时仍然活着。
+2. **D16（发布语义）把 D8（核心索引结构） 的中间态语义改写成「根 + journal 任意前缀，replay 后合法」。**
+   若一个块在 journal 位置 p 被释放、位置 q > p 被重新分配并写入新内容，
+   那么重放到 `p < r < q` 的前缀会得到一棵指向该地址的树，
+   **而盘上的字节已经是 q 的内容了**（物理写不受 journal 位置约束）。
+   **这不是理论风险，是必然的错。**
+
+ZFS 有同型机制且更保守：`include/sys/txg.h` 的
+`#define TXG_DEFER_SIZE 2 /* Number of txgs worth of frees we defer adding to in-core spacemaps */`。
+⚠️ **那个 2 为什么是 2，没查到一手解释**；本工程的 defer 窗口要按 D16（发布语义）的重放语义自己推，**不许照抄**。
+
+⚠️ 新规则 2 的 defer 窗口容量与 ENOSPC 直接相关（D3（空间分配）：**释放空间这个操作本身不许申请空间**），
+而 D16（发布语义）使「建了又删」在同一窗口内闭合的概率大幅上升，**defer 窗口因此落在热路径上**。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:178-216`（整段抄，未转述）**
+
+```markdown
+### 已定项 6（2026-09-02，用户定案，先过对抗测试）：发布计数器
+
+**每次发布把 checkpoint_txg 加一——fsync 触发的发布也是发布，没有「小发布不记号」的例外；
+根槽的轮转键（D22（单元原子性怎么合成）已定项 2 的「区域 = txg mod R」里那个 txg）、
+记账的代（D5（快照 / 空间记账机制）已定项 2）、恢复重放的水位（D23（journal 的角色与格式）已定项 14）
+都是这同一个计数。不另设「发布代号」字段——它与 checkpoint_txg 是同一个东西。**
+
+此前四处各自成立、从没被写成一条（fsync = 提前发布 / 区域 = txg mod R / 一个 txg 一个号 /
+记账代 = checkpoint 号），哪个实现读岔一处就会撞根槽或读错账——欠账原记
+[checks-owed.md](../checks-owed.md) C85（发布计数器的四个等号没写死）。
+
+**对抗测试（2026-09-02 三方论证，用户要求先攻再定）**：口径是**两条云端腿方向一致 + 本地腿回溯作废**，主 agent 自核后采纳。原始输出 `research/prompts/c85-publication-counter-forward-sonnet-output.md`、`research/prompts/c85-publication-counter-reverse-opus-output.md`、`research/results/c85-publication-counter-local.out`。
+⚠️ **本地腿那一份 2026-09-06 被收窄后的字词损坏检查判红**（`proposed proposed`，实词自复读那一类，口径见 [tooling.md](../tooling.md)）⇒ 按 `.claude/rules/three-way-inference.md`「闸判红之后那一轮作废」，这一轮实际上跑在两条腿上。**C85（发布计数器的四个等号没写死） 这条定案不因此推翻**（两条云端腿各自的判定性产出仍在，逐腿产出那张表一行未动），但**不许再拿它当「三方一致」引用**：
+
+| 腿 | 判定性产出 |
+|---|---|
+| 正推（云端 Sonnet） | D22（单元原子性怎么合成）已定项 2 与 I-7.3（环健康性）**本就预设逐发布的轮转键**；D16（发布语义）新规则 1（快照钉在本 checkpoint 全部变更之后）在「fsync 造出窗口内中间持久点」之后**只有逐发布计数能自动满足** |
+| 反推（云端 Opus，攻击腿） | 自己最强的「记账每窗 13925× 税」攻击自我坍缩（环本来就逐发布轮转 ⇒ K 代 = K 次发布，两种读法下保留的 key 数相同）；给出三条骑手条款（并入「四条骑手条款」那一段）与一个**新的可达破绽**（根环缺时间线判别，落 C88（根环的时间线判别未实现）） |
+| 本地（找反例） | 证实「不逐发布计数 ⇒ 同窗两次发布撞同一根槽、I-7.3（环健康性）破」可达。⚠️ 它对提案的反例（说 D23（journal 的角色与格式）已定项 9 要求同窗记录共享 txg 是规范）**不采纳**——那句是描述 jsn 为何存在的陈述句，本定案下「一次发布的多条记录共享 txg」仍字面成立 |
+
+**主 agent 自核（不采信转述）**：E50（根环槽数的上下界）源码逐字「一圈时长（秒）= 槽总数 ÷ fsync 率。
+每次 fsync 发一次根」；E48（根环几何的可行点）的轮转键就叫 txg 且逐次发布递增
+⇒ **已入库的根环算术——E48（根环几何的可行点）、E50（根环槽数的上下界）、E53（丢一整块盘之后根环还挂不挂得上）——只在本等式下为真**；不钉等式，那批实测追溯性作废。
+
+**四条骑手条款（与定案同日采纳，不是可选项）**：
+
+1. **根记录必须带 32 位实例代号**（与 D23（journal 的角色与格式）已定项 9 的 journal 实例代号
+   是同一个计数），择新在 checkpoint_txg 平局时按实例代号高者赢。
+   机制（反推腿发现，主 agent 核实）：E53（丢一整块盘之后根环还挂不挂得上）的丢盘回退 + 盘失而复得
+   会造出两条同 txg 的自证合法根——journal 靠实例代号分辨时间线，根环此前什么都没有。
+   字段落点在 D22（单元原子性怎么合成）已定项 7，checker 欠账在 C88（根环的时间线判别未实现）。
+2. **记账 key 的「代」段宽度 ≥ 48 位**：按 E44（序号位宽的本机实测与代价）的 2785 发布/秒，
+   32 位 17.8 天回绕。E71（记账 key 的条目数与宽度）的宽度算术自陈是假设，要按此重算。
+3. **E70（checkpoint 两个阈值的可行域）的 T_time 下界推导（197 ms）只适用于非 fsync 触发的发布**——
+   那步推导以「一窗多次操作共享一次发布」为前提，fsync 密集负载下窗口由 fsync 自身触发。
+   引用 D16（发布语义）已定项 5 的下界时连这句一起引；上界 5 s（用户定的丢失窗口）不受影响。
+4. **记账条目的跨发布合并不再可行**（代进了 key，「后者胜」并不掉不同代的两条）
+   ⇒ E54（记账的「代」要保留几代）的每代「统计量数 × 2」次写就是实付值，不是上界。代价，照实记。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:217-233`（整段抄，未转述）**
+
+```markdown
+### 已定项 7（2026-09-02，用户定案）：发布的持久顺序
+
+**一次发布的持久顺序恒为：COW 单元/节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）；
+fsync 等根槽持久之后才返回。恢复重放在施加任何记录之前，必须逐项验证点名单元的校验和。**
+
+**依据（E77（发布的持久顺序），崩溃子集穷举）**：数据完整性的必要屏障恰一道（根槽之前）——
+不上它 1024 个崩溃状态里 504 个违例；**第二道（记录先于根槽）买的是记录流完整性**
+（不上它有 7 类「根在案而记录缺席」的状态，记录核对器与反向链的输入有洞）——
+用户定案「需要」，两道都上。**重放施加前验证点名单元是承重步骤**：拿掉它 b_rs 臂 63 处静默嫁接。
+
+⚠️ **屏障口径**：两道 FLUSH + 根槽 FUA = 每次发布三个序点，比 D25（目标负载优先级）
+推导的两个多一个——那是第二道屏障的价钱，知情接受。C26（屏障数从没量过）的真机实测仍欠。
+⚠️ **「redo 为空」的射程**（D16（发布语义）连带 3 那句）：只对「根已持久」的发布成立；
+E42（一事务几条记录）实测 1601 个前缀里 1400 个被前缀切开（87.4%），**被切开的比例与边界字段在不在无关**——变的是这 1400 个非法还是合法（无边界字段臂 1400 非法，有边界字段臂 0） ⇒ **恢复期重放非空是常态，不是边角**。
+⚠️ 崩溃点重放 harness 的两条自证用例照 E77（发布的持久顺序）造：摘掉根槽前的屏障必须红，
+关掉重放验证必须红。落点 [checks-owed.md](../checks-owed.md) C76（发布时序没有权威落点）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:285-404`（整段抄，未转述）**
+
+```markdown
+### 未定项
+
+1. **defer 窗口取多大。** 判据要从 D16（发布语义）的 journal 前缀重放语义推，不能照抄别家的常数。 改第一个事务的字节：是（2026-09-11 改判，依据：若取动态回退下界，根记录要加 8 字节的 F（242 → 250），第一个事务写出的根记录就变了；2026-09-01 那条依据「窗口是运行时时序参数」只对整环与收窄两条臂成立）。 **状态：未定。**
+   ⚠️ **占位值 8 秒（2026-08-31 用户）。仍记未定**：用户同时指明**这一项是算出来的，不是取舍**，
+   而那个推导一次都没做。⇒ 8 秒是让第一版实现能跑起来的占位数，**不许当依据引用**。
+   ⚠️ **它与分项 5 的 `T_time` 不恒等——单位就不同**（2026-09-11 三方论证，两条云端腿一致）：defer 窗口保护的是「环里的根还能不能用」，
+   E92（最坏块重用延迟需求） 普查的九个消费者里六个按代数计价、墙钟那一个是遍历跳、没有一个按秒计 ⇒ 单位是**发布**（D16（发布语义）已定项 6 那个计数）。
+   按墙钟取 5 秒或 8 秒，在「每 5 秒发布一次」那一档只罩住 1 代，罩不住恢复择根要的 2 代与两盘掉盘择根要的 3 代
+   （C222（I-7.4 的下限 2 与第一版两盘几何要的 3 打架））⇒ 占位的 8 秒只能读成「第一版先有个数」，不许读成秒。
+   ⚠️ 2026-08-29 那批定案**不动本项**：D8（核心索引结构） 已定项 1 定的是记账条目的**形态**（幂等完整值），
+   本项问的是**释放延迟多久**——两者量纲不同，幂等与否不改变窗口该取多大。
+
+   **2026-09-11 三方论证（用户要求定下来）走到哪一步**（材料 `research/prompts/_d16-items134-background.md`；
+   正推 `research/prompts/d16-items134-sonnet-output.md`、反推 `research/prompts/d16-items134-opus-output.md`、
+   本地两次抽样 `research/prompts/d16-items134-local-output-s1.md` / `-s2.md`，s2 带一个截断词，只当线索）：
+
+   | 臂 | 形态 | 判决 |
+   |---|---|---|
+   | 甲 | 窗口 = 已持久的整个根环：可再分配 ⟺ 已释放 ∧ 释放代 ≤ 环里已持久的最旧根的 checkpoint_txg | 算得出，不动用户定案，C215（回退深度的承诺与 K 的下限不能同时成立） 与 C222（I-7.4 的下限 2 与第一版两盘几何要的 3 打架） 一起收掉；失败条款按字面被触发两处——回退后第一次发布（各臂都有，病根在 D23（journal 的角色与格式） 已定项 14，落 C281（回退后第一次发布会复用被抛弃时间线还引用的块））、按算术取最旧根（收严成按已持久的盘上内容取，落 C282（环里最旧根没有定义））；而且拿掉了盘快满时的运行时阀 |
+   | 乙 | K 是运行时策略，下限 max(2, 掉盘择根回退 + 1)，回退深度收窄到 ≤ K | 留着阀，但要改用户定案 D23（journal 的角色与格式） 已定项 14 |
+   | 丙 | 墙钟（5 秒 / 8 秒） | 出局，单位错 |
+   | 丁 | 窗口 = 1 次发布 | 出局，罩不住恢复择根要的 2 代 |
+
+   **用户的三次追问改变了这一项的形状**：
+   ① 「这不就是 btrfs 那个毛病」——按今天的条款是：准入不够时没有一条让它先推发布、把窗口里的释放放回来再报 ENOSPC
+   （落 C283（准入失败时不先推发布就报 ENOSPC）），空闲时按已定项 2 每 5 秒才发布一次，S = 16 的窗口要约 4 分钟才吐回来，
+   正是 [pitfalls.md](../pitfalls.md) 第 1 条那个症状。病根不同（btrfs 是两级分配 + chunk 分类，解 pin 靠 flush 里的 `COMMIT_TRANS`，
+   本机树 `fs/btrfs/space-info.c`，未在本项目验证），补法是一条准入条款，不是改窗口。
+   ② 「这个承诺带来什么收益」——只有 E92（最坏块重用延迟需求） 的 c8（管理员回退）要整个根环；它按发布计，墙钟跨度随负载变：
+   本机 2785 发布/秒时 S = 16 约 17 毫秒，每 5 秒一次时约 4 分钟。全仓没有一句写过这个操作给谁用——
+   它是 C113（扫描重建时多版单元的现行版本判定无输入） 第二轮正推腿走验算时发现「手动回退没有实例代号纪律」而加进来的
+   （`research/prompts/c113-r2-sonnet-output.md` 第五步）。别家不承诺旧根一定能用：btrfs 的备份根只能在只读挂载下用 `usebackuproot` 挨个试
+   （本机树 `fs/btrfs/disk-io.c`、`fs/btrfs/super.c`），ZFS 的 `zpool import -X` 明写「回到一个不再保证一致的 txg……只能当最后手段」
+   （OpenZFS 文档），都未在本项目验证。
+   ③ 「能否动态缩容」——由此立第五条臂，**主 agent 起草，未经三方论证、未进模型**：根记录带一个回退下界 F
+   （8 字节；根记录 242 → 250，512 字节槽余量 270 装得下，但登记的格式常量要改），恢复对根环里全部自证合法的根取最大值
+   （与 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 那个水位同形）；可再分配 ⟺ 已释放 ∧ 释放代 ≤ max(F, 环里已持久的最旧根)；
+   平时 F 不动、窗口是整环，盘紧时抬高 F，明确作废最旧的几代再回收，不会冒出假候选；F 只增不减，上限是 当前 − K_min + 1，
+   K_min = max(崩溃恢复 2, 掉盘择根回退 + 1)；带新 F 的根持久之后再过 K_min 次发布才放出 F 以下的块。
+
+   ⚠️ **E135（动态回退下界） 已跑（2026-09-11）**：数与判决全在它的正文。
+
+   **2026-09-11 第二轮三方论证判决**（材料 `research/prompts/_d16-item1-r2-background.md`；正推 `research/prompts/d16-item1-r2-sonnet-output.md`、
+   反推 `research/prompts/d16-item1-r2-opus-output.md`、本地两次抽样 `research/prompts/d16-item1-r2-local-output-s1.md` / `-s2.md`；拿的是 E135（动态回退下界） 的数）：
+
+   | 臂 | 判决 |
+   |---|---|
+   | 整环 + 推空 | 正确性过：反推腿把根槽写失败跳号与掉盘 0 叠在一起，副本里零假候选。**在 E135（动态回退下界） 的 `df` 口径下达不到 D3（空间分配） 已定项 9（用户定案）**（那个 `df` 把扣住的块与保留池都算空闲）：推空时每次空发布自己释放的块也要等 N 次发布，剩余空间 < N × 空发布开销 + 保留池 + 一次写时推不出空间，E135（动态回退下界） 产物 S = 16、空发布开销 5 块时 24 次假性 ENOSPC；那一格每个用户窗口约 47 次强制发布。`df` 先扣掉保留池与推空最坏残留 5 + (N − 2) × 空发布开销，同一个判别式下那一带报的就是真 ENOSPC（主 agent 推的，未量） |
+   | 收窄承诺（K = 3） | 出局：一次盘 1 根槽写失败 + 掉盘 0 ⇒ 24 / 24 不可恢复——K = 3 默认 txg 不跳号，而根槽写失败会让 txg 跳一格 |
+   | 动态回退下界（E135（动态回退下界） 那一形） | 出局一次：「K_min 次发布后生效」与「抬 F 的上限 = 当前 − K_min + 1」都按 txg 算，跳号之后带新 F 的根可以全落在盘 0 上，丢盘 0 就退回旧 F ⇒ 假候选（S = 4 时 49 个、S = 16 时 261 个），两次写失败还有不可恢复。E135（动态回退下界） 从没把故障注入到抬 F 到生效那段区间里 |
+   | 动态回退下界 + 保留池 ≥ (K_min + 1) × 空发布开销 | 退回上一行：放行的格全部卡死，漏了正在做的那个窗口自己的元数据（两条云端腿各自在副本上跑出；主 agent 复现，保留池 20–22 仍卡、23 起不卡） |
+
+   机制由反推腿在 E135（动态回退下界） 源码的副本上跑出，主 agent 按源码逐步推核过（活化判的是 `txg >= carrier + K_min`，写失败烧掉的那个 txg 也算进去）。
+   ⚠️ 「F 只增不减」只对**幸存失败域上**的根成立：丢一块盘，恢复读到的 F 可以退回（第二轮反推腿指出）。
+   ⚠️ 本地腿两次抽样的构造都跳过了谓词本身或把字段挂错了层，不采纳；它提的「管理员选了一个低于 F 的根，系统悄悄换根」是一条接口要求——回退目标不在候选集里必须明确拒绝。
+
+   **用户定案（2026-09-11）**：盘紧时候选集可以一直缩，最少保留 4 个持久的根，**且每块盘上最新的那个持久有效根都在内**——
+   按盘数，不按 txg 数；知情接受任何把盘写满的进程都能让回退历史缩到这个下限。
+   **2026-09-12 用户澄清**：「4」数的是**可退到的不同状态**——只数改过用户可见状态的根，推空与抬 F 产生的空发布根不算。⚠️ E138（按盘回退下界与推空的空间要求） 的最少保留检查是按根数的，不是这个口径。
+
+   ⚠️ **E138（按盘回退下界与推空的空间要求） 已跑（2026-09-11）**：按盘生效的那一形动态回退下界（臂 G）与整环 + 推空（臂 A）在全部故障世界——含活化区间里 16 种写失败组合 × 8 个崩溃窗口 × 丢两块盘——
+   零假候选、零不可恢复；在扣掉保留池与推空最坏残留的 `df` 口径下两条臂假性 ENOSPC 都是 0。
+   **臂 G 在 D3（空间分配） 已定项 9 第 2 条出局**：空发布开销 5 块时，填满后删一个对象、下一次写仍报 ENOSPC（S = 4、S = 16 各 24 / 24 个种子）。
+   **臂 A 在无故障的近满盘上两条都达标**，界是 N 次发布。代价：近满盘上每个用户窗口约 36–39 次强制发布（S = 16），`df` 少报 480 块（S = 16、开销 5 块），
+   满环 48 个根里非空发布的根平均只有约 2.2 个。数与判决全在它的正文；「按盘取上限」那一半没被测到。拿它定这一项要走三方论证，还没走。
+
+   **2026-09-12 第三轮三方论证判决**（材料 `research/prompts/_d16-item1-r3-background.md`；正推 `research/prompts/d16-item1-r3-sonnet-output.md`、
+   反推 `research/prompts/d16-item1-r3-opus-output.md`、本地两次干净抽样 `-local-output-s2.md` / `-s3.md`（`-void1.md` 被字词损坏闸判红作废）；
+   主 agent 复现 `research/prompts/d16-item1-r3-main-verification.md` 与 `-2.md`）：**照写下来的形态，没有一条臂全部过关。**
+
+   | 臂 | 判决 |
+   |---|---|
+   | 整环 + 推空 | 正确性过（两轮反推都没打中）。**D3（空间分配） 已定项 9 两条与界都输**：推空期间一次根槽写失败，写失败的槽按旧内容算，那个旧根把回收界卡住一整圈 ⇒ 出假性 ENOSPC，一次准入要 2N − 1 次发布（主 agent 复现：推空第 1..N − 1 次写任一次失败，S = 4 时 88 / 88、S = 16 时 376 / 376）；**一个根槽持续写不进时，回收界永远冻住**，占用 70% 时 `df` 报约 1171 块而写报 ENOSPC，下一个窗口卡死（S = 4 / 16 × 开销 1 / 5 四格，8 / 8 个种子，主 agent 复现）。坏槽在条款之内：D23（journal 的角色与格式） 已定项 14 的探针写写固定落点、判瞬时失败，同一行逐字「同一个根槽连续失败」不再是一条判据。要修只能把陈旧根挪出候选集并落盘一个下界——改 D23（journal 的角色与格式） 已定项 14（用户定案），再加 F 字段 |
+   | 按盘回退下界（G） | 正确性过，含活化区间内崩溃不丢盘、先跳号再抬 F（反推腿副本里 G 为 0，对照 G_txgcap 抓到 2096 次违例——「按盘取上限」那一半第一次被测到，未入库）。**删了再写输，病根在准入**：准入按当下扣住的量放行、`df` 按最坏残留扣，填满时停在 `df_guaranteed` = −3；准入改成按最坏残留收费之后副本里四格全 0（机制探针，未进故障世界）。推空期间一次写失败也会出假性 ENOSPC（48 次里 8 次），界 7 要放到 8–9、保留池加约 2 × 开销——有界 |
+   | G′（材料写的「处置做满」） | **材料的定义自相矛盾**（主 agent 的错）：「做到生效」只要 6 或 7 次发布，残留不恒定，照字面与 G 逐种子同样输；「一律做满 7 次」无故障时过，一次写失败时照写下来的界输 |
+
+   两臂同有的：空发布开销在挂载后变大而式子按挂载时算 ⇒ 都出假性 ENOSPC 或卡死（反推腿单腿，未复现）⇒ 式子要按最坏开销扣，而最坏开销今天没有口径；`df` 都没扣实例切换的挂载时预留。
+   近满盘代价：整环 + 推空每次写约 40 次串行发布（S = 16，每次三个序点），按盘回退下界约 5–6 次、与 S 无关。
+   ⚠️ 用户定案 P2 的「最少 4 个持久根」：整环 + 推空近满盘时 48 个根里非空发布的根平均只有约 2.2 个——「4 个」指根还是可退到的状态，要问用户。
+
+   **用户定案（2026-09-12）**：往按盘回退下界一族走，立实验量它的收严形态。
+
+   **E139（按盘回退下界的收严形态） 已跑（2026-09-12）**：收严形态按「4 个」的两种读法各建一条臂——按根数读（G2R，E138（按盘回退下界与推空的空间要求） 的读法）与按用户 2026-09-12 澄清的状态数读（G2S）——
+   准入按最坏残留收费、界给 k_tol = 2 次根槽写失败留余量（B_R = 7 + 2k = 11、B_S = 4 + 2k = 8）、保留池与残留按声明的最坏空发布开销 c_max 算（(c₀, c_max) 取 (1, 5) 与 (5, 10)）；
+   世界除 E138（按盘回退下界与推空的空间要求） 已有的之外加了活化区间内崩溃不丢盘、先跳号再抬 F、推空期间 1..3 次根槽写失败、坏槽、开销升到 c_max。数与判决全在它的正文，判据按每一格判：
+
+   | 臂 | 判决 |
+   |---|---|
+   | G2R（按根数读） | **每一格都过**：全部故障世界零假候选、零不可恢复；近满盘、推空期间 ≤ 2 次写失败、坏槽、开销升到 c_max 各格假性 ENOSPC 为 0、删了再写全成功、发布数 ≤ 11（2 次失败时正好 11，「每次失败加 2」是紧的）、跑前保留池下不卡死、最少保留不违反。代价：`df` 少报 110 / 205 块（c_max = 5 / 10，与 S 无关；E138（按盘回退下界与推空的空间要求） 的臂 G 是 26 / 70，臂 A 在 S = 16 时 108 / 480），每个用户窗口约 1 次强制发布（臂 A 约 36–39 次），根记录加 F 8 字节。推空之后候选集里只剩这次删除那一个状态（根数不少于 5） |
+   | G2S（按状态数读） | 正确性、假性 ENOSPC、界、卡死同样全过，候选集任何时候不少于 4 个状态；**但填满之后的前 3 个窗口删了再写失败**（24 个种子每个都一样，之后 400 个窗口一次没有）：要复用这次删的块，比它旧的根都得出候选集，而保留 4 个状态就得留住 3 个更旧的非空根 ⇒ 这次删的块要再过 3 个改用户状态的窗口才放回。按它自己的 `df`（再扣一截随最近三个状态释放量变的滞后量，近满盘平均约 32–35 块、最大 52）那几次是真 ENOSPC，按 D3（空间分配） 已定项 9 第 2 条的字面没达标。S = 4 上带 3 次写失败（超过容忍）的处置把环里当时数进 4 个状态的两个根轮掉，环深 12 装不下 |
+
+   「按盘取上限」那一半（E138（按盘回退下界与推空的空间要求） 判「未验」）由先跳号再抬 F 的世界测到：对照臂 G_txgcap 三格各 4192 次越过盘 1 上最新的根，G2R / G2S 为 0。
+   保留池扫描四个最小值都落在扫描下沿（式子 − 6），两条臂真正要多少保留池没量到。c_max 是声明的上界，本工程没有它的口径（C83（提交固定点没人回答））。
+
+   ⇒ **这一项现在问的是**：「删了立刻能写」（D3（空间分配） 已定项 9 第 2 条的字面）与「任何时候保留 4 个可退到的状态」（用户 2026-09-12 的口径）在按盘回退下界一族里**不能同真**——
+   要复用这次删的块，比它旧的根都得出候选集，那一刻能退到的只有这次删除之后的状态。这是用户要定的取舍，不是算术：取根数读法（G2R）就是接受盘紧时可退的历史缩到 1 个状态；
+   取状态数读法（G2S）就是接受删掉的空间要过三个状态才回来、`df` 少报一截随负载变的量。下一步：走一轮三方论证（第四轮）核 E139（按盘回退下界的收严形态），然后带着数交用户定案；
+   定案之后 D23（journal 的角色与格式） 已定项 14 的候选集那一句要同步（候选集加「txg ≥ F」），根记录加 F 8 字节（242 → 250），C282（环里最旧根没有定义） / C283（准入失败时不先推发布就报 ENOSPC） 随之改写。
+4. **记录核对器那第二份 replay 实现的成本，以及它与 D13（验证路线）「三 oracle 合谋测试」怎么配合。** 改第一个事务的字节：否（2026-09-01，依据：问的是记录核对器那第二份实现的工程量，不产生盘上字节）。 **状态：未定。**
+
+   **2026-09-11 用户定案收窄问法（按三方论证）**：问的是「那第二份实现必须独立实现什么、允许共享什么」加「它在合谋测试里站什么位置」；
+   「要多少人工」在零代码时没有可核的答案，能核的只有下界替身——research 里前三样工作的模型等价物
+   `e42_transaction_records.rs` 240 行、`e77_publish_order.rs` 506 行、`e78_replay_start.rs` 556 行（反推腿 `wc -l`），
+   第四样（把期望态算出来）一行模型都没有。已经定下的四样：
+
+   | # | 定了什么 | 依据 |
+   |---|---|---|
+   | ① | **共享**：与实现只共享 D13（验证路线） 已定项 5 那份生成常量；与 checker **默认不共享**，要共享得另行论证；不与 RefFS 共享恢复代码 | D13（验证路线） 冲突 1 的折中管的是 checker 自己遍历、扫描两个方向之间，不授权两个判决器之间共享（两条云端腿一致） |
+   | ② | **入参拆成三份**：崩溃态镜像（择根与前缀判定看它）、记录流（崩溃态镜像环里的 journal 记录）、实现恢复后的镜像（比对的对象） | 恢复本身会改盘（实例切换写行、重发在飞 checkpoint，D23（journal 的角色与格式） 已定项 14），D13（验证路线） 定案写的「崩溃后镜像」在 harness 先恢复、后核对的顺序下是两份（反推腿 4-B）；D13（验证路线） 那一节已补注 |
+   | ③ | **缺一个数**：前缀第一条要的「在飞记录数上限」本仓没有值（I-8.3（重放前缀严格连续）；D23（journal 的角色与格式） 已定项 1 的 C 条要它进超级块） | E92（最坏块重用延迟需求） c2「本仓没有这个数」 |
+   | ④ | **合谋测试**：记录核对器是第四个判决器；每个判决器都要有一个只有它抓得住、而且对可见状态或结构有害的坏实现。「摘掉根槽前的屏障」不够格——它抓到的缺失只伤记录核对器自己；候选是回退行 W 截断（C124（回退行与重放下界没有会红的检查）），RefFS 若建模了管理员回退也可能抓到，要核。O3（独立规约执行器） 今天不在 [verification-build.md](../verification-build.md) 的落地步骤里 | 反推腿 4-D |
+
+   **还开着的一问：一次发布只施加了其中一部分事务时，期望的恢复后指针层怎么算，要不要树语义。**
+   前缀五条口径按事务施加，前缀可以落在同一次发布的两个事务之间（E42（一事务几条记录） 那种切法）；
+   而「施加一条记录」在指针层上具体做什么——换哪个指针、祖先谁来 COW、落点谁分配——全仓没有定义，
+   D23（journal 的角色与格式） 开篇「重放不要分配器」与「只施加一部分事务就要重新生成祖先」互相顶着。
+   D13（验证路线） 那句「核对一条记录只需格式解析 + 校验和 + 根环择新」管的是**验记录**，不是算期望态（反推腿 4-A）。
+   落 C284（施加一条记录在指针层上做什么没有定义）。成本量级由这一问决定：定成「一次发布整体施加或整体不施加」，
+   第二份实现停在句法层；允许部分施加，它就要自己实现树语义。
+
+```
+
+**出处 `.claude/kb/decisions/03-空间分配.md:137-170`（整段抄，未转述）**
+
+````markdown
+#### 已定项 4（2026-09-01，用户定案）：准入不等式的权威形式
+
+```
+可用 = Σ设备( 容量 − 已分配 − 不可回收 − defer 待释放 ) − 待删占用 − 已承诺预留
+```
+
+**它是「任何增加空间占用的操作，进门前先算最坏情况下解开自己需要多少」（D3（空间分配） 第 3 条）的可执行形式。**
+此前全仓没有一处把它写全——I-3.4（可用空间扣待删占用） 只说「可用空间统计已扣除待删占用」，
+第 3 条只说「先算最坏情况」。
+
+**六项逐项有出处，不是凑出来的**：
+
+| 项 | 为什么在式子里 |
+|---|---|
+| 容量、**已分配** | I-3.1（已分配统计对得上） 的被审计对象 |
+| **不可回收** | zoned 上一个活快照钉住的物理空间是 zone 粒度而引用的块数是块粒度，[invariants.md](../invariants.md) 逐字要求「另立一个不可回收量」 |
+| **defer 待释放** | D16（发布语义）：checkpoint C 中产生的释放在 C 发布之前不得进入可分配集合 |
+| **待删占用** | I-3.4（可用空间扣待删占用）；D5（快照 / 空间记账机制） 与 D8（核心索引结构） 分批删除定「待删除结构算作活引用」 |
+| **已承诺预留** | D3（空间分配） 第 3 条；已定项 2 逐字「墓碑就是解开自己的一部分，计入那个量」 |
+
+⚠️ **前三项按设备求和，后两项不按**——前三项是物理量（一块盘满了不能靠别的盘补），
+后两项是全池的承诺量。**这个分界直接决定 D5（快照 / 空间记账机制） 已定项 4 里哪几个统计量要带设备维。**
+
+⚠️ **它解锁了两样**：D5（快照 / 空间记账机制） 已定项 4（统计量有哪几个）的完备性现在可判了——
+清单相对这个式子完备即可；[checks-owed.md](../checks-owed.md) C70（跨统计量的和没人盯） 的那条向量等式现在写得出来了。
+
+⚠️ **式子的六项都是已发布统计量，准入却发生在窗口中间——在飞合成已由 E82（准入的在飞合成）
+建模（2026-09-02）**：只读已发布值 ⇒ 同窗并发超卖（实测 80/120 格）；把窗口内释放记成可用
+⇒ 20 格吃进 defer 该扣住的块（D16（发布语义）新规则 2 被静默绕过）；忘了把墓碑计入「解开自己」
+⇒ 盘满后删除全数死锁。**正确形态已定案（2026-09-02），权威记录在 D3（空间分配）已定项 6**；
+实现侧的测试开关（overlay 可强制清零，双向证）仍欠，见 [checks-owed.md](../checks-owed.md)
+C87（准入读的合成值无定义）。
+
+
+````
+
+**出处 `.claude/kb/decisions/03-空间分配.md:277-306`（整段抄，未转述）**
+
+```markdown
+#### 已定项 9（2026-09-11，用户定案）：不许有假性 ENOSPC，删掉的空间在有界步数内可用
+
+**两条，都是硬要求**：
+
+1. **不许有假性 ENOSPC**：只要 `df` 报出的空闲 ≥ s，写 s 字节就必须成功。文件系统可以先在内部做有界步数的工作
+   （推发布、抬回退下界之类）再分配；只有盘真的写满（`df` 空闲 < s）才许报 ENOSPC。
+2. **删掉的空间在有界步数内可用**：删掉一个 s 字节的对象之后，同样大小的写必须在有界步数内成功。
+   这个界要写成算得出的数，不许是「最终会」。
+
+**依据（用户定案，2026-09-11）**：用户逐字「我们的目标是 避免 btrfs ENOSPC， 我们绝对不能接受 ENOSPC」。
+问法当场收成一种读法：盘真写满时的 ENOSPC 任何文件系统都免不了，不在此列；用户在「只要第 1 条」与「两条都要」之间选了两条都要。
+这正是 [pitfalls.md](../pitfalls.md) 第 1 条那个症状的两半（`df` 有空间但写不进、删文件也报没空间）。
+D3（空间分配）「不分类」只治了它的一个病根（两级分配 + chunk 分类），被 defer 窗口扣住的那一半到这一天才有要求。
+
+**可判定形式**：不变量 I-5.3（报出的空闲都兑现得了）；会红的检查落在 [checks-owed.md](../checks-owed.md)
+C283（准入失败时不先推发布就报 ENOSPC），那一行随这条定案改写。
+
+**它当场改变了什么**：
+
+- **`df` 报什么是这条定案的一半**。E135（动态回退下界） 的 `df` 把已释放而还扣着的块与保留池都算成空闲；
+  在这个口径下 D16（发布语义） 未定项 1 的「整环 + 推空」那条臂达不到第 1 条——推空时每次空发布自己释放的块也要等 N 次发布才放回，
+  剩余空间小于「N × 空发布开销 + 保留池 + 一次写」时推空推不出空间，而 `df` 显示有空
+  （E135（动态回退下界） 产物 S = 16、空发布开销 5 块时 24 次；判别式与副本逐格一致，见 D16（发布语义） 未定项 1 第二轮判决）。
+  ⚠️ 同一个判别式也说明：`df` 若先扣掉保留池与推空的最坏残留（5 + (N − 2) × 空发布开销），那一带报出的空闲就小于一次写，成了真 ENOSPC
+  ⇒ 第 1 条兑不兑现取决于 `df` 的口径，不只取决于臂；代价是 `df` 少报那一截。E138（按盘回退下界与推空的空间要求） 量过：这样扣之后整环 + 推空在全部格上假性 ENOSPC 为 0，`df` 少报 保留池 + 5 + (N − 2) × 空发布开销（S = 16、开销 5 块时 480 块）。⚠️ **这只在无故障的近满盘上成立**：推空期间一次根槽写失败，整环 + 推空就出假性 ENOSPC；一个根槽持续写不进时，它在占用 70% 时报 ENOSPC 并卡死（D16（发布语义） 未定项 1 第三轮判决）。
+- 第 2 条的「有界步数」：E138（按盘回退下界与推空的空间要求） 量过——整环 + 推空一次准入最多 N 次发布（S = 16 时 48），删了再写全部成功；按盘生效的动态回退下界最多 7 次、与 S 无关，但空发布开销 5 块时删了再写会失败，第 2 条不达标。两个界都只在无故障时成立：推空期间一次根槽写失败，整环 + 推空要 2N − 1 次，按盘回退下界要 8–9 次（D16（发布语义） 未定项 1 第三轮判决）。
+
+**射程**：只管假性 ENOSPC 与删除后的可用性，不管真 ENOSPC；配额不在内（第一版不做每快照配额）；
+「有界步数」的具体界随 D16（发布语义） 未定项 1 的形态定，今天没有数。未在真设备上验证。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:189-200`（整段抄，未转述）**
+
+```markdown
+### 三个死锁，两个落在格式上、事后补不进去
+
+| # | 环 | 现役破法（逐字核实，Linux 7.2.0 本地树） | 对本工程 |
+|---|---|---|---|
+| 1 | journal 满 → checkpoint → 发根 → **发根要不要写 journal** | jbd2 `fs/jbd2/transaction.c`：「The commit code assumes that it can get enough log space **without forcing a checkpoint**. This is \*critical\* for correctness: a checkpoint of a buffer which is also associated with a committing transaction creates a **deadlock**」 | **D16（发布语义） 那句措辞必须显式裁一个读法**，见下 |
+| 2 | **COW 独有**：checkpoint → COW 写新节点 → 要分配 → 盘满 → 发不出根 | jbd2/XFS **没有**这个环，因为它们**原地写**、回家不需要新空间。btrfs 有，用 `global_block_rsv`（`fs/btrfs/block-rsv.c`）按 extent/csum/root 树大小动态定尺 | **保留池治这一条**，`reserve ≥ ckpt_cost` 即可（E19（defer 窗口下的假性 ENOSPC） 实测，见 D23（journal 的角色与格式）「死锁 2 与假性 ENOSPC 是两种故障，要分治」）。⚠️ **D22（单元原子性怎么合成） 的 K 加重它**：盘快满时最该救命的空间正是被 K 扣住的 ⇒ **K 必须是运行时策略，不能是格式常量** |
+| 3 | 单条操作大于环 | XFS `fs/xfs/libxfs/xfs_log_rlimit.c`：「no single transaction can be larger than half size of the log… **dead loop situation**」；`XFS_MIN_LOG_FACTOR = 3`（`libxfs/xfs_log_format.h:42`），**mkfs 时算、mount 时校验** | 需要等价的几何不变量：**任一操作的最坏 journal 占用 ≤ 环大小 / F，F ≥ 2** |
+
+**死锁 3 推出一条依赖关系**：
+**D8（核心索引结构） 的意图分批机制不是「删大文件的便利设施」，
+它是 journal 满死锁的必要条件之一**——算不下的操作必须能拆成若干个各自合法的事务。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:201-222`（整段抄，未转述）**
+
+```markdown
+### 死锁 2 与假性 ENOSPC 是两种故障，要分治（E19（defer 窗口下的假性 ENOSPC） **建模层**实测，2026-08-28 第二轮）
+
+| 故障 | 谁治得了 | 数字 |
+|---|---|---|
+| **checkpoint 卡死**（D23（journal 的角色与格式）死锁 2） | **保留池**，且 `reserve ≥ ckpt_cost` 就够 | 预留 **64 块**（恰等于一次 checkpoint 的开销）把卡死次数从 **199 打到 0** |
+| **假性 ENOSPC** | **只有准入**。保留池反而加重它 | 预留 0 → 16384 块，假性 ENOSPC 从 3150 涨到 **7246**，每档增量恰为 `reserve / 文件块数` |
+
+**机制**：保留池是给 checkpoint 开的一道地板，对**普通分配**是纯税。
+而假性 ENOSPC 的成因是「defer 窗口与根环 K 扣住的量超过剩余空间」，
+**那不在保留池的射程内**——btrfs 的 `global_block_rsv` 防的是普通分配吃光空间。
+
+**假性 ENOSPC 的破法是一条可计算的准入规则**
+（E19（defer 窗口下的假性 ENOSPC） 跨 6 档填充率 × 6 档延迟共 36 格，预测与实测逐格一致）：
+
+> **剩余空间必须 > 每 checkpoint 搅动量 × (延迟代数 + 1) + 一次 checkpoint 的开销**
+
+⇒ 不许把盘填到 `容量 − 搅动量 × (延迟+1) − checkpoint 开销` 以上。
+这与 `.claude/rules/fs-design.md`「准入控制要在进门前先算最坏情况」同构——
+**「最坏情况」里必须含 defer 窗口与 K 扣住的那一块。**
+
+⚠️ **搅动量在真实负载里是变量，E19（defer 窗口下的假性 ENOSPC）把它当常数。** 怎么估它是真机压测那一半的问题。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:1177-1202`（整段抄，未转述）**
+
+```markdown
+### 已定项 14（2026-09-02，用户定案）：重放的下界由所选根给出
+
+**显式例外：管理员回退（2026-09-05，随 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3）。** 回退 = 一次恢复：管理员带外从回退候选集里选一个旧根 R_old——候选集 = 根环里按实例表判仍然有效的根，(i, T) 可选 ⟺ 实例表无 i 的行，或有行 (i, Ti, Wi) 且 T ≤ Ti（被抛弃时间线的根一条都选不中）；不施加 R_old 之后的任何记录；取新实例代号；写回退行 (r_old, T_old, 0) 与中间实例的 (i, 0, 0)（r_old 诞生代号 ≤ T_old 的单元全部已发布、之后的一个都不算，不需要事务号上限）；第一个新根的 checkpoint_txg = 根环里全部根记录 txg 的最大值 + 1；defer 队列、分配器游标、全部记账统计量的现行值从 R_old 那棵账重新载入。回退与它的第一个新根同一次发布，之前没有持久效果，崩了就重做；回退深度 ≤ 根环深度。E104（扫描重建的现行版本判定）：不写回退行时全规则臂复活 3，新根取 T_old + 1 时压不过被抛弃的根。
+
+**恢复只施加 `(实例代号, checkpoint_txg)` 严格大于所选根的记录；
+陈旧 tail 只是「从哪开始扫环」的优化，不再决定重放集合。**
+
+**依据（E78（重放的起点），四条恢复算法各过一遍判据）**：陈旧 tail 叠上块重用之后，
+「全环扫描 + 断号即止 + 幂等」三件套不闭合——从 tail 逐条验证重放的形态在**健康镜像上自我中止**
+（把陈旧失配当损坏），失配跳过的形态撕裂判别力归零。两条可行出路里取**水位臂**；
+**尾删臂（盲放全前缀 + 收尾走读 + 尾删重试）落选**，理由：D16（发布语义）已定项 6 定案之后
+水位就是根记录已有的 `(实例代号, checkpoint_txg)`（D22（单元原子性怎么合成）已定项 7），
+**零新增格式字段**，而尾删臂要在恢复路径里加一个重试环——同价买贵的没有理由。
+
+**前缀判定的完整口径从此是五条，缺一不可**（引用 I-8.3（重放前缀严格连续）时连这句一起引）：
+jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于根的水位**、
+提交标记齐全的事务才施加（D23（journal 的角色与格式）已定项 7）、
+施加前逐项验证点名单元（D16（发布语义）已定项 7，E77（发布的持久顺序）证明承重）、
+**所选根的实例在实例表里有回退行时，该实例的记录只施加到回退行的 W 为止**（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2，2026-09-05：
+否则一次落在 R_old 上的普通恢复会把被回退抛弃的那段时间线整段重放回来，管理员的回退被静默撤销）。
+
+⚠️ **它对 D23（journal 的角色与格式）已定项 3 是收窄不是推翻**：「先全环扫描、逐条验证、
+不许先信 tail」原样成立——变的是验证出的合法前缀里**哪一段被施加**。
+⚠️ **checker 侧欠账**：水位判定的会红检查（陈旧 tail + 已复用镜像上恢复必须完成且终态与真值逐格相等）
+落在 [checks-owed.md](../checks-owed.md) C77（重放起点未定义），等崩溃点重放 harness。
+
+```
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:1-22`（整段抄，未转述）**
+
+````markdown
+## E139 按盘回退下界的收严形态 —— 已跑（2026-09-12）
+
+**问的是**：D16（发布语义） 未定项 1 第三轮三方论证之后用户定的方向——按盘回退下界的收严形态
+（准入按最坏残留收费、界与保留池给 k_tol = 2 次根槽写失败留余量、保留池与残留按声明的最坏空发布开销 c_max 算、最少保留按 4 个不同状态数）——
+在第三轮打中的三个世界（推空期间根槽写失败、一个根槽从此写不进、空发布开销在挂载之后变大）与 E138（按盘回退下界与推空的空间要求） 已有的故障世界里过不过 D3（空间分配） 已定项 9 的两条硬要求，界与代价各是多少。
+「4 个」按两种读法各建一条臂：按根数读（G2R，E138（按盘回退下界与推空的空间要求） 的读法）与按用户 2026-09-12 澄清的状态数读（G2S）。
+
+**跑前写死**：`research/prompts/e139-preregistration.md`。写装置时改过三处（G2S 滞后量那句的算术、滞后量的精确定义、活着的元数据记回保留池），都在第一次运行之前；
+第一次运行之后改过一处（非空有效根不足 4 个时按状态数读的上限取最旧的有效根而不是最旧的非空根），第一次运行的产物留作 `research/results/e139-tightened-floor-2026-09-12-run1.out`，
+两次产物只差 G2S 在 S = 1 的五格与由它们汇总出的两行，见文末「历史版本」。写登记的人有两个倾向（G2R 全过；G2S 在近满盘的删建循环里这次删的块要再过 3 个改状态的窗口才放回），**两个都对了**。
+
+**复跑命令**（`exact` 模式，与留存产物逐字节比对）：
+
+```bash
+cd research && bash scripts/replay.sh E139
+# 直接跑装置：
+cd research && cargo run --release --bin e139_tightened_floor
+```
+
+代码 `research/e7-index-bench/src/bin/e139_tightened_floor.rs`（从 E138（按盘回退下界与推空的空间要求） 的源码拷出来改），
+原始输出 `research/results/e139-tightened-floor-2026-09-12.out`（第二次运行，901 行，末行 `emitted=901`；本机 release 约 67 秒）。
+
+````
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:23-29`（整段抄，未转述）**
+
+```markdown
+### 这是计数模型，不是实现
+
+没有 I/O、随机源是写死的种子 ⇒ 跑 N 遍必然逐字节一致。证据强度来自 **20 个单测 + 15 条变异全部被抓**（`research/mutations/e139_tightened_floor.tsv`）；
+变异 M13（按状态数读的上限把空根也数进去）第一轮一个单测都没红，按 `.claude/rules/mutation-sampling.md` 判为取样点不敏感——原有单测只在没推过空的环上取样，两种上限那里同值；
+补了「推空的空根进环之后再抬一次」的单测 `forced_pressure_keeps_four_states_for_states_arm` 之后抓到。M14 第一版让被测代码不终止（区域号永远对不上），换成「失败打在区域 2」的形态后抓到。
+跨装置闸两道（E123（K 与回退深度的二选一各要付什么） 的扣住块数、E92（最坏块重用延迟需求） 的 N − K），与 E138（按盘回退下界与推空的空间要求） 同值。
+
+```
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:30-43`（整段抄，未转述）**
+
+```markdown
+### 臂
+
+| 臂 | 是什么 | 角色 |
+|---|---|---|
+| A `ring_persisted` | E138（按盘回退下界与推空的空间要求） 原样：可再分配 ⟺ 释放代 ≤ 环里已持久的最旧有效根；准入不按最坏残留收费 | 对照：第三轮判它输的三个世界在这里当检测器的靶子 |
+| C `k_runtime`、D `floor_txg` | E135（动态回退下界） 原样 | 对照：跨装置闸；活化按 txg 算 |
+| G `floor_per_disk` | E138（按盘回退下界与推空的空间要求） 臂 G 原样（上限按根数，B = 7，式子按 c₀） | 对照：准入收费那一条的靶子 |
+| G_txgcap | 上限按 txg 数 4 代、不看盘 | 对照：「按盘取上限」那一半的靶子（E138（按盘回退下界与推空的空间要求） 判「未验」） |
+| **G2R** | 按盘回退下界 + 准入按最坏残留收费 + B_R = 7 + 2 × 2 = 11 + 保留池 2 × 5 + 10 c_max、残留 5 + 9 c_max + 上限 min(每块盘上最新的持久有效根, 第 4 新的持久有效根) | 被测：按根数读 |
+| **G2S** | 同 G2R，但 B_S = 4 + 2 × 2 = 8、保留池 2 × 5 + 7 c_max、残留 5 + 6 c_max，上限取第 4 新的**非空**有效根，`df` 再扣滞后量（释放代 > max(第 4 新的非空根, 环里最旧有效根) 且不是空发布放掉的已释放块） | 被测：按状态数读 |
+| G2R_mount | 同 G2R，式子按挂载时的 c₀ | 对照：c_max 那一条的靶子 |
+
+两条收严臂的可分配量与 `df` 都把当前活着的元数据记回保留池（保留池正是给它留的）；(c₀, c_max) ∈ {(1, 5), (5, 10)}。
+
+```
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:44-80`（整段抄，未转述）**
+
+````markdown
+### 判决（按跑前写死的判据）
+
+整行抄自 `research/results/e139-tightened-floor-2026-09-12.out`：
+
+```text
+E7RESULT name=verdict crit1_holds=1 crit2_a_drain_false_enospc=3424 crit2_a_broken_false_or_stall=64 crit2_g_near_full_wad_cost5=48 crit2_g2r_mount_growth_false_or_stall=32 crit2_d_activation_fakes=584 crit2_gtxgcap_skip_retention=12576 crit2_a_raw_false_enospc=144
+E7RESULT name=verdict_candidate arm=G2R_tightened_roots crit3_fakes=0 crit3_unrecoverable=0 crit4_false_enospc_cells=0 crit5_write_after_delete_cells=0 crit5_bound_exceeded_cells=0 crit6_stall_cells=0 crit7_retention=0 crit8_max_publications_within_tolerance=11 beyond_tolerance_max_publications=9 bound=11
+E7RESULT name=verdict_candidate arm=G2S_tightened_states crit3_fakes=0 crit3_unrecoverable=0 crit4_false_enospc_cells=0 crit5_write_after_delete_cells=26 crit5_bound_exceeded_cells=0 crit6_stall_cells=0 crit7_retention=24 crit8_max_publications_within_tolerance=7 beyond_tolerance_max_publications=7 bound=8
+E7RESULT name=crit6_min_no_stall_reserve g2r_pair0=54 g2r_pair1=104 g2s_pair0=39 g2s_pair1=74
+E7RESULT name=crit9_c281 A_ring_persisted=72 C_k_runtime=72 D_floor_txg=72 G_floor_per_disk=72 G_txg_cap=72 G2R_tightened_roots=72 G2S_tightened_states=72 G2R_mount=72
+```
+
+| # | 判据 | 结果 |
+|---|---|---|
+| 1 | 装置与跑前式子 | 全中：两道跨装置闸；A 用 N 次、扣 5 + (N − 2) c；G 与 G2R 在三种落点上 6 或 7 次、扣最多 5 + 5c；**G2S 3 或 4 次、滞后量之外扣最多 5 + 2c、滞后量 39**；S = 1 时四条臂都是 3 次（产物 `crit1_push` 各行 `holds=1`） |
+| 2 | 判别力 | 六个靶子都抓到：A 在推空期间写失败出假性 ENOSPC 3424 次、坏槽之下 64 次假性或卡死；G 在 c₀ = 5 近满盘删了再写失败 48 次；G2R_mount 开销升到 c_max 之后 32 次假性或卡死；D 在活化区间 584 个假候选；**G_txgcap 在先跳号再抬 F 的三格各 4192 次越过盘 1 上最新的根**——E138（按盘回退下界与推空的空间要求） 判「未验」的「按盘取上限」那一半第一次被测到，G2R / G2S 在同一世界里为 0 |
+| 3 | 正确性 | G2R、G2S 在全部故障世界（含活化区间内崩溃不丢盘、先跳号再抬 F、推空期间 1..3 次写失败、坏槽、开销变大）零假候选、零不可恢复 |
+| 4 | 第 1 条：不许有假性 ENOSPC | G2R、G2S 每一格都是 0（按各自的 `df`；A 的 raw 与 drain 那两列非 0，检测器证明会红） |
+| 5 | 第 2 条：删掉之后有界步数内可用 | **G2R 每一格都过**，发布数没有一格越过 B_R。**G2S 26 格里删了再写失败**——全部是填满之后的前 3 个窗口（c₀ = 5 时第 1..3 窗口、c₀ = 1 时第 2..3 窗口，24 个种子每个都一样），之后 400 个窗口一次都没有：这次删的块要再过 3 个改用户状态的窗口才放回，正是「保留 4 个可退到的状态」按字面推出来的滞后；按它自己的 `df_S` 那几次都是真 ENOSPC，但 D3（空间分配） 已定项 9 第 2 条按字面判它没达标 |
+| 6 | 卡死 | 跑前保留池下两条臂全部为 0；扫描里不卡死的最小保留池 G2R 54 / 104、G2S 39 / 74（两档开销对），四个数都正好是扫描下沿（式子 − 6）⇒ 只能写「≤ 下沿，边界没量到」 |
+| 7 | 最少保留 | G2R 0。G2S 在容忍范围之内 0；**只在 S = 4、c₀ = 5、推空期间 3 次写失败（超过容忍的格）里 24 次**：一次带 3 次失败的处置用掉 11 个 txg，12 槽的环把当时数进 4 个状态的两个非空根轮掉了，失败的槽里又留着更老的旧根，上限落到 F 之下——不是 F 越界，是环深 12 装不下 4 个状态加一次带 3 次失败的处置；S = 16 同格为 0 |
+| 8 | 界的算术 | G2R 容忍范围之内实测最大 11 = B_R（2 次失败、c₀ = 1、S = 4 与 16），「每次失败加 2」是紧的；G2S 实测最大 7 ≤ B_S = 8。3 次失败（只取前 20 种组合）G2R 最大 9、G2S 7 |
+| 9 | C281（回退后第一次发布会复用被抛弃时间线还引用的块） | 八条臂各 72，各臂都有 |
+
+G2S 失败的窗口号（整行抄）：
+
+```text
+E7RESULT name=near_full_failure_windows arm=G2S_tightened_states s=4 c0=1 seeds_with_failure=24 first_windows=2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2 last_windows=3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3
+E7RESULT name=near_full_failure_windows arm=G2S_tightened_states s=4 c0=5 seeds_with_failure=24 first_windows=1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1 last_windows=3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3
+E7RESULT name=near_full_failure_windows arm=G2S_tightened_states s=16 c0=1 seeds_with_failure=24 first_windows=2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2/2 last_windows=3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3
+E7RESULT name=near_full_failure_windows arm=G2S_tightened_states s=16 c0=5 seeds_with_failure=24 first_windows=1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1/1 last_windows=3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3/3
+E7RESULT name=drain_failure arm=G2S_tightened_states s=4 c0=5 c_max=10 failures=3 cases=160 runs_with_false_enospc=0 runs_with_write_after_delete_failed=8 false_enospc_arm=0 false_enospc_raw=24 write_after_delete_failed=24 max_publications=7 bound=8 stalls=0 fakes=0 unrecoverable=0 retention_violations=24 injected=480
+```
+
+**两种读法的差别落成了数**：按根数读，推空之后候选集里只剩这次删除那一个状态（近满盘各格 `min_states=1`，根数不少于 5）；按状态数读任何时候不少于 4 个（`min_states=4`）。
+代价是后者的 `df` 要扣一截随最近三个状态释放量变的滞后量（近满盘平均约 32–35 块，最大 44 / 52，按 16 KiB 一块 0.5–0.8 MiB），删掉的东西要过三个状态才回来。
+
+````
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:81-109`（整段抄，未转述）**
+
+````markdown
+### 代价（整行抄自 `research/results/e139-tightened-floor-2026-09-12.out`，`near_full` S = 16 各格，24 个种子合计）
+
+```text
+E7RESULT name=near_full arm=A_ring_persisted s=16 c0=1 c_max=5 reserve=57 residue=51 hidden_blocks=108 hidden_bytes=1769472 avg_lag_x100=0 max_lag=0 false_enospc_raw=24 false_enospc_arm=0 true_enospc=24 write_after_delete_failed=0 first_failure_window=0 last_failure_window=0 max_publications=48 bound=48 admissions_under_pressure=10200 forced_per_window_x100=3622 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=48 avg_candidates_x100=4800 avg_nonempty_x100=230 min_states=1 avg_states_x100=325
+E7RESULT name=near_full arm=G_floor_per_disk s=16 c0=1 c_max=5 reserve=16 residue=10 hidden_blocks=26 hidden_bytes=425984 avg_lag_x100=0 max_lag=0 false_enospc_raw=24 false_enospc_arm=0 true_enospc=24 write_after_delete_failed=0 first_failure_window=0 last_failure_window=0 max_publications=7 bound=7 admissions_under_pressure=9984 forced_per_window_x100=486 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=1039 avg_nonempty_x100=431 min_states=1 avg_states_x100=433
+E7RESULT name=near_full arm=G2R_tightened_roots s=16 c0=1 c_max=5 reserve=60 residue=50 hidden_blocks=110 hidden_bytes=1802240 avg_lag_x100=0 max_lag=0 false_enospc_raw=24 false_enospc_arm=0 true_enospc=24 write_after_delete_failed=0 first_failure_window=0 last_failure_window=0 max_publications=7 bound=11 admissions_under_pressure=1848 forced_per_window_x100=131 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=2019 avg_nonempty_x100=885 min_states=1 avg_states_x100=888
+E7RESULT name=near_full arm=G2S_tightened_states s=16 c0=1 c_max=5 reserve=45 residue=35 hidden_blocks=80 hidden_bytes=1310720 avg_lag_x100=3380 max_lag=44 false_enospc_raw=72 false_enospc_arm=0 true_enospc=72 write_after_delete_failed=48 first_failure_window=2 last_failure_window=3 max_publications=4 bound=8 admissions_under_pressure=6552 forced_per_window_x100=114 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=1247 avg_nonempty_x100=1033 min_states=4 avg_states_x100=1033
+E7RESULT name=near_full arm=A_ring_persisted s=16 c0=5 c_max=10 reserve=245 residue=235 hidden_blocks=480 hidden_bytes=7864320 avg_lag_x100=0 max_lag=0 false_enospc_raw=24 false_enospc_arm=0 true_enospc=24 write_after_delete_failed=0 first_failure_window=0 last_failure_window=0 max_publications=48 bound=48 admissions_under_pressure=9624 forced_per_window_x100=3928 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=48 avg_candidates_x100=4800 avg_nonempty_x100=221 min_states=1 avg_states_x100=316
+E7RESULT name=near_full arm=G_floor_per_disk s=16 c0=5 c_max=10 reserve=40 residue=30 hidden_blocks=70 hidden_bytes=1146880 avg_lag_x100=0 max_lag=0 false_enospc_raw=48 false_enospc_arm=0 true_enospc=48 write_after_delete_failed=24 first_failure_window=1 last_failure_window=1 max_publications=7 bound=7 admissions_under_pressure=9720 forced_per_window_x100=485 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=981 avg_nonempty_x100=395 min_states=1 avg_states_x100=397
+E7RESULT name=near_full arm=G2R_tightened_roots s=16 c0=5 c_max=10 reserve=110 residue=95 hidden_blocks=205 hidden_bytes=3358720 avg_lag_x100=0 max_lag=0 false_enospc_raw=24 false_enospc_arm=0 true_enospc=24 write_after_delete_failed=0 first_failure_window=0 last_failure_window=0 max_publications=7 bound=11 admissions_under_pressure=1608 forced_per_window_x100=109 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=2036 avg_nonempty_x100=867 min_states=1 avg_states_x100=871
+E7RESULT name=near_full arm=G2S_tightened_states s=16 c0=5 c_max=10 reserve=80 residue=65 hidden_blocks=145 hidden_bytes=2375680 avg_lag_x100=3517 max_lag=52 false_enospc_raw=96 false_enospc_arm=0 true_enospc=96 write_after_delete_failed=72 first_failure_window=1 last_failure_window=3 max_publications=4 bound=8 admissions_under_pressure=7320 forced_per_window_x100=97 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=1329 avg_nonempty_x100=1146 min_states=4 avg_states_x100=1146
+```
+
+读法：`hidden_blocks` = 保留池 + 推空最坏残留，是这条臂的 `df` 比 E135（动态回退下界） 的口径少报的常数（G2S 另加 `avg_lag_x100` / `max_lag` 那截滞后量）；`forced_per_window_x100` 是每个用户窗口的强制发布数 × 100。
+
+- `df` 少报：G2R 110 / 205 块（1.7 / 3.3 MiB，两档开销对），比 E138（按盘回退下界与推空的空间要求） 的臂 G 多 84 / 135 块——多出来的是 k_tol = 2 的余量与按 c_max 算的差；与 S 无关。臂 A 108 / 480 块，随 N 线性涨。G2S 80 / 145 块加滞后量。
+- 强制发布：G2R 每个用户窗口约 1.1–1.3 次（c₀ = 1）、0.8–1.1 次（c₀ = 5）；臂 A 约 36–39 次（S = 16）；E138（按盘回退下界与推空的空间要求） 的臂 G 约 4.9 次。G2R 比 G 少，是准入按最坏残留收费之后盘紧得更早、处置次数少了（`admissions_under_pressure` 1608–1848 对 9720–9984）。
+- 候选集：G2R 近满盘平均约 20 个根、其中非空约 8.7–8.9 个、最少 5 个根；按状态数最少 1 个。G2S 平均约 12–13 个根、非空约 10–11 个、最少 4 个状态。
+- 格式字节：两条被测臂都要根记录带 F 8 字节，与 E135（动态回退下界） 那一形相同。
+
+推空期间根槽写失败与坏槽（对照臂 A、G 的数，整行抄，S = 16、c₀ = 5）：
+
+```text
+E7RESULT name=drain_failure arm=A_ring_persisted s=16 c0=5 c_max=10 failures=1 cases=104 runs_with_false_enospc=96 runs_with_write_after_delete_failed=96 false_enospc_arm=96 false_enospc_raw=96 write_after_delete_failed=96 max_publications=48 bound=48 stalls=0 fakes=0 unrecoverable=0 retention_violations=0 injected=104
+E7RESULT name=drain_failure arm=G_floor_per_disk s=16 c0=5 c_max=10 failures=2 cases=224 runs_with_false_enospc=64 runs_with_write_after_delete_failed=64 false_enospc_arm=64 false_enospc_raw=64 write_after_delete_failed=64 max_publications=7 bound=7 stalls=0 fakes=0 unrecoverable=0 retention_violations=0 injected=448
+E7RESULT name=broken_slot arm=A_ring_persisted s=16 c0=5 c_max=10 seeds=8 seeds_with_no_space=8 seeds_halted=8 first_failure_window=67 false_enospc_arm=8 false_enospc_raw=8 write_after_delete_failed=8 max_publications=48 bound=48 stalls=8 fakes=0 unrecoverable=0 retention_violations=0 injected=16 forced_per_window_x100=72 max_lag=0
+E7RESULT name=broken_slot arm=G2R_tightened_roots s=16 c0=5 c_max=10 seeds=8 seeds_with_no_space=0 seeds_halted=0 first_failure_window=0 false_enospc_arm=0 false_enospc_raw=0 write_after_delete_failed=0 max_publications=7 bound=11 stalls=0 fakes=0 unrecoverable=0 retention_violations=0 injected=176 forced_per_window_x100=7 max_lag=0
+```
+
+````
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:110-123`（整段抄，未转述）**
+
+```markdown
+### 它答不了的
+
+1. 墙钟：全按发布计。
+2. 真设备：计数模型，不碰设备；坏槽在真设备上多常见没有数。
+3. journal 重放窗口：只建根一级的引用，不建记录。
+4. 实例切换：只建「txg 推进一格、写失败的槽留旧根」这一半；它自己的挂载时预留没有口径，`df` 没扣它。
+5. c_max 是声明的上界，本工程没有它的口径（C83（提交固定点没人回答） 欠着运行时读数）；开销超过 c_max 的格只报不判：G2R 在 c₀ = 1 升到 8 的格照样全 0，G2S 出 32 次假性 ENOSPC。非空发布的元数据固定 5 块。
+6. 容量 4000 块：`df` 少报的块数占容量的比例搬不到真盘上。
+7. 槽位公式与盘归属用的是 first-txn-layout.md 的预想；只有两块盘。
+8. k_tol 固定取 2；别的 k 只有式子（B = 7 + 2k / 4 + 2k）。3 次失败的组合只取了前 20 种（位置靠前），那一格的最大发布数不是 3 次失败的最坏值。
+9. `df_S` 的滞后量是写登记的人替状态数口径构造的，用户没定过 `df` 该不该扣它。
+10. 保留池扫描四个最小值都落在扫描下沿（式子 − 6），两条臂真正要多少没量到。
+11. 环深与状态数的关系（S = 4 上 3 次失败那一格）只有一个观测，没有式子。
+
+```
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:124-139`（整段抄，未转述）**
+
+````markdown
+## 历史版本
+
+### 2026-09-12
+- 新建。装置写作期间改过三处（都在第一次运行之前）：G2S 滞后量那句的算术（漏了前两个窗口各删的 8 块）、滞后量排除空发布放掉的块、
+  收严臂把活着的元数据记回保留池（不记回去，填满与第一次删建之间连着两次处置只有一次删除，G2R 在 c₀ = 5 那一格删了再写失败一次；`df` 报 6，物理上可分配 76）。
+- 第一次运行之后改一处：非空有效根不足 4 个时，按状态数读的上限从「最旧的非空有效根」改成「最旧的有效根」——3 槽的环里比最旧非空根更老的空根带着更老的状态，跳过它们等于丢状态。
+  第一次运行的产物留作 `research/results/e139-tightened-floor-2026-09-12-run1.out`，与第二次只差下面五格与由它们汇总的两行（整行抄自第一次的产物）：
+
+  ```text
+  E7RESULT name=cell arm=G2S_tightened_states world=torn_newest s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=18 checks=9654 min_candidates=2 avg_candidates_x100=299 avg_nonempty_x100=297 min_states=1 avg_states_x100=298 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=disk_loss s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=6 checks=2258 min_candidates=1 avg_candidates_x100=297 avg_nonempty_x100=290 min_states=1 avg_states_x100=292 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=disk_loss s=1 lost_disk=1 fakes=0 unrecoverable=0 retention_violations=6 checks=2258 min_candidates=2 avg_candidates_x100=298 avg_nonempty_x100=291 min_states=1 avg_states_x100=293 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=slot_write_fail s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=6 checks=9654 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=298 min_states=1 avg_states_x100=298 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=admin_rollback s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=5 checks=9677 min_candidates=1 avg_candidates_x100=298 avg_nonempty_x100=297 min_states=1 avg_states_x100=297 stalls=0
+  ```
+
+````
+
+**出处 `.claude/kb/experiments/139-按盘回退下界的收严形态.md:126-139`（整段抄，未转述）**
+
+````markdown
+### 2026-09-12
+- 新建。装置写作期间改过三处（都在第一次运行之前）：G2S 滞后量那句的算术（漏了前两个窗口各删的 8 块）、滞后量排除空发布放掉的块、
+  收严臂把活着的元数据记回保留池（不记回去，填满与第一次删建之间连着两次处置只有一次删除，G2R 在 c₀ = 5 那一格删了再写失败一次；`df` 报 6，物理上可分配 76）。
+- 第一次运行之后改一处：非空有效根不足 4 个时，按状态数读的上限从「最旧的非空有效根」改成「最旧的有效根」——3 槽的环里比最旧非空根更老的空根带着更老的状态，跳过它们等于丢状态。
+  第一次运行的产物留作 `research/results/e139-tightened-floor-2026-09-12-run1.out`，与第二次只差下面五格与由它们汇总的两行（整行抄自第一次的产物）：
+
+  ```text
+  E7RESULT name=cell arm=G2S_tightened_states world=torn_newest s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=18 checks=9654 min_candidates=2 avg_candidates_x100=299 avg_nonempty_x100=297 min_states=1 avg_states_x100=298 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=disk_loss s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=6 checks=2258 min_candidates=1 avg_candidates_x100=297 avg_nonempty_x100=290 min_states=1 avg_states_x100=292 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=disk_loss s=1 lost_disk=1 fakes=0 unrecoverable=0 retention_violations=6 checks=2258 min_candidates=2 avg_candidates_x100=298 avg_nonempty_x100=291 min_states=1 avg_states_x100=293 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=slot_write_fail s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=6 checks=9654 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=298 min_states=1 avg_states_x100=298 stalls=0
+  E7RESULT name=cell arm=G2S_tightened_states world=admin_rollback s=1 lost_disk=0 fakes=0 unrecoverable=0 retention_violations=5 checks=9677 min_candidates=1 avg_candidates_x100=298 avg_nonempty_x100=297 min_states=1 avg_states_x100=297 stalls=0
+  ```
+
+````
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:1-21`（整段抄，未转述）**
+
+````markdown
+## E138 按盘回退下界与推空的空间要求 —— 已跑（2026-09-11）
+
+**问的是**：D16（发布语义） 未定项 1 第二轮三方论证判决之后的两件事——
+① 按盘生效、按盘取上限（用户定案：最少保留 4 个持久根，且每块盘上最新的持久有效根都在内）、保留池计入窗口元数据的动态回退下界（臂 G），
+在把故障注入到抬 F 到生效那段区间里之后成不成立；
+② 它与整环 + 推空（臂 A）在同一个 `df` 口径（扣掉各自的保留池与推空最坏残留）下，D3（空间分配） 已定项 9 的两条达不达标、界各是多少、`df` 各少报多少。
+
+**跑前写死**：`research/prompts/e138-preregistration.md`（写于装置之前；写装置时改过保留池式子与臂 G 的抬 F 时机，都在第一次运行之前，见本文件「历史版本」）。
+写登记的人有两个倾向（臂 G 成立；臂 A 在新 `df` 口径下也许达标），登记里写明了。**结果是第一个倾向错了，第二个对了。**
+
+**复跑命令**（`exact` 模式，与留存产物逐字节比对）：
+
+```bash
+cd research && bash scripts/replay.sh E138
+# 直接跑装置：
+cd research && cargo run --release --bin e138_per_disk_floor
+```
+
+代码 `research/e7-index-bench/src/bin/e138_per_disk_floor.rs`（从 E135（动态回退下界） 的源码拷出来改），
+原始输出 `research/results/e138-per-disk-floor-2026-09-11.out`（一次运行，317 行，末行 `emitted=317`；本机 release 约 43 秒）。
+
+````
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:22-29`（整段抄，未转述）**
+
+```markdown
+### 这是计数模型，不是实现
+
+没有 I/O、随机源是写死的种子 ⇒ 跑 N 遍必然逐字节一致（跑了两遍，md5 一致，只说明没有隐藏状态）。
+证据强度来自 **15 个单测 + 9 条变异全部被抓**（`research/mutations/e138_per_disk_floor.tsv`）；
+变异 M6（恢复时生效值取各盘最大）第一轮一个单测都没红，按 `.claude/rules/mutation-sampling.md` 判为取样点不敏感，补了单测
+`recovery_does_not_activate_floor_carried_on_only_one_disk` 之后抓到。
+跨装置闸两道（E123（K 与回退深度的二选一各要付什么） 的扣住块数、E92（最坏块重用延迟需求） 的 N − K），与 E135（动态回退下界） 同值。
+
+```
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:30-43`（整段抄，未转述）**
+
+```markdown
+### 臂
+
+| 臂 | 是什么 | 角色 |
+|---|---|---|
+| A `ring_persisted` | 可再分配 ⟺ 释放代 ≤ 环里已持久的最旧有效根；准入失败先发布正在攒的窗口，再连续空发布最多 N − 1 次 | 候选 |
+| C `k_runtime` | 释放代 ≤ 最新持久根 + 1 − 3 | 对照：K = 3 在跳号下不够 |
+| D `floor_txg` | E135（动态回退下界） 的臂 D 原样：抬 F 与活化都按 txg 算 | 对照：活化按 txg 算 |
+| G `floor_per_disk` | 抬 F 的上限 = min(每块幸存盘上最新的持久有效根, 第 4 新的持久有效根)；新 F 写进每块幸存盘上至少一个持久根才生效；准入失败先发布正在攒的窗口（txg t），上限够到 t 时一次把 F 抬到 t，最多 6 次空发布 | 被测 |
+| G_count | G，但生效改成「带新 F 的根之后再有 3 次持久发布」 | 对照 |
+| G_txgcap | G，但上限改成 最新持久根 + 1 − 4 | 对照 |
+
+保留池（跑前式子）：A = 2 × 5 + (N − 1) × 空发布开销；G = 2 × 5 + 6 × 空发布开销。推空最坏残留：A = 5 + (N − 2) × 空发布开销；G = 5 + 5 × 空发布开销。
+`df_guaranteed` = 没用过的 + 已释放的 − 保留池 − 推空最坏残留；`df_raw` 不扣（E135（动态回退下界） 的口径）。判据只用前者。
+
+```
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:44-84`（整段抄，未转述）**
+
+````markdown
+### 判决（按跑前写死的判据）
+
+整行抄自 `research/results/e138-per-disk-floor-2026-09-11.out`：
+
+```text
+E7RESULT name=verdict crit1_holds=1 crit2_d_activation_fakes=584 crit2_c_activation_unrecoverable=281 crit2_gcount_double_fakes=171 crit2_gtxgcap_retention=0 crit2_a_raw_false_enospc_s16_cost5=24 crit3_a_fakes=0 crit3_a_unrecoverable=0 crit3_g_fakes=0 crit3_g_unrecoverable=0 crit4_a_false_guaranteed=0 crit4_g_false_guaranteed=0 crit5_a_bound_exceeded_cells=0 crit5_g_bound_exceeded_cells=0 crit5_a_write_after_delete_failed=0 crit5_g_write_after_delete_failed=104 crit6_a_stalls=0 crit6_g_stalls=0 crit7_g_retention=0
+E7RESULT name=crit6_min_no_stall_reserve a_cost1=51 a_cost5=239 g_cost1=14 g_cost5=35
+E7RESULT name=crit8_c281 a=72 c=72 d=72 g=72 g_count=72 g_txg_cap=72
+```
+
+| # | 判据 | 结果 |
+|---|---|---|
+| 1 | 装置与跑前式子 | 全中：推空探针在 t 的三种落点上，A 用 N 次发布、扣住 5 + (N − 2) × 开销；G 用 6 或 7 次、最多扣住 5 + 5 × 开销；S = 1 时两条都是 3 次（产物 `crit1_push` 各行 `holds=1`） |
+| 2 | 对照臂抓不抓得到 | D 584、C 281、G_count 171、A 的 raw 假性 ENOSPC 24，都抓到。**G_txgcap 为 0 ⇒「按盘取上限」那一半记未验**：两个靶子世界都是先抬 F、后写失败，抬 F 时盘 1 上最新的根 ≥ 最新 − 2，这条对照要的是「写失败跳号之后再抬 F」，E138（按盘回退下界与推空的空间要求） 的世界里没有 |
+| 3 | 正确性 | A、G 在全部故障世界（含活化区间里 16 种写失败组合 × 8 个崩溃窗口 × 丢两块盘各一次）零假候选、零不可恢复 |
+| 4 | 第 1 条：不许有假性 ENOSPC | A、G 都是 0（raw 那一列非 0，检测器证明会红） |
+| 5 | 第 2 条：删掉之后有界步数内可用 | **臂 G 出局**：空发布开销 5 块时填满之后删一个对象，下一次写仍报 ENOSPC，S = 4、S = 16 各 24 / 24 个种子（失败时 `df_guaranteed` 也报 < 8，不是假性）；保留池扫描里 ≥ 跑前式子的档位还有 7 档出现。**臂 A 全部成功**。两条臂都没越过各自的界（A = N，G = 7） |
+| 6 | 卡死 | 保留池 ≥ 跑前式子时两条臂都是 0；扫描里不卡死的最小保留池 A 51 / 239、G 14 / 35（开销 1 / 5 块）；臂 A 那两个数正好是扫描的下沿（跑前式子 − 6），它真正要多少没量到，G 那两个在扫描区间里面 |
+| 7 | 最少保留 | G 为 0 |
+| 8 | C281（回退后第一次发布会复用被抛弃时间线还引用的块） | 六条臂各 72，各臂都有（与 C281（回退后第一次发布会复用被抛弃时间线还引用的块） 那一行「每条臂都有」一致） |
+
+臂 G 在保留池扫描里失败的档位（整行抄）：
+
+```text
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=1 reserve=22 formula=16 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=38 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=39 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=40 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=41 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=42 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=46 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=47 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+E7RESULT name=reserve_sweep arm=G_floor_per_disk s=16 empty_cost=5 reserve=48 formula=40 stalls=0 false_enospc_guaranteed=0 write_after_delete_failed=8 max_publications=7 fakes=0
+```
+
+⚠️ **失败不随保留池单调**：开销 5 块时 38–42、46–48 失败，43–45 不失败；开销 1 块时只有 22 失败。
+
+**臂 G 为什么输**（主 agent 在仓外副本里复现并打出那一刻的账，`research/prompts/d16-item1-r3-main-verification.md`；D16（发布语义） 未定项 1 第三轮正推腿先报出「处置做到放回为止也照样输」）：一次处置之后扣着的块数随带新 F 的根落在哪个区域，是 5 + 4 × 开销 或 5 + 5 × 开销；准入按当下实际扣住的量放行，`df_guaranteed` 按最坏那一档扣 ⇒ 填满时系统停在 `df_guaranteed` 有符号值为 −3 的状态（开销 5 块）。
+在这个状态下删 8 块，下一次处置落在多的那一档时可分配只有 5，写失败；落在少的那一档时成功——所以每个种子只失败一次，之后少一个对象就不再失败。
+**病根在准入，不在处置**：处置做到放回为止（发布数仍是 6 或 7）逐种子同样失败；准入改成按最坏残留收费（可分配取「可再分配 − 保留池」与 `df_guaranteed` 的较小值）之后，副本里近满盘四格删了再写失败全部是 0。那一形没进故障世界、没有跑前登记，不是判决。
+
+````
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:85-109`（整段抄，未转述）**
+
+````markdown
+### 代价（整行抄自 `research/results/e138-per-disk-floor-2026-09-11.out`，`near_full` 各格，24 个种子合计）
+
+```text
+E7RESULT name=near_full arm=A_ring_persisted s=1 empty_cost=1 reserve=12 residue=6 hidden_blocks=18 hidden_bytes=294912 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=3 bound=3 admissions_under_pressure=9648 forced_per_window_x100=219 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=162
+E7RESULT name=near_full arm=G_floor_per_disk s=1 empty_cost=1 reserve=16 residue=10 hidden_blocks=26 hidden_bytes=425984 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=7 bound=7 admissions_under_pressure=9648 forced_per_window_x100=220 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=161
+E7RESULT name=near_full arm=A_ring_persisted s=1 empty_cost=5 reserve=20 residue=10 hidden_blocks=30 hidden_bytes=491520 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=3 bound=3 admissions_under_pressure=9624 forced_per_window_x100=220 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=162
+E7RESULT name=near_full arm=G_floor_per_disk s=1 empty_cost=5 reserve=40 residue=30 hidden_blocks=70 hidden_bytes=1146880 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=7 bound=7 admissions_under_pressure=9624 forced_per_window_x100=221 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=3 avg_candidates_x100=300 avg_nonempty_x100=161
+E7RESULT name=near_full arm=A_ring_persisted s=4 empty_cost=1 reserve=21 residue=15 hidden_blocks=36 hidden_bytes=589824 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=12 bound=12 admissions_under_pressure=9768 forced_per_window_x100=886 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=12 avg_candidates_x100=1200 avg_nonempty_x100=211
+E7RESULT name=near_full arm=G_floor_per_disk s=4 empty_cost=1 reserve=16 residue=10 hidden_blocks=26 hidden_bytes=425984 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=7 bound=7 admissions_under_pressure=9744 forced_per_window_x100=479 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=845 avg_nonempty_x100=264
+E7RESULT name=near_full arm=A_ring_persisted s=4 empty_cost=5 reserve=65 residue=55 hidden_blocks=120 hidden_bytes=1966080 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=12 bound=12 admissions_under_pressure=9624 forced_per_window_x100=899 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=12 avg_candidates_x100=1200 avg_nonempty_x100=210
+E7RESULT name=near_full arm=G_floor_per_disk s=4 empty_cost=5 reserve=40 residue=30 hidden_blocks=70 hidden_bytes=1146880 false_enospc_raw=48 false_enospc_guaranteed=0 true_enospc=48 write_after_delete_failed=24 max_publications=7 bound=7 admissions_under_pressure=9696 forced_per_window_x100=484 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=842 avg_nonempty_x100=261
+E7RESULT name=near_full arm=A_ring_persisted s=16 empty_cost=1 reserve=57 residue=51 hidden_blocks=108 hidden_bytes=1769472 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=48 bound=48 admissions_under_pressure=10200 forced_per_window_x100=3622 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=48 avg_candidates_x100=4800 avg_nonempty_x100=230
+E7RESULT name=near_full arm=G_floor_per_disk s=16 empty_cost=1 reserve=16 residue=10 hidden_blocks=26 hidden_bytes=425984 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=7 bound=7 admissions_under_pressure=9984 forced_per_window_x100=486 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=1039 avg_nonempty_x100=431
+E7RESULT name=near_full arm=A_ring_persisted s=16 empty_cost=5 reserve=245 residue=235 hidden_blocks=480 hidden_bytes=7864320 false_enospc_raw=24 false_enospc_guaranteed=0 true_enospc=24 write_after_delete_failed=0 max_publications=48 bound=48 admissions_under_pressure=9624 forced_per_window_x100=3928 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=48 avg_candidates_x100=4800 avg_nonempty_x100=221
+E7RESULT name=near_full arm=G_floor_per_disk s=16 empty_cost=5 reserve=40 residue=30 hidden_blocks=70 hidden_bytes=1146880 false_enospc_raw=48 false_enospc_guaranteed=0 true_enospc=48 write_after_delete_failed=24 max_publications=7 bound=7 admissions_under_pressure=9720 forced_per_window_x100=485 stalls=0 halted_before_counting=0 fakes=0 unrecoverable=0 retention_violations=0 min_candidates=5 avg_candidates_x100=981 avg_nonempty_x100=395
+```
+
+读法：`hidden_blocks` = 保留池 + 推空最坏残留，是 `df` 比 E135（动态回退下界） 的口径少报的块数（`hidden_bytes` 按一块 16 KiB 折）；
+`forced_per_window_x100` 是每个用户窗口的强制发布数 × 100；`avg_nonempty_x100` 是候选集里非空发布的根数 × 100（空发布与推空的根不改用户可见状态）。
+
+- 臂 A 近满盘上候选集满环（S = 16 时 48 个根），**但其中非空发布的根平均只有约 2.2 个**——环里几乎全是推空产生的空根；臂 G 约 4.0 个（最少 5 个根）。
+  E135（动态回退下界） 的「可退代数」数的是根，E138（按盘回退下界与推空的空间要求） 第一次按非空根数。
+- 臂 A 的强制发布：S = 16 时每个用户窗口约 36–39 次，随 S 线性涨；臂 G 约 4.9 次，与 S 无关。
+- `df` 少报：臂 A 在 S = 16、开销 5 块时 480 块（7.5 MiB，按 16 KiB 一块），随 N 线性涨；臂 G 70 块，与 S 无关。
+
+````
+
+**出处 `.claude/kb/experiments/138-按盘回退下界与推空的空间要求.md:110-123`（整段抄，未转述）**
+
+```markdown
+### 它答不了的
+
+1. 墙钟：全按发布计。
+2. 真设备：计数模型，不碰设备。
+3. journal 重放窗口：只建根一级的引用，不建记录。
+4. 实例切换不建；它自己的挂载时预留与保留池叠加没有量。
+5. 空发布开销只取 1 与 5 两档常数；真实开销随树高涨，挂载后保留池可能不再够。
+6. 容量 4000 块：`df` 少报的块数占容量的比例搬不到真盘上，只报块数与字节数。
+7. 槽位公式与盘归属用的是 first-txn-layout.md 的预想；只有两块盘。
+8. **世界里没有「活化区间内崩溃、不丢盘」这一格**：`torn_newest` 在崩溃之前已经把 F 推到两块盘都生效。恢复时生效值怎么取只由单测 `recovery_does_not_activate_floor_carried_on_only_one_disk` 钉着。
+9. **「按盘取上限」没被测到**（判据 2 的 G_txgcap 为 0）：要测它，得有「写失败跳号之后再抬 F」的世界。
+10. **近满盘世界里没有注入任何故障**：「假性 ENOSPC 为 0」「界 N / 7 次发布」只在无故障的近满盘上成立。D16（发布语义） 未定项 1 第三轮反推腿与主 agent 的复现（`research/prompts/d16-item1-r3-main-verification-2.md`）：推空期间一次根槽写失败，臂 A 出假性 ENOSPC、界变 2N − 1；一个根槽持续写不进，臂 A 在占用 70% 时报 ENOSPC 并卡死。
+11. `df_guaranteed` 没扣实例切换的挂载时预留；空发布开销取常数，真实开销随树高涨，式子要按最坏值扣，而最坏值今天没有口径。
+
+```
+
+**出处 `.claude/kb/pitfalls.md:2-29`（整段抄，未转述）**
+
+```markdown
+
+**现有 COW 文件系统上已被证实的设计失误。用法：每做一个设计决定，回来对一遍这张表。**
+
+目前条目主要取自 btrfs——不是针对它，而是因为它的失败模式记录得最完整、
+社区讨论最公开、可考证。别的实现有同类教训一样收进来。
+
+坑的描述来自公开资料与各自的官方文档，**未在本工程验证**。
+"对策"一栏链接到 [decisions.md](decisions.md) 的对应决策。
+
+| # | 坑 | 根因 | 对策 |
+|---|---|---|---|
+| 1 | ENOSPC 荒谬（`df` 有空间但写不进、删文件也报没空间） | 两级分配 + chunk 分类僵化 | ✅ D3（空间分配） 不分类；✅ 不许有假性 ENOSPC、删掉的空间在有界步数内可用（D3（空间分配） 已定项 9，2026-09-11 用户定案），落地形态随 D16（发布语义） 未定项 1 |
+| 2 | RAID5/6 write hole，至今不建议生产使用 | 定宽条带需 read-modify-write | ✅ D2（RAID 条带策略） 变宽全条带 |
+| 3 | extent tree + backref 是复杂度黑洞与 bug 集中区 | 反向索引是长出来的，不是设计的 | ✅ D1（数据可移动性 / 反向索引） day-1 设计 |
+| 4 | fsync 走特例化的 log tree，独立 bug 源 | 第二套事务机制 | ✅ 统一事务层（.claude/rules/fs-design.md） |
+| 5 | 所有数据挤在同一棵树、同一 key 空间、同一把锁 | 单一索引结构 | ✅ D8（核心索引结构） 已定：一套 btree 实现 + 多个独立 keyspace + write buffer / key cache 两个前端 |
+| 6 | RAID 级别只能整盘设，做不到按文件设 | profile 绑在 chunk 上 | ⏸ 候选：指针内联多副本 |
+| 7 | qgroup 又慢又常年记错（+76% 提交时间 / +1347% 事务等待 / −25% 写吞吐） | 记账是后补的，且依赖反向索引遍历 | ✅ D5（快照 / 空间记账机制） birth txg 增量记账 |
+| 8 | `nodatacow` 是逃生舱不是解法（关 COW = 同时丢校验和与快照一致性） | 随机写碎片化没有真答案 | ✅ D26（后台整理与放置回收） 常驻整理 + 结构抗老化叠加，自己解决不押设备 |
+| 9 | degraded 挂载会写出单副本 chunk，越救越糟 | 降级行为没有设计 | ⏸ 未决：降级语义需显式定义 |
+| 10 | `btrfs check --repair` 社区自己劝你别用 | 可重建性不是设计目标 | ✅ 自描述块 + checker day-1 |
+| 11 | 没有原生加密 | 从未进入格式，现在塞不进去 | ✅ D9（加密） 已定：整卷 AEAD，指针里 MAC / nonce / 算法类型 / extent 偏移 day-1 预留，加密本身不进第一版（已定项 10） |
+| 12 | `df` 输出对用户没有意义 | 实现细节泄漏给用户 | ⏸ 未决：空间语义要面向用户设计 |
+| 13 | 原生加密与 send/recv 复制路径长期互相踩（openzfs/zfs#12014 自 2021-05 开着，2025 年仍在修） | 认证结构为了 raw send 而变形：MAC 不能做成 Merkle 树，改用聚合 MAC + objset 层双根 | ⏸ D9（加密）：密文复制的语义要在格式层定，不做成事后功能 |
+| 14 | nonce 绑物理位置 → 搬一个块就要重新加密，后台整理离不开密钥，多副本还字节不同 | 加密与数据可移动性没有一起设计 | ✅ D9（加密） 硬要求：nonce 跟逻辑身份走，存在指针里 |
+| 15 | per-directory 加密逼着文件大小留明文（fsck 要用），filenames / xattr / inline extent 跟着各留一堆缺口 | 加密粒度细于校验粒度 | ✅ D9（加密）：整卷加密，不做 per-directory |
+| 16 | 换用户密钥不使旧的被包裹主密钥失效，可被取证恢复 | 换钥只重新包裹主密钥，不重新加密数据 | ⏸ 没有条款管它（D9（加密） 已全部定案，换钥这一格没立分项）：换钥能保证什么要写给用户看，不能让人以为等于重新加密 |
+
+```
+
+**出处 `.claude/kb/checks-owed.md:94-94`（整段抄，未转述）**
+
+```markdown
+| C83 | 提交固定点没人回答 | **给记账树 / 分配记录树写新 COW 节点本身要分配空间、而分配又改这两棵树** ⇒ 提交收敛是固定点迭代（D3（空间分配）已定项 3、D5（快照 / 空间记账机制）已定项 3、D22（单元原子性怎么合成）已定项 3 三条合起来让全部记账结构都是 COW 树）。迭代收敛性与轮数上界没人证过；上界不存在则 I-8.1（环几何够大）要的「任一事务的最坏 journal 占用」算不出。ZFS 用 sync passes 处理同型问题——线索不是证据，未在本工程验证 | **模型层已还（2026-09-02）**：E81（提交的固定点）实测收敛总会发生（脏节点集有限），但上界由「提交自身产生的块聚不聚簇」定——散布分配把一次 12 单元 fsync 放大到 5909 个元数据块（65 轮、journal 点名项 5921 ⇒ I-8.1（环几何够大）在该政策下没有可用上界），只聚簇元数据就断链（2 轮、28 块）。**决策已落（2026-09-02）：D3（空间分配）已定项 5**。**仍欠**：实现后提交路径记「固定点收敛轮数」、超声明上界判红（政策不是格式位，违反只表现为几百倍的性能悬崖，唯一拦法是这条读数） | 实现侧等事务层与分配器 | 2026-09-02 正推；E81（提交的固定点） |
+```
+
+**出处 `.claude/kb/checks-owed.md:273-275`（整段抄，未转述）**
+
+```markdown
+| C281 | 回退后第一次发布会复用被抛弃时间线还引用的块 | **D23（journal 的角色与格式） 已定项 14（2026-09-05 用户定案）的管理员回退：defer 队列、分配器游标、记账统计量从 R_old 那棵账重新载入，回退与它的第一个新根同一次发布、之前没有持久效果。** ⇒ 这次发布可以分配一个在 R_old 视角已释放、而被抛弃时间线的根还引用的落点；根槽 FUA 之前崩溃时回退行还没落盘，被抛弃的根按实例表全部有效，恢复择新挑中最新那个，而它引用的块已被改写 ⇒ D22（单元原子性怎么合成） 已定项 4「可检测，不可恢复」。与 D16（发布语义） 未定项 1 的 defer 窗口取多大无关，每条臂都有 | 二选一，都改 D23（journal 的角色与格式） 已定项 14（用户定案），要用户定：① 回退那次发布只从「R_old 视角空闲 ∧ 盘上最新有效根视角也空闲」的落点里分配；② 回退那次发布除实例表链与根记录之外不写别的。检查形态：崩溃点重放在回退后第一次发布的每个崩溃点上恢复，I-7.2（最新根可完整遍历） 必须绿；判别力自证：去掉这条约束必须由绿转红 | 事务层、管理员回退实现、崩溃点重放 harness（均未实现）；决策侧先欠用户定案 | 2026-09-11 D16（发布语义） 未定项 1 / 3 / 4 三方论证反推腿 1-A，主 agent 逐字核 D23（journal 的角色与格式） 已定项 14 与 D16（发布语义） 已定项 7 坐实 |
+| C282 | 环里最旧根没有定义 | **D3（空间分配） 已定项 7 的清扫准入（用户定案）与 I-7.4（近 K 代块未被复用） 的注都用「根环最旧根的 checkpoint_txg」，而根槽写失败重发时 checkpoint_txg 推进一格再发（D23（journal 的角色与格式） 已定项 14）、在飞 checkpoint 深度是两个（D16（发布语义） 已定项 5）** ⇒ 盘上的环不是一个 N 代滑动窗；按算术（最新 − N + 1）取，会放出仍被一个自证合法、实例有效的根引用的落点 | 定义写成「盘上全部根槽里自证合法、实例有效的根的最小 checkpoint_txg；写失败的槽按旧内容算，拿不准就回读；在飞、没持久的发布不算」，写在 D3（空间分配） 已定项 7 那条谓词旁边。检查形态：造一个根槽写失败之后的镜像，按算术取最旧根的实现必须被 I-4.8（近 K 代根校验和自洽） 判红；判别力自证：换成按盘上内容取必须转绿 | 根环实现、崩溃点重放 harness | 2026-09-11 D16（发布语义） 三方论证反推腿 1-B / 1-C，主 agent 核 D23（journal 的角色与格式） 已定项 14 索引行「根槽写失败重发时 checkpoint_txg 推进一格再发」坐实 |
+| C283 | 准入失败时不先推发布就报 ENOSPC | **D3（空间分配） 已定项 9（2026-09-11 用户定案）：`df` 报出 s 字节空闲，写 s 字节就必须成功；删掉 s 字节之后同样大小的写在有界步数内成功。今天没有任何条款、任何检查兑现它**：刚释放的块要等若干次发布之后才回可分配集合（D16（发布语义） 新规则 2 与 I-7.4（近 K 代块未被复用）），全仓没有一条写「准入不够时先把扣住的放回来，再判 ENOSPC」；空闲时按 D16（发布语义） 已定项 2 每 5 秒才发布一次。⚠️ **推发布兑不兑现得了，取决于 `df` 报什么**：推空时每次空发布自己释放的块也要等 N 次发布，剩余空间 < N × 空发布开销 + 保留池 + 一次写时推不出空间，E135（动态回退下界） 产物 S = 16、空发布开销 5 块时 24 次假性 ENOSPC——那是 E135（动态回退下界） 的 `df` 口径（扣住的块与保留池都算空闲）；`df` 先扣掉保留池与推空最坏残留 5 + (N − 2) × 空发布开销，那一带就成了真 ENOSPC——E138（按盘回退下界与推空的空间要求） 量过，扣掉之后假性 ENOSPC 为 0、删了再写全部成功，界 N 次发布；⚠️ 只在无故障的近满盘上成立，推空期间一次根槽写失败就不成立，一个根槽持续写不进时回收界冻住（D16（发布语义） 未定项 1 第三轮判决）。btrfs 的同形机制是 flush 状态机里的 `COMMIT_TRANS`（本机树 `fs/btrfs/space-info.c`），未在本项目验证 | 不变量 I-5.3（报出的空闲都兑现得了）做成一条负载检查：近满镜像上删一个对象再写同样大小，必须在界内成功；`df` 报出 ≥ s 时写 s 必须成功。判别力自证：摘掉「把扣住的放回来」那一步，必须由绿转红 | 事务层、准入实现；「有界步数」的界随 D16（发布语义） 未定项 1 的形态定，下一个实验量 | 2026-09-11 用户问「这不就是 btrfs 一样的毛病」，主 agent 现查 kb 零命中、现查 btrfs 源码坐实；同日用户定案 D3（空间分配） 已定项 9 后改写 |
+```
