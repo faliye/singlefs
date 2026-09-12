@@ -1,0 +1,13 @@
+基线：全绿
+✅ [M1_不可解判定只看第一轮] 红：pooled_container_arm_absolute_values
+✅ [M2_阳性对照臂也走求解] 红：positive_control_unsolvable_count_equals_lost_count,add_disk_window_leaves_pooled_container_arm_solvable
+✅ [M3_容器不动点忽略自己] 红：container_fixpoint_accounts_for_itself
+✅ [M4_记录容量按整单元算] 红：cost_absolute,records_per_container_is_pinned
+✅ [M5_镜像臂也发parity格] 红：first_stripe_self_reference_is_unsolvable,parity_header_and_mirrored_container_arms_are_zero,negative_control_no_failure,add_disk_window_leaves_pooled_container_arm_solvable
+✅ [M6_成员表只看自己那一条] 红：add_disk_window_leaves_pooled_container_arm_solvable,pooled_container_arm_absolute_values
+✅ [M7_代价漏掉parity落点] 红：container_fixpoint_accounts_for_itself,add_disk_window_leaves_pooled_container_arm_solvable,negative_control_no_failure,pooled_container_arm_absolute_values,parity_header_and_mirrored_container_arms_are_zero
+✅ [M8_镜像副本当成两个容器] 红：first_stripe_self_reference_is_unsolvable
+✅ [M9_自指那格换一块没坏的盘] 红：first_stripe_self_reference_is_unsolvable
+✅ [M10_占用当成数据格数] 红：cost_absolute,occupancy_is_self_consistent
+✅ [M11_闭式条带数少算一轮] 红：closed_form_matches_loop,cost_absolute,stripe_count_arithmetic
+已还原，基线仍全绿

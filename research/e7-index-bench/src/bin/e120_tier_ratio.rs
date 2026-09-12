@@ -16,7 +16,7 @@
 //!
 //! ## 被引用条款逐字贴在这里
 //!
-//! - **D4 已定项 5**：单元恒 32768 含头。**D18 已定项 11**：打包记录单元头 103。
+//! - **D4 已定项 5**：单元恒 32768 含头。**D18 已定项 11**：打包记录单元头 107。
 //! - **D2 已定项 9**：第一版 2 盘恒 `w` = 2。**D27 已定项 2**：界线 ≤ 4 KiB。
 //! - **D27 已定项 8 ④**：槽定宽，对象补齐到槽宽，槽 `i` 起点 = 头 + `i × W`。
 //! - **E116 的闭式**：回本比下界 = `w / (cap − 1)` ⇒ 要 `cap ≥ 4`（`w` = 2）。
@@ -64,8 +64,8 @@
 use e7_index_bench::Emitter;
 
 const UNIT_BYTES: u64 = 32768;
-const PACKED_UNIT_HEADER_BYTES: u64 = 103;
-const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32665
+const PACKED_UNIT_HEADER_BYTES: u64 = 107;
+const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32661
 const SLOT_EXTRA_BYTES: u64 = 43;
 const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2
 const MINIMUM_SLOT_WIDTH: u64 = 64;
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn main_absolute() {
         let uniform_counts = counts("uniform", OBJECT_COUNT);
-        assert_eq!(containers_variable_length(&uniform_counts), 6814);
+        assert_eq!(containers_variable_length(&uniform_counts), 6815);
         assert_eq!(containers_tiered(&geometric_tiers(1125), &uniform_counts), 7378);
         assert_eq!(containers_tiered(&geometric_tiers(1250), &uniform_counts), 7675);
         assert_eq!(containers_tiered(&geometric_tiers(1500), &uniform_counts), 8101);
@@ -341,7 +341,7 @@ mod tests {
         assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
         assert_eq!(containers_tiered(&geometric_tiers(1125), &log_uniform_counts), 1771);
         assert_eq!(containers_tiered(&geometric_tiers(1250), &log_uniform_counts), 1820);
-        assert_eq!(containers_tiered(&geometric_tiers(1500), &log_uniform_counts), 1903);
+        assert_eq!(containers_tiered(&geometric_tiers(1500), &log_uniform_counts), 1904);
         // ⚠️ discrete 那个分布不中立：它的三个取样点 512 / 1024 / 4096 全是 2 的幂，
         // 所以 r = 2.0 在它上面只多 1 个容器（0.02%），而 r = 1.125 多 1.91%。
         // 只看那个分布会得出「公比越大越好」这个与另两个分布相反的结论。

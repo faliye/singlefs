@@ -1,4 +1,4 @@
-M1_容器头算成0	const PACKED_UNIT_HEADER_BYTES: u64 = 103; // D18 已定项 11	const PACKED_UNIT_HEADER_BYTES: u64 = 0; // D18 已定项 11
+M1_容器头算成0	const PACKED_UNIT_HEADER_BYTES: u64 = 107; // D18 已定项 11	const PACKED_UNIT_HEADER_BYTES: u64 = 0; // D18 已定项 11
 M2_每槽额外算成0	const SLOT_EXTRA_BYTES: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目	const SLOT_EXTRA_BYTES: u64 = 0; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
 M3_界线抬到8KiB	const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB	const PACKING_LIMIT_BYTES: u64 = 8192; // D27 已定项 2：界线 ≤ 4 KiB
 M4_定宽臂不补齐	        let objects_in_tier: u64 = (smallest_size_in_tier..=tier_width).map(|object_size| count_by_size[object_size as usize]).sum();\n        let tier_slots_per_container = slots_per_container(tier_width);	        let objects_in_tier: u64 = (smallest_size_in_tier..=tier_width).map(|object_size| count_by_size[object_size as usize]).sum();\n        let tier_slots_per_container = slots_per_container(smallest_size_in_tier);

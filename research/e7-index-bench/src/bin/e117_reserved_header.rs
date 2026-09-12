@@ -16,7 +16,7 @@
 //! - D9 已定项 2：MAC **满 128 位**不截断 ⇒ 预留的 MAC 位 = 16 字节。
 //! - D9 已定项 4：「指针头部为每个逻辑 extent 存一份 **96 位** nonce」⇒ 完整 nonce = 12 字节。
 //! - D18 已定项 14 臂甲（等用户定案）：nonce 代号就是完整 nonce ⇒ 代号位 = 12 字节。
-//! - D18 已定项 7 补注：E73 的三档下界 58 / 67 / 76 各加 10 成 **68 / 77 / 86**。
+//! - D18 已定项 7 补注：E73 的三档下界 58 / 67 / 76 各加写序 10 与出生序号 4 成 **72 / 81 / 90**（2026-09-12 C288 ②；此前只加写序 10 成 68 / 77 / 86）。
 //!
 //! ## 跑前写死的判据（跑完一个字都没改）
 //!
@@ -49,9 +49,9 @@ const COMMON_PREFIX: u64 = 42;
 /// D18 已定项 7 数据单元类身份段：五元组 33 + 诞生代号 8 + fsid 8 + 写序 10 + 载荷 CRC 4。
 const DATA_IDENTITY: u64 = 63;
 /// D18 已定项 11：打包记录单元头（表内部分）。
-const PACKED_HEADER_BARE_BYTES: u64 = 103;
-/// D18 已定项 7 补注：码 2 三档基础头（58 / 67 / 76 各加写序 10）。
-const NODE_HEADER_BYTES_BY_TIER: [u64; 3] = [68, 77, 86];
+const PACKED_HEADER_BARE_BYTES: u64 = 107;
+/// D18 已定项 7 补注：码 2 三档基础头（58 / 67 / 76 各加写序 10 与出生序号 4）。
+const NODE_HEADER_BYTES_BY_TIER: [u64; 3] = [72, 81, 90];
 /// D9 已定项 2：MAC 满 128 位不截断。
 const MAC_BYTES: u64 = 16;
 /// E98 的 format-const：inode 记录定长。
@@ -190,8 +190,8 @@ mod tests {
         assert_eq!(data_unit_header_bytes(Arm::Bare), 105);
         assert_eq!(data_unit_header_bytes(Arm::ReservedTwelveByteNonceCode), 105 + 28);
         assert_eq!(data_unit_header_bytes(Arm::ReservedFourByteNonceCode), 105 + 20);
-        assert_eq!(packed_header_bytes(Arm::Bare), 103);
-        assert_eq!(packed_header_bytes(Arm::ReservedTwelveByteNonceCode), 103 + 28);
+        assert_eq!(packed_header_bytes(Arm::Bare), 107);
+        assert_eq!(packed_header_bytes(Arm::ReservedTwelveByteNonceCode), 107 + 28);
     }
 
     /// 判据 1：预留位的构成钉死。
@@ -282,8 +282,8 @@ mod tests {
     /// ⇒ 判据 5 由这一格满足，不必造人造取样点。
     #[test]
     fn discriminating_sample_point() {
-        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 1), 105);
-        assert_eq!(node_header_bytes(Arm::ReservedFourByteNonceCode, 1), 97);
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 1), 109);
+        assert_eq!(node_header_bytes(Arm::ReservedFourByteNonceCode, 1), 101);
         assert_eq!(fanout(NODE_BYTES, node_header_bytes(Arm::ReservedTwelveByteNonceCode, 1), UPDATED_POINTER_ENTRY_BYTES), 200);
         assert_eq!(fanout(NODE_BYTES, node_header_bytes(Arm::ReservedFourByteNonceCode, 1), UPDATED_POINTER_ENTRY_BYTES), 201);
     }
@@ -312,14 +312,14 @@ mod tests {
         assert_eq!(NODE_BYTES, 16384);
         assert_eq!(DATA_UNIT_BYTES, 32768);
         assert_eq!(INODE_RECORD_BYTES, 140);
-        assert_eq!(PACKED_HEADER_BARE_BYTES, 103);
+        assert_eq!(PACKED_HEADER_BARE_BYTES, 107);
     }
 
     /// 三档基础头就是 D18 已定项 7 补注那三个数。
     #[test]
     fn node_tiers() {
-        assert_eq!(NODE_HEADER_BYTES_BY_TIER, [68, 77, 86]);
-        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 0), 96);
-        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 2), 114);
+        assert_eq!(NODE_HEADER_BYTES_BY_TIER, [72, 81, 90]);
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 0), 100);
+        assert_eq!(node_header_bytes(Arm::ReservedTwelveByteNonceCode, 2), 118);
     }
 }

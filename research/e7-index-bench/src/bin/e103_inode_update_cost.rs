@@ -7,7 +7,7 @@
 //!   ⚠️ 那个估算**只数了叶子**：住索引叶那一侧算成 1 个 16 KiB 叶，打包那一侧算成 1 个容器 + 1 个索引叶。
 //! - **D23 已定项 1 取甲，逐字**：「每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录。祖先不延后。」
 //!   ⇒ 更新代价必须把**树高**算进去，两条形态的祖先数不同。
-//! - **D18 已定项 11**：打包记录单元头 103（2026-09-05 C113 定案加写序 10 之前是 93，叶容量 233 不变）；容器索引是物理指针唯一持有者，别的树按身份
+//! - **D18 已定项 11**：打包记录单元头 107（2026-09-05 C113 定案加写序 10 之前是 93，2026-09-12 C288 ① 加出生序号 4 之前是 103，叶容量 233 都不变）；容器索引是物理指针唯一持有者，别的树按身份
 //!   （出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8）引用容器；更新一个容器 = COW 它 + 改容器索引一条。
 //! - **D8 已定项 2**：节点 16384。**D4 已定项 7**：单元 32768。**D2 已定项 9**：第一版 2 盘恒 w = 2。
 //! - **D19 已定项 4**：子指针 59。**E98**：inode 记录 140、住索引叶时叶扇出 116（头 58）、内部扇出 243。
@@ -67,7 +67,7 @@ const CHILD_POINTER_BYTES: u64 = 59;
 /// E98 的 inode 记录宽。
 const INODE_RECORD_BYTES: u64 = 140;
 /// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`）。
-const PACKED_UNIT_HEADER_BYTES: u64 = 103;
+const PACKED_UNIT_HEADER_BYTES: u64 = 107;
 /// D2 已定项 9：第一版 2 盘恒 w = 2。
 const COLUMNS_PER_WRITE: u64 = 2;
 /// D23 已定项 12 / E79：每次发布的常量部分（一条 journal 记录 + 根槽），两条形态相同。
@@ -81,7 +81,7 @@ const CONTAINER_KEY_BYTES: u64 = 26;
 /// 第三臂：inode 树内部节点的条目 = 分隔 key 8 + 身份引用 26（与 CONTAINER_KEY_BYTES 同一段）+ 子指针 59 = 93。
 /// 写成字面量是给 27 号门禁（format-const）钉的；与推导式的相等由单测守。
 const INODE_INTERNAL_ENTRY: u64 = 93;
-/// 一个类型 2 容器装几条记录 = ⌊(32768 − 103) / 140⌋ = 233（93 时也是 233）；字面量同样为 27 号门禁，与 fanout() 的相等由单测守。
+/// 一个类型 2 容器装几条记录 = ⌊(32768 − 107) / 140⌋ = 233（93、103 时也是 233）；字面量同样为 27 号门禁，与 fanout() 的相等由单测守。
 const INODE_LEAF_RECORDS: u64 = 233;
 
 const INODE_COUNTS: [u64; 3] = [10_000, 1_000_000, 100_000_000];
@@ -307,7 +307,7 @@ mod tests {
     fn format_constants_match_knowledge_base() {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
         assert_eq!(UNIT_BYTES, 32768, "D4 已定项 7");
-        assert_eq!(PACKED_UNIT_HEADER_BYTES, 103, "D18 已定项 11（C113 定案 2026-09-05 加写序 10）");
+        assert_eq!(PACKED_UNIT_HEADER_BYTES, 107, "D18 已定项 11（C113 定案 2026-09-05 加写序 10；C288 ① 2026-09-12 加出生序号 4）");
         assert_eq!(CHILD_POINTER_BYTES, 59, "D19 已定项 4");
         assert_eq!(COLUMNS_PER_WRITE, 2, "D2 已定项 9");
         assert_eq!(JOURNAL_RECORD_BYTES, 4096, "D23 已定项 12");
@@ -450,7 +450,7 @@ mod tests {
     fn third_arm_leaf_as_container_is_pinned() {
         assert_eq!(INODE_INTERNAL_ENTRY, 93);
         assert_eq!(INODE_INTERNAL_ENTRY, INODE_KEY + CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES, "93 = 8 + 26 + 59");
-        assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), "233 = ⌊(32768 − 103) / 140⌋");
+        assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), "233 = ⌊(32768 − 107) / 140⌋");
         assert_eq!(fanout(NODE_BYTES, 58, INODE_INTERNAL_ENTRY), 175, "(16384 − 58) / 93");
         assert_eq!(fanout(NODE_BYTES, 76, INODE_INTERNAL_ENTRY), 175, "基础头三档（E73 的不带区间下界）里最大的 76");
         assert_eq!(fanout(NODE_BYTES, 92, INODE_INTERNAL_ENTRY), 175, "基础头 76 加 16 字节 key 区间 = 92，扇出仍不掉格");

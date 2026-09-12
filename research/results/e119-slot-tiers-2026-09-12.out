@@ -1,0 +1,136 @@
+E7RESULT name=config unit=32768 pack_hdr=107 net=32661 w=2 slot_extra=43 limit=4096 n=100000
+E7RESULT name=positive_exact tier_width=512 arm=gran64 var_occ=56524800 arm_occ=56524800 same=true
+E7RESULT name=positive_exact tier_width=512 arm=gran256 var_occ=56524800 arm_occ=56524800 same=true
+E7RESULT name=positive_exact tier_width=512 arm=pow2 var_occ=56524800 arm_occ=56524800 same=true
+E7RESULT name=positive_exact tier_width=512 arm=tier4 var_occ=56524800 arm_occ=56524800 same=true
+E7RESULT name=positive_exact tier_width=1024 arm=gran64 var_occ=109248512 arm_occ=109248512 same=true
+E7RESULT name=positive_exact tier_width=1024 arm=gran256 var_occ=109248512 arm_occ=109248512 same=true
+E7RESULT name=positive_exact tier_width=1024 arm=pow2 var_occ=109248512 arm_occ=109248512 same=true
+E7RESULT name=positive_exact tier_width=1024 arm=tier4 var_occ=109248512 arm_occ=109248512 same=true
+E7RESULT name=positive_exact tier_width=2048 arm=gran64 var_occ=218464256 arm_occ=218464256 same=true
+E7RESULT name=positive_exact tier_width=2048 arm=gran256 var_occ=218464256 arm_occ=218464256 same=true
+E7RESULT name=positive_exact tier_width=2048 arm=pow2 var_occ=218464256 arm_occ=218464256 same=true
+E7RESULT name=positive_exact tier_width=2048 arm=tier4 var_occ=218464256 arm_occ=218464256 same=true
+E7RESULT name=positive_exact tier_width=4096 arm=gran64 var_occ=468123648 arm_occ=468123648 same=true
+E7RESULT name=positive_exact tier_width=4096 arm=gran256 var_occ=468123648 arm_occ=468123648 same=true
+E7RESULT name=positive_exact tier_width=4096 arm=pow2 var_occ=468123648 arm_occ=468123648 same=true
+E7RESULT name=positive_exact tier_width=4096 arm=tier4 var_occ=468123648 arm_occ=468123648 same=true
+E7RESULT name=positive_exact tier_width=4096 arm=single var_occ=468123648 arm_occ=468123648 same=true
+E7RESULT name=discrimination var_containers=1725 single_containers=14286 ratio=8.281739 expect=7.457658
+E7RESULT name=negative arm=var containers=0 occ=0
+E7RESULT name=negative arm=gran64 containers=0 occ=0
+E7RESULT name=negative arm=gran256 containers=0 occ=0
+E7RESULT name=negative arm=pow2 containers=0 occ=0
+E7RESULT name=negative arm=tier4 containers=0 occ=0
+E7RESULT name=negative arm=single containers=0 occ=0
+E7RESULT name=main dist=uniform arm=var n=100000 containers=6815 occ=223313920 gain=14.6735 per_obj=2233.14 loss_vs_var=0.0000 tiers=0 min_cap=7
+E7RESULT name=main dist=uniform arm=gran64 n=100000 containers=6935 occ=227246080 gain=14.4196 per_obj=2272.46 loss_vs_var=0.0176 tiers=64 min_cap=7
+E7RESULT name=main dist=uniform arm=gran256 n=100000 containers=7271 occ=238256128 gain=13.7533 per_obj=2382.56 loss_vs_var=0.0669 tiers=16 min_cap=7
+E7RESULT name=main dist=uniform arm=pow2 n=100000 containers=9463 occ=310083584 gain=10.5675 per_obj=3100.84 loss_vs_var=0.3886 tiers=7 min_cap=7
+E7RESULT name=main dist=uniform arm=tier4 n=100000 containers=9525 occ=312115200 gain=10.4987 per_obj=3121.15 loss_vs_var=0.3977 tiers=4 min_cap=7
+E7RESULT name=main dist=uniform arm=single n=100000 containers=14286 occ=468123648 gain=6.9999 per_obj=4681.24 loss_vs_var=1.0963 tiers=1 min_cap=7
+E7RESULT name=main dist=logunif arm=var n=100000 containers=1592 occ=52166656 gain=62.8141 per_obj=521.67 loss_vs_var=0.0000 tiers=0 min_cap=7
+E7RESULT name=main dist=logunif arm=gran64 n=100000 containers=1745 occ=57180160 gain=57.3066 per_obj=571.80 loss_vs_var=0.0961 tiers=64 min_cap=7
+E7RESULT name=main dist=logunif arm=gran256 n=100000 containers=2186 occ=71630848 gain=45.7457 per_obj=716.31 loss_vs_var=0.3731 tiers=16 min_cap=7
+E7RESULT name=main dist=logunif arm=pow2 n=100000 containers=2099 occ=68780032 gain=47.6417 per_obj=687.80 loss_vs_var=0.3185 tiers=7 min_cap=7
+E7RESULT name=main dist=logunif arm=tier4 n=100000 containers=3038 occ=99549184 gain=32.9164 per_obj=995.49 loss_vs_var=0.9083 tiers=4 min_cap=7
+E7RESULT name=main dist=logunif arm=single n=100000 containers=14286 occ=468123648 gain=6.9999 per_obj=4681.24 loss_vs_var=7.9736 tiers=1 min_cap=7
+E7RESULT name=main dist=discrete arm=var n=100000 containers=6448 occ=211288064 gain=15.5087 per_obj=2112.88 loss_vs_var=0.0000 tiers=0 min_cap=7
+E7RESULT name=main dist=discrete arm=gran64 n=100000 containers=6449 occ=211320832 gain=15.5063 per_obj=2113.21 loss_vs_var=0.0002 tiers=64 min_cap=7
+E7RESULT name=main dist=discrete arm=gran256 n=100000 containers=6449 occ=211320832 gain=15.5063 per_obj=2113.21 loss_vs_var=0.0002 tiers=16 min_cap=7
+E7RESULT name=main dist=discrete arm=pow2 n=100000 containers=6449 occ=211320832 gain=15.5063 per_obj=2113.21 loss_vs_var=0.0002 tiers=7 min_cap=7
+E7RESULT name=main dist=discrete arm=tier4 n=100000 containers=6449 occ=211320832 gain=15.5063 per_obj=2113.21 loss_vs_var=0.0002 tiers=4 min_cap=7
+E7RESULT name=main dist=discrete arm=single n=100000 containers=14286 occ=468123648 gain=6.9999 per_obj=4681.24 loss_vs_var=1.2156 tiers=1 min_cap=7
+E7RESULT name=capgate arm=gran64 tier=64 cap=305 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=128 cap=191 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=192 cap=138 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=256 cap=109 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=320 cap=89 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=384 cap=76 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=448 cap=66 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=512 cap=58 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=576 cap=52 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=640 cap=47 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=704 cap=43 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=768 cap=40 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=832 cap=37 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=896 cap=34 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=960 cap=32 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1024 cap=30 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1088 cap=28 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1152 cap=27 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1216 cap=25 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1280 cap=24 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1344 cap=23 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1408 cap=22 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1472 cap=21 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1536 cap=20 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1600 cap=19 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1664 cap=19 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1728 cap=18 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1792 cap=17 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1856 cap=17 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1920 cap=16 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=1984 cap=16 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2048 cap=15 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2112 cap=15 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2176 cap=14 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2240 cap=14 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2304 cap=13 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2368 cap=13 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2432 cap=13 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2496 cap=12 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2560 cap=12 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2624 cap=12 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2688 cap=11 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2752 cap=11 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2816 cap=11 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2880 cap=11 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=2944 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3008 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3072 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3136 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3200 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3264 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3328 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3392 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3456 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3520 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3584 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3648 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3712 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3776 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3840 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3904 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=3968 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=4032 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran64 tier=4096 cap=7 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=256 cap=109 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=512 cap=58 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=768 cap=40 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=1024 cap=30 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=1280 cap=24 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=1536 cap=20 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=1792 cap=17 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=2048 cap=15 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=2304 cap=13 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=2560 cap=12 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=2816 cap=11 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=3072 cap=10 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=3328 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=3584 cap=9 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=3840 cap=8 pays_back=true
+E7RESULT name=capgate arm=gran256 tier=4096 cap=7 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=64 cap=305 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=128 cap=191 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=256 cap=109 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=512 cap=58 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=1024 cap=30 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=2048 cap=15 pays_back=true
+E7RESULT name=capgate arm=pow2 tier=4096 cap=7 pays_back=true
+E7RESULT name=capgate arm=tier4 tier=512 cap=58 pays_back=true
+E7RESULT name=capgate arm=tier4 tier=1024 cap=30 pays_back=true
+E7RESULT name=capgate arm=tier4 tier=2048 cap=15 pays_back=true
+E7RESULT name=capgate arm=tier4 tier=4096 cap=7 pays_back=true
+E7RESULT name=capgate arm=single tier=4096 cap=7 pays_back=true
+E7RESULT name=done emitted=136

@@ -1,0 +1,8 @@
+基线：全绿
+✅ [M1_活槽表按每槽一条算] 红：crossover_is_pinned,signed_tables_are_pinned
+✅ [M2_成员表不随宽度涨] 红：member_snapshot_scales_with_width
+✅ [M3_上锁只写不读] 红：crossover_is_pinned
+✅ [M4_映射表漏掉副本维] 红：map_costs_are_pinned
+✅ [M5_每次发布漏掉树路径] 红：crossover_is_pinned,map_costs_are_pinned
+✅ [M6_填充率当成满] 红：crossover_is_pinned,signed_tables_are_pinned
+已还原，基线仍全绿

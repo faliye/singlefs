@@ -1,0 +1,65 @@
+E7RESULT name=config note=条带成员表的载体 devs=8 n_ord=4096 widths=3,4 unit_bytes=32768 packed_hdr=107 rec=56 per_container=583 reserve_h=128 cap_bytes=17592186044416 fill=0.9
+E7RESULT name=fail1 arm=甲_容器同池 seed=1 grids=5749 stripes=1643 containers=10 lost=682 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲_容器同池 seed=2 grids=5749 stripes=1643 containers=10 lost=695 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲_容器同池 seed=3 grids=5749 stripes=1643 containers=10 lost=726 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲_容器同池 seed=4 grids=5749 stripes=1643 containers=10 lost=680 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲_容器同池 seed=5 grids=5749 stripes=1643 containers=10 lost=712 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=summary arm=甲_容器同池 no_failure_unsolvable=0 cost_bytes=27157757952 cost_ppm=1543.7
+E7RESULT name=fail1 arm=甲镜_容器镜像 seed=1 grids=5755 stripes=1649 containers=10 lost=683 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲镜_容器镜像 seed=2 grids=5755 stripes=1649 containers=10 lost=695 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲镜_容器镜像 seed=3 grids=5755 stripes=1649 containers=10 lost=726 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲镜_容器镜像 seed=4 grids=5755 stripes=1649 containers=10 lost=680 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=fail1 arm=甲镜_容器镜像 seed=5 grids=5755 stripes=1649 containers=10 lost=712 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=summary arm=甲镜_容器镜像 no_failure_unsolvable=0 cost_bytes=54315515904 cost_ppm=3087.5
+E7RESULT name=fail1 arm=乙_parity自证 seed=1 grids=5735 stripes=1639 containers=0 lost=681 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=乙_parity自证 seed=2 grids=5735 stripes=1639 containers=0 lost=694 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=乙_parity自证 seed=3 grids=5735 stripes=1639 containers=0 lost=723 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=乙_parity自证 seed=4 grids=5735 stripes=1639 containers=0 lost=678 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=乙_parity自证 seed=5 grids=5735 stripes=1639 containers=0 lost=711 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=summary arm=乙_parity自证 no_failure_unsolvable=0 cost_bytes=44176806400 cost_ppm=2511.2
+E7RESULT name=fail1 arm=丙_无成员表 seed=1 grids=5735 stripes=1639 containers=0 lost=681 unsolvable=681 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=丙_无成员表 seed=2 grids=5735 stripes=1639 containers=0 lost=694 unsolvable=694 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=丙_无成员表 seed=3 grids=5735 stripes=1639 containers=0 lost=723 unsolvable=723 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=丙_无成员表 seed=4 grids=5735 stripes=1639 containers=0 lost=678 unsolvable=678 rounds=0 solved_after_first=0
+E7RESULT name=fail1 arm=丙_无成员表 seed=5 grids=5735 stripes=1639 containers=0 lost=711 unsolvable=711 rounds=0 solved_after_first=0
+E7RESULT name=summary arm=丙_无成员表 no_failure_unsolvable=0 cost_bytes=0 cost_ppm=0.0
+E7RESULT name=add_disk arm=甲_容器同池 devs=8 prefill=4096 new_dev=7 containers=10 lost=1643 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=add_disk arm=甲镜_容器镜像 devs=8 prefill=4096 new_dev=7 containers=10 lost=1649 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=add_disk arm=乙_parity自证 devs=8 prefill=4096 new_dev=7 containers=0 lost=1639 unsolvable=0 rounds=0 solved_after_first=0
+E7RESULT name=add_disk arm=丙_无成员表 devs=8 prefill=4096 new_dev=7 containers=0 lost=1639 unsolvable=1639 rounds=0 solved_after_first=0
+E7RESULT name=first_stripe arm=甲_容器同池 seed=1 devs=4 w=4 containers=1 container_dev=3 self_referential=true lost=1 unsolvable=1 rounds=1 solved_after_first=0
+E7RESULT name=first_stripe arm=甲_容器同池 seed=2 devs=4 w=4 containers=1 container_dev=2 self_referential=true lost=1 unsolvable=1 rounds=1 solved_after_first=0
+E7RESULT name=first_stripe arm=甲_容器同池 seed=3 devs=4 w=4 containers=1 container_dev=0 self_referential=true lost=1 unsolvable=1 rounds=1 solved_after_first=0
+E7RESULT name=first_stripe arm=甲_容器同池 seed=4 devs=4 w=4 containers=1 container_dev=1 self_referential=true lost=1 unsolvable=1 rounds=1 solved_after_first=0
+E7RESULT name=first_stripe arm=甲_容器同池 seed=5 devs=4 w=4 containers=1 container_dev=3 self_referential=true lost=1 unsolvable=1 rounds=1 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=583 seed=1 containers=10 container_frac=0.0017 lost=682 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=583 seed=2 containers=10 container_frac=0.0017 lost=695 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=583 seed=3 containers=10 container_frac=0.0017 lost=726 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=583 seed=4 containers=10 container_frac=0.0017 lost=680 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=583 seed=5 containers=10 container_frac=0.0017 lost=712 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=64 seed=1 containers=92 container_frac=0.0157 lost=696 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=64 seed=2 containers=92 container_frac=0.0157 lost=709 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=64 seed=3 containers=92 container_frac=0.0157 lost=740 unsolvable=0 rounds=3 solved_after_first=2
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=64 seed=4 containers=92 container_frac=0.0157 lost=688 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=64 seed=5 containers=92 container_frac=0.0157 lost=730 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=16 seed=1 containers=393 container_frac=0.0625 lost=755 unsolvable=0 rounds=3 solved_after_first=2
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=16 seed=2 containers=393 container_frac=0.0625 lost=745 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=16 seed=3 containers=393 container_frac=0.0625 lost=793 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=16 seed=4 containers=393 container_frac=0.0625 lost=741 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=16 seed=5 containers=393 container_frac=0.0625 lost=785 unsolvable=0 rounds=3 solved_after_first=2
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=8 seed=1 containers=869 container_frac=0.1250 lost=832 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=8 seed=2 containers=869 container_frac=0.1250 lost=824 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=8 seed=3 containers=869 container_frac=0.1250 lost=874 unsolvable=0 rounds=3 solved_after_first=3
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=8 seed=4 containers=869 container_frac=0.1250 lost=820 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=8 seed=5 containers=869 container_frac=0.1250 lost=878 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=4 seed=1 containers=2206 container_frac=0.2500 lost=1065 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=4 seed=2 containers=2206 container_frac=0.2500 lost=1052 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=4 seed=3 containers=2206 container_frac=0.2500 lost=1109 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=4 seed=4 containers=2206 container_frac=0.2500 lost=1060 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=4 seed=5 containers=2206 container_frac=0.2500 lost=1101 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=2 seed=1 containers=9558 container_frac=0.5000 lost=2374 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=2 seed=2 containers=9558 container_frac=0.5000 lost=2312 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=2 seed=3 containers=9558 container_frac=0.5000 lost=2379 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=2 seed=4 containers=9558 container_frac=0.5000 lost=2328 unsolvable=0 rounds=2 solved_after_first=0
+E7RESULT name=cap_sweep arm=甲_容器同池 cap=2 seed=5 containers=9558 container_frac=0.5000 lost=2398 unsolvable=0 rounds=3 solved_after_first=1
+E7RESULT name=done emitted=65

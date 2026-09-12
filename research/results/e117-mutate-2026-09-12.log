@@ -1,0 +1,14 @@
+基线：全绿
+✅ [M1_MAC宽度算成0] 红：discriminating_sample_point,head_widths_absolute,node_fanout_at_updated_pointer_entry,node_tiers,payload_absolute,reserved_composition,sampling_insensitive_at_e73_entry
+✅ [M2_预留位整个漏掉] 红：discriminating_sample_point,head_widths_absolute,node_fanout_at_updated_pointer_entry,node_fanout_e73_entry,node_tiers,payload_absolute,reserved_composition,sampling_insensitive_at_e73_entry
+✅ [M3_共同前缀少一格] 红：head_widths_absolute,payload_absolute
+✅ [M4_类身份段算错] 红：head_widths_absolute,payload_absolute
+✅ [M5_打包头用旧值] 红：format_constants,head_widths_absolute
+✅ [M6_三档基础头外推] 红：discriminating_sample_point,node_fanout_at_updated_pointer_entry,node_fanout_e73_entry,node_tiers
+✅ [M7_扇出不减头] 红：discriminating_sample_point,negative_control,node_fanout_at_updated_pointer_entry,node_fanout_e73_entry,packed_records_absolute
+✅ [M8_头装不下时返回1] 红：negative_control
+✅ [M9_D19条目宽算成E73] 红：discriminating_sample_point,node_fanout_at_updated_pointer_entry,positive_control_on_every_arm
+✅ [M10_inode记录宽算错] 红：format_constants,packed_records_absolute,positive_control_on_every_arm
+✅ [M11_resv4臂等同resv12] 红：discriminating_sample_point,head_widths_absolute,node_fanout_at_updated_pointer_entry,reserved_composition
+✅ [M12_节点大小算成数据单元] 红：format_constants,discriminating_sample_point,node_fanout_at_updated_pointer_entry,node_fanout_e73_entry,positive_control_on_every_arm,sampling_insensitive_at_e73_entry
+已还原，基线仍全绿

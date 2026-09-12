@@ -49,8 +49,8 @@ const ROOT_SLOT_BYTES: u64 = 512;
 const MAIN_LEAVES: u64 = 8;
 /// 那条共享脊柱上被 COW 的索引节点数。
 const SPINE_NODES: u64 = 4;
-/// 码 3 打包记录容器 32768、头 103（D18 已定项 11）。
-const PACKED_CONTAINER_HEADER_BYTES: u64 = 103;
+/// 码 3 打包记录容器 32768、头 107（D18 已定项 11）。
+const PACKED_CONTAINER_HEADER_BYTES: u64 = 107;
 /// 条带成员记录定长 56（E106 已钉：格宽标志 1 + w 1 + 自己是第几列 1 + 成员表 4×10 + 条带诞生代 8 + 补齐 5）。
 const STRIPE_RECORD_BYTES: u64 = 56;
 /// 容器索引节点头 76、条目 85（E106 / D18 已定项 11 口径）。
@@ -556,7 +556,7 @@ mod tests {
     /// E106 已钉的同一个数，直接抄过来做交叉校验。
     #[test]
     fn records_per_container_matches_e106() {
-        assert_eq!(PACKED_CONTAINER_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 17, 32768);
+        assert_eq!(PACKED_CONTAINER_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 13, 32768);
         assert_eq!(records_per_container(), 583);
     }
 

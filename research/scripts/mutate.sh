@@ -54,6 +54,11 @@ WORK_SRC="$WORK/$SRC"
 MUTATE_TARGET="${MUTATE_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-mutate-target}"
 ORIGINAL_SUM="$(sha256sum "$SRC" | cut -d' ' -f1)"
 BAK="$(mktemp)"; cp "$WORK_SRC" "$BAK"
+# ⚠️ rsync -a 保留源码的旧 mtime，而 $MUTATE_TARGET 跨轮共用：上一轮中途退出（替换没命中 exit 3）时
+# 那里留着一份**打着变异**编出来的二进制，它比副本里的源码新 ⇒ cargo 判「不用重编」，基线直接跑变异版。
+# 实测（2026-09-12）：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
+# 先 touch 被测源码，逼 cargo 按这一轮的副本重编。
+touch "$WORK_SRC"
 restore() { cp "$BAK" "$WORK_SRC"; }
 cleanup() { rm -rf "${WORK:?}" "${BAK:?}"; }
 trap cleanup EXIT

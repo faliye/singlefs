@@ -18,7 +18,7 @@
 //!
 //! - **D4 已定项 5**：单元恒 32768 含头。**已定项 1**：元数据侧 16 KiB、数据侧 32 KiB。
 //! - **D8 已定项 2**：索引节点 16384（`format-const NODE_BYTES`）。
-//! - **D18 已定项 7**：单元头三档 68 / 77 / 86。**已定项 11**：打包记录单元头 103。
+//! - **D18 已定项 7**：单元头三档 68 / 77 / 86。**已定项 11**：打包记录单元头 107。
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
@@ -75,7 +75,7 @@ use e7_index_bench::Emitter;
 // ── 有出处的格式常量 ────────────────────────────────────────────────
 const UNIT: u64 = 32768; // D4 已定项 5
 const NODE: u64 = 16384; // D8 已定项 2（format-const NODE_BYTES）
-const PACK_HDR: u64 = 103; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）
+const PACK_HDR: u64 = 107; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）
 const NODE_HDR: u64 = 86; // D18 已定项 7 三档头最宽那档
 const W: u64 = 2; // D2 已定项 9
 const MAP_KEY: u64 = 33; // D18 已定项 3
@@ -315,7 +315,7 @@ mod tests {
         assert_eq!(capacity(4096, SLOT_EXTRA), 7);
         assert_eq!(capacity(8192, SLOT_EXTRA), 3);
         assert_eq!(capacity(16384, SLOT_EXTRA), 1);
-        // 头宽敏感的取样点：头 103 时 1，头 0 时 2
+        // 头宽敏感的取样点：头 107 时 1，头 0 时 2
         assert_eq!(capacity(16286, SLOT_EXTRA), 1);
         assert_eq!((UNIT - 0) / (16286 + SLOT_EXTRA), 2);
     }

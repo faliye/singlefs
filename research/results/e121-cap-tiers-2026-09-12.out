@@ -1,0 +1,49 @@
+E7RESULT name=config unit=32768 pack_hdr=107 net=32661 slot_extra=43 limit=4096 n=100000 arms=["wgeo", "wgeo_dedup", "capgeo125", "capgeo150", "capgeo200", "capall"]
+E7RESULT name=positive_exact_summary arm=wgeo tiers=36 all_same=true
+E7RESULT name=positive_exact_summary arm=wgeo_dedup tiers=36 all_same=true
+E7RESULT name=positive_exact_summary arm=capgeo125 tiers=15 all_same=true
+E7RESULT name=positive_exact_summary arm=capgeo150 tiers=10 all_same=true
+E7RESULT name=positive_exact_summary arm=capgeo200 tiers=5 all_same=true
+E7RESULT name=positive_exact_summary arm=capall tiers=248 all_same=true
+E7RESULT name=discrimination capgeo200=9117 capall=6979 differ=true
+E7RESULT name=negative arm=var containers=0
+E7RESULT name=negative arm=wgeo containers=0
+E7RESULT name=negative arm=wgeo_dedup containers=0
+E7RESULT name=negative arm=capgeo125 containers=0
+E7RESULT name=negative arm=capgeo150 containers=0
+E7RESULT name=negative arm=capgeo200 containers=0
+E7RESULT name=negative arm=capall containers=0
+E7RESULT name=table arm=wgeo tiers=36 worst_waste=0.111034 min_cap=7 min_tier=64 max_tier=4096
+E7RESULT name=table arm=wgeo_dedup tiers=36 worst_waste=0.111034 min_cap=7 min_tier=64 max_tier=4096
+E7RESULT name=table arm=capgeo125 tiers=15 worst_waste=0.252928 min_cap=7 min_tier=133 max_tier=4096
+E7RESULT name=table arm=capgeo150 tiers=10 worst_waste=0.445378 min_cap=7 min_tier=65 max_tier=4096
+E7RESULT name=table arm=capgeo200 tiers=5 worst_waste=0.538889 min_cap=7 min_tier=248 max_tier=4096
+E7RESULT name=table arm=capall tiers=248 worst_waste=0.111909 min_cap=7 min_tier=64 max_tier=4096
+E7RESULT name=main dist=uniform arm=var containers=6815 loss=0.0000
+E7RESULT name=main dist=uniform arm=wgeo containers=7378 loss=0.0826 tiers=36
+E7RESULT name=main dist=uniform arm=wgeo_dedup containers=7378 loss=0.0826 tiers=36
+E7RESULT name=main dist=uniform arm=capgeo125 containers=7456 loss=0.0941 tiers=15
+E7RESULT name=main dist=uniform arm=capgeo150 containers=8181 loss=0.2004 tiers=10
+E7RESULT name=main dist=uniform arm=capgeo200 containers=9117 loss=0.3378 tiers=5
+E7RESULT name=main dist=uniform arm=capall containers=6979 loss=0.0241 tiers=248
+E7RESULT name=main dist=logunif arm=var containers=1592 loss=0.0000
+E7RESULT name=main dist=logunif arm=wgeo containers=1771 loss=0.1124 tiers=36
+E7RESULT name=main dist=logunif arm=wgeo_dedup containers=1771 loss=0.1124 tiers=36
+E7RESULT name=main dist=logunif arm=capgeo125 containers=1918 loss=0.2048 tiers=15
+E7RESULT name=main dist=logunif arm=capgeo150 containers=1917 loss=0.2041 tiers=10
+E7RESULT name=main dist=logunif arm=capgeo200 containers=2423 loss=0.5220 tiers=5
+E7RESULT name=main dist=logunif arm=capall containers=1789 loss=0.1237 tiers=248
+E7RESULT name=main dist=discrete arm=var containers=6448 loss=0.0000
+E7RESULT name=main dist=discrete arm=wgeo containers=6571 loss=0.0191 tiers=36
+E7RESULT name=main dist=discrete arm=wgeo_dedup containers=6571 loss=0.0191 tiers=36
+E7RESULT name=main dist=discrete arm=capgeo125 containers=6569 loss=0.0188 tiers=15
+E7RESULT name=main dist=discrete arm=capgeo150 containers=6900 loss=0.0701 tiers=10
+E7RESULT name=main dist=discrete arm=capgeo200 containers=6549 loss=0.0157 tiers=5
+E7RESULT name=main dist=discrete arm=capall containers=6449 loss=0.0002 tiers=248
+E7RESULT name=wmin arm=capgeo150 w_min=32 dist=uniform tiers=10 containers=8181 loss=0.2004 floor_waste_bytes=31
+E7RESULT name=wmin arm=capgeo150 w_min=32 dist=logunif tiers=10 containers=1917 loss=0.2041 floor_waste_bytes=31
+E7RESULT name=wmin arm=capgeo150 w_min=64 dist=uniform tiers=10 containers=8181 loss=0.2004 floor_waste_bytes=63
+E7RESULT name=wmin arm=capgeo150 w_min=64 dist=logunif tiers=10 containers=1917 loss=0.2041 floor_waste_bytes=63
+E7RESULT name=wmin arm=capgeo150 w_min=128 dist=uniform tiers=8 containers=8189 loss=0.2016 floor_waste_bytes=127
+E7RESULT name=wmin arm=capgeo150 w_min=128 dist=logunif tiers=8 containers=2166 loss=0.3606 floor_waste_bytes=127
+E7RESULT name=done emitted=49

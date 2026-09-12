@@ -1,4 +1,4 @@
-M1_容器头算成0	const PACK_HDR: u64 = 103; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）	const PACK_HDR: u64 = 0; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）
+M1_容器头算成0	const PACK_HDR: u64 = 107; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）	const PACK_HDR: u64 = 0; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）
 M2_元数据节点当成数据单元	const NODE: u64 = 16384; // D8 已定项 2（format-const NODE_BYTES）	const NODE: u64 = 32768; // D8 已定项 2（format-const NODE_BYTES）
 M3_副本数算成1	const W: u64 = 2; // D2 已定项 9	const W: u64 = 1; // D2 已定项 9
 M4_映射条目少算位置条目	const MAP_ENTRY: u64 = MAP_KEY + LOC_ENTRY * W; // 61	const MAP_ENTRY: u64 = MAP_KEY + LOC_ENTRY; // 61
@@ -13,4 +13,4 @@ M12_搬迁读只读对象不读整单元	             move_read: n * UNIT, blast
 M13_爆炸半径算成1	             move_read: n * UNIT, blast: cap }	             move_read: n * UNIT, blast: 1 }
 M14_死槽全死概率算反	    let alive_frac = if correlated { 1.0 - d } else { 1.0 - d.powi(cap as i32) };	    let alive_frac = if correlated { 1.0 - d } else { 1.0 - d };
 M15_批量散布模型退化成常数	    let per_batch = l * (1.0 - (1.0 - 1.0 / l).powi(b.min(n) as i32));	    let per_batch = l;
-M16_journal记录头算错	const JOURNAL_HEADER_BYTES: u64 = 78; // D23（format-const JOURNAL_HEADER_BYTES）	const JOURNAL_HEADER_BYTES: u64 = 8; // D23（format-const JOURNAL_HEADER_BYTES）
+M16_journal记录头算错	const JOURNAL_HEADER_BYTES: u64 = 78; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES	const JOURNAL_HEADER_BYTES: u64 = 8; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES

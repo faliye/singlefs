@@ -1,0 +1,102 @@
+E7RESULT name=config unit=32768 pack_hdr=107 net=32661 slot_extra=43 limit=4096 w_min=64 n=100000 ratios=[1125, 1250, 1500, 2000]
+E7RESULT name=positive_exact r=1125 tier=64 var=328 tiered=328 same=true
+E7RESULT name=positive_exact r=1125 tier=72 var=353 tiered=353 same=true
+E7RESULT name=positive_exact r=1125 tier=81 var=381 tiered=381 same=true
+E7RESULT name=positive_exact r=1125 tier=92 var=415 tiered=415 same=true
+E7RESULT name=positive_exact r=1125 tier=104 var=451 tiered=451 same=true
+E7RESULT name=positive_exact r=1125 tier=117 var=491 tiered=491 same=true
+E7RESULT name=positive_exact r=1125 tier=132 var=538 tiered=538 same=true
+E7RESULT name=positive_exact r=1125 tier=149 var=589 tiered=589 same=true
+E7RESULT name=positive_exact r=1125 tier=168 var=650 tiered=650 same=true
+E7RESULT name=positive_exact r=1125 tier=189 var=715 tiered=715 same=true
+E7RESULT name=positive_exact r=1125 tier=213 var=788 tiered=788 same=true
+E7RESULT name=positive_exact r=1125 tier=240 var=870 tiered=870 same=true
+E7RESULT name=positive_exact r=1125 tier=270 var=962 tiered=962 same=true
+E7RESULT name=positive_exact r=1125 tier=304 var=1064 tiered=1064 same=true
+E7RESULT name=positive_exact r=1125 tier=342 var=1191 tiered=1191 same=true
+E7RESULT name=positive_exact r=1125 tier=385 var=1316 tiered=1316 same=true
+E7RESULT name=positive_exact r=1125 tier=434 var=1471 tiered=1471 same=true
+E7RESULT name=positive_exact r=1125 tier=489 var=1640 tiered=1640 same=true
+E7RESULT name=positive_exact r=1125 tier=551 var=1852 tiered=1852 same=true
+E7RESULT name=positive_exact r=1125 tier=620 var=2041 tiered=2041 same=true
+E7RESULT name=positive_exact r=1125 tier=698 var=2273 tiered=2273 same=true
+E7RESULT name=positive_exact r=1125 tier=786 var=2565 tiered=2565 same=true
+E7RESULT name=positive_exact r=1125 tier=885 var=2858 tiered=2858 same=true
+E7RESULT name=positive_exact r=1125 tier=996 var=3226 tiered=3226 same=true
+E7RESULT name=positive_exact r=1125 tier=1121 var=3572 tiered=3572 same=true
+E7RESULT name=positive_exact r=1125 tier=1262 var=4000 tiered=4000 same=true
+E7RESULT name=positive_exact r=1125 tier=1420 var=4546 tiered=4546 same=true
+E7RESULT name=positive_exact r=1125 tier=1598 var=5264 tiered=5264 same=true
+E7RESULT name=positive_exact r=1125 tier=1798 var=5883 tiered=5883 same=true
+E7RESULT name=positive_exact r=1125 tier=2023 var=6667 tiered=6667 same=true
+E7RESULT name=positive_exact r=1125 tier=2276 var=7143 tiered=7143 same=true
+E7RESULT name=positive_exact r=1125 tier=2561 var=8334 tiered=8334 same=true
+E7RESULT name=positive_exact r=1125 tier=2882 var=9091 tiered=9091 same=true
+E7RESULT name=positive_exact r=1125 tier=3243 var=11112 tiered=11112 same=true
+E7RESULT name=positive_exact r=1125 tier=3649 var=12500 tiered=12500 same=true
+E7RESULT name=positive_exact r=1125 tier=4096 var=14286 tiered=14286 same=true
+E7RESULT name=positive_exact r=1250 tier=64 var=328 tiered=328 same=true
+E7RESULT name=positive_exact r=1250 tier=80 var=378 tiered=378 same=true
+E7RESULT name=positive_exact r=1250 tier=100 var=439 tiered=439 same=true
+E7RESULT name=positive_exact r=1250 tier=125 var=516 tiered=516 same=true
+E7RESULT name=positive_exact r=1250 tier=157 var=614 tiered=614 same=true
+E7RESULT name=positive_exact r=1250 tier=197 var=736 tiered=736 same=true
+E7RESULT name=positive_exact r=1250 tier=247 var=893 tiered=893 same=true
+E7RESULT name=positive_exact r=1250 tier=309 var=1087 tiered=1087 same=true
+E7RESULT name=positive_exact r=1250 tier=387 var=1334 tiered=1334 same=true
+E7RESULT name=positive_exact r=1250 tier=484 var=1640 tiered=1640 same=true
+E7RESULT name=positive_exact r=1250 tier=605 var=2000 tiered=2000 same=true
+E7RESULT name=positive_exact r=1250 tier=757 var=2500 tiered=2500 same=true
+E7RESULT name=positive_exact r=1250 tier=947 var=3125 tiered=3125 same=true
+E7RESULT name=positive_exact r=1250 tier=1184 var=3847 tiered=3847 same=true
+E7RESULT name=positive_exact r=1250 tier=1480 var=4762 tiered=4762 same=true
+E7RESULT name=positive_exact r=1250 tier=1850 var=5883 tiered=5883 same=true
+E7RESULT name=positive_exact r=1250 tier=2313 var=7693 tiered=7693 same=true
+E7RESULT name=positive_exact r=1250 tier=2892 var=9091 tiered=9091 same=true
+E7RESULT name=positive_exact r=1250 tier=3615 var=12500 tiered=12500 same=true
+E7RESULT name=positive_exact r=1250 tier=4096 var=14286 tiered=14286 same=true
+E7RESULT name=positive_exact r=1500 tier=64 var=328 tiered=328 same=true
+E7RESULT name=positive_exact r=1500 tier=96 var=428 tiered=428 same=true
+E7RESULT name=positive_exact r=1500 tier=144 var=575 tiered=575 same=true
+E7RESULT name=positive_exact r=1500 tier=216 var=794 tiered=794 same=true
+E7RESULT name=positive_exact r=1500 tier=324 var=1137 tiered=1137 same=true
+E7RESULT name=positive_exact r=1500 tier=486 var=1640 tiered=1640 same=true
+E7RESULT name=positive_exact r=1500 tier=729 var=2381 tiered=2381 same=true
+E7RESULT name=positive_exact r=1500 tier=1094 var=3572 tiered=3572 same=true
+E7RESULT name=positive_exact r=1500 tier=1641 var=5264 tiered=5264 same=true
+E7RESULT name=positive_exact r=1500 tier=2462 var=7693 tiered=7693 same=true
+E7RESULT name=positive_exact r=1500 tier=3693 var=12500 tiered=12500 same=true
+E7RESULT name=positive_exact r=1500 tier=4096 var=14286 tiered=14286 same=true
+E7RESULT name=positive_exact r=2000 tier=64 var=328 tiered=328 same=true
+E7RESULT name=positive_exact r=2000 tier=128 var=524 tiered=524 same=true
+E7RESULT name=positive_exact r=2000 tier=256 var=918 tiered=918 same=true
+E7RESULT name=positive_exact r=2000 tier=512 var=1725 tiered=1725 same=true
+E7RESULT name=positive_exact r=2000 tier=1024 var=3334 tiered=3334 same=true
+E7RESULT name=positive_exact r=2000 tier=2048 var=6667 tiered=6667 same=true
+E7RESULT name=positive_exact r=2000 tier=4096 var=14286 tiered=14286 same=true
+E7RESULT name=discrimination r1125=7378 r2000=9463 differ=true
+E7RESULT name=negative arm=var containers=0
+E7RESULT name=negative r=1125 containers=0
+E7RESULT name=negative r=1250 containers=0
+E7RESULT name=negative r=1500 containers=0
+E7RESULT name=negative r=2000 containers=0
+E7RESULT name=closed r=1125 tiers=36 worst_waste_above_floor=0.111034 closed_form=0.111111 floor_waste_bytes=63 max_tier=4096 cap_max_tier=7 min_tier=64 cap_min_tier=305
+E7RESULT name=closed r=1250 tiers=20 worst_waste_above_floor=0.199862 closed_form=0.200000 floor_waste_bytes=63 max_tier=4096 cap_max_tier=7 min_tier=64 cap_min_tier=305
+E7RESULT name=closed r=1500 tiers=12 worst_waste_above_floor=0.333063 closed_form=0.333333 floor_waste_bytes=63 max_tier=4096 cap_max_tier=7 min_tier=64 cap_min_tier=305
+E7RESULT name=closed r=2000 tiers=7 worst_waste_above_floor=0.499756 closed_form=0.500000 floor_waste_bytes=63 max_tier=4096 cap_max_tier=7 min_tier=64 cap_min_tier=305
+E7RESULT name=main dist=uniform arm=var containers=6815 gain=14.6735 loss=0.0000 tiers=0
+E7RESULT name=main dist=uniform r=1125 containers=7378 gain=13.5538 loss=0.0826 tiers=36
+E7RESULT name=main dist=uniform r=1250 containers=7675 gain=13.0293 loss=0.1262 tiers=20
+E7RESULT name=main dist=uniform r=1500 containers=8101 gain=12.3442 loss=0.1887 tiers=12
+E7RESULT name=main dist=uniform r=2000 containers=9463 gain=10.5675 loss=0.3886 tiers=7
+E7RESULT name=main dist=logunif arm=var containers=1592 gain=62.8141 loss=0.0000 tiers=0
+E7RESULT name=main dist=logunif r=1125 containers=1771 gain=56.4653 loss=0.1124 tiers=36
+E7RESULT name=main dist=logunif r=1250 containers=1820 gain=54.9451 loss=0.1432 tiers=20
+E7RESULT name=main dist=logunif r=1500 containers=1904 gain=52.5210 loss=0.1960 tiers=12
+E7RESULT name=main dist=logunif r=2000 containers=2099 gain=47.6417 loss=0.3185 tiers=7
+E7RESULT name=main dist=discrete arm=var containers=6448 gain=15.5087 loss=0.0000 tiers=0
+E7RESULT name=main dist=discrete r=1125 containers=6571 gain=15.2184 loss=0.0191 tiers=36
+E7RESULT name=main dist=discrete r=1250 containers=6712 gain=14.8987 loss=0.0409 tiers=20
+E7RESULT name=main dist=discrete r=1500 containers=6747 gain=14.8214 loss=0.0464 tiers=12
+E7RESULT name=main dist=discrete r=2000 containers=6449 gain=15.5063 loss=0.0002 tiers=7
+E7RESULT name=done emitted=102

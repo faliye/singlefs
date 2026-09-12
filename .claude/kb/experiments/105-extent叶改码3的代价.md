@@ -15,7 +15,7 @@
 ### 臂与判据（跑前写死，跑完没改）
 
 甲 = 今天的形态：叶是码 2 索引叶（16 KiB，扇出 196）；乙 = 臂 B：叶是 32 KiB 码 3 容器（宽记录每容器 393 条、窄记录 628 条），内部节点不变。k 次散开更新碰到的节点数按 L × (1 − (1 − 1/L)^k) 算，w = 2。
-1. 单次更新（k = 1）两种形态各自「写出的节点 / 单元数 × 大小 × w」，N ∈ {1e4, 1e6, 1e8}、节点头 68 / 77 / 86 逐格；容器头 103。
+1. 单次更新（k = 1）两种形态各自「写出的节点 / 单元数 × 大小 × w」，N ∈ {1e4, 1e6, 1e8}、节点头 68 / 77 / 86 逐格；容器头 107（2026-09-12 起；节点头三档仍按 68 / 77 / 86，改成 72 / 81 / 90 归 C288（映射 key 定案的连带改动没落到别的决策） 第 ⑦ 条）。
 2. 批量 k ∈ {1, 10, 100, 1000}；饱和对照：k 远大于某层节点数时碰到的节点数收敛到该层节点数。
 3. 点查：树高次节点读（甲）对 树高 − 1 次节点读 + 1 次 32 KiB 单元读（乙）。
 4. 阳性对照：把容器取 16 KiB 且记录宽相同时，两种形态的叶那一层代价必须相等（同一把尺子）。
@@ -50,7 +50,7 @@
 
 ### 口径与复跑
 
-- 代码 `research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `research/results/e105-extent-leaf-packed-2026-09-05.out`（116 行，收尾行 `emitted=116`）。
+- 代码 `research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `research/results/e105-extent-leaf-packed-2026-09-12.out`（116 行，收尾行 `emitted=116`；容器头 107 的那一版，与留在 results/ 的上一版 `e105-extent-leaf-packed-2026-09-05.out` 只差 config 行；变异复跑 `research/results/e105-mutate-2026-09-12.log` 5 条全抓）。
 - 变异表 `research/mutations/e105_extent_leaf_packed.tsv`，日志 `research/results/e105-mutate-2026-09-05.log`（`cd research && bash scripts/mutate.sh e105-extent-leaf-packed e7-index-bench/src/bin/e105_extent_leaf_packed.rs mutations/e105_extent_leaf_packed.tsv`）。
 - 复跑比对：`bash research/scripts/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
 - 容器头常量在源码里叫 `PACKED_UNIT_HEADER_BYTES`，与 kb 的登记名同名 ⇒ `.claude/gate.d/27-format-constants.sh` 绑得住它。

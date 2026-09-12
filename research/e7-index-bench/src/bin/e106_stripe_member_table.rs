@@ -32,9 +32,9 @@
 
 use e7_index_bench::Emitter;
 
-/// 码 3 容器 32768、头 103（D18 已定项 11）。
+/// 码 3 容器 32768、头 107（D18 已定项 11）。
 const UNIT_BYTES: u64 = 32768;
-const PACKED_HEADER_BYTES: u64 = 103;
+const PACKED_HEADER_BYTES: u64 = 107;
 /// 条带成员记录定长 56：格宽标志 1 + w 1 + 自己是第几列 1 + 成员表 4 × 10 + 条带诞生代 8 + 补齐 5。
 const STRIPE_RECORD_BYTES: u64 = 56;
 /// 臂乙的恒零预留区：共同前缀 42 + fsid 8 + 诞生代号 8 + 写序 10 + 成员数 1 + 成员表 40，
@@ -465,11 +465,11 @@ mod tests {
         }
     }
 
-    /// 记录容量钉绝对值：(32768 − 103) / 56。
+    /// 记录容量钉绝对值：(32768 − 107) / 56。
     #[test]
     fn records_per_container_is_pinned() {
         assert_eq!(records_per_container(), 583);
-        assert_eq!(PACKED_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 17, UNIT_BYTES);
+        assert_eq!(PACKED_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 13, UNIT_BYTES);
     }
 
     /// 判据 1 阳性对照：臂丙的不可解格数恰等于坏盘上的活格数，另行独立数出来。

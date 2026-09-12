@@ -12,7 +12,7 @@
 //! ## 被引用条款逐字贴在这里
 //!
 //! - **D4 已定项 5**：单元恒 32768 含头。**已定项 2**：短 extent 补齐到整单元。
-//! - **D18 已定项 11**：打包记录单元头 103。**D2 已定项 9**：第一版 2 盘恒 w = 2。
+//! - **D18 已定项 11**：打包记录单元头 107。**D2 已定项 9**：第一版 2 盘恒 w = 2。
 //! - **D27 已定项 2**：界线 ≤ 4 KiB 的对象才进容器。
 //! - **D27 已定项 8 ④**：槽定宽，对象补齐到槽宽；槽 `i` 起点 = 头 + `i × W`，不需要槽目录。
 //! - **E116 的闭式**：回本比下界 = `w / (cap − 1)` ⇒ 回得了本当且仅当 `cap > w + 1`；
@@ -78,12 +78,12 @@
 use e7_index_bench::Emitter;
 
 const UNIT_BYTES: u64 = 32768; // D4 已定项 5
-const PACKED_UNIT_HEADER_BYTES: u64 = 103; // D18 已定项 11
+const PACKED_UNIT_HEADER_BYTES: u64 = 107; // D18 已定项 11
 const REPLICATION_WIDTH: u64 = 2; // D2 已定项 9
 const SLOT_EXTRA_BYTES: u64 = 43; // 假设：五元组 33 + 写序 10，定宽下不要槽目录条目
 const PACKING_LIMIT_BYTES: u64 = 4096; // D27 已定项 2：界线 ≤ 4 KiB
 const OBJECTS_PER_DISTRIBUTION: u64 = 100_000;
-const CONTAINER_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 容器净荷 32665
+const CONTAINER_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 容器净荷 32661
 
 fn slots_per_container(tier_width: u64) -> u64 { CONTAINER_PAYLOAD_BYTES / (tier_width + SLOT_EXTRA_BYTES) }
 
@@ -309,16 +309,16 @@ mod tests {
     /// 容量钉绝对值，含跨整数边界的取样点（rules/mutation-sampling.md）。
     #[test]
     fn slots_per_container_absolute() {
-        assert_eq!(CONTAINER_PAYLOAD_BYTES, UNIT_BYTES - 103);
-        assert_eq!(CONTAINER_PAYLOAD_BYTES, 32665);
+        assert_eq!(CONTAINER_PAYLOAD_BYTES, UNIT_BYTES - 107);
+        assert_eq!(CONTAINER_PAYLOAD_BYTES, 32661);
         assert_eq!(slots_per_container(512), 58);
         assert_eq!(slots_per_container(1024), 30);
         assert_eq!(slots_per_container(2048), 15);
         assert_eq!(slots_per_container(4096), 7);
         assert_eq!(slots_per_container(64), 305);
-        // 跨整数边界：cap = 8 的档宽区间是 [3587, 4040]，抬到 4041 就掉成 7。
-        assert_eq!(slots_per_container(4040), 8);
-        assert_eq!(slots_per_container(4041), 7);
+        // 跨整数边界：cap = 8 的档宽区间是 [3587, 4039]，抬到 4040 就掉成 7（净荷 32661，头 107）。
+        assert_eq!(slots_per_container(4039), 8);
+        assert_eq!(slots_per_container(4040), 7);
     }
 
     /// 每一档都要 cap ≥ 4（E116 闭式 w/(cap−1) < 1 的充要条件）。
@@ -331,8 +331,8 @@ mod tests {
             }
         }
         // 钉住边界：cap = 4 的最大档宽
-        assert_eq!(slots_per_container(8123), 4);
-        assert_eq!(slots_per_container(8124), 3);
+        assert_eq!(slots_per_container(8122), 4);
+        assert_eq!(slots_per_container(8123), 3);
     }
 
     /// 分布展开之后对象总数恒等于 OBJECTS_PER_DISTRIBUTION —— 取整误差不许漏对象。
@@ -358,7 +358,7 @@ mod tests {
         let count_by_size = counts("uniform", OBJECTS_PER_DISTRIBUTION);
         let total_slot_bytes: u64 = (1..=PACKING_LIMIT_BYTES).map(|object_size| count_by_size[object_size as usize] * (object_size + SLOT_EXTRA_BYTES)).sum();
         assert_eq!(total_slot_bytes, 212_622_560);
-        assert_eq!(run_variable_length_arm(&count_by_size).containers, 6814);
+        assert_eq!(run_variable_length_arm(&count_by_size).containers, 6815);
     }
 
     /// 主判据的绝对值：uniform 下四条候选臂的容器数逐个钉住。

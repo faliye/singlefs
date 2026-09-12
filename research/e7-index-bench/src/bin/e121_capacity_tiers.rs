@@ -3,7 +3,7 @@
 //! ## 它问什么
 //!
 //! E120（档表取等比时公比怎么定）的四个候选是**同一个家族**：按槽宽 `W` 等比切。
-//! 而决定占用的不是 `W`，是 **`cap` = ⌊(32768 − 103) / (W + 43)⌋**（一个容器装几个对象）。
+//! 而决定占用的不是 `W`，是 **`cap` = ⌊(32768 − 107) / (W + 43)⌋**（一个容器装几个对象）。
 //! 两档若 `cap` 相同，一个容器装的对象数就相同 ⇒ **它们对占用完全等价，留两档是冗余的**。
 //!
 //! E121 换这个家族：**先选一组 `cap` 值，再把每个 `cap` 对应的最大 `W` 取成档宽**。
@@ -12,7 +12,7 @@
 //!
 //! ## 被引用条款逐字贴在这里
 //!
-//! - **D4 已定项 5**：单元恒 32768 含头。**D18 已定项 11**：打包记录单元头 103。
+//! - **D4 已定项 5**：单元恒 32768 含头。**D18 已定项 11**：打包记录单元头 107。
 //! - **D2 已定项 9**：`w` = 2。**D27 已定项 2**：界线 ≤ 4 KiB。
 //! - **D27 已定项 8 ④**：槽定宽，对象补齐到槽宽。
 //! - **D27 已定项 12**：档表不进格式，容器头声明槽宽 ⇒ 档表是策略，可以按 `cap` 切。
@@ -63,8 +63,8 @@
 use e7_index_bench::Emitter;
 
 const UNIT_BYTES: u64 = 32768;
-const PACKED_UNIT_HEADER_BYTES: u64 = 103;
-const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32665
+const PACKED_UNIT_HEADER_BYTES: u64 = 107;
+const UNIT_PAYLOAD_BYTES: u64 = UNIT_BYTES - PACKED_UNIT_HEADER_BYTES; // 32661
 const SLOT_EXTRA: u64 = 43;
 const LIMIT: u64 = 4096;
 const OBJECT_COUNT: u64 = 100_000;
@@ -365,20 +365,20 @@ mod tests {
         assert!(containers_tiered(&capall_tier_widths, &uniform_counts) < containers_tiered(&wgeo_tier_widths, &uniform_counts));
         // logunif：档多的输
         assert!(containers_tiered(&capall_tier_widths, &log_uniform_counts) > containers_tiered(&wgeo_tier_widths, &log_uniform_counts));
-        // 尾容器那笔账钉绝对值：logunif 上 capall 的容器数 1788，其中档数 248
-        assert_eq!(containers_tiered(&capall_tier_widths, &log_uniform_counts), 1788);
+        // 尾容器那笔账钉绝对值：logunif 上 capall 的容器数 1789，其中档数 248
+        assert_eq!(containers_tiered(&capall_tier_widths, &log_uniform_counts), 1789);
         assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
     }
 
     /// 等价性留档（变异 M10）：`capall_tiers` 末尾那句 `tier_widths.push(LIMIT)` 是**冗余**的——
-    /// `cap` = 7 那一档算出来的最大槽宽本来就是 4096（`32665/7 − 43 = 4623`，被界线截到 4096，
+    /// `cap` = 7 那一档算出来的最大槽宽本来就是 4096（`32661/7 − 43 = 4622`，被界线截到 4096，
     /// 而 `objects_per_container_for_slot_width(4096)` 恰好还是 7）。去掉那句在所有输入上同值 ⇒ 按
     /// `.claude/rules/mutation-sampling.md` 判**等价变异**，不是盲区，把等价性写成这条测试留档。
     #[test]
     fn capall_contains_limit_without_the_explicit_push() {
         assert_eq!(widest_slot_width_for_objects_per_container(objects_per_container_for_slot_width(LIMIT), 64), Some(LIMIT));
         assert_eq!(objects_per_container_for_slot_width(LIMIT), 7);
-        assert_eq!(UNIT_PAYLOAD_BYTES / 7 - SLOT_EXTRA, 4623); // 未截断前
+        assert_eq!(UNIT_PAYLOAD_BYTES / 7 - SLOT_EXTRA, 4622); // 未截断前
     }
 
     /// 界线截断真的在起作用：去掉 `.min(LIMIT)` 会让档宽越过 D27 已定项 2 的 4 KiB。
@@ -389,7 +389,7 @@ mod tests {
                 assert!(slot_width <= LIMIT, "arm={arm} 档宽 {slot_width} 越过界线 {LIMIT}");
             }
         }
-        // cap = 7 那一档若不截断会算出 4623 > 4096
+        // cap = 7 那一档若不截断会算出 4622 > 4096
         assert!(UNIT_PAYLOAD_BYTES / objects_per_container_for_slot_width(LIMIT) - SLOT_EXTRA > LIMIT);
     }
 
@@ -418,18 +418,18 @@ mod tests {
     #[test]
     fn main_absolute() {
         let uniform_counts = counts("uniform", OBJECT_COUNT);
-        assert_eq!(containers_variable_length(&uniform_counts), 6814);
+        assert_eq!(containers_variable_length(&uniform_counts), 6815);
         assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &uniform_counts), 7378);
         assert_eq!(containers_tiered(&arm_tiers("wgeo_dedup", 64), &uniform_counts), 7378);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo125", 64), &uniform_counts), 7455);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo150", 64), &uniform_counts), 8180);
-        assert_eq!(containers_tiered(&arm_tiers("capgeo200", 64), &uniform_counts), 9116);
-        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &uniform_counts), 6977);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo125", 64), &uniform_counts), 7456);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo150", 64), &uniform_counts), 8181);
+        assert_eq!(containers_tiered(&arm_tiers("capgeo200", 64), &uniform_counts), 9117);
+        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &uniform_counts), 6979);
 
         let log_uniform_counts = counts("logunif", OBJECT_COUNT);
         assert_eq!(containers_variable_length(&log_uniform_counts), 1592);
         assert_eq!(containers_tiered(&arm_tiers("wgeo", 64), &log_uniform_counts), 1771);
-        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &log_uniform_counts), 1788);
+        assert_eq!(containers_tiered(&arm_tiers("capall", 64), &log_uniform_counts), 1789);
     }
 
     /// 分布守恒。

@@ -36,8 +36,8 @@ const MAP_ENTRY_BYTES: u64 = 47;
 const CHECKSUM_BYTES_PER_SLOT: u64 = 4;
 /// 条带成员表快照：每活槽一条位置键 10 字节（设备 4 + 槽号 6）× (stripe_width − 1) 个兄弟。
 const MEMBER_KEY_BYTES: u64 = 10;
-/// 码 3 容器 32768、头 103；映射表的记录按 47 字节打包。
-const PACKED_HEADER_BYTES: u64 = 103;
+/// 码 3 容器 32768、头 107；映射表的记录按 47 字节打包。
+const PACKED_HEADER_BYTES: u64 = 107;
 const NODE_BYTES: u64 = 16384;
 const NODE_HEADER_BYTES: u64 = 76;
 const CHILD_ENTRY_BYTES: u64 = 85;
@@ -155,11 +155,11 @@ mod tests {
         assert_eq!(map_resident(CAPACITY_16_TEBIBYTES, 2), 483_183_820 * 2 * 47);
         let map_resident_parts_per_million = map_resident(CAPACITY_16_TEBIBYTES, 2) as f64 * 1e6 / CAPACITY_16_TEBIBYTES as f64;
         assert!((map_resident_parts_per_million - 2581.8).abs() < 0.5, "ppm={map_resident_parts_per_million}");
-        // 每容器 (32768−103)/47 = 695 条；容器数与树高钉死
-        assert_eq!((UNIT_BYTES - PACKED_HEADER_BYTES) / MAP_ENTRY_BYTES, 695);
+        // 每容器 (32768−107)/47 = 694 条；容器数与树高钉死
+        assert_eq!((UNIT_BYTES - PACKED_HEADER_BYTES) / MAP_ENTRY_BYTES, 694);
         assert_eq!(fanout(NODE_BYTES, NODE_HEADER_BYTES, CHILD_ENTRY_BYTES), 191);
-        let container_count = (483_183_820u64 * 2).div_ceil(695);
-        assert_eq!(container_count, 1_390_458);
+        let container_count = (483_183_820u64 * 2).div_ceil(694);
+        assert_eq!(container_count, 1_392_461);
         assert_eq!(tree_height(container_count, 191), 4);
         assert_eq!(map_per_publish(CAPACITY_16_TEBIBYTES, 2), (UNIT_BYTES + 3 * NODE_BYTES) * 2);
         assert_eq!(map_per_publish(CAPACITY_16_TEBIBYTES, 2), 163_840);

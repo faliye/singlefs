@@ -1,0 +1,17 @@
+基线：全绿
+✅ [M1_容器头算成0] 红：capacity_absolute
+✅ [M2_末次发布按满算] 红：positive_control_cap1_matches_pad
+✅ [M3_pad不补齐] 红：benefit_law_holds,discrimination_pad_pads,m1_gives_no_benefit,pad_absolute,positive_control_cap1_matches_pad
+✅ [M4_副本数算成1] 红：compaction_absolute,pack_pays_more_metadata,packbg_absolute,pad_absolute,write_bytes_absolute
+✅ [M5_槽额外开销漏掉] 红：blast_radius_absolute,capacity_absolute,packbg_absolute
+✅ [M6_容器索引漏计] 红：pack_pays_more_metadata
+✅ [M7_活槽记账漏计] 红：pack_pays_more_metadata
+✅ [M8_故障域算成1] 红：blast_radius_absolute
+✅ [M9_落点粒度算成单元] 红：packbg_absolute,pad_absolute
+✅ [M10_覆写不产生新单元] 红：overwrite_absolute
+✅ [M11_整理触及率不饱和] 红：compaction_absolute
+✅ [M12_容器容量多算一格] 红：blast_radius_absolute,capacity_absolute,packbg_absolute,positive_control_cap1_matches_pad
+✅ [M13_整理臂容器索引漏计] 红：packbg_absolute
+✅ [M14_整理臂活槽记账漏计] 红：packbg_absolute
+✅ [M15_整理臂覆写不产生新单元] 红：packbg_absolute
+已还原，基线仍全绿

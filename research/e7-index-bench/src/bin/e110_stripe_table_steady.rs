@@ -30,7 +30,7 @@ const NODE_SIZE_BYTES: u64 = 16384;
 const JOURNAL_RECORD_BYTES: u64 = 4096;
 const ROOT_SLOT_BYTES: u64 = 512;
 const SPINE_NODES: u64 = 4;
-const PACKED_CONTAINER_HEADER_BYTES: u64 = 103;
+const PACKED_CONTAINER_HEADER_BYTES: u64 = 107;
 const STRIPE_RECORD_BYTES: u64 = 56;
 const CONTAINER_INDEX_LAYERS: u64 = 3;
 const STRIPE_WIDTH_MAXIMUM: u64 = 4;
@@ -188,7 +188,7 @@ mod tests {
         assert_eq!(publish_on_stripe_table_arm(8, 4, 582).0, 692736);
         assert_eq!(publish_on_full_mirror_arm(8), 659968);
         assert_eq!(records_per_container(), 583);
-        assert_eq!(PACKED_CONTAINER_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 17, 32768);
+        assert_eq!(PACKED_CONTAINER_HEADER_BYTES + STRIPE_RECORD_BYTES * 583 + 13, 32768);
     }
 
     /// 主负载每次发布 17 条记录，容器装 583 条。

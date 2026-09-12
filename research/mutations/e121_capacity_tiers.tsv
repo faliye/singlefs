@@ -1,4 +1,4 @@
-M1_容器头算成0	const PACKED_UNIT_HEADER_BYTES: u64 = 103;	const PACKED_UNIT_HEADER_BYTES: u64 = 0;
+M1_容器头算成0	const PACKED_UNIT_HEADER_BYTES: u64 = 107;	const PACKED_UNIT_HEADER_BYTES: u64 = 0;
 M2_每槽额外算成0	const SLOT_EXTRA: u64 = 43;	const SLOT_EXTRA: u64 = 0;
 M3_界线抬到8KiB	const LIMIT: u64 = 4096;	const LIMIT: u64 = 8192;
 M4_去重比错cap	        if objects_per_container_for_slot_width(last) == objects_per_container_for_slot_width(slot_width) { deduplicated_tier_widths.pop(); }	        if last == slot_width { deduplicated_tier_widths.pop(); }
