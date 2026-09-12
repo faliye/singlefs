@@ -65,9 +65,9 @@ const NODE_HEADERS_TODAY: [u64; 3] = [
 /// D19 已定项 4 之后：31 + 14 × 2。
 const CHILD_POINTER_BYTES: u64 = 59;
 /// E98 的 inode 记录宽。
-const INODE_REC: u64 = 140;
-/// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`）。
-const UNIT_HDR_PACKED: u64 = 103;
+const INODE_RECORD_BYTES: u64 = 140;
+/// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`）。
+const PACKED_UNIT_HEADER_BYTES: u64 = 103;
 /// D2 已定项 9：第一版 2 盘恒 w = 2。
 const COLUMNS_PER_WRITE: u64 = 2;
 /// D23 已定项 12 / E79：每次发布的常量部分（一条 journal 记录 + 根槽），两条形态相同。
@@ -144,10 +144,10 @@ struct Geometry {
 }
 
 fn geometry(inode_count: u64, node_header: u64) -> Geometry {
-    let in_leaf_leaf_fanout = fanout(NODE_BYTES, node_header, INODE_REC);
+    let in_leaf_leaf_fanout = fanout(NODE_BYTES, node_header, INODE_RECORD_BYTES);
     let internal_fanout = fanout(NODE_BYTES, node_header, INODE_KEY + CHILD_POINTER_BYTES);
     let in_leaf_tree_levels = tree_levels(inode_count, in_leaf_leaf_fanout, internal_fanout);
-    let records_per_container = fanout(UNIT_BYTES, UNIT_HDR_PACKED, INODE_REC);
+    let records_per_container = fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES);
     let container_count = inode_count.div_ceil(records_per_container);
     let container_index_fanout = fanout(NODE_BYTES, node_header, CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES);
     let packed_container_index_levels = tree_levels(container_count, container_index_fanout, container_index_fanout);
@@ -213,7 +213,7 @@ fn main() {
     let mut emitter = Emitter::new();
     let mut output_lines: Vec<String> = Vec::new();
     output_lines.push(emitter.emit_raw(&format!(
-        "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} packed_hdr={UNIT_HDR_PACKED} inode_rec={INODE_REC} \
+        "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} packed_hdr={PACKED_UNIT_HEADER_BYTES} inode_rec={INODE_RECORD_BYTES} \
          child_ptr={CHILD_POINTER_BYTES} w={COLUMNS_PER_WRITE} per_publish_const={} ident_value={IDENTITY_VALUE_BYTES} cont_key={CONTAINER_KEY_BYTES} internal_entry={INODE_INTERNAL_ENTRY} leaf_records={INODE_LEAF_RECORDS} model=arithmetic file_ops=0",
         per_publish_constant_bytes()
     )));
@@ -307,7 +307,7 @@ mod tests {
     fn format_constants_match_knowledge_base() {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
         assert_eq!(UNIT_BYTES, 32768, "D4 已定项 7");
-        assert_eq!(UNIT_HDR_PACKED, 103, "D18 已定项 11（C113 定案 2026-09-05 加写序 10）");
+        assert_eq!(PACKED_UNIT_HEADER_BYTES, 103, "D18 已定项 11（C113 定案 2026-09-05 加写序 10）");
         assert_eq!(CHILD_POINTER_BYTES, 59, "D19 已定项 4");
         assert_eq!(COLUMNS_PER_WRITE, 2, "D2 已定项 9");
         assert_eq!(JOURNAL_RECORD_BYTES, 4096, "D23 已定项 12");
@@ -450,7 +450,7 @@ mod tests {
     fn third_arm_leaf_as_container_is_pinned() {
         assert_eq!(INODE_INTERNAL_ENTRY, 93);
         assert_eq!(INODE_INTERNAL_ENTRY, INODE_KEY + CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES, "93 = 8 + 26 + 59");
-        assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, UNIT_HDR_PACKED, INODE_REC), "233 = ⌊(32768 − 103) / 140⌋");
+        assert_eq!(INODE_LEAF_RECORDS, fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), "233 = ⌊(32768 − 103) / 140⌋");
         assert_eq!(fanout(NODE_BYTES, 58, INODE_INTERNAL_ENTRY), 175, "(16384 − 58) / 93");
         assert_eq!(fanout(NODE_BYTES, 76, INODE_INTERNAL_ENTRY), 175, "基础头三档（E73 的不带区间下界）里最大的 76");
         assert_eq!(fanout(NODE_BYTES, 92, INODE_INTERNAL_ENTRY), 175, "基础头 76 加 16 字节 key 区间 = 92，扇出仍不掉格");

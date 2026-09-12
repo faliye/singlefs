@@ -45,7 +45,7 @@ const EXTENT_NON_POINTER_BYTES: u64 = 8 + 8 + 8;
 /// ⚠️ D8 已定项 7 定 write buffer 条目的 seq 4 字节住 value，按那个口径是 34；两个口径各臂同值，
 /// 只影响记账树门槛的绝对值、不影响臂间比较，这里取 D5 那一处并注明（不自己挑第三个）。
 const LEDGER_LEAF_ENTRY_BYTES: u64 = 22 + 8;
-/// 树表条目除根指针之外：长度 2 + 种类 2 + flags 2 + 树 ID 8 + prev_snap_txg 8 + 诞生 txg 8 + 预留 32（D8 已定项 8）。
+/// 树表条目除根指针之外：长度 2 + 种类 2 + flags 2 + 树 ID 8 + previous_snapshot_txg 8 + 诞生 txg 8 + 预留 32（D8 已定项 8）。
 const TREE_TABLE_NON_POINTER_BYTES: u64 = 2 + 2 + 2 + 8 + 8 + 8 + 32;
 /// 根记录除两条指针之外：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树 ID 水位 8 + 自证校验和 32（D22 已定项 7）。
 const ROOT_RECORD_NON_POINTER_BYTES: u64 = 4 + 16 + 4 + 4 + 8 + 8 + 32;

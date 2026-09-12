@@ -120,7 +120,7 @@ const HEADER_CHECKSUM_BYTES: usize = 32;
 const HEADER_LENGTHS_IN_BYTES: [usize; 3] = [86, 95, 99];
 
 /// 造一个形态真实的记录头：可变字段填满，`header_csum` 段清零。
-fn make_header(header_length_in_bytes: usize, journal_sequence_number: u64, epoch: u32, checkpoint_transaction_group: u64) -> Vec<u8> {
+fn make_header(header_length_in_bytes: usize, jsn: u64, epoch: u32, checkpoint_txg: u64) -> Vec<u8> {
     let mut header_bytes = vec![0u8; header_length_in_bytes];
     header_bytes[0..4].copy_from_slice(&0x6A_53_4E_31u32.to_be_bytes()); // magic
     header_bytes[4..6].copy_from_slice(&1u16.to_be_bytes());             // version/type
@@ -128,12 +128,12 @@ fn make_header(header_length_in_bytes: usize, journal_sequence_number: u64, epoc
     header_bytes[7] = 0;                                                 // 对齐填充
     header_bytes[8..12].copy_from_slice(&(header_length_in_bytes as u32).to_be_bytes()); // record_length
     header_bytes[12..16].copy_from_slice(&7u32.to_be_bytes());            // named_count
-    header_bytes[16..20].copy_from_slice(&epoch.to_be_bytes());           // journal_sequence_number 高段：实例代号 32 位
-    header_bytes[20..26].copy_from_slice(&journal_sequence_number.to_be_bytes()[2..]);        // journal_sequence_number 低段：计数器 48 位
-    header_bytes[26..34].copy_from_slice(&checkpoint_transaction_group.to_be_bytes());             // checkpoint_txg
-    header_bytes[34..42].copy_from_slice(&(journal_sequence_number ^ 0x5A5A).to_be_bytes());  // tail_lsn
+    header_bytes[16..20].copy_from_slice(&epoch.to_be_bytes());           // jsn 高段：实例代号 32 位
+    header_bytes[20..26].copy_from_slice(&jsn.to_be_bytes()[2..]);        // jsn 低段：计数器 48 位
+    header_bytes[26..34].copy_from_slice(&checkpoint_txg.to_be_bytes());             // checkpoint_txg
+    header_bytes[34..42].copy_from_slice(&(jsn ^ 0x5A5A).to_be_bytes());  // tail_lsn
     for nonce_byte_index in 42..54 {
-        header_bytes[nonce_byte_index] = (journal_sequence_number as u8).wrapping_add(nonce_byte_index as u8);              // nonce 12 字节
+        header_bytes[nonce_byte_index] = (jsn as u8).wrapping_add(nonce_byte_index as u8);              // nonce 12 字节
     }
     // 54..54+32 是 header_csum，按已定项 10 的纪律留零，不进输入
     header_bytes
@@ -263,7 +263,7 @@ fn main() {
         }
     }
 
-    // ── 量二：结构性差异——只有 journal_sequence_number 的实例代号那 4 字节不同（两条时间线的实际形态）──
+    // ── 量二：结构性差异——只有 jsn 的实例代号那 4 字节不同（两条时间线的实际形态）──
     for &header_length in &HEADER_LENGTHS_IN_BYTES {
         for (arm, name) in [
             (&crc32c as &dyn Fn(&[u8]) -> u32, "jia_crc32c"),

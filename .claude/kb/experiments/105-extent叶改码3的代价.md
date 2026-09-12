@@ -53,7 +53,7 @@
 - 代码 `research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs`（`cargo run --release --bin e105-extent-leaf-packed`，在 `research/` 下跑），原始输出 `research/results/e105-extent-leaf-packed-2026-09-05.out`（116 行，收尾行 `emitted=116`）。
 - 变异表 `research/mutations/e105_extent_leaf_packed.tsv`，日志 `research/results/e105-mutate-2026-09-05.log`（`cd research && bash scripts/mutate.sh e105-extent-leaf-packed e7-index-bench/src/bin/e105_extent_leaf_packed.rs mutations/e105_extent_leaf_packed.tsv`）。
 - 复跑比对：`bash research/scripts/replay.sh` 的 E105（extent 叶改码 3 的代价） 那一行。
-- 容器头常量在源码里叫 `UNIT_HDR_PACKED`，与 kb 的登记名同名 ⇒ `.claude/gate.d/27-format-constants.sh` 绑得住它。
+- 容器头常量在源码里叫 `PACKED_UNIT_HEADER_BYTES`，与 kb 的登记名同名 ⇒ `.claude/gate.d/27-format-constants.sh` 绑得住它。
   （2026-09-05 跑的时候它临时叫 `PACKED_HDR_WITH_WSEQ`，为的是不让门禁把 103 当成当时登记值 93 的漂移；
   C113（扫描重建时多版单元的现行版本判定无输入） 定案当日已把登记值改成 103，2026-09-06 改回登记名，产物逐字节不变。）
 

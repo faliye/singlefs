@@ -7,6 +7,6 @@ M6_三档基础头外推	const NODE_HEADER_BYTES_BY_TIER: [u64; 3] = [68, 77, 86
 M7_扇出不减头	    (unit - header) / entry	    unit / entry
 M8_头装不下时返回1	        return 0;	        return 1;
 M9_D19条目宽算成E73	const UPDATED_POINTER_ENTRY_BYTES: u64 = 22 + 59;	const UPDATED_POINTER_ENTRY_BYTES: u64 = 54;
-M10_inode记录宽算错	const INODE_REC: u64 = 140;	const INODE_REC: u64 = 139;
+M10_inode记录宽算错	const INODE_RECORD_BYTES: u64 = 140;	const INODE_RECORD_BYTES: u64 = 139;
 M11_resv4臂等同resv12	            Arm::ReservedFourByteNonceCode => 4 + MAC_BYTES,	            Arm::ReservedFourByteNonceCode => 12 + MAC_BYTES,
 M12_节点大小算成数据单元	const NODE_BYTES: u64 = 16384;	const NODE_BYTES: u64 = 32768;

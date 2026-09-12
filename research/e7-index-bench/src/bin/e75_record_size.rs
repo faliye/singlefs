@@ -47,7 +47,7 @@ use e7_index_bench::Emitter;
 /// 点名项宽度。E23 字段表口径，E45 沿用。
 const ITEM: u64 = 56;
 /// D23 已定项 4 的现行头部字节数。**格式常量**，与 kb 的 format-const 标记绑定。
-const JOURNAL_HDR: u64 = 78;
+const JOURNAL_HEADER_BYTES: u64 = 78;
 /// 已定项 7 的事务号 + 提交标记，9 字节。
 const PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES: u64 = 9;
 /// 已定项 8 的反向链，32 位 = 4 字节。
@@ -105,12 +105,12 @@ fn ring_floor(items: u64, record_bytes: u64, unit: u64, header_bytes: u64) -> Op
 
 fn main() {
     let mut emitter = Emitter::new();
-    let header_bytes_landed = JOURNAL_HDR + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES;
+    let header_bytes_landed = JOURNAL_HEADER_BYTES + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES;
     let header_bytes_full = header_bytes_landed + PENDING_INCREMENT_PAYLOAD_CHECKSUM_BYTES;
     println!(
         "{}",
         emitter.emit_raw(&format!(
-            "name=config item={ITEM} hdr_now={JOURNAL_HDR} hdr_landed={header_bytes_landed} \
+            "name=config item={ITEM} hdr_now={JOURNAL_HEADER_BYTES} hdr_landed={header_bytes_landed} \
              hdr_full={header_bytes_full} hdr_cited_by_d23_item12={HEADER_BYTES_AS_CITED_BY_JOURNAL_DECISION_ITEM_12} \
              target_items={TARGET_ITEMS} f={SAFETY_FACTOR} model=arithmetic file_ops=0"
         ))
@@ -122,7 +122,7 @@ fn main() {
     for record_kibibytes in [1u64, 2, 4, 8, 32] {
         let record_bytes = record_kibibytes * 1024;
         for (header_tag, header_bytes) in [
-            ("now78", JOURNAL_HDR),
+            ("now78", JOURNAL_HEADER_BYTES),
             ("landed91", header_bytes_landed),
             ("full95", header_bytes_full),
             ("d23item12_99", HEADER_BYTES_AS_CITED_BY_JOURNAL_DECISION_ITEM_12),
@@ -144,7 +144,7 @@ fn main() {
     // ── 判据 3：记录头完整落在一个 physical_block_size 内，512 与 4096 各验一次 ──
     for physical_block_size_bytes in [512u64, 4096] {
         for (header_tag, header_bytes) in [
-            ("now78", JOURNAL_HDR),
+            ("now78", JOURNAL_HEADER_BYTES),
             ("landed91", header_bytes_landed),
             ("full95", header_bytes_full),
         ] {
@@ -215,7 +215,7 @@ fn main() {
     // ── 阳性对照 2：对齐逻辑本身有没有判别力 ─────────────────────────────
     // 2 的幂记录尺寸下 I-8.2 恒满足 ⇒ 主扫里一个字节的对齐浪费都看不到。
     // 拿一个非 2 的幂尺寸逼它出现，否则「对齐浪费恒 0」分不清是结论还是死代码。
-    let packed_bytes = laid_out_bytes(6, 100, 512, JOURNAL_HDR);
+    let packed_bytes = laid_out_bytes(6, 100, 512, JOURNAL_HEADER_BYTES);
     println!(
         "{}",
         emitter.emit_raw(&format!(
@@ -226,7 +226,7 @@ fn main() {
         ))
     );
     // ── 阴性对照：单元 = 1 字节 ⇒ 对齐浪费必须恰好为 0 ───────────────────
-    let unaligned_bytes = laid_out_bytes(6, 100, 1, JOURNAL_HDR);
+    let unaligned_bytes = laid_out_bytes(6, 100, 1, JOURNAL_HEADER_BYTES);
     println!(
         "{}",
         emitter.emit_raw(&format!(
@@ -345,14 +345,14 @@ mod tests {
     /// 总占用 512 + 100 = 612，比裸的 600 多 12。
     #[test]
     fn positive_control_alignment_actually_pads() {
-        assert_eq!(laid_out_bytes(6, 100, 512, JOURNAL_HDR), 612);
-        assert!(laid_out_bytes(6, 100, 512, JOURNAL_HDR) > 6 * 100);
+        assert_eq!(laid_out_bytes(6, 100, 512, JOURNAL_HEADER_BYTES), 612);
+        assert!(laid_out_bytes(6, 100, 512, JOURNAL_HEADER_BYTES) > 6 * 100);
     }
 
     /// **阴性对照**：单元 = 1 字节 ⇒ 对齐浪费恰好 0。
     #[test]
     fn negative_control_unit_one_has_zero_padding() {
-        assert_eq!(laid_out_bytes(6, 100, 1, JOURNAL_HDR), 600);
+        assert_eq!(laid_out_bytes(6, 100, 1, JOURNAL_HEADER_BYTES), 600);
         assert_eq!(laid_out_bytes(71, 4096, 1, 95), 71 * 4096);
     }
 
@@ -389,9 +389,9 @@ mod tests {
     #[test]
     fn absolute_pending_header_increments_sum_to_17() {
         assert_eq!(PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES + PENDING_INCREMENT_PAYLOAD_CHECKSUM_BYTES, 17);
-        assert_eq!(JOURNAL_HDR + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES, 91);
+        assert_eq!(JOURNAL_HEADER_BYTES + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES, 91);
         assert_eq!(
-            JOURNAL_HDR + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES + PENDING_INCREMENT_PAYLOAD_CHECKSUM_BYTES,
+            JOURNAL_HEADER_BYTES + PENDING_INCREMENT_TRANSACTION_BOUNDARY_BYTES + PENDING_INCREMENT_BACK_CHAIN_BYTES + PENDING_INCREMENT_PAYLOAD_CHECKSUM_BYTES,
             95
         );
     }
@@ -399,7 +399,7 @@ mod tests {
     /// 格式常量必须与 kb 的 format-const 标记一致。
     #[test]
     fn format_constants_match_knowledge_base() {
-        assert_eq!(JOURNAL_HDR, 78, "D23 已定项 4 的 format-const 标记");
+        assert_eq!(JOURNAL_HEADER_BYTES, 78, "D23 已定项 4 的 format-const 标记");
         assert_eq!(ITEM, 56, "E23 字段表的点名项宽度");
     }
 }

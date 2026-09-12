@@ -23,7 +23,7 @@ const NODE_BYTES: u64 = 16384; // D8 已定项 2
 const NODE_HEADER_BYTES: u64 = 64;
 /// 树表单元装条目的净字节，`22-单元原子性怎么合成.md` 的口径（C157 记着另一个口径 16320，不采用）。
 const TREE_TABLE_PAYLOAD: u64 = 16284;
-/// 树表条目：长度 2 + 种类 2 + flags 2 + 树 ID 8 + 根指针 59 + prev_snap_txg 8 + 诞生 txg 8 + 预留 32。
+/// 树表条目：长度 2 + 种类 2 + flags 2 + 树 ID 8 + 根指针 59 + previous_snapshot_txg 8 + 诞生 txg 8 + 预留 32。
 const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 32;
 /// 内部节点里一条子指针：头部 31 + 位置条目 14 × 2（D22 已定项 7）。
 const CHILD_POINTER_BYTES: u64 = 31 + 14 * 2;

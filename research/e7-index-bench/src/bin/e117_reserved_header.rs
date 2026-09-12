@@ -55,7 +55,7 @@ const NODE_HEADER_BYTES_BY_TIER: [u64; 3] = [68, 77, 86];
 /// D9 已定项 2：MAC 满 128 位不截断。
 const MAC_BYTES: u64 = 16;
 /// E98 的 format-const：inode 记录定长。
-const INODE_REC: u64 = 140;
+const INODE_RECORD_BYTES: u64 = 140;
 /// E73 自己的条目宽：key 22 + 子指针 32。
 const E73_ENTRY: u64 = 54;
 /// 按 D19 已定项 4 更新后的条目宽：key 22 + 指针 59。
@@ -138,7 +138,7 @@ fn main() {
         line(format!(
             "name=packed arm={} records={}",
             arm.name(),
-            fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_REC)
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_RECORD_BYTES)
         ));
         // 阳性对照，逐臂跑：头强制为 0
         line(format!(
@@ -146,7 +146,7 @@ fn main() {
             arm.name(),
             fanout(NODE_BYTES, 0, E73_ENTRY),
             fanout(NODE_BYTES, 0, UPDATED_POINTER_ENTRY_BYTES),
-            fanout(DATA_UNIT_BYTES, 0, INODE_REC)
+            fanout(DATA_UNIT_BYTES, 0, INODE_RECORD_BYTES)
         ));
     }
     // 阴性对照：条目宽大于可用字节
@@ -168,8 +168,8 @@ fn main() {
             differing_cells += 1;
         }
     }
-    if fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_REC)
-        != fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_REC)
+    if fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_RECORD_BYTES)
+        != fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_RECORD_BYTES)
     {
         differing_cells += 1;
     }
@@ -245,7 +245,7 @@ mod tests {
     /// 判据 3：码 3 每容器记录数逐格钉绝对值。
     #[test]
     fn packed_records_absolute() {
-        let records_per_container_for = |arm: Arm| fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_REC);
+        let records_per_container_for = |arm: Arm| fanout(DATA_UNIT_BYTES, packed_header_bytes(arm), INODE_RECORD_BYTES);
         assert_eq!(records_per_container_for(Arm::Bare), 233);
         assert_eq!(records_per_container_for(Arm::ReservedTwelveByteNonceCode), 233);
         assert_eq!(records_per_container_for(Arm::ReservedFourByteNonceCode), 233);
@@ -264,7 +264,7 @@ mod tests {
         for arm in [Arm::Bare, Arm::ReservedTwelveByteNonceCode, Arm::ReservedFourByteNonceCode] {
             assert_eq!(fanout(NODE_BYTES, 0, E73_ENTRY), 303, "{}", arm.name());
             assert_eq!(fanout(NODE_BYTES, 0, UPDATED_POINTER_ENTRY_BYTES), 202, "{}", arm.name());
-            assert_eq!(fanout(DATA_UNIT_BYTES, 0, INODE_REC), 234, "{}", arm.name());
+            assert_eq!(fanout(DATA_UNIT_BYTES, 0, INODE_RECORD_BYTES), 234, "{}", arm.name());
         }
     }
 
@@ -301,8 +301,8 @@ mod tests {
             );
         }
         assert_eq!(
-            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_REC),
-            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_REC)
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedTwelveByteNonceCode), INODE_RECORD_BYTES),
+            fanout(DATA_UNIT_BYTES, packed_header_bytes(Arm::ReservedFourByteNonceCode), INODE_RECORD_BYTES)
         );
     }
 
@@ -311,7 +311,7 @@ mod tests {
     fn format_constants() {
         assert_eq!(NODE_BYTES, 16384);
         assert_eq!(DATA_UNIT_BYTES, 32768);
-        assert_eq!(INODE_REC, 140);
+        assert_eq!(INODE_RECORD_BYTES, 140);
         assert_eq!(PACKED_HEADER_BARE_BYTES, 103);
     }
 

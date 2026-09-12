@@ -12,8 +12,8 @@ M11_长度字段量程算错	(1u64 << (8 * LENGTH_FIELD_BYTES)) - 1	(1u64 << (8 
 M12_条带档基线打错	const BASE_METADATA_RAID_TENTHS: u64 = 2020;	const BASE_METADATA_RAID_TENTHS: u64 = 1360;
 M13_容器约束扣144	unit - IN_UNIT_HEADER_BYTES - 1 // 至少留 1 字节净荷	unit - IN_UNIT_HEADER_BYTES - OUT_OF_UNIT_POINTER_BYTES - 1 // 至少留 1 字节净荷
 M14_节点不留指针	node - NODE_HEADER_BYTES - POINTER_BYTES	node - NODE_HEADER_BYTES
-M15_单元头宽度打错	const IN_UNIT_HEADER_BYTES: u64 = 105; // 单元头（kb 里 `format-const: UNIT_HDR_DATA`，D18 已定项 7），住在单元里	const IN_UNIT_HEADER_BYTES: u64 = 91; // 单元头（kb 里 `format-const: UNIT_HDR_DATA`，D18 已定项 7），住在单元里
+M15_单元头宽度打错	const IN_UNIT_HEADER_BYTES: u64 = 105; // 单元头（kb 里 `format-const: DATA_UNIT_HEADER_BYTES`，D18 已定项 7），住在单元里	const IN_UNIT_HEADER_BYTES: u64 = 91; // 单元头（kb 里 `format-const: DATA_UNIT_HEADER_BYTES`，D18 已定项 7），住在单元里
 M16_自证余量算错	atomic - header_bytes	atomic - header_bytes / 2
 M17_槽不按原子单元数	(atomic / slot).max(1)	1
 M18_挂载判定漏掉撕裂隔离	if slots_per_atomic(slot, atomic) != 1 {	if false {
-M19_挂载判定漏掉自证溢出	if extension_point_bytes > self_witness_room(JOURNAL_HDR, atomic) {	if false {
+M19_挂载判定漏掉自证溢出	if extension_point_bytes > self_witness_room(JOURNAL_HEADER_BYTES, atomic) {	if false {

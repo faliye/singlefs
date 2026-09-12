@@ -95,10 +95,10 @@ impl SlotOrder {
             SlotOrder::AcrossRegions => "across_regions",
         }
     }
-    fn region_of(self, transaction_group: u64, regions: u64, slots: u64) -> u64 {
+    fn region_of(self, txg: u64, regions: u64, slots: u64) -> u64 {
         match self {
-            SlotOrder::WithinRegion => (transaction_group % (regions * slots)) / slots,
-            SlotOrder::AcrossRegions => transaction_group % regions,
+            SlotOrder::WithinRegion => (txg % (regions * slots)) / slots,
+            SlotOrder::AcrossRegions => txg % regions,
         }
     }
 }
@@ -115,23 +115,23 @@ fn worst_case(
     let mut survivors = 0u64;
     let mut worst_rollback: Option<u64> = None;
     for phase in 0..ring_slot_count {
-        let latest_transaction_group = ring_slot_count * 1_000_000 + phase;
+        let latest_txg = ring_slot_count * 1_000_000 + phase;
         let mut alive_slots = 0u64;
-        let mut newest_surviving_transaction_group: Option<u64> = None;
+        let mut newest_surviving_txg: Option<u64> = None;
         for steps_back in 0..ring_slot_count {
-            let candidate_transaction_group = latest_transaction_group - steps_back;
-            let region_index = order.region_of(candidate_transaction_group, regions, slots);
+            let candidate_txg = latest_txg - steps_back;
+            let region_index = order.region_of(candidate_txg, regions, slots);
             if device_of_region[region_index as usize] == failed_device {
                 continue;
             }
             alive_slots += 1;
-            if newest_surviving_transaction_group.is_none() {
-                newest_surviving_transaction_group = Some(candidate_transaction_group);
+            if newest_surviving_txg.is_none() {
+                newest_surviving_txg = Some(candidate_txg);
             }
         }
         survivors = alive_slots;
-        if let Some(newest_transaction_group) = newest_surviving_transaction_group {
-            let rollback = latest_transaction_group - newest_transaction_group;
+        if let Some(newest_txg) = newest_surviving_txg {
+            let rollback = latest_txg - newest_txg;
             worst_rollback = Some(worst_rollback.map_or(rollback, |previous_worst: u64| previous_worst.max(rollback)));
         }
     }

@@ -8,7 +8,7 @@
 //! ## 两条臂（逐字取自 D6 已定项 1）
 //!
 //! ① `key_snapshot_dim`：单树，快照 ID 进 key 低位，查找按祖先关系过滤。
-//! ② `tree_per_head`：每头一棵自己的树，各持一份 `prev_snap_txg` 与 deadlist。
+//! ② `tree_per_head`：每头一棵自己的树，各持一份 `previous_snapshot_txg` 与 deadlist。
 //!
 //! ## 判据（跑前写死）
 //!

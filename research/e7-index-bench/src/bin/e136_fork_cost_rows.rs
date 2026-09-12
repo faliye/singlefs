@@ -37,7 +37,7 @@ const LEDGER_INTERNAL_NON_POINTER_BYTES: u64 = 22;
 const EXTENT_NON_POINTER_BYTES: u64 = 8 + 8 + 8;
 /// 记账叶条目：key 22 + value 8（D5 已定项 5）。
 const LEDGER_LEAF_ENTRY_BYTES: u64 = 22 + 8;
-/// 树表条目的非指针段：长度 2 + 种类 2 + flags 2 + 树 ID 8 + prev_snap_txg 8 + 诞生 txg 8 + 预留 32（D8 已定项 8）。
+/// 树表条目的非指针段：长度 2 + 种类 2 + flags 2 + 树 ID 8 + previous_snapshot_txg 8 + 诞生 txg 8 + 预留 32（D8 已定项 8）。
 const TREE_TABLE_NON_POINTER_BYTES: u64 = 2 + 2 + 2 + 8 + 8 + 8 + 32;
 /// 根记录的非指针段（D22 已定项 7）。
 const ROOT_RECORD_NON_POINTER_BYTES: u64 = 4 + 16 + 4 + 4 + 8 + 8 + 32;

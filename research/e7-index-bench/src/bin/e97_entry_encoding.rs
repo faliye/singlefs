@@ -117,7 +117,7 @@ const RING_REGIONS: u64 = 3;
 const SLOTS_PER_REGION_MAXIMUM: u64 = 16;
 const KEPT_GENERATIONS_MAXIMUM: u64 = RING_REGIONS * SLOTS_PER_REGION_MAXIMUM + 1;
 /// D22 已定项 7：`checkpoint_txg` 8 字节 ⇒ 「代」的值域要 8 字节才装得下。
-const CHECKPOINT_TRANSACTION_GROUP_BYTES: u64 = 8;
+const CHECKPOINT_TXG_BYTES: u64 = 8;
 /// E73 按 D18 已定项 7 重算过的三档基础节点头下界。
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
 /// D18 已定项 7 的两个预留位合计（nonce 代号 12 + MAC 16）。E117 的 `resv12` 臂同一个数。
@@ -411,7 +411,7 @@ fn main() {
 
     output_lines.push(emitter.emit_raw(&format!(
         "name=config node_bytes={NODE_BYTES} unit_bytes={DATA_UNIT_BYTES} stats={STATISTIC_COUNT} \
-         k_max={KEPT_GENERATIONS_MAXIMUM} t_dirty={DIRTY_BYTES_THRESHOLD} budget={ACCOUNTING_WRITE_BUDGET_BYTES} ckpt_txg_bytes={CHECKPOINT_TRANSACTION_GROUP_BYTES}"
+         k_max={KEPT_GENERATIONS_MAXIMUM} t_dirty={DIRTY_BYTES_THRESHOLD} budget={ACCOUNTING_WRITE_BUDGET_BYTES} ckpt_txg_bytes={CHECKPOINT_TXG_BYTES}"
     )));
 
     // ── 记账树：四条臂 × 三档节点头 × 两种子指针宽 ──────────────────────
@@ -666,7 +666,7 @@ mod tests {
         assert_eq!(DATA_UNIT_BYTES, 32768, "D4 已定项 5");
         assert_eq!(STATISTIC_COUNT, 11, "D5 已定项 4 第一次重开之后");
         assert_eq!(KEPT_GENERATIONS_MAXIMUM, 49, "D22 已定项 2：3 × 16 + 1");
-        assert_eq!(CHECKPOINT_TRANSACTION_GROUP_BYTES, 8, "D22 已定项 7");
+        assert_eq!(CHECKPOINT_TXG_BYTES, 8, "D22 已定项 7");
     }
 
     /// **判据 1 的绝对值**：22 字节 key、头 58、带区间、子指针 32

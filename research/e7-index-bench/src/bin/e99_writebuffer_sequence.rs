@@ -136,15 +136,27 @@ struct Update {
 /// 四条臂各自怎么给一条条目定序。返回 `None` = 这条臂给不出序（无 seq）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
-    NoSeq,
+    NoSequence,
     WallClock,
     MountLocal,
     TxgPlusWindow,
 }
 
+impl Arm {
+    /// 印进产物的臂名。留存产物里是改名前 `{:?}` 的形态（NoSeq），这里照原样输出，产物一个字节都不变。
+    fn output_label(self) -> &'static str {
+        match self {
+            Arm::NoSequence => "NoSeq",
+            Arm::WallClock => "WallClock",
+            Arm::MountLocal => "MountLocal",
+            Arm::TxgPlusWindow => "TxgPlusWindow",
+        }
+    }
+}
+
 fn order_key(arm: Arm, update: &Update) -> Option<u128> {
     match arm {
-        Arm::NoSeq => None,
+        Arm::NoSequence => None,
         Arm::WallClock => Some(update.wall_clock_reading as u128),
         Arm::MountLocal => Some(update.mount_local as u128),
         // 两段拼起来：高位 txg、低位窗口序号。位宽够不够是判据 1 的事。
@@ -306,13 +318,13 @@ fn main() {
     for &(key_count, updates_per_key) in [(1000u32, 1u64), (1000, 8)].iter() {
         for &remount in [None, Some(4u64)].iter() {
             let updates = make_updates(key_count, updates_per_key, remount);
-            for &arm in [Arm::NoSeq, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
+            for &arm in [Arm::NoSequence, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
                 let (wrong_winner_count, undefined_winner_count) = wrong_winners(&updates, arm);
                 output_lines.push(emitter.emit_raw(&format!(
-                    "name=dedup keys={key_count} per_key={updates_per_key} remount={} arm={:?} \
+                    "name=dedup keys={key_count} per_key={updates_per_key} remount={} arm={} \
                      wrong_winners={wrong_winner_count} undefined_winners={undefined_winner_count}",
                     remount.map(|remount_round| remount_round.to_string()).unwrap_or_else(|| "none".into()),
-                    arm,
+                    arm.output_label(),
                 )));
             }
         }
@@ -439,13 +451,13 @@ mod tests {
     fn criterion2_only_a_monotone_sequence_picks_the_right_winner() {
         let updates = make_updates(1000, 8, None);
         // 无 seq：1000 个 key 全部**未定义**（不是「选错」——它根本没有序）
-        assert_eq!(wrong_winners(&updates, Arm::NoSeq), (0, 1000));
+        assert_eq!(wrong_winners(&updates, Arm::NoSequence), (0, 1000));
         // 不插挂载时墙钟与挂载计数器都单调 ⇒ 全对
         assert_eq!(wrong_winners(&updates, Arm::WallClock), (0, 0));
         assert_eq!(wrong_winners(&updates, Arm::MountLocal), (0, 0));
         assert_eq!(wrong_winners(&updates, Arm::TxgPlusWindow), (0, 0), "txg + 窗口序号：恒 0");
         // 阳性对照：无 seq 那条臂的「未定义」数必须是全部
-        let (wrong_winner_count, undefined_winner_count) = wrong_winners(&updates, Arm::NoSeq);
+        let (wrong_winner_count, undefined_winner_count) = wrong_winners(&updates, Arm::NoSequence);
         assert_eq!(wrong_winner_count + undefined_winner_count, 1000, "1000 个 key 一个都不落下");
     }
 
@@ -467,12 +479,12 @@ mod tests {
     #[test]
     fn negative_control_single_update_per_key_is_unambiguous() {
         let updates = make_updates(1000, 1, None);
-        for &arm in [Arm::NoSeq, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
+        for &arm in [Arm::NoSequence, Arm::WallClock, Arm::MountLocal, Arm::TxgPlusWindow].iter() {
             assert_eq!(wrong_winners(&updates, arm), (0, 0), "{arm:?} 在无歧义输入上就该全对");
         }
     }
 
-    /// **等价变异留档**：把 `Arm::NoSeq` 从 `None` 换成「所有条目同一个常数序号」，
+    /// **等价变异留档**：把 `Arm::NoSequence` 从 `None` 换成「所有条目同一个常数序号」，
     /// 在**所有输入上**与原式同结果——两种写法都让同 key 的条目全部并列，
     /// 而并列在本模型里就判「胜者未定义」。**这不算盲区，是等价。**
     /// 变异表里那一条已换成一个真会改行为的（把墙钟压成常数）。
@@ -481,7 +493,7 @@ mod tests {
         for &(key_count, updates_per_key) in [(4u32, 1u64), (4, 4), (1000, 8)].iter() {
             let updates = make_updates(key_count, updates_per_key, None);
             // 原式：None
-            let original_result = wrong_winners(&updates, Arm::NoSeq);
+            let original_result = wrong_winners(&updates, Arm::NoSequence);
             // 等价写法：所有条目同一个常数 ⇒ 全并列 ⇒ 同样判未定义
             let equivalent_result = {
                 use std::collections::HashMap;

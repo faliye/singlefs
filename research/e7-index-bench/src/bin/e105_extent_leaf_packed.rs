@@ -24,8 +24,8 @@ const UNIT_BYTES: u64 = 32768;
 /// D18 已定项 7 三档 58 / 67 / 76 加 C113 的写序 10。
 const NODE_HEADERS: [u64; 3] = [68, 77, 86];
 /// 码 3 头 93（D18 已定项 11 登记的现行值）+ 写序 10。不用登记名，免得格式常量门禁把它当成现行值的漂移。
-/// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`；C113 定案 2026-09-05 加写序 10）。
-const UNIT_HDR_PACKED: u64 = 103;
+/// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`；C113 定案 2026-09-05 加写序 10）。
+const PACKED_UNIT_HEADER_BYTES: u64 = 103;
 const CHILD_POINTER_BYTES: u64 = 59;
 const EXTENT_KEY: u64 = 24;
 /// extent 记录 = key 24 + 位置指针 59。
@@ -106,7 +106,7 @@ fn packed_unit_form_point_lookup(tree_geometry: &Geometry) -> (u64, u64) {
 
 /// 树高：甲 = 码 2 叶形态的层数，乙 = 码 3 叶形态的层数（容器算一层）。
 fn heights(record_count: u64, node_header_bytes: u64, record_bytes: u64) -> (usize, usize) {
-    let tree_geometry = geometry(record_count, node_header_bytes, record_bytes, UNIT_BYTES, UNIT_HDR_PACKED);
+    let tree_geometry = geometry(record_count, node_header_bytes, record_bytes, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
     (tree_geometry.index_leaf_tree_levels.len(), tree_geometry.packed_internal_levels.len() + 1)
 }
 
@@ -116,7 +116,7 @@ fn heights(record_count: u64, node_header_bytes: u64, record_bytes: u64) -> (usi
 fn equal_cost_segments(node_header_bytes: u64, record_bytes: u64, record_count_limit: u64) -> Vec<(u64, u64)> {
     let index_leaf_fanout = fanout(NODE_BYTES, node_header_bytes, record_bytes);
     let inner_fanout = fanout(NODE_BYTES, node_header_bytes, EXTENT_KEY + CHILD_POINTER_BYTES);
-    let records_per_container = fanout(UNIT_BYTES, UNIT_HDR_PACKED, record_bytes);
+    let records_per_container = fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, record_bytes);
     let mut edges: Vec<u64> = vec![0];
     let (mut index_leaf_height_step, mut packed_height_step) = (index_leaf_fanout, records_per_container);
     while index_leaf_height_step < record_count_limit || packed_height_step < record_count_limit {
@@ -138,12 +138,12 @@ fn equal_cost_segments(node_header_bytes: u64, record_bytes: u64, record_count_l
 fn main() {
     let mut emitter = Emitter::new();
     println!("{}", emitter.emit_raw(&format!(
-        "name=config note=extent 叶改码 3 的更新代价 node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} unit_hdr={UNIT_HDR_PACKED} \
+        "name=config note=extent 叶改码 3 的更新代价 node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} unit_hdr={PACKED_UNIT_HEADER_BYTES} \
          extent_rec={EXTENT_RECORD_BYTES} extent_rec_narrow={EXTENT_RECORD_NARROW_BYTES} child_ptr={CHILD_POINTER_BYTES} w={STRIPE_WIDTH} model=arithmetic file_ops=0")));
     for (record_width_name, record_bytes) in [("wide", EXTENT_RECORD_BYTES), ("narrow", EXTENT_RECORD_NARROW_BYTES)] {
         for &record_count in &EXTENT_RECORD_COUNTS {
             for &node_header_bytes in &NODE_HEADERS {
-                let tree_geometry = geometry(record_count, node_header_bytes, record_bytes, UNIT_BYTES, UNIT_HDR_PACKED);
+                let tree_geometry = geometry(record_count, node_header_bytes, record_bytes, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
                 println!("{}", emitter.emit_raw(&format!(
                     "name=geom rec={record_width_name} n={record_count} hdr={node_header_bytes} a_leaf_fanout={} a_height={} b_per_container={} b_containers={} b_height={}",
                     tree_geometry.index_leaf_fanout, tree_geometry.index_leaf_tree_levels.len(), tree_geometry.records_per_container, tree_geometry.container_count, tree_geometry.packed_internal_levels.len() + 1)));
@@ -183,8 +183,8 @@ mod tests {
     fn fanouts_are_absolute() {
         assert_eq!(fanout(NODE_BYTES, 68, EXTENT_RECORD_BYTES), 196);
         assert_eq!(fanout(NODE_BYTES, 86, EXTENT_RECORD_BYTES), 196);
-        assert_eq!(fanout(UNIT_BYTES, UNIT_HDR_PACKED, EXTENT_RECORD_BYTES), 393);
-        assert_eq!(fanout(UNIT_BYTES, UNIT_HDR_PACKED, EXTENT_RECORD_NARROW_BYTES), 628);
+        assert_eq!(fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, EXTENT_RECORD_BYTES), 393);
+        assert_eq!(fanout(UNIT_BYTES, PACKED_UNIT_HEADER_BYTES, EXTENT_RECORD_NARROW_BYTES), 628);
         assert_eq!(fanout(NODE_BYTES, 68, EXTENT_KEY + CHILD_POINTER_BYTES), 196);
     }
 
@@ -192,7 +192,7 @@ mod tests {
     /// 码 3 叶写 1 个 32 KiB 单元 × 2 + 2 层内部节点 × 16 KiB × 2 = 131072 ⇒ 1.333。
     #[test]
     fn single_update_is_pinned() {
-        let tree_geometry = geometry(1_000_000, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, UNIT_HDR_PACKED);
+        let tree_geometry = geometry(1_000_000, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
         assert_eq!(tree_geometry.index_leaf_tree_levels.len(), 3);
         assert_eq!(tree_geometry.packed_internal_levels.len(), 2);
         // 容器扇出与容器数要单独钉：单次更新的字节数不随容器数变，变异「扇出按节点算容器」曾一个测试都不红
@@ -217,7 +217,7 @@ mod tests {
     /// 判据 5 阴性对照 + 判据 2 饱和对照。
     #[test]
     fn zero_and_saturation() {
-        let tree_geometry = geometry(1_000_000, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, UNIT_HDR_PACKED);
+        let tree_geometry = geometry(1_000_000, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
         assert_eq!(index_leaf_form_update_bytes(&tree_geometry, 0), 0.0);
         assert_eq!(packed_unit_form_update_bytes(&tree_geometry, 0, UNIT_BYTES), 0.0);
         let container_count = tree_geometry.container_count;
@@ -235,7 +235,7 @@ mod tests {
         assert_eq!(segments, vec![(38417, 77028), (7529537, 15097488)], "{segments:?}");
         for (segment_start, segment_end) in [(38417u64, 77028u64), (7529537, 15097488)] {
             for record_count in [segment_start, segment_end] {
-                let tree_geometry = geometry(record_count, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, UNIT_HDR_PACKED);
+                let tree_geometry = geometry(record_count, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
                 let (index_leaf_height, packed_height) = heights(record_count, 68, EXTENT_RECORD_BYTES);
                 assert_eq!(packed_height + 1, index_leaf_height, "n={record_count}");
                 assert_eq!(packed_unit_form_update_bytes(&tree_geometry, 1, UNIT_BYTES), index_leaf_form_update_bytes(&tree_geometry, 1), "n={record_count}");
@@ -246,7 +246,7 @@ mod tests {
             }
             // 区段两端之外恰好回到 1 + 1/h_A
             for record_count in [segment_start - 1, segment_end + 1] {
-                let tree_geometry = geometry(record_count, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, UNIT_HDR_PACKED);
+                let tree_geometry = geometry(record_count, 68, EXTENT_RECORD_BYTES, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
                 let (index_leaf_height, packed_height) = heights(record_count, 68, EXTENT_RECORD_BYTES);
                 assert_eq!(packed_height, index_leaf_height, "n={record_count}");
                 assert!(packed_unit_form_update_bytes(&tree_geometry, 1, UNIT_BYTES) > index_leaf_form_update_bytes(&tree_geometry, 1), "n={record_count}");
@@ -264,7 +264,7 @@ mod tests {
     fn read_ratio_bounds() {
         for &record_count in &EXTENT_RECORD_COUNTS {
             for &node_header_bytes in &NODE_HEADERS {
-                let tree_geometry = geometry(record_count, node_header_bytes, EXTENT_RECORD_BYTES, UNIT_BYTES, UNIT_HDR_PACKED);
+                let tree_geometry = geometry(record_count, node_header_bytes, EXTENT_RECORD_BYTES, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES);
                 let (_, index_leaf_read_bytes) = index_leaf_form_point_lookup(&tree_geometry);
                 let (_, packed_read_bytes) = packed_unit_form_point_lookup(&tree_geometry);
                 let read_bytes_ratio = packed_read_bytes as f64 / index_leaf_read_bytes as f64;

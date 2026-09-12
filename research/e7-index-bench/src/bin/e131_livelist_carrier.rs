@@ -25,7 +25,7 @@ const NODE_BYTES: u64 = 16384;
 /// ⚠️ 仓里另有一个口径 16320（C157），本装置不采用。
 const TREE_TABLE_PAYLOAD: u64 = 16284;
 /// 一条树表条目。D8 已定项 8：长度 2 + 种类 2 + flags 2 + 树 ID 8 + 根指针 59
-/// + `prev_snap_txg` 8 + 诞生 txg 8 + 预留 32。
+/// + `previous_snapshot_txg` 8 + 诞生 txg 8 + 预留 32。
 const TREE_TABLE_ENTRY: u64 = 121;
 /// 索引节点头。E73 给的基础节点头下界那一档，与 E128 同口径。
 const NODE_HEADER_BYTES: u64 = 64;

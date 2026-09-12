@@ -17,15 +17,31 @@ use std::collections::BTreeSet;
 enum PlaintextField {
     Kind,   // 单元类型标签
     Tree,   // 树 ID
-    Obj,    // 对象 ID
+    Object, // 对象 ID
     Birth,  // 对象出生代
     Anchor, // 锚点偏移
-    Dev,    // 设备号
+    Device, // 设备号
     Off,    // 设备内偏移
     CiphertextChecksum,    // 密文校验和
 }
-const ALL_HEADER: [PlaintextField; 5] = [PlaintextField::Kind, PlaintextField::Tree, PlaintextField::Obj, PlaintextField::Birth, PlaintextField::Anchor];
-const ALL_MAPPING: [PlaintextField; 7] = [PlaintextField::Tree, PlaintextField::Obj, PlaintextField::Birth, PlaintextField::Anchor, PlaintextField::Dev, PlaintextField::Off, PlaintextField::CiphertextChecksum];
+
+impl PlaintextField {
+    /// 印进产物的字段名。留存产物里是改名前 `{:?}` 的形态（Obj、Dev），这里照原样输出，产物一个字节都不变。
+    fn output_label(self) -> &'static str {
+        match self {
+            PlaintextField::Kind => "Kind",
+            PlaintextField::Tree => "Tree",
+            PlaintextField::Object => "Obj",
+            PlaintextField::Birth => "Birth",
+            PlaintextField::Anchor => "Anchor",
+            PlaintextField::Device => "Dev",
+            PlaintextField::Off => "Off",
+            PlaintextField::CiphertextChecksum => "CiphertextChecksum",
+        }
+    }
+}
+const ALL_HEADER: [PlaintextField; 5] = [PlaintextField::Kind, PlaintextField::Tree, PlaintextField::Object, PlaintextField::Birth, PlaintextField::Anchor];
+const ALL_MAPPING: [PlaintextField; 7] = [PlaintextField::Tree, PlaintextField::Object, PlaintextField::Birth, PlaintextField::Anchor, PlaintextField::Device, PlaintextField::Off, PlaintextField::CiphertextChecksum];
 
 #[derive(Clone, Copy)]
 struct Unit {
@@ -72,7 +88,7 @@ fn mapping_of(arm: &Arm) -> BTreeSet<PlaintextField> {
 fn known_fields_rebuilding_mapping_from_header(unit: &Unit, arm: &Arm) -> BTreeSet<PlaintextField> {
     let mut known_fields = header_of(unit, arm);
     if arm.scan_supplies_physical {
-        known_fields.insert(PlaintextField::Dev);
+        known_fields.insert(PlaintextField::Device);
         known_fields.insert(PlaintextField::Off);
     }
     known_fields.insert(PlaintextField::CiphertextChecksum);
@@ -171,8 +187,8 @@ fn main() {
         ] {
             let header_to_mapping_gap = rebuild(&units, &arm, true);
             let mapping_to_header_gap = rebuild(&units, &arm, false);
-            let header_to_mapping_missing_names: Vec<String> = header_to_mapping_gap.kinds.iter().map(|field| format!("{field:?}")).collect();
-            let mapping_to_header_missing_names: Vec<String> = mapping_to_header_gap.kinds.iter().map(|field| format!("{field:?}")).collect();
+            let header_to_mapping_missing_names: Vec<String> = header_to_mapping_gap.kinds.iter().map(|field| field.output_label().to_string()).collect();
+            let mapping_to_header_missing_names: Vec<String> = mapping_to_header_gap.kinds.iter().map(|field| field.output_label().to_string()).collect();
             println!(
                 "E7RESULT name=arm arm={name} meta={metadata_unit_count} data={data_unit_count} n={unit_count} A缺口单元={} A缺口字段={} A缺的是={} B缺口单元={} B缺口字段={} B缺的是={}",
                 header_to_mapping_gap.units, header_to_mapping_gap.fields, if header_to_mapping_missing_names.is_empty() { "无".to_string() } else { header_to_mapping_missing_names.join("+") },
@@ -258,7 +274,7 @@ mod tests {
         let header_only_fields: BTreeSet<PlaintextField> = header_of(&units[0], &CURRENT);
         let missing_fields = missing(&header_only_fields, &wanted_fields);
         assert_eq!(missing_fields.len(), 3);
-        assert_eq!(missing_fields.into_iter().collect::<Vec<_>>(), vec![PlaintextField::Dev, PlaintextField::Off, PlaintextField::CiphertextChecksum]);
+        assert_eq!(missing_fields.into_iter().collect::<Vec<_>>(), vec![PlaintextField::Device, PlaintextField::Off, PlaintextField::CiphertextChecksum]);
     }
 
     #[test]
@@ -284,7 +300,7 @@ mod tests {
         // 这条断言给出答案：Dev / Off / Crc **三项全部已在映射层七字段之内**，
         // 方向 B 一开始就拿着它们 ⇒ 不对称不存在，对称臂因此恒等于现行臂。
         // ⇒ 这个「恒等」是结论，不是疏忽；写成断言免得后人当成没做。
-        let free_inputs: BTreeSet<PlaintextField> = [PlaintextField::Dev, PlaintextField::Off, PlaintextField::CiphertextChecksum].into_iter().collect();
+        let free_inputs: BTreeSet<PlaintextField> = [PlaintextField::Device, PlaintextField::Off, PlaintextField::CiphertextChecksum].into_iter().collect();
         let mapping = mapping_of(&CURRENT);
         assert!(free_inputs.is_subset(&mapping), "免费输入若跑到映射层之外，这个判定就真的不对称了");
         assert_eq!(known_fields_rebuilding_header_from_mapping(&SYMMETRIC), known_fields_rebuilding_header_from_mapping(&CURRENT), "对称臂给不出任何新东西");
@@ -326,7 +342,7 @@ mod tests {
         let mapping_to_header_gap = rebuild(&units, &CORRECTED, false);
         assert_eq!(header_to_mapping_gap.units, unit_count);
         assert_eq!(header_to_mapping_gap.fields, 2 * unit_count, "缺的恰好是 Dev 与 Off 两项");
-        assert_eq!(header_to_mapping_gap.kinds.into_iter().collect::<Vec<_>>(), vec![PlaintextField::Dev, PlaintextField::Off]);
+        assert_eq!(header_to_mapping_gap.kinds.into_iter().collect::<Vec<_>>(), vec![PlaintextField::Device, PlaintextField::Off]);
         assert_eq!(mapping_to_header_gap.units, unit_count);
         assert_eq!(mapping_to_header_gap.fields, unit_count);
         assert!(verdict_of(header_to_mapping_gap.units, mapping_to_header_gap.units).contains("按字段拆"));

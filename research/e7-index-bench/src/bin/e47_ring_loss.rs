@@ -8,8 +8,8 @@
 //!
 //! ## 核心自变量：槽序，而 D22 从没定过这一维
 //!
-//! ① **区内连续**：`slot = transaction_group mod (R×S)`，区域 = `slot / S` ⇒ 连续 S 次发布落在同一个区域。
-//! ② **跨区轮转**：区域 = `transaction_group mod R`，区内槽 = `(transaction_group / R) mod S` ⇒ 相邻两次发布落在不同区域。
+//! ① **区内连续**：`slot = txg mod (R×S)`，区域 = `slot / S` ⇒ 连续 S 次发布落在同一个区域。
+//! ② **跨区轮转**：区域 = `txg mod R`，区内槽 = `(txg / R) mod S` ⇒ 相邻两次发布落在不同区域。
 //!
 //! 丢一个区域时，①丢的是**连续 S 代**，②丢的是**每 R 代里的一代**。
 //! **这不是差一点，是差一个量纲。**
@@ -44,9 +44,9 @@ fn device_of(logical_block_address: u64, chunk: u64, device_count: u64) -> u64 {
 /// 槽序。两种都合法，D22 已定项 2 从没点名过。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SlotOrder {
-    /// `slot = transaction_group mod (R×S)`，区域 = `slot / S`。
+    /// `slot = txg mod (R×S)`，区域 = `slot / S`。
     WithinRegion,
-    /// 区域 = `transaction_group mod R`，区内槽 = `(transaction_group / R) mod S`。
+    /// 区域 = `txg mod R`，区内槽 = `(txg / R) mod S`。
     AcrossRegions,
 }
 
@@ -57,11 +57,11 @@ impl SlotOrder {
             SlotOrder::AcrossRegions => "across_regions",
         }
     }
-    /// 第 `transaction_group` 次发布落在哪个区域。
-    fn region_of(self, transaction_group: u64, regions: u64, slots: u64) -> u64 {
+    /// 第 `txg` 次发布落在哪个区域。
+    fn region_of(self, txg: u64, regions: u64, slots: u64) -> u64 {
         match self {
-            SlotOrder::WithinRegion => (transaction_group % (regions * slots)) / slots,
-            SlotOrder::AcrossRegions => transaction_group % regions,
+            SlotOrder::WithinRegion => (txg % (regions * slots)) / slots,
+            SlotOrder::AcrossRegions => txg % regions,
         }
     }
 }

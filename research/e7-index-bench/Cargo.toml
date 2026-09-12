@@ -62,8 +62,8 @@ name = "e75-record-size"
 path = "src/bin/e75_record_size.rs"
 
 [[bin]]
-name = "e76-payload-csum"
-path = "src/bin/e76_payload_csum.rs"
+name = "e76-payload-checksum"
+path = "src/bin/e76_payload_checksum.rs"
 
 [[bin]]
 name = "e71-accounting-keys"
@@ -78,8 +78,8 @@ name = "e73-key-range"
 path = "src/bin/e73_key_range.rs"
 
 [[bin]]
-name = "e74-alloc-records"
-path = "src/bin/e74_alloc_records.rs"
+name = "e74-allocation-records"
+path = "src/bin/e74_allocation_records.rs"
 
 [dependencies]
 aes-gcm = "0.11.1"
@@ -218,8 +218,8 @@ name = "e91-ring-admission"
 path = "src/bin/e91_ring_admission.rs"
 
 [[bin]]
-name = "e123-k-fork-cost"
-path = "src/bin/e123_k_fork_cost.rs"
+name = "e123-reuse-window-versus-rollback-depth"
+path = "src/bin/e123_reuse_window_versus_rollback_depth.rs"
 
 [[bin]]
 name = "e92-reuse-requirement"
@@ -246,8 +246,8 @@ name = "e98-inode-record"
 path = "src/bin/e98_inode_record.rs"
 
 [[bin]]
-name = "e99-writebuffer-seq"
-path = "src/bin/e99_writebuffer_seq.rs"
+name = "e99-writebuffer-sequence"
+path = "src/bin/e99_writebuffer_sequence.rs"
 
 [[bin]]
 name = "e100-superblock-slot"
@@ -334,12 +334,12 @@ name = "e120-tier-ratio"
 path = "src/bin/e120_tier_ratio.rs"
 
 [[bin]]
-name = "e121-cap-tiers"
-path = "src/bin/e121_cap_tiers.rs"
+name = "e121-capacity-tiers"
+path = "src/bin/e121_capacity_tiers.rs"
 
 [[bin]]
-name = "e122-dir-locality"
-path = "src/bin/e122_dir_locality.rs"
+name = "e122-directory-locality"
+path = "src/bin/e122_directory_locality.rs"
 
 [[bin]]
 name = "e124-superblock-recompute"

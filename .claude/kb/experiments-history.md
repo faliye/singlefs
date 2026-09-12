@@ -16,6 +16,31 @@
 
 ## 历史版本
 
+### 2026-09-12（其二）：13 个实验源码改名、两个实验的枚举成员改名，留存产物一个字节没动
+
+- **改前**：13 个实验源码的文件名带缩写或单字母（见「13 个实验源码的改名对照」的改前一列）；`e57_field_authority.rs` 的枚举成员 `Obj`、`Dev` 与 `e99_writebuffer_seq.rs` 的 `Arm::NoSeq` 经 `{:?}` 印进留存产物。
+- **改后**：文件名换成「13 个实验源码的改名对照」的改后一列，Cargo.toml 的 bin 名、`research/scripts/replay.sh` 的二进制列、`research/mutations/` 的同名变异表、kb 里的复跑命令与源码路径一起换。`research/results/` 的产物文件名不改：那是按当时的二进制名存下的证据，`research/prompts/` 与 `records/` 按这个名字引它们。枚举成员改成 `Object`、`Device`、`NoSequence`，另加 `output_label()` 照原样输出旧字符串。
+
+  13 个实验源码的改名对照：
+
+  | 改前 | 改后 |
+  |---|---|
+  | `e121_cap_tiers` | `e121_capacity_tiers` |
+  | `e122_dir_locality` | `e122_directory_locality` |
+  | `e123_k_fork_cost` | `e123_reuse_window_versus_rollback_depth` |
+  | `e27_d5_paths` | `e27_snapshot_accounting_risk_paths` |
+  | `e38_accounting_cow` | `e38_accounting_copy_on_write` |
+  | `e40_csum_width` | `e40_checksum_width` |
+  | `e42_txn_records` | `e42_transaction_records` |
+  | `e43_ext_budget` | `e43_extension_point_budget` |
+  | `e54_accounting_gen` | `e54_accounting_generations` |
+  | `e59_msg_recompute` | `e59_message_recompute` |
+  | `e74_alloc_records` | `e74_allocation_records` |
+  | `e76_payload_csum` | `e76_payload_checksum` |
+  | `e99_writebuffer_seq` | `e99_writebuffer_sequence` |
+
+- **依据**：naming-lint 报出文件名里的 cap、dir、k、d5、cow、csum、txn、ext、gen、msg、alloc、seq 与枚举成员里的 obj、dev、seq。改完之后受影响的 36 个实验复跑与留存产物逐字节一致；123 张变异表逐条核过，原文在源码里的命中数与改名前相同。E12（攒批的顺序追加 vs 不攒批的随机页读改写） 要真块设备、产物未留存，这次只改了它一个标识符，没有复跑证据，只有构建与单测。
+
 ### 2026-09-12：E138（按盘回退下界与推空的空间要求） 正文改机制、补射程——「臂 G 为什么输」换成复现出来的那一形，近满盘结论只在无故障时成立
 
 - **改前**：「臂 G 为什么输」一段标「推的」，说病在处置的发布数随落点变、改法是「一律做满 7 次」；判据 6 那一格写两条臂的最小不卡死保留池「都比跑前式子小」；「它答不了的」十条里没有近满盘与故障的组合；代价段写臂 G「约 4.8 次」。
@@ -219,7 +244,7 @@
   与同 `stride` 的 `grouped` 行**逐格相同**。
   这与 E122（按目录聚在一起买到什么） 自己的阳性对照是同一件事——那一行逐字写着
   「`stride = 32` 时两条臂的落点序列**完全相同**」，而落点序列相同则任何从落点算出来的量必然相同。
-- **装置没错，正文错**：`research/e7-index-bench/src/bin/e122_dir_locality.rs` 的
+- **装置没错，正文错**：`research/e7-index-bench/src/bin/e122_directory_locality.rs` 的
   `t05_empty_segs_are_absolute` 写死 `stride = 2`，断言消息逐字
   「arrival **交错之后**一个整段都空不出来（段长 {sg}）」⇒ 断言的范围一直是对的，
   是正文把那个限定删掉了。**源码与产物一个字没动。**
@@ -962,7 +987,7 @@ E98（inode 记录与 inode 树的几何） 的数会不会动」做成可钉绝
 
 **依据**：第二轮反推攻击腿（opus）与正推腿（sonnet）**各自独立**指出这两处，
 主 agent 逐条读源码坐实（`e98_inode_record.rs` 的 `records_lost_per_leaf` 只出现在 `name=geom` 行、
-`e99_writebuffer_seq.rs` 的 `wrap_millis` 从没被 `wrong_winners` 消费）。
+`e99_writebuffer_sequence.rs` 的 `wrap_millis` 从没被 `wrong_winners` 消费）。
 
 **同轮新增两条等价变异留档**：E99（write buffer 条目与 seq 的去重） 的
 「回绕边界 `<=` 换成 `<`」在所有输入上同结果（边界那格 q=1、r=0 ⇒ `C(1,2)=0`），
@@ -2046,7 +2071,7 @@ E49（反向链宽度 32 还是 64） 把记录核对器每一次相邻比较都
   结果：原地预留 **32.5 MiB（F=64/H=2）到 128.5 GiB（F=256/H=3）**；
   恢复代价 4 GiB 池 35 万倍、1 TiB 池 **8948 万倍**。
   ⚠️ **占比那段算术原先只活在 `main()` 里**，把 10 000 改成 1 000 时一个测试都没红——
-  抽成函数并钉住绝对值之后被 `e38_accounting_cow` 的变异 `M8_占比算成千分之一` 抓住。
+  抽成函数并钉住绝对值之后被 `e38_accounting_copy_on_write` 的变异 `M8_占比算成千分之一` 抓住。
 
 - **E39（反向链挡不挡得住残留记录） 补了宽度扫描**（用户：8 位太少，试 16 和 32，并要体积）。
   每档 **200 万轮独立试验**：8 位 3961 ppm、16 位 16 ppm、32 位 0，**逐档贴住 2⁻ⁿ**；

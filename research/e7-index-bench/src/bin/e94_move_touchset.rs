@@ -848,7 +848,7 @@ mod tests {
         assert_eq!(audit_stale_references(&world, Architecture::CentralMap, &plan), 0);
     }
 
-    /// **deadlist 条目重写**：快照 1 之后更新 key 3（旧版本 birth 1 ≤ prev_snap ⇒ 进活头 deadlist），
+    /// **deadlist 条目重写**：快照 1 之后更新 key 3（旧版本 birth 1 ≤ previous_snapshot_txg ⇒ 进活头 deadlist），
     /// 快照 2 接管它。搬那个死版本：它只被快照 1 的树引用 ⇒ 波只走快照 1 一棵 + deadlist 改 1 条。
     #[test]
     fn dead_version_rewrites_deadlist() {
@@ -885,7 +885,7 @@ mod tests {
         let world = build_history(4, 64, 0);
         assert!(world.snapshots.len() == 4);
         let mut snapshotless_world = World::new(2, 8, 32);
-        snapshotless_world.update(3); // 无快照 ⇒ birth 2 > prev_snap 0 ⇒ 立即释放旧槽
+        snapshotless_world.update(3); // 无快照 ⇒ birth 2 > previous_snapshot_txg 0 ⇒ 立即释放旧槽
         assert!(snapshotless_world.free_slots.contains(&3), "旧槽 3 必须立即回空");
         assert!(snapshotless_world.head_deadlist.is_empty());
     }
@@ -990,7 +990,7 @@ mod tests {
     /// **销毁级联的 prev 传递**：毁 S1 后 S2 的 prev 必须变 0，否则毁 S2 时
     /// birth ≤ 旧 prev 的条目被永久钉住。
     #[test]
-    fn destroy_cascade_propagates_previous_transaction_group() {
+    fn destroy_cascade_propagates_previous_txg() {
         let mut world = small_world();
         world.snapshot(); // S1 @ txg 1
         world.update(3);

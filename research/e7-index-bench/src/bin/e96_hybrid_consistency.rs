@@ -655,7 +655,7 @@ mod tests {
     #[test]
     fn free_via_hint_misfrees_reused_slot() {
         let mut world = hand_scenario(Header::KeyBirth);
-        // hand_scenario 里 update(3) 把旧 ver 3（birth 1 ≤ prev_snap 1）推进了活头 deadlist，提示 = 3
+        // hand_scenario 里 update(3) 把旧 ver 3（birth 1 ≤ previous_snapshot_txg 1）推进了活头 deadlist，提示 = 3
         assert_eq!(world.head_deadlist, vec![DlEntry { version_number: 3, hint: 3 }]);
         world.snapshot(); // S2 接管
         world.destroy_oldest(); // 毁 S1：ver 3 释放

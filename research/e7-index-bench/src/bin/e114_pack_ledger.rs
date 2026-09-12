@@ -62,7 +62,7 @@ use e7_index_bench::Emitter;
 
 // ── 格式常量，全部有出处 ────────────────────────────────────────────────
 const UNIT: u64 = 32768; // D4 已定项 5
-const UNIT_HDR_DATA: u64 = 105; // D18 已定项 7
+const DATA_UNIT_HEADER_BYTES: u64 = 105; // D18 已定项 7
 const PACK_HDR: u64 = 103; // D18 已定项 11
 const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度
 const W: u64 = 2; // D2 已定项 9
@@ -191,7 +191,7 @@ fn compaction_bytes(n: u64, size: u64, m: u64, f: f64, slot_extra: u64) -> u64 {
 fn main() {
     let mut em = Emitter::new();
     println!("{}", em.emit_raw(&format!(
-        "name=config unit={UNIT} unit_hdr={UNIT_HDR_DATA} pack_hdr={PACK_HDR} grain={GRAIN} w={W} \
+        "name=config unit={UNIT} unit_hdr={DATA_UNIT_HEADER_BYTES} pack_hdr={PACK_HDR} grain={GRAIN} w={W} \
          map_key={MAP_KEY} loc={LOC_ENTRY} alloc={ALLOC_ENTRY} cref={CONTAINER_REF} \
          slot_full={SLOT_FULL} slot_min={SLOT_MIN} live={LIVE_COUNT_ENTRY} n={N} \
          sizes={SIZES:?} ms={MS:?} fs={FS:?}")));

@@ -67,7 +67,7 @@ const CHECKSUM_BYTES: u64 = 4; // 位置条目里的密文校验和
 // ── 158 字节里，哪些住在单元自己身上 ──
 // D4（校验和位置）已定「父节点存子节点校验和」⇒ **指针住在父节点里，不在被指的单元里**。
 // ⇒ 单元自身的容器约束只扣得到单元头那 105 字节，扣不到指针那 53 字节。
-const IN_UNIT_HEADER_BYTES: u64 = 105; // 单元头（kb 里 `format-const: UNIT_HDR_DATA`，D18 已定项 7），住在单元里
+const IN_UNIT_HEADER_BYTES: u64 = 105; // 单元头（kb 里 `format-const: DATA_UNIT_HEADER_BYTES`，D18 已定项 7），住在单元里
 const OUT_OF_UNIT_POINTER_BYTES: u64 = 53; // 指针头部 31 + 位置条目 ×2 共 22，住在父节点里
 
 /// 扩展点长在哪些单元上。D21 没区分，所以两档都跑。
@@ -170,7 +170,7 @@ fn maximum_extension_point_bytes_keeping_one_pointer_in_node(node: u64) -> u64 {
 // ── 自证单元那一档（D20 推论三：根槽、journal 记录头）──
 // 它们没有带校验和的父指针，原子宽度**等于运行时探测到的 `physical_block_size`**。
 // ⇒ 扩展点在这一档的余量由**原子宽度**夹，不由「省不省」夹。
-const JOURNAL_HDR: u64 = 78; // D23 已定项 4 逐字：头部字段合计 78 字节（tail_lsn 随已定项 3 去掉）
+const JOURNAL_HEADER_BYTES: u64 = 78; // D23 已定项 4 逐字：头部字段合计 78 字节（tail_lsn 随已定项 3 去掉）
 const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 已定项 2 的候选槽宽
 
 /// 一个自证单元的头部落进一个原子单元之后，还剩多少字节。
@@ -199,7 +199,7 @@ fn mount_verdict(extension_point_bytes: u64, unit: u64, node: u64, slot: u64, at
     if slots_per_atomic(slot, atomic) != 1 {
         return "reject_slot_shares_atomic"; // 撕裂隔离失效：一个原子单元里不止一个槽
     }
-    if extension_point_bytes > self_witness_room(JOURNAL_HDR, atomic) {
+    if extension_point_bytes > self_witness_room(JOURNAL_HEADER_BYTES, atomic) {
         return "reject_self_witness_overflow"; // 自证单元的头顶不住一个原子宽度
     }
     "ok"
@@ -339,9 +339,9 @@ fn main() {
         println!(
             "{}",
             emitter.emit_raw(&format!(
-                "name=self_witness kind=journal_record hdr={JOURNAL_HDR} atomic={atomic} \
+                "name=self_witness kind=journal_record hdr={JOURNAL_HEADER_BYTES} atomic={atomic} \
                  room={} slots_per_atomic=NA",
-                self_witness_room(JOURNAL_HDR, atomic),
+                self_witness_room(JOURNAL_HEADER_BYTES, atomic),
             ))
         );
     }
@@ -374,9 +374,9 @@ fn main() {
         emitter.emit_raw(&format!(
             "name=self_witness_bound n_max_journal_512={} n_max_root_slot_256={} \
              n_max_if_self_witness_carries={}",
-            self_witness_room(JOURNAL_HDR, 512),
+            self_witness_room(JOURNAL_HEADER_BYTES, 512),
             ROOT_SLOT_CANDIDATE - 1,
-            self_witness_room(JOURNAL_HDR, 512).min(ROOT_SLOT_CANDIDATE - 1),
+            self_witness_room(JOURNAL_HEADER_BYTES, 512).min(ROOT_SLOT_CANDIDATE - 1),
         ))
     );
 
@@ -518,8 +518,8 @@ mod tests {
     /// 78 字节头落进 512 扇区之后余 434。
     #[test]
     fn self_witness_room_matches_the_decision_23_number() {
-        assert_eq!(self_witness_room(JOURNAL_HDR, 512), 434);
-        assert_eq!(self_witness_room(JOURNAL_HDR, 4096), 4018);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512), 434);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096), 4018);
     }
 
     /// **撕裂隔离**：E34 主张一——槽宽 256、原子宽度 512 ⇒ 一个原子单元里挤 2 个槽。
@@ -535,7 +535,7 @@ mod tests {
     /// 独立算术：min(512 − 78, 256 − 1) = min(434, 255) = 255。
     #[test]
     fn the_self_witness_bound_is_255_not_864() {
-        let bound = self_witness_room(JOURNAL_HDR, 512).min(ROOT_SLOT_CANDIDATE - 1);
+        let bound = self_witness_room(JOURNAL_HEADER_BYTES, 512).min(ROOT_SLOT_CANDIDATE - 1);
         assert_eq!(bound, 255);
         assert!(bound < 864); // 比索引节点那条紧 3.4 倍
     }

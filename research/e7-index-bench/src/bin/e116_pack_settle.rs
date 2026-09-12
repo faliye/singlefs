@@ -22,7 +22,7 @@
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
-//! - **D23（journal 的角色与格式）**：journal 记录头 78，登记名 JOURNAL_HDR。
+//! - **D23（journal 的角色与格式）**：journal 记录头 78，登记名 JOURNAL_HEADER_BYTES。
 //! - **D2 已定项 9**：第一版 2 盘恒 w = 2。
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
@@ -75,14 +75,14 @@ use e7_index_bench::Emitter;
 // ── 有出处的格式常量 ────────────────────────────────────────────────
 const UNIT: u64 = 32768; // D4 已定项 5
 const NODE: u64 = 16384; // D8 已定项 2（format-const NODE_BYTES）
-const PACK_HDR: u64 = 103; // D18 已定项 11（format-const UNIT_HDR_PACKED）
+const PACK_HDR: u64 = 103; // D18 已定项 11（format-const PACKED_UNIT_HEADER_BYTES）
 const NODE_HDR: u64 = 86; // D18 已定项 7 三档头最宽那档
 const W: u64 = 2; // D2 已定项 9
 const MAP_KEY: u64 = 33; // D18 已定项 3
 const LOC_ENTRY: u64 = 14; // D19 已定项 4
 const ALLOC_ENTRY: u64 = 18; // D3 已定项 7
 const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度
-const JOURNAL_HDR: u64 = 78; // D23（journal 的角色与格式），登记名 JOURNAL_HDR
+const JOURNAL_HEADER_BYTES: u64 = 78; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
 const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
@@ -155,7 +155,7 @@ fn pack_ledger(n: u64, size: u64, slot_extra: u64, policy: u8, b: u64, journal: 
     let alloc_w = alloc_leaves * NODE * W;
 
     // ④ journal：每搬一个对象一条记录（假设；policy 2 记 0）
-    let journal_w = if journal && policy != 2 { n * (JOURNAL_HDR + MAP_ENTRY) } else { 0 };
+    let journal_w = if journal && policy != 2 { n * (JOURNAL_HEADER_BYTES + MAP_ENTRY) } else { 0 };
 
     Ledger { occupancy, move_write: data_w + map_w + alloc_w + journal_w,
              move_read: n * UNIT, blast: cap }
@@ -185,7 +185,7 @@ fn main() {
     println!("{}", em.emit_raw(&format!(
         "name=config unit={UNIT} node={NODE} pack_hdr={PACK_HDR} node_hdr={NODE_HDR} w={W} \
          map_entry={MAP_ENTRY} map_leaf_cap={} alloc_entry={ALLOC_ENTRY} alloc_leaf_cap={} \
-         journal_hdr={JOURNAL_HDR} slot_extra={SLOT_EXTRA} n={N} sizes={SIZES:?} batches={BATCHES:?}",
+         journal_hdr={JOURNAL_HEADER_BYTES} slot_extra={SLOT_EXTRA} n={N} sizes={SIZES:?} batches={BATCHES:?}",
         map_leaf_cap(), alloc_leaf_cap())));
 
     // 阳性对照：容器容量强制为 1 ⇒ 三条打包臂的稳态占用与 pad 逐格相同
@@ -336,7 +336,7 @@ mod tests {
         let alloc_leaves = alloc_changed.div_ceil(alloc_leaf_cap());
         assert_eq!(alloc_leaves, 113);
         assert_eq!(alloc_leaves * NODE * W, 3_702_784);
-        let journal_w = N * (JOURNAL_HDR + MAP_ENTRY);
+        let journal_w = N * (JOURNAL_HEADER_BYTES + MAP_ENTRY);
         assert_eq!(journal_w, 13_900_000);
         let l = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true);
         assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 13_900_000);

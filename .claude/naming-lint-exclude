@@ -1,33 +1,14 @@
 # naming-lint 不扫的目录或单个 .rs（.claude/singlefs-ai-sop/rules/code-discipline.md「门禁管哪一半」）。
 # 一行一条：<相对路径>  # 为什么。这是 0.0.41 命名纪律的回扫账：改完一个文件就删它那一行，只删不加；新文件照查。
-research/e7-index-bench/src/bin/e102_unit_class_registry.rs  # 回扫已改完，剩 3 处待定：登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 3
-research/e7-index-bench/src/bin/e103_inode_update_cost.rs  # 回扫已改完，剩 2 处待定：登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 2
-research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs  # 回扫已改完，剩 1 处待定：登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 1
 research/e7-index-bench/src/bin/e114_pack_ledger.rs  # 回扫跳过：变异表 M6/M7 的原文在源码里各命中两处，改名前要先把这张表修成唯一命中
 research/e7-index-bench/src/bin/e116_pack_settle.rs  # 回扫跳过：变异表 M16 的原文是一段后来被改写的注释，表已对不上源码，要先修表
-research/e7-index-bench/src/bin/e117_reserved_header.rs  # 回扫已改完，剩 1 处待定：登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 1
-research/e7-index-bench/src/bin/e121_cap_tiers.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e122_dir_locality.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e123_k_fork_cost.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
 research/e7-index-bench/src/bin/e126_superblock_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
 research/e7-index-bench/src/bin/e17_merge.rs  # 回扫跳过：开 overflow-checks 时第 111 行溢出，阳性对照 panic、replay 跑不出产物，要先修
-research/e7-index-bench/src/bin/e27_d5_paths.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
 research/e7-index-bench/src/bin/e34_ring_iomin.rs  # 回扫已改完，剩 8 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 8
-research/e7-index-bench/src/bin/e38_accounting_cow.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e40_csum_width.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
 research/e7-index-bench/src/bin/e41_root_ring_geom.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
-research/e7-index-bench/src/bin/e42_txn_records.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e43_ext_budget.rs  # 回扫已改完，剩 2 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1；登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 1
 research/e7-index-bench/src/bin/e46_region_spacing.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7
-research/e7-index-bench/src/bin/e54_accounting_gen.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e57_field_authority.rs  # 回扫已改完，剩 2 处待定：枚举成员经 {:?} 印进留存产物（改名要重跑产物） 2
 research/e7-index-bench/src/bin/e58_csum_grain.rs  # 回扫跳过：留存产物早于 ptr_bytes 108→53 的修正，replay 对不上 32 行，要先重跑产物
-research/e7-index-bench/src/bin/e59_msg_recompute.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
 research/e7-index-bench/src/bin/e67_device_subset.rs  # 回扫跳过：变异表 M1 的替换编不过、M2 的原文命中两处，要先修表
-research/e7-index-bench/src/bin/e74_alloc_records.rs  # 回扫已改完，剩 1 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1
-research/e7-index-bench/src/bin/e75_record_size.rs  # 回扫已改完，剩 1 处待定：登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 1
-research/e7-index-bench/src/bin/e76_payload_csum.rs  # 回扫已改完，剩 2 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1；登记过的 format-const 名（gate.d/27 按名字钉 kb 与源码，改名要连 kb 登记位一起改） 1
 research/e7-index-bench/src/bin/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
 research/e7-index-bench/src/bin/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
-research/e7-index-bench/src/bin/e99_writebuffer_seq.rs  # 回扫已改完，剩 2 处待定：Cargo bin 文件名（replay 表与 kb 复跑命令引它） 1；枚举成员经 {:?} 印进留存产物（改名要重跑产物） 1
 research/e7-index-bench/src/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3

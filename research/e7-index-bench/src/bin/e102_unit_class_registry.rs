@@ -59,8 +59,8 @@ use e7_index_bench::Emitter;
 
 const UNIT_BYTES: u64 = 32768;
 const COMMON_PREFIX_BYTES: u64 = 42;
-/// D18 已定项 7 数据单元头（kb 里 `format-const: UNIT_HDR_DATA`）。
-const UNIT_HDR_DATA: u64 = 105;
+/// D18 已定项 7 数据单元头（kb 里 `format-const: DATA_UNIT_HEADER_BYTES`）。
+const DATA_UNIT_HEADER_BYTES: u64 = 105;
 /// 提案 P4（第三版）：打包记录单元类身份段 = 单元类型标签 1（偏移 6 的密文侧副本）+ 出生树 ID 8 +
 /// 打包记录类型 2 + 容器号 8 + 容器出生代 8 + 记录数 2 + 记录宽 2 + 诞生代号 8 + fsid 8 +
 /// 载荷校验和 4（CRC32C，D23 已定项 13 口径）+ 写序 10（C113 定案，2026-09-05）= 61 ⇒ 头 103。
@@ -69,11 +69,11 @@ const UNIT_HDR_DATA: u64 = 105;
 /// 对只有头校验和的形态 distinguishable=0。记录宽在头里再抄一份：不认识记录类型的读者才判得了
 /// 「记录数 × 记录宽 ≤ 声明长度」这条头合法性条件（D23 已定项 1 的 B 条同形）。
 const PACKED_BODY_BYTES: u64 = 61;
-/// D18 已定项 11 打包记录单元头（kb 里 `format-const: UNIT_HDR_PACKED`）；单测钉它 == 前缀 + 类身份段。
-const UNIT_HDR_PACKED: u64 = 103;
+/// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`）；单测钉它 == 前缀 + 类身份段。
+const PACKED_UNIT_HEADER_BYTES: u64 = 103;
 /// E83 的墓碑区间记录量级假设；E98 的 inode 记录。
 const TOMBSTONE_RECORD_BYTES: u64 = 56;
-const INODE_REC: u64 = 140;
+const INODE_RECORD_BYTES: u64 = 140;
 /// 标签 1 字节。
 const TAG_VALUES: u64 = 256;
 
@@ -240,7 +240,7 @@ enum Parse {
 
 /// **判据 5**：定宽解析。只认头里的三个数。
 fn parse_packed(count: u64, width: u64, declared_length: u64) -> Parse {
-    if width == 0 || count.saturating_mul(width).saturating_add(UNIT_HDR_PACKED) > declared_length {
+    if width == 0 || count.saturating_mul(width).saturating_add(PACKED_UNIT_HEADER_BYTES) > declared_length {
         return Parse::Corrupt;
     }
     Parse::Records(count)
@@ -314,8 +314,8 @@ fn main() {
     let mut output_lines: Vec<String> = Vec::new();
 
     output_lines.push(emitter.emit_raw(&format!(
-        "name=config unit={UNIT_BYTES} common_prefix={COMMON_PREFIX_BYTES} data_hdr={UNIT_HDR_DATA} packed_body={PACKED_BODY_BYTES} packed_hdr={UNIT_HDR_PACKED} \
-         tomb_rec={TOMBSTONE_RECORD_BYTES} inode_rec={INODE_REC} tag_values={TAG_VALUES} registry={} used_names={} \
+        "name=config unit={UNIT_BYTES} common_prefix={COMMON_PREFIX_BYTES} data_hdr={DATA_UNIT_HEADER_BYTES} packed_body={PACKED_BODY_BYTES} packed_hdr={PACKED_UNIT_HEADER_BYTES} \
+         tomb_rec={TOMBSTONE_RECORD_BYTES} inode_rec={INODE_RECORD_BYTES} tag_values={TAG_VALUES} registry={} used_names={} \
          model=arithmetic file_ops=0",
         REGISTRY.len(),
         USED_NAMES.len()
@@ -349,14 +349,14 @@ fn main() {
     )));
 
     // 判据 3：容量与头宽区间
-    for &record_bytes in [TOMBSTONE_RECORD_BYTES, INODE_REC].iter() {
-        for &header_bytes in [64u64, 65, 76, UNIT_HDR_DATA, UNIT_HDR_PACKED, 120, 121, 148, 149].iter() {
+    for &record_bytes in [TOMBSTONE_RECORD_BYTES, INODE_RECORD_BYTES].iter() {
+        for &header_bytes in [64u64, 65, 76, DATA_UNIT_HEADER_BYTES, PACKED_UNIT_HEADER_BYTES, 120, 121, 148, 149].iter() {
             output_lines.push(emitter.emit_raw(&format!(
                 "name=capacity rec={record_bytes} hdr={header_bytes} cap={}",
                 capacity(header_bytes, record_bytes)
             )));
         }
-        let packed_header_capacity = capacity(UNIT_HDR_PACKED, record_bytes);
+        let packed_header_capacity = capacity(PACKED_UNIT_HEADER_BYTES, record_bytes);
         let (lowest_header_bytes, highest_header_bytes) = header_interval_for(packed_header_capacity, record_bytes);
         output_lines.push(emitter.emit_raw(&format!(
             "name=capacity_interval rec={record_bytes} cap_at_packed_hdr={packed_header_capacity} hdr_lo={lowest_header_bytes} hdr_hi={highest_header_bytes} \
@@ -367,7 +367,7 @@ fn main() {
     }
 
     // 判据 4：指认力
-    let packed_record_count = capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES);
+    let packed_record_count = capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES);
     output_lines.push(emitter.emit_raw(&format!(
         "name=identity records={packed_record_count} unnamed_by_five_tuple={} unnamed_by_packed_identity={}",
         unnamed_by_five_tuple(packed_record_count),
@@ -388,8 +388,8 @@ fn main() {
         parse_packed(packed_record_count + 1, TOMBSTONE_RECORD_BYTES, UNIT_BYTES)
     )));
     output_lines.push(emitter.emit_raw(&format!(
-        "name=mixing a={TOMBSTONE_RECORD_BYTES} n_a=10 b={INODE_REC} n_b=10 misparsed={}",
-        misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_REC, 10)
+        "name=mixing a={TOMBSTONE_RECORD_BYTES} n_a=10 b={INODE_RECORD_BYTES} n_b=10 misparsed={}",
+        misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_RECORD_BYTES, 10)
     )));
     output_lines.push(emitter.emit_raw(&format!(
         "name=mixing a={TOMBSTONE_RECORD_BYTES} n_a=10 b={TOMBSTONE_RECORD_BYTES} n_b=10 misparsed={} note=unmixed",
@@ -435,12 +435,12 @@ mod tests {
     fn format_constants_match_knowledge_base() {
         assert_eq!(UNIT_BYTES, 32768, "D4 已定项 7");
         assert_eq!(COMMON_PREFIX_BYTES, 42, "D18 已定项 7");
-        assert_eq!(UNIT_HDR_DATA, 105, "D18 已定项 7：42 + 33 + 8 + 8 + 写序 10 + 载荷 CRC 4（C113 定案，2026-09-05）");
-        assert_eq!(UNIT_HDR_PACKED, 103, "D18 已定项 11：42 + 61");
-        assert_eq!(UNIT_HDR_PACKED, COMMON_PREFIX_BYTES + PACKED_BODY_BYTES, "头 = 共同前缀 + 类身份段");
+        assert_eq!(DATA_UNIT_HEADER_BYTES, 105, "D18 已定项 7：42 + 33 + 8 + 8 + 写序 10 + 载荷 CRC 4（C113 定案，2026-09-05）");
+        assert_eq!(PACKED_UNIT_HEADER_BYTES, 103, "D18 已定项 11：42 + 61");
+        assert_eq!(PACKED_UNIT_HEADER_BYTES, COMMON_PREFIX_BYTES + PACKED_BODY_BYTES, "头 = 共同前缀 + 类身份段");
         assert_eq!(AAD_PACKED_BODY, 26, "树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8");
         assert_eq!(TOMBSTONE_RECORD_BYTES, 56, "E83 量级假设");
-        assert_eq!(INODE_REC, 140, "E98");
+        assert_eq!(INODE_RECORD_BYTES, 140, "E98");
     }
 
     /// **判据 1 的绝对值**：提案登记表下映不到 0、一名多码 0、未登记 0。
@@ -482,24 +482,24 @@ mod tests {
     /// **判据 3 的绝对值 + 反向接受条款**：103 字节头下 583 / 233 不动（93 时同值），区间两端各多 1 字节掉 1 格。
     #[test]
     fn criterion3_downstream_capacities_do_not_move_under_the_packed_header() {
-        assert_eq!(capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES), 583, "E83 / E84 的 583");
-        assert_eq!(capacity(UNIT_HDR_DATA, TOMBSTONE_RECORD_BYTES), 583);
-        assert_eq!(capacity(UNIT_HDR_PACKED, INODE_REC), 233, "E98 的 233");
-        assert_eq!(capacity(UNIT_HDR_DATA, INODE_REC), 233);
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 583, "E83 / E84 的 583");
+        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 583);
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), 233, "E98 的 233");
+        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), 233);
         // 583 成立的头宽闭区间 [65, 120]
         assert_eq!(header_interval_for(583, TOMBSTONE_RECORD_BYTES), (65, 120));
         assert_eq!(capacity(64, TOMBSTONE_RECORD_BYTES), 584);
         assert_eq!(capacity(121, TOMBSTONE_RECORD_BYTES), 582);
         // 233 成立的头宽闭区间 [9, 148]
-        assert_eq!(header_interval_for(233, INODE_REC), (9, 148));
-        assert_eq!(capacity(8, INODE_REC), 234);
-        assert_eq!(capacity(149, INODE_REC), 232);
+        assert_eq!(header_interval_for(233, INODE_RECORD_BYTES), (9, 148));
+        assert_eq!(capacity(8, INODE_RECORD_BYTES), 234);
+        assert_eq!(capacity(149, INODE_RECORD_BYTES), 232);
     }
 
     /// **判据 4 的绝对值**：五元组指认不到 582 条；打包类身份段 + 解析恰 0。
     #[test]
     fn criterion4_five_tuple_names_one_object_packed_identity_names_all() {
-        let packed_record_count = capacity(UNIT_HDR_PACKED, TOMBSTONE_RECORD_BYTES);
+        let packed_record_count = capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES);
         assert_eq!(unnamed_by_five_tuple(packed_record_count), 582);
         assert_eq!(unnamed_by_five_tuple(1), 0, "装 1 条时五元组刚好够——已定项 8 原话成立的唯一情形");
         let parsed = match parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES) {
@@ -519,12 +519,12 @@ mod tests {
         assert_eq!(parse_packed(16, TOMBSTONE_RECORD_BYTES, 1000), Parse::Records(16));
         assert_eq!(parse_packed(17, TOMBSTONE_RECORD_BYTES, 1000), Parse::Corrupt);
         // 阳性对照：56 / 140 混装各 10 条，period = 56 / gcd(56,140) = 56 / 28 = 2 ⇒ 错分 5
-        assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_REC, 10), 5);
+        assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_RECORD_BYTES, 10), 5);
         // 互素宽度全错：56 与 57，period 56 ⇒ 10 条里只有 i=0 对齐 ⇒ 错 9
         assert_eq!(misparsed_when_mixed(56, 10, 57, 10), 9);
         // 阴性对照：不混装恒 0
         assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, TOMBSTONE_RECORD_BYTES, 10), 0);
-        assert_eq!(misparsed_when_mixed(INODE_REC, 3, INODE_REC, 300), 0);
+        assert_eq!(misparsed_when_mixed(INODE_RECORD_BYTES, 3, INODE_RECORD_BYTES, 300), 0);
     }
 
     /// **判据 6 的绝对值**：incompat 静默漏 0 且拒挂；跳过政策静默漏恰 k；未登记记录类型可验不可用。
@@ -567,7 +567,7 @@ mod tests {
     #[test]
     fn illegal_geometry_is_not_a_measurement() {
         assert_eq!(capacity(UNIT_BYTES, TOMBSTONE_RECORD_BYTES), 0);
-        assert_eq!(capacity(UNIT_HDR_PACKED, 0), 0);
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, 0), 0);
         assert_eq!(parse_packed(1, TOMBSTONE_RECORD_BYTES, 10), Parse::Corrupt);
     }
 }

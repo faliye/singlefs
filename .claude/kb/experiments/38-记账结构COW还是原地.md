@@ -93,16 +93,16 @@ COW 那一侧**恒为 0**。
 | 撒开（同样 8 叶，落在 8 个不同父下） | 2.125–3.125× |
 
 ⚠️ **两个数都记下来，不预设哪个是「真实」的**：D25（目标负载优先级） 若改，
-把 `Spread` 那一维重跑一遍即可（`cargo run --release --bin e38_accounting_cow`，秒级）。
+把 `Spread` 那一维重跑一遍即可（`cargo run --release --bin e38_accounting_copy_on_write`，秒级）。
 
 **阳性对照**：把 COW 的「每次新地址」换成「原地覆盖同一地址」（不重写祖先），
 写量从 110 000 降到 80 000 ⇒ 模型确实在量 COW 那部分代价。
 
 **口径**：10 000 次提交 × 每次 8 叶；池 4 GiB / 64 GiB / 1 TiB 三档 × 四档树几何 × 两种摊法。
-代码 `research/e7-index-bench/src/bin/e38_accounting_cow.rs`
-（`cargo run --release --bin e38_accounting_cow`），
+代码 `research/e7-index-bench/src/bin/e38_accounting_copy_on_write.rs`
+（`cargo run --release --bin e38_accounting_copy_on_write`），
 原始输出 `research/results/e38-accounting-cow-2026-08-29.out`，
-变异表 `research/mutations/e38_accounting_cow.tsv`。
+变异表 `research/mutations/e38_accounting_copy_on_write.tsv`。
 **13 个单测，8 条变异逐条命中、0 个盲区。** 绝对值断言：
 碰一个叶恰写 `1 + 树高`；碰满一个父下的 F 个叶恰写 `F + 树高`；
 节点总数由几何直接算出；占比单位是万分之一（`8322 / 1048576 = 79 bp`）。

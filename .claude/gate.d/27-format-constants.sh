@@ -13,7 +13,7 @@
 #
 # 权威在 kb，形态是一行机器可读标记，紧挨着定这个值的那句话：
 #
-#     <!-- format-const: JOURNAL_HDR = 86 stale=hdr=84|room=428 -->
+#     <!-- format-const: JOURNAL_HEADER_BYTES = 86 stale=hdr=84|room=428 -->
 #
 # `stale=` 列的是**旧值的字面串**（`|` 分隔，可省）。它们不许再出现在 kb 正文与
 # 实验源码/产物里——但**允许出现在「## 历史版本」之后与 *-history.md 里**，

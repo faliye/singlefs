@@ -127,8 +127,8 @@ impl Device {
 /// 这就是本实验要量的那个机制。抽成函数是为了让单测走**生产路径**——
 /// 测试里再写一遍判据，就测不到 `arm_d5` 里实际用的那一份
 /// （E21 的分块逻辑踩过这个坑，变异测试当场证明）。
-fn is_direct_release(birth: u64, previous_snapshot_transaction_group: u64) -> bool {
-    birth > previous_snapshot_transaction_group
+fn is_direct_release(birth: u64, previous_snapshot_txg: u64) -> bool {
+    birth > previous_snapshot_txg
 }
 
 fn arm_time_order_deadlist(device: &mut Device, operation_count: u64, seed: u64, deadlist_base: u64) -> IoCounters {
@@ -137,10 +137,10 @@ fn arm_time_order_deadlist(device: &mut Device, operation_count: u64, seed: u64,
     let mut buffered_bytes = 0usize;
     let mut append_offset = deadlist_base;
     let mut random_state = seed;
-    let previous_snapshot_transaction_group: u64 = 1_000_000; // 常驻内存的一个标量
+    let previous_snapshot_txg: u64 = 1_000_000; // 常驻内存的一个标量
     for _ in 0..operation_count {
         let birth = next_random(&mut random_state) % 2_000_000; // 指针里已有的字段，零次额外 I/O
-        if is_direct_release(birth, previous_snapshot_transaction_group) {
+        if is_direct_release(birth, previous_snapshot_txg) {
             continue; // 直接释放：连 deadlist 都不写
         }
         deadlist_buffer.as_mut_slice()[buffered_bytes..buffered_bytes + 8].copy_from_slice(&birth.to_le_bytes());

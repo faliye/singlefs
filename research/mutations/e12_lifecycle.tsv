@@ -1,4 +1,4 @@
-M1_直接释放边界写松	birth > previous_snapshot_transaction_group	birth >= previous_snapshot_transaction_group
+M1_直接释放边界写松	birth > previous_snapshot_txg	birth >= previous_snapshot_txg
 M2_blk差值漏字段	write_sectors: after.write_sectors.saturating_sub(before.write_sectors),	write_sectors: after.write_sectors,
 M3_缺读数当零	let (before, after) = (before?, after?);	let (before, after) = (before.unwrap_or_default(), after.unwrap_or_default());
 M4_对齐参数退化	let layout = Layout::from_size_align(length_in_bytes, PAGE_BYTES).expect("对齐参数非法");	let layout = Layout::from_size_align(length_in_bytes, 8).expect("对齐参数非法");

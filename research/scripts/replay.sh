@@ -41,7 +41,7 @@ E23|e23_journal_geom||e23-journal-geom-2026-08-29.out|exact
 E24|e24_recovery||e24-recovery-2026-08-29.out|exact
 E25|e25_journal_reserve||e25-journal-reserve-2026-08-29.out|exact
 E26|e26_accounting||e26-accounting-2026-08-29.out|exact
-E27|e27_d5_paths||e27-d5-paths-2026-08-29.out|exact
+E27|e27_snapshot_accounting_risk_paths||e27-d5-paths-2026-08-29.out|exact
 E28|e28_map_rebuild||e28-map-rebuild-2026-08-29.out|exact
 E29|e29_blast_radius||e29-blast-radius-2026-08-29.out|exact
 E30|e30_range_rebuild||e30-range-rebuild-2026-08-29.out|exact
@@ -51,16 +51,16 @@ E33|e33-pin-rules||e33-pin-rules-2026-08-29.out|exact
 E35|e35-head-forms||e35-head-forms-2026-08-29.out|exact
 E36|e36-slot-mapping||e36-slot-mapping-2026-08-29.out|exact
 E37|e37-log-epoch||e37-log-epoch-2026-08-29.out|exact
-E38|e38_accounting_cow||e38-accounting-cow-2026-08-29.out|exact
+E38|e38_accounting_copy_on_write||e38-accounting-cow-2026-08-29.out|exact
 E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
-E42|e42_txn_records||e42-txn-records-2026-08-29.out|exact
+E42|e42_transaction_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
-E43|e43_ext_budget||e43-ext-budget-2026-09-06.out|exact
+E43|e43_extension_point_budget||e43-ext-budget-2026-09-06.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
-E76|e76-payload-csum||e76-payload-csum-2026-09-01.out|exact
+E76|e76-payload-checksum||e76-payload-csum-2026-09-01.out|exact
 E77|e77-publish-order||e77-publish-order-2026-09-02.out|exact
 E78|e78-replay-start||e78-replay-start-2026-09-02.out|exact
 E79|e79-root-record||e79-root-record-2026-09-06.out|exact
@@ -69,11 +69,11 @@ E113|e113-unknown-tree-full-arms||e113-unknown-tree-full-arms-2026-09-06.out|exa
 E114|e114-pack-ledger||e114-pack-ledger-2026-09-07.out|exact
 E117|e117-reserved-header||e117-reserved-header-2026-09-07.out|exact
 E118|e118-single-disk-recovery||e118-single-disk-recovery-2026-09-07.out|exact
-E122|e122-dir-locality||e122-dir-locality-2026-09-07.out|exact
+E122|e122-directory-locality||e122-dir-locality-2026-09-07.out|exact
 E116|e116-pack-settle||e116-pack-settle-2026-09-07.out|exact
 E119|e119-slot-tiers||e119-slot-tiers-2026-09-08.out|exact
 E120|e120-tier-ratio||e120-tier-ratio-2026-09-08.out|exact
-E121|e121-cap-tiers||e121-cap-tiers-2026-09-08.out|exact
+E121|e121-capacity-tiers||e121-cap-tiers-2026-09-08.out|exact
 E115|e115-superblock-completeness||e115-superblock-completeness-2026-09-07.out|exact
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
@@ -88,7 +88,7 @@ E89|e89-interval-frontier||e89-interval-frontier-2026-09-03.out|exact
 E90|e90-tree-aad||e90-tree-aad-2026-09-03.out|exact
 E91|e91-ring-admission||e91-ring-admission-2026-09-03.out|exact
 E92|e92-reuse-requirement||e92-reuse-requirement-2026-09-08.out|exact
-E123|e123-k-fork-cost||e123-k-fork-cost-2026-09-09.out|exact
+E123|e123-reuse-window-versus-rollback-depth||e123-k-fork-cost-2026-09-09.out|exact
 E124|e124-superblock-recompute||e124-superblock-recompute-2026-09-09.out|exact
 E126|e126-superblock-slot-width||e126-superblock-slot-width-2026-09-09.out|exact
 E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
@@ -97,7 +97,7 @@ E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
 E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact
 E98|e98-inode-record||e98-inode-record-2026-09-07.out|exact
-E99|e99-writebuffer-seq||e99-writebuffer-seq-2026-09-03.out|exact
+E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-05.out|exact
@@ -112,8 +112,8 @@ E110|e110-stripe-table-steady||e110-stripe-table-steady-2026-09-06.out|exact
 E111|e111-stripe-table-key||e111-stripe-table-key-2026-09-06.out|exact
 E34|e34-ring-iomin||e34-ring-iomin-2026-09-01.out|exact
 E73|e73-key-range||e73-key-range-2026-09-07.out|exact
-E74|e74-alloc-records||e74-alloc-records-2026-09-01.out|exact
-E40|e40_csum_width||e40-csum-width-2026-08-30.out|exact
+E74|e74-allocation-records||e74-alloc-records-2026-09-01.out|exact
+E40|e40_checksum_width||e40-csum-width-2026-08-30.out|exact
 E46|e46_region_spacing||e46-region-spacing-2026-08-30.out|exact
 E47|e47_ring_loss||e47-ring-loss-2026-08-30.out|exact
 E48|e48_ring_placement||e48-ring-placement-2026-08-30.out|exact
@@ -121,9 +121,9 @@ E50|e50_ring_slots||e50-ring-slots-2026-08-30.out|exact
 E49|e49_chain_width||e49-chain-width-2026-08-30.out|exact
 E51|e51_chain_chances||e51-chain-chances-2026-08-30.out|exact
 E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
-E54|e54_accounting_gen||e54-accounting-gen-2026-08-30.out|exact
+E54|e54_accounting_generations||e54-accounting-gen-2026-08-30.out|exact
 E57|e57_field_authority||e57-field-authority-2026-08-31.out|exact
-E59|e59_msg_recompute||e59-msg-recompute-2026-08-31.out|exact
+E59|e59_message_recompute||e59-msg-recompute-2026-08-31.out|exact
 E61|e61-chain-hash||e61-chain-hash-2026-08-31.out|exact
 E69|e69-backref-cost||e69-backref-cost-2026-08-31.out|exact
 E60|e60-rebalance||e60-rebalance-2026-08-31.out|exact

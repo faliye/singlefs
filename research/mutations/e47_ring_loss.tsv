@@ -1,6 +1,6 @@
 M1_落盘不取模设备数	(logical_block_address / chunk) % device_count	(logical_block_address / chunk)
-M2_区内连续退化成跨区	SlotOrder::WithinRegion => (transaction_group % (regions * slots)) / slots,	SlotOrder::WithinRegion => transaction_group % regions,
-M3_跨区退化成区内连续	SlotOrder::AcrossRegions => transaction_group % regions,	SlotOrder::AcrossRegions => (transaction_group % (regions * slots)) / slots,
+M2_区内连续退化成跨区	SlotOrder::WithinRegion => (txg % (regions * slots)) / slots,	SlotOrder::WithinRegion => txg % regions,
+M3_跨区退化成区内连续	SlotOrder::AcrossRegions => txg % regions,	SlotOrder::AcrossRegions => (txg % (regions * slots)) / slots,
 M4_只取一个相位	for phase in 0..ring_slot_count {	for phase in 0..1 {
 M5_读不到记成回退0	newest_alive.map(|newest_alive_generation| latest - newest_alive_generation)	Some(newest_alive.map(|newest_alive_generation| latest - newest_alive_generation).unwrap_or(0))
 M6_区域数少算一个	fn regions_needed(failure_domains: u64) -> u64 {\n    failure_domains + 1\n}	fn regions_needed(failure_domains: u64) -> u64 {\n    failure_domains\n}
