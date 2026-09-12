@@ -1,0 +1,9 @@
+1. For arm A, all classes have key components available in pointers. Type 1 pointers carry birth tree, birth txg, and write sequence; types 2 and 3 carry birth tree, birth txg, instance id, and birth sequence. Class tag comes from lookup path, so key assembly is possible.  
+For arm B, types 2 and 3 do not use the map, so no key assembly is needed. Type 1 pointers carry required components, so key assembly is possible.  
+For arm C, type 1 pointers do not carry write sequence. When dereferencing, the key requires write sequence, but it cannot be obtained from the pointer. The system would need to read it from the target unit's header, but accessing the target requires map lookup using the key, creating a dependency loop.  
+
+2. During background compaction, a type 2 node is moved to a new physical location without updating parent pointers. In arm B, parent pointers are authoritative, so they retain the old location. When reading, the system accesses the old location which may now contain unrelated data or be freed, resulting in incorrect data.  
+
+3. A type 2 node is shared between two trees. The header's tree id is fixed to one tree (e.g., tree A). During map scan rebuild, the node's header shows birth tree A. Tree B references this node with birth tree B in its pointer. The map key for tree B's reference requires birth tree B, but the node's header only provides birth tree A. Thus, the map cannot correctly rebuild the entry for tree B's reference. This case does not hurt arm B because arm B does not use the map for types 2 and 3.  
+
+4. After a crash and replay, two different type 2 units are written during the same transaction group (txg). Both have instance id 1, birth tree 5, txg 10, and birth sequence 2. Under F3, the map key for both is identical (class tag + birth tree + birth txg + instance id + birth sequence), causing a key collision in the map.
