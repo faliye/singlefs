@@ -1,4 +1,5 @@
 exit=1
-want=2 处条目住错了地方
-want=写在了只放说明的 decisions-history.md 里
+want=3 处条目住错了地方
+want=写在了放快查表的 decisions-history.md 里
 want=日期 2026-09-01 的条目住在 2026-08 那一份
+want=2026-07-decisions-history.md  按月的文件要放进 .claude/kb/decisions-history/

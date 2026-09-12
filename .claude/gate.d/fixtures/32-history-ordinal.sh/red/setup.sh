@@ -26,7 +26,8 @@ cat > .claude/kb/decisions-history.md <<'X'
 ### 2026-09-02（其二）：另一个会话先取走的那条
 ### 2026-09-01（其一）：更早的一条
 X
-cat > .claude/kb/2026-08-decisions-history.md <<'X'
+mkdir -p .claude/kb/decisions-history
+cat > .claude/kb/decisions-history/2026-08.md <<'X'
 # 决策变更史 · 2026-08
 
 ## 历史版本

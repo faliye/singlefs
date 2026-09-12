@@ -55,7 +55,7 @@
 |---|---|
 | `.claude/kb/decisions.md` | **决策索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/decisions/` | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
-| `.claude/kb/decisions-history.md` | 决策变更史的说明与月份表；条目按月住在 `.claude/kb/<年-月>-decisions-history.md`，每条写改前、改后、依据 |
+| `.claude/kb/decisions-history.md` | 决策变更史的快查表：每条变更一行，日期、改了什么、改前、改后；原文按月住在 `.claude/kb/decisions-history/<年-月>.md`，每条写改前、改后、依据 |
 | `.claude/kb/experiments.md` | **实验索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/experiments/` | 每个实验一个文件（`NN-简称.md`），正文与口径都在这里 |
 | `.claude/kb/experiments-history.md` | 全部实验的变更史 |
@@ -122,6 +122,7 @@ bash .claude/gate.d/45-script-modes.sh     # 脚本的执行位在暂存区里�
 bash .claude/gate.d/46-write-hook.sh     # Write 覆盖未跟踪文件的 hook 注册着、而且会拒绝（几个会话共写一个仓）
 bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自证还会红（ask-local 判红分支、清单生成取法、机械整抄、小节清单）
 bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）
+bash .claude/gate.d/49-history-brief.sh # 决策变更史快查表与原文同步（--write 按原文重排，新条目填「（待补）」）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）

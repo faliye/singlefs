@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gate-stage: 决策变更留痕
 #
-# 改了决策正文却没在决策变更史（`kb/<年-月>-decisions-history.md`）留条目 ⇒ 判红。
+# 改了决策正文却没在决策变更史（`kb/decisions-history/<年-月>.md`）留条目 ⇒ 判红。
 #
 # 为什么判红而不是提醒：`.claude/rules/format-evolution.md` 已定
 # 「决策变更**必须记进** decisions-history.md，含推翻依据」；
@@ -17,12 +17,12 @@
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 KB=(.claude/kb/decisions.md .claude/kb/decisions)
-# 变更史 2026-09-12 起按月拆档：条目住 <年-月>-decisions-history.md，decisions-history.md 只放说明与月份表。
+# 变更史 2026-09-12 起按月拆档：条目住 decisions-history/<年-月>.md，decisions-history.md 放快查表。
 # 新条目可能落在还没进 git 的新月份文件里，git diff HEAD 看不见它 ⇒ 那几份里的条目整份算新增。
 shopt -s nullglob
-HIST=(.claude/kb/*decisions-history.md)
+HIST=(.claude/kb/decisions-history.md .claude/kb/decisions-history/*.md)
 shopt -u nullglob
-HIST_THIS_MONTH=".claude/kb/$(date +%Y-%m)-decisions-history.md"
+HIST_THIS_MONTH=".claude/kb/decisions-history/$(date +%Y-%m).md"
 bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
@@ -55,7 +55,7 @@ fi
 
 bad "决策正文改了 $changed 行，却没往变更史新增任何条目"
 howto "若这次改动推翻或定下了任何结论，在 $HIST_THIS_MONTH 的「## 历史版本」下最上面加一条"
-howto "  （这个月的文件还没有就新建，文件头照上个月那份写，并在 decisions-history.md 的月份表顶上加一行）："
+howto "  （这个月的文件还没有就新建，文件头照上个月那份写），再在 decisions-history.md 的快查表里补一行："
 howto "  ### $(date +%F)  —— 曾经 X / 现在 Y / 依据 Z"
 howto "纯排版改动可以拆成单独一个提交，那时这一项就无对象可判了。"
 exit 1

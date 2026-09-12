@@ -15,9 +15,9 @@
 # ⚠️ 因此**存量撞号不判红，只如实报数**——把它读成「存量是干净的」是错的。
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
-# 决策变更史 2026-09-12 起按月拆档（<年-月>-decisions-history.md），几份都要查
+# 决策变更史 2026-09-12 起按月拆档（decisions-history/<年-月>.md），几份都要查
 shopt -s nullglob
-HIST=(.claude/kb/*decisions-history.md .claude/kb/experiments-history.md)
+HIST=(.claude/kb/decisions-history.md .claude/kb/decisions-history/*.md .claude/kb/experiments-history.md)
 shopt -u nullglob
 bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
@@ -31,15 +31,19 @@ hits=(); legacy=0; checked=0
 # 搬过去的不是新取的号——不排掉的话，存量撞号会在搬家那一次被当成新撞号判红。
 # ⚠️ 按整行比，不按「日期（其 N）」比：新写的一条若又取了已有的号，钥匙与 HEAD 里那条相同，
 # 按钥匙排会把它一起排掉，这一路就永远不红（2026-09-12 写这段时实测）。
-head_headings="$(for f in "${HIST[@]}"; do git show "HEAD:$f" 2>/dev/null; done | grep '^### 20' || true)"
+# ⚠️ 按 HEAD 当时的文件名取，不按现在的：文件改名或挪目录的那一次，现在的路径在 HEAD 里不存在，
+# 按现在的取就一条都取不到，搬过去的存量撞号又会被当成新撞号（2026-09-12 挪进 decisions-history/ 时写的）。
+head_history_files="$(git ls-tree -r --name-only HEAD -- .claude/kb 2>/dev/null | grep -E -- '-history\.md$|/decisions-history/[^/]+\.md$' || true)"
+# 存量：以 HEAD 那几份为准数重复，只报数不判红
+while IFS= read -r head_file; do
+  [[ -n "$head_file" ]] || continue
+  n=$(git show "HEAD:$head_file" 2>/dev/null | key_of | sort | uniq -d | wc -l)
+  legacy=$((legacy + n))
+done <<<"$head_history_files"
+head_headings="$(while IFS= read -r head_file; do [[ -n "$head_file" ]] && git show "HEAD:$head_file" 2>/dev/null; done <<<"$head_history_files" | grep '^### 20' || true)"
 for f in "${HIST[@]}"; do
   [[ -f "$f" ]] || continue
   checked=$((checked + 1))
-  # 存量：以 HEAD 那份为准数重复，只报数不判红
-  if git rev-parse --verify HEAD >/dev/null 2>&1; then
-    n=$(git show "HEAD:$f" 2>/dev/null | key_of | sort | uniq -d | wc -l)
-    legacy=$((legacy + n))
-  fi
   # 本次新增的条目标题
   if git cat-file -e "HEAD:$f" 2>/dev/null; then
     mapfile -t added < <(git diff HEAD -- "$f" 2>/dev/null | sed -n 's/^+//p' | key_of)

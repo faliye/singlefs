@@ -1,4 +1,4 @@
 exit=1
 want=处撞号
 want=decisions-history.md  ### 2026-09-02（其二）  在该文件里出现 2 次
-want=2026-08-decisions-history.md  ### 2026-08-30（其二）  在该文件里出现 3 次
+want=decisions-history/2026-08.md  ### 2026-08-30（其二）  在该文件里出现 3 次

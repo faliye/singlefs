@@ -41,7 +41,7 @@ def body_of(text):
 # 那是历史陈述，不是第二处权威记录。与旧值字面串的豁免同一条理由
 # （`writing-discipline.md`「正文只写现状，历史进文末」）。
 kb_all = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
-kb_files = [f for f in kb_all if not f.endswith('-history.md')]
+kb_files = [f for f in kb_all if not f.endswith('-history.md') and '/decisions-history/' not in f]
 
 # ---- 1. 收标记，且同一个常量只许登记一处（kb-discipline 第 4 条）----
 marks, dup = {}, []
@@ -88,7 +88,7 @@ for f in srcs:
 # 产物是**那一轮的原始输出**，改它等于产物不再对应它的输入，证据链当场断掉。
 # 「源码改了而产物没重跑」由 `87-replay.sh` 逐字节比对抓——改了源码它就会红，直到重跑。
 scan = [(f, MARK.sub('', body_of(open(f, encoding='utf-8').read()))) for f in kb_files
-        if not f.endswith('-history.md')]
+        if not f.endswith('-history.md') and '/decisions-history/' not in f]
 scan += [(f, open(f, encoding='utf-8', errors='ignore').read()) for f in srcs]
 
 for name, (kbf, want, stale) in sorted(marks.items()):

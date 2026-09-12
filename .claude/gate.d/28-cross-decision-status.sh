@@ -67,6 +67,9 @@ tight_re = re.compile(r'^[\s，,、（(]*(?:取值|状态)?[\s：:]*(?:仍然|�
 bad, in_hist = [], False
 for f in sorted(kb.rglob("*.md")):
     rel = f.relative_to(kb.parent.parent)
+    # 决策变更史整份都是历史：原文住 decisions-history/，快查表 decisions-history.md 的「改前 / 改后」写的是当时的状态
+    if f.name == "decisions-history.md" or f.parent.name == "decisions-history":
+        continue
     in_hist = False
     for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
         if re.match(r'^#+\s*历史版本', line):

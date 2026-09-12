@@ -20,7 +20,8 @@ lib = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib)
 item_map, names = lib.load_map()
 self_map = lib.self_decisions()
 files = [f for f in lib.scanned_files()
-         if not f.endswith(('decisions-history.md', 'experiments-history.md')) and not f.startswith('records/')]
+         if not f.endswith(('decisions-history.md', 'experiments-history.md')) and '/decisions-history/' not in f
+         and not f.startswith('records/')]
 bad = []; seen = 0
 for path in files:
     for ln, line, m, want, owner, missing, _ in lib.references(path, item_map, self_map):

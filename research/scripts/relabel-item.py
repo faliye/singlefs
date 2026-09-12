@@ -79,7 +79,7 @@ def relabel(root, decision, item, dry_run):
         review = []
         if status == '已':
             for path in library.scanned_files():
-                if path.endswith(HISTORY_FILES) or path.startswith('records/'):
+                if path.endswith(HISTORY_FILES) or '/decisions-history/' in path or path.startswith('records/'):
                     continue
                 for line_number, line, match, written, owner, _, _ in library.references(path, item_map, self_map):
                     if owner == decision and int(match.group(2)) == item and written == '已' and library.says_open_after(line, match.end()):

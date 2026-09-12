@@ -39,7 +39,7 @@ live = len(rows) - len(retired)
 
 scanned, hits, bad = 0, [], []
 for p in sorted(glob.glob(os.path.join(kb, "**", "*.md"), recursive=True)):
-    if os.path.abspath(p) == inv or os.path.basename(p).endswith("-history.md"):
+    if os.path.abspath(p) == inv or os.path.basename(p).endswith("-history.md") or "/decisions-history/" in p:
         continue
     scanned += 1
     body = open(p, encoding="utf-8").read().split("\n## 历史版本")[0]

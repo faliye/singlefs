@@ -59,7 +59,7 @@ def references(path, item_map, self_map):
     """逐处给出一个分项引用：(行号, 行, 匹配, 写的状态, 归属或 None, 指名却没有第 k 条的那条决策或 None, 紧挨着指名的决策或 None)。"""
     self_d = self_map.get(path); last = None; hist = None
     for ln, line in enumerate(open(path, encoding='utf-8').read().split('\n'), 1):
-        if path.endswith('decisions-history.md') and line.startswith('### '):
+        if (path.endswith('decisions-history.md') or '/decisions-history/' in path) and line.startswith('### '):
             mm = re.search(r'D(\d+)', line); hist = 'D' + mm.group(1) if mm else None
         for m in re.finditer(r'(已定项|未定项)\s*(\d+)', line):
             k = int(m.group(2)); want = '已' if m.group(1) == '已定项' else '未'

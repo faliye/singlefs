@@ -237,7 +237,7 @@ echo "── 6. 正文（文末历史版本之前）不写历史 ──"
 # ⚠️ **词表只认「以前写的是 X」这一种形态**，不认「此前没有 / 此前只量了两样」——
 # 后者陈述的是一个**至今仍然成立**的缺口，是论证的一部分，不是历史。
 # 实测：不做这个区分时 30 处里只有 7 处是真的，假红压倒真红。
-hit=$(for f in $(find "$KB" -name '*.md' ! -name '*-history.md' | sort); do
+hit=$(for f in $(find "$KB" -name '*.md' ! -name '*-history.md' ! -path '*/decisions-history/*' | sort); do
         awk -v F="$f" '/^## 历史版本/{exit} {print F":"FNR": "$0}' "$f"
       done | grep -E '本决策此前|正文此前写|此前写的是|此前写着|此前从未写|此前没有写过|此前没写过|此前不存在|曾经写作|曾经写着|原先写的是|已经不是现行' || true)
 if [[ -n "$hit" ]]; then
