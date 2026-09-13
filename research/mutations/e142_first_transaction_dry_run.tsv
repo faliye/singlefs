@@ -1,5 +1,5 @@
 M1_root_record_242	const ROOT_RECORD_BYTES: u64 = 250;	const ROOT_RECORD_BYTES: u64 = 242;
-M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 1 mod 3 的槽 0。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 1 mod 3 的槽 0。
+M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
 M3_oracle_ignores_walk_failure	        RecoveryOutcome::Failed { reason, .. } => Some(format!("走读失败：{reason}")),	        RecoveryOutcome::Failed { .. } => None,
 M4_accept_unit_without_checksum	        if castagnoli_crc32(&bytes) == location.unit_checksum {	        if true {
 M5_wide_checksum_misses_last_byte	    let mut covered = bytes[..cover_end].to_vec();	    let mut covered = bytes[..cover_end - 1].to_vec();
@@ -16,3 +16,6 @@ M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIF
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {
 M17_feature_bit_not_written	writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT);	writer.put_u8(0);
 M18_parser_ignores_unknown_incompat	unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity	has_layout_identity
+M19_one_warm_up_publish	const WARM_UP_EMPTY_PUBLISHES: u64 = 2;	const WARM_UP_EMPTY_PUBLISHES: u64 = 1;
+M20_mkfs_drops_trailing_barrier	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);\n    }\n    pool.barrier();	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);\n    }
+M21_superblock_slot_recorded_as_unit_write	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::UnitWrite);

@@ -95,6 +95,7 @@ E92|e92-reuse-requirement||e92-reuse-requirement-2026-09-08.out|exact
 E123|e123-reuse-window-versus-rollback-depth||e123-k-fork-cost-2026-09-09.out|exact
 E124|e124-superblock-recompute||e124-superblock-recompute-2026-09-09.out|exact
 E126|e126-superblock-slot-width||e126-superblock-slot-width-2026-09-09.out|exact
+E127|e127-group-identity-under-split-merge||e127-group-identity-under-split-merge-2026-09-13-knobs.out|exact
 E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
 E95|e95-node-layout-arms||e95-node-layout-arms-2026-09-09.out|exact
 E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
@@ -152,13 +153,15 @@ E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exa
 E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
-E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13.out|exact
-E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-featurebit.out|exact
+E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13-warmup.out|exact
+E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-kinds.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-13.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-13.out|exact
 E147|e147-superblock-recompute-from-layout||e147-superblock-recompute-from-layout-2026-09-13.out|exact
 E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
+E150|e150-rollback-reuse-of-abandoned-roots||e150-rollback-reuse-of-abandoned-roots-2026-09-13.out|exact
+E151|e151-arrival-and-container-arms||e151-arrival-and-container-arms-2026-09-13-sweep.out|exact
 E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026-09-13.out|exact
 E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact

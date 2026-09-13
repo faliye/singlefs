@@ -1,0 +1,11 @@
+1. Yes. Sequence A: WriteData, Barrier, WriteJournal. Sequence B: Barrier, WriteData, WriteJournal. Both use the same CommitStep members {WriteData, WriteJournal, Barrier}, but the barrier positions differ. In A, the barrier separates WriteData from WriteJournal, so a crash after WriteData but before Barrier leaves only WriteData. In B, the barrier is first, so a crash before Barrier leaves nothing. The crash-state sets differ, so the criterion must include the order of barriers relative to other steps, not just the set of step kinds.
+
+2. mkfs seeding: WriteRootRing, WriteSuperblock. Ordinary publish: WriteData, WriteIndex, Barrier, WriteJournal, Barrier, FUAWrite, WriteSuperblock. Empty publish: Barrier, WriteJournal, Barrier, FUAWrite, WriteSuperblock. Instance switch: WriteInstanceTable, Barrier, WriteJournal, Barrier, FUAWrite, WriteSuperblock. Administrator rollback: WriteRollbackRow, Barrier, WriteJournal, Barrier, FUAWrite, WriteSuperblock. Superblock slot rotation: WriteSuperblock. Root-ring region rotation: WriteRootRing. Instance switch and administrator rollback use WriteInstanceTable and WriteRollbackRow, which are structural step kinds not present in F4's set (F4 only has WriteData, WriteIndex, Barrier, WriteJournal, FUAWrite, WriteSuperblock).
+
+3. No. Read-back verification involves reads, but reads are not part of the commit protocol steps (which are writes and barriers). Double write uses existing Write steps. Extra log records are written via Write steps. No new CommitStep members are needed as synthesis mechanisms use existing step kinds or are handled outside the commit step sequence.
+
+4. No. F1 specifies a single shared CommitStep enum where adding a member is a diff the gate can grep. "One closed enum per layout line" would violate this by creating multiple enums, conflicting with F1's requirement for one shared enum.
+
+5. The enum gaining AppendRootRecord, ZoneFinish, and ZoneReset. F1 explicitly states zoned devices require these steps (root pointer cannot be overwritten in place, root records appended, zone finish and reset steps appear), so the presence of these members defines the structural class. F9's answer about superblock rotation is deferred and does not determine the class count.
+
+6. None.

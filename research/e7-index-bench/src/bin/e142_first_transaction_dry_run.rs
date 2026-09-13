@@ -145,6 +145,10 @@ const FIXED_FSID: [u8; 16] = [0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const FIRST_INODE_NUMBER: u64 = 1;
 const FIRST_INSTANCE_GENERATION: u32 = 1;
+/// D16 已定项 8（暖机取甲′，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
+/// 第一版几何区域 1 / 2 分住两块盘 ⇒ 两次（txg 1、2），第一个事务从 txg 3 起。
+const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
+const FIRST_TRANSACTION_TXG: u64 = 3;
 
 // ───────────────────────── 地址空间的 newtype：混用编译不过 ─────────────────────────
 
@@ -434,13 +438,75 @@ impl BlockReader for Pool {
     }
 }
 
+/// 录制器里一次**写**的步骤种类。D17（实现分层与第三方管道） 已定项 2 把结构等价类定成
+/// 「段边界位置 + 每段步骤种类集合」，所以步骤种类要是机器可读的封闭枚举，不能是自由文本标签（C316 ②）。
+/// 没有通配臂：以后多一种写步骤，每一处 match 都编译不过。
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+enum StepKind {
+    /// 单元区里一次整单元写（码 1 / 码 2 / 码 3 都是同一种步骤：一个 16 KiB 或 32 KiB 落点写满）。
+    UnitWrite,
+    /// journal 环里一条 4 KiB 记录。
+    JournalRecord,
+    /// 根环槽的一次 FUA 写（D16（发布语义） 已定项 7：只有这一步等落盘才发下一条）。
+    RootRecordFua,
+    /// 超级块槽的一次写。
+    SuperblockSlot,
+}
+
+impl StepKind {
+    /// 发到输出里的名字，lowercase snake_case，一个种类一个。
+    fn tag(self) -> &'static str {
+        match self {
+            StepKind::UnitWrite => "unit_write",
+            StepKind::JournalRecord => "journal_record",
+            StepKind::RootRecordFua => "root_record_fua",
+            StepKind::SuperblockSlot => "superblock_slot",
+        }
+    }
+    /// FUA 由步骤种类决定，不再是调用点各传各的布尔：超级块槽写不可能是 FUA，这样它写不出来。
+    fn is_fua(self) -> bool {
+        match self {
+            StepKind::RootRecordFua => true,
+            StepKind::UnitWrite | StepKind::JournalRecord | StepKind::SuperblockSlot => false,
+        }
+    }
+}
+
+/// 录制到的一步的种类：写请求带着它那四种之一，屏障自己是一种。
+/// 段序列说的「步骤种类」是这个字母表——屏障是段边界，它也要有名字。
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+enum RecordedStepKind {
+    Write(StepKind),
+    Barrier,
+}
+
+impl RecordedStepKind {
+    fn of(operation: &RecordedOperation) -> Self {
+        match operation {
+            RecordedOperation::Write(write) => RecordedStepKind::Write(write.kind),
+            RecordedOperation::Barrier => RecordedStepKind::Barrier,
+        }
+    }
+    fn tag(self) -> &'static str {
+        match self {
+            RecordedStepKind::Write(kind) => kind.tag(),
+            RecordedStepKind::Barrier => "barrier",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 struct WriteRequest {
     device: DeviceIdentity,
     offset: DeviceOffset,
     bytes: Vec<u8>,
-    is_fua: bool,
-    label: &'static str,
+    kind: StepKind,
+}
+
+impl WriteRequest {
+    fn is_fua(&self) -> bool {
+        self.kind.is_fua()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -456,9 +522,9 @@ struct RecordingPool {
 }
 
 impl RecordingPool {
-    fn write(&mut self, device: DeviceIdentity, offset: DeviceOffset, bytes: &[u8], is_fua: bool, label: &'static str) {
+    fn write(&mut self, device: DeviceIdentity, offset: DeviceOffset, bytes: &[u8], kind: StepKind) {
         self.pool.devices[device.0 as usize].write(offset, bytes);
-        self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: bytes.to_vec(), is_fua, label }));
+        self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: bytes.to_vec(), kind }));
     }
     fn barrier(&mut self) {
         self.operations.push(RecordedOperation::Barrier);
@@ -1582,9 +1648,9 @@ impl BirthSequenceAllocator {
     }
 }
 
-fn write_unit_to_every_device(pool: &mut RecordingPool, parameters: &PoolParameters, slot: SlotNumber, unit: &[u8], label: &'static str) {
+fn write_unit_to_every_device(pool: &mut RecordingPool, parameters: &PoolParameters, slot: SlotNumber, unit: &[u8]) {
     for device in parameters.devices() {
-        pool.write(device, slot.device_offset(), unit, false, label);
+        pool.write(device, slot.device_offset(), unit, StepKind::UnitWrite);
     }
 }
 
@@ -1627,8 +1693,8 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
         TREE_TABLE_ENTRY_BYTES as u16,
         &[],
     );
-    write_unit_to_every_device(&mut pool, parameters, SlotNumber(SLOT_INSTANCE_TABLE), &instance_table_unit, "m1 实例表单元");
-    write_unit_to_every_device(&mut pool, parameters, SlotNumber(SLOT_TREE_TABLE_GENESIS), &tree_table_genesis_unit, "m2 树表单元第 0 版");
+    write_unit_to_every_device(&mut pool, parameters, SlotNumber(SLOT_INSTANCE_TABLE), &instance_table_unit);
+    write_unit_to_every_device(&mut pool, parameters, SlotNumber(SLOT_TREE_TABLE_GENESIS), &tree_table_genesis_unit);
     pool.barrier();
 
     let root = RootRecord {
@@ -1653,7 +1719,7 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     let root_slot = root.to_slot();
     // D22 已定项 8：第 0 代根种进全部区域，各自槽 0，FUA。
     for region in 0..RING_REGIONS {
-        pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, 0), &root_slot, true, "m3 第 0 代根");
+        pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, 0), &root_slot, StepKind::RootRecordFua);
     }
     for device in parameters.devices() {
         let superblock = Superblock {
@@ -1665,10 +1731,65 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
             journal_tail: 0,
             journal_instance: instance,
         };
-        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), false, "m4 超级块槽 0");
+        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);
     }
     pool.barrier();
     (pool, MkfsOutput { root, instance_table_unit, tree_table_genesis_unit })
+}
+
+/// 第一个事务写出的八个单元各自的身份。以前它是自由文本标签，靠 `match` 字符串取类与 key 宽，
+/// 漏一个只能在运行期 panic；做成封闭枚举之后每一处 match 都穷举，漏一种编译不过。
+/// 步骤种类（`StepKind`）说的是「这一步是哪一类写」，这个说的是「写的是哪个单元」——两件事分开。
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+enum TransactionUnit {
+    Data,
+    ExtentRoot,
+    InodeLeaf,
+    InodeRoot,
+    AllocationTree,
+    AccountingTree,
+    MappingTree,
+    TreeTable,
+}
+
+impl TransactionUnit {
+    /// 字节表七里的步号 t1..t8，`name=write_list` 的 `units=` 用它。
+    fn tag(self) -> &'static str {
+        match self {
+            TransactionUnit::Data => "t1",
+            TransactionUnit::ExtentRoot => "t2",
+            TransactionUnit::InodeLeaf => "t3",
+            TransactionUnit::InodeRoot => "t4",
+            TransactionUnit::AllocationTree => "t5",
+            TransactionUnit::AccountingTree => "t6",
+            TransactionUnit::MappingTree => "t7",
+            TransactionUnit::TreeTable => "t8",
+        }
+    }
+    /// D18（块里携带什么信息） 已定项 11 的类码，加上码 2 的 key 宽（码 1 与码 3 没有 key 区间，写 0）。
+    fn class_and_key_width(self) -> (u8, usize) {
+        match self {
+            TransactionUnit::Data => (UNIT_CLASS_DATA, 0),
+            TransactionUnit::InodeLeaf => (UNIT_CLASS_PACKED, 0),
+            TransactionUnit::ExtentRoot => (UNIT_CLASS_INDEX_NODE, 24),
+            TransactionUnit::InodeRoot => (UNIT_CLASS_INDEX_NODE, 8),
+            TransactionUnit::AllocationTree => (UNIT_CLASS_INDEX_NODE, 12),
+            TransactionUnit::AccountingTree => (UNIT_CLASS_INDEX_NODE, 22),
+            TransactionUnit::MappingTree => (UNIT_CLASS_INDEX_NODE, MAPPING_KEY_BYTES as usize),
+            TransactionUnit::TreeTable => (UNIT_CLASS_INDEX_NODE, TREE_TABLE_KEY_WIDTH),
+        }
+    }
+    /// 点名项里的归属树；树表单元不属于任何一棵树（写 0）。
+    fn tree(self) -> TreeIdentifier {
+        match self {
+            TransactionUnit::Data | TransactionUnit::ExtentRoot => TreeIdentifier(TREE_IDENTIFIER_EXTENT),
+            TransactionUnit::InodeLeaf | TransactionUnit::InodeRoot => TreeIdentifier(TREE_IDENTIFIER_INODE),
+            TransactionUnit::AllocationTree => TreeIdentifier(TREE_IDENTIFIER_ALLOCATION),
+            TransactionUnit::AccountingTree => TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING),
+            TransactionUnit::MappingTree => TreeIdentifier(TREE_IDENTIFIER_MAPPING),
+            TransactionUnit::TreeTable => TreeIdentifier(TREE_IDENTIFIER_NONE),
+        }
+    }
 }
 
 /// 第一个事务写出的东西，留给探针与断言用。
@@ -1677,7 +1798,7 @@ struct TransactionOutput {
     root: RootRecord,
     record: JournalRecord,
     record_bytes: Vec<u8>,
-    units_by_slot: Vec<(SlotNumber, &'static str, Vec<u8>)>,
+    units_by_slot: Vec<(SlotNumber, TransactionUnit, Vec<u8>)>,
     data_pointer: DataPointer,
     mapping_keys: Vec<Vec<u8>>,
     allocation_records: Vec<AllocationRecord>,
@@ -1696,14 +1817,60 @@ fn payload_crc_of_unit(unit: &[u8], unit_class: u8, key_width: usize) -> u32 {
     u32::from_le_bytes(unit[offset..offset + 4].try_into().expect("切了 4 字节"))
 }
 
+/// 暖机（D16 已定项 8）：每次空发布照 D16 已定项 7 的顺序——屏障 → 空记录 → 屏障 → 根槽 FUA → 超级块槽轮换；
+/// 空记录不点名任何单元、事务号 0，根记录只改 checkpoint_txg，树表与实例表指针照 mkfs。
+fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &MkfsOutput) -> Vec<RootRecord> {
+    let instance = InstanceGeneration(FIRST_INSTANCE_GENERATION);
+    let mut roots = Vec::new();
+    for txg_number in 1..=WARM_UP_EMPTY_PUBLISHES {
+        let txg = CheckpointTxg(txg_number);
+        if parameters.barriers == BarrierPolicy::Settled {
+            pool.barrier();
+        }
+        let record = JournalRecord { instance, counter: JournalCounter(txg_number), checkpoint_txg: txg, transaction: TransactionNumber(0), is_commit: true, back_chain: 0, named: Vec::new() };
+        let record_bytes = record.to_bytes();
+        for device in parameters.devices() {
+            pool.write(device, DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES + (txg_number - 1) * JOURNAL_RECORD_BYTES), &record_bytes, StepKind::JournalRecord);
+        }
+        if parameters.barriers == BarrierPolicy::Settled {
+            pool.barrier();
+        }
+        let root = RootRecord {
+            fsid: genesis.root.fsid,
+            instance,
+            checkpoint_txg: txg,
+            tree_table: genesis.root.tree_table,
+            tree_identifier_watermark: genesis.root.tree_identifier_watermark,
+            rollback_floor: genesis.root.rollback_floor,
+            instance_table: genesis.root.instance_table,
+        };
+        let (region, ring_slot) = ring_target_for_publish(txg);
+        pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
+        for device in parameters.devices() {
+            let superblock = Superblock {
+                fsid: parameters.fsid,
+                this_device: device,
+                device_count: u32::try_from(parameters.device_count).expect("设备数"),
+                slot_generation: txg_number + 1,
+                region_devices: parameters.region_devices,
+                journal_tail: txg_number,
+                journal_instance: instance,
+            };
+            pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[(txg_number % 2) as usize]), &superblock.to_slot(), StepKind::SuperblockSlot);
+        }
+        roots.push(root);
+    }
+    roots
+}
+
 fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &MkfsOutput, file_bytes: &[u8]) -> TransactionOutput {
     let instance = InstanceGeneration(FIRST_INSTANCE_GENERATION);
-    let txg = CheckpointTxg(1);
+    let txg = CheckpointTxg(FIRST_TRANSACTION_TXG);
     let transaction = TransactionNumber(1);
     let write_order = WriteOrder { instance, transaction };
     let fsid = &parameters.fsid;
     let mut sequences = BirthSequenceAllocator::default();
-    let mut units: Vec<(SlotNumber, &'static str, Vec<u8>)> = Vec::new();
+    let mut units: Vec<(SlotNumber, TransactionUnit, Vec<u8>)> = Vec::new();
     let mut index_node_header_widths = Vec::new();
 
     // t1 数据单元
@@ -1875,55 +2042,31 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
     index_node_header_widths.push(("tree_table", index_node_header_bytes(TREE_TABLE_KEY_WIDTH)));
     let tree_table_pointer = node_pointer(TreeIdentifier(TREE_IDENTIFIER_NONE), SLOT_TREE_TABLE_FIRST_PUBLISH, &tree_table_unit, tree_table_sequence);
 
-    units.push((SlotNumber(SLOT_DATA_UNIT), "t1 数据单元", data_unit));
-    units.push((SlotNumber(SLOT_EXTENT_ROOT), "t2 extent 根", extent_unit));
-    units.push((SlotNumber(SLOT_INODE_LEAF), "t3 inode 叶", inode_leaf_unit));
-    units.push((SlotNumber(SLOT_INODE_ROOT), "t4 inode 根", inode_root_unit));
-    units.push((SlotNumber(SLOT_ALLOCATION_ROOT), "t5 分配树", allocation_unit));
-    units.push((SlotNumber(SLOT_ACCOUNTING_ROOT), "t6 记账树", accounting_unit));
-    units.push((SlotNumber(SLOT_MAPPING_ROOT), "t7 映射树", mapping_unit));
-    units.push((SlotNumber(SLOT_TREE_TABLE_FIRST_PUBLISH), "t8 树表第 1 版", tree_table_unit));
+    units.push((SlotNumber(SLOT_DATA_UNIT), TransactionUnit::Data, data_unit));
+    units.push((SlotNumber(SLOT_EXTENT_ROOT), TransactionUnit::ExtentRoot, extent_unit));
+    units.push((SlotNumber(SLOT_INODE_LEAF), TransactionUnit::InodeLeaf, inode_leaf_unit));
+    units.push((SlotNumber(SLOT_INODE_ROOT), TransactionUnit::InodeRoot, inode_root_unit));
+    units.push((SlotNumber(SLOT_ALLOCATION_ROOT), TransactionUnit::AllocationTree, allocation_unit));
+    units.push((SlotNumber(SLOT_ACCOUNTING_ROOT), TransactionUnit::AccountingTree, accounting_unit));
+    units.push((SlotNumber(SLOT_MAPPING_ROOT), TransactionUnit::MappingTree, mapping_unit));
+    units.push((SlotNumber(SLOT_TREE_TABLE_FIRST_PUBLISH), TransactionUnit::TreeTable, tree_table_unit));
 
     // 持久顺序第一段：单元与节点。
-    for (slot, label, unit) in &units {
-        write_unit_to_every_device(pool, parameters, *slot, unit, label);
+    for (slot, _, unit) in &units {
+        write_unit_to_every_device(pool, parameters, *slot, unit);
     }
     if parameters.barriers == BarrierPolicy::Settled {
         pool.barrier();
     }
 
     // 第二段：journal 记录，点名 t1..t8 每个两盘。反向链：前一条不存在，写 0（gap G6）。
-    let class_and_key_width = |label: &str| -> (u8, usize) {
-        match label {
-            "t1 数据单元" => (UNIT_CLASS_DATA, 0),
-            "t3 inode 叶" => (UNIT_CLASS_PACKED, 0),
-            "t2 extent 根" => (UNIT_CLASS_INDEX_NODE, 24),
-            "t4 inode 根" => (UNIT_CLASS_INDEX_NODE, 8),
-            "t5 分配树" => (UNIT_CLASS_INDEX_NODE, 12),
-            "t6 记账树" => (UNIT_CLASS_INDEX_NODE, 22),
-            "t7 映射树" => (UNIT_CLASS_INDEX_NODE, MAPPING_KEY_BYTES as usize),
-            "t8 树表第 1 版" => (UNIT_CLASS_INDEX_NODE, TREE_TABLE_KEY_WIDTH),
-            _ => panic!("没登记的单元"),
-        }
-    };
-    let tree_of = |label: &str| -> TreeIdentifier {
-        match label {
-            "t1 数据单元" | "t2 extent 根" => TreeIdentifier(TREE_IDENTIFIER_EXTENT),
-            "t3 inode 叶" | "t4 inode 根" => TreeIdentifier(TREE_IDENTIFIER_INODE),
-            "t5 分配树" => TreeIdentifier(TREE_IDENTIFIER_ALLOCATION),
-            "t6 记账树" => TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING),
-            "t7 映射树" => TreeIdentifier(TREE_IDENTIFIER_MAPPING),
-            "t8 树表第 1 版" => TreeIdentifier(TREE_IDENTIFIER_NONE),
-            _ => panic!("没登记的单元"),
-        }
-    };
     let named: Vec<NamedUnit> = units
         .iter()
-        .map(|(slot, label, unit)| {
-            let (unit_class, key_width) = class_and_key_width(label);
+        .map(|(slot, unit_identity, unit)| {
+            let (unit_class, key_width) = unit_identity.class_and_key_width();
             NamedUnit {
                 locations: parameters.location_entries(*slot, unit),
-                tree: tree_of(label),
+                tree: unit_identity.tree(),
                 birth_txg: txg,
                 unit_class,
                 unit_bytes: u32::try_from(unit.len()).expect("单元大小 4 字节"),
@@ -1931,16 +2074,16 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
             }
         })
         .collect();
-    let record = JournalRecord { instance, counter: JournalCounter(1), checkpoint_txg: txg, transaction, is_commit: true, back_chain: 0, named };
+    let record = JournalRecord { instance, counter: JournalCounter(FIRST_TRANSACTION_TXG), checkpoint_txg: txg, transaction, is_commit: true, back_chain: 0, named };
     let record_bytes = record.to_bytes();
     for device in parameters.devices() {
-        pool.write(device, DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES), &record_bytes, false, "t9 journal 记录");
+        pool.write(device, DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES + (FIRST_TRANSACTION_TXG - 1) * JOURNAL_RECORD_BYTES), &record_bytes, StepKind::JournalRecord);
     }
     if parameters.barriers == BarrierPolicy::Settled {
         pool.barrier();
     }
 
-    // 第三段：根槽 FUA，区域 1 mod 3 的槽 0。
+    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
     let root = RootRecord {
         fsid: parameters.fsid,
         instance,
@@ -1951,20 +2094,20 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
         instance_table: genesis.root.instance_table,
     };
     let (region, ring_slot) = ring_target_for_publish(txg);
-    pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), true, "t10 第 1 代根");
+    pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
 
-    // 根槽之后：超级块槽 1 轮换，世代号 2，tail 前移（预想）。
+    // 根槽之后：超级块槽轮换（暖机两次之后轮到槽 1），世代号 4，tail 前移到 jsn 3（D16 已定项 7 的超级块注）。
     for device in parameters.devices() {
         let superblock = Superblock {
             fsid: parameters.fsid,
             this_device: device,
             device_count: u32::try_from(parameters.device_count).expect("设备数"),
-            slot_generation: 2,
+            slot_generation: FIRST_TRANSACTION_TXG + 1,
             region_devices: parameters.region_devices,
-            journal_tail: 1,
+            journal_tail: FIRST_TRANSACTION_TXG,
             journal_instance: instance,
         };
-        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[1]), &superblock.to_slot(), false, "t11 超级块槽 1");
+        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[(FIRST_TRANSACTION_TXG % 2) as usize]), &superblock.to_slot(), StepKind::SuperblockSlot);
     }
 
     TransactionOutput {
@@ -2338,7 +2481,7 @@ fn split_into_segments(operations: &[RecordedOperation], fua_is_boundary: bool) 
     for operation in operations {
         match operation {
             RecordedOperation::Write(write) => {
-                let is_fua = write.is_fua;
+                let is_fua = write.is_fua();
                 writes.push(write.clone());
                 current.push(writes.len() - 1);
                 if fua_is_boundary && is_fua {
@@ -2356,6 +2499,66 @@ fn split_into_segments(operations: &[RecordedOperation], fua_is_boundary: bool) 
         segments.push(current);
     }
     (writes, segments)
+}
+
+/// 每段的步骤种类，按与 `split_into_segments` 相同的切法分组——这是 D17（实现分层与第三方管道） 已定项 2
+/// 说的「每段步骤种类集合」的机器可读输入（C316 ②）。关掉一段的那道屏障算进它关掉的那一段；
+/// 段里还一个写都没有时（流首那道屏障）算进即将开始的那一段；流尾那一串只有屏障没有写的，并进上一段——
+/// 这样录到的每一步都恰好出现在一个段里，段数也与 `split_into_segments` 一样。
+/// 末尾的断言把两者钉在一起：逐段数出来的写数必须相等，对不上就是切法分了叉。
+fn segment_step_kinds(operations: &[RecordedOperation], fua_is_boundary: bool) -> Vec<Vec<RecordedStepKind>> {
+    let mut groups: Vec<Vec<RecordedStepKind>> = Vec::new();
+    let mut current: Vec<RecordedStepKind> = Vec::new();
+    let mut writes_in_current: usize = 0;
+    for operation in operations {
+        current.push(RecordedStepKind::of(operation));
+        match operation {
+            RecordedOperation::Write(write) => {
+                writes_in_current += 1;
+                if fua_is_boundary && write.is_fua() {
+                    groups.push(std::mem::take(&mut current));
+                    writes_in_current = 0;
+                }
+            }
+            RecordedOperation::Barrier => {
+                if writes_in_current > 0 {
+                    groups.push(std::mem::take(&mut current));
+                    writes_in_current = 0;
+                }
+            }
+        }
+    }
+    if !current.is_empty() {
+        match (writes_in_current, groups.last_mut()) {
+            (0, Some(last_group)) => last_group.append(&mut current),
+            (_, _) => groups.push(current),
+        }
+    }
+    let (_, segments) = split_into_segments(operations, fua_is_boundary);
+    let writes_per_group: Vec<usize> = groups
+        .iter()
+        .map(|group| group.iter().filter(|kind| **kind != RecordedStepKind::Barrier).count())
+        .collect();
+    assert_eq!(writes_per_group, segments.iter().map(Vec::len).collect::<Vec<usize>>(), "步骤种类的切法与 split_into_segments 对不上");
+    groups
+}
+
+/// 把每段的步骤种类写成一行可解析的文字：段之间用 `|`，段内按枚举声明序排成规范多重集
+/// `[种类×次数,…]`，只出现一次的不带次数。规范序是为了让两段只要多重集相同、文字就一模一样。
+fn format_segment_kinds(groups: &[Vec<RecordedStepKind>]) -> String {
+    let mut rendered: Vec<String> = Vec::new();
+    for group in groups {
+        let mut counts: BTreeMap<RecordedStepKind, usize> = BTreeMap::new();
+        for kind in group {
+            *counts.entry(*kind).or_insert(0) += 1;
+        }
+        let entries: Vec<String> = counts
+            .into_iter()
+            .map(|(kind, count)| if count == 1 { kind.tag().to_string() } else { format!("{}×{count}", kind.tag()) })
+            .collect();
+        rendered.push(format!("[{}]", entries.join(",")));
+    }
+    rendered.join("|")
 }
 
 /// E77 的闭式：1 + Σ(2^|段| − 1)。
@@ -2411,14 +2614,15 @@ fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, ro
     if let Some(reason) = oracle_violation(&consulted.outcome, root_persisted, expected_content) {
         tally.violations += 1;
         if tally.first_violation.is_none() {
-            let persisted_labels: Vec<&str> = image.persisted.iter().zip(writes).filter(|(is_persisted, _)| **is_persisted).map(|(_, write)| write.label).collect();
-            tally.first_violation = Some(format!("{reason}（持久的写：{}）", persisted_labels.join("|")));
+            let persisted_kinds: Vec<&str> = image.persisted.iter().zip(writes).filter(|(is_persisted, _)| **is_persisted).map(|(_, write)| write.kind.tag()).collect();
+            tally.first_violation = Some(format!("{reason}（持久的写：{}）", persisted_kinds.join("|")));
         }
     }
 }
 
 fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>], expected_content: &[u8]) -> Layer0Tally {
-    let root_index = writes.iter().position(|write| write.label.starts_with("t10")).expect("写流里有根槽那一条");
+    // 被判的是这条流里最后一次根槽 FUA 写：暖机的两个根在它前面，主臂与阳性对照都取这一条。
+    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
     let mut tally = Layer0Tally::default();
     let mut persisted_before = vec![false; writes.len()];
     for segment in segments {
@@ -2471,13 +2675,14 @@ struct Probe {
 }
 
 fn probes(parameters: &PoolParameters) -> Vec<Probe> {
-    let region_one_device = parameters.region_devices[1];
-    let journal_start = DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES);
+    let (newest_root_region, newest_root_slot) = ring_target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let newest_root_device = parameters.region_devices[newest_root_region as usize];
+    let journal_start = DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES + (FIRST_TRANSACTION_TXG - 1) * JOURNAL_RECORD_BYTES);
     let data_offset = SlotNumber(SLOT_DATA_UNIT).device_offset();
     let tree_table_offset = SlotNumber(SLOT_TREE_TABLE_FIRST_PUBLISH).device_offset();
     let both = |offset: DeviceOffset, byte: u64| vec![(DeviceIdentity(0), offset, byte), (DeviceIdentity(1), offset, byte)];
     vec![
-        Probe { name: "newest_root_slot_one_byte", flips: vec![(region_one_device, ring_slot_offset(1, 0), 100)] },
+        Probe { name: "newest_root_slot_one_byte", flips: vec![(newest_root_device, ring_slot_offset(newest_root_region, newest_root_slot), 100)] },
         Probe { name: "journal_record_both_copies", flips: both(journal_start, 200) },
         Probe { name: "journal_record_one_copy", flips: vec![(DeviceIdentity(0), journal_start, 200)] },
         Probe { name: "data_payload_one_copy", flips: vec![(DeviceIdentity(0), data_offset, 200)] },
@@ -2516,8 +2721,9 @@ const GAPS: &[(&str, &str)] = &[
     ("G14", "实例表链指针行宽在这一轮里从64改成88（C304，D18已定项11）；写装置那天kb还是64，跑之前改成了88，行里的83宽指针无下一片时清零"),
     ("G15", "码2的「声明长度」语义未定（I-2.3把码2排除在外）；装置写载荷已用字节"),
     ("G16", "出生序号的分配规则只在E137源码里（C291）；装置按(树,txg,实例)从0计、码2与码3共用一个计数"),
-    ("G17", "D13已定项4只说屏障切段，FUA写算不算段边界没写；装置把FUA当边界，两种口径的状态数都报"),
+    ("G17", "已收口（2026-09-13 C313用户定案）：FUA写算段边界；装置主臂按它枚举，另一读法只报数不判"),
     ("G18", "D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同"),
+    ("G19", "mkfs种根的11次操作（9写+2屏障，段序列4+1+1+1+2、22个崩溃状态）不在层0枚举里：装置从mkfs之后的池起枚举（暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住"),
 ];
 
 // ───────────────────────── main：发结果行 ─────────────────────────
@@ -2562,16 +2768,35 @@ fn main() {
     let parameters = PoolParameters::settled_two_devices();
     let (mut recording, genesis) = mkfs(&parameters);
     let mkfs_operation_count = recording.operations.len();
+    let warm_up_roots = warm_up(&mut recording, &parameters, &genesis);
+    let warm_up_operation_count = recording.operations.len();
     let output = publish_first_file(&mut recording, &parameters, &genesis, &file_bytes);
-    let transaction_operations = &recording.operations[mkfs_operation_count..];
+    let warm_up_operations = &recording.operations[mkfs_operation_count..warm_up_operation_count];
+    emit(&mut emitter, &format!(
+        "name=warm_up publishes={} writes={} barriers={} fua={} first_transaction_txg={FIRST_TRANSACTION_TXG} last_warm_up_root_txg={}",
+        warm_up_roots.len(),
+        warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count(),
+        warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count(),
+        warm_up_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count(),
+        warm_up_roots.last().map_or(0, |root| root.checkpoint_txg.0)
+    ));
+    // 写清单只数第一个事务；层 0 枚举吃 mkfs 之后的全部操作（暖机两次空发布 + 第一个事务）
+    let transaction_operations = &recording.operations[warm_up_operation_count..];
+    let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
+    // 段序列登记表（first-txn-layout 八）的输入：每条根槽写路径单独切段、再加整条流。mkfs 那一行不进层 0 枚举（G19），但段序列钉在这里。
+    for (path_name, operations) in [("mkfs", &recording.operations[..mkfs_operation_count]), ("warm_up", warm_up_operations), ("transaction", transaction_operations), ("post_mkfs_stream", post_mkfs_operations)] {
+        let (_, path_segments) = split_into_segments(operations, true);
+        let sizes: Vec<String> = path_segments.iter().map(|segment| segment.len().to_string()).collect();
+        emit(&mut emitter, &format!("name=segments path={path_name} operations={} segments={} closed_form={} kinds={}", operations.len(), sizes.join("+"), closed_form_state_count(&path_segments), format_segment_kinds(&segment_step_kinds(operations, true))));
+    }
     let write_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
     let barrier_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count();
-    let fua_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua)).count();
+    let fua_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count();
     let instance_table = parse_packed_unit(&genesis.instance_table_unit).expect("mkfs 写出的实例表单元自检要过");
     let tree_table_genesis = parse_index_node(&genesis.tree_table_genesis_unit, TREE_TABLE_KEY_WIDTH).expect("mkfs 写出的树表单元自检要过");
     emit(&mut emitter, &format!("name=mkfs_units instance_table_records={} instance_table_row_bytes={} tree_table_entries={} genesis_root_watermark={}", instance_table.records.len(), instance_table.record_width, tree_table_genesis.entries.len(), genesis.root.tree_identifier_watermark));
     emit(&mut emitter, &format!("name=root_record checkpoint_txg={} instance={} tree_identifier_watermark={} rollback_floor={} record_bytes={} back_chain={}", output.root.checkpoint_txg.0, output.root.instance.0, output.root.tree_identifier_watermark, output.root.rollback_floor.0, output.record_bytes.len(), output.record.back_chain));
-    let slots: Vec<String> = output.units_by_slot.iter().map(|(slot, label, unit)| format!("{}@{}x{}", label.split(' ').next().expect("标签"), slot.0, unit.len())).collect();
+    let slots: Vec<String> = output.units_by_slot.iter().map(|(slot, unit_identity, unit)| format!("{}@{}x{}", unit_identity.tag(), slot.0, unit.len())).collect();
     emit(&mut emitter, &format!("name=write_list writes={write_count} barriers={barrier_count} fua={fua_count} named={} units={}", output.record.named.len(), slots.join(",")));
     for (tree, width) in &output.index_node_header_widths {
         emit(&mut emitter, &format!("name=index_node_header tree={tree} header_bytes={width} with_reserved={} layout_table_says=84", width + NONCE_MAC_RESERVED_BYTES as usize));
@@ -2589,7 +2814,7 @@ fn main() {
     // 判据 4：层 0 主臂。基线是 mkfs 之后的池（事务的写全没持久那一态）。
     let (base_pool, _) = mkfs(&parameters);
     let base_pool = base_pool.pool;
-    let (writes, segments) = split_into_segments(transaction_operations, true);
+    let (writes, segments) = split_into_segments(post_mkfs_operations, true);
     let segment_sizes: Vec<String> = segments.iter().map(|segment| segment.len().to_string()).collect();
     let closed_form = closed_form_state_count(&segments);
     let tally = enumerate_layer0(&base_pool, &writes, &segments, &file_bytes);
@@ -2598,7 +2823,7 @@ fn main() {
         segment_sizes.join("+"), tally.states, tally.violations, tally.root_persisted_states, tally.no_file_states, tally.file_read_states, tally.failed_states, tally.verification_ran_states, tally.verification_failed_states,
         tally.first_violation.clone().unwrap_or_else(|| "none".to_string()).replace(' ', "_")
     ));
-    let (_, segments_fua_free) = split_into_segments(transaction_operations, false);
+    let (_, segments_fua_free) = split_into_segments(post_mkfs_operations, false);
     emit(&mut emitter, &format!("name=layer0_fua_not_boundary segments={} closed_form={}", segments_fua_free.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"), closed_form_state_count(&segments_fua_free)));
     emit(&mut emitter, &format!("name=journal_effect arm=settled_two_devices states={} differing_states={}", tally.states, tally.journal_differing_states));
 
@@ -2671,7 +2896,7 @@ fn main() {
     emit(&mut emitter, &format!(
         "name=verdict width_mismatches={width_mismatches} write_list_ok={} recover_full_ok={content_matches} layer0_states_ok={} layer0_violations={} control_states_ok={} control_violations_ok={} journal_differing_states={}",
         write_count == 21 && barrier_count == 2 && fua_count == 1,
-        tally.states == closed_form && closed_form == 65543,
+        tally.states == closed_form && closed_form == 262162,
         tally.violations,
         control_tally.states == control_closed_form && control_closed_form == 2048,
         control_tally.violations == control_expected_violations,
@@ -2688,12 +2913,15 @@ mod tests {
         (0..3000u32).map(|index| u8::try_from((index * 7 + 3) % 251).expect("小于 256")).collect()
     }
 
-    fn built_pool() -> (RecordingPool, MkfsOutput, TransactionOutput, usize) {
+    /// mkfs → 暖机两次空发布 → 第一个事务；返回值最后一项是 mkfs 之后的操作数（暖机从这里起），倒数第二项是暖机之后的（事务从这里起）。
+    fn built_pool() -> (RecordingPool, MkfsOutput, TransactionOutput, usize, usize) {
         let parameters = PoolParameters::settled_two_devices();
         let (mut recording, genesis) = mkfs(&parameters);
         let mkfs_operation_count = recording.operations.len();
+        warm_up(&mut recording, &parameters, &genesis);
+        let warm_up_operation_count = recording.operations.len();
         let output = publish_first_file(&mut recording, &parameters, &genesis, &sample_file());
-        (recording, genesis, output, mkfs_operation_count)
+        (recording, genesis, output, warm_up_operation_count, mkfs_operation_count)
     }
 
     #[test]
@@ -2738,21 +2966,16 @@ mod tests {
 
     #[test]
     fn transaction_issues_21_writes_2_barriers_1_fua_in_the_settled_order() {
-        let (recording, _, output, mkfs_operation_count) = built_pool();
-        let operations = &recording.operations[mkfs_operation_count..];
-        let labels: Vec<String> = operations
-            .iter()
-            .map(|operation| match operation {
-                RecordedOperation::Write(write) => format!("{}{}", write.label.split(' ').next().expect("标签"), if write.is_fua { "!" } else { "" }),
-                RecordedOperation::Barrier => "|".to_string(),
-            })
-            .collect();
-        assert_eq!(labels.iter().filter(|label| label.as_str() != "|").count(), 21);
-        assert_eq!(labels.iter().filter(|label| label.as_str() == "|").count(), 2);
-        assert_eq!(labels.iter().filter(|label| label.ends_with('!')).count(), 1);
-        assert_eq!(labels[16], "|");
-        assert_eq!(labels[19], "|");
-        assert_eq!(labels[20], "t10!");
+        let (recording, _, output, warm_up_operation_count, _) = built_pool();
+        let operations = &recording.operations[warm_up_operation_count..];
+        let steps: Vec<&'static str> = operations.iter().map(|operation| RecordedStepKind::of(operation).tag()).collect();
+        assert_eq!(steps.iter().filter(|tag| **tag != "barrier").count(), 21);
+        assert_eq!(steps.iter().filter(|tag| **tag == "barrier").count(), 2);
+        assert_eq!(steps.iter().filter(|tag| **tag == "root_record_fua").count(), 1);
+        assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(write) if write.is_fua())).count(), 1, "FUA 只由步骤种类决定，只有根槽那一步是");
+        assert_eq!(steps[16], "barrier");
+        assert_eq!(steps[19], "barrier");
+        assert_eq!(steps[20], "root_record_fua");
         assert_eq!(output.record.named.len(), 8);
         assert_eq!(output.record.named.iter().map(|named| named.locations.len()).sum::<usize>(), 16);
         let slots: Vec<u64> = output.units_by_slot.iter().map(|(slot, _, _)| slot.0).collect();
@@ -2798,37 +3021,111 @@ mod tests {
 
     #[test]
     fn cold_start_reads_the_file_back_and_chooses_root_one_one() {
-        let (recording, _, _, _) = built_pool();
+        let (recording, _, _, _, _) = built_pool();
         let report = recover(&recording.pool, JournalPolicy::Consult);
-        assert_eq!(report.outcome, RecoveryOutcome::FileRead { root: (InstanceGeneration(1), CheckpointTxg(1)), content: sample_file() });
-        assert_eq!(report.journal.valid_records, 1);
-        assert_eq!(report.journal.above_water, 0, "记录 txg 1 不高于根的水位 1，不施加");
+        assert_eq!(report.outcome, RecoveryOutcome::FileRead { root: (InstanceGeneration(1), CheckpointTxg(3)), content: sample_file() });
+        assert_eq!(report.journal.valid_records, 3, "两条暖机空记录 + 事务记录");
+        assert_eq!(report.journal.above_water, 0, "记录 txg 1..3 都不高于根的水位 3，不施加");
         assert_eq!(report.mapping_fallbacks, 0);
     }
 
     #[test]
-    fn layer0_state_count_is_65543_with_zero_violations() {
-        let (recording, _, _, mkfs_operation_count) = built_pool();
+    /// 暖机第一次 [2 条空记录][根 FUA][2 个超级块槽]（7 个状态）、第二次 [2][1]（4 个）；第二次的超级块槽写与事务的 16 个单元写之间没有屏障、同一段 18 个（2¹⁸ − 1）；
+    /// 再 [2 条记录][根 FUA][2 个超级块槽]（7 个）⇒ 1 + 7 + 4 + 262143 + 7 = 262162。
+    #[test]
+    fn layer0_state_count_is_262162_with_zero_violations() {
+        let (recording, _, _, _, mkfs_operation_count) = built_pool();
         let (base, _) = mkfs(&PoolParameters::settled_two_devices());
         let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
-        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![16, 2, 1, 2]);
-        assert_eq!(closed_form_state_count(&segments), 65543);
+        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 1, 2, 2, 1, 18, 2, 1, 2]);
+        assert_eq!(closed_form_state_count(&segments), 262162);
         let tally = enumerate_layer0(&base.pool, &writes, &segments, &sample_file());
-        assert_eq!(tally.states, 65543);
+        assert_eq!(tally.states, 262162);
         assert_eq!(tally.violations, 0, "{:?}", tally.first_violation);
-        assert_eq!(tally.root_persisted_states, 4);
+        assert_eq!(tally.root_persisted_states, 4, "事务根槽持久的状态照旧 4 个：根槽那一段与之后超级块段的子集");
         assert_eq!(tally.file_read_states, 4);
-        assert_eq!(tally.no_file_states, 65539);
+        assert_eq!(tally.no_file_states, 262158);
         assert_eq!(tally.journal_differing_states, 0);
-        assert_eq!(tally.verification_ran_states, 3);
+        assert_eq!(tally.verification_ran_states, 9, "三条记录各自「持久而所属的根还没持久」的 3 个子集：暖机 jsn 1、jsn 2 与事务 jsn 3");
         assert_eq!(tally.verification_failed_states, 0);
     }
 
+    /// FUA 不当边界（C313 已判掉的另一读法，只钉它给的数不同）：[2][3][2][1 + 2 + 16 = 19][2][3] ⇒ 1 + 3 + 7 + 3 + 524287 + 3 + 7 = 524311。
     #[test]
-    fn fua_not_a_boundary_gives_65546_states() {
-        let (recording, _, _, mkfs_operation_count) = built_pool();
+    fn fua_not_a_boundary_gives_524311_states() {
+        let (recording, _, _, _, mkfs_operation_count) = built_pool();
         let (_, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], false);
-        assert_eq!(closed_form_state_count(&segments), 65546);
+        assert_eq!(closed_form_state_count(&segments), 524311);
+    }
+
+    /// 段序列登记表（first-txn-layout 八）的四行由这条钉住：mkfs 4+1+1+1+2（11 次操作、22 个状态）、暖机 2+1+2+2+1+2、事务 16+2+1+2、整条流 2+1+2+2+1+18+2+1+2。
+    /// 改任何一条路径里屏障或 FUA 的位置都红——mkfs 那一行不进层 0 枚举，这里是它唯一的会红检查。
+    ///
+    /// D17（实现分层与第三方管道） 已定项 2 的结构等价类要的是「段边界位置 + 每段步骤种类集合」，
+    /// 所以这里连每段的步骤种类多重集一起钉死，四条路径各钉一个**绝对值**（不是拿几条路径互相比）：
+    /// 把某一步录成别的种类——例如超级块槽写录成单元写——段边界与状态数一个都不变，只有这几行会红（C316 ②）。
+    #[test]
+    fn registered_segment_sequences_match_every_recorded_path() {
+        let (recording, _, _, warm_up_operation_count, mkfs_operation_count) = built_pool();
+        let sizes = |operations: &[RecordedOperation]| split_into_segments(operations, true).1.iter().map(Vec::len).collect::<Vec<_>>();
+        let kinds = |operations: &[RecordedOperation]| format_segment_kinds(&segment_step_kinds(operations, true));
+        let mkfs_operations = &recording.operations[..mkfs_operation_count];
+        let warm_up_operations = &recording.operations[mkfs_operation_count..warm_up_operation_count];
+        let transaction_operations = &recording.operations[warm_up_operation_count..];
+        let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
+        assert_eq!(mkfs_operations.len(), 11, "mkfs：9 次写 + 2 道屏障");
+        assert_eq!(sizes(mkfs_operations), vec![4, 1, 1, 1, 2]);
+        assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 22);
+        assert_eq!(sizes(warm_up_operations), vec![2, 1, 2, 2, 1, 2]);
+        assert_eq!(sizes(transaction_operations), vec![16, 2, 1, 2]);
+        assert_eq!(sizes(post_mkfs_operations), vec![2, 1, 2, 2, 1, 18, 2, 1, 2]);
+
+        assert_eq!(
+            kinds(mkfs_operations),
+            "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[superblock_slot×2,barrier]",
+            "mkfs：m1/m2 两个单元各两盘一段、三个第 0 代根各自 FUA 一段、两个超级块槽收尾"
+        );
+        assert_eq!(
+            kinds(warm_up_operations),
+            "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
+            "暖机两次空发布：每次「空记录两盘 → 根 FUA → 超级块槽两盘」，第一段前面还有那道开场屏障"
+        );
+        assert_eq!(
+            kinds(transaction_operations),
+            "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
+            "第一个事务：8 个单元各两盘 → journal 记录两盘 → 根 FUA → 超级块槽两盘"
+        );
+        assert_eq!(
+            kinds(post_mkfs_operations),
+            "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
+            "整条流：暖机第二次的两个超级块槽与事务的 16 个单元写之间没有屏障，同一段 18 个写"
+        );
+
+        // 每一步都恰好落在一个段里：各段的步骤数加起来等于录到的操作数。
+        for operations in [mkfs_operations, warm_up_operations, transaction_operations, post_mkfs_operations] {
+            assert_eq!(segment_step_kinds(operations, true).iter().map(Vec::len).sum::<usize>(), operations.len());
+        }
+        // 种类的字母表就这五个，别处不许冒出第六个。
+        let alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(post_mkfs_operations, true).concat().iter().map(|kind| kind.tag()).collect();
+        assert_eq!(alphabet.into_iter().collect::<Vec<_>>(), vec!["barrier", "journal_record", "root_record_fua", "superblock_slot", "unit_write"]);
+    }
+
+    /// 暖机（D16 已定项 8）：两次空发布，根落区域 1 与区域 2（分住两块盘），jsn 1、2 不点名任何单元，第一个事务从 txg 3 起。
+    #[test]
+    fn warm_up_writes_two_empty_publishes_covering_both_devices() {
+        let (recording, _, output, warm_up_operation_count, mkfs_operation_count) = built_pool();
+        let operations = &recording.operations[mkfs_operation_count..warm_up_operation_count];
+        let writes = operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
+        let fua_writes: Vec<&WriteRequest> = operations.iter().filter_map(|operation| match operation { RecordedOperation::Write(write) if write.is_fua() => Some(write), RecordedOperation::Write(_) | RecordedOperation::Barrier => None }).collect();
+        assert_eq!(writes, 10, "每次空发布 2 条记录 + 1 个根 + 2 个超级块槽");
+        assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count(), 4);
+        assert_eq!(fua_writes.len(), 2);
+        let parameters = PoolParameters::settled_two_devices();
+        assert_ne!(fua_writes[0].device, fua_writes[1].device, "两个暖机根要落在两块盘上");
+        assert_eq!((parameters.region_devices[1], parameters.region_devices[2]), (fua_writes[0].device, fua_writes[1].device));
+        assert_eq!(output.root.checkpoint_txg, CheckpointTxg(3));
+        assert_eq!(output.record.counter, JournalCounter(3));
+        assert_eq!(FIRST_TRANSACTION_TXG, WARM_UP_EMPTY_PUBLISHES + 1, "第一个事务紧跟暖机之后");
     }
 
     #[test]
@@ -2848,7 +3145,7 @@ mod tests {
 
     #[test]
     fn flipping_the_last_header_byte_is_caught_by_the_header_checksum() {
-        let (_, _, output, _) = built_pool();
+        let (_, _, output, _, _) = built_pool();
         let mut unit = output.units_by_slot[0].2.clone();
         unit[DATA_UNIT_HEADER_BYTES as usize - 1] ^= 0x01;
         assert_eq!(parse_data_unit(&unit).unwrap_err(), UnitError::HeaderChecksum);
@@ -2862,7 +3159,7 @@ mod tests {
 
     #[test]
     fn flipping_the_payload_checksum_field_breaks_the_journal_header_checksum() {
-        let (_, _, output, _) = built_pool();
+        let (_, _, output, _, _) = built_pool();
         let mut record = output.record_bytes.clone();
         record[JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES as usize - 1] ^= 0x01;
         assert!(JournalRecord::parse(&record).is_none(), "载荷校验和字段要落在头校验和覆盖内（D23 已定项 13）");
@@ -2871,16 +3168,16 @@ mod tests {
 
     #[test]
     fn probes_behave_as_milestone_step_six_expects() {
-        let (recording, _, _, _) = built_pool();
+        let (recording, _, _, _, _) = built_pool();
         let parameters = PoolParameters::settled_two_devices();
         let mut by_name = BTreeMap::new();
         for probe in probes(&parameters) {
             by_name.insert(probe.name, run_probe(&recording.pool, &probe));
         }
-        assert_eq!(by_name["newest_root_slot_one_byte"].outcome, RecoveryOutcome::NoFile { root: (InstanceGeneration(1), CheckpointTxg(0)) });
+        assert_eq!(by_name["newest_root_slot_one_byte"].outcome, RecoveryOutcome::NoFile { root: (InstanceGeneration(1), CheckpointTxg(2)) }, "最新根槽坏了退到暖机的第 2 代根");
         assert!(matches!(by_name["journal_record_both_copies"].outcome, RecoveryOutcome::FileRead { .. }));
-        assert_eq!(by_name["journal_record_both_copies"].journal.valid_records, 0);
-        assert_eq!(by_name["journal_record_one_copy"].journal.valid_records, 1);
+        assert_eq!(by_name["journal_record_both_copies"].journal.valid_records, 2, "事务记录两份都坏，暖机的两条空记录还在");
+        assert_eq!(by_name["journal_record_one_copy"].journal.valid_records, 3);
         assert!(matches!(by_name["data_payload_one_copy"].outcome, RecoveryOutcome::FileRead { .. }));
         assert!(matches!(by_name["data_payload_both_copies"].outcome, RecoveryOutcome::Failed { .. }));
         assert_eq!(by_name["data_payload_both_copies"].mapping_fallbacks, 1);
@@ -2891,9 +3188,9 @@ mod tests {
 
     #[test]
     fn two_data_units_in_one_transaction_share_a_mapping_key() {
-        let (_, _, output, _) = built_pool();
+        let (_, _, output, _, _) = built_pool();
         let first = mapping_key_for_data(output.data_pointer.head, output.data_pointer.write_order);
-        let second = mapping_key_for_data(PointerHead { birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT), birth_txg: CheckpointTxg(1) }, WriteOrder { instance: InstanceGeneration(1), transaction: TransactionNumber(1) });
+        let second = mapping_key_for_data(PointerHead { birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT), birth_txg: CheckpointTxg(FIRST_TRANSACTION_TXG) }, WriteOrder { instance: InstanceGeneration(1), transaction: TransactionNumber(1) });
         assert_eq!(first, second);
         assert_eq!(first.len(), 27);
         let distinct: std::collections::BTreeSet<Vec<u8>> = output.mapping_keys.iter().cloned().collect();
@@ -2902,7 +3199,7 @@ mod tests {
 
     #[test]
     fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
-        let (_, _, output, _) = built_pool();
+        let (_, _, output, _, _) = built_pool();
         assert_eq!(output.allocation_records.len(), 20);
         assert_eq!(output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(0)).count(), 4);
         assert_eq!(output.accounting_entries.len(), 3);
@@ -2916,7 +3213,7 @@ mod tests {
 
     #[test]
     fn instance_table_row_is_64_bytes_and_the_inode_leaf_holds_one_140_byte_record() {
-        let (_, genesis, output, _) = built_pool();
+        let (_, genesis, output, _, _) = built_pool();
         let instance_table = parse_packed_unit(&genesis.instance_table_unit).expect("实例表");
         assert_eq!(instance_table.record_width as u64, INSTANCE_ROW_BYTES);
         assert_eq!(instance_table.records.len(), 1);

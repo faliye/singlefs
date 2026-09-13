@@ -350,6 +350,18 @@ name = "e95-node-layout-arms"
 path = "src/bin/e95_node_layout_arms.rs"
 
 [[bin]]
+name = "e127-group-identity-under-split-merge"
+path = "src/bin/e127_group_identity_under_split_merge.rs"
+
+[[bin]]
+name = "e150-rollback-reuse-of-abandoned-roots"
+path = "src/bin/e150_rollback_reuse_of_abandoned_roots.rs"
+
+[[bin]]
+name = "e151-arrival-and-container-arms"
+path = "src/bin/e151_arrival_and_container_arms.rs"
+
+[[bin]]
 name = "e126-superblock-slot-width"
 path = "src/bin/e126_superblock_slot_width.rs"
 

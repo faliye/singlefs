@@ -1,0 +1,14 @@
+M1_split_not_at_midpoint	let midpoint = keys.len() / 2;	let midpoint = keys.len() - 1;
+M2_split_child_always_joins_parent_group	if (self.group_member_count[parent_group as usize] as usize) < self.nominal_group_size {	if true {
+M3_merge_at_or_below_quarter	self.node_keys[identifier].len() < self.geometry.merge_below() && self.node_count() >= 2	self.node_keys[identifier].len() <= self.geometry.merge_below() && self.node_count() >= 2
+M4_remove_node_skips_before_pairs	let before = self.broken_pairs_among(&[position, position + 1]);\n        let identifier = self.order.remove(position);	let before = 0;\n        let identifier = self.order.remove(position);
+M5_xfixture_cell_off_by_one	(256, "fmt_group_g32", "runs8", 276),	(256, "fmt_group_g32", "runs8", 277),
+M6_policy_sweep_includes_dirty	        if !mandatory_set.contains(&position) {\n            sweep_positions.push(position);\n        }	        sweep_positions.push(position);
+M7_key_interval_never_relands_whole_group	let clean = (range_start..range_end).filter(|position| !mandatory_set.contains(position)).count();	let clean = usize::MAX;
+M8_node_group_never_relands_whole_group	let clean = group_members.iter().filter(|position| !mandatory_set.contains(position)).count();	let clean = usize::MAX;
+M9_presence_rank_off_by_one	if candidate < self.tree.len() && self.tree[candidate] < remaining {	if candidate < self.tree.len() && self.tree[candidate] <= remaining {
+M10_split_forgets_unplaced_counter	        self.unplaced_nodes += 1;\n        self.insert_node_at(position + 1, new_identifier);	        self.insert_node_at(position + 1, new_identifier);
+M11_policy_sweeps_one_over_budget	while sweep_positions.len() < extra {	while sweep_positions.len() < extra + 1 {
+M12_dirty_key_maps_to_position_zero	positions.insert(sim.position_holding(key));	positions.insert(0);
+M13_no_inserts	for _ in 0..sim.geometry.inserts_per_checkpoint {	for _ in 0..0 {
+M14_win_threshold_is_one	node_group_runs * NODE_GROUP_WIN_DENOMINATOR < key_interval_runs * NODE_GROUP_WIN_NUMERATOR	node_group_runs * NODE_GROUP_WIN_DENOMINATOR < key_interval_runs * NODE_GROUP_WIN_DENOMINATOR

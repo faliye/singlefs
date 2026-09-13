@@ -1,0 +1,11 @@
+1. Yes. Grouping based on access frequency of keys where nodes are grouped together if their keys are frequently accessed together in transactions requires storing a group identifier in the node header. This could reduce runs by more than 20 percent in workloads with correlated key access patterns (e.g., transactional workloads where non-adjacent keys are always accessed together), which model B did not test because it only used uniform and runs-of-8 workloads. For example, if keys 1, 100, and 200 are always accessed together but spaced far apart in key space, key-interval grouping would split them into separate groups causing high, while access-frequency frequency grouping would keep them contiguous, reducing runs significantly.
+
+2. No. Sibling nodes under the same parent do not need a field in the node header because the placement engine can determine parent relationships by reading the parent node's data from the tree structure during traversal. The group identity can be derived dynamically from the parent's location without storing it in the child node, so the claim that group identity must be stored is invalid.
+
+3. None. If the format half is settled as no stored group identity and no layout change, the bytes of the first transaction's index nodes remain unchanged from the existing design.
+
+4. Yes. Model A's node group arm used key interval grouping (key divided by G), which is computable from keys without stored fields. The verdict should read "a key-computable grouping policy halves the compaction policy". Model A's node group arm does nothing that key-interval grouping cannot—it is exactly key-interval grouping.
+
+5. The runs measure counted over nodes is correct for this question. Each node is stored as a contiguous block, so node-level runs directly reflect key-level physical contiguity. Counting over keys would not show additional fragmentation because keys within a node are always contiguous by design.
+
+6. None. The inference does not contradict any settled fact. F1 describes the current status of the item, which the inference proposes to change, but F1 itself remains a true statement about the current state. All other facts (F2-F7) are consistent with the inference.

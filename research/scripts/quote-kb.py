@@ -21,6 +21,12 @@
 自证会红：`quote-kb.py --selftest` 走一遍三种取法，再用 QUOTE_KB_CORRUPT=1
 强制进入「抄漏一行」那条分支，确认回读比对判红（`.claude/rules/fs-design.md` 硬要求 2：
 每条分支必须能被测试强制进入）。
+
+退出码：
+    3   回读比对不一致（抄出来的与源文件不一致）
+    4   清单标了「抄」而附录里没有那一节（正向核对）
+    5   --cited 缺清单：正文提到的某个 kb 文件，清单里没给它做一张小节清单
+    6   清单标了「不抄」的小节，其实整段被 --extra 之类的行区间连带抄进了附录（反向核对，C320）
 """
 import glob, os, re, sys, tempfile
 
@@ -133,6 +139,16 @@ def verify(specs, produced):
     return None
 
 
+def normalize_heading(text):
+    """去掉 `**` 与首尾空白，让清单里的标题格与产物里的标题行能互相比对。
+
+    清单表格里的标题格偶尔会被人手写成带强调的形态，产物里的标题行是从源文件原样抄来的、
+    从不带 `**`；两边都过一遍这个函数，比对就不挑这个格式差异。正向、反向核对共用它——
+    两处比的是同一件事：清单上的一节标题，是不是（不是）产物里的那一行标题。
+    """
+    return text.replace('**', '').strip()
+
+
 def check_checklist(checklist, produced):
     """清单里标「抄」的每一节，产物里必须真的有。返回缺的那几行（空表 = 对得上）。
 
@@ -142,6 +158,7 @@ def check_checklist(checklist, produced):
     读成另一个形态上（C262）。
     """
     lines = [l.replace('|', '/') for l in produced]
+    heading_lines = {normalize_heading(l) for l in lines if l.strip().startswith('#')}
     sources = []
     for l in produced:
         m = re.match(r'\*\*出处 `(.+):(\d+)-(\d+)`', l)
@@ -159,7 +176,7 @@ def check_checklist(checklist, produced):
             continue
         title = cells[0]
         if title.startswith('#'):
-            if title not in lines:
+            if normalize_heading(title) not in heading_lines:
                 missing.append(f"{cur}：{title[:60]}")
         else:
             r = re.search(r'第 (\d+)-(\d+) 行', title)
@@ -167,6 +184,61 @@ def check_checklist(checklist, produced):
                              for src, a, b in sources):
                 missing.append(f"{cur}：{title[:60]}")
     return missing
+
+
+def heading_lines_by_file(produced):
+    """{文件路径: 产物里这个文件的抄录块里出现过的每一行标题（已归一化）}。
+
+    产物的形状是 `build()` 定的：一行「**出处 `文件:a-b`（整段抄，未转述）**」，
+    紧接着一个围栏、被抄的正文、闭围栏、空行，再是下一段的出处行或结尾。
+    按这个形状走一遍，就知道每一行标题原文来自哪个文件的抄录块——
+    这一步是为了不让「### 已定项」这种在多个决策文件里都用的通用小标题跨文件互相误报。
+    """
+    by_file, current_file = {}, None
+    for line in produced:
+        m = re.match(r'\*\*出处 `(.+):\d+-\d+`', line)
+        if m:
+            current_file = m.group(1); continue
+        if current_file and line.strip().startswith('#'):
+            by_file.setdefault(current_file, set()).add(normalize_heading(line))
+    return by_file
+
+
+def check_checklist_reverse(checklist, produced):
+    """反向核对：清单标「不抄」的小节，标题行不许出现在产物里同一个文件的抄录块里（C320）。
+
+    正向核对（check_checklist）只管「标『抄』的是不是真抄了」，没人管反过来——
+    清单标「不抄」的一节，如果被一个 `--extra 文件:A-B` 之类的行区间整段带进了附录，
+    清单与附录就各说各的：清单说这一节没引，附录里它的原文躺在那儿。
+    实测（2026-09-13，D3 未定项 8 第二轮）：`_d3-r2-checklist.md` 把 D26 已定项 3 与
+    D3 已定项 9 标「不抄」，而 `_d3-r2-appendix.md` 用来带其他已定项的行区间
+    （`26-后台整理与放置回收.md:44-219`、`03-空间分配.md:277-358`）恰好整段覆盖了这两条
+    已定项自己的标题行，两条「不抄」的标题原样躺在附录里，没有任何东西报警。
+
+    只查带独立标题行的「不抄」行（`#` 开头的小节）；行区间形态的「不抄」
+    （比如「（… 正文：第 a-b 行）」这种引言段）没有自己的标题行可比对，跳过。
+    比对按**同一个文件**收窄，不是「这个标题在附录里出现过就算」——不同决策文件常有
+    同名的通用小标题（比如「### 已定项」），跨文件比对会把它们全部误判成命中。
+
+    返回 [(文件, 标题)]，空表 = 对得上。
+    """
+    by_file = heading_lines_by_file(produced)
+    cur, hits = None, []
+    for row in open(checklist, encoding='utf-8').read().split('\n'):
+        m = re.match(r'### 小节清单：`([^`]+)`', row)
+        if m:
+            cur = m.group(1); continue
+        if not row.startswith('| ') or row.startswith('|---'):
+            continue
+        cells = [c.strip() for c in row.strip().strip('|').split('|')]
+        if len(cells) < 2 or cells[1] != '不抄':
+            continue
+        title = cells[0]
+        if not title.startswith('#'):
+            continue
+        if normalize_heading(title) in by_file.get(cur, set()):
+            hits.append((cur, title))
+    return hits
 
 
 def cited_kb_files(text, root):
@@ -225,6 +297,24 @@ def selftest():
         print("  ✗ 自检：清单与附录对得上时竟然判红"); return 1
     if not check_checklist(ck, build(two[:1])):
         print("  ✗ 自检：清单标了抄而附录里没有，比对**没有**判红（C262 那个形态）"); return 1
+    if check_checklist_reverse(ck, build(two)):
+        print("  ✗ 自检：清单标「不抄」的小节没被带进附录，反向核对却判红"); return 1
+    leaked = check_checklist_reverse(ck, build(two + [f'{src}:8-13']))
+    if not leaked:
+        print("  ✗ 自检：一个行区间把「不抄」的小节标题连带抄进了附录，反向核对**没有**判红（C320）"); return 1
+    if leaked != [(src, '#### 带代码块的')]:
+        print(f"  ✗ 自检：反向核对命中的不是预期那一节——{leaked}"); return 1
+    print("  ✓ 自检：反向核对——「不抄」的小节没被带进附录时是绿的，被行区间连带带进去时判红（C320）")
+    src2 = os.path.join(os.path.dirname(src), 'sample2.md')
+    with open(src2, 'w', encoding='utf-8') as f:
+        f.write('# 头二\n\n#### 带代码块的\n\n另一个文件，同名标题在这里合法标了抄\n')
+    with open(ck, 'a', encoding='utf-8') as f:
+        f.write(f"\n### 小节清单：`{src2}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n"
+                "| #### 带代码块的 | 抄 | 样本二 |\n")
+    cross_file = check_checklist_reverse(ck, build([f'{src2}@#### 带代码块的']))
+    if cross_file:
+        print(f"  ✗ 自检：另一个文件里同名标题合法抄进来，反向核对却误报到别的文件头上——{cross_file}"); return 1
+    print("  ✓ 自检：反向核对按文件收窄，不同文件里同名的通用小标题不会互相误报")
     _, _, bare = pick(f'{src}@### 未定项')
     if bare != ['### 未定项', '', '裸标题下的表', '']:
         print(f"  ✗ 自检：裸标题「### 未定项」取错了——{bare}"); return 1
@@ -285,6 +375,15 @@ def main(argv):
             print("  → 把缺的那几节补进取法（优先用 文件@标题），或者把清单那一行改成「不抄」并写理由",
                   file=sys.stderr)
             return 4
+        reverse_hits = check_checklist_reverse(checklist, produced)
+        if reverse_hits:
+            print(f"quote-kb: 清单标了「不抄」，却有 {len(reverse_hits)} 节其实被抄进了附录：",
+                  file=sys.stderr)
+            for f, title in reverse_hits:
+                print(f"    {f}：{title[:60]}", file=sys.stderr)
+            print("  → 把清单那一行改成「抄」并写理由，或者收窄带出这一节的那个 文件:A-B 行区间，别让它连带把它抄进来",
+                  file=sys.stderr)
+            return 6
     if cited:
         lacking = check_cited(checklist, open(cited, encoding='utf-8').read(), os.getcwd())
         if lacking:

@@ -5,6 +5,11 @@
 //! 每片行数 = ⌊(32768 − 135) / 行宽⌋ − 1，预留 = N_switch × 一次切换的最坏量；两份副本各落一块盘，按设备算。
 //! 挂载判定（D2（RAID 条带策略） 已定项 13「实例切换的预留拿得到」）：每块盘上
 //! 容量 − 已分配 − 不可回收 − defer 待释放 ≥ 这块盘的份额。纯算术，确定性。
+//!
+//! 2026-09-13 加暖机那一半（D16（发布语义） 已定项 8 + D28（挂载期承诺量） 已定项 3 的连带）：一次切换还要加
+//! 「至多 R = 3 次空发布 × 现算的 c_max」，c_max 按 D28（挂载期承诺量） 已定项 4 每次发布现算、装置把它当输入扫两档
+//! （E148（提交固定点按两棵记录树重算）：第一个事务规模 4 块、池规模 9 块）。第一个可运行目标两块盘互为镜像
+//! （E142（第一个事务的干跑） 每个单元写到每块盘），所以空发布的 c_max 块每块盘各占一份，份额按设备加。
 
 use e7_index_bench::Emitter;
 
@@ -18,6 +23,12 @@ const BLOCK_BYTES: u64 = 16384;
 const INSTANCE_TABLE_COPIES: u64 = 2;
 /// 一次挂载允许的实例切换次数 N_switch（D23（journal 的角色与格式） 已定项 14）。
 const SWITCHES_PER_MOUNT: u64 = 3;
+/// 每次切换至多推几次空发布（暖机，D16（发布语义） 已定项 8：第一版几何至多 R = 3）。
+const EMPTY_PUBLISHES_PER_SWITCH: u64 = 3;
+/// c_max 的两档取样：E148（提交固定点按两棵记录树重算） 第一个事务规模 4 块、池规模 9 块；它是现算的量，装置当输入扫。
+const CHECKPOINT_COST_SAMPLES: [u64; 2] = [4, 9];
+/// 暖机份额的手算表（跑前写死）：(c_max, 每块盘的暖机块数 = N_switch × R × c_max)。
+const HAND_COMPUTED_WARM_UP_SHARE_BLOCKS: [(u64, u64); 2] = [(4, 36), (9, 81)];
 /// 链指针还是 59 宽时的实例表行宽（2026-09-13 之前 D18（块里携带什么信息） 已定项 11 的值）。
 const ROW_BYTES_WITH_59_WIDE_POINTER: u64 = 64;
 /// 2026-09-13 起的实例表行宽：链指针记录 1 + 1 + 83 + 3（C304（实例表链指针记录装不下 83 宽的指针） 收口）。
@@ -58,14 +69,28 @@ fn unit_blocks() -> u64 {
     INSTANCE_TABLE_UNIT_BYTES / BLOCK_BYTES
 }
 
-/// D28（挂载期承诺量） 已定项 3：每块盘的份额（16 KiB 块）= N_switch × 32768 × 片数(rows0 + N_switch) / 16384。
-fn reserve_share_per_device_blocks(rows_at_mount: u64, row_bytes: u64) -> u64 {
+/// D28（挂载期承诺量） 已定项 3 链重写那一半：每块盘的份额（16 KiB 块）= N_switch × 32768 × 片数(rows0 + N_switch) / 16384。
+fn chain_rewrite_share_per_device_blocks(rows_at_mount: u64, row_bytes: u64) -> u64 {
     let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes));
     SWITCHES_PER_MOUNT * pages * unit_blocks()
 }
 
-fn reserve_total_blocks(rows_at_mount: u64, row_bytes: u64) -> u64 {
-    reserve_share_per_device_blocks(rows_at_mount, row_bytes) * INSTANCE_TABLE_COPIES
+/// 暖机那一半（D16（发布语义） 已定项 8）：每块盘 N_switch × R × c_max 块，镜像两块盘各占一份。
+fn warm_up_share_per_device_blocks(checkpoint_cost_blocks: u64) -> u64 {
+    SWITCHES_PER_MOUNT * EMPTY_PUBLISHES_PER_SWITCH * checkpoint_cost_blocks
+}
+
+/// 每块盘的切换预留份额 = 链重写 + 暖机。
+fn reserve_share_per_device_blocks(rows_at_mount: u64, row_bytes: u64, checkpoint_cost_blocks: u64) -> u64 {
+    chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes) + warm_up_share_per_device_blocks(checkpoint_cost_blocks)
+}
+
+fn chain_rewrite_total_blocks(rows_at_mount: u64, row_bytes: u64) -> u64 {
+    chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes) * INSTANCE_TABLE_COPIES
+}
+
+fn reserve_total_blocks(rows_at_mount: u64, row_bytes: u64, checkpoint_cost_blocks: u64) -> u64 {
+    reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks) * INSTANCE_TABLE_COPIES
 }
 
 /// 判据 5 的错法：取样点要分得开它们与 D28（挂载期承诺量） 已定项 3 的式子。
@@ -79,13 +104,19 @@ enum WrongForm {
     FixedRowWidth,
     /// 逐次累加代替 N_switch × 最坏一次。
     SummedInsteadOfWorstTimesSwitches,
+    /// 漏掉暖机那一半（2026-09-13 之前的式子）。
+    NoWarmUp,
+    /// 暖机只按池级一份算，不按镜像每块盘各一份。
+    WarmUpPoolLevelOnly,
 }
 
-const WRONG_FORMS: [WrongForm; 4] = [
+const WRONG_FORMS: [WrongForm; 6] = [
     WrongForm::FirstRoundCandidate,
     WrongForm::NoChainPointerPerPage,
     WrongForm::FixedRowWidth,
     WrongForm::SummedInsteadOfWorstTimesSwitches,
+    WrongForm::NoWarmUp,
+    WrongForm::WarmUpPoolLevelOnly,
 ];
 
 impl WrongForm {
@@ -95,22 +126,28 @@ impl WrongForm {
             WrongForm::NoChainPointerPerPage => "no_chain_pointer_per_page",
             WrongForm::FixedRowWidth => "fixed_row_width",
             WrongForm::SummedInsteadOfWorstTimesSwitches => "summed_instead_of_worst_times_switches",
+            WrongForm::NoWarmUp => "no_warm_up",
+            WrongForm::WarmUpPoolLevelOnly => "warm_up_pool_level_only",
         }
     }
 
-    fn total_blocks(self, rows_at_mount: u64, row_bytes: u64) -> u64 {
+    /// 错法的总预留；前四种只错链重写那一半、暖机照对，后两种只错暖机那一半。
+    fn total_blocks(self, rows_at_mount: u64, row_bytes: u64, checkpoint_cost_blocks: u64) -> u64 {
+        let warm_up_total = warm_up_share_per_device_blocks(checkpoint_cost_blocks) * INSTANCE_TABLE_COPIES;
         match self {
             WrongForm::FirstRoundCandidate => (1..=SWITCHES_PER_MOUNT)
                 .map(|switch_number| INSTANCE_TABLE_COPIES * unit_blocks() * (rows_at_mount + switch_number + 1).div_ceil(records_per_page(ROW_BYTES_WITH_59_WIDE_POINTER)))
-                .sum(),
+                .sum::<u64>() + warm_up_total,
             WrongForm::NoChainPointerPerPage => {
                 let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, records_per_page(row_bytes));
-                SWITCHES_PER_MOUNT * pages * unit_blocks() * INSTANCE_TABLE_COPIES
+                SWITCHES_PER_MOUNT * pages * unit_blocks() * INSTANCE_TABLE_COPIES + warm_up_total
             }
-            WrongForm::FixedRowWidth => reserve_total_blocks(rows_at_mount, ROW_BYTES_WITH_59_WIDE_POINTER),
+            WrongForm::FixedRowWidth => chain_rewrite_total_blocks(rows_at_mount, ROW_BYTES_WITH_59_WIDE_POINTER) + warm_up_total,
             WrongForm::SummedInsteadOfWorstTimesSwitches => (1..=SWITCHES_PER_MOUNT)
                 .map(|switch_number| INSTANCE_TABLE_COPIES * unit_blocks() * pages_for_rows(rows_at_mount + switch_number, rows_per_page(row_bytes)))
-                .sum(),
+                .sum::<u64>() + warm_up_total,
+            WrongForm::NoWarmUp => chain_rewrite_total_blocks(rows_at_mount, row_bytes),
+            WrongForm::WarmUpPoolLevelOnly => chain_rewrite_total_blocks(rows_at_mount, row_bytes) + warm_up_share_per_device_blocks(checkpoint_cost_blocks),
         }
     }
 }
@@ -179,9 +216,9 @@ fn pool_with_tight_device(tight_device: usize, tight_free_blocks: u64, share_blo
     }
 }
 
-fn mount_decision(arm: ReserveArm, devices: &[DeviceState; DEVICE_COUNT], rows_at_mount: u64, row_bytes: u64) -> MountDecision {
+fn mount_decision(arm: ReserveArm, devices: &[DeviceState; DEVICE_COUNT], rows_at_mount: u64, row_bytes: u64, checkpoint_cost_blocks: u64) -> MountDecision {
     let share_per_device = match arm {
-        ReserveArm::SettledPerDevice | ReserveArm::PoolScalar => reserve_share_per_device_blocks(rows_at_mount, row_bytes),
+        ReserveArm::SettledPerDevice | ReserveArm::PoolScalar => reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks),
         ReserveArm::PositiveControlZeroReserve => 0,
     };
     let is_reserve_obtainable = match arm {
@@ -199,14 +236,24 @@ fn mount_decision(arm: ReserveArm, devices: &[DeviceState; DEVICE_COUNT], rows_a
     }
 }
 
-fn sampling_points() -> Vec<(u64, u64)> {
+fn sampling_points() -> Vec<(u64, u64, u64)> {
     let mut points = Vec::new();
-    for row_bytes in ROW_BYTES_SAMPLES {
-        for rows_at_mount in ROWS_AT_MOUNT_SAMPLES {
-            points.push((rows_at_mount, row_bytes));
+    for checkpoint_cost_blocks in CHECKPOINT_COST_SAMPLES {
+        for row_bytes in ROW_BYTES_SAMPLES {
+            for rows_at_mount in ROWS_AT_MOUNT_SAMPLES {
+                points.push((rows_at_mount, row_bytes, checkpoint_cost_blocks));
+            }
         }
     }
     points
+}
+
+fn hand_computed_warm_up_share_blocks(checkpoint_cost_blocks: u64) -> u64 {
+    HAND_COMPUTED_WARM_UP_SHARE_BLOCKS
+        .iter()
+        .find(|(cost, _)| *cost == checkpoint_cost_blocks)
+        .map(|(_, share)| *share)
+        .expect("手算表覆盖两档 c_max")
 }
 
 fn hand_computed_total_blocks(rows_at_mount: u64, row_bytes: u64) -> u64 {
@@ -225,25 +272,27 @@ fn main() {
     let mut criterion_three_scalar_read_only = 0u64;
     let mut criterion_four_mismatches = 0u64;
 
-    for (rows_at_mount, row_bytes) in sampling_points() {
-        let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes);
-        let total = reserve_total_blocks(rows_at_mount, row_bytes);
-        let expected_total = hand_computed_total_blocks(rows_at_mount, row_bytes);
-        if total != expected_total || share * INSTANCE_TABLE_COPIES != total {
+    for (rows_at_mount, row_bytes, checkpoint_cost_blocks) in sampling_points() {
+        let chain_share = chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes);
+        let warm_up_share = warm_up_share_per_device_blocks(checkpoint_cost_blocks);
+        let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
+        let total = reserve_total_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
+        let expected_total = hand_computed_total_blocks(rows_at_mount, row_bytes) + hand_computed_warm_up_share_blocks(checkpoint_cost_blocks) * INSTANCE_TABLE_COPIES;
+        if total != expected_total || share * INSTANCE_TABLE_COPIES != total || share != chain_share + warm_up_share {
             criterion_four_mismatches += 1;
         }
         println!("{}", emitter.emit_raw(&format!(
-            "name=reserve rows_at_mount={rows_at_mount} row_bytes={row_bytes} records_per_page={} rows_per_page={} pages={} total_blocks={total} share_per_device_blocks={share} expected_total_blocks={expected_total}",
+            "name=reserve rows_at_mount={rows_at_mount} row_bytes={row_bytes} checkpoint_cost_blocks={checkpoint_cost_blocks} records_per_page={} rows_per_page={} pages={} chain_share_per_device_blocks={chain_share} warm_up_share_per_device_blocks={warm_up_share} total_blocks={total} share_per_device_blocks={share} expected_total_blocks={expected_total}",
             records_per_page(row_bytes), rows_per_page(row_bytes), pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes))
         )));
 
         for tight_device in 0..DEVICE_COUNT {
             let at_share = pool_with_tight_device(tight_device, share, share);
             let below_share = pool_with_tight_device(tight_device, share - 1, share);
-            let settled_at_share = mount_decision(ReserveArm::SettledPerDevice, &at_share, rows_at_mount, row_bytes);
-            let settled_below_share = mount_decision(ReserveArm::SettledPerDevice, &below_share, rows_at_mount, row_bytes);
-            let control_at_share = mount_decision(ReserveArm::PositiveControlZeroReserve, &at_share, rows_at_mount, row_bytes);
-            let control_below_share = mount_decision(ReserveArm::PositiveControlZeroReserve, &below_share, rows_at_mount, row_bytes);
+            let settled_at_share = mount_decision(ReserveArm::SettledPerDevice, &at_share, rows_at_mount, row_bytes, checkpoint_cost_blocks);
+            let settled_below_share = mount_decision(ReserveArm::SettledPerDevice, &below_share, rows_at_mount, row_bytes, checkpoint_cost_blocks);
+            let control_at_share = mount_decision(ReserveArm::PositiveControlZeroReserve, &at_share, rows_at_mount, row_bytes, checkpoint_cost_blocks);
+            let control_below_share = mount_decision(ReserveArm::PositiveControlZeroReserve, &below_share, rows_at_mount, row_bytes, checkpoint_cost_blocks);
             if settled_at_share != MountDecision::Writable || settled_below_share != MountDecision::ReadOnly {
                 criterion_one_bad_pairs += 1;
             }
@@ -251,14 +300,14 @@ fn main() {
                 criterion_two_control_failures += 1;
             }
             println!("{}", emitter.emit_raw(&format!(
-                "name=flip rows_at_mount={rows_at_mount} row_bytes={row_bytes} tight_device={tight_device} share_per_device_blocks={share} at_share={} below_share={} control_at_share={} control_below_share={}",
+                "name=flip rows_at_mount={rows_at_mount} row_bytes={row_bytes} checkpoint_cost_blocks={checkpoint_cost_blocks} tight_device={tight_device} share_per_device_blocks={share} at_share={} below_share={} control_at_share={} control_below_share={}",
                 settled_at_share.name(), settled_below_share.name(), control_at_share.name(), control_below_share.name()
             )));
         }
 
         let one_device_short = pool_with_frees(share + DEVICE_DIMENSION_SLACK_BLOCKS, share - 1);
-        let settled = mount_decision(ReserveArm::SettledPerDevice, &one_device_short, rows_at_mount, row_bytes);
-        let scalar = mount_decision(ReserveArm::PoolScalar, &one_device_short, rows_at_mount, row_bytes);
+        let settled = mount_decision(ReserveArm::SettledPerDevice, &one_device_short, rows_at_mount, row_bytes, checkpoint_cost_blocks);
+        let scalar = mount_decision(ReserveArm::PoolScalar, &one_device_short, rows_at_mount, row_bytes, checkpoint_cost_blocks);
         if settled == MountDecision::Writable {
             criterion_three_settled_writable += 1;
         }
@@ -266,7 +315,7 @@ fn main() {
             criterion_three_scalar_read_only += 1;
         }
         println!("{}", emitter.emit_raw(&format!(
-            "name=device_dimension rows_at_mount={rows_at_mount} row_bytes={row_bytes} device_zero_free={} device_one_free={} settled={} pool_scalar={}",
+            "name=device_dimension rows_at_mount={rows_at_mount} row_bytes={row_bytes} checkpoint_cost_blocks={checkpoint_cost_blocks} device_zero_free={} device_one_free={} settled={} pool_scalar={}",
             share + DEVICE_DIMENSION_SLACK_BLOCKS, share - 1, settled.name(), scalar.name()
         )));
     }
@@ -275,13 +324,13 @@ fn main() {
     for form in WRONG_FORMS {
         let mut agreeing_points = 0u64;
         let mut first_difference = String::from("none");
-        for (rows_at_mount, row_bytes) in sampling_points() {
-            let settled_total = reserve_total_blocks(rows_at_mount, row_bytes);
-            let wrong_total = form.total_blocks(rows_at_mount, row_bytes);
+        for (rows_at_mount, row_bytes, checkpoint_cost_blocks) in sampling_points() {
+            let settled_total = reserve_total_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
+            let wrong_total = form.total_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
             if settled_total == wrong_total {
                 agreeing_points += 1;
             } else if first_difference == "none" {
-                first_difference = format!("{rows_at_mount}:{row_bytes}:settled={settled_total}:wrong={wrong_total}");
+                first_difference = format!("{rows_at_mount}:{row_bytes}:{checkpoint_cost_blocks}:settled={settled_total}:wrong={wrong_total}");
             }
         }
         let point_count = sampling_points().len() as u64;
@@ -320,43 +369,55 @@ mod tests {
     }
 
     #[test]
-    fn first_transaction_geometry_reserve_is_twelve_blocks_six_per_device() {
-        assert_eq!(reserve_total_blocks(0, 64), 12, "3 × 2 × 32768 字节 = 12 个 16 KiB 块");
-        assert_eq!(reserve_share_per_device_blocks(0, 64), 6);
+    fn first_transaction_geometry_chain_rewrite_is_twelve_blocks_six_per_device() {
+        assert_eq!(chain_rewrite_total_blocks(0, 64), 12, "3 × 2 × 32768 字节 = 12 个 16 KiB 块");
+        assert_eq!(chain_rewrite_share_per_device_blocks(0, 64), 6);
+    }
+
+    /// 暖机那一半：N_switch × R × c_max，两档 c_max 手算 36 / 81，每块盘各一份。
+    #[test]
+    fn warm_up_share_is_switches_times_empty_publishes_times_checkpoint_cost() {
+        assert_eq!(warm_up_share_per_device_blocks(4), 3 * 3 * 4);
+        assert_eq!(warm_up_share_per_device_blocks(9), 81, "D16 已定项 8 逐字「池规模 9 块 ⇒ 27 块」是一次切换的量，三次切换 81");
+        for (checkpoint_cost_blocks, expected_share) in HAND_COMPUTED_WARM_UP_SHARE_BLOCKS {
+            assert_eq!(warm_up_share_per_device_blocks(checkpoint_cost_blocks), expected_share);
+        }
+        assert_eq!(reserve_share_per_device_blocks(0, 88, 9), 6 + 81, "第一个事务几何、池规模 c_max：每块盘 87 块");
+        assert_eq!(reserve_total_blocks(0, 88, 9), 174);
     }
 
     #[test]
-    fn reserve_totals_match_hand_computed_table() {
+    fn chain_rewrite_totals_match_hand_computed_table() {
         for (rows_at_mount, row_bytes, expected_total) in HAND_COMPUTED_TOTAL_BLOCKS {
-            assert_eq!(reserve_total_blocks(rows_at_mount, row_bytes), expected_total, "rows0={rows_at_mount} 行宽={row_bytes}");
-            assert_eq!(reserve_share_per_device_blocks(rows_at_mount, row_bytes) * 2, expected_total, "每块盘恰好一半");
+            assert_eq!(chain_rewrite_total_blocks(rows_at_mount, row_bytes), expected_total, "rows0={rows_at_mount} 行宽={row_bytes}");
+            assert_eq!(chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes) * 2, expected_total, "每块盘恰好一半");
         }
-        assert_eq!(reserve_total_blocks(4064, 64), 108, "C126 行里点名要钉的那一格");
-        assert_eq!(reserve_total_blocks(4064, 88), 144);
+        assert_eq!(chain_rewrite_total_blocks(4064, 64), 108, "C126 行里点名要钉的那一格");
+        assert_eq!(chain_rewrite_total_blocks(4064, 88), 144);
     }
 
     #[test]
     fn settled_arm_flips_exactly_at_the_share_on_either_device() {
-        for (rows_at_mount, row_bytes) in sampling_points() {
-            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes);
+        for (rows_at_mount, row_bytes, checkpoint_cost_blocks) in sampling_points() {
+            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
             for tight_device in 0..DEVICE_COUNT {
                 let at_share = pool_with_tight_device(tight_device, share, share);
                 let below_share = pool_with_tight_device(tight_device, share - 1, share);
-                assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &at_share, rows_at_mount, row_bytes), MountDecision::Writable,
-                    "rows0={rows_at_mount} 行宽={row_bytes} 紧盘={tight_device}：空闲 = 份额要挂得成可写");
-                assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &below_share, rows_at_mount, row_bytes), MountDecision::ReadOnly,
-                    "rows0={rows_at_mount} 行宽={row_bytes} 紧盘={tight_device}：空闲 = 份额 − 1 要只读");
+                assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &at_share, rows_at_mount, row_bytes, checkpoint_cost_blocks), MountDecision::Writable,
+                    "rows0={rows_at_mount} 行宽={row_bytes} c_max={checkpoint_cost_blocks} 紧盘={tight_device}：空闲 = 份额要挂得成可写");
+                assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &below_share, rows_at_mount, row_bytes, checkpoint_cost_blocks), MountDecision::ReadOnly,
+                    "rows0={rows_at_mount} 行宽={row_bytes} c_max={checkpoint_cost_blocks} 紧盘={tight_device}：空闲 = 份额 − 1 要只读");
             }
         }
     }
 
     #[test]
     fn zero_reserve_control_mounts_both_pools_writable() {
-        for (rows_at_mount, row_bytes) in sampling_points() {
-            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes);
+        for (rows_at_mount, row_bytes, checkpoint_cost_blocks) in sampling_points() {
+            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
             for tight_device in 0..DEVICE_COUNT {
                 let below_share = pool_with_tight_device(tight_device, share - 1, share);
-                assert_eq!(mount_decision(ReserveArm::PositiveControlZeroReserve, &below_share, rows_at_mount, row_bytes), MountDecision::Writable,
+                assert_eq!(mount_decision(ReserveArm::PositiveControlZeroReserve, &below_share, rows_at_mount, row_bytes, checkpoint_cost_blocks), MountDecision::Writable,
                     "预留置 0 时少 1 块的池也该可写，否则装置不是在测预留");
             }
         }
@@ -364,24 +425,28 @@ mod tests {
 
     #[test]
     fn pool_scalar_misses_the_short_device_that_settled_arm_catches() {
-        for (rows_at_mount, row_bytes) in sampling_points() {
-            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes);
+        for (rows_at_mount, row_bytes, checkpoint_cost_blocks) in sampling_points() {
+            let share = reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks);
             let one_device_short = pool_with_frees(share + DEVICE_DIMENSION_SLACK_BLOCKS, share - 1);
-            assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &one_device_short, rows_at_mount, row_bytes), MountDecision::ReadOnly);
-            assert_eq!(mount_decision(ReserveArm::PoolScalar, &one_device_short, rows_at_mount, row_bytes), MountDecision::Writable);
+            assert_eq!(mount_decision(ReserveArm::SettledPerDevice, &one_device_short, rows_at_mount, row_bytes, checkpoint_cost_blocks), MountDecision::ReadOnly);
+            assert_eq!(mount_decision(ReserveArm::PoolScalar, &one_device_short, rows_at_mount, row_bytes, checkpoint_cost_blocks), MountDecision::Writable);
         }
     }
 
     #[test]
     fn every_wrong_form_disagrees_at_a_sampling_point() {
-        assert_eq!(WrongForm::FirstRoundCandidate.total_blocks(506, 64), 16, "4 × (1 + 1 + 2)");
-        assert_eq!(WrongForm::NoChainPointerPerPage.total_blocks(506, 64), 12, "每片 509 时 509 行仍是一片");
-        assert_eq!(WrongForm::FixedRowWidth.total_blocks(367, 88), 12, "行宽恒 64 时 370 行是一片");
-        assert_eq!(WrongForm::SummedInsteadOfWorstTimesSwitches.total_blocks(506, 64), 16, "4 × (1 + 1 + 2)");
+        assert_eq!(WrongForm::FirstRoundCandidate.total_blocks(506, 64, 4), 16 + 72, "4 × (1 + 1 + 2) + 暖机 72");
+        assert_eq!(WrongForm::NoChainPointerPerPage.total_blocks(506, 64, 4), 12 + 72, "每片 509 时 509 行仍是一片");
+        assert_eq!(WrongForm::FixedRowWidth.total_blocks(367, 88, 4), 12 + 72, "行宽恒 64 时 370 行是一片");
+        assert_eq!(WrongForm::SummedInsteadOfWorstTimesSwitches.total_blocks(506, 64, 4), 16 + 72, "4 × (1 + 1 + 2)");
+        assert_eq!(WrongForm::NoWarmUp.total_blocks(0, 64, 9), 12, "漏暖机：只剩链重写 12");
+        assert_eq!(WrongForm::WarmUpPoolLevelOnly.total_blocks(0, 64, 9), 12 + 81, "池级一份：少算一块盘的 81");
         for form in WRONG_FORMS {
-            assert_eq!(form.total_blocks(0, 64), 12, "rows0 = 0 那一格分不开任何错法（{}）", form.name());
-            let differs_somewhere = sampling_points().into_iter().any(|(rows_at_mount, row_bytes)| form.total_blocks(rows_at_mount, row_bytes) != reserve_total_blocks(rows_at_mount, row_bytes));
+            let differs_somewhere = sampling_points().into_iter().any(|(rows_at_mount, row_bytes, checkpoint_cost_blocks)| form.total_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks) != reserve_total_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks));
             assert!(differs_somewhere, "取样点分不开 {}", form.name());
+        }
+        for form in [WrongForm::FirstRoundCandidate, WrongForm::NoChainPointerPerPage, WrongForm::FixedRowWidth, WrongForm::SummedInsteadOfWorstTimesSwitches] {
+            assert_eq!(form.total_blocks(0, 64, 4), 12 + 72, "rows0 = 0 那一格分不开链重写的任何错法（{}）", form.name());
         }
     }
 }

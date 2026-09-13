@@ -1,0 +1,15 @@
+M1_arrival_no_shuffle	for index in (1..order.len()).rev() {	for index in (1..1).rev() {
+M2_container_capacity_8	const CONTAINER_CAPACITY: usize = 7;	const CONTAINER_CAPACITY: usize = 8;
+M3_pack_ignores_hysteresis	let eligible = sim.key_count_at(position) == 1 && checkpoint.saturating_sub(sim.last_write[key as usize]) >= hysteresis;	let eligible = sim.key_count_at(position) == 1;
+M4_incremental_breaks_only_on_same_slot	        right != left + 1\n    }	        right != left\n    }
+M5_container_slot_deferred_early	        if self.slot_occupancy[slot as usize] == 0 {\n            self.deferred.push(slot);	        if self.slot_occupancy[slot as usize] <= 1 {\n            self.deferred.push(slot);
+M6_xfixture_cell_off_by_one	("bump_cp_b256", "runs8", 1339),	("bump_cp_b256", "runs8", 1340),
+M7_metadata_never_released	        let previous = std::mem::take(&mut self.metadata_current);\n        for slot in previous {\n            self.deferred.push(slot);\n        }	        let _previous = std::mem::take(&mut self.metadata_current);
+M8_empty_segment_counter_stale	        if self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment {\n            self.empty_segments -= 1;\n        }\n        self.free_slots_per_segment[segment_index] -= 1;	        self.free_slots_per_segment[segment_index] -= 1;
+M9_tie_band_ten_percent	const ARRIVAL_TIE_PERCENT: u64 = 5;	const ARRIVAL_TIE_PERCENT: u64 = 10;
+M10_bump_segment_uses_first_fit	            Arm::BumpSegment | Arm::BumpCompact(_) | Arm::Container { .. } => {\n                for &key in &dirty {\n                    let slot = sim.allocate_bump();	            Arm::BumpSegment | Arm::BumpCompact(_) | Arm::Container { .. } => {\n                for &key in &dirty {\n                    let slot = sim.allocate_first_fit();
+M11_fallback_not_counted	                    self.fallback_allocations += 1;\n                    return self.allocate_first_fit();	                    return self.allocate_first_fit();
+M12_pack_sweep_one	const PACK_SWEEP_PER_CHECKPOINT: usize = 64;	const PACK_SWEEP_PER_CHECKPOINT: usize = 1;
+M13_by_request_shuffles_keys_not_requests	        requests.swap(index, other);	        requests.swap(index, index);
+M14_metadata_fallback_not_attributed	            self.metadata_fallback_allocations += self.fallback_allocations - before;	            let _ = before;
+M15_pack_sweep_parameter_ignored	    while looked < sim.pack_sweep_per_checkpoint {	    while looked < PACK_SWEEP_PER_CHECKPOINT {

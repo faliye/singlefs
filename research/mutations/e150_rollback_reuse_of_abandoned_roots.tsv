@@ -1,0 +1,12 @@
+M1_baseline_ignores_i74	if self.arm == Arm::ShadowAccounts || table.root_is_valid(root.instance, root.txg) {	if self.arm == Arm::ShadowAccounts {
+M2_shadow_same_as_baseline	if self.arm == Arm::ShadowAccounts || table.root_is_valid(root.instance, root.txg) {	if table.root_is_valid(root.instance, root.txg) {
+M3_no_tombstones	        if self.arm == Arm::Tombstones {\n            for slot in &abandoned {	        if false {\n            for slot in &abandoned {
+M4_recovery_picks_oldest	candidates.sort_by(|left, right| (right.txg, right.instance).cmp(&(left.txg, left.instance)));	candidates.sort_by(|left, right| (left.txg, left.instance).cmp(&(right.txg, right.instance)));
+M5_recovery_ignores_table_rows	        if !table.root_is_valid(candidate.instance, candidate.txg) {\n            continue;\n        }	        let _ = table;
+M6_violation_check_blind	.filter(|(unit, expected_writer)| disk.units[**unit] != UnitContent::Data { writer_root: **expected_writer })	.filter(|(_, _)| false)
+M7_new_txg_not_max_plus_one	let new_txg_minus_one = self.maximum_txg_in_ring();	let new_txg_minus_one = target.txg;
+M8_ring_slot_no_region_rotation	((txg % RING_REGIONS) * RING_SLOTS_PER_REGION + (txg / RING_REGIONS) % RING_SLOTS_PER_REGION) as usize	(txg % (RING_REGIONS * RING_SLOTS_PER_REGION)) as usize
+M9_closed_form_off_by_one	1 + segments.iter().map(|segment| (1u64 << segment.len()) - 1).sum::<u64>()	segments.iter().map(|segment| (1u64 << segment.len()) - 1).sum::<u64>()
+M10_fua_not_a_boundary	            RecordedOperation::Write { is_fua: true, .. } => {\n                if !current.is_empty() {\n                    segments.push(std::mem::take(&mut current));\n                }\n                segments.push(vec![index]);\n            }	            RecordedOperation::Write { is_fua: true, .. } => current.push(index),
+M11_fault_injection_skips	            if record.instance == rollback_instance {\n                model.disk.slot_unreadable[slot] = true;	            if false {\n                model.disk.slot_unreadable[slot] = true;
+M12_table_not_governing_allocator	                self.current.instance_table = table_identifier;\n                let slot = self.allocate(&taken);	                let slot = self.allocate(&taken);
