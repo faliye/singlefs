@@ -92,6 +92,9 @@ enum Arm {
     DirectoryHint,
     /// 丙′：目录的家固定为初始所在段 + 一个溢出段，重写落到家里槽号最小的空槽，家满才回落，回落不改变家。
     DirectoryHome,
+    /// 第六次跑（C146 / C243 的模型形态）：用户数据按 D3 已定项 8 落最低空槽，每轮一条整理意图搬空占用最少的段 R；
+    /// protect_region 为真时落点与搬迁目的地都排除 R（D26 已定项 1 第 3 条），为假是判别力自证那一半。
+    CompactRegion { protect_region: bool },
     BumpNeighbor(usize),
     BumpCompact(usize),
 }
@@ -107,6 +110,8 @@ impl Arm {
             Arm::ContainerOnFirstFit { hysteresis } => format!("container_firstfit_k{hysteresis}"),
             Arm::DirectoryHint => "directory_hint".into(),
             Arm::DirectoryHome => "directory_home".into(),
+            Arm::CompactRegion { protect_region: true } => "compact_r_protected".into(),
+            Arm::CompactRegion { protect_region: false } => "compact_r_unprotected".into(),
             Arm::BumpNeighbor(radius) => format!("bump_nb_r{radius}"),
             Arm::BumpCompact(compact_budget) => format!("bump_cp_b{compact_budget}"),
         }
@@ -114,7 +119,7 @@ impl Arm {
     fn is_e93_arm(self) -> bool {
         match self {
             Arm::FirstFit | Arm::BumpSegment | Arm::BumpNeighbor(_) | Arm::BumpCompact(_) => true,
-            Arm::Arrival | Arm::ArrivalByRequest | Arm::Container { .. } | Arm::ContainerOnFirstFit { .. } | Arm::DirectoryHint | Arm::DirectoryHome => false,
+            Arm::Arrival | Arm::ArrivalByRequest | Arm::Container { .. } | Arm::ContainerOnFirstFit { .. } | Arm::DirectoryHint | Arm::DirectoryHome | Arm::CompactRegion { .. } => false,
         }
     }
 }
@@ -169,6 +174,17 @@ struct Sim {
     pack_sweep_per_checkpoint: usize,
     /// 家固定的提示拿几个尾部段当溢出段（None = 尾部全部，第四次跑的取法；第五次跑扫 4 / 8 / 16 / 32）。
     home_overflow_segments: Option<usize>,
+    /// 同一请求内相邻 key 后一个先到达的次数（C319 要的运行时计数在模型里的形态）。
+    request_order_violations: u64,
+    /// 整理意图正在清空的段（D26 已定项 1 的 R）；None = 没有在飞的意图。
+    region: Option<usize>,
+    /// 本批整理自己写出的落点落在 R 里的次数（C146 ①）。
+    moves_landed_in_region: u64,
+    /// 用户数据的落点与「最低空槽、排除开放段与 R」这条政策函数不一致的次数（C146 ②）。
+    fallback_policy_mismatches: u64,
+    intents_completed: u64,
+    /// 意图完成、R 释放之后 R 全空的次数（C243：停机谓词那个量有没有净增量）。
+    intents_completed_with_region_empty: u64,
 }
 
 impl Sim {
@@ -212,6 +228,12 @@ impl Sim {
             metadata_current: Vec::new(),
             pack_sweep_per_checkpoint: PACK_SWEEP_PER_CHECKPOINT,
             home_overflow_segments: None,
+            request_order_violations: 0,
+            region: None,
+            moves_landed_in_region: 0,
+            fallback_policy_mismatches: 0,
+            intents_completed: 0,
+            intents_completed_with_region_empty: 0,
         }
     }
 
@@ -526,6 +548,61 @@ impl Sim {
         }
     }
 
+    /// 政策函数（只看不拿）：最低空槽，排除 bump 的开放段与整理正在清空的 R。
+    fn policy_lowest_free_excluding(&self, excluded_segment: Option<usize>) -> u32 {
+        *self
+            .free
+            .iter()
+            .find(|&&free_slot| {
+                let segment_index = free_slot as usize / self.slots_per_segment;
+                self.open_segment != Some(segment_index) && excluded_segment != Some(segment_index)
+            })
+            .expect("槽用尽：配置违反 D ≤ S−L")
+    }
+    /// 按政策函数分配（D3 已定项 8 第 1 条 + D26 已定项 1 第 3 条的排除 R）。
+    fn allocate_first_fit_excluding(&mut self, excluded_segment: Option<usize>) -> u32 {
+        let slot = self.policy_lowest_free_excluding(excluded_segment);
+        self.free.remove(&slot);
+        self.segment_free_decrement(slot);
+        slot
+    }
+    /// 挑整理意图的 R：占用最少的非空段，不挑 bump 的开放段。
+    fn pick_region(&self) -> Option<usize> {
+        let mut best: Option<(usize, usize)> = None;
+        for segment_index in 0..self.free_slots_per_segment.len() {
+            if self.open_segment == Some(segment_index) {
+                continue;
+            }
+            let occupied = self.slots_per_segment - self.free_slots_per_segment[segment_index] as usize;
+            if occupied == 0 {
+                continue;
+            }
+            if best.is_none_or(|(_, best_occupied)| occupied < best_occupied) {
+                best = Some((segment_index, occupied));
+            }
+        }
+        best.map(|(segment_index, _)| segment_index)
+    }
+    /// 一条整理意图：把 R 里的活节点全部搬走，目的地按政策函数（protect 为真排除 R，为假不排除）。
+    fn run_compaction_intent(&mut self, region: usize, protect_region: bool) {
+        let region_start = (region * self.slots_per_segment) as u32;
+        let region_end = region_start + self.slots_per_segment as u32;
+        let positions: Vec<usize> = (0..self.node_count())
+            .filter(|&position| {
+                let slot = self.node_slot[self.order[position] as usize];
+                slot >= region_start && slot < region_end
+            })
+            .collect();
+        for position in positions {
+            let target = if protect_region { self.allocate_first_fit_excluding(Some(region)) } else { self.allocate_first_fit_excluding(None) };
+            if target >= region_start && target < region_end {
+                self.moves_landed_in_region += 1;
+            }
+            self.move_node(position, target);
+        }
+        self.intents_completed += 1;
+    }
+
     fn find_empty_segment(&mut self) -> Option<usize> {
         (0..self.free_slots_per_segment.len())
             .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment && self.open_segment != Some(segment_index))
@@ -707,6 +784,22 @@ fn arrival_order_by_request(dirty: &[usize], rng: &mut Rng) -> Vec<usize> {
     requests.into_iter().flatten().collect()
 }
 
+/// 同一请求内取号序与 key 序不一致的次数（C319）：请求 = 脏集合里 key 连续的一段，请求内每对相邻 key 若后一个先到达算一次。
+fn request_order_violations(dirty: &[usize], order: &[usize]) -> u64 {
+    let mut position_of: std::collections::BTreeMap<usize, usize> = std::collections::BTreeMap::new();
+    for (index, &key) in order.iter().enumerate() {
+        position_of.insert(key, index);
+    }
+    let mut violations = 0u64;
+    for pair in dirty.windows(2) {
+        let (key, next) = (pair[0], pair[1]);
+        if next == key + 1 && position_of[&next] < position_of[&key] {
+            violations += 1;
+        }
+    }
+    violations
+}
+
 /// E93 的 bump_neighbor：把脏 key 段向两侧各扩 ≤R 个干净邻居。
 fn extend_neighbors(dirty: &[usize], radius: usize, object_count: usize) -> Vec<usize> {
     let mut set: BTreeSet<usize> = dirty.iter().copied().collect();
@@ -790,6 +883,11 @@ struct Outcome {
     container_writes: u64,
     hint_fallback_allocations: u64,
     directory: DirectoryMetrics,
+    request_order_violations: u64,
+    moves_landed_in_region: u64,
+    fallback_policy_mismatches: u64,
+    intents_completed: u64,
+    intents_completed_with_region_empty: u64,
 }
 
 fn run_arm(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64) -> Outcome {
@@ -815,6 +913,12 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
     let mut empty_segments_peak_after_drain = 0usize;
     let mut rounds_with_empty_segments_after_drain = 0u64;
     for checkpoint in 1..=checkpoint_count {
+        if let Some(region) = sim.region.take() {
+            // 上一轮的意图完成、R 的槽已在轮末回到空闲集合：停机谓词那个量在这一刻看 R 是不是全空
+            if sim.free_slots_per_segment[region] as usize == sim.slots_per_segment {
+                sim.intents_completed_with_region_empty += 1;
+            }
+        }
         sim.allocate_metadata_blocks(metadata_blocks);
         let dirty = dirty_set(load, &mut rng, OBJECT_COUNT, DIRTY_PER_CHECKPOINT);
         sim.user_writes += dirty.len() as u64;
@@ -839,6 +943,7 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
             }
             Arm::Arrival => {
                 let order = arrival_order(&dirty, &mut rng);
+                sim.request_order_violations += request_order_violations(&dirty, &order);
                 for &key in &order {
                     let slot = sim.allocate_bump();
                     rewrite_key(&mut sim, key, slot, checkpoint);
@@ -846,6 +951,7 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
             }
             Arm::ArrivalByRequest => {
                 let order = arrival_order_by_request(&dirty, &mut rng);
+                sim.request_order_violations += request_order_violations(&dirty, &order);
                 for &key in &order {
                     let slot = sim.allocate_bump();
                     rewrite_key(&mut sim, key, slot, checkpoint);
@@ -861,6 +967,23 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
                 for &key in &dirty {
                     let slot = sim.allocate_directory_home(key as u32);
                     rewrite_key(&mut sim, key, slot, checkpoint);
+                }
+            }
+            Arm::CompactRegion { protect_region } => {
+                if sim.region.is_none() {
+                    sim.region = sim.pick_region();
+                }
+                let region = sim.region;
+                for &key in &dirty {
+                    let expected = sim.policy_lowest_free_excluding(region);
+                    let slot = if protect_region { sim.allocate_first_fit_excluding(region) } else { sim.allocate_first_fit_excluding(None) };
+                    if slot != expected {
+                        sim.fallback_policy_mismatches += 1;
+                    }
+                    rewrite_key(&mut sim, key, slot, checkpoint);
+                }
+                if let Some(region_index) = region {
+                    sim.run_compaction_intent(region_index, protect_region);
                 }
             }
             Arm::BumpNeighbor(radius) => {
@@ -925,6 +1048,11 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
         container_writes: sim.container_writes,
         hint_fallback_allocations: sim.hint_fallback_allocations,
         directory: sim.directory_metrics(),
+        request_order_violations: sim.request_order_violations,
+        moves_landed_in_region: sim.moves_landed_in_region,
+        fallback_policy_mismatches: sim.fallback_policy_mismatches,
+        intents_completed: sim.intents_completed,
+        intents_completed_with_region_empty: sim.intents_completed_with_region_empty,
     }
 }
 
@@ -1069,6 +1197,8 @@ fn main() {
         Arm::ContainerOnFirstFit { hysteresis: PACK_HYSTERESIS_SAMPLES[1] },
         Arm::DirectoryHint,
         Arm::DirectoryHome,
+        Arm::CompactRegion { protect_region: true },
+        Arm::CompactRegion { protect_region: false },
         Arm::BumpNeighbor(1),
         Arm::BumpNeighbor(2),
         Arm::BumpCompact(32),
@@ -1360,6 +1490,95 @@ fn main() {
         }
     }
     println!("{}", emitter.emit_raw(&format!("name=home_overflow_answer uniform_has_overflow_count_with_zero_metadata_fallback_and_local={uniform_has_clean_overflow} runs8_has_such_overflow_count={runs8_has_clean_overflow} criterion=E151_K1")));
+    // 第六次跑：C146 两条断言与 C243 自证的模型形态（跑前登记 e151-r6-prereg.md 的 Q1–Q3）。
+    let mut protected_moves_zero = true;
+    let mut unprotected_moves_positive = true;
+    let mut protected_mismatch_zero = true;
+    let mut unprotected_mismatch_positive = true;
+    let mut protected_intents_empty_positive = true;
+    let mut unprotected_intents_empty_zero = true;
+    let mut unprotected_intents_empty_below_five_percent_of_protected = true;
+    let mut protected_intents_empty_by_cell: std::collections::BTreeMap<(&'static str, usize), u64> = std::collections::BTreeMap::new();
+    for load in [Load::Uniform, Load::Runs8] {
+        for metadata_blocks in [METADATA_BLOCKS_SAMPLES[0], METADATA_BLOCKS_SAMPLES[2]] {
+            for protect_region in [true, false] {
+                let arm = Arm::CompactRegion { protect_region };
+                let mut intents_empty = Vec::new();
+                let mut empties = Vec::new();
+                let mut peaks = Vec::new();
+                let mut key_runs = Vec::new();
+                let mut moves_in_region = 0u64;
+                let mut mismatches = 0u64;
+                let mut intents = 0u64;
+                for seed in 0..SEED_COUNT {
+                    let outcome = run_arm(arm, load, seed, metadata_blocks, CHECKPOINT_COUNT, SAMPLE_EVERY);
+                    if seed == 0 {
+                        moves_in_region = outcome.moves_landed_in_region;
+                        mismatches = outcome.fallback_policy_mismatches;
+                        intents = outcome.intents_completed;
+                    }
+                    intents_empty.push(outcome.intents_completed_with_region_empty);
+                    empties.push(outcome.empty_segments_final as u64);
+                    peaks.push(outcome.empty_segments_peak_after_drain as u64);
+                    key_runs.push(outcome.runs_final);
+                }
+                let intents_empty_median = median_of_five(intents_empty);
+                if protect_region {
+                    protected_intents_empty_by_cell.insert((load.tag(), metadata_blocks), intents_empty_median);
+                    protected_moves_zero &= moves_in_region == 0;
+                    protected_mismatch_zero &= mismatches == 0;
+                    protected_intents_empty_positive &= intents_empty_median > 0;
+                } else {
+                    unprotected_moves_positive &= moves_in_region > 0;
+                    unprotected_mismatch_positive &= mismatches > 0;
+                    unprotected_intents_empty_zero &= intents_empty_median == 0;
+                    let protected_median = protected_intents_empty_by_cell[&(load.tag(), metadata_blocks)];
+                    unprotected_intents_empty_below_five_percent_of_protected &= intents_empty_median * 20 < protected_median;
+                }
+                println!(
+                    "{}",
+                    emitter.emit_raw(&format!(
+                        "name=region_intent arm={} load={} metadata_blocks={metadata_blocks} intents_completed_seed0={intents} intents_with_region_empty_median={intents_empty_median} moves_landed_in_region_seed0={moves_in_region} fallback_policy_mismatches_seed0={mismatches} empty_segments_median={} empty_peak_after_drain_median={} runs_median={}",
+                        arm.tag(),
+                        load.tag(),
+                        median_of_five(empties),
+                        median_of_five(peaks),
+                        median_of_five(key_runs)
+                    ))
+                );
+            }
+        }
+    }
+    println!(
+        "{}",
+        emitter.emit_raw(&format!("name=region_answer protected_moves_in_region_zero={protected_moves_zero} unprotected_moves_in_region_positive={unprotected_moves_positive} protected_policy_mismatch_zero={protected_mismatch_zero} unprotected_policy_mismatch_positive={unprotected_mismatch_positive} protected_intents_leave_region_empty={protected_intents_empty_positive} unprotected_intents_never_leave_region_empty={unprotected_intents_empty_zero} unprotected_intents_empty_below_five_percent_of_protected={unprotected_intents_empty_below_five_percent_of_protected} criterion=E151_Q1_Q3"))
+    );
+    // 第六次跑：C319 的计数在模型里的形态（Q4）。
+    let mut by_request_zero = true;
+    let mut arrival_runs8_positive = true;
+    let mut arrival_uniform_zero = true;
+    let mut arrival_violations_by_load: std::collections::BTreeMap<&'static str, u64> = std::collections::BTreeMap::new();
+    for load in [Load::Uniform, Load::Runs8] {
+        for arm in [Arm::Arrival, Arm::ArrivalByRequest] {
+            let outcome = run_arm(arm, load, 0, 0, CHECKPOINT_COUNT, SAMPLE_EVERY);
+            let violations = outcome.request_order_violations;
+            match (arm, load) {
+                (Arm::ArrivalByRequest, _) => by_request_zero &= violations == 0,
+                (Arm::Arrival, Load::Runs8) => {
+                    arrival_runs8_positive &= violations > 0;
+                    arrival_violations_by_load.insert("runs8", violations);
+                }
+                (Arm::Arrival, Load::Uniform) => {
+                    arrival_uniform_zero &= violations == 0;
+                    arrival_violations_by_load.insert("uniform", violations);
+                }
+                _ => unreachable!("只跑两条到达序臂"),
+            }
+            println!("{}", emitter.emit_raw(&format!("name=request_order arm={} load={} metadata_blocks=0 violations_seed0={violations}", arm.tag(), load.tag())));
+        }
+    }
+    let arrival_uniform_far_below_runs8 = arrival_violations_by_load["uniform"] * 10 < arrival_violations_by_load["runs8"];
+    println!("{}", emitter.emit_raw(&format!("name=request_order_answer by_request_violations_zero={by_request_zero} arrival_runs8_violations_positive={arrival_runs8_positive} arrival_uniform_violations_zero={arrival_uniform_zero} arrival_uniform_violations_far_below_runs8={arrival_uniform_far_below_runs8} criterion=E151_Q4")));
     println!("{}", emitter.finish());
 }
 
@@ -1624,6 +1843,71 @@ mod tests {
         let elsewhere = sim.allocate_directory_hint(4000);
         assert_eq!(elsewhere, 8193, "目录 125 的成员都在段 62、段 62 全满 ⇒ 回落到全池最低空槽 8193");
         assert_eq!(sim.hint_fallback_allocations, 2);
+    }
+
+    /// C319 的计数：请求内保持 key 序 ⇒ 0；请求内倒着来 ⇒ 每对相邻 key 一次；单 key 请求之间怎么排都不算。
+    #[test]
+    fn request_order_violations_count_reversed_pairs_inside_requests_only() {
+        let dirty = vec![10usize, 11, 12, 13, 40, 41, 42, 43, 90];
+        assert_eq!(request_order_violations(&dirty, &[40, 41, 42, 43, 10, 11, 12, 13, 90]), 0, "请求之间洗牌不算");
+        assert_eq!(request_order_violations(&dirty, &[13, 12, 11, 10, 90, 43, 42, 41, 40]), 6, "两个请求各倒 3 对");
+        assert_eq!(request_order_violations(&dirty, &[10, 12, 11, 13, 40, 41, 43, 42, 90]), 2);
+        let by_request = run_arm(Arm::ArrivalByRequest, Load::Runs8, 0, 0, 200, 50);
+        let uniform_permutation = run_arm(Arm::Arrival, Load::Runs8, 0, 0, 200, 50);
+        assert_eq!(by_request.request_order_violations, 0);
+        assert!(uniform_permutation.request_order_violations > 0, "均匀置换在 runs8 上必然打乱请求内的顺序");
+        let uniform_permutation_on_uniform = run_arm(Arm::Arrival, Load::Uniform, 0, 0, 200, 50).request_order_violations;
+        assert!(uniform_permutation_on_uniform * 10 < uniform_permutation.request_order_violations, "uniform 负载的请求几乎都是单 key，只有碰巧相邻的 key 才算：{} 对 runs8 的 {}", uniform_permutation_on_uniform, uniform_permutation.request_order_violations);
+    }
+
+    /// C146 ① / ② 与 C243 自证的手算锚点：R = 段 0（占用 2 个：key 0 与 key 1，其余 62 槽空），protected 的搬迁与用户数据都落到段 0 之外的最低空槽，
+    /// unprotected 的落到段 0 里的最低空槽（2 与 3）。
+    #[test]
+    fn anchor_region_protection_keeps_moves_and_fallback_out_of_the_region() {
+        let mut sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        for slot in 2..64u32 {
+            let key = slot;
+            let target = sim.allocate_first_fit_excluding(Some(0));
+            assert!(target >= 8192, "段 0 之外的最低空槽在尾部");
+            rewrite_key(&mut sim, key as usize, target, 1);
+        }
+        sim.end_checkpoint();
+        assert_eq!(sim.free_slots_per_segment[0], 62);
+        assert_eq!(sim.pick_region(), Some(0), "占用最少的非空段是段 0");
+        assert_eq!(sim.policy_lowest_free_excluding(Some(0)), 8254, "排除段 0 之后最低空槽");
+        assert_eq!(sim.policy_lowest_free_excluding(None), 2, "不排除时最低空槽就在段 0 里");
+        let mut protected = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        let mut unprotected = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        for sim_under_test in [&mut protected, &mut unprotected] {
+            for slot in 2..64u32 {
+                let target = sim_under_test.allocate_first_fit_excluding(Some(0));
+                rewrite_key(sim_under_test, slot as usize, target, 1);
+            }
+            sim_under_test.end_checkpoint();
+        }
+        protected.run_compaction_intent(0, true);
+        unprotected.run_compaction_intent(0, false);
+        assert_eq!(protected.moves_landed_in_region, 0);
+        assert_eq!(unprotected.moves_landed_in_region, 2, "两个活节点都搬回了段 0（槽 2 与 3）");
+        assert_eq!(protected.intents_completed, 1);
+        protected.end_checkpoint();
+        unprotected.end_checkpoint();
+        assert_eq!(protected.free_slots_per_segment[0] as usize, SLOTS_PER_SEGMENT, "protected 的意图完成后 R 全空");
+        assert_eq!(unprotected.free_slots_per_segment[0], 62, "unprotected 的 R 还住着搬回来的两个");
+    }
+
+    /// 老化 300 轮：protected 四个量的方向与 unprotected 相反（判别力自证）。
+    #[test]
+    fn region_protection_is_discriminated_by_all_three_counters() {
+        let protected = run_arm(Arm::CompactRegion { protect_region: true }, Load::Uniform, 0, 0, 300, 50);
+        let unprotected = run_arm(Arm::CompactRegion { protect_region: false }, Load::Uniform, 0, 0, 300, 50);
+        assert_eq!(protected.moves_landed_in_region, 0);
+        assert_eq!(protected.fallback_policy_mismatches, 0);
+        assert!(protected.intents_completed_with_region_empty > 0, "protected 的意图完成后 R 全空：{}", protected.intents_completed_with_region_empty);
+        assert!(unprotected.moves_landed_in_region > 0);
+        assert!(unprotected.fallback_policy_mismatches > 0);
+        assert!(unprotected.intents_completed_with_region_empty * 20 < protected.intents_completed_with_region_empty, "unprotected 搬回自己正在清空的段，净增量塌向 0：{} 对 protected 的 {}", unprotected.intents_completed_with_region_empty, protected.intents_completed_with_region_empty);
+        assert_eq!(protected.intents_completed, 300);
     }
 
     /// 溢出段数是参数：None 就是尾部全部 32 段（第四次跑），8 时 128 个家段分 8 个溢出段、其余 24 段留给提交内生块。

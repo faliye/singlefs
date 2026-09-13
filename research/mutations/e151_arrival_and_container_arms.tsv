@@ -17,3 +17,6 @@ M16_directory_hint_ignores_member_segments	        for member in first_member..l
 M17_directory_metrics_group_by_double_size	        let directory_count = object_count.div_ceil(OBJECTS_PER_DIRECTORY);	        let directory_count = object_count.div_ceil(2 * OBJECTS_PER_DIRECTORY);
 M18_directory_home_forgets_overflow_segment	        [home_segment, overflow_segment]	        [home_segment, home_segment]
 M19_home_overflow_parameter_ignored	        let overflow_segment_count = self.home_overflow_segments.unwrap_or(tail_segment_count).min(tail_segment_count).max(1);	        let overflow_segment_count = tail_segment_count;
+M20_request_order_counts_forward_pairs	        if next == key + 1 && position_of[&next] < position_of[&key] {	        if next == key + 1 && position_of[&next] > position_of[&key] {
+M21_protected_mover_forgets_region	            let target = if protect_region { self.allocate_first_fit_excluding(Some(region)) } else { self.allocate_first_fit_excluding(None) };	            let target = self.allocate_first_fit_excluding(None);
+M22_region_empty_counted_when_any_slot_free	            if sim.free_slots_per_segment[region] as usize == sim.slots_per_segment {	            if sim.free_slots_per_segment[region] as usize >= 1 {

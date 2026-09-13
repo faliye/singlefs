@@ -84,6 +84,23 @@ impl RootRecord {
     }
 }
 
+/// 准入不等式里的三项与两种算法（带 / 不带第九项）算出的可用数（C318 的判别力自证）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct AdmissionTerms {
+    allocated: usize,
+    deferred: usize,
+    abandoned_only: usize,
+}
+
+impl AdmissionTerms {
+    fn usable_with_abandoned_term(self) -> usize {
+        UNIT_SLOTS - self.allocated - self.deferred - self.abandoned_only
+    }
+    fn usable_without_abandoned_term(self) -> usize {
+        UNIT_SLOTS - self.allocated - self.deferred
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 enum RingSlot {
     Empty,
@@ -249,6 +266,33 @@ impl Model {
             union.extend(root.account());
         }
         union.difference(&self.current.account()).count()
+    }
+
+    /// 准入不等式里与这个模型有关的三项（D28 已定项 1），各自独立算：已分配 = 当前根的账；
+    /// defer 待释放 = 回退候选集里有效根引用而当前根不引用的；被抛弃根独占量 = 只被被抛弃的根引用的（第九项，2026-09-13 用户定案）。
+    fn admission_terms(&self) -> AdmissionTerms {
+        let table = &self.tables[self.current.instance_table as usize];
+        let current = self.current.account();
+        let mut valid_older: BTreeSet<usize> = BTreeSet::new();
+        let mut abandoned: BTreeSet<usize> = BTreeSet::new();
+        for root in self.disk.readable_roots() {
+            if table.root_is_valid(root.instance, root.txg) {
+                valid_older.extend(root.account());
+            } else {
+                abandoned.extend(root.account());
+            }
+        }
+        let deferred: BTreeSet<usize> = valid_older.difference(&current).copied().collect();
+        let mut valid_all = current.clone();
+        valid_all.extend(valid_older.iter().copied());
+        let abandoned_only: BTreeSet<usize> = abandoned.difference(&valid_all).copied().collect();
+        AdmissionTerms { allocated: current.len(), deferred: deferred.len(), abandoned_only: abandoned_only.len() }
+    }
+
+    /// 分配器实际发得出的槽数：影子账之下不在 forbidden 里的槽（与 allocate 同一条判据）。
+    fn deliverable_units(&self) -> usize {
+        let forbidden = self.forbidden_slots();
+        (0..UNIT_SLOTS).filter(|slot| !forbidden.contains(slot)).count()
     }
 
     /// 只因被抛弃的根（按当前实例表判无效）才隔离的单元：它们的账的并集 − 有效根（含当前根）的账的并集。
@@ -464,7 +508,8 @@ struct CaseTwoOutcome {
     chosen_is_abandoned: bool,
 }
 
-fn run_case_two(arm: Arm, warm_up: bool, follow_up_publishes: u64) -> CaseTwoOutcome {
+/// 场景二的池：普通发布、回退、（可选暖机）、P 次后续发布，停在注入故障之前。返回模型、被抛弃的根身份、回退实例。
+fn model_after_rollback(arm: Arm, warm_up: bool, follow_up_publishes: u64) -> (Model, BTreeSet<u32>, u32) {
     let mut model = Model::mkfs(arm);
     let mut roots = vec![model.current.clone()];
     for _ in 0..NORMAL_PUBLISHES_BEFORE_ROLLBACK {
@@ -482,6 +527,11 @@ fn run_case_two(arm: Arm, warm_up: bool, follow_up_publishes: u64) -> CaseTwoOut
     for _ in 0..follow_up_publishes {
         model.publish(DIRTY_UNITS_PER_PUBLISH, None);
     }
+    (model, abandoned_identities, rollback_instance)
+}
+
+fn run_case_two(arm: Arm, warm_up: bool, follow_up_publishes: u64) -> CaseTwoOutcome {
+    let (mut model, abandoned_identities, rollback_instance) = model_after_rollback(arm, warm_up, follow_up_publishes);
     let quarantined_before_fault = model.quarantined_units();
     let quarantined_by_abandoned_before_fault = model.quarantined_by_abandoned_roots();
     let mut faults_injected = 0usize;
@@ -645,6 +695,35 @@ fn main() {
         }
     }
 
+    // 第二次跑（C318 的判别力自证，跑前登记 e150-r2-prereg.md）：带第九项的可用要等于分配器发得出的槽数，不带就多出被抛弃根独占量。
+    let mut equal_with_term_everywhere = true;
+    let mut gap_positive_before_drain = false;
+    let mut gap_zero_at_drain = false;
+    for follow_up in [0u64, 5, 11] {
+        let (model, _, _) = model_after_rollback(Arm::ShadowAccounts, false, follow_up);
+        let terms = model.admission_terms();
+        let deliverable = model.deliverable_units();
+        let with_term = terms.usable_with_abandoned_term();
+        let without_term = terms.usable_without_abandoned_term();
+        let gap = without_term - deliverable;
+        let equal_with_term = with_term == deliverable;
+        equal_with_term_everywhere &= equal_with_term;
+        if follow_up == 0 {
+            gap_positive_before_drain = gap > 0 && gap == model.quarantined_by_abandoned_roots();
+        }
+        if follow_up == 11 {
+            gap_zero_at_drain = gap == 0;
+        }
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=admission_term arm=shadow_accounts follow_up={follow_up} allocated={} deferred={} abandoned_only={} usable_with_term={with_term} deliverable={deliverable} usable_without_term={without_term} gap={gap} equal_with_term={equal_with_term}",
+                terms.allocated, terms.deferred, terms.abandoned_only
+            ))
+        );
+    }
+    println!("{}", emitter.emit_raw(&format!("name=admission_answer usable_with_term_equals_deliverable_in_every_row={equal_with_term_everywhere} gap_equals_quarantine_before_drain={gap_positive_before_drain} gap_zero_at_drain={gap_zero_at_drain} criterion=E150_A1_A2")));
+
     // 判据 3：阳性对照——基线两格都要有违例，否则整轮作废
     assert!(case_one_violations["baseline"] > 0 && case_two_violations["baseline"] > 0, "基线两格都必须有违例，否则模型看不见 C314");
     let shadow_clean = case_one_violations["shadow_accounts"] == 0 && case_two_violations["shadow_accounts"] == 0;
@@ -784,6 +863,22 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// C318 的判别力自证：带第九项的可用 = 分配器发得出的槽数；不带就多报被抛弃根独占量（P = 0 时 > 0，P = 11 时 0）。
+    #[test]
+    fn admission_with_abandoned_term_matches_allocator_and_without_it_overstates_by_quarantine() {
+        let (fresh, _, _) = model_after_rollback(Arm::ShadowAccounts, false, 0);
+        let terms = fresh.admission_terms();
+        assert_eq!(terms.usable_with_abandoned_term(), fresh.deliverable_units());
+        assert_eq!(terms.abandoned_only, fresh.quarantined_by_abandoned_roots());
+        assert!(terms.abandoned_only > 0, "回退刚完成时被抛弃的根还在环里");
+        assert_eq!(terms.usable_without_abandoned_term() - fresh.deliverable_units(), terms.abandoned_only, "不带第九项就多报正好那几块");
+        let (drained, _, _) = model_after_rollback(Arm::ShadowAccounts, false, 11);
+        let drained_terms = drained.admission_terms();
+        assert_eq!(drained_terms.abandoned_only, 0);
+        assert_eq!(drained_terms.usable_with_abandoned_term(), drained.deliverable_units());
+        assert_eq!(drained_terms.usable_without_abandoned_term(), drained.deliverable_units());
     }
 
     /// 判据 5：影子账的隔离量随后续发布降到 0，且不超过环容量。
