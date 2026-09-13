@@ -31,6 +31,9 @@ export REPLAY_DEV45
 # 交给二进制自己建、自己填。真读错了阳性对照会判红（读洞时 read_bytes 是 0）。
 REPLAY_DEV58="${REPLAY_DEV58:-$OUT_DIR/e58.img}"
 export REPLAY_DEV58
+# E140 与 E58 同一套装置（8 GiB O_DIRECT 测试区，二进制自己建、自己填），同样不许预先 truncate。
+REPLAY_DEV140="${REPLAY_DEV140:-$OUT_DIR/e140.img}"
+export REPLAY_DEV140
 
 # 实验号 | 二进制 | 参数 | 入库产物 | 判据（exact=应逐字节一致 / timing=含计时字段，只比结构）
 TABLE=$(cat <<'TSV'
@@ -56,6 +59,7 @@ E39|e39_back_chain||e39-back-chain-2026-08-29.out|exact
 E42|e42_transaction_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
+E140|e140-header-alignment|$REPLAY_DEV140 1 none 4096 8192|e140-header-alignment-repro-2026-09-13.out|timing
 E43|e43_extension_point_budget||e43-ext-budget-2026-09-13.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
@@ -149,9 +153,13 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13.out|exact
-E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13.out|exact
+E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-settled.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-13.out|exact
+E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-13.out|exact
+E147|e147-superblock-recompute-from-layout||e147-superblock-recompute-from-layout-2026-09-13.out|exact
+E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
+E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026-09-13.out|exact
 E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
@@ -163,7 +171,7 @@ TSV
 # ⚠️ **判决字段一律不抹**：E128 那几行里 `verdict=` 与 `rounds_jia_slower=` 是结论不是计时，
 # 留着逐字比 ⇒ 结论翻向会被这一步当场抓住，不用等下面的区间断言。
 strip_timing() {
-  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|bing_median|jia_median|ratio_median|ratio_min|ratio_max|e128_median|deviation|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs)=[^ ]*/\1=X/g'
+  sed -E 's/(per_sec_milli|median_per_sec_milli|spread_bp|min|max|ratio_bp|years_at_sync1|years_at_sync8|sync1_per_sec_milli|nosync_per_sec_milli|elapsed_ns|verify_ns|ns_per_op|ns_per_lookup|lookups_per_s|ns_small|ns_big|bing_median|jia_median|ratio_median|ratio_min|ratio_max|e128_median|deviation|ratio|one_shot_ns|two_phase_ns|two_phase_plus_5ms_ns|injected_recovered_ns|spread_one_shot|spread_two_phase|per_round_ns|best_ns|t1_ns|t16_ns|mibs|mib_per_s|entries_per_s|gbps|peak_gbps|speedup|threads16_speedup|dev|secs|copy_ns|r_rand_qd1|r_seq|random_ns_per_byte_padded|random_ns_per_byte_h133|seq_ns_per_byte_padded|seq_ns_per_byte_h133|crossover_random_share)=[^ ]*/\1=X/g'
 }
 
 # ── 结论区间断言 ──────────────────────────────────────────────────────────
@@ -288,6 +296,19 @@ check_claims() {
     # 阳性对照：内核记的字节 ÷ ops×G，读到洞或读到缓存都会让它塌
     x=$(grep 'name=rand_g32768 ' "$f" | sed -n 's/.*pr_over_devbytes=\([0-9.]*\).*/\1/p')
     claim E58 "阳性对照：内核记的字节 ÷ (ops×G)" "$x" 0.98 1.02 || bad=1 ;;
+  E140)
+    # kb 的承重结论：含头随机页读比补齐慢 7.7%–9.1%，顺序读补齐少 7.6%–9.2% 带宽。复跑用的是种子 1、ops 4096 的单轮，
+    # 抽样比第三轮少 4 倍，区间按第三轮五个种子的极差再各放 5 个百分点。
+    v=$(grep 'name=verdict' "$f" | sed -n 's/.*r_rand_qd1=\([0-9.]*\).*/\1/p')
+    claim E140 "随机 4 KiB 页读：含头是补齐的几倍" "$v" 1.03 1.15 || bad=1
+    w=$(grep 'name=verdict' "$f" | sed -n 's/.* r_seq=\([0-9.]*\).*/\1/p')
+    claim E140 "顺序读：补齐带宽是含头的几倍" "$w" 0.85 0.97 || bad=1
+    # 绝对值：跨单元页占比由闭式 (4096 − gcd) / 32635 独立算出，与计时无关
+    x=$(grep 'name=model_h133 ' "$f" | sed -n 's/.*straddle_fraction=\([0-9.]*\).*/\1/p')
+    claim E140 "头 133 时跨单元页占比（闭式）" "$x" 0.125479 0.125479 || bad=1
+    # 阳性对照：内核记的字节 ÷ 程序记账，读到缓存就塌（阴性对照那份产物里同一格是 0.0000）
+    y=$(grep 'name=rand_h133 ' "$f" | sed -n 's/.*pr_over_devbytes=\([0-9.]*\).*/\1/p')
+    claim E140 "阳性对照：内核记的字节 ÷ 程序记账" "$y" 0.98 1.02 || bad=1 ;;
   E107)
     # kb 的承重结论有两条，一条是字节、一条是延迟，两条都要钉。
     # 字节那条是纯算术、逐次相同，但仍然钉住——只钉延迟会让一个把字节模型改错的变异照样绿。
@@ -344,7 +365,8 @@ printf '%s\n' "-----------------------------------------------------------------
 while IFS='|' read -r exp bin args stored kind; do
   [[ -z "$exp" ]] && continue
   want "$exp" || continue
-  args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"  # 先换长的，否则前缀会被短的吃掉
+  args="${args//\$REPLAY_DEV140/$REPLAY_DEV140}"  # 先换长的，否则前缀会被短的吃掉
+  args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"
   args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"
   args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
   fresh="$OUT_DIR/$exp.out"

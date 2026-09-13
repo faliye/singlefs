@@ -1,0 +1,14 @@
+E7RESULT name=config slot_bytes=512 rows=39 key_slot_inline=80 kdf_wide=4
+E7RESULT name=segment segment=bootstrap bytes=166
+E7RESULT name=segment segment=encryption_reserve bytes=32
+E7RESULT name=segment segment=geometry bytes=167
+E7RESULT name=segment segment=tunable bytes=36
+E7RESULT name=segment segment=runtime bytes=12
+E7RESULT name=variant arm=as_layout total_bytes=413 slot_remainder=99 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=variant arm=key_slot_inline total_bytes=493 slot_remainder=19 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=variant arm=kdf_identifier_4 total_bytes=415 slot_remainder=97 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=variant arm=device_count_dropped total_bytes=409 slot_remainder=103 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=variant arm=directory_pointer_dropped total_bytes=354 slot_remainder=158 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=variant arm=all_three_widest total_bytes=495 slot_remainder=17 overflow_bytes=0 sectors=1 torn_states=0
+E7RESULT name=verdict layout_total=413 variants=6 variants_fitting_512=6 e115_e124_cells_superseded=true
+E7RESULT name=done emitted=14

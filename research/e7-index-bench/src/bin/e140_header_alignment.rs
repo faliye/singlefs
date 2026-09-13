@@ -35,7 +35,7 @@ use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
 use std::time::Instant;
 
-const O_DIRECT: i32 = 0o40000;
+const O_DIRECT: i32 = 0o40000; // naming-lint:external Linux open(2) 标志名，取自 <fcntl.h>，名字不归我们定
 const ALIGN: usize = 4096;
 /// D4 已定项 1 / 5：数据单元恒 32768 字节，含头。
 const UNIT_BYTES: usize = 32768;
@@ -48,9 +48,9 @@ const HEADER_WITH_RESERVE_BYTES: usize = 133;
 /// 替代形态：净荷补齐到 7 个整页，头与补齐占一个页。
 const PADDED_PAYLOAD_BYTES: usize = 28672;
 /// 顺序臂的 I/O 大小，与净荷布局无关：预读定它。
-const SEQ_IO_BYTES: usize = 1024 * 1024;
+const SEQUENTIAL_REQUEST_BYTES: usize = 1024 * 1024;
 /// 顺序臂要交给用户的字节数。
-const SEQ_USER_BYTES: u64 = 512 * 1024 * 1024;
+const SEQUENTIAL_USER_BYTES: u64 = 512 * 1024 * 1024;
 /// `randq` 臂的并发度。
 const QUEUE_DEPTH: usize = 16;
 /// 拷贝判别力对照每次多搬的字节数。
@@ -102,8 +102,34 @@ fn next_random(state: &mut u64) -> u64 {
     value.wrapping_mul(0x2545_F491_4F6C_DD1D)
 }
 
+/// 命令行种子先过一次 splitmix 混淆再置位（C59（种子折叠成同一个状态） 的改法）：
+/// 直接 `seed | 1` 会让 2 与 3、4 与 5 折成同一个状态，五个种子只剩三个访问模式。
+fn mixed_seed_state(seed: u64) -> u64 {
+    let mut value = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    (value ^ (value >> 31)) | 1
+}
+
+/// 盘闲置之后头几秒的随机读偏慢（2026-09-12 与 2026-09-13 两次第二轮都是进程里第一条臂 `rand_padded` 慢 15%），
+/// 所以第一条臂之前先做固定次数的随机整单元读，不计入任何臂。
+const WARM_UP_READS: u64 = 16384;
+
+fn warm_up_device(path: &str, direct: bool, unit_total: u64) -> u64 {
+    let file = open_file(path, direct);
+    let mut buffer = Aligned::new(UNIT_BYTES);
+    let mut state = mixed_seed_state(0xE140_A11A);
+    let mut sink = 0u64;
+    for _ in 0..WARM_UP_READS {
+        let unit_index = next_random(&mut state) % unit_total;
+        file.read_exact_at(buffer.as_mut_slice(), unit_index * UNIT_BYTES as u64).expect("暖机读失败");
+        sink = sink.wrapping_add(buffer.as_slice()[0] as u64);
+    }
+    sink
+}
+
 /// 内核记的「这个进程让存储层取了多少字节」——本实验的校验路径，与程序记账不共享代码。
-fn proc_read_bytes() -> Option<u64> {
+fn kernel_read_bytes_of_this_process() -> Option<u64> {
     let text = std::fs::read_to_string("/proc/self/io").ok()?;
     for line in text.lines() {
         if let Some(value) = line.strip_prefix("read_bytes:") {
@@ -141,7 +167,7 @@ fn page_straddles(page_index: u64, payload: usize) -> bool {
 
 /// 穷举一段页号里跨单元的页数（与闭式互为校验）。
 fn straddle_count(payload: usize, page_count: u64) -> u64 {
-    (0..page_count).filter(|&k| page_straddles(k, payload)).count() as u64
+    (0..page_count).filter(|&page_index| page_straddles(page_index, payload)).count() as u64
 }
 
 /// 随机页读期望读几个单元。
@@ -163,13 +189,13 @@ fn units_for_user_bytes(user_bytes: u64, payload: usize) -> u64 {
 /// 代价按每用户字节的纳秒算：random 用 ns_per_op / 4096，sequential 用 1e9 / bytes_per_second。
 /// 返回 None 表示同向（没有交叉点）。
 fn crossover_random_share(
-    random_ns_per_byte_padded: f64,
-    random_ns_per_byte_header: f64,
-    sequential_ns_per_byte_padded: f64,
-    sequential_ns_per_byte_header: f64,
+    random_nanoseconds_per_byte_padded: f64,
+    random_nanoseconds_per_byte_header: f64,
+    sequential_nanoseconds_per_byte_padded: f64,
+    sequential_nanoseconds_per_byte_header: f64,
 ) -> Option<f64> {
-    let random_gap = random_ns_per_byte_header - random_ns_per_byte_padded;
-    let sequential_gap = sequential_ns_per_byte_padded - sequential_ns_per_byte_header;
+    let random_gap = random_nanoseconds_per_byte_header - random_nanoseconds_per_byte_padded;
+    let sequential_gap = sequential_nanoseconds_per_byte_padded - sequential_nanoseconds_per_byte_header;
     if random_gap <= 0.0 || sequential_gap <= 0.0 {
         return None;
     }
@@ -200,7 +226,7 @@ fn verify_unit(
 }
 
 #[derive(Clone, Copy)]
-enum Layout2 {
+enum PayloadLayout {
     /// 净荷补齐到 7 个整页，页从单元偏移 4096 起。
     Padded,
     /// 含头 h，净荷从偏移 h 起、连续打包。
@@ -208,9 +234,9 @@ enum Layout2 {
 }
 
 struct ArmResult {
-    elapsed_ns: u64,
-    verify_ns: u64,
-    copy_ns: u64,
+    elapsed_nanoseconds: u64,
+    verify_nanoseconds: u64,
+    copy_nanoseconds: u64,
     device_bytes: u64,
     user_bytes: u64,
     operations: u64,
@@ -228,7 +254,7 @@ fn cipher_and_nonce() -> (Aes256Gcm, Nonce<aes_gcm::aes::cipher::consts::U12>) {
 fn random_arm(
     path: &str,
     direct: bool,
-    layout: Layout2,
+    layout: PayloadLayout,
     page_count: u64,
     operations: u64,
     seed: u64,
@@ -240,17 +266,17 @@ fn random_arm(
     let mut destination = Aligned::new(PAGE_BYTES);
     let mut control_source = control_copy.map(Aligned::new);
     let mut control_destination = control_copy.map(Aligned::new);
-    let mut state = seed | 1;
+    let mut state = mixed_seed_state(seed);
     let mut sink = 0u64;
-    let mut verify_ns = 0u64;
-    let mut copy_ns = 0u64;
+    let mut verify_nanoseconds = 0u64;
+    let mut copy_nanoseconds = 0u64;
     let mut device_bytes = 0u64;
     let mut straddled_pages = 0u64;
     let started = Instant::now();
     for _ in 0..operations {
         let page_index = next_random(&mut state) % page_count;
         match layout {
-            Layout2::Padded => {
+            PayloadLayout::Padded => {
                 let unit_index = page_index / 7;
                 let offset_in_unit = UNIT_BYTES - PADDED_PAYLOAD_BYTES + (page_index % 7) as usize * PAGE_BYTES;
                 file.read_exact_at(&mut buffer.as_mut_slice()[..UNIT_BYTES], unit_index * UNIT_BYTES as u64)
@@ -258,10 +284,10 @@ fn random_arm(
                 device_bytes += UNIT_BYTES as u64;
                 let verify_started = Instant::now();
                 sink = sink.wrapping_add(verify_unit(&cipher, &nonce, &mut buffer.as_mut_slice()[..UNIT_BYTES]) as u64);
-                verify_ns += verify_started.elapsed().as_nanos() as u64;
+                verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
                 sink = sink.wrapping_add(buffer.as_slice()[offset_in_unit] as u64);
             }
-            Layout2::Header { header_bytes, copy_out } => {
+            PayloadLayout::Header { header_bytes, copy_out } => {
                 let payload = payload_bytes(header_bytes);
                 let (unit_index, offset_in_payload) = locate_page(page_index, payload);
                 let straddles = page_straddles(page_index, payload);
@@ -283,7 +309,7 @@ fn random_arm(
                         verify_unit(&cipher, &nonce, &mut buffer.as_mut_slice()[slot..slot + UNIT_BYTES]) as u64,
                     );
                 }
-                verify_ns += verify_started.elapsed().as_nanos() as u64;
+                verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
                 let first_piece = PAGE_BYTES.min(payload - offset_in_payload);
                 let source_start = header_bytes + offset_in_payload;
                 if copy_out {
@@ -295,7 +321,7 @@ fn random_arm(
                         let second_start = UNIT_BYTES + header_bytes;
                         target[first_piece..].copy_from_slice(&source[second_start..second_start + PAGE_BYTES - first_piece]);
                     }
-                    copy_ns += copy_started.elapsed().as_nanos() as u64;
+                    copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
                     sink = sink.wrapping_add(destination.as_slice()[0] as u64);
                 } else {
                     sink = sink.wrapping_add(buffer.as_slice()[source_start] as u64);
@@ -309,14 +335,14 @@ fn random_arm(
             let copy_started = Instant::now();
             source.as_mut_slice()[0] = sink as u8;
             target.as_mut_slice().copy_from_slice(source.as_slice());
-            copy_ns += copy_started.elapsed().as_nanos() as u64;
+            copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
             sink = sink.wrapping_add(target.as_slice()[0] as u64);
         }
     }
     ArmResult {
-        elapsed_ns: started.elapsed().as_nanos() as u64,
-        verify_ns,
-        copy_ns,
+        elapsed_nanoseconds: started.elapsed().as_nanos() as u64,
+        verify_nanoseconds,
+        copy_nanoseconds,
         device_bytes,
         user_bytes: operations * PAGE_BYTES as u64,
         operations,
@@ -326,7 +352,7 @@ fn random_arm(
 }
 
 /// 同一个负载，QD=16：每个线程自己的 fd、缓冲、种子；挂钟按整个并发段算。
-fn random_arm_queued(path: &str, direct: bool, layout: Layout2, page_count: u64, operations: u64, seed: u64) -> ArmResult {
+fn random_arm_queued(path: &str, direct: bool, layout: PayloadLayout, page_count: u64, operations: u64, seed: u64) -> ArmResult {
     let per_thread = operations / QUEUE_DEPTH as u64;
     let started = Instant::now();
     let mut handles = Vec::with_capacity(QUEUE_DEPTH);
@@ -345,9 +371,9 @@ fn random_arm_queued(path: &str, direct: bool, layout: Layout2, page_count: u64,
         }));
     }
     let mut total = ArmResult {
-        elapsed_ns: 0,
-        verify_ns: 0,
-        copy_ns: 0,
+        elapsed_nanoseconds: 0,
+        verify_nanoseconds: 0,
+        copy_nanoseconds: 0,
         device_bytes: 0,
         user_bytes: 0,
         operations: 0,
@@ -356,66 +382,66 @@ fn random_arm_queued(path: &str, direct: bool, layout: Layout2, page_count: u64,
     };
     for handle in handles {
         let part = handle.join().expect("线程 panic");
-        total.verify_ns += part.verify_ns;
-        total.copy_ns += part.copy_ns;
+        total.verify_nanoseconds += part.verify_nanoseconds;
+        total.copy_nanoseconds += part.copy_nanoseconds;
         total.device_bytes += part.device_bytes;
         total.user_bytes += part.user_bytes;
         total.operations += part.operations;
         total.straddled_pages += part.straddled_pages;
         total.sink = total.sink.wrapping_add(part.sink);
     }
-    total.elapsed_ns = started.elapsed().as_nanos() as u64;
+    total.elapsed_nanoseconds = started.elapsed().as_nanos() as u64;
     total
 }
 
 /// 顺序读：I/O 固定 1 MiB，逐单元验；含头臂把每单元净荷搬进连续缓冲，补齐臂就地消费。
-fn sequential_arm(path: &str, direct: bool, layout: Layout2) -> ArmResult {
+fn sequential_arm(path: &str, direct: bool, layout: PayloadLayout) -> ArmResult {
     let file = open_file(path, direct);
     let (cipher, nonce) = cipher_and_nonce();
-    let mut buffer = Aligned::new(SEQ_IO_BYTES);
-    let mut destination = Aligned::new(SEQ_IO_BYTES);
-    let units_per_io = SEQ_IO_BYTES / UNIT_BYTES;
+    let mut buffer = Aligned::new(SEQUENTIAL_REQUEST_BYTES);
+    let mut destination = Aligned::new(SEQUENTIAL_REQUEST_BYTES);
+    let units_per_request = SEQUENTIAL_REQUEST_BYTES / UNIT_BYTES;
     let (payload, header_bytes, copy_out) = match layout {
-        Layout2::Padded => (PADDED_PAYLOAD_BYTES, UNIT_BYTES - PADDED_PAYLOAD_BYTES, false),
-        Layout2::Header { header_bytes, copy_out } => (payload_bytes(header_bytes), header_bytes, copy_out),
+        PayloadLayout::Padded => (PADDED_PAYLOAD_BYTES, UNIT_BYTES - PADDED_PAYLOAD_BYTES, false),
+        PayloadLayout::Header { header_bytes, copy_out } => (payload_bytes(header_bytes), header_bytes, copy_out),
     };
-    let units = units_for_user_bytes(SEQ_USER_BYTES, payload);
-    let io_count = (units + units_per_io as u64 - 1) / units_per_io as u64;
+    let units = units_for_user_bytes(SEQUENTIAL_USER_BYTES, payload);
+    let request_count = (units + units_per_request as u64 - 1) / units_per_request as u64;
     let mut sink = 0u64;
-    let mut verify_ns = 0u64;
-    let mut copy_ns = 0u64;
+    let mut verify_nanoseconds = 0u64;
+    let mut copy_nanoseconds = 0u64;
     let started = Instant::now();
-    for io_index in 0..io_count {
-        file.read_exact_at(buffer.as_mut_slice(), io_index * SEQ_IO_BYTES as u64)
+    for request_index in 0..request_count {
+        file.read_exact_at(buffer.as_mut_slice(), request_index * SEQUENTIAL_REQUEST_BYTES as u64)
             .expect("顺序读失败");
         let verify_started = Instant::now();
         for unit in buffer.as_mut_slice().chunks_mut(UNIT_BYTES) {
             sink = sink.wrapping_add(verify_unit(&cipher, &nonce, unit) as u64);
         }
-        verify_ns += verify_started.elapsed().as_nanos() as u64;
+        verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
         if copy_out {
             let copy_started = Instant::now();
             let source = buffer.as_slice();
             let target = destination.as_mut_slice();
-            for unit_index in 0..units_per_io {
+            for unit_index in 0..units_per_request {
                 let source_start = unit_index * UNIT_BYTES + header_bytes;
                 let target_start = unit_index * payload;
                 target[target_start..target_start + payload]
                     .copy_from_slice(&source[source_start..source_start + payload]);
             }
-            copy_ns += copy_started.elapsed().as_nanos() as u64;
+            copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
             sink = sink.wrapping_add(destination.as_slice()[0] as u64);
         } else {
             sink = sink.wrapping_add(buffer.as_slice()[header_bytes] as u64);
         }
     }
     ArmResult {
-        elapsed_ns: started.elapsed().as_nanos() as u64,
-        verify_ns,
-        copy_ns,
-        device_bytes: io_count * SEQ_IO_BYTES as u64,
+        elapsed_nanoseconds: started.elapsed().as_nanos() as u64,
+        verify_nanoseconds,
+        copy_nanoseconds,
+        device_bytes: request_count * SEQUENTIAL_REQUEST_BYTES as u64,
         user_bytes: units * payload as u64,
-        operations: io_count,
+        operations: request_count,
         straddled_pages: 0,
         sink,
     }
@@ -439,29 +465,29 @@ fn fill(path: &str, region: u64) {
         return;
     }
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
-    let mut buffer = Aligned::new(SEQ_IO_BYTES);
+    let mut buffer = Aligned::new(SEQUENTIAL_REQUEST_BYTES);
     for (index, byte) in buffer.as_mut_slice().iter_mut().enumerate() {
         *byte = (index as u8).wrapping_mul(31).wrapping_add(7);
     }
     file.seek(SeekFrom::Start(0)).expect("seek 失败");
-    for _ in 0..(region / SEQ_IO_BYTES as u64) {
+    for _ in 0..(region / SEQUENTIAL_REQUEST_BYTES as u64) {
         file.write_all(buffer.as_slice()).expect("填充失败");
     }
     file.sync_all().expect("sync 失败");
 }
 
 fn emit_arm(emitter: &mut Emitter, name: &str, result: &ArmResult, read_before: Option<u64>, read_after: Option<u64>) {
-    let proc_delta = match (read_before, read_after) {
+    let kernel_read_delta = match (read_before, read_after) {
         (Some(before), Some(after)) => format!("{}", after.saturating_sub(before)),
         _ => "NA".into(),
     };
-    let proc_ratio = match (read_before, read_after) {
+    let kernel_over_device_ratio = match (read_before, read_after) {
         (Some(before), Some(after)) if result.device_bytes > 0 => {
             format!("{:.4}", after.saturating_sub(before) as f64 / result.device_bytes as f64)
         }
         _ => "NA".into(),
     };
-    let seconds = result.elapsed_ns as f64 / 1e9;
+    let seconds = result.elapsed_nanoseconds as f64 / 1e9;
     let user_mib_per_second = if seconds > 0.0 {
         format!("{:.3}", result.user_bytes as f64 / (1024.0 * 1024.0) / seconds)
     } else {
@@ -472,16 +498,16 @@ fn emit_arm(emitter: &mut Emitter, name: &str, result: &ArmResult, read_before: 
         emitter.emit_raw(&format!(
             "name={name} ops={} dev_bytes={} user_bytes={} elapsed_ns={} verify_ns={} copy_ns={} \
              straddled={} units_per_op={:.5} ns_per_op={:.1} user_mib_per_s={user_mib_per_second} \
-             proc_read_bytes={proc_delta} pr_over_devbytes={proc_ratio} sink={}",
+             proc_read_bytes={kernel_read_delta} pr_over_devbytes={kernel_over_device_ratio} sink={}",
             result.operations,
             result.device_bytes,
             result.user_bytes,
-            result.elapsed_ns,
-            result.verify_ns,
-            result.copy_ns,
+            result.elapsed_nanoseconds,
+            result.verify_nanoseconds,
+            result.copy_nanoseconds,
             result.straddled_pages,
             result.device_bytes as f64 / UNIT_BYTES as f64 / result.operations.max(1) as f64,
-            result.elapsed_ns as f64 / result.operations.max(1) as f64,
+            result.elapsed_nanoseconds as f64 / result.operations.max(1) as f64,
             result.sink
         ))
     );
@@ -492,14 +518,14 @@ fn main() {
         eprintln!("用法：e140-header-alignment <块设备或文件> [种子] [none|nodirect] [ops] [区域 MiB]");
         std::process::exit(2)
     });
-    let seed: u64 = std::env::args().nth(2).and_then(|x| x.parse().ok()).unwrap_or(0x0140_1234);
+    let seed: u64 = std::env::args().nth(2).and_then(|text| text.parse().ok()).unwrap_or(0x0140_1234);
     let mode = std::env::args().nth(3).unwrap_or_else(|| "none".into());
     let direct = mode != "nodirect";
-    let operations: u64 = std::env::args().nth(4).and_then(|x| x.parse().ok()).unwrap_or(8192);
-    let region_mib: u64 = std::env::args().nth(5).and_then(|x| x.parse().ok()).unwrap_or(8192);
+    let operations: u64 = std::env::args().nth(4).and_then(|text| text.parse().ok()).unwrap_or(8192);
+    let region_mib: u64 = std::env::args().nth(5).and_then(|text| text.parse().ok()).unwrap_or(8192);
     let region = region_mib * 1024 * 1024;
 
-    let is_device = std::fs::metadata(&path).map(|m| !m.is_file()).unwrap_or(false);
+    let is_device = std::fs::metadata(&path).map(|metadata| !metadata.is_file()).unwrap_or(false);
     if !is_device {
         fill(&path, region);
     }
@@ -516,62 +542,72 @@ fn main() {
         "{}",
         emitter.emit_raw(&format!(
             "name=config dev={path} size={size} region={region} units={unit_total} ops={operations} qd={QUEUE_DEPTH} \
-             seq_io={SEQ_IO_BYTES} seq_user_bytes={SEQ_USER_BYTES} unit={UNIT_BYTES} page={PAGE_BYTES} \
+             seq_io={SEQUENTIAL_REQUEST_BYTES} seq_user_bytes={SEQUENTIAL_USER_BYTES} unit={UNIT_BYTES} page={PAGE_BYTES} \
              headers={HEADER_REGISTERED_BYTES}/{HEADER_WITH_RESERVE_BYTES} padded_payload={PADDED_PAYLOAD_BYTES} \
              control_copy={CONTROL_COPY_BYTES} seed={seed} mode={mode} o_direct={direct}"
         ))
     );
 
+    let warm_up_started = Instant::now();
+    let warm_up_sink = warm_up_device(&path, direct, unit_total);
+    println!(
+        "{}",
+        emitter.emit_raw(&format!(
+            "name=warmup reads={WARM_UP_READS} elapsed_ns={} sink={warm_up_sink}",
+            warm_up_started.elapsed().as_nanos() as u64
+        ))
+    );
+
     // 页数按各自净荷算，最后一页不用（它可能伸出区域末尾）。
     let pages_padded = unit_total * 7 - 1;
-    let arms: Vec<(&str, Layout2, u64)> = vec![
-        ("padded", Layout2::Padded, pages_padded),
+    let arms: Vec<(&str, PayloadLayout, u64)> = vec![
+        ("padded", PayloadLayout::Padded, pages_padded),
         (
             "h133",
-            Layout2::Header { header_bytes: HEADER_WITH_RESERVE_BYTES, copy_out: true },
+            PayloadLayout::Header { header_bytes: HEADER_WITH_RESERVE_BYTES, copy_out: true },
             unit_total * payload_bytes(HEADER_WITH_RESERVE_BYTES) as u64 / PAGE_BYTES as u64 - 1,
         ),
         (
             "h133_nocopy",
-            Layout2::Header { header_bytes: HEADER_WITH_RESERVE_BYTES, copy_out: false },
+            PayloadLayout::Header { header_bytes: HEADER_WITH_RESERVE_BYTES, copy_out: false },
             unit_total * payload_bytes(HEADER_WITH_RESERVE_BYTES) as u64 / PAGE_BYTES as u64 - 1,
         ),
         (
             "h105",
-            Layout2::Header { header_bytes: HEADER_REGISTERED_BYTES, copy_out: true },
+            PayloadLayout::Header { header_bytes: HEADER_REGISTERED_BYTES, copy_out: true },
             unit_total * payload_bytes(HEADER_REGISTERED_BYTES) as u64 / PAGE_BYTES as u64 - 1,
         ),
         (
             "h105_nocopy",
-            Layout2::Header { header_bytes: HEADER_REGISTERED_BYTES, copy_out: false },
+            PayloadLayout::Header { header_bytes: HEADER_REGISTERED_BYTES, copy_out: false },
             unit_total * payload_bytes(HEADER_REGISTERED_BYTES) as u64 / PAGE_BYTES as u64 - 1,
         ),
     ];
 
-    let mut random_ns_per_byte = std::collections::HashMap::new();
-    let mut sequential_ns_per_byte = std::collections::HashMap::new();
+    let mut random_nanoseconds_per_byte = std::collections::HashMap::new();
+    let mut sequential_nanoseconds_per_byte = std::collections::HashMap::new();
     for (arm_name, layout, page_count) in &arms {
         for load in ["rand", "randq", "seq"] {
-            let before = proc_read_bytes();
+            let before = kernel_read_bytes_of_this_process();
             let result = match load {
                 "rand" => random_arm(&path, direct, *layout, *page_count, operations, seed, None),
                 "randq" => random_arm_queued(&path, direct, *layout, *page_count, operations, seed),
                 _ => sequential_arm(&path, direct, *layout),
             };
-            let after = proc_read_bytes();
+            let after = kernel_read_bytes_of_this_process();
             let name = format!("{load}_{arm_name}");
             emit_arm(&mut emitter, &name, &result, before, after);
-            if result.operations > 0 && result.elapsed_ns > 0 {
+            if result.operations > 0 && result.elapsed_nanoseconds > 0 {
                 match load {
                     "rand" => {
-                        random_ns_per_byte.insert(
+                        random_nanoseconds_per_byte.insert(
                             arm_name.to_string(),
-                            result.elapsed_ns as f64 / result.operations as f64 / PAGE_BYTES as f64,
+                            result.elapsed_nanoseconds as f64 / result.operations as f64 / PAGE_BYTES as f64,
                         );
                     }
                     "seq" => {
-                        sequential_ns_per_byte
-                            .insert(arm_name.to_string(), result.elapsed_ns as f64 / result.user_bytes as f64);
+                        sequential_nanoseconds_per_byte
+                            .insert(arm_name.to_string(), result.elapsed_nanoseconds as f64 / result.user_bytes as f64);
                     }
                     _ => {}
                 }
@@ -580,9 +616,9 @@ fn main() {
     }
 
     // 拷贝判别力对照：padded 读加每次 memcpy 1 MiB。
-    let before = proc_read_bytes();
-    let control = random_arm(&path, direct, Layout2::Padded, pages_padded, operations, seed, Some(CONTROL_COPY_BYTES));
-    let after = proc_read_bytes();
+    let before = kernel_read_bytes_of_this_process();
+    let control = random_arm(&path, direct, PayloadLayout::Padded, pages_padded, operations, seed, Some(CONTROL_COPY_BYTES));
+    let after = kernel_read_bytes_of_this_process();
     emit_arm(&mut emitter, "rand_ctl_copy1m", &control, before, after);
 
     // 跑前写死的解析值，与实测落进同一份产物。
@@ -606,22 +642,22 @@ fn main() {
     }
 
     // 判据 1 / 2 与交叉点，由本轮实测算出（各轮各自算，跨轮同向才算数）。
-    if let (Some(rp), Some(rh), Some(sp), Some(sh)) = (
-        random_ns_per_byte.get("padded"),
-        random_ns_per_byte.get("h133"),
-        sequential_ns_per_byte.get("padded"),
-        sequential_ns_per_byte.get("h133"),
+    if let (Some(random_padded), Some(random_header), Some(sequential_padded), Some(sequential_header)) = (
+        random_nanoseconds_per_byte.get("padded"),
+        random_nanoseconds_per_byte.get("h133"),
+        sequential_nanoseconds_per_byte.get("padded"),
+        sequential_nanoseconds_per_byte.get("h133"),
     ) {
-        let crossover = crossover_random_share(*rp, *rh, *sp, *sh)
-            .map(|p| format!("{p:.6}"))
+        let crossover = crossover_random_share(*random_padded, *random_header, *sequential_padded, *sequential_header)
+            .map(|share| format!("{share:.6}"))
             .unwrap_or_else(|| "NA".into());
         println!(
             "{}",
             emitter.emit_raw(&format!(
-                "name=verdict r_rand_qd1={:.4} r_seq={:.4} random_ns_per_byte_padded={rp:.4} random_ns_per_byte_h133={rh:.4} \
-                 seq_ns_per_byte_padded={sp:.4} seq_ns_per_byte_h133={sh:.4} crossover_random_share={crossover}",
-                rh / rp,
-                sh / sp
+                "name=verdict r_rand_qd1={:.4} r_seq={:.4} random_ns_per_byte_padded={random_padded:.4} random_ns_per_byte_h133={random_header:.4} \
+                 seq_ns_per_byte_padded={sequential_padded:.4} seq_ns_per_byte_h133={sequential_header:.4} crossover_random_share={crossover}",
+                random_header / random_padded,
+                sequential_header / sequential_padded
             ))
         );
     }
@@ -642,7 +678,7 @@ mod tests {
         assert_eq!(PADDED_PAYLOAD_BYTES, 7 * 4096, "补齐臂：七个整页");
         assert_eq!(payload_bytes(HEADER_WITH_RESERVE_BYTES), 32635);
         assert_eq!(payload_bytes(HEADER_REGISTERED_BYTES), 32663);
-        assert_eq!(SEQ_IO_BYTES, 1 << 20);
+        assert_eq!(SEQUENTIAL_REQUEST_BYTES, 1 << 20);
         assert_eq!(QUEUE_DEPTH, 16);
     }
 
@@ -661,7 +697,7 @@ mod tests {
 
     /// 绝对值断言 3：h133 的跨单元占比 12.548%，期望单元数 1.12548。
     #[test]
-    fn h133_straddle_share_is_one_eighth_ish() {
+    fn header_133_straddle_share_is_one_eighth_ish() {
         let share = straddle_fraction(32635);
         assert!((share - 4095.0 / 32635.0).abs() < 1e-12);
         assert!((share - 0.125479).abs() < 1e-6, "实得 {share}");
@@ -678,7 +714,7 @@ mod tests {
 
     /// 页 7（文件偏移 28672）在 h133 下跨单元：前 3963 字节在单元 0，后 133 字节在单元 1。
     #[test]
-    fn page_seven_straddles_units_zero_and_one_under_h133() {
+    fn page_seven_straddles_units_zero_and_one_under_header_133() {
         let (unit, offset) = locate_page(7, 32635);
         assert_eq!((unit, offset), (0, 28672));
         assert!(page_straddles(7, 32635));
@@ -708,19 +744,32 @@ mod tests {
     #[test]
     fn crossover_exists_only_when_arms_split() {
         // 随机每字节 10 对 12（含头贵 2），顺序每字节 1.0 对 0.9（补齐贵 0.1）⇒ p* = 0.1/(2+0.1)
-        let p = crossover_random_share(10.0, 12.0, 1.0, 0.9).expect("应有交叉点");
-        assert!((p - 0.1 / 2.1).abs() < 1e-12, "{p}");
+        let share = crossover_random_share(10.0, 12.0, 1.0, 0.9).expect("应有交叉点");
+        assert!((share - 0.1 / 2.1).abs() < 1e-12, "{share}");
         assert!(crossover_random_share(10.0, 9.0, 1.0, 0.9).is_none(), "两格补齐都贵，没有交叉");
         assert!(crossover_random_share(10.0, 12.0, 0.9, 1.0).is_none(), "两格含头都贵，没有交叉");
+    }
+
+    /// C59（种子折叠成同一个状态） 那一形：命令行种子 2 与 3、4 与 5 不许折成同一个状态。
+    #[test]
+    fn adjacent_seeds_give_different_page_sequences() {
+        for (left, right) in [(2u64, 3u64), (4, 5), (1, 2)] {
+            let (mut left_state, mut right_state) = (mixed_seed_state(left), mixed_seed_state(right));
+            let left_pages: Vec<u64> = (0..64).map(|_| next_random(&mut left_state) % 1_000_003).collect();
+            let right_pages: Vec<u64> = (0..64).map(|_| next_random(&mut right_state) % 1_000_003).collect();
+            assert_ne!(left_pages, right_pages, "种子 {left} 与 {right} 折成了同一串页号");
+        }
+        assert_eq!(mixed_seed_state(2) & 1, 1, "状态必须是奇数（非零）");
+        assert_eq!(WARM_UP_READS, 16384);
     }
 
     /// 伪随机可复现且不退化。
     #[test]
     fn prng_is_deterministic() {
-        let (mut a, mut b) = (777u64, 777u64);
-        let xs: Vec<u64> = (0..8).map(|_| next_random(&mut a)).collect();
-        let ys: Vec<u64> = (0..8).map(|_| next_random(&mut b)).collect();
-        assert_eq!(xs, ys);
-        assert!(xs.windows(2).all(|w| w[0] != w[1]));
+        let (mut state_one, mut state_two) = (777u64, 777u64);
+        let first_sequence: Vec<u64> = (0..8).map(|_| next_random(&mut state_one)).collect();
+        let second_sequence: Vec<u64> = (0..8).map(|_| next_random(&mut state_two)).collect();
+        assert_eq!(first_sequence, second_sequence);
+        assert!(first_sequence.windows(2).all(|pair| pair[0] != pair[1]));
     }
 }

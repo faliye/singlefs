@@ -1,0 +1,12 @@
+M1_头树ID宽改4	const HEAD_TREE_IDENTIFIER_BYTES: u64 = 8;	const HEAD_TREE_IDENTIFIER_BYTES: u64 = 4;
+M2_码1映射key宽改25	const MAPPING_KEY_DATA_BYTES: u64 = 27;	const MAPPING_KEY_DATA_BYTES: u64 = 25;
+M3_头宽漏乘2	HEADER_WITHOUT_KEY_RANGE + 2 * self.key_bytes + NONCE_MAC_RESERVED_BYTES	HEADER_WITHOUT_KEY_RANGE + self.key_bytes + NONCE_MAC_RESERVED_BYTES
+M4_预留位改0	const NONCE_MAC_RESERVED_BYTES: u64 = 28;	const NONCE_MAC_RESERVED_BYTES: u64 = 0;
+M5_叶扇出向上取整	self.payload_bytes() / self.entry_bytes()	self.payload_bytes().div_ceil(self.entry_bytes())
+M6_内部条目漏加指针	self.payload_bytes() / (self.key_bytes + NODE_POINTER_BYTES)	self.payload_bytes() / self.key_bytes
+M7_树高每层加2	        height += 1;	        height += 2;
+M8_两棵树不分条目	let node_entries = total_entries / (DATA_UNITS_PER_NODE + 1);	let node_entries = 0;
+M9_预付按节点大小算万分点	prepaid_bytes * BASIS_POINTS / UNIT_BYTES	prepaid_bytes * BASIS_POINTS / NODE_BYTES
+M10_空树要根时漏算映射条目	TREE_TABLE_ENTRY_BYTES + NODE_BYTES + JOURNAL_NAMED_ENTRY_BYTES + MAPPING_ENTRY_NODE_BYTES	TREE_TABLE_ENTRY_BYTES + NODE_BYTES + JOURNAL_NAMED_ENTRY_BYTES
+M11_事件字节不加	("shared", TreeShape { key_bytes: padded_key + EVENT_TYPE_BYTES, value_bytes: 0 })	("shared", TreeShape { key_bytes: padded_key, value_bytes: 0 })
+M12_树表第一版条目数改112	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 5;	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 112;

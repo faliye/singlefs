@@ -1,0 +1,8 @@
+M1_容器头抄成103	const PACK_HEADER_BYTES: u64 = 107;	const PACK_HEADER_BYTES: u64 = 103;
+M2_槽自描述抄成43	const SLOT_SELF_DESCRIPTION_BYTES: u64 = 47;	const SLOT_SELF_DESCRIPTION_BYTES: u64 = 43;
+M3_收益不除副本数	objects_per_container * REPLICA_COUNT * BASIS_POINTS / replica_count	objects_per_container * BASIS_POINTS
+M4_写字节比不乘副本数	(BASIS_POINTS + BASIS_POINTS / objects_per_container) * replica_count / REPLICA_COUNT	BASIS_POINTS + BASIS_POINTS / objects_per_container
+M5_cap顶用max	Repair::CapLimited(limit) => cap.min(limit),	Repair::CapLimited(limit) => cap.max(limit),
+M6_放弃打包按cap算	Repair::NoPack => 1,	Repair::NoPack => cap,
+M7_多副本改成4份	const EXTRA_COPY_REPLICA_COUNT: u64 = 3;	const EXTRA_COPY_REPLICA_COUNT: u64 = 4;
+M8_不打包写字节比也加1/k	if objects_per_container <= 1 {\n        return BASIS_POINTS * replica_count / REPLICA_COUNT;\n    }	if objects_per_container == 0 {\n        return BASIS_POINTS * replica_count / REPLICA_COUNT;\n    }

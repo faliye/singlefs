@@ -12,5 +12,5 @@ M11_allocated_bytes_short_one_slot	value: allocated_slots * SLOT_BYTES	value: (a
 M12_enumeration_skips_empty_subset	        for mask in 0..full_mask {	        for mask in 1..full_mask {
 M13_fua_never_a_boundary	                if fua_is_boundary && is_fua {	                if false {
 M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
-M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIFIER_MAPPING + 1,	        tree_identifier_watermark: TREE_IDENTIFIER_MAPPING,
+M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT + 1,	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT,
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {

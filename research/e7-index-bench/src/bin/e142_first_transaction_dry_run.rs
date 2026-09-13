@@ -62,8 +62,8 @@ const JOURNAL_RECORD_BYTES: u64 = 4096;
 const JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES: u64 = 95;
 /// D23（journal 的角色与格式） 已定项 4 口径的点名项宽度；构成无落点，装置按字节表六的预想构成写。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
-/// 字节表一的超级块预想字段表合计（D22（单元原子性怎么合成） 未定项 9 未定）。
-const SUPERBLOCK_BYTES: u64 = 413;
+/// 字节表一的超级块预想字段表合计（D22（单元原子性怎么合成） 已定项 9，2026-09-13 定案）。
+const SUPERBLOCK_BYTES: u64 = 495;
 /// 头校验和 / 自证校验和的宽度（D18 已定项 7、D22 已定项 7、D23 已定项 4 同口径）；算法全仓未定（gap G5），装置取 SHA-256。
 const WIDE_CHECKSUM_BYTES: u64 = 32;
 
@@ -102,12 +102,18 @@ const TREE_IDENTIFIER_INODE: u64 = 2;
 const TREE_IDENTIFIER_ALLOCATION: u64 = 3;
 const TREE_IDENTIFIER_ACCOUNTING: u64 = 4;
 const TREE_IDENTIFIER_MAPPING: u64 = 5;
+/// D6 已定项 2（2026-09-13 用户定案）：livelist 共享树 day-1 注册，第一个事务根指针为零。
+const TREE_IDENTIFIER_LIVELIST: u64 = 6;
+/// D5 已定项 6（2026-09-13 用户定案）：稀疏旁表树 day-1 注册，第一个事务根指针为零。
+const TREE_IDENTIFIER_SHARE_COUNT: u64 = 7;
 /// 树的种类的码（字节表七：预想 1..5，与树 ID 同号）。
 const TREE_KIND_EXTENT: u16 = 1;
 const TREE_KIND_INODE: u16 = 2;
 const TREE_KIND_ALLOCATION: u16 = 3;
 const TREE_KIND_ACCOUNTING: u16 = 4;
 const TREE_KIND_MAPPING: u16 = 5;
+const TREE_KIND_LIVELIST: u16 = 6;
+const TREE_KIND_SHARE_COUNT: u16 = 7;
 
 /// D18（块里携带什么信息） 已定项 11 登记表的码。
 const UNIT_CLASS_DATA: u8 = 1;
@@ -555,6 +561,21 @@ struct NodePointer {
 }
 
 impl NodePointer {
+    /// 空树的根：位置条目、实例代号、出生序号全零（D6 已定项 2 / D5 已定项 6 的 day-1 注册树在第一个事务里就是这样）。
+    fn empty_root() -> NodePointer {
+        NodePointer {
+            head: PointerHead { birth_tree: TreeIdentifier(TREE_IDENTIFIER_NONE), birth_txg: CheckpointTxg(0) },
+            locations: [
+                LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(0), unit_checksum: 0 },
+                LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(0), unit_checksum: 0 },
+            ],
+            instance: InstanceGeneration(0),
+            birth_sequence: BirthSequence(0),
+        }
+    }
+    fn is_empty_root(&self) -> bool {
+        self.locations.iter().all(|location| location.slot.0 == 0 && location.unit_checksum == 0) && self.birth_sequence.0 == 0
+    }
     fn write_to(&self, writer: &mut ByteWriter) {
         let start = writer.position();
         self.head.write_to(writer);
@@ -998,7 +1019,7 @@ impl RootRecord {
     }
 }
 
-/// 字节表一的超级块预想字段表（D22 未定项 9 未定），413 字节，字段序照那张表。
+/// 字节表一的超级块预想字段表（D22 已定项 9，2026-09-13 用户定案：KDF 4、主密钥槽内联 80），495 字节，字段序照那张表。
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct Superblock {
     fsid: [u8; 16],
@@ -1011,8 +1032,8 @@ struct Superblock {
 }
 
 const SUPERBLOCK_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 4 + 4 + 8;
-const SUPERBLOCK_REGION_DEVICES_OFFSET: usize = 268;
-const SUPERBLOCK_TAIL_OFFSET: usize = 401;
+const SUPERBLOCK_REGION_DEVICES_OFFSET: usize = 350;
+const SUPERBLOCK_TAIL_OFFSET: usize = 483;
 
 impl Superblock {
     fn to_slot(&self) -> Vec<u8> {
@@ -1026,9 +1047,10 @@ impl Superblock {
         writer.put_u64(self.slot_generation);
         writer.assert_position(SUPERBLOCK_CHECKSUM_OFFSET as u64, "超级块整槽校验和");
         writer.skip(WIDE_CHECKSUM_BYTES as usize);
-        writer.skip(16 + 12 + 2); // 超级块 MAC、nonce 水位、KDF 标识
+        writer.skip(16 + 12 + 4); // 超级块 MAC、nonce 水位、KDF 标识（4，D22 已定项 9）
         writer.put_u8(0); // 加密类型：关
         writer.put_u8(16); // MAC 长度声明
+        writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0（D22 已定项 9，2026-09-13 用户定案）
         writer.put_u32(NODE_BYTES as u32);
         writer.put_u32(DATA_UNIT_BYTES as u32);
         writer.put_u32(SLOT_BYTES as u32);
@@ -1805,13 +1827,15 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
     index_node_header_widths.push(("mapping", index_node_header_bytes(MAPPING_KEY_BYTES as usize)));
     let mapping_pointer = node_pointer(TreeIdentifier(TREE_IDENTIFIER_MAPPING), SLOT_MAPPING_ROOT, &mapping_unit, mapping_sequence);
 
-    // t8 树表单元第 1 版：五条条目按树 ID 升序（D8 已定项 8）。
+    // t8 树表单元第 1 版：七条条目按树 ID 升序（D8 已定项 8）；livelist 与稀疏旁表两棵 day-1 注册、根指针为零。
     let tree_table_entries = [
         TreeTableEntry { kind: TREE_KIND_EXTENT, tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT), root: extent_pointer, birth_txg: txg },
         TreeTableEntry { kind: TREE_KIND_INODE, tree: TreeIdentifier(TREE_IDENTIFIER_INODE), root: inode_root_pointer, birth_txg: txg },
         TreeTableEntry { kind: TREE_KIND_ALLOCATION, tree: TreeIdentifier(TREE_IDENTIFIER_ALLOCATION), root: allocation_pointer, birth_txg: txg },
         TreeTableEntry { kind: TREE_KIND_ACCOUNTING, tree: TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING), root: accounting_pointer, birth_txg: txg },
         TreeTableEntry { kind: TREE_KIND_MAPPING, tree: TreeIdentifier(TREE_IDENTIFIER_MAPPING), root: mapping_pointer, birth_txg: txg },
+        TreeTableEntry { kind: TREE_KIND_LIVELIST, tree: TreeIdentifier(TREE_IDENTIFIER_LIVELIST), root: NodePointer::empty_root(), birth_txg: txg },
+        TreeTableEntry { kind: TREE_KIND_SHARE_COUNT, tree: TreeIdentifier(TREE_IDENTIFIER_SHARE_COUNT), root: NodePointer::empty_root(), birth_txg: txg },
     ];
     let tree_table_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_NONE), txg, instance);
     let tree_table_unit = build_index_node(
@@ -1819,7 +1843,7 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
         0,
         TREE_TABLE_KEY_WIDTH,
         &TREE_IDENTIFIER_EXTENT.to_le_bytes(),
-        &TREE_IDENTIFIER_MAPPING.to_le_bytes(),
+        &TREE_IDENTIFIER_SHARE_COUNT.to_le_bytes(),
         txg,
         fsid,
         instance,
@@ -1901,7 +1925,7 @@ fn publish_first_file(pool: &mut RecordingPool, parameters: &PoolParameters, gen
         instance,
         checkpoint_txg: txg,
         tree_table: tree_table_pointer,
-        tree_identifier_watermark: TREE_IDENTIFIER_MAPPING + 1,
+        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT + 1,
         rollback_floor: CheckpointTxg(0),
         instance_table: genesis.root.instance_table,
     };
@@ -2145,6 +2169,9 @@ fn walk_to_file(reader: &dyn BlockReader, root: &RootRecord, fsid: &[u8; 16], ma
     for entry in &entries {
         if entry.tree.0 >= root.tree_identifier_watermark {
             return Err("树 ID 不低于水位".to_string()); // I-7.8
+        }
+        if entry.root.is_empty_root() {
+            continue; // day-1 注册、还没有根的树（livelist、稀疏旁表）：没有单元可读
         }
         by_kind.insert(entry.kind, read_tree_root(reader, entry, root, expected_fsid)?);
     }
@@ -2501,7 +2528,7 @@ fn main() {
         ("accounting_entry", 34, ACCOUNTING_ENTRY_BYTES),
         ("mapping_entry", 55, MAPPING_ENTRY_BYTES),
         ("location_entry", 14, LOC_ENTRY),
-        ("superblock", 413, SUPERBLOCK_BYTES),
+        ("superblock", 495, SUPERBLOCK_BYTES),
     ];
     let mut width_mismatches = 0u64;
     for (structure, expected, actual) in width_rows {
@@ -2824,7 +2851,7 @@ mod tests {
         assert_eq!(allocated.value, 212_992);
         let watermark = output.accounting_entries.iter().find(|entry| entry.statistic == STATISTIC_INODE_WATERMARK).expect("水位");
         assert_eq!(watermark.value, 2);
-        assert_eq!(output.root.tree_identifier_watermark, 6);
+        assert_eq!(output.root.tree_identifier_watermark, 8, "五棵有根的树 + livelist + 稀疏旁表");
         assert_eq!(output.root.rollback_floor, CheckpointTxg(0));
     }
 

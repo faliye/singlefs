@@ -376,3 +376,19 @@ path = "src/bin/e144_header_checksum_cost.rs"
 [[bin]]
 name = "e145-self-describing-node-header"
 path = "src/bin/e145_self_describing_node_header.rs"
+
+[[bin]]
+name = "e146-livelist-entry-width"
+path = "src/bin/e146_livelist_entry_width.rs"
+
+[[bin]]
+name = "e147-superblock-recompute-from-layout"
+path = "src/bin/e147_superblock_recompute_from_layout.rs"
+
+[[bin]]
+name = "e149-pack-container-repair-options"
+path = "src/bin/e149_pack_container_repair_options.rs"
+
+[[bin]]
+name = "e148-commit-fixpoint-two-record-trees"
+path = "src/bin/e148_commit_fixpoint_two_record_trees.rs"

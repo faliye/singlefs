@@ -1,0 +1,9 @@
+M1_feature_bits抄成64	(Segment::Bootstrap, "feature_bits", 96),	(Segment::Bootstrap, "feature_bits", 64),
+M2_撕裂态公式减1	(1u64 << sectors_spanned(total_bytes)) - 2	(1u64 << sectors_spanned(total_bytes)) - 1
+M3_跨扇区向下取整	total_bytes.div_ceil(SLOT_BYTES)	total_bytes / SLOT_BYTES
+M4_主密钥槽估60	const KEY_SLOT_INLINE_BYTES: u64 = 80;	const KEY_SLOT_INLINE_BYTES: u64 = 60;
+M5_省devs时少减	Variant::DeviceCountDropped => base - row_width("device_count"),	Variant::DeviceCountDropped => base,
+M6_KDF变体忘减原宽	Variant::KdfIdentifier4 => base - row_width("kdf_identifier") + KDF_IDENTIFIER_WIDE_BYTES,	Variant::KdfIdentifier4 => base + KDF_IDENTIFIER_WIDE_BYTES,
+M7_槽宽改4096	const SLOT_BYTES: u64 = 512;	const SLOT_BYTES: u64 = 4096;
+M8_nonce水位抄成8	(Segment::EncryptionReserve, "nonce_watermark", 12),	(Segment::EncryptionReserve, "nonce_watermark", 8),
+M9_段归属抄错	(Segment::EncryptionReserve, "mac_length", 1),	(Segment::Geometry, "mac_length", 1),

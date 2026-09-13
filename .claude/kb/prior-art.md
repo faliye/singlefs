@@ -619,7 +619,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ## 八、根环槽宽与「长时间消费者怎么跟发布赛跑」这两件事，现役实现怎么做
 
 **2026-09-08 在本机固定点 `/home/fy5090/code/fs-refs` 现查逐字抄出。均未在本项目验证。**
-它们回答的是 D2（RAID 条带策略） 未定项 15（「生命周期不同的对象」的通用判据）
+它们回答的是 D2（RAID 条带策略） 已定项 15（「生命周期不同的对象」的通用判据）
 与 [checks-owed.md](checks-owed.md) C214（遍历跳的窗口余量没人守）。
 
 ### 8.1 ZFS：根环槽宽确实随设备粒度抬，但封顶 8 KiB，而且抬槽宽是减槽数不是多占地
@@ -694,6 +694,23 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 （清扫准入「释放代 ≤ 环里最旧根 txg」那条闸），保护宽度随之变」——
 **崩溃之后那一半，锁一个字都说不上话。**
 
+<!-- doc-lint:not-numbers EXT4 -->
+
+## 九、每对象扩展槽：五家现役实现怎么放「属于这个对象、但不在主字段里」的数据（D21（权威态与派生态的分界） 已定项 3 ③ 的外部调研，2026-09-13 现查）
+
+D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的外部调研（别家怎么做每对象扩展槽）还没做」。下面五家全部现查原文（URL 在表里），**未在本项目验证**；按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`，它们只能提假设、指该测的路径，不进正推 / 反推 / 校验。每家都写一处与本工程的已知差异。
+
+| 实现 | 扩展槽住哪 | 形态与宽度 | 装不下时 | 来源（2026-09-13 现查） | 与本工程的一处差异 |
+|---|---|---|---|---|---|
+| ext4 | inode 记录里固定字段之后的空间（`i_extra_isize` 记「Size of this inode - 128」，默认 256 字节 inode 里固定部分 160 字节，余下装 xattr） | 头 `ext4_xattr_ibody_header` 4 字节（magic 0xEA020000）+ 条目 `ext4_xattr_entry`（`e_name_len`、`e_name_index`、`e_value_offs`、`e_value_inum`、`e_value_size`、`e_hash`），值 4 字节对齐；内联数据是一条名为 `system.data` 的 xattr（`EXT4_INLINE_DATA_FL`） | 溢出到 `i_file_acl` 指向的一个独立块（「it is not possible for this block to contain a pointer to a second extended attribute block」）；值再大用 EA inode（`e_value_inum`，`EXT4_EA_INODE_FL`） | https://www.kernel.org/doc/html/latest/filesystems/ext4/inodes.html 、 https://www.kernel.org/doc/html/latest/filesystems/ext4/attributes.html | 槽在 inode 记录内、可按名字装任意键值；本工程的扩展点按 D1（数据可移动性 / 反向索引） 已定项 3「要么为空，要么是一个指向」，不内联数据 |
+| XFS | inode 字面区（`XFS_LITINO` = inode 大小 − 核心）由数据叉与属性叉共用，`di_forkoff`（「attr fork offs, <<3 for 64b align」，单位 8 字节）定属性叉起点；`di_aformat` 取 `XFS_DINODE_FMT_LOCAL / EXTENTS / BTREE` | 短形式：`xfs_attr_sf_hdr { totsize u16, count u8, padding u8 }` + `xfs_attr_sf_entry { namelen u8, valuelen u8, flags u8, nameval[] }`，「packed as tightly as possible so as to fit into the literal area of the inode」 | 属性叉换成 extents / btree 格式指向叶块、节点块、远程值块 | https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_format.h 、 https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_da_format.h | 叉起点是每 inode 一个可变偏移（`di_forkoff`）；本工程的扩展点起点由超级块声明的 N 与单元结构隐含，每单元不另存偏移 |
+| btrfs | fs 树里按 objectid 挂的条目：`XATTR_ITEM`（0x18，key 里带名字哈希）、`DIR_ITEM`（0x54）、`EXTENT_DATA`（0x6c，内联时「the remaining item bytes are the data bytes」） | 叶内变长条目：「header \| item 0 \| item 1 \| … \| free space \| data N \| … \| data 0」；内联数据上限 `max_inline` 「default: min(2048, page size)」，4 KiB sectorsize 时约 3900 字节 | 同哈希的 xattr 必须装进一个叶；数据超过 `max_inline` 走外部 extent | https://btrfs.readthedocs.io/en/latest/dev/On-disk-format.html 、 https://btrfs.readthedocs.io/en/latest/Administration.html | 扩展数据是索引树里的独立条目、可变长；本工程放在单元自描述头之后的定长配额里 |
+| ZFS | dnode（`DNODE_SHIFT 9`，512 字节）核心 64 字节之后的 bonus 缓冲：`DN_BONUS_SIZE(dnsize) = dnsize − DNODE_CORE_SIZE − (1 << SPA_BLKPTRSHIFT)`（512 字节 dnode 时 320），`dn_bonustype u8`、`dn_bonuslen u16` | bonus 装系统属性（SA）；类型由 `dn_bonustype` 声明 | 「Spill blocks are used to store system attribute data (i.e. file metadata) that does not fit in the dnode's bonus buffer」，`DNODE_FLAG_SPILL_BLKPTR (1 << 2)`，spill 指针占掉 bonus 末尾的一个 blkptr | https://raw.githubusercontent.com/openzfs/zfs/master/include/sys/dnode.h | 每对象槽宽是 dnode 大小减核心（可到 1 KiB 以上的 dnode）；本工程扩展点配额 N 由每条线在超级块声明、第一版为 0 |
+| APFS | inode 记录值 `j_inode_val` 末尾的可变长扩展字段：`apfs_xf_blob { xf_num_exts u16, xf_used_data u16, xf_data[] }`，每个字段 `apfs_x_field { x_type u8, x_flags u8, x_size u16 }`；类型如 `DSTREAM = 8`、`NAME = 4`、`FINDER_INFO = 7`、`SPARSE_BYTES = 13` | 每字段 4 字节元数据 + 值；xattr 值 `apfs_xattr_val { flags u16, xdata_len u16, xdata[] }` | 嵌入上限 `APFS_XATTR_MAX_EMBEDDED_SIZE = 3804`（`XATTR_DATA_EMBEDDED = 2`），更大的走数据流（`XATTR_DATA_STREAM = 1`） | https://raw.githubusercontent.com/linux-apfs/linux-apfs-rw/master/apfs_raw.h （Apple 的 APFS Reference PDF 用 CID 字体，本机 `pdf-text.py` 抽不出文字，改核 Linux 驱动头文件） | 类型 + 长度的自描述字段列表，可装数据；本工程的扩展点只装一个指向 |
+
+**五家共有的形态**：都是「对象记录内一段有上限的空间 + 装不下时指向外部」，上限 320 字节（ZFS 512 字节 dnode）到约 3.9 KiB（btrfs 一叶、APFS 3804）。**没有一家把扩展槽做成「只许一个指向、不许内联」**——这是本工程 D1（数据可移动性 / 反向索引） 已定项 3 独有的形态，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「没有任何现役实现走 X 这条路」是最值钱的一类外部信号：举证责任在本工程这边（理由记在 D1（数据可移动性 / 反向索引） 已定项 3 与 D21（权威态与派生态的分界） 硬约束 5）。
+**「为空」怎么编码，五家各自的做法**：ext4 靠 `e_value_size = 0` 与条目计数；XFS 靠 `count = 0`；btrfs 靠条目不存在；ZFS 靠 `dn_bonuslen = 0`；APFS 靠 `xf_num_exts = 0`——**都是「计数为 0」而不是「某个全零指针」**，与 D21（权威态与派生态的分界） 已定项 3 ②「全零不能直接当空用」那句同向。
+
 ### 7.9 「七、近十年学术成果扫描（2012–2026）」的来源
 
 - [The Full Path to Full-Path Indexing (FAST 2018)](https://www.usenix.org/conference/fast18/presentation/zhan)
@@ -718,6 +735,9 @@ I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ �
 ---
 
 ## 历史版本
+
+### 2026-09-13
+- 补第九节：D21（权威态与派生态的分界） 已定项 3 ③ 要的每对象扩展槽调研，ext4 / XFS / btrfs / ZFS / APFS 五家现查原文，各记一处与本工程的差异；五家「为空」都靠计数为 0，没有一家只装一个指向。
 
 ### 2026-08-30
 - 抬头新增「来源固定点与复核机制」：那一节从 [decisions.md](decisions.md) 顶部那块

@@ -1,0 +1,10 @@
+M1_映射叶扇出改512	const MAPPING_RECORDS_PER_LEAF: u64 = 296;	const MAPPING_RECORDS_PER_LEAF: u64 = 512;
+M2_映射内部扇出改256	const MAPPING_FANOUT: u64 = 147;	const MAPPING_FANOUT: u64 = 256;
+M3_只建一棵树	    if tree_count == 2 {	    if tree_count == 3 {
+M4_记账节点改0	const ACCOUNTING_NODES_PER_PUBLISH: u64 = 2;	const ACCOUNTING_NODES_PER_PUBLISH: u64 = 0;
+M5_脏计数不累加	                        state.dirty_count += 1;	                        state.dirty_count += 0;
+M6_元数据块漏加记账	    let metadata_blocks = dirty_per_tree.iter().sum::<u64>() + accounting_node_count;	    let metadata_blocks = dirty_per_tree.iter().sum::<u64>();
+M7_meta_clustered把用户块也聚簇	            Arm::Clustered => true,\n            Arm::Scattered | Arm::MetadataClustered => false,	            Arm::Clustered | Arm::MetadataClustered => true,\n            Arm::Scattered => false,
+M9_新脏节点不再分配	        pending = (0..newly_dirty_count)	        pending = (0..0)
+M10_层数少算一层	        while nodes_in_level > 1 {	        while nodes_in_level > 2 {
+M8_游标从0起	    tree.total_keys() / 2	    tree.total_keys() * 0

@@ -9,3 +9,4 @@ M8_跨单元判据松一格	locate_page(page_index, payload).1 + PAGE_BYTES > pa
 M9_交叉点分母漏一项	Some(sequential_gap / (random_gap + sequential_gap))	Some(sequential_gap / random_gap)
 M10_单元大小改成64K	const UNIT_BYTES: usize = 32768;	const UNIT_BYTES: usize = 65536;
 M11_一GiB单元数向下取整	(user_bytes + payload as u64 - 1) / payload as u64	user_bytes / payload as u64
+M12_种子不混淆折叠回去	(value ^ (value >> 31)) | 1	{ let _ = value; seed | 1 }
