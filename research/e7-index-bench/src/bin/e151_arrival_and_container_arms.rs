@@ -1,4 +1,4 @@
-//! E151：用户数据落点的到达序与容器臂 —— D3（空间分配）已定项 8 与 D14 未定项 2 欠的基线臂（C239 第 ② 笔）。
+//! E151：用户数据落点的到达序与容器臂 —— D3（空间分配）已定项 8 与 D14 已定项 2 欠的基线臂（C239 第 ② 笔）。
 //!
 //! ## 模型（判据与失败条款的权威登记在 research/prompts/e151-preregistration.md，跑前写死 2026-09-13）
 //!
@@ -47,6 +47,14 @@ const PACK_HYSTERESIS_SAMPLES: [u64; 2] = [16, 64];
 const METADATA_BLOCKS_SAMPLES: [usize; 3] = [0, 4, 9];
 /// 判据 6(a) 的阈值：丙与乙的 runs 中位数之差在 ±5% 以内算打平。
 const ARRIVAL_TIE_PERCENT: u64 = 5;
+/// 目录 = 32 个连续 key（E122 的每目录文件数）；按目录聚的提示臂与目录局部性指标都按它分组（第四次跑）。
+const OBJECTS_PER_DIRECTORY: usize = 32;
+/// 「只住一个目录」的块的两种粒度：E122 用的 32 槽，与本装置的 64 槽段。
+const DIRECTORY_CHUNK_SLOTS: [usize; 2] = [32, 64];
+/// 判据 H1：提示臂的目录遍历段数要 ≤ 减数臂的这个百分比才算买到局部性。
+const DIRECTORY_HINT_RUNS_RATIO_PERCENT: u64 = 50;
+/// 第五次跑扫的「家固定的提示拿几个尾部段当溢出段」：32 是第四次跑的取法（尾部全部），其余留给提交内生块。
+const HOME_OVERFLOW_SEGMENT_SAMPLES: [usize; 4] = [4, 8, 16, 32];
 
 struct Rng(u64);
 impl Rng {
@@ -80,6 +88,10 @@ enum Arm {
     Container { hysteresis: u64 },
     /// 容器臂的打包前落点换成最低空槽（第二次跑，反推腿打中之后加）：打包规则一字不改。
     ContainerOnFirstFit { hysteresis: u64 },
+    /// 丙（D14 已定项 2 的「按目录」提示，第四次跑加）：重写落到该目录成员所在段里槽号最小的空槽，没有就回落到最低空槽。
+    DirectoryHint,
+    /// 丙′：目录的家固定为初始所在段 + 一个溢出段，重写落到家里槽号最小的空槽，家满才回落，回落不改变家。
+    DirectoryHome,
     BumpNeighbor(usize),
     BumpCompact(usize),
 }
@@ -93,6 +105,8 @@ impl Arm {
             Arm::ArrivalByRequest => "arrival_by_request".into(),
             Arm::Container { hysteresis } => format!("container_k{hysteresis}"),
             Arm::ContainerOnFirstFit { hysteresis } => format!("container_firstfit_k{hysteresis}"),
+            Arm::DirectoryHint => "directory_hint".into(),
+            Arm::DirectoryHome => "directory_home".into(),
             Arm::BumpNeighbor(radius) => format!("bump_nb_r{radius}"),
             Arm::BumpCompact(compact_budget) => format!("bump_cp_b{compact_budget}"),
         }
@@ -100,7 +114,7 @@ impl Arm {
     fn is_e93_arm(self) -> bool {
         match self {
             Arm::FirstFit | Arm::BumpSegment | Arm::BumpNeighbor(_) | Arm::BumpCompact(_) => true,
-            Arm::Arrival | Arm::ArrivalByRequest | Arm::Container { .. } | Arm::ContainerOnFirstFit { .. } => false,
+            Arm::Arrival | Arm::ArrivalByRequest | Arm::Container { .. } | Arm::ContainerOnFirstFit { .. } | Arm::DirectoryHint | Arm::DirectoryHome => false,
         }
     }
 }
@@ -146,11 +160,15 @@ struct Sim {
     fallback_allocations: u64,
     /// 其中提交内生块的回落次数（绝对值：它们本该恒进聚簇段，D3 已定项 5）。
     metadata_fallback_allocations: u64,
+    /// 按目录聚的提示臂：成员所在段里没有空槽、回落到全池最低空槽的次数。
+    hint_fallback_allocations: u64,
     sweep: usize,
     pack_cursor: usize,
     metadata_current: Vec<u32>,
     /// 每 checkpoint 打包巡回最多看几个 key；run_arm 用 PACK_SWEEP_PER_CHECKPOINT，第三次跑的扫描按点改它。
     pack_sweep_per_checkpoint: usize,
+    /// 家固定的提示拿几个尾部段当溢出段（None = 尾部全部，第四次跑的取法；第五次跑扫 4 / 8 / 16 / 32）。
+    home_overflow_segments: Option<usize>,
 }
 
 impl Sim {
@@ -188,10 +206,12 @@ impl Sim {
             container_writes: 0,
             fallback_allocations: 0,
             metadata_fallback_allocations: 0,
+            hint_fallback_allocations: 0,
             sweep: 0,
             pack_cursor: 0,
             metadata_current: Vec::new(),
             pack_sweep_per_checkpoint: PACK_SWEEP_PER_CHECKPOINT,
+            home_overflow_segments: None,
         }
     }
 
@@ -383,6 +403,129 @@ impl Sim {
         self.segment_free_decrement(slot);
         slot
     }
+    /// key 现在住哪个槽（容器成员给容器的槽）。
+    fn slot_of_key(&self, key: u32) -> u32 {
+        let position = self.position_holding(key);
+        self.node_slot[self.order[position] as usize]
+    }
+
+    /// 按目录聚的提示（D14 已定项 2 臂丙）：候选槽 = 该目录成员现在住的那些段里的空槽，取槽号最小的；
+    /// 没有就回落到减数臂（全池最低空槽），回落单独计。目录 = key / OBJECTS_PER_DIRECTORY。
+    fn allocate_directory_hint(&mut self, key: u32) -> u32 {
+        let directory = key as usize / OBJECTS_PER_DIRECTORY;
+        let first_member = (directory * OBJECTS_PER_DIRECTORY) as u32;
+        let last_member = (((directory + 1) * OBJECTS_PER_DIRECTORY).min(self.last_write.len())) as u32;
+        let mut member_segments: BTreeSet<usize> = BTreeSet::new();
+        for member in first_member..last_member {
+            member_segments.insert(self.slot_of_key(member) as usize / self.slots_per_segment);
+        }
+        for segment_index in member_segments {
+            if self.open_segment == Some(segment_index) {
+                continue;
+            }
+            let segment_start = (segment_index * self.slots_per_segment) as u32;
+            let segment_end = segment_start + self.slots_per_segment as u32;
+            if let Some(&slot) = self.free.range(segment_start..segment_end).next() {
+                self.free.remove(&slot);
+                self.segment_free_decrement(slot);
+                return slot;
+            }
+        }
+        self.hint_fallback_allocations += 1;
+        self.allocate_first_fit()
+    }
+
+    /// 目录的家（D14 已定项 2 臂丙′）：初始所在段，加一个溢出段——初始全空的尾部段按顺序分给各家段，
+    /// 尾部有 (S − L) / G 段、家段有 L / G 段，每个溢出段归 (L / G) / ((S − L) / G) 个家段。
+    fn home_segments_of_directory(&self, directory: usize) -> [usize; 2] {
+        let object_count = self.last_write.len();
+        let home_segment = directory * OBJECTS_PER_DIRECTORY / self.slots_per_segment;
+        let home_segment_count = object_count / self.slots_per_segment;
+        let tail_segment_count = (self.slot_count - object_count) / self.slots_per_segment;
+        let overflow_segment_count = self.home_overflow_segments.unwrap_or(tail_segment_count).min(tail_segment_count).max(1);
+        let overflow_segment = home_segment_count + home_segment * overflow_segment_count / home_segment_count;
+        [home_segment, overflow_segment]
+    }
+
+    fn allocate_directory_home(&mut self, key: u32) -> u32 {
+        let directory = key as usize / OBJECTS_PER_DIRECTORY;
+        for segment_index in self.home_segments_of_directory(directory) {
+            if self.open_segment == Some(segment_index) {
+                continue;
+            }
+            let segment_start = (segment_index * self.slots_per_segment) as u32;
+            let segment_end = segment_start + self.slots_per_segment as u32;
+            if let Some(&slot) = self.free.range(segment_start..segment_end).next() {
+                self.free.remove(&slot);
+                self.segment_free_decrement(slot);
+                return slot;
+            }
+        }
+        self.hint_fallback_allocations += 1;
+        self.allocate_first_fit()
+    }
+
+    /// 目录局部性（期末量）：每个目录成员按槽排序后的连续段数之和、成员散在几个段里（均值 ×100 与最大值）、
+    /// 只住一个目录的 32 槽 / 64 槽块数。
+    fn directory_metrics(&self) -> DirectoryMetrics {
+        let object_count = self.last_write.len();
+        let directory_count = object_count.div_ceil(OBJECTS_PER_DIRECTORY);
+        let mut directory_runs_total = 0u64;
+        let mut segments_touched_sum = 0usize;
+        let mut segments_touched_maximum = 0usize;
+        let mut slot_directory: Vec<Option<usize>> = vec![None; self.slot_count];
+        for directory in 0..directory_count {
+            let first_member = directory * OBJECTS_PER_DIRECTORY;
+            let last_member = ((directory + 1) * OBJECTS_PER_DIRECTORY).min(object_count);
+            let mut member_slots: Vec<u32> = (first_member..last_member).map(|member| self.slot_of_key(member as u32)).collect();
+            for &slot in &member_slots {
+                slot_directory[slot as usize] = Some(directory);
+            }
+            member_slots.sort_unstable();
+            member_slots.dedup();
+            let mut runs = 0u64;
+            let mut previous: Option<u32> = None;
+            for &slot in &member_slots {
+                if previous.is_none_or(|previous_slot| previous_slot + 1 != slot) {
+                    runs += 1;
+                }
+                previous = Some(slot);
+            }
+            directory_runs_total += runs;
+            let touched: BTreeSet<usize> = member_slots.iter().map(|&slot| slot as usize / self.slots_per_segment).collect();
+            segments_touched_sum += touched.len();
+            segments_touched_maximum = segments_touched_maximum.max(touched.len());
+        }
+        let mut single_directory_chunks = [0usize; 2];
+        for (chunk_index, chunk_slots) in DIRECTORY_CHUNK_SLOTS.iter().enumerate() {
+            for chunk_start in (0..self.slot_count).step_by(*chunk_slots) {
+                let mut owner: Option<usize> = None;
+                let mut mixed = false;
+                for slot in chunk_start..(chunk_start + chunk_slots) {
+                    if let Some(directory) = slot_directory[slot] {
+                        match owner {
+                            None => owner = Some(directory),
+                            Some(current) if current != directory => {
+                                mixed = true;
+                                break;
+                            }
+                            Some(_) => {}
+                        }
+                    }
+                }
+                if owner.is_some() && !mixed {
+                    single_directory_chunks[chunk_index] += 1;
+                }
+            }
+        }
+        DirectoryMetrics {
+            directory_runs_total,
+            segments_touched_mean_percent: (segments_touched_sum * 100 / directory_count) as u64,
+            segments_touched_maximum,
+            single_directory_chunks,
+        }
+    }
+
     fn find_empty_segment(&mut self) -> Option<usize> {
         (0..self.free_slots_per_segment.len())
             .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment && self.open_segment != Some(segment_index))
@@ -623,6 +766,15 @@ fn pack_step(sim: &mut Sim, checkpoint: u64, hysteresis: u64) {
     }
 }
 
+/// 目录局部性的四个量（第四次跑，D14 已定项 2 的被减数与减数都报）。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct DirectoryMetrics {
+    directory_runs_total: u64,
+    segments_touched_mean_percent: u64,
+    segments_touched_maximum: usize,
+    single_directory_chunks: [usize; 2],
+}
+
 struct Outcome {
     runs_final: u64,
     empty_segments_final: usize,
@@ -636,6 +788,8 @@ struct Outcome {
     fallback_percent: f64,
     metadata_fallback_allocations: u64,
     container_writes: u64,
+    hint_fallback_allocations: u64,
+    directory: DirectoryMetrics,
 }
 
 fn run_arm(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64) -> Outcome {
@@ -644,8 +798,18 @@ fn run_arm(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_c
 
 /// 同 run_arm，打包巡回预算按参数给（第三次跑的扫描用）。
 fn run_arm_with_pack_sweep(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64, pack_sweep_per_checkpoint: usize) -> Outcome {
+    run_arm_with_knobs(arm, load, seed, metadata_blocks, checkpoint_count, sample_every, pack_sweep_per_checkpoint, None)
+}
+
+/// 同 run_arm，家固定的提示拿几个尾部段当溢出段按参数给（第五次跑的扫描用）。
+fn run_arm_with_home_overflow(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64, home_overflow_segments: usize) -> Outcome {
+    run_arm_with_knobs(arm, load, seed, metadata_blocks, checkpoint_count, sample_every, PACK_SWEEP_PER_CHECKPOINT, Some(home_overflow_segments))
+}
+
+fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64, pack_sweep_per_checkpoint: usize, home_overflow_segments: Option<usize>) -> Outcome {
     let mut sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
     sim.pack_sweep_per_checkpoint = pack_sweep_per_checkpoint;
+    sim.home_overflow_segments = home_overflow_segments;
     let mut rng = Rng::new(seed);
     let mut reservoir_drained_at: Option<u64> = None;
     let mut empty_segments_peak_after_drain = 0usize;
@@ -684,6 +848,18 @@ fn run_arm_with_pack_sweep(arm: Arm, load: Load, seed: u64, metadata_blocks: usi
                 let order = arrival_order_by_request(&dirty, &mut rng);
                 for &key in &order {
                     let slot = sim.allocate_bump();
+                    rewrite_key(&mut sim, key, slot, checkpoint);
+                }
+            }
+            Arm::DirectoryHint => {
+                for &key in &dirty {
+                    let slot = sim.allocate_directory_hint(key as u32);
+                    rewrite_key(&mut sim, key, slot, checkpoint);
+                }
+            }
+            Arm::DirectoryHome => {
+                for &key in &dirty {
+                    let slot = sim.allocate_directory_home(key as u32);
                     rewrite_key(&mut sim, key, slot, checkpoint);
                 }
             }
@@ -747,6 +923,8 @@ fn run_arm_with_pack_sweep(arm: Arm, load: Load, seed: u64, metadata_blocks: usi
         fallback_percent: 100.0 * sim.fallback_allocations as f64 / (sim.total_writes + (checkpoint_count as usize * metadata_blocks) as u64) as f64,
         metadata_fallback_allocations: sim.metadata_fallback_allocations,
         container_writes: sim.container_writes,
+        hint_fallback_allocations: sim.hint_fallback_allocations,
+        directory: sim.directory_metrics(),
     }
 }
 
@@ -889,6 +1067,8 @@ fn main() {
         Arm::Container { hysteresis: PACK_HYSTERESIS_SAMPLES[1] },
         Arm::ContainerOnFirstFit { hysteresis: PACK_HYSTERESIS_SAMPLES[0] },
         Arm::ContainerOnFirstFit { hysteresis: PACK_HYSTERESIS_SAMPLES[1] },
+        Arm::DirectoryHint,
+        Arm::DirectoryHome,
         Arm::BumpNeighbor(1),
         Arm::BumpNeighbor(2),
         Arm::BumpCompact(32),
@@ -1057,6 +1237,129 @@ fn main() {
         );
     }
     println!("{}", emitter.emit_raw(&format!("name=sweep_answer verdict_sensitive_to_pack_sweep={sweep_sensitive} criterion=E151_S1")));
+    // 第四次跑：目录局部性（跑前登记 e151-r4-prereg.md 的 H1–H3），减数臂 first_fit 对被减数 directory_hint，另报 bump_seg 与 arrival_by_request。
+    let directory_arms = [Arm::FirstFit, Arm::BumpSegment, Arm::ArrivalByRequest, Arm::DirectoryHint, Arm::DirectoryHome];
+    let directory_metadata_samples = [METADATA_BLOCKS_SAMPLES[0], METADATA_BLOCKS_SAMPLES[2]];
+    let mut hint_halves_everywhere = true;
+    let mut hint_more_single_chunks_everywhere = true;
+    let mut home_halves_everywhere = true;
+    let mut home_more_single_chunks_everywhere = true;
+    let mut home_stays_in_few_segments_everywhere = true;
+    for load in [Load::Uniform, Load::Runs8] {
+        for metadata_blocks in directory_metadata_samples {
+            let mut by_arm: Vec<(String, u64, u64, u64, u64, u64, u64, u64)> = Vec::new();
+            for arm in directory_arms {
+                let mut directory_runs = Vec::new();
+                let mut touched_means = Vec::new();
+                let mut touched_maximumes = Vec::new();
+                let mut chunks_32 = Vec::new();
+                let mut chunks_64 = Vec::new();
+                let mut key_runs = Vec::new();
+                let mut hint_fallback = 0u64;
+                let mut fallback_percent = 0.0;
+                for seed in 0..SEED_COUNT {
+                    let outcome = run_arm(arm, load, seed, metadata_blocks, CHECKPOINT_COUNT, SAMPLE_EVERY);
+                    if seed == 0 {
+                        hint_fallback = outcome.hint_fallback_allocations;
+                        fallback_percent = outcome.fallback_percent;
+                    }
+                    directory_runs.push(outcome.directory.directory_runs_total);
+                    touched_means.push(outcome.directory.segments_touched_mean_percent);
+                    touched_maximumes.push(outcome.directory.segments_touched_maximum as u64);
+                    chunks_32.push(outcome.directory.single_directory_chunks[0] as u64);
+                    chunks_64.push(outcome.directory.single_directory_chunks[1] as u64);
+                    key_runs.push(outcome.runs_final);
+                }
+                let row = (
+                    arm.tag(),
+                    median_of_five(directory_runs),
+                    median_of_five(touched_means),
+                    median_of_five(touched_maximumes),
+                    median_of_five(chunks_32),
+                    median_of_five(chunks_64),
+                    median_of_five(key_runs),
+                    hint_fallback,
+                );
+                println!(
+                    "{}",
+                    emitter.emit_raw(&format!(
+                        "name=directory arm={} load={} metadata_blocks={metadata_blocks} directory_runs_total={} segments_touched_mean_percent={} segments_touched_max={} single_directory_chunks_32={} single_directory_chunks_64={} runs_median={} hint_fallback_seed0={} fallback_pct={fallback_percent:.1}",
+                        row.0, load.tag(), row.1, row.2, row.3, row.4, row.5, row.6, row.7
+                    ))
+                );
+                by_arm.push(row);
+            }
+            let first_fit_row = by_arm.iter().find(|row| row.0 == "first_fit").expect("减数臂在");
+            for hint_tag in ["directory_hint", "directory_home"] {
+                let hint_row = by_arm.iter().find(|row| row.0 == hint_tag).expect("被减数在");
+                let halves = hint_row.1 * 100 <= first_fit_row.1 * DIRECTORY_HINT_RUNS_RATIO_PERCENT;
+                let more_single_chunks = hint_row.4 > first_fit_row.4;
+                let few_segments = hint_row.3 <= 3 && hint_row.2 <= 300 && first_fit_row.3 >= 10;
+                let key_runs_tied = within_tie_band(hint_row.6, first_fit_row.6);
+                if hint_tag == "directory_hint" {
+                    hint_halves_everywhere &= halves;
+                    hint_more_single_chunks_everywhere &= more_single_chunks;
+                } else {
+                    home_halves_everywhere &= halves;
+                    home_more_single_chunks_everywhere &= more_single_chunks;
+                    home_stays_in_few_segments_everywhere &= few_segments;
+                }
+                println!(
+                    "{}",
+                    emitter.emit_raw(&format!(
+                        "name=verdict_directory arm={hint_tag} load={} metadata_blocks={metadata_blocks} first_fit_directory_runs={} hint_directory_runs={} hint_at_most_half={halves} first_fit_segments_touched_max={} hint_segments_touched_max={} hint_segments_touched_mean_percent={} hint_stays_in_few_segments={few_segments} first_fit_single_chunks_32={} hint_single_chunks_32={} hint_more_single_chunks={more_single_chunks} first_fit_runs={} hint_runs={} key_runs_tied_within_5pct={key_runs_tied}",
+                        load.tag(), first_fit_row.1, hint_row.1, first_fit_row.3, hint_row.3, hint_row.2, first_fit_row.4, hint_row.4, first_fit_row.6, hint_row.6
+                    ))
+                );
+            }
+        }
+    }
+    println!(
+        "{}",
+        emitter.emit_raw(&format!("name=directory_answer hint_halves_directory_runs_in_every_cell={hint_halves_everywhere} hint_more_single_chunks_in_every_cell={hint_more_single_chunks_everywhere} home_halves_directory_runs_in_every_cell={home_halves_everywhere} home_more_single_chunks_in_every_cell={home_more_single_chunks_everywhere} home_stays_in_few_segments_in_every_cell={home_stays_in_few_segments_everywhere} criterion=E151_H1_H3"))
+    );
+    // 第五次跑：家固定的提示拿几个尾部段当溢出段（跑前登记 e151-r5-prereg.md 的 K1 / K2），directory_home × 两组负载 × M = 9。
+    let overflow_metadata_blocks = METADATA_BLOCKS_SAMPLES[2];
+    let mut uniform_has_clean_overflow = false;
+    let mut runs8_has_clean_overflow = false;
+    for load in [Load::Uniform, Load::Runs8] {
+        for home_overflow_segments in HOME_OVERFLOW_SEGMENT_SAMPLES {
+            let mut directory_runs = Vec::new();
+            let mut touched_maximumes = Vec::new();
+            let mut empties = Vec::new();
+            let mut key_runs = Vec::new();
+            let mut metadata_fallback = 0u64;
+            let mut hint_fallback = 0u64;
+            for seed in 0..SEED_COUNT {
+                let outcome = run_arm_with_home_overflow(Arm::DirectoryHome, load, seed, overflow_metadata_blocks, CHECKPOINT_COUNT, SAMPLE_EVERY, home_overflow_segments);
+                if seed == 0 {
+                    metadata_fallback = outcome.metadata_fallback_allocations;
+                    hint_fallback = outcome.hint_fallback_allocations;
+                }
+                directory_runs.push(outcome.directory.directory_runs_total);
+                touched_maximumes.push(outcome.directory.segments_touched_maximum as u64);
+                empties.push(outcome.empty_segments_final as u64);
+                key_runs.push(outcome.runs_final);
+            }
+            let touched_maximum = median_of_five(touched_maximumes);
+            let clean = metadata_fallback == 0 && touched_maximum <= 3;
+            match load {
+                Load::Uniform => uniform_has_clean_overflow |= clean,
+                Load::Runs8 => runs8_has_clean_overflow |= clean,
+            }
+            println!(
+                "{}",
+                emitter.emit_raw(&format!(
+                    "name=home_overflow arm=directory_home load={} metadata_blocks={overflow_metadata_blocks} home_overflow_segments={home_overflow_segments} directory_runs_total={} segments_touched_max={touched_maximum} empty_segments_median={} runs_median={} metadata_fallback_seed0={metadata_fallback} hint_fallback_seed0={hint_fallback} clean_and_local={clean}",
+                    load.tag(),
+                    median_of_five(directory_runs),
+                    median_of_five(empties),
+                    median_of_five(key_runs)
+                ))
+            );
+        }
+    }
+    println!("{}", emitter.emit_raw(&format!("name=home_overflow_answer uniform_has_overflow_count_with_zero_metadata_fallback_and_local={uniform_has_clean_overflow} runs8_has_such_overflow_count={runs8_has_clean_overflow} criterion=E151_K1")));
     println!("{}", emitter.finish());
 }
 
@@ -1287,6 +1590,84 @@ mod tests {
         );
         let first_fit = run_arm(Arm::FirstFit, Load::Uniform, 0, 0, 500, 50);
         assert_eq!(first_fit.reservoir_drained_at, None, "最低空槽不吃尾部那批全空段");
+    }
+
+    /// 目录局部性的绝对值：初始布局每个目录一段连续 ⇒ 遍历段数 256、只住一个目录的 32 槽块 256、64 槽块 0（一段正好两个目录）。
+    #[test]
+    fn initial_layout_directory_metrics_are_pinned() {
+        let sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        let metrics = sim.directory_metrics();
+        assert_eq!(metrics.directory_runs_total, (OBJECT_COUNT / OBJECTS_PER_DIRECTORY) as u64);
+        assert_eq!(metrics.directory_runs_total, 256);
+        assert_eq!(metrics.segments_touched_mean_percent, 100);
+        assert_eq!(metrics.segments_touched_maximum, 1);
+        assert_eq!(metrics.single_directory_chunks, [256, 0]);
+    }
+
+    /// 手算锚点：目录 0 的成员住段 0；重写 key 3 时段 0 没有空槽（初始全满），回落到最低空槽 8192（段 128）；
+    /// 此后再重写 key 5，段 128 里已有成员（key 3），空槽 8193 在那里 ⇒ 提示把它放到 8193 而不是全池别处。
+    #[test]
+    fn anchor_directory_hint_places_next_rewrite_beside_the_directory_member() {
+        let mut sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        let first = sim.allocate_directory_hint(3);
+        assert_eq!(first, 8192, "段 0 全满，回落到全池最低空槽");
+        assert_eq!(sim.hint_fallback_allocations, 1);
+        rewrite_key(&mut sim, 3, first, 1);
+        sim.end_checkpoint();
+        let second = sim.allocate_directory_hint(5);
+        assert_eq!(second, 3, "key 3 的旧槽 3 在下一轮回到空闲集合，它在段 0 里、是成员所在段里最小的空槽");
+        rewrite_key(&mut sim, 5, second, 2);
+        sim.end_checkpoint();
+        let third = sim.allocate_directory_hint(7);
+        assert_eq!(third, 5, "同理落回段 0 的槽 5，而不是段 128");
+        assert_eq!(sim.hint_fallback_allocations, 1, "后两次都没回落");
+        let elsewhere = sim.allocate_directory_hint(4000);
+        assert_eq!(elsewhere, 8193, "目录 125 的成员都在段 62、段 62 全满 ⇒ 回落到全池最低空槽 8193");
+        assert_eq!(sim.hint_fallback_allocations, 2);
+    }
+
+    /// 溢出段数是参数：None 就是尾部全部 32 段（第四次跑），8 时 128 个家段分 8 个溢出段、其余 24 段留给提交内生块。
+    #[test]
+    fn home_overflow_count_is_a_parameter() {
+        let mut sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        assert_eq!(sim.home_segments_of_directory(255), [127, 159]);
+        sim.home_overflow_segments = Some(8);
+        assert_eq!(sim.home_segments_of_directory(0), [0, 128]);
+        assert_eq!(sim.home_segments_of_directory(255), [127, 135], "8 个溢出段时最后一个家段用第 8 个溢出段");
+        sim.home_overflow_segments = Some(64);
+        assert_eq!(sim.home_segments_of_directory(255), [127, 159], "超过尾部段数按尾部全部算");
+        let all = run_arm_with_home_overflow(Arm::DirectoryHome, Load::Uniform, 0, 9, 300, 50, 32);
+        let default_run = run_arm(Arm::DirectoryHome, Load::Uniform, 0, 9, 300, 50);
+        assert_eq!(all.directory, default_run.directory, "溢出段 32 与不给参数逐字段同数");
+        let eight = run_arm_with_home_overflow(Arm::DirectoryHome, Load::Uniform, 0, 9, 300, 50, 8);
+        assert_eq!(eight.metadata_fallback_allocations, 0, "留 24 段给提交内生块时它们不回落");
+        assert!(all.metadata_fallback_allocations > 0);
+        assert!(eight.hint_fallback_allocations > all.hint_fallback_allocations, "溢出段少了，家满回落的次数只多不少");
+    }
+
+    /// 家的编号：目录 d 的家段是 d / 2（两目录合住一段），溢出段按 128 个家段 : 32 个尾部段 = 4 : 1 分。
+    #[test]
+    fn directory_home_segments_are_pinned() {
+        let sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
+        assert_eq!(sim.home_segments_of_directory(0), [0, 128]);
+        assert_eq!(sim.home_segments_of_directory(1), [0, 128]);
+        assert_eq!(sim.home_segments_of_directory(7), [3, 128]);
+        assert_eq!(sim.home_segments_of_directory(8), [4, 129]);
+        assert_eq!(sim.home_segments_of_directory(255), [127, 159]);
+    }
+
+    /// 老化 300 轮后（uniform、M = 0）：跟着成员走的提示与减数臂几乎一样散（家只增不减），
+    /// 家固定的提示把每个目录钉在家段 + 溢出段里；槽相邻性三条都守不住。数字钉成绝对值的方向。
+    #[test]
+    fn directory_home_pins_directories_to_few_segments_while_member_hint_drifts() {
+        let first_fit = run_arm(Arm::FirstFit, Load::Uniform, 0, 0, 300, 50);
+        let hint = run_arm(Arm::DirectoryHint, Load::Uniform, 0, 0, 300, 50);
+        let home = run_arm(Arm::DirectoryHome, Load::Uniform, 0, 0, 300, 50);
+        assert!(first_fit.directory.segments_touched_maximum >= 20, "first_fit 最多散在 {} 段", first_fit.directory.segments_touched_maximum);
+        assert!(hint.directory.segments_touched_maximum >= 15, "跟着成员走的提示最多散在 {} 段", hint.directory.segments_touched_maximum);
+        assert!(home.directory.segments_touched_maximum <= 3, "家固定的提示最多散在 {} 段", home.directory.segments_touched_maximum);
+        assert!(home.directory.segments_touched_mean_percent <= 300);
+        assert!(home.directory.directory_runs_total * 10 > first_fit.directory.directory_runs_total * 5, "槽相邻性谁都守不住：home {} 对 first_fit {}", home.directory.directory_runs_total, first_fit.directory.directory_runs_total);
     }
 
     /// 巡回预算是参数：预算 64 与 run_arm 逐字同数，预算 1024 打包更多（容器写更多、runs 更少）。

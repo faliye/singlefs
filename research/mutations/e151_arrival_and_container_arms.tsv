@@ -13,3 +13,7 @@ M12_pack_sweep_one	const PACK_SWEEP_PER_CHECKPOINT: usize = 64;	const PACK_SWEEP
 M13_by_request_shuffles_keys_not_requests	        requests.swap(index, other);	        requests.swap(index, index);
 M14_metadata_fallback_not_attributed	            self.metadata_fallback_allocations += self.fallback_allocations - before;	            let _ = before;
 M15_pack_sweep_parameter_ignored	    while looked < sim.pack_sweep_per_checkpoint {	    while looked < PACK_SWEEP_PER_CHECKPOINT {
+M16_directory_hint_ignores_member_segments	        for member in first_member..last_member {	        for member in first_member..first_member {
+M17_directory_metrics_group_by_double_size	        let directory_count = object_count.div_ceil(OBJECTS_PER_DIRECTORY);	        let directory_count = object_count.div_ceil(2 * OBJECTS_PER_DIRECTORY);
+M18_directory_home_forgets_overflow_segment	        [home_segment, overflow_segment]	        [home_segment, home_segment]
+M19_home_overflow_parameter_ignored	        let overflow_segment_count = self.home_overflow_segments.unwrap_or(tail_segment_count).min(tail_segment_count).max(1);	        let overflow_segment_count = tail_segment_count;

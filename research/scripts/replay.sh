@@ -161,7 +161,7 @@ E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-13.out|exact
 E147|e147-superblock-recompute-from-layout||e147-superblock-recompute-from-layout-2026-09-13.out|exact
 E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
 E150|e150-rollback-reuse-of-abandoned-roots||e150-rollback-reuse-of-abandoned-roots-2026-09-13.out|exact
-E151|e151-arrival-and-container-arms||e151-arrival-and-container-arms-2026-09-13-sweep.out|exact
+E151|e151-arrival-and-container-arms||e151-arrival-and-container-arms-2026-09-13-overflow.out|exact
 E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026-09-13.out|exact
 E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
