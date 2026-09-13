@@ -46,7 +46,7 @@ NEXT_HEADING_PATTERN = re.compile(r'^## ', re.MULTILINE)
 DECLARED_PRODUCT_PATHS_PATTERN = re.compile(r'`path=([^`]+)`')
 MERGED_STREAM_NOTE_PATTERN = re.compile(r'整条流\s*`([0-9]+(?:\+[0-9]+)+)`\s*、\s*(\d+)\s*个状态')
 ROW_PRODUCT_PATH_PATTERN = re.compile(r'path=([A-Za-z0-9_]+)')
-SEGMENT_SEQUENCE_PATTERN = re.compile(r'`([0-9]+(?:\+[0-9]+)+)`')
+SEGMENT_SEQUENCE_PATTERN = re.compile(r'`([0-9]+(?:\+[0-9]+)*)`')  # 一条路径可以只有一段（取号那一行是 `2`），所以 + 与 * 之间取 *
 STEP_KINDS_PATTERN = re.compile(r'种类\s*`(\[[^`]+\])`')
 UNESCAPED_PIPE_PATTERN = re.compile(r'(?<!\\)\|')
 OPERATION_COUNT_PATTERN = re.compile(r'(\d+)\s*次操作')

@@ -1,4 +1,4 @@
-M1_root_record_242	const ROOT_RECORD_BYTES: u64 = 250;	const ROOT_RECORD_BYTES: u64 = 242;
+M1_root_record_250	const ROOT_RECORD_BYTES: u64 = 333;	const ROOT_RECORD_BYTES: u64 = 250;
 M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
 M3_oracle_ignores_walk_failure	        RecoveryOutcome::Failed { reason, .. } => Some(format!("走读失败：{reason}")),	        RecoveryOutcome::Failed { .. } => None,
 M4_accept_unit_without_checksum	        if castagnoli_crc32(&bytes) == location.unit_checksum {	        if true {
@@ -12,10 +12,29 @@ M11_allocated_bytes_short_one_slot	value: allocated_slots * SLOT_BYTES	value: (a
 M12_enumeration_skips_empty_subset	        for mask in 0..full_mask {	        for mask in 1..full_mask {
 M13_fua_never_a_boundary	                if fua_is_boundary && is_fua {	                if false {
 M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
-M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT + 1,	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT,
+M15_watermark_not_above_max_tree	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_SHARE_COUNT + 1;	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_SHARE_COUNT;
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {
 M17_feature_bit_not_written	writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT);	writer.put_u8(0);
 M18_parser_ignores_unknown_incompat	unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity	has_layout_identity
 M19_one_warm_up_publish	const WARM_UP_EMPTY_PUBLISHES: u64 = 2;	const WARM_UP_EMPTY_PUBLISHES: u64 = 1;
-M20_mkfs_drops_trailing_barrier	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);\n    }\n    pool.barrier();	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);\n    }
-M21_superblock_slot_recorded_as_unit_write	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::SuperblockSlot);	        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), &superblock.to_slot(), StepKind::UnitWrite);
+M20_mkfs_drops_trailing_barrier	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);\n        }\n    }\n    pool.barrier();	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);\n        }\n    }
+M21_superblock_slot_recorded_as_unit_write	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::UnitWrite);
+M22_superblock_495	const SUPERBLOCK_BYTES: u64 = 452;	const SUPERBLOCK_BYTES: u64 = 495;
+M23_journal_header_95	const JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES: u64 = 277;	const JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES: u64 = 95;
+M24_index_node_header_81	const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;	const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 81;
+M25_node_mapping_key_padded_to_27	const MAPPING_KEY_NODE_BYTES: u64 = 25;	const MAPPING_KEY_NODE_BYTES: u64 = 27;
+M26_mkfs_takes_instance_one	const MKFS_INSTANCE_GENERATION: u32 = 0;	const MKFS_INSTANCE_GENERATION: u32 = 1;
+M27_tree_identifiers_from_one	const TREE_IDENTIFIER_EXTENT: u64 = 11;	const TREE_IDENTIFIER_EXTENT: u64 = 1;
+M28_in_flight_limit_no_safety_factor	const JOURNAL_SAFETY_FACTOR: u64 = 3;	const JOURNAL_SAFETY_FACTOR: u64 = 1;
+M29_journal_ring_64_mebibytes	const JOURNAL_RING_BYTES: u64 = 768 << 20;	const JOURNAL_RING_BYTES: u64 = 64 << 20;
+M30_allocation_key_still_twelve	const ALLOCATION_KEY_BYTES: usize = 10;	const ALLOCATION_KEY_BYTES: usize = 12;
+M31_apply_record_keeps_old_tree_table	                tree_table: record.new_tree_table,	                tree_table: rebuilt.tree_table,
+M32_empty_cluster_segments_off_by_one	        .count() as u64\n}	        .count() as u64 - 1\n}
+M33_free_runs_counts_every_free_slot	        if is_free && !previous_was_free {	        if is_free {
+M34_superblock_slot_never_rotates	    (generation, (generation % 2) as usize)	    (generation, 0)
+M35_warm_up_back_chain_always_zero	        back_chain: previous_record_bytes.as_deref().map_or(0, journal_back_chain),	        back_chain: 0,
+M36_named_entry_drops_birth_sequence	    tail[4..8].copy_from_slice(&birth_sequence.0.to_le_bytes());	    tail[4..8].fill(0);
+M37_header_does_not_self_describe_key_width	    writer.put_u8(u8::try_from(key_width).expect("key 宽 1 字节"));	    writer.put_u8(0);
+M38_declared_length_not_entry_bytes	    let declared_length: usize = entries.iter().map(Vec::len).sum();	    let declared_length: usize = 0;
+M39_data_unit_in_the_open_cluster_segment	const SLOT_DATA_UNIT: u64 = 50180;	const SLOT_DATA_UNIT: u64 = 50304;
+M40_device_bytes_doubled	const DEVICE_BYTES: u64 = 1 << 30;	const DEVICE_BYTES: u64 = 1 << 31;

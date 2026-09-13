@@ -22,7 +22,7 @@
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
-//! - **D23（journal 的角色与格式）**：journal 记录头 95（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17），登记名 JOURNAL_HEADER_BYTES。
+//! - **D23（journal 的角色与格式）**：journal 记录头 277（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 已定项 15 新根段 182），登记名 JOURNAL_HEADER_BYTES。
 //! - **D2 已定项 9**：第一版 2 盘恒 w = 2。
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
@@ -82,7 +82,7 @@ const MAP_KEY: u64 = 33; // D18 已定项 3
 const LOC_ENTRY: u64 = 14; // D19 已定项 4
 const ALLOC_ENTRY: u64 = 18; // D3 已定项 7
 const GRAIN: u64 = 16384; // D3 已定项 7 落点粒度
-const JOURNAL_HEADER_BYTES: u64 = 95; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
+const JOURNAL_HEADER_BYTES: u64 = 277; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
 const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
@@ -337,10 +337,10 @@ mod tests {
         assert_eq!(alloc_leaves, 113);
         assert_eq!(alloc_leaves * NODE * W, 3_702_784);
         let journal_w = N * (JOURNAL_HEADER_BYTES + MAP_ENTRY);
-        assert_eq!(journal_w, 15_600_000);
+        assert_eq!(journal_w, 33_800_000);
         let l = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true);
-        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 15_600_000);
-        assert_eq!(l.move_write, 144_640_384);
+        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 33_800_000);
+        assert_eq!(l.move_write, 162_840_384);
     }
 
     /// 反向接受条款要判的那个符号：bg_key 的回本比，逐档钉住。
@@ -351,7 +351,7 @@ mod tests {
         let saved = pad.occupancy - l.occupancy;
         assert_eq!(saved, 3_220_275_200);
         let p = payback(&pad, &l);
-        assert!((p - 0.044916).abs() < 1e-6, "512 B 档回本比实测 {p}");
+        assert!((p - 0.050567).abs() < 1e-6, "512 B 档回本比实测 {p}");
         // 16 KiB 档 cap = 1 ⇒ 一点不省 ⇒ 回本比无穷
         let l16 = pack_ledger(N, 16384, SLOT_EXTRA, 0, 1, true);
         assert!(payback(&pad, &l16).is_infinite());
@@ -370,8 +370,10 @@ mod tests {
         // 而 b=1 的凑满序把分配记录也打散了（101 725 条改动散在 113 片叶上），再加 journal。
         // 三个数都留在这里，不许回头改前两个：跑前登记值 1.058893；
         // 第一版实测 3.127186（分配记录按落点算，一个单元记 2 条 —— 建模错）；
-        // 改成 D3 已定项 7 逐字「一条记一个单元」之后 2.092080。
-        assert!((p - 2.092608).abs() < 1e-5, "实测 {p}");
+        // 改成 D3 已定项 7 逐字「一条记一个单元」之后 2.092080（journal 头 78 那一版）；
+        // 头 78 → 95 之后 2.092608；头 95 → 277（D23 已定项 15 的新根段 182）之后 2.098260。
+        // 每一版的数都逐字抄自当时那份产物的 name=payback_fill size=512 b=1 journal=true 行。
+        assert!((p - 2.098260).abs() < 1e-5, "实测 {p}");
     }
 
     /// bg_ideal 是上界：它的回本比必须严格小于另外两条臂。
@@ -430,8 +432,8 @@ mod tests {
         assert_eq!(leaves_touched_scattered(alloc_changed, alloc_changed.div_ceil(alloc_leaf_cap()), N), 226);
         let key = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let fill_n = pack_ledger(N, 512, SLOT_EXTRA, 1, N, true).move_write;
-        assert_eq!(key, 144_640_384);
-        assert_eq!(fill_n, 148_343_168);
+        assert_eq!(key, 162_840_384);
+        assert_eq!(fill_n, 166_543_168);
     }
 
     /// 稳态占用：均匀独立死亡下，打包形态在任何 d 上都不比 pad 差。
@@ -492,11 +494,12 @@ mod tests {
         assert_eq!(l.move_read, 3_276_800_000);
     }
 
-    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 13 900 000。
+    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 33 800 000
+    /// （每搬一个对象一条记录，头 277 + 映射条目 61 = 338 字节 × 100 000）。
     #[test]
     fn journal_is_an_assumption() {
         let with = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let without = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, false).move_write;
-        assert_eq!(with, without + 15_600_000);
+        assert_eq!(with, without + 33_800_000);
     }
 }
