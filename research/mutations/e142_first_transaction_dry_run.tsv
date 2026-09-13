@@ -14,3 +14,5 @@ M13_fua_never_a_boundary	                if fua_is_boundary && is_fua {	        
 M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
 M15_watermark_not_above_max_tree	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT + 1,	        tree_identifier_watermark: TREE_IDENTIFIER_SHARE_COUNT,
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {
+M17_feature_bit_not_written	writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT);	writer.put_u8(0);
+M18_parser_ignores_unknown_incompat	unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity	has_layout_identity

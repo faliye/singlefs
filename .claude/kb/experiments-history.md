@@ -16,6 +16,12 @@
 
 ## 历史版本
 
+### 2026-09-13（其十四）：E142（第一个事务的干跑） 按 D15（格式冻结政策） 已定项 4 第三次跑——incompat 位 0 置 1、解析器「不认识不许挂」，判决不变
+
+- **改前**：产物 `research/results/e142-first-txn-dry-run-2026-09-13-settled.out` 的超级块 feature bits 全 0，解析器跳过那 96 字节；空白 G12 开着。
+- **改后**：产物 `research/results/e142-first-txn-dry-run-2026-09-13-featurebit.out`（66 行）：mkfs 起 incompat 位 0 置 1，解析器遇到未登记的 incompat 位或位 0 没置就拒绝，compat_ro / compat 不看；多一行 `name=feature_bits incompat_byte0=0x01 … refuses_unknown_incompat=true refuses_missing_layout_bit=true`，G12 改成已收口，判决行逐字不变；17 单测、18 条变异全抓；复跑登记改指新产物。
+- **依据**：用户 2026-09-13 定案 D15（格式冻结政策） 已定项 4；C312（第一条布局线的 incompat 位没赋值） 前置已还。
+
 ### 2026-09-13（其十三）：E142（第一个事务的干跑） 按用户定案重跑——超级块 495、树表第 1 版 7 条、树 ID 水位 8，判决不变
 
 - **改前**：产物 `research/results/e142-first-txn-dry-run-2026-09-13.out` 按定案前的字节表：超级块 413、树表 5 条、水位 6。

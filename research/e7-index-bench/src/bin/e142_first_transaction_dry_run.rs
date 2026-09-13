@@ -130,6 +130,13 @@ const STATISTIC_INODE_WATERMARK: u16 = 12;
 const UNIT_MAGIC: [u8; 4] = *b"SFSU";
 const ROOT_MAGIC: [u8; 4] = *b"SFSR";
 const SUPERBLOCK_MAGIC: [u8; 4] = *b"SFSB";
+/// D15 已定项 4：incompat 位 0 = 第一条纯 SSD 布局线，mkfs 起就置上；位图小端、位 0 是第一个字节的最低位。
+const INCOMPAT_FIRST_SSD_LINE_BIT: u8 = 0x01;
+/// 三张位图各 32 字节（256 位）紧跟 magic 4 + 版本 2，incompat 在前、compat_ro 居中、compat 在后（D15 已定项 1）。
+const SUPERBLOCK_FEATURE_BITS_OFFSET: usize = 4 + 2;
+const FEATURE_BITMAP_BYTES: usize = 32;
+/// 读者认识的全部 incompat 位；多出任何一位就是「不认识不许挂」（fs-design 格式层判据）。
+const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_FIRST_SSD_LINE_BIT;
 const JOURNAL_MAGIC: [u8; 4] = *b"SFSJ";
 const FORMAT_VERSION: u16 = 1;
 
@@ -1040,7 +1047,8 @@ impl Superblock {
         let mut writer = ByteWriter::new(PHYSICAL_BLOCK_BYTES as usize);
         writer.put(&SUPERBLOCK_MAGIC);
         writer.put_u16(FORMAT_VERSION);
-        writer.skip(96); // feature bits 全 0（gap G12：D12 要求每套布局各占一个 incompat 位，第一条线的位没赋值）
+        writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT); // feature bits：incompat 位 0 = 第一条纯 SSD 布局线（D15 已定项 4，2026-09-13 用户定案）
+        writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
         writer.put(&self.fsid);
         writer.put_u32(self.this_device.0);
         writer.put_u32(self.device_count);
@@ -1095,6 +1103,9 @@ impl Superblock {
         if wide_checksum_with_field_zeroed(bytes, PHYSICAL_BLOCK_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET) != bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32] {
             return None;
         }
+        if !incompat_bits_are_mountable(bytes) {
+            return None;
+        }
         let mut reader = ByteReader::at(bytes, 4 + 2 + 96);
         let fsid: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节");
         let this_device = DeviceIdentity(reader.get_u32());
@@ -1107,6 +1118,16 @@ impl Superblock {
         let journal_instance = InstanceGeneration(tail_reader.get_u32());
         Some(Self { fsid, this_device, device_count, slot_generation, region_devices, journal_tail, journal_instance })
     }
+}
+
+/// D15 已定项 4 与 fs-design「格式层的让非法状态无法表示」：incompat 位图里有读者不认识的位、
+/// 或第一条 SSD 线那一位没置（没有布局身份），都拒绝挂载；compat_ro / compat 两张位图不认识随便，读者不看。
+fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
+    let incompat = &slot[SUPERBLOCK_FEATURE_BITS_OFFSET..SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
+    let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
+    let unknown_in_rest = incompat[1..].iter().any(|byte| *byte != 0);
+    let has_layout_identity = incompat[0] & INCOMPAT_FIRST_SSD_LINE_BIT != 0;
+    unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity
 }
 
 /// 根环区域 r 的起点（设备内偏移）：`1 MiB + r × P × chunk`（字节表零，预想按设备内偏移读）。
@@ -2490,7 +2511,7 @@ const GAPS: &[(&str, &str)] = &[
     ("G9", "journal两份镜像何时算「记录在」没有条款（一份合法即在、还是两份都要）；装置取任一份合法即在"),
     ("G10", "里程碑步4验收「把位置提示改坏、经映射仍读到」在字节层做不到：提示住父节点、父节点被树表指针里的整单元CRC罩着，改坏提示先红父节点；要验的是搬走单元那条路"),
     ("G11", "里程碑步1验收「同参数两次mkfs逐字节相同」与字节表「fsid=mkfs随机」矛盾：fsid必须是mkfs参数"),
-    ("G12", "超级块feature位全0与D12已定项1「每套布局各占一个incompat位」不合：第一条线（纯SSD）的位没赋值"),
+    ("G12", "已收口（2026-09-13 D15已定项4）：incompat位0=第一条纯SSD布局线，装置从mkfs起置上；位图其余全0"),
     ("G13", "码2节点的条目数与条目宽不在头字段表里，只能住载荷内部布局（D15第4层）；装置在预留位之后放u16条目数+u16条目宽"),
     ("G14", "实例表链指针行宽在这一轮里从64改成88（C304，D18已定项11）；写装置那天kb还是64，跑之前改成了88，行里的83宽指针无下一片时清零"),
     ("G15", "码2的「声明长度」语义未定（I-2.3把码2排除在外）；装置写载荷已用字节"),
@@ -2630,6 +2651,23 @@ fn main() {
     }
     emit(&mut emitter, &format!("name=gaps count={}", GAPS.len()));
 
+    // 判据 9（2026-09-13 加，D15 已定项 4）：feature bits 的实际字节与「不认识不许挂」。
+    let superblock_slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), PHYSICAL_BLOCK_BYTES as usize);
+    let feature_bits = &superblock_slot[SUPERBLOCK_FEATURE_BITS_OFFSET..SUPERBLOCK_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES];
+    let mut unknown_incompat_slot = superblock_slot.clone();
+    unknown_incompat_slot[SUPERBLOCK_FEATURE_BITS_OFFSET] = 0x03;
+    let mut no_layout_slot = superblock_slot.clone();
+    no_layout_slot[SUPERBLOCK_FEATURE_BITS_OFFSET] = 0x00;
+    emit(&mut emitter, &format!(
+        "name=feature_bits incompat_byte0={:#04x} incompat_rest_zero={} compat_ro_zero={} compat_zero={} refuses_unknown_incompat={} refuses_missing_layout_bit={}",
+        feature_bits[0],
+        feature_bits[1..FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0),
+        feature_bits[FEATURE_BITMAP_BYTES..2 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0),
+        feature_bits[2 * FEATURE_BITMAP_BYTES..].iter().all(|byte| *byte == 0),
+        !incompat_bits_are_mountable(&unknown_incompat_slot),
+        !incompat_bits_are_mountable(&no_layout_slot),
+    ));
+
     emit(&mut emitter, &format!(
         "name=verdict width_mismatches={width_mismatches} write_list_ok={} recover_full_ok={content_matches} layer0_states_ok={} layer0_violations={} control_states_ok={} control_violations_ok={} journal_differing_states={}",
         write_count == 21 && barrier_count == 2 && fua_count == 1,
@@ -2735,6 +2773,27 @@ mod tests {
         }
         assert_eq!(readable, 3);
         assert_eq!(ring_region_offset(2).0, 7 << 20);
+    }
+
+    #[test]
+    fn unknown_incompat_bit_or_missing_ssd_line_bit_refuses_to_mount_but_compat_bits_do_not() {
+        let parameters = PoolParameters::settled_two_devices();
+        let (recording, _) = mkfs(&parameters);
+        let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), PHYSICAL_BLOCK_BYTES as usize);
+        assert_eq!(slot[SUPERBLOCK_FEATURE_BITS_OFFSET], INCOMPAT_FIRST_SSD_LINE_BIT, "mkfs 起 incompat 位 0 置 1（D15 已定项 4）");
+        assert!(slot[SUPERBLOCK_FEATURE_BITS_OFFSET + 1..SUPERBLOCK_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
+        assert!(Superblock::parse_slot(&slot).is_some(), "原样可挂");
+        let reseal = |mut bytes: Vec<u8>, offset: usize, value: u8| {
+            bytes[offset] = value;
+            let digest = wide_checksum_with_field_zeroed(&bytes, PHYSICAL_BLOCK_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);
+            bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+            bytes
+        };
+        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET, 0x03)).is_none(), "incompat 位 1 没登记：不认识不许挂");
+        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
+        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET, 0x00)).is_none(), "没有布局身份：拒绝");
+        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat_ro 位不认识只读挂，读者照样解析");
+        assert!(Superblock::parse_slot(&reseal(slot, SUPERBLOCK_FEATURE_BITS_OFFSET + 2 * FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat 位不认识随便");
     }
 
     #[test]

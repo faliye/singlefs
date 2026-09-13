@@ -153,7 +153,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13.out|exact
-E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-settled.out|exact
+E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-featurebit.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-13.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-13.out|exact
