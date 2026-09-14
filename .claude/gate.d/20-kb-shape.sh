@@ -242,7 +242,7 @@ hit=$(for f in $(find "$KB" -name '*.md' ! -name '*-history.md' ! -path '*/decis
       done | grep -E '本决策此前|正文此前写|此前写的是|此前写着|此前从未写|此前没有写过|此前没写过|此前不存在|曾经写作|曾经写着|原先写的是|已经不是现行' || true)
 if [[ -n "$hit" ]]; then
   bad "正文里出现历史语气"; printf '%s\n' "$hit" | sed 's/^/     /'
-  howto "正文改写成现状，把「原先如何 / 依据」写进文末「历史版本」。"
+  howto "正文改写成现状，把「原先如何 / 依据」写进文末「历史版本」；决策正文（decisions.md 与 decisions/）不写文末，写进当月的 decisions-history/<年-月>.md（写法见 decisions-history.md「怎么加一条」）。"
 else ok "正文没有历史语气"; fi
 
 echo

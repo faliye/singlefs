@@ -3,8 +3,8 @@
 **一个从零设计的 COW 文件系统，Rust 实现。**
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
 
-当前里程碑：**格式设计阶段**——尚无磁盘格式、无代码。
-先定决策里的待定项，再动第一行实现——索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`。
+当前里程碑：**「第一个事务」**（`.claude/kb/milestone-first-txn.md`），步 0 脚手架 2026-09-14 开工：`crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
+磁盘格式仍是软的（`.claude/rules/format-evolution.md`）；决策索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`，第一个事务的字节表在 `.claude/kb/first-txn-layout.md`。
 
 ## 规则（始终生效）
 
@@ -72,6 +72,8 @@
 | `research/scripts/stage-mine.py` | 几个会话共写一批文件时只暂存这一轮的块：插入段按标题行、表格行、replay 登记行切块，命中 `--match` 的进暂存区、其余留在工作区，进暂存区的块命中 `--foreign` 就拒绝；`--selftest` 自证会红 |
 | `research/scripts/check-staged.sh` | 在临时 worktree 上只拿「HEAD + 暂存区」跑 doc-lint 与快的 kb 阶段，别的会话没收尾的改动与未跟踪文件都不进来；`--selftest` 自证会红 |
 | `research/scripts/relabel-item.py` | 分项翻了状态之后按 22 号门禁的归属规则改写全仓引用（`D19 6 --dry-run` 先看），改完标签仍说它没定的句子列成「要人看」；`--selftest` 自证会红 |
+| `research/scripts/check-segment-registry.py` | 把 `first-txn-layout.md` 八的段序列登记表（段序列、操作数、闭式、每段步骤种类多重集）与 E142 产物的 `name=segments` 行逐字比对，产物路径从 `replay.sh` 的 E142 行动态解析；门禁 52 号调它；`--selftest` 自证会红 |
+| `research/scripts/replace-once.py` | 定点替换：`replace-once.py 文件 旧串 新串`，旧串在文件里必须恰好命中一次，0 次或多次都拒绝、不写；几个会话共写一批文件时只许这样改，不许整份重写；`--selftest` 自证会红 |
 | `research/scripts/claim-experiment.sh` | 取实验号并当场占住：查号与建跑前登记在同一步，建文件用排他方式；`--next` 打印下一个空号；`--selftest` 自证会红 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
@@ -121,11 +123,14 @@ bash .claude/gate.d/44-settled-ref-says-open.sh # 引用写着「已定项」，
 bash .claude/gate.d/45-script-modes.sh     # 脚本的执行位在暂存区里没丢（手工暂存写死 100644 的那一型）
 bash .claude/gate.d/46-write-hook.sh     # Write 覆盖未跟踪文件的 hook 注册着、而且会拒绝（几个会话共写一个仓）
 bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自证还会红（ask-local 判红分支、清单生成取法、机械整抄、小节清单）
-bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）
+bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）；决策正文文末只放指路、不写条目
 bash .claude/gate.d/49-history-brief.sh # 决策变更史的快查与原文同步（每条原文标题下两行快查；--write 重新生成按决策的汇总）
 bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
 bash .claude/gate.d/51-admission-terms-covered.sh # 准入不等式的每一项都有人维护：被维护的统计量，或写明的例外
 bash .claude/gate.d/52-segment-registry.sh     # 段序列登记表（first-txn-layout.md 八）与 E142 产物的 name=segments 行逐字比对
+bash .claude/gate.d/53-format-const-placeholders.sh # 格式常量文件（crates/singlefs-format）里的占位：每个占位都指得到一条真实存在的分项或欠账
+bash .claude/gate.d/54-layer0-replay.sh # 层 0 崩溃点重放：第一个事务的全部崩溃状态（262165 个）在 release 下逐个跑恢复，计数与 E142 产物逐字比对
+bash .claude/gate.d/55-qemu-first-transaction.sh # QEMU 真设备上的第一个事务：两块 virtio 盘、设备侧独立录制与程序录制流逐项比，漏一道屏障与走页缓存两个对照必须判红
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
 bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（55 条承重引用，源码树不在也判红）

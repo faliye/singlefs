@@ -16,6 +16,24 @@
 
 ## 历史版本
 
+### 2026-09-14（其三）：E141（切换预留的挂载准入自证） 第三次跑——预留按 N_switch + 1 份（写行那次发布多一份）
+
+- **改前**：第二次跑（产物 `research/results/e141-switch-reserve-mount-admission-2026-09-13-warmup.out`，120 行）：份额 = N_switch × (链重写 + 暖机)，第一个事务几何每块盘 42 / 87 块（c_max 4 / 9），六个错法、13 条变异。
+- **改后**：产物 `research/results/e141-switch-reserve-mount-admission-2026-09-14-row-writing.out`（121 行）：份额 = (N_switch + 1) × (链重写 + 暖机)，每块盘 56 / 116 块；五条判据全过，七个错法（加「漏写行那一份」）各有分得开的取样点，14 条变异全抓；两张手算表在跑之前重算，判据与作废条款没改。
+- **依据**：用户 2026-09-14 收尾弹窗定 C329（写行那次发布之前推抬 F 的空发布没有检查） 的预留多一份（`research/prompts/c329-c330-r3-main-verification.md` 第五节），D28（挂载期承诺量） 已定项 3 随之改写。
+
+### 2026-09-14（其二）：E142（第一个事务的干跑） 第七次跑——按当日 18 问的定案改装置重跑，超级块槽宽收尾时改 4096
+
+- **改前**：第六次跑（产物 `research/results/e142-first-txn-dry-run-2026-09-13-settled6.out`）：指针 85 / 83、根记录 333、journal 记录头 277、树表 6 条 145、超级块 452 / 槽 512、镜像 1 GiB、记账 8 行、t3 先于 t2。
+- **改后**：产物 `research/results/e142-first-txn-dry-run-2026-09-14-round2-slot4096.out`（93 行）：指针 88 / 86、根记录 371、journal 记录头 307、树表 7 条 148、超级块 481 / 槽 4096、镜像 4 GiB（单元区 211968 槽）、记账 15 行、bump 次序按树 ID 升序（t2 50240、t3 50242–50243 … t8 50248，runs 每盘 4）；`name=width` 28 行 expected == actual，`name=segments` 五行与第六次跑逐字相同，层 0 262165 个状态零违例；25 单测；新记 G24 / G25 两笔账。
+- **依据**：用户 2026-09-14 弹窗定案 18 问（记录第十一节）与超级块槽宽三方第一轮的主 agent 判决（`research/prompts/d22-slotwidth-r1-main-verification.md`，预想、待收尾弹窗）。
+
+### 2026-09-14（其一）：五份装置跟上 2026-09-14 用户定案的三个格式常量——journal 记录头 307、inode 内部条目 120、树表条目 148
+
+- **改前**：`JOURNAL_HEADER_BYTES = 277`（E43（扩展点字节上限）、E116（打包容器的账·补元数据写与整理策略））、`INODE_INTERNAL_ENTRY = 117` 与 `CHILD_POINTER_BYTES = 83`（E103（inode 打包路 ① 的更新代价））、`TREE_TABLE_ENTRY_BYTES = 145`（E145（码 2 自描述头与映射树 key 宽的代价）、E146（livelist 条目按映射 key 定身份之后的宽度与代价））。E43（扩展点字节上限） 报自证单元余量 235 / 3819；E116（打包容器的账·补元数据写与整理策略） 每搬一个对象的 journal 写 277 + 61 = 338 字节、`bg_key` 512 B 0.0506 / 1 KiB 0.0847 / 4 KiB 0.3512 / 8 KiB 1.0233、凑满序 512 B `b`=1 时 2.0983 / `b`=N 时 0.0517；E103（inode 打包路 ① 的更新代价） 内部扇出 173 的位置是 179、容器索引扇出 149、1e6 层数向量 [8621, 49, 1] 与 [29, 1]；E145（码 2 自描述头与映射树 key 宽的代价） 三臂 `tree_table_bytes` 145 / 290 / 145；E146（livelist 条目按映射 key 定身份之后的宽度与代价） day-1 注册 145 / 16638 字节。
+- **改后**：`JOURNAL_HEADER_BYTES = 307`、`INODE_INTERNAL_ENTRY = 120`（连带 `CHILD_POINTER_BYTES = 86`，见依据）、`TREE_TABLE_ENTRY_BYTES = 148`；五份产物全部重跑，文件名后缀 `-2026-09-14-round2`，旧产物一份没删。E43（扩展点字节上限）：128 行里 **3 行**变（`room` 235→**205**、3819→**3789**，`n_max_journal_512` 235→**205**，连带 `n_max_if_self_witness_carries` 235→**205**），18 行 `mount_eval` 逐字未变，单测改名 `the_self_witness_bound_is_205_not_864`，21 单测 / 19 条变异全抓。E116（打包容器的账·补元数据写与整理策略）：306 行里 **36 行**变（config 1 + `payback_key` 5 + `payback_fill` 30），journal 写每次 307 + 61 = 368 字节，`bg_key` 512 B **0.0515** / 1 KiB **0.0857** / 4 KiB **0.3523** / 8 KiB **1.0247（仍不赚）**，凑满序 512 B `b`=1 时 **2.0992** / `b`=N 时 **0.0526**，策略拉开的倍数 41→**40**；稳态占用、爆炸半径、阳性与阴性对照逐字未变，17 单测 / 16 条变异全抓。E103（inode 打包路 ① 的更新代价）：131 行里 **49 行**变（config 1 + `geom` 12 + `write` 36），内部扇出 179→**173**、容器索引扇出 149→**145**、1e6 层数向量 [8621, **50**, 1] 与 [**30**, 1]、第三臂内部层 [**32**, 1] 与 [**3156, 24**, 1]，`stat` 与 `write_clustered` 与爆炸半径逐格未变，批量比 1.83→**1.82**、第三臂对路 ① 最多多 0.93%→**0.92%**，13 单测 / 11 条变异全抓。E145（码 2 自描述头与映射树 key 宽的代价）：57 行里 **3 行**变（三臂 `tree_table_bytes` 148 / 296 / 148），9 单测 / 11 条变异全抓。E146（livelist 条目按映射 key 定身份之后的宽度与代价）：130 行里 **6 行**变（config 1 + `first_transaction` 5，day-1 注册 **148** / **16641** 字节，两棵树 **296** / **33282**），8 单测 / 12 条变异全抓。`research/scripts/replay.sh` 里这五行改指新产物，五份逐字节比对都一致。
+- **依据**：`.claude/kb/decisions/23-journal的角色与格式.md` 的 `<!-- format-const: JOURNAL_HEADER_BYTES = 307 -->`、`.claude/kb/decisions/08-核心索引结构.md` 的 `<!-- format-const: INODE_INTERNAL_ENTRY = 120 -->`、[first-txn-layout.md](first-txn-layout.md) 的 `<!-- format-const: TREE_TABLE_ENTRY_BYTES = 148 -->`，都是 2026-09-14 用户弹窗定案；门禁阶段「格式常量在 kb 与实验源码之间同步」当天对这五份装置判红，它的 howto 逐字要求「改常量要三处一起动：① kb 标记与正文 ② 实验源码的 `const` 与钉死它的单测 ③ 重跑实验并更新 `research/results/` 的产物」。`CHILD_POINTER_BYTES` 83→86 不是额外发挥：E103（inode 打包路 ① 的更新代价） 有一条结构性断言写着 `INODE_INTERNAL_ENTRY == INODE_KEY + CONTAINER_KEY_BYTES + CHILD_POINTER_BYTES`，而 D8（核心索引结构） 已定项 6 逐字是「**内部节点条目 = 分隔 key 8 + 身份引用 26 + 子指针 86 = 120 字节**」——120 本来就是由 86 推出来的，只改 120 那条断言会永远红。⚠️ E146（livelist 条目按映射 key 定身份之后的宽度与代价） 的变异表 M12 原文停在 `TREE_TABLE_FIRST_VERSION_ENTRIES = 5`（装置 2026-09-13 已按定案改成 7），这一轮之前它就替换不上、整轮变异中断，原文改成 7 之后 12 条全抓。
+
 ### 2026-09-13（其二十八）：E43（扩展点字节上限）、E116（打包容器的账·补元数据写与整理策略） 按 journal 头 277 重跑——夹住自证单元那一档的从根槽换成 journal 记录头
 
 - **改前**：两份装置都写 `const JOURNAL_HEADER_BYTES: u64 = 95`。E43（扩展点字节上限） 报自证单元余量 417 / 4001、`n_max_if_self_witness_carries=255`（由根槽的 256 − 1 夹）；E116（打包容器的账·补元数据写与整理策略） 每搬一个对象的 journal 写是 95 + 61 = 156 字节，`bg_key` 回本比 512 B 0.0449 / 1 KiB 0.0790 / 4 KiB 0.3448 / 8 KiB 1.0150，凑满序 512 B `b`=1 时 2.0926、`b`=N 时 0.0461。

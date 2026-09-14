@@ -1,5 +1,5 @@
 # naming-lint 不扫的目录或单个 .rs（.claude/singlefs-ai-sop/rules/code-discipline.md「门禁管哪一半」）。
-# 一行一条：<相对路径>  # 为什么。这是 0.0.41 命名纪律的回扫账：改完一个文件就删它那一行，只删不加；新文件照查。
+# 一行一条：<相对路径>  # 为什么。按文件列的那些是 0.0.41 命名纪律的回扫账：改完一个文件就删它那一行，只删不加；新文件照查。按目录列的 research/prompts 是原样保存的证据，不回收（evidence-discipline.md「原样保存的证据不许事后改」：门禁也得绕开这批目录）。
 research/e7-index-bench/src/bin/e114_pack_ledger.rs  # 回扫跳过：变异表 M6/M7 的原文在源码里各命中两处，改名前要先把这张表修成唯一命中
 research/e7-index-bench/src/bin/e116_pack_settle.rs  # 回扫跳过：变异表 M16 的原文是一段后来被改写的注释，表已对不上源码，要先修表
 research/e7-index-bench/src/bin/e126_superblock_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
@@ -12,3 +12,4 @@ research/e7-index-bench/src/bin/e67_device_subset.rs  # 回扫跳过：变异表
 research/e7-index-bench/src/bin/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
 research/e7-index-bench/src/bin/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
 research/e7-index-bench/src/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3
+research/prompts  # 三方论证发给模型的提示、原始输出与云端腿写的模型源码，与判决一一对应，改一个字就不再对应（evidence-discipline.md「原样保存的证据不许事后改」）；doc-lint 同样绕开它，见 .claude/doc-lint-exclude

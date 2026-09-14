@@ -1,0 +1,30 @@
+C first-txn-root-implies-units-nofence
+
+(*
+ * first-txn-root-implies-units 的对照组：发布一侧两道屏障都去掉。
+ * 只去掉其中一道仍判 Never——smp_wmb 把它之前的全部写排在它之后的全部写前面，单元与根槽之间隔着哪一道都够；
+ * 所以对照要两道都去掉才分得出屏障挡住了与本来就撞不上。
+ *
+ * singlefs-expect: Sometimes
+ *)
+
+{}
+
+P0(int *unit, int *journal, int *root)
+{
+	WRITE_ONCE(*unit, 1);
+	WRITE_ONCE(*journal, 1);
+	WRITE_ONCE(*root, 1);
+}
+
+P1(int *unit, int *journal, int *root)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*root);
+	smp_rmb();
+	r1 = READ_ONCE(*unit);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

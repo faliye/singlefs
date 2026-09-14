@@ -1,5 +1,5 @@
 M1_rows_per_page_keeps_chain_pointer	records_per_page(row_bytes) - 1	records_per_page(row_bytes)
-M2_pages_ignore_switch_rows	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes));\n    SWITCHES_PER_MOUNT * pages * unit_blocks()\n}	let pages = pages_for_rows(rows_at_mount, rows_per_page(row_bytes));\n    SWITCHES_PER_MOUNT * pages * unit_blocks()\n}
+M2_pages_ignore_switch_rows	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes));\n    RESERVED_SHARES_PER_MOUNT * pages * unit_blocks()\n}	let pages = pages_for_rows(rows_at_mount, rows_per_page(row_bytes));\n    RESERVED_SHARES_PER_MOUNT * pages * unit_blocks()\n}
 M3_two_switches	const SWITCHES_PER_MOUNT: u64 = 3;	const SWITCHES_PER_MOUNT: u64 = 2;
 M4_header_103	const PACKED_RECORD_HEADER_BYTES: u64 = 135;	const PACKED_RECORD_HEADER_BYTES: u64 = 103;
 M5_one_copy	const INSTANCE_TABLE_COPIES: u64 = 2;	const INSTANCE_TABLE_COPIES: u64 = 1;
@@ -8,6 +8,7 @@ M7_threshold_strict	.free_before_mount_commitment_blocks() >= share_per_device)	
 M8_control_keeps_reserve	ReserveArm::PositiveControlZeroReserve => 0,	ReserveArm::PositiveControlZeroReserve => reserve_share_per_device_blocks(rows_at_mount, row_bytes, checkpoint_cost_blocks),
 M9_block_is_32k	const BLOCK_BYTES: u64 = 16384;	const BLOCK_BYTES: u64 = 32768;
 M10_empty_table_zero_pages	rows.div_ceil(rows_per_page).max(1)	rows.div_ceil(rows_per_page)
-M11_row_width_ignored	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes));\n    SWITCHES_PER_MOUNT * pages * unit_blocks()\n}	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(ROW_BYTES_WITH_59_WIDE_POINTER));\n    SWITCHES_PER_MOUNT * pages * unit_blocks()\n}
+M11_row_width_ignored	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(row_bytes));\n    RESERVED_SHARES_PER_MOUNT * pages * unit_blocks()\n}	let pages = pages_for_rows(rows_at_mount + SWITCHES_PER_MOUNT, rows_per_page(ROW_BYTES_WITH_59_WIDE_POINTER));\n    RESERVED_SHARES_PER_MOUNT * pages * unit_blocks()\n}
 M12_two_empty_publishes	const EMPTY_PUBLISHES_PER_SWITCH: u64 = 3;	const EMPTY_PUBLISHES_PER_SWITCH: u64 = 2;
 M13_share_forgets_warm_up	chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes) + warm_up_share_per_device_blocks(checkpoint_cost_blocks)	chain_rewrite_share_per_device_blocks(rows_at_mount, row_bytes)
+M14_no_row_writing_publish_share	const ROW_WRITING_PUBLISH_SHARES: u64 = 1;	const ROW_WRITING_PUBLISH_SHARES: u64 = 0;

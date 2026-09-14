@@ -1,28 +1,28 @@
-M1_root_record_250	const ROOT_RECORD_BYTES: u64 = 333;	const ROOT_RECORD_BYTES: u64 = 250;
+M1_root_record_250	const ROOT_RECORD_BYTES: u64 = 371;	const ROOT_RECORD_BYTES: u64 = 333;
 M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
 M3_oracle_ignores_walk_failure	        RecoveryOutcome::Failed { reason, .. } => Some(format!("走读失败：{reason}")),	        RecoveryOutcome::Failed { .. } => None,
 M4_accept_unit_without_checksum	        if castagnoli_crc32(&bytes) == location.unit_checksum {	        if true {
 M5_wide_checksum_misses_last_byte	    let mut covered = bytes[..cover_end].to_vec();	    let mut covered = bytes[..cover_end - 1].to_vec();
-M6_data_pointer_83	const DATA_POINTER_BYTES: u64 = 85;	const DATA_POINTER_BYTES: u64 = 83;
+M6_data_pointer_83	const DATA_POINTER_BYTES: u64 = 88;	const DATA_POINTER_BYTES: u64 = 85;
 M7_mkfs_seeds_two_regions	    for region in 0..RING_REGIONS {\n        pool.write(	    for region in 0..RING_REGIONS - 1 {\n        pool.write(
-M8_payload_checksum_outside_header_checksum	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES as usize - 4, JOURNAL_HEADER_CHECKSUM_OFFSET);
+M8_payload_checksum_outside_header_checksum	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_RECORD_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_BYTES as usize - 4, JOURNAL_HEADER_CHECKSUM_OFFSET);
 M9_node_mapping_key_drops_birth_tree	    writer.put_u64(pointer.head.birth_tree.0);	    writer.put_u64(0);
 M10_instance_table_span_one	        (SLOT_INSTANCE_TABLE, 2, 0),	        (SLOT_INSTANCE_TABLE, 1, 0),
-M11_allocated_bytes_short_one_slot	value: allocated_slots * SLOT_BYTES	value: (allocated_slots - 1) * SLOT_BYTES
+M11_allocated_bytes_short_one_slot	accounting_entries.push(per_device(STATISTIC_ALLOCATED_BYTES, allocated_slots * SLOT_BYTES));	accounting_entries.push(per_device(STATISTIC_ALLOCATED_BYTES, (allocated_slots - 1) * SLOT_BYTES));
 M12_enumeration_skips_empty_subset	        for mask in 0..full_mask {	        for mask in 1..full_mask {
 M13_fua_never_a_boundary	                if fua_is_boundary && is_fua {	                if false {
 M14_root_always_region_zero	    (checkpoint_txg.0 % RING_REGIONS, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)	    (0, (checkpoint_txg.0 / RING_REGIONS) % RING_SLOTS_PER_REGION)
-M15_watermark_not_above_max_tree	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_SHARE_COUNT + 1;	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_SHARE_COUNT;
+M15_watermark_not_above_max_tree	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_DEADLIST + 1;	const TREE_IDENTIFIER_WATERMARK_AFTER_PUBLISH: u64 = TREE_IDENTIFIER_DEADLIST;
 M16_read_only_first_location	    for location in locations {	    for location in &locations[..1] {
 M17_feature_bit_not_written	writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT);	writer.put_u8(0);
 M18_parser_ignores_unknown_incompat	unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity	has_layout_identity
 M19_one_warm_up_publish	const WARM_UP_EMPTY_PUBLISHES: u64 = 2;	const WARM_UP_EMPTY_PUBLISHES: u64 = 1;
 M20_mkfs_drops_trailing_barrier	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);\n        }\n    }\n    pool.barrier();	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);\n        }\n    }
 M21_superblock_slot_recorded_as_unit_write	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);	            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::UnitWrite);
-M22_superblock_495	const SUPERBLOCK_BYTES: u64 = 452;	const SUPERBLOCK_BYTES: u64 = 495;
-M23_journal_header_95	const JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES: u64 = 277;	const JOURNAL_HEADER_WITH_SETTLED_INCREMENTS_BYTES: u64 = 95;
+M22_superblock_452	const SUPERBLOCK_BYTES: u64 = 481;	const SUPERBLOCK_BYTES: u64 = 452;
+M23_journal_header_95	const JOURNAL_HEADER_BYTES: u64 = 307;	const JOURNAL_HEADER_BYTES: u64 = 95;
 M24_index_node_header_81	const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;	const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 81;
-M25_node_mapping_key_padded_to_27	const MAPPING_KEY_NODE_BYTES: u64 = 25;	const MAPPING_KEY_NODE_BYTES: u64 = 27;
+M25_node_mapping_key_not_padded_to_27	const MAPPING_KEY_NODE_SIGNIFICANT_BYTES: u64 = 25;	const MAPPING_KEY_NODE_SIGNIFICANT_BYTES: u64 = 27;
 M26_mkfs_takes_instance_one	const MKFS_INSTANCE_GENERATION: u32 = 0;	const MKFS_INSTANCE_GENERATION: u32 = 1;
 M27_tree_identifiers_from_one	const TREE_IDENTIFIER_EXTENT: u64 = 11;	const TREE_IDENTIFIER_EXTENT: u64 = 1;
 M28_in_flight_limit_no_safety_factor	const JOURNAL_SAFETY_FACTOR: u64 = 3;	const JOURNAL_SAFETY_FACTOR: u64 = 1;
@@ -35,6 +35,32 @@ M34_superblock_slot_never_rotates	    (generation, (generation % 2) as usize)	  
 M35_warm_up_back_chain_always_zero	        back_chain: previous_record_bytes.as_deref().map_or(0, journal_back_chain),	        back_chain: 0,
 M36_named_entry_drops_birth_sequence	    tail[4..8].copy_from_slice(&birth_sequence.0.to_le_bytes());	    tail[4..8].fill(0);
 M37_header_does_not_self_describe_key_width	    writer.put_u8(u8::try_from(key_width).expect("key 宽 1 字节"));	    writer.put_u8(0);
-M38_declared_length_not_entry_bytes	    let declared_length: usize = entries.iter().map(Vec::len).sum();	    let declared_length: usize = 0;
+M38_declared_length_not_entry_bytes	    let declared_length: usize = entries.len() * entry_width as usize;	    let declared_length: usize = 0;
 M39_data_unit_in_the_open_cluster_segment	const SLOT_DATA_UNIT: u64 = 50180;	const SLOT_DATA_UNIT: u64 = 50304;
-M40_device_bytes_doubled	const DEVICE_BYTES: u64 = 1 << 30;	const DEVICE_BYTES: u64 = 1 << 31;
+M40_device_bytes_doubled	const DEVICE_BYTES: u64 = 4 << 30;	const DEVICE_BYTES: u64 = 8 << 30;
+M41_journal_worst_case_is_record_bytes	const JOURNAL_WORST_CASE_BYTES: u64 = JOURNAL_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES;	const JOURNAL_WORST_CASE_BYTES: u64 = JOURNAL_RECORD_BYTES;
+M42_pointer_head_without_compression	const POINTER_HEAD_BYTES: u64 = 50;	const POINTER_HEAD_BYTES: u64 = 47;
+M43_tree_table_entry_145	const TREE_TABLE_ENTRY_BYTES: u64 = 148;	const TREE_TABLE_ENTRY_BYTES: u64 = 145;
+M44_inode_internal_entry_117	const INODE_INTERNAL_ENTRY: u64 = 120;	const INODE_INTERNAL_ENTRY: u64 = 117;
+M45_extent_leaf_record_109	const EXTENT_LEAF_RECORD_BYTES: u64 = 112;	const EXTENT_LEAF_RECORD_BYTES: u64 = 109;
+M46_unit_reserved_still_28	const NONCE_MAC_RESERVED_BYTES: u64 = 29;	const NONCE_MAC_RESERVED_BYTES: u64 = 28;
+M47_key_width_field_back_after_the_key_range	const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;	const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 50;
+M48_journal_record_drops_the_fsid	        writer.put_u64(self.fsid);	        writer.put_u64(0);
+M49_header_checksum_covers_only_the_head	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_RECORD_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);\n        bytes[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);	        let digest = wide_checksum_with_field_zeroed(&bytes, JOURNAL_HEADER_BYTES as usize, JOURNAL_HEADER_CHECKSUM_OFFSET);\n        bytes[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+M50_superblock_writer_identity_left_blank	        writer.put(&writer_identity);\n        writer.put_u32(WRITER_IDENTITY_VERSION);	        writer.put(&[0u8; WRITER_IDENTITY_NAME_BYTES]);\n        writer.put_u32(0);
+M51_checksum_algorithm_identifier_zero	const CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI: u8 = 1;	const CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI: u8 = 0;
+M52_tree_table_head_identifier_always_zero	        writer.put_u64(self.head_identifier);	        writer.put_u64(0);
+M53_deadlist_not_registered_in_the_tree_table	        TreeTableEntry { kind: TREE_KIND_DEADLIST, tree: TreeIdentifier(TREE_IDENTIFIER_DEADLIST), root: NodePointer::empty_root(), birth_txg: txg, head_identifier: TREE_TABLE_HEAD_IDENTIFIER_NONE },\n    ];	    ];
+M54_admission_statistics_not_written_on_day_one	        accounting_entries.push(per_device(STATISTIC_UNRECLAIMABLE_BYTES, 0));\n        accounting_entries.push(per_device(STATISTIC_DEFER_QUEUE_BYTES, 0));	
+M55_runs_stays_pool_wide	        accounting_entries.push(per_device(STATISTIC_FRAGMENTATION_RUNS, free_run_count(&occupied)));	        accounting_entries.push(pool_wide(STATISTIC_FRAGMENTATION_RUNS, TREE_IDENTIFIER_NONE, free_run_count(&occupied)));
+M56_mkfs_physical_block_size_not_recorded	const MKFS_PHYSICAL_BLOCK_BYTES: u32 = 512;	const MKFS_PHYSICAL_BLOCK_BYTES: u32 = 4096;
+M57_extension_point_declared_nonzero	const EXTENSION_POINT_DECLARED_BYTES: u32 = 0;	const EXTENSION_POINT_DECLARED_BYTES: u32 = 8;
+M58_ring_region_devices_not_zero_one_zero	const RING_REGION_DEVICES: [u32; 3] = [0, 1, 0];	const RING_REGION_DEVICES: [u32; 3] = [0, 0, 1];
+M59_root_record_algorithm_type_nonzero	        writer.put_u8(0);\n        writer.skip(12 + 16);\n        writer.assert_position(ROOT_RECORD_BYTES, "根记录");	        writer.put_u8(1);\n        writer.skip(12 + 16);\n        writer.assert_position(ROOT_RECORD_BYTES, "根记录");
+M60_bump_order_back_to_the_sixth_run	const SLOT_EXTENT_ROOT: u64 = 50240;	const SLOT_EXTENT_ROOT: u64 = 50242;
+M61_journal_scan_ignores_the_fsid	                if record.fsid != expected_fsid {\n                    continue;\n                }	                if false {\n                    continue;\n                }
+M62_index_node_accepts_a_zero_entry_width	    if entry_width < key_width || entry_count * entry_width != declared_length as usize {	    if false {
+M63_tree_table_reserved_bytes_not_checked	        if bytes[TREE_TABLE_ENTRY_BYTES as usize - 24..].iter().any(|&byte| byte != 0) {\n            return Err(UnitError::Structure("树表条目预留 24 字节非零"));\n        }	
+M64_journal_worst_case_room_computed_from_the_old_header	const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;	const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 86;
+M65_superblock_slot_back_to_the_physical_block_width	const SUPERBLOCK_SLOT_BYTES: u64 = 4096;	const SUPERBLOCK_SLOT_BYTES: u64 = 512;
+M66_superblock_slot_checksum_covers_only_the_first_sector	        let digest = wide_checksum_with_field_zeroed(&bytes, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);\n        bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);\n        bytes\n    }	        let digest = wide_checksum_with_field_zeroed(&bytes, PHYSICAL_BLOCK_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);\n        bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);\n        bytes\n    }

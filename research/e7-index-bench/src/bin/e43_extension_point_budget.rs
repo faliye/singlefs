@@ -170,11 +170,12 @@ fn maximum_extension_point_bytes_keeping_one_pointer_in_node(node: u64) -> u64 {
 // ── 自证单元那一档（D20 推论三：根槽、journal 记录头）──
 // 它们没有带校验和的父指针，原子宽度**等于运行时探测到的 `physical_block_size`**。
 // ⇒ 扩展点在这一档的余量由**原子宽度**夹，不由「省不省」夹。
-const JOURNAL_HEADER_BYTES: u64 = 277; // D23 已定项 4：头 277 字节 = 十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 已定项 15 新根段 182
+const JOURNAL_HEADER_BYTES: u64 = 307; // D23 已定项 4：头 307 字节 = 十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 已定项 15 新根段 188 + fsid 8 + MAC 16
 const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 已定项 2 的候选槽宽
 
 /// 一个自证单元的头部落进一个原子单元之后，还剩多少字节。
-/// D23 已定项 4 逐字：277 字节头「占 512 扇区的 54%，其后还余 235 字节」；4096 上余 3819。
+/// D23 已定项 4 逐字：「头是 307 字节（……），占 512 扇区的 60%，其后还余 205 字节（装得下 3 个点名项，
+/// 每项 56 字节）；4096 上余 3789（67 个点名项）」。
 fn self_witness_room(header_bytes: u64, atomic: u64) -> u64 {
     atomic - header_bytes
 }
@@ -515,11 +516,11 @@ mod tests {
     }
 
     /// **自证单元那一档的余量由原子宽度夹**，绝对值钉在 D23 逐字写下的那个数上：
-    /// 277 字节头落进 512 扇区之后余 235。
+    /// 307 字节头落进 512 扇区之后余 205。
     #[test]
     fn self_witness_room_matches_the_decision_23_number() {
-        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512), 235);
-        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096), 3819);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512), 205);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096), 3789);
     }
 
     /// **撕裂隔离**：E34 主张一——槽宽 256、原子宽度 512 ⇒ 一个原子单元里挤 2 个槽。
@@ -531,14 +532,14 @@ mod tests {
         assert_eq!(slots_per_atomic(256, 4096), 16);
     }
 
-    /// **若自证单元也带扩展点，上界是 235，不是 864。**
-    /// 独立算术：min(512 − 277, 256 − 1) = min(235, 255) = 235。
-    /// 头 277 之后夹住这一档的换成了 journal 记录头那一侧（此前是根槽的 255）。
+    /// **若自证单元也带扩展点，上界是 205，不是 864。**
+    /// 独立算术：min(512 − 307, 256 − 1) = min(205, 255) = 205。
+    /// 夹住这一档的是 journal 记录头那一侧（205 < 255），不是根槽的 256 − 1。
     #[test]
-    fn the_self_witness_bound_is_235_not_864() {
+    fn the_self_witness_bound_is_205_not_864() {
         let bound = self_witness_room(JOURNAL_HEADER_BYTES, 512).min(ROOT_SLOT_CANDIDATE - 1);
-        assert_eq!(bound, 235);
-        assert!(bound < 864); // 比索引节点那条紧 3.7 倍
+        assert_eq!(bound, 205);
+        assert!(bound < 864); // 比索引节点那条紧 4.2 倍（864 ÷ 205）
     }
 
     /// **挂载时判定是可移植性的分水岭**：同一份声明（槽宽 512）在 512 字节原子宽度的设备上

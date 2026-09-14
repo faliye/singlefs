@@ -1,0 +1,11 @@
+[package]
+name = "c322-r3-opus-mount-history"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 只用 std；自己是一个 workspace 根。
+[workspace]
+
+[profile.release]
+overflow-checks = true

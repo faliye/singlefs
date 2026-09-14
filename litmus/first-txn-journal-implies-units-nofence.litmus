@@ -1,0 +1,30 @@
+C first-txn-journal-implies-units-nofence
+
+(*
+ * first-txn-journal-implies-units 的对照组：只去掉单元与 journal 记录之间那道屏障，记录与根槽之间那道留着。
+ * 声明 Sometimes：第一道屏障是这条性质承重的那一道，第二道替不了它。
+ *
+ * singlefs-expect: Sometimes
+ *)
+
+{}
+
+P0(int *unit, int *journal, int *root)
+{
+	WRITE_ONCE(*unit, 1);
+	WRITE_ONCE(*journal, 1);
+	smp_wmb();
+	WRITE_ONCE(*root, 1);
+}
+
+P1(int *unit, int *journal, int *root)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*journal);
+	smp_rmb();
+	r1 = READ_ONCE(*unit);
+}
+
+exists (1:r0=1 /\ 1:r1=0)

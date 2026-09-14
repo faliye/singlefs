@@ -1,0 +1,17 @@
+# singlefs workspace（里程碑「第一个事务」步 0 的脚手架，2026-09-14）。
+# research/ 是实验 workspace，自己有 Cargo.toml，这里显式排除。
+[workspace]
+resolver = "2"
+members = [
+    "crates/singlefs-format",
+    "crates/singlefs-core",
+    "crates/singlefs-harness",
+    "crates/singlefs-checker",
+]
+exclude = ["research"]
+
+# 与 research/Cargo.toml 同一条理由：release 默认关掉整数溢出检查，溢出会变成静默回绕。
+[profile.release]
+opt-level = 3
+debug = true
+overflow-checks = true

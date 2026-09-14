@@ -1,0 +1,42 @@
+X2 owner row (2,0,3) of a switch whose only root becomes unreadable; later recoveries
+  M3 versioned_base_is_selected_root_table mounted=(4,6) table=(1,3,0)(2,0,0)(3,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M4 versioned_base_is_selected_root_table mounted=(5,7) table=(1,3,0)(2,0,0)(3,0,0)(4,6,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M3 hypothetical_global_table_plain_overwrite mounted=(4,6) table=(1,3,0)(2,0,0)(3,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M4 hypothetical_global_table_plain_overwrite mounted=(5,7) table=(1,3,0)(2,0,0)(3,0,0)(4,6,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M3 hypothetical_global_table_owner_row_protected mounted=(4,6) table=(1,3,0)(2,0,3,owner)(3,0,0) wrongly_published=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] wrongly_unpublished=0 [] corrupt=0
+  M4 hypothetical_global_table_owner_row_protected mounted=(5,7) table=(1,3,0)(2,0,3,owner)(3,0,0)(4,6,0) wrongly_published=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] wrongly_unpublished=0 [] corrupt=0
+  M3 control_switch_root_readable mounted=(4,7) table=(1,3,0)(2,0,3,owner)(3,4,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+X3a switch inside the rollback publication (one transient unit-write error)
+  switch_selected_root_is_in_flight_base_r_old mounted=(4,12) table=(1,3,0,rollback)(2,0,0)(3,0,2,owner) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  switch_selected_root_is_newest_readable mounted=(4,12) table=(1,3,0,rollback)(2,9,0)(3,0,2,owner) wrongly_published=3 ["i2.t6.node", "i2.t8.accounting", "i2.t9.data1"] wrongly_unpublished=0 [] corrupt=0
+  switch_writes_only_old_instance_row mounted=(4,12) table=(1,3,0,rollback)(2,0,0)(3,0,2,owner) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  after_recovery5 in_flight_base mounted=(5,14) table=(1,3,0,rollback)(2,0,0)(3,0,2,owner)(4,13,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  after_recovery5 newest_readable mounted=(5,14) table=(1,3,0,rollback)(2,9,0)(3,0,2,owner)(4,13,0) wrongly_published=3 ["i2.t6.node", "i2.t8.accounting", "i2.t9.data1"] wrongly_unpublished=0 [] corrupt=0
+X3b switch inside a warm-up empty publication, no replay
+  r_tpub_after_replay sel_is_last_published_root mounted=(3,7) table=(1,3,0)(2,4,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  r_tpub_after_replay sel_is_mount_recovery_root_p330_row_written_last mounted=(3,7) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.node"] corrupt=0
+  r_tpub_after_replay sel_is_mount_recovery_root_d23_row_written_last mounted=(3,7) table=(1,3,0)(2,4,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  r_tpub_after_replay sel_is_last_published_root_w_from_transaction_counter mounted=(3,7) table=(1,3,0)(2,4,3) wrongly_published=1 ["i2.t6.data3"] wrongly_unpublished=0 [] corrupt=0
+X3c switch inside a warm-up empty publication right after R's row-writing publication (replay)
+  r_tpub_after_replay sel_is_last_published_root mounted=(3,8) table=(1,4,2)(2,5,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  r_tpub_after_replay sel_is_mount_recovery_root_p330_row_written_last mounted=(3,8) table=(1,4,2)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t5.data1", "i2.t5.data2", "i2.t5.node"] corrupt=0
+  r_tpub_after_replay sel_is_mount_recovery_root_d23_row_written_last mounted=(3,8) table=(1,4,2)(2,5,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  r_tpub_after_replay sel_is_last_published_root_w_from_transaction_counter mounted=(3,8) table=(1,4,2)(2,5,3) wrongly_published=1 ["i2.t7.data3"] wrongly_unpublished=0 [] corrupt=0
+  today_tpub_selected sel_is_last_published_root mounted=(3,8) table=(1,3,2)(2,5,0) wrongly_published=0 [] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+  today_tpub_selected sel_is_mount_recovery_root_p330_row_written_last mounted=(3,8) table=(1,3,2)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i1.t4.node", "i2.t5.data1", "i2.t5.data2", "i2.t5.node"] corrupt=0
+  today_tpub_selected sel_is_mount_recovery_root_d23_row_written_last mounted=(3,8) table=(1,3,2)(2,5,0) wrongly_published=0 [] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+  today_tpub_selected sel_is_last_published_root_w_from_transaction_counter mounted=(3,8) table=(1,3,2)(2,5,3) wrongly_published=1 ["i2.t7.data3"] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+SUMMARY arm rows with a wrongly published unit / with a wrongly unpublished unit
+  HIT X2 M3 hypothetical_global_table_owner_row_protected wrongly_published=3 wrongly_unpublished=0
+  HIT X2 M4 hypothetical_global_table_owner_row_protected wrongly_published=3 wrongly_unpublished=0
+  HIT X3a switch_selected_root_is_newest_readable wrongly_published=3 wrongly_unpublished=0
+  HIT X3a after_recovery5 newest_readable wrongly_published=3 wrongly_unpublished=0
+  HIT X3b replay=false r_tpub_after_replay sel_is_mount_recovery_root_p330_row_written_last wrongly_published=0 wrongly_unpublished=3
+  HIT X3b replay=false r_tpub_after_replay sel_is_last_published_root_w_from_transaction_counter wrongly_published=1 wrongly_unpublished=0
+  HIT X3b replay=true r_tpub_after_replay sel_is_mount_recovery_root_p330_row_written_last wrongly_published=0 wrongly_unpublished=3
+  HIT X3b replay=true r_tpub_after_replay sel_is_last_published_root_w_from_transaction_counter wrongly_published=1 wrongly_unpublished=0
+  HIT X3b replay=true today_tpub_selected sel_is_last_published_root wrongly_published=0 wrongly_unpublished=1
+  HIT X3b replay=true today_tpub_selected sel_is_mount_recovery_root_p330_row_written_last wrongly_published=0 wrongly_unpublished=4
+  HIT X3b replay=true today_tpub_selected sel_is_mount_recovery_root_d23_row_written_last wrongly_published=0 wrongly_unpublished=1
+  HIT X3b replay=true today_tpub_selected sel_is_last_published_root_w_from_transaction_counter wrongly_published=1 wrongly_unpublished=1
+DONE evaluated_arm_rows=24 hit_rows=12

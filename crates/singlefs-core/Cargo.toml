@@ -1,0 +1,9 @@
+[package]
+name = "singlefs-core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "核心层：地址 newtype 与块设备抽象（步 0），事务层与写路径随后各步接上"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

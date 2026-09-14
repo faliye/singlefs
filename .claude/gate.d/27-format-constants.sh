@@ -63,7 +63,7 @@ if not marks:
     sys.exit(1)
 
 # ---- 2. 源码里的 const 定义必须等于 kb 的现行值 ----
-srcs = sorted(glob.glob('research/**/*.rs', recursive=True))
+srcs = sorted(glob.glob('research/**/*.rs', recursive=True) + glob.glob('crates/**/*.rs', recursive=True))  # 2026-09-14 起格式常量模块住 crates/singlefs-format，同一套标记绑住它
 seen_in_src = set()
 for f in srcs:
     for i, line in enumerate(open(f, encoding='utf-8', errors='ignore'), 1):

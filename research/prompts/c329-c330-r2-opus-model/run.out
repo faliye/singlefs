@@ -1,0 +1,101 @@
+S1 switch during the row-writing publication (kept transactions owned by the new instance)
+  today mounted=(3,6) table=(1,3,0)(2,3,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,3)(2,0,0) wrongly_published=1 ["i1.t4.data2"] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+S1_SWEEP kept_transaction_count x old_orphan_transaction (1..=4 x 2..=5)
+  today mounted=(3,6) table=(1,3,0)(2,3,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,1)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,1)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,1)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,1)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i2.t4.data1"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,2)(2,0,0) wrongly_published=1 ["i1.t4.data2"] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,2)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,2)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,2)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t4.data1", "i2.t4.data2"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,3)(2,0,0) wrongly_published=1 ["i1.t4.data2"] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,3)(2,0,0) wrongly_published=1 ["i1.t4.data3"] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,3)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,3)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=3 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,3) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,4)(2,0,0) wrongly_published=1 ["i1.t4.data2"] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,4)(2,0,0) wrongly_published=1 ["i1.t4.data3"] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,4)(2,0,0) wrongly_published=1 ["i1.t4.data4"] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  today mounted=(3,6) table=(1,3,0)(2,3,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  p330_as_worded mounted=(3,6) table=(1,3,4)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  p330_intermediate_first mounted=(3,6) table=(1,3,0)(2,0,0) wrongly_published=0 [] wrongly_unpublished=4 ["i2.t4.data1", "i2.t4.data2", "i2.t4.data3", "i2.t4.data4"] corrupt=0
+  owner_row_fix mounted=(3,6) table=(1,3,0)(2,0,4) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+S1_SWEEP_SUMMARY arm=owner_row_fix cells=16 cells_with_wrongly_published=0 cells_with_wrongly_unpublished=0
+S1_SWEEP_SUMMARY arm=p330_as_worded cells=16 cells_with_wrongly_published=6 cells_with_wrongly_unpublished=16
+S1_SWEEP_SUMMARY arm=p330_intermediate_first cells=16 cells_with_wrongly_published=0 cells_with_wrongly_unpublished=16
+S1_SWEEP_SUMMARY arm=today cells=16 cells_with_wrongly_published=0 cells_with_wrongly_unpublished=0
+S2 double switch, redo inside the resend, instance 4 keeps instance 3's completed redo
+  today mounted=(4,8) table=(1,3,0)(2,5,0)(3,5,3) wrongly_published=0 [] wrongly_unpublished=2 ["i2.t6.data2", "i2.t6.data3"] corrupt=0
+  p330_as_worded mounted=(4,8) table=(1,3,0)(2,5,3)(3,0,0) wrongly_published=0 [] wrongly_unpublished=1 ["i3.t6.redo1"] corrupt=0
+  owner_row_fix mounted=(4,8) table=(1,3,0)(2,5,3)(3,0,1) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+S2 double switch, redo inside the resend, instance 4 redoes it again
+  today mounted=(4,8) table=(1,3,0)(2,5,0)(3,5,3) wrongly_published=1 ["i3.t6.redo1"] wrongly_unpublished=2 ["i2.t6.data2", "i2.t6.data3"] corrupt=0
+  p330_as_worded mounted=(4,8) table=(1,3,0)(2,5,3)(3,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  owner_row_fix mounted=(4,8) table=(1,3,0)(2,5,3)(3,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+S3 replay, rollback onto the row-writing root, recovery after the rollback
+  M2 today_tpub_selected mounted=(2,9) table=(1,3,2) wrongly_published=0 [] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+  M3 rollback today_tpub_selected mounted=(3,10) table=(1,3,2)(2,6,0,rollback) wrongly_published=0 [] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+  M4 recovery today_tpub_selected mounted=(4,14) table=(1,3,2)(2,6,0,rollback)(3,13,0) wrongly_published=0 [] wrongly_unpublished=1 ["i1.t4.node"] corrupt=0
+  M2 r_tpub_after_replay mounted=(2,9) table=(1,4,2) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M3 rollback r_tpub_after_replay mounted=(3,10) table=(1,4,2)(2,6,0,rollback) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  M4 recovery r_tpub_after_replay mounted=(4,14) table=(1,4,2)(2,6,0,rollback)(3,13,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+S4 Q330 with a torn overwrite of the unreadable root's record
+  Q330 superblock_carries_txg=false M3 watermark=4 first_txg=5 | c4 torn | M4 watermark=3 first_txg=4 (collides with unreadable (2,4): true)
+  q330_alone_today_rows mounted=(5,5) table=(1,3,0)(2,4,0)(3,4,0)(4,4,0) wrongly_published=2 ["i4.t4.node", "i4.t4.data1"] wrongly_unpublished=0 [] corrupt=0
+  q330_plus_p330 mounted=(5,5) table=(1,3,0)(2,4,0)(3,0,0)(4,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  Q330 superblock_carries_txg=true M3 watermark=4 first_txg=5 | c4 torn | M4 watermark=3 first_txg=4 (collides with unreadable (2,4): true)
+  q330_alone_today_rows mounted=(5,5) table=(1,3,0)(2,4,0)(3,4,0)(4,4,0) wrongly_published=2 ["i4.t4.node", "i4.t4.data1"] wrongly_unpublished=0 [] corrupt=0
+  q330_plus_p330 mounted=(5,5) table=(1,3,0)(2,4,0)(3,0,0)(4,0,0) wrongly_published=0 [] wrongly_unpublished=0 [] corrupt=0
+  Q330_INVERSION M3 watermark=7 | c4..c7 torn | M4 watermark=3 first_txg=4 acknowledged_root=(4,6) | M5 selects (2,7) over it: true (acknowledged write lost; rows do not enter selection, so P330 does not change it)
+S5 row reclamation with a temporarily unreadable root slot
+  RECLAIM literal_condition: row (2,0,0) deleted=true | slot heals | (2,4) in rollback candidate set=true | its instance-2 units were erased by the sweep=true
+  RECLAIM unreadable_slot_blocks: row (2,0,0) deleted=false | slot heals | (2,4) in rollback candidate set=false | its instance-2 units were erased by the sweep=true
+DONE evaluated_arm_rows=20 sweep_cells=16

@@ -60,7 +60,7 @@ E42|e42_transaction_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-08-31.out|timing
 E140|e140-header-alignment|$REPLAY_DEV140 1 none 4096 8192|e140-header-alignment-repro-2026-09-13.out|timing
-E43|e43_extension_point_budget||e43-ext-budget-2026-09-13-hdr277.out|exact
+E43|e43_extension_point_budget||e43-ext-budget-2026-09-14-round2.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
@@ -74,7 +74,7 @@ E114|e114-pack-ledger||e114-pack-ledger-2026-09-12.out|exact
 E117|e117-reserved-header||e117-reserved-header-2026-09-12.out|exact
 E118|e118-single-disk-recovery||e118-single-disk-recovery-2026-09-07.out|exact
 E122|e122-directory-locality||e122-dir-locality-2026-09-07.out|exact
-E116|e116-pack-settle||e116-pack-settle-2026-09-13-hdr277.out|exact
+E116|e116-pack-settle||e116-pack-settle-2026-09-14-round2.out|exact
 E119|e119-slot-tiers||e119-slot-tiers-2026-09-12.out|exact
 E120|e120-tier-ratio||e120-tier-ratio-2026-09-12.out|exact
 E121|e121-capacity-tiers||e121-cap-tiers-2026-09-12.out|exact
@@ -106,7 +106,7 @@ E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-12.out|exact
-E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-12-ptr83.out|exact
+E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-14-round2.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-12.out|exact
 E106|e106-stripe-member-table||e106-stripe-member-table-2026-09-12.out|exact
@@ -153,11 +153,11 @@ E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exa
 E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
-E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-13-warmup.out|exact
-E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-13-settled6.out|exact
+E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
+E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-14-round2-slot4096.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
-E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-13.out|exact
-E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-13.out|exact
+E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-14-round2.out|exact
+E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-14-round2.out|exact
 E147|e147-superblock-recompute-from-layout||e147-superblock-recompute-from-layout-2026-09-13.out|exact
 E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
 E150|e150-rollback-reuse-of-abandoned-roots||e150-rollback-reuse-of-abandoned-roots-2026-09-13-admission.out|exact

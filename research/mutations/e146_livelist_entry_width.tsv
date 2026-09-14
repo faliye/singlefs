@@ -9,4 +9,4 @@ M8_两棵树不分条目	let node_entries = total_entries / (DATA_UNITS_PER_NODE
 M9_预付按节点大小算万分点	prepaid_bytes * BASIS_POINTS / UNIT_BYTES	prepaid_bytes * BASIS_POINTS / NODE_BYTES
 M10_空树要根时漏算映射条目	TREE_TABLE_ENTRY_BYTES + NODE_BYTES + JOURNAL_NAMED_ENTRY_BYTES + MAPPING_ENTRY_NODE_BYTES	TREE_TABLE_ENTRY_BYTES + NODE_BYTES + JOURNAL_NAMED_ENTRY_BYTES
 M11_事件字节不加	("shared", TreeShape { key_bytes: padded_key + EVENT_TYPE_BYTES, value_bytes: 0 })	("shared", TreeShape { key_bytes: padded_key, value_bytes: 0 })
-M12_树表第一版条目数改112	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 5;	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 112;
+M12_树表第一版条目数改112	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 7;	const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 112;

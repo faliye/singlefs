@@ -83,6 +83,20 @@ INIT
     drivearg=( -blockdev "driver=raw,node-name=raw0,file.driver=file,file.filename=$disk,file.aio=native,file.cache.direct=on"
                -blockdev "driver=throttle,node-name=thr0,throttle-group=tg0,file=raw0"
                -device "virtio-blk-pci,drive=thr0" )
+  elif [[ -n "${VM_BLKLOGWRITES_DIR:-}" ]]; then
+    # 设备侧的独立录制（C6（块层语义假设写错））：每块盘前面套一层 QEMU 的 blklogwrites 过滤节点，
+    # 把来宾发到这块盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进宿主上的 log<d>.img。
+    # 录制在来宾之外，与被测程序自己的录制器不共享一行代码。数据盘也放进这个目录，跑完宿主还能直接读。
+    drivearg=()
+    for ((d=0; d<VM_DISKS; d++)); do
+      truncate -s "${VM_DISK_MB}M" "$VM_BLKLOGWRITES_DIR/disk$d.img"
+      rm -f "$VM_BLKLOGWRITES_DIR/log$d.img"
+      truncate -s "${VM_LOG_MB:-256}M" "$VM_BLKLOGWRITES_DIR/log$d.img"
+      drivearg+=( -blockdev "driver=file,node-name=data$d,filename=$VM_BLKLOGWRITES_DIR/disk$d.img,cache.direct=on,aio=native"
+                  -blockdev "driver=file,node-name=logfile$d,filename=$VM_BLKLOGWRITES_DIR/log$d.img"
+                  -blockdev "driver=blklogwrites,node-name=logwrites$d,file=data$d,log=logfile$d,log-sector-size=512,log-append=off"
+                  -device "virtio-blk-pci,drive=logwrites$d" )
+    done
   else
     drivearg=()
     for ((d=0; d<VM_DISKS; d++)); do

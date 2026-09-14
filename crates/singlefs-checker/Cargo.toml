@@ -1,0 +1,9 @@
+[package]
+name = "singlefs-checker"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "checker：与实现只共享格式常量模块（D13 已定项 5），解析、校验、遍历各写一份"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

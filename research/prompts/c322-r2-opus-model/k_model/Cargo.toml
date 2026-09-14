@@ -1,0 +1,11 @@
+[package]
+name = "c322-r2-opus-k-model"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 自己是一个 workspace 根：不进 research/Cargo.toml，也不进仓根的 workspace。只用 std。
+[workspace]
+
+[profile.release]
+overflow-checks = true

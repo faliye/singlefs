@@ -15,7 +15,7 @@ const NONCE_MAC_RESERVED_BYTES: u64 = 28;
 /// D19 已定项 7 / 已定项 8：指向码 2 / 码 3 的指针。
 const NODE_POINTER_BYTES: u64 = 83;
 /// D8 已定项 8。
-const TREE_TABLE_ENTRY_BYTES: u64 = 145;
+const TREE_TABLE_ENTRY_BYTES: u64 = 148;
 /// C157 收口后的口径：树表一个单元装几条。
 const TREE_TABLE_ENTRIES_PER_UNIT: u64 = 112;
 /// first-txn-layout.md 第 1 版树表的条目数：2026-09-13 用户定案后 7（extent、inode、分配记录、记账、映射，加 day-1 注册的 livelist 与稀疏旁表）；本实验建模时是 5，两处都装得进 112 条的单元。
@@ -318,9 +318,9 @@ mod tests {
     /// 第一个事务：day-1 注册只多一条树表条目，空树要根时再加一个节点、一个点名项、一条映射条目；两棵树翻倍；都装进第 1 版树表单元。
     #[test]
     fn first_transaction_bytes_are_pinned() {
-        assert_eq!(first_transaction_day1_bytes(1, false), 145);
-        assert_eq!(first_transaction_day1_bytes(1, true), 145 + 16384 + 56 + 53);
-        assert_eq!(first_transaction_day1_bytes(2, true), 2 * (145 + 16384 + 56 + 53));
+        assert_eq!(first_transaction_day1_bytes(1, false), 148);
+        assert_eq!(first_transaction_day1_bytes(1, true), 148 + 16384 + 56 + 53);
+        assert_eq!(first_transaction_day1_bytes(2, true), 2 * (148 + 16384 + 56 + 53));
         assert!(tree_table_fits_in_first_unit(2));
         assert!(!tree_table_fits_in_first_unit(TREE_TABLE_ENTRIES_PER_UNIT - TREE_TABLE_FIRST_VERSION_ENTRIES + 1));
     }

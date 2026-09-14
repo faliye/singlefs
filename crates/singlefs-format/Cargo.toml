@@ -1,0 +1,8 @@
+[package]
+name = "singlefs-format"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "格式常量：第一个事务要写的每个宽度都在这里，值来自 .claude/kb 的决策分项；占位的常量带占位标记与分项号"
+
+[dependencies]

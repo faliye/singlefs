@@ -1,0 +1,17 @@
+[package]
+name = "c322-r2-opus-real-code"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# 自己是一个 workspace 根；依赖仓里的四个 crate，只读、不改。
+[workspace]
+
+[dependencies]
+singlefs-checker = { path = "/home/fy5090/code/singlefs/crates/singlefs-checker" }
+singlefs-core = { path = "/home/fy5090/code/singlefs/crates/singlefs-core" }
+singlefs-format = { path = "/home/fy5090/code/singlefs/crates/singlefs-format" }
+singlefs-harness = { path = "/home/fy5090/code/singlefs/crates/singlefs-harness" }
+
+[profile.release]
+overflow-checks = true

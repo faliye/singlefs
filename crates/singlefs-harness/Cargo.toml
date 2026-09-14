@@ -1,0 +1,12 @@
+[package]
+name = "singlefs-harness"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "验证装置：包在块设备外面的录制器，把每个写请求与屏障记成一条流，给崩溃点重放用"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+

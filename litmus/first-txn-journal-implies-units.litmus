@@ -1,0 +1,36 @@
+C first-txn-journal-implies-units
+
+(*
+ * 第一个事务的持久顺序（D16（发布语义） 已定项 7，实现在 crates/singlefs-core 的 transaction::publish_first_file）：
+ * 单元 -> 屏障 -> journal 记录 -> 屏障 -> 根槽 FUA。
+ * 坏结果 = 恢复看见了 journal 记录，却读不到它点名的单元。
+ * 重放逐项验点名单元，所以这不会读出坏数据；但那条记录持久时 fsync 已经返回，单元没了就是丢了已确认的写。
+ *
+ * P0 = 发布；P1 = 恢复（先扫 journal，再读单元）。屏障写成 smp_wmb，恢复一侧的先后写成 smp_rmb：
+ * herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；块层那一半在虚机里的真设备上验。
+ *
+ * singlefs-expect: Never
+ *)
+
+{}
+
+P0(int *unit, int *journal, int *root)
+{
+	WRITE_ONCE(*unit, 1);
+	smp_wmb();
+	WRITE_ONCE(*journal, 1);
+	smp_wmb();
+	WRITE_ONCE(*root, 1);
+}
+
+P1(int *unit, int *journal, int *root)
+{
+	int r0;
+	int r1;
+
+	r0 = READ_ONCE(*journal);
+	smp_rmb();
+	r1 = READ_ONCE(*unit);
+}
+
+exists (1:r0=1 /\ 1:r1=0)
