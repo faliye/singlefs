@@ -9,6 +9,8 @@ C first-txn-root-implies-units
  * herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；块层那一半在虚机里的真设备上验。
  *
  * singlefs-expect: Never
+ * singlefs-models: crates/singlefs-core/src/transaction.rs::publish_first_file 写者（P0）
+ * singlefs-models: crates/singlefs-core/src/recovery.rs::choose_root 读者（P1：先择根，再沿树读单元）
  *)
 
 {}

@@ -27,7 +27,7 @@ set -uo pipefail
 DEC=.claude/kb/decisions
 IDX=.claude/kb/decisions.md
 [[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
 # diff 基准：与共享门禁的 Show me test 同一套口径
 BASE="${GATE_BASE:-}"

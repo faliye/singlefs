@@ -10,6 +10,7 @@ C commit-publish
  * P0 = 写者（提交事务）；P1 = 读者（挂载或并发读）。
  *
  * singlefs-expect: Never
+ * singlefs-models: none —— COW 发布序的通用形态（块内容先于指向它的超级块）；第一个事务的具体顺序由 first-txn-* 两条绑着代码。
  *)
 
 {}

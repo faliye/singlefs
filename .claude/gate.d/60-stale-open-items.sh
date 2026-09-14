@@ -19,7 +19,7 @@ set -uo pipefail
 REVIEW_LIB="$(cd "$(dirname "$0")" && pwd)/lib-open-item-review.py"
 DEC=.claude/kb/decisions
 [[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
 # 每个决策状态行最后一次变动的提交时间
 declare -A st_time

@@ -29,7 +29,7 @@ ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 IDX=.claude/kb/experiments.md
 EXP=.claude/kb/experiments
-[[ -f "$IDX" && -d "$EXP" ]] || { echo "  ! 找不到 $IDX 或 $EXP，本阶段跳过"; exit 0; }
+[[ -f "$IDX" && -d "$EXP" ]] || { echo "  ! 找不到 $IDX 或 $EXP，本阶段跳过"; exit 77; }
 
 python3 - "$IDX" "$EXP" <<'PY'
 import re, sys, glob, os

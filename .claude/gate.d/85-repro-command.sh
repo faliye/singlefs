@@ -12,7 +12,7 @@
 # 例外：正文写明「原始输出未留存」的（要真设备 / 虚机的那类），本阶段不管。
 set -uo pipefail
 EXP_DIR=.claude/kb/experiments
-[[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，本阶段跳过"; exit 0; }
+[[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，本阶段跳过"; exit 77; }
 
 bad=()
 for f in "$EXP_DIR"/*.md; do

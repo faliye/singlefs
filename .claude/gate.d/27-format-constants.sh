@@ -25,7 +25,7 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-[[ -d .claude/kb ]] || { echo "  ! 找不到 kb，本阶段跳过"; exit 0; }
+[[ -d .claude/kb ]] || { echo "  ! 找不到 kb，本阶段跳过"; exit 77; }
 
 python3 - <<'PY'
 import re, glob, sys, os

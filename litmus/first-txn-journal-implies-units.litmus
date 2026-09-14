@@ -10,6 +10,9 @@ C first-txn-journal-implies-units
  * herd7 判的是这条屏障形态在 LKMM 下的序，不是块层的 FLUSH；块层那一半在虚机里的真设备上验。
  *
  * singlefs-expect: Never
+ * singlefs-models: crates/singlefs-core/src/transaction.rs::publish_first_file 写者（P0）
+ * singlefs-models: crates/singlefs-core/src/recovery.rs::scan_journal 读者（P1：先扫 journal）
+ * singlefs-models: crates/singlefs-core/src/recovery.rs::replay_journal 读者（P1：再逐项读点名的单元）
  *)
 
 {}

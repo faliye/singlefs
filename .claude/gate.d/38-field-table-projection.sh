@@ -21,7 +21,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 FTL=.claude/kb/first-txn-layout.md
-[[ -f "$FTL" && -d .claude/kb/decisions ]] || { echo "  ! 找不到 $FTL 或 decisions/，本阶段跳过"; exit 0; }
+[[ -f "$FTL" && -d .claude/kb/decisions ]] || { echo "  ! 找不到 $FTL 或 decisions/，本阶段跳过"; exit 77; }
 
 python3 - "$FTL" <<'PY'
 import re, sys, glob, os

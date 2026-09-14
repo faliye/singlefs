@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # gate-stage: QEMU 真设备上的第一个事务（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
+# gate-covers: QEMU 真实负载
 #
 # C6（块层语义假设写错）要的：「程序以为发了什么」与「盘上实际收到了什么」由两条不共享代码的路比。
 #   程序那一条 = 被测程序自己的录制器（宿主上同参数重跑，同字节）；
@@ -13,7 +14,7 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-[[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 0; }
+[[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
 
 fail() { echo "  ✗ $1"; echo "     → 怎么办：$2"; exit 1; }
 

@@ -10,7 +10,7 @@
 #   ② 暂存区里的模式与工作区的执行位一致（100755 ⇔ 工作区可执行）。
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 checked=0; wrong_mode_count=0
 while IFS= read -r -d '' entry; do
   mode="${entry%% *}"; path="${entry#*$'\t'}"

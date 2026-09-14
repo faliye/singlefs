@@ -19,7 +19,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 DEC=.claude/kb/decisions
-[[ -d "$DEC" ]] || { echo "  ! 找不到 $DEC，本阶段跳过"; exit 0; }
+[[ -d "$DEC" ]] || { echo "  ! 找不到 $DEC，本阶段跳过"; exit 77; }
 
 # 扫的范围：决策正文 + 实验正文 + records/。
 # 后两处今天是干净的（2026-08-31 现查：三类毛病各 0 处），扫它们是**防复发**——

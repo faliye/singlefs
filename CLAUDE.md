@@ -85,11 +85,10 @@
 
 ```bash
 bash .claude/scripts/gate.sh          # 准入门禁，提交前必跑
-GATE_QEMU=1 bash .claude/scripts/gate.sh   # 再加 QEMU harness 自检
 
 bash .claude/scripts/check.sh         # 快速反馈（格式/lint/构建/单测）
-bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/）
-bash .claude/scripts/qemu.sh --selftest    # QEMU harness 自检
+bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/；每条 Never 要有对照组、要绑到代码）
+bash research/scripts/vm-bench.sh --selftest   # 虚机装置自检（装置归项目，见 .claude/kb/vm-harness.md）
 bash .claude/scripts/gate-lint.sh     # 门禁自身：每条拒绝是否都给了下一步
 bash .claude/scripts/env.sh           # 环境自检
 bash .claude/gate.d/10-kb-rot.sh          # kb 腐化：引用悬空、结论悬空、条数对不上

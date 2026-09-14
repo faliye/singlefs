@@ -11,7 +11,7 @@ set -uo pipefail
 RULES=.claude/rules
 MD=CLAUDE.md
 [[ -d "$RULES" ]] || { echo "  ✓ 没有 $RULES，无对象可判"; exit 0; }
-[[ -f "$MD" ]] || { echo "  ! 找不到 $MD，本阶段跳过"; exit 0; }
+[[ -f "$MD" ]] || { echo "  ! 找不到 $MD，本阶段跳过"; exit 77; }
 
 on_disk="$(find "$RULES" -maxdepth 1 -name '*.md' -printf '%f\n' | sort)"
 referenced="$(grep -oE '@\.claude/rules/[A-Za-z0-9._-]+\.md' "$MD" | sed 's|.*/||' | sort -u)"

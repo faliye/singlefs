@@ -29,7 +29,7 @@ cd "$ROOT" 2>/dev/null || exit 2
 FTL=.claude/kb/first-txn-layout.md
 MS=.claude/kb/milestone-first-txn.md
 DEC=.claude/kb/decisions
-[[ -f "$FTL" && -f "$MS" && -d "$DEC" ]] || { echo "  ! 找不到 $FTL / $MS / $DEC，本阶段跳过"; exit 0; }
+[[ -f "$FTL" && -f "$MS" && -d "$DEC" ]] || { echo "  ! 找不到 $FTL / $MS / $DEC，本阶段跳过"; exit 77; }
 
 python3 - "$FTL" "$MS" "$DEC" <<'PY'
 import re, sys, glob, os

@@ -63,7 +63,7 @@ DEC=.claude/kb/decisions
 GEN="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)/.claude/scripts/gen-decision-items.py"
 [[ -f "$GEN" ]] || GEN=.claude/scripts/gen-decision-items.py
 [[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
-[[ -f "$GEN" ]] || { echo "  ! 找不到 $GEN，本阶段跳过"; exit 0; }
+[[ -f "$GEN" ]] || { echo "  ! 找不到 $GEN，本阶段跳过"; exit 77; }
 
 python3 - "$DEC" "$GEN" <<'PY'
 import re, sys, glob, subprocess, os

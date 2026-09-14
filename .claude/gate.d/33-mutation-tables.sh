@@ -14,7 +14,7 @@
 set -uo pipefail
 BIN_DIR=research/e7-index-bench/src/bin
 MUT_DIR=research/mutations
-[[ -d "$BIN_DIR" && -d "$MUT_DIR" ]] || { echo "  ! 找不到 $BIN_DIR 或 $MUT_DIR，本阶段跳过"; exit 0; }
+[[ -d "$BIN_DIR" && -d "$MUT_DIR" ]] || { echo "  ! 找不到 $BIN_DIR 或 $MUT_DIR，本阶段跳过"; exit 77; }
 
 missing=(); malformed=()
 for src in "$BIN_DIR"/*.rs; do

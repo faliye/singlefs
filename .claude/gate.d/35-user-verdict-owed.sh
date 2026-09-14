@@ -18,7 +18,7 @@ KB="$ROOT/.claude/kb"
 OWED="$KB/checks-owed.md"
 MARK='待用户复核\|等用户复核'
 
-[[ -d "$KB/decisions" ]] || { echo "  ! 找不到 $KB/decisions，本阶段跳过"; exit 0; }
+[[ -d "$KB/decisions" ]] || { echo "  ! 找不到 $KB/decisions，本阶段跳过"; exit 77; }
 [[ -f "$OWED" ]] || { echo "  ✗ 缺 $OWED"
   echo "     → 怎么办： 待复核的条款要有账本盯着。先建 checks-owed.md，再把这一笔记进去。"; exit 1; }
 

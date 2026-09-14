@@ -15,7 +15,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 IDX=.claude/kb/decisions.md
-[[ -f "$IDX" ]] || { echo "  ! 找不到 $IDX，本阶段跳过"; exit 0; }
+[[ -f "$IDX" ]] || { echo "  ! 找不到 $IDX，本阶段跳过"; exit 77; }
 
 python3 - "$IDX" <<'PY'
 import re, sys

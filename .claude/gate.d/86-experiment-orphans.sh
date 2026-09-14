@@ -11,7 +11,7 @@
 # ——**排除规则正好盖住了这一个**。
 set -uo pipefail
 EXP_DIR=.claude/kb/experiments
-[[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，本阶段跳过"; exit 0; }
+[[ -d "$EXP_DIR" ]] || { echo "  ! 找不到 $EXP_DIR，本阶段跳过"; exit 77; }
 
 have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
 want=$(for d in research/prompts research/results research/e7-index-bench/src/bin research/mutations; do

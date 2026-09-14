@@ -15,7 +15,7 @@ EXP_ALL="$(mktemp)"; trap 'rm -f "$EXP_ALL"' EXIT
 cat .claude/kb/experiments.md "$EXP_DIR"/*.md > "$EXP_ALL" 2>/dev/null
 EXP="$EXP_ALL"
 RES=research/results
-[[ -s "$EXP" ]] || { echo "  ! 找不到实验正文，本阶段跳过"; exit 0; }
+[[ -s "$EXP" ]] || { echo "  ! 找不到实验正文，本阶段跳过"; exit 77; }
 [[ -d "$RES" ]] || { echo "  ✓ 没有 $RES 目录，无对象可判"; exit 0; }
 
 missing=()

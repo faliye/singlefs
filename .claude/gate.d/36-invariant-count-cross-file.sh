@@ -24,7 +24,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 KB=.claude/kb
-[[ -f "$KB/invariants.md" ]] || { echo "  ! 找不到 $KB/invariants.md，本阶段跳过"; exit 0; }
+[[ -f "$KB/invariants.md" ]] || { echo "  ! 找不到 $KB/invariants.md，本阶段跳过"; exit 77; }
 
 python3 - "$KB" <<'PY'
 import re, sys, os, glob

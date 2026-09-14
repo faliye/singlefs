@@ -12,7 +12,7 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-[[ -d crates/singlefs-format/src ]] || { echo "  ! 没有 crates/singlefs-format/src，本阶段跳过（步 0 之前没有常量文件）"; exit 0; }
+[[ -d crates/singlefs-format/src ]] || { echo "  ! 没有 crates/singlefs-format/src，本阶段跳过（步 0 之前没有常量文件）"; exit 77; }
 
 python3 - <<'PY'
 import glob, os, re, sys

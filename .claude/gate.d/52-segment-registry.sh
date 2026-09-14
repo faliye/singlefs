@@ -24,6 +24,6 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-[[ -f research/scripts/check-segment-registry.py ]] || { echo "  ! 找不到 research/scripts/check-segment-registry.py，本阶段跳过"; exit 0; }
+[[ -f research/scripts/check-segment-registry.py ]] || { echo "  ! 找不到 research/scripts/check-segment-registry.py，本阶段跳过"; exit 77; }
 
 python3 research/scripts/check-segment-registry.py --root "$ROOT" || exit 1

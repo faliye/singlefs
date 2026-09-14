@@ -26,7 +26,7 @@ GEN=.claude/scripts/gen-decision-items.py
 S='<!-- gen:decision-items:start -->'
 E='<!-- gen:decision-items:end -->'
 
-[[ -f "$IDX" && -f "$GEN" ]] || { echo "  ! 找不到 $IDX 或 $GEN，本阶段跳过"; exit 0; }
+[[ -f "$IDX" && -f "$GEN" ]] || { echo "  ! 找不到 $IDX 或 $GEN，本阶段跳过"; exit 77; }
 grep -qF "$S" "$IDX" || { echo "  ✗ $IDX 里没有生成块标记 $S"; echo "     → 加回标记，或跑 --write 重建"; exit 1; }
 
 gen_err="$(mktemp)"
