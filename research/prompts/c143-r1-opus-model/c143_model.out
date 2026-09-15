@@ -1,0 +1,499 @@
+# c143_model.py output (stdlib only, deterministic)
+# arm A == arm B for stat 12 in this model (same max over the same readable-root set)
+
+## sweep1: one rollback after a prefix of <= 6 publishes (p0 p1 f0 f1), optional
+##         crash-after-record, rollback kk in 1..3, read fault u, switch-in-rb sw
+name=sweep1 warm=lenient arm=A runs=455216 violating=227596 min_faults=1 by_faults=0:0/754;1:692/6560;2:5442/26322;3:19784/62744;4:41324/97908;5:56168/107856;6:53756/85472;7:33938/46672;8:12940/16768;9:3216/3776;10:336/384
+name=sweep1 warm=lenient arm=A/reload runs=227608 violating=164650 min_faults=1 by_faults=1:312/754;2:2860/5806;3:11752/20516;4:27244/42228;5:39354/55680;6:40152/52176;7:27936/33296;8:11590/13376;9:3094/3392;10:356/384
+name=sweep1 warm=lenient arm=AJ runs=455216 violating=0 min_faults=None by_faults=0:0/754;1:0/6560;2:0/26322;3:0/62744;4:0/97908;5:0/107856;6:0/85472;7:0/46672;8:0/16768;9:0/3776;10:0/384
+name=sweep1 warm=lenient arm=C runs=455216 violating=32746 min_faults=1 by_faults=0:0/754;1:40/6560;2:320/26322;3:1958/62744;4:5020/97908;5:7292/107856;6:8748/85472;7:6144/46672;8:2516/16768;9:652/3776;10:56/384
+name=sweep1 warm=lenient arm=CJ runs=455216 violating=0 min_faults=None by_faults=0:0/754;1:0/6560;2:0/26322;3:0/62744;4:0/97908;5:0/107856;6:0/85472;7:0/46672;8:0/16768;9:0/3776;10:0/384
+name=sweep1 warm=strict arm=A runs=506248 violating=178112 min_faults=1 by_faults=0:0/754;1:692/6564;2:4832/26790;3:16376/66212;4:34036/108820;5:45196/123276;6:39964/97272;7:24584/53040;8:10032/19104;9:2208/4032;10:192/384
+name=sweep1 warm=strict arm=A/reload runs=253124 violating=147254 min_faults=1 by_faults=1:312/754;2:2594/5810;3:10310/20980;4:24138/45232;5:36402/63588;6:36110/59688;7:24052/37584;8:10536/15456;9:2544/3648;10:256/384
+name=sweep1 warm=strict arm=AJ runs=506248 violating=0 min_faults=None by_faults=0:0/754;1:0/6564;2:0/26790;3:0/66212;4:0/108820;5:0/123276;6:0/97272;7:0/53040;8:0/19104;9:0/4032;10:0/384
+name=sweep1 warm=strict arm=C runs=506248 violating=6502 min_faults=2 by_faults=0:0/754;1:0/6564;2:24/26790;3:184/66212;4:718/108820;5:1592/123276;6:2036/97272;7:1388/53040;8:480/19104;9:80/4032;10:0/384
+name=sweep1 warm=strict arm=CJ runs=506248 violating=0 min_faults=None by_faults=0:0/754;1:0/6564;2:0/26790;3:0/66212;4:0/108820;5:0/123276;6:0/97272;7:0/53040;8:0/19104;9:0/4032;10:0/384
+example warm=lenient arm=A faults=1 script=[p1 rb1d10 u2]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; wm=12:2
+    txg4 i2 root->disk1 wm=12:2
+    txg5 i2 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 root->disk0 creates (12,3,bg6) wm=12:4
+example warm=lenient arm=A/reload faults=1 script=[p1 rb2none1 u2]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2: rollback root write FAILS
+      switch -> i3 (watermark reloaded from R_old)
+    txg6 i3 root->disk0 wm=12:2
+    txg7 i3 root->disk1 creates (12,2,bg7) wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+example warm=lenient arm=C faults=1 script=[p0 p0 p1 rb1d00 u2]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 wm=12:2
+    txg5 i1 root->disk0 wm=12:2
+    txg6 i1 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:2
+    txg5 i2 root->disk0 wm=12:2
+    txg6 i2 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 root->disk1 creates (12,3,bg7) wm=12:4
+example warm=strict arm=A faults=1 script=[p1 rb1d10 u2]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; wm=12:2
+    txg4 i2 root->disk1 wm=12:2
+    txg5 i2 root->disk0 wm=12:2
+    txg6 i2 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 root->disk1 creates (12,3,bg7) wm=12:4
+example warm=strict arm=A/reload faults=1 script=[p1 rb2none1 u2]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2: rollback root write FAILS
+      switch -> i3 (watermark reloaded from R_old)
+    txg6 i3 root->disk0 wm=12:2
+    txg7 i3 root->disk1 wm=12:2
+    txg8 i3 root->disk0 creates (12,2,bg8) wm=12:3
+    txg9 i3 root->disk0 creates (12,3,bg9) wm=12:4
+example warm=strict arm=C faults=2 script=[p0 p0 p0 p0 p1 rb1d0n10 u2]
+  violations=[((12, 2, 8), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 wm=12:2
+    txg5 i1 root->disk0 wm=12:2
+    txg6 i1 root->disk0 wm=12:2
+    txg7 i1 root->disk1 wm=12:2
+    txg8 i1 root->disk0 creates (12,2,bg8) wm=12:3
+    ROLLBACK u=d0n1: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:2
+    txg5 i2 root->disk0 wm=12:2
+    txg6 i2 root->disk0 wm=12:2
+    txg7 i2 root->disk1 wm=12:2
+    txg8 i2 root->disk0 creates (12,2,bg8) wm=12:3
+    txg9 i2 root->disk0 creates (12,3,bg9) wm=12:4
+
+## sweep1 cross-arm pattern: arms violated (own criterion), by fault count
+name=pattern warm=lenient faults=0 arms=- scripts=754
+name=pattern warm=lenient faults=1 arms=- scripts=5556
+name=pattern warm=lenient faults=1 arms=A scripts=652
+name=pattern warm=lenient faults=1 arms=A+C scripts=40
+name=pattern warm=lenient faults=1 arms=A/reload scripts=312
+name=pattern warm=lenient faults=2 arms=- scripts=18712
+name=pattern warm=lenient faults=2 arms=A scripts=4430
+name=pattern warm=lenient faults=2 arms=A+A/reload scripts=692
+name=pattern warm=lenient faults=2 arms=A+C scripts=320
+name=pattern warm=lenient faults=2 arms=A/reload scripts=2168
+name=pattern warm=lenient faults=3 arms=- scripts=35958
+name=pattern warm=lenient faults=3 arms=A scripts=13140
+name=pattern warm=lenient faults=3 arms=A+A/reload scripts=4686
+name=pattern warm=lenient faults=3 arms=A+A/reload+C scripts=64
+name=pattern warm=lenient faults=3 arms=A+C scripts=1894
+name=pattern warm=lenient faults=3 arms=A/reload scripts=7002
+name=pattern warm=lenient faults=4 arms=- scripts=44374
+name=pattern warm=lenient faults=4 arms=A scripts=21842
+name=pattern warm=lenient faults=4 arms=A+A/reload scripts=14462
+name=pattern warm=lenient faults=4 arms=A+A/reload+C scripts=572
+name=pattern warm=lenient faults=4 arms=A+C scripts=4448
+name=pattern warm=lenient faults=4 arms=A/reload scripts=12210
+name=pattern warm=lenient faults=5 arms=- scripts=38624
+name=pattern warm=lenient faults=5 arms=A scripts=24722
+name=pattern warm=lenient faults=5 arms=A+A/reload scripts=24154
+name=pattern warm=lenient faults=5 arms=A+A/reload+C scripts=2136
+name=pattern warm=lenient faults=5 arms=A+C scripts=5156
+name=pattern warm=lenient faults=5 arms=A/reload scripts=13064
+name=pattern warm=lenient faults=6 arms=- scripts=21442
+name=pattern warm=lenient faults=6 arms=A scripts=18288
+name=pattern warm=lenient faults=6 arms=A+A/reload scripts=26720
+name=pattern warm=lenient faults=6 arms=A+A/reload+C scripts=3158
+name=pattern warm=lenient faults=6 arms=A+C scripts=5590
+name=pattern warm=lenient faults=6 arms=A/reload scripts=10274
+name=pattern warm=lenient faults=7 arms=- scripts=8676
+name=pattern warm=lenient faults=7 arms=A scripts=7836
+name=pattern warm=lenient faults=7 arms=A+A/reload scripts=19958
+name=pattern warm=lenient faults=7 arms=A+A/reload+C scripts=3920
+name=pattern warm=lenient faults=7 arms=A+C scripts=2224
+name=pattern warm=lenient faults=7 arms=A/reload scripts=4058
+name=pattern warm=lenient faults=8 arms=- scripts=2298
+name=pattern warm=lenient faults=8 arms=A scripts=2140
+name=pattern warm=lenient faults=8 arms=A+A/reload scripts=8284
+name=pattern warm=lenient faults=8 arms=A+A/reload+C scripts=1776
+name=pattern warm=lenient faults=8 arms=A+C scripts=740
+name=pattern warm=lenient faults=8 arms=A/reload scripts=1530
+name=pattern warm=lenient faults=9 arms=- scripts=346
+name=pattern warm=lenient faults=9 arms=A scripts=248
+name=pattern warm=lenient faults=9 arms=A+A/reload scripts=2316
+name=pattern warm=lenient faults=9 arms=A+A/reload+C scripts=564
+name=pattern warm=lenient faults=9 arms=A+C scripts=88
+name=pattern warm=lenient faults=9 arms=A/reload scripts=214
+name=pattern warm=lenient faults=10 arms=- scripts=28
+name=pattern warm=lenient faults=10 arms=A+A/reload scripts=280
+name=pattern warm=lenient faults=10 arms=A+A/reload+C scripts=56
+name=pattern warm=lenient faults=10 arms=A/reload scripts=20
+name=pattern warm=strict faults=0 arms=- scripts=754
+name=pattern warm=strict faults=1 arms=- scripts=5560
+name=pattern warm=strict faults=1 arms=A scripts=692
+name=pattern warm=strict faults=1 arms=A/reload scripts=312
+name=pattern warm=strict faults=2 arms=- scripts=20056
+name=pattern warm=strict faults=2 arms=A scripts=4116
+name=pattern warm=strict faults=2 arms=A+A/reload scripts=692
+name=pattern warm=strict faults=2 arms=A+C scripts=24
+name=pattern warm=strict faults=2 arms=A/reload scripts=1902
+name=pattern warm=strict faults=3 arms=- scripts=43666
+name=pattern warm=strict faults=3 arms=A scripts=12076
+name=pattern warm=strict faults=3 arms=A+A/reload scripts=4116
+name=pattern warm=strict faults=3 arms=A+A/reload+C scripts=24
+name=pattern warm=strict faults=3 arms=A+C scripts=160
+name=pattern warm=strict faults=3 arms=A/reload scripts=6170
+name=pattern warm=strict faults=4 arms=- scripts=62882
+name=pattern warm=strict faults=4 arms=A scripts=21198
+name=pattern warm=strict faults=4 arms=A+A/reload scripts=12120
+name=pattern warm=strict faults=4 arms=A+A/reload+C scripts=116
+name=pattern warm=strict faults=4 arms=A+C scripts=602
+name=pattern warm=strict faults=4 arms=A/reload scripts=11902
+name=pattern warm=strict faults=5 arms=- scripts=63478
+name=pattern warm=strict faults=5 arms=A scripts=22116
+name=pattern warm=strict faults=5 arms=A+A/reload scripts=21488
+name=pattern warm=strict faults=5 arms=A+A/reload+C scripts=312
+name=pattern warm=strict faults=5 arms=A+C scripts=1280
+name=pattern warm=strict faults=5 arms=A/reload scripts=14602
+name=pattern warm=strict faults=6 arms=- scripts=44594
+name=pattern warm=strict faults=6 arms=A scripts=15300
+name=pattern warm=strict faults=6 arms=A+A/reload scripts=22628
+name=pattern warm=strict faults=6 arms=A+A/reload+C scripts=768
+name=pattern warm=strict faults=6 arms=A+C scripts=1268
+name=pattern warm=strict faults=6 arms=A/reload scripts=12714
+name=pattern warm=strict faults=7 arms=- scripts=20972
+name=pattern warm=strict faults=7 arms=A scripts=7488
+name=pattern warm=strict faults=7 arms=A+A/reload scripts=15708
+name=pattern warm=strict faults=7 arms=A+A/reload+C scripts=860
+name=pattern warm=strict faults=7 arms=A+C scripts=528
+name=pattern warm=strict faults=7 arms=A/reload scripts=7484
+name=pattern warm=strict faults=8 arms=- scripts=6552
+name=pattern warm=strict faults=8 arms=A scripts=1936
+name=pattern warm=strict faults=8 arms=A+A/reload scripts=7616
+name=pattern warm=strict faults=8 arms=A+A/reload+C scripts=400
+name=pattern warm=strict faults=8 arms=A+C scripts=80
+name=pattern warm=strict faults=8 arms=A/reload scripts=2520
+name=pattern warm=strict faults=9 arms=- scripts=1296
+name=pattern warm=strict faults=9 arms=A scripts=192
+name=pattern warm=strict faults=9 arms=A+A/reload scripts=1936
+name=pattern warm=strict faults=9 arms=A+A/reload+C scripts=80
+name=pattern warm=strict faults=9 arms=A/reload scripts=528
+name=pattern warm=strict faults=10 arms=- scripts=128
+name=pattern warm=strict faults=10 arms=A+A/reload scripts=192
+name=pattern warm=strict faults=10 arms=A/reload scripts=64
+name=C_hit_but_A_not count=0 first=[]
+
+## sweep2: after a clean rollback, and clone made in the abandoned timeline
+name=sweep2 warm=lenient family=clone_after_rb arm=A runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_after_rb arm=AJ runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_after_rb arm=AJ2 runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_after_rb arm=C runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_after_rb arm=CJ runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_after_rb arm=CJ2 runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=clone_in_abandoned arm=A runs=78 violating=19 tree_id_reused=27 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=lenient family=clone_in_abandoned arm=AJ runs=78 violating=27 tree_id_reused=27 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=lenient family=clone_in_abandoned arm=AJ2 runs=78 violating=27 tree_id_reused=27 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=lenient family=clone_in_abandoned arm=C runs=78 violating=0 tree_id_reused=27 min_example=None
+name=sweep2 warm=lenient family=clone_in_abandoned arm=CJ runs=78 violating=0 tree_id_reused=27 min_example=None
+name=sweep2 warm=lenient family=clone_in_abandoned arm=CJ2 runs=78 violating=0 tree_id_reused=27 min_example=None
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=A runs=72 violating=18 tree_id_reused=0 min_example=(2, 5, 'rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=AJ runs=72 violating=18 tree_id_reused=0 min_example=(2, 5, 'rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=AJ2 runs=72 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=C runs=72 violating=8 tree_id_reused=0 min_example=(2, 5, 'rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=CJ runs=72 violating=8 tree_id_reused=0 min_example=(2, 5, 'rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=lenient family=rb_then_crash_mount arm=CJ2 runs=72 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=two_rollbacks arm=A runs=167 violating=116 tree_id_reused=0 min_example=(1, 4, 'rb1none0 u2 rb1d00 u1')
+name=sweep2 warm=lenient family=two_rollbacks arm=AJ runs=167 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=two_rollbacks arm=AJ2 runs=167 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=two_rollbacks arm=C runs=167 violating=10 tree_id_reused=0 min_example=(2, 5, 'p1 rb1none0 u2 rb1d0n10 u1')
+name=sweep2 warm=lenient family=two_rollbacks arm=CJ runs=167 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=lenient family=two_rollbacks arm=CJ2 runs=167 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=A runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=AJ runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=AJ2 runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=C runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=CJ runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_after_rb arm=CJ2 runs=9 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=clone_in_abandoned arm=A runs=84 violating=25 tree_id_reused=30 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=strict family=clone_in_abandoned arm=AJ runs=84 violating=30 tree_id_reused=30 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=strict family=clone_in_abandoned arm=AJ2 runs=84 violating=30 tree_id_reused=30 min_example=(1, 6, 'p1 clone uc1 rb1d00 clone uc1')
+name=sweep2 warm=strict family=clone_in_abandoned arm=C runs=84 violating=0 tree_id_reused=30 min_example=None
+name=sweep2 warm=strict family=clone_in_abandoned arm=CJ runs=84 violating=0 tree_id_reused=30 min_example=None
+name=sweep2 warm=strict family=clone_in_abandoned arm=CJ2 runs=84 violating=0 tree_id_reused=30 min_example=None
+name=sweep2 warm=strict family=rb_then_crash_mount arm=A runs=72 violating=8 tree_id_reused=0 min_example=(2, 6, 'p1 rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=strict family=rb_then_crash_mount arm=AJ runs=72 violating=8 tree_id_reused=0 min_example=(2, 6, 'p1 rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=strict family=rb_then_crash_mount arm=AJ2 runs=72 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=rb_then_crash_mount arm=C runs=72 violating=6 tree_id_reused=0 min_example=(2, 6, 'p1 rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=strict family=rb_then_crash_mount arm=CJ runs=72 violating=6 tree_id_reused=0 min_example=(2, 6, 'p1 rb1none0 u2 crash mountd0n1 u1')
+name=sweep2 warm=strict family=rb_then_crash_mount arm=CJ2 runs=72 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=two_rollbacks arm=A runs=188 violating=135 tree_id_reused=0 min_example=(1, 4, 'rb1none0 u2 rb1d10 u1')
+name=sweep2 warm=strict family=two_rollbacks arm=AJ runs=188 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=two_rollbacks arm=AJ2 runs=188 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=two_rollbacks arm=C runs=188 violating=6 tree_id_reused=0 min_example=(2, 5, 'p1 rb1none0 u2 rb1d0n10 u1')
+name=sweep2 warm=strict family=two_rollbacks arm=CJ runs=188 violating=0 tree_id_reused=0 min_example=None
+name=sweep2 warm=strict family=two_rollbacks arm=CJ2 runs=188 violating=0 tree_id_reused=0 min_example=None
+example2 family=clone_in_abandoned arm=A faults=1 script=[p1 clone uc1 rb1d00 clone uc1] tree_reuse=[19]
+  violations=[((19, 3), [3, 4], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg5 i1 root->disk0 wm=12:3,19:3
+    txg6 i1 root->disk0 creates (19,3,bg6) wm=12:3,19:4
+    ROLLBACK u=d0: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg8 i2 root->disk0 wm=12:3,19:3
+    txg9 i2 root->disk0 creates (19,3,bg9) wm=12:3,19:4
+example2 family=clone_in_abandoned arm=AJ faults=1 script=[p1 clone uc1 rb1d00 clone uc1] tree_reuse=[19]
+  violations=[((19, 3), [3, 4], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg5 i1 root->disk0 wm=12:3,19:3
+    txg6 i1 root->disk0 creates (19,3,bg6) wm=12:3,19:4
+    ROLLBACK u=d0: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg8 i2 root->disk0 wm=12:3,19:3
+    txg9 i2 root->disk0 creates (19,3,bg9) wm=12:3,19:4
+example2 family=clone_in_abandoned arm=AJ2 faults=1 script=[p1 clone uc1 rb1d00 clone uc1] tree_reuse=[19]
+  violations=[((19, 3), [3, 4], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg5 i1 root->disk0 wm=12:3,19:3
+    txg6 i1 root->disk0 creates (19,3,bg6) wm=12:3,19:4
+    ROLLBACK u=d0: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    clone of 12 -> tree 19 (wm 3)
+    txg8 i2 root->disk0 wm=12:3,19:3
+    txg9 i2 root->disk0 creates (19,3,bg9) wm=12:3,19:4
+example2 family=rb_then_crash_mount arm=A faults=2 script=[p1 rb1none0 u2 crash mountd0n1 u1] tree_reuse=[]
+  violations=[((12, 3), [3, 5], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    txg8 i2 root->disk0 creates (12,3,bg8) wm=12:4
+    txg9 i2 root->disk0 creates (12,4,bg9) wm=12:5
+    CRASH (nothing in flight)
+    MOUNT u=d0n1: selects txg4 i1, replays to txg4, new i3, wm=12:3
+    txg5 i3 root->disk0 wm=12:3
+    txg6 i3 root->disk0 wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+example2 family=rb_then_crash_mount arm=AJ faults=2 script=[p1 rb1none0 u2 crash mountd0n1 u1] tree_reuse=[]
+  violations=[((12, 3), [3, 5], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    txg8 i2 root->disk0 creates (12,3,bg8) wm=12:4
+    txg9 i2 root->disk0 creates (12,4,bg9) wm=12:5
+    CRASH (nothing in flight)
+    MOUNT u=d0n1: selects txg4 i1, replays to txg4, new i3, wm=12:3
+    txg5 i3 root->disk0 wm=12:3
+    txg6 i3 root->disk0 wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+example2 family=rb_then_crash_mount arm=C faults=2 script=[p1 rb1none0 u2 crash mountd0n1 u1] tree_reuse=[]
+  violations=[((12, 3, 8), [3, 5], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    txg8 i2 root->disk0 creates (12,3,bg8) wm=12:4
+    txg9 i2 root->disk0 creates (12,4,bg9) wm=12:5
+    CRASH (nothing in flight)
+    MOUNT u=d0n1: selects txg4 i1, replays to txg4, new i3, wm=12:3
+    txg5 i3 root->disk0 wm=12:3
+    txg6 i3 root->disk0 wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+example2 family=rb_then_crash_mount arm=CJ faults=2 script=[p1 rb1none0 u2 crash mountd0n1 u1] tree_reuse=[]
+  violations=[((12, 3, 8), [3, 5], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    txg8 i2 root->disk0 creates (12,3,bg8) wm=12:4
+    txg9 i2 root->disk0 creates (12,4,bg9) wm=12:5
+    CRASH (nothing in flight)
+    MOUNT u=d0n1: selects txg4 i1, replays to txg4, new i3, wm=12:3
+    txg5 i3 root->disk0 wm=12:3
+    txg6 i3 root->disk0 wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+example2 family=two_rollbacks arm=A faults=1 script=[rb1none0 u2 rb1d10 u1] tree_reuse=[]
+  violations=[((12, 3), [3, 4], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; wm=12:2
+    txg4 i2 root->disk1 wm=12:2
+    txg5 i2 root->disk0 wm=12:2
+    txg6 i2 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 root->disk1 creates (12,3,bg7) wm=12:4
+    ROLLBACK u=d1: R_old=txg6 i2; readable ring max txg6; first new root txg7 i3; wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 wm=12:3
+    txg9 i3 root->disk0 creates (12,3,bg9) wm=12:4
+example2 family=two_rollbacks arm=C faults=2 script=[p1 rb1none0 u2 rb1d0n10 u1] tree_reuse=[]
+  violations=[((12, 3, 8), [3, 5], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; wm=12:3
+    txg5 i2 root->disk0 wm=12:3
+    txg6 i2 root->disk0 wm=12:3
+    txg7 i2 root->disk1 wm=12:3
+    txg8 i2 root->disk0 creates (12,3,bg8) wm=12:4
+    txg9 i2 root->disk0 creates (12,4,bg9) wm=12:5
+    ROLLBACK u=d0n1: R_old=txg4 i1; readable ring max txg4; first new root txg5 i3; wm=12:3
+    txg5 i3 root->disk0 wm=12:3
+    txg6 i3 root->disk0 wm=12:3
+    txg7 i3 root->disk1 wm=12:3
+    txg8 i3 root->disk0 creates (12,3,bg8) wm=12:4
+
+## sweep3 (question 3): R_old kept in the ring by a failed write on its own slot
+name=sweep3 S=4 skip=True n_obj=1 arm=A R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[((19, 2), [2, 3], True)]
+    txg1 i1 root->disk1 wm=
+    txg2 i1 root->disk0 wm=
+    txg3 i1 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 root->disk1 wm=12:2,19:2
+    txg5 i1 root->disk0 wm=12:2,19:2
+    txg6 i1 root->disk0 creates (19,2,bg6) wm=12:2,19:3
+    destroy head 19
+    txg7 i1 root->disk1 wm=12:2
+    txg8 i1 root->disk0 wm=12:2
+    txg9 i1 root->disk0 wm=12:2
+    txg10 i1 root->disk1 wm=12:2
+    txg11 i1 root->disk0 wm=12:2
+    txg12 i1 root->disk0 wm=12:2
+    txg13 i1 root->disk1 wm=12:2
+    txg14 i1 root->disk0 wm=12:2
+    txg15 i1 root->disk0 wm=12:2
+    txg16 i1 root->disk1 wm=12:2
+    txg17 i1: root write to disk0 FAILS
+      switch -> i2
+    txg18 i2 root->disk0 wm=12:2
+    txg19 i2 root->disk1 wm=12:2
+    txg20 i2 root->disk0 wm=12:2
+    txg21 i2 root->disk0 wm=12:2
+    txg22 i2 root->disk1 wm=12:2
+    txg23 i2 root->disk0 wm=12:2
+    txg24 i2 root->disk0 wm=12:2
+    txg25 i2 root->disk1 wm=12:2
+    txg26 i2 root->disk0 wm=12:2
+    txg27 i2 root->disk0 wm=12:2
+    txg28 i2 root->disk1 wm=12:2
+    ROLLBACK u=none: R_old=txg5 i1; readable ring max txg28; first new root txg29 i3; wm=12:2,19:2
+    txg29 i3 root->disk0 wm=12:2,19:2
+    txg30 i3 root->disk0 wm=12:2,19:2
+    txg31 i3 root->disk1 wm=12:2,19:2
+    txg32 i3 root->disk0 creates (19,2,bg32) wm=12:2,19:3
+name=sweep3 S=4 skip=True n_obj=1 arm=AJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=True n_obj=1 arm=C R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=True n_obj=1 arm=CJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=True n_obj=2 arm=A R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[((19, 2), [2, 4], True)]
+name=sweep3 S=4 skip=True n_obj=2 arm=AJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=True n_obj=2 arm=C R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=True n_obj=2 arm=CJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=4 skip=False n_obj=1 arm=A R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=1 arm=AJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=1 arm=C R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=1 arm=CJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=2 arm=A R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=2 arm=AJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=2 arm=C R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=4 skip=False n_obj=2 arm=CJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=True n_obj=1 arm=A R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[((19, 2), [2, 3], True)]
+name=sweep3 S=5 skip=True n_obj=1 arm=AJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=True n_obj=1 arm=C R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=True n_obj=1 arm=CJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=True n_obj=2 arm=A R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[((19, 2), [2, 4], True)]
+name=sweep3 S=5 skip=True n_obj=2 arm=AJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=True n_obj=2 arm=C R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=True n_obj=2 arm=CJ R_old=txg5 R_old_in_ring=True ring_roots_carrying_H2=[5] rollback_ok=True faults=1 violations=[]
+name=sweep3 S=5 skip=False n_obj=1 arm=A R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=1 arm=AJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=1 arm=C R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=1 arm=CJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=2 arm=A R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=2 arm=AJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=2 arm=C R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+name=sweep3 S=5 skip=False n_obj=2 arm=CJ R_old=txg5 R_old_in_ring=False ring_roots_carrying_H2=[] rollback_ok=False faults=0 violations=None
+
+## spot checks (strict warm-up): named scripts, every arm
+name=spot case='A/B one slot fault' arm=A script=[p1 rb1new10 u2] faults=1 violations=[((12, 2), [2, 3], True)]
+name=spot case='A/B one slot fault' arm=AJ script=[p1 rb1new10 u2] faults=1 violations=[]
+name=spot case='A/B one slot fault' arm=C script=[p1 rb1new10 u2] faults=1 violations=[]
+name=spot case='A/B one slot fault' arm=CJ script=[p1 rb1new10 u2] faults=1 violations=[]
+name=spot case='C lenient 1-event history under strict' arm=A script=[p0 p0 p1 rb1d00 u2] faults=1 violations=[((12, 2), [2, 3], True)]
+name=spot case='C lenient 1-event history under strict' arm=AJ script=[p0 p0 p1 rb1d00 u2] faults=1 violations=[]
+name=spot case='C lenient 1-event history under strict' arm=C script=[p0 p0 p1 rb1d00 u2] faults=1 violations=[]
+name=spot case='C lenient 1-event history under strict' arm=CJ script=[p0 p0 p1 rb1d00 u2] faults=1 violations=[]
+name=spot case='slots only, 2 newest unreadable' arm=A script=[p0 p0 p0 p0 p1 rb1new20 u2] faults=2 violations=[((12, 2), [2, 3], True)]
+name=spot case='slots only, 2 newest unreadable' arm=AJ script=[p0 p0 p0 p0 p1 rb1new20 u2] faults=2 violations=[]
+name=spot case='slots only, 2 newest unreadable' arm=C script=[p0 p0 p0 p0 p1 rb1new20 u2] faults=2 violations=[]
+name=spot case='slots only, 2 newest unreadable' arm=CJ script=[p0 p0 p0 p0 p1 rb1new20 u2] faults=2 violations=[]
+name=spot case='slots only, 3 newest unreadable' arm=A script=[p0 p0 p0 p0 p1 rb1new30 u2] faults=3 violations=[((12, 2), [2, 3], True)]
+name=spot case='slots only, 3 newest unreadable' arm=AJ script=[p0 p0 p0 p0 p1 rb1new30 u2] faults=3 violations=[]
+name=spot case='slots only, 3 newest unreadable' arm=C script=[p0 p0 p0 p0 p1 rb1new30 u2] faults=3 violations=[((12, 2, 8), [2, 3], True)]
+name=spot case='slots only, 3 newest unreadable' arm=CJ script=[p0 p0 p0 p0 p1 rb1new30 u2] faults=3 violations=[]
+
+## rebuild: level-1 scan rebuild with the instance table unreadable
+name=rebuild case=crash join_by_birthgen=False result={'leaves(cno:[inos])': [(1, [1, 2, 3])], 'I-9.4_violations': 0, 'duplicate_keys': 0, 'mixed_extents': 1, 'orphan_extents': 0}
+name=rebuild case=crash join_by_birthgen=True result={'leaves(cno:[inos])': [(1, [1, 2, 3])], 'I-9.4_violations': 0, 'duplicate_keys': 0, 'mixed_extents': 0, 'orphan_extents': 2}
+name=rebuild case=rollback_AB join_by_birthgen=False result={'leaves(cno:[inos])': [(1, [1, 2, 5]), (4, [4]), (6, [6])], 'I-9.4_violations': 1, 'duplicate_keys': 0, 'mixed_extents': 0, 'orphan_extents': 2}
+name=rebuild case=rollback_AB join_by_birthgen=True result={'leaves(cno:[inos])': [(1, [1, 2, 5]), (4, [4]), (6, [6])], 'I-9.4_violations': 1, 'duplicate_keys': 0, 'mixed_extents': 0, 'orphan_extents': 2}
+name=rebuild case=rollback_C join_by_birthgen=False result={'leaves(cno:[inos])': [(1, [1, 2, 3]), (4, [4]), (4, [4])], 'I-9.4_violations': 1, 'duplicate_keys': 1, 'mixed_extents': 1, 'orphan_extents': 0}
+name=rebuild case=rollback_C join_by_birthgen=True result={'leaves(cno:[inos])': [(1, [1, 2, 3]), (4, [4]), (4, [4])], 'I-9.4_violations': 1, 'duplicate_keys': 1, 'mixed_extents': 0, 'orphan_extents': 2}
+END c143_model lines_before_this=498

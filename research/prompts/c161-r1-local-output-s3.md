@@ -1,0 +1,9 @@
+1. Read correctness: Candidate A is invalid due to F11 requiring a single publish path, so node buffers cannot receive updates outside the front end. Candidate B and Candidate C both fail to order entries across publishes because seq as defined in F3 (per publish count) resets for each publish, making it impossible to determine the newest entry between publishes. Within a single publish, both Candidate B and C correctly order entries across levels using seq.
+
+2. Crash: Candidate A is invalid. For Candidate B and C, a crash before publish results in undrained front-end entries being lost, causing stale accounts. A crash after publish (with buffers drained at publish point) results in accounts matching the published root. Undrained front-end entries after crash are lost because the journal does not log buffer contents.
+
+3. Cost and format: Candidate A is invalid. Candidate B requires freeze layer 4 changes for internal node buffers, increases write amplification (messages pushed down tree height times), and read amplification (multiple buffer checks per read). Candidate C also changes freeze layer 4 per tree, but write amplification is lower for front end trees (direct to leaves) and higher for node buffer trees; read amplification is lower for front end trees (front end then leaves) and higher for node buffer trees. No second publish path is needed for either.
+
+4. Check: For Candidate B, if seq is altered during message push down between levels, reads return incorrect newest entry. For Candidate C, if a tree that cannot recompute (e.g., inode) has node buffers, it violates F5.
+
+5. Candidate C is preferred. The observation that node buffers are only useful for trees that can recompute from authoritative state would not change the pick, but if a tree that requires high write throughput cannot recompute (contradicting F5), it would require reevaluation.

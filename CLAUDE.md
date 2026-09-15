@@ -65,7 +65,7 @@
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
 | `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项、给具体的宽度与取值（未定的给预想值），指不到的就是格式级空白；每节标里程碑步号 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
-| `.claude/kb/verification-build.md` | 三样未实现的验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
+| `.claude/kb/verification-build.md` | 三样验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
 | `.claude/kb/milestone-first-txn.md` | 里程碑「第一个事务」的规划：八步，每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
@@ -75,6 +75,8 @@
 | `research/scripts/check-segment-registry.py` | 把 `first-txn-layout.md` 八的段序列登记表（段序列、操作数、闭式、每段步骤种类多重集）与 E142 产物的 `name=segments` 行逐字比对，产物路径从 `replay.sh` 的 E142 行动态解析；门禁 52 号调它；`--selftest` 自证会红 |
 | `research/scripts/replace-once.py` | 定点替换：`replace-once.py 文件 旧串 新串`，旧串在文件里必须恰好命中一次，0 次或多次都拒绝、不写；几个会话共写一批文件时只许这样改，不许整份重写；`--selftest` 自证会红 |
 | `research/scripts/claim-experiment.sh` | 取实验号并当场占住：查号与建跑前登记在同一步，建文件用排他方式；`--next` 打印下一个空号；`--selftest` 自证会红 |
+| `research/scripts/replace-batch.py` | 批量定点替换：规格文件（JSON）里每一处（文件、旧串、新串）都先在内存里核「恰好命中一次」，全过了才写盘并回读；有一处不中就一个文件都不写；`--dry-run` 只核不写；`--selftest` 自证会红（`REPLACE_BATCH_WRITE_EACH=1` 强制走回逐处写盘，自检必须判红） |
+| `research/perf-by-milestone.md` | singlefs 与六家文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）按里程碑的性能对比：六家基线的表，每个里程碑一节写 singlefs 能跑哪几维、差多少、跑不了的还缺什么；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `research/scripts/e152-tables.py` 从产物生成；每过一个里程碑给 singlefs 重跑一遍、加一节 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
 
@@ -163,4 +165,4 @@ bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红
 - 先定决策，再写代码——D4/D8 未定之前写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」。
 - 记账必须在提交时增量维护；任何要「事后扫一遍」的记账设计当场否决。
-- 门禁全绿**不构成崩溃一致性证据**——崩溃点重放还没接进来。
+- 门禁全绿**只构成第一个事务在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载还只有第一个事务，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量。

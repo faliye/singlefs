@@ -1,0 +1,11 @@
+{"section": "lookup", "heads": 1, "gap": 0, "table": 20, "forward": 0, "backward": 0, "latest_to_end": 0}
+{"section": "lookup", "heads": 1, "gap": 10, "table": 10, "forward": 0, "backward": 0, "latest_to_end": 0}
+{"section": "lookup", "heads": 2, "gap": 0, "table": 40, "forward": 1, "backward": 1, "latest_to_end": 1}
+{"section": "lookup", "heads": 2, "gap": 10, "table": 30, "forward": 11, "backward": 1, "latest_to_end": 1}
+{"section": "lookup", "heads": 8, "gap": 0, "table": 160, "forward": 7, "backward": 7, "latest_to_end": 7}
+{"section": "lookup", "heads": 8, "gap": 10, "table": 150, "forward": 77, "backward": 7, "latest_to_end": 7}
+{"section": "lookup", "heads": 64, "gap": 0, "table": 1280, "forward": 63, "backward": 63, "latest_to_end": 63}
+{"section": "lookup", "heads": 64, "gap": 10, "table": 1270, "forward": 693, "backward": 63, "latest_to_end": 63}
+{"section": "lookup", "heads": 1024, "gap": 0, "table": 20480, "forward": 1023, "backward": 1023, "latest_to_end": 1023}
+{"section": "lookup", "heads": 1024, "gap": 10, "table": 20470, "forward": 11253, "backward": 1023, "latest_to_end": 1023}
+{"section": "END", "rows": 10}

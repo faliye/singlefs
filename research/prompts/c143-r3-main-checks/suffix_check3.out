@@ -1,0 +1,9 @@
+family=f5 x=CJ2 x_hit=True x_fs=10 c_hit_unpadded=False points=[4, 7] variants_tried=24 c_best=(10, (4, 0))
+  c_variant=[p(1) f(1) rb(3,none,0) f(1) u(0) p(0) p(0) p(0) p(0) u(1) crash mount(d1+r4+j3) u(1)]
+family=f5 x=CJ2 x_hit=True x_fs=11 c_hit_unpadded=False points=[4, 7] variants_tried=24 c_best=(11, (4, 1))
+  c_variant=[p(1) f(1) rb(3,none,0) f(1) u(0) p(0) p(0) p(0) p(0) u(1) crash mount(d1+r4+j4) u(0) p(0) u(1)]
+family=f12d x=CJ2 x_hit=True x_fs=11 c_hit_unpadded=False points=[2, 5, 6] variants_tried=124 c_best=(11, (2, 0, 1))
+  c_variant=[p(1) rb(2,none,0) u(0) p(0) p(0) u(1) crash mount(d0+r1+j3) rb(1,d1+r2+j3,0) u(0) p(0) u(1)]
+family=f12d x=CJ2 x_hit=True x_fs=7 c_hit_unpadded=False points=[3, 6, 7] variants_tried=124 c_best=(7, (0, 3, 0))
+  c_variant=[p(1) f(1) rb(2,none,0) u(1) crash mount(d0+r1) u(0) p(0) p(0) p(0) rb(1,d0+r2+j3,0) u(1)]
+done

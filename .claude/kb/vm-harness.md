@@ -32,7 +32,7 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
 | 前置 | 怎么查 | 不满足怎么办 |
 |---|---|---|
 | **KVM 可读写** | `id -nG \| grep -w kvm`，再实测 `[ -r /dev/kvm ] && [ -w /dev/kvm ]` | 本机靠 **`kvm` 组成员身份**拿权限。不满足就 `sudo usermod -aG kvm $USER`（口令在 `.env` 的 `SUDO_PASS_A`）；当前 shell 用 `sg kvm -c '<命令>'` 立即取得，新会话自动带上 |
-| **内核镜像可读** | `bash scripts/vm-kernel.sh --check` | 跑 `bash scripts/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown |
+| **内核镜像可读** | `bash scripts/vm-kernel.sh --check` | 跑 `bash scripts/vm-kernel.sh`，它打印一个可用路径；必要时用 `.env` 里的口令从 `/boot` 复制一份到 `TMPDIR` 并 chown。要量时间就跑 `bash scripts/vm-kernel.sh --release $(uname -r)`：它只认 `/boot/vmlinuz-<版本>`，复制成 `TMPDIR` 下的 `singlefs-vmlinuz-<版本>`，不会先撞上 lockdep 那个 |
 | **二进制是静态的** | `file <二进制>` | 用 `--target x86_64-unknown-linux-musl` 编。musl 目标已装（`rustup target list --installed`） |
 
 ⚠️ **判断 KVM 前置一律查组并实测读写，不许查 ACL，也不许用 `setfacl` 去补。**
@@ -45,6 +45,9 @@ VM_DISKS=4 VM_DISK_MB=64 bash scripts/vm-bench.sh <静态二进制>
 ⚠️ **本机 `/boot` 下只有一个可读内核：`vmlinuz-6.17.0-lockdep`**（其余是 `-rw-------`）。
 **它带 lockdep**，锁校验开销很大 ⇒ **虚机里量到的时间不可与宿主比**，
 但**计数类指标（I/O 次数、块数）不受影响**。引用虚机跑出来的时间数必须带这一句。
+⚠️ **要比时间，用 `vm-kernel.sh --release $(uname -r)` 取宿主正在跑的 OEM 内核**（E152（按里程碑对比六家文件系统的文件性能） 就这么跑）：
+不带 lockdep，同一个测试台上几次虚机跑的时间可以互相比；它仍然不与宿主上的时间比（虚拟化与 `cache=none` 都在里面）。
+lockdep 内核量出来的时间连虚机之间都不宜比：锁校验的开销随加锁次数走，被测对象加锁多少不一样（推测，没在本机量过）。
 
 ## 跑之前先做卫生检查
 
@@ -77,7 +80,7 @@ bash scripts/vm-bench.sh --selftest
 |---|---|---|
 | I/O 次数、块数 | 有 | 有 |
 | **块层独立读数**（`/sys/block/vda/stat`） | **没有**（`blkstat=false`） | **有** |
-| 时间 | 可比 | **不可比**（lockdep 内核） |
+| 时间 | 可比 | lockdep 内核：**不可比**；`--release` 取的 OEM 内核：同一测试台上的几次虚机跑之间可比，仍不与宿主比 |
 
 ⚠️ **块层独立读数是好几个实验的校验路径**——
 E7（离线索引 harness） 把「块层与程序计数器逐格相符」列为它四层校验之一，
@@ -129,7 +132,22 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 
 ⚠️ 这一档验的是「程序发出的写与 FLUSH 在虚拟设备上原样到达、次序不变」，不是真盘的持久语义：`cache=none` 下设备侧 FLUSH 映射成宿主上的 `fdatasync`，宿主盘自己的缓存不在射程里。
 
+## 附加根与盘镜像预分配（E152（按里程碑对比六家文件系统的文件性能） 加的两个开关）
+
+| 开关 | 做什么 | 口径 |
+|---|---|---|
+| `VM_EXTRA_ROOT=<目录>` | 目录里的东西原样并进 initramfs 的根 | E152（按里程碑对比六家文件系统的文件性能） 用 `research/scripts/e152-stage-root.sh` 生成它：fio、各家格式化与挂载工具连同 ldd 解出的全部库、解压过的内核模块与加载次序，共 129 MB；initramfs 按 gzip -1 打包，每次起虚机多几秒 |
+| `VM_DISK_PREALLOCATE=1` | 盘镜像用 fallocate 预分配，不用 truncate 出稀疏文件 | 宿主 ext4 不在来宾写的时候边写边分配；预分配失败就不跑这一次，不退回稀疏文件 |
+
+⚠️ **往附加根里放动态链接的程序，库（尤其 `/lib64/ld-linux-x86-64.so.2`）要带执行位。**
+内核执行动态程序时先执行 ELF 里写的那个加载器；加载器没有执行位，来宾里每个动态程序都报 Permission denied，而静态链接的程序照常跑。
+实测（2026-09-15，E152（按里程碑对比六家文件系统的文件性能） 第一次冒烟跑）：库按 0644 装，八个配置里七个卡在第一个外部命令，只有静态链接的 singlefs 二进制跑通。
+`e152-stage-root.sh` 现在按 0755 装，并在搭完时用搭好的加载器与库实际跑一次搭好的 fio，这一步没过就不交出附加根。
+
 ## 历史版本
+
+### 2026-09-15
+- **新增** `VM_EXTRA_ROOT`、`VM_DISK_PREALLOCATE` 两个开关与 `vm-kernel.sh --release`。**依据**：E152（按里程碑对比六家文件系统的文件性能） 要在同一台虚机里挂六家文件系统跑 fio，要一个与宿主同版本、不带 lockdep 的内核，而最小 initramfs 里没有这些程序与模块。
 
 ### 2026-08-29
 - **曾经**：`vm-bench.sh` 在子 shell 里 `mktemp -d` 出工作目录，路径传不回父进程，

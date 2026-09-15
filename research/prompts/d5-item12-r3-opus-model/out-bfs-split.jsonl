@@ -1,0 +1,7 @@
+{"section": "bfs-split", "arm": "BING_R", "cfg": {"inherit": "nextpub"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 487}
+{"section": "bfs-split", "arm": "YI", "cfg": {"inherit": "nextpub"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 487}
+{"section": "bfs-split", "arm": "BING_T", "cfg": {"inherit": "nextpub"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 487}
+{"section": "bfs-split", "arm": "BING_R", "cfg": {"inherit": "nextpub_lost"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 490}
+{"section": "bfs-split", "arm": "YI", "cfg": {"inherit": "nextpub_lost"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 490}
+{"section": "bfs-split", "arm": "BING_T", "cfg": {"inherit": "nextpub_lost"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["D", 12], ["PS", 11], ["K", 11, 0]], "over": [0], "double": 0, "leak": [], "explored": 658, "states": 490}
+{"section": "END", "rows": 6}

@@ -4,9 +4,8 @@
 #   vm-bench.sh <静态二进制> [参数...]    跑它，退出码传回宿主
 #   vm-bench.sh --selftest                验证本 harness 能分辨成功与失败
 #
-# 为什么不用 singlefs-ai-sop/scripts/qemu/run.sh：那个 harness 不挂任何块设备，
-# 也没有把额外文件塞进 initramfs 的钩子（可调环境变量只有 SINGLEFS_KERNEL 与 TMPDIR）。
-# 索引 benchmark 要量的就是块设备行为，没有盘就没有被测对象。
+# 虚机装置归项目：共享门禁不带虚机装置（.claude/singlefs-ai-sop/rules/show-me-test.md「最终判据是 QEMU/KVM 压测」）。
+# 挂几块盘、塞什么二进制、结果怎么抓，都跟被测对象绑在一起；索引 benchmark 要量的就是块设备行为，没有盘就没有被测对象。
 #
 # 纪律沿用 rules/command-safety.md：镜像落 TMPDIR 不落仓库；虚机 pid 写文件，
 # 按字面量 pid 清理，不按名字匹配。读不到退出标记一律判「不明」，绝不当成 0。
@@ -46,11 +45,21 @@ run_one() {
   cp "$(command -v busybox)" "$ird/bin/busybox"
   ( cd "$ird/bin" && ./busybox --list | while read -r a; do ln -sf busybox "$a"; done ) 2>/dev/null || true
   cp "$bin" "$ird/bench"; chmod +x "$ird/bench"
+  # VM_EXTRA_ROOT：这个目录里的东西原样并进 initramfs 的根
+  # （E152（按里程碑对比六家文件系统的文件性能） 要的 fio、各家用户态、依赖库、解压过的模块）。
+  [[ -n "${VM_EXTRA_ROOT:-}" ]] && cp -a "$VM_EXTRA_ROOT"/. "$ird"/
   printf '%s\n' "$*" > "$ird/args"
   # N 块盘：disk.img / disk1.img …；来宾侧设备名按 virtio 顺序 vda vdb vdc …
   local d devs=""
   for ((d=0; d<VM_DISKS; d++)); do
-    truncate -s "${VM_DISK_MB}M" "$work/disk$d.img"
+    # VM_DISK_PREALLOCATE=1：fallocate 预分配，宿主 ext4 不在来宾写的时候边写边分配（E152 的顺序写要它）。
+    # 预分配失败就不跑这一次，不许悄悄退回稀疏文件——那会换掉被测条件而没人知道。
+    if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
+      fallocate -l "${VM_DISK_MB}M" "$work/disk$d.img" \
+        || { echo "fallocate $work/disk$d.img 失败" >&2; printf '%s\n' "$work" >> "$VM_WORKLIST"; return 1; }
+    else
+      truncate -s "${VM_DISK_MB}M" "$work/disk$d.img"
+    fi
     devs="$devs /dev/vd$(printf "\\$(printf '%03o' $((97+d)))")"
   done
   printf '%s\n' "${devs# }" > "$ird/devs"
@@ -168,6 +177,14 @@ command -v cpio >/dev/null || die "cpio 缺失"
 KERNEL="$(find_kernel)" || die "找不到可读的内核镜像。SINGLEFS_KERNEL=/path/to/bzImage 指定，或 sudo chmod +r /boot/vmlinuz-\$(uname -r)"
 ok "内核 $KERNEL"
 ok "虚机 ${VM_MEM}M 内存 / ${VM_CPUS} vCPU / ${VM_DISK_MB}M virtio 盘"
+if [[ -n "${VM_EXTRA_ROOT:-}" ]]; then
+  [[ -d "$VM_EXTRA_ROOT" ]] || die "VM_EXTRA_ROOT 指的不是目录：$VM_EXTRA_ROOT" "→ 先用 research/scripts/e152-stage-root.sh 生成附加根，或者不设这个变量"
+  ok "initramfs 附加根 $VM_EXTRA_ROOT（$(du -sh "$VM_EXTRA_ROOT" | cut -f1)）"
+fi
+if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
+  command -v fallocate >/dev/null || die "VM_DISK_PREALLOCATE=1 要 fallocate，本机没有" "→ 装 util-linux，或者不设 VM_DISK_PREALLOCATE"
+  ok "盘镜像用 fallocate 预分配"
+fi
 
 if [[ "${1:-}" == "--selftest" ]]; then
   say ""

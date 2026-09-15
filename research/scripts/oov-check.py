@@ -84,6 +84,22 @@ def splice_of(w, words):
             cand = c + b
             if len(cand) >= 7 and cand in words:
                 return "%s+(%s)%s" % (a, c, b)
+    # 规则 E：屈折后缀之后又叠一个后缀（`sorting+ing`、`unaffected+ing`、`unaffected+able`）。
+    # 英语里 -ing / -ed 之后几乎不再接 -ing / -able。⚠️ 这条是补出来的：实测 2026-09-14
+    # 同一天四份本地腿输出被 A–D 判绿，里面有 `Sortinging` `totalinging` `unaffecteding`
+    # `unaffectedable`——A 要两截各 >= 5 字母切不开，D 的尾巴 `ing` `able` 在后缀表里被放掉。
+    # 两道闸压假阳性：「-inging」要去掉两个 -ing 之后剩下的词根成词且 >= 4 字母（`bringing`
+    # `singing` 的词根只剩 1–3 个字母，放掉）；「-ed + ing / able」要 -ed 那一截本身成词且
+    # >= 8 字母（`exceeding` `proceeding` 的 `exceed` `proceed` 不到 8，放掉）。
+    if lw.endswith('inging'):
+        base = lw[:-6]
+        if len(base) >= 4 and base in words:
+            return "%sing+ing" % base
+    for suf in ('ing', 'able'):
+        if lw.endswith(suf):
+            stem = lw[:-len(suf)]
+            if stem.endswith('ed') and len(stem) >= 8 and stem in words:
+                return "%s+%s" % (stem, suf)
     # 规则 D：成词的长前缀后面粘着一截**既不成词也不是后缀**的短尾巴。
     # ⚠️ 这条是补出来的：实测 `cryptographicord`（cryptographic + [Rec]ord，后一个词掉了三个
     # 字母）在 A / B / C 下全切不开——A 要两截各 >=5，C 只补得回一个字母——于是被记成
@@ -129,6 +145,9 @@ SELFTEST_RED = [
     'batchinggroup',         # 规则 A：两个实词粘死
     'configurationing',      # 规则 B：名词后缀之后接动词后缀
     'cryptographicord',      # 规则 D：cryptographic + [Rec]ord，尾巴只剩三个字母
+    'sortinging',            # 规则 E：sorting + ing
+    'unaffecteding',         # 规则 E：unaffected + ing
+    'unaffectedable',        # 规则 E：unaffected + able
 ]
 SELFTEST_GREEN = [
     'distinguishable',       # 曾被规则 C 误判成 distinguish+(c)able
@@ -137,6 +156,8 @@ SELFTEST_GREEN = [
     # 规则 D 的假阳性靶子：合成词与正常派生都不许判红
     # 只放真会走到 splice_of 的词（词表里没有的），否则测的不是实际会发生的事
     'filesystemwide', 'rollbacked',
+    # 规则 E 的假阳性靶子：真词里的 -inging 与 -ed + ing
+    'bringing', 'springing', 'exceeding', 'proceeding', 'embedding',
 ]
 
 def selftest(words):
@@ -150,7 +171,7 @@ def selftest(words):
             print("  ✗ 绿样本被误判：%s -> %s" % (w, s)); bad += 1
     if bad:
         print("  ✗ oov-check 自检未通过：%d 个样本判错" % bad)
-        print("     → 怎么办： 改 splice_of 的三条规则，改完把两组样本都跑一遍；"
+        print("     → 怎么办： 改 splice_of 的五条规则，改完把两组样本都跑一遍；"
               "红样本抓不到说明检测器有盲区，绿样本被误判说明它会误伤正常英文。")
         return EXIT_RED
     print("  ✓ oov-check 自检通过（红样本 %d 个全抓，绿样本 %d 个不误伤）"

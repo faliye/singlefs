@@ -1,0 +1,16 @@
+M1_flush_field_moved_to_discard_ticks	flush_requests: *fields.get(15)?	flush_requests: *fields.get(14)?
+M2_read_bandwidth_takes_operations_field	read_bandwidth_kibibytes_per_second: number(7)?	read_bandwidth_kibibytes_per_second: number(8)?
+M3_direct_check_never_fires	const DIRECT_CHECK_NUMERATOR: u64 = 9;	const DIRECT_CHECK_NUMERATOR: u64 = 0;
+M4_percentile_rank_rounds_down	(percentile * count).div_ceil(100)	(percentile * count) / 100
+M5_stability_threshold_ten_times_wider	const STABLE_SPREAD_PERCENT: f64 = 15.0;	const STABLE_SPREAD_PERCENT: f64 = 150.0;
+M6_even_median_takes_upper_middle	(sorted[count / 2 - 1] + sorted[count / 2]) / 2.0	sorted[count / 2]
+M7_summarize_accepts_failed_attempt	if block.virtual_machine_exit == 0 {	if block.virtual_machine_exit >= 0 {
+M8_sector_is_four_kibibytes	const SECTOR_BYTES: u64 = 512;	const SECTOR_BYTES: u64 = 4096;
+M9_inner_line_keeps_name_prefix	strip_prefix("name=")	strip_prefix("xname=")
+M10_persist_mean_ignores_count	total(|delta| delta.write_bytes) / count	total(|delta| delta.write_bytes)
+M11_control_drops_page_cache_again	"--ioengine=psync", "--invalidate=0"	"--ioengine=psync"
+M12_zfs_partition_starts_at_sector_34	start=2048, type=L	start=34, type=L
+M13_summed_counters_drop_second_member_reads	read_sectors: self.read_sectors + other.read_sectors,	read_sectors: self.read_sectors,
+M14_raid_recovery_not_noticed	mdstat_text.contains("resync") || mdstat_text.contains("recovery")	mdstat_text.contains("resync")
+M15_bcachefs_devices_joined_with_comma	let bcachefs_devices = device_paths.join(":");	let bcachefs_devices = device_paths.join(",");
+M16_software_raid_without_assume_clean	"--bitmap=none", "--assume-clean", "--run"	"--bitmap=none", "--run"

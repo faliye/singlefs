@@ -1,0 +1,21 @@
+{"section": "geometry", "shape": "G2", "n": 1000, "arm": "REF", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 0, "count_reads": 0, "second_kill": 0, "max_intents": 0}
+{"section": "geometry", "shape": "G2", "n": 1000, "arm": "BING_R", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G2", "n": 1000, "arm": "YI", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 1000, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G2", "n": 1000, "arm": "BING_T", "over": 0, "double": 0, "leak": 0, "moves": 1000, "frees": 0, "units": 1000, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G3", "n": 1000, "arm": "REF", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 0, "count_reads": 0, "second_kill": 0, "max_intents": 0}
+{"section": "geometry", "shape": "G3", "n": 1000, "arm": "BING_R", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G3", "n": 1000, "arm": "YI", "over": 0, "double": 0, "leak": 0, "moves": 1000, "frees": 0, "units": 1000, "count_reads": 1000, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G3", "n": 1000, "arm": "BING_T", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G4", "n": 1000, "arm": "REF", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 0, "count_reads": 0, "second_kill": 0, "max_intents": 0}
+{"section": "geometry", "shape": "G4", "n": 1000, "arm": "BING_R", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G4", "n": 1000, "arm": "YI", "over": 0, "double": 0, "leak": 0, "moves": 500, "frees": 0, "units": 500, "count_reads": 1000, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G4", "n": 1000, "arm": "BING_T", "over": 0, "double": 0, "leak": 0, "moves": 500, "frees": 0, "units": 500, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G5", "n": 1000, "arm": "REF", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 1000, "units": 0, "count_reads": 0, "second_kill": 0, "max_intents": 0}
+{"section": "geometry", "shape": "G5", "n": 1000, "arm": "BING_R", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 1000, "units": 1000, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G5", "n": 1000, "arm": "YI", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 1000, "units": 1000, "count_reads": 2000, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G5", "n": 1000, "arm": "BING_T", "over": 0, "double": 0, "leak": 0, "moves": 1000, "frees": 1000, "units": 2000, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G6", "n": 1000, "arm": "REF", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 0, "count_reads": 0, "second_kill": 0, "max_intents": 0}
+{"section": "geometry", "shape": "G6", "n": 1000, "arm": "BING_R", "over": 0, "double": 0, "leak": 0, "moves": 0, "frees": 0, "units": 1, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G6", "n": 1000, "arm": "YI", "over": 0, "double": 0, "leak": 0, "moves": 500, "frees": 0, "units": 500, "count_reads": 1000, "second_kill": 0, "max_intents": 1}
+{"section": "geometry", "shape": "G6", "n": 1000, "arm": "BING_T", "over": 0, "double": 0, "leak": 0, "moves": 500, "frees": 0, "units": 500, "count_reads": 0, "second_kill": 0, "max_intents": 1}
+{"section": "END", "rows": 20}

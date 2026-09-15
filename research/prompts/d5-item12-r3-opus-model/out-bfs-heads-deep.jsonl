@@ -1,0 +1,7 @@
+{"section": "bfs-heads-deep", "arm": "BING_R", "cfg": {}, "found": false, "explored": 6000000, "states": 2581224, "depth_reached": 9, "truncated": true}
+{"section": "bfs-heads-deep", "arm": "YI", "cfg": {}, "found": false, "explored": 6000000, "states": 2630276, "depth_reached": 9, "truncated": true}
+{"section": "bfs-heads-deep", "arm": "BING_T", "cfg": {}, "found": false, "explored": 6000000, "states": 2612765, "depth_reached": 9, "truncated": true}
+{"section": "bfs-heads-deep-snap", "arm": "YI", "cfg": {}, "found": false, "explored": 6000000, "states": 2607012, "depth_reached": 9, "truncated": true}
+{"section": "bfs-heads-deep-snap", "arm": "BING_T", "cfg": {}, "found": false, "explored": 6000000, "states": 2604733, "depth_reached": 9, "truncated": true}
+{"section": "bfs-heads-deep-snap", "arm": "BING_R", "cfg": {"order": "lineage"}, "found": false, "explored": 6000000, "states": 2623180, "depth_reached": 9, "truncated": true}
+{"section": "END", "rows": 6}

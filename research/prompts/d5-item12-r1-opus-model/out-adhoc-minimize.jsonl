@@ -1,0 +1,427 @@
+{"section": "minimized", "arm": "JIA_B", "seed": 0, "want": "over", "original_len": 73, "min_len": 48, "ops": [["W", 11, 2], ["PSS", 11], ["W", 11, 2], ["PS", 11], ["PS", 11], ["D", 12], ["PS", 11], ["W", 11, 3], ["W", 11, 3], ["W", 11, 2], ["D", 13], ["W", 11, 3], ["D", 15], ["W", 11, 2], ["D", 14], ["D", 16], ["W", 11, 3], ["W", 11, 3], ["PS", 11], ["W", 11, 1], ["W", 11, 2], ["D", 17], ["W", 11, 2], ["PS", 11], ["W", 11, 3], ["PS", 11], ["W", 11, 1], ["PS", 11], ["W", 11, 1], ["W", 11, 1], ["W", 11, 3], ["W", 11, 3], ["W", 11, 3], ["PS", 11], ["W", 11, 3], ["PS", 11], ["PS", 11], ["PS", 11], ["D", 22], ["D", 23], ["PSS", 11], ["K", 11, 14], ["K", 11, 12], ["W", 11, 1], ["D", 26], ["PSS", 11], ["K", 11, 20], ["D", 25]]}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA_B | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | YI_min | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | BING_R | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 1)] ps=[(12, 0), (13, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 1)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 3)] ps=[(12, 0), (13, 1), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 3)] ps=[(12, 0), (13, 1), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 3)] ps=[(12, 0), (13, 1), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 3)] ps=[(12, 0), (13, 1), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 12) | JIA_B | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 12) | JIA | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 12) | YI_min | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 12) | BING_R | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 1), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 4)] ps=[(13, 0), (14, 1), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 13) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 13) | JIA | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 13) | YI_min | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 13) | BING_R | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 4)] ps=[(14, 0), (15, 2), (16, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 15) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 15) | JIA | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 15) | YI_min | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 15) | BING_R | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 4)] ps=[(14, 0), (16, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 14) | JIA_B | dl=[] | ph=[(11, 4)] ps=[(16, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 14) | JIA | dl=[] | ph=[(11, 4)] ps=[(16, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 14) | YI_min | dl=[] | ph=[(11, 4)] ps=[(16, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 14) | BING_R | dl=[] | ph=[(11, 4)] ps=[(16, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 16) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 16) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 16) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 16) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA_B | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 5)] ps=[(17, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 17) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 17) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 17) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 17) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA_B | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 0)] ps=[] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 6)] ps=[(18, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA_B | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 7)] ps=[(18, 0), (19, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 8)] ps=[(18, 0), (19, 6), (20, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA_B | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 9)] ps=[(18, 0), (19, 6), (20, 7), (21, 8)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 10)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 10)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 10)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 10)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 11)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 11)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 11)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 11)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA_B | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (22, 9), (23, 10), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 22) | JIA_B | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (23, 9), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 22) | JIA | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (23, 9), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 22) | YI_min | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (23, 9), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 22) | BING_R | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (23, 9), (24, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 23) | JIA_B | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 23) | JIA | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 23) | YI_min | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 23) | BING_R | dl=[] | ph=[(11, 12)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA_B | dl=[] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA | dl=[] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | YI_min | dl=[] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | BING_R | dl=[] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 14) | JIA_B | dl=[(11, 1, 11, 9, 15)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 14) | JIA | dl=[(11, 1, 11, 9, 15)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 14) | YI_min | dl=[(26, 1, 11, 9, 15)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 14) | BING_R | dl=[(11, 13, 1, 11, 9, 15)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 12) | JIA_B | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 12) | JIA | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 12) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 12) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA_B | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | JIA | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('W', 11, 1) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (26, 13)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 26) | JIA_B | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 26) | JIA | dl=[(11, 1, 11, 9, 15), (11, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 26) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 26) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13)] | ph=[(11, 13)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA_B | dl=[(11, 3, 11, 7, 13), (27, 1, 11, 9, 15)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=['vector']"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | JIA | dl=[(27, 1, 11, 9, 15), (27, 3, 11, 7, 13)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('PSS', 11) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 20) | JIA_B | dl=[(11, 1, 11, 14, 21), (11, 3, 11, 7, 13), (27, 1, 11, 9, 15)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=['vector']"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 20) | JIA | dl=[(11, 1, 11, 14, 21), (27, 1, 11, 9, 15), (27, 3, 11, 7, 13)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 20) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13), (28, 1, 11, 14, 21)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('K', 11, 20) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13), (11, 14, 1, 11, 14, 21)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (25, 12), (27, 13), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 25) | JIA_B | dl=[(11, 3, 11, 7, 13), (27, 1, 11, 9, 15)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (27, 12), (28, 14)] | freed=[20] | over=[20] leak=[] | checker=['vector']"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 25) | JIA | dl=[(11, 1, 11, 14, 21), (27, 1, 11, 9, 15), (27, 3, 11, 7, 13)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (27, 12), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 25) | YI_min | dl=[(26, 1, 11, 9, 15), (26, 3, 11, 7, 13), (28, 1, 11, 14, 21)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (27, 12), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "JIA_B", "line": "('D', 25) | BING_R | dl=[(11, 13, 1, 11, 9, 15), (11, 13, 3, 11, 7, 13), (11, 14, 1, 11, 14, 21)] | ph=[(11, 14)] ps=[(18, 0), (19, 6), (20, 7), (21, 8), (24, 9), (27, 12), (28, 14)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "minimized", "arm": "BING_B", "seed": 1, "want": "over", "original_len": 107, "min_len": 58, "ops": [["PS", 11], ["W", 11, 2], ["PSS", 11], ["D", 12], ["W", 11, 2], ["W", 11, 2], ["W", 11, 1], ["PS", 11], ["W", 11, 1], ["C", 15], ["PS", 16], ["W", 16, 1], ["W", 16, 2], ["W", 16, 2], ["W", 16, 1], ["W", 11, 1], ["W", 11, 1], ["W", 16, 3], ["W", 16, 2], ["W", 16, 1], ["PS", 11], ["W", 16, 1], ["W", 16, 2], ["W", 16, 3], ["W", 11, 1], ["W", 16, 2], ["W", 11, 3], ["W", 16, 2], ["PS", 16], ["PSS", 11], ["W", 16, 2], ["W", 16, 2], ["W", 16, 2], ["W", 11, 1], ["W", 16, 2], ["W", 11, 2], ["W", 16, 1], ["W", 16, 3], ["W", 11, 3], ["C", 14], ["D", 13], ["W", 11, 3], ["PS", 11], ["W", 16, 2], ["C", 21], ["X", 24], ["D", 23], ["PS", 11], ["X", 22], ["C", 20], ["D", 18], ["D", 17], ["D", 14], ["PS", 11], ["C", 15], ["PSS", 16], ["K", 16, 31], ["D", 29]]}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_B | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 1)] ps=[(12, 0)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | BING_B | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | JIA | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | YI_min | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | BING_R | dl=[] | ph=[(11, 2)] ps=[(12, 0), (13, 1), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 12) | BING_B | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 12) | JIA | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 12) | YI_min | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 12) | BING_R | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_B | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_B | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 2)] ps=[(13, 0), (14, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | BING_B | dl=[] | ph=[(11, 3), (16, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | JIA | dl=[] | ph=[(11, 3), (16, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | YI_min | dl=[] | ph=[(11, 3), (16, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | BING_R | dl=[] | ph=[(11, 3), (16, 3)] ps=[(13, 0), (14, 2), (15, 2)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_B | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | JIA | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | YI_min | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_R | dl=[] | ph=[(11, 3), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 5), (16, 4)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | BING_B | dl=[] | ph=[(11, 5), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | JIA | dl=[] | ph=[(11, 5), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | YI_min | dl=[] | ph=[(11, 5), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 16) | BING_R | dl=[] | ph=[(11, 5), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 11) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 1) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 2) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 1) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 3) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_B | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 7), (16, 6)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 14) | BING_B | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 14) | JIA | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 14) | YI_min | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 14) | BING_R | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(13, 0), (14, 2), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 13) | BING_B | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 13) | JIA | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 13) | YI_min | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 13) | BING_R | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_B | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | JIA | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | YI_min | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 11, 3) | BING_R | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_B | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | JIA | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | YI_min | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('W', 16, 2) | BING_R | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 21) | BING_B | dl=[] | ph=[(11, 8), (16, 6), (22, 2), (24, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 21) | JIA | dl=[] | ph=[(11, 8), (16, 6), (22, 2), (24, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 21) | YI_min | dl=[] | ph=[(11, 8), (16, 6), (22, 2), (24, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 21) | BING_R | dl=[] | ph=[(11, 8), (16, 6), (22, 2), (24, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 24) | BING_B | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 24) | JIA | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 24) | YI_min | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 24) | BING_R | dl=[] | ph=[(11, 8), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (23, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 23) | BING_B | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 23) | JIA | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 23) | YI_min | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 23) | BING_R | dl=[] | ph=[(11, 7), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 9), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 9), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 9), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 9), (16, 6), (22, 2)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 22) | BING_B | dl=[] | ph=[(11, 9), (16, 6)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 22) | JIA | dl=[] | ph=[(11, 9), (16, 6)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 22) | YI_min | dl=[] | ph=[(11, 9), (16, 6)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('X', 22) | BING_R | dl=[] | ph=[(11, 9), (16, 6)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 20) | BING_B | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 20) | JIA | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 20) | YI_min | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 20) | BING_R | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (18, 3), (19, 4), (20, 5), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 18) | BING_B | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (19, 4), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 18) | JIA | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (19, 4), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 18) | YI_min | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (19, 4), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 18) | BING_R | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (17, 3), (19, 4), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 17) | BING_B | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 17) | JIA | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 17) | YI_min | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 17) | BING_R | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(14, 0), (15, 2), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 14) | BING_B | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 14) | JIA | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 14) | YI_min | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 14) | BING_R | dl=[] | ph=[(11, 9), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_B | dl=[] | ph=[(11, 10), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | JIA | dl=[] | ph=[(11, 10), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | YI_min | dl=[] | ph=[(11, 10), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PS', 11) | BING_R | dl=[] | ph=[(11, 10), (16, 6), (26, 7)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | BING_B | dl=[] | ph=[(11, 10), (16, 6), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | JIA | dl=[] | ph=[(11, 10), (16, 6), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | YI_min | dl=[] | ph=[(11, 10), (16, 6), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('C', 15) | BING_R | dl=[] | ph=[(11, 10), (16, 6), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 16) | BING_B | dl=[] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 16) | JIA | dl=[] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 16) | YI_min | dl=[] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('PSS', 16) | BING_R | dl=[] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('K', 16, 31) | BING_B | dl=[(16, 11, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=['vector', 'decode']"}
+{"section": "replay", "arm": "BING_B", "line": "('K', 16, 31) | JIA | dl=[(16, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('K', 16, 31) | YI_min | dl=[(30, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('K', 16, 31) | BING_R | dl=[(16, 11, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (29, 6), (30, 11)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 29) | BING_B | dl=[] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (30, 6)] | freed=[31] | over=[31] leak=[] | checker=['vector']"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 29) | JIA | dl=[(16, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (30, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 29) | YI_min | dl=[(30, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (30, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "replay", "arm": "BING_B", "line": "('D', 29) | BING_R | dl=[(16, 11, 2, 16, 9, 19)] | ph=[(11, 10), (16, 11), (26, 7), (28, 3)] ps=[(15, 0), (19, 3), (20, 3), (21, 7), (25, 7), (27, 9), (30, 6)] | freed=[] | over=[] leak=[] | checker=[]"}
+{"section": "END"}

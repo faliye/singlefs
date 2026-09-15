@@ -1,0 +1,5 @@
+regime=all cj_hit_c_not_cases=8164 c_hit_after_delay=8164 by_delay={1: 1574, 2: 3076, 3: 1968, 4: 288, 5: 736, 6: 336, 7: 36, 8: 108, 9: 36, 11: 6} with_fs_not_above_cj=8164 unrescued=0
+regime=all prefixes_where_c_never_hit_with_u2=158 of_which_c_hit_once_delay_allowed=158
+regime=slot_only cj_hit_c_not_cases=4272 c_hit_after_delay=4272 by_delay={1: 868, 2: 1552, 3: 1064, 4: 154, 5: 370, 6: 174, 7: 18, 8: 52, 9: 18, 11: 2} with_fs_not_above_cj=4272 unrescued=0
+regime=slot_only prefixes_where_c_never_hit_with_u2=172 of_which_c_hit_once_delay_allowed=172
+done

@@ -88,19 +88,36 @@ echo
 echo "── 4. 已跑的实验有没有决策引用 ──"
 # 一个实验跑完、产出了决策相关的结果，却没有任何决策引用它 ⇒ 那个结果没落进任何判断。
 # 这不是「引用格式问题」，是**结论悬空**。
+# 出路二：实验正文里一行「**备料**：」，点名它等着的决策或欠账（编号带简称），而且那个编号在 kb 里真有。
+# 此前出路里写着这一句而检查并不认它，照做了也还是红（2026-09-15 E152（按里程碑对比六家文件系统的文件性能） 撞上）；
+# 点名一个不存在的编号照样红，否则「备料」两个字就成了免检章。
 orphan=0
 while read -r line; do
   e="${line%% *}"
   grep -q "已跑" <<<"$line" || continue
   n=$(cat "$KB/decisions.md" "$KB"/decisions/*.md | grep -cE "(^|[^A-Za-z0-9/-])$e([^A-Za-z0-9-]|$)")
-  if [[ "$n" -eq 0 ]]; then
-    bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
-    howto "在它支撑（或推翻）的那条决策正文里点它的名，写清它证明了什么；" \
-          "确实谁也不支撑的话，实验正文里写明它是备料、等哪条分项来用。"
-    orphan=1
+  [[ "$n" -gt 0 ]] && continue
+  body="$(grep -lE "^## $e " "$KB"/experiments/*.md 2>/dev/null | head -1)"
+  reserve=""
+  [[ -n "$body" ]] && reserve="$(grep -m1 -E '^\*\*备料\*\*：' "$body")"
+  waiting_for=""
+  for token in $(grep -oE '(D|C)[0-9]{1,3}（' <<<"$reserve" | tr -d '（' | sort -u); do
+    case "$token" in
+      D*) grep -rqE "^## $token " "$KB/decisions" && waiting_for="$waiting_for $token" ;;
+      C*) grep -qE "^\| $token \|" "$KB/checks-owed.md" && waiting_for="$waiting_for $token" ;;
+    esac
+  done
+  if [[ -n "$waiting_for" ]]; then
+    ok "$e 不被任何决策引用，正文写明是备料，等$waiting_for"
+    continue
   fi
+  bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
+  howto "在它支撑（或推翻）的那条决策正文里点它的名，写清它证明了什么；" \
+        "确实谁也不支撑的话，在实验正文里写一行「**备料**：……」，点名它等着的决策或欠账（编号带简称，例：D23（journal 的角色与格式）），" \
+        "那个编号要在 decisions/ 下有正文、或在 checks-owed.md 里有一行。"
+  orphan=1
 done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
-[[ $orphan -eq 0 ]] && ok "每个已跑实验都至少被一条决策引用"
+[[ $orphan -eq 0 ]] && ok "每个已跑实验都被决策引用，或正文写明了备料在等谁"
 
 echo
 echo "── 5. 正文写死的条数 vs 实际条数 ──"

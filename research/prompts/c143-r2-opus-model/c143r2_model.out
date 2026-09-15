@@ -1,0 +1,976 @@
+# c143r2_model.py output (stdlib only, deterministic)
+# arms: A = arm jia / yi for stat 12 (max over readable roots); AJ / AJ2 = + journal
+# records (at rollback / every mount); G = clue: pool-wide number watermark in root and
+# record headers; C = arm bing; CJ / CJ2 = + journal checkpoint_txg (rollback / every mount)
+# fs = faults per slot (down disk 1, root slot 1, record copy 1); fr = record copies per range
+
+## s1 destroyed head
+name=s1_destroyed_head scripts_invalid_for_every_arm=4356
+name=s1_destroyed_head arm=A runs=8712 violating=5016 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=5016 by_fs=0:0/198;1:510/864;2:1158/1914;3:1587/2466;4:1059/1722;5:315/810;6:387/738
+name=s1_destroyed_head arm=AJ runs=8712 violating=1824 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=1824 by_fs=0:0/198;1:0/864;2:294/1914;3:675/2466;4:465/1722;5:183/810;6:207/738
+name=s1_destroyed_head arm=G runs=8712 violating=66 min_fs=3 min_fr=2 viol_mount_on_abandoned=0 viol_other=66 by_fs=0:0/198;1:0/864;2:0/1914;3:33/2466;4:24/1722;5:0/810;6:9/738
+name=s1_destroyed_head arm=C runs=8712 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/198;1:0/864;2:0/1914;3:0/2466;4:0/1722;5:0/810;6:0/738
+name=s1_destroyed_head arm=CJ runs=8712 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/198;1:0/864;2:0/1914;3:0/2466;4:0/1722;5:0/810;6:0/738
+name=s1_destroyed_head hit=C not_hit=A scripts=0
+name=s1_destroyed_head hit=CJ not_hit=AJ scripts=0
+name=s1_destroyed_head hit=CJ not_hit=C scripts=0
+name=s1_destroyed_head hit=AJ not_hit=CJ scripts=1824
+name=s1_destroyed_head hit=AJ not_hit=C scripts=1824
+name=s1_destroyed_head hit=A not_hit=C scripts=5016
+name=s1_destroyed_head hit=G not_hit=CJ scripts=66
+name=s1_destroyed_head hit=CJ not_hit=G scripts=0
+name=s1_destroyed_head hit=AJ not_hit=G scripts=1758
+name=s1_destroyed_head hit=G not_hit=AJ scripts=0
+name=s1_destroyed_head hit=A not_hit=AJ scripts=3192
+name=s1_destroyed_head hit=A not_hit=CJ scripts=5016
+name=s1_destroyed_head hit=A not_hit=G scripts=4950
+name=s1_destroyed_head hit=G not_hit=C scripts=66
+example name=s1_destroyed_head arm=A min_by=fs fs=1 script=[clone mark ucx(1) destroy rbm(d0+jt3,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt7: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2,19:2
+    txg5 i2 c5 root->disk0 wm=12:2,19:2
+    txg6 i2 c6 root->disk0 wm=12:2,19:2
+    txg7 i2 c7 root->disk1 wm=12:2,19:2
+    txg8 i2 c8 root->disk0 creates (19,2,bg8) wm=12:2,19:3
+example name=s1_destroyed_head arm=AJ min_by=fs fs=2 script=[clone mark ucx(1) destroy rbm(d0+jt1,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt5: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2,19:2
+    txg5 i2 c5 root->disk0 wm=12:2,19:2
+    txg6 i2 c6 root->disk0 wm=12:2,19:2
+    txg7 i2 c7 root->disk1 wm=12:2,19:2
+    txg8 i2 c8 root->disk0 creates (19,2,bg8) wm=12:2,19:3
+example name=s1_destroyed_head arm=G min_by=fs fs=3 script=[clone mark ucx(1) destroy rbm(d0+jt1/2,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt5/6: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2,19:2
+    txg5 i2 c5 root->disk0 wm=12:2,19:2
+    txg6 i2 c6 root->disk0 wm=12:2,19:2
+    txg7 i2 c7 root->disk1 wm=12:2,19:2
+    txg8 i2 c8 root->disk0 creates (19,2,bg8) wm=12:2,19:3
+
+## s2 newest roots and records
+name=s2_newest_strict scripts_invalid_for_every_arm=27132
+name=s2_newest_strict arm=A runs=169428 violating=78732 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=78732 by_fs=0:0/125;1:118/871;2:667/3060;3:2019/7061;4:4196/12174;5:6777/16850;6:9074/20177;7:10440/21746;8:10714/21264;9:9893/18666;10:8237/14806;11:6098/10964;12:4022/7878;13:2557/5612;14:1748/3926;15:1204/2504;16:696/1264;17:240/416;18:32/64
+name=s2_newest_strict arm=AJ runs=169428 violating=51493 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=51493 by_fs=0:0/125;1:0/871;2:55/3060;3:390/7061;4:1242/12174;5:2626/16850;6:4243/20177;7:5876/21746;8:7215/21264;9:7678/18666;10:6907/14806;11:5315/10964;12:3627/7878;13:2415/5612;14:1732/3926;15:1204/2504;16:696/1264;17:240/416;18:32/64
+name=s2_newest_strict arm=G runs=169428 violating=46000 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=46000 by_fs=0:0/125;1:0/871;2:55/3060;3:390/7061;4:1242/12174;5:2546/16850;6:3951/20177;7:5129/21746;8:5993/21264;9:6413/18666;10:6034/14806;11:4805/10964;12:3295/7878;13:2275/5612;14:1700/3926;15:1204/2504;16:696/1264;17:240/416;18:32/64
+name=s2_newest_strict arm=C runs=169428 violating=9144 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=9144 by_fs=0:0/125;1:0/871;2:2/3060;3:33/7061;4:274/12174;5:699/16850;6:1075/20177;7:1298/21746;8:1393/21264;9:1376/18666;10:1187/14806;11:804/10964;12:454/7878;13:221/5612;14:134/3926;15:110/2504;16:68/1264;17:16/416;18:0/64
+name=s2_newest_strict arm=CJ runs=169428 violating=3075 min_fs=5 min_fr=3 viol_mount_on_abandoned=0 viol_other=3075 by_fs=0:0/125;1:0/871;2:0/3060;3:0/7061;4:0/12174;5:2/16850;6:18/20177;7:113/21746;8:356/21264;9:606/18666;10:659/14806;11:496/10964;12:315/7878;13:182/5612;14:134/3926;15:110/2504;16:68/1264;17:16/416;18:0/64
+name=s2_newest_strict hit=C not_hit=A scripts=0
+name=s2_newest_strict hit=CJ not_hit=AJ scripts=0
+name=s2_newest_strict hit=CJ not_hit=C scripts=1158
+name=s2_newest_strict hit=AJ not_hit=CJ scripts=48418
+name=s2_newest_strict hit=AJ not_hit=C scripts=45163
+name=s2_newest_strict hit=A not_hit=C scripts=69588
+name=s2_newest_strict hit=G not_hit=CJ scripts=42925
+name=s2_newest_strict hit=CJ not_hit=G scripts=0
+name=s2_newest_strict hit=AJ not_hit=G scripts=5493
+name=s2_newest_strict hit=G not_hit=AJ scripts=0
+name=s2_newest_strict hit=A not_hit=AJ scripts=27239
+name=s2_newest_strict hit=A not_hit=CJ scripts=75657
+name=s2_newest_strict hit=A not_hit=G scripts=32732
+name=s2_newest_strict hit=C not_hit=AJ scripts=2814
+name=s2_newest_strict hit=C not_hit=CJ scripts=7227
+name=s2_newest_strict hit=C not_hit=G scripts=3402
+name=s2_newest_strict hit=G not_hit=C scripts=40258
+example name=s2_newest_strict arm=A min_by=fs fs=1 script=[p(1) rb(1,d1,0) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s2_newest_strict arm=AJ min_by=fs fs=2 script=[p(1) rb(1,d1+j1,0) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1+j1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s2_newest_strict arm=G min_by=fs fs=2 script=[p(1) rb(1,d1+j1,0) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1+j1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s2_newest_strict arm=C min_by=fs fs=2 script=[p(0) p(0) p(0) p(0) p(1) rb(1,d0+r1,0) u(2)]
+  violations=[((12, 2, 8), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 wm=12:2
+    txg5 i1 c5 root->disk0 wm=12:2
+    txg6 i1 c6 root->disk0 wm=12:2
+    txg7 i1 c7 root->disk1 wm=12:2
+    txg8 i1 c8 root->disk0 creates (12,2,bg8) wm=12:3
+    ROLLBACK u=d0+r1: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 wm=12:2
+    txg7 i2 c7 root->disk1 wm=12:2
+    txg8 i2 c8 root->disk0 creates (12,2,bg8) wm=12:3
+    txg9 i2 c9 root->disk0 creates (12,3,bg9) wm=12:4
+example name=s2_newest_strict arm=CJ min_by=fs fs=5 script=[p(0) p(0) p(0) p(0) p(1) rb(1,d0+r1+j3,0) u(2)]
+  violations=[((12, 2, 8), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 wm=12:2
+    txg5 i1 c5 root->disk0 wm=12:2
+    txg6 i1 c6 root->disk0 wm=12:2
+    txg7 i1 c7 root->disk1 wm=12:2
+    txg8 i1 c8 root->disk0 creates (12,2,bg8) wm=12:3
+    ROLLBACK u=d0+r1+j3: R_old=txg4 i1; readable ring max txg4; first new root txg6 i2; records from c5; wm=12:2
+    txg6 i2 c5 root->disk0 wm=12:2
+    txg7 i2 c6 root->disk1 wm=12:2
+    txg8 i2 c7 root->disk0 creates (12,2,bg8) wm=12:3
+    txg9 i2 c8 root->disk0 creates (12,3,bg9) wm=12:4
+name=s2_newest_lenient scripts_invalid_for_every_arm=6168
+name=s2_newest_lenient arm=A runs=6072 violating=2736 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=2736 by_fs=0:0/29;1:22/135;2:94/344;3:203/549;4:274/672;5:320/728;6:332/739;7:324/700;8:287/572;9:221/424;10:175/330;11:136/284;12:123/242;13:110/176;14:75/100;15:33/40;16:7/8
+name=s2_newest_lenient arm=C runs=6072 violating=564 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=564 by_fs=0:0/29;1:2/135;2:7/344;3:36/549;4:52/672;5:65/728;6:69/739;7:67/700;8:66/572;9:48/424;10:40/330;11:29/284;12:25/242;13:25/176;14:21/100;15:10/40;16:2/8
+name=s2_newest_lenient arm=CJ runs=6072 violating=307 min_fs=3 min_fr=2 viol_mount_on_abandoned=0 viol_other=307 by_fs=0:0/29;1:0/135;2:0/344;3:2/549;4:3/672;5:10/728;6:28/739;7:37/700;8:44/572;9:37/424;10:37/330;11:26/284;12:24/242;13:26/176;14:21/100;15:10/40;16:2/8
+name=s2_newest_lenient hit=C not_hit=A scripts=0
+name=s2_newest_lenient hit=CJ not_hit=C scripts=74
+name=s2_newest_lenient hit=A not_hit=C scripts=2172
+name=s2_newest_lenient hit=A not_hit=CJ scripts=2429
+name=s2_newest_lenient hit=C not_hit=CJ scripts=331
+example name=s2_newest_lenient arm=A min_by=fs fs=1 script=[p(1) rb(1,d1,0) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=d1: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+example name=s2_newest_lenient arm=C min_by=fs fs=1 script=[p(0) p(0) p(1) rb(1,d0,0) u(2)]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 wm=12:2
+    txg5 i1 c5 root->disk0 wm=12:2
+    txg6 i1 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s2_newest_lenient arm=CJ min_by=fs fs=3 script=[p(0) p(0) p(1) rb(1,d0+j2,0) u(2)]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 wm=12:2
+    txg5 i1 c5 root->disk0 wm=12:2
+    txg6 i1 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0+j2: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+
+## s3 journal wrap inside the rollback window
+name=s3_wrap S=4 nrec=1 J=big arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=big arm=AJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=big arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=big arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=big arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=12 arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=12 arm=AJ first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=12 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=12 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=12 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=24 arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=24 arm=AJ first_violation=(2, 2, 6, 32) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=24 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=24 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=24 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=48 arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=48 arm=AJ first_violation=(4, 4, 6, 56) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=48 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=48 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=48 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=96 arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=96 arm=AJ first_violation=(8, 8, 6, 104) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=96 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=96 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=96 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=192 arm=A first_violation=(1, 1, 6, 20) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=20) 2:V(c_rb=32) 3:V(c_rb=44) 4:V(c_rb=56) 5:V(c_rb=68) 6:V(c_rb=80) 7:V(c_rb=92) 8:V(c_rb=104) 9:V(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=192 arm=AJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=192 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=192 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=1 J=192 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=20) 2:-(c_rb=32) 3:-(c_rb=44) 4:-(c_rb=56) 5:-(c_rb=68) 6:-(c_rb=80) 7:-(c_rb=92) 8:-(c_rb=104) 9:-(c_rb=116)
+name=s3_wrap S=4 nrec=4 J=big arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=big arm=AJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=big arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=big arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=big arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=12 arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=12 arm=AJ first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=12 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=12 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=12 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=24 arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=24 arm=AJ first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=24 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=24 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=24 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=48 arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=48 arm=AJ first_violation=(2, 2, 6, 98) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=48 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=48 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=48 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=96 arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=96 arm=AJ first_violation=(3, 3, 6, 143) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=96 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=96 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=96 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=192 arm=A first_violation=(1, 1, 6, 53) record_of_H_at=c6 trail=0:-(c_rb=8) 1:V(c_rb=53) 2:V(c_rb=98) 3:V(c_rb=143) 4:V(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=192 arm=AJ first_violation=(5, 5, 6, 233) record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:V(c_rb=233) 6:V(c_rb=278) 7:V(c_rb=323) 8:V(c_rb=368) 9:V(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=192 arm=G first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=192 arm=C first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+name=s3_wrap S=4 nrec=4 J=192 arm=CJ first_violation=none<=9 record_of_H_at=c6 trail=0:-(c_rb=8) 1:-(c_rb=53) 2:-(c_rb=98) 3:-(c_rb=143) 4:-(c_rb=188) 5:-(c_rb=233) 6:-(c_rb=278) 7:-(c_rb=323) 8:-(c_rb=368) 9:-(c_rb=413)
+
+## s4 rollback attempt crashes, then redo
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/72;1:162/306;2:99/171;3:63/99
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=AJ runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/72;1:162/306;2:99/171;3:63/99
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=AJ not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=AJ not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=AJ not_hit=G scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=redo_only hit=A not_hit=G scripts=324
+example name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=A min_by=fs fs=1 script=[clone mark ucx(1) destroy rbx(none) mount(none) rbm(d0+jt1,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK ATTEMPT u=none: R_old=txg4 i1; readable ring max txg6; first new root txg7 i2; records from c5; wm=12:2,19:3
+    txg7 i2: record c5 durable, CRASH before root
+    MOUNT u=none: selects txg6 i1, replays to txg6 (prefix end c6), new i3 from txg7, wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt5: R_old=txg4 i1; readable ring max txg7; first new root txg8 i4; records from c5; wm=12:2,19:2
+    txg8 i4 c5 root->disk0 wm=12:2,19:2
+    txg9 i4 c6 root->disk0 wm=12:2,19:2
+    txg10 i4 c7 root->disk1 wm=12:2,19:2
+    txg11 i4 c8 root->disk0 creates (19,2,bg11) wm=12:2,19:3
+example name=s4_crash_redo rbp=rold reuse=True faults=redo_only arm=AJ min_by=fs fs=1 script=[clone mark ucx(1) destroy rbx(none) mount(none) rbm(d0+jt1,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK ATTEMPT u=none: R_old=txg4 i1; readable ring max txg6; first new root txg7 i2; records from c5; wm=12:2,19:3
+    txg7 i2: record c5 durable, CRASH before root
+    MOUNT u=none: selects txg6 i1, replays to txg6 (prefix end c6), new i3 from txg7, wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt5: R_old=txg4 i1; readable ring max txg7; first new root txg8 i4; records from c5; wm=12:2,19:2
+    txg8 i4 c5 root->disk0 wm=12:2,19:2
+    txg9 i4 c6 root->disk0 wm=12:2,19:2
+    txg10 i4 c7 root->disk1 wm=12:2,19:2
+    txg11 i4 c8 root->disk0 creates (19,2,bg11) wm=12:2,19:3
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/249;3:126/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo arm=AJ runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/249;3:126/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/249;3:0/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/249;3:0/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/240;3:0/198;4:0/9;5:0/12
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=AJ not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=AJ not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=AJ not_hit=G scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=True faults=attempt_and_redo hit=A not_hit=G scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/72;1:162/306;2:99/171;3:63/99
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only arm=AJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/72;1:0/306;2:0/171;3:0/99
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=AJ not_hit=CJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=AJ not_hit=C scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=AJ not_hit=G scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=A not_hit=AJ scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=redo_only hit=A not_hit=G scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/249;3:126/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo arm=AJ runs=648 violating=108 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=108 by_fs=0:0/36;1:0/153;2:45/249;3:63/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/249;3:0/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/249;3:0/198;5:0/12
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/240;3:0/198;4:0/9;5:0/12
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=AJ not_hit=CJ scripts=108
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=AJ not_hit=C scripts=108
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=AJ not_hit=G scripts=108
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=A not_hit=AJ scripts=216
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=rold reuse=False faults=attempt_and_redo hit=A not_hit=G scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/261;3:126/198
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=AJ runs=648 violating=108 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=108 by_fs=0:0/36;1:0/153;2:45/261;3:63/198
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=AJ not_hit=CJ scripts=108
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=AJ not_hit=C scripts=108
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=AJ not_hit=G scripts=108
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=A not_hit=AJ scripts=216
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=redo_only hit=A not_hit=G scripts=324
+example name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=A min_by=fs fs=1 script=[clone mark ucx(1) destroy rbx(none) mount(none) rbm(d0+rt1,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK ATTEMPT u=none: R_old=txg4 i1; readable ring max txg6; first new root txg7 i2; records from c7; wm=12:2,19:3
+    txg7 i2: record c7 durable, CRASH before root
+    MOUNT u=none: selects txg6 i1, replays to txg6 (prefix end c6), new i3 from txg7, wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 wm=12:2
+    ROLLBACK u=d0+rt5: R_old=txg4 i1; readable ring max txg7; first new root txg8 i4; records from c7; wm=12:2,19:2
+    txg8 i4 c7 root->disk0 wm=12:2,19:2
+    txg9 i4 c8 root->disk0 wm=12:2,19:2
+    txg10 i4 c9 root->disk1 wm=12:2,19:2
+    txg11 i4 c10 root->disk0 creates (19,2,bg11) wm=12:2,19:3
+example name=s4_crash_redo rbp=scan reuse=True faults=redo_only arm=AJ min_by=fs fs=2 script=[clone mark ucx(1) destroy rbx(none) mount(none) rbm(d0+jt1,0) ucx(1)]
+  violations=[((19, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    clone of 12 -> tree 19 (wm 2)
+    txg4 i1 c4 root->disk1 wm=12:2,19:2
+    txg5 i1 c5 root->disk0 creates (19,2,bg5) wm=12:2,19:3
+    destroy head 19
+    txg6 i1 c6 root->disk0 wm=12:2
+    ROLLBACK ATTEMPT u=none: R_old=txg4 i1; readable ring max txg6; first new root txg7 i2; records from c7; wm=12:2,19:3
+    txg7 i2: record c7 durable, CRASH before root
+    MOUNT u=none: selects txg6 i1, replays to txg6 (prefix end c6), new i3 from txg7, wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 wm=12:2
+    ROLLBACK u=d0+jt5: R_old=txg4 i1; readable ring max txg7; first new root txg8 i4; records from c5; wm=12:2,19:2
+    txg8 i4 c5 root->disk0 wm=12:2,19:2
+    txg9 i4 c6 root->disk0 wm=12:2,19:2
+    txg10 i4 c7 root->disk1 wm=12:2,19:2
+    txg11 i4 c8 root->disk0 creates (19,2,bg11) wm=12:2,19:3
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/261;3:126/198
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo arm=AJ runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/261;3:126/198
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=AJ not_hit=CJ scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=AJ not_hit=C scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=AJ not_hit=G scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=scan reuse=True faults=attempt_and_redo hit=A not_hit=G scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/261;3:126/198
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only arm=AJ runs=648 violating=108 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=108 by_fs=0:0/36;1:0/153;2:45/261;3:63/198
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=AJ not_hit=CJ scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=AJ not_hit=C scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=AJ not_hit=G scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=A not_hit=AJ scripts=216
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=redo_only hit=A not_hit=G scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo scripts_invalid_for_every_arm=324
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo arm=A runs=648 violating=324 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=324 by_fs=0:0/36;1:81/153;2:117/261;3:126/198
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo arm=AJ runs=648 violating=108 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=108 by_fs=0:0/36;1:0/153;2:45/261;3:63/198
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo arm=G runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo arm=C runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo arm=CJ runs=648 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/36;1:0/153;2:0/261;3:0/198
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=C not_hit=A scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=CJ not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=CJ not_hit=C scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=AJ not_hit=CJ scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=AJ not_hit=C scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=A not_hit=C scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=G not_hit=CJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=CJ not_hit=G scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=AJ not_hit=G scripts=108
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=G not_hit=AJ scripts=0
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=A not_hit=AJ scripts=216
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=A not_hit=CJ scripts=324
+name=s4_crash_redo rbp=scan reuse=False faults=attempt_and_redo hit=A not_hit=G scripts=324
+
+## s5 after a rollback: crash and mount
+name=s5_rb_then_crash_mount scripts_invalid_for_every_arm=2393
+name=s5_rb_then_crash_mount arm=A runs=6427 violating=5037 min_fs=2 min_fr=2 viol_mount_on_abandoned=504 viol_other=4533 by_fs=0:0/33;1:0/128;2:52/291;3:226/455;4:425/607;5:574/697;6:642/750;7:651/748;8:612/686;9:508/543;10:388/427;11:274/303;12:188/227;13:145/174;14:135/141;15:103/103;16:73/73;17:35/35;18:6/6
+name=s5_rb_then_crash_mount arm=AJ runs=6427 violating=5037 min_fs=2 min_fr=2 viol_mount_on_abandoned=504 viol_other=4533 by_fs=0:0/33;1:0/128;2:52/291;3:226/455;4:425/607;5:574/697;6:642/750;7:651/748;8:612/686;9:508/543;10:388/427;11:274/303;12:188/227;13:145/174;14:135/141;15:103/103;16:73/73;17:35/35;18:6/6
+name=s5_rb_then_crash_mount arm=AJ2 runs=6427 violating=4653 min_fs=2 min_fr=2 viol_mount_on_abandoned=421 viol_other=4232 by_fs=0:0/33;1:0/128;2:31/291;3:154/455;4:311/607;5:464/697;6:587/750;7:640/748;8:611/686;9:508/543;10:388/427;11:274/303;12:188/227;13:145/174;14:135/141;15:103/103;16:73/73;17:35/35;18:6/6
+name=s5_rb_then_crash_mount arm=G runs=6427 violating=4653 min_fs=2 min_fr=2 viol_mount_on_abandoned=421 viol_other=4232 by_fs=0:0/33;1:0/128;2:31/291;3:154/455;4:311/607;5:464/697;6:587/750;7:640/748;8:611/686;9:508/543;10:388/427;11:274/303;12:188/227;13:145/174;14:135/141;15:103/103;16:73/73;17:35/35;18:6/6
+name=s5_rb_then_crash_mount arm=C runs=6427 violating=1068 min_fs=2 min_fr=2 viol_mount_on_abandoned=105 viol_other=963 by_fs=0:0/33;1:0/128;2:13/291;3:50/455;4:88/607;5:121/697;6:136/750;7:136/748;8:130/686;9:122/543;10:98/427;11:57/303;12:34/227;13:20/174;14:17/141;15:18/103;16:17/73;17:11/35;18:0/6
+name=s5_rb_then_crash_mount arm=CJ runs=6427 violating=1068 min_fs=2 min_fr=2 viol_mount_on_abandoned=105 viol_other=963 by_fs=0:0/33;1:0/128;2:13/291;3:50/455;4:88/607;5:121/697;6:136/750;7:136/748;8:130/686;9:122/543;10:98/427;11:57/303;12:34/227;13:20/174;14:17/141;15:18/103;16:17/73;17:11/35;18:0/6
+name=s5_rb_then_crash_mount arm=CJ2 runs=6427 violating=525 min_fs=5 min_fr=3 viol_mount_on_abandoned=80 viol_other=445 by_fs=0:0/33;1:0/128;2:0/291;3:0/455;4:0/607;5:10/697;6:32/750;7:63/748;8:75/686;9:88/543;10:80/427;11:55/303;12:35/227;13:24/174;14:17/141;15:18/103;16:17/73;17:11/35;18:0/6
+name=s5_rb_then_crash_mount hit=C not_hit=A scripts=0
+name=s5_rb_then_crash_mount hit=CJ not_hit=AJ scripts=0
+name=s5_rb_then_crash_mount hit=CJ not_hit=C scripts=0
+name=s5_rb_then_crash_mount hit=AJ not_hit=CJ scripts=3969
+name=s5_rb_then_crash_mount hit=AJ not_hit=C scripts=3969
+name=s5_rb_then_crash_mount hit=A not_hit=C scripts=3969
+name=s5_rb_then_crash_mount hit=CJ2 not_hit=AJ2 scripts=0
+name=s5_rb_then_crash_mount hit=AJ2 not_hit=CJ2 scripts=4128
+name=s5_rb_then_crash_mount hit=CJ2 not_hit=C scripts=75
+name=s5_rb_then_crash_mount hit=G not_hit=CJ scripts=3730
+name=s5_rb_then_crash_mount hit=CJ not_hit=G scripts=145
+name=s5_rb_then_crash_mount hit=AJ not_hit=G scripts=384
+name=s5_rb_then_crash_mount hit=G not_hit=AJ scripts=0
+name=s5_rb_then_crash_mount hit=A not_hit=AJ2 scripts=384
+name=s5_rb_then_crash_mount hit=A not_hit=CJ scripts=3969
+name=s5_rb_then_crash_mount hit=A not_hit=CJ2 scripts=4512
+name=s5_rb_then_crash_mount hit=A not_hit=G scripts=384
+name=s5_rb_then_crash_mount hit=AJ not_hit=AJ2 scripts=384
+name=s5_rb_then_crash_mount hit=AJ not_hit=CJ2 scripts=4512
+name=s5_rb_then_crash_mount hit=AJ2 not_hit=C scripts=3730
+name=s5_rb_then_crash_mount hit=AJ2 not_hit=CJ scripts=3730
+name=s5_rb_then_crash_mount hit=C not_hit=AJ2 scripts=145
+name=s5_rb_then_crash_mount hit=C not_hit=CJ2 scripts=618
+name=s5_rb_then_crash_mount hit=C not_hit=G scripts=145
+name=s5_rb_then_crash_mount hit=CJ not_hit=AJ2 scripts=145
+name=s5_rb_then_crash_mount hit=CJ not_hit=CJ2 scripts=618
+name=s5_rb_then_crash_mount hit=CJ2 not_hit=CJ scripts=75
+name=s5_rb_then_crash_mount hit=G not_hit=C scripts=3730
+name=s5_rb_then_crash_mount hit=G not_hit=CJ2 scripts=4128
+example name=s5_rb_then_crash_mount arm=A min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+j1) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+j1: selects txg4 i2, replays to txg5 (prefix end c5), new i3 from txg6, wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s5_rb_then_crash_mount arm=AJ min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+j1) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+j1: selects txg4 i2, replays to txg5 (prefix end c5), new i3 from txg6, wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s5_rb_then_crash_mount arm=AJ2 min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+j1) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+j1: selects txg4 i2, replays to txg5 (prefix end c5), new i3 from txg6, wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s5_rb_then_crash_mount arm=G min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+j1) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+j1: selects txg4 i2, replays to txg5 (prefix end c5), new i3 from txg6, wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s5_rb_then_crash_mount arm=C min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+r1) u(1)]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+r1: selects txg1 i1, replays to txg3 (prefix end c3), new i3 from txg4, wm=12:2
+    txg4 i3 c4 root->disk1 wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 creates (12,2,bg6) wm=12:3
+example name=s5_rb_then_crash_mount arm=CJ min_by=fs fs=2 script=[rb(1,none,0) u(1) crash mount(d0+r1) u(1)]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+r1: selects txg1 i1, replays to txg3 (prefix end c3), new i3 from txg4, wm=12:2
+    txg4 i3 c4 root->disk1 wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 creates (12,2,bg6) wm=12:3
+example name=s5_rb_then_crash_mount arm=CJ2 min_by=fs fs=5 script=[rb(1,none,0) u(1) crash mount(d0+r1+j3) u(1)]
+  violations=[((12, 2, 6), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d0+r1+j3: selects txg1 i1, replays to txg3 (prefix end c3), new i3 from txg4, wm=12:2
+    txg4 i3 c4 root->disk1 wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 creates (12,2,bg6) wm=12:3
+
+## s6 second rollback
+name=s6_two_rollbacks scripts_invalid_for_every_arm=2946
+name=s6_two_rollbacks arm=A runs=6126 violating=4728 min_fs=1 min_fr=1 viol_mount_on_abandoned=0 viol_other=4728 by_fs=0:0/54;1:86/190;2:243/413;3:434/601;4:539/721;5:607/774;6:610/792;7:589/703;8:471/549;9:353/404;10:238/304;11:192/243;12:167/179;13:124/124;14:63/63;15:12/12
+name=s6_two_rollbacks arm=AJ runs=6126 violating=3940 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=3940 by_fs=0:0/54;1:0/190;2:32/413;3:193/601;4:372/721;5:538/774;6:596/792;7:589/703;8:471/549;9:353/404;10:238/304;11:192/243;12:167/179;13:124/124;14:63/63;15:12/12
+name=s6_two_rollbacks arm=AJ2 runs=6126 violating=3940 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=3940 by_fs=0:0/54;1:0/190;2:32/413;3:193/601;4:372/721;5:538/774;6:596/792;7:589/703;8:471/549;9:353/404;10:238/304;11:192/243;12:167/179;13:124/124;14:63/63;15:12/12
+name=s6_two_rollbacks arm=G runs=6126 violating=3940 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=3940 by_fs=0:0/54;1:0/190;2:32/413;3:193/601;4:372/721;5:538/774;6:596/792;7:589/703;8:471/549;9:353/404;10:238/304;11:192/243;12:167/179;13:124/124;14:63/63;15:12/12
+name=s6_two_rollbacks arm=C runs=6126 violating=630 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=630 by_fs=0:0/54;1:0/190;2:8/413;3:39/601;4:59/721;5:84/774;6:92/792;7:94/703;8:84/549;9:68/404;10:44/304;11:23/243;12:11/179;13:13/124;14:11/63;15:0/12
+name=s6_two_rollbacks arm=CJ runs=6126 violating=230 min_fs=5 min_fr=3 viol_mount_on_abandoned=0 viol_other=230 by_fs=0:0/54;1:0/190;2:0/413;3:0/601;4:0/721;5:6/774;6:21/792;7:42/703;8:46/549;9:46/404;10:21/304;11:13/243;12:11/179;13:13/124;14:11/63;15:0/12
+name=s6_two_rollbacks arm=CJ2 runs=6126 violating=230 min_fs=5 min_fr=3 viol_mount_on_abandoned=0 viol_other=230 by_fs=0:0/54;1:0/190;2:0/413;3:0/601;4:0/721;5:6/774;6:21/792;7:42/703;8:46/549;9:46/404;10:21/304;11:13/243;12:11/179;13:13/124;14:11/63;15:0/12
+name=s6_two_rollbacks hit=C not_hit=A scripts=0
+name=s6_two_rollbacks hit=CJ not_hit=AJ scripts=0
+name=s6_two_rollbacks hit=CJ not_hit=C scripts=23
+name=s6_two_rollbacks hit=AJ not_hit=CJ scripts=3710
+name=s6_two_rollbacks hit=AJ not_hit=C scripts=3415
+name=s6_two_rollbacks hit=A not_hit=C scripts=4098
+name=s6_two_rollbacks hit=CJ2 not_hit=AJ2 scripts=0
+name=s6_two_rollbacks hit=AJ2 not_hit=CJ2 scripts=3710
+name=s6_two_rollbacks hit=CJ2 not_hit=C scripts=23
+name=s6_two_rollbacks hit=G not_hit=CJ scripts=3710
+name=s6_two_rollbacks hit=CJ not_hit=G scripts=0
+name=s6_two_rollbacks hit=AJ not_hit=G scripts=0
+name=s6_two_rollbacks hit=G not_hit=AJ scripts=0
+name=s6_two_rollbacks hit=A not_hit=AJ scripts=788
+name=s6_two_rollbacks hit=A not_hit=AJ2 scripts=788
+name=s6_two_rollbacks hit=A not_hit=CJ scripts=4498
+name=s6_two_rollbacks hit=A not_hit=CJ2 scripts=4498
+name=s6_two_rollbacks hit=A not_hit=G scripts=788
+name=s6_two_rollbacks hit=AJ not_hit=CJ2 scripts=3710
+name=s6_two_rollbacks hit=AJ2 not_hit=C scripts=3415
+name=s6_two_rollbacks hit=AJ2 not_hit=CJ scripts=3710
+name=s6_two_rollbacks hit=C not_hit=AJ scripts=105
+name=s6_two_rollbacks hit=C not_hit=AJ2 scripts=105
+name=s6_two_rollbacks hit=C not_hit=CJ scripts=423
+name=s6_two_rollbacks hit=C not_hit=CJ2 scripts=423
+name=s6_two_rollbacks hit=C not_hit=G scripts=105
+name=s6_two_rollbacks hit=G not_hit=C scripts=3415
+name=s6_two_rollbacks hit=G not_hit=CJ2 scripts=3710
+example name=s6_two_rollbacks arm=A min_by=fs fs=1 script=[rb(1,none,0) u(1) rb(1,d0,0) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0: R_old=txg4 i2; readable ring max txg4; first new root txg5 i3; records from c5; wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s6_two_rollbacks arm=AJ min_by=fs fs=2 script=[rb(1,none,0) u(1) rb(1,d0+j1,0) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0+j1: R_old=txg4 i2; readable ring max txg4; first new root txg5 i3; records from c5; wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s6_two_rollbacks arm=AJ2 min_by=fs fs=2 script=[rb(1,none,0) u(1) rb(1,d0+j1,0) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0+j1: R_old=txg4 i2; readable ring max txg4; first new root txg5 i3; records from c5; wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s6_two_rollbacks arm=G min_by=fs fs=2 script=[rb(1,none,0) u(1) rb(1,d0+j1,0) u(1)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    ROLLBACK u=none: R_old=txg3 i1; readable ring max txg3; first new root txg4 i2; records from c4; wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    ROLLBACK u=d0+j1: R_old=txg4 i2; readable ring max txg4; first new root txg5 i3; records from c5; wm=12:2
+    txg5 i3 c5 root->disk0 wm=12:2
+    txg6 i3 c6 root->disk0 wm=12:2
+    txg7 i3 c7 root->disk1 wm=12:2
+    txg8 i3 c8 root->disk0 creates (12,2,bg8) wm=12:3
+example name=s6_two_rollbacks arm=C min_by=fs fs=2 script=[p(1) rb(1,none,0) u(1) rb(1,d0+r1,0) u(1)]
+  violations=[((12, 3, 8), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 wm=12:3
+    txg7 i2 c7 root->disk1 wm=12:3
+    txg8 i2 c8 root->disk0 creates (12,3,bg8) wm=12:4
+    ROLLBACK u=d0+r1: R_old=txg4 i1; readable ring max txg4; first new root txg5 i3; records from c5; wm=12:3
+    txg5 i3 c5 root->disk0 wm=12:3
+    txg6 i3 c6 root->disk0 wm=12:3
+    txg7 i3 c7 root->disk1 wm=12:3
+    txg8 i3 c8 root->disk0 creates (12,3,bg8) wm=12:4
+example name=s6_two_rollbacks arm=CJ min_by=fs fs=5 script=[p(1) rb(1,none,0) u(1) rb(1,d0+r1+j3,0) u(1)]
+  violations=[((12, 3, 8), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 wm=12:3
+    txg7 i2 c7 root->disk1 wm=12:3
+    txg8 i2 c8 root->disk0 creates (12,3,bg8) wm=12:4
+    ROLLBACK u=d0+r1+j3: R_old=txg4 i1; readable ring max txg4; first new root txg6 i3; records from c5; wm=12:3
+    txg6 i3 c5 root->disk0 wm=12:3
+    txg7 i3 c6 root->disk1 wm=12:3
+    txg8 i3 c7 root->disk0 creates (12,3,bg8) wm=12:4
+example name=s6_two_rollbacks arm=CJ2 min_by=fs fs=5 script=[p(1) rb(1,none,0) u(1) rb(1,d0+r1+j3,0) u(1)]
+  violations=[((12, 3, 8), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    ROLLBACK u=none: R_old=txg4 i1; readable ring max txg4; first new root txg5 i2; records from c5; wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 wm=12:3
+    txg7 i2 c7 root->disk1 wm=12:3
+    txg8 i2 c8 root->disk0 creates (12,3,bg8) wm=12:4
+    ROLLBACK u=d0+r1+j3: R_old=txg4 i1; readable ring max txg4; first new root txg6 i3; records from c5; wm=12:3
+    txg6 i3 c5 root->disk0 wm=12:3
+    txg7 i3 c6 root->disk1 wm=12:3
+    txg8 i3 c7 root->disk0 creates (12,3,bg8) wm=12:4
+
+## s8 geometry margin
+name=s8_geometry own=0/0/0 devs=1 warmup=[2] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=-1] C_strict:fs=3,fr=3[L=3,d=-1] CJ_strict:fs=6,fr=4[L=3,d=-1] C_lenient:fs=2,fr=2[L=2,d=-1] CJ_lenient:fs=4,fr=3[L=2,d=-1]
+name=s8_geometry own=0/1/0 devs=2 warmup=[2, 3] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=1,fr=1[L=2,d=0] CJ_lenient:fs=3,fr=2[L=2,d=0]
+name=s8_geometry own=0/1/0 devs=3 warmup=[2, 3] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=1,fr=1[L=2,d=0] CJ_lenient:fs=3,fr=2[L=2,d=0]
+name=s8_geometry own=0/1/2 devs=3 warmup=[2] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=3,fr=3[L=3,d=-1] CJ_strict:fs=6,fr=4[L=3,d=0] C_lenient:fs=2,fr=2[L=2,d=-1] CJ_lenient:fs=4,fr=3[L=2,d=0]
+name=s8_geometry own=0/1/0/1 devs=2 warmup=[2] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=2,fr=2[L=2,d=-1] CJ_lenient:fs=4,fr=3[L=2,d=0]
+name=s8_geometry own=0/0/1/1 devs=2 warmup=[2, 3] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=1,fr=1[L=2,d=0] CJ_lenient:fs=3,fr=2[L=2,d=0]
+name=s8_geometry own=0/1/2/0 devs=3 warmup=[2, 3] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=1,fr=1[L=2,d=0] CJ_lenient:fs=3,fr=2[L=2,d=0]
+name=s8_geometry own=0/1/2/3 devs=4 warmup=[2] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=3,fr=3[L=3,d=-1] CJ_strict:fs=6,fr=4[L=3,d=0] C_lenient:fs=2,fr=2[L=2,d=-1] CJ_lenient:fs=4,fr=3[L=2,d=0]
+name=s8_geometry own=0/1/0/1/0 devs=2 warmup=[2, 3] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=1,fr=1[L=2,d=0] CJ_lenient:fs=3,fr=2[L=2,d=0]
+name=s8_geometry own=0/1/2/0/1 devs=3 warmup=[2] A:fs=1,fr=1[L=1,d=-1] AJ:fs=2,fr=2[L=1,d=0] C_strict:fs=2,fr=2[L=3,d=0] CJ_strict:fs=5,fr=3[L=3,d=0] C_lenient:fs=2,fr=2[L=2,d=-1] CJ_lenient:fs=4,fr=3[L=2,d=0]
+
+## s9 side: plain crash, no rollback
+name=s9_plain_crash_strict scripts_invalid_for_every_arm=86
+name=s9_plain_crash_strict arm=A runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_strict arm=AJ runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_strict arm=AJ2 runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_strict arm=G runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_strict arm=C runs=154 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/4;1:0/12;2:0/24;3:0/27;4:0/26;5:0/24;6:0/12;7:0/9;8:0/7;9:0/5;10:0/3;11:0/1
+name=s9_plain_crash_strict arm=CJ runs=154 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/4;1:0/12;2:0/24;3:0/27;4:0/26;5:0/24;6:0/12;7:0/9;8:0/7;9:0/5;10:0/3;11:0/1
+name=s9_plain_crash_strict arm=CJ2 runs=154 violating=0 min_fs=None min_fr=None viol_mount_on_abandoned=0 viol_other=0 by_fs=0:0/4;1:0/12;2:0/24;3:0/27;4:0/26;5:0/24;6:0/12;7:0/9;8:0/7;9:0/5;10:0/3;11:0/1
+name=s9_plain_crash_strict hit=C not_hit=A scripts=0
+name=s9_plain_crash_strict hit=CJ not_hit=AJ scripts=0
+name=s9_plain_crash_strict hit=CJ not_hit=C scripts=0
+name=s9_plain_crash_strict hit=AJ not_hit=CJ scripts=86
+name=s9_plain_crash_strict hit=AJ not_hit=C scripts=86
+name=s9_plain_crash_strict hit=A not_hit=C scripts=86
+name=s9_plain_crash_strict hit=CJ2 not_hit=AJ2 scripts=0
+name=s9_plain_crash_strict hit=AJ2 not_hit=CJ2 scripts=86
+name=s9_plain_crash_strict hit=CJ2 not_hit=C scripts=0
+name=s9_plain_crash_strict hit=G not_hit=CJ scripts=86
+name=s9_plain_crash_strict hit=CJ not_hit=G scripts=0
+name=s9_plain_crash_strict hit=AJ not_hit=G scripts=0
+name=s9_plain_crash_strict hit=G not_hit=AJ scripts=0
+name=s9_plain_crash_strict hit=A not_hit=CJ scripts=86
+name=s9_plain_crash_strict hit=A not_hit=CJ2 scripts=86
+name=s9_plain_crash_strict hit=AJ not_hit=CJ2 scripts=86
+name=s9_plain_crash_strict hit=AJ2 not_hit=C scripts=86
+name=s9_plain_crash_strict hit=AJ2 not_hit=CJ scripts=86
+name=s9_plain_crash_strict hit=G not_hit=C scripts=86
+name=s9_plain_crash_strict hit=G not_hit=CJ2 scripts=86
+example name=s9_plain_crash_strict arm=A min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s9_plain_crash_strict arm=AJ min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s9_plain_crash_strict arm=AJ2 min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+example name=s9_plain_crash_strict arm=G min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 wm=12:2
+    txg6 i2 c6 root->disk0 creates (12,2,bg6) wm=12:3
+    txg7 i2 c7 root->disk1 creates (12,3,bg7) wm=12:4
+name=s9_plain_crash_lenient scripts_invalid_for_every_arm=86
+name=s9_plain_crash_lenient arm=A runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_lenient arm=AJ runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_lenient arm=AJ2 runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_lenient arm=G runs=154 violating=86 min_fs=2 min_fr=2 viol_mount_on_abandoned=0 viol_other=86 by_fs=0:0/4;1:0/12;2:4/24;3:16/27;4:17/26;5:20/24;6:8/12;7:9/9;8:3/7;9:5/5;10:3/3;11:1/1
+name=s9_plain_crash_lenient arm=C runs=154 violating=25 min_fs=3 min_fr=2 viol_mount_on_abandoned=0 viol_other=25 by_fs=0:0/4;1:0/12;2:0/24;3:1/27;4:4/26;5:5/24;6:5/12;7:4/9;8:2/7;9:1/5;10:2/3;11:1/1
+name=s9_plain_crash_lenient arm=CJ runs=154 violating=25 min_fs=3 min_fr=2 viol_mount_on_abandoned=0 viol_other=25 by_fs=0:0/4;1:0/12;2:0/24;3:1/27;4:4/26;5:5/24;6:5/12;7:4/9;8:2/7;9:1/5;10:2/3;11:1/1
+name=s9_plain_crash_lenient arm=CJ2 runs=154 violating=25 min_fs=3 min_fr=2 viol_mount_on_abandoned=0 viol_other=25 by_fs=0:0/4;1:0/12;2:0/24;3:1/27;4:4/26;5:5/24;6:5/12;7:4/9;8:2/7;9:1/5;10:2/3;11:1/1
+name=s9_plain_crash_lenient hit=C not_hit=A scripts=0
+name=s9_plain_crash_lenient hit=CJ not_hit=AJ scripts=0
+name=s9_plain_crash_lenient hit=CJ not_hit=C scripts=0
+name=s9_plain_crash_lenient hit=AJ not_hit=CJ scripts=61
+name=s9_plain_crash_lenient hit=AJ not_hit=C scripts=61
+name=s9_plain_crash_lenient hit=A not_hit=C scripts=61
+name=s9_plain_crash_lenient hit=CJ2 not_hit=AJ2 scripts=0
+name=s9_plain_crash_lenient hit=AJ2 not_hit=CJ2 scripts=61
+name=s9_plain_crash_lenient hit=CJ2 not_hit=C scripts=0
+name=s9_plain_crash_lenient hit=G not_hit=CJ scripts=61
+name=s9_plain_crash_lenient hit=CJ not_hit=G scripts=0
+name=s9_plain_crash_lenient hit=AJ not_hit=G scripts=0
+name=s9_plain_crash_lenient hit=G not_hit=AJ scripts=0
+name=s9_plain_crash_lenient hit=A not_hit=CJ scripts=61
+name=s9_plain_crash_lenient hit=A not_hit=CJ2 scripts=61
+name=s9_plain_crash_lenient hit=AJ not_hit=CJ2 scripts=61
+name=s9_plain_crash_lenient hit=AJ2 not_hit=C scripts=61
+name=s9_plain_crash_lenient hit=AJ2 not_hit=CJ scripts=61
+name=s9_plain_crash_lenient hit=G not_hit=C scripts=61
+name=s9_plain_crash_lenient hit=G not_hit=CJ2 scripts=61
+example name=s9_plain_crash_lenient arm=A min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+example name=s9_plain_crash_lenient arm=AJ min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+example name=s9_plain_crash_lenient arm=AJ2 min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+example name=s9_plain_crash_lenient arm=G min_by=fs fs=2 script=[p(1) crash mount(d1+j1) u(2)]
+  violations=[((12, 2), [2, 3], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    CRASH (nothing in flight)
+    MOUNT u=d1+j1: selects txg3 i1, replays to txg3 (prefix end c3), new i2 from txg4, wm=12:2
+    txg4 i2 c4 root->disk1 wm=12:2
+    txg5 i2 c5 root->disk0 creates (12,2,bg5) wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+example name=s9_plain_crash_lenient arm=C min_by=fs fs=3 script=[p(1) p(0) p(1) crash mount(d0+j2) u(2)]
+  violations=[((12, 3, 6), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    txg5 i1 c5 root->disk0 wm=12:3
+    txg6 i1 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    CRASH (nothing in flight)
+    MOUNT u=d0+j2: selects txg4 i1, replays to txg4 (prefix end c4), new i2 from txg5, wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    txg7 i2 c7 root->disk1 creates (12,4,bg7) wm=12:5
+example name=s9_plain_crash_lenient arm=CJ min_by=fs fs=3 script=[p(1) p(0) p(1) crash mount(d0+j2) u(2)]
+  violations=[((12, 3, 6), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    txg5 i1 c5 root->disk0 wm=12:3
+    txg6 i1 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    CRASH (nothing in flight)
+    MOUNT u=d0+j2: selects txg4 i1, replays to txg4 (prefix end c4), new i2 from txg5, wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    txg7 i2 c7 root->disk1 creates (12,4,bg7) wm=12:5
+example name=s9_plain_crash_lenient arm=CJ2 min_by=fs fs=3 script=[p(1) p(0) p(1) crash mount(d0+j2) u(2)]
+  violations=[((12, 3, 6), [3, 4], True)]
+    txg1 i1 c1 root->disk1 wm=
+    txg2 i1 c2 root->disk0 wm=
+    txg3 i1 c3 root->disk0 creates (12,1,bg3) wm=12:2
+    txg4 i1 c4 root->disk1 creates (12,2,bg4) wm=12:3
+    txg5 i1 c5 root->disk0 wm=12:3
+    txg6 i1 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    CRASH (nothing in flight)
+    MOUNT u=d0+j2: selects txg4 i1, replays to txg4 (prefix end c4), new i2 from txg5, wm=12:3
+    txg5 i2 c5 root->disk0 wm=12:3
+    txg6 i2 c6 root->disk0 creates (12,3,bg6) wm=12:4
+    txg7 i2 c7 root->disk1 creates (12,4,bg7) wm=12:5
+END c143r2_model lines_before_this=975

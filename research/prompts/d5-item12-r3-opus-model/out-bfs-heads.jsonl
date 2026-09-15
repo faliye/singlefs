@@ -1,0 +1,4 @@
+{"section": "bfs-heads", "arm": "BING_R", "cfg": {}, "found": false, "explored": 910974, "states": 449664, "depth_reached": 8, "truncated": false}
+{"section": "bfs-heads", "arm": "YI", "cfg": {}, "found": false, "explored": 693332, "states": 344285, "depth_reached": 8, "truncated": false}
+{"section": "bfs-heads", "arm": "BING_T", "cfg": {}, "found": false, "explored": 696812, "states": 344032, "depth_reached": 8, "truncated": false}
+{"section": "END", "rows": 3}

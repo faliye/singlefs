@@ -404,3 +404,7 @@ path = "src/bin/e149_pack_container_repair_options.rs"
 [[bin]]
 name = "e148-commit-fixpoint-two-record-trees"
 path = "src/bin/e148_commit_fixpoint_two_record_trees.rs"
+
+[[bin]]
+name = "e152-file-system-benchmark"
+path = "src/bin/e152_file_system_benchmark.rs"

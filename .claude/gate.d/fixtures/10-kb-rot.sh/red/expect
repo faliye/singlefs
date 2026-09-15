@@ -1,2 +1,3 @@
 exit=1
 want=E999 被引用但 experiments/ 下没有它
+want=E343 已跑，但决策正文一次都没引用它

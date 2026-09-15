@@ -3,6 +3,7 @@
 #
 #   vm-kernel.sh            打印可用内核的路径（必要时先复制）
 #   vm-kernel.sh --check    只检查，不复制；有可读内核回 0，没有回 1
+#   vm-kernel.sh --release <版本>   只认 /boot/vmlinuz-<版本>，必要时复制成 TMPDIR 下的 singlefs-vmlinuz-<版本>
 #
 # 为什么要它：`/boot/vmlinuz-*` 是 `-rw------- root root`，而 `vm-bench.sh` 的
 # `find_kernel()` 只认可读的镜像。每次跑虚机实验都卡在这一步，所以做成脚本。
@@ -27,15 +28,26 @@ find_readable() {
   return 1
 }
 
-if K="$(find_readable)"; then
-  printf '%s\n' "$K"; exit 0
-fi
-[[ "${1:-}" == "--check" ]] && exit 1
+if [[ "${1:-}" == "--release" ]]; then
+  # 指定版本：E152（按里程碑对比六家文件系统的文件性能） 要与宿主同版本、不带 lockdep 的内核，
+  # 而 find_readable 会先撞上 /boot 里唯一可读的那个 lockdep 内核（锁校验开销因文件系统而异，量出来的时间不能拿来比）。
+  RELEASE="${2:-}"
+  [[ -n "$RELEASE" ]] || die "--release 后面没有内核版本" "→ 例：vm-kernel.sh --release $(uname -r)"
+  DEST="$DEST_DIR/singlefs-vmlinuz-$RELEASE"
+  [[ -r "$DEST" ]] && { printf '%s\n' "$DEST"; exit 0; }
+  SRC="/boot/vmlinuz-$RELEASE"
+  [[ -e "$SRC" ]] || die "/boot 下没有 vmlinuz-$RELEASE" "→ ls /boot 看有哪些版本，把其中一个传给 --release"
+else
+  if K="$(find_readable)"; then
+    printf '%s\n' "$K"; exit 0
+  fi
+  [[ "${1:-}" == "--check" ]] && exit 1
 
-# ── 到这里说明要复制一份 ──
-SRC="/boot/vmlinuz-$(uname -r)"
-[[ -e "$SRC" ]] || { SRC="$(ls -1 /boot/vmlinuz-* 2>/dev/null | tail -1)"; }
-[[ -n "$SRC" && -e "$SRC" ]] || die "/boot 下找不到任何内核镜像"
+  # ── 到这里说明要复制一份 ──
+  SRC="/boot/vmlinuz-$(uname -r)"
+  [[ -e "$SRC" ]] || { SRC="$(ls -1 /boot/vmlinuz-* 2>/dev/null | tail -1)"; }
+  [[ -n "$SRC" && -e "$SRC" ]] || die "/boot 下找不到任何内核镜像"
+fi
 
 [[ -f "$REPO/.env" ]] || die "需要 sudo 复制内核，但 $REPO/.env 不在。手动做一次：
        sudo cp $SRC $DEST && sudo chown \$USER $DEST

@@ -30,13 +30,6 @@ waaagh！
 完整的决策记录与依据在 [`.claude/kb/decisions.md`](.claude/kb/decisions.md)，
 避坑清单在 [`.claude/kb/pitfalls.md`](.claude/kb/pitfalls.md)。
 
-## 当前状态
-
-**格式设计阶段。还没有磁盘格式，也还没有代码。**
-
-先定 `decisions.md` 里的待定项，再动第一行实现——其中校验和位置与核心索引结构
-决定「第一段代码长什么样」，不定就写会返工。
-
 ## 贡献者治理（Contributor Governance）
 
 > **实现上 AI 友好，审核上人类友好。**
@@ -73,7 +66,7 @@ waaagh！
 |---|---|
 | **QEMU / KVM** | 真实负载 + 崩溃注入下的端到端行为，是准入的最终判据 |
 | **herd7 / LKMM** | 并发路径的内存序——无锁结构、屏障、跨 CPU 可见性 |
-| 崩溃点重放 | 任意断电点能否恢复（`dm-log-writes` 截断 + 重放 + checker） |
+| 崩溃点重放 | 屏障切段、段内任意一组写持久，枚举出的每个崩溃状态都生成镜像、跑恢复 + checker（第一个事务的全量在门禁 54 号） |
 | 模型对拍 | 功能正确性：随机操作序列与内存里的理想模型比对 |
 
 三条硬要求：
@@ -87,16 +80,19 @@ waaagh！
 提交前跑门禁：
 
 ```bash
-bash .claude/scripts/gate.sh              # 规范版本 / 文档 / 有无测试 / 构建单测 / LKMM
-GATE_QEMU=1 bash .claude/scripts/gate.sh  # 再加 QEMU harness 自检（要两次虚机启动）
+bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 全量与 QEMU 真设备，要几分钟）
 
+cargo test --workspace                    # 平时的单测；层 0 全量标 ignored，这里只跑缩小版
+bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放全量（release）
+bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
-bash .claude/scripts/qemu.sh --selftest   # 单跑 QEMU harness 自检
+bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）
 ```
 
 `lkmm.sh` 要 `opam install herdtools7`，并用 `SINGLEFS_KERNEL_TREE=` 指一棵带
-`tools/memory-model` 的 Linux 源码树。`qemu.sh` 要可读的内核镜像，
-找不到会给出办法而**不会静默降级到软件模拟**。
+`tools/memory-model` 的 Linux 源码树。虚机装置 `research/scripts/vm-bench.sh` 要可读的内核镜像，
+找不到会给出办法而**不会静默降级到软件模拟**。门禁 55 号要 `qemu-system-x86_64` 与 KVM，
+前置条件见 [`.claude/kb/vm-harness.md`](.claude/kb/vm-harness.md)「三个前置」。
 
 **门禁脚本与规则由 [singlefs-ai-sop](https://github.com/faliye/singlefs-ai-sop) 统一分发**，
 所有参与者跑的是同一套——判据一致，你才知道自己该验到什么程度。
@@ -120,8 +116,15 @@ bash .claude/scripts/gate.sh
 
 | 路径 | 内容 |
 |---|---|
+| `crates/singlefs-format` | 格式常量：每个宽度的值来自 kb 的决策分项，没定的带占位标记 |
+| `crates/singlefs-core` | mkfs、分配器、事务层（封闭的提交步骤枚举）、恢复、O_DIRECT 块设备后端 |
+| `crates/singlefs-harness` | 写请求录制器、层 0 崩溃状态枚举、设备侧日志核对，以及里程碑各步的验收用例 |
+| `crates/singlefs-checker` | checker：与实现只共享格式常量，解析、校验、遍历各写一份 |
 | `.claude/kb/` | 设计决策、不变量清单、他家方案调研、避坑清单 |
 | `.claude/scripts/` | 门禁包装（逻辑在 singlefs-ai-sop） |
+| `.claude/gate.d/` | 项目本地的门禁阶段 |
+| `research/` | 实验装置、留存产物与复跑脚本 |
+| `litmus/` | herd7 的 litmus 测试，每条 Never 配一条去掉屏障的对照 |
 | `records/` | 建设过程 |
 
 ## 许可
