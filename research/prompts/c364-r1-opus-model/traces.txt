@@ -1,0 +1,88 @@
+== Q1 前台释放在 R 外腾出全空段（S甲，停机即删意图，rec）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  DELETE I@0                                   txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  DELETE U@2                                   txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=True 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=无 已删意图的目标态=False
+      ↑ 这一步判出 a_prime：谓词判有产出时 R 里还有要搬的落点（提前停机）
+      ↑ 这一步判出 c：意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+== Q1 同一序列（S丙）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  DELETE I@0                                   txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  DELETE U@2                                   txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(3, 3) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+== 共用序列：不带前台，搬完 R（S甲，occ）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+      ↑ 这一步判出 b：R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+  PUBLISH(txg=2)                               txg=3 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+  PUBLISH(txg=3)                               txg=4 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+  PUBLISH(txg=4)                               txg=5 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+  PUBLISH(txg=5)                               txg=6 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+== 共用序列：不带前台，搬完 R（S丙，occ）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+      ↑ 这一步判出 a：谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+== P甲 续做点越过没搬成的落点、扫到尾就删
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  WRITE@16                                     txg=2 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  PUBLISH(txg=2)                               txg=3 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  BATCH                                        txg=3 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=无 已删意图的目标态=False
+      ↑ 这一步判出 c：意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+== 同一序列，P甲 只越过搬成的落点
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  WRITE@16                                     txg=2 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  PUBLISH(txg=2)                               txg=3 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  BATCH                                        txg=3 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=6 谓词=False 目标态=False
+== c0：切换重做把在飞分配代改成新 txg，c0 照旧
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1)] 意图=无
+  WRITE@6                                      txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('U', 6, 2)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('U', 6, 2)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  SWITCH_KEEP(在飞 checkpoint 2 按 3 重做)          txg=3 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('U', 6, 3)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+== c0 取上一次已发布的 txg
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1)] 意图=无
+  WRITE@6                                      txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('U', 6, 2)] 意图=无
+  SIGN(R=('A', 1),c0=1)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('U', 6, 2)] 意图=有 c0=1 segs0=None 续做点=None 谓词=False 目标态=False
+== Q1 序列，S甲，谓词只在意图照目标态删的那一刻判（AC）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  DELETE I@0                                   txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=False 目标态=False
+  DELETE U@2                                   txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=True 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(2, 2) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=((0, 1), (1, 1)) 续做点=None 谓词=True 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(3, 3) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+== P甲（只越过搬成的）+ 意图不随根回退
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  PUBLISH(txg=2)                               txg=3 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  BATCH                                        txg=3 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  PUBLISH(txg=3)                               txg=4 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  ROLLBACK(→根 2,新 txg=5)                       txg=5 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  BATCH                                        txg=5 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('U', 4, 1)] 意图=有 c0=2 segs0=None 续做点=7 谓词=False 目标态=False
+  BATCH                                        txg=5 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('U', 4, 1)] 意图=有 c0=2 segs0=None 续做点=7 谓词=False 目标态=False
+      ↑ 这一步判出 stuck：续做点 7 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+== 同一序列，意图随根回退
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=无
+  SIGN(R=('A', 1),c0=2)                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  PUBLISH(txg=2)                               txg=3 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  BATCH                                        txg=3 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  PUBLISH(txg=3)                               txg=4 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  ROLLBACK(→根 2,新 txg=5)                       txg=5 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 4, 1), ('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=4 谓词=False 目标态=False
+  BATCH                                        txg=5 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=5 谓词=False 目标态=False
+  BATCH                                        txg=5 occ=(0, 0) rec=(0, 0) R内活记录(种类,槽,分配代)=[('I', 6, 1)] 意图=有 c0=2 segs0=None 续做点=6 谓词=False 目标态=False
+== R丙 起点落在两槽单元中间（R=[5,9)）
+  初始                                           txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1), ('U', 8, 1)] 意图=无
+  SIGN(R=('C', 5, 4),c0=2)                     txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('I', 6, 1), ('U', 8, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  DELETE I@6                                   txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[('U', 8, 1)] 意图=有 c0=2 segs0=None 续做点=None 谓词=False 目标态=False
+  BATCH                                        txg=2 occ=(1, 1) rec=(1, 1) R内活记录(种类,槽,分配代)=[] 意图=无 已删意图的目标态=True
+      ↑ 这一步判出 c_overlap：按记录 key 目标态已达成、意图被删，而一个起点在 R 外的活单元的跨度仍压在 R 里（「落点在 R 内」按重叠读就是 (c)）
+      ↑ 这一步判出 a：谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]

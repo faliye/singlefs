@@ -1,8 +1,8 @@
 M1_每头只算一棵数据树	const DATA_TREES_PER_HEAD: u64 = 2;	const DATA_TREES_PER_HEAD: u64 = 1;
 M2_漏掉池级树	const POOL_TREES: u64 = 3;	const POOL_TREES: u64 = 0;
 M3_内部扇出等于叶扇出	const CHILD_POINTER_BYTES: u64 = 31 + 14 * 2;	const CHILD_POINTER_BYTES: u64 = 0;
-M4_树表净字节换成另一个口径	const TREE_TABLE_PAYLOAD: u64 = 16284;	const TREE_TABLE_PAYLOAD: u64 = 16320;
-M5_树表条目预留少算	const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 32;	const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 24;
+M4_树表净字节换成另一个口径	const TREE_TABLE_PAYLOAD: u64 = 16253;	const TREE_TABLE_PAYLOAD: u64 = 16000;
+M5_树表条目预留少算	const TREE_TABLE_ENTRY: u64 = 8 + 2 + 2 + 2 + 86 + 8 + 8 + 8 + 76;	const TREE_TABLE_ENTRY: u64 = 8 + 2 + 2 + 2 + 86 + 8 + 8 + 8 + 66;
 M6_共享臂不数那棵共享树	Arm::SharedLivelist => heads * DATA_TREES_PER_HEAD + POOL_TREES + 1,	Arm::SharedLivelist => heads * DATA_TREES_PER_HEAD + POOL_TREES,
 M7_每树一棵的臂只算一棵	Arm::OneLivelistPerDataTree => heads * (DATA_TREES_PER_HEAD + DATA_TREES_PER_HEAD) + POOL_TREES,	Arm::OneLivelistPerDataTree => heads * (DATA_TREES_PER_HEAD + 1) + POOL_TREES,
 M8_表层数把叶算成零	let mut level_count = 1u32;\n    let mut capacity_in_entries = fanout_per_node;	let mut level_count = 0u32;\n    let mut capacity_in_entries = fanout_per_node;

@@ -21,10 +21,11 @@ use e7_index_bench::Emitter;
 
 const NODE_BYTES: u64 = 16384; // D8 已定项 2
 const NODE_HEADER_BYTES: u64 = 64;
-/// 树表单元装条目的净字节，`22-单元原子性怎么合成.md` 的口径（C157 记着另一个口径 16320，不采用）。
-const TREE_TABLE_PAYLOAD: u64 = 16284;
-/// 树表条目：长度 2 + 种类 2 + flags 2 + 树 ID 8 + 根指针 59 + previous_snapshot_txg 8 + 诞生 txg 8 + 预留 32。
-const TREE_TABLE_ENTRY: u64 = 2 + 2 + 2 + 8 + 59 + 8 + 8 + 32;
+/// 树表单元装条目的净字节，`22-单元原子性怎么合成.md` 树表单元那一段写死的唯一读法：16384 − 含预留位的码 2 头 131。
+const TREE_TABLE_PAYLOAD: u64 = 16253;
+/// 树表条目（D8 已定项 8，2026-09-16 用户定案加宽）：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86
+/// + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76。
+const TREE_TABLE_ENTRY: u64 = 8 + 2 + 2 + 2 + 86 + 8 + 8 + 8 + 76;
 /// 内部节点里一条子指针：头部 31 + 位置条目 14 × 2（D22 已定项 7）。
 const CHILD_POINTER_BYTES: u64 = 31 + 14 * 2;
 /// 每个头的数据树棵数（extent 树 + inode 树），已提交 first-txn-layout 第 47 行预想。
@@ -198,10 +199,10 @@ mod tests {
 
     #[test]
     fn constants_are_the_knowledge_base_field_tables_segment_by_segment() {
-        assert_eq!(TREE_TABLE_ENTRY, 121);
+        assert_eq!(TREE_TABLE_ENTRY, 200);
         assert_eq!(CHILD_POINTER_BYTES, 59);
-        assert_eq!(TREE_TABLE_PAYLOAD, 16284);
-        assert_eq!(tree_table_entries_per_level(), 134);
+        assert_eq!(TREE_TABLE_PAYLOAD + 131, 16384);
+        assert_eq!(tree_table_entries_per_level(), 81);
     }
 
     #[test]
@@ -215,24 +216,24 @@ mod tests {
 
     #[test]
     fn thresholds_match_the_preregistered_hand_arithmetic() {
-        // 作废条款 2：3H+3、4H+3、2H+4 越过 134 与 134²。
-        assert_eq!(first_heads_at_level(Arm::OneLivelistPerHead, 2), 44);
-        assert_eq!(first_heads_at_level(Arm::OneLivelistPerHead, 3), 5985);
-        assert_eq!(first_heads_at_level(Arm::OneLivelistPerDataTree, 2), 33);
-        assert_eq!(first_heads_at_level(Arm::OneLivelistPerDataTree, 3), 4489);
-        assert_eq!(first_heads_at_level(Arm::SharedLivelist, 2), 66);
-        assert_eq!(first_heads_at_level(Arm::SharedLivelist, 3), 8977);
+        // 作废条款 2：3H+3、4H+3、2H+4 越过 81 与 81² = 6561（手算：3·26+3 = 81 仍一层、3·2186+3 = 6561 仍两层）。
+        assert_eq!(first_heads_at_level(Arm::OneLivelistPerHead, 2), 27);
+        assert_eq!(first_heads_at_level(Arm::OneLivelistPerHead, 3), 2187);
+        assert_eq!(first_heads_at_level(Arm::OneLivelistPerDataTree, 2), 20);
+        assert_eq!(first_heads_at_level(Arm::OneLivelistPerDataTree, 3), 1640);
+        assert_eq!(first_heads_at_level(Arm::SharedLivelist, 2), 39);
+        assert_eq!(first_heads_at_level(Arm::SharedLivelist, 3), 3279);
     }
 
     #[test]
     fn the_e131_count_was_one_data_tree_and_no_pool_trees() {
         // 留档：E131 的 `heads * 2` 只数了一棵数据树 + 一棵 livelist，没有池级树，
-        // 于是它给的第二层门槛是 68，而按真实树数是 44。
+        // 于是它给的第二层门槛是 41，而按真实树数是 27（两边都按今天每层 81 棵算）。
         let e131_tree_table_entry_count = |heads: u64| heads * 2;
         let e131_first_heads_at_second_level = (1u64..)
-            .find(|&heads| tree_level_count(e131_tree_table_entry_count(heads), 134) >= 2)
+            .find(|&heads| tree_level_count(e131_tree_table_entry_count(heads), 81) >= 2)
             .unwrap();
-        assert_eq!(e131_first_heads_at_second_level, 68);
+        assert_eq!(e131_first_heads_at_second_level, 41);
         assert_ne!(e131_first_heads_at_second_level, first_heads_at_level(Arm::OneLivelistPerHead, 2));
     }
 

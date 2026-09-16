@@ -1,0 +1,11 @@
+1. Yes, the state "publish has two records, only the first is durable" is reachable without any disk fault. This can occur due to a crash during the journal record write phase after the first record is written but before the second record and subsequent barrier, as per F3 which allows any whole-write subset between barriers. For the second part, yes, the re-published fixed-point unit may land on the old fixed-point unit's slot because after an instance switch (F5), the failed attempt's allocations are discarded, but the physical storage blocks can be reused for new allocations, so the new fixed-point unit could be written to the same slot.
+
+2. F6 does not say anything about two simultaneous faults where both the root slot and the record the chosen root covers are unreadable. F6 addresses single faults for the first root of a new instance and the recoverability of stepping back one root within the same instance, but it does not cover this specific two-fault scenario.
+
+3. For A: Consider a publish with two transactions where only the first journal record is durable and its discriminator fields (index within publish and records in publish) are unreadable. Recovery cannot determine the publish structure and might incorrectly apply the partial publish as complete if it assumes a single transaction, but rule six requires the whole publish to be applied only if all transactions are present.
+
+For B: Consider a publish with one transaction where the journal record naming the fixed-point units is unreadable. Recovery, following the convention that fixed-point units must be named only in the last record, will not apply the publish because the fixed-point units are not named by a readable record, but the publish is complete and should be applied.
+
+For C: Consider a publish where the root slot is durable but the journal record naming a unit in the tree is unreadable. During recovery, walking the tree from the root segment finds the unit but no readable record of the publish names it, so recovery does not apply the publish, but it should be applied if the record was readable.
+
+4. I would pick C. A single observation that would change my pick is if the file system's tree structure is consistently very large, making tree walking during recovery prohibitively slow for practical performance reasons.

@@ -1,0 +1,12 @@
+C245R2-IMPL shape=S12_back_chain_collision residual_after_solve=0 unit_checksum_covered_variant=0x0634792c back_chain_covered_variant=0xee116bdd back_chain_head_variant=0xee116bdd successor_bytes_identical=true
+C245R2-IMPL shape=S1_mkfs_root_warmup_record chosen_root=(0,0) above_water=1 prefix_applied=1 last_applied=(1,1) effective_root=(1,1) truth=none
+C245R2-IMPL shape=S2_H1_rollback_overwrote_covered_record chosen_root=(1,1) above_water=2 prefix_applied=1 last_applied=(1,2) effective_root=(1,2) truth=apply(1,2)
+C245R2-IMPL shape=S3_uncommitted_rollback_record_above_water chosen_root=(1,3) above_water=1 prefix_applied=1 last_applied=(2,3) effective_root=(2,4) truth=none
+C245R2-IMPL shape=S4_H3_covered_record_unreadable chosen_root=(1,2) above_water=1 prefix_applied=1 last_applied=(1,3) effective_root=(1,3) truth=apply(1,3)
+C245R2-IMPL shape=S5_multi_record_head_torn chosen_root=(1,2) above_water=1 prefix_applied=1 last_applied=(1,4) effective_root=(1,3) truth=none
+C245R2-IMPL shape=S6_multi_record_tail_torn chosen_root=(1,2) above_water=1 prefix_applied=1 last_applied=(1,3) effective_root=(1,3) truth=none(sixth_rule)
+C245R2-IMPL shape=S7_one_transaction_two_records_complete chosen_root=(1,2) above_water=2 prefix_applied=0 last_applied=none effective_root=(1,2) truth=apply(1,3)(1,4)
+C245R2-IMPL shape=S8_torn_head_residual_after_new_instance_record chosen_root=(1,2) above_water=2 prefix_applied=1 last_applied=(1,4) effective_root=(1,3) truth=none
+C245R2-IMPL shape=S9_switch_from_covered_plus_one_overwrote_in_flight chosen_root=(1,3) above_water=1 prefix_applied=1 last_applied=(2,4) effective_root=(2,5) truth=none
+C245R2-IMPL shape=S10_switch_from_mount_prefix_end_overwrote_warmup chosen_root=(1,3) above_water=2 prefix_applied=1 last_applied=(1,4) effective_root=(1,4) truth=apply(1,4)
+C245R2-IMPL shape=S11_synthetic_back_chain_mismatch chosen_root=(1,2) above_water=1 prefix_applied=1 last_applied=(1,3) effective_root=(1,3) truth=none

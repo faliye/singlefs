@@ -1,0 +1,38 @@
+V2RESULT name=selftest passed=11
+V2RESULT name=two_devices cost=1 ledger=PerCopy variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=1 ledger=PerCopy variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=4240 unsafe_min=free0=4:free1=4:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=1 ledger=PerCopy variant=PoolTermsKeptInSum states=67240 unsafe_admits=8400 unsafe_min=free0=4:free1=4:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=1 ledger=BothCopies variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=7040 false_reject_min=free0=5:free1=5:containers=1:request_units=1
+V2RESULT name=two_devices cost=1 ledger=BothCopies variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=1 ledger=BothCopies variant=PoolTermsKeptInSum states=67240 unsafe_admits=6880 unsafe_min=free0=4:free1=6:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=4 ledger=PerCopy variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=4 ledger=PerCopy variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=3760 unsafe_min=free0=7:free1=7:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=4 ledger=PerCopy variant=PoolTermsKeptInSum states=67240 unsafe_admits=7440 unsafe_min=free0=7:free1=7:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=4 ledger=BothCopies variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=6080 false_reject_min=free0=8:free1=8:containers=1:request_units=1
+V2RESULT name=two_devices cost=4 ledger=BothCopies variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=4 ledger=BothCopies variant=PoolTermsKeptInSum states=67240 unsafe_admits=5920 unsafe_min=free0=7:free1=9:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=9 ledger=PerCopy variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=9 ledger=PerCopy variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=2960 unsafe_min=free0=12:free1=12:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=9 ledger=PerCopy variant=PoolTermsKeptInSum states=67240 unsafe_admits=5840 unsafe_min=free0=12:free1=12:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=9 ledger=BothCopies variant=EachDeviceWholeScalar states=67240 unsafe_admits=0 unsafe_min=none false_rejects=4480 false_reject_min=free0=13:free1=13:containers=1:request_units=1
+V2RESULT name=two_devices cost=9 ledger=BothCopies variant=EachDeviceScalarOverDevices states=67240 unsafe_admits=0 unsafe_min=none false_rejects=0 false_reject_min=none
+V2RESULT name=two_devices cost=9 ledger=BothCopies variant=PoolTermsKeptInSum states=67240 unsafe_admits=4320 unsafe_min=free0=12:free1=14:containers=1:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=three_devices_policy cost=1 states=138915 greedy_loses_to_some_placement=2055 min=free=1/4/5:containers=1:request_units=1
+V2RESULT name=three_devices cost=1 truth=greedy variant=AllDevices unsafe_admits=0 unsafe_min=none false_rejects=69035 false_reject_min=free=0/3/3:containers=0:request_units=1
+V2RESULT name=three_devices cost=1 truth=any_placement variant=AllDevices unsafe_admits=0 unsafe_min=none false_rejects=71090 false_reject_min=free=0/3/3:containers=0:request_units=1
+V2RESULT name=three_devices cost=1 truth=greedy variant=SelectedDevices unsafe_admits=0 unsafe_min=none false_rejects=17915 false_reject_min=free=1/2/3:containers=0:request_units=1
+V2RESULT name=three_devices cost=1 truth=any_placement variant=SelectedDevices unsafe_admits=0 unsafe_min=none false_rejects=19970 false_reject_min=free=1/2/3:containers=0:request_units=1
+V2RESULT name=three_devices cost=1 truth=greedy variant=Summed unsafe_admits=15734 unsafe_min=free=0/0/6:containers=0:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=three_devices cost=1 truth=any_placement variant=Summed unsafe_admits=13679 unsafe_min=free=0/0/6:containers=0:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=three_devices cost=1 truth=greedy variant=SelectedWithPoolTermsInSum unsafe_admits=4705 unsafe_min=free=0/3/7:containers=1:request_units=1 false_rejects=7046 false_reject_min=free=1/2/3:containers=0:request_units=1
+V2RESULT name=three_devices cost=1 truth=any_placement variant=SelectedWithPoolTermsInSum unsafe_admits=3388 unsafe_min=free=0/3/7:containers=1:request_units=1 false_rejects=7784 false_reject_min=free=1/2/3:containers=0:request_units=1
+V2RESULT name=three_devices_policy cost=3 states=138915 greedy_loses_to_some_placement=2510 min=free=1/6/7:containers=1:request_units=1
+V2RESULT name=three_devices cost=3 truth=greedy variant=AllDevices unsafe_admits=0 unsafe_min=none false_rejects=68055 false_reject_min=free=0/5/5:containers=0:request_units=1
+V2RESULT name=three_devices cost=3 truth=any_placement variant=AllDevices unsafe_admits=0 unsafe_min=none false_rejects=70565 false_reject_min=free=0/5/5:containers=0:request_units=1
+V2RESULT name=three_devices cost=3 truth=greedy variant=SelectedDevices unsafe_admits=0 unsafe_min=none false_rejects=22875 false_reject_min=free=1/4/5:containers=0:request_units=1
+V2RESULT name=three_devices cost=3 truth=any_placement variant=SelectedDevices unsafe_admits=0 unsafe_min=none false_rejects=25385 false_reject_min=free=1/4/5:containers=0:request_units=1
+V2RESULT name=three_devices cost=3 truth=greedy variant=Summed unsafe_admits=16019 unsafe_min=free=0/0/10:containers=0:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=three_devices cost=3 truth=any_placement variant=Summed unsafe_admits=13509 unsafe_min=free=0/0/10:containers=0:request_units=1 false_rejects=0 false_reject_min=none
+V2RESULT name=three_devices cost=3 truth=greedy variant=SelectedWithPoolTermsInSum unsafe_admits=3893 unsafe_min=free=0/5/9:containers=1:request_units=1 false_rejects=10666 false_reject_min=free=1/4/5:containers=0:request_units=1
+V2RESULT name=three_devices cost=3 truth=any_placement variant=SelectedWithPoolTermsInSum unsafe_admits=2580 unsafe_min=free=0/5/9:containers=1:request_units=1 false_rejects=11863 false_reject_min=free=1/4/5:containers=0:request_units=1
+V2RESULT name=done

@@ -1,0 +1,4 @@
+C orphan
+(* singlefs-expect: Never *)
+{}
+exists (x=1)

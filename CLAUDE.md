@@ -3,7 +3,7 @@
 **一个从零设计的 COW 文件系统，Rust 实现。**
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
 
-当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档、未开工：覆盖写、释放、延迟重用、第二个可写实例、管理员回退，每一件都进层 0）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，步 0–7 的代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
+当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档，步 1 / 步 2 发布 B 已落地：覆盖写、释放、延迟重用、第二个可写实例、管理员回退，每一件都进层 0）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，步 0–7 的代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
 磁盘格式仍是软的（`.claude/rules/format-evolution.md`）；决策索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`，第一个事务的字节表在 `.claude/kb/first-txn-layout.md`。
 
 ## 规则（始终生效）
@@ -41,6 +41,8 @@
 @.claude/rules/format-evolution.md
 @.claude/rules/three-way-inference.md
 @.claude/rules/mutation-sampling.md
+@.claude/rules/implementation-workflow.md
+@.claude/rules/implementation-first.md
 
 文件系统的设计纪律只有本工程需要，所以它不在共享 SOP 里——
 共享 SOP 管的是「项目怎么和 AI 协作」，不管某一类系统怎么设计。
@@ -77,7 +79,7 @@
 | `research/scripts/claim-experiment.sh` | 取实验号并当场占住：查号与建跑前登记在同一步，建文件用排他方式；`--next` 打印下一个空号；`--selftest` 自证会红 |
 | `research/scripts/replace-batch.py` | 批量定点替换：规格文件（JSON）里每一处（文件、旧串、新串）都先在内存里核「恰好命中一次」，全过了才写盘并回读；有一处不中就一个文件都不写；`--dry-run` 只核不写；`--selftest` 自证会红（`REPLACE_BATCH_WRITE_EACH=1` 强制走回逐处写盘，自检必须判红） |
 | `research/perf-by-milestone.md` | singlefs 与六家文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）按里程碑的性能对比：六家基线的表，每个里程碑一节写 singlefs 能跑哪几维、差多少、跑不了的还缺什么；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `research/scripts/e152-tables.py` 从产物生成；每过一个里程碑给 singlefs 重跑一遍、加一节 |
-| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
+| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据、`implementation-workflow.md` 实现改动三步走：写代码 → 三方对抗 → checker，提交前跑 herd7 与 QEMU、`implementation-first.md` 方案与探讨建在 `crates/` 的实现上、`research/` 的装置只作独立验证） |
 | `records/` | 建设过程 |
 | `briefs/` | 每次更新的简报，按日期一份（`YYYY-MM-DD.md`）：那一版能做什么、验到哪、还没罩到什么；给读者看现状，旧的一份不回头改，下次更新另起一份 |
 
@@ -90,7 +92,7 @@
 bash .claude/scripts/gate.sh          # 准入门禁，提交前必跑
 
 bash .claude/scripts/check.sh         # 快速反馈（格式/lint/构建/单测）
-bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/；每条 Never 要有对照组、要绑到代码）
+bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/；每条 Never 要有对照组、要绑到代码；2026-09-16 起是本工程自己的脚本，门禁阶段 57 号）
 bash research/scripts/vm-bench.sh --selftest   # 虚机装置自检（装置归项目，见 .claude/kb/vm-harness.md）
 bash .claude/scripts/gate-lint.sh     # 门禁自身：每条拒绝是否都给了下一步
 bash .claude/scripts/env.sh           # 环境自检
@@ -131,8 +133,11 @@ bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 
 bash .claude/gate.d/51-admission-terms-covered.sh # 准入不等式的每一项都有人维护：被维护的统计量，或写明的例外
 bash .claude/gate.d/52-segment-registry.sh     # 段序列登记表（first-txn-layout.md 八）与 E142 产物的 name=segments 行逐字比对
 bash .claude/gate.d/53-format-const-placeholders.sh # 格式常量文件（crates/singlefs-format）里的占位：每个占位都指得到一条真实存在的分项或欠账
-bash .claude/gate.d/54-layer0-replay.sh # 层 0 崩溃点重放：第一个事务的全部崩溃状态（262165 个）在 release 下逐个跑恢复，计数与 E142 产物逐字比对
+bash .claude/gate.d/54-layer0-replay.sh # 层 0 崩溃点重放：两条流的全部崩溃状态（第一个事务 262165 个、覆盖写 + 释放 524312 个）在 release 下逐个跑恢复，计数与 E142 产物 / 用例里的闭式逐字比对
 bash .claude/gate.d/55-qemu-first-transaction.sh # QEMU 真设备上的第一个事务：两块 virtio 盘、设备侧独立录制与程序录制流逐项比，漏一道屏障与走页缓存两个对照必须判红
+bash .claude/gate.d/56-crates-adversarial-review.sh # crates 里的实现改动有没有走过三方正反对抗推理：每个改过的 crates/*/src/*.rs 要在同一次改动的三方判决文件里被按路径点名
+bash .claude/gate.d/57-lkmm.sh # 内存序（herd7 + litmus/）：上游 2026-09-16 移交给本工程之后唯一判它的阶段，缺 herd7 直接红
+bash .claude/gate.d/58-implementation-premise.sh # 三方论证正文有没有「实现今天的样子」：标题日期 ≥ 2026-09-17 的 `research/prompts/_*-body.md` 必须提到 `crates/`
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
 bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（承重引用逐条复核，条数以 research/scripts/verify-citations.sh 为准；源码树不在也判红）
@@ -140,6 +145,7 @@ bash .claude/gate.d/80-absolute-assertions.sh # 每个实验都要有钉绝对�
 bash .claude/gate.d/85-repro-command.sh   # 点了产物的实验有没有写复跑命令
 bash .claude/gate.d/86-experiment-orphans.sh # research 里的实验号在 kb 里有没有正文
 bash .claude/gate.d/87-replay.sh          # 入库的实验数今天还复现得出来吗（默认跳过脚本里列的 4 个慢实验、其余从 replay.sh 的表现算；`GATE_REPLAY_FULL=1` 全跑）
+bash .claude/gate.d/88-quoted-result-lines.sh # kb 正文里整行抄的 E7RESULT 行，在 research/results/ 的产物里逐字找得到（抄的时候改了数、产物重跑之后正文没跟）
 bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红（样本在 gate.d/fixtures/）
 ```
 
@@ -166,4 +172,4 @@ bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。第一个事务的代码是 2026-09-13 总审核把未定项集中交用户定案之后才开工的（`records/2026-09-13-总审核.md`）。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」。
 - 记账必须在提交时增量维护；任何要「事后扫一遍」的记账设计当场否决。
-- 门禁全绿**只构成第一个事务在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载还只有第一个事务，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量。
+- 门禁全绿**只构成第一个事务与一次覆盖写在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载是两条流：第一个事务，以及同一实例里的覆盖写 + 释放（发布 B）；多次挂载、回退、已释放落点的复用都没进来，checker 也只判第一版那部分不变量。

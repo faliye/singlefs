@@ -1,0 +1,7 @@
+C245 name=selftest mutation=None key=L0-first-mount/BING_STRICT/prefix/outcome_differs expect=zero value=0 ok=True
+C245 name=selftest mutation=strict_start_at_covered key=L0-first-mount/BING_STRICT/prefix/outcome_differs expect=positive value=49 ok=True
+C245 name=selftest mutation=None key=L0-first-mount/T2/JIA_LITERAL/prefix/stale/outcome_changed expect=zero value=0 ok=True
+C245 name=selftest mutation=literal_trusts_tail_as_covered key=L0-first-mount/T2/JIA_LITERAL/prefix/stale/outcome_changed expect=positive value=105 ok=True
+C245 name=selftest mutation=None key=L0-first-mount/T2/TRUST_TAIL/prefix/stale/file_changed expect=positive value=6 ok=True
+C245 name=selftest mutation=ringmax_ignores_ring key=L0-rollback/ORACLE/ringmax/uncommitted_differs_cause/baseline_chain_record_overwritten expect=positive value=44 ok=True
+C245 name=selftest failures=0

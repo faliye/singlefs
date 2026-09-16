@@ -13,20 +13,20 @@
 //!
 //! ## 跨装置口径：分母不自己挑
 //!
-//! 「树表单元每层装几棵」的分母，仓里有两个口径（16284 与 16320），差异记在 C157。
-//! 本装置**按仓里那个（16284）算并注明出处**，不自己挑——
+//! 「树表单元每层装几棵」的分母，`22-单元原子性怎么合成.md` 写死成一种读法：16384 减含预留位的
+//! 码 2 头（树表单元 key 宽 8 ⇒ 115 + 16 = 131），即 16253；条目宽取 D8 已定项 8 定的 200 字节
+//! ⇒ 每层 81 棵。本装置**照抄那一种读法并注明出处**，不自己挑——
 //! `.claude/rules/mutation-sampling.md` 第五类正是 2026-09-10 从 E128 那次立的。
 
 use e7_index_bench::Emitter;
 
 /// 索引节点字节数。D8 已定项 2。
 const NODE_BYTES: u64 = 16384;
-/// 树表单元装条目的净字节。`22-单元原子性怎么合成.md` 的口径，C148 用的也是它。
-/// ⚠️ 仓里另有一个口径 16320（C157），本装置不采用。
-const TREE_TABLE_PAYLOAD: u64 = 16284;
-/// 一条树表条目。D8 已定项 8：长度 2 + 种类 2 + flags 2 + 树 ID 8 + 根指针 59
-/// + `previous_snapshot_txg` 8 + 诞生 txg 8 + 预留 32。
-const TREE_TABLE_ENTRY: u64 = 121;
+/// 树表单元装条目的净字节。`22-单元原子性怎么合成.md` 树表单元那一段的唯一读法：16384 − 含预留位的码 2 头 131。
+const TREE_TABLE_PAYLOAD: u64 = 16253;
+/// 一条树表条目。D8 已定项 8（2026-09-16 用户定案加宽）：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2
+/// + 根指针 86 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 头 ID 8 + 预留 76。
+const TREE_TABLE_ENTRY: u64 = 8 + 2 + 2 + 2 + 86 + 8 + 8 + 8 + 76;
 /// 索引节点头。E73 给的基础节点头下界那一档，与 E128 同口径。
 const NODE_HEADER_BYTES: u64 = 64;
 /// livelist 一条事件记录：类型标签 2 + 位置条目 14（D19 已定项 4）+ birth txg 8。
@@ -218,22 +218,23 @@ mod tests {
     // ── 钉绝对值 ──────────────────────────────────────────────────────
 
     #[test]
-    fn tree_table_holds_exactly_one_hundred_thirty_four_per_level() {
-        // 作废条款 3：16284 / 121 = 134。分母按仓里那个取，不自己挑（C157）。
-        assert_eq!(TREE_TABLE_PAYLOAD, 16284);
-        assert_eq!(TREE_TABLE_ENTRY, 121);
-        assert_eq!(tree_table_entries_per_level(), 134);
+    fn tree_table_holds_exactly_eighty_one_per_level() {
+        // 作废条款 3：⌊16253 / 200⌋ = 81。分母照 D22 那一种读法取，不自己挑。
+        assert_eq!(TREE_TABLE_PAYLOAD + 131, 16384);
+        assert_eq!(TREE_TABLE_PAYLOAD, 16253);
+        assert_eq!(TREE_TABLE_ENTRY, 200);
+        assert_eq!(tree_table_entries_per_level(), 81);
     }
 
     #[test]
-    fn the_other_tree_table_denominator_in_the_repo_agrees_at_121_bytes_and_diverges_at_137() {
-        // 留档：仓里另一个口径是 16320（C157）。它在 121 这一档上给同一个数，
+    fn the_retired_denominator_agrees_at_200_bytes_and_diverges_at_148() {
+        // 留档：本装置跑第一次时取的分母是 16284。它在今天的 200 字节这一档上给同一个 81，
         // 所以「基线对上了」在这里不构成证据——第五类那条纪律的原样形态。
-        assert_eq!(16320u64 / TREE_TABLE_ENTRY, 134);
-        assert_eq!(TREE_TABLE_PAYLOAD / TREE_TABLE_ENTRY, 134);
-        // 而在 137 这一档上两者分道（E128 那次就是栽在这里）。
-        assert_eq!(16320u64 / 137, 119);
-        assert_eq!(TREE_TABLE_PAYLOAD / 137, 118);
+        assert_eq!(16284u64 / TREE_TABLE_ENTRY, 81);
+        assert_eq!(TREE_TABLE_PAYLOAD / TREE_TABLE_ENTRY, 81);
+        // 而在 148 这一档（2026-09-14 的条目宽）上两者分道：D22 那条「112 → 109」是按 16253 算的。
+        assert_eq!(16284u64 / 148, 110);
+        assert_eq!(TREE_TABLE_PAYLOAD / 148, 109);
     }
 
     #[test]
@@ -268,26 +269,22 @@ mod tests {
     // ── 判据 1：树表层数 ──────────────────────────────────────────────
 
     #[test]
-    fn per_head_needs_a_second_tree_table_level_only_past_sixty_seven_heads() {
-        // 每头两条 ⇒ 134 条装得下 67 个头。
-        assert_eq!(per_head(67, 1024).tree_table_levels, 1);
-        assert_eq!(per_head(68, 1024).tree_table_levels, 2);
+    fn per_head_needs_a_second_tree_table_level_only_past_forty_heads() {
+        // 每头两条 ⇒ 81 条装得下 40 个头。
+        assert_eq!(per_head(40, 1024).tree_table_levels, 1);
+        assert_eq!(per_head(41, 1024).tree_table_levels, 2);
     }
 
     #[test]
-    fn per_head_stays_at_two_tree_table_levels_through_the_whole_sweep() {
-        // 判据 1 的判红条件：H ≤ 64 就压到三层 ⇒ per_head 输。
+    fn per_head_reaches_a_third_tree_table_level_inside_the_sweep_but_not_by_sixty_four_heads() {
+        // 判据 1 的判红条件：H ≤ 64 就压到三层 ⇒ per_head 输。今天仍不触发。
         assert!(per_head(64, 1024).tree_table_levels < 3, "H=64 就三层 ⇒ per_head 输");
-        for &heads in HEADS_SWEPT.iter() {
-            assert!(
-                per_head(heads, 1024).tree_table_levels <= 2,
-                "H={heads} 时 per_head 已经要三层"
-            );
-        }
-        // 三层的门槛：134² = 17956 条 ⇒ 8978 个头。
-        assert_eq!(134u64 * 134, 17956);
-        assert_eq!(per_head(8978, 1024).tree_table_levels, 2);
-        assert_eq!(per_head(8979, 1024).tree_table_levels, 3);
+        // 三层的门槛：81² = 6561 条 ⇒ 3280 个头还是两层，3281 个头起三层。
+        assert_eq!(81u64 * 81, 6561);
+        assert_eq!(per_head(3280, 1024).tree_table_levels, 2);
+        assert_eq!(per_head(3281, 1024).tree_table_levels, 3);
+        // 扫描里最大那一格 4096 头已经三层：条目宽到 200 之后门槛才落进扫描区间。
+        assert_eq!(per_head(4096, 1024).tree_table_levels, 3);
     }
 
     // ── 判据 2：点查 ──────────────────────────────────────────────────

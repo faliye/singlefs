@@ -1,0 +1,180 @@
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=287492 complete=True
+C364RESULT exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('A', 1),c0=2) → BATCH → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=327334 complete=True
+C364RESULT exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=4 path=SIGN(R=('A', 1),c0=2) → WRITE@10 → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364RESULT exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('A', 1),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364RESULT exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=4 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-A cfg=[R=A,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=287492 complete=True
+C364RESULT exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('B', 0, 1),c0=2) → BATCH → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=327334 complete=True
+C364RESULT exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=4 path=SIGN(R=('B', 0, 1),c0=2) → WRITE@10 → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364RESULT exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('B', 0, 1),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0] 的全空段数 [1] 不多于签发时 [1]
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364RESULT exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=4 path=SIGN(R=('B', 0, 1),c0=2) → BATCH → WRITE@16 → BATCH detail=谓词判有产出，而盘 [0] 的全空段数 [1] 不多于签发时 [1]
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-B cfg=[R=B,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=287492 complete=True
+C364RESULT exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('C', 4, 4),c0=2) → BATCH → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=327334 complete=True
+C364RESULT exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=4 path=SIGN(R=('C', 4, 4),c0=2) → WRITE@10 → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364RESULT exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('C', 4, 4),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364RESULT exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=4 path=SIGN(R=('C', 4, 4),c0=2) → BATCH → WRITE@16 → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-C-seg cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=280974 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('C', 5, 4),c0=2) → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=280974 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=按记录 key 目标态已达成、意图被删，而一个起点在 R 外的活单元的跨度仍压在 R 里（「落点在 R 内」按重叠读就是 (c)）
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=319690 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('C', 5, 4),c0=2) → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=319690 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=按记录 key 目标态已达成、意图被删，而一个起点在 R 外的活单元的跨度仍压在 R 里（「落点在 R 内」按重叠读就是 (c)）
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=319690 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=280974 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=按记录 key 目标态已达成、意图被删，而一个起点在 R 外的活单元的跨度仍压在 R 里（「落点在 R 内」按重叠读就是 (c)）
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=280974 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=280974 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=319690 complete=True
+C364RESULT exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap len=3 path=SIGN(R=('C', 5, 4),c0=2) → BATCH → BATCH detail=按记录 key 目标态已达成、意图被删，而一个起点在 R 外的活单元的跨度仍压在 R 里（「落点在 R 内」按重叠读就是 (c)）
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=319690 complete=True
+C364NONE exp=R-C-odd cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=319690 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=287492 complete=True
+C364RESULT exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=3 path=SIGN(R=('C', 4, 3),c0=2) → BATCH → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a depth=8 states=327334 complete=True
+C364RESULT exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b len=4 path=SIGN(R=('C', 4, 3),c0=2) → WRITE@10 → DELETE I@6 → BATCH detail=R 已无未释放记录，停机谓词在之后 28 次发布里一次都没判真
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=A,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True
+C364RESULT exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=3 path=SIGN(R=('C', 4, 3),c0=2) → BATCH → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=287492 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=287492 complete=True
+C364RESULT exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a len=4 path=SIGN(R=('C', 4, 3),c0=2) → BATCH → WRITE@16 → BATCH detail=谓词判有产出，而盘 [0, 1] 的全空段数 [1, 1] 不多于签发时 [1, 1]
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=b depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c_overlap depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=a_prime depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=8 states=327334 complete=True
+C364NONE exp=R-C-part cfg=[R=C,S=C,P=B,E=rec,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=8 states=327334 complete=True

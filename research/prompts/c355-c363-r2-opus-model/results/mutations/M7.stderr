@@ -1,0 +1,6 @@
+
+thread 'main' (573287) panicked at src/bin/v4_df.rs:164:5:
+assertion `left == right` failed
+  left: 162
+ right: 133
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,0 +1,26 @@
+C245R2 name=selftest mutation=None key=L0/TRUTH6/prefix/outcome_differs expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=L0/DING/prefix/outcome_differs expect=positive value=7 ok=True
+C245R2 name=selftest mutation=truth_ignores_sixth_rule key=L0/DING/prefix/outcome_differs expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=L0/WALK/prefix/unverified_install expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=L0/TRUTH6/prefix/unverified_install expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=L0/DING/prefix/unverified_install expect=positive value=7 ok=True
+C245R2 name=selftest mutation=None key=L0/T1_OPT/prefix/head_differs_vs_DING expect=positive value=8 ok=True
+C245R2 name=selftest mutation=walk_skips_check key=L0/WALK/prefix/unverified_install expect=positive value=12 ok=True
+C245R2 name=selftest mutation=None key=L1-root+ring/YI/prefix/head_differs_vs_DING expect=zero value=0 ok=True
+C245R2 name=selftest mutation=yi_hint_off_by_one key=L1-root+ring/YI/prefix/head_differs_vs_DING expect=positive value=5118 ok=True
+C245R2 name=selftest mutation=None key=L1-root+ring/BING_R1/prefix/durability_violations_truth_holds expect=positive value=483 ok=True
+C245R2 name=selftest mutation=None key=L1-root+ring/WALK/prefix/durability_violations_truth_holds expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=L1-root+ring/T1_TX_STRICT/prefix/durability_violations_truth_holds expect=positive value=35 ok=True
+C245R2 name=selftest mutation=None key=L1-root/DING_DROPLAST/prefix/durability_violations_truth_holds expect=positive value=417 ok=True
+C245R2 name=selftest mutation=None key=L1U/DING/prefix/read_error_truth_reads expect=positive value=15 ok=True
+C245R2 name=selftest mutation=None key=L1U/WALK/prefix/read_error_truth_reads expect=zero value=0 ok=True
+C245R2 name=selftest mutation=walk_skips_check key=L1U/WALK/prefix/read_error_truth_reads expect=positive value=21 ok=True
+C245R2 name=selftest mutation=None key=L1U/IDXN/prefix/read_error_truth_reads expect=zero value=0 ok=True
+C245R2 name=selftest mutation=truth_ignores_sixth_rule key=L1U/TRUTH6/prefix/unverified_install expect=positive value=15 ok=True
+C245R2 name=selftest mutation=None key=RB/TRUTH6/mount/named/uncommitted_differs_from_no_rollback expect=zero value=0 ok=True
+C245R2 name=selftest mutation=None key=RB/TRUTH6/old/named/cause/baseline_record_overwritten expect=positive value=27 ok=True
+C245R2 name=selftest mutation=None key=RB/TRUTH6/mount/shadow/cause/baseline_unit_reused expect=positive value=60 ok=True
+C245R2 name=selftest mutation=None key=RB/DING/mount/named/cause/head_or_other expect=positive value=42 ok=True
+C245R2 name=selftest mutation=None key=RB/DING/mount/reach/uncommitted_differs_from_no_rollback expect=zero value=0 ok=True
+C245R2 name=selftest mutation=ringmax_is_prefix key=WRAP/ring12/acknowledged/DING/ringmax expect=-1 value=-1 ok=True
+C245R2 name=selftest failures=0

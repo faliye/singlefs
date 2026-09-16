@@ -1,0 +1,120 @@
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=475859 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → BATCH → BATCH detail=续做点 7 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=475232 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=475859 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=475859 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → BATCH → BATCH detail=续做点 7 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=475462 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=475462 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=475462 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=475462 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=475462 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=476092 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=476092 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=476092 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=476092 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → BATCH → BATCH detail=续做点 7 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=472688 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → DELETE U@4 → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=472688 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=472688 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=472688 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=473287 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → DELETE U@4 → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=473287 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=473287 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_safe,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → BATCH → BATCH detail=续做点 7 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=479734 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=479734 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=479734 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck len=7 path=SIGN(R=('A', 1),c0=2) → WRITE@10 → PUBLISH(txg=2) → PUBLISH(txg=3) → BATCH → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=480471 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=480471 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=480471 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=479734 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=479734 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=479734 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck len=7 path=SIGN(R=('A', 1),c0=2) → WRITE@10 → PUBLISH(txg=2) → PUBLISH(txg=3) → BATCH → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=480471 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=480471 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=480471 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=479789 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=479789 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=479789 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck len=7 path=WRITE@10 → PUBLISH(txg=2) → PUBLISH(txg=3) → SIGN(R=('A', 1),c0=4) → BATCH → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=480524 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=480524 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=480524 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → DELETE U@4 → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=477282 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=477282 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck len=7 path=WRITE@10 → PUBLISH(txg=2) → PUBLISH(txg=3) → SIGN(R=('A', 1),c0=4) → BATCH → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=c len=5 path=SIGN(R=('A', 1),c0=2) → BATCH → WRITE@16 → PUBLISH(txg=2) → BATCH detail=意图被删而 R 里还有分配代 ≤ c0 的未释放落点
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → DELETE U@4 → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=477990 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=477990 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=A_adv,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck len=6 path=SIGN(R=('A', 1),c0=2) → BATCH → PUBLISH(txg=2) → ROLLBACK(→根 1,新 txg=4) → DELETE I@6 → BATCH detail=续做点 5 之后一个要搬的都没有，而 R 里还有分配代 ≤ c0 的未释放落点（续做点与分配记录对不上：意图永不完成，R 一直被锁）
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=472025 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck depth=7 states=472330 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=469248 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=469248 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=469248 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=469248 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=469248 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=469506 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=d depth=7 states=469506 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=469506 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=469506 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=True,r3_view=inflight,intent_rooted=False] witness=stuck depth=7 states=469506 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=468347 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → BATCH → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=468347 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stall depth=7 states=468347 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=True] witness=stuck depth=7 states=468347 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=c depth=7 states=468601 complete=True
+C364RESULT exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=d len=4 path=SIGN(R=('A', 1),c0=2) → PUBLISH(txg=2) → BATCH → BATCH detail=槽 4 的单元按计划再搬一次，而在飞态里它已经不在那儿（旧落点第二次进 defer）
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=R3 depth=7 states=468601 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stall depth=7 states=468601 complete=True
+C364NONE exp=P cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=published,req4=False,r3_view=inflight,intent_rooted=False] witness=stuck depth=7 states=468601 complete=True

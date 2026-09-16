@@ -1,0 +1,24 @@
+C364RESULT exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 len=3 path=WRITE@6 → SIGN(R=('A', 1),c0=2) → SWITCH_KEEP(在飞 checkpoint 2 按 3 重做) detail=意图还活着，R 里有分配代 3 > c0=2 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=9771 complete=True
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=9771 complete=True
+C364RESULT exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=R3 len=3 path=SIGN(R=('A', 1),c0=2) → BATCH → SWITCH_KEEP(在飞 checkpoint 2 按 3 重做) detail=意图还活着，R 里有分配代 3 > c0=2 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=c depth=7 states=9626 complete=True
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=d depth=7 states=9626 complete=True
+C364RESULT exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 len=2 path=WRITE@6 → SIGN(R=('A', 1),c0=1) detail=意图还活着，R 里有分配代 2 > c0=1 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=9490 complete=True
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=9490 complete=True
+C364RESULT exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=R3 len=2 path=SIGN(R=('A', 1),c0=1) → WRITE@6 detail=意图还活着，R 里有分配代 2 > c0=1 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=c depth=7 states=9943 complete=True
+C364NONE exp=C0-SWITCH_KEEP cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=d depth=7 states=9943 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 depth=7 states=9237 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=9237 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=9237 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=R3 depth=7 states=8770 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=c depth=7 states=8770 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=inflight,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=d depth=7 states=8770 complete=True
+C364RESULT exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=R3 len=2 path=WRITE@6 → SIGN(R=('A', 1),c0=1) detail=意图还活着，R 里有分配代 2 > c0=1 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=c depth=7 states=9490 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=inflight,intent_rooted=True] witness=d depth=7 states=9490 complete=True
+C364RESULT exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=R3 len=2 path=SIGN(R=('A', 1),c0=1) → WRITE@6 detail=意图还活着，R 里有分配代 2 > c0=1 的活落点（目标态不罩它）
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=c depth=7 states=9943 complete=True
+C364NONE exp=C0-SWITCH_RECOMPUTE cfg=[R=A,S=C,P=B,E=occ,SP=AC,c0=published,plan_view=inflight,req4=True,r3_view=published,intent_rooted=True] witness=d depth=7 states=9943 complete=True
