@@ -435,6 +435,7 @@ struct PublishWrites {
     units: Vec<usize>,
     records: Vec<usize>,
     root: usize,
+    instance: u32,
     checkpoint_txg: u64,
 }
 
@@ -447,16 +448,13 @@ fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
             StepKind::UnitWrite => units.push(index),
             StepKind::JournalRecord => records.push(index),
             StepKind::RootRecordFua => {
-                let checkpoint_txg = u64::from_le_bytes(
-                    write.bytes[28..36]
-                        .try_into()
-                        .expect("根记录的 checkpoint_txg 在偏移 28"),
-                );
+                let (instance, checkpoint_txg) = root_identity_of_write(write);
                 publishes.push(PublishWrites {
                     units: std::mem::take(&mut units),
                     records: std::mem::take(&mut records),
                     root: index,
-                    checkpoint_txg,
+                    instance: instance.0,
+                    checkpoint_txg: checkpoint_txg.0,
                 });
             }
             StepKind::SuperblockSlot | StepKind::Barrier => {}
@@ -515,6 +513,10 @@ pub struct Layer0Tally {
     pub verification_ran_states: u64,
     pub verification_failed_states: u64,
     pub first_violation: Option<String>,
+    /// 不看 journal 那一遍恢复（`JournalPolicy::Ignore`）过同一个 oracle 判违例的状态数，另计、不混进 `violations`
+    /// （靶向对照里「根槽已持久而单元缺席」那一格两遍都违例）。发布 B 之后两遍恢复会读出两个不同的版本，这一遍此前没人判。
+    pub ignored_violations: u64,
+    pub first_ignored_violation: Option<String>,
     /// 记录核对器判「根在案而记录缺席」的状态数。
     pub record_root_without_record: u64,
     /// 记录核对器判「恢复自称新态而单元缺席」的状态数。
@@ -526,6 +528,7 @@ pub struct Layer0Tally {
 }
 
 /// oracle（E77（发布的持久顺序） 判据 1）：读回的内容要对；根槽已持久就不许恢复到旧态；走读不许失败。
+/// 单版本形态：整条流只有一次带文件的发布（第一个事务）。
 #[must_use]
 pub fn oracle_violation(
     outcome: &RecoveryOutcome,
@@ -543,7 +546,110 @@ pub fn oracle_violation(
     }
 }
 
-/// 评一个状态：跑两种 journal 政策的恢复，记进计数。
+/// 文件的一个已发布版本：哪次发布（实例代号 + checkpoint_txg）写出了什么内容。多次发布的流上 oracle 按实际走的根判该读出哪一版。
+/// 版本按 (txg, 实例) 认，不只按 txg：设备失而复得或回退会造出两条同 txg 不同实例的根（D22（单元原子性怎么合成） 已定项 7），
+/// 只按 txg 认时 oracle 在那一格两个方向都错（三方代码第一轮攻方腿）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PublishedVersion {
+    pub instance: InstanceGeneration,
+    pub checkpoint_txg: CheckpointTxg,
+    pub content: Vec<u8>,
+}
+
+/// 多版本形态的 oracle：实际走的根是哪一代，读回的就得是那一代写出的内容；根下面没有文件的那几代（mkfs、暖机）只许报没有文件；
+/// 盘上已持久的最新根槽是 (T, 实例 i)，恢复就不许落到按 (txg, 实例) 字典序比它旧的根上（D22（单元原子性怎么合成） 已定项 7：
+/// 择新 txg 为主、平局按实例代号高者赢）；走读不许失败。
+#[must_use]
+pub fn oracle_violation_for_versions(
+    outcome: &RecoveryOutcome,
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+    newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
+    versions: &[PublishedVersion],
+) -> Option<String> {
+    let Some((effective_instance, effective_txg)) = effective_root else {
+        return Some("没择到根".to_string());
+    };
+    if let Some((newest_txg, newest_instance)) = newest_persisted_root {
+        if (effective_txg, effective_instance) < (newest_txg, newest_instance) {
+            return Some(format!(
+                "根槽已持久而恢复到旧态（盘上最新的根槽是实例 {} 第 {} 代，走的是实例 {} 第 {} 代）",
+                newest_instance.0, newest_txg.0, effective_instance.0, effective_txg.0
+            ));
+        }
+    }
+    let version = versions.iter().find(|version| {
+        version.checkpoint_txg == effective_txg && version.instance == effective_instance
+    });
+    match (outcome, version) {
+        (RecoveryOutcome::Failed { failure, .. }, _) => Some(format!("走读失败：{failure:?}")),
+        // 落在一个没发布过的更新的根上报「没有文件」：更旧的根下面有文件时是违例（第二轮攻方腿：此前一律放过）。
+        (RecoveryOutcome::NoFile { .. }, None) => versions
+            .iter()
+            .find(|candidate_version| {
+                (candidate_version.checkpoint_txg, candidate_version.instance)
+                    < (effective_txg, effective_instance)
+            })
+            .map(|older_version| {
+                format!(
+                    "走到实例 {} 第 {} 代根报没有文件，而没有这一代的版本、实例 {} 第 {} 代下面有文件",
+                    effective_instance.0,
+                    effective_txg.0,
+                    older_version.instance.0,
+                    older_version.checkpoint_txg.0
+                )
+            }),
+        (RecoveryOutcome::NoFile { .. }, Some(_)) => {
+            Some(format!("第 {} 代根下面有文件却报没有", effective_txg.0))
+        }
+        (RecoveryOutcome::FileRead { .. }, None) => Some(format!(
+            "第 {} 代根下面没有文件却读出了内容",
+            effective_txg.0
+        )),
+        (RecoveryOutcome::FileRead { content, .. }, Some(version)) => (*content != version.content)
+            .then(|| format!("读回的内容不对（走的是第 {} 代根）", effective_txg.0)),
+    }
+}
+
+/// 这一状态里持久了的根槽写中最新的那一条，按 (txg, 实例) 字典序取（D22（单元原子性怎么合成） 已定项 7 的择新序）。
+#[must_use]
+pub fn newest_persisted_root(
+    writes: &[RetainedWrite],
+    persisted: &[bool],
+) -> Option<(CheckpointTxg, InstanceGeneration)> {
+    publishes_in(writes)
+        .iter()
+        .filter(|publish| persisted[publish.root])
+        .map(|publish| {
+            (
+                CheckpointTxg(publish.checkpoint_txg),
+                InstanceGeneration(publish.instance),
+            )
+        })
+        .max()
+}
+
+/// 根槽 FUA 写里的根记录身份：实例代号在偏移 24（4 字节）、checkpoint_txg 在偏移 28（8 字节）。
+fn root_identity_of_write(write: &RetainedWrite) -> (InstanceGeneration, CheckpointTxg) {
+    assert_eq!(
+        write.kind,
+        StepKind::RootRecordFua,
+        "被判的那条写要是根槽 FUA 写"
+    );
+    (
+        InstanceGeneration(u32::from_le_bytes(
+            write.bytes[24..28]
+                .try_into()
+                .expect("根记录的实例代号在偏移 24"),
+        )),
+        CheckpointTxg(u64::from_le_bytes(
+            write.bytes[28..36]
+                .try_into()
+                .expect("根记录的 checkpoint_txg 在偏移 28"),
+        )),
+    )
+}
+
+/// 单版本形态：被判的那次根槽写出的那一代就是唯一带文件的版本。
 pub fn evaluate_state(
     base: &MemoryPool,
     writes: &[RetainedWrite],
@@ -552,7 +658,27 @@ pub fn evaluate_state(
     expected_content: &[u8],
     tally: &mut Layer0Tally,
 ) -> RecoveryReport {
-    let root_persisted = persisted[root_index];
+    let (instance, checkpoint_txg) = root_identity_of_write(&writes[root_index]);
+    let versions = [PublishedVersion {
+        instance,
+        checkpoint_txg,
+        content: expected_content.to_vec(),
+    }];
+    evaluate_state_for_versions(base, writes, persisted, root_index, &versions, tally)
+}
+
+/// 评一个状态：跑两种 journal 政策的恢复，记进计数。`judged_root_index` 是被判的那次根槽 FUA 写（计「根槽已持久」的状态数用），
+/// oracle 按 `versions` 判实际走的根该读出哪一版。
+pub fn evaluate_state_for_versions(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    persisted: Vec<bool>,
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    tally: &mut Layer0Tally,
+) -> RecoveryReport {
+    let root_persisted = persisted[judged_root_index];
+    let newest_persisted = newest_persisted_root(writes, &persisted);
     let image = CrashImage {
         base,
         writes,
@@ -578,7 +704,12 @@ pub fn evaluate_state(
         RecoveryOutcome::FileRead { .. } => tally.file_read_states += 1,
         RecoveryOutcome::Failed { .. } => tally.failed_states += 1,
     }
-    if let Some(reason) = oracle_violation(&consulted.outcome, root_persisted, expected_content) {
+    if let Some(reason) = oracle_violation_for_versions(
+        &consulted.outcome,
+        consulted.effective_root,
+        newest_persisted,
+        versions,
+    ) {
         tally.violations += 1;
         if tally.first_violation.is_none() {
             let persisted_kinds: Vec<&str> = image
@@ -592,6 +723,17 @@ pub fn evaluate_state(
                 "{reason}（持久的写：{}）",
                 persisted_kinds.join("|")
             ));
+        }
+    }
+    if let Some(reason) = oracle_violation_for_versions(
+        &ignored.outcome,
+        ignored.effective_root,
+        newest_persisted,
+        versions,
+    ) {
+        tally.ignored_violations += 1;
+        if tally.first_ignored_violation.is_none() {
+            tally.first_ignored_violation = Some(reason);
         }
     }
     for (invariant, verdict) in check_pool_image(&image) {
@@ -620,8 +762,7 @@ pub fn evaluate_state(
     consulted
 }
 
-/// 枚举：前面的段全持久 + 当前段任意真子集，最后再加全部持久那一个状态；`expand` 决定哪一段展开子集
-/// （不展开的段只以整段持久进入后面的状态，平时 `cargo test` 里跳过 18 个写那一段就靠它）。`root_index` 是被判的那次根槽 FUA 写。
+/// 单版本形态的枚举。
 #[must_use]
 pub fn enumerate_layer0_selecting(
     base: &MemoryPool,
@@ -629,6 +770,26 @@ pub fn enumerate_layer0_selecting(
     segments: &[Vec<usize>],
     root_index: usize,
     expected_content: &[u8],
+    expand: &dyn Fn(usize, &[usize]) -> bool,
+) -> Layer0Tally {
+    let (instance, checkpoint_txg) = root_identity_of_write(&writes[root_index]);
+    let versions = [PublishedVersion {
+        instance,
+        checkpoint_txg,
+        content: expected_content.to_vec(),
+    }];
+    enumerate_layer0_selecting_versions(base, writes, segments, root_index, &versions, expand)
+}
+
+/// 枚举：前面的段全持久 + 当前段任意真子集，最后再加全部持久那一个状态；`expand` 决定哪一段展开子集
+/// （不展开的段只以整段持久进入后面的状态，平时 `cargo test` 里跳过 18 个写那一段就靠它）。`judged_root_index` 是被判的那次根槽 FUA 写。
+#[must_use]
+pub fn enumerate_layer0_selecting_versions(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
     expand: &dyn Fn(usize, &[usize]) -> bool,
 ) -> Layer0Tally {
     let mut tally = Layer0Tally::default();
@@ -643,12 +804,12 @@ pub fn enumerate_layer0_selecting(
                         persisted[*write_index] = true;
                     }
                 }
-                evaluate_state(
+                evaluate_state_for_versions(
                     base,
                     writes,
                     persisted,
-                    root_index,
-                    expected_content,
+                    judged_root_index,
+                    versions,
                     &mut tally,
                 );
             }
@@ -657,15 +818,34 @@ pub fn enumerate_layer0_selecting(
             persisted_before[*write_index] = true;
         }
     }
-    evaluate_state(
+    evaluate_state_for_versions(
         base,
         writes,
         persisted_before,
-        root_index,
-        expected_content,
+        judged_root_index,
+        versions,
         &mut tally,
     );
     tally
+}
+
+/// 全量、多版本：每一段都展开。
+#[must_use]
+pub fn enumerate_layer0_versions(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+) -> Layer0Tally {
+    enumerate_layer0_selecting_versions(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        &|_segment_index, _segment| true,
+    )
 }
 
 /// 全量：每一段都展开。
@@ -715,5 +895,93 @@ mod tests {
             .enumerate()
             .all(|(index, byte)| index == 600 || *byte == 1));
         assert_eq!(closed_form_state_count(&[vec![0, 1], vec![2]]), 1 + 3 + 1);
+    }
+}
+
+#[cfg(test)]
+mod oracle_instance_tests {
+    use super::{oracle_violation_for_versions, PublishedVersion};
+    use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+    use singlefs_core::recovery::RecoveryOutcome;
+
+    /// 两条同 txg 不同实例的版本（设备失而复得、或回退实例与被抛弃实例同时在环里会造出来）。
+    fn two_instances_at_txg_seven() -> Vec<PublishedVersion> {
+        vec![
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(7),
+                content: b"written by instance one".to_vec(),
+            },
+            PublishedVersion {
+                instance: InstanceGeneration(2),
+                checkpoint_txg: CheckpointTxg(7),
+                content: b"written by instance two".to_vec(),
+            },
+        ]
+    }
+
+    /// D22（单元原子性怎么合成） 已定项 7：txg 平局按实例代号高者赢。实例 2 的第 7 代根已持久而恢复落在实例 1 的第 7 代根上是一次退代。
+    #[test]
+    fn landing_on_the_lower_instance_of_the_same_txg_is_a_violation() {
+        let outcome = RecoveryOutcome::FileRead {
+            root: (InstanceGeneration(1), CheckpointTxg(7)),
+            content: b"written by instance one".to_vec(),
+        };
+        let violation = oracle_violation_for_versions(
+            &outcome,
+            Some((InstanceGeneration(1), CheckpointTxg(7))),
+            Some((CheckpointTxg(7), InstanceGeneration(2))),
+            &two_instances_at_txg_seven(),
+        );
+        assert!(
+            violation.is_some(),
+            "只按 txg 比会把实例 1 的第 7 代当成最新的"
+        );
+    }
+
+    /// 走到一个没有版本的更新的根上报「没有文件」，而更旧的根下面有文件：违例，不许因为查不到版本就放过。
+    #[test]
+    fn newer_root_without_any_version_reporting_no_file_is_violation() {
+        let outcome = RecoveryOutcome::NoFile {
+            root: (InstanceGeneration(1), CheckpointTxg(9)),
+        };
+        assert!(oracle_violation_for_versions(
+            &outcome,
+            Some((InstanceGeneration(1), CheckpointTxg(9))),
+            Some((CheckpointTxg(7), InstanceGeneration(2))),
+            &two_instances_at_txg_seven(),
+        )
+        .is_some());
+        // 比每条版本都旧的根（暖机）报没有文件照旧不是违例。
+        let warm_up = RecoveryOutcome::NoFile {
+            root: (InstanceGeneration(1), CheckpointTxg(2)),
+        };
+        assert_eq!(
+            oracle_violation_for_versions(
+                &warm_up,
+                Some((InstanceGeneration(1), CheckpointTxg(2))),
+                Some((CheckpointTxg(2), InstanceGeneration(1))),
+                &two_instances_at_txg_seven(),
+            ),
+            None
+        );
+    }
+
+    /// 同 txg 的两条版本是两条版本：落在实例 2 上读出实例 2 的内容不是违例。
+    #[test]
+    fn the_same_txg_from_two_instances_are_two_versions() {
+        let outcome = RecoveryOutcome::FileRead {
+            root: (InstanceGeneration(2), CheckpointTxg(7)),
+            content: b"written by instance two".to_vec(),
+        };
+        assert_eq!(
+            oracle_violation_for_versions(
+                &outcome,
+                Some((InstanceGeneration(2), CheckpointTxg(7))),
+                Some((CheckpointTxg(7), InstanceGeneration(2))),
+                &two_instances_at_txg_seven(),
+            ),
+            None
+        );
     }
 }

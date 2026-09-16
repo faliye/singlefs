@@ -171,6 +171,11 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
     println!("{}", checker_line(&tally));
     println!("CHECKER_FIRST {:?}", tally.checker_first_violation);
     assert_eq!(
+        tally.ignored_violations, 0,
+        "不看 journal 那一遍恢复同样过 oracle：{:?}",
+        tally.first_ignored_violation
+    );
+    assert_eq!(
         oracle_counts(&tally),
         OracleCounts {
             states: 262_165,

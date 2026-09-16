@@ -121,6 +121,16 @@ pub fn build_packed_unit(
 /// 42 树 ID / 50 层级 / 51 key 宽 / 52 key 区间 2k / 52+2k 诞生代号 / 60+2k fsid / 68+2k 写序 4 / 72+2k 出生序号 /
 /// 76+2k 载荷 CRC / 80+2k 预留 2 / 82+2k 条目数 / 84+2k 条目宽 / 86+2k 预留位 29 / 115+2k 条目区。
 /// 头校验和罩 [0, 86+2k)，载荷 CRC 罩 [86+2k, 16384)；条目定宽、key 打头；声明长度 = 条目数 × 条目宽。
+/// 一个码 2 节点装得下多少条定宽条目：(16384 − 头 − 预留) / 条目宽。写者在装节点之前拿它判「装不下」并报错，不走到断言。
+#[must_use]
+pub fn index_node_entry_capacity(key_width: usize, entry_width: usize) -> usize {
+    let entries_start = usize::try_from(index_node_header_bytes(
+        u64::try_from(key_width).expect("key 宽"),
+    ))
+    .expect("头宽");
+    (usize::try_from(NODE_BYTES).expect("16384") - entries_start) / entry_width
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "字段表就是这么多段，收成结构体只会多一层没人验的名字"
@@ -146,11 +156,10 @@ pub fn build_index_node(
             - NONCE_MAC_ALGORITHM_RESERVED_BYTES,
     )
     .expect("头宽");
-    let entries_start = header_end + reserved_bytes();
     let declared_length = entries.len() * usize::from(entry_width);
     assert!(
-        entries_start + declared_length <= usize::try_from(NODE_BYTES).expect("16384"),
-        "条目装不进一个节点"
+        entries.len() <= index_node_entry_capacity(key_width, usize::from(entry_width)),
+        "条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里"
     );
     let mut writer = ByteWriter::new(usize::try_from(NODE_BYTES).expect("16384"));
     write_common_prefix(
@@ -203,6 +212,14 @@ pub struct DataUnitIdentity {
     pub anchor_offset: u64,
 }
 
+/// 一个数据单元装得下多少字节载荷：32768 − 头 105 − 预留 29 = 32634。写者在装单元之前拿它判「装不下」并报错，不走到断言。
+#[must_use]
+pub fn data_unit_payload_capacity() -> usize {
+    usize::try_from(DATA_UNIT_BYTES).expect("32768")
+        - usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105")
+        - reserved_bytes()
+}
+
 /// 码 1 数据单元 32768：类身份段 105（偏移 42 标签副本 / 43 树 ID / 51 对象 ID / 59 对象出生代 / 67 锚点 / 75 诞生代号 / 83 fsid / 91 写序 / 101 载荷 CRC）
 /// + 预留位 29，载荷从 134 起、声明长度之后补 0；载荷 CRC 罩 [105, 32768)，头校验和罩 [0, 105)。
 #[must_use]
@@ -214,11 +231,10 @@ pub fn build_data_unit(
     payload: &[u8],
 ) -> Vec<u8> {
     let header_end = usize::try_from(DATA_UNIT_HEADER_BYTES).expect("105");
-    let payload_start = header_end + reserved_bytes();
     let unit_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
     assert!(
-        payload.len() <= unit_bytes - payload_start,
-        "载荷装不进一个单元"
+        payload.len() <= data_unit_payload_capacity(),
+        "载荷装不进一个单元：写者要先按 data_unit_payload_capacity 判、报错，不许走到这里"
     );
     let mut writer = ByteWriter::new(unit_bytes);
     write_common_prefix(

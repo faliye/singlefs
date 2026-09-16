@@ -1080,9 +1080,10 @@ fn mutations_are_caught_by_the_check_that_owns_them() {
         check_index_node_keys(&loose_range, KEY_SCHEMA_MAPPING),
         Err(Verdict::KeyWidthMismatch)
     );
-    // 树表条目预留 24 里塞一个非零字节：条目解析拒收。
+    // 树表条目预留的最后一个字节塞成非零：条目解析拒收。下标从条目长度取，不写死（条目宽改过两次）。
     let mut tampered_entry = pool.output.tree_table_entries[0].to_bytes();
-    tampered_entry[147] = 1;
+    let last_reserved_byte = tampered_entry.len() - 1;
+    tampered_entry[last_reserved_byte] = 1;
     assert_eq!(TreeTableEntry::parse(&tampered_entry), None);
     // journal 记录补齐区改一字节：`header_csum` 罩整条 4096，判红。
     let mut torn_record = pool.output.record_bytes.clone();

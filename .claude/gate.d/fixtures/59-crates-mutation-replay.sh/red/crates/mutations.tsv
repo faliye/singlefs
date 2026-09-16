@@ -1,0 +1,1 @@
+comment-only	crates/tiny/src/lib.rs	// 门禁 59 号的判别力样本	// 变异只动注释	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five

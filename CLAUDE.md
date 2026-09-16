@@ -138,6 +138,7 @@ bash .claude/gate.d/55-qemu-first-transaction.sh # QEMU 真设备上的第一个
 bash .claude/gate.d/56-crates-adversarial-review.sh # crates 里的实现改动有没有走过三方正反对抗推理：每个改过的 crates/*/src/*.rs 要在同一次改动的三方判决文件里被按路径点名
 bash .claude/gate.d/57-lkmm.sh # 内存序（herd7 + litmus/）：上游 2026-09-16 移交给本工程之后唯一判它的阶段，缺 herd7 直接红
 bash .claude/gate.d/58-implementation-premise.sh # 三方论证正文有没有「实现今天的样子」：标题日期 ≥ 2026-09-17 的 `research/prompts/_*-body.md` 必须提到 `crates/`
+bash .claude/gate.d/59-crates-mutation-replay.sh # crates 变异表复跑：`crates/mutations.tsv` 每条改坏一处、跑点名的测试、必须红、还原；锚点腐化或一条没红都判红
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
 bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（承重引用逐条复核，条数以 research/scripts/verify-citations.sh 为准；源码树不在也判红）

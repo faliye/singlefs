@@ -7,7 +7,7 @@
 //! 前缀 = `(实例代号, checkpoint_txg)` 严格大于所选根、jsn 严格连续、提交标记齐全、在飞上限之内、点名单元逐项验过，
 //! 施加一条记录 = 把所选根的四个字段换成记录新根段里的（D23（journal 的角色与格式） 已定项 15）。
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{
     journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
@@ -513,6 +513,51 @@ fn read_tree_root(
     Ok(node)
 }
 
+/// 分配记录「每个落点每盘各一条」（两盘同槽、同一批字段）：同一块盘上一个槽只许一条记录，每块盘各自的（槽, 跨度, 代, 已释放）集合相同，
+/// 每盘不少于 10 个落点（mkfs 2 + 第一个事务 8）。同盘同槽两条记录（代不同）在集合里是两个元素、两盘对称就过——第二轮攻方腿打中，
+/// 走读自己不判 key 严格递增，这里逐盘核槽号不重复。
+#[must_use]
+pub fn allocation_records_are_one_per_device(
+    records: &[AllocationRecord],
+    device_identities: &[DeviceIdentity],
+) -> bool {
+    let mut placements_per_device: BTreeMap<DeviceIdentity, BTreeSet<(u64, u16, u64, bool)>> =
+        BTreeMap::new();
+    let mut slots_per_device: BTreeMap<DeviceIdentity, BTreeSet<u64>> = BTreeMap::new();
+    for record in records {
+        if !slots_per_device
+            .entry(record.device)
+            .or_default()
+            .insert(record.slot.0)
+        {
+            return false;
+        }
+        placements_per_device
+            .entry(record.device)
+            .or_default()
+            .insert((
+                record.slot.0,
+                record.span_slots,
+                record.generation.0,
+                record.is_released,
+            ));
+    }
+    if placements_per_device.len() != device_identities.len()
+        || device_identities
+            .iter()
+            .any(|identity| !placements_per_device.contains_key(identity))
+    {
+        return false;
+    }
+    let mut placement_sets = placements_per_device.values();
+    let first_device_placements = placement_sets.next().expect("上面核过每块盘都有记录");
+    first_device_placements.len() >= FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE
+        && placement_sets.all(|placements| placements == first_device_placements)
+}
+
+/// mkfs 写在单元区里的 2 个落点加第一个事务的 8 个落点（字节表五：20 条记录，每盘 10 条），之后每次发布只多不少。
+const FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE: usize = 10;
+
 struct TreeRoots {
     extent: IndexNodeHeader,
     inode: IndexNodeHeader,
@@ -620,11 +665,20 @@ pub fn walk_to_file(
             expected_filesystem_identifier,
         )?,
     };
-    let device_count = reader.device_identities().len();
-    if roots.allocation.entries.len() != 10 * device_count {
+    let device_identities = reader.device_identities();
+    let device_count = device_identities.len();
+    let allocation_records: Vec<AllocationRecord> = roots
+        .allocation
+        .entries
+        .iter()
+        .map(|record_bytes| AllocationRecord::parse(record_bytes))
+        .collect();
+    // 每个落点每盘一条（两盘同槽）：第一个事务 10 × 盘数，每次覆盖写再加 8 × 盘数（换下的那些改写、不删）。
+    // 只核总数是盘数的整数倍拦不住「一盘多一条、另一盘少一条」——发布 B 三方第一轮正推腿打中，改成逐盘核同一批（槽, 跨度）。
+    if !allocation_records_are_one_per_device(&allocation_records, &device_identities) {
         return Err(RecoveryFailure::InvariantViolated {
             invariant: "E142 走读同款",
-            detail: "分配记录数不是 10 × 盘数",
+            detail: "分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于 10 个落点",
         });
     }
     if roots.accounting.entries.len() != 3 + 6 * device_count {
@@ -639,15 +693,12 @@ pub fn walk_to_file(
             detail: "映射条目数不是 6",
         });
     }
-    for record_bytes in &roots.allocation.entries {
-        let record = AllocationRecord::parse(record_bytes);
-        if record.span_slots & 0x8000 != 0
-            || record.generation > root.checkpoint_txg
-            || record.span_slots == 0
-        {
+    // 已释放的记录合法（D3（空间分配） 已定项 7：改写不删），它的代是释放代，同样不许晚于根。
+    for record in &allocation_records {
+        if record.generation > root.checkpoint_txg || record.span_slots == 0 {
             return Err(RecoveryFailure::InvariantViolated {
                 invariant: "E142 走读同款",
-                detail: "分配记录带已释放标志、跨度为 0 或分配代晚于根",
+                detail: "分配记录跨度为 0，或分配代 / 释放代晚于根",
             });
         }
     }
@@ -866,5 +917,121 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
         effective_root: Some((effective_root.instance, effective_root.checkpoint_txg)),
         journal,
         mapping_fallbacks,
+    }
+}
+
+#[cfg(test)]
+mod allocation_records_per_device_tests {
+    use super::{allocation_records_are_one_per_device, FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE};
+    use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
+    use crate::allocator::AllocationRecord;
+
+    const BOTH_DEVICES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
+
+    fn record(device: DeviceIdentity, slot: u64, is_released: bool) -> AllocationRecord {
+        AllocationRecord {
+            device,
+            slot: SlotNumber(slot),
+            span_slots: 2,
+            generation: CheckpointTxg(3),
+            is_released,
+        }
+    }
+
+    /// 第一个事务的形状：每盘 10 个落点、同一批槽号；已释放的记录照样算一个落点。
+    fn first_transaction_shape() -> Vec<AllocationRecord> {
+        let mut records = Vec::new();
+        for placement_index in 0..FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE {
+            let slot = 50176 + 2 * u64::try_from(placement_index).expect("落点序号");
+            for device in BOTH_DEVICES {
+                records.push(record(device, slot, placement_index == 0));
+            }
+        }
+        records
+    }
+
+    #[test]
+    fn first_transaction_shape_is_one_record_per_placement_per_device() {
+        assert!(allocation_records_are_one_per_device(
+            &first_transaction_shape(),
+            &BOTH_DEVICES
+        ));
+    }
+
+    #[test]
+    fn placement_recorded_on_one_device_only_is_rejected_even_when_the_total_is_even() {
+        // 盘 0 多一条、盘 1 少一条：总数仍是 20，旧的「总数是盘数的整数倍」判定放过它。
+        let mut records = first_transaction_shape();
+        let moved = records
+            .iter()
+            .position(|record| record.device == DeviceIdentity(1))
+            .expect("有盘 1 的记录");
+        records[moved].device = DeviceIdentity(0);
+        records[moved].slot = SlotNumber(50300);
+        assert_eq!(records.len(), 2 * FIRST_TRANSACTION_PLACEMENTS_PER_DEVICE);
+        assert!(!allocation_records_are_one_per_device(
+            &records,
+            &BOTH_DEVICES
+        ));
+    }
+
+    #[test]
+    fn unknown_device_or_missing_device_is_rejected() {
+        let mut records = first_transaction_shape();
+        records.push(record(DeviceIdentity(2), 50176, false));
+        assert!(!allocation_records_are_one_per_device(
+            &records,
+            &BOTH_DEVICES
+        ));
+        let only_device_zero: Vec<AllocationRecord> = first_transaction_shape()
+            .into_iter()
+            .filter(|record| record.device == DeviceIdentity(0))
+            .collect();
+        assert!(!allocation_records_are_one_per_device(
+            &only_device_zero,
+            &BOTH_DEVICES
+        ));
+    }
+
+    /// 两盘同一个落点、一盘改写成已释放而另一盘没有：槽号集合相同，字段不同，同样拒。
+    #[test]
+    fn release_rewritten_on_one_device_only_is_rejected() {
+        let mut records = first_transaction_shape();
+        let released_on_device_one = records
+            .iter()
+            .position(|record| record.device == DeviceIdentity(1) && record.is_released)
+            .expect("盘 1 有一条已释放");
+        records[released_on_device_one].is_released = false;
+        assert!(!allocation_records_are_one_per_device(
+            &records,
+            &BOTH_DEVICES
+        ));
+    }
+
+    /// 同一块盘上同一个槽两条记录（代不同、两盘对称）：槽号集合相同、字段集合也相同，靠「同盘槽号唯一」拦。
+    #[test]
+    fn two_records_for_the_same_slot_on_the_same_device_are_rejected() {
+        let mut records = first_transaction_shape();
+        for device in BOTH_DEVICES {
+            let mut second_record_for_first_slot = record(device, 50176, false);
+            second_record_for_first_slot.generation = CheckpointTxg(9);
+            records.push(second_record_for_first_slot);
+        }
+        assert!(!allocation_records_are_one_per_device(
+            &records,
+            &BOTH_DEVICES
+        ));
+    }
+
+    #[test]
+    fn fewer_than_the_first_transaction_placements_is_rejected() {
+        let records: Vec<AllocationRecord> = first_transaction_shape()
+            .into_iter()
+            .filter(|record| record.slot != SlotNumber(50176))
+            .collect();
+        assert!(!allocation_records_are_one_per_device(
+            &records,
+            &BOTH_DEVICES
+        ));
     }
 }

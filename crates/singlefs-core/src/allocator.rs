@@ -12,22 +12,40 @@ use singlefs_format::{CLUSTER_SEGMENT_SLOTS, SLOT_BYTES, UNIT_AREA_START_SLOT};
 use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
 use crate::bytes::ByteWriter;
 
-/// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志, 分配代 8)。
+/// 跨度段的最高位借作已释放标志（D3（空间分配） 已定项 7 / 已定项 11）：0 = 仍分配、1 = 已释放，不占表达跨度值的位。
+pub const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
+
+/// 分配记录 20（D3（空间分配） 已定项 7 / 已定项 11）：key (设备 4, 槽号 6) + value (跨度 2 含已释放标志, 分配代或释放代 8)。
+/// 释放时条目不删、不点删：改写成已释放 + 释放代，留到该落点被重新分配时覆盖（覆盖是步 5 回收接上时的事：
+/// 可再分配谓词今天没实现、同一个落点不会再分配到，所以 `record` 今天只追加）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AllocationRecord {
     pub device: DeviceIdentity,
     pub slot: SlotNumber,
+    /// 纯跨度，不含标志位。
     pub span_slots: u16,
+    /// 仍分配时是分配代；已释放时是释放代。
     pub generation: CheckpointTxg,
+    pub is_released: bool,
 }
 
 impl AllocationRecord {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
+        assert_eq!(
+            self.span_slots & ALLOCATION_RECORD_RELEASED_FLAG,
+            0,
+            "跨度值不许占到标志位"
+        );
+        let span_field = if self.is_released {
+            self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG
+        } else {
+            self.span_slots
+        };
         let mut writer = ByteWriter::new(20);
         writer.put_u32(self.device.0);
         writer.put_six_byte_unsigned(self.slot.0);
-        writer.put_u16(self.span_slots);
+        writer.put_u16(span_field);
         writer.put_u64(self.generation.0);
         writer.assert_position(20, "分配记录");
         writer.into_bytes()
@@ -47,13 +65,14 @@ impl AllocationRecord {
         let mut reader = crate::bytes::ByteReader::at(bytes, 0);
         let device = DeviceIdentity(reader.get_u32());
         let slot = SlotNumber(reader.get_six_byte_unsigned());
-        let span_slots = reader.get_u16();
+        let span_field = reader.get_u16();
         let generation = CheckpointTxg(reader.get_u64());
         Self {
             device,
             slot,
-            span_slots,
+            span_slots: span_field & !ALLOCATION_RECORD_RELEASED_FLAG,
             generation,
+            is_released: span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0,
         }
     }
 }
@@ -85,7 +104,14 @@ pub struct DeviceFreeMap {
     used_per_segment: Vec<u64>,
     /// 空闲槽的连续段数（增量维护）。
     free_runs: u64,
+    /// 占着的槽数：仍分配的加上已释放、还在 defer 窗口里的——它们仍被根环里的有效根引用、仍占着空间
+    /// （I-3.1（已分配统计对得上） 的读法 2026-09-14 用户定甲：按根环里全部有效根的引用取并集）。
     allocated_slots: u64,
+    /// 空闲槽数，独立维护：分配时减、回收放回时加，不由「容量 − 已分配」现算（D5（快照 / 空间记账机制） 已定项 4 的 ⚠️：
+    /// 那样 I-5.2（空闲统计对得上） 是恒真式；三方代码第一轮攻方腿打中）。已释放而还在 defer 窗口里的不算空闲。
+    free_slots: u64,
+    /// 其中已释放、还在 defer 窗口里的槽数（D5（快照 / 空间记账机制） 已定项 4 第 5 项）。
+    deferred_slots: u64,
 }
 
 impl DeviceFreeMap {
@@ -101,6 +127,8 @@ impl DeviceFreeMap {
             used_per_segment: vec![0; usize::try_from(segments).expect("段数")],
             free_runs: u64::from(unit_area_slots > 0),
             allocated_slots: 0,
+            free_slots: unit_area_slots,
+            deferred_slots: 0,
         }
     }
 
@@ -123,9 +151,25 @@ impl DeviceFreeMap {
     pub fn allocated_slots(&self) -> u64 {
         self.allocated_slots
     }
+    /// 独立维护的空闲槽数（I-5.2（空闲统计对得上） 拿它与「已分配」相加对容量），已释放而还在 defer 窗口里的不算空闲。
     #[must_use]
     pub fn free_slots(&self) -> u64 {
-        self.unit_area_slots - self.allocated_slots
+        self.free_slots
+    }
+    #[must_use]
+    pub fn deferred_slots(&self) -> u64 {
+        self.deferred_slots
+    }
+
+    /// 把一个仍分配的落点放进 defer 队列：槽仍占着（分配器不许再发它），只是记账上从「仍分配」挪到「待释放」。
+    pub fn mark_released(&mut self, slot: SlotNumber, span: u64) {
+        let start = Self::index(slot);
+        let end = start + usize::try_from(span).expect("跨度");
+        assert!(
+            self.allocated[start..end].iter().all(|taken| *taken),
+            "释放的跨度里有没分配的槽"
+        );
+        self.deferred_slots += span;
     }
     #[must_use]
     pub fn free_runs(&self) -> u64 {
@@ -168,6 +212,7 @@ impl DeviceFreeMap {
             self.used_per_segment[segment] += 1;
         }
         self.allocated_slots += span;
+        self.free_slots -= span;
     }
 
     /// 用户数据落点：起点槽号最小、偶数槽（32768 对齐）、两槽都空、不在开放段里。
@@ -250,6 +295,18 @@ impl PoolAllocator {
         &self.records
     }
 
+    /// 某块盘上某个槽的分配记录；没分配过就 `None`。释放判定路径拿它核「映射查出来的落点真的在册、跨度对得上」。
+    #[must_use]
+    pub fn record_for(
+        &self,
+        device: DeviceIdentity,
+        slot: SlotNumber,
+    ) -> Option<&AllocationRecord> {
+        self.records
+            .iter()
+            .find(|record| record.device == device && record.slot == slot)
+    }
+
     fn record(&mut self, placement: Placement, generation: CheckpointTxg) {
         for device in &self.devices {
             self.records.push(AllocationRecord {
@@ -257,10 +314,32 @@ impl PoolAllocator {
                 slot: placement.slot,
                 span_slots: u16::try_from(placement.span).expect("跨度 2 字节"),
                 generation,
+                is_released: false,
             });
         }
         for device in &mut self.devices {
             device.mark_allocated(placement.slot, placement.span);
+        }
+    }
+
+    /// 释放一个落点（D3（空间分配） 已定项 7：「释放」= 放进 defer 队列那一刻）：每盘那条分配记录改写成已释放 + 释放代，
+    /// 条目不删；槽仍占着，要等释放代 ≤ max(F_生效, 环里最旧有效根) 才可再分配（D16（发布语义） 已定项 1）。
+    pub fn release(&mut self, placement: Placement, release_generation: CheckpointTxg) {
+        for device in &mut self.devices {
+            let record = self
+                .records
+                .iter_mut()
+                .find(|record| record.device == device.device && record.slot == placement.slot)
+                .expect("释放的落点要有分配记录");
+            assert!(!record.is_released, "同一个落点释放了两次");
+            assert_eq!(
+                u64::from(record.span_slots),
+                placement.span,
+                "释放的跨度与分配记录不符"
+            );
+            record.is_released = true;
+            record.generation = release_generation;
+            device.mark_released(placement.slot, placement.span);
         }
     }
 
@@ -436,5 +515,39 @@ mod tests {
         );
         assert_eq!(pool.devices[0].empty_segments(), 3310);
         assert_eq!(pool.devices[1].free_runs(), 4, "两盘同构");
+    }
+
+    #[test]
+    fn releasing_a_placement_keeps_the_slots_occupied_and_moves_them_into_the_defer_queue() {
+        let mut pool = pool_after_mkfs();
+        let data = pool.allocate_user_data(CheckpointTxg(3)).expect("t1");
+        pool.release(data, CheckpointTxg(4));
+        assert_eq!(pool.devices[0].allocated_slots(), 5, "占着的槽数不变");
+        assert_eq!(pool.devices[0].deferred_slots(), 2, "两槽进了 defer 队列");
+        assert_eq!(pool.devices[0].free_slots(), 211_968 - 5, "空闲不变");
+        let released: Vec<&AllocationRecord> = pool
+            .records()
+            .iter()
+            .filter(|record| record.slot == data.slot)
+            .collect();
+        assert_eq!(released.len(), 2, "每盘一条");
+        for record in released {
+            assert!(record.is_released);
+            assert_eq!(record.generation, CheckpointTxg(4), "释放代");
+            assert_eq!(record.span_slots, 2, "跨度值不含标志位");
+            let parsed = AllocationRecord::parse(&record.to_bytes());
+            assert_eq!(parsed, *record, "标志位进跨度段最高位再读回来");
+            assert_eq!(
+                u16::from_le_bytes([record.to_bytes()[10], record.to_bytes()[11]]),
+                2 | ALLOCATION_RECORD_RELEASED_FLAG
+            );
+        }
+        assert_eq!(
+            pool.allocate_user_data(CheckpointTxg(4))
+                .expect("有空槽")
+                .slot,
+            SlotNumber(50182),
+            "已释放的 50180 不许再发，下一个偶数空槽对是 50182"
+        );
     }
 }
