@@ -1,0 +1,2 @@
+exit=1
+want=缺 (* singlefs-expect: Never|Sometimes *) 声明

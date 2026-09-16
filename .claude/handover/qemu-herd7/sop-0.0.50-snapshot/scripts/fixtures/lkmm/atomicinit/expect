@@ -1,0 +1,2 @@
+exit=1
+want=要写成 'atomic_t gen = ...'

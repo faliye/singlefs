@@ -5,3 +5,4 @@ research/prompts/  # 当时原样发给模型的提示，与 research/results/ �
 .claude/gate.d/fixtures/43-owed-table-shape.sh/  # 门禁阶段「欠账表两张登记表的行形状」的判别力样本：故意造的登记表，与真表同号不同名，扫它只会报登记冲突
 .claude/gate.d/fixtures/51-admission-terms-covered.sh/  # 门禁阶段「准入不等式的每一项都有人维护」的判别力样本：造了带登记标题的 D28 / D5 样本文件，扫它只会报登记冲突
 .claude/gate.d/fixtures/53-format-const-placeholders.sh/  # 门禁阶段「格式常量文件里的占位」的判别力样本：造了带登记标题的 D22 样本决策与 C323 样本欠账行，扫它只会报登记冲突
+.claude/handover/  # 从 singlefs-ai-sop 原样移交来的 QEMU 与 herd7 记录：规则段落是 SOP 原文、样本里有故意写坏的 litmus；怎么接由本项目自己定，接进来之前不扫
