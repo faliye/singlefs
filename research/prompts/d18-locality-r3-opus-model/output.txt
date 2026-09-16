@@ -1,0 +1,769 @@
+# D18 locality_id 第三轮攻方腿模型输出（确定性）RECORDS_PER_CONTAINER=2 OFFSETS=(0, 1) LOCALITIES=(1, 2) ROLLBACK_DEPTH=2
+## 手造历史（钉绝对值）
+assert A1 丙′-记录优先：先抄后切抄了一份、丢首段 1 那片叶，R-view                                     got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A1 同上 R-disk                                                             got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A1 丙′-S1 R-view（第二轮模型的读法）                                                got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A1 丙′-S1 R-disk：幸存 key 在 2、盘上记录说 1，找不到                                   got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert A1 乙′（S3）R-view                                                          got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A1 乙′（S3）R-disk：同上，找不到                                                   got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert A2 翻记录之后丢首段 2 的叶：丙′-记录优先 R-disk                                          got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A2 同上 丙′-S1 R-disk：幸存 key 在 1、记录说 2                                      got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert A2 同上 乙′ R-disk                                                          got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert A3 甲-S 同一段历史 extent 全丢 R-view（S7 管用）                                     got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert A3 甲-S R-disk（= 第二轮打中 B 的记录优先读法）                                         got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert B1 回退抛弃了协议 P 搬的一条（甲重写过那个单元）、实例表 readable：甲-S                             got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B1 同上 丙′-记录优先                                                            got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B1 同上 乙′                                                                 got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B1 回退抛弃了协议 P 搬的一条（甲重写过那个单元）、实例表 unreadable：甲-S                           got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert B1 同上 丙′-记录优先                                                            got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B1 同上 乙′                                                                 got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B2 回退抛弃了一次协议 A 重编、实例表读不出：丙′-记录优先 R-disk                                  got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B2 同上 甲-S R-view（首段跑到被抛弃的 2，内容相同）                                        got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert B2 同上 甲-S R-disk                                                         got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert C1 被抛弃的时间线重编后又写、实例表读不出：丙′-记录优先读到被抛弃的版本                                   got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert C1 同上 甲-S R-view（S6 让写序最大的孤儿胜出）                                          got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert C1 同上 甲去掉 S6（字面分组）：两个首段、读者按 1 读到现行版本                                     got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert C1 阴性对照：实例表读得出时甲-S                                                       got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert D1 甲-S 打包规则读成 p1：没打包的 ≤ 4 KiB 对象、记录与 extent 都丢，AAD 失配                    got=(0, 0, 1, 0) want=(0, 0, 1, 0) ok
+assert D1 同上读成 p2                                                               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert D2 p1：重编之后记录容器回到上一版，AAD 失配                                               got=(0, 0, 1, 0) want=(0, 0, 1, 0) ok
+assert E1 打包之后重编、extent 全丢：丙′-记录优先 R-disk                                       got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert E1 同上 甲-S R-view（槽与打包前单元同写序，单元胜出）                                        got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert E1 同上 甲-S R-disk                                                         got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert F1 克隆后 origin 重编、克隆头 extent 全丢、祖先表 readable：丙′-记录优先 R-disk               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F1 同上 甲-S R-view                                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F1 同上 甲-S R-disk                                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F1 克隆后 origin 重编、克隆头 extent 全丢、祖先表 unreadable：丙′-记录优先 R-disk             got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F1 同上 甲-S R-view                                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F1 同上 甲-S R-disk                                                         got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert F2 克隆头重编、origin 之后截断、祖先表 readable：丙′-记录优先                                got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F2 同上 甲-S（克隆头重写过的单元照样被 origin 的墓碑盖住）                                     got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert F2 克隆头重编、origin 之后截断、祖先表 unreadable：丙′-记录优先                              got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert F2 同上 甲-S（克隆头重写过的单元照样被 origin 的墓碑盖住）                                     got=(1, 0, 0, 0) want=(1, 0, 0, 0) ok
+assert G1 截掉 offset 1、重编、再写回 offset 1，墓碑 intact：丙′-记录优先                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G1 同上 甲-S                                                                got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G1 同上 甲去掉 S6（被截掉的旧单元按头里的 1 自成一组放回）                                       got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert G1 截掉 offset 1、重编、再写回 offset 1，墓碑 lost：丙′-记录优先                           got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G1 同上 甲-S                                                                got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G1 同上 甲去掉 S6（被截掉的旧单元按头里的 1 自成一组放回）                                       got=(0, 1, 0, 1) want=(0, 1, 0, 1) ok
+assert G2 截断之后墓碑 intact：bing_rec 读到被删掉的版本数                                      got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 截断之后墓碑 intact：yi_s3 读到被删掉的版本数                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 截断之后墓碑 intact：jia_s 读到被删掉的版本数                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 截断之后墓碑 lost：bing_rec 读到被删掉的版本数                                        got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert G2 截断之后墓碑 lost：yi_s3 读到被删掉的版本数                                           got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert G2 截断之后墓碑 lost：jia_s 读到被删掉的版本数                                           got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert G2 删除之后墓碑 intact：bing_rec 读到被删掉的版本数                                      got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 删除之后墓碑 intact：yi_s3 读到被删掉的版本数                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 删除之后墓碑 intact：jia_s 读到被删掉的版本数                                         got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert G2 删除之后墓碑 lost：bing_rec 读到被删掉的版本数                                        got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert G2 删除之后墓碑 lost：yi_s3 读到被删掉的版本数                                           got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert G2 删除之后墓碑 lost：jia_s 读到被删掉的版本数                                           got=(0, 1, 0, 0) want=(0, 1, 0, 0) ok
+assert H 回退抛弃了一次重编、丢 offset 0 那片叶、{'table': 'unreadable'}：丙′-记录优先               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 乙′                                                                  got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 甲-S R-view：写序更大、头里是 2 的那个单元胜出，一个对象两个首段                              got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert H 同上 甲去掉 S6：只往丢了的原 key (1, 1, 0) 上补，补回现行版本                               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 阴性对照：表读得出时甲-S                                                          got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 崩溃丢了一次重编、丢 offset 0 那片叶、{'table': 'unreadable'}：丙′-记录优先                got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 乙′                                                                  got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 甲-S R-view：写序更大、头里是 2 的那个单元胜出，一个对象两个首段                              got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert H 同上 甲去掉 S6：只往丢了的原 key (1, 1, 0) 上补，补回现行版本                               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 阴性对照：表读得出时甲-S                                                          got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 克隆之后 origin 重编、丢 offset 0 那片叶、{'ancestor': 'unreadable'}：丙′-记录优先       got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 乙′                                                                  got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 同上 甲-S R-view：写序更大、头里是 2 的那个单元胜出，一个对象两个首段                              got=(0, 0, 0, 1) want=(0, 0, 0, 1) ok
+assert H 同上 甲去掉 S6：只往丢了的原 key (1, 1, 0) 上补，补回现行版本                               got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+assert H 阴性对照：表读得出时甲-S                                                          got=(0, 0, 0, 0) want=(0, 0, 0, 0) ok
+## U4：S10（I-9.9 按侧判）在真错与合法中间态上各判什么
+assert U4-1 bing_rec：(注入后常规读找不到, I-9.9 字面红) / 记录丢了之后读者 tally / S10              got=((1, 1), (0, 0, 0, 0), 'undecidable') want=((1, 1), (0, 0, 0, 0), 'undecidable') ok
+assert U4-1 yi_s3：(注入后常规读找不到, I-9.9 字面红) / 记录丢了之后读者 tally / S10                 got=((1, 1), (0, 0, 0, 0), 'undecidable') want=((1, 1), (0, 0, 0, 0), 'undecidable') ok
+assert U4-1 jia_s：(注入后常规读找不到, I-9.9 字面红) / 记录丢了之后读者 tally / S10                 got=((1, 1), (0, 0, 1, 0), 'undecidable') want=((1, 1), (0, 0, 1, 0), 'undecidable') ok
+assert U4-2 合法的协议 P 中间态 vs 写路径 bug，记录都丢了：(key 集合, 按记录取自 key 的字面红, S10)          got=(((1, 1, 1), (2, 1, 0)), True, 'undecidable') want=(((1, 1, 1), (2, 1, 0)), True, 'undecidable') ok
+assert U4-2 同上两者的 S10                                                           got=undecidable want=undecidable ok
+assert U4-2 甲-S 同两幅镜像：AAD 失配数（合法, bug）——单元头替它作证                                 got=(0, 1)     want=(0, 1)     ok
+## S6 / S7 / S8 各配一条检查：甲-S 上判绿，去掉那一条收严的对照上判红（判别力自证）
+assert S6 检查（没有幸存 key 的锚点只补一条、且是择新键最大的）：(甲-S, 去掉 S6)                            got=(0, 1)     want=(0, 1)     ok
+assert S7 检查（重建过的对象每条 key 的首段都在视图记录里）：(甲-S, 去掉 S7)                              got=(0, 1)     want=(0, 1)     ok
+assert S8 检查（迁移期间一次写在两个首段各写一个码 1 单元的次数）：(甲-S, 去掉 S8)                            got=(0, 1)     want=(0, 1)     ok
+## 穷举：每条历史 × 每个家族 × 每个头 × 全部损坏形态 × 每条臂 × 两种读者读法
+columns(row): world family arm reader max_depth histories patterns objects failures missing misread mac_fail split_new locality_changed s6_red s7_red
+coverage copy_r max_depth=8 histories_one_step_longer=100 (0 = 在这个世界的操作上限之内穷举完了)
+family copy_r plain histories=518 skipped=0 normal_fail=0 i99_legal_red=360 forced_rewrites=0 unshared=0 double_writes=0
+family copy_r jia histories=386 skipped=132 normal_fail=0 i99_legal_red=216 forced_rewrites=536 unshared=0 double_writes=0
+family copy_r jia_both histories=518 skipped=0 normal_fail=0 i99_legal_red=360 forced_rewrites=996 unshared=0 double_writes=272
+row copy_r plain bing_rec view 8 518 6732 6728 0 0 0 0 0 2896 0 0
+row copy_r plain bing_rec disk 8 518 6732 6728 0 0 0 0 0 2896 0 0
+row copy_r plain bing_s1 view 8 518 6732 6728 0 0 0 0 0 2552 0 0
+row copy_r plain bing_s1 disk 8 518 6732 6728 576 1088 0 0 0 1976 0 0
+row copy_r plain yi_s3 view 8 518 6732 6728 0 0 0 0 0 2212 0 0
+row copy_r plain yi_s3 disk 8 518 6732 6728 576 1088 0 0 0 1636 0 0
+row copy_r jia jia_s view 8 386 5004 5000 0 0 0 0 0 1844 0 0
+row copy_r jia jia_s disk 8 386 5004 5000 444 540 0 0 0 1208 0 0
+row copy_r jia jia_noS6 view 8 386 5004 5000 452 0 182 0 396 3324 2752 0
+row copy_r jia jia_noS6 disk 8 386 5004 5000 430 0 114 0 396 2152 2752 0
+row copy_r jia jia_noS7 view 8 386 5004 5000 1484 2232 0 0 0 1980 0 2764
+row copy_r jia jia_noS7 disk 8 386 5004 5000 1484 2232 0 0 0 1980 0 2764
+row copy_r jia_both jia_s view 8 518 6732 6728 60 0 0 0 60 3350 0 0
+row copy_r jia_both jia_s disk 8 518 6732 6728 816 970 0 0 60 2282 0 0
+common copy_r view patterns=6732 all_arms_fail=0
+common copy_r disk patterns=6732 all_arms_fail=0
+dist copy_r plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r plain bing_s1 disk fails_where_bing_rec_ok=576 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r plain yi_s3 disk fails_where_bing_rec_ok=576 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_s view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_s disk fails_where_bing_rec_ok=444 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_noS6 view fails_where_bing_rec_ok=452 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_noS6 disk fails_where_bing_rec_ok=430 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_noS7 view fails_where_bing_rec_ok=1484 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia jia_noS7 disk fails_where_bing_rec_ok=1484 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia_both jia_s view fails_where_bing_rec_ok=60 ok_where_bing_rec_fails=0 both_fail=0
+dist copy_r jia_both jia_s disk fails_where_bing_rec_ok=816 ok_where_bing_rec_fails=0 both_fail=0
+shortest copy_r plain bing_rec view none_through_depth=8
+shortest copy_r plain bing_rec disk none_through_depth=8
+shortest copy_r plain bing_s1 view none_through_depth=8
+shortest copy_r plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest copy_r plain yi_s3 view none_through_depth=8
+shortest copy_r plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest copy_r jia jia_s view none_through_depth=8
+shortest copy_r jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest copy_r jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest copy_r jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest copy_r jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest copy_r jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest copy_r jia_both jia_s view depth=7 head=11 history=[create(11,2) ; write(11,1,0) ; c_step(11,1,1) ; write(11,1,0) ; c_flip(11,1) ; write(11,1,1) ; c_drop(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest copy_r jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest copy_r plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest copy_r plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest copy_r jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia_both jia_s view depth=7 head=11 history=[create(11,2) ; write(11,1,0) ; c_step(11,1,1) ; write(11,1,0) ; c_flip(11,1) ; write(11,1,1) ; c_drop(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest copy_r jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+s10 copy_r plain bing_rec view green/ok=360 undecidable/ok=5852
+s10 copy_r plain bing_rec disk green/ok=360 undecidable/ok=5852
+s10 copy_r plain bing_s1 view undecidable/ok=6212
+s10 copy_r plain bing_s1 disk green/ok=904 red/loc_bad=576 undecidable/ok=4732
+s10 copy_r plain yi_s3 view undecidable/ok=6212
+s10 copy_r plain yi_s3 disk green/ok=904 red/loc_bad=576 undecidable/ok=4732
+s10 copy_r jia jia_s view undecidable/ok=4616
+s10 copy_r jia jia_s disk green/ok=916 red/loc_bad=444 red/ok=192 undecidable/ok=3064
+s10 copy_r jia jia_noS6 view undecidable/content_bad=56 undecidable/loc_bad=396 undecidable/ok=4164
+s10 copy_r jia jia_noS6 disk green/ok=380 red/loc_bad=140 red/ok=1032 undecidable/content_bad=34 undecidable/loc_bad=256 undecidable/ok=2774
+s10 copy_r jia jia_noS7 view green/ok=960 red/loc_bad=1484 red/ok=236 undecidable/ok=1936
+s10 copy_r jia jia_noS7 disk green/ok=960 red/loc_bad=1484 red/ok=236 undecidable/ok=1936
+s10 copy_r jia_both jia_s view undecidable/loc_bad=60 undecidable/ok=6152
+s10 copy_r jia_both jia_s disk green/ok=928 red/loc_bad=776 red/ok=292 undecidable/loc_bad=40 undecidable/ok=4176
+coverage tomb_a max_depth=7 histories_one_step_longer=0 (0 = 在这个世界的操作上限之内穷举完了)
+family tomb_a plain histories=144 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=0 unshared=0 double_writes=0
+family tomb_a jia histories=144 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=108 unshared=0 double_writes=0
+row tomb_a plain bing_rec view 7 144 1916 1896 342 0 468 0 0 840 0 0
+row tomb_a plain bing_rec disk 7 144 1916 1896 342 0 468 0 0 840 0 0
+row tomb_a plain bing_s1 view 7 144 1916 1896 342 0 468 0 0 728 0 0
+row tomb_a plain bing_s1 disk 7 144 1916 1896 342 0 468 0 0 728 0 0
+row tomb_a plain yi_s3 view 7 144 1916 1896 342 0 468 0 0 610 0 0
+row tomb_a plain yi_s3 disk 7 144 1916 1896 342 0 468 0 0 610 0 0
+row tomb_a jia jia_s view 7 144 1916 1896 342 0 468 0 42 438 0 0
+row tomb_a jia jia_s disk 7 144 1916 1896 342 0 456 0 42 426 0 0
+row tomb_a jia jia_noS6 view 7 144 1916 1896 516 0 483 0 424 820 492 0
+row tomb_a jia jia_noS6 disk 7 144 1916 1896 516 0 466 0 424 694 492 0
+row tomb_a jia jia_noS7 view 7 144 1916 1896 472 256 370 0 42 652 0 354
+row tomb_a jia jia_noS7 disk 7 144 1916 1896 472 256 370 0 42 652 0 354
+common tomb_a view patterns=1916 all_arms_fail=296
+common tomb_a disk patterns=1916 all_arms_fail=296
+dist tomb_a plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a jia jia_s view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a jia jia_s disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a jia jia_noS6 view fails_where_bing_rec_ok=174 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a jia jia_noS6 disk fails_where_bing_rec_ok=174 ok_where_bing_rec_fails=0 both_fail=342
+dist tomb_a jia jia_noS7 view fails_where_bing_rec_ok=176 ok_where_bing_rec_fails=46 both_fail=296
+dist tomb_a jia jia_noS7 disk fails_where_bing_rec_ok=176 ok_where_bing_rec_fails=46 both_fail=296
+shortest tomb_a plain bing_rec view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a plain bing_rec disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a plain bing_s1 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a plain yi_s3 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a jia jia_s view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; delete(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest tomb_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest tomb_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest tomb_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest tomb_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest tomb_a jia jia_noS7 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2) ; delete(11,1)] containers=[(0, ('rolled_back', 2))] extents=[(1, 'all_lost')] tomb=lost
+rdist_shortest tomb_a jia jia_noS7 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2) ; delete(11,1)] containers=[(0, ('rolled_back', 2))] extents=[(1, 'all_lost')] tomb=lost
+s10 tomb_a plain bing_rec view green/ok=484 undecidable/content_bad=342 undecidable/ok=790
+s10 tomb_a plain bing_rec disk green/ok=484 undecidable/content_bad=342 undecidable/ok=790
+s10 tomb_a plain bing_s1 view green/ok=404 undecidable/content_bad=342 undecidable/ok=870
+s10 tomb_a plain bing_s1 disk green/ok=452 undecidable/content_bad=342 undecidable/ok=822
+s10 tomb_a plain yi_s3 view green/ok=404 undecidable/content_bad=342 undecidable/ok=870
+s10 tomb_a plain yi_s3 disk green/ok=452 undecidable/content_bad=342 undecidable/ok=822
+s10 tomb_a jia jia_s view undecidable/content_bad=300 undecidable/loc_bad=42 undecidable/ok=1274
+s10 tomb_a jia jia_s disk green/content_bad=90 green/ok=226 red/loc_bad=12 undecidable/content_bad=210 undecidable/loc_bad=30 undecidable/ok=1048
+s10 tomb_a jia jia_noS6 view undecidable/content_bad=92 undecidable/loc_bad=424 undecidable/ok=1100
+s10 tomb_a jia jia_noS6 disk green/content_bad=34 green/ok=168 red/loc_bad=126 undecidable/content_bad=58 undecidable/loc_bad=298 undecidable/ok=932
+s10 tomb_a jia jia_noS7 view green/content_bad=154 green/ok=592 red/loc_bad=216 red/ok=46 undecidable/content_bad=90 undecidable/loc_bad=12 undecidable/ok=506
+s10 tomb_a jia jia_noS7 disk green/content_bad=154 green/ok=592 red/loc_bad=216 red/ok=46 undecidable/content_bad=90 undecidable/loc_bad=12 undecidable/ok=506
+coverage tomb_c max_depth=8 histories_one_step_longer=124 (0 = 在这个世界的操作上限之内穷举完了)
+family tomb_c plain histories=914 skipped=0 normal_fail=0 i99_legal_red=504 forced_rewrites=0 unshared=0 double_writes=0
+family tomb_c jia histories=712 skipped=202 normal_fail=0 i99_legal_red=336 forced_rewrites=848 unshared=0 double_writes=0
+family tomb_c jia_both histories=914 skipped=0 normal_fail=0 i99_legal_red=504 forced_rewrites=1470 unshared=0 double_writes=364
+row tomb_c plain bing_rec view 8 914 20128 20120 1060 0 1060 0 0 8760 0 0
+row tomb_c plain bing_rec disk 8 914 20128 20120 1060 0 1060 0 0 8760 0 0
+row tomb_c plain bing_s1 view 8 914 20128 20120 1060 0 1060 0 0 7704 0 0
+row tomb_c plain bing_s1 disk 8 914 20128 20120 2518 2752 990 0 0 6176 0 0
+row tomb_c plain yi_s3 view 8 914 20128 20120 1060 0 1060 0 0 6490 0 0
+row tomb_c plain yi_s3 disk 8 914 20128 20120 2518 2752 990 0 0 4962 0 0
+row tomb_c jia jia_s view 8 712 15736 15728 844 0 844 0 150 5780 0 0
+row tomb_c jia jia_s disk 8 712 15736 15728 2066 1640 716 0 150 3830 0 0
+row tomb_c jia jia_noS6 view 8 712 15736 15728 1871 0 1033 0 1556 10174 8258 0
+row tomb_c jia jia_noS6 disk 8 712 15736 15728 1798 0 782 0 1556 6626 8258 0
+row tomb_c jia jia_noS7 view 8 712 15736 15728 5032 6416 648 0 150 6228 0 8076
+row tomb_c jia jia_noS7 disk 8 712 15736 15728 5032 6416 648 0 150 6228 0 8076
+row tomb_c jia_both jia_s view 8 914 20128 20120 1180 0 1060 0 270 9310 0 0
+row tomb_c jia_both jia_s disk 8 914 20128 20120 3061 2598 888 0 270 6378 0 0
+common tomb_c view patterns=20128 all_arms_fail=702
+common tomb_c disk patterns=20128 all_arms_fail=683
+dist tomb_c plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c plain bing_s1 disk fails_where_bing_rec_ok=1458 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c plain yi_s3 disk fails_where_bing_rec_ok=1458 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c jia jia_s view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=844
+dist tomb_c jia jia_s disk fails_where_bing_rec_ok=1274 ok_where_bing_rec_fails=52 both_fail=792
+dist tomb_c jia jia_noS6 view fails_where_bing_rec_ok=1347 ok_where_bing_rec_fails=320 both_fail=524
+dist tomb_c jia jia_noS6 disk fails_where_bing_rec_ok=1300 ok_where_bing_rec_fails=346 both_fail=498
+dist tomb_c jia jia_noS7 view fails_where_bing_rec_ok=4252 ok_where_bing_rec_fails=64 both_fail=780
+dist tomb_c jia jia_noS7 disk fails_where_bing_rec_ok=4252 ok_where_bing_rec_fails=64 both_fail=780
+dist tomb_c jia_both jia_s view fails_where_bing_rec_ok=120 ok_where_bing_rec_fails=0 both_fail=1060
+dist tomb_c jia_both jia_s disk fails_where_bing_rec_ok=2078 ok_where_bing_rec_fails=77 both_fail=983
+shortest tomb_c plain bing_rec view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c plain bing_rec disk depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c plain bing_s1 view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_c plain yi_s3 view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_c jia jia_s view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_c jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_c jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest tomb_c jia_both jia_s view depth=3 head=11 history=[create(11,1) ; write(11,1,1) ; truncate(11,1,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest tomb_c jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest tomb_c plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest tomb_c plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest tomb_c jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia_both jia_s view depth=7 head=11 history=[create(11,2) ; write(11,1,0) ; c_step(11,1,1) ; write(11,1,0) ; c_flip(11,1) ; write(11,1,1) ; c_drop(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest tomb_c jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+rdist_shortest tomb_c jia jia_s disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2) ; c_flip(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost
+rdist_shortest tomb_c jia jia_noS6 view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tomb=lost
+rdist_shortest tomb_c jia jia_noS6 disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tomb=lost
+rdist_shortest tomb_c jia jia_noS7 view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2) ; c_flip(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost
+rdist_shortest tomb_c jia jia_noS7 disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2) ; c_flip(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost
+rdist_shortest tomb_c jia_both jia_s disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; truncate(11,1,1) ; c_step(11,1,2) ; c_flip(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tomb=lost
+s10 tomb_c plain bing_rec view green/ok=1348 undecidable/content_bad=1060 undecidable/ok=15888
+s10 tomb_c plain bing_rec disk green/ok=1348 undecidable/content_bad=1060 undecidable/ok=15888
+s10 tomb_c plain bing_s1 view green/ok=132 undecidable/content_bad=1060 undecidable/ok=17104
+s10 tomb_c plain bing_s1 disk green/content_bad=70 green/ok=2438 red/loc_bad=1528 undecidable/content_bad=920 undecidable/ok=13340
+s10 tomb_c plain yi_s3 view green/ok=132 undecidable/content_bad=1060 undecidable/ok=17104
+s10 tomb_c plain yi_s3 disk green/content_bad=70 green/ok=2438 red/loc_bad=1528 undecidable/content_bad=920 undecidable/ok=13340
+s10 tomb_c jia jia_s view undecidable/content_bad=694 undecidable/loc_bad=150 undecidable/ok=13464
+s10 tomb_c jia jia_s disk green/content_bad=144 green/ok=2574 red/loc_bad=1402 red/ok=548 undecidable/content_bad=420 undecidable/loc_bad=100 undecidable/ok=9120
+s10 tomb_c jia jia_noS6 view undecidable/content_bad=315 undecidable/loc_bad=1556 undecidable/ok=12437
+s10 tomb_c jia jia_noS6 disk green/content_bad=32 green/ok=1088 red/content_bad=26 red/loc_bad=540 red/ok=2982 undecidable/content_bad=184 undecidable/loc_bad=1016 undecidable/ok=8440
+s10 tomb_c jia jia_noS7 view green/content_bad=170 green/ok=2768 red/loc_bad=4538 red/ok=744 undecidable/content_bad=274 undecidable/loc_bad=50 undecidable/ok=5764
+s10 tomb_c jia jia_noS7 disk green/content_bad=170 green/ok=2768 red/loc_bad=4538 red/ok=744 undecidable/content_bad=274 undecidable/loc_bad=50 undecidable/ok=5764
+s10 tomb_c jia_both jia_s view undecidable/content_bad=910 undecidable/loc_bad=270 undecidable/ok=17116
+s10 tomb_c jia_both jia_s disk green/content_bad=158 green/ok=2638 red/loc_bad=2159 red/ok=773 undecidable/content_bad=564 undecidable/loc_bad=180 undecidable/ok=11824
+coverage rollback_a max_depth=7 histories_one_step_longer=123536 (0 = 在这个世界的操作上限之内穷举完了)
+family rollback_a plain histories=40810 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=0 unshared=0 double_writes=0
+family rollback_a jia histories=40810 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=33384 unshared=0 double_writes=0
+row rollback_a plain bing_rec view 7 40810 1327760 2407936 103096 7040 104792 0 0 750912 0 0
+row rollback_a plain bing_rec disk 7 40810 1327760 2407936 103096 7040 104792 0 0 750912 0 0
+row rollback_a plain bing_s1 view 7 40810 1327760 2407936 103096 7040 104792 0 0 538476 0 0
+row rollback_a plain bing_s1 disk 7 40810 1327760 2407936 103096 7040 104792 0 0 538476 0 0
+row rollback_a plain yi_s3 view 7 40810 1327760 2407936 103096 7040 104792 0 0 221596 0 0
+row rollback_a plain yi_s3 disk 7 40810 1327760 2407936 103096 7040 104792 0 0 221596 0 0
+row rollback_a jia jia_s view 7 40810 1327760 2407936 107796 7040 100564 0 17964 46788 0 0
+row rollback_a jia jia_s disk 7 40810 1327760 2407936 112416 18440 96072 0 17964 33196 0 0
+row rollback_a jia jia_noS6 view 7 40810 1327760 2407936 424036 7056 126318 0 383672 387400 442084 0
+row rollback_a jia jia_noS6 disk 7 40810 1327760 2407936 424036 7056 116994 0 383672 288156 442084 0
+row rollback_a jia jia_noS7 view 7 40810 1327760 2407936 411448 500104 93692 0 17964 368096 0 497956
+row rollback_a jia jia_noS7 disk 7 40810 1327760 2407936 411448 500104 93692 0 17964 368096 0 497956
+common rollback_a view patterns=1327760 all_arms_fail=98548
+common rollback_a disk patterns=1327760 all_arms_fail=98548
+dist rollback_a plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=103096
+dist rollback_a jia jia_s view fails_where_bing_rec_ok=8544 ok_where_bing_rec_fails=3844 both_fail=99252
+dist rollback_a jia jia_s disk fails_where_bing_rec_ok=13740 ok_where_bing_rec_fails=4420 both_fail=98676
+dist rollback_a jia jia_noS6 view fails_where_bing_rec_ok=321620 ok_where_bing_rec_fails=680 both_fail=102416
+dist rollback_a jia jia_noS6 disk fails_where_bing_rec_ok=321620 ok_where_bing_rec_fails=680 both_fail=102416
+dist rollback_a jia jia_noS7 view fails_where_bing_rec_ok=311424 ok_where_bing_rec_fails=3072 both_fail=100024
+dist rollback_a jia jia_noS7 disk fails_where_bing_rec_ok=311424 ok_where_bing_rec_fails=3072 both_fail=100024
+shortest rollback_a plain bing_rec view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a plain bing_rec disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a plain bing_s1 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a plain bing_s1 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a plain yi_s3 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a plain yi_s3 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a jia jia_s view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest rollback_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest rollback_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest rollback_a jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; rekey(11,1,2) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+dist_shortest rollback_a jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest rollback_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest rollback_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest rollback_a jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_a jia jia_s disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_a jia jia_noS6 view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; write(11,1,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+rdist_shortest rollback_a jia jia_noS6 disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; write(11,1,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+rdist_shortest rollback_a jia jia_noS7 view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_a jia jia_noS7 disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+s10 rollback_a plain bing_rec view green/ok=301520 undecidable/content_bad=102568 undecidable/loc_bad=6608 undecidable/ok=1720184
+s10 rollback_a plain bing_rec disk green/ok=301520 undecidable/content_bad=102568 undecidable/loc_bad=6608 undecidable/ok=1720184
+s10 rollback_a plain bing_s1 view undecidable/content_bad=102568 undecidable/loc_bad=6608 undecidable/ok=2021704
+s10 rollback_a plain bing_s1 disk green/content_bad=1008 green/ok=125168 undecidable/content_bad=101560 undecidable/loc_bad=6608 undecidable/ok=1896536
+s10 rollback_a plain yi_s3 view undecidable/content_bad=102568 undecidable/loc_bad=6608 undecidable/ok=2021704
+s10 rollback_a plain yi_s3 disk green/content_bad=1008 green/ok=125168 undecidable/content_bad=101560 undecidable/loc_bad=6608 undecidable/ok=1896536
+s10 rollback_a jia jia_s view undecidable/content_bad=89208 undecidable/loc_bad=24572 undecidable/ok=2017100
+s10 rollback_a jia jia_s disk green/content_bad=24860 green/ok=370476 red/loc_bad=13016 red/ok=576 undecidable/content_bad=62348 undecidable/loc_bad=19104 undecidable/ok=1640500
+s10 rollback_a jia jia_noS6 view undecidable/content_bad=76540 undecidable/loc_bad=390296 undecidable/ok=1664044
+s10 rollback_a jia jia_noS6 disk green/content_bad=23212 green/ok=286472 red/loc_bad=99244 undecidable/content_bad=53328 undecidable/loc_bad=291052 undecidable/ok=1377572
+s10 rollback_a jia jia_noS7 view green/content_bad=46104 green/loc_bad=6160 green/ok=761912 red/loc_bad=354784 red/ok=592 undecidable/content_bad=38940 undecidable/loc_bad=5924 undecidable/ok=916464
+s10 rollback_a jia jia_noS7 disk green/content_bad=46104 green/loc_bad=6160 green/ok=761912 red/loc_bad=354784 red/ok=592 undecidable/content_bad=38940 undecidable/loc_bad=5924 undecidable/ok=916464
+coverage rollback_p max_depth=8 histories_one_step_longer=600 (0 = 在这个世界的操作上限之内穷举完了)
+family rollback_p plain histories=2038 skipped=0 normal_fail=0 i99_legal_red=1320 forced_rewrites=0 unshared=0 double_writes=0
+family rollback_p jia histories=2038 skipped=0 normal_fail=0 i99_legal_red=1320 forced_rewrites=1788 unshared=0 double_writes=0
+row rollback_p plain bing_rec view 8 2038 37672 37600 2996 0 2996 0 0 26056 0 0
+row rollback_p plain bing_rec disk 8 2038 37672 37600 2996 0 2996 0 0 20344 0 0
+row rollback_p plain bing_s1 view 8 2038 37672 37600 2996 0 2996 0 0 24652 0 0
+row rollback_p plain bing_s1 disk 8 2038 37672 37600 2996 0 2996 0 0 18940 0 0
+row rollback_p plain yi_s3 view 8 2038 37672 37600 2996 0 2996 0 0 23644 0 0
+row rollback_p plain yi_s3 disk 8 2038 37672 37600 2996 0 2996 0 0 17932 0 0
+row rollback_p jia jia_s view 8 2038 37672 37600 2398 0 2270 0 804 15854 0 0
+row rollback_p jia jia_s disk 8 2038 37672 37600 2406 24 2202 0 804 12072 0 0
+row rollback_p jia jia_noS6 view 8 2038 37672 37600 9662 0 3402 0 8728 14696 10368 0
+row rollback_p jia jia_noS6 disk 8 2038 37672 37600 9648 0 3028 0 8728 11600 10368 0
+row rollback_p jia jia_noS7 view 8 2038 37672 37600 9528 10540 2014 0 804 17798 0 10720
+row rollback_p jia jia_noS7 disk 8 2038 37672 37600 9528 10540 2014 0 804 17798 0 10720
+common rollback_p view patterns=37672 all_arms_fail=2240
+common rollback_p disk patterns=37672 all_arms_fail=2242
+dist rollback_p plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=2996
+dist rollback_p jia jia_s view fails_where_bing_rec_ok=128 ok_where_bing_rec_fails=726 both_fail=2270
+dist rollback_p jia jia_s disk fails_where_bing_rec_ok=136 ok_where_bing_rec_fails=726 both_fail=2270
+dist rollback_p jia jia_noS6 view fails_where_bing_rec_ok=6993 ok_where_bing_rec_fails=327 both_fail=2669
+dist rollback_p jia jia_noS6 disk fails_where_bing_rec_ok=6980 ok_where_bing_rec_fails=328 both_fail=2668
+dist rollback_p jia jia_noS7 view fails_where_bing_rec_ok=7100 ok_where_bing_rec_fails=568 both_fail=2428
+dist rollback_p jia jia_noS7 disk fails_where_bing_rec_ok=7100 ok_where_bing_rec_fails=568 both_fail=2428
+shortest rollback_p plain bing_rec view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p plain bing_rec disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p plain bing_s1 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p plain bing_s1 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p plain yi_s3 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p plain yi_s3 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_s view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_noS7 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_p jia jia_noS7 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+dist_shortest rollback_p jia jia_s view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; p_begin(11,1,2) ; p_step(11,1) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest rollback_p jia jia_s disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1) ; rollback(2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest rollback_p jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_p jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_p jia jia_noS7 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest rollback_p jia jia_noS7 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest rollback_p jia jia_s view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_p jia jia_s disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_p jia jia_noS6 view depth=7 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; write(11,1,1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 2))] table=unreadable
+rdist_shortest rollback_p jia jia_noS6 disk depth=7 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; write(11,1,1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_p jia jia_noS7 view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_p jia jia_noS7 disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+s10 rollback_p plain bing_rec view green/ok=4560 undecidable/content_bad=2996 undecidable/ok=26004
+s10 rollback_p plain bing_rec disk green/ok=4560 undecidable/content_bad=2996 undecidable/ok=26004
+s10 rollback_p plain bing_s1 view undecidable/content_bad=2996 undecidable/ok=30564
+s10 rollback_p plain bing_s1 disk green/content_bad=48 green/ok=880 red/content_bad=148 red/ok=2924 undecidable/content_bad=2800 undecidable/ok=26760
+s10 rollback_p plain yi_s3 view undecidable/content_bad=2996 undecidable/ok=30564
+s10 rollback_p plain yi_s3 disk green/content_bad=48 green/ok=880 red/content_bad=148 red/ok=2924 undecidable/content_bad=2800 undecidable/ok=26760
+s10 rollback_p jia jia_s view undecidable/content_bad=1594 undecidable/loc_bad=804 undecidable/ok=31162
+s10 rollback_p jia jia_s disk green/content_bad=188 green/ok=2048 red/content_bad=342 red/loc_bad=264 red/ok=5198 undecidable/content_bad=1064 undecidable/loc_bad=548 undecidable/ok=23908
+s10 rollback_p jia jia_noS6 view undecidable/content_bad=934 undecidable/loc_bad=8728 undecidable/ok=23898
+s10 rollback_p jia jia_noS6 disk green/content_bad=104 green/ok=1232 red/content_bad=220 red/loc_bad=2600 red/ok=3884 undecidable/content_bad=596 undecidable/loc_bad=6128 undecidable/ok=18796
+s10 rollback_p jia jia_noS7 view green/content_bad=336 green/ok=3948 red/content_bad=526 red/loc_bad=7880 red/ok=8790 undecidable/content_bad=530 undecidable/loc_bad=256 undecidable/ok=11294
+s10 rollback_p jia jia_noS7 disk green/content_bad=336 green/ok=3948 red/content_bad=526 red/loc_bad=7880 red/ok=8790 undecidable/content_bad=530 undecidable/loc_bad=256 undecidable/ok=11294
+coverage rollback_c max_depth=8 histories_one_step_longer=664 (0 = 在这个世界的操作上限之内穷举完了)
+family rollback_c plain histories=2058 skipped=0 normal_fail=0 i99_legal_red=1380 forced_rewrites=0 unshared=0 double_writes=0
+family rollback_c jia histories=1790 skipped=268 normal_fail=0 i99_legal_red=1000 forced_rewrites=2508 unshared=0 double_writes=0
+family rollback_c jia_both histories=2058 skipped=0 normal_fail=0 i99_legal_red=1380 forced_rewrites=3516 unshared=0 double_writes=692
+row rollback_c plain bing_rec view 8 2058 42632 42560 3992 0 3992 0 0 16732 0 0
+row rollback_c plain bing_rec disk 8 2058 42632 42560 3992 0 3992 0 0 16732 0 0
+row rollback_c plain bing_s1 view 8 2058 42632 42560 3992 0 3992 0 0 16808 0 0
+row rollback_c plain bing_s1 disk 8 2058 42632 42560 7335 5864 3651 0 0 13124 0 0
+row rollback_c plain yi_s3 view 8 2058 42632 42560 3992 0 3992 0 0 13960 0 0
+row rollback_c plain yi_s3 disk 8 2058 42632 42560 7335 5864 3651 0 0 10276 0 0
+row rollback_c jia jia_s view 8 1790 37480 37408 3032 0 2944 0 692 16136 0 0
+row rollback_c jia jia_s disk 8 1790 37480 37408 6990 5518 2444 0 692 10376 0 0
+row rollback_c jia jia_noS6 view 8 1790 37480 37408 4506 0 2640 0 3344 26544 20724 0
+row rollback_c jia jia_noS6 disk 8 1790 37480 37408 4465 0 2213 0 3344 16880 20724 0
+row rollback_c jia jia_noS7 view 8 1790 37480 37408 11998 12994 2200 0 692 14328 0 17056
+row rollback_c jia jia_noS7 disk 8 1790 37480 37408 11998 12994 2200 0 692 14328 0 17056
+row rollback_c jia_both jia_s view 8 2058 42632 42560 3648 0 3560 0 388 20912 0 0
+row rollback_c jia_both jia_s disk 8 2058 42632 42560 8501 6809 2907 0 388 13859 0 0
+common rollback_c view patterns=42632 all_arms_fail=2010
+common rollback_c disk patterns=42632 all_arms_fail=2044
+dist rollback_c plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c plain bing_s1 disk fails_where_bing_rec_ok=3343 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c plain yi_s3 disk fails_where_bing_rec_ok=3343 ok_where_bing_rec_fails=0 both_fail=3992
+dist rollback_c jia jia_s view fails_where_bing_rec_ok=88 ok_where_bing_rec_fails=432 both_fail=2944
+dist rollback_c jia jia_s disk fails_where_bing_rec_ok=4082 ok_where_bing_rec_fails=468 both_fail=2908
+dist rollback_c jia jia_noS6 view fails_where_bing_rec_ok=2822 ok_where_bing_rec_fails=1692 both_fail=1684
+dist rollback_c jia jia_noS6 disk fails_where_bing_rec_ok=2810 ok_where_bing_rec_fails=1721 both_fail=1655
+dist rollback_c jia jia_noS7 view fails_where_bing_rec_ok=9038 ok_where_bing_rec_fails=416 both_fail=2960
+dist rollback_c jia jia_noS7 disk fails_where_bing_rec_ok=9038 ok_where_bing_rec_fails=416 both_fail=2960
+dist rollback_c jia_both jia_s view fails_where_bing_rec_ok=88 ok_where_bing_rec_fails=432 both_fail=3560
+dist rollback_c jia_both jia_s disk fails_where_bing_rec_ok=5088 ok_where_bing_rec_fails=579 both_fail=3413
+shortest rollback_c plain bing_rec view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c plain bing_rec disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c plain bing_s1 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_c plain yi_s3 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_c jia jia_s view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_c jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_c jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest rollback_c jia_both jia_s view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest rollback_c jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest rollback_c plain bing_s1 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest rollback_c plain yi_s3 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))]
+dist_shortest rollback_c jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; c_step(11,1,2) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest rollback_c jia jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_c jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_c jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_c jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_c jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest rollback_c jia_both jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; c_step(11,1,2) ; rollback(1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest rollback_c jia_both jia_s disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+rdist_shortest rollback_c jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_c jia jia_s disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_c jia jia_noS6 view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] table=unreadable
+rdist_shortest rollback_c jia jia_noS6 disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_segment', 1))] table=unreadable
+rdist_shortest rollback_c jia jia_noS7 view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_c jia jia_noS7 disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_c jia_both jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest rollback_c jia_both jia_s disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; rollback(1) ; c_step(11,1,2)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] table=unreadable
+s10 rollback_c plain bing_rec view green/ok=2256 undecidable/content_bad=3992 undecidable/ok=32232
+s10 rollback_c plain bing_rec disk green/ok=2256 undecidable/content_bad=3992 undecidable/ok=32232
+s10 rollback_c plain bing_s1 view undecidable/content_bad=3992 undecidable/ok=34488
+s10 rollback_c plain bing_s1 disk green/content_bad=441 green/ok=4675 red/loc_bad=3684 undecidable/content_bad=3210 undecidable/ok=26470
+s10 rollback_c plain yi_s3 view undecidable/content_bad=3992 undecidable/ok=34488
+s10 rollback_c plain yi_s3 disk green/content_bad=441 green/ok=4675 red/loc_bad=3684 undecidable/content_bad=3210 undecidable/ok=26470
+s10 rollback_c jia jia_s view undecidable/content_bad=2340 undecidable/loc_bad=692 undecidable/ok=30832
+s10 rollback_c jia jia_s disk green/content_bad=484 green/ok=5380 red/content_bad=8 red/loc_bad=4664 red/ok=1088 undecidable/content_bad=1410 undecidable/loc_bad=424 undecidable/ok=20406
+s10 rollback_c jia jia_noS6 view undecidable/content_bad=1162 undecidable/loc_bad=3344 undecidable/ok=29358
+s10 rollback_c jia jia_noS6 disk green/content_bad=72 green/ok=1888 red/content_bad=364 red/loc_bad=1216 red/ok=8084 undecidable/content_bad=685 undecidable/loc_bad=2128 undecidable/ok=19427
+s10 rollback_c jia jia_noS7 view green/content_bad=588 green/ok=6124 red/content_bad=12 red/loc_bad=10200 red/ok=1772 undecidable/content_bad=930 undecidable/loc_bad=268 undecidable/ok=13970
+s10 rollback_c jia jia_noS7 disk green/content_bad=588 green/ok=6124 red/content_bad=12 red/loc_bad=10200 red/ok=1772 undecidable/content_bad=930 undecidable/loc_bad=268 undecidable/ok=13970
+s10 rollback_c jia_both jia_s view undecidable/content_bad=3260 undecidable/loc_bad=388 undecidable/ok=34832
+s10 rollback_c jia_both jia_s disk green/content_bad=433 green/ok=5394 red/content_bad=11 red/loc_bad=5819 red/ok=1223 undecidable/content_bad=2004 undecidable/loc_bad=234 undecidable/ok=23362
+coverage crash_a max_depth=7 histories_one_step_longer=68464 (0 = 在这个世界的操作上限之内穷举完了)
+family crash_a plain histories=26958 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=0 unshared=0 double_writes=0
+family crash_a jia histories=26958 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=24708 unshared=0 double_writes=0
+row crash_a plain bing_rec view 7 26958 1074128 2039984 57560 5072 52856 0 0 645424 0 0
+row crash_a plain bing_rec disk 7 26958 1074128 2039984 57560 5072 52856 0 0 645424 0 0
+row crash_a plain bing_s1 view 7 26958 1074128 2039984 57560 5072 52856 0 0 449428 0 0
+row crash_a plain bing_s1 disk 7 26958 1074128 2039984 57560 5072 52856 0 0 449428 0 0
+row crash_a plain yi_s3 view 7 26958 1074128 2039984 57560 5072 52856 0 0 199300 0 0
+row crash_a plain yi_s3 disk 7 26958 1074128 2039984 57560 5072 52856 0 0 199300 0 0
+row crash_a jia jia_s view 7 26958 1074128 2039984 60924 5072 49948 0 11272 25776 0 0
+row crash_a jia jia_s disk 7 26958 1074128 2039984 64888 11656 48692 0 11272 18460 0 0
+row crash_a jia jia_noS6 view 7 26958 1074128 2039984 357916 5072 74230 0 342008 343992 394664 0
+row crash_a jia jia_noS6 disk 7 26958 1074128 2039984 357916 5072 66818 0 342008 257140 394664 0
+row crash_a jia jia_noS7 view 7 26958 1074128 2039984 343148 463720 46832 0 11272 329940 0 460864
+row crash_a jia jia_noS7 disk 7 26958 1074128 2039984 343148 463720 46832 0 11272 329940 0 460864
+common crash_a view patterns=1074128 all_arms_fail=54652
+common crash_a disk patterns=1074128 all_arms_fail=54652
+dist crash_a plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=57560
+dist crash_a jia jia_s view fails_where_bing_rec_ok=6272 ok_where_bing_rec_fails=2908 both_fail=54652
+dist crash_a jia jia_s disk fails_where_bing_rec_ok=10236 ok_where_bing_rec_fails=2908 both_fail=54652
+dist crash_a jia jia_noS6 view fails_where_bing_rec_ok=300764 ok_where_bing_rec_fails=408 both_fail=57152
+dist crash_a jia jia_noS6 disk fails_where_bing_rec_ok=300764 ok_where_bing_rec_fails=408 both_fail=57152
+dist crash_a jia jia_noS7 view fails_where_bing_rec_ok=287340 ok_where_bing_rec_fails=1752 both_fail=55808
+dist crash_a jia jia_noS7 disk fails_where_bing_rec_ok=287340 ok_where_bing_rec_fails=1752 both_fail=55808
+shortest crash_a plain bing_rec view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a plain bing_rec disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a plain bing_s1 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a plain bing_s1 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a plain yi_s3 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a plain yi_s3 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a jia jia_s view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest crash_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest crash_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest crash_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest crash_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest crash_a jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; rekey(11,1,2) ; crash()] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+dist_shortest crash_a jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2) ; crash()] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+dist_shortest crash_a jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest crash_a jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest crash_a jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest crash_a jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest crash_a jia jia_s view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest crash_a jia jia_s disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest crash_a jia jia_noS6 view depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; write(11,1,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+rdist_shortest crash_a jia jia_noS6 disk depth=6 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; write(11,1,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] table=unreadable
+rdist_shortest crash_a jia jia_noS7 view depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+rdist_shortest crash_a jia jia_noS7 disk depth=5 head=11 history=[create(11,1) ; write(11,1,0) ; write(11,1,0) ; crash() ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] table=unreadable
+s10 crash_a plain bing_rec view green/ok=261232 undecidable/content_bad=52856 undecidable/loc_bad=4704 undecidable/ok=1496232
+s10 crash_a plain bing_rec disk green/ok=261232 undecidable/content_bad=52856 undecidable/loc_bad=4704 undecidable/ok=1496232
+s10 crash_a plain bing_s1 view undecidable/content_bad=52856 undecidable/loc_bad=4704 undecidable/ok=1757464
+s10 crash_a plain bing_s1 disk green/content_bad=680 green/ok=114584 undecidable/content_bad=52176 undecidable/loc_bad=4704 undecidable/ok=1642880
+s10 crash_a plain yi_s3 view undecidable/content_bad=52856 undecidable/loc_bad=4704 undecidable/ok=1757464
+s10 crash_a plain yi_s3 disk green/content_bad=680 green/ok=114584 undecidable/content_bad=52176 undecidable/loc_bad=4704 undecidable/ok=1642880
+s10 crash_a jia jia_s view undecidable/content_bad=44948 undecidable/loc_bad=15976 undecidable/ok=1754100
+s10 crash_a jia jia_s disk green/content_bad=13584 green/ok=320860 red/loc_bad=7316 undecidable/content_bad=31364 undecidable/loc_bad=12624 undecidable/ok=1429276
+s10 crash_a jia jia_noS6 view undecidable/content_bad=40356 undecidable/loc_bad=346712 undecidable/ok=1427956
+s10 crash_a jia jia_noS6 disk green/content_bad=12432 green/ok=242476 red/loc_bad=86852 undecidable/content_bad=27924 undecidable/loc_bad=259860 undecidable/ok=1185480
+s10 crash_a jia jia_noS7 view green/content_bad=23136 green/loc_bad=4336 green/ok=658044 red/loc_bad=323188 undecidable/content_bad=20080 undecidable/loc_bad=3720 undecidable/ok=782520
+s10 crash_a jia jia_noS7 disk green/content_bad=23136 green/loc_bad=4336 green/ok=658044 red/loc_bad=323188 undecidable/content_bad=20080 undecidable/loc_bad=3720 undecidable/ok=782520
+coverage pack3 max_depth=8 histories_one_step_longer=0 (0 = 在这个世界的操作上限之内穷举完了)
+family pack3 plain histories=144 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=0 unshared=0 double_writes=0
+family pack3 jia histories=144 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=60 unshared=0 double_writes=0
+row pack3 plain bing_rec view 8 144 918 908 0 0 0 0 0 418 0 0
+row pack3 plain bing_rec disk 8 144 918 908 0 0 0 0 0 418 0 0
+row pack3 plain bing_s1 view 8 144 918 908 0 0 0 0 0 366 0 0
+row pack3 plain bing_s1 disk 8 144 918 908 0 0 0 0 0 366 0 0
+row pack3 plain yi_s3 view 8 144 918 908 0 0 0 0 0 328 0 0
+row pack3 plain yi_s3 disk 8 144 918 908 0 0 0 0 0 328 0 0
+row pack3 jia jia_s view 8 144 918 908 0 0 0 0 0 286 0 0
+row pack3 jia jia_s disk 8 144 918 908 14 14 0 0 0 272 0 0
+row pack3 jia jia_noS6 view 8 144 918 908 156 0 35 0 156 414 156 0
+row pack3 jia jia_noS6 disk 8 144 918 908 156 0 25 0 156 362 156 0
+row pack3 jia jia_noS7 view 8 144 918 908 104 104 0 0 0 362 0 104
+row pack3 jia jia_noS7 disk 8 144 918 908 104 104 0 0 0 362 0 104
+row pack3 jia jia_s_p1 view 8 144 918 908 142 0 0 142 0 418 0 0
+row pack3 jia jia_s_p1 disk 8 144 918 908 142 0 0 142 0 418 0 0
+common pack3 view patterns=918 all_arms_fail=0
+common pack3 disk patterns=918 all_arms_fail=0
+dist pack3 plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_s view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_s disk fails_where_bing_rec_ok=14 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_noS6 view fails_where_bing_rec_ok=156 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_noS6 disk fails_where_bing_rec_ok=156 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_noS7 view fails_where_bing_rec_ok=104 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_noS7 disk fails_where_bing_rec_ok=104 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_s_p1 view fails_where_bing_rec_ok=142 ok_where_bing_rec_fails=0 both_fail=0
+dist pack3 jia jia_s_p1 disk fails_where_bing_rec_ok=142 ok_where_bing_rec_fails=0 both_fail=0
+shortest pack3 plain bing_rec view none_through_depth=8
+shortest pack3 plain bing_rec disk none_through_depth=8
+shortest pack3 plain bing_s1 view none_through_depth=8
+shortest pack3 plain bing_s1 disk none_through_depth=8
+shortest pack3 plain yi_s3 view none_through_depth=8
+shortest pack3 plain yi_s3 disk none_through_depth=8
+shortest pack3 jia jia_s view none_through_depth=8
+shortest pack3 jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; pack(11,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest pack3 jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest pack3 jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest pack3 jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest pack3 jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest pack3 jia jia_s_p1 view depth=2 head=11 history=[create(11,1) ; write(11,1,0)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=1,split_new=0
+shortest pack3 jia jia_s_p1 disk depth=2 head=11 history=[create(11,1) ; write(11,1,0)] containers=[(0, 'lost')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=1,split_new=0
+dist_shortest pack3 jia jia_s disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; pack(11,1) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest pack3 jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest pack3 jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest pack3 jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest pack3 jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest pack3 jia jia_s_p1 view depth=2 head=11 history=[create(11,1) ; write(11,1,0)] containers=[(0, 'lost')] extents=[(1, 'all_lost')]
+dist_shortest pack3 jia jia_s_p1 disk depth=2 head=11 history=[create(11,1) ; write(11,1,0)] containers=[(0, 'lost')] extents=[(1, 'all_lost')]
+s10 pack3 plain bing_rec view green/ok=244 undecidable/ok=524
+s10 pack3 plain bing_rec disk green/ok=244 undecidable/ok=524
+s10 pack3 plain bing_s1 view green/ok=192 undecidable/ok=576
+s10 pack3 plain bing_s1 disk green/ok=192 undecidable/ok=576
+s10 pack3 plain yi_s3 view green/ok=192 undecidable/ok=576
+s10 pack3 plain yi_s3 disk green/ok=192 undecidable/ok=576
+s10 pack3 jia jia_s view undecidable/ok=768
+s10 pack3 jia jia_s disk green/ok=126 red/loc_bad=14 undecidable/ok=628
+s10 pack3 jia jia_noS6 view undecidable/loc_bad=156 undecidable/ok=612
+s10 pack3 jia jia_noS6 disk green/ok=88 red/loc_bad=52 undecidable/loc_bad=104 undecidable/ok=524
+s10 pack3 jia jia_noS7 view green/ok=384 red/loc_bad=104 undecidable/ok=280
+s10 pack3 jia jia_noS7 disk green/ok=384 red/loc_bad=104 undecidable/ok=280
+s10 pack3 jia jia_s_p1 view undecidable/loc_bad=142 undecidable/ok=626
+s10 pack3 jia jia_s_p1 disk green/loc_bad=14 green/ok=126 undecidable/loc_bad=128 undecidable/ok=500
+coverage clone3 max_depth=7 histories_one_step_longer=369050 (0 = 在这个世界的操作上限之内穷举完了)
+family clone3 plain histories=63718 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=0 unshared=0 double_writes=0
+family clone3 jia histories=63718 skipped=0 normal_fail=0 i99_legal_red=0 forced_rewrites=45908 unshared=10668 double_writes=0
+row clone3 plain bing_rec view 7 63718 1723124 2432176 164214 22374 155620 0 0 743864 0 0
+row clone3 plain bing_rec disk 7 63718 1723124 2432176 164214 22374 155620 0 0 743864 0 0
+row clone3 plain bing_s1 view 7 63718 1723124 2432176 164214 22374 155620 0 0 598350 0 0
+row clone3 plain bing_s1 disk 7 63718 1723124 2432176 164214 22374 155620 0 0 598350 0 0
+row clone3 plain yi_s3 view 7 63718 1723124 2432176 164214 22374 155620 0 0 245926 0 0
+row clone3 plain yi_s3 disk 7 63718 1723124 2432176 164214 22374 155620 0 0 245926 0 0
+row clone3 jia jia_s view 7 63718 1723124 2432176 168028 19470 156352 0 37262 141300 0 0
+row clone3 jia jia_s disk 7 63718 1723124 2432176 166744 32750 137074 0 37262 120076 0 0
+row clone3 jia jia_noS6 view 7 63718 1723124 2432176 392024 19510 165480 0 298006 377018 347536 0
+row clone3 jia jia_noS6 disk 7 63718 1723124 2432176 391306 19584 150975 0 298006 290726 347536 0
+row clone3 jia jia_noS7 view 7 63718 1723124 2432176 387788 356498 134230 0 37262 344694 0 348760
+row clone3 jia jia_noS7 disk 7 63718 1723124 2432176 387788 356498 134230 0 37262 344694 0 348760
+common clone3 view patterns=1723124 all_arms_fail=147728
+common clone3 disk patterns=1723124 all_arms_fail=147728
+dist clone3 plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=164214
+dist clone3 jia jia_s view fails_where_bing_rec_ok=14416 ok_where_bing_rec_fails=10602 both_fail=153612
+dist clone3 jia jia_s disk fails_where_bing_rec_ok=15346 ok_where_bing_rec_fails=12816 both_fail=151398
+dist clone3 jia jia_noS6 view fails_where_bing_rec_ok=235312 ok_where_bing_rec_fails=7502 both_fail=156712
+dist clone3 jia jia_noS6 disk fails_where_bing_rec_ok=235084 ok_where_bing_rec_fails=7992 both_fail=156222
+dist clone3 jia jia_noS7 view fails_where_bing_rec_ok=232684 ok_where_bing_rec_fails=9110 both_fail=155104
+dist clone3 jia jia_noS7 disk fails_where_bing_rec_ok=232684 ok_where_bing_rec_fails=9110 both_fail=155104
+shortest clone3 plain bing_rec view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 plain bing_rec disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 plain bing_s1 view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 plain bing_s1 disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 plain yi_s3 view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 plain yi_s3 disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 jia jia_s view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 jia jia_s disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone3 jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest clone3 jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest clone3 jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest clone3 jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest clone3 jia jia_s view depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; clone(11,21) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 0))] ancestor=unreadable
+dist_shortest clone3 jia jia_s disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+dist_shortest clone3 jia jia_noS6 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest clone3 jia jia_noS6 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest clone3 jia jia_noS7 view depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest clone3 jia jia_noS7 disk depth=3 head=11 history=[create(11,1) ; write(11,1,0) ; rekey(11,1,2)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest clone3 jia jia_s view depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone3 jia jia_s disk depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone3 jia jia_noS6 view depth=5 head=21 history=[create(11,1) ; write(11,1,1) ; clone(11,21) ; truncate(11,1,1) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone3 jia jia_noS6 disk depth=5 head=21 history=[create(11,1) ; write(11,1,1) ; clone(11,21) ; truncate(11,1,1) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone3 jia jia_noS7 view depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone3 jia jia_noS7 disk depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; rekey(21,1,2)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+s10 clone3 plain bing_rec view green/ok=275604 undecidable/content_bad=141840 undecidable/loc_bad=22374 undecidable/ok=1658050
+s10 clone3 plain bing_rec disk green/ok=275604 undecidable/content_bad=141840 undecidable/loc_bad=22374 undecidable/ok=1658050
+s10 clone3 plain bing_s1 view green/ok=51078 undecidable/content_bad=141840 undecidable/loc_bad=22374 undecidable/ok=1882576
+s10 clone3 plain bing_s1 disk green/content_bad=5806 green/loc_bad=2088 green/ok=167424 undecidable/content_bad=136034 undecidable/loc_bad=20286 undecidable/ok=1766230
+s10 clone3 plain yi_s3 view green/ok=51078 undecidable/content_bad=141840 undecidable/loc_bad=22374 undecidable/ok=1882576
+s10 clone3 plain yi_s3 disk green/content_bad=5806 green/loc_bad=2088 green/ok=167424 undecidable/content_bad=136034 undecidable/loc_bad=20286 undecidable/ok=1766230
+s10 clone3 jia jia_s view undecidable/content_bad=111296 undecidable/loc_bad=56732 undecidable/ok=1929840
+s10 clone3 jia jia_s disk green/content_bad=28814 green/loc_bad=6260 green/ok=406010 red/loc_bad=18782 red/ok=2442 undecidable/content_bad=74802 undecidable/loc_bad=38086 undecidable/ok=1522672
+s10 clone3 jia jia_noS6 view undecidable/content_bad=84092 undecidable/loc_bad=316124 undecidable/ok=1697652
+s10 clone3 jia jia_noS6 disk green/content_bad=27178 green/loc_bad=6022 green/ok=342816 red/loc_bad=85574 red/ok=718 undecidable/content_bad=56138 undecidable/loc_bad=224586 undecidable/ok=1354836
+s10 clone3 jia jia_noS7 view green/content_bad=65690 green/loc_bad=11400 green/ok=713588 red/loc_bad=259110 red/ok=2648 undecidable/content_bad=36494 undecidable/loc_bad=18646 undecidable/ok=990292
+s10 clone3 jia jia_noS7 disk green/content_bad=65690 green/loc_bad=11400 green/ok=713588 red/loc_bad=259110 red/ok=2648 undecidable/content_bad=36494 undecidable/loc_bad=18646 undecidable/ok=990292
+coverage clone_p max_depth=7 histories_one_step_longer=238188 (0 = 在这个世界的操作上限之内穷举完了)
+family clone_p plain histories=44268 skipped=0 normal_fail=0 i99_legal_red=33472 forced_rewrites=0 unshared=0 double_writes=0
+family clone_p jia histories=44268 skipped=0 normal_fail=0 i99_legal_red=33472 forced_rewrites=6056 unshared=1950 double_writes=0
+row clone_p plain bing_rec view 7 44268 1350864 1941360 127456 0 137696 0 0 854924 0 0
+row clone_p plain bing_rec disk 7 44268 1350864 1941360 127456 0 137696 0 0 745412 0 0
+row clone_p plain bing_s1 view 7 44268 1350864 1941360 127456 0 137696 0 0 840584 0 0
+row clone_p plain bing_s1 disk 7 44268 1350864 1941360 127456 0 137696 0 0 731072 0 0
+row clone_p plain yi_s3 view 7 44268 1350864 1941360 127456 0 137696 0 0 576204 0 0
+row clone_p plain yi_s3 disk 7 44268 1350864 1941360 127456 0 137696 0 0 466692 0 0
+row clone_p jia jia_s view 7 44268 1350864 1941360 128564 0 137408 0 9864 434148 0 0
+row clone_p jia jia_s disk 7 44268 1350864 1941360 128696 2336 134496 0 9864 355566 0 0
+row clone_p jia jia_noS6 view 7 44268 1350864 1941360 157262 0 136666 0 42908 408120 48012 0
+row clone_p jia jia_noS6 disk 7 44268 1350864 1941360 157004 0 134274 0 42908 337296 48012 0
+row clone_p jia jia_noS7 view 7 44268 1350864 1941360 195192 76668 134464 0 9864 398370 0 78162
+row clone_p jia jia_noS7 disk 7 44268 1350864 1941360 195192 76668 134464 0 9864 398370 0 78162
+common clone_p view patterns=1350864 all_arms_fail=123912
+common clone_p disk patterns=1350864 all_arms_fail=123844
+dist clone_p plain bing_rec view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p plain bing_rec disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p plain bing_s1 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p plain bing_s1 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p plain yi_s3 view fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p plain yi_s3 disk fails_where_bing_rec_ok=0 ok_where_bing_rec_fails=0 both_fail=127456
+dist clone_p jia jia_s view fails_where_bing_rec_ok=2504 ok_where_bing_rec_fails=1396 both_fail=126060
+dist clone_p jia jia_s disk fails_where_bing_rec_ok=2796 ok_where_bing_rec_fails=1556 both_fail=125900
+dist clone_p jia jia_noS6 view fails_where_bing_rec_ok=32064 ok_where_bing_rec_fails=2258 both_fail=125198
+dist clone_p jia jia_noS6 disk fails_where_bing_rec_ok=31884 ok_where_bing_rec_fails=2336 both_fail=125120
+dist clone_p jia jia_noS7 view fails_where_bing_rec_ok=68868 ok_where_bing_rec_fails=1132 both_fail=126324
+dist clone_p jia jia_noS7 disk fails_where_bing_rec_ok=68868 ok_where_bing_rec_fails=1132 both_fail=126324
+shortest clone_p plain bing_rec view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p plain bing_rec disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p plain bing_s1 view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p plain bing_s1 disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p plain yi_s3 view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p plain yi_s3 disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p jia jia_s view depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p jia jia_s disk depth=4 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable tally=missing=0,misread=1,mac_fail=0,split_new=0
+shortest clone_p jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest clone_p jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] tally=missing=0,misread=0,mac_fail=0,split_new=1
+shortest clone_p jia jia_noS7 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+shortest clone_p jia jia_noS7 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')] tally=missing=1,misread=0,mac_fail=0,split_new=0
+dist_shortest clone_p jia jia_s view depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; write(11,1,1) ; clone(11,21) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+dist_shortest clone_p jia jia_s disk depth=5 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+dist_shortest clone_p jia jia_noS6 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest clone_p jia jia_noS6 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; p_step(11,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')]
+dist_shortest clone_p jia jia_noS7 view depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+dist_shortest clone_p jia jia_noS7 disk depth=4 head=11 history=[create(11,1) ; write(11,1,0) ; p_begin(11,1,2) ; write(11,1,1)] containers=[(0, ('rolled_back', 1))] extents=[(1, 'intact')]
+rdist_shortest clone_p jia jia_s view depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; p_begin(21,1,2) ; p_step(21,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone_p jia jia_s disk depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; p_begin(21,1,2) ; p_step(21,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone_p jia jia_noS6 view depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; p_begin(11,1,2) ; write(21,1,1) ; write(11,1,1)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 1))] ancestor=unreadable
+rdist_shortest clone_p jia jia_noS6 disk depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; p_begin(11,1,2) ; write(21,1,1) ; write(11,1,1)] containers=[(0, 'intact')] extents=[(1, ('lose_offset', 1))] ancestor=unreadable
+rdist_shortest clone_p jia jia_noS7 view depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; p_begin(21,1,2) ; p_step(21,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+rdist_shortest clone_p jia jia_noS7 disk depth=6 head=21 history=[create(11,1) ; write(11,1,0) ; clone(11,21) ; write(11,1,0) ; p_begin(21,1,2) ; p_step(21,1)] containers=[(0, 'intact')] extents=[(1, 'all_lost')] ancestor=unreadable
+s10 clone_p plain bing_rec view green/ok=194008 undecidable/content_bad=127456 undecidable/ok=1371620
+s10 clone_p plain bing_rec disk green/ok=194008 undecidable/content_bad=127456 undecidable/ok=1371620
+s10 clone_p plain bing_s1 view undecidable/content_bad=127456 undecidable/ok=1565628
+s10 clone_p plain bing_s1 disk green/content_bad=3960 green/ok=72136 red/content_bad=2188 red/ok=42068 undecidable/content_bad=121308 undecidable/ok=1451424
+s10 clone_p plain yi_s3 view undecidable/content_bad=127456 undecidable/ok=1565628
+s10 clone_p plain yi_s3 disk green/content_bad=3960 green/ok=72136 red/content_bad=2188 red/ok=42068 undecidable/content_bad=121308 undecidable/ok=1451424
+s10 clone_p jia jia_s view undecidable/content_bad=118700 undecidable/loc_bad=9864 undecidable/ok=1564520
+s10 clone_p jia jia_s disk green/content_bad=26740 green/ok=231930 red/content_bad=9692 red/loc_bad=4506 red/ok=98928 undecidable/content_bad=81432 undecidable/loc_bad=6326 undecidable/ok=1233530
+s10 clone_p jia jia_noS6 view undecidable/content_bad=114674 undecidable/loc_bad=42908 undecidable/ok=1535502
+s10 clone_p jia jia_noS6 disk green/content_bad=26716 green/ok=231352 red/content_bad=8916 red/loc_bad=13100 red/ok=91712 undecidable/content_bad=78784 undecidable/loc_bad=29808 undecidable/ok=1212696
+s10 clone_p jia jia_noS7 view green/content_bad=59092 green/ok=560966 red/content_bad=20036 red/loc_bad=75418 red/ok=154748 undecidable/content_bad=37268 undecidable/loc_bad=3538 undecidable/ok=782018
+s10 clone_p jia jia_noS7 disk green/content_bad=59092 green/ok=560966 red/content_bad=20036 red/loc_bad=75418 red/ok=154748 undecidable/content_bad=37268 undecidable/loc_bad=3538 undecidable/ok=782018
+done

@@ -113,8 +113,8 @@ pub const ACCOUNTING_ENTRY_BYTES: u64 = ACCOUNTING_KEY_BYTES + 8 + 4;
 /// 第一个事务这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
 pub const FIRST_TRANSACTION_ACCOUNTING_ROWS: u64 = 15;
 
-/// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 24（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
-pub const TREE_TABLE_ENTRY_BYTES: u64 = 148;
+/// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
+pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
 /// 第一个事务写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）。
 pub const FIRST_TRANSACTION_TREE_TABLE_ENTRIES: u64 = 7;
@@ -248,7 +248,7 @@ mod tests {
         );
         assert_eq!(
             TREE_TABLE_ENTRY_BYTES,
-            8 + 2 + 2 + 2 + NODE_POINTER_BYTES + 8 + 8 + 8 + 24,
+            8 + 2 + 2 + 2 + NODE_POINTER_BYTES + 8 + 8 + 8 + 76,
             "树表条目九段"
         );
         assert_eq!(
@@ -284,7 +284,7 @@ mod tests {
         assert_eq!(INSTANCE_TABLE_PAGE_RECORDS, 370, "实例表一片装几条");
         assert_eq!(ALLOCATION_RECORD_BYTES, 20, "分配记录");
         assert_eq!(ACCOUNTING_ENTRY_BYTES, 34, "记账条目");
-        assert_eq!(TREE_TABLE_ENTRY_BYTES, 148, "树表条目");
+        assert_eq!(TREE_TABLE_ENTRY_BYTES, 200, "树表条目");
         assert_eq!(ROOT_RECORD_BYTES, 371, "根记录");
         assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 188, "journal 新根段");
         assert_eq!(JOURNAL_HEADER_BYTES, 307, "journal 记录头");

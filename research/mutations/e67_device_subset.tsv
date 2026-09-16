@@ -1,4 +1,4 @@
 M1_戊不固定每次重选	Pick::PinnedByEmptiest => pinned.clone().unwrap_or_else(|| {	Pick::PinnedByEmptiest => (|| {
-M2_命中只看一块盘	if set.contains(&a) && set.contains(&b) {	if set.contains(&a) {
+M2_命中只看一块盘	if set.contains(&a) && set.contains(&b) {\n                hit_obj[owner[i]] = true;	if set.contains(&a) {\n                hit_obj[owner[i]] = true;
 M3_窗口宽度写死	(0..WIDTH).map(|i| (start + i) % DEVS).collect()	(0..DEVS).map(|i| (start + i) % DEVS).collect()
 M4_丢数据按w计	lost += 2 * (width as u64 - 1);	lost += 2 * width as u64;

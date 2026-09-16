@@ -1,6 +1,6 @@
 # 实验变更史
 
-<!-- doc-lint:not-numbers M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13 M14 M15 M16 -->
+<!-- doc-lint:not-numbers M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13 M14 M15 M16 M43 M63 -->
 
 **这是 [experiments.md](experiments.md) 与 `experiments/` 下各实验正文的文末历史，拆出来单独成文。**
 正文只写现状，历史一律在这里——规则见 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 8 条。
@@ -15,6 +15,12 @@
 同一次改写也动了 `records/` 与 `research/prompts/`；`research/results/` 是实验产物，**一个字没动**。
 
 ## 历史版本
+
+### 2026-09-16（其一）：三份装置跟上树表条目 148 → 200——E142（第一个事务的干跑） 第八次跑，E145（码 2 自描述头与映射树 key 宽的代价） 与 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 各换产物
+
+- **改前**：三份装置的 `TREE_TABLE_ENTRY_BYTES` 都是 148，产物是 `research/results/e142-first-txn-dry-run-2026-09-14-round2-slot4096.out`、`e145-self-describing-node-header-2026-09-14-round2.out`、`e146-livelist-entry-width-2026-09-14-round2.out`；E146（livelist 条目按映射 key 定身份之后的宽度与代价） 的 `TREE_TABLE_ENTRIES_PER_UNIT` 停在 112（2026-09-14 kb 把每层棵数改成 109 时这一份没跟，它不是登记过的 format-const，门禁 27 号看不见）。
+- **改后**：三份常量都是 200。E142（第一个事务的干跑） 第八次跑产物 `research/results/e142-first-txn-dry-run-2026-09-16-tree-table-200.out`（93 行，末行 `emitted=93`），93 行里 **3 行**变：`name=width` 的 `tree_table_entry` 148 → 200、`name=root_record` 的 `back_chain` 3984932094 → 628216162、`name=back_chain` 的 chains 第 2 / 3 项 1195436654 / 3984932094 → 1134114971 / 628216162；段序列五行、层 0 的 262165 个状态与零违例逐字未变。E145（码 2 自描述头与映射树 key 宽的代价） 产物 `e145-self-describing-node-header-2026-09-16-tree-table-200.out`（57 行），3 行 `name=mapping` 的 `tree_table_bytes` 148 / 296 / 148 → 200 / 400 / 200。E146（livelist 条目按映射 key 定身份之后的宽度与代价） 产物 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行），6 行变：`name=config` 的 `tree_table_entry` 与 5 行 `name=first_transaction` 的 `day1_null_root_bytes` / `day1_root_required_bytes`（148 / 16641 → 200 / 16693，两棵树那臂 296 / 33282 → 400 / 33386）；`TREE_TABLE_ENTRIES_PER_UNIT` 一并改成 81 并在注释里写明它随条目宽变；这一改让 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 变异表里「树表第一版条目数改 112」那一条从被抓变成「变异导致编译失败、本条无效」——断言写的是 `!fits(每单元容量 − 第一版条目数 + 1)`，容量从 112 变 81 之后这个减法在常量求值期溢出，12 条全抓悄悄变成 11 条；断言改用 `saturating_sub` 之后那一条重新被抓，重跑确认 12 条全抓、0 条无效。E142（第一个事务的干跑） 的变异表两条跟着改：`M43` 的原串与变异值 148 / 145 → 200 / 197（名字随之从 `M43_tree_table_entry_145` 改成 `M43_tree_table_entry_197`），`M63` 的锚点按预留宽从 24 改成 76。
+- **依据**：用户 2026-09-16 定案把树表条目加宽（decisions-history 2026-09-16（其九））；三份产物各自过完整性闸（末行 `emitted=N` 与行数相等：93 / 57 / 130）。**跨装置那一格自己对上了**：E142（第一个事务的干跑） 新产物的 `back_chain=628216162` 与 `crates/singlefs-harness` 的实现独立算出的值逐字相同——`first_transaction_step_five_publish.rs` 那条断言先按旧值判红、换成新值之后与产物两边相等，不是改断言迁就实现。
 
 ### 2026-09-15（其三）：E152（按里程碑对比六家文件系统的文件性能） 第二次正式跑——六家也跑两盘镜像
 

@@ -43,8 +43,8 @@ const NODE_POINTER_BYTES: u64 = 86;
 /// D19（块指针的结构与宽度预算） 已定项 8：指向码 1 的指针 = 头部 + 位置条目 × 2 + 写序 10。
 const DATA_POINTER_BYTES: u64 = 88;
 /// D8（核心索引结构） 已定项 8（2026-09-14 用户定案重排）：树 ID 8 打头 + 条目长度 2 + 树的种类 2 + flags 2
-/// + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 24。
-const TREE_TABLE_ENTRY_BYTES: u64 = 148;
+/// + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8，2026-09-16 用户定案）。
+const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// D8（核心索引结构） 已定项 6。
 const INODE_RECORD_BYTES: u64 = 140;
 /// D8（核心索引结构） 已定项 6：分隔 key 8 + 身份引用 26 + 子指针 86。
@@ -1515,7 +1515,7 @@ impl JournalRecord {
 // ───────────────────────── 树表条目、inode、extent、分配、记账、映射 ─────────────────────────
 
 /// D8（核心索引结构） 已定项 8（2026-09-14 用户定案重排）：树 ID 8 打头（= 码 2 条目的 key）+ 条目长度 2
-/// + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 24 = 148。
+/// + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76 = 200。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct TreeTableEntry {
     kind: u16,
@@ -1537,7 +1537,7 @@ impl TreeTableEntry {
         writer.put_u64(0); // previous_snapshot_txg：0 = 不适用（第一个事务没有前驱快照）
         writer.put_u64(self.birth_txg.0);
         writer.put_u64(self.head_identifier);
-        writer.skip(24);
+        writer.skip(76);
         writer.assert_position(TREE_TABLE_ENTRY_BYTES, "树表条目");
         writer.bytes
     }
@@ -1555,8 +1555,8 @@ impl TreeTableEntry {
         let _previous_snapshot_txg = reader.get_u64();
         let birth_txg = CheckpointTxg(reader.get_u64());
         let head_identifier = reader.get_u64();
-        if bytes[TREE_TABLE_ENTRY_BYTES as usize - 24..].iter().any(|&byte| byte != 0) {
-            return Err(UnitError::Structure("树表条目预留 24 字节非零"));
+        if bytes[TREE_TABLE_ENTRY_BYTES as usize - 76..].iter().any(|&byte| byte != 0) {
+            return Err(UnitError::Structure("树表条目预留 76 字节非零"));
         }
         Ok(Self { kind, tree, root, birth_txg, head_identifier })
     }
@@ -3174,7 +3174,7 @@ fn main() {
         ("data_unit_header_with_reserved", 134, DATA_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES),
         ("packed_unit_header_with_reserved", 136, PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES),
         ("root_record", 371, ROOT_RECORD_BYTES),
-        ("tree_table_entry", 148, TREE_TABLE_ENTRY_BYTES),
+        ("tree_table_entry", 200, TREE_TABLE_ENTRY_BYTES),
         ("journal_header", 307, JOURNAL_HEADER_BYTES),
         ("journal_header_ten_fields", 78, JOURNAL_HEADER_TEN_FIELD_BYTES),
         ("journal_new_root_segment", 188, JOURNAL_NEW_ROOT_SEGMENT_BYTES),
@@ -3470,8 +3470,8 @@ mod tests {
         assert_eq!(EXTENT_LEAF_RECORD_BYTES, 112);
         assert_eq!(8 + 26 + NODE_POINTER_BYTES, INODE_INTERNAL_ENTRY);
         assert_eq!(INODE_INTERNAL_ENTRY, 120);
-        assert_eq!(TREE_TABLE_ENTRY_BYTES, 148);
-        assert_eq!(8 + 2 + 2 + 2 + NODE_POINTER_BYTES + 8 + 8 + 8 + 24, TREE_TABLE_ENTRY_BYTES);
+        assert_eq!(TREE_TABLE_ENTRY_BYTES, 200);
+        assert_eq!(8 + 2 + 2 + 2 + NODE_POINTER_BYTES + 8 + 8 + 8 + 76, TREE_TABLE_ENTRY_BYTES);
         assert_eq!(NONCE_MAC_RESERVED_BYTES, 29, "nonce 12 + MAC 16 + 算法类型 1（D18 已定项 16，2026-09-14 用户定案）");
         assert_eq!(DATA_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES, 134, "码 1 载荷从 134 起");
         assert_eq!(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES, 136, "码 3 记录区从 136 起");
@@ -3505,7 +3505,7 @@ mod tests {
         assert_eq!(with_reserved(MAPPING_KEY_BYTES as usize), 169, "中央映射树（key 宽 27）");
         assert_eq!(index_node_header_bytes(0), INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE as usize);
         // 树表一层装几条：分母是 16384 减含预留位的码 2 头，不减别的数（D8 已定项 8 写死的口径）。
-        assert_eq!((NODE_BYTES as usize - with_reserved(TREE_TABLE_KEY_WIDTH)) / TREE_TABLE_ENTRY_BYTES as usize, 109);
+        assert_eq!((NODE_BYTES as usize - with_reserved(TREE_TABLE_KEY_WIDTH)) / TREE_TABLE_ENTRY_BYTES as usize, 81);
         // inode 树内部节点一层装几条：头 131、条目 120。
         assert_eq!((NODE_BYTES as usize - with_reserved(8)) / INODE_INTERNAL_ENTRY as usize, 135);
     }
@@ -4055,11 +4055,11 @@ mod tests {
         assert_eq!(node.smallest_key, TREE_IDENTIFIER_EXTENT.to_le_bytes().to_vec());
         assert_eq!(node.largest_key, TREE_IDENTIFIER_DEADLIST.to_le_bytes().to_vec());
         let declared_length = u16::from_le_bytes(output.units_by_slot[7].2[8..10].try_into().expect("切了 2 字节"));
-        assert_eq!(declared_length, 1036, "7 × 148");
-        // 预留 24 里塞一个非零字节：条目解析当场拒绝。
+        assert_eq!(declared_length, 1400, "7 × 200");
+        // 预留 76 里塞一个非零字节：条目解析当场拒绝。
         let mut tampered = node.entries[0].clone();
         tampered[TREE_TABLE_ENTRY_BYTES as usize - 1] = 1;
-        assert_eq!(TreeTableEntry::parse(&tampered).unwrap_err(), UnitError::Structure("树表条目预留 24 字节非零"));
+        assert_eq!(TreeTableEntry::parse(&tampered).unwrap_err(), UnitError::Structure("树表条目预留 76 字节非零"));
     }
 
     #[test]

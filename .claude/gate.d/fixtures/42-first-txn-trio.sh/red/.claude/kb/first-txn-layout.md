@@ -2,7 +2,7 @@
 
 ## 一、样本节
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 1。
+**里程碑**：[01-first-txn.md](milestone/01-first-txn.md) 步 1。
 
 | 字段 | 宽度 | 指向 | 状态 |
 |---|---|---|---|

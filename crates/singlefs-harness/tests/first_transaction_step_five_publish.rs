@@ -1,5 +1,5 @@
 //! 里程碑「第一个事务」步 3 / 步 4 / 步 5 的验收：mkfs → 取号 → 暖机两次 → 第一个事务，落到两个文件镜像上，
-//! 录制流按路径切段与 E142（第一个事务的干跑） 第七次跑的产物 `research/results/e142-first-txn-dry-run-2026-09-14-round2-slot4096.out`
+//! 录制流按路径切段与 E142（第一个事务的干跑） 第八次跑的产物 `research/results/e142-first-txn-dry-run-2026-09-16-tree-table-200.out`
 //! 逐字对（`name=segments` 五行、`name=root_record` 的反向链、`name=accounting` 的数），盘上的每个单元都由 checker 另一份解析判过。
 
 use std::collections::BTreeSet;
@@ -53,14 +53,14 @@ static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 const IMAGE_BYTES: u64 = 4 << 30;
 /// E142 的第一个文件 3000 字节（`name=config file_bytes=3000`）。
 const FILE_BYTES: usize = 3000;
-/// E142 装置里的固定 fsid（`FIXED_FSID`）：用同一个 fsid，暖机第二条记录头的 CRC 才能与产物 `name=root_record … back_chain=3984932094` 逐字对上。
+/// E142 装置里的固定 fsid（`FIXED_FSID`）：用同一个 fsid，暖机第二条记录头的 CRC 才能与产物 `name=root_record … back_chain=628216162` 逐字对上。
 const E142_FILESYSTEM_IDENTIFIER: [u8; 16] = [
     0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x32, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x2d, 0x00,
 ];
 /// E142 装置里的固定写入时间（`FIXED_WRITE_TIME_SECONDS`）。
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 产物第 37 行逐字：`name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 record_bytes=4096 back_chain=3984932094`。
-const E142_BACK_CHAIN_OF_FIRST_TRANSACTION: u32 = 3_984_932_094;
+/// 产物第 37 行逐字：`name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 record_bytes=4096 back_chain=628216162`。
+const E142_BACK_CHAIN_OF_FIRST_TRANSACTION: u32 = 628_216_162;
 
 fn image_path(tag: &str, device: u32) -> PathBuf {
     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -495,7 +495,7 @@ fn root_slots_superblocks_and_journal_ring_hold_the_published_state() {
             );
             assert_eq!(
                 view.back_chain, E142_BACK_CHAIN_OF_FIRST_TRANSACTION,
-                "与 E142 第七次跑产物第 37 行的 back_chain 逐字相同"
+                "与 E142 第八次跑产物第 37 行的 back_chain 逐字相同"
             );
             assert_eq!(
                 &view.new_root_segment[..86],
@@ -1019,8 +1019,8 @@ fn tree_table_holds_seven_entries_keyed_by_tree_identifier() {
     let tree_table_unit = &pool.output.unit(TransactionUnit::TreeTable).bytes;
     assert_eq!(
         u16::from_le_bytes([tree_table_unit[8], tree_table_unit[9]]),
-        1036,
-        "声明长度 7 × 148"
+        1400,
+        "声明长度 7 × 200"
     );
     let view = index_node_view(tree_table_unit).expect("树表单元");
     assert_eq!(
@@ -1094,9 +1094,9 @@ fn mutations_are_caught_by_the_check_that_owns_them() {
         ),
         Err(Verdict::ChecksumMismatch)
     );
-    // 声明长度与条目宽对不上：解析拒绝（E142 第七次跑变异 M62 逼出来的那条）。
+    // 声明长度与条目宽对不上：解析拒绝（E142 第八次跑变异 M62 逼出来的那条）。
     let mut wrong_width = pool.output.unit(TransactionUnit::TreeTable).bytes.clone();
-    wrong_width[84 + 16..86 + 16].copy_from_slice(&147u16.to_le_bytes());
+    wrong_width[84 + 16..86 + 16].copy_from_slice(&199u16.to_le_bytes());
     singlefs_core::unit::seal_header_checksum(&mut wrong_width, 86 + 16);
     assert_eq!(
         index_node_view(&wrong_width),

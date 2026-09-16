@@ -1,5 +1,5 @@
 //! 里程碑「第一个事务」步 6 的验收：进程外重开两个镜像走完整的挂载路径读出那个文件；坏字节探针与 E142（第一个事务的干跑）
-//! 第七次跑产物 `research/results/e142-first-txn-dry-run-2026-09-14-round2-slot4096.out` 的 `name=recover_full` / `name=probe` 行逐字对。
+//! 第八次跑产物 `research/results/e142-first-txn-dry-run-2026-09-16-tree-table-200.out` 的 `name=recover_full` / `name=probe` 行逐字对。
 
 mod common;
 

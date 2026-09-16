@@ -1,4 +1,4 @@
-//! 树里的记录与条目：inode 记录 140、inode 内部条目 120、extent 叶记录 112、记账条目 34、映射条目 55、树表条目 148。
+//! 树里的记录与条目：inode 记录 140、inode 内部条目 120、extent 叶记录 112、记账条目 34、映射条目 55、树表条目 200。
 //! key 的全序按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11）——小端存储不构成 memcmp 序，所以各给 sort key。
 
 use singlefs_format::{
@@ -254,7 +254,7 @@ pub const TREE_KIND_LIVELIST: u16 = 6;
 pub const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 pub const TREE_KIND_DEADLIST: u16 = 8;
 
-/// 树表条目 148：树 ID 8（打头 = key）+ 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 24。
+/// 树表条目 200：树 ID 8（打头 = key）+ 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TreeTableEntry {
     pub kind: u16,
@@ -268,24 +268,24 @@ pub struct TreeTableEntry {
 impl TreeTableEntry {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut writer = ByteWriter::new(usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("148"));
+        let mut writer = ByteWriter::new(usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"));
         writer.put_u64(self.tree.0);
-        writer.put_u16(u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("148"));
+        writer.put_u16(u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"));
         writer.put_u16(self.kind);
         writer.put_u16(0);
         self.root.write_to(&mut writer);
         writer.put_u64(0); // previous_snapshot_txg：0 = 不适用
         writer.put_u64(self.birth_txg.0);
         writer.put_u64(self.head_identifier);
-        writer.skip(24);
+        writer.skip(76);
         writer.assert_position(TREE_TABLE_ENTRY_BYTES, "树表条目");
         writer.into_bytes()
     }
-    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 24 非零都判不可用。
+    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零都判不可用。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("148")
-            || bytes[bytes.len() - 24..].iter().any(|byte| *byte != 0)
+        if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
+            || bytes[bytes.len() - 76..].iter().any(|byte| *byte != 0)
         {
             return None;
         }
@@ -449,7 +449,7 @@ mod tests {
             birth_txg: CheckpointTxg(3),
             head_identifier: 12,
         };
-        assert_eq!(table_entry.to_bytes().len(), 148);
+        assert_eq!(table_entry.to_bytes().len(), 200);
         assert_eq!(
             TreeTableEntry::parse(&table_entry.to_bytes()),
             Some(table_entry)

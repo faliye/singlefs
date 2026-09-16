@@ -32,6 +32,10 @@ BIN="target/x86_64-unknown-linux-musl/release/first_transaction_on_device"
 CHECK="target/debug/first_transaction_device_log_check"
 PRODUCT="research/results/$(awk -F'|' '$1=="E142"{print $4}' research/scripts/replay.sh)"
 [[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 E142 行解析不出产物文件（得到 $PRODUCT）" "看 research/scripts/replay.sh 里 E142 那一行的第 4 列。"
+# 反向链从产物里现取，不写死：写死的那个数在格式常量一改就过期，而这道闸红起来像是写路错了。
+# 实测 2026-09-16 树表条目 148 → 200：产物已经是新链值，闸里还写着旧的，红在一个与写路无关的地方。
+EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
+[[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-gate55.XXXXXX")"
 trap 'rm -rf "${work:?}"' EXIT
@@ -55,8 +59,8 @@ for mode in "${MODES[@]}"; do
   fi
   grep -aq 'name=recover_cold outcome=file_read root=1:3 content_matches=true' "$out" \
     || fail "虚机跑 $mode 冷重开之后没读回文件" "看 $mode 的 name=recover_cold 行与来宾的 stderr（vm-bench.sh 保留现场用 VM_KEEP=1）。"
-  grep -aq 'name=transaction policy_mismatches=0 key_order_mismatches=0 root_txg=3 back_chain=3984932094' "$out" \
-    || fail "虚机跑 $mode 的第一个事务计数或反向链与产物不符" "产物 name=root_record 行的 back_chain 是 3984932094；两个运行时计数要是 0。"
+  grep -aq "name=transaction policy_mismatches=0 key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN" "$out" \
+    || fail "虚机跑 $mode 的第一个事务计数或反向链与产物不符" "产物 name=root_record 行的 back_chain 是 $EXPECTED_BACK_CHAIN；两个运行时计数要是 0。"
   # 来宾块层的 FLUSH 数 = 程序真正交给设备的屏障 + FUA 写（来宾内核是第三条独立的路）
   while IFS= read -r line; do
     barriers="$(sed -n 's/.* barriers=\([0-9]*\) .*/\1/p' <<<"$line")"

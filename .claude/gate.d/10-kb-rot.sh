@@ -134,9 +134,15 @@ if [[ -n "$inv_claim" && "$inv_claim" != "$inv_live" ]]; then
 else
   ok "不变量条数一致：在用 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
 fi
-# 历史版本里的「已还清」表也是 `| C<n> |` 行 —— 一起数会把还清的算进欠账里。
-chk_actual=$(sed '/^## 历史版本/,$d' "$KB/checks-owed.md" | grep -cE '^\| C[0-9]+ ')
-chk_done=$(sed -n '/^## 历史版本/,$p' "$KB/checks-owed.md" | grep -cE '^\| C[0-9]+ ')
+# 三段各数各的：欠着的那张表、「### 已还清」那张表、「## 历史版本」里的条目。
+# ⚠️ **分界线是「### 已还清」，不是「## 历史版本」**：已还清那张表住在历史版本**之前**，
+# 按历史版本切会把还清的全算进欠账里——2026-09-16 现查它报「欠 326、已还清 0」，
+# 真数是 297 / 29。一条报错数的检查与没有这条检查，在门禁输出里长得一模一样。
+read -r chk_actual chk_done < <(awk '
+  /^### 已还清/{sec=1; next}
+  /^## 历史版本/{sec=2; next}
+  /^\| C[0-9]+ /{ if(sec==0) a++; else if(sec==1) d++ }
+  END{print a+0, d+0}' "$KB/checks-owed.md")
 ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
 
 echo

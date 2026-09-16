@@ -952,7 +952,7 @@ pub fn publish_first_file<Device: BlockDevice>(
         filesystem_identifier,
         instance,
         tree_table_sequence,
-        u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("148"),
+        u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"),
         &tree_table_entries
             .iter()
             .map(TreeTableEntry::to_bytes)

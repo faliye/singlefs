@@ -163,13 +163,16 @@ E21（GPU 卸载的净收益）的两个单测钉的是「折叠与顺序无关�
 
 ### 口径与代码
 
-GPU：`research/scripts/e21-transfer.py`（torch 2.11.0+cu130），每档先跑一轮丢弃（建 CUDA 上下文），
+GPU 传输段：`research/scripts/e21-transfer.py`（torch 2.11.0+cu130），每档先跑一轮丢弃（建 CUDA 上下文），
 **每次计时前后都 `torch.cuda.synchronize()`**——不同步量到的是异步启动不是传输，数字会好看一个数量级。
 N=5 取中位。
 CPU：`research/e7-index-bench/src/bin/e21_cpu.rs`，`cargo run --release --bin e21-cpu -- 2048 5`，
 2 GiB 缓冲、5 轮取最好值；4 个单测，3 条变异逐条证明会红
 （其中一条变异暴露了单测**自己重写了一遍分块逻辑、没走生产路径**，已抽成共用函数）。
 输出 `research/results/e21-cpu-2026-08-28.out`。
+GPU 计算段：`research/scripts/e21-compute.py`（显存内异或折叠 + 含传输的同一个算子 + 阳性对照），
+「计算段」那一节的 1041.3 GB/s、50.3 GB/s、9.7% 与阳性对照 10.3× 都出自它；
+⚠️ **它的原始输出未留存**，那几个数今天只能靠重跑这个脚本复核（本机要 CUDA 与 ≥ 4 GiB 空闲显存，脚本自己会拒绝不满足的机器）。
 
 **背景**：[decisions.md](../decisions.md) D24（后台重活能不能卸给 GPU）。三个候选场景（批量压缩、全盘 scrub、EC 重建）
 全部落在 `.claude/rules/fs-design.md` 第三格（后台、可续做、非决策路径，无戒律），
@@ -206,7 +209,7 @@ CPU：`research/e7-index-bench/src/bin/e21_cpu.rs`，`cargo run --release --bin 
 **本机**（2026-08-28 现查）：NVIDIA RTX 5090（32 GB）+ RTX 5060 Ti（16 GB），驱动 595.84。
 ⚠️ **两块卡型号不同，跑分要钉死用哪一块并记进口径。**
 
-**前置**：无。但需要 CUDA 工具链，`research/scripts/env.sh` 尚未检查它。
+**前置**：无。但需要 CUDA 工具链，`.claude/scripts/env.sh` 尚未检查它。
 
 ## 历史版本
 

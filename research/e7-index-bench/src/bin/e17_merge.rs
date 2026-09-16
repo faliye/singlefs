@@ -108,7 +108,7 @@ fn arm_control(n: usize, threads: usize, seed: u64) -> u64 {
     let per = n / threads;
     for t in 0..threads {
         handles.push(std::thread::spawn(move || {
-            let mut v = gen(per, seed ^ (t as u64 * 0x9E3779B97F4A7C15));
+            let mut v = gen(per, seed ^ (t as u64).wrapping_mul(0x9E3779B97F4A7C15));
             v.sort_unstable_by_key(|e| (e.0, e.1));
             v.len() as u64
         }));

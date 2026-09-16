@@ -1,3 +1,5 @@
 exit=1
 want=没有同名变异表
 want=e2_naked
+want=不是恰好命中一次
+want=e1_sample 的 M1_样本

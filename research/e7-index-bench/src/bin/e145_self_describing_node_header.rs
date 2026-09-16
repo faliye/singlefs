@@ -17,7 +17,7 @@ const SELF_DESCRIBING_EXTRA_BYTES: u64 = 5;
 const FIXED_KEY_RANGE_KEY_BYTES: u64 = 32;
 const NODE_POINTER_BYTES: u64 = 83;
 const LOCATION_ENTRY_PAIR_BYTES: u64 = 28;
-const TREE_TABLE_ENTRY_BYTES: u64 = 148;
+const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// 10 TB ÷ 32 KiB。
 const DATA_UNITS_IN_POOL: u64 = 335_544_320;
 /// 码 2 / 码 3 单元数按数据单元的 1/8 计（跑前登记的粗档）。
@@ -447,6 +447,6 @@ mod tests {
         assert_eq!(described.data_height, 4);
         // 两棵树的码 2 / 码 3 树：41 943 040 ÷ 306 = 137 069 叶 → 内部扇出 (16384 − 136 − 28) ÷ 108 = 150 → 914 → 7 → 1，共 4 层
         assert_eq!(two.node_height, 4);
-        assert_eq!(two.tree_table_entries * TREE_TABLE_ENTRY_BYTES, 296);
+        assert_eq!(two.tree_table_entries * TREE_TABLE_ENTRY_BYTES, 400);
     }
 }

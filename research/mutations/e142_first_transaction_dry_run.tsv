@@ -40,7 +40,7 @@ M39_data_unit_in_the_open_cluster_segment	const SLOT_DATA_UNIT: u64 = 50180;	con
 M40_device_bytes_doubled	const DEVICE_BYTES: u64 = 4 << 30;	const DEVICE_BYTES: u64 = 8 << 30;
 M41_journal_worst_case_is_record_bytes	const JOURNAL_WORST_CASE_BYTES: u64 = JOURNAL_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES;	const JOURNAL_WORST_CASE_BYTES: u64 = JOURNAL_RECORD_BYTES;
 M42_pointer_head_without_compression	const POINTER_HEAD_BYTES: u64 = 50;	const POINTER_HEAD_BYTES: u64 = 47;
-M43_tree_table_entry_145	const TREE_TABLE_ENTRY_BYTES: u64 = 148;	const TREE_TABLE_ENTRY_BYTES: u64 = 145;
+M43_tree_table_entry_197	const TREE_TABLE_ENTRY_BYTES: u64 = 200;	const TREE_TABLE_ENTRY_BYTES: u64 = 197;
 M44_inode_internal_entry_117	const INODE_INTERNAL_ENTRY: u64 = 120;	const INODE_INTERNAL_ENTRY: u64 = 117;
 M45_extent_leaf_record_109	const EXTENT_LEAF_RECORD_BYTES: u64 = 112;	const EXTENT_LEAF_RECORD_BYTES: u64 = 109;
 M46_unit_reserved_still_28	const NONCE_MAC_RESERVED_BYTES: u64 = 29;	const NONCE_MAC_RESERVED_BYTES: u64 = 28;
@@ -60,7 +60,7 @@ M59_root_record_algorithm_type_nonzero	        writer.put_u8(0);\n        writer
 M60_bump_order_back_to_the_sixth_run	const SLOT_EXTENT_ROOT: u64 = 50240;	const SLOT_EXTENT_ROOT: u64 = 50242;
 M61_journal_scan_ignores_the_fsid	                if record.fsid != expected_fsid {\n                    continue;\n                }	                if false {\n                    continue;\n                }
 M62_index_node_accepts_a_zero_entry_width	    if entry_width < key_width || entry_count * entry_width != declared_length as usize {	    if false {
-M63_tree_table_reserved_bytes_not_checked	        if bytes[TREE_TABLE_ENTRY_BYTES as usize - 24..].iter().any(|&byte| byte != 0) {\n            return Err(UnitError::Structure("树表条目预留 24 字节非零"));\n        }	
+M63_tree_table_reserved_bytes_not_checked	        if bytes[TREE_TABLE_ENTRY_BYTES as usize - 76..].iter().any(|&byte| byte != 0) {\n            return Err(UnitError::Structure("树表条目预留 76 字节非零"));\n        }	
 M64_journal_worst_case_room_computed_from_the_old_header	const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;	const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 86;
 M65_superblock_slot_back_to_the_physical_block_width	const SUPERBLOCK_SLOT_BYTES: u64 = 4096;	const SUPERBLOCK_SLOT_BYTES: u64 = 512;
 M66_superblock_slot_checksum_covers_only_the_first_sector	        let digest = wide_checksum_with_field_zeroed(&bytes, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);\n        bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);\n        bytes\n    }	        let digest = wide_checksum_with_field_zeroed(&bytes, PHYSICAL_BLOCK_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);\n        bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);\n        bytes\n    }

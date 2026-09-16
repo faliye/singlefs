@@ -3,7 +3,7 @@
 **一个从零设计的 COW 文件系统，Rust 实现。**
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
 
-当前里程碑：**「第一个事务」**（`.claude/kb/milestone-first-txn.md`），步 0 脚手架 2026-09-14 开工：`crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
+当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档、未开工：覆盖写、释放、延迟重用、第二个可写实例、管理员回退，每一件都进层 0）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，步 0–7 的代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
 磁盘格式仍是软的（`.claude/rules/format-evolution.md`）；决策索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`，第一个事务的字节表在 `.claude/kb/first-txn-layout.md`。
 
 ## 规则（始终生效）
@@ -28,7 +28,7 @@
 | 项 | 值 |
 |---|---|
 | 上游仓 | `singlefs-ai-sop`，本机在兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
-| 项目里的副本 | `.claude/singlefs-ai-sop/`，是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份 |
+| 项目里的副本 | `.claude/singlefs-ai-sop/`，是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
 | 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
 | 怎么改 | 共享规则只能在**上游**改并抬 `VERSION`，然后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了 |
 
@@ -66,7 +66,7 @@
 | `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项、给具体的宽度与取值（未定的给预想值），指不到的就是格式级空白；每节标里程碑步号 |
 | `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
 | `.claude/kb/verification-build.md` | 三样验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
-| `.claude/kb/milestone-first-txn.md` | 里程碑「第一个事务」的规划：八步，每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
+| `.claude/kb/milestone/` | 里程碑规划，一个里程碑一个文件（`NN-简称.md`）：`01-first-txn.md` 是「第一个事务」（八步，出口 2026-09-14 满足）、`02-second-txn.md` 是「第二个事务」（八步：装置扩成固定脚本、覆盖写、释放、第二个可写实例、管理员回退、抬 F 与延迟重用、层 0 全量、出口）；每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
 | `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
 | `research/scripts/stage-mine.py` | 几个会话共写一批文件时只暂存这一轮的块：插入段按标题行、表格行、replay 登记行切块，命中 `--match` 的进暂存区、其余留在工作区，进暂存区的块命中 `--foreign` 就拒绝；`--selftest` 自证会红 |
@@ -79,6 +79,7 @@
 | `research/perf-by-milestone.md` | singlefs 与六家文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）按里程碑的性能对比：六家基线的表，每个里程碑一节写 singlefs 能跑哪几维、差多少、跑不了的还缺什么；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `research/scripts/e152-tables.py` 从产物生成；每过一个里程碑给 singlefs 重跑一遍、加一节 |
 | `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据） |
 | `records/` | 建设过程 |
+| `briefs/` | 每次更新的简报，按日期一份（`YYYY-MM-DD.md`）：那一版能做什么、验到哪、还没罩到什么；给读者看现状，旧的一份不回头改，下次更新另起一份 |
 
 ## 门禁
 
@@ -134,11 +135,11 @@ bash .claude/gate.d/54-layer0-replay.sh # 层 0 崩溃点重放：第一个事�
 bash .claude/gate.d/55-qemu-first-transaction.sh # QEMU 真设备上的第一个事务：两块 virtio 盘、设备侧独立录制与程序录制流逐项比，漏一道屏障与走页缓存两个对照必须判红
 bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
 bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
-bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（55 条承重引用，源码树不在也判红）
+bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（承重引用逐条复核，条数以 research/scripts/verify-citations.sh 为准；源码树不在也判红）
 bash .claude/gate.d/80-absolute-assertions.sh # 每个实验都要有钉绝对值的断言（防「所有臂一起错」）却没回收
 bash .claude/gate.d/85-repro-command.sh   # 点了产物的实验有没有写复跑命令
 bash .claude/gate.d/86-experiment-orphans.sh # research 里的实验号在 kb 里有没有正文
-bash .claude/gate.d/87-replay.sh          # 入库的实验数今天还复现得出来吗（默认只跑快的 19 个）
+bash .claude/gate.d/87-replay.sh          # 入库的实验数今天还复现得出来吗（默认跳过脚本里列的 4 个慢实验、其余从 replay.sh 的表现算；`GATE_REPLAY_FULL=1` 全跑）
 bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红（样本在 gate.d/fixtures/）
 ```
 
@@ -162,7 +163,7 @@ bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红
 
 ## 一句话版本
 
-- 先定决策，再写代码——D4/D8 未定之前写下去的实现多半要返工。
+- 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。第一个事务的代码是 2026-09-13 总审核把未定项集中交用户定案之后才开工的（`records/2026-09-13-总审核.md`）。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」。
 - 记账必须在提交时增量维护；任何要「事后扫一遍」的记账设计当场否决。
 - 门禁全绿**只构成第一个事务在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载还只有第一个事务，覆盖写、释放、多次挂载、回退都没进来，checker 也只判第一版那部分不变量。

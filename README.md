@@ -67,7 +67,7 @@ waaagh！
 | **QEMU / KVM** | 真实负载 + 崩溃注入下的端到端行为，是准入的最终判据 |
 | **herd7 / LKMM** | 并发路径的内存序——无锁结构、屏障、跨 CPU 可见性 |
 | 崩溃点重放 | 屏障切段、段内任意一组写持久，枚举出的每个崩溃状态都生成镜像、跑恢复 + checker（第一个事务的全量在门禁 54 号） |
-| 模型对拍 | 功能正确性：随机操作序列与内存里的理想模型比对 |
+| 模型对拍 | 功能正确性：随机操作序列与内存里的理想模型比对。**还没实现**，门禁把它列在未实现清单里 |
 
 三条硬要求：
 
@@ -80,7 +80,7 @@ waaagh！
 提交前跑门禁：
 
 ```bash
-bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 全量与 QEMU 真设备，要几分钟）
+bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 全量与 QEMU 真设备，要十几分钟）
 
 cargo test --workspace                    # 平时的单测；层 0 全量标 ignored，这里只跑缩小版
 bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放全量（release）
@@ -120,12 +120,13 @@ bash .claude/scripts/gate.sh
 | `crates/singlefs-core` | mkfs、分配器、事务层（封闭的提交步骤枚举）、恢复、O_DIRECT 块设备后端 |
 | `crates/singlefs-harness` | 写请求录制器、层 0 崩溃状态枚举、设备侧日志核对，以及里程碑各步的验收用例 |
 | `crates/singlefs-checker` | checker：与实现只共享格式常量，解析、校验、遍历各写一份 |
-| `.claude/kb/` | 设计决策、不变量清单、他家方案调研、避坑清单 |
+| `.claude/kb/` | 设计决策与变更史、不变量清单、实验索引与正文、欠账表、第一个事务的字节表、里程碑规划、验证手段与虚机装置怎么落地、他家方案调研、避坑清单 |
 | `.claude/scripts/` | 门禁包装（逻辑在 singlefs-ai-sop） |
 | `.claude/gate.d/` | 项目本地的门禁阶段 |
 | `research/` | 实验装置、留存产物与复跑脚本 |
 | `litmus/` | herd7 的 litmus 测试，每条 Never 配一条去掉屏障的对照 |
 | `records/` | 建设过程 |
+| [`briefs/`](briefs/) | 每次更新的简报，按日期一份：那一版能做什么、验到哪、还没罩到什么。`records/` 写过程，这里写现状 |
 
 ## 许可
 

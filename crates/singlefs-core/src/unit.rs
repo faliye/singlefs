@@ -525,7 +525,7 @@ mod tests {
             &filesystem_identifier,
             InstanceGeneration(0),
             BirthSequence(1),
-            148,
+            200,
             &[],
         );
         assert_eq!(node.len(), 16384);
@@ -539,7 +539,7 @@ mod tests {
         );
         assert_eq!(
             u16::from_le_bytes([node[84 + 16], node[85 + 16]]),
-            148,
+            200,
             "条目宽在 84 + 2k"
         );
         assert!(wide_checksum_field_holds(

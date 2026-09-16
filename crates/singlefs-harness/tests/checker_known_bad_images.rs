@@ -202,9 +202,9 @@ fn set_u16(bytes: &mut [u8], offset: usize, value: u16) {
     bytes[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
 }
 
-/// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 148）。
+/// 树表单元里第 index 条条目（条目区从 115 + 2 × 8 = 131 起，每条 200）。
 fn tree_table_entry_offset(index: usize) -> usize {
-    131 + 148 * index
+    131 + 200 * index
 }
 
 /// 一份坏镜像：它要让哪一条判违例，以及怎么从干净镜像改出来。

@@ -370,7 +370,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 每过一个里程碑，给 singlefs 重跑一遍（`E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh <产物>`），在这份文件里加一节，格式照第三节：能跑哪几维、差多少、还缺什么。
 六家的基线只在内核、测试台或负载变了的时候重跑，重跑就是新一次正式跑，要另写跑前登记。
 
-里程碑只规划到第一个事务（`.claude/kb/milestone-first-txn.md`），所以哪一维什么时候能跑，按缺的能力写，不按里程碑名写：
+里程碑规划到第二个事务（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档：同一个池里再发布一次、释放、延迟重用、第二个可写实例、管理员回退，一个文件跨多个单元与目录都不在里面），所以哪一维什么时候能跑，按缺的能力写，不按里程碑名写：
 
 | 缺的能力 | 补上之后能跑的维 |
 |---|---|
