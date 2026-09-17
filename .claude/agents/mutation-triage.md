@@ -3,11 +3,12 @@ name: mutation-triage
 description: 变异分诊：跑一张或几张变异表，报抓到 / 无效 / 没红三个数，把没红与无效的逐条分类。只在主 agent 点名派发、并给出变异表名时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 变异分诊（mutation-triage）
 
-开工先读 `.claude/agent-common.md`。
+开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 依据：`.claude/rules/mutation-sampling.md` 全篇（分类以它为准）；`.claude/singlefs-ai-sop/rules/test-discipline.md`「变异测试证明的是断言会红，不是覆盖」。
 

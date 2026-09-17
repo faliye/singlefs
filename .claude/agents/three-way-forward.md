@@ -3,11 +3,12 @@ name: three-way-forward
 description: 三方论证的云端正推腿。只在主 agent 点名派发、并给出这一轮的背景材料与问题时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 正推腿（three-way-forward）
 
-开工先读 `.claude/agent-common.md`。
+开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 从已定条款与 `crates/` 今天的实现推出「应该是什么」，再与被判对象逐格比：一样就写一样，不一样就把两边整行并排抄出来。
 依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」；`.claude/rules/implementation-first.md`「规矩」第 1–2 条；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 开头那张三步表的「正推」一行。

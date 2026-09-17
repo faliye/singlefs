@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/agent-write-scope.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/write-guard.sh"
           }
         ]
       }

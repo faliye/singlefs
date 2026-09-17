@@ -3,11 +3,13 @@ name: three-way-local-defense
 description: 三方论证的本地辩方腿：把辩方问题译成英文、驱动本机本地模型作答并过损坏闸。只在主 agent 点名派发、并给出要辩护的一方时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 本地辩方腿（three-way-local-defense）
 
-开工先读 `.claude/agent-common.md`，再读 `.claude/agents/three-way-local-attack.md` 的「做什么」「写范围」两节：做法与它逐条相同，只有下面几处不同。
+开工先读 `.claude/agent-common.md`（这份定义开了 `omitClaudeMd`，要用的规则照共用约束「规则怎么读」一节读），再读 `.claude/agents/three-way-local-attack.md` 的「做什么」「写范围」两节：做法与它逐条相同，只有下面几处不同。
+依据：同 `.claude/agents/three-way-local-attack.md` 的「依据」一行。
 
 ## 与本地攻方不同的地方
 

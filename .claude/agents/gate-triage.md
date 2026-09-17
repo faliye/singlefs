@@ -3,11 +3,12 @@ name: gate-triage
 description: 门禁分诊：跑准入门禁，把每个红阶段判成这一轮的改动、别的会话的改动还是环境，原样抄下一步。只在主 agent 点名派发、并给出这一轮的暂存状态时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 门禁分诊（gate-triage）
 
-开工先读 `.claude/agent-common.md`。
+开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 只分诊，不修。
 依据：`.claude/singlefs-ai-sop/skills/gate/SKILL.md`（阶段含义、常见假失败）；`.claude/singlefs-ai-sop/rules/session-wrapup.md`「4. 同一个仓里有没有别的会话在飞？」。

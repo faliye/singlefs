@@ -2,12 +2,13 @@
 # gate-stage: 项目 subagent 的写范围闸注册着、会拒绝，写范围表与定义一致
 #
 # 判据，任一条不成立判红：
-#   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `agent-write-scope.sh` 的 hook；
-#   ② `.claude/hooks/agent-write-scope.sh --selftest` 通过（自证里有走真实 stdin 入口的情形）；
+#   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `write-guard.sh` 的 hook（写范围与整份覆盖未跟踪文件两道合在里面）；
+#   ② `.claude/hooks/write-guard.sh --selftest` 通过（自证里有走真实 stdin 入口的情形）；
 #   ③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；
 #   ④ 表里每个 agent 名都有定义，每行至少两列；
 #   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（按模式找进程与没超时的等待循环记进检出记录、一律放行：hook 只检出，结不结束由主 agent 判断）；
-#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒）。
+#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒）；
+#   ⑦ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「依据：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
 # 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
@@ -16,7 +17,7 @@
 #   bash .claude/gate.d/63-agent-write-scope.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
-HOOK="$(cd "$(dirname "$0")/../hooks" && pwd)/agent-write-scope.sh"
+HOOK="$(cd "$(dirname "$0")/../hooks" && pwd)/write-guard.sh"
 cd "$ROOT" 2>/dev/null || exit 2
 table_output="$(python3 - <<'PY'
 import glob, json, os, re, sys
@@ -41,11 +42,11 @@ except Exception as error:
 if entries is not None:
     registered = [entry for entry in entries
                   if matcher_covers(entry.get("matcher", ""), "Write") and matcher_covers(entry.get("matcher", ""), "Edit")
-                  and any("agent-write-scope.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+                  and any("write-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
     if not registered:
         failed = True
-        print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 agent-write-scope.sh 的一条")
-        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/agent-write-scope.sh"。')
+        print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 write-guard.sh 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/write-guard.sh"。')
     guard_registered = [entry for entry in entries
                         if matcher_covers(entry.get("matcher", ""), "Bash")
                         and any("bash-command-detector.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
@@ -77,8 +78,14 @@ else:
     print(f"  ✗ 没有 {table_path}")
     print("     → 怎么办：建这张表：agent 名、路径模式、出处三列，用制表符分隔，按每个能写文件的定义的「写范围」一节转写。")
 writers = []
+missing_omit, missing_basis = [], []
 for path in sorted(glob.glob(".claude/agents/*.md")):
-    head = open(path, encoding="utf-8").read().split("\n---", 1)[0]
+    whole = open(path, encoding="utf-8").read()
+    head = whole.split("\n---", 1)[0]
+    if not any(line.strip() == "omitClaudeMd: true" for line in head.split("\n")):
+        missing_omit.append(os.path.basename(path)[:-3])
+    if not any(line.startswith("依据：") for line in whole.split("\n")):
+        missing_basis.append(os.path.basename(path)[:-3])
     tools_line = next((line for line in head.split("\n") if line.startswith("tools:")), "")
     tools = {tool.strip() for tool in tools_line[len("tools:"):].split(",")}
     if tools & {"Write", "Edit"}:
@@ -103,6 +110,18 @@ if ghosts:
     for name in ghosts:
         print(f"     {name}")  # gate-lint:detail
     print("     → 怎么办：改成现在的定义名，或删掉这几行。")
+if missing_omit:
+    failed = True
+    print("  ✗ 这些定义的 frontmatter 没有 omitClaudeMd: true——每次派发都白带约 10 万 token 的 CLAUDE.md 与规则：")  # gate-lint:summary
+    for name in missing_omit:
+        print(f"     {name}")  # gate-lint:detail
+    print("     → 怎么办：在它的 frontmatter 里加一行 omitClaudeMd: true，开工先读那一句指到 .claude/agent-common.md「规则怎么读」。")
+if missing_basis:
+    failed = True
+    print("  ✗ 这些定义没有「依据：」一行——不继承 CLAUDE.md 之后，它要读的规则没有地方点名：")  # gate-lint:summary
+    for name in missing_basis:
+        print(f"     {name}")  # gate-lint:detail
+    print("     → 怎么办：在正文里加一行「依据：」，点名它干活要守的规则文件与小节。")
 if failed:
     sys.exit(1)
 pattern_count = sum(len(patterns) for patterns in patterns_by_agent.values())
@@ -114,9 +133,9 @@ if [[ $table_rc -ne 0 ]]; then exit 1; fi
 read -r _ writer_count pattern_count <<<"$(printf '%s\n' "$table_output" | grep '^TABLE_OK ')"
 selftest_output="$(bash "$HOOK" --selftest 2>&1)"; selftest_rc=$?
 if [[ $selftest_rc -ne 0 ]]; then
-  echo "  ✗ agent-write-scope.sh 的自证没过："
+  echo "  ✗ write-guard.sh 的自证没过："
   printf '%s\n' "$selftest_output" | sed 's/^/    /'   # gate-lint:detail
-  echo "     → 怎么办：修 .claude/hooks/agent-write-scope.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
+  echo "     → 怎么办：修 .claude/hooks/write-guard.sh 的 decide_scope() 或入口，再跑 --selftest 看它转绿。"
   exit 1
 fi
 guard_output="$(bash "$(dirname "$HOOK")/bash-command-detector.sh" --selftest 2>&1)"; guard_rc=$?

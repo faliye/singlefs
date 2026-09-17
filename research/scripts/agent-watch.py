@@ -439,9 +439,15 @@ def read_detections(detections_path, start_offset, session_ids):
                 continue
             if BROKEN_DETECTION == "detections" or entry.get("session_id") not in session_ids:
                 continue
+            findings = [str(finding) for finding in (entry.get("findings") or [])]
+            if findings and all(finding.startswith("没有 timeout 的等待循环") for finding in findings) and BROKEN_DETECTION != "loopnoise":
+                # 只检出等待循环的不立刻叫醒：正常等编译、等全量跑也是这个形状。会话记录那一路在它跑满 --wait-loop-minutes 时再报。
+                continue
             alerts.append((entry.get("agent_type") or "?", "hook 检出",
                            f"{'、'.join(entry.get('findings') or [])}：{(entry.get('command') or '')[:160]}",
-                           "hook 只记不拦，命令照常在跑；主 agent 判断它会不会出问题，再决定接着盯、发消息让它改、还是处理"))
+                           ("这次写被 hook 拒了、没写进去；主 agent 判断是不是该写的，再决定发消息让它改、自己改、还是派该写的 agent"
+                            if any(str(finding).startswith("写被拒") for finding in (entry.get("findings") or []))
+                            else "检出 hook 只记不拦，命令照常在跑；主 agent 判断它会不会出问题，再决定接着盯、发消息让它改、还是处理")))
         return handle.tell(), alerts
 
 
@@ -641,10 +647,11 @@ def selftest():
                                  "--session-dir", session, "--interval-seconds", "1", "--max-minutes", "0.03", "--process-root-pid", "0"],
                                 capture_output=True, text=True).returncode
     if watch_exit != 4:
-        failures.append(f"到寿命上限时看门狗应当退出码 4，实际 {watch_exit}")
+        failures.append(f"到定时回报的时刻看门狗应当退出码 4，实际 {watch_exit}")
     detections_file = os.path.join(work, "detections.jsonl")
     open(detections_file, "w").close()
-    for session_label, wanted_exit in (("session", 3), ("另一个会话", 4)):
+    for session_label, finding_text, wanted_exit in (("session", "按模式匹配的进程命令", 3), ("另一个会话", "按模式匹配的进程命令", 4),
+                                                     ("session", "没有 timeout 的等待循环", 4)):
         watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--agents", "healthy", "--session-dir", session,
                                     "--interval-seconds", "2", "--detection-poll-seconds", "0.5", "--max-minutes", "0.12",
                                     "--process-root-pid", "0", "--detections-file", detections_file],
@@ -652,10 +659,10 @@ def selftest():
         time.sleep(1.5)
         with open(detections_file, "a", encoding="utf-8") as handle:
             handle.write(json.dumps({"session_id": session_label, "agent_type": "experiment-runner",
-                                     "command": "pgrep -f x", "findings": ["按模式匹配的进程命令"]}, ensure_ascii=False) + "\n")
+                                     "command": "pgrep -f x", "findings": [finding_text]}, ensure_ascii=False) + "\n")
         output, _ = watcher.communicate(timeout=60)
         if watcher.returncode != wanted_exit or (wanted_exit == 3 and "hook 检出" not in output):
-            failures.append(f"检出记录属于「{session_label}」时看门狗应当退出码 {wanted_exit}，实际 {watcher.returncode}")
+            failures.append(f"检出记录属于「{session_label}」、检出「{finding_text}」时看门狗应当退出码 {wanted_exit}，实际 {watcher.returncode}")
     subprocess.run(["rm", "-rf", work])
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
@@ -663,7 +670,7 @@ def selftest():
         print("    → 看 agent_alerts() / process_alerts() / run() 的判法；AGENT_WATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-watch 自检通过：等待循环、工具过长、同一命令反复且输出不变、禁用命令、无动静、进程无输出六种告警都报得出，"
-          f"跑完、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，看门狗三种退出码对，本会话的 hook 检出会叫醒主 agent、别的会话的不会，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、5 次看门狗）")
+          f"跑完、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，看门狗三种退出码对，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、6 次看门狗）")
     return 0
 
 

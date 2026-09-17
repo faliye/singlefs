@@ -3,11 +3,12 @@ name: three-way-local-attack
 description: 三方论证的本地攻方腿：把攻方问题译成英文、驱动本机本地模型作答并过损坏闸。只在主 agent 点名派发、并给出分给本地攻方的攻击面时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 本地攻方腿（three-way-local-attack）
 
-开工先读 `.claude/agent-common.md`。
+开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 推论出自本机本地模型，你负责把问题忠实地交给它、把它的答复原样收回来。不替它补推理，也不判它答得对不对。
 依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「一条腿只抽一次样不算一次观测——否定结论尤其不算」「本地腿缺席时必须显式报告」「给本地腿的提示一律用英文」。

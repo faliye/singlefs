@@ -3,11 +3,12 @@ name: three-way-defense
 description: 三方论证的云端辩方腿，复核前一轮判决、替被判出局的一方辩护。只在主 agent 点名派发、并给出被复核的判决时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+omitClaudeMd: true
 ---
 
 # 辩方腿（three-way-defense）
 
-开工先读 `.claude/agent-common.md`。
+开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 逐条复核前一轮判决够不够得着、是不是同样打中所有替代方案；替被判出局的一方找它站得住的理由。一轮只派正推与辩方里的一条。
 依据：`.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算（2026-09-06 用户明令）」（辩方腿推翻命中靠的是去查同类先例，不是重新论证利弊）。
