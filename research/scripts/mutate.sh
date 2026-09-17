@@ -131,8 +131,15 @@ PY
   # （例如 `..._analytic_io_per_op_of_1_9375`、`..._reads_exactly_122`）匹配不上，
   # `red` 为空 ⇒ **一条确实红了的变异被报成「一个测试都没红」**。
   # 方向是谎报盲区，会把人引去补一条本来就有的检查。2026-08-29 实测踩过并修。
-  red="$(sed -n 's/^test tests::\(.*\) \.\.\. FAILED$/\1/p' <<<"$out" | paste -sd, -)"
-  if [[ -z "$red" ]]; then
+  # ⚠️ **第三次同形：模块名也不许写死。** 2026-09-17 写的是 `^test tests::`，E154 的单测分在
+  # `gate_tests` 与 `integration_tests` 两个模块里，7 条变异全被报成「一个测试都没红」，合并成 `mod tests` 之后 7 条全红。
+  # ⇒ `test ` 与 ` ... FAILED` 之间的整段都算名字（含模块路径）；另加一道兜底：测试进程报了失败、名字却一个没抓到，
+  #   说明抓取规则又有盲区，单独报，不报成「没被看见」。
+  red="$(sed -n 's/^test \(.*\) \.\.\. FAILED$/\1/p' <<<"$out" | paste -sd, -)"
+  if [[ -z "$red" ]] && grep -q '^test result: FAILED' <<<"$out"; then
+    echo "⚠️  [$name] 测试进程报了失败，但一个失败的测试名都没抓到 —— mutate.sh 抓名字的规则有盲区，这一条不算盲区也不算命中"
+    fail=1
+  elif [[ -z "$red" ]]; then
     echo "❌ [$name] 一个测试都没红 —— 这条破坏没有被任何检查看见"
     fail=1
   else

@@ -9,15 +9,6 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/refuse-overwrite-untracked.sh"
           }
         ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/agent-write-scope.sh"
-          }
-        ]
       }
     ]
   }

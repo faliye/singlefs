@@ -1,0 +1,12 @@
+name=items count=10
+name=scan item=D18_11 relabel_rc=0 rs_files=16 stage33_rc=1 rotted_entries=3 e142_product_lines=1 replay_pinned_products_with_label=1
+name=scan item=D18_7 relabel_rc=0 rs_files=25 stage33_rc=1 rotted_entries=2 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D22_7 relabel_rc=0 rs_files=16 stage33_rc=1 rotted_entries=1 e142_product_lines=1 replay_pinned_products_with_label=1
+name=scan item=D23_14 relabel_rc=0 rs_files=10 stage33_rc=1 rotted_entries=1 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D27_2 relabel_rc=0 rs_files=3 stage33_rc=1 rotted_entries=2 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D2_12 relabel_rc=0 rs_files=3 stage33_rc=1 rotted_entries=1 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D2_9 relabel_rc=0 rs_files=14 stage33_rc=1 rotted_entries=2 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D3_7 relabel_rc=0 rs_files=13 stage33_rc=1 rotted_entries=3 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D4_5 relabel_rc=0 rs_files=18 stage33_rc=1 rotted_entries=1 e142_product_lines=0 replay_pinned_products_with_label=0
+name=scan item=D8_2 relabel_rc=0 rs_files=25 stage33_rc=1 rotted_entries=1 e142_product_lines=0 replay_pinned_products_with_label=0
+name=done

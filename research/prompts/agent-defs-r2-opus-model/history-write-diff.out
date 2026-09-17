@@ -1,0 +1,3 @@
+name=case case=W1_only_this_round_entry foreign_entry=no write_rc=0 placeholders_written_into_foreign_entry=0 card_rows_removed=1 card_rows_removed_not_this_round=1 card_rows_added_for_foreign_entry=0 write_log=_✓_按原文重新生成了_.claude/kb/decisions-history.md：425_条条目，这次补了_0_条「（待补）」快查
+name=case case=W2_plus_foreign_entry_without_quick foreign_entry=yes write_rc=0 placeholders_written_into_foreign_entry=2 card_rows_removed=2 card_rows_removed_not_this_round=2 card_rows_added_for_foreign_entry=1 write_log=_✓_按原文重新生成了_.claude/kb/decisions-history.md：426_条条目，这次补了_1_条「（待补）」快查
+name=done cases=2

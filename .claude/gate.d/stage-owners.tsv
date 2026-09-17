@@ -1,0 +1,57 @@
+# 门禁阶段归属：每个项目本地阶段先由哪个 agent 在干完自己的活之后跑。提交前的整轮门禁（gate-triage）照旧跑全部阶段。
+# 三列用制表符分隔：阶段文件名、agent 名（逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么归它。
+# 表与目录、定义逐项一致由 62-stage-owners.sh 判；各 agent 怎么从表里取自己的阶段，见 .claude/agent-common.md「门禁」。
+10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
+15-research-build.sh	experiment-runner	research 构建与单测
+20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
+21-decision-items-sync.sh	kb-scribe	决策分项清单与正文
+22-item-ref-status.sh	kb-scribe	分项引用写的状态
+23-link-targets.sh	kb-scribe	文档里的链接与「第 N 节」指向
+24-status-redundancy.sh	kb-scribe	分项状态重复标注
+25-kb-deictic.sh	kb-scribe	kb 里的「本轮」锚
+26-number-name-sync.sh	kb-scribe	编号与简称
+27-format-constants.sh	kb-scribe,experiment-runner	kb 登记的格式常量与实验源码两边
+28-cross-decision-status.sh	kb-scribe	跨决策的未定说法
+29-settled-item-self-open.sh	kb-scribe	已定分项自称没定
+30-decision-history.sh	kb-scribe	决策变更留痕
+31-blocking-verdict.sh	kb-scribe	未定项判没判过挡不挡第一个事务
+32-first-txn-fields.sh	kb-scribe	字节表字段指向真实分项
+32-history-ordinal.sh	kb-scribe	新增历史条目撞号
+33-mutation-tables.sh	experiment-runner,kb-scribe	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑
+34-experiment-index-sync.sh	experiment-runner	实验索引行与正文标题
+35-user-verdict-owed.sh	kb-scribe	动了用户定案要记欠账
+36-invariant-count-cross-file.sh	kb-scribe	不变量条数跨文件
+37-decision-summary-width.sh	kb-scribe	决策索引结论列宽度
+38-field-table-projection.sh	kb-scribe	决策里定的字段投影进字节表
+39-field-table-sum.sh	kb-scribe	字段表合计
+40-results-cited.sh	experiment-runner	实验产物写回
+41-pipefail-grepq.sh	gate-triage	脚本纪律；没有 agent 负责写门禁脚本
+42-first-txn-trio.sh	kb-scribe	字节表、里程碑、决策索引三份互相挂钩
+43-owed-table-shape.sh	kb-scribe	欠账表行形状
+44-settled-ref-says-open.sh	kb-scribe	已定项引用紧跟着说没定
+45-script-modes.sh	gate-triage	看暂存区里的执行位，暂存之后才有对象
+46-write-hook.sh	gate-triage	看项目 settings 里的 hook
+47-research-script-selftests.sh	three-way-materials	材料员用的抽取脚本与本地腿脚本的自证
+48-history-month-file.sh	kb-scribe	变更史条目住在所在月
+49-history-brief.sh	kb-scribe	变更史快查与原文
+50-rules-manifest.sh	gate-triage	看 CLAUDE.md 的规则引用
+51-admission-terms-covered.sh	kb-scribe	准入不等式各项有人维护
+52-segment-registry.sh	kb-scribe,experiment-runner	字节表段序列登记与 E142 产物两边
+53-format-const-placeholders.sh	implementation-writer,kb-scribe	crates 常量文件的占位与 kb 分项两边
+54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放
+55-qemu-first-transaction.sh	crash-verifier	QEMU 真设备
+56-crates-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名
+57-lkmm.sh	crash-verifier	herd7 内存序
+58-implementation-premise.sh	three-way-materials	三方正文是材料员的输入
+59-crates-mutation-replay.sh	crash-verifier	crates 变异表复跑
+60-stale-open-items.sh	kb-scribe	未定项被别处定了
+61-settled-same-file.sh	kb-scribe	定了新东西之后回看同文件未定项
+62-stage-owners.sh	gate-triage	本表与门禁目录、agent 定义
+70-citations.sh	kb-scribe,prior-art	外部引用还核得动；写进 kb 的是书记员，查源码树的是调研员
+80-absolute-assertions.sh	experiment-runner	实验钉绝对值的断言
+85-repro-command.sh	experiment-runner	实验复跑命令
+86-experiment-orphans.sh	experiment-runner	实验号在 kb 里有正文
+87-replay.sh	experiment-runner	入库实验复现
+88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
+89-stage-selftest.sh	gate-triage	项目本地阶段自己会不会红
+63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表

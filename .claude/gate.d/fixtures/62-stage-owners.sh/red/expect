@@ -1,0 +1,9 @@
+exit=1
+want=30-c.sh
+want=表里没有登记
+want=40-gone.sh
+want=门禁目录里没有这个文件
+want=ghost
+want=没有定义
+want=不止一行
+want=有空的

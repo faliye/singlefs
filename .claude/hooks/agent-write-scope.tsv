@@ -1,0 +1,19 @@
+# 项目 subagent 用 Write / Edit 时的写范围：一个 agent 一个或几个路径模式，一行一个。由 agent-write-scope.sh 在 PreToolUse 里判。
+# 三列用制表符分隔：agent 名、路径模式、出处。路径模式相对仓根，以 / 开头的是绝对路径；** 跨目录，* 不跨目录。
+# 只登记 tools 里有 Write 或 Edit 的定义；表与定义逐项一致由 63-agent-write-scope.sh 判。Bash 里的写不经过这道闸。
+implementation-writer	crates/**	implementation-writer.md「写范围」
+implementation-writer	litmus/**	implementation-writer.md「写范围」
+implementation-writer	/tmp/claude-1000/**	报告文件与草稿目录（定义不许它写 kb 与 research/）
+kb-scribe	.claude/kb/**	kb-scribe.md「写范围」；relabel-item.py 改写的别处文件只许那个脚本改，不经 Edit
+kb-scribe	/tmp/claude-1000/**	报告文件与草稿目录
+experiment-runner	research/e7-index-bench/src/bin/**	experiment-runner.md「写范围」：bin 源文件
+experiment-runner	research/mutations/**	变异表
+experiment-runner	research/results/**	这个实验的产物
+experiment-runner	research/scripts/replay.sh	复跑登记行
+experiment-runner	research/e7-index-bench/Cargo.toml	在末尾追加这个实验的 [[bin]]（agent-defs-r2 写范围探针：138 个实验 bin 有 100 个显式登记，副本里的试跑测不到这一处被拒）
+experiment-runner	research/prompts/e*-preregistration.md	跑前登记的「修订」一段
+experiment-runner	.claude/kb/experiments/**	实验页
+experiment-runner	.claude/kb/experiments.md	实验索引行
+experiment-runner	.claude/kb/experiments-history.md	重跑已有实验时这个实验的历史条目（agent-defs-r1 判决 D2）
+experiment-runner	research/prompts/e*-r*-prereg.md	重跑已有实验的重跑登记（agent-defs-r1 判决 D2）
+experiment-runner	/tmp/claude-1000/**	报告文件与草稿目录

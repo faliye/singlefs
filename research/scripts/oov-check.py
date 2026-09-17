@@ -15,6 +15,11 @@
 规则 D 换个方向判：成词的长前缀 + 一截既不成词也不是后缀的短尾巴。实测 2026-09-08：
 在 395 份既有输出上回扫，新增判红 4 份、两个词（`cryptographicord`、`rewritingopy`），全是真损坏、零误报。
 
+⚠️ **粘死的还可以是一个词自己尾部的一截，或者前缀不在词表里。** 规则 F 抓 `reachable+achable`、
+`anew+ew`（5–8 字母的短生词只走这一条），规则 C 的前缀放宽到「词表词 + 常见派生后缀」（`observational`）。
+实测 2026-09-17：在 339 份既有本地腿输出上回扫，新增判红 5 份（`anewew`、`observationalomputational`、
+`reachableachable`、`draftraft`、`keyedeyed`、`zoneone`），全是真损坏、零误报。
+
 排掉常见构词前缀，否则 `mis+represents` 这类正常派生词会被误判。
 """
 import sys, re, os
@@ -50,6 +55,30 @@ def load_words():
         sys.stderr.write("oov-check: 读不了词表 %s: %s\n" % (WORDS_PATH, e))
         sys.exit(EXIT_BROKEN)
 
+def is_word_or_derived(a, words):
+    """词表里的词，或「词表词 + 常见派生后缀」（词根 >= 5 字母）。
+    ⚠️ 补出来的：词表来自内核文档，`observational` 不在里面，`observationalomputational`
+    （observational + [c]omputational）的前缀因此切不出来，规则 C 判绿（2026-09-17 alloc-basis-r3 本地辩方 s2）。"""
+    if a in words:
+        return True
+    for suf in SUFFIX:
+        if len(suf) >= 2 and a.endswith(suf) and len(a) - len(suf) >= 5 and a[:-len(suf)] in words:
+            return True
+    return False
+
+def self_tail_repeat(lw, words, shortest_head):
+    """规则 F：一个词后面粘着它自己尾部的一截（`reachable` + `achable`、`anew` + `ew`）。
+    ⚠️ 补出来的：2026-09-17 alloc-basis-r3 本地辩方 s1 的 `anewew`、s2 的 `root-reachableachable`，
+    A–E 与取词长度下限都放过了它们。两道闸压假阳性：前半截成词且不短于 shortest_head，
+    尾巴 >= 2 字母、不是常见后缀、而且正好是前半截的后缀。"""
+    for i in range(len(lw) - 2, shortest_head - 1, -1):
+        a, b = lw[:i], lw[i:]
+        if len(b) < 2 or b in SUFFIX or not a.endswith(b) or len(b) >= len(a):
+            continue
+        if a in words:
+            return "%s+%s" % (a, b)
+    return None
+
 def splice_of(w, words):
     """两条高精度规则，任一命中即判拼接。返回切法，都不命中返回 None。
 
@@ -78,7 +107,7 @@ def splice_of(w, words):
     # 那是正常派生词，一旦误伤检测器就没人信了。
     for i in range(len(lw) - 5, 5, -1):
         a, b = lw[:i], lw[i:]
-        if len(a) < 6 or len(b) < 5 or a in PREFIX or a not in words:
+        if len(a) < 6 or len(b) < 5 or a in PREFIX or not is_word_or_derived(a, words):
             continue
         for c in 'abcdefghijklmnopqrstuvwxyz':
             cand = c + b
@@ -100,6 +129,9 @@ def splice_of(w, words):
             stem = lw[:-len(suf)]
             if stem.endswith('ed') and len(stem) >= 8 and stem in words:
                 return "%s+%s" % (stem, suf)
+    tail = self_tail_repeat(lw, words, 5)                 # 规则 F
+    if tail:
+        return tail
     # 规则 D：成词的长前缀后面粘着一截**既不成词也不是后缀**的短尾巴。
     # ⚠️ 这条是补出来的：实测 `cryptographicord`（cryptographic + [Rec]ord，后一个词掉了三个
     # 字母）在 A / B / C 下全切不开——A 要两截各 >=5，C 只补得回一个字母——于是被记成
@@ -126,6 +158,14 @@ def scan(path, prompt_path, words):
         with open(prompt_path, encoding='utf-8', errors='replace') as f:
             known = set(re.findall(r"[a-z][a-z']{2,}", f.read().lower()))
     oov, spliced = [], []
+    for w in re.findall(r"(?<![A-Za-z'])[A-Za-z]{5,8}(?![A-Za-z'])", txt):
+        lw = w.lower()
+        if lw in words or lw in known:
+            continue
+        s = self_tail_repeat(lw, words, 4)
+        if s:
+            oov.append(w)
+            spliced.append("%s(=%s)" % (w, s))
     for w in re.findall(r"[A-Za-z][A-Za-z']{8,}", txt):
         lw = w.lower()
         if lw in words or lw in known:
@@ -148,7 +188,12 @@ SELFTEST_RED = [
     'sortinging',            # 规则 E：sorting + ing
     'unaffecteding',         # 规则 E：unaffected + ing
     'unaffectedable',        # 规则 E：unaffected + able
+    'reachableachable',      # 规则 F：reachable + achable（自己尾部复读）
+    'observationalomputational',  # 规则 C（派生前缀）：observational + (c)omputational
 ]
+# 短词（5–8 字母）只走规则 F，单独一组
+SELFTEST_SHORT_RED = ['anewew']
+SELFTEST_SHORT_GREEN = ['tartar', 'papers', 'vetoes', 'reruns', 'rerun', 'dodos', 'hmmm']
 SELFTEST_GREEN = [
     'distinguishable',       # 曾被规则 C 误判成 distinguish+(c)able
     'indistinguishable', 'unfalsifiable', 'counterobservation',
@@ -169,13 +214,20 @@ def selftest(words):
         s = splice_of(w, words)
         if s:
             print("  ✗ 绿样本被误判：%s -> %s" % (w, s)); bad += 1
+    for w in SELFTEST_SHORT_RED:
+        if not self_tail_repeat(w, words, 4):
+            print("  ✗ 短词红样本没被抓到：%s" % w); bad += 1
+    for w in SELFTEST_SHORT_GREEN:
+        s = self_tail_repeat(w, words, 4) if w not in words else None
+        if s:
+            print("  ✗ 短词绿样本被误判：%s -> %s" % (w, s)); bad += 1
     if bad:
         print("  ✗ oov-check 自检未通过：%d 个样本判错" % bad)
-        print("     → 怎么办： 改 splice_of 的五条规则，改完把两组样本都跑一遍；"
+        print("     → 怎么办： 改 splice_of 的六条规则与 self_tail_repeat，改完把两组样本都跑一遍；"
               "红样本抓不到说明检测器有盲区，绿样本被误判说明它会误伤正常英文。")
         return EXIT_RED
     print("  ✓ oov-check 自检通过（红样本 %d 个全抓，绿样本 %d 个不误伤）"
-          % (len(SELFTEST_RED), len(SELFTEST_GREEN)))
+          % (len(SELFTEST_RED) + len(SELFTEST_SHORT_RED), len(SELFTEST_GREEN) + len(SELFTEST_SHORT_GREEN)))
     return EXIT_CLEAN
 
 if __name__ == '__main__':

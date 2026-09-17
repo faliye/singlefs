@@ -3,8 +3,23 @@
 **一个从零设计的 COW 文件系统，Rust 实现。**
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
 
-当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档，步 1 / 步 2 发布 B 已落地：覆盖写、释放、延迟重用、第二个可写实例、管理员回退，每一件都进层 0）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，步 0–7 的代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
-磁盘格式仍是软的（`.claude/rules/format-evolution.md`）；决策索引在 `.claude/kb/decisions.md`，正文在 `.claude/kb/decisions/`，第一个事务的字节表在 `.claude/kb/first-txn-layout.md`。
+当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档，做到哪一步看那份文件）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
+
+## 什么时候派哪个 agent
+
+主 agent 只调度和判断：和用户说话、写三方正文与判决、定案、git 暂存与提交、收尾报进度留在主 agent，其余按下表派。定义在 `.claude/agents/`，每个定义的「输入」一节是派发时必须给的东西，缺一样它不开工；共用约束在 `.claude/agent-common.md`。一次性的活照旧临时写提示派 general-purpose。改了定义要新派才生效：续做（SendMessage）沿用第一次派发时的定义；新建的定义要等几秒才派得出去。改了本文件（连同它 `@` 的规则）要新开会话才对派出去的 agent 生效：同一会话里派的继承会话开始时那一份。计划、实测与现状在 `records/2026-09-16-subagent拆分提案.md`。
+
+| 什么时候 | 派谁、按什么次序 |
+|---|---|
+| 要推论：设计判断、取舍，拿依据（包括实验结论）去推翻或确立决策，实现改动的对抗 | 主 agent 写 `research/prompts/_<轮>-body.md` → `three-way-materials` → 同一条消息并行派 `three-way-forward` 或 `three-way-defense`（一轮一条）、`three-way-attack`、`three-way-local-attack` 或 `three-way-local-defense`（一轮一条）→ 全部交齐后，有腿交了模型或产物就派 `three-way-verifier` → 主 agent 写判决；三轮之后停 |
+| 改 `crates/`：条款已定、验收标准写得清、改动有界（照已定分项实现、补测试与变异、修原因已知的红） | `implementation-writer`（后台派，主 agent 审 diff）→ 上一行的三方（代码轮）→ `crash-verifier`（层 0、QEMU、herd7、crates 变异表） |
+| 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 上一行的三方（代码轮）→ `crash-verifier` |
+| 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧 `implementation-writer`（输入给分诊报告），`research/` 那侧 `experiment-designer` 写重跑登记 → `experiment-runner` |
+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → `gate-triage` |
+| 撤回一个数、改格式常量、新立一条判据 | `sweep` |
+| 定案之后写回 kb | `kb-scribe`（主 agent 给逐条规格）；它翻了分项状态、33 号红（变异表锚点腐化）→ `experiment-runner` 只修锚点 |
+| 要建计数实验，或重跑已有实验 | `experiment-designer` 写跑前登记或重跑登记 → 主 agent 删掉登记里待删的问法（有的话）→ `experiment-runner` |
+| 要别家文件系统的事实 | `prior-art` |
 
 ## 规则（始终生效）
 
@@ -28,12 +43,9 @@
 | 项 | 值 |
 |---|---|
 | 上游仓 | `singlefs-ai-sop`，本机在兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
-| 项目里的副本 | `.claude/singlefs-ai-sop/`，是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
+| 项目里的副本 | `.claude/singlefs-ai-sop/`（[README](.claude/singlefs-ai-sop/README.md)），是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
 | 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
-| 怎么改 | 共享规则只能在**上游**改并抬 `VERSION`，然后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了 |
-
-上游管的是「项目怎么和 AI 协作」，不管文件系统怎么设计；
-只有本工程需要的纪律放 `.claude/rules/`，不要往上游推。
+| 怎么改 | 共享规则只能在**上游**改并抬 `VERSION`，然后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了，而且改它们等于改所有项目。上游的改动应当罕见：经常变说明规范本身没设计好；**作业在本仓，不在上游仓** |
 
 ## 项目本地规则
 
@@ -44,12 +56,7 @@
 @.claude/rules/implementation-workflow.md
 @.claude/rules/implementation-first.md
 
-文件系统的设计纪律只有本工程需要，所以它不在共享 SOP 里——
-共享 SOP 管的是「项目怎么和 AI 协作」，不管某一类系统怎么设计。
-
-（上面那批是 [singlefs-ai-sop](.claude/singlefs-ai-sop/README.md) 分发的共享规则，
-**改它们等于改所有项目**——要改就改上游并抬 `VERSION`，不许在项目里就地改。
-上游的改动应当罕见：经常变说明规范本身没设计好。**作业在本仓，不在上游仓。**）
+共享 SOP 只管「项目怎么和 AI 协作」；只有本工程需要的纪律（文件系统怎么设计、压在本机资源上的流程）放 `.claude/rules/`，不往上游推。
 
 ## 项目本地事实
 
@@ -57,7 +64,7 @@
 |---|---|
 | `.claude/kb/decisions.md` | **决策索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/decisions/` | 每个决策一个文件（`NN-简称.md`），正文与论证都在这里 |
-| `.claude/kb/decisions-history.md` | 决策变更史按决策的汇总：每条决策的现状、改过几次与最近 3 次改动（改了什么、改前、改后），由原文生成；原文按月住在 `.claude/kb/decisions-history/<年-月>.md`，每条写改前、改后、依据，标题下两行快查 |
+| `.claude/kb/decisions-history.md` | 决策变更史按决策的汇总，由 49 号 `--write` 从原文生成；原文按月在 `.claude/kb/decisions-history/<年-月>.md`，怎么写见 `.claude/rules/format-evolution.md`「硬约束」 |
 | `.claude/kb/experiments.md` | **实验索引**：编号、简称、状态、指向正文的链接 |
 | `.claude/kb/experiments/` | 每个实验一个文件（`NN-简称.md`），正文与口径都在这里 |
 | `.claude/kb/experiments-history.md` | 全部实验的变更史 |
@@ -65,112 +72,27 @@
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |
-| `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项、给具体的宽度与取值（未定的给预想值），指不到的就是格式级空白；每节标里程碑步号 |
-| `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑：三个前置、卫生检查、虚机里才有的校验路径 |
-| `.claude/kb/verification-build.md` | 三样验证手段（checker、事务层、崩溃点重放）怎么落地：消费哪些条款、被谁挡着、能复用什么、第一版范围、待定案的问题 |
-| `.claude/kb/milestone/` | 里程碑规划，一个里程碑一个文件（`NN-简称.md`）：`01-first-txn.md` 是「第一个事务」（八步，出口 2026-09-14 满足）、`02-second-txn.md` 是「第二个事务」（八步：装置扩成固定脚本、覆盖写、释放、第二个可写实例、管理员回退、抬 F 与延迟重用、层 0 全量、出口）；每步写设想实现什么、预想的细节、验收标准、写出的字节在 `first-txn-layout.md` 哪几节、会碰到的决策点；按当时判断写，不要求正确，每步开工前回来改 |
-| `research/scripts/replay.sh` | 复跑已入库的实验，与 `research/results/` 里那份逐字节比对；计时实验另有把 kb 里的数钉住的区间断言 |
+| `.claude/kb/first-txn-layout.md` | 第一个事务写出哪些字节：每段每字段指向一条决策分项、给宽度与取值，指不到的就是格式级空白 |
+| `.claude/kb/vm-harness.md` | 怎么把实验送进虚机在真块设备上跑 |
+| `.claude/kb/verification-build.md` | 三样验证手段（checker、事务层、崩溃点重放）怎么落地、被谁挡着 |
+| `.claude/kb/milestone/` | 里程碑规划，一个里程碑一个文件（`NN-简称.md`）：每步设想、验收标准、写出的字节、会碰到的决策点；每步开工前回来改 |
 | `research/scripts/fetch-refs.sh` | 把承重的外部文献重新固定到本机（URL + sha256 + 引用方），`pdf-text.py` 抽文本，断言在 `verify-citations.sh` |
-| `research/scripts/stage-mine.py` | 几个会话共写一批文件时只暂存这一轮的块：插入段按标题行、表格行、replay 登记行切块，命中 `--match` 的进暂存区、其余留在工作区，进暂存区的块命中 `--foreign` 就拒绝；`--selftest` 自证会红 |
-| `research/scripts/check-staged.sh` | 在临时 worktree 上只拿「HEAD + 暂存区」跑 doc-lint 与快的 kb 阶段，别的会话没收尾的改动与未跟踪文件都不进来；`--selftest` 自证会红 |
-| `research/scripts/relabel-item.py` | 分项翻了状态之后按 22 号门禁的归属规则改写全仓引用（`D19 6 --dry-run` 先看），改完标签仍说它没定的句子列成「要人看」；`--selftest` 自证会红 |
-| `research/scripts/check-segment-registry.py` | 把 `first-txn-layout.md` 八的段序列登记表（段序列、操作数、闭式、每段步骤种类多重集）与 E142 产物的 `name=segments` 行逐字比对，产物路径从 `replay.sh` 的 E142 行动态解析；门禁 52 号调它；`--selftest` 自证会红 |
-| `research/scripts/replace-once.py` | 定点替换：`replace-once.py 文件 旧串 新串`，旧串在文件里必须恰好命中一次，0 次或多次都拒绝、不写；几个会话共写一批文件时只许这样改，不许整份重写；`--selftest` 自证会红 |
-| `research/scripts/claim-experiment.sh` | 取实验号并当场占住：查号与建跑前登记在同一步，建文件用排他方式；`--next` 打印下一个空号；`--selftest` 自证会红 |
-| `research/scripts/replace-batch.py` | 批量定点替换：规格文件（JSON）里每一处（文件、旧串、新串）都先在内存里核「恰好命中一次」，全过了才写盘并回读；有一处不中就一个文件都不写；`--dry-run` 只核不写；`--selftest` 自证会红（`REPLACE_BATCH_WRITE_EACH=1` 强制走回逐处写盘，自检必须判红） |
-| `research/perf-by-milestone.md` | singlefs 与六家文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）按里程碑的性能对比：六家基线的表，每个里程碑一节写 singlefs 能跑哪几维、差多少、跑不了的还缺什么；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `research/scripts/e152-tables.py` 从产物生成；每过一个里程碑给 singlefs 重跑一遍、加一节 |
-| `.claude/rules/` | 项目本地规则（`fs-design.md` 设计纪律、`format-evolution.md` 格式演进纪律、`three-way-inference.md` 推论三方论证 + 引 kb 条目一律整行抄、`mutation-sampling.md` 变异没被抓时的三分判据、`implementation-workflow.md` 实现改动三步走：写代码 → 三方对抗 → checker，提交前跑 herd7 与 QEMU、`implementation-first.md` 方案与探讨建在 `crates/` 的实现上、`research/` 的装置只作独立验证） |
+| `research/scripts/stage-mine.py` | 几个会话共写一批文件时，只把这一轮的块放进暂存区（命中 `--match` 的进，命中 `--foreign` 的拒绝） |
+| `research/scripts/check-staged.sh` | 在临时 worktree 上只拿「HEAD + 暂存区」跑 doc-lint 与快的 kb 阶段 |
+| `research/scripts/replace-once.py` | 定点替换：旧串在文件里必须恰好命中一次，否则不写；几个会话共写一批文件时只许这样改，不许整份重写 |
+| `research/perf-by-milestone.md` | singlefs 与六家文件系统按里程碑的性能对比；数来自 E152（按里程碑对比六家文件系统的文件性能），表由 `research/scripts/e152-tables.py` 生成 |
 | `records/` | 建设过程 |
-| `briefs/` | 每次更新的简报，按日期一份（`YYYY-MM-DD.md`）：那一版能做什么、验到哪、还没罩到什么；给读者看现状，旧的一份不回头改，下次更新另起一份 |
-
-## 门禁
-
-门禁的目的是**把每一份提交抬到值得花人的时间去看那条线上**，不是把谁挡在外面。
-它不按来源区分提交者，只区分带证据的和不带的。
-
-```bash
-bash .claude/scripts/gate.sh          # 准入门禁，提交前必跑
-
-bash .claude/scripts/check.sh         # 快速反馈（格式/lint/构建/单测）
-bash .claude/scripts/lkmm.sh          # 内存序（herd7 + litmus/；每条 Never 要有对照组、要绑到代码；2026-09-16 起是本工程自己的脚本，门禁阶段 57 号）
-bash research/scripts/vm-bench.sh --selftest   # 虚机装置自检（装置归项目，见 .claude/kb/vm-harness.md）
-bash .claude/scripts/gate-lint.sh     # 门禁自身：每条拒绝是否都给了下一步
-bash .claude/scripts/env.sh           # 环境自检
-bash .claude/gate.d/10-kb-rot.sh          # kb 腐化：引用悬空、结论悬空、条数对不上
-bash .claude/gate.d/15-research-build.sh  # research 构建与单测（共享门禁只看 crates/，而证据住在 research/）
-bash .claude/gate.d/20-kb-shape.sh        # kb 形状：用词、指代、链接、条数与标题相符
-bash .claude/gate.d/21-decision-items-sync.sh # 决策分项清单与索引表状态列，与正文同步（--write 重新生成）
-bash .claude/gate.d/22-item-ref-status.sh # 分项引用写的状态与正文的两张索引表相符
-bash .claude/gate.d/23-link-targets.sh    # 相对链接与「第 N 节」指向到不到得了
-bash .claude/gate.d/24-status-redundancy.sh   # 分项状态在索引表与正文里重复标注
-bash .claude/gate.d/25-kb-deictic.sh      # kb 里的「本轮」锚不锚得到具体一轮
-bash .claude/gate.d/26-number-name-sync.sh    # 编号简称在 doc-lint 够不到的地方也要一致
-bash .claude/gate.d/27-format-constants.sh    # 格式常量在 kb 与实验源码之间同步
-bash .claude/gate.d/28-cross-decision-status.sh # 说某条决策未定，而它已经定了
-bash .claude/gate.d/29-settled-item-self-open.sh # 已定分项的正文里说自己还没定
-bash .claude/gate.d/30-decision-history.sh # 决策变更有没有在当月的变更史里留条目
-bash .claude/gate.d/31-blocking-verdict.sh # 每个未定项有没有判过改不改第一个事务的字节
-bash .claude/gate.d/32-history-ordinal.sh # 本次新增的历史条目有没有撞号（并发会话共写一个仓）
-bash .claude/gate.d/32-first-txn-fields.sh # 第一个事务的每个字段都指到一条真实存在的分项
-bash .claude/gate.d/33-mutation-tables.sh # 每个实验二进制都有同名变异表（只验装置在，不跑变异）
-bash .claude/gate.d/34-experiment-index-sync.sh # 实验索引行与正文标题说的是不是同一件事
-bash .claude/gate.d/35-user-verdict-owed.sh # 动了用户定案的条款有没有记一笔未还的账
-bash .claude/gate.d/36-invariant-count-cross-file.sh # 不变量条数在 invariants.md 之外也要对
-bash .claude/gate.d/37-decision-summary-width.sh # 决策索引结论列的宽度（上限从 decisions.md 那一句读）
-bash .claude/gate.d/38-field-table-projection.sh # 决策里定的字段有没有漏投影进第一个事务的表
-bash .claude/gate.d/39-field-table-sum.sh # 字段表加出来的数：表后合计与 format-const 标记
-bash .claude/gate.d/40-results-cited.sh   # 实验产物有没有写回：跑过的必须被点名，或写明未留存
-bash .claude/gate.d/41-pipefail-grepq.sh  # pipefail 下用 grep -q 收尾的管道（命中会被读成没命中）
-bash .claude/gate.d/42-first-txn-trio.sh   # 第一个事务的三份文件互相挂钩：字节表 / 里程碑 / 决策索引里判「是」的未定项
-bash .claude/gate.d/43-owed-table-shape.sh  # 欠账表两张登记表的行形状：已还清那张不许混进六列的欠账行
-bash .claude/gate.d/44-settled-ref-says-open.sh # 引用写着「已定项」，紧跟着却说它没定（归属与 22 号同一份库）
-bash .claude/gate.d/45-script-modes.sh     # 脚本的执行位在暂存区里没丢（手工暂存写死 100644 的那一型）
-bash .claude/gate.d/46-write-hook.sh     # Write 覆盖未跟踪文件的 hook 注册着、而且会拒绝（几个会话共写一个仓）
-bash .claude/gate.d/47-research-script-selftests.sh # 三方论证脚本的自证还会红（ask-local 判红分支、清单生成取法、机械整抄、小节清单）
-bash .claude/gate.d/48-history-month-file.sh # 决策变更史的条目住在它日期所在月的那一份（别处按日期找条目）；决策正文文末只放指路、不写条目
-bash .claude/gate.d/49-history-brief.sh # 决策变更史的快查与原文同步（每条原文标题下两行快查；--write 重新生成按决策的汇总）
-bash .claude/gate.d/50-rules-manifest.sh  # 项目规则清单与本文件的 @ 引用逐项相等
-bash .claude/gate.d/51-admission-terms-covered.sh # 准入不等式的每一项都有人维护：被维护的统计量，或写明的例外
-bash .claude/gate.d/52-segment-registry.sh     # 段序列登记表（first-txn-layout.md 八）与 E142 产物的 name=segments 行逐字比对
-bash .claude/gate.d/53-format-const-placeholders.sh # 格式常量文件（crates/singlefs-format）里的占位：每个占位都指得到一条真实存在的分项或欠账
-bash .claude/gate.d/54-layer0-replay.sh # 层 0 崩溃点重放：两条流的全部崩溃状态（第一个事务 262165 个、覆盖写 + 释放 524312 个）在 release 下逐个跑恢复，计数与 E142 产物 / 用例里的闭式逐字比对
-bash .claude/gate.d/55-qemu-first-transaction.sh # QEMU 真设备上的第一个事务：两块 virtio 盘、设备侧独立录制与程序录制流逐项比，漏一道屏障与走页缓存两个对照必须判红
-bash .claude/gate.d/56-crates-adversarial-review.sh # crates 里的实现改动有没有走过三方正反对抗推理：每个改过的 crates/*/src/*.rs 要在同一次改动的三方判决文件里被按路径点名
-bash .claude/gate.d/57-lkmm.sh # 内存序（herd7 + litmus/）：上游 2026-09-16 移交给本工程之后唯一判它的阶段，缺 herd7 直接红
-bash .claude/gate.d/58-implementation-premise.sh # 三方论证正文有没有「实现今天的样子」：标题日期 ≥ 2026-09-17 的 `research/prompts/_*-body.md` 必须提到 `crates/`
-bash .claude/gate.d/59-crates-mutation-replay.sh # crates 变异表复跑：`crates/mutations.tsv` 每条改坏一处、跑点名的测试、必须红、还原；锚点腐化或一条没红都判红
-bash .claude/gate.d/60-stale-open-items.sh # 未定项有没有被别处定了（跨文件 + 看历史）
-bash .claude/gate.d/61-settled-same-file.sh # 定了新东西之后有没有回头看同文件的未定项（同文件 + 看 diff）
-bash .claude/gate.d/70-citations.sh       # 外部引用还核得动吗（承重引用逐条复核，条数以 research/scripts/verify-citations.sh 为准；源码树不在也判红）
-bash .claude/gate.d/80-absolute-assertions.sh # 每个实验都要有钉绝对值的断言（防「所有臂一起错」）却没回收
-bash .claude/gate.d/85-repro-command.sh   # 点了产物的实验有没有写复跑命令
-bash .claude/gate.d/86-experiment-orphans.sh # research 里的实验号在 kb 里有没有正文
-bash .claude/gate.d/87-replay.sh          # 入库的实验数今天还复现得出来吗（默认跳过脚本里列的 4 个慢实验、其余从 replay.sh 的表现算；`GATE_REPLAY_FULL=1` 全跑）
-bash .claude/gate.d/88-quoted-result-lines.sh # kb 正文里整行抄的 E7RESULT 行，在 research/results/ 的产物里逐字找得到（抄的时候改了数、产物重跑之后正文没跟）
-bash .claude/gate.d/89-stage-selftest.sh  # 上面这批阶段自己会不会红（样本在 gate.d/fixtures/）
-```
-
-**`.claude/gate.d/*.sh` 是项目本地门禁阶段**，`gate.sh` 按文件名顺序逐个跑，
-每个记成一个独立阶段。放进去的检查**会红**，不是提醒句。
-新增一条：写个 `.sh` 丢进去，头部写 `# gate-stage: <阶段名>`。
-⚠️ **脚本存在但跑不起来（没执行位、语法错）一律判红，不许当成跳过。**
-
-**Gate proves evidence requirements, not semantic correctness.**
-绿色只说明证据要求被满足，不代表语义正确——`gate.sh` 每次都会列出未实现的阶段。
+| `briefs/` | 每次更新的简报，按日期一份（`YYYY-MM-DD.md`）：那一版能做什么、验到哪、还没罩到什么；旧的不回头改 |
 
 ## 本项目的特殊性
 
 1. **没有 oracle。** 从零设计意味着没有参照实现可比对——移植类项目那种
    「拿现成工具的输出当标准答案」的便利这里不存在。功能正确性只能靠模型对拍，
-   这是最大的隐性成本，见 `kb/prior-art.md`「三、Rust 侧现有轮子」。
-2. **格式还是软的。** 第一个外部用户出现前可以随时拆了重做。
-   真正要慎重的是 `kb/decisions.md`，不是 `.rs` 文件。
-3. **不进 Linux 主线**（D7）。前几年按单人项目做，准入判据是门禁——
-   每个 patch 都要经过严格测试，不按提交来源区别对待。
+   这是最大的隐性成本，见 `.claude/kb/prior-art.md`「三、Rust 侧现有轮子」。
+2. **不进 Linux 主线**（D7（是否进 Linux 主线））。前几年按单人项目做，准入判据是门禁。
 
 ## 一句话版本
 
 - 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。第一个事务的代码是 2026-09-13 总审核把未定项集中交用户定案之后才开工的（`records/2026-09-13-总审核.md`）。
-- 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」。
-- 记账必须在提交时增量维护；任何要「事后扫一遍」的记账设计当场否决。
+- 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
 - 门禁全绿**只构成第一个事务与一次覆盖写在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载是两条流：第一个事务，以及同一实例里的覆盖写 + 释放（发布 B）；多次挂载、回退、已释放落点的复用都没进来，checker 也只判第一版那部分不变量。

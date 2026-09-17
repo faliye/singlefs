@@ -1,0 +1,6 @@
+# 样本表
+10-a.sh	alpha	样本理由
+10-a.sh	beta	重复登记
+20-b.sh	ghost	没有这个定义
+40-gone.sh	alpha	目录里没有
+50-d.sh		第二列空
