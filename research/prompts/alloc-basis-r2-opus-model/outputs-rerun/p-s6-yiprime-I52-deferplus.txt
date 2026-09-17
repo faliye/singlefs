@@ -1,0 +1,11 @@
+S6 A txg=3 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211955 acct_defer=2 mem_alloc=13 mem_defer=1 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3472670720) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=4 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211945 acct_defer=12 mem_alloc=23 mem_defer=11 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3472506880) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=5 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211935 acct_defer=22 mem_alloc=33 mem_defer=21 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3472343040) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=6 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211925 acct_defer=32 mem_alloc=43 mem_defer=31 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3472179200) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=7 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211915 acct_defer=42 mem_alloc=53 mem_defer=41 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3472015360) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=8 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211905 acct_defer=52 mem_alloc=63 mem_defer=51 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3471851520) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite txg=9 inst=1 F_root=0 F_eff=0 acct_alloc=12 acct_free=211895 acct_defer=62 mem_alloc=73 mem_defer=61 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3471687680) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 raise F=5 ceiling=6 publishes=[10, 11] reclaimed=17
+S6 after-raise txg=11 inst=1 F_root=5 F_eff=5 acct_alloc=12 acct_free=211908 acct_defer=49 mem_alloc=60 mem_defer=48 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3471900672) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+S6 overwrite-after-raise txg=12 inst=1 F_root=5 F_eff=5 acct_alloc=12 acct_free=211898 acct_defer=59 mem_alloc=70 mem_defer=58 mem_isolated=0 | I-5.2[盘 0：空闲 Some(3471736832) + 已分配 Some(196608) ≠ 单元区 Some(3472883712)]
+PROBE-COMPLETE

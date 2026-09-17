@@ -1,0 +1,9 @@
+S4 before-raise txg=18 inst=1 F_root=0 F_eff=0 acct_alloc=157 acct_free=211811 acct_defer=145 mem_alloc=157 mem_defer=145 mem_isolated=0 | GREEN
+S4 old F_eff=0 victim root txg=3 referenced slots={50176, 50177, 50180, 50181, 50240, 50242, 50243, 50244, 50245, 50246, 50247, 50248}
+S4 ceiling=14 reclaimed=[50178, 50180, 50240, 50242, 50244, 50245, 50246, 50247, 50248, 50182, 50249, 50250, 50252, 50253, 50254, 50255, 50256, 50184, 50257, 50258, 50260, 50261, 50262, 50263, 50264, 50186, 50265, 50266, 50268, 50269, 50270, 50271, 50272, 50188, 50273, 50274, 50276, 50277, 50278, 50279, 50280, 50190, 50281, 50282, 50284, 50285, 50286, 50287, 50288, 50192, 50289, 50290, 50292, 50293, 50294, 50295, 50296, 50194, 50297, 50298, 50300, 50301, 50302, 50303, 50304]
+S4 publish txg=19 F=11 wrote=[(AllocationTree, 50365, 1), (AccountingTree, 50366, 1), (MappingTree, 50367, 1), (TreeTable, 50240, 1)]
+S4 crash-state txg=19 inst=1 F_root=11 F_eff=0 acct_alloc=80 acct_free=211888 acct_defer=68 mem_alloc=80 mem_defer=68 mem_isolated=0 | I-2.1[树 11（种类 1）的根 在盘 0 槽 50240 的那一份与位置条目里的校验和对不上] ; I-3.1[盘 0：记账的已分配 Some(1310720)，遍历全部有效根得到 2588672]
+S4 crash-state newest root txg=19 F=11 ; F_eff (recovery definition)=0 ; victim still in ring=true
+S4 crash->rollback(victim) refused/failed: Recovery(UnitUnreadable { slot: SlotNumber(50240) })
+S4 crash->remount txg=22 inst=2 F_root=0 F_eff=0 acct_alloc=174 acct_free=211794 acct_defer=162 mem_alloc=174 mem_defer=162 mem_isolated=0 | I-2.1[树 11（种类 1）的根 在盘 0 槽 50240 的那一份与位置条目里的校验和对不上] ; I-3.1[盘 0：记账的已分配 Some(2850816)，遍历全部有效根得到 2818048]
+PROBE-COMPLETE

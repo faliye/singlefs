@@ -5,7 +5,9 @@
 #   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `agent-write-scope.sh` 的 hook；
 #   ② `.claude/hooks/agent-write-scope.sh --selftest` 通过（自证里有走真实 stdin 入口的情形）；
 #   ③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；
-#   ④ 表里每个 agent 名都有定义，每行至少两列。
+#   ④ 表里每个 agent 名都有定义，每行至少两列；
+#   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（按模式找进程与没超时的等待循环记进检出记录、一律放行：hook 只检出，结不结束由主 agent 判断）；
+#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒）。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
 # 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
@@ -44,6 +46,20 @@ if entries is not None:
         failed = True
         print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 agent-write-scope.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/agent-write-scope.sh"。')
+    guard_registered = [entry for entry in entries
+                        if matcher_covers(entry.get("matcher", ""), "Bash")
+                        and any("bash-command-detector.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not guard_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册 Bash 检出 hook：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 bash-command-detector.sh 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Bash"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/bash-command-detector.sh"。')
+    dispatch_registered = [entry for entry in entries
+                           if matcher_covers(entry.get("matcher", ""), "Agent")
+                           and any("runner-dispatch-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not dispatch_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册续派闸：PreToolUse 里没有 matcher 覆盖 Agent、命令指向 runner-dispatch-guard.sh 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Agent|Task"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/runner-dispatch-guard.sh"。')
 table_path = ".claude/hooks/agent-write-scope.tsv"
 patterns_by_agent, malformed = {}, []
 if os.path.isfile(table_path):
@@ -103,4 +119,18 @@ if [[ $selftest_rc -ne 0 ]]; then
   echo "     → 怎么办：修 .claude/hooks/agent-write-scope.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
   exit 1
 fi
-echo "  ✓ 写范围闸注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"
+guard_output="$(bash "$(dirname "$HOOK")/bash-command-detector.sh" --selftest 2>&1)"; guard_rc=$?
+if [[ $guard_rc -ne 0 ]]; then
+  echo "  ✗ bash-command-detector.sh 的自证没过："
+  printf '%s\n' "$guard_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/bash-command-detector.sh 的 findings_for() 或入口，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+dispatch_output="$(bash "$(dirname "$HOOK")/runner-dispatch-guard.sh" --selftest 2>&1)"; dispatch_rc=$?
+if [[ $dispatch_rc -ne 0 ]]; then
+  echo "  ✗ runner-dispatch-guard.sh 的自证没过："
+  printf '%s\n' "$dispatch_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/runner-dispatch-guard.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+echo "  ✓ 写范围闸、Bash 检出 hook 与续派闸注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"

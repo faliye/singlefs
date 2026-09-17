@@ -1,0 +1,13 @@
+Z2adv[fkou,cap=false] before-raise txg=13 inst=2 F_root=0 F_eff=0 floor_now=0 acct_alloc=97 acct_free=211871 acct_defer=85 mem_alloc=97 mem_defer=85 mem_free=211871 iso=0 held=0  | GREEN
+Z2adv[fkou,cap=false] raise arm=FKou { hold: true, release_unconditionally: true } F=8 ceiling=10 reclaimed_before_first_new_F_root=30
+Z2adv[fkou,cap=false] raise-publish txg=14 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=66 acct_free=211902 acct_defer=54 mem_alloc=66 mem_defer=54 mem_free=211902 iso=0 held=35 root_write_failed_at=[] wrote=[50367-50370] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] raise-publish txg=15 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=70 acct_free=211898 acct_defer=58 mem_alloc=70 mem_defer=58 mem_free=211898 iso=0 held=35 root_write_failed_at=[] wrote=[50371-50374] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] raise-publish txg=17 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=74 acct_free=211894 acct_defer=62 mem_alloc=74 mem_defer=62 mem_free=211894 iso=0 held=35 root_write_failed_at=[16] wrote=[50375-50378] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] raise-publish txg=18 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=78 acct_free=211890 acct_defer=66 mem_alloc=78 mem_defer=66 mem_free=211890 iso=0 held=35 root_write_failed_at=[] wrote=[50379-50382] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] raise-publish txg=19 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=82 acct_free=211886 acct_defer=70 mem_alloc=82 mem_defer=70 mem_free=211886 iso=0 held=35 root_write_failed_at=[] wrote=[50383-50386] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] released holds covered=true
+Z2adv[fkou,cap=false] loop ended covered=true
+Z2adv[fkou,cap=false] overwrite txg=20 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=92 acct_free=211876 acct_defer=80 mem_alloc=92 mem_defer=80 mem_free=211876 iso=0 held=0 wrote=[50176-50177,50387-50394] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] overwrite txg=21 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=102 acct_free=211866 acct_defer=90 mem_alloc=102 mem_defer=90 mem_free=211866 iso=0 held=0 wrote=[50178-50179,50395-50402] hit_abandoned=- hit_candidate=- | GREEN
+Z2adv[fkou,cap=false] overwrite txg=22 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=112 acct_free=211856 acct_defer=100 mem_alloc=112 mem_defer=100 mem_free=211856 iso=0 held=0 wrote=[50180-50181,50403-50410] hit_abandoned=- hit_candidate=- | GREEN
+PROBE-COMPLETE

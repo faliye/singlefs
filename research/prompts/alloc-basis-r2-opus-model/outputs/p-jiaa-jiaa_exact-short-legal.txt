@@ -1,0 +1,11 @@
+S6 A txg=3 inst=1 F_root=0 F_eff=0 acct_alloc=13 acct_free=211955 acct_defer=1 mem_alloc=13 mem_defer=1 mem_isolated=0 | GREEN
+S6 overwrite txg=4 inst=1 F_root=0 F_eff=0 acct_alloc=23 acct_free=211945 acct_defer=11 mem_alloc=23 mem_defer=11 mem_isolated=0 | GREEN
+S6 overwrite txg=5 inst=1 F_root=0 F_eff=0 acct_alloc=33 acct_free=211935 acct_defer=21 mem_alloc=33 mem_defer=21 mem_isolated=0 | GREEN
+S6 overwrite txg=6 inst=1 F_root=0 F_eff=0 acct_alloc=43 acct_free=211925 acct_defer=31 mem_alloc=43 mem_defer=31 mem_isolated=0 | GREEN
+S6 overwrite txg=7 inst=1 F_root=0 F_eff=0 acct_alloc=53 acct_free=211915 acct_defer=41 mem_alloc=53 mem_defer=41 mem_isolated=0 | GREEN
+S6 overwrite txg=8 inst=1 F_root=0 F_eff=0 acct_alloc=63 acct_free=211905 acct_defer=51 mem_alloc=63 mem_defer=51 mem_isolated=0 | GREEN
+S6 overwrite txg=9 inst=1 F_root=0 F_eff=0 acct_alloc=73 acct_free=211895 acct_defer=61 mem_alloc=73 mem_defer=61 mem_isolated=0 | GREEN
+S6 raise F=5 ceiling=6 publishes=[10, 11] reclaimed=17
+S6 after-raise txg=11 inst=1 F_root=5 F_eff=5 acct_alloc=60 acct_free=211908 acct_defer=48 mem_alloc=60 mem_defer=48 mem_isolated=0 | GREEN
+S6 overwrite-after-raise txg=12 inst=1 F_root=5 F_eff=5 acct_alloc=70 acct_free=211898 acct_defer=58 mem_alloc=70 mem_defer=58 mem_isolated=0 | GREEN
+PROBE-COMPLETE

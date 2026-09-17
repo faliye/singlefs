@@ -4,3 +4,5 @@ want=写范围表里却没有登记
 want=alpha
 want=ghost
 want=没有定义
+want=没注册 Bash 检出 hook
+want=没注册续派闸

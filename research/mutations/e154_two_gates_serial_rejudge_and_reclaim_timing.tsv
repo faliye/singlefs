@@ -1,0 +1,14 @@
+M1_预算式子改成三倍k_tol	const RETRY_BUDGET_PUBLICATIONS: u64 = 4 + 2 * TOLERATED_ROOT_WRITE_FAILURE_COUNT;	const RETRY_BUDGET_PUBLICATIONS: u64 = 4 + 3 * TOLERATED_ROOT_WRITE_FAILURE_COUNT;
+M2_切换预留份额式子多加一	self.switch_reserve_shares_per_disk * (2 + RING_REGIONS * self.fixpoint_cost)	self.switch_reserve_shares_per_disk * (3 + RING_REGIONS * self.fixpoint_cost)
+M3_切换上限改成2	const INSTANCE_SWITCH_LIMIT: u64 = 3;	const INSTANCE_SWITCH_LIMIT: u64 = 2;
+M4_起点实例表只写一槽	let instance_table_slots: Vec<usize> = vec![fixpoint_slots.len(), fixpoint_slots.len() + 1];	let instance_table_slots: Vec<usize> = vec![fixpoint_slots.len()];
+M5_起点次一个txg改成2	next_txg: 3,	next_txg: 2,
+M6_推空保留池与残留式子各减一	(10 + 7 * fixpoint_cost, 5 + 6 * fixpoint_cost, fixpoint_cost, pool.switch_reserve_slots())	(10 + 6 * fixpoint_cost, 5 + 5 * fixpoint_cost, fixpoint_cost, pool.switch_reserve_slots())
+M7_触动预算式子少加一	3 * slots_per_region + 5	3 * slots_per_region + 4
+M8_checkpoint保留池多算一	fixpoint_cost, pool.switch_reserve_slots())	fixpoint_cost + 1, pool.switch_reserve_slots())
+M9_写失败不推进txg	        pool.next_txg += 1;\n        return Err(PublishAttemptFailed);	        return Err(PublishAttemptFailed);
+M10_覆盖判据mod改成0	if last_txg % RING_REGIONS == 1 { 3 } else { 2 }	if last_txg % RING_REGIONS == 0 { 3 } else { 2 }
+M11_失败窗口边界改成大于	if self.call_index >= self.window_start && self.remaining > 0 {	if self.call_index > self.window_start && self.remaining > 0 {
+M12_退化不再先判真卡死	if pool.allocation_failure_hit {\n        build_run_summary(arm, geometry, history, pool, "卡死".to_string(), -2, true, 0)\n    } else {\n        build_run_summary(arm, geometry, history, pool, "退化".to_string(), -3, false, 0)\n    }	build_run_summary(arm, geometry, history, pool, "退化".to_string(), -3, false, 0)
+M13_H5撇位首窗口起点改成2	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 1,	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 2,
+M14_H4崩溃点不看第一道闸是否重判	    if gate1 >= need || !arm.gate.rejudges_first_gate() {	    if gate1 >= need {

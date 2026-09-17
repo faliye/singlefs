@@ -1,0 +1,24 @@
+Z3 arm=乙′ reading=串 H1_steps_to_reuse=None H1_false_enospc=0 H3_false_enospc=0 H4_false_enospc=0
+Z3 arm=乙′ reading=合 H1_steps_to_reuse=3 H1_false_enospc=0 H3_false_enospc=2 H4_false_enospc=1
+Z3 arm=乙′ reading=串-重判 H1_steps_to_reuse=5 H1_false_enospc=0 H3_false_enospc=0 H4_false_enospc=0
+Z3 arm=甲 reading=串 H1_steps_to_reuse=None H1_false_enospc=0 H3_false_enospc=0 H4_false_enospc=0
+Z3 arm=甲 reading=合 H1_steps_to_reuse=None H1_false_enospc=12 H3_false_enospc=2 H4_false_enospc=2
+Z3 arm=甲 reading=串-重判 H1_steps_to_reuse=8 H1_false_enospc=0 H3_false_enospc=0 H4_false_enospc=0
+ok   乙′ 串：删掉 16 块之后一直做改用户可见状态的发布（1 块覆盖写被拒就删下一个对象，删光或 30 次为止），写回同样大小一次都没成功（第 2 条的界 3 不成立）
+ok   乙′ 串-重判：删后第 5 次改用户可见状态的发布之后写回成功（钉绝对值；越过界 3，落在 D3 已定项 9 ⚠️ 承认的 6 以内）
+ok   乙′ 串：回退隔离之后按 df 写不出假性 ENOSPC
+ok   乙′ 串-重判：两次重开之后按 df 写不出假性 ENOSPC
+ok   甲 串：删掉 16 块之后一直做改用户可见状态的发布（1 块覆盖写被拒就删下一个对象，删光或 30 次为止），写回同样大小一次都没成功（第 2 条的界 3 不成立）
+ok   甲 串-重判：删后第 8 次改用户可见状态的发布之后写回成功（钉绝对值；越过界 3 也越过 ⚠️ 的 6；式子里 defer 被扣两次（第一轮 Y1））
+ok   甲 串：回退隔离之后按 df 写不出假性 ENOSPC
+ok   甲 串-重判：两次重开之后按 df 写不出假性 ENOSPC
+ok   乙′ 合：删后第 3 次改用户可见状态的发布之后写回成功（界 3）
+ok   乙′ 合：回退隔离 36 块之后按 D16 的 df 写，第一道闸拒 ⇒ 假性 ENOSPC
+ok   乙′ 合：两次重开之后按 D16 的 df 写（空发布放掉的不算滞后量）⇒ 假性 ENOSPC
+ok   甲 合：式子里「已分配」含 defer，抬 F 放得回来的那一截仍被扣一次 ⇒ 假性 ENOSPC
+ok   ① 不重开、不对齐：上一次准入推空放掉的固定点，D16 的 df 算可用、合的第一道闸不算 ⇒ 第一道闸拒
+ok   ① 的控制：第一道闸把空发布放掉的也算可用 ⇒ 归 0
+ok   ② 对齐之后重开两次：写行与暖机放掉的超过 D16 残留那一截 ⇒ D16 自己的第二道闸拒（df 仍报 6）
+ok   ③ 的控制：对齐、隔离 0 ⇒ 归 0
+ok   ③ 对齐、隔离 36 块：D16 的 df 没有被抛弃根独占量那一项 ⇒ df 报 38 时写 16 块被第一道闸拒
+SELFTEST-COMPLETE

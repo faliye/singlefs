@@ -1,0 +1,15 @@
+Z2[g7] before-raise txg=13 inst=2 F_root=0 F_eff=0 floor_now=0 acct_alloc=97 acct_free=211871 acct_defer=85 mem_alloc=97 mem_defer=85 mem_free=211871 iso=0 held=0  | GREEN
+Z2[g7] raise arm=G7 F=8 ceiling=10 reclaimed_before_first_new_F_root=0
+Z2[g7] raise-publish txg=14 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=101 acct_free=211867 acct_defer=89 mem_alloc=101 mem_defer=89 mem_free=211867 iso=0 held=0 root_write_failed_at=[] wrote=[50367-50370] hit_abandoned=- hit_candidate=- | I-3.1[盘 0：记账的已分配 Some(1654784)，遍历全部有效根得到 1081344]
+Z2[g7] G7 not covered: nothing reclaimed
+Z2[g7] crash-after-first-new-F-root txg=14 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=101 acct_free=211867 acct_defer=89 mem_alloc=101 mem_defer=89 mem_free=211867 iso=0 held=0  | I-3.1[盘 0：记账的已分配 Some(1654784)，遍历全部有效根得到 1081344]
+Z2[g7] crash->remount txg=16 inst=3 F_root=0 F_eff=0 floor_now=0 acct_alloc=111 acct_free=211857 acct_defer=99 mem_alloc=111 mem_defer=99 mem_free=211857 iso=0 held=0  | GREEN
+Z2[g7] crash->rollback(1,3) txg=16 inst=3 F_root=0 F_eff=0 floor_now=0 acct_alloc=23 acct_free=211945 acct_defer=11 mem_alloc=23 mem_defer=11 mem_free=211945 iso=88 held=0  | GREEN
+Z2[g7] full raise arm=G7 F=8 ceiling=10 reclaimed_before_first_new_F_root=0
+Z2[g7] full raise-publish txg=14 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=101 acct_free=211867 acct_defer=89 mem_alloc=101 mem_defer=89 mem_free=211867 iso=0 held=0 root_write_failed_at=[] wrote=[50367-50370] hit_abandoned=- hit_candidate=- | I-3.1[盘 0：记账的已分配 Some(1654784)，遍历全部有效根得到 1081344]
+Z2[g7] full raise-publish txg=15 inst=2 F_root=8 F_eff=0 floor_now=0 acct_alloc=105 acct_free=211863 acct_defer=93 mem_alloc=105 mem_defer=93 mem_free=211863 iso=0 held=0 root_write_failed_at=[] wrote=[50371-50374] hit_abandoned=- hit_candidate=- | I-3.1[盘 0：记账的已分配 Some(1720320)，遍历全部有效根得到 1146880]
+Z2[g7] full raise-publish txg=16 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=74 acct_free=211894 acct_defer=62 mem_alloc=109 mem_defer=97 mem_free=211859 iso=0 held=0 root_write_failed_at=[] wrote=[50375-50378] hit_abandoned=- hit_candidate=- | GREEN
+Z2[g7] full G7 reclaimed after both devices carry F: 30
+Z2[g7] after-F-effective txg=16 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=74 acct_free=211894 acct_defer=62 mem_alloc=74 mem_defer=62 mem_free=211894 iso=0 held=0  | GREEN
+Z2[g7] E txg=17 inst=2 F_root=8 F_eff=8 floor_now=8 acct_alloc=84 acct_free=211884 acct_defer=72 mem_alloc=84 mem_defer=72 mem_free=211884 iso=0 held=0 wrote=[50176-50177,50379-50386] hit_abandoned=- hit_candidate=- | GREEN
+PROBE-COMPLETE

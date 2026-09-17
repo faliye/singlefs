@@ -1,0 +1,31 @@
+record_width_single_generation	const RECORD_WIDTH_BYTES_SINGLE_GENERATION: u64 = 20;	const RECORD_WIDTH_BYTES_SINGLE_GENERATION: u64 = 28;
+record_width_dual_generation	const RECORD_WIDTH_BYTES_DUAL_GENERATION: u64 = 28;	const RECORD_WIDTH_BYTES_DUAL_GENERATION: u64 = 20;
+unit_area_capacity_slots	const UNIT_AREA_CAPACITY_SLOTS: u64 = 211968;	const UNIT_AREA_CAPACITY_SLOTS: u64 = 211960;
+record_tree_node_header_bytes	const RECORD_TREE_NODE_HEADER_BYTES: u64 = 86 + 2 * 10 + 29;	const RECORD_TREE_NODE_HEADER_BYTES: u64 = 96 + 2 * 10 + 29;
+root_ring_slot_in_region_drops_region_count	(txg / ROOT_RING_REGIONS) % slots_per_region	(txg / (ROOT_RING_REGIONS + 1)) % slots_per_region
+reclaim_threshold_drops_floor_term	self.oldest_valid_root_txg().max(self.effective_floor())	self.oldest_valid_root_txg()
+threshold_floor_predicate_off_by_one	Predicate::ThresholdFloor => record.release_generation <= threshold,	Predicate::ThresholdFloor => record.release_generation < threshold,
+interval_blocking_predicate_negated	blocking.range(record.allocation_generation..record.release_generation).next().is_none()	blocking.range(record.allocation_generation..record.release_generation).next().is_some()
+allocation_order_swaps_extent_and_inode_root	[Role::DataUnit, Role::InstanceTable, Role::ExtentRoot, Role::InodeLeaf, Role::InodeRoot, Role::AllocationTree, Role::AcctTree, Role::CentralMapTree, Role::TableUnit];	[Role::DataUnit, Role::InstanceTable, Role::InodeRoot, Role::InodeLeaf, Role::ExtentRoot, Role::AllocationTree, Role::AcctTree, Role::CentralMapTree, Role::TableUnit];
+rollback_new_txg_ignores_live_roots	let new_txg_minus_one = self.pool.live_roots().iter().map(|entry| entry.txg).max().unwrap_or(target_txg);	let new_txg_minus_one = target_txg;
+raise_floor_target_takes_max_instead_of_min	let target_floor = ceiling_per_device.min(fourth_newest_nonempty).max(self.pool.current_rollback_floor);	let target_floor = ceiling_per_device.max(fourth_newest_nonempty).max(self.pool.current_rollback_floor);
+warm_up_stops_after_one_device	while covered.len() < 2 {\n            let outcome = self.publish(PublishKind::Empty);	while covered.len() < 1 {\n            let outcome = self.publish(PublishKind::Empty);
+data_unit_and_leaf_span_collapsed_to_one	Role::InstanceTable | Role::DataUnit | Role::InodeLeaf => 2,	Role::InstanceTable | Role::DataUnit | Role::InodeLeaf => 1,
+first_mount_warmup_skips_instance_acquisition	let instance = self.pool.take_next_instance();	let instance = 0;
+rollback_candidate_includes_own_abandoned_extension	self.pool.candidate_roots().iter().map(|entry| entry.txg).filter(|txg| !abandoned_extended.contains(txg)).collect();	self.pool.candidate_roots().iter().map(|entry| entry.txg).collect();
+raise_floor_skips_narrow_shadow_recompute	if arm.shadow_kind() == ShadowLedger::Narrow {\n                arm.isolate_additional_for_raised_floor(&abandoned_txgs_now, &candidate_txgs_at_target_floor);\n            }	if false {\n                arm.isolate_additional_for_raised_floor(&abandoned_txgs_now, &candidate_txgs_at_target_floor);\n            }
+reclaim_baseline_free_slots_gated_by_withhold	self.baseline_deferred_slots -= span;\n                self.baseline_free_slots += span;\n                if withhold_instead_of_free {	self.baseline_deferred_slots -= span;\n                if !withhold_instead_of_free { self.baseline_free_slots += span; }\n                if withhold_instead_of_free {
+rebuild_allocator_baseline_deferred_missing_free_decrement	                        self.baseline_free_slots -= entry.span_in_slots;	                        let _ = entry.span_in_slots;
+h5early_borrows_h4_trailing_workload	        let (mut outcomes, first_target, _first_write_row_txg) = self.history_rollback_prefix(slots_per_region)?;	        let (mut outcomes, first_target, _first_write_row_txg) = self.history_single_rollback(slots_per_region)?;
+allocation_record_entries_uses_occupied_not_ledger	        entries[index] = arm.ledger.len() as u64;	        entries[index] = arm.occupied.len() as u64;
+allocation_record_bytes_uses_addition_not_multiplication	    (entries * record_width_bytes, entries.div_ceil(records_per_node))	    (entries + record_width_bytes, entries.div_ceil(records_per_node))
+write_row_outcome_not_tagged_as_rebuild_step	            is_rebuild_step: true,	            is_rebuild_step: false,
+allocated_minus_deferred_formula_skips_subtraction	row.item1_occupied_slots.saturating_sub(row.item5_deferred_slots) != newest_reference_size	row.item1_occupied_slots != newest_reference_size
+interval_inference_alloc_generation_boundary_off_by_one	entry.allocation_generation <= txg && (!entry.released || txg < entry.release_generation)	entry.allocation_generation < txg && (!entry.released || txg < entry.release_generation)
+interval_inference_release_generation_boundary_off_by_one	entry.allocation_generation <= txg && (!entry.released || txg < entry.release_generation)	entry.allocation_generation <= txg && (!entry.released || txg <= entry.release_generation)
+abandoned_root_item1_bounds_newest_uses_minimum	let newest_txg = *abandoned_txgs.iter().max().expect("非空");	let newest_txg = *abandoned_txgs.iter().min().expect("非空");
+abandoned_root_bound_check_uses_off_by_one	isolated_exceeds_newest_bound: isolated > newest_bound,	isolated_exceeds_newest_bound: isolated >= newest_bound,
+bad_image_b1b_modifies_item1_instead_of_item5	modified.accounting.item5_deferred_slots += 2;	modified.accounting.item1_occupied_slots += 2;
+bad_image_deferred_overcount_by_one_modifies_item1_instead_of_item5	modified.accounting.item5_deferred_slots += 1;	modified.accounting.item1_occupied_slots += 1;
+bad_image_bk1_modifies_item5_instead_of_item1	modified.accounting.item1_occupied_slots += 1;	modified.accounting.item5_deferred_slots += 1;
+bad_image_bk2_modifies_item1_instead_of_item2	modified.accounting.item2_free_slots = modified.accounting.item2_free_slots.saturating_sub(1);	modified.accounting.item1_occupied_slots = modified.accounting.item1_occupied_slots.saturating_sub(1);

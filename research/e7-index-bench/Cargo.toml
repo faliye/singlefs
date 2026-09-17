@@ -408,3 +408,11 @@ path = "src/bin/e148_commit_fixpoint_two_record_trees.rs"
 [[bin]]
 name = "e152-file-system-benchmark"
 path = "src/bin/e152_file_system_benchmark.rs"
+
+[[bin]]
+name = "e153-ledger-shape-and-ring-holes"
+path = "src/bin/e153_ledger_shape_and_ring_holes.rs"
+
+[[bin]]
+name = "e154-two-gates-serial-rejudge-and-reclaim-timing"
+path = "src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs"

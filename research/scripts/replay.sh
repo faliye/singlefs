@@ -166,6 +166,8 @@ E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026
 E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
+E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out|exact
+E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out|exact
 TSV
 )
 

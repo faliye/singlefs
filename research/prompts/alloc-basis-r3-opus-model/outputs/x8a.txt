@@ -1,0 +1,4 @@
+X8A F-扣: reclaimed=64 first_fixed_point=None retry_reclaimed=0 retry_fixed_point=None free_slots=64 allocated_slots=64 deferred=0
+X8A G7: first_fixed_point=None free_slots=0 allocated_slots=128 deferred=64
+X8A F-扣+α(失败路径放开扣住): first=None after_release=Some(50240)（发出去的是生效之前回收的槽）
+PROBE-COMPLETE
