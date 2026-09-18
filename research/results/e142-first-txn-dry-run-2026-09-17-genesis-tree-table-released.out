@@ -1,0 +1,93 @@
+E7RESULT name=config devices=2 physical_block_bytes=512 file_bytes=3000 fsid=fixed device_bytes=4294967296 journal_ring_bytes=805306368 journal_ring_slots=196608 in_flight_limit=65536 unit_area_start_slot=50176 unit_area_slots=211968 cluster_segment_slots=64 open_cluster_segment_start=50240
+E7RESULT name=width structure=pointer_head expected=50 actual=50
+E7RESULT name=width structure=data_unit_header expected=105 actual=105
+E7RESULT name=width structure=packed_unit_header expected=107 actual=107
+E7RESULT name=width structure=unit_reserved expected=29 actual=29
+E7RESULT name=width structure=data_unit_header_with_reserved expected=134 actual=134
+E7RESULT name=width structure=packed_unit_header_with_reserved expected=136 actual=136
+E7RESULT name=width structure=root_record expected=371 actual=371
+E7RESULT name=width structure=tree_table_entry expected=200 actual=200
+E7RESULT name=width structure=journal_header expected=307 actual=307
+E7RESULT name=width structure=journal_header_ten_fields expected=78 actual=78
+E7RESULT name=width structure=journal_new_root_segment expected=188 actual=188
+E7RESULT name=width structure=journal_named_entry expected=56 actual=56
+E7RESULT name=width structure=journal_named_entries_per_record expected=67 actual=67
+E7RESULT name=width structure=data_pointer expected=88 actual=88
+E7RESULT name=width structure=node_pointer expected=86 actual=86
+E7RESULT name=width structure=instance_table_row expected=88 actual=88
+E7RESULT name=width structure=inode_record expected=140 actual=140
+E7RESULT name=width structure=inode_internal_entry expected=120 actual=120
+E7RESULT name=width structure=extent_leaf_record expected=112 actual=112
+E7RESULT name=width structure=allocation_record expected=20 actual=20
+E7RESULT name=width structure=allocation_key expected=10 actual=10
+E7RESULT name=width structure=allocation_value expected=10 actual=10
+E7RESULT name=width structure=accounting_entry expected=34 actual=34
+E7RESULT name=width structure=mapping_key expected=27 actual=27
+E7RESULT name=width structure=mapping_entry expected=55 actual=55
+E7RESULT name=width structure=location_entry expected=14 actual=14
+E7RESULT name=width structure=superblock expected=481 actual=481
+E7RESULT name=width structure=superblock_slot expected=4096 actual=4096
+E7RESULT name=warm_up publishes=2 writes=10 barriers=4 fua=2 first_transaction_txg=3 last_warm_up_root_txg=2
+E7RESULT name=segments path=mkfs operations=13 segments=4+1+1+1+4 closed_form=34 kinds=[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[superblock_slot×4,barrier]
+E7RESULT name=segments path=instance_acquisition operations=2 segments=2 closed_form=4 kinds=[superblock_slot×2]
+E7RESULT name=segments path=warm_up operations=14 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]
+E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_form=65543 kinds=[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]
+E7RESULT name=segments path=post_mkfs_stream operations=39 segments=2+2+1+2+2+1+18+2+1+2 closed_form=262165 kinds=[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]
+E7RESULT name=mkfs_units instance_table_records=1 instance_table_row_bytes=88 tree_table_entries=0 genesis_root_watermark=11
+E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 record_bytes=4096 back_chain=628216162
+E7RESULT name=write_list writes=21 barriers=2 fua=1 named=8 units=t1@50180x32768,t2@50240x16384,t3@50242x32768,t4@50244x16384,t5@50245x16384,t6@50246x16384,t7@50247x16384,t8@50248x16384
+E7RESULT name=index_node_header tree=extent header_bytes=134 with_reserved=163
+E7RESULT name=index_node_header tree=inode header_bytes=102 with_reserved=131
+E7RESULT name=index_node_header tree=allocation header_bytes=106 with_reserved=135
+E7RESULT name=index_node_header tree=accounting header_bytes=130 with_reserved=159
+E7RESULT name=index_node_header tree=mapping header_bytes=140 with_reserved=169
+E7RESULT name=index_node_header tree=tree_table header_bytes=102 with_reserved=131
+E7RESULT name=recover_full outcome=file_read root=1:3 content_matches=true valid_records=3 above_water=0 applied=0 verification_passed=0 mapping_fallbacks=0
+E7RESULT name=layer0 arm=settled_two_devices segments=2+2+1+2+2+1+18+2+1+2 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 first_violation=none
+E7RESULT name=layer0_fua_not_boundary segments=2+2+3+2+19+2+3 closed_form=524314
+E7RESULT name=journal_effect arm=settled_two_devices states=262165 differing_states=3
+E7RESULT name=layer0_control arm=one_device_no_barriers writes=11 states=2048 closed_form=2048 violations=1020 expected_violations=1020 root_persisted_states=1024 failed=1020
+E7RESULT name=probe probe=newest_root_slot_one_byte outcome=file_read root=1:2 content_matches=true valid_records=3 applied=1 mapping_fallbacks=0 reason=none
+E7RESULT name=probe probe=journal_record_both_copies outcome=file_read root=1:3 content_matches=true valid_records=2 applied=0 mapping_fallbacks=0 reason=none
+E7RESULT name=probe probe=journal_record_one_copy outcome=file_read root=1:3 content_matches=true valid_records=3 applied=0 mapping_fallbacks=0 reason=none
+E7RESULT name=probe probe=data_payload_one_copy outcome=file_read root=1:3 content_matches=true valid_records=3 applied=0 mapping_fallbacks=0 reason=none
+E7RESULT name=probe probe=data_payload_both_copies outcome=failed root=1:3 content_matches=false valid_records=3 applied=0 mapping_fallbacks=1 reason=经映射仍读不到：槽_50180_的两条位置条目都读不到校验和相符的单元
+E7RESULT name=probe probe=data_header_last_byte_both_copies outcome=failed root=1:3 content_matches=false valid_records=3 applied=0 mapping_fallbacks=1 reason=经映射仍读不到：槽_50180_的两条位置条目都读不到校验和相符的单元
+E7RESULT name=probe probe=tree_table_both_copies outcome=failed root=1:3 content_matches=false valid_records=3 applied=0 mapping_fallbacks=0 reason=槽_50248_的两条位置条目都读不到校验和相符的单元
+E7RESULT name=probe probe=superblock_slot_one_both_devices outcome=file_read root=1:3 content_matches=true valid_records=3 applied=0 mapping_fallbacks=0 reason=none
+E7RESULT name=mapping_key_collision same_transaction_data_units=2 distinct_keys=1 mapping_entries_first_transaction=6
+E7RESULT name=named_mapping_keys named=8 rebuilt_from_named=8 mapping_entries=6 covered=6
+E7RESULT name=journal_per_mebibyte data_units=32 transactions_under_split_rule=32 records=32 journal_bytes_two_devices=262144 journal_over_data_percent=12
+E7RESULT name=accounting entries=15 allocated_bytes_per_device=212992 free_bytes_per_device=3472670720 empty_cluster_segments_per_device=3310 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=0 sequence_all_one=true generation=3
+E7RESULT name=allocation records=20 first_slot=50176 last_slot=50248 key_bytes=10 value_bytes=10 mkfs_generation_records=2
+E7RESULT name=instances mkfs_instance=0 first_writable_mount_instance=1 mkfs_superblock_generation=1 acquisition_superblock_generation=2 transaction_superblock_generation=5 transaction_superblock_slot=1
+E7RESULT name=back_chain records=3 chains=1:0,2:1134114971,3:628216162
+E7RESULT name=gap id=G1 text=已收口（2026-09-13 D8已定项11 + D18已定项16/18）：码2头=86+2×key宽，含29字节预留位115+2×key宽（inode与树表131、分配135、记账159、extent163、映射169）；跑出空白那天三处预想数（84、68+44、72/81/90三档）互不相等
+E7RESULT name=gap id=G2 text=已收口（2026-09-14用户定案，C325还清）：key宽字段从81+2k挪到**偏移51**，它自己的偏移不依赖k⇒扫描期按[0,51)这段定长前缀读出k、一次定出头末端，I-2.4对码2从此直接判得了；装置的parse_index_node不再收调用方给的key宽
+E7RESULT name=gap id=G3 text=已收口（2026-09-14用户定案改写D19已定项10）：映射key**一律27**——码2/码3的25字节末尾补零到27、条目一律55；2026-09-13那一版的「按类27/25不补齐、条目55/53」作废
+E7RESULT name=gap id=G4 text=根记录字段序：D22已定项7的表与字节表七的表行序不同（水位、F、校验和、实例表指针四行的先后），两处都没写偏移；2026-09-14加的算法类型1+nonce12+MAC16同样只说「放在中央映射树根指针之后」、没写偏移；装置按D22的表序
+E7RESULT name=gap id=G5 text=已收口（2026-09-13 D18已定项17）：32字节校验和字段里放CRC32C4字节+28字节零，自证结构罩整个槽含补齐、字段按零参与；跑出空白那天装置取的是SHA-256
+E7RESULT name=gap id=G6 text=已收口（2026-09-13 D23已定项19②，2026-09-14改写口径）：previous_hash=CRC32C(**本实例内逻辑前一条**记录的307字节头，header_csum那32字节按零参与)，本实例写出的第一条恒0、不读盘
+E7RESULT name=gap id=G7 text=已收口（2026-09-13 D23已定项15）：记录头加新根段188（树表指针86+映射树根指针86+树ID水位8+回退下界F8），施加一条记录=把所选根这四个字段换成记录里的；实例代号与txg照记录头、实例表指针照所选根⇒journal从此承重（journal_effect差异态3个）
+E7RESULT name=gap id=G8 text=码1映射key靠D16的事务切分纪律（一个事务最多写一个单元的用户数据）才唯一：同一事务写两个数据单元key相同；按D23已定项7一条记录一个事务，每个数据单元一条4KiB记录
+E7RESULT name=gap id=G9 text=journal两份镜像何时算「记录在」没有条款（一份合法即在、还是两份都要）；装置取任一份合法即在
+E7RESULT name=gap id=G10 text=里程碑步4验收「把位置提示改坏、经映射仍读到」在字节层做不到：提示住父节点、父节点被树表指针里的整单元CRC罩着，改坏提示先红父节点；要验的是搬走单元那条路
+E7RESULT name=gap id=G11 text=里程碑步1验收「同参数两次mkfs逐字节相同」与字节表「fsid=mkfs随机」矛盾：fsid必须是mkfs参数
+E7RESULT name=gap id=G12 text=已收口（2026-09-13 D15已定项4）：incompat位0=第一条纯SSD布局线，装置从mkfs起置上；位图其余全0
+E7RESULT name=gap id=G13 text=已收口（2026-09-13 D8已定项11）：条目数2与条目宽2进头（偏移82+2k、84+2k），不再住载荷内部布局
+E7RESULT name=gap id=G14 text=实例表链指针行宽2026-09-13从64改成88（C304，D18已定项11）；2026-09-14指针从83变86之后那3字节预留被吃掉，记录宽仍88⇒**这条记录没有余量了**，指针再宽一个字节INSTANCE_ROW_BYTES就要跟着涨（打包记录定长，kind0与kind1必须同宽），而条款里没有这一句
+E7RESULT name=gap id=G15 text=已收口（2026-09-13 D18已定项18）：码2的声明长度=条目数×条目宽，条目区之后的补齐区恒0且参与载荷CRC，I-2.3射程扩到码2
+E7RESULT name=gap id=G16 text=已收口（2026-09-13 D19已定项9）：出生序号从0起、同一棵树内码2与码3共用一个计数、换checkpoint清零、同一checkpoint里重写换新号
+E7RESULT name=gap id=G17 text=已收口（2026-09-13 C313用户定案）：FUA写算段边界；装置主臂按它枚举，另一读法只报数不判
+E7RESULT name=gap id=G18 text=D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同
+E7RESULT name=gap id=G19 text=mkfs种根的13次操作（11写+2屏障，段序列4+1+1+1+4、34个崩溃状态）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住
+E7RESULT name=gap id=G20 text=已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错
+E7RESULT name=gap id=G21 text=取号那一步（D23已定项16：第一次可写挂载写每一份超级块之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[superblock_slot×2]
+E7RESULT name=gap id=G22 text=**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节3472670720、全空聚簇段数3310、runs4三个数都随它变
+E7RESULT name=gap id=G23 text=已收口（2026-09-14用户定案，C324还清）：码3打包容器按「数据单元」那一档取落点（起点32768对齐、两槽都空）；连同D3已定项10⑤的bump次序（树ID升序、树内先叶后根、映射树倒数第二、树表最末）⇒t2 extent根拿50240、游标停在50241而t3要对齐⇒t3拿50242–50243，**槽50241空着**、runs因此从3变4
+E7RESULT name=gap id=G24 text=树表条目的「头ID」（D5已定项9，2026-09-14用户定案）只说了inode树写自己、extent树写12、其余写0，没说**这个数从哪来**：第一版只有一个可写头，装置按「inode树的树ID就是头ID」写；多头之后头ID与树ID还是不是一回事，条款没答
+E7RESULT name=gap id=G25 text=journal记录头2026-09-14加的fsid8与MAC16，条款只说fsid「与单元头同口径」（超级块fsid的低8字节）、MAC第一版全0；**读者拿fsid做什么没写**——装置按I-1.4把fsid不符的记录整条丢掉（不进重放前缀），而「丢掉」与「判损坏断链」在条款里分不出来
+E7RESULT name=gaps count=25
+E7RESULT name=feature_bits incompat_byte0=0x01 incompat_rest_zero=true compat_ro_zero=true compat_zero=true refuses_unknown_incompat=true refuses_missing_layout_bit=true
+E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+E7RESULT name=done emitted=93

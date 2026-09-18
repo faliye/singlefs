@@ -154,7 +154,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|e142-first-txn-dry-run||e142-first-txn-dry-run-2026-09-16-tree-table-200.out|exact
+E142|@driver_e142||e142-first-txn-dry-run-2026-09-18-change-count-three.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -168,6 +168,7 @@ E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
 E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out|exact
 E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out|exact
+E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-17-stage4.out|exact
 TSV
 )
 
@@ -361,6 +362,19 @@ driver_e9() {
       ./target/release/e9-keylayout "$REPLAY_DEV" "$s" interleave 8 "$r" || return 1
     done
   done
+}
+
+# E142 第十一次跑（量 5）：装置↔crates/ 逐字节比对要跨两个 cargo workspace（research/ 与仓根的 crates/ workspace，
+# 仓根 Cargo.toml 显式 exclude = ["research"]，两边互相看不到对方，不能合并成一次 cargo 调用）。
+# crates 侧的只读产出（`cargo run -p singlefs-harness --bin first_transaction_region_bytes`，无参数、不碰真设备、确定性、
+# 2026-09-18 现查跑两遍逐字节一致）每次现跑现读，装置那个二进制的第一个命令行参数就是这份产出的文件路径——
+# 装置读盘做真比较，把 `name=impl_bytes_equal` 算出来；crates 那份产出本身也原样拼进产物尾部，供人核对 sha256 的算法与来源。
+# 两段都各自有自己的 `name=done`，闸 2 逐段核过。
+driver_e142() {
+  local impl_snapshot="$OUT_DIR/e142-impl-region-bytes.tmp"
+  (cd .. && cargo run -q -p singlefs-harness --bin first_transaction_region_bytes) >"$impl_snapshot" || return 1
+  ./target/release/e142-first-txn-dry-run "$impl_snapshot" || return 1
+  cat "$impl_snapshot"
 }
 
 ONLY=("$@")

@@ -1,4 +1,4 @@
-//! E142：第一个事务的干跑——把 `.claude/kb/first-txn-layout.md` 那张字节表原样写成字节，
+//! E142：第一个事务的干跑——把 `.claude/kb/layout/01-first-txn.md` 那张字节表原样写成字节，
 //! mkfs + 一个小文件 + 一次发布，两块 512 槽的盘；冷启动读回；按 D13（验证路线） 已定项 4 的层 0
 //! 崩溃状态集合逐个恢复。目的是让代码把「字节表里哪几格写不出来、哪几条已定条款在字节层面互相顶着」逼出来：
 //! 每一处装置不得不自己补的取法都报成一行 `gap`。跑前登记 `research/prompts/e142-preregistration.md`。
@@ -428,6 +428,141 @@ fn wide_checksum_with_field_zeroed(bytes: &[u8], cover_end: usize, field_offset:
     let mut field = [0u8; 32];
     field[..WIDE_CHECKSUM_CRC_BYTES].copy_from_slice(&castagnoli_crc32(&covered).to_le_bytes());
     field
+}
+
+// ───────────────────────── SHA-256（E142 第十一次跑量 5：与 crates/ 侧 `first_transaction_region_bytes` 的 `sha256=` 对齐）─────────────────────────
+// 标准 FIPS 180-4 实现，不加新依赖（这个包只依赖 aes-gcm / chacha20poly1305，都不带现成的 SHA-256）。
+// 64 个圆常量与 8 个初始哈希值都是规范里那两组固定质数算出来的值，单测钉了 "" 与 "abc" 两个标准测试向量。
+const SHA256_INITIAL_HASH: [u32; 8] = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+const SHA256_ROUND_CONSTANTS: [u32; 64] = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+    0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+    0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+];
+
+fn sha256(bytes: &[u8]) -> [u8; 32] {
+    let mut hash = SHA256_INITIAL_HASH;
+    let bit_length = (bytes.len() as u64) * 8;
+    let mut message = bytes.to_vec();
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_length.to_be_bytes());
+    for chunk in message.chunks_exact(64) {
+        let mut schedule = [0u32; 64];
+        for (index, word) in schedule.iter_mut().take(16).enumerate() {
+            *word = u32::from_be_bytes(chunk[index * 4..index * 4 + 4].try_into().expect("切了 4 字节"));
+        }
+        for index in 16..64 {
+            let sigma0 = schedule[index - 15].rotate_right(7) ^ schedule[index - 15].rotate_right(18) ^ (schedule[index - 15] >> 3);
+            let sigma1 = schedule[index - 2].rotate_right(17) ^ schedule[index - 2].rotate_right(19) ^ (schedule[index - 2] >> 10);
+            schedule[index] = schedule[index - 16].wrapping_add(sigma0).wrapping_add(schedule[index - 7]).wrapping_add(sigma1);
+        }
+        let [mut register_first, mut register_second, mut register_third, mut register_fourth, mut register_fifth, mut register_sixth, mut register_seventh, mut register_eighth] = hash;
+        for index in 0..64 {
+            let big_sigma1 = register_fifth.rotate_right(6) ^ register_fifth.rotate_right(11) ^ register_fifth.rotate_right(25);
+            let choose = (register_fifth & register_sixth) ^ ((!register_fifth) & register_seventh);
+            let temporary_one = register_eighth.wrapping_add(big_sigma1).wrapping_add(choose).wrapping_add(SHA256_ROUND_CONSTANTS[index]).wrapping_add(schedule[index]);
+            let big_sigma0 = register_first.rotate_right(2) ^ register_first.rotate_right(13) ^ register_first.rotate_right(22);
+            let majority = (register_first & register_second) ^ (register_first & register_third) ^ (register_second & register_third);
+            let temporary_two = big_sigma0.wrapping_add(majority);
+            register_eighth = register_seventh;
+            register_seventh = register_sixth;
+            register_sixth = register_fifth;
+            register_fifth = register_fourth.wrapping_add(temporary_one);
+            register_fourth = register_third;
+            register_third = register_second;
+            register_second = register_first;
+            register_first = temporary_one.wrapping_add(temporary_two);
+        }
+        for (slot, value) in hash.iter_mut().zip([register_first, register_second, register_third, register_fourth, register_fifth, register_sixth, register_seventh, register_eighth]) {
+            *slot = slot.wrapping_add(value);
+        }
+    }
+    let mut digest = [0u8; 32];
+    for (index, word) in hash.iter().enumerate() {
+        digest[index * 4..index * 4 + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    digest
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    hex_bytes(&sha256(bytes))
+}
+
+fn hex_decode(hex: &str) -> Vec<u8> {
+    (0..hex.len() / 2).map(|index| u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap_or(0)).collect()
+}
+
+/// 一行 `E7RESULT name=... key=value key=value...` 拆成 key→value；量 5 用它读 crates 侧的产出（自己格式自己拆，不新加依赖）。
+fn parse_result_line(line: &str) -> std::collections::BTreeMap<String, String> {
+    line.split_whitespace().filter_map(|token| token.split_once('=')).map(|(key, value)| (key.to_string(), value.to_string())).collect()
+}
+
+/// 两段等长字节比出第一个不同的下标与不同字节总数；长度不等时直接报「整段都算」。
+fn byte_diff_summary(left_bytes: &[u8], right_bytes: &[u8]) -> (Option<u64>, Option<u64>) {
+    if left_bytes.len() != right_bytes.len() {
+        return (Some(0), Some(left_bytes.len().max(right_bytes.len()) as u64));
+    }
+    let mut first_diff = None;
+    let mut mismatch_count = 0u64;
+    for (index, (left, right)) in left_bytes.iter().zip(right_bytes.iter()).enumerate() {
+        if left != right {
+            if first_diff.is_none() {
+                first_diff = Some(index as u64);
+            }
+            mismatch_count += 1;
+        }
+    }
+    (first_diff, Some(mismatch_count))
+}
+
+/// 量 5 一个区域的比较结果。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RegionComparison {
+    equal: bool,
+    first_diff_offset: Option<u64>,
+    mismatch_bytes: Option<u64>,
+}
+
+/// 量 5 的核心判定：装置自己的字节 / sha256 与从 crates 快照里读出来的那一行字段比。
+/// 抽出成独立函数是因为 `main()` 本身不可测——这条判定逻辑要能被单测钉住、被变异表抓，就不能只留在 `main()` 里
+/// （E142 第十一次跑修订第 1 条已经在 V1 上踩过一次这个教训）。
+fn compare_region(device_bytes: &[u8], device_sha256: &str, impl_fields: &std::collections::BTreeMap<String, String>, region_length: u64) -> RegionComparison {
+    let impl_sha256 = impl_fields.get("sha256").cloned().unwrap_or_default();
+    let impl_length: u64 = impl_fields.get("length").and_then(|value| value.parse().ok()).unwrap_or(0);
+    if impl_length != region_length {
+        return RegionComparison { equal: false, first_diff_offset: Some(0), mismatch_bytes: Some(impl_length.max(region_length)) };
+    }
+    if impl_sha256 == device_sha256 {
+        return RegionComparison { equal: true, first_diff_offset: None, mismatch_bytes: Some(0) };
+    }
+    let (first_diff_offset, mismatch_bytes) = match impl_fields.get("hexadecimal_extent").map(String::as_str) {
+        Some("whole_region") => byte_diff_summary(&hex_decode(impl_fields.get("hexadecimal").map(String::as_str).unwrap_or("")), device_bytes),
+        Some("head_and_tail") => {
+            let head_and_tail_bytes: usize = impl_fields.get("head_and_tail_bytes").and_then(|value| value.parse().ok()).unwrap_or(32);
+            let impl_head = hex_decode(impl_fields.get("head_hexadecimal").map(String::as_str).unwrap_or(""));
+            let impl_tail = hex_decode(impl_fields.get("tail_hexadecimal").map(String::as_str).unwrap_or(""));
+            let sample_bytes = head_and_tail_bytes.min(device_bytes.len());
+            let device_head = &device_bytes[..sample_bytes];
+            let device_tail = &device_bytes[device_bytes.len() - sample_bytes..];
+            if impl_head != *device_head {
+                byte_diff_summary(&impl_head, device_head)
+            } else if impl_tail != *device_tail {
+                let tail_start = region_length - sample_bytes as u64;
+                let (offset, count) = byte_diff_summary(&impl_tail, device_tail);
+                (offset.map(|value| value + tail_start), count)
+            } else {
+                // sha256 不等，但抽样的头尾字节两边都对得上：差异藏在没抽样的中段，这个函数定位不了第一处差异
+                // （写进实验页「它答不了的」，不是这里的 bug）。
+                (None, None)
+            }
+        }
+        _ => (None, None),
+    };
+    RegionComparison { equal: false, first_diff_offset, mismatch_bytes }
 }
 
 // ───────────────────────── 设备、录制器、崩溃镜像 ─────────────────────────
@@ -1256,7 +1391,7 @@ impl Superblock {
         writer.put_u32(JOURNAL_RECORD_BYTES as u32);
         // D23（journal 的角色与格式） 已定项 18：在飞记录数上限 = 环槽数 ÷ F。
         writer.put_u32(u32::try_from(JOURNAL_IN_FLIGHT_RECORD_LIMIT).expect("在飞上限 4 字节"));
-        // journal 最坏占用 = 在飞上限 × 记录宽（字节表 `first-txn-layout.md` 那一行逐字
+        // journal 最坏占用 = 在飞上限 × 记录宽（字节表 `layout/01-first-txn.md` 那一行逐字
         // 「268 435 456（65536 条 × 4096）」；此前这里写成了记录宽本身 4096）。
         writer.put_u64(JOURNAL_WORST_CASE_BYTES);
         writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数 4 字节"));
@@ -1677,21 +1812,30 @@ struct AllocationRecord {
     slot: SlotNumber,
     span_slots: u16,
     generation: CheckpointTxg,
+    /// 已释放（跨度段最高位）：第一个事务里只有 mkfs 那片第 0 版树表单元——A 重写树表把它换下、进 defer 队列（D3 已定项 7），释放代 = A 的 txg。
+    is_released: bool,
 }
+
+/// 分配记录跨度段的最高位 = 已释放（与 crates 的 `ALLOCATION_RECORD_RELEASED_FLAG` 同一位）。
+const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
 
 impl AllocationRecord {
     fn to_bytes(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new(ALLOCATION_RECORD_BYTES as usize);
         writer.put_u32(self.device.0);
         writer.put_six_byte_unsigned(self.slot.0);
-        writer.put_u16(self.span_slots);
+        writer.put_u16(if self.is_released { self.span_slots | ALLOCATION_RECORD_RELEASED_FLAG } else { self.span_slots });
         writer.put_u64(self.generation.0);
         writer.assert_position(ALLOCATION_RECORD_BYTES, "分配记录");
         writer.bytes
     }
     fn parse(bytes: &[u8]) -> Self {
         let mut reader = ByteReader::new(bytes);
-        Self { device: DeviceIdentity(reader.get_u32()), slot: SlotNumber(reader.get_six_byte_unsigned()), span_slots: reader.get_u16(), generation: CheckpointTxg(reader.get_u64()) }
+        let device = DeviceIdentity(reader.get_u32());
+        let slot = SlotNumber(reader.get_six_byte_unsigned());
+        let span_field = reader.get_u16();
+        let generation = CheckpointTxg(reader.get_u64());
+        Self { device, slot, span_slots: span_field & !ALLOCATION_RECORD_RELEASED_FLAG, generation, is_released: span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0 }
     }
     fn key_bytes(&self) -> Vec<u8> {
         self.to_bytes()[..ALLOCATION_KEY_BYTES].to_vec()
@@ -2001,6 +2145,19 @@ enum TransactionUnit {
 }
 
 impl TransactionUnit {
+    /// E142 第十一次跑量 1/3/4 用的可读标签（`tag()` 的 t1..t8 是既有产物格式，这里不改它）。
+    fn descriptive_tag(self) -> &'static str {
+        match self {
+            TransactionUnit::Data => "data_unit",
+            TransactionUnit::ExtentRoot => "extent_root",
+            TransactionUnit::InodeLeaf => "inode_leaf",
+            TransactionUnit::InodeRoot => "inode_root",
+            TransactionUnit::AllocationTree => "allocation_root",
+            TransactionUnit::AccountingTree => "accounting_root",
+            TransactionUnit::MappingTree => "mapping_root",
+            TransactionUnit::TreeTable => "tree_table",
+        }
+    }
     /// 字节表七里的步号 t1..t8，`name=write_list` 的 `units=` 用它。
     fn tag(self) -> &'static str {
         match self {
@@ -2180,6 +2337,7 @@ fn publish_first_file(
     file_bytes: &[u8],
     instance: InstanceGeneration,
     previous_record_bytes: Option<&[u8]>,
+    change_count: u64,
 ) -> TransactionOutput {
     let txg = CheckpointTxg(FIRST_TRANSACTION_TXG);
     let transaction = TransactionNumber(1);
@@ -2201,7 +2359,9 @@ fn publish_first_file(
     // t3 inode 树叶容器
     let inode_leaf_identity = PackedIdentity { birth_tree: TreeIdentifier(TREE_IDENTIFIER_INODE), record_type: PACKED_TYPE_INODE, container: FIRST_INODE_NUMBER, container_birth: txg };
     let inode_leaf_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_INODE), txg, instance);
-    let inode_record = InodeRecord { inode: FIRST_INODE_NUMBER, object_birth: txg, size: file_bytes.len() as u64, change_count: 1 };
+    // E142 第十一次跑（2026-09-18）：改动计数从字面 1 改成调用方传入的 change_count（D8 已定项 6 偏移 88 的字段定义 = 最后一次改动所在发布的
+    // checkpoint_txg；主口径传 FIRST_TRANSACTION_TXG，`crates/` 今天同口径——重跑登记 e142-r11-prereg.md 第三节）。
+    let inode_record = InodeRecord { inode: FIRST_INODE_NUMBER, object_birth: txg, size: file_bytes.len() as u64, change_count };
     let inode_leaf_unit = build_packed_unit(inode_leaf_identity, INODE_RECORD_BYTES as u16, &[inode_record.to_bytes()], txg, fsid, write_order, inode_leaf_sequence);
     let inode_leaf_pointer = NodePointer {
         head: PointerHead { birth_tree: TreeIdentifier(TREE_IDENTIFIER_INODE), birth_txg: txg },
@@ -2234,24 +2394,25 @@ fn publish_first_file(
     );
     index_node_header_widths.push(("inode", index_node_header_bytes(8)));
 
-    // t5 分配记录树：mkfs 的 m1 / m2 分配代 0，其余就是这次发布的 txg（D3 已定项 7 的「分配代」）；每盘各一条。
+    // t5 分配记录树：mkfs 的 m1 分配代 0；m2（第 0 版树表）被这次发布重写树表换下 ⇒ 记录改写成已释放、释放代 = 这次的 txg（D3 已定项 7，
+    // 里程碑「第二个事务」步 5 逼出：不释放它，txg 0 的根离开候选集之后这一槽永远占着、I-3.1 红）；其余就是这次发布的 txg（「分配代」）；每盘各一条。
     // deadlist 树 day-1 注册但没有根节点 ⇒ 不占落点、不写分配记录（字节表零那一节的 t5 那一行）。
-    let allocated: [(u64, u16, u64); 10] = [
-        (SLOT_INSTANCE_TABLE, 2, 0),
-        (SLOT_TREE_TABLE_GENESIS, 1, 0),
-        (SLOT_DATA_UNIT, 2, FIRST_TRANSACTION_TXG),
-        (SLOT_EXTENT_ROOT, 1, FIRST_TRANSACTION_TXG),
-        (SLOT_INODE_LEAF, 2, FIRST_TRANSACTION_TXG),
-        (SLOT_INODE_ROOT, 1, FIRST_TRANSACTION_TXG),
-        (SLOT_ALLOCATION_ROOT, 1, FIRST_TRANSACTION_TXG),
-        (SLOT_ACCOUNTING_ROOT, 1, FIRST_TRANSACTION_TXG),
-        (SLOT_MAPPING_ROOT, 1, FIRST_TRANSACTION_TXG),
-        (SLOT_TREE_TABLE_FIRST_PUBLISH, 1, FIRST_TRANSACTION_TXG),
+    let allocated: [(u64, u16, u64, bool); 10] = [
+        (SLOT_INSTANCE_TABLE, 2, 0, false),
+        (SLOT_TREE_TABLE_GENESIS, 1, FIRST_TRANSACTION_TXG, true),
+        (SLOT_DATA_UNIT, 2, FIRST_TRANSACTION_TXG, false),
+        (SLOT_EXTENT_ROOT, 1, FIRST_TRANSACTION_TXG, false),
+        (SLOT_INODE_LEAF, 2, FIRST_TRANSACTION_TXG, false),
+        (SLOT_INODE_ROOT, 1, FIRST_TRANSACTION_TXG, false),
+        (SLOT_ALLOCATION_ROOT, 1, FIRST_TRANSACTION_TXG, false),
+        (SLOT_ACCOUNTING_ROOT, 1, FIRST_TRANSACTION_TXG, false),
+        (SLOT_MAPPING_ROOT, 1, FIRST_TRANSACTION_TXG, false),
+        (SLOT_TREE_TABLE_FIRST_PUBLISH, 1, FIRST_TRANSACTION_TXG, false),
     ];
     let mut allocation_records: Vec<AllocationRecord> = parameters
         .devices()
         .iter()
-        .flat_map(|device| allocated.iter().map(move |(slot, span, generation)| AllocationRecord { device: *device, slot: SlotNumber(*slot), span_slots: *span, generation: CheckpointTxg(*generation) }))
+        .flat_map(|device| allocated.iter().map(move |(slot, span, generation, is_released)| AllocationRecord { device: *device, slot: SlotNumber(*slot), span_slots: *span, generation: CheckpointTxg(*generation), is_released: *is_released }))
         .collect();
     allocation_records.sort_by_key(AllocationRecord::sort_key);
     let allocation_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_ALLOCATION), txg, instance);
@@ -2274,8 +2435,8 @@ fn publish_first_file(
     // 带设备维的六项各两行（已分配 1、空闲 2、不可回收 3、defer 待释放 5、碎片度 runs 10、全空聚簇段数 11），
     // 池级三行（待删占用 4、已承诺预留 6、inode 号水位 12）。准入不等式要的四项 day-1 各写一行 0，
     // 「空 ≠ 0」那条防线因此保住：读不到行是坏账，读到 0 是真的 0。seq 一律 1（D8 已定项 10：直落叶）。
-    let allocated_slots: u64 = allocated.iter().map(|(_, span, _)| u64::from(*span)).sum();
-    let occupied: std::collections::BTreeSet<u64> = allocated.iter().flat_map(|(slot, span, _)| (0..u64::from(*span)).map(move |offset| slot + offset)).collect();
+    let allocated_slots: u64 = allocated.iter().map(|(_, span, _, _)| u64::from(*span)).sum();
+    let occupied: std::collections::BTreeSet<u64> = allocated.iter().flat_map(|(slot, span, _, _)| (0..u64::from(*span)).map(move |offset| slot + offset)).collect();
     // bump 次序 + 码 3 容器要 32768 对齐 ⇒ 开放段里 t2 与 t3 之间恰好空着一个槽，它自己是一段空闲 run。
     assert_eq!(SLOT_SKIPPED_BY_ALIGNMENT, SLOT_EXTENT_ROOT + 1, "空洞紧跟在 extent 根后面");
     assert_eq!(SLOT_INODE_LEAF, SLOT_SKIPPED_BY_ALIGNMENT + 1, "inode 叶容器跳过空洞落在下一个对齐槽对");
@@ -2307,7 +2468,8 @@ fn publish_first_file(
         // 第 2 项必须独立维护、不许由「容量 − 已分配」现算（D5 已定项 4 的 ⚠️）：这里从空槽数直接数出来。
         accounting_entries.push(per_device(STATISTIC_FREE_BYTES, free_slot_count(&occupied) * SLOT_BYTES));
         accounting_entries.push(per_device(STATISTIC_UNRECLAIMABLE_BYTES, 0));
-        accounting_entries.push(per_device(STATISTIC_DEFER_QUEUE_BYTES, 0));
+        // defer 待释放 = mkfs 那片第 0 版树表单元（1 槽）：A 重写树表把它换下（D3 已定项 7）。
+        accounting_entries.push(per_device(STATISTIC_DEFER_QUEUE_BYTES, SLOT_BYTES));
         // 第 10 项 2026-09-14 起换口径并带设备维：单元区空闲槽的连续段数，逐设备一行。
         accounting_entries.push(per_device(STATISTIC_FRAGMENTATION_RUNS, free_run_count(&occupied)));
         accounting_entries.push(per_device(STATISTIC_EMPTY_CLUSTER_SEGMENTS, empty_cluster_segment_count(&occupied)));
@@ -2635,15 +2797,23 @@ fn replay_journal(
     let mut report = JournalScanReport { valid_records: records.len(), ..JournalScanReport::default() };
     let water = (root.instance, root.checkpoint_txg);
     let mut rebuilt = *root;
-    let mut above: Vec<&JournalRecord> = records.values().filter(|record| (record.instance, record.checkpoint_txg) > water).collect();
+    // 前缀规则不跨实例边界（D23 已定项 14 第 1 条）：只有所选根自己那个实例的记录是候选，链从所选根覆盖的最后一条之后接；
+    // 所选根是 mkfs 的第 0 代根时一条都不施加。
+    let mut above: Vec<&JournalRecord> = records.values().filter(|record| record.instance == root.instance && (record.instance, record.checkpoint_txg) > water).collect();
     above.sort_by_key(|record| (record.instance, record.counter));
     report.above_water = above.len();
-    let mut expected: Option<(InstanceGeneration, JournalCounter)> = None;
+    // 链首接在所选根自己那条记录（同实例、checkpoint_txg 相等）之后；那条读不出时链首只认 checkpoint_txg = 根 txg + 1 的那条
+    // （一次发布一条记录、txg 每次加一；与 crates 同一条规则，里程碑「第二个事务」步 3 三方第一轮攻方腿打中「无锚点时无条件接上」）。
+    let root_own_record_counter = records.values().find(|record| record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg).map(|record| record.counter.0);
+    let mut expected: Option<(InstanceGeneration, JournalCounter)> = root_own_record_counter.map(|counter| (root.instance, JournalCounter(counter + 1)));
+    let chain_start_txg_without_anchor = CheckpointTxg(root.checkpoint_txg.0 + 1);
     for record in above.into_iter().take(usize::try_from(JOURNAL_IN_FLIGHT_RECORD_LIMIT).expect("在飞上限")) {
         if let Some(expected_key) = expected {
             if (record.instance, record.counter) != expected_key {
                 break;
             }
+        } else if record.checkpoint_txg != chain_start_txg_without_anchor {
+            break;
         }
         expected = Some((record.instance, JournalCounter(record.counter.0 + 1)));
         if !record.is_commit {
@@ -3118,6 +3288,362 @@ fn run_probe(full: &Pool, probe: &Probe) -> RecoveryReport {
     recover(&damaged, JournalPolicy::Consult)
 }
 
+// ───────────────────────── E142 第十一次跑：改动计数从 1 改成 3，逐字节相减 ─────────────────────────
+// 重跑登记 research/prompts/e142-r11-prereg.md 第一节第 3 条：分母是两块盘的全部字节，不是只看那 8 个单元。
+// 没写过的扇区两边都读 0，差不出字节，所以「两份镜像里写过的扇区并集」与「全部字节逐字节比对」等价（第 3 步跑之前已在这里写死这条推理）。
+
+/// 量 1 的六元组，去掉「所属结构 + 结构内偏移」——那两列由 `classify_offset` 事后算，不是逐字节比对本身要用的。
+#[derive(Clone, Debug)]
+struct DiffSegment {
+    device: u32,
+    offset: u64,
+    length: u64,
+    old: Vec<u8>,
+    new: Vec<u8>,
+}
+
+/// 两份镜像（同设备数）逐字节相减，合并相邻差异字节成段。
+fn diff_pools(old: &Pool, new: &Pool) -> Vec<DiffSegment> {
+    assert_eq!(old.devices.len(), new.devices.len(), "两份镜像设备数必须一致才能相减");
+    let mut segments = Vec::new();
+    let zero_sector = [0u8; PHYSICAL_BLOCK_BYTES as usize];
+    for device_index in 0..old.devices.len() {
+        let device = u32::try_from(device_index).expect("设备数");
+        let mut sectors: std::collections::BTreeSet<u64> = old.devices[device_index].sectors.keys().copied().collect();
+        sectors.extend(new.devices[device_index].sectors.keys().copied());
+        let mut open: Option<(u64, Vec<u8>, Vec<u8>)> = None;
+        for sector in sectors {
+            let sector_offset = sector * PHYSICAL_BLOCK_BYTES;
+            let old_sector = old.devices[device_index].sectors.get(&sector).unwrap_or(&zero_sector);
+            let new_sector = new.devices[device_index].sectors.get(&sector).unwrap_or(&zero_sector);
+            for byte_index in 0..PHYSICAL_BLOCK_BYTES as usize {
+                let absolute = sector_offset + byte_index as u64;
+                let old_byte = old_sector[byte_index];
+                let new_byte = new_sector[byte_index];
+                if old_byte == new_byte {
+                    if let Some((start, old_bytes, new_bytes)) = open.take() {
+                        segments.push(DiffSegment { device, offset: start, length: old_bytes.len() as u64, old: old_bytes, new: new_bytes });
+                    }
+                    continue;
+                }
+                let extends = matches!(&open, Some((start, old_bytes, _)) if *start + old_bytes.len() as u64 == absolute);
+                if extends {
+                    let (_, old_bytes, new_bytes) = open.as_mut().expect("刚判过 extends");
+                    old_bytes.push(old_byte);
+                    new_bytes.push(new_byte);
+                } else {
+                    if let Some((start, old_bytes, new_bytes)) = open.take() {
+                        segments.push(DiffSegment { device, offset: start, length: old_bytes.len() as u64, old: old_bytes, new: new_bytes });
+                    }
+                    open = Some((absolute, vec![old_byte], vec![new_byte]));
+                }
+            }
+        }
+        if let Some((start, old_bytes, new_bytes)) = open.take() {
+            segments.push(DiffSegment { device, offset: start, length: old_bytes.len() as u64, old: old_bytes, new: new_bytes });
+        }
+    }
+    segments
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join("")
+}
+
+/// 量 1/3/4 的「所属结构」候选表：第一个事务写到的 8 个单元、根记录、journal 记录（第一节第 3 条的区域清单，去掉超级块——
+/// 超级块与改动计数无关，按第三节推导；它若意外出现在差异里，classify_offset 找不到候选、归到「未登记」而不是被这张表悄悄吃掉）。
+struct StructureCatalog<'output> {
+    units: &'output [(SlotNumber, TransactionUnit, Vec<u8>)],
+    root_device: u32,
+    root_offset: u64,
+    journal_offset: u64,
+    journal_length: u64,
+}
+
+fn build_structure_catalog(output: &TransactionOutput, root_device: u32, root_offset: u64) -> StructureCatalog<'_> {
+    StructureCatalog { units: &output.units_by_slot, root_device, root_offset, journal_offset: journal_record_offset(output.record.counter).0, journal_length: output.record_bytes.len() as u64 }
+}
+
+/// 给一个 (device, offset) 找它落在哪个候选结构里；返回 (标签, 结构内偏移)。
+fn classify_offset(catalog: &StructureCatalog, device: u32, offset: u64) -> Option<(&'static str, u64)> {
+    for (slot, unit, bytes) in catalog.units {
+        let base = slot.device_offset().0;
+        if offset >= base && offset < base + bytes.len() as u64 {
+            return Some((unit.descriptive_tag(), offset - base));
+        }
+    }
+    if device == catalog.root_device && offset >= catalog.root_offset && offset < catalog.root_offset + PHYSICAL_BLOCK_BYTES {
+        return Some(("root_record", offset - catalog.root_offset));
+    }
+    if offset >= catalog.journal_offset && offset < catalog.journal_offset + catalog.journal_length {
+        return Some(("journal_record", offset - catalog.journal_offset));
+    }
+    None
+}
+
+/// NodePointer 内两条位置条目校验和的相对偏移（`NodePointer::write_to`：头 50 + 位置条目 14 × 2，校验和在条目内偏移 10）。
+fn node_pointer_checksum_offsets(pointer_start: u64) -> [u64; 2] {
+    [pointer_start + POINTER_HEAD_BYTES as u64 + 10, pointer_start + POINTER_HEAD_BYTES as u64 + LOC_ENTRY + 10]
+}
+
+fn overlaps(segment_offset: u64, segment_length: u64, target_offset: u64, target_length: u64) -> bool {
+    segment_offset < target_offset + target_length && target_offset < segment_offset + segment_length
+}
+
+/// inode 记录字段表（D8 已定项 6，`decisions/08-核心索引结构.md:391-410`）：偏移 → 字段名。
+fn inode_record_field_name(offset: u64) -> &'static str {
+    match offset {
+        0..=7 => "inode",
+        8..=15 => "object_birth（出生代）",
+        16..=23 => "locality_id",
+        24..=39 => "mode/uid/gid/nlink",
+        40..=63 => "size/blocks/rdev",
+        64..=87 => "atime/mtime/ctime 秒",
+        88..=95 => "改动计数",
+        96..=107 => "atime/mtime/ctime 纳秒",
+        108..=111 => "填充",
+        112..=119 => "flags",
+        _ => "预留",
+    }
+}
+
+/// 量 3：给一个 (结构标签, 结构内偏移) 找「谁的校验和 / 指针罩到它」。返回 (是否归了因, 说明)。
+/// 归不了因的（返回 false）按 F6 记一行 `name=gap`，不作废——重跑登记第十节 F6。
+fn explain_unit_offset(unit: TransactionUnit, offset: u64) -> (bool, String) {
+    let (class, key_width) = unit.class_and_key_width();
+    if (10..42).contains(&offset) {
+        return (true, "单元头校验和：seal_header_checksum 罩 [0,头末尾)，头内容变了就重算（D18 已定项 17）".to_string());
+    }
+    let payload_crc_offset: u64 = if class == UNIT_CLASS_PACKED { 89 } else { 76 + 2 * key_width as u64 };
+    if (payload_crc_offset..payload_crc_offset + 4).contains(&offset) {
+        return (true, format!("单元载荷 CRC：castagnoli_crc32 罩记录/条目区到单元末尾（D18 已定项 11 逐字，偏移 {payload_crc_offset}）"));
+    }
+    match unit {
+        TransactionUnit::InodeLeaf => {
+            let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+            if offset >= record_start && offset < record_start + INODE_RECORD_BYTES {
+                let field_offset = offset - record_start;
+                return (true, format!("inode 记录内偏移 {field_offset}：{}（D8 已定项 6）", inode_record_field_name(field_offset)));
+            }
+        }
+        TransactionUnit::InodeRoot => {
+            let entries_start = index_node_header_bytes(key_width) as u64 + NONCE_MAC_RESERVED_BYTES;
+            if offset >= entries_start && offset < entries_start + INODE_INTERNAL_ENTRY {
+                let entry_offset = offset - entries_start;
+                let pointer_start = 34u64; // 分隔 key 8 + 子身份引用 26（build_inode_internal_entry）
+                if entry_offset >= pointer_start && entry_offset < pointer_start + NODE_POINTER_BYTES {
+                    let checks = node_pointer_checksum_offsets(pointer_start);
+                    if (checks[0]..checks[0] + 4).contains(&entry_offset) {
+                        return (true, "内部条目里子指针（指向 inode 叶）第 0 条位置条目单元校验和（D19 已定项 4）".to_string());
+                    }
+                    if (checks[1]..checks[1] + 4).contains(&entry_offset) {
+                        return (true, "内部条目里子指针（指向 inode 叶）第 1 条位置条目单元校验和（D19 已定项 4）".to_string());
+                    }
+                    return (true, "内部条目里子指针其余字段（出生树 / 出生代号 / 实例代号 / 出生序号，不含校验和）".to_string());
+                }
+                return (true, format!("内部条目内偏移 {entry_offset}（分隔 key / 子身份引用段）"));
+            }
+        }
+        TransactionUnit::MappingTree => {
+            let entries_start = index_node_header_bytes(key_width) as u64 + NONCE_MAC_RESERVED_BYTES;
+            if offset >= entries_start {
+                let relative = offset - entries_start;
+                let entry_index = relative / MAPPING_ENTRY_BYTES;
+                let entry_offset = relative % MAPPING_ENTRY_BYTES;
+                if entry_offset >= MAPPING_KEY_BYTES {
+                    let location_offset = entry_offset - MAPPING_KEY_BYTES;
+                    let which = u64::from(location_offset >= LOC_ENTRY);
+                    let local = location_offset % LOC_ENTRY;
+                    if (10..14).contains(&local) {
+                        return (true, format!("映射树条目 {entry_index} 的第 {which} 条位置条目单元校验和（build_mapping_entry，D19 已定项 10）"));
+                    }
+                }
+                return (true, format!("映射树条目 {entry_index} 内偏移 {entry_offset}（key 或位置条目非校验和字段）"));
+            }
+        }
+        TransactionUnit::TreeTable => {
+            let entries_start = index_node_header_bytes(key_width) as u64 + NONCE_MAC_RESERVED_BYTES;
+            if offset >= entries_start {
+                let relative = offset - entries_start;
+                let entry_index = relative / TREE_TABLE_ENTRY_BYTES;
+                let entry_offset = relative % TREE_TABLE_ENTRY_BYTES;
+                let pointer_start = 14u64; // 树 ID 8 + 条目长度 2 + 种类 2 + flags 2（TreeTableEntry::to_bytes）
+                if entry_offset >= pointer_start && entry_offset < pointer_start + NODE_POINTER_BYTES {
+                    let local = entry_offset - pointer_start;
+                    let checks = node_pointer_checksum_offsets(0);
+                    if (checks[0]..checks[0] + 4).contains(&local) {
+                        return (true, format!("树表条目 {entry_index} 的根指针第 0 条位置条目单元校验和（D19 已定项 4）"));
+                    }
+                    if (checks[1]..checks[1] + 4).contains(&local) {
+                        return (true, format!("树表条目 {entry_index} 的根指针第 1 条位置条目单元校验和（D19 已定项 4）"));
+                    }
+                    return (true, format!("树表条目 {entry_index} 的根指针其余字段"));
+                }
+                return (true, format!("树表条目 {entry_index} 内偏移 {entry_offset}（树 ID / 种类 / 出生 txg / 头 ID 一类）"));
+            }
+        }
+        _ => {}
+    }
+    (false, format!("单元内偏移 {offset}：不在头校验和 / 载荷 CRC / 已知记录条目区里，未登记"))
+}
+
+fn explain_root_record_offset(offset: u64) -> (bool, String) {
+    match offset {
+        0..=3 => (true, "root magic".to_string()),
+        4..=19 => (true, "fsid".to_string()),
+        20..=23 => (true, "flags 占位（恒 0）".to_string()),
+        24..=27 => (true, "instance".to_string()),
+        28..=35 => (true, "checkpoint_txg".to_string()),
+        36..=121 => {
+            let local = offset - 36;
+            let checks = node_pointer_checksum_offsets(0);
+            if (checks[0]..checks[0] + 4).contains(&local) {
+                (true, "tree_table 指针第 0 条位置条目单元校验和".to_string())
+            } else if (checks[1]..checks[1] + 4).contains(&local) {
+                (true, "tree_table 指针第 1 条位置条目单元校验和".to_string())
+            } else {
+                (true, "tree_table 指针其余字段".to_string())
+            }
+        }
+        122..=129 => (true, "tree_identifier_watermark".to_string()),
+        130..=137 => (true, "rollback_floor".to_string()),
+        138..=169 => (true, "根记录自证校验和（罩整个 512 槽含补齐、自身按 0 参与，D18 已定项 17）".to_string()),
+        170..=255 => (true, "instance_table 指针（预期不随改动计数变；若变了记一行 gap）".to_string()),
+        256..=341 => {
+            let local = offset - 256;
+            let checks = node_pointer_checksum_offsets(0);
+            if (checks[0]..checks[0] + 4).contains(&local) {
+                (true, "mapping_root 指针第 0 条位置条目单元校验和".to_string())
+            } else if (checks[1]..checks[1] + 4).contains(&local) {
+                (true, "mapping_root 指针第 1 条位置条目单元校验和".to_string())
+            } else {
+                (true, "mapping_root 指针其余字段".to_string())
+            }
+        }
+        342..=370 => (true, "算法类型 / nonce / MAC 留位（恒 0）".to_string()),
+        _ => (false, format!("根记录内偏移 {offset}：落在 371 字节字段表之外的补齐区，未登记")),
+    }
+}
+
+fn explain_journal_record_offset(units: &[(SlotNumber, TransactionUnit, Vec<u8>)], offset: u64) -> (bool, String) {
+    match offset {
+        0..=3 => (true, "journal magic".to_string()),
+        4..=9 => (true, "type/algo/pad".to_string()),
+        10..=13 => (true, "record_length".to_string()),
+        14..=17 => (true, "named_count".to_string()),
+        18..=21 => (true, "instance".to_string()),
+        22..=27 => (true, "counter（six-byte）".to_string()),
+        28..=35 => (true, "checkpoint_txg".to_string()),
+        36..=45 => (true, "nonce 留位（恒 0）".to_string()),
+        46..=77 => (true, "记录头校验和（罩整条记录 [0,4096) 含补齐、自身按 0 参与，D23 已定项 13）".to_string()),
+        78..=85 => (true, "transaction".to_string()),
+        86 => (true, "is_commit".to_string()),
+        87..=90 => (true, "back_chain".to_string()),
+        91..=94 => (true, "载荷校验和（罩点名项数组，D23 已定项 13）".to_string()),
+        95..=180 => {
+            let local = offset - 95;
+            let checks = node_pointer_checksum_offsets(0);
+            if (checks[0]..checks[0] + 4).contains(&local) {
+                (true, "new_tree_table 指针第 0 条位置条目单元校验和".to_string())
+            } else if (checks[1]..checks[1] + 4).contains(&local) {
+                (true, "new_tree_table 指针第 1 条位置条目单元校验和".to_string())
+            } else {
+                (true, "new_tree_table 指针其余字段".to_string())
+            }
+        }
+        181..=266 => {
+            let local = offset - 181;
+            let checks = node_pointer_checksum_offsets(0);
+            if (checks[0]..checks[0] + 4).contains(&local) {
+                (true, "new_mapping_root 指针第 0 条位置条目单元校验和".to_string())
+            } else if (checks[1]..checks[1] + 4).contains(&local) {
+                (true, "new_mapping_root 指针第 1 条位置条目单元校验和".to_string())
+            } else {
+                (true, "new_mapping_root 指针其余字段".to_string())
+            }
+        }
+        267..=274 => (true, "new_tree_identifier_watermark".to_string()),
+        275..=282 => (true, "new_rollback_floor".to_string()),
+        283..=290 => (true, "fsid".to_string()),
+        291..=306 => (true, "MAC 留位（恒 0）".to_string()),
+        _ => {
+            let relative = offset - JOURNAL_HEADER_BYTES;
+            let entry_index = (relative / JOURNAL_NAMED_ENTRY_BYTES) as usize;
+            let entry_offset = relative % JOURNAL_NAMED_ENTRY_BYTES;
+            let tag = units.get(entry_index).map_or("?", |(_, unit, _)| unit.descriptive_tag());
+            if (10..14).contains(&entry_offset) {
+                return (true, format!("点名项 {entry_index}（{tag}）第 0 条位置条目单元校验和"));
+            }
+            if (24..28).contains(&entry_offset) {
+                return (true, format!("点名项 {entry_index}（{tag}）第 1 条位置条目单元校验和"));
+            }
+            (true, format!("点名项 {entry_index}（{tag}）内偏移 {entry_offset}（非校验和字段）"))
+        }
+    }
+}
+
+/// 量 3 的统一入口：按结构标签分派到对应的 explain 函数。
+fn explain_offset(catalog: &StructureCatalog, structure: &str, offset_in_structure: u64) -> (bool, String) {
+    if structure == "root_record" {
+        return explain_root_record_offset(offset_in_structure);
+    }
+    if structure == "journal_record" {
+        return explain_journal_record_offset(catalog.units, offset_in_structure);
+    }
+    for (_, unit, _) in catalog.units {
+        if unit.descriptive_tag() == structure {
+            return explain_unit_offset(*unit, offset_in_structure);
+        }
+    }
+    (false, format!("标签 {structure} 不在候选表里"))
+}
+
+/// 问题单第 1 行「够判条件」点名的六处（重跑登记第一节）：每处至少一段差异才够判。
+#[derive(Clone, Copy, Default, Debug)]
+struct ChangeCountBullets {
+    offset_88_covered: bool,
+    leaf_checksum_covered: bool,
+    pointer_to_leaf_checksum_covered: bool,
+    inode_root_checksum_covered: bool,
+    tree_table_covered: bool,
+    root_record_checksum_covered: bool,
+}
+
+impl ChangeCountBullets {
+    fn all_covered(&self) -> bool {
+        self.offset_88_covered && self.leaf_checksum_covered && self.pointer_to_leaf_checksum_covered && self.inode_root_checksum_covered && self.tree_table_covered && self.root_record_checksum_covered
+    }
+    fn record(&mut self, structure: &str, offset_in_structure: u64, length: u64) {
+        match structure {
+            "inode_leaf" => {
+                let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+                if overlaps(offset_in_structure, length, record_start + 88, 8) {
+                    self.offset_88_covered = true;
+                }
+                if overlaps(offset_in_structure, length, 10, 32) || overlaps(offset_in_structure, length, 89, 4) {
+                    self.leaf_checksum_covered = true;
+                }
+            }
+            "inode_root" => {
+                // 结构内偏移 225 / 239（重跑登记第七节乙类，entries_start 131 + pointer_start 34 + {60,74}）。
+                if overlaps(offset_in_structure, length, 225, 4) || overlaps(offset_in_structure, length, 239, 4) {
+                    self.pointer_to_leaf_checksum_covered = true;
+                }
+                if overlaps(offset_in_structure, length, 10, 32) || overlaps(offset_in_structure, length, 92, 4) {
+                    self.inode_root_checksum_covered = true;
+                }
+            }
+            "tree_table" => self.tree_table_covered = true,
+            "root_record" => {
+                if overlaps(offset_in_structure, length, 138, 32) {
+                    self.root_record_checksum_covered = true;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 // ───────────────────────── 装置自己补的取法：空白清单 ─────────────────────────
 
 /// 每一条是仓里没有条款、装置不得不自己取一个值才写得出字节的地方。文字里不用空格，好让结果行按空格切段。
@@ -3142,12 +3668,43 @@ const GAPS: &[(&str, &str)] = &[
     ("G18", "D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同"),
     ("G19", "mkfs种根的13次操作（11写+2屏障，段序列4+1+1+1+4、34个崩溃状态）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住"),
     ("G20", "已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错"),
-    ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份超级块之后才动单元）不是根槽写路径，first-txn-layout八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[superblock_slot×2]"),
+    ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份超级块之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[superblock_slot×2]"),
     ("G22", "**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节3472670720、全空聚簇段数3310、runs4三个数都随它变"),
     ("G23", "已收口（2026-09-14用户定案，C324还清）：码3打包容器按「数据单元」那一档取落点（起点32768对齐、两槽都空）；连同D3已定项10⑤的bump次序（树ID升序、树内先叶后根、映射树倒数第二、树表最末）⇒t2 extent根拿50240、游标停在50241而t3要对齐⇒t3拿50242–50243，**槽50241空着**、runs因此从3变4"),
     ("G24", "树表条目的「头ID」（D5已定项9，2026-09-14用户定案）只说了inode树写自己、extent树写12、其余写0，没说**这个数从哪来**：第一版只有一个可写头，装置按「inode树的树ID就是头ID」写；多头之后头ID与树ID还是不是一回事，条款没答"),
     ("G25", "journal记录头2026-09-14加的fsid8与MAC16，条款只说fsid「与单元头同口径」（超级块fsid的低8字节）、MAC第一版全0；**读者拿fsid做什么没写**——装置按I-1.4把fsid不符的记录整条丢掉（不进重放前缀），而「丢掉」与「判损坏断链」在条款里分不出来"),
 ];
+
+/// 整条路（mkfs → 取号 → 暖机两次 → 第一个事务）跑一遍，返回落盘后的整份镜像与这次发布的产出。
+/// E142 第十一次跑用它跑出 M_A（change_count = FIRST_TRANSACTION_TXG）、M_B（真实基线，change_count = 1）与量 8 的两个几何取样点。
+fn run_full_pipeline(parameters: &PoolParameters, change_count: u64, file_bytes: &[u8]) -> (Pool, TransactionOutput) {
+    let (mut recording, genesis) = mkfs(parameters);
+    let instance = acquire_instance(&mut recording, parameters);
+    let (_, last_warm_up_record) = warm_up(&mut recording, parameters, &genesis, instance);
+    let output = publish_first_file(&mut recording, parameters, &genesis, file_bytes, instance, last_warm_up_record.as_deref(), change_count);
+    (recording.pool.clone(), output)
+}
+
+/// 差异段所属结构名去重（量 8 的「结构集合」）。
+fn structure_name_set(differences: &[DiffSegment], catalog: &StructureCatalog) -> std::collections::BTreeSet<&'static str> {
+    differences.iter().map(|segment| classify_offset(catalog, segment.device, segment.offset).map_or("unregistered", |(structure, _)| structure)).collect()
+}
+
+/// 差异段的完整位置集合（设备 + 结构 + 结构内偏移，不含值——量 8 的判据要求「不含值」）。
+fn structure_position_set(differences: &[DiffSegment], catalog: &StructureCatalog) -> std::collections::BTreeSet<(u32, &'static str, u64)> {
+    differences
+        .iter()
+        .map(|segment| {
+            let (structure, offset) = classify_offset(catalog, segment.device, segment.offset).unwrap_or(("unregistered", segment.offset));
+            (segment.device, structure, offset)
+        })
+        .collect()
+}
+
+/// 量 8 的判据：结构集合逐项相等（不是「相差 ≤ 1 段」的容差版——V6 变异测的就是这一句）。
+fn structure_sets_match(left: &std::collections::BTreeSet<&str>, right: &std::collections::BTreeSet<&str>) -> bool {
+    left == right
+}
 
 // ───────────────────────── main：发结果行 ─────────────────────────
 
@@ -3157,14 +3714,17 @@ fn emit(emitter: &mut Emitter, body: &str) {
 
 fn main() {
     let mut emitter = Emitter::new();
-    let file_bytes: Vec<u8> = (0..3000u32).map(|index| u8::try_from((index * 7 + 3) % 251).expect("小于 256")).collect();
+    // 2026-09-18 F1 诊断报告（research/prompts/e142-r11-f1-diagnosis.md）核过：跑前登记第一节第 1 条要求「同 3000 字节内容」，
+    // 这一格此前与 `crates/singlefs-harness/src/scenario.rs::first_file_content()` 的公式不一样，量 5 的 11 处不等全部可以追到这一处；
+    // 主 agent 判定改装置这一侧对齐到 `index % 251`（crates 一侧被 QEMU 读回核对、三份用例与层 0 两条流钉着）。
+    let file_bytes: Vec<u8> = (0..3000u32).map(|index| u8::try_from(index % 251).expect("小于 256")).collect();
     emit(&mut emitter, &format!(
         "name=config devices=2 physical_block_bytes={PHYSICAL_BLOCK_BYTES} file_bytes={} fsid=fixed device_bytes={DEVICE_BYTES} journal_ring_bytes={JOURNAL_RING_BYTES} journal_ring_slots={JOURNAL_RING_SLOTS} in_flight_limit={JOURNAL_IN_FLIGHT_RECORD_LIMIT} unit_area_start_slot={UNIT_AREA_START_SLOT} unit_area_slots={UNIT_AREA_SLOTS} cluster_segment_slots={CLUSTER_SEGMENT_SLOTS} open_cluster_segment_start={OPEN_CLUSTER_SEGMENT_START_SLOT}",
         file_bytes.len()
     ));
 
     // 判据 1：宽度对账。
-    // 「预期」那一列逐格抄自 `.claude/kb/first-txn-layout.md` 零到七（2026-09-14 用户定案之后的那一版），
+    // 「预期」那一列逐格抄自 `.claude/kb/layout/01-first-txn.md` 零到七（2026-09-14 用户定案之后的那一版），
     // 「实测」是装置自己的常量算出来的。两列不等就记一笔 `width_mismatches`。
     let width_rows: [(&str, u64, u64); 28] = [
         ("pointer_head", 50, POINTER_HEAD_BYTES),
@@ -3211,7 +3771,7 @@ fn main() {
     let acquisition_operation_count = recording.operations.len();
     let (warm_up_roots, last_warm_up_record) = warm_up(&mut recording, &parameters, &genesis, instance);
     let warm_up_operation_count = recording.operations.len();
-    let output = publish_first_file(&mut recording, &parameters, &genesis, &file_bytes, instance, last_warm_up_record.as_deref());
+    let output = publish_first_file(&mut recording, &parameters, &genesis, &file_bytes, instance, last_warm_up_record.as_deref(), FIRST_TRANSACTION_TXG);
     let warm_up_operations = &recording.operations[acquisition_operation_count..warm_up_operation_count];
     emit(&mut emitter, &format!(
         "name=warm_up publishes={} writes={} barriers={} fua={} first_transaction_txg={FIRST_TRANSACTION_TXG} last_warm_up_root_txg={}",
@@ -3225,7 +3785,7 @@ fn main() {
     let transaction_operations = &recording.operations[warm_up_operation_count..];
     let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
     let acquisition_operations = &recording.operations[mkfs_operation_count..acquisition_operation_count];
-    // 段序列登记表（first-txn-layout 八）的输入：每条路径单独切段、再加整条流。mkfs 那一行不进层 0 枚举（G19），但段序列钉在这里。
+    // 段序列登记表（layout/01-first-txn 八）的输入：每条路径单独切段、再加整条流。mkfs 那一行不进层 0 枚举（G19），但段序列钉在这里。
     for (path_name, operations) in [("mkfs", &recording.operations[..mkfs_operation_count]), ("instance_acquisition", acquisition_operations), ("warm_up", warm_up_operations), ("transaction", transaction_operations), ("post_mkfs_stream", post_mkfs_operations)] {
         let (_, path_segments) = split_into_segments(operations, true);
         let sizes: Vec<String> = path_segments.iter().map(|segment| segment.len().to_string()).collect();
@@ -3253,6 +3813,182 @@ fn main() {
         outcome_kind(&full_report.outcome), outcome_root(&full_report.outcome), full_report.journal.valid_records, full_report.journal.above_water, full_report.journal.prefix_applied, full_report.journal.verification_passed, full_report.mapping_fallbacks
     ));
 
+    // ═════════ E142 第十一次跑（重跑登记 research/prompts/e142-r11-prereg.md）：改动计数从 1 改成 3，盘上还有哪些字节跟着变 ═════════
+    // 真实基线 M_B（臂 B，旧口径写 1）：同一次进程里再跑一遍整条路，parameters / file_bytes 与 M_A 一字不差。
+    let (image_change_count_old, output_change_count_old) = run_full_pipeline(&parameters, 1, &file_bytes);
+    let image_change_count_new = full.clone();
+    let (root_region, root_ring_slot) = ring_target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let root_device = parameters.region_devices[root_region as usize].0;
+    let root_offset = ring_slot_offset(root_region, root_ring_slot).0;
+    let catalog = build_structure_catalog(&output, root_device, root_offset);
+    // 量 1：M_A 与 M_B 在两块盘全部字节上逐字节相减（分母是全部字节——第一节第 3 条；见 diff_pools 的推理注释）。
+    let differences = diff_pools(&image_change_count_old, &image_change_count_new);
+    emit(&mut emitter, &format!("name=change_count_run_pair devices={} file_bytes={} old_change_count=1 new_change_count={FIRST_TRANSACTION_TXG} segments={}", parameters.device_count, file_bytes.len(), differences.len()));
+    let mut bullets = ChangeCountBullets::default();
+    let mut structures_found: std::collections::BTreeSet<&str> = std::collections::BTreeSet::new();
+    let mut unexplained = 0u64;
+    for (index, segment) in differences.iter().enumerate() {
+        let (structure, offset_in_structure) = classify_offset(&catalog, segment.device, segment.offset).unwrap_or(("unregistered", segment.offset));
+        emit(&mut emitter, &format!(
+            "name=change_count_diff index={index} device={} offset={} length={} old={} new={} structure={structure} offset_in_structure={offset_in_structure}",
+            segment.device, segment.offset, segment.length, hex_bytes(&segment.old), hex_bytes(&segment.new)
+        ));
+        structures_found.insert(structure);
+        bullets.record(structure, offset_in_structure, segment.length);
+        // 量 3：谁的校验和/指针罩到它；归不了因的按 F6 记一行 gap，不作废。
+        let (explained, reason) = if structure == "unregistered" { (false, "落在候选表任何一个结构区间之外".to_string()) } else { explain_offset(&catalog, structure, offset_in_structure) };
+        let reason = reason.replace(' ', "_");
+        if explained {
+            emit(&mut emitter, &format!("name=diff_explained index={index} structure={structure} offset_in_structure={offset_in_structure} reason={reason}"));
+        } else {
+            unexplained += 1;
+            emit(&mut emitter, &format!("name=gap id=CC{index} text=diff段{index}未归因_structure={structure}_offset={offset_in_structure}_detail={reason}"));
+        }
+    }
+    emit(&mut emitter, &format!("name=diff_explained_summary segments={} unexplained={unexplained}", differences.len()));
+    // 量 4：差异段所属结构去重之后，减去问题单点名的六处对应的四个结构标签（inode_leaf/inode_root 各扛两条bullet）。
+    let expected_structures: std::collections::BTreeSet<&str> = ["inode_leaf", "inode_root", "tree_table", "root_record"].into_iter().collect();
+    let extra: Vec<&str> = structures_found.iter().filter(|structure| !expected_structures.contains(*structure)).copied().collect();
+    emit(&mut emitter, &format!("name=extra_structures structures={} count={}", if extra.is_empty() { "none".to_string() } else { extra.join(",") }, extra.len()));
+    emit(&mut emitter, &format!(
+        "name=change_count_bullets offset_88_covered={} leaf_checksum_covered={} pointer_to_leaf_checksum_covered={} inode_root_checksum_covered={} tree_table_covered={} root_record_checksum_covered={} all_covered={}",
+        bullets.offset_88_covered, bullets.leaf_checksum_covered, bullets.pointer_to_leaf_checksum_covered, bullets.inode_root_checksum_covered, bullets.tree_table_covered, bullets.root_record_checksum_covered, bullets.all_covered()
+    ));
+
+    // 量 2：偏移 88 那 8 字节的值本身，两份镜像 × 两块盘各一行。
+    let leaf_slot_base = SlotNumber(SLOT_INODE_LEAF).device_offset();
+    let record_field_offset: usize = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as usize + 88; // 224：记录区 136 起 + 记录内偏移 88
+    for (image, label, expected_change_count) in [(&image_change_count_new, "M_A", FIRST_TRANSACTION_TXG), (&image_change_count_old, "M_B", 1u64)] {
+        for device_index in 0..parameters.device_count {
+            let device = DeviceIdentity(u32::try_from(device_index).expect("设备数"));
+            let sector = image.read(device, leaf_slot_base, PHYSICAL_BLOCK_BYTES as usize);
+            let field_bytes = &sector[record_field_offset..record_field_offset + 8];
+            let matches_expected = field_bytes == expected_change_count.to_le_bytes().as_slice();
+            emit(&mut emitter, &format!("name=change_count_value image={label} device={device_index} value={} matches_expected={matches_expected}", hex_bytes(field_bytes)));
+        }
+    }
+
+    // 阳性对照 A / B（第五节）：inode 叶偏移 88 首字节注入一次已知改动，比对器必须精确报出注入点（且只报出注入点）。
+    // 对照 C 要 crates/ 实装的镜像；experiment-runner 的写范围没有 crates/**（agent-write-scope.tsv 第 4 行只许 implementation-writer 写），
+    // 这个二进制造不出 M_C，下面只跑 A / B，C 那一行如实标 blocked（交回报告里详列）。
+    for (image, label) in [(&image_change_count_new, "A"), (&image_change_count_old, "B")] {
+        let mut mutated = image.clone();
+        for device_index in 0..parameters.device_count {
+            flip_byte(&mut mutated, DeviceIdentity(u32::try_from(device_index).expect("设备数")), leaf_slot_base, 88);
+        }
+        let detected_segments = diff_pools(image, &mutated);
+        let injection_points: std::collections::BTreeSet<(u32, u64)> = (0..parameters.device_count).map(|device_index| (u32::try_from(device_index).expect("设备数"), leaf_slot_base.0 + 88)).collect();
+        let detected_points: std::collections::BTreeSet<(u32, u64)> = detected_segments.iter().map(|segment| (segment.device, segment.offset)).collect();
+        let matches_injection = detected_points == injection_points;
+        emit(&mut emitter, &format!("name=positive_control_change_count control={label} segments={} matches_injection={matches_injection}", detected_segments.len()));
+    }
+    emit(&mut emitter, "name=positive_control_change_count control=C segments=0 matches_injection=false reason=blocked_no_crates_write_scope");
+
+    // 量 5：装置↔crates/ 实装区域清单逐字节比对（问题单的翻面观测，第十一节 F1 停机条款）。
+    // 2026-09-18 crates 侧补上了只读产出 `cargo run -p singlefs-harness --bin first_transaction_region_bytes`
+    // （`name=impl_region_bytes region=… device=… offset=… length=… sha256=…`，≤4096 字节整段十六进制、其余头尾各 32 字节，
+    // `region=` 与这里的 `descriptive_tag()` 同名同序）。这个二进制的第一个命令行参数给它那份输出的文件路径就做真比对；
+    // 不给参数（旧调用方式）退回 `equal=unknown`，不炸。
+    let (_, superblock_slot_index) = superblock_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let superblock_offset = SUPERBLOCK_SLOT_OFFSETS[superblock_slot_index];
+    let mut region_geometry: Vec<(&'static str, u32, u64, u64)> = Vec::new();
+    for (slot, unit, bytes) in catalog.units {
+        for device_index in 0..parameters.device_count {
+            region_geometry.push((unit.descriptive_tag(), u32::try_from(device_index).expect("设备数"), slot.device_offset().0, bytes.len() as u64));
+        }
+    }
+    region_geometry.push(("root_record", root_device, root_offset, PHYSICAL_BLOCK_BYTES));
+    for device_index in 0..parameters.device_count {
+        region_geometry.push(("journal_record", u32::try_from(device_index).expect("设备数"), catalog.journal_offset, catalog.journal_length));
+    }
+    for device_index in 0..parameters.device_count {
+        region_geometry.push(("superblock", u32::try_from(device_index).expect("设备数"), superblock_offset, SUPERBLOCK_SLOT_BYTES));
+    }
+
+    let impl_snapshot_path = std::env::args().nth(1);
+    let impl_lines: Vec<String> = impl_snapshot_path
+        .as_deref()
+        .map(|path| std::fs::read_to_string(path).unwrap_or_else(|error| panic!("量 5：读不到 crates 快照 {path}：{error}")))
+        .map(|content| content.lines().filter(|line| line.contains("name=impl_region_bytes ")).map(str::to_string).collect())
+        .unwrap_or_default();
+
+    let mut equal_count = 0u64;
+    let mut unequal_count = 0u64;
+    for (region, device, offset, length) in &region_geometry {
+        let device_bytes = image_change_count_new.read(DeviceIdentity(*device), DeviceOffset(*offset), *length as usize);
+        let device_sha256 = sha256_hex(&device_bytes);
+        // 与 crates 侧 `impl_region_bytes` 同名同格式的自报行——供人核对，也是量 5 判定的可审计依据（不只是一个 equal= 布尔值）。
+        if *length <= 4096 {
+            emit(&mut emitter, &format!("name=device_region_bytes region={region} device={device} offset={offset} length={length} sha256={device_sha256} hexadecimal_extent=whole_region hexadecimal={}", hex_bytes(&device_bytes)));
+        } else {
+            let sample_bytes = 32.min(device_bytes.len());
+            emit(&mut emitter, &format!(
+                "name=device_region_bytes region={region} device={device} offset={offset} length={length} sha256={device_sha256} hexadecimal_extent=head_and_tail head_and_tail_bytes={sample_bytes} head_hexadecimal={} tail_hexadecimal={}",
+                hex_bytes(&device_bytes[..sample_bytes]), hex_bytes(&device_bytes[device_bytes.len() - sample_bytes..])
+            ));
+        }
+        let matching_line = impl_lines.iter().find(|line| {
+            let fields = parse_result_line(line);
+            fields.get("region").map(String::as_str) == Some(*region) && fields.get("device").and_then(|value| value.parse::<u32>().ok()) == Some(*device)
+        });
+        let Some(line) = matching_line else {
+            emit(&mut emitter, &format!("name=impl_bytes_equal region={region} device={device} equal=unknown first_diff_offset=none mismatch_bytes=0 reason=no_impl_snapshot_given"));
+            continue;
+        };
+        let fields = parse_result_line(line);
+        let comparison = compare_region(&device_bytes, &device_sha256, &fields, *length);
+        if comparison.equal {
+            equal_count += 1;
+        } else {
+            unequal_count += 1;
+        }
+        // `equal=true` 时 `first_diff_offset` 恒是「没有差异」的 none，不是「有差异但定位不到」的 unknown_middle_of_region——
+        // 这两种 None 语义不同，共用一个 map_or 会把「没有差异」错标成「差异藏在中段」（2026-09-18 诊断报告「顺带发现」第 1 条）。
+        let first_diff_offset_text = if comparison.equal {
+            "none".to_string()
+        } else {
+            comparison.first_diff_offset.map_or("unknown_middle_of_region".to_string(), |value| value.to_string())
+        };
+        emit(&mut emitter, &format!(
+            "name=impl_bytes_equal region={region} device={device} equal={} first_diff_offset={first_diff_offset_text} mismatch_bytes={}",
+            comparison.equal,
+            comparison.mismatch_bytes.map_or("unknown".to_string(), |value| value.to_string())
+        ));
+    }
+    emit(&mut emitter, &format!("name=impl_bytes_equal_summary regions={} equal={equal_count} unequal={unequal_count} snapshot_given={}", region_geometry.len(), impl_snapshot_path.is_some()));
+
+    // 量 8：几何敏感性——取样点一（盘数 2→1）与取样点二（换一个值 1→4）。
+    let one_device_parameters = PoolParameters::control_one_device_no_barriers();
+    let (one_device_image_new, one_device_output_new) = run_full_pipeline(&one_device_parameters, FIRST_TRANSACTION_TXG, &file_bytes);
+    let (one_device_image_old, _) = run_full_pipeline(&one_device_parameters, 1, &file_bytes);
+    let (one_device_root_region, one_device_root_slot) = ring_target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let one_device_root_device = one_device_parameters.region_devices[one_device_root_region as usize].0;
+    let one_device_root_offset = ring_slot_offset(one_device_root_region, one_device_root_slot).0;
+    let one_device_catalog = build_structure_catalog(&one_device_output_new, one_device_root_device, one_device_root_offset);
+    let one_device_differences = diff_pools(&one_device_image_old, &one_device_image_new);
+    let one_device_structures = structure_name_set(&one_device_differences, &one_device_catalog);
+    let main_structures = structure_name_set(&differences, &catalog);
+    let one_device_stable = structure_sets_match(&one_device_structures, &main_structures);
+    emit(&mut emitter, &format!("name=geometry_sensitivity point=G1 devices={} segments={} structures={} stable={one_device_stable}", one_device_parameters.device_count, one_device_differences.len(), one_device_structures.len()));
+    if !one_device_stable {
+        emit(&mut emitter, &format!("name=geometry_sensitivity_detail point=G1 main_only={} sample_only={}", main_structures.difference(&one_device_structures).copied().collect::<Vec<_>>().join(","), one_device_structures.difference(&main_structures).copied().collect::<Vec<_>>().join(",")));
+    }
+
+    let (larger_change_count_image_new, larger_change_count_output_new) = run_full_pipeline(&parameters, 4, &file_bytes);
+    let larger_change_count_catalog = build_structure_catalog(&larger_change_count_output_new, root_device, root_offset);
+    let larger_change_count_differences = diff_pools(&image_change_count_old, &larger_change_count_image_new);
+    let larger_change_count_positions = structure_position_set(&larger_change_count_differences, &larger_change_count_catalog);
+    let main_positions = structure_position_set(&differences, &catalog);
+    let larger_change_count_stable = larger_change_count_positions == main_positions;
+    emit(&mut emitter, &format!("name=geometry_sensitivity point=G2 devices={} segments={} positions={} stable={larger_change_count_stable}", parameters.device_count, larger_change_count_differences.len(), larger_change_count_positions.len()));
+    if !larger_change_count_stable {
+        let main_only: Vec<String> = main_positions.difference(&larger_change_count_positions).map(|(device, structure, offset)| format!("{device}:{structure}:{offset}")).collect();
+        let sample_only: Vec<String> = larger_change_count_positions.difference(&main_positions).map(|(device, structure, offset)| format!("{device}:{structure}:{offset}")).collect();
+        emit(&mut emitter, &format!("name=geometry_sensitivity_detail point=G2 main_only={} sample_only={}", if main_only.is_empty() { "none".to_string() } else { main_only.join(",") }, if sample_only.is_empty() { "none".to_string() } else { sample_only.join(",") }));
+    }
+    // output_change_count_old 只用于量 2/量 8 的旁证；避免「构造了却没用」的 dead_code 告警。
+    let _ = &output_change_count_old.record.counter;
+
     // 判据 4：层 0 主臂。基线是 mkfs 之后的池（事务的写全没持久那一态）。
     let (base_pool, _) = mkfs(&parameters);
     let base_pool = base_pool.pool;
@@ -3273,7 +4009,7 @@ fn main() {
     let control = PoolParameters::control_one_device_no_barriers();
     let (mut control_recording, control_genesis) = mkfs(&control);
     let control_mkfs_operation_count = control_recording.operations.len();
-    let _ = publish_first_file(&mut control_recording, &control, &control_genesis, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None);
+    let _ = publish_first_file(&mut control_recording, &control, &control_genesis, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
     let (control_base, _) = mkfs(&control);
     let (control_writes, control_segments) = split_into_segments(&control_recording.operations[control_mkfs_operation_count..], false);
     let control_closed_form = closed_form_state_count(&control_segments);
@@ -3388,7 +4124,8 @@ mod tests {
     use super::*;
 
     fn sample_file() -> Vec<u8> {
-        (0..3000u32).map(|index| u8::try_from((index * 7 + 3) % 251).expect("小于 256")).collect()
+        // 与 main() 里的 file_bytes 同一个公式（2026-09-18 对齐到 crates 的 `index % 251`，见 main() 里的注释）。
+        (0..3000u32).map(|index| u8::try_from(index % 251).expect("小于 256")).collect()
     }
 
     /// mkfs → 取号 → 暖机两次空发布 → 第一个事务。返回的三个下标分别是 mkfs 之后（取号从这里起）、
@@ -3410,7 +4147,7 @@ mod tests {
         let acquisition_operation_count = recording.operations.len();
         let (_, last_warm_up_record) = warm_up(&mut recording, &parameters, &genesis, instance);
         let warm_up_operation_count = recording.operations.len();
-        let output = publish_first_file(&mut recording, &parameters, &genesis, &sample_file(), instance, last_warm_up_record.as_deref());
+        let output = publish_first_file(&mut recording, &parameters, &genesis, &sample_file(), instance, last_warm_up_record.as_deref(), FIRST_TRANSACTION_TXG);
         BuiltPool { recording, genesis, output, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count }
     }
 
@@ -3697,7 +4434,9 @@ mod tests {
         assert_eq!(tally.file_read_states, 7);
         assert_eq!(tally.no_file_states, 262158);
         assert_eq!(tally.journal_differing_states, 3, "journal 从此承重：这 3 个状态查不查 journal 结果不同");
-        assert_eq!(tally.verification_ran_states, 9, "三条记录各自「持久而所属的根还没持久」的 3 个子集：暖机 jsn 1、jsn 2 与事务 jsn 3");
+        // 前缀规则不跨实例边界（D23 已定项 14 第 1 条）：暖机 jsn 1 之上只有 mkfs 的第 0 代根（实例 0），它一条都不施加、验证也不跑；
+        // 剩下 jsn 2（所选根是实例 1 的第 1 代）与事务 jsn 3（所选根是第 2 代）各 3 个子集。2026-09-16 之前这里是 9：jsn 1 被错施加到 mkfs 根上。
+        assert_eq!(tally.verification_ran_states, 6, "两条记录各自「持久而所属的根还没持久」的 3 个子集：暖机 jsn 2 与事务 jsn 3");
         assert_eq!(tally.verification_failed_states, 0);
     }
 
@@ -3710,7 +4449,7 @@ mod tests {
         assert_eq!(closed_form_state_count(&segments), 524314);
     }
 
-    /// 段序列登记表（first-txn-layout 八）的五行由这条钉住：mkfs 4+1+1+1+4（13 次操作、34 个状态）、取号 2、
+    /// 段序列登记表（layout/01-first-txn 八）的五行由这条钉住：mkfs 4+1+1+1+4（13 次操作、34 个状态）、取号 2、
     /// 暖机 2+1+2+2+1+2、事务 16+2+1+2、整条流 2+2+1+2+2+1+18+2+1+2。
     /// 改任何一条路径里屏障或 FUA 的位置都红——mkfs 那一行不进层 0 枚举，这里是它唯一的会红检查。
     ///
@@ -3805,7 +4544,7 @@ mod tests {
         let control = PoolParameters::control_one_device_no_barriers();
         let (mut recording, genesis) = mkfs(&control);
         let mkfs_operation_count = recording.operations.len();
-        let _ = publish_first_file(&mut recording, &control, &genesis, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None);
+        let _ = publish_first_file(&mut recording, &control, &genesis, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
         let (base, _) = mkfs(&control);
         let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], false);
         assert_eq!(writes.len(), 11);
@@ -3994,8 +4733,9 @@ mod tests {
     fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
         let BuiltPool { output, .. } = built_pool();
         assert_eq!(output.allocation_records.len(), 20, "每盘 10 条：m1 m2 与 t1–t8（deadlist 无节点、不占落点）");
-        assert_eq!(output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(0)).count(), 4, "mkfs 的 m1 / m2 分配代 0");
-        assert_eq!(output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(3)).count(), 16);
+        assert_eq!(output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(0)).count(), 2, "mkfs 的 m1 分配代 0；m2 被 A 换下、释放代 3");
+        assert_eq!(output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(3)).count(), 18, "A 的八个落点各两盘 16 条，加 m2 那两条（已释放、释放代 3）");
+        assert_eq!(output.allocation_records.iter().filter(|record| record.is_released).map(|record| record.slot.0).collect::<Vec<_>>(), vec![50178, 50178], "只有 m2 已释放");
         assert_eq!(output.allocation_records[0].key_bytes().len(), 10);
         let slots_per_device: Vec<u64> = output.allocation_records.iter().filter(|record| record.device == DeviceIdentity(0)).map(|record| record.slot.0).collect();
         assert_eq!(slots_per_device, vec![50176, 50178, 50180, 50240, 50242, 50244, 50245, 50246, 50247, 50248]);
@@ -4010,10 +4750,11 @@ mod tests {
         assert_eq!(value_of(STATISTIC_EMPTY_CLUSTER_SEGMENTS), 3310, "3312 个 64 槽段里两个被占");
         assert_eq!(value_of(STATISTIC_FRAGMENTATION_RUNS), 4, "空闲 run：[50179]、[50182, 50239]、[50241]、[50249, 单元区末]");
         assert_eq!(value_of(STATISTIC_INODE_WATERMARK), 2);
-        // 准入不等式要的四项 day-1 各写一行 0：读不到行是坏账，读到 0 是真的 0。
-        for statistic in [STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_DEFER_QUEUE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES] {
+        // 准入不等式要的四项 day-1 各写一行：三项 0（读不到行是坏账，读到 0 是真的 0），defer 待释放 = 被 A 换下的 mkfs 树表 1 槽。
+        for statistic in [STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES] {
             assert_eq!(value_of(statistic), 0);
         }
+        assert_eq!(value_of(STATISTIC_DEFER_QUEUE_BYTES), SLOT_BYTES, "mkfs 那片第 0 版树表单元进 defer 队列");
         // 哪几项带设备维、哪几项是池级的：逐项数行数**并逐项核 key 里的设备段**——
         // 只数行数抓不到「两行都写成池级」（那也是两行），这一格是第七次跑的变异 M55 逼出来的。
         let devices_of = |statistic: u16| -> Vec<u32> {
@@ -4076,5 +4817,271 @@ mod tests {
         assert_eq!(InodeRecord::parse(&leaf.records[0]).expect("记录").size, 3000);
         let tree_table = parse_index_node(&genesis.tree_table_genesis_unit).expect("树表第 0 版");
         assert_eq!(tree_table.entries.len(), 0);
+    }
+
+    // ───────── E142 第十一次跑新增：量 1-4/8 与阳性对照 A/B 用到的算术模型的单测 ─────────
+
+    #[test]
+    fn inode_record_change_count_bytes_differ_only_in_the_low_byte_between_1_and_3() {
+        let record_1 = InodeRecord { inode: 1, object_birth: CheckpointTxg(3), size: 3000, change_count: 1 }.to_bytes();
+        let record_3 = InodeRecord { inode: 1, object_birth: CheckpointTxg(3), size: 3000, change_count: 3 }.to_bytes();
+        let differing: Vec<usize> = (0..record_1.len()).filter(|&index| record_1[index] != record_3[index]).collect();
+        assert_eq!(differing, vec![88], "改动计数 1→3 的 u64 小端表示只翻低位那一个字节（重跑登记第七节乙类）");
+        assert_eq!(record_1[88], 1);
+        assert_eq!(record_3[88], 3);
+    }
+
+    #[test]
+    fn diff_pools_reports_a_single_byte_segment_when_only_one_byte_changes() {
+        let mut old_sector = [0u8; PHYSICAL_BLOCK_BYTES as usize];
+        old_sector[10] = 1;
+        let mut new_sector = old_sector;
+        new_sector[10] = 3;
+        let old_pool = Pool { devices: vec![SparseDevice { sectors: std::collections::BTreeMap::from([(5u64, old_sector)]) }] };
+        let new_pool = Pool { devices: vec![SparseDevice { sectors: std::collections::BTreeMap::from([(5u64, new_sector)]) }] };
+        let differences = diff_pools(&old_pool, &new_pool);
+        assert_eq!(differences.len(), 1);
+        assert_eq!(differences[0].device, 0);
+        assert_eq!(differences[0].offset, 5 * PHYSICAL_BLOCK_BYTES + 10);
+        assert_eq!(differences[0].length, 1);
+        assert_eq!(differences[0].old, vec![1]);
+        assert_eq!(differences[0].new, vec![3]);
+    }
+
+    #[test]
+    fn diff_pools_merges_adjacent_differing_bytes_and_keeps_separated_ones_apart() {
+        let mut old_sector = [0u8; PHYSICAL_BLOCK_BYTES as usize];
+        let mut new_sector = old_sector;
+        new_sector[20] = 9;
+        new_sector[21] = 9; // 相邻两字节都变 ⇒ 合并成一段，长度 2
+        new_sector[100] = 9; // 隔得远的一字节 ⇒ 单独一段
+        old_sector[300] = 5;
+        new_sector[300] = 5; // 这个字节没变，不该出现在任何段里
+        let old_pool = Pool { devices: vec![SparseDevice { sectors: std::collections::BTreeMap::from([(0u64, old_sector)]) }] };
+        let new_pool = Pool { devices: vec![SparseDevice { sectors: std::collections::BTreeMap::from([(0u64, new_sector)]) }] };
+        let mut differences = diff_pools(&old_pool, &new_pool);
+        differences.sort_by_key(|segment| segment.offset);
+        assert_eq!(differences.len(), 2, "20-21 合并成一段，100 单独一段");
+        assert_eq!((differences[0].offset, differences[0].length), (20, 2));
+        assert_eq!((differences[1].offset, differences[1].length), (100, 1));
+    }
+
+    #[test]
+    fn diff_pools_detects_a_flipped_byte_at_the_exact_injected_position() {
+        let BuiltPool { recording, .. } = built_pool();
+        let base = recording.pool.clone();
+        let mut mutated = base.clone();
+        let leaf_base = SlotNumber(SLOT_INODE_LEAF).device_offset();
+        flip_byte(&mut mutated, DeviceIdentity(0), leaf_base, 88);
+        let differences = diff_pools(&base, &mutated);
+        assert_eq!(differences.len(), 1, "阳性对照：注入一个字节只能测出一段");
+        assert_eq!(differences[0].device, 0);
+        assert_eq!(differences[0].offset, leaf_base.0 + 88);
+        assert_eq!(differences[0].length, 1);
+    }
+
+    #[test]
+    fn classify_offset_finds_the_inode_leaf_change_count_field_and_the_root_record_checksum() {
+        let BuiltPool { output, .. } = built_pool();
+        let parameters = PoolParameters::settled_two_devices();
+        let (region, slot) = ring_target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+        let root_device = parameters.region_devices[region as usize].0;
+        let root_offset = ring_slot_offset(region, slot).0;
+        let catalog = build_structure_catalog(&output, root_device, root_offset);
+        let leaf_base = SlotNumber(SLOT_INODE_LEAF).device_offset().0;
+        assert_eq!(classify_offset(&catalog, 0, leaf_base + 224), Some(("inode_leaf", 224)), "记录区 136 起 + 记录内偏移 88 = 224");
+        assert_eq!(classify_offset(&catalog, 0, leaf_base), Some(("inode_leaf", 0)));
+        assert_eq!(classify_offset(&catalog, root_device, root_offset + 138), Some(("root_record", 138)), "根记录自证校验和的结构内偏移");
+        assert_eq!(classify_offset(&catalog, 0, 999_999_999_999), None, "远处的偏移落不进任何候选结构");
+    }
+
+    #[test]
+    fn explain_unit_offset_finds_the_change_count_field_and_the_checksum_regions_but_not_the_common_prefix() {
+        let record_start = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as u64;
+        let (explained, reason) = explain_unit_offset(TransactionUnit::InodeLeaf, record_start + 88);
+        assert!(explained);
+        assert!(reason.contains("改动计数"), "reason={reason}");
+        assert!(explain_unit_offset(TransactionUnit::InodeLeaf, 15).0, "偏移 15 落在头校验和 [10,42)");
+        assert!(explain_unit_offset(TransactionUnit::InodeLeaf, 89).0, "偏移 89 是码 3 载荷 CRC");
+        assert!(!explain_unit_offset(TransactionUnit::InodeLeaf, 5).0, "偏移 5 是共同前缀，不在头校验和/载荷CRC/记录区里，量 3 该记 gap");
+    }
+
+    #[test]
+    fn explain_inode_root_offset_finds_the_two_location_checksums_that_point_at_the_inode_leaf() {
+        let (explained_0, reason_0) = explain_unit_offset(TransactionUnit::InodeRoot, 225);
+        let (explained_1, reason_1) = explain_unit_offset(TransactionUnit::InodeRoot, 239);
+        assert!(explained_0 && reason_0.contains("位置条目单元校验和"), "reason_0={reason_0}");
+        assert!(explained_1 && reason_1.contains("位置条目单元校验和"), "reason_1={reason_1}");
+    }
+
+    #[test]
+    fn change_count_bullets_are_all_covered_only_when_all_six_offsets_are_hit() {
+        let mut bullets = ChangeCountBullets::default();
+        assert!(!bullets.all_covered());
+        bullets.record("inode_leaf", 136 + 88, 1);
+        bullets.record("inode_leaf", 15, 4);
+        bullets.record("inode_root", 225, 4);
+        bullets.record("inode_root", 92, 4);
+        bullets.record("tree_table", 50, 4);
+        assert!(!bullets.all_covered(), "根记录那一格还没打到，六处不能全过");
+        bullets.record("root_record", 150, 4);
+        assert!(bullets.all_covered());
+    }
+
+    #[test]
+    fn structure_sets_differing_by_one_are_reported_unstable() {
+        let left: std::collections::BTreeSet<&str> = ["inode_leaf", "inode_root"].into_iter().collect();
+        let right: std::collections::BTreeSet<&str> = ["inode_leaf", "inode_root", "mapping_root"].into_iter().collect();
+        assert!(!structure_sets_match(&left, &right), "量 8 判据是「相等」，不是「相差 ≤ 1 段」（V6 判别力自证）");
+    }
+
+    #[test]
+    fn run_full_pipeline_writes_the_requested_change_count_into_the_inode_leaf_record() {
+        // V1 变异（改动计数字面值改回 1）锚在 run_full_pipeline 内部的转发行：main() 自己那个独立调用点没有单测直接盖到，
+        // M_A / M_B / G1 / G2 都经这个函数构造，锚在这里等价地测住了「装置真的按参数写出对应的 change_count」。
+        for &value in &[1u64, FIRST_TRANSACTION_TXG, 4u64] {
+            let (image, output) = run_full_pipeline(&PoolParameters::settled_two_devices(), value, &sample_file());
+            let leaf = output.units_by_slot.iter().find(|(_, unit, _)| *unit == TransactionUnit::InodeLeaf).expect("t3 是 inode 叶");
+            let parsed = parse_packed_unit(&leaf.2).expect("inode 叶自检要过");
+            assert_eq!(InodeRecord::parse(&parsed.records[0]).expect("记录三段恒零要过").change_count, value);
+            let record_field_offset = (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES) as usize + 88;
+            let sector = image.read(DeviceIdentity(0), leaf.0.device_offset(), PHYSICAL_BLOCK_BYTES as usize);
+            assert_eq!(&sector[record_field_offset..record_field_offset + 8], value.to_le_bytes().as_slice(), "盘上的字节要与请求的 change_count 一致");
+        }
+    }
+
+    #[test]
+    fn run_full_pipeline_matches_the_manually_assembled_pool_for_the_same_change_count() {
+        let BuiltPool { recording, .. } = built_pool();
+        let (image, _) = run_full_pipeline(&PoolParameters::settled_two_devices(), FIRST_TRANSACTION_TXG, &sample_file());
+        assert_eq!(recording.pool.devices.len(), image.devices.len());
+        for device_index in 0..image.devices.len() {
+            assert_eq!(recording.pool.devices[device_index].sectors, image.devices[device_index].sectors, "同参数同口径应逐字节相同");
+        }
+    }
+
+    // ───────── E142 第十一次跑（量 5，crates 侧补上之后）新增：SHA-256 与 crates 快照解析的单测 ─────────
+
+    #[test]
+    fn sha256_matches_the_two_standard_test_vectors() {
+        assert_eq!(sha256_hex(b""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        assert_eq!(sha256_hex(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    }
+
+    #[test]
+    fn sha256_of_the_actual_root_record_bytes_matches_the_crates_side_reference_value() {
+        // 这个十六进制串与 sha256 都是 2026-09-18 从 `cargo run -p singlefs-harness --bin first_transaction_region_bytes`
+        // 的真实产出里摘的一行（`region=root_record device=0`），用来钉住「这份手写 SHA-256 与 crates 侧算的是同一个函数」，
+        // 不是只对着标准测试向量自证。
+        let hex = "534653525f5346532d453134322d303030312d000000000001000000030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000048c40000000024acb30e0100000048c40000000024acb30e010000000000000013000000000000000000000000000000afc75d3e0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c40000000021aa2fd40100000000c40000000021aa2fd40000000000000000000000000000000000000000000000000000000000000000000000000000000000000f0000000000000003000000000000000000000047c400000000bedfaead0100000047c400000000bedfaead01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        assert_eq!(hex_decode(hex).len(), 512);
+        assert_eq!(sha256_hex(&hex_decode(hex)), "b2c014f937018d4e11d74410302b319efa0feda62b6b7073446bcb64560dd51f");
+    }
+
+    #[test]
+    fn hex_decode_round_trips_hex_bytes() {
+        assert_eq!(hex_decode("00ff10"), vec![0x00, 0xff, 0x10]);
+        assert_eq!(hex_decode(""), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn parse_result_line_reads_key_value_pairs_and_ignores_the_leading_marker() {
+        let fields = parse_result_line("E7RESULT name=impl_region_bytes region=root_record device=0 offset=1052672 length=512 sha256=abc123");
+        assert_eq!(fields.get("region").map(String::as_str), Some("root_record"));
+        assert_eq!(fields.get("device").map(String::as_str), Some("0"));
+        assert_eq!(fields.get("sha256").map(String::as_str), Some("abc123"));
+        assert_eq!(fields.get("name").map(String::as_str), Some("impl_region_bytes"));
+    }
+
+    #[test]
+    fn byte_diff_summary_finds_the_first_differing_byte_and_counts_the_rest() {
+        assert_eq!(byte_diff_summary(&[1, 2, 3], &[1, 2, 3]), (None, Some(0)));
+        assert_eq!(byte_diff_summary(&[1, 2, 3], &[1, 9, 9]), (Some(1), Some(2)));
+        assert_eq!(byte_diff_summary(&[1, 2], &[1, 2, 3]), (Some(0), Some(3)), "长度不等直接报整段");
+    }
+
+    #[test]
+    fn impl_bytes_equal_reports_true_when_a_synthetic_snapshot_line_has_the_same_sha256() {
+        // 端到端钉一遍量 5 的关键逻辑：给一行手工拼的「crates 快照」，装置读出来的字节算出的 sha256 与快照里写的一样 ⇒ equal=true；
+        // 不给参数（旧调用方式）不炸、只是找不到对应行。
+        let device_bytes = b"hello region bytes".to_vec();
+        let expected_sha256 = sha256_hex(&device_bytes);
+        let snapshot_line = format!("E7RESULT name=impl_region_bytes region=root_record device=0 offset=0 length={} sha256={expected_sha256} hexadecimal_extent=whole_region hexadecimal={}", device_bytes.len(), hex_bytes(&device_bytes));
+        let fields = parse_result_line(&snapshot_line);
+        assert_eq!(fields.get("sha256").map(String::as_str), Some(expected_sha256.as_str()));
+        assert_eq!(hex_decode(fields.get("hexadecimal").expect("hexadecimal 字段")), device_bytes);
+    }
+
+    fn snapshot_fields(body: &str) -> std::collections::BTreeMap<String, String> {
+        parse_result_line(&format!("E7RESULT name=impl_region_bytes {body}"))
+    }
+
+    #[test]
+    fn compare_region_reports_equal_when_sha256_matches() {
+        let device_bytes = b"same bytes on both sides".to_vec();
+        let device_sha256 = sha256_hex(&device_bytes);
+        let fields = snapshot_fields(&format!("region=x device=0 length={} sha256={device_sha256}", device_bytes.len()));
+        let comparison = compare_region(&device_bytes, &device_sha256, &fields, device_bytes.len() as u64);
+        assert_eq!(comparison, RegionComparison { equal: true, first_diff_offset: None, mismatch_bytes: Some(0) });
+    }
+
+    #[test]
+    fn compare_region_reports_the_declared_lengths_do_not_even_match() {
+        let device_bytes = vec![0u8; 10];
+        let fields = snapshot_fields("region=x device=0 length=20 sha256=deadbeef");
+        let comparison = compare_region(&device_bytes, "not_used", &fields, 10);
+        assert_eq!(comparison, RegionComparison { equal: false, first_diff_offset: Some(0), mismatch_bytes: Some(20) });
+    }
+
+    #[test]
+    fn compare_region_localizes_the_first_difference_for_a_whole_region_snapshot() {
+        let device_bytes = vec![1u8, 2, 3, 4];
+        let impl_bytes = vec![1u8, 2, 9, 4];
+        let fields = snapshot_fields(&format!("region=x device=0 length=4 sha256=different hexadecimal_extent=whole_region hexadecimal={}", hex_bytes(&impl_bytes)));
+        let comparison = compare_region(&device_bytes, &sha256_hex(&device_bytes), &fields, 4);
+        assert_eq!(comparison, RegionComparison { equal: false, first_diff_offset: Some(2), mismatch_bytes: Some(1) });
+    }
+
+    #[test]
+    fn compare_region_localizes_a_difference_that_falls_in_the_sampled_head() {
+        let mut device_bytes = vec![0u8; 100];
+        device_bytes[5] = 9;
+        let mut impl_bytes = device_bytes.clone();
+        impl_bytes[5] = 1;
+        let fields = snapshot_fields(&format!(
+            "region=x device=0 length=100 sha256=different hexadecimal_extent=head_and_tail head_and_tail_bytes=32 head_hexadecimal={} tail_hexadecimal={}",
+            hex_bytes(&impl_bytes[..32]),
+            hex_bytes(&impl_bytes[68..])
+        ));
+        let comparison = compare_region(&device_bytes, &sha256_hex(&device_bytes), &fields, 100);
+        assert_eq!(comparison, RegionComparison { equal: false, first_diff_offset: Some(5), mismatch_bytes: Some(1) }, "差异落在头 32 字节里，找得到确切偏移");
+    }
+
+    #[test]
+    fn compare_region_localizes_a_difference_that_falls_in_the_sampled_tail() {
+        let device_bytes = vec![0u8; 100];
+        let mut impl_bytes = device_bytes.clone();
+        impl_bytes[90] = 7; // 尾 32 字节窗口 = [68,100)，90 落在里面
+        let fields = snapshot_fields(&format!(
+            "region=x device=0 length=100 sha256=different hexadecimal_extent=head_and_tail head_and_tail_bytes=32 head_hexadecimal={} tail_hexadecimal={}",
+            hex_bytes(&impl_bytes[..32]),
+            hex_bytes(&impl_bytes[68..])
+        ));
+        let comparison = compare_region(&device_bytes, &sha256_hex(&device_bytes), &fields, 100);
+        assert_eq!(comparison, RegionComparison { equal: false, first_diff_offset: Some(90), mismatch_bytes: Some(1) }, "尾窗口里的偏移要加回 tail_start（68）才是区域内的真实偏移");
+    }
+
+    #[test]
+    fn compare_region_cannot_localize_a_difference_hidden_in_the_unsampled_middle() {
+        // 这正是「它答不了的」那一条：sha256 不等，但抽样的头尾 32 字节两边都一样，差异藏在中段，函数如实报「不知道」而不是瞎猜。
+        let device_bytes = vec![0u8; 100];
+        let impl_bytes = device_bytes.clone(); // 头尾抽样看起来完全一样
+        let fields = snapshot_fields(&format!(
+            "region=x device=0 length=100 sha256=different_even_though_the_samples_match hexadecimal_extent=head_and_tail head_and_tail_bytes=32 head_hexadecimal={} tail_hexadecimal={}",
+            hex_bytes(&impl_bytes[..32]),
+            hex_bytes(&impl_bytes[68..])
+        ));
+        let comparison = compare_region(&device_bytes, &sha256_hex(&device_bytes), &fields, 100);
+        assert_eq!(comparison, RegionComparison { equal: false, first_diff_offset: None, mismatch_bytes: None });
     }
 }

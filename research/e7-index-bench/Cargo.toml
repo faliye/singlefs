@@ -416,3 +416,7 @@ path = "src/bin/e153_ledger_shape_and_ring_holes.rs"
 [[bin]]
 name = "e154-two-gates-serial-rejudge-and-reclaim-timing"
 path = "src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs"
+
+[[bin]]
+name = "e155-fsync-write-volume"
+path = "src/bin/e155_fsync_write_volume.rs"

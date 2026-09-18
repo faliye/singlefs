@@ -1,0 +1,93 @@
+dump-impl data_unit off=10 header_csum[0,105) value=0x8935cdda ok=True
+dump-impl data_unit off=101 payload_crc[105,32768) value=0x73e0742b ok=True
+dump-impl data_unit off=134 payload_first4 value=0x03020100 ok=True
+dump-impl extent_root off=10 header_csum[0,134) value=0xd1bc08c2 ok=True
+dump-impl extent_root off=124 payload_crc[134,16384) value=0x7c6d67fa ok=True
+dump-impl inode_root off=10 header_csum[0,102) value=0xba0e7426 ok=True
+dump-impl inode_root off=92 payload_crc[102,16384) value=0x906d3c77 ok=True
+dump-impl allocation_root off=10 header_csum[0,106) value=0x700fcfa3 ok=True
+dump-impl allocation_root off=96 payload_crc[106,16384) value=0x1cf52b92 ok=True
+dump-impl accounting_root off=10 header_csum[0,130) value=0x6e4dc1f5 ok=True
+dump-impl accounting_root off=120 payload_crc[130,16384) value=0x0bfe3d06 ok=True
+dump-impl mapping_root off=10 header_csum[0,140) value=0x37e5993b ok=True
+dump-impl mapping_root off=130 payload_crc[140,16384) value=0x5137e0d7 ok=True
+dump-impl tree_table off=10 header_csum[0,102) value=0x82b024c1 ok=True
+dump-impl tree_table off=92 payload_crc[102,16384) value=0xd08aedb8 ok=True
+dump-impl extent_root off=247 ptr@187.loc0(dev0).crc->data_unit value=0xd1f534ad ok=True
+dump-impl extent_root off=261 ptr@187.loc1(dev1).crc->data_unit value=0xd1f534ad ok=True
+dump-impl mapping_root off=206 entry0(class1,tree11).loc0.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl mapping_root off=220 entry0(class1,tree11).loc1.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl mapping_root off=261 entry1(class2,tree11).loc0.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl mapping_root off=275 entry1(class2,tree11).loc1.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl mapping_root off=316 entry2(class2,tree12).loc0.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl mapping_root off=330 entry2(class2,tree12).loc1.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl mapping_root off=371 entry3(class2,tree13).loc0.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl mapping_root off=385 entry3(class2,tree13).loc1.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl mapping_root off=426 entry4(class2,tree14).loc0.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl mapping_root off=440 entry4(class2,tree14).loc1.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl mapping_root off=481 entry5(class3,tree12).loc0.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl mapping_root off=495 entry5(class3,tree12).loc1.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl tree_table off=205 entry0(tree11).root_ptr.loc0.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl tree_table off=219 entry0(tree11).root_ptr.loc1.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl tree_table off=405 entry1(tree12).root_ptr.loc0.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl tree_table off=419 entry1(tree12).root_ptr.loc1.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl tree_table off=605 entry2(tree13).root_ptr.loc0.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl tree_table off=619 entry2(tree13).root_ptr.loc1.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl tree_table off=805 entry3(tree14).root_ptr.loc0.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl tree_table off=819 entry3(tree14).root_ptr.loc1.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl tree_table off=1005 entry4(tree16).root_ptr.loc0.crc matches=[] value=0x00000000 ok=True
+dump-impl tree_table off=1019 entry4(tree16).root_ptr.loc1.crc matches=[] value=0x00000000 ok=True
+dump-impl tree_table off=1205 entry5(tree17).root_ptr.loc0.crc matches=[] value=0x00000000 ok=True
+dump-impl tree_table off=1219 entry5(tree17).root_ptr.loc1.crc matches=[] value=0x00000000 ok=True
+dump-impl tree_table off=1405 entry6(tree18).root_ptr.loc0.crc matches=[] value=0x00000000 ok=True
+dump-impl tree_table off=1419 entry6(tree18).root_ptr.loc1.crc matches=[] value=0x00000000 ok=True
+dump-impl root_record off=138 self_csum[0,512) value=0x3e5dc7af ok=True
+dump-impl root_record off=96 ptr@36.loc0(dev0).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl root_record off=110 ptr@36.loc1(dev1).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl root_record off=316 ptr@256.loc0(dev0).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl root_record off=330 ptr@256.loc1(dev1).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl journal_record0 off=46 header_csum[0,4096) value=0x18795dc2 ok=True
+dump-impl journal_record0 off=91 payload_crc[307,755) value=0x62cbb960 ok=True
+dump-impl journal_record0 off=155 ptr@95.loc0(dev0).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl journal_record0 off=169 ptr@95.loc1(dev1).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl journal_record0 off=241 ptr@181.loc0(dev0).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl journal_record0 off=255 ptr@181.loc1(dev1).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl journal_record0 off=317 named0(class1).loc0.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl journal_record0 off=331 named0(class1).loc1.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl journal_record0 off=373 named1(class2).loc0.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl journal_record0 off=387 named1(class2).loc1.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl journal_record0 off=429 named2(class3).loc0.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl journal_record0 off=443 named2(class3).loc1.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl journal_record0 off=485 named3(class2).loc0.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl journal_record0 off=499 named3(class2).loc1.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl journal_record0 off=541 named4(class2).loc0.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl journal_record0 off=555 named4(class2).loc1.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl journal_record0 off=597 named5(class2).loc0.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl journal_record0 off=611 named5(class2).loc1.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl journal_record0 off=653 named6(class2).loc0.crc matches=['mapping_root'] value=0xadaedfbe ok=True
+dump-impl journal_record0 off=667 named6(class2).loc1.crc matches=['mapping_root'] value=0xadaedfbe ok=True
+dump-impl journal_record0 off=709 named7(class2).loc0.crc matches=['tree_table'] value=0x0eb3ac24 ok=True
+dump-impl journal_record0 off=723 named7(class2).loc1.crc matches=['tree_table'] value=0x0eb3ac24 ok=True
+dump-impl journal_record1 off=46 header_csum[0,4096) value=0x18795dc2 ok=True
+dump-impl journal_record1 off=91 payload_crc[307,755) value=0x62cbb960 ok=True
+dump-impl journal_record1 off=155 ptr@95.loc0(dev0).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl journal_record1 off=169 ptr@95.loc1(dev1).crc->tree_table value=0x0eb3ac24 ok=True
+dump-impl journal_record1 off=241 ptr@181.loc0(dev0).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl journal_record1 off=255 ptr@181.loc1(dev1).crc->mapping_root value=0xadaedfbe ok=True
+dump-impl journal_record1 off=317 named0(class1).loc0.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl journal_record1 off=331 named0(class1).loc1.crc matches=['data_unit'] value=0xd1f534ad ok=True
+dump-impl journal_record1 off=373 named1(class2).loc0.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl journal_record1 off=387 named1(class2).loc1.crc matches=['extent_root'] value=0xd3ba8bec ok=True
+dump-impl journal_record1 off=429 named2(class3).loc0.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl journal_record1 off=443 named2(class3).loc1.crc matches=['inode_leaf'] value=0x045d2a83 ok=True
+dump-impl journal_record1 off=485 named3(class2).loc0.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl journal_record1 off=499 named3(class2).loc1.crc matches=['inode_root'] value=0xdc4bcfeb ok=True
+dump-impl journal_record1 off=541 named4(class2).loc0.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl journal_record1 off=555 named4(class2).loc1.crc matches=['allocation_root'] value=0xe0ef7c1c ok=True
+dump-impl journal_record1 off=597 named5(class2).loc0.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl journal_record1 off=611 named5(class2).loc1.crc matches=['accounting_root'] value=0xa6858e87 ok=True
+dump-impl journal_record1 off=653 named6(class2).loc0.crc matches=['mapping_root'] value=0xadaedfbe ok=True
+dump-impl journal_record1 off=667 named6(class2).loc1.crc matches=['mapping_root'] value=0xadaedfbe ok=True
+dump-impl journal_record1 off=709 named7(class2).loc0.crc matches=['tree_table'] value=0x0eb3ac24 ok=True
+dump-impl journal_record1 off=723 named7(class2).loc1.crc matches=['tree_table'] value=0x0eb3ac24 ok=True
+dump-impl rows 92 all_ok True

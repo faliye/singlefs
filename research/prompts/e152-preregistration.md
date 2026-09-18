@@ -232,3 +232,28 @@ fio 公共参数：`--thread --output-format=terse --terse-version=3`，其余�
   bash 按字节偏移边读边执行脚本，那一次正在跑的 vm-bench.sh 读到错位的内容，报语法错退出。改完之后 `bash -n` 通过；和 HEAD 比，那处改动只动注释，E152 加的几块原样在，测试台的行为没变。
 - 处置：照第八节第 1 条同参数重跑一次。这次失败留在产物里（`E152RUN … attempt=1 … vm_exit=2`），汇总只取成功的那一次。
 - 欠的防护：驱动脚本起跑时应把 vm-bench.sh 等脚本复制一份、之后只调副本，免得共写的仓里别人中途一改就把正在跑的实验弄坏；正在跑的就是这个驱动脚本，现在改它会把它自己弄坏，所以跑完再加。
+
+## 十二、里程碑「第二个事务」的 singlefs 重跑（2026-09-17 JST 写，装置改动之后、一格产物都还没跑）
+
+只重跑 singlefs 那一臂（`E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh <产物>`），六家的基线不重跑（内核、测试台、负载都没变）。这一轮改了三样，都在跑之前写死：
+
+1. 真设备二进制多一个模式 `second-transaction`（`crates/singlefs-harness/src/bin/first_transaction_on_device.rs`）：第一个事务之后同一个进程里再覆盖写一次（里程碑「第二个事务」步 1 的发布 B，4100 字节的第二版），分配器从第一个事务的分配记录重建（与可写挂载同一条路），冷重开读回的是第二版；它自己报一行 `name=second_transaction`：B 的 txg、事务号、释放的落点数、挂钟纳秒、录制流里 B 的操作数与段序列、逐盘写请求 / 写字节 / FUA 写 / 屏障（程序计数，门禁 55 号已证录制流与设备侧日志逐项相等，不另量）。来宾二进制的 singlefs 臂从此跑这个模式（第四节那段的 `direct` 换成 `second-transaction`）。
+2. 挂钟从两段切成三段：起跑到 `name=transaction` = 第一个事务的写路（mkfs + 取号 + 暖机 + 第一个事务，仍拆不开，记 P 的上界）；`name=transaction` 到 `name=second_transaction` = 第二个事务的挂钟（**这一格才是稳态的每次代价**，六家拿来比的是刚格式化之后第一次写，singlefs 这一格与它们的「第二次写」同口径）；`name=second_transaction` 到 `name=recover_cold` = 冷恢复。
+3. 报四个新指标：B 两盘合计的写请求、写字节、屏障、FUA 写（`singlefs_second_transaction_*`），表由 `research/scripts/e152-tables.py` 从 `name=summary` 行生成。
+
+**判据（跑前写死）**：
+
+- B 的段序列必须是 `16+2+1+2`、操作数 21（与 E142（第一个事务的干跑） 的 `path=transaction` 同型：8 个单元 × 2 盘 + 记录 × 2 + 根 FUA + 超级块 × 2）；两盘合计写请求 21、写字节 = 2 × 172 032 + 512（根槽 512 只落一块盘）= 344 576；屏障两盘合计 4、FUA 1。**触发的观测**：`name=second_transaction` 行的 `segments=` 不是 `16+2+1+2`，或 `singlefs_timing` 行的四个 `second_transaction_*_both_devices` 与上面的数不等 ⇒ 那一轮的 singlefs 格作废，先查二进制再重跑。
+- 冷恢复读回第二版（`content_matches=true`），根是 1:4。**触发的观测**：`recover_cold` 的 `root=` 不是 `1:4` 或 `content_matches=false` ⇒ 作废。
+- 5 轮，格子取中位、离散 =（最大 − 最小）÷ 中位，超过 15% 标 ⚠ 照报（第七节不变）；第二个事务的挂钟这一格离散多半会大（几毫秒量级的挂钟被虚机调度吃掉），照报、不删。
+
+**它答不了的**：大文件顺序读写、4K 随机读写、元数据、格式化的挂钟与写量（真设备整环写 0 还没做）——这四维在这一轮的表里仍写「不能跑」，缺的能力照 `research/perf-by-milestone.md`「以后的里程碑怎么往下接」那张表。冷恢复仍读整环，这一轮没动它。
+
+## 十三、里程碑「第二个事务」收尾时的 singlefs 再跑一次（2026-09-17 JST 写，一格产物都还没跑）
+
+用户 2026-09-17 在里程碑收尾时要求「完成后参照实验 152 进行一轮 benchmark」。第十二节那次跑（产物 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`）之后 `crates/` 又改了四处：抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开开段之后才置的隔离位与扣住位（`crates/singlefs-core/src/allocator.rs` 的 `allocate_commit_generated` 多一个跳过循环，发布 B 走这条路）、抬 F 接住读不出计数、checker 多判 I-7.4（近 K 代块未被复用） 与 I-4.8（近 K 代根校验和自洽）（checker 不在真设备二进制的路径上）。真设备二进制 `second-transaction` 模式的负载、判据、指标一个字不改。
+
+- 命令：`E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮。六家的基线不重跑（内核、测试台、负载都没变）。
+- 判据与作废条款逐条照第十二节：B 的段序列 `16+2+1+2`、两盘合计 21 次写请求 / 344 576 字节 / 4 次屏障 / 1 次 FUA，冷恢复读回第二版、根 1:4。**触发的观测**：任一轮 `name=second_transaction` 行的 `segments=` 或四个计数与之不同 ⇒ bump 路的跳过循环改变了发布 B 的落点或写数，那一轮作废、如实记下并回查 `allocate_commit_generated`；`content_matches=false` ⇒ 作废。
+- 与第十二节那次比：两次的写数必须逐字相同（跳过循环在发布 B 上不应碰到任何被挡的槽）；挂钟两次各报 5 轮中位与离散，不合并、不取平均，差异只写观测，不下「变快 / 变慢」的结论——第十二节那次第二个事务挂钟的离散已是 186%。**触发的观测**：写数不同 ⇒ 上一条作废条款；挂钟中位差得比两次各自的离散还大 ⇒ 照报，写明两次宿主负载。
+- 宿主上可能同时在跑门禁 54 号（层 0 全量，`nice -n 19`，一个核）：照第七节逐轮记 1 分钟负载，照跑照记。

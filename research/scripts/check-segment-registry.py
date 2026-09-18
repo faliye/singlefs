@@ -7,7 +7,7 @@
 
 为什么要有它：`.claude/kb/checks-owed.md` C316（提交步骤的登记位有四处且互不相同） 收窄之后
 剩两半，第①半是「kb 登记表八与产物 `name=segments` 行之间没有逐字比对（表是人抄的）」——
-`.claude/kb/first-txn-layout.md` 「八、根槽写路径的段序列登记表」里每一行的段序列数字串
+`.claude/kb/layout/01-first-txn.md` 「八、根槽写路径的段序列登记表」里每一行的段序列数字串
 （`4+1+1+1+2` 这种）都是人从 E142（第一个事务的干跑） 产物里抄过来的，抄错一位、
 或者产物重跑之后表没跟着改，都没有任何东西会报警。这个脚本把「抄的对不对」变成一条会红的检查。
 
@@ -24,7 +24,7 @@
 - 产物路径本身也不写死：从 `research/scripts/replay.sh` 的复跑登记表里找 `E142|...` 那一行，
   取它的「入库产物」那一列，这样产物重跑之后换了文件名，这个脚本自动跟着换，不用改代码。
 
-自证会红：`--selftest` 把当前这份 first-txn-layout.md 与 replay.sh 指向的真实产物，
+自证会红：`--selftest` 把当前这份 layout/01-first-txn.md 与 replay.sh 指向的真实产物，
 分别拷进两个临时目录（`green/` 原样、`red/` 改坏了 mkfs 那一行的一个段序列数字），
 断言 `green/` 判绿、`red/` 判红；改坏之前先确认那个数字串在整份文件里只出现一次，
 免得改错了别的地方也跟着变。
@@ -37,7 +37,7 @@ import shutil
 import sys
 import tempfile
 
-LAYOUT_RELATIVE_PATH = pathlib.Path('.claude/kb/first-txn-layout.md')
+LAYOUT_RELATIVE_PATH = pathlib.Path('.claude/kb/layout/01-first-txn.md')
 REPLAY_SCRIPT_RELATIVE_PATH = pathlib.Path('research/scripts/replay.sh')
 RESULTS_DIRECTORY_RELATIVE_PATH = pathlib.Path('research/results')
 
@@ -52,6 +52,9 @@ UNESCAPED_PIPE_PATTERN = re.compile(r'(?<!\\)\|')
 OPERATION_COUNT_PATTERN = re.compile(r'(\d+)\s*次操作')
 CRASH_STATE_COUNT_PATTERN = re.compile(r'(\d+)\s*个(?:崩溃)?状态')
 E142_REPLAY_ROW_PATTERN = re.compile(r'^E142\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)$', re.MULTILINE)
+DEVICE_PINNED_NOTE_PATTERN = re.compile(
+    r'第二条流的段序列\s*`([0-9]+(?:\+[0-9]+)+)`\s*、\s*(\d+)\s*次写\s*、\s*(\d+)\s*个状态[^\n]*?装置钉住[^\n]*?`(crates/[^`]+\.rs)`'
+)  # 里程碑「第二个事务」的固定脚本没有干跑产物，整条流由 harness 用例里钉的数组守着：数字串、写数、状态数、钉它的用例文件
 PRODUCT_SEGMENT_LINE_PREFIX = 'E7RESULT name=segments '
 PRODUCT_SEGMENT_LINE_REQUIRED_KEYS = ('path', 'operations', 'segments', 'closed_form')
 
@@ -65,6 +68,7 @@ class RegistryEntry:
     row_label: str
     origin_description: str  # '表格行' 或 '整条流提示'——只用来在成功摘要里分开计数，不参与比对
     is_anticipated: bool
+    is_device_pinned: bool  # 段序列标「装置钉住」：从第二条流推得、不与 E142 产物比，只计数
     product_path_name: str | None
     segment_sequence_text: str | None
     operation_count: int | None
@@ -99,7 +103,7 @@ def extract_section_eight(layout_text):
     """截出「## 八、……」到下一个「## 」标题之间的正文（含表格与表下面的提示段落）。"""
     heading_match = SECTION_EIGHT_HEADING_PATTERN.search(layout_text)
     if heading_match is None:
-        raise CheckError('first-txn-layout.md 里找不到「## 八、」这个标题，登记表挪地方了？')
+        raise CheckError('layout/01-first-txn.md 里找不到「## 八、」这个标题，登记表挪地方了？')
     section_start = heading_match.end()
     remainder = layout_text[section_start:]
     next_heading_match = NEXT_HEADING_PATTERN.search(remainder)
@@ -144,6 +148,7 @@ def row_to_entry(row_cells):
     row_label, segment_cell, source_cell = row_cells[0], row_cells[1], row_cells[2]
 
     is_anticipated = '预想' in segment_cell
+    is_device_pinned = '装置钉住' in segment_cell
 
     path_match = ROW_PRODUCT_PATH_PATTERN.search(source_cell)
     product_path_name = path_match.group(1) if path_match else None
@@ -164,6 +169,7 @@ def row_to_entry(row_cells):
         row_label=row_label,
         origin_description='表格行',
         is_anticipated=is_anticipated,
+        is_device_pinned=is_device_pinned,
         product_path_name=product_path_name,
         segment_sequence_text=segment_sequence_text,
         operation_count=operation_count,
@@ -220,6 +226,7 @@ def build_merged_stream_entry(section_text, table_entries):
         row_label='⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）',
         origin_description='整条流提示',
         is_anticipated=False,
+        is_device_pinned=False,
         product_path_name=merged_stream_path_name,
         segment_sequence_text=merged_segment_sequence_text,
         operation_count=None,
@@ -271,6 +278,69 @@ def parse_product_segment_lines(product_text):
     return product_segment_lines
 
 
+def closed_form_crash_state_count(segment_lengths):
+    """D13（验证路线） 已定项 4 的闭式：1 + Σ(2^|段| − 1)。"""
+    return 1 + sum((1 << length) - 1 for length in segment_lengths)
+
+
+def check_device_pinned_notes(section_text, repository_root):
+    """八节里「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」那些句子。
+
+    这条流没有干跑产物，登记表能核的是三件事：数字串加起来是不是它自称的写数、
+    闭式算出来是不是它自称的状态数、钉它的那份用例文件里有没有这个数组（rustfmt 会把长数组折行，
+    所以把用例文件的空白压成一个空格再找 `[a, b, c]`）与那个状态数。
+    返回 (mismatches, checked_descriptions)。
+    """
+    mismatches = []
+    checked_descriptions = []
+    for match in DEVICE_PINNED_NOTE_PATTERN.finditer(section_text):
+        segment_sequence_text, claimed_operation_count, claimed_crash_state_count, test_file_relative_path = (
+            match.group(1), int(match.group(2)), int(match.group(3)), match.group(4)
+        )
+        segment_lengths = [int(term) for term in segment_sequence_text.split('+')]
+        label = f'第二条流 `{segment_sequence_text}`'
+        if sum(segment_lengths) != claimed_operation_count:
+            mismatches.append(f'{label}：数字串加起来是 {sum(segment_lengths)} 次写，kb 写的是 {claimed_operation_count}')
+        computed_crash_state_count = closed_form_crash_state_count(segment_lengths)
+        if computed_crash_state_count != claimed_crash_state_count:
+            mismatches.append(
+                f'{label}：闭式 1 + Σ(2^|段| − 1) 算出 {computed_crash_state_count} 个状态，kb 写的是 {claimed_crash_state_count}'
+            )
+        test_file_path = repository_root / test_file_relative_path
+        if not test_file_path.is_file():
+            mismatches.append(f'{label}：装置钉住指向的用例文件 {test_file_relative_path} 不在')
+            continue
+        normalized_test_text = re.sub(r'\s+', ' ', test_file_path.read_text(encoding='utf-8'))
+        array_text = '[' + ', '.join(str(length) for length in segment_lengths) + ']'
+        # rustfmt 把长数组折行之后 `[` 后面、`]` 前面各多一个换行，压成空白再按「可有可无的空白」找
+        array_pattern = re.compile(r'\[\s*' + re.escape(', '.join(str(length) for length in segment_lengths)) + r'\s*\]')
+        array_count = len(array_pattern.findall(normalized_test_text))
+        if array_count == 0:
+            mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉这个数组 `{array_text}`')
+        if str(claimed_crash_state_count) not in normalized_test_text:
+            mismatches.append(f'{label}：用例文件 {test_file_relative_path} 里没有钉状态数 {claimed_crash_state_count}')
+        checked_descriptions.append(f'{label}（{claimed_operation_count} 次写、{claimed_crash_state_count} 个状态，数组在 {test_file_relative_path} 里出现 {array_count} 次）')
+    return mismatches, checked_descriptions
+
+
+def mutate_device_pinned_note(layout_text):
+    """--selftest 用：把第一句「第二条流的段序列」的最后一项加 1——闭式与用例里的数组都该对不上。"""
+    section_text = extract_section_eight(layout_text)
+    match = DEVICE_PINNED_NOTE_PATTERN.search(section_text)
+    if match is None:
+        raise CheckError('八节里找不到「第二条流的段序列 `…`、N 次写、M 个状态 … 装置钉住 … `crates/….rs`」这句登记，自证没法造出可判红的改动')
+    original_segment_sequence_text = match.group(1)
+    original_span = f'`{original_segment_sequence_text}`'
+    occurrence_count = layout_text.count(original_span)
+    if occurrence_count != 1:
+        raise CheckError(f'第二条流的段序列 {original_span} 在整份文件里出现了 {occurrence_count} 次，不是 1 次——自证定位不到唯一位置')
+    terms = original_segment_sequence_text.split('+')
+    terms[-1] = str(int(terms[-1]) + 1)
+    mutated_segment_sequence_text = '+'.join(terms)
+    return (layout_text.replace(original_span, f'`{mutated_segment_sequence_text}`', 1),
+            original_segment_sequence_text, mutated_segment_sequence_text, match.group(4))
+
+
 def mutate_one_segment_number(layout_text):
     """--selftest 用：把八节表格第一条可比对的行，段序列的最后一项加 1。
 
@@ -280,7 +350,7 @@ def mutate_one_segment_number(layout_text):
     section_text = extract_section_eight(layout_text)
     for row_cells in parse_registry_table_rows(section_text):
         entry = row_to_entry(row_cells)
-        if entry.is_anticipated or entry.segment_sequence_text is None:
+        if entry.is_anticipated or entry.is_device_pinned or entry.segment_sequence_text is None:
             continue
         original_segment_sequence_text = entry.segment_sequence_text
         original_span = f'`{original_segment_sequence_text}`'
@@ -306,7 +376,7 @@ def mutate_one_step_kind(layout_text):
     section_text = extract_section_eight(layout_text)
     for row_cells in parse_registry_table_rows(section_text):
         entry = row_to_entry(row_cells)
-        if entry.is_anticipated or entry.step_kinds_text is None:
+        if entry.is_anticipated or entry.is_device_pinned or entry.step_kinds_text is None:
             continue
         # 表格单元格里的竖线在文件里写成 `\\|`，定位原文要按转义后的样子找。
         original_span = '`' + entry.step_kinds_text.replace('|', '\\|') + '`'
@@ -350,9 +420,13 @@ def perform_check(repository_root):
     compared_table_row_count = 0
     compared_note_count = 0
     skipped_count = 0
+    device_pinned_row_count = 0
     for entry in entries:
         if entry.is_anticipated:
             skipped_count += 1
+            continue
+        if entry.is_device_pinned:
+            device_pinned_row_count += 1
             continue
         if entry.product_path_name is None:
             mismatches.append(f'{entry.row_label}：这一行不是预想，「出处」栏里却没有 `path=...` 引用，登记表这一行本身要修')
@@ -408,11 +482,14 @@ def perform_check(repository_root):
         else:
             compared_note_count += 1
 
+    device_pinned_mismatches, device_pinned_descriptions = check_device_pinned_notes(section_text, repository_root)
+    mismatches.extend(device_pinned_mismatches)
+
     if mismatches:
-        lines = [f'  ✗ 段序列登记表与 E142 产物的 name=segments 行对不上，共 {len(mismatches)} 处：']
+        lines = [f'  ✗ 段序列登记表与 E142 产物的 name=segments 行（或第二条流与钉它的用例）对不上，共 {len(mismatches)} 处：']
         for mismatch in mismatches:
             lines.append(f'     {mismatch}')
-        lines.append('     → 怎么办：表是抄错了，就照产物改 .claude/kb/first-txn-layout.md 那一行；')
+        lines.append('     → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；')
         lines.append('       产物是过期了，就重跑 E142（第一个事务的干跑），更新 research/results/ 下的文件，')
         lines.append('       再让 research/scripts/replay.sh 里 E142 那一行的入库产物名字跟上。')
         return 1, lines
@@ -421,13 +498,15 @@ def perform_check(repository_root):
     lines = [
         f'  ✓ 比对了 {compared_total_count} 处登记（表格 {compared_table_row_count} 行 + '
         f'整条流提示 {compared_note_count} 处，段序列与每段步骤种类多重集都与 {product_path.name} 的 name=segments 行逐字一致），'
-        f'跳过 {skipped_count} 条标预想的表格行'
+        f'跳过 {skipped_count} 条标预想的表格行；'
+        f'{device_pinned_row_count} 条标「装置钉住」的表格行不与产物比（形状从第二条流推得），'
+        f'第二条流的登记 {len(device_pinned_descriptions)} 处与钉它的用例相符：' + '；'.join(device_pinned_descriptions)
     ]
     return 0, lines
 
 
-def build_fixture_root(root_path, layout_text, replay_script_text, product_file_name, product_text):
-    """在临时目录里按仓库的相对路径摆好三份文件，供 --selftest 各拿一份去跑真正的比对逻辑。"""
+def build_fixture_root(root_path, layout_text, replay_script_text, product_file_name, product_text, pinned_test_files):
+    """在临时目录里按仓库的相对路径摆好三份文件加钉第二条流的用例文件，供 --selftest 各拿一份去跑真正的比对逻辑。"""
     layout_path = root_path / LAYOUT_RELATIVE_PATH
     replay_script_path = root_path / REPLAY_SCRIPT_RELATIVE_PATH
     product_path = root_path / RESULTS_DIRECTORY_RELATIVE_PATH / product_file_name
@@ -436,6 +515,10 @@ def build_fixture_root(root_path, layout_text, replay_script_text, product_file_
     layout_path.write_text(layout_text, encoding='utf-8')
     replay_script_path.write_text(replay_script_text, encoding='utf-8')
     product_path.write_text(product_text, encoding='utf-8')
+    for relative_path, text in pinned_test_files.items():
+        pinned_path = root_path / relative_path
+        pinned_path.parent.mkdir(parents=True, exist_ok=True)
+        pinned_path.write_text(text, encoding='utf-8')
     return root_path
 
 
@@ -450,6 +533,12 @@ def run_self_test():
          original_segment_sequence_text, mutated_segment_sequence_text) = mutate_one_segment_number(layout_text)
         (kind_mutated_layout_text, kind_mutated_row_label,
          original_kind_text, mutated_kind_text) = mutate_one_step_kind(layout_text)
+        (pinned_mutated_layout_text, original_pinned_text,
+         mutated_pinned_text, pinned_test_relative_path) = mutate_device_pinned_note(layout_text)
+        pinned_test_files = {
+            match.group(4): (real_repository_root / match.group(4)).read_text(encoding='utf-8')
+            for match in DEVICE_PINNED_NOTE_PATTERN.finditer(extract_section_eight(layout_text))
+        }
     except CheckError as error:
         print(f'  ✗ --selftest 备料就失败了：{error}')
         print('     → 怎么办：先跑一次不带 --selftest 的检查，确认真实仓库能正常读出登记表与产物。')
@@ -460,18 +549,22 @@ def run_self_test():
     workspace_path = pathlib.Path(tempfile.mkdtemp(prefix='check-segment-registry-selftest-'))
     try:
         green_root = build_fixture_root(
-            workspace_path / 'green', layout_text, replay_script_text, real_product_path.name, product_text,
+            workspace_path / 'green', layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
         )
         red_root = build_fixture_root(
-            workspace_path / 'red', mutated_layout_text, replay_script_text, real_product_path.name, product_text,
+            workspace_path / 'red', mutated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
         )
         kind_red_root = build_fixture_root(
-            workspace_path / 'kind-red', kind_mutated_layout_text, replay_script_text, real_product_path.name, product_text,
+            workspace_path / 'kind-red', kind_mutated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
+        )
+        pinned_red_root = build_fixture_root(
+            workspace_path / 'pinned-red', pinned_mutated_layout_text, replay_script_text, real_product_path.name, product_text, pinned_test_files,
         )
 
         green_exit_code, green_lines = perform_check(green_root)
         red_exit_code, red_lines = perform_check(red_root)
         kind_red_exit_code, _kind_red_lines = perform_check(kind_red_root)
+        pinned_red_exit_code, _pinned_red_lines = perform_check(pinned_red_root)
     finally:
         shutil.rmtree(workspace_path, ignore_errors=True)
 
@@ -488,6 +581,11 @@ def run_self_test():
             f'把「{kind_mutated_row_label}」那一行第一段的种类 `{original_kind_text}` 改成 '
             f'`{mutated_kind_text}`（段序列不动）之后，检查仍然判绿——种类那一半没有判别力'
         )
+    if pinned_red_exit_code == 0:
+        problems.append(
+            f'把第二条流的段序列 `{original_pinned_text}` 改成 `{mutated_pinned_text}` 之后，检查仍然判绿——'
+            f'装置钉住那一半（闭式、{pinned_test_relative_path} 里的数组）没有判别力'
+        )
 
     if problems:
         print('  ✗ --selftest 没通过：')
@@ -500,14 +598,15 @@ def run_self_test():
     print(
         '  ✓ --selftest 通过：未改动的拷贝判绿（退出码 0）；'
         f'把「{mutated_row_label}」的段序列改成 `{mutated_segment_sequence_text}` 之后判红（退出码 {red_exit_code}）；'
-        f'只把「{kind_mutated_row_label}」第一段的种类 `{original_kind_text}` 改成 `{mutated_kind_text}` 也判红（退出码 {kind_red_exit_code}）'
+        f'只把「{kind_mutated_row_label}」第一段的种类 `{original_kind_text}` 改成 `{mutated_kind_text}` 也判红（退出码 {kind_red_exit_code}）；'
+        f'把第二条流的段序列改成 `{mutated_pinned_text}` 也判红（退出码 {pinned_red_exit_code}）'
     )
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='比对 first-txn-layout.md 「八、根槽写路径的段序列登记表」与 E142 产物的 name=segments 行'
+        description='比对 layout/01-first-txn.md 「八、根槽写路径的段序列登记表」与 E142 产物的 name=segments 行'
     )
     parser.add_argument(
         '--root', type=pathlib.Path, default=None,
