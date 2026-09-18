@@ -11,7 +11,7 @@ omitClaudeMd: true
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 从已定条款与 `crates/` 今天的实现推出「应该是什么」，再与被判对象逐格比：一样就写一样，不一样就把两边整行并排抄出来。
-依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」；`.claude/rules/implementation-first.md`「规矩」第 1–2 条；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 开头那张三步表的「正推」一行。
+开工先读：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」；`.claude/rules/implementation-first.md`「规矩」第 1–2 条；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 开头那张三步表的「正推」一行。
 
 ## 输入（主 agent 必须给）
 
@@ -23,7 +23,7 @@ omitClaudeMd: true
 ## 做什么
 
 1. 读背景材料；附录不够时读 kb 原文与 `crates/` 源码。
-2. 每一格各报各的判定（一致 / 冲突 / 规则没说），冲突的两句并排整行抄。
+2. 每一格各报各的判定（一致 / 冲突 / 规则没说），冲突的两句并排整行抄。每一句引文（kb 条款、代码行、产物行）写进报告之前，在被引文件里 `grep -nF` 那句原文一次：命中 0 次就不许写成引文（换成转述并标「转述」），命中的行号就是要写的行号——不从背景材料里数行号、不把自己的读法写成条款原文。
 3. 能用命令核的事实复跑并贴原样输出；只能由主 agent 实测、你复核不了的，写「复核不了」与原因。
 4. 每条结论写「什么现象会推翻它」。
 

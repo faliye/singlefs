@@ -1,0 +1,77 @@
+  ✗ 35 行写了日期却没在同一行指路（实测与经过写在别处，这里只指过去）：
+     .claude/agent-common.md:42：**结束本轮去等之前，再用 `run_in_background` 起一次 `bash research/scripts/cache-keepalive.sh`**：它 230 秒
+     .claude/agent-common.md:43：等的时候看到进程不动、报错、或等的条件不会成立，把看到的命令、输出与时刻写进草稿目录里的进度记录，接着做定义里还能做的；结不结束、怎么处置由主 agent 定（2026-09-17
+     .claude/agent-common.md:55：- 交回与报告在不影响正确性的前提下写简练（用户 2026-09-17 定）：写结论、依据与没做什么，不写做事的经过、不复述派发提示与定义；下面几条要求的命令与原样输出、行号、推翻
+     .claude/agent-common.md:56：- 引规则、kb、脚本、代码，写那份文件自己的行号，行号去原文件里现查，不从背景材料里数；没现查过的行号不写进报告，先写「行号待查」；行号用 `grep -n` 或 `awk 'N
+     .claude/agent-common.md:61：- 定义点名的产出文件（跑前登记、腿的 output、样本、运行记录、实验页、代码与 kb 的改动）照定义写进文件。三方论证的云端腿与核查员，报告就是派发提示给的 `researc
+     .claude/agents/crash-verifier.md:27：5. 缺 herd7、缺 KVM、虚机起不来这一类判「环境」，以阶段自己的报错为准，另贴 `command -v herd7`、`ls -l /dev/kvm`、`command 
+     .claude/agents/crash-verifier.md:28：6. 别的会话常在同时改 `crates/`：每个阶段开跑与结束时各记一次指纹，开跑那次与起阶段写在同一条 Bash 命令里（分两次调用，中间几秒的改动会落进空窗，2026-09-
+     .claude/agents/experiment-designer.md:30：3b. 估一下实现量：历史族 × 几何格 × 臂 × 崩溃支线 × 坏镜像，加上要另写的子系统（检查器、触发式重算、崩溃枚举）。按岔路排序：能最先让岔路单里某一行够判的量放在最前，
+     .claude/agents/experiment-runner.md:28：3. 写变异表 `research/mutations/e<号>_<简称>.tsv`，在 `research/` 下跑完整张表：`cd research && nice -n 19
+     .claude/agents/experiment-runner.md:29：3b. 登记里的停机条款（第十一节里标「停机」的，通常是装置与 `crates/` 实现逐项对拍）在跑产物之前做，照原文真跑，不许只推；做不了就停下交回，不跑产物、不写实验页。登记
+     .claude/agents/experiment-runner.md:31：4b. 产物出来之后先自查齐不齐：按登记的「臂 × 历史 × 几何」数一遍产物里每一类结果行的条数与字段，缺行、缺字段（例如某一族没有臂字段）、某一族一次都没造出被测形状，都列进报
+     .claude/agents/experiment-runner.md:33：6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节）；其中要编译或复跑整张表的，开跑前照共用约束看负载。15 
+     .claude/agents/gate-triage.md:27：4. 原样抄未实现清单与「由项目本地阶段覆盖」清单。跑全量工作区时「工作区跑的过程中没变」那一条在别的会话同时改仓时多半红（2026-09-17 试跑整轮 2 小时 13 分，工作
+     .claude/agents/implementation-writer.md:13：在主工作区改（用户 2026-09-16 定）。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步
+     .claude/agents/implementation-writer.md:27：3. 每条新测试证明会红：在草稿目录的仓副本里（`rsync -a --exclude target --exclude .git`）改坏被测代码一处，跑那条测试所在的整个测试二进
+     .claude/agents/implementation-writer.md:31：- 走得到（包括要坏盘、崩溃、瞬时读错才走得到）：在**任何落盘动作之前**返回一个错误成员，名字说清是哪条条款没定、第一版不支持；写一条用例钉住「返回这个成员、盘上逐字节不变」（
+     .claude/agents/implementation-writer.md:33：- 2026-09-17 实测：三处 `todo!` 落在可达路径上，其中一处在取号写进超级块之后才 panic，而改之前那一格是干净地报错返回；主 agent 让续做两次才改成写
+     .claude/agents/implementation-writer.md:35：7. 新加层 0 流或崩溃点重放用例时，报告写明它比已有的流多罩了哪些崩溃状态、多跑了哪一步（重开、挂载、恢复）；与已有流的基线镜像、写表、段序列逐项相同的，不新开全量枚举，只加一
+     .claude/agents/kb-scribe.md:29：4. 跑阶段归属表登记给你的阶段各一次并贴结果（共用约束 `.claude/agent-common.md`「门禁」一节）；阶段数用那条 `awk` 接 `| wc 
+     .claude/main-agent.md:27：判决与写回只引产物与代码，agent 的结论句一律当线索：同一个 agent 两次交回、数不一样是实际发生过的（2026-09-18 一轮里四次），以仓里的产物为准，现查过再写进 
+     .claude/agents/three-way-attack.md:27：3. 由用户决定的动作（回退之后先做什么、建几个对象）不写死：判一条臂「同一段历史上不中」之前，把这几步放开扫一遍，只固定前缀与故障（`.claude/rules/three-wa
+     .claude/agents/three-way-attack.md:29：5. 自己提的改法写明「只在我的模型上量过、被攻过零轮」。写「几个改法各修哪一格」的表时，每一格标「量过」（贴副本上的原样输出）或「推的」（按代码推、没实现没跑）——2026-09
+     .claude/agents/three-way-defense.md:25：1. 对判决里每一条打中：它引的原文现查在不在、字面满足的是哪一个分句、同一形状在别的臂上是不是同样成立。每一句引文（kb 条款、代码行、产物行）写进报告之前，在被引文件里 `gr
+     .claude/agents/three-way-forward.md:26：2. 每一格各报各的判定（一致 / 冲突 / 规则没说），冲突的两句并排整行抄。每一句引文（kb 条款、代码行、产物行）写进报告之前，在被引文件里 `grep -nF` 那句原文一
+     .claude/agents/three-way-local-attack.md:25：1. 把攻击面写成英文提示：自足（本地模型读不到附录）、不用任何 markdown 强调、答案按编号、每条答复写「什么现象会推翻它」。能落成数的问题给写死的事实表（数整行抄，核对表
+     .claude/agents/three-way-local-attack.md:26：2. 逐句核转述：每一句英文与原文并排，缺一个限定词就补上；英文比原文多出来的限定词、括注也单列一行，写明为什么加（2026-09-17 一句多加的括注让一格作废）。核对表写进 `
+     .claude/agents/three-way-local-attack.md:29：5. 闸判绿也要跑 `python3 research/scripts/oov-check.py <样本>` 看它列出的生词：缺头的粘连词（例：`achievesceives`）闸
+     .claude/agents/three-way-local-attack.md:38：- 回复与一份短报告（写进 `research/prompts/<轮>-local-attack-runlog.md`）：每份样本的退出码、词数、生词清单、干净 / 带损坏 / 作
+     .claude/agents/three-way-local-defense.md:24：- 实测（2026-09-16 第一轮）：辩方提示在本地模型上五次坏三次，其中两次闸判绿；样本更容易不够两份，不够就照实报。
+     .claude/agents/three-way-materials.md:20：- 代码轮另给 diff 的范围（例：`git diff <基准> -- crates/`），放附录二，形态照 `research/prompts/_m2-code-r1-diff
+     .claude/agents/three-way-materials.md:28：4. 代码轮先写 `_<轮>-diff.md`（附录二）：文件头写基准与生成时刻，输入给的 diff 原样放进代码块，再附新文件全文，形态照 `research/prompts/_
+     .claude/agents/three-way-materials.md:29：5. 拼背景材料：正文 + 清单 + 附录，排他新建。顺序固定，主 agent 派发时写成别的顺序（例如把 diff 并进来）照定义拼、回复里写明（2026-09-17 几轮代码轮
+     .claude/agents/three-way-verifier.md:21：- 腿开工那一刻的快照路径（`crates/` 与 `.claude/kb/` 至少这两样；代码轮必给）。腿交回之后主 agent 往往已经改了主树，行号对主树核会报一批假 ✗——
+     .claude/agents/three-way-verifier.md:30：5. 本地腿的转述核对表里每一处「原文文件:行」也逐条核：行号在不在、抄的是不是原文、英文有没有丢限定词，也有没有多加原文没有的限定词或括注（2026-09-17 alloc-ba
+     .claude/agents/three-way-verifier.md:36：- 报告用 Bash 写：`set -o noclobber` 后 `cat > 报告路径 <<'EOF'` 新建，之后 `>>` 分段追加（共用约束「写」一节）。定义里没有 Wr
+     → 怎么办：把经过写进 records/2026-09-16-subagent拆分提案.md 或对应 kb，定义里只留指令；
+               日期是引的规则小节名的一部分，就把小节名放进「」里原样引。
+  ✗ 3 处解释性段落（以日期、「为什么」「依据」「实测」「经过」「因为」这类起头）：
+     .claude/agents/implementation-writer.md:33（以「日期」起头，2 行）：- 2026-09-17 实测：三处 `todo!` 落在可达路径上，其中一处在取号写进超级块之后才 panic，而改之前那一格是干净地报错返回；主 agent 让续做两次才改成写
+     .claude/agents/mutation-triage.md:13（以「依据」起头，1 行）：依据：`.claude/rules/mutation-sampling.md` 全篇（分类以它为准）；`.claude/singlefs-ai-sop/rules/test-dis
+     .claude/agents/three-way-local-defense.md:24（以「实测」起头，1 行）：- 实测（2026-09-16 第一轮）：辩方提示在本地模型上五次坏三次，其中两次闸判绿；样本更容易不够两份，不够就照实报。
+     → 怎么办：把经过写进 records/2026-09-16-subagent拆分提案.md 或对应 kb，定义里删掉这一段；
+               是要读的规则或 kb，改成一条读取指令「开工先读：`文件`「小节」」。
+  ✗ 30 处解释性半句（指令后面挂着「实测」「因为」「依据」这类尾巴）：
+     .claude/agent-common.md:4（「试跑」）：…026-09-17 写成；试跑、对抗与真活上的使用到哪一步，只记在那份计划里，…
+     .claude/agent-common.md:15（段落中间一行以「日期」起头）：2026-09-17 两次试点（同一件活派给继承与不继承的两个定义）产出逐项一致；起步上下文从约 11 万 token 降到约 1 万（`records/2026-09-16-su
+     .claude/agent-common.md:42（「实测」）：…分钟不调用模型就整份重写，2026-09-17 实测一段执行员 6 次、每次 36–59 万 tok…
+     .claude/agents/crash-verifier.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/skills/crash-test/SKILL.md`「判读纪律」；`.claude/singlefs-ai-sop/rul
+     .claude/agents/crash-verifier.md:27（「试跑」）：…opam env` 再找（2026-09-17 试跑：`command -v herd7` 退出码…
+     .claude/agents/crash-verifier.md:28（「试跑」）：…中间几秒的改动会落进空窗，2026-09-17 试跑撞上过）：`git rev-parse HEAD…
+     .claude/agents/experiment-designer.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/rules/test-discipline.md`「实验开跑之前，答案不许已经存在」「实验的失败条款不许让结论不可证伪」「阳
+     .claude/agents/experiment-runner.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/rules/test-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/ev
+     .claude/agents/experiment-runner.md:28（「试跑」）：…n，报成「基线就是红的」，2026-09-17 试跑实测。bin 名以 `research/e7-i…
+     .claude/agents/gate-triage.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/skills/gate/SKILL.md`（阶段含义、常见假失败）；`.claude/singlefs-ai-sop/rul
+     .claude/agents/gate-triage.md:27（「试跑」）：…别的会话同时改仓时多半红（2026-09-17 试跑整轮 2 小时 13 分，工作区从 128 项变…
+     .claude/agents/implementation-writer.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop
+     .claude/agents/implementation-writer.md:27（「实测」）：…跑上一份副本编出的二进制，2026-09-17 实测源码与原件相同的副本报 8 过 2 红），先跑一…
+     .claude/agents/implementation-writer.md:31（「实测」）：…写之前重算、对不上就不写（2026-09-17 实测：判定与取号各读一遍超级块，两次瞬时读错让判定放…
+     .claude/agents/implementation-writer.md:35（「实测」）：…加一条快用例钉住「相同」（2026-09-17 实测：一条新流与第一个事务那条逐项相同，全量等于把第…
+     .claude/agents/kb-scribe.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/skills/decide/SKILL.md`；`.claude/singlefs-ai-sop/rules/kb-disc
+     .claude/agents/kb-scribe.md:29（「实测」）：…t 改规格，不自己改句子（2026-09-17 实测：照规格写回之后阶段全绿交回，doc-lint…
+     .claude/agents/prior-art.md:14（段落中间一行以「依据」起头）：依据：`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」；`.claude/single
+     .claude/agents/sweep.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/format-evolution.md`「改一个格式常量：旧值的派生形态要逐类搜，改完登记进 `stale=`」；`.claude/single
+     .claude/agents/three-way-attack.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「判决由主 agent 做，不由投票做」「多轮：一次打穿不算数，三轮里多数打
+     .claude/agents/three-way-attack.md:29（「实测」）：…（按代码推、没实现没跑）——2026-09-17 实测：一张三个改法各修哪几格的表全是推的、没标，下一…
+     .claude/agents/three-way-defense.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「多轮：一次打穿不算数，三轮里多数打穿才算（2026-09-06 用户明令）」（辩方腿推翻命中靠的
+     .claude/agents/three-way-defense.md:25（「实测」）：…把自己的读法写成条款原文（2026-09-17 实测：一句「有效只按实例表判」被写成出自 D23（j…
+     .claude/agents/three-way-forward.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」；`.claude/rules/implementation-first.m
+     .claude/agents/three-way-forward.md:26（「实测」）：…把自己的读法写成条款原文（2026-09-17 实测：一句「有效只按实例表判」被写成出自 D23（j…
+     .claude/agents/three-way-local-attack.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「一条腿只抽一次样不算一次观测——否定结论尤其不算」「本地腿缺席时必须显式报
+     .claude/agents/three-way-local-defense.md:12（段落中间一行以「依据」起头）：依据：同 `.claude/agents/three-way-local-attack.md` 的「依据」一行。
+     .claude/agents/three-way-materials.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄，不许摘句——三处都管」整节；`.claude/singlefs-ai
+     .claude/agents/three-way-materials.md:20（「实测」）：…两项的，停下要全名，不猜（2026-09-17 实测：「名字含 unreadable 的用例」对得上…
+     .claude/agents/three-way-verifier.md:14（段落中间一行以「依据」起头）：依据：`.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」；`.claude/singlefs-ai-sop/rul
+     → 怎么办：指令留下，尾巴删掉；尾巴里的经过写进 records/2026-09-16-subagent拆分提案.md 或对应 kb，
+               要读的规则或 kb 改成一条读取指令「照 `文件`「小节」办」。

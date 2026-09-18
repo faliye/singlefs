@@ -1,0 +1,8 @@
+original	FP7	exit=1	②=1
+original	before-files	exit=1	②=35
+original	fixture-red	pass=True	exit=1	missing=[]
+original	fixture-green	pass=True	exit=0	missing=[]
+R2	FP7	exit=0	②=0
+R2	before-files	exit=1	②=35
+R2	fixture-red	pass=True	exit=1	missing=[]
+R2	fixture-green	pass=False	exit=0	missing=['✓ 定义只写怎么做（3 份文件 39 行；3 行带日期：2 行的日期只在「」引的小节名里，1 行同行指路；记录小节 0、解释性段落 0、解释性半句 0）']

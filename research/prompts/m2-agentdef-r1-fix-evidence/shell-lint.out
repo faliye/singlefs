@@ -1,0 +1,6 @@
+$ bash .claude/singlefs-ai-sop/scripts/shell-lint.sh .claude/gate.d   # 2026-09-18 06:09:18 UTC
+
+══ shell 纪律检查 ══
+
+  ✓ shell 纪律检查通过（共 79 个脚本）
+exit=0

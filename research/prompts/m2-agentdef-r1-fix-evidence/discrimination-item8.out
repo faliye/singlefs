@@ -1,0 +1,64 @@
+# 第 8 条判别力（规格没要，顺带）：72 / 56 号的判决来源改回「改动范围里任何一份 *-main-verification.md」，对各自红绿样本照 89 号的判法跑
+# 跑于 2026-09-18 06:09:19 UTC；副本由 tools/make-reverted.py 造
+
+$ diff .claude/gate.d/72-agent-def-adversarial-review.sh 72-item8-reverted.sh
+32c32
+< verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added" || true)"
+---
+> verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$changed" || true)"
+$ bash tools/fixture-check.sh .claude/gate.d/fixtures/72-agent-def-adversarial-review.sh .claude/gate.d/72-agent-def-adversarial-review.sh   # 现在的 72 号
+  red: 退出码 1（期望 1）→ 判得对
+  ---- red 原样输出 ----
+  |   ✗ 改过的定义与共用约束里 2 份没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+  |       .claude/agent-common.md
+  |       .claude/main-agent.md
+  |      → 怎么办：走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，
+  |                正文里按路径点名改过的每一份定义（打中的写回定义再改一轮）；点名写进新的判决，不往旧判决里补。
+  green: 退出码 0（期望 0）→ 判得对
+  ---- green 原样输出 ----
+  |   ✓ 改过的定义与共用约束 4 份都有三方判决点名（新写的判决文件 1 份，基准 HEAD）
+
+$ bash tools/fixture-check.sh .claude/gate.d/fixtures/72-agent-def-adversarial-review.sh 72-item8-reverted.sh   # 改回去
+  red: 输出里找不到「改过的定义与共用约束里 2 份没有三方判决点名」
+  red: 输出里找不到「      .claude/main-agent.md」
+  red: 退出码 1（期望 1）→ 判错
+  ---- red 原样输出 ----
+  |   ✗ 改过的定义与共用约束里 1 份没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+  |       .claude/agent-common.md
+  |      → 怎么办：走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，
+  |                正文里按路径点名改过的每一份定义（打中的写回定义再改一轮）；点名写进新的判决，不往旧判决里补。
+  green: 退出码 0（期望 0）→ 判得对
+  ---- green 原样输出 ----
+  |   ✓ 改过的定义与共用约束 4 份都有三方判决点名（新写的判决文件 1 份，基准 HEAD）
+
+$ diff .claude/gate.d/56-crates-adversarial-review.sh 56-item8-reverted.sh
+31c31
+< verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added" || true)"
+---
+> verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$changed" || true)"
+$ bash tools/fixture-check.sh .claude/gate.d/fixtures/56-crates-adversarial-review.sh .claude/gate.d/56-crates-adversarial-review.sh   # 现在的 56 号
+  red: 退出码 1（期望 1）→ 判得对
+  ---- red 原样输出 ----
+  |   ✗ crates 改动里 2 个文件没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+  |       crates/demo/src/lib.rs
+  |       crates/demo/src/other.rs
+  |      → 怎么办：写代码之后、提交之前走一轮三方（.claude/rules/three-way-inference.md）：材料带上 diff，正推 / 反推 / 找反例三条腿各攻一遍，
+  |                主 agent 的判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 文件（打中的写回代码再改一轮）；
+  |                点名写进新的判决，不往旧判决里补。
+  green: 退出码 0（期望 0）→ 判得对
+  ---- green 原样输出 ----
+  |   ✓ crates 改动 1 个文件都有三方判决点名（新写的判决文件 1 份，基准 HEAD）
+
+$ bash tools/fixture-check.sh .claude/gate.d/fixtures/56-crates-adversarial-review.sh 56-item8-reverted.sh   # 改回去
+  red: 输出里找不到「crates 改动里 2 个文件没有三方判决点名」
+  red: 输出里找不到「      crates/demo/src/other.rs」
+  red: 退出码 1（期望 1）→ 判错
+  ---- red 原样输出 ----
+  |   ✗ crates 改动里 1 个文件没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+  |       crates/demo/src/lib.rs
+  |      → 怎么办：写代码之后、提交之前走一轮三方（.claude/rules/three-way-inference.md）：材料带上 diff，正推 / 反推 / 找反例三条腿各攻一遍，
+  |                主 agent 的判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 文件（打中的写回代码再改一轮）；
+  |                点名写进新的判决，不往旧判决里补。
+  green: 退出码 0（期望 0）→ 判得对
+  ---- green 原样输出 ----
+  |   ✓ crates 改动 1 个文件都有三方判决点名（新写的判决文件 1 份，基准 HEAD）

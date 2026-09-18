@@ -2,7 +2,7 @@
 # 三列用制表符分隔：阶段文件名、agent 名（逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么归它。
 # 表与目录、定义逐项一致由 62-stage-owners.sh 判；各 agent 怎么从表里取自己的阶段，见 .claude/agent-common.md「门禁」。
 10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
-15-research-build.sh	experiment-runner	research 构建与单测
+15-research-build.sh	gate-triage	research 构建与单测（全工作区十几分钟，2026-09-17 从 experiment-runner 挪到收尾：执行员前台等它会让缓存过期、整份上下文重写）
 20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
 21-decision-items-sync.sh	kb-scribe	决策分项清单与正文
 22-item-ref-status.sh	kb-scribe	分项引用写的状态
@@ -51,7 +51,14 @@
 80-absolute-assertions.sh	experiment-runner	实验钉绝对值的断言
 85-repro-command.sh	experiment-runner	实验复跑命令
 86-experiment-orphans.sh	experiment-runner	实验号在 kb 里有正文
-87-replay.sh	experiment-runner	入库实验复现
+87-replay.sh	gate-triage	入库实验复现（全部实验复跑十几分钟，2026-09-17 从 experiment-runner 挪到收尾，理由同 15 号；执行员只跑自己那一个实验的 replay.sh）
 88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
 89-stage-selftest.sh	gate-triage	项目本地阶段自己会不会红
 63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表
+64-moved-paths.sh	sweep	搬过的文件与目录全仓不再指向旧路径；搬迁的回扫归回扫员
+66-abandoned-rounds.sh	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，材料员与腿跑它只会红，提交前核
+67-milestone-closeout-owed.sh	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行，都在它手上变红
+68-knowledge-sync.sh	gate-triage	同步记录由主 agent 在阶段收尾时写；提交前核
+69-evidence-in-repo.sh	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，是执行员跑完自己那一个实验就该核的（与 40、85、88 同一批）；kb 里把依据写成 /tmp 路径，是书记员写回时该核的；research/prompts/ 那一半（提示、报告与判决）由主 agent 写，提交前核
+71-agent-def-flow-only.sh	gate-triage	定义与共用约束只由主 agent 改（共用约束「不做」一节不许子 agent 改 .claude/agents/），没有哪个子 agent 写完会先跑它；提交前核
+72-agent-def-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名（形态照 56 号）

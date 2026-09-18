@@ -1,0 +1,4 @@
+$ nice -n 19 bash .claude/gate.d/26-number-name-sync.sh   # 开跑 2026-09-18 06:07:46 UTC
+  ✓ 编号与简称一致（扫 224 个文件，prompts/ 按证据链原样保留）
+exit=0
+# 结束 2026-09-18 06:07:46 UTC

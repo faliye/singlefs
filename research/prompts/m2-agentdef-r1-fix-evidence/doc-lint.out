@@ -1,0 +1,14 @@
+$ bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .   # 2026-09-18 06:08:16 UTC
+
+══ 文档铁律检查 ══
+  ! 按 .claude/doc-lint-exclude 绕开 1704 个 .md —— 原样保存的证据，改了就断证据链：
+  !   research/prompts/  （1689 个）—— 当时原样发给模型的提示，与 research/results/ 的产物一一对应；改提示只能连同重跑一起改（文件与目录路径除外，见 .claude/rules/path-moves.md）
+  !   .claude/gate.d/fixtures/43-owed-table-shape.sh/  （2 个）—— 门禁阶段「欠账表两张登记表的行形状」的判别力样本：故意造的登记表，与真表同号不同名，扫它只会报登记冲突
+  !   .claude/gate.d/fixtures/51-admission-terms-covered.sh/  （4 个）—— 门禁阶段「准入不等式的每一项都有人维护」的判别力样本：造了带登记标题的 D28 / D5 样本文件，扫它只会报登记冲突
+  !   .claude/gate.d/fixtures/53-format-const-placeholders.sh/  （4 个）—— 门禁阶段「格式常量文件里的占位」的判别力样本：造了带登记标题的 D22 样本决策与 C323 样本欠账行，扫它只会报登记冲突
+  !   .claude/handover/  （5 个）—— 从 singlefs-ai-sop 原样移交来的 QEMU 与 herd7 记录：规则段落是 SOP 原文、样本里有故意写坏的 litmus；怎么接由本项目自己定，接进来之前不扫
+
+  ! 上下文指代与自指称呼这两条是**启发式**：只认句首或标点之后的常见说法，
+  !   「按本决策办」这种嵌在句中的漏得掉。绿不代表这两条穷举过了。
+  ✓ 文档铁律检查通过（检查 434，跳过 0；DOC_LINT_VERBOSE=1 看全部）
+exit=0

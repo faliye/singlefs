@@ -1,0 +1,164 @@
+[
+ {
+  "id": "cv1",
+  "file": ".claude/agents/crash-verifier.md",
+  "old": "里最重的那几道，派你是为了在提交前的整轮门禁之前先拿到它们的读数。",
+  "new": "里最重的那几道。"
+ },
+ {
+  "id": "cv2",
+  "file": ".claude/agents/crash-verifier.md",
+  "old": "不起 54 号，等它结束（两份层 0 全量同时跑各要一个多钟头）。",
+  "new": "不起 54 号，等它结束。"
+ },
+ {
+  "id": "cv3",
+  "file": ".claude/agents/crash-verifier.md",
+  "old": "2>&1`，后台起它的那条命令自己的 `$?` 只说明起没起来），结束后读输出（54 号在本机负载下实测约 47 分钟，55、57、59 号各在一分钟内）。",
+  "new": "2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。"
+ },
+ {
+  "id": "gt1",
+  "file": ".claude/agents/gate-triage.md",
+  "old": "在跑就等它结束（两道门禁同时跑，重阶段互相拖、工作区指纹互相干扰）。",
+  "new": "在跑就等它结束。"
+ },
+ {
+  "id": "ks1",
+  "file": ".claude/agents/kb-scribe.md",
+  "old": "不由你概括；标题决定条目挂在哪条决策下、条目里裸写的分项归谁，所以也由主 agent 给；标题里",
+  "new": "不由你概括；标题里"
+ },
+ {
+  "id": "ks2",
+  "file": ".claude/agents/kb-scribe.md",
+  "old": "然后不带 `--dry-run` 实写并回读。用它不用逐条 Edit：两阶段写在有一处不中时一个文件都不写，逐条 Edit 中途被打断或锚点被别人改掉会留下半套（agent-defs-r2 攻方模型：1/3 对 0/3）。",
+  "new": "然后不带 `--dry-run` 实写并回读。用它，不用逐条 Edit。"
+ },
+ {
+  "id": "ks3",
+  "file": ".claude/agents/kb-scribe.md",
+  "old": "就停在 `--write` 之前交回（`--write` 会先往那些条目里写「（待补）」）；",
+  "new": "就停在 `--write` 之前交回，不让 `--write` 往那些条目里写「（待补）」；"
+ },
+ {
+  "id": "ks4",
+  "file": ".claude/agents/kb-scribe.md",
+  "old": "加跑 33 号（变异表锚点里的分项标签不跟着改，会腐化），并把改到的实验源码逐个列给主 agent（入库产物里印着旧标签的，复跑会对不上）；",
+  "new": "加跑 33 号，并把改到的实验源码逐个列给主 agent；"
+ },
+ {
+  "id": "mt1",
+  "file": ".claude/agents/mutation-triage.md",
+  "old": "（路径相对 `research/`；在仓根下跑会被报成「基线就是红的」）；表头写着「被测装置是 shell 探针」的（今天 4 张），照表头",
+  "new": "（路径相对 `research/`；报「基线就是红的」时先查是不是在仓根下跑）；表头写着「被测装置是 shell 探针」的，照表头"
+ },
+ {
+  "id": "mt2",
+  "file": ".claude/agents/mutation-triage.md",
+  "old": "不用它默认那个跨轮共用的：共用的会让开头几行链接上一轮最后一条变异，计划第十八节）。",
+  "new": "不用它默认那个跨轮共用的）。"
+ },
+ {
+  "id": "er1",
+  "file": ".claude/agents/experiment-runner.md",
+  "old": "也要等，免得读数被抢。",
+  "new": "也要等。"
+ },
+ {
+  "id": "er2",
+  "file": ".claude/agents/experiment-runner.md",
+  "old": "新文件里的缩写与单字母名改完再往下走（后面的门禁阶段都不查命名）。",
+  "new": "新文件里的缩写与单字母名在这一步改完再往下走，不留给后面的门禁阶段。"
+ },
+ {
+  "id": "er3",
+  "file": ".claude/agents/experiment-runner.md",
+  "old": "生成产物用的二进制在 `research/target/` 下（`replay.sh` 按这个相对路径找），用最后一次源码改动编出来；草稿目录里的 target 只拿来迭代。",
+  "new": "生成产物用的二进制编在 `research/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。"
+ },
+ {
+  "id": "ed1",
+  "file": ".claude/agents/experiment-designer.md",
+  "old": "--exclude-dir=prompts`，免得命中行把结论带进来。",
+  "new": "--exclude-dir=prompts`。"
+ },
+ {
+  "id": "ed2",
+  "file": ".claude/agents/experiment-designer.md",
+  "old": "写明它在哪个取样点上改变输出，防等价变异。",
+  "new": "写明它在哪个取样点上改变输出。"
+ },
+ {
+  "id": "ed3",
+  "file": ".claude/agents/experiment-designer.md",
+  "old": "写一句为什么不适用，不删节。`experiment-runner` 照这些节名找东西，以后门禁也按它们查。",
+  "new": "写一句为什么不适用，不删节。"
+ },
+ {
+  "id": "ed4",
+  "file": ".claude/agents/experiment-designer.md",
+  "old": "回读一致后 `>>` 追加进登记（它只会整份写出口文件，出口写成登记本身会盖掉占号时写的文件头，而且退出码照样是 0） |",
+  "new": "回读一致后 `>>` 追加进登记；出口不指向登记本身，追加完回读登记，占号时写的文件头在不在看文件，不看退出码 |"
+ },
+ {
+  "id": "iw1",
+  "file": ".claude/agents/implementation-writer.md",
+  "old": "（不把 `CARGO_TARGET_DIR` 指到几份副本共用的目录），先跑一份不改动的副本：",
+  "new": "（不把 `CARGO_TARGET_DIR` 指到几份副本共用的目录）；改坏的副本要还原时，从原件拷回之后对被改的文件 `touch`，或删掉这份副本重拷，不用 `rsync -a` 拷回了事；先跑一份不改动的副本："
+ },
+ {
+  "id": "iw2",
+  "file": ".claude/agents/implementation-writer.md",
+  "old": "- 没走三方对抗（56 号门禁要的判决文件由主 agent 的那一轮产出）；",
+  "new": "- 没走三方对抗；"
+ },
+ {
+  "id": "ac1",
+  "file": ".claude/agent-common.md",
+  "old": "停下，那类读数被抢了 CPU 就不作数；只有别的",
+  "new": "停下；只有别的"
+ },
+ {
+  "id": "ac2",
+  "file": ".claude/agent-common.md",
+  "old": "等锁等了多久。这个仓里别的会话几乎一直在跑 cargo，见到就停等于开不了工。定义另有",
+  "new": "等锁等了多久。定义另有"
+ },
+ {
+  "id": "ac3",
+  "file": ".claude/agent-common.md",
+  "old": "再往下做：`/tmp` 下的草稿目录会话一重启就没了，那一跑等于白干。停机条款",
+  "new": "再往下做。停机条款"
+ },
+ {
+  "id": "ma1",
+  "file": ".claude/main-agent.md",
+  "old": "逐条写去向。延迟不是丢掉，不做也要写明依据。",
+  "new": "逐条写去向。不做也要写明依据。"
+ },
+ {
+  "id": "ma2",
+  "file": ".claude/main-agent.md",
+  "old": "一条都不许无声消失。发散是探索该有的样子，开口子不是问题，开出来没人收才是。",
+  "new": "一条都不许无声消失。"
+ },
+ {
+  "id": "ma3",
+  "file": ".claude/main-agent.md",
+  "old": "盯住，不强制结束：",
+  "new": "盯住，不能一直干等，也不强制结束："
+ },
+ {
+  "id": "ma4",
+  "file": ".claude/main-agent.md",
+  "old": "临时派 general-purpose 干带长等待的活时，派发提示里写上这一条：它不读共用约束。",
+  "new": "临时派不读共用约束的 agent（general-purpose 这类）干带长等待的活时，派发提示里写上这一条。"
+ },
+ {
+  "id": "tv1",
+  "file": ".claude/agents/three-way-verifier.md",
+  "old": "没给快照的代码轮，停下要，不对主树核。",
+  "new": "没给快照的代码轮，停下要，不对主树核。没给快照的轮（设计轮）对主树核，腿引的行号与主树对不上时记「分不清：文件可能在腿交回之后被改过」（与第 6 步那一类一样单列），不记 ✗。"
+ }
+]

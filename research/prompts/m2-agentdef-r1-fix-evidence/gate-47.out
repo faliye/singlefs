@@ -1,0 +1,4 @@
+$ nice -n 19 bash .claude/gate.d/47-research-script-selftests.sh   # 开跑 2026-09-18 06:07:46 UTC
+  ✓ research 脚本的自证都通过（查了 13 份：ask-local 判红分支、清单生成取法、机械整抄、小节清单、段序列登记表比对、定点替换、批量定点替换、E152 出表、子 agent 监控、搬迁路径改写、按项名抽 Rust 代码、读子进程输出的计时写法、子 agent 的缓存计时器）
+exit=0
+# 结束 2026-09-18 06:08:14 UTC

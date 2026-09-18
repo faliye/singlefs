@@ -8,7 +8,7 @@
 #   ④ 表里每个 agent 名都有定义，每行至少两列；
 #   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（按模式找进程与没超时的等待循环记进检出记录、一律放行：hook 只检出，结不结束由主 agent 判断）；
 #   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒）；
-#   ⑦ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「依据：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）。
+#   ⑦ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
 # 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
@@ -84,7 +84,7 @@ for path in sorted(glob.glob(".claude/agents/*.md")):
     head = whole.split("\n---", 1)[0]
     if not any(line.strip() == "omitClaudeMd: true" for line in head.split("\n")):
         missing_omit.append(os.path.basename(path)[:-3])
-    if not any(line.startswith("依据：") for line in whole.split("\n")):
+    if not any(line.startswith("开工先读：") for line in whole.split("\n")):
         missing_basis.append(os.path.basename(path)[:-3])
     tools_line = next((line for line in head.split("\n") if line.startswith("tools:")), "")
     tools = {tool.strip() for tool in tools_line[len("tools:"):].split(",")}
@@ -118,10 +118,10 @@ if missing_omit:
     print("     → 怎么办：在它的 frontmatter 里加一行 omitClaudeMd: true，开工先读那一句指到 .claude/agent-common.md「规则怎么读」。")
 if missing_basis:
     failed = True
-    print("  ✗ 这些定义没有「依据：」一行——不继承 CLAUDE.md 之后，它要读的规则没有地方点名：")  # gate-lint:summary
+    print("  ✗ 这些定义没有「开工先读：」一行——不继承 CLAUDE.md 之后，它要读的规则没有地方点名：")  # gate-lint:summary
     for name in missing_basis:
         print(f"     {name}")  # gate-lint:detail
-    print("     → 怎么办：在正文里加一行「依据：」，点名它干活要守的规则文件与小节。")
+    print("     → 怎么办：在正文里加一行「开工先读：」，点名它干活要读的规则文件与小节。")
 if failed:
     sys.exit(1)
 pattern_count = sum(len(patterns) for patterns in patterns_by_agent.values())

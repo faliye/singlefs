@@ -1,0 +1,6 @@
+$ bash .claude/singlefs-ai-sop/scripts/gate-lint.sh .claude/gate.d   # 2026-09-18 06:09:17 UTC
+
+══ 门禁自检（每条拒绝都要给出路） ══
+
+  ✓ 门禁自检通过：83 个脚本（.sh 与 .py）、264 条拒绝都带了出路
+exit=0

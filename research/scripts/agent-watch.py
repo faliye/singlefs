@@ -14,7 +14,8 @@
 
 主 agent 派发之后用 Bash 的 run_in_background 起 watch：它一退出，harness 就会叫醒主 agent。
 它只看、只报，不停任何子 agent、不杀任何进程：子 agent 与脚本不强制结束，结束不结束由主 agent 看了报告定（用户 2026-09-17）。
-退出码：0 全部子 agent 已结束且没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
+退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
+「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务（缓存续命见 research/scripts/cache-keepalive.sh），不算结束。
 
 hook 的检出也在这里汇给主 agent：`.claude/hooks/bash-command-detector.sh` 只记不拦，把检出写进检出记录；
 watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出、叫醒主 agent。
@@ -92,6 +93,8 @@ class AgentTranscript:
         seen_message_ids = set()
         pending_by_id = {}
         tool_inputs_by_id = {}
+        handback_tool_ids = set()
+        is_handed_back = False  # 最近一次交回成功之后没有再调别的工具（续做之后又调工具就回到没交回）
         previous_call_time = None
         last_kind = None
         for line in open(self.transcript_path, encoding="utf-8", errors="replace"):
@@ -138,6 +141,10 @@ class AgentTranscript:
                             tool_inputs_by_id[block.get("id")] = (block.get("name"), tool_input)
                             if block.get("name") == "Bash":
                                 self.bash_commands.append([timestamp, tool_input.get("command", ""), None, block.get("id")])
+                            if block.get("name") == "SubagentHandback":
+                                handback_tool_ids.add(block.get("id"))
+                            else:
+                                is_handed_back = False
                             last_kind = "tool_use"
                         elif block.get("type") == "text":
                             last_kind = "end_turn" if message.get("stop_reason") == "end_turn" else "text"
@@ -146,6 +153,10 @@ class AgentTranscript:
                     for block in content:
                         if block.get("type") == "tool_result":
                             pending_by_id.pop(block.get("tool_use_id"), None)
+                            if block.get("tool_use_id") in handback_tool_ids:
+                                result_text = json.dumps(block.get("content"), ensure_ascii=False).replace("\\", "").replace(" ", "")
+                                if '"success":true' in result_text:
+                                    is_handed_back = True
                             if block.get("tool_use_id") in tool_inputs_by_id:
                                 self._count_tool_result(*tool_inputs_by_id[block.get("tool_use_id")], block.get("content"))
                             for entry in self.bash_commands[-20:]:
@@ -160,10 +171,14 @@ class AgentTranscript:
         self.pending_tool = max(pending_by_id.values(), key=lambda item: item[0]) if pending_by_id else None
         if last_kind == "interrupted":
             self.state = "被停"
-        elif last_kind == "end_turn" and not pending_by_id and BROKEN_DETECTION != "finished":
-            self.state = "已结束"
+        elif is_handed_back and not pending_by_id and BROKEN_DETECTION != "finished":
+            self.state = "已交回"
         elif self.pending_tool is not None:
             self.state = "执行工具中"
+        elif last_kind == "end_turn" and BROKEN_DETECTION == "handback":
+            self.state = "已交回"
+        elif last_kind == "end_turn":
+            self.state = "本轮结束、没交回"
         else:
             self.state = "思考中"
 
@@ -179,7 +194,7 @@ class AgentTranscript:
             file_entry[1] += len(text)
 
     def is_done(self):
-        return self.state in ("已结束", "被停")
+        return self.state in ("已交回", "被停")
 
 
 def tool_result_category(tool_name, tool_input):
@@ -385,7 +400,7 @@ def process_alerts(root_pid, excluded_pids, thresholds):
 
 def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pids, process_root_pid):
     now = datetime.now(timezone.utc)
-    lines, alerts, done_flags = [], [], []
+    lines, alerts, done_flags, active_ids, unstarted_ids = [], [], [], [], []
     if agent_ids:
         targets = [(agent_id, find_transcript(agent_id, session_dir)) for agent_id in agent_ids]
     else:
@@ -397,11 +412,14 @@ def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pid
             waited = time.time() - watch_started
             lines.append(f"子 agent {agent_id}：还没有会话记录（已等 {format_duration(waited)}）")
             done_flags.append(False)
+            unstarted_ids.append(agent_id)
             if waited >= thresholds.not_started_minutes * 60:
                 alerts.append((agent_id, "没启动", f"派发 {format_duration(waited)} 之后还没有会话记录", "查派发是否失败、agent id 是否抄对"))
             continue
         transcript = AgentTranscript(agent_id, path)
         done_flags.append(transcript.is_done())
+        if not transcript.is_done():
+            active_ids.append(agent_id)
         since_last = format_duration((now - transcript.last_timestamp).total_seconds()) if transcript.last_timestamp else "?"
         total = format_duration((transcript.last_timestamp - transcript.first_timestamp).total_seconds()) if transcript.first_timestamp else "?"
         lines.append(f"子 agent {agent_id} {transcript.agent_type}「{transcript.description}」状态={transcript.state} 已跑 {total} "
@@ -418,7 +436,7 @@ def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pid
             lines.extend(process_lines)
         for name, explanation, next_step in found:
             alerts.append(("进程", name, explanation, next_step))
-    return lines, alerts, bool(done_flags) and all(done_flags)
+    return lines, alerts, bool(done_flags) and all(done_flags), (active_ids, unstarted_ids)
 
 
 def session_id_of(transcript_path):
@@ -463,6 +481,13 @@ def print_report(lines, alerts):
         print("没有告警。")
 
 
+def print_active_list(active_ids, unstarted_ids):
+    if not active_ids and not unstarted_ids:
+        return
+    print(f"还没交回、没被停的子 agent（{len(active_ids)} 个，另有还没会话记录的 {len(unstarted_ids)} 个）：{','.join(active_ids + unstarted_ids)}")
+    print(f"   → 接着盯就再起一个看门狗 --agents {','.join(active_ids + unstarted_ids)}")
+
+
 def own_process_chain(table, start_pid):
     chain, pid = set(), start_pid
     while pid in table and pid > 1:
@@ -491,8 +516,9 @@ def run(arguments):
     watch_started = time.time()
     detections_path = arguments.detections_file
     detections_offset = os.path.getsize(detections_path) if (arguments.mode == "watch" and os.path.isfile(detections_path)) else 0
+    report_deadline = watch_started + arguments.max_minutes * 60
     while True:
-        lines, alerts, all_done = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
+        lines, alerts, all_done, active_lists = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
         session_ids = {session_id_of(path) for path in (find_transcript(agent_id, arguments.session_dir) for agent_id in agent_ids) if path}
         if arguments.session_dir:
             session_ids.add(os.path.basename(os.path.normpath(arguments.session_dir)))
@@ -503,22 +529,27 @@ def run(arguments):
             return 3 if alerts else 0
         if alerts:
             print_report(lines, alerts)
+            print_active_list(*active_lists)
             return 3
         if all_done:
             print_report(lines, alerts)
-            print("被看的子 agent 全部结束。")
+            print("被看的子 agent 全部交回或被停。")
             return 0
-        if time.time() - watch_started >= arguments.max_minutes * 60:
+        if time.time() >= report_deadline:
             print_report(lines, alerts)
-            print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警、子 agent 还在跑。主 agent 看一眼上面的状态，接着盯就再起一个看门狗。")
+            print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警。")
+            print_active_list(*active_lists)
             return 4
         next_full_check = time.time() + arguments.interval_seconds
+        if BROKEN_DETECTION != "deadline":
+            next_full_check = min(next_full_check, report_deadline)
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(next_full_check - time.time(), 0)))
             detections_offset, detection_alerts = read_detections(detections_path, detections_offset, session_ids)
             if detection_alerts:
-                lines, alerts, _ = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
+                lines, alerts, _, active_lists = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
                 print_report(lines, alerts + detection_alerts)
+                print_active_list(*active_lists)
                 return 3
 
 
@@ -557,6 +588,14 @@ def bash_result(minutes_ago, tool_id):
     return record_at(minutes_ago, "user", [{"type": "tool_result", "tool_use_id": tool_id, "content": "ok"}])
 
 
+def handback_records(minutes_ago, tool_id, message_id):
+    """交回工具的调用与成功返回，返回的形态照 2026-09-18 会话记录里的原样。"""
+    return [record_at(minutes_ago, "assistant", [{"type": "tool_use", "id": tool_id, "name": "SubagentHandback", "input": {"message": "报告"}}],
+                      stop_reason="tool_use", message_id=message_id, usage={"input_tokens": 10, "cache_read_input_tokens": 1000}),
+            record_at(minutes_ago - 0.1, "user", [{"type": "tool_result", "tool_use_id": tool_id,
+                                                   "content": [{"type": "text", "text": '{"success":true,"message":"Report delivered to your caller."}'}]}])]
+
+
 def selftest():
     work = tempfile.mkdtemp(prefix="agent-watch-selftest-")
     thresholds = argparse.Namespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3,
@@ -564,9 +603,17 @@ def selftest():
                                     not_started_minutes=5, active_minutes=600)
     session = os.path.join(work, "session")
     failures = []
-    write_transcript(session, "finished", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"),
-                                           record_at(18, "assistant", [{"type": "text", "text": "交回"}], stop_reason="end_turn", message_id="m2")],
+    write_transcript(session, "finished", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"), *handback_records(18.5, "h1", "m2"),
+                                           record_at(18, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m3")],
                      {"agentType": "experiment-runner", "description": "跑完的"})
+    write_transcript(session, "waiting", [bash_use(1, "t1", "cargo test --release", "m1"),
+                                          record_at(0.9, "user", [{"type": "tool_result", "tool_use_id": "t1", "content": "Command running in background with ID: b1."}]),
+                                          record_at(0.8, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2")],
+                     {"agentType": "experiment-runner", "description": "结束本轮在等后台任务、没交回"})
+    write_transcript(session, "continued", [*handback_records(3, "h1", "m1"),
+                                            record_at(2.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m2"),
+                                            record_at(2, "user", "续做：再补一格"), bash_use(1, "t2", "ls", "m3"), bash_result(0.9, "t2")],
+                     {"agentType": "experiment-runner", "description": "交回之后被续做"})
     write_transcript(session, "waitloop", [bash_use(5, "t1", 'until grep -q "^exit=" log; do sleep 10; done', "m1")])
     write_transcript(session, "longtool", [bash_use(20, "t1", "cargo test --release", "m1")])
     write_transcript(session, "healthy", [bash_use(0.5, "t1", "cargo build", "m1")])
@@ -609,7 +656,7 @@ def selftest():
     if costed.tool_result_characters.get("Read 跑前登记（整份）") != [1, 400] or costed.tool_result_characters.get("Bash cargo") != [1, 100]:
         failures.append(f"工具结果分类不对：{costed.tool_result_characters}")
     expectations = {
-        "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(),
+        "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
         "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "idle": {"无动静"},
     }
     now = datetime.now(timezone.utc)
@@ -618,8 +665,11 @@ def selftest():
         got = {name for name, _, _ in agent_alerts(transcript, now, thresholds)}
         if got != wanted:
             failures.append(f"子 agent {agent_id}：应当告警 {sorted(wanted) or '无'}，实际 {sorted(got) or '无'}")
-    if AgentTranscript("finished", find_transcript("finished", session)).state != "已结束":
-        failures.append("跑完的子 agent 没被认成「已结束」")
+    wanted_done = {"finished": True, "interrupted": True, "waiting": False, "continued": False, "healthy": False}
+    for agent_id, wanted in wanted_done.items():
+        transcript = AgentTranscript(agent_id, find_transcript(agent_id, session))
+        if transcript.is_done() != wanted:
+            failures.append(f"子 agent {agent_id} 应当{'算' if wanted else '不算'}交回或被停，实际状态「{transcript.state}」")
     stale_file = os.path.join(work, "stale-output.log")
     open(stale_file, "w").close()
     old = time.time() - 3600
@@ -633,25 +683,39 @@ def selftest():
     finally:
         sleeper.kill()
         sleeper.wait()
-    watch_exit = subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", "finished,interrupted",
-                                 "--session-dir", session, "--interval-seconds", "1", "--max-minutes", "1", "--process-root-pid", "0"],
-                                capture_output=True, text=True).returncode
+    watch_runs = []
+
+    def run_watch(watch_arguments, timeout=None):
+        watch_runs.append(watch_arguments)
+        return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", *watch_arguments, "--session-dir", session, "--process-root-pid", "0"],
+                              capture_output=True, text=True, timeout=timeout)
+
+    watch_exit = run_watch(["--agents", "finished,interrupted", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
     if watch_exit != 0:
-        failures.append(f"被看的子 agent 都已结束时看门狗应当退出码 0，实际 {watch_exit}")
-    watch_exit = subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", "waitloop",
-                                 "--session-dir", session, "--interval-seconds", "1", "--max-minutes", "1", "--process-root-pid", "0"],
-                                capture_output=True, text=True).returncode
+        failures.append(f"被看的子 agent 都交回或被停时看门狗应当退出码 0，实际 {watch_exit}")
+    watch_exit = run_watch(["--agents", "waitloop", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
     if watch_exit != 3:
         failures.append(f"有告警时看门狗应当退出码 3，实际 {watch_exit}")
-    watch_exit = subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", "healthy",
-                                 "--session-dir", session, "--interval-seconds", "1", "--max-minutes", "0.03", "--process-root-pid", "0"],
-                                capture_output=True, text=True).returncode
+    watch_exit = run_watch(["--agents", "healthy", "--interval-seconds", "1", "--max-minutes", "0.03"]).returncode
     if watch_exit != 4:
         failures.append(f"到定时回报的时刻看门狗应当退出码 4，实际 {watch_exit}")
+    watched = run_watch(["--agents", "waiting,finished", "--interval-seconds", "1", "--max-minutes", "0.03"])
+    wanted_active_line = "还没交回、没被停的子 agent（1 个，另有还没会话记录的 0 个）：waiting"
+    if watched.returncode != 4 or wanted_active_line not in watched.stdout:
+        failures.append(f"一个结束本轮没交回、一个已交回时看门狗应当退出码 4 并列出「{wanted_active_line}」，"
+                        f"实际退出码 {watched.returncode}，输出：{watched.stdout[-300:]}")
+    try:
+        started = time.time()
+        watched = run_watch(["--agents", "waiting", "--interval-seconds", "240", "--max-minutes", "0.05"], timeout=30)
+        if watched.returncode != 4:
+            failures.append(f"复检间隔 240 秒、回报周期 3 秒时看门狗应当到点退出码 4，实际 {watched.returncode}")
+    except subprocess.TimeoutExpired:
+        failures.append(f"复检间隔比回报周期长时看门狗没有按回报周期退出（{time.time() - started:.0f} 秒还没退出）：回报会被拖到下一次复检")
     detections_file = os.path.join(work, "detections.jsonl")
     open(detections_file, "w").close()
     for session_label, finding_text, wanted_exit in (("session", "按模式匹配的进程命令", 3), ("另一个会话", "按模式匹配的进程命令", 4),
                                                      ("session", "没有 timeout 的等待循环", 4)):
+        watch_runs.append(["--detections-file", session_label, finding_text])
         watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--agents", "healthy", "--session-dir", session,
                                     "--interval-seconds", "2", "--detection-poll-seconds", "0.5", "--max-minutes", "0.12",
                                     "--process-root-pid", "0", "--detections-file", detections_file],
@@ -670,7 +734,7 @@ def selftest():
         print("    → 看 agent_alerts() / process_alerts() / run() 的判法；AGENT_WATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-watch 自检通过：等待循环、工具过长、同一命令反复且输出不变、禁用命令、无动静、进程无输出六种告警都报得出，"
-          f"跑完、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，看门狗三种退出码对，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、6 次看门狗）")
+          f"交回、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，交回按交回工具成功判（只结束本轮、交回后又被续做的都不算），看门狗三种退出码对、定时回报不被复检间隔拖后并列出还没交回的子 agent，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、{len(watch_runs)} 次看门狗）")
     return 0
 
 

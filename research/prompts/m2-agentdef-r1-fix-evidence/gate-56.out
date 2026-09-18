@@ -1,0 +1,4 @@
+$ nice -n 19 bash .claude/gate.d/56-crates-adversarial-review.sh   # 开跑 2026-09-18 06:08:14 UTC
+  ✓ crates 改动 23 个文件都有三方判决点名（新写的判决文件 9 份，基准 502ba80e8065351d968d061b8dd28698e3463c8d）
+exit=0
+# 结束 2026-09-18 06:08:14 UTC

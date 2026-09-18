@@ -1,0 +1,4 @@
+$ nice -n 19 bash .claude/gate.d/62-stage-owners.sh   # 开跑 2026-09-18 06:08:14 UTC
+  ✓ 阶段归属表与门禁目录一致（62 个阶段，归 8 个 agent）
+exit=0
+# 结束 2026-09-18 06:08:14 UTC

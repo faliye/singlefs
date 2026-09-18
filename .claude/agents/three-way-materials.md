@@ -11,13 +11,13 @@ omitClaudeMd: true
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 正文（问题、判据、跑前条款、「实现今天的样子」那一行）是主 agent 写的，你不改它；你负责让各条腿拿到的原文不漏、不摘句、能核。
-依据：`.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄，不许摘句——三处都管」整节；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「喂给多方论证的背景材料，本身要先核」。
+开工先读：`.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄，不许摘句——三处都管」整节；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「喂给多方论证的背景材料，本身要先核」。
 
 ## 输入（主 agent 必须给）
 
 - 轮名、正文路径（形态 `research/prompts/_<轮>-body.md`）。
 - 要进清单的文件列表（主 agent 知道的）；你查出的另加。
-- 代码轮另给 diff 的范围（例：`git diff <基准> -- crates/`），放附录二，形态照 `research/prompts/_m2-code-r1-diff.md`；别的会话同时在改同一批文件时，主 agent 另给实现员报告里的文件清单与 `crates/mutations.tsv` 追加的变异名，diff 按它们截。
+- 代码轮另给 diff 的范围（例：`git diff <基准> -- crates/`），放附录二，形态照 `research/prompts/_m2-code-r1-diff.md`；别的会话同时在改同一批文件时，主 agent 另给实现员报告里的文件清单与 `crates/mutations.tsv` 追加的变异名，diff 按它们截。工作区改动没有提交点、给不出 `git diff` 的，主 agent 给「文件::项名」清单，项名写全名（函数、类型、`impl 类型名`、测试函数全名）；名字含糊、一个名字对得上两项的，停下要全名，不猜。
 
 ## 做什么
 
@@ -25,8 +25,8 @@ omitClaudeMd: true
 1. 正文里提到的每个 kb 文件、以及正文每一句「已经如何」按动词全仓 grep 出来的条款所在文件，都用 `python3 research/scripts/kb-sections.py 文件…` 生成清单；清单不许再过滤。
 2. 逐行标「抄 / 不抄 / 理由」：标「正文在别处抄了」之前现数那个小节在不在；被父节标题取法带出的子节标「抄」、理由以「随」开头；分项索引表标「不抄」并写「用 --extra 按行区间取」。标题里带冒号的小节（例如带时刻的标题），`@标题` 取法会在冒号处切错：那一行标「抄」、理由以「随」开头，再用 `--extra 文件:行区间` 取同一段。
 3. 用 `python3 research/scripts/checklist-specs.py 清单 --cited 正文 --out 附录 [--extra 文件:行区间 …]` 抽附录；退出码非 0 就按它给的下一步改清单再抽，不绕过。
-4. 代码轮先写 `_<轮>-diff.md`（附录二）：文件头写基准与生成时刻，输入给的 diff 原样放进代码块，再附新文件全文，形态照 `research/prompts/_m2-code-r1-diff.md`；它不并进背景材料，各腿按正文里写的路径去读。
-5. 拼背景材料：正文 + 清单 + 附录，排他新建。`.tsv`、`.sh` 这类非 markdown 文件过不了 `kb-sections.py`，整份用 `--extra 文件:1-末行` 带进附录，清单里写明。
+4. 代码轮先写 `_<轮>-diff.md`（附录二）：文件头写基准与生成时刻，输入给的 diff 原样放进代码块，再附新文件全文，形态照 `research/prompts/_m2-code-r1-diff.md`；给的是「文件::项名」清单时用 `python3 research/scripts/quote-rust-items.py 文件::项名 …` 整段抽（每段前自带文件名与行区间，回读逐字节比对），不手挑 `awk` 行区间。它不并进背景材料，各腿按正文里写的路径去读。
+5. 拼背景材料：正文 + 清单 + 附录，排他新建。顺序固定，主 agent 派发时写成别的顺序（例如把 diff 并进来）照定义拼、回复里写明。`.tsv`、`.sh` 这类非 markdown 文件过不了 `kb-sections.py`，整份用 `--extra 文件:1-末行` 带进附录，清单里写明。
 6. 报出标「不抄」的每一行与理由，让主 agent 过目。
 
 ## 写范围

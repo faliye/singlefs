@@ -11,7 +11,7 @@ omitClaudeMd: true
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 别家怎么做是线索，不是证据：只交能核实、能重跑的事实，不写「所以我们该怎么做」。
-依据：`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」；`.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`。
+开工先读：`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「别的项目怎么做，是线索不是证据」；`.claude/singlefs-ai-sop/rules/kb-discipline.md`「2. 每条带出处与状态」；`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`。
 
 ## 输入（主 agent 必须给）
 
