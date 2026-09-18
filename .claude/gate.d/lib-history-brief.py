@@ -117,7 +117,7 @@ def table(entries):
 def recent_line(count):
     if count <= RECENT_PER_DECISION:
         return f'共改过 {count} 次：'
-    return f'共改过 {count} 次，下面是最近 {RECENT_PER_DECISION} 次，更早的在 `decisions-history/` 的原文里：'
+    return f'共改过 {count} 次，只列最近 {RECENT_PER_DECISION} 次，更早的在 `decisions-history/` 的原文里：'
 
 
 def render(entries):

@@ -1,0 +1,11 @@
+exit=1
+want=没有判决、也不在撂下登记表里
+want=drop-r3（_drop-r3-body.md、drop-r3-opus.md、drop-r3-sonnet.md）
+want=cited-r1（_cited-r1-body.md）
+want=补判决（写 research/prompts/<轮>-main-verification.md），或在 research/prompts/abandoned-rounds.tsv 加一行：轮名、日期、为什么撂下、去向
+want=日期不是 YYYY-MM-DD
+want=不是四列、或有空列
+want=dup-r1（第 
+want=认不出它们发过腿
+want=ghost-r1
+want=done-r1：判决在 research/prompts/done-r1-main-verification.md

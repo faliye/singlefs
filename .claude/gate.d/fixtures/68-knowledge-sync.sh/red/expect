@@ -1,0 +1,12 @@
+exit=1
+want=2 个触发文件没在任何同步记录里点名
+want=      .claude/hooks/demo.sh
+want=      crates/demo/src/lib.rs
+want=research/prompts/nomarker-sync.md
+want=research/prompts/nosearch-sync.md：没有「## 搜索」小节
+want=research/prompts/nosearch-sync.md:8：「## 命中处置」的表头不是 | 载体 | 原句 | 处置 |
+want=research/prompts/bad-sync.md:14：处置写「改了」，载体 records/untouched.md 不在改动范围里
+want=research/prompts/bad-sync.md:15：处置开头不合法：看过了，没问题
+want=research/prompts/bad-sync.md:16：「不改：」后面没写理由
+want=research/prompts/bad-sync.md:17：载体格不是「路径:行号」：notes.md
+want=research/prompts/bad-sync.md:18：载体路径 records/gone.md 在仓里不存在，也不在改动范围里

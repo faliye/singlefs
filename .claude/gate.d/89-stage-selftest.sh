@@ -39,10 +39,12 @@ for stage in "$GD"/*.sh; do
     # 免得把 .git 之类的东西塞进本仓。
     work="$(mktemp -d)"
     cp -a "$d/." "$work/"
+    # 样本在清掉 GATE_BASE / GATE_STAGED_FROM 的环境里跑：`gate.sh --staged` 把真仓的 diff 基准传给里层，
+    # 漏进样本就成了临时仓里不存在的提交（实测 2026-09-17：--staged 下 61 号红绿两个样本一起判错）。
     if [[ -f "$work/setup.sh" ]]; then
-      ( cd "$work" && bash setup.sh >/dev/null 2>&1 ) || { printf '  ✗ %-28s %-5s setup.sh 没跑成\n' "$name" "$kind"; fail=$((fail+1)); rm -rf "$work"; continue; }   # gate-lint:detail
+      ( cd "$work" && env -u GATE_BASE -u GATE_STAGED_FROM bash setup.sh >/dev/null 2>&1 ) || { printf '  ✗ %-28s %-5s setup.sh 没跑成\n' "$name" "$kind"; fail=$((fail+1)); rm -rf "$work"; continue; }   # gate-lint:detail
     fi
-    out="$(cd "$work" && bash "$stage" "$work" 2>&1)"; got=$?
+    out="$(cd "$work" && env -u GATE_BASE -u GATE_STAGED_FROM bash "$stage" "$work" 2>&1)"; got=$?
     rm -rf "$work"
     okc=1
     [[ "$got" == "$want_exit" ]] || { printf '  ✗ %-28s %-5s 期望退出 %s，实测 %s\n' "$name" "$kind" "$want_exit" "$got"; okc=0; }   # gate-lint:detail

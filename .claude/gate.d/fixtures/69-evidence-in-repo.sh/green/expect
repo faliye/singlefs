@@ -1,0 +1,4 @@
+exit=0
+want=✓ 产物与依据都落在仓里（判了 2 份这一轮改过的实验装置与变异表、2 份 .md，扫到 4 处 /tmp 路径、没有一处是引依据；基准 HEAD）
+want=没判 1 份 research/prompts 下这一轮没新写的 .md
+want=没判 1 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：research/e7-index-bench/src/bin/e905_comment_only.rs

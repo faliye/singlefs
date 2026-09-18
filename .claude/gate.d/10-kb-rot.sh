@@ -125,8 +125,12 @@ inv_actual=$(grep -cE '^\| I-[0-9]+\.[0-9]+ ' "$KB/invariants.md")
 # 表里第 2 列是简称（singlefs-ai-sop/rules/kb-discipline.md 第 5 条），陈述在第 3 列
 inv_retired=$(grep -cE '^\| I-[0-9]+\.[0-9]+ \| [^|]* \| \*\*此编号不再使用' "$KB/invariants.md")
 inv_live=$(( inv_actual - inv_retired ))
-# 历史版本是新的在前 ⇒ 取**第一处**。取 tail 会拿到最老那条，永远判红（实测踩过）。
-inv_claim=$(grep -oE '现共 [0-9]+ 条在用' "$KB/invariants.md" | head -1 | grep -oE '[0-9]+')
+# 当前条数的权威登记位是 <!-- invariant-count --> 下一行那句（2026-09-18 立）：历史版本里也有「现共 N 条在用」，
+# 那是当时的数、不跟着改，按文件序取第一处会取到历史里的那一句（实测：2026-09-18 取到 2026-09-14 那条的 66）。
+inv_claim=$(awk '/<!-- invariant-count -->/{found=1; next} found && /现共 [0-9]+ 条在用/{print; exit}' "$KB/invariants.md" | grep -oE '[0-9]+' | head -1)
+if [[ -z "$inv_claim" ]]; then
+  inv_claim=$(grep -oE '现共 [0-9]+ 条在用' "$KB/invariants.md" | head -1 | grep -oE '[0-9]+')
+fi
 if [[ -n "$inv_claim" && "$inv_claim" != "$inv_live" ]]; then
   bad "invariants.md 正文声称在用 $inv_claim 条，实际 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
   howto "把正文那句「现共 N 条在用」改成 $inv_live，或者补回漏掉的那几条——" \

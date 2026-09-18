@@ -1,0 +1,4 @@
+exit=0
+want=查了 3 轮：判决文件 1 轮、kb 小节里的判决 1 轮、登记撂下 1 轮
+want=没判 3 个前缀
+want=：legacy-r1、nonumber、oldtopic
