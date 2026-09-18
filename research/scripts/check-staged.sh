@@ -9,7 +9,8 @@
 # 规范副本 .claude/singlefs-ai-sop/ 不进 git，worktree 里没有它；有就原样拷进去，doc-lint 与链接检查才跑得起来。
 # 自证会红：--selftest 在临时仓里放一个「文件里有 BAD 就红」的阶段，确认工作区里没暂存的 BAD 不算、暂存了的 BAD 判红；
 # 再用 CHECK_STAGED_USE_WORKTREE=1 改成拿工作区原样去跑，确认没暂存的 BAD 也被算进来、selftest 判红；
-# CHECK_STAGED_NO_TRAP=1 关掉打断时的清理，确认 selftest 判红（临时 worktree 留在仓里）。
+# CHECK_STAGED_NO_TRAP=1 关掉打断时的清理，确认 selftest 判红（临时 worktree 留在仓里）；
+# CHECK_STAGED_77_IS_RED=1 把退出码 77（无对象可判）照旧算红，确认 selftest 判红。
 set -uo pipefail
 
 DEFAULT_STAGES=(doc 10 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 42 43 44 45 50 60 61 85 86)
@@ -25,6 +26,7 @@ run_isolated() {
   local repo="$1"; shift
   local stages=("$@")
   local base wt patch red=0 ran=0
+  local -a not_run=()
   base="$(mktemp -d)"; wt="$base/wt"; patch="$base/staged.patch"
   git -C "$repo" diff --cached --binary > "$patch" || { echo "  ✗ 取不到暂存区的 diff"; echo "    → 在仓里跑，并确认 git 可用"; rm -rf "${base:?}"; return 2; }
   git -C "$repo" worktree add --detach "$wt" HEAD >/dev/null 2>&1 || { echo "  ✗ 建临时 worktree 失败"; echo "    → git worktree prune 之后再试"; rm -rf "${base:?}"; return 2; }
@@ -58,7 +60,10 @@ run_isolated() {
       [[ -f "$script" ]] || continue
       matched=1; ran=$((ran + 1))
       out="$(cd "$wt" && bash "$script" 2>&1)"; rc=$?
-      if [[ $rc -eq 0 ]]; then echo "  ok  $(basename "$script")"; else red=$((red + 1)); echo "  RED $(basename "$script")"; echo "$out" | grep -E "✗|→" | head -8; fi
+      # 77 = 这一轮无对象可判（show-me-test.md「门禁不许假装通过」）：不算红，也不算通过，单独列名
+      if [[ $rc -eq 77 && "${CHECK_STAGED_77_IS_RED:-0}" != 1 ]]; then
+        not_run+=("$(basename "$script")"); echo "  77  $(basename "$script")（无对象可判，没跑）"
+      elif [[ $rc -eq 0 ]]; then echo "  ok  $(basename "$script")"; else red=$((red + 1)); echo "  RED $(basename "$script")"; echo "$out" | grep -E "✗|→" | head -8; fi
     done
     [[ $matched -eq 1 ]] || echo "  ! 阶段号 $stage 没有对应的 .claude/gate.d/$stage-*.sh（没跑）"
   done
@@ -69,12 +74,18 @@ run_isolated() {
     echo "    → 阶段号写成 .claude/gate.d/ 下文件名的前缀（例：34），doc-lint 写 doc"
     return 1
   fi
+  local not_run_note=""
+  [[ ${#not_run[@]} -gt 0 ]] && not_run_note="；无对象没跑 ${#not_run[@]} 个：${not_run[*]}"
   if [[ $red -gt 0 ]]; then
-    echo "  ✗ HEAD + 暂存区上跑了 $ran 个阶段，红 $red 个"
+    echo "  ✗ HEAD + 暂存区上跑了 $ran 个阶段，红 $red 个${not_run_note}"
     echo "    → 红的是这一次提交带进来的（别人的未提交改动不在这棵树里）；先查它在不在 HEAD 上就红：暂存区清空再跑一次"
     return 1
   fi
-  echo "  ✓ HEAD + 暂存区上跑了 $ran 个阶段，全绿"
+  if [[ ${#not_run[@]} -eq $ran ]]; then
+    echo "  ! HEAD + 暂存区上点名的 $ran 个阶段全是无对象可判，一个都没判（不记通过）"
+    return 77
+  fi
+  echo "  ✓ HEAD + 暂存区上跑了 $ran 个阶段，判了的 $((ran - ${#not_run[@]})) 个全绿${not_run_note}"
   return 0
 }
 
@@ -89,6 +100,12 @@ selftest() {
   echo "BAD（别人没收尾的）" >> "$repo/kb/a.md"
   echo "我的" >> "$repo/kb/b.md" && git -C "$repo" add kb/b.md
   run_isolated "$repo" 20 >/dev/null; rc_clean=$?
+  # 无对象可判（77）的阶段：与判得了的阶段一起点名时应当通过并在成功行里列名；只点名它时应当报 77、不报通过
+  printf '#!/usr/bin/env bash\n# gate-stage: selftest-none\necho "  ! 无对象"; exit 77\n' > "$repo/.claude/gate.d/40-none.sh"
+  git -C "$repo" add .claude/gate.d/40-none.sh
+  local out_mixed rc_mixed rc_none
+  out_mixed="$(run_isolated "$repo" 20 40 2>&1)"; rc_mixed=$?
+  run_isolated "$repo" 40 >/dev/null 2>&1; rc_none=$?
   if [[ "${CHECK_STAGED_USE_WORKTREE:-0}" == 1 ]]; then
     rm -rf "${repo:?}"
     if [[ $rc_clean -eq 0 ]]; then echo "selftest: 拿工作区原样去跑，没暂存的 BAD 却没算进来 —— 检查坏了"; return 1; fi
@@ -96,6 +113,8 @@ selftest() {
   fi
   echo "BAD（我的）" >> "$repo/kb/b.md" && git -C "$repo" add kb/b.md
   run_isolated "$repo" 20 >/dev/null; rc_bad=$?
+  local out_red_mixed rc_red_mixed
+  out_red_mixed="$(run_isolated "$repo" 20 40 2>&1)"; rc_red_mixed=$?
   # 跑到一半被打断：一个睡 20 秒的阶段，worktree 建起来之后给整组发 INT（Ctrl-C 的形态）；
   # 打断之后仓里只许剩主工作区那一个登记。开 job control（set -m）是为了让后台那一组收得到 INT。
   printf '#!/usr/bin/env bash\n# gate-stage: selftest-slow\nsleep 20\n' > "$repo/.claude/gate.d/30-slow.sh"
@@ -122,7 +141,14 @@ selftest() {
   if [[ "$registered_after_interrupt" != 1 ]]; then echo "selftest: 跑到一半被打断，临时 worktree 留在仓里（登记 $registered_after_interrupt 个）"; return 1; fi
   if [[ $rc_clean -ne 0 ]]; then echo "selftest: 只有工作区里没暂存的 BAD，却判红了 —— 别人的改动漏进来了"; return 1; fi
   if [[ $rc_bad -ne 1 ]]; then echo "selftest: 暂存了 BAD 却没判红"; return 1; fi
-  echo "selftest: 通过（没暂存的 BAD 不算、暂存了的 BAD 判红、跑到一半被打断也清掉临时 worktree）"
+  if [[ $rc_mixed -ne 0 || "$out_mixed" != *"无对象没跑 1 个：40-none.sh"* ]]; then
+    echo "selftest: 无对象可判（退出码 77）的阶段被当成红、或没在成功行里列名（退出码 $rc_mixed）"; return 1
+  fi
+  if [[ $rc_none -ne 77 ]]; then echo "selftest: 点名的阶段全是无对象可判时应当退出码 77，实际 $rc_none"; return 1; fi
+  if [[ $rc_red_mixed -ne 1 || "$out_red_mixed" != *"红 1 个；无对象没跑 1 个：40-none.sh"* ]]; then
+    echo "selftest: 一个红、一个无对象可判时应当退出码 1 并在红的那句里列出没跑的（退出码 $rc_red_mixed）"; return 1
+  fi
+  echo "selftest: 通过（没暂存的 BAD 不算、暂存了的 BAD 判红、无对象可判的阶段不算红也不算通过、与红的混着时照样列名、跑到一半被打断也清掉临时 worktree）"
   return 0
 }
 

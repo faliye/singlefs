@@ -3,6 +3,7 @@ name: three-way-forward
 description: 三方论证的云端正推腿。只在主 agent 点名派发、并给出这一轮的背景材料与问题时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+effort: high
 omitClaudeMd: true
 ---
 

@@ -3,6 +3,7 @@ name: three-way-defense
 description: 三方论证的云端辩方腿，复核前一轮判决、替被判出局的一方辩护。只在主 agent 点名派发、并给出被复核的判决时用；不要自动派发。
 tools: Read, Bash
 model: sonnet
+effort: high
 omitClaudeMd: true
 ---
 

@@ -3,6 +3,7 @@ name: three-way-attack
 description: 三方论证的云端攻方腿。只在主 agent 点名派发、并给出这一轮的背景材料、攻击面与前几轮判决时用；不要自动派发。
 tools: Read, Bash
 model: opus
+effort: high
 omitClaudeMd: true
 ---
 

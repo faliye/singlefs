@@ -15,7 +15,13 @@
 主 agent 派发之后用 Bash 的 run_in_background 起 watch：它一退出，harness 就会叫醒主 agent。
 它只看、只报，不停任何子 agent、不杀任何进程：子 agent 与脚本不强制结束，结束不结束由主 agent 看了报告定（用户 2026-09-17）。
 退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
-「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务（缓存续命见 research/scripts/cache-keepalive.sh），不算结束。
+「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务，不算结束。
+「被停」认两处：子 agent 会话记录里的 `[Request interrupted`（停在工具调用中途）；主会话记录（<会话 id>.jsonl）里 TaskStop 对它的成功结果，
+时刻不早于它自己最后一条记录减 30 秒（停在结束本轮、等后台任务的时候，子 agent 的会话记录里一个字都不写；停了之后又被续做的不算）。
+主会话记录不在那个位置时，报告里写明「被停只按打断判」，不悄悄退回。
+「结束本轮却不会醒」：子 agent 结束本轮、没交回，而它起过的后台任务（工具结果「Command running in background with ID: …」）都已收到完成通知
+（会话记录里 origin 为 task-notification 的消息，或忙时排进队的 queued_command 附件），结束本轮之后也没有新的通知进来——没有任何东西会叫醒它，
+过 60 秒就报，不等 10 分钟的「无动静」。
 
 hook 的检出也在这里汇给主 agent：`.claude/hooks/bash-command-detector.sh` 只记不拦，把检出写进检出记录；
 watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出、叫醒主 agent。
@@ -40,10 +46,40 @@ DEFAULT_DETECTIONS = "/tmp/claude-1000/agent-hook-detections.jsonl"
 WAIT_LOOP_PATTERN = re.compile(r"\b(until|while)\b[\s\S]*\bsleep\b")
 BANNED_COMMAND_PATTERN = re.compile(r"\bpgrep\s+-f\b|\bpkill\s+-f\b|\bkillall\b")
 BROKEN_DETECTION = os.environ.get("AGENT_WATCH_BREAK", "")
+STOP_AFTER_LAST_RECORD_SECONDS = 30  # 停在工具中途时，被停之后还可能落几条收尾记录
+NO_WAKE_GRACE_SECONDS = 60           # 结束本轮之后，完成通知可能还在路上
+BACKGROUND_STARTED = re.compile(r"^Command running in background with ID: (\w+)")
+TASK_NOTIFICATION_ID = re.compile(r"<task-id>(\w+)</task-id>")
 
 
 def parse_timestamp(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def parent_session_transcript(transcript_path):
+    """…/<会话 id>/subagents/agent-<id>.jsonl → …/<会话 id>.jsonl（派它的那个会话的记录）。"""
+    return os.path.dirname(os.path.dirname(transcript_path)) + ".jsonl"
+
+
+def task_stop_time(agent_id, session_transcript_path):
+    """主会话记录里 TaskStop 停掉这个子 agent 的最晚一次成功结果的时刻；没有就 None。"""
+    if not os.path.isfile(session_transcript_path):
+        return None
+    stopped_at = None
+    for line in open(session_transcript_path, encoding="utf-8", errors="replace"):
+        if agent_id not in line or "Successfully stopped task" not in line:
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            continue
+        result = record.get("toolUseResult")
+        if not isinstance(result, dict) or result.get("task_id") != agent_id or "Successfully stopped task" not in str(result.get("message", "")):
+            continue
+        if record.get("timestamp"):
+            timestamp = parse_timestamp(record["timestamp"])
+            stopped_at = timestamp if stopped_at is None else max(stopped_at, timestamp)
+    return stopped_at
 
 
 def format_duration(seconds):
@@ -86,8 +122,19 @@ class AgentTranscript:
         self.read_characters_by_file = {}  # 文件名 → [次数, 字符数]
         self.bash_commands = []          # [[时间, 命令, 输出（还没回来是 None）, 工具调用 id]]
         self.pending_tool = None         # (时间, 工具名, 命令或路径) —— 发出了还没收到结果
+        self.background_started = []     # 它用 run_in_background 起过的后台任务 id
+        self.background_finished = set() # 收到过完成通知的后台任务 id
+        self.last_turn_end_timestamp = None
+        self.last_notification_timestamp = None
         self.state = "思考中"
         self._read()
+        parent_path = parent_session_transcript(transcript_path)
+        self.parent_transcript_missing = not os.path.isfile(parent_path)
+        self.parent_transcript_path = parent_path
+        stopped_at = task_stop_time(agent_id, parent_path)
+        if (stopped_at is not None and BROKEN_DETECTION != "taskstop" and self.state != "已交回"
+                and (self.last_timestamp is None or (self.last_timestamp - stopped_at).total_seconds() <= STOP_AFTER_LAST_RECORD_SECONDS)):
+            self.state = "被停"
 
     def _read(self):
         seen_message_ids = set()
@@ -108,6 +155,12 @@ class AgentTranscript:
             timestamp = parse_timestamp(timestamp_text)
             self.first_timestamp = self.first_timestamp or timestamp
             self.last_timestamp = timestamp
+            attachment = record.get("attachment")
+            is_notification = ((record.get("origin") or {}).get("kind") == "task-notification"
+                               or (isinstance(attachment, dict) and attachment.get("type") == "queued_command" and "<task-notification>" in json.dumps(attachment)))
+            if is_notification:
+                self.background_finished.update(TASK_NOTIFICATION_ID.findall(json.dumps(record.get("message") or attachment, ensure_ascii=False)))
+                self.last_notification_timestamp = timestamp
             message = record.get("message")
             if not isinstance(message, dict):
                 continue
@@ -148,11 +201,16 @@ class AgentTranscript:
                             last_kind = "tool_use"
                         elif block.get("type") == "text":
                             last_kind = "end_turn" if message.get("stop_reason") == "end_turn" else "text"
+                            if last_kind == "end_turn":
+                                self.last_turn_end_timestamp = timestamp
             elif role == "user":
                 if isinstance(content, list):
                     for block in content:
                         if block.get("type") == "tool_result":
                             pending_by_id.pop(block.get("tool_use_id"), None)
+                            started = BACKGROUND_STARTED.match(block.get("content")) if isinstance(block.get("content"), str) else None
+                            if started:
+                                self.background_started.append(started.group(1))
                             if block.get("tool_use_id") in handback_tool_ids:
                                 result_text = json.dumps(block.get("content"), ensure_ascii=False).replace("\\", "").replace(" ", "")
                                 if '"success":true' in result_text:
@@ -195,6 +253,17 @@ class AgentTranscript:
 
     def is_done(self):
         return self.state in ("已交回", "被停")
+
+    def live_background_tasks(self):
+        return [task_id for task_id in self.background_started if task_id not in self.background_finished]
+
+    def ended_turn_with_nothing_to_wake_it(self, now):
+        """结束本轮、没交回、起过的后台任务都完了，结束之后也没有通知进来，而且已经过了宽限。"""
+        if self.state != "本轮结束、没交回" or self.live_background_tasks() or self.last_turn_end_timestamp is None:
+            return False
+        if self.last_notification_timestamp is not None and self.last_notification_timestamp >= self.last_turn_end_timestamp:
+            return False
+        return (now - self.last_turn_end_timestamp).total_seconds() >= NO_WAKE_GRACE_SECONDS
 
 
 def tool_result_category(tool_name, tool_input):
@@ -291,6 +360,10 @@ def agent_alerts(transcript, now, thresholds):
         elif BROKEN_DETECTION != "timeout" and running_seconds >= thresholds.tool_minutes * 60:
             alerts.append(("工具调用过长", f"{tool_name} 已跑 {format_duration(running_seconds)}：{detail[:160]}",
                            "主 agent 判断：这条命令起的进程还在不在动（本报告的进程一节）、预期还要多久；动就接着盯，不动再决定怎么处理"))
+    elif BROKEN_DETECTION != "nowake" and transcript.ended_turn_with_nothing_to_wake_it(now):
+        alerts.append(("结束本轮却不会醒", f"结束本轮、没交回已 {format_duration((now - transcript.last_turn_end_timestamp).total_seconds())}，"
+                       f"起过的 {len(transcript.background_started)} 个后台任务都已收到完成通知，没有东西会叫醒它",
+                       "主 agent 看它最后在等什么：发消息让它接着做或交回，或者停掉；多半是它把活自己放了后台（run_in_background 里又加了 &），或忘了交回"))
     elif (transcript.last_timestamp is not None and BROKEN_DETECTION != "idle"
           and (now - transcript.last_timestamp).total_seconds() >= thresholds.idle_minutes * 60):
         alerts.append(("无动静", f"最后一条记录在 {format_duration((now - transcript.last_timestamp).total_seconds())} 以前，没有工具在跑",
@@ -424,6 +497,8 @@ def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pid
         total = format_duration((transcript.last_timestamp - transcript.first_timestamp).total_seconds()) if transcript.first_timestamp else "?"
         lines.append(f"子 agent {agent_id} {transcript.agent_type}「{transcript.description}」状态={transcript.state} 已跑 {total} "
                      f"最后动作 {since_last} 前 调用 {transcript.model_calls} 次 上下文 {transcript.last_context_tokens // 1000}k 缓存整份重写 {transcript.full_cache_rewrites} 次")
+        if transcript.parent_transcript_missing and not transcript.is_done():
+            lines.append(f"  主会话记录 {transcript.parent_transcript_path} 不在：被 TaskStop 停掉的认不出，被停只按会话记录里的打断判")
         if transcript.pending_tool is not None and not transcript.is_done():
             started, tool_name, detail = transcript.pending_tool
             lines.append(f"  正在跑 {tool_name}（{format_duration((now - started).total_seconds())}）：{' '.join(detail.split())[:200]}")
@@ -563,6 +638,20 @@ def write_transcript(directory, agent_id, records, meta=None):
         json.dump(meta, open(path[: -len(".jsonl")] + ".meta.json", "w", encoding="utf-8"), ensure_ascii=False)
 
 
+def write_session_stops(session_directory, minutes_ago_by_agent):
+    """主会话记录里 TaskStop 的调用与成功结果，结果的形态照 2026-09-18 主会话记录里的原样。"""
+    with open(session_directory + ".jsonl", "w", encoding="utf-8") as handle:
+        for index, (agent_id, minutes_ago) in enumerate(minutes_ago_by_agent.items()):
+            use = record_at(minutes_ago, "assistant", [{"type": "tool_use", "id": f"s{index}", "name": "TaskStop", "input": {"task_id": agent_id}}],
+                            stop_reason="tool_use", message_id=f"ms{index}")
+            message = f"Successfully stopped task: {agent_id} (样本)"
+            result = record_at(minutes_ago - 0.01, "user", [{"tool_use_id": f"s{index}", "type": "tool_result",
+                                                             "content": json.dumps({"message": message, "task_id": agent_id}, ensure_ascii=False)}])
+            result["toolUseResult"] = {"message": message, "task_id": agent_id, "task_type": "local_agent", "command": "样本"}
+            handle.write(json.dumps(use, ensure_ascii=False) + "\n")
+            handle.write(json.dumps(result, ensure_ascii=False) + "\n")
+
+
 def iso_minutes_ago(minutes):
     return (datetime.now(timezone.utc).timestamp() - minutes * 60)
 
@@ -631,6 +720,36 @@ def selftest():
     write_transcript(session, "idle", [bash_use(40, "t1", "ls", "m1"), bash_result(39, "t1")])
     write_transcript(session, "interrupted", [bash_use(40, "t1", "ls", "m1"), bash_result(39, "t1"),
                                               record_at(39, "user", [{"type": "text", "text": "[Request interrupted by user]"}])])
+    waiting_then_idle = [bash_use(25, "t1", "bash gate.sh --staged", "m1"), bash_result(24.9, "t1"),
+                         record_at(24.8, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2")]
+    write_transcript(session, "stoppedidle", waiting_then_idle,
+                     {"agentType": "gate-triage", "description": "结束本轮等后台任务时被 TaskStop 停掉"})
+    write_transcript(session, "stoppedcontinued", [*waiting_then_idle, record_at(2, "user", "续做：再跑一遍"), bash_use(0.5, "t2", "cargo build", "m3")],
+                     {"agentType": "gate-triage", "description": "被停之后又被续做"})
+    write_transcript(session, "stoppedtwice", [*waiting_then_idle, record_at(18, "user", "续做：再跑一遍"), bash_use(17, "t2", "cargo build", "m3"),
+                                               bash_result(16, "t2"), record_at(15.9, "assistant", [{"type": "text", "text": "又在等"}], stop_reason="end_turn", message_id="m4")],
+                     {"agentType": "gate-triage", "description": "停了、续做、又停"})
+    write_session_stops(session, {"stoppedidle": 20, "stoppedcontinued": 20, "stoppedtwice": 20})
+    with open(session + ".jsonl", "a", encoding="utf-8") as handle:   # stoppedtwice 第二次被停：晚于续做之后的最后一条记录
+        second = record_at(15, "user", [{"tool_use_id": "s9", "type": "tool_result", "content": "stopped"}])
+        second["toolUseResult"] = {"message": "Successfully stopped task: stoppedtwice (样本)", "task_id": "stoppedtwice", "task_type": "local_agent"}
+        handle.write(json.dumps(second, ensure_ascii=False) + "\n")
+    background_started = record_at(4.9, "user", [{"type": "tool_result", "tool_use_id": "t1",
+                                                  "content": "Command running in background with ID: bx1. Output is being written to: /tmp/x.output."}])
+    finished_while_busy = {"timestamp": record_at(4.85, "user", "")["timestamp"], "type": "attachment",
+                           "attachment": {"type": "queued_command", "prompt": "<task-notification>\n<task-id>bx1</task-id>\n<status>completed</status>\n</task-notification>"}}
+    write_transcript(session, "nowake", [bash_use(5, "t1", "nohup bash gate.sh > gate.log 2>&1 &", "m1"), background_started, finished_while_busy,
+                                         record_at(4.8, "assistant", [{"type": "text", "text": "等后台通知"}], stop_reason="end_turn", message_id="m2")],
+                     {"agentType": "gate-triage", "description": "起的后台任务当场完了、结束本轮去等"})
+    woken = record_at(2, "user", "<task-notification>\n<task-id>bx1</task-id>\n<status>completed</status>\n</task-notification>")
+    woken["origin"] = {"kind": "task-notification"}
+    write_transcript(session, "wokenup", [bash_use(5, "t1", "bash gate.sh > gate.log 2>&1", "m1"), background_started,
+                                          record_at(4.8, "assistant", [{"type": "text", "text": "等后台通知"}], stop_reason="end_turn", message_id="m2"), woken],
+                     {"agentType": "gate-triage", "description": "等的后台任务完了、通知刚到、正要醒"})
+    os.makedirs(os.path.join(work, "orphan"), exist_ok=True)
+    write_transcript(os.path.join(work, "orphan"), "noparent", waiting_then_idle, {"agentType": "gate-triage", "description": "主会话记录不在"})
+    if not AgentTranscript("noparent", find_transcript("noparent", os.path.join(work, "orphan"))).parent_transcript_missing:
+        failures.append("主会话记录不在时应当标出来（parent_transcript_missing），实际没标")
     write_transcript(session, "costed", [
         record_at(30, "assistant", [{"type": "tool_use", "id": "c1", "name": "Read", "input": {"file_path": "/x/e999-preregistration.md"}}],
                   stop_reason="tool_use", message_id="k1",
@@ -657,6 +776,7 @@ def selftest():
         failures.append(f"工具结果分类不对：{costed.tool_result_characters}")
     expectations = {
         "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
+        "stoppedidle": set(), "stoppedcontinued": set(), "stoppedtwice": set(), "wokenup": set(), "nowake": {"结束本轮却不会醒"},
         "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "idle": {"无动静"},
     }
     now = datetime.now(timezone.utc)
@@ -665,7 +785,8 @@ def selftest():
         got = {name for name, _, _ in agent_alerts(transcript, now, thresholds)}
         if got != wanted:
             failures.append(f"子 agent {agent_id}：应当告警 {sorted(wanted) or '无'}，实际 {sorted(got) or '无'}")
-    wanted_done = {"finished": True, "interrupted": True, "waiting": False, "continued": False, "healthy": False}
+    wanted_done = {"finished": True, "interrupted": True, "stoppedidle": True, "waiting": False, "continued": False, "healthy": False,
+                   "stoppedcontinued": False, "stoppedtwice": True, "nowake": False, "wokenup": False}
     for agent_id, wanted in wanted_done.items():
         transcript = AgentTranscript(agent_id, find_transcript(agent_id, session))
         if transcript.is_done() != wanted:
@@ -690,7 +811,7 @@ def selftest():
         return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", *watch_arguments, "--session-dir", session, "--process-root-pid", "0"],
                               capture_output=True, text=True, timeout=timeout)
 
-    watch_exit = run_watch(["--agents", "finished,interrupted", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
+    watch_exit = run_watch(["--agents", "finished,interrupted,stoppedidle", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
     if watch_exit != 0:
         failures.append(f"被看的子 agent 都交回或被停时看门狗应当退出码 0，实际 {watch_exit}")
     watch_exit = run_watch(["--agents", "waitloop", "--interval-seconds", "1", "--max-minutes", "1"]).returncode
@@ -734,7 +855,9 @@ def selftest():
         print("    → 看 agent_alerts() / process_alerts() / run() 的判法；AGENT_WATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-watch 自检通过：等待循环、工具过长、同一命令反复且输出不变、禁用命令、无动静、进程无输出六种告警都报得出，"
-          f"交回、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，交回按交回工具成功判（只结束本轮、交回后又被续做的都不算），看门狗三种退出码对、定时回报不被复检间隔拖后并列出还没交回的子 agent，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、{len(watch_runs)} 次看门狗）")
+          f"交回、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，交回按交回工具成功判（只结束本轮、交回后又被续做的都不算），"
+          f"被停认会话记录里的打断与主会话记录里的 TaskStop（停在等后台任务时的算、停了又被续做的不算、续做之后又停的算，主会话记录不在的标出来），"
+          f"结束本轮而起过的后台任务都已完成、没有通知在路上的报「结束本轮却不会醒」（通知刚到正要醒的不报），看门狗三种退出码对、定时回报不被复检间隔拖后并列出还没交回的子 agent，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对（查了 {len(expectations) + 1} 个子 agent、1 个进程、{len(watch_runs)} 次看门狗）")
     return 0
 
 
