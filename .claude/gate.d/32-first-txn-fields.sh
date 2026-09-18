@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gate-stage: 第一个事务的每个字段都要指到一条真实存在的分项
 #
-# **判据**：`kb/first-txn-layout.md` 每一行的「指向」列，凡是写了
+# **判据**：`kb/layout/01-first-txn.md` 每一行的「指向」列，凡是写了
 # 「D<n>（简称） 已定项 <k>」或「…… 未定项 <k>」的，那条分项必须在
 # `kb/decisions/` 里真实存在；指不到就判红。
 #
@@ -21,7 +21,7 @@
 set -uo pipefail
 ROOT="${1:-.}"
 KB="$ROOT/.claude/kb"
-TABLE="$KB/first-txn-layout.md"
+TABLE="$KB/layout/01-first-txn.md"
 
 [[ -f "$TABLE" ]] || { echo "  ✓ 没有 $TABLE，无对象可判"; exit 0; }
 [[ -d "$KB/decisions" ]] || { echo "  ✓ 没有 $KB/decisions，无对象可判"; exit 0; }

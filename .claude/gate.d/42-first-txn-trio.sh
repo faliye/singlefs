@@ -3,7 +3,7 @@
 #
 # 三份文件说的是同一件事的三面：
 #   decisions/*.md 里每条未定项判过「改第一个事务的字节：是 / 否」（31 阶段管「判过没有」）；
-#   first-txn-layout.md 把第一个事务的每个字节列成表，判「是」的未定项在它的「还剩几处空白」表里各占一行；
+#   layout/01-first-txn.md 把第一个事务的每个字节列成表，判「是」的未定项在它的「还剩几处空白」表里各占一行；
 #   milestone/01-first-txn.md 把写这些字节的活拆成步，每步写「写出的字节」在字节表哪几节、「会碰到的决策点」有哪些。
 #
 # **它拦的是三面对不上**（2026-09-10 实测三处）：字节表的空白表里躺着一条 2026-09-06 已定案的分项
@@ -26,7 +26,7 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-FTL=.claude/kb/first-txn-layout.md
+FTL=.claude/kb/layout/01-first-txn.md
 MS=.claude/kb/milestone/01-first-txn.md
 DEC=.claude/kb/decisions
 [[ -f "$FTL" && -f "$MS" && -d "$DEC" ]] || { echo "  ! 找不到 $FTL / $MS / $DEC，本阶段跳过"; exit 77; }
@@ -115,8 +115,8 @@ for idx, (i, n) in enumerate(step_lines):
             bad.append(f"{ms_path}:{i + 1} 步 {n} 写「写出的字节：无」，而 {ftl_path} 有节标着归它")
         continue
     quoted = re.findall(r"「([^」]+)」", row)
-    if "first-txn-layout.md" not in row or not quoted:
-        bad.append(f"{ms_path}:{i + 1} 步 {n} 的「写出的字节」既不是「无」，也没点名 first-txn-layout.md 里的节")
+    if "layout/01-first-txn.md" not in row or not quoted:
+        bad.append(f"{ms_path}:{i + 1} 步 {n} 的「写出的字节」既不是「无」，也没点名 layout/01-first-txn.md 里的节")
         continue
     for q in quoted:
         if not any(q in h for h in headings):

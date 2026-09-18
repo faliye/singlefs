@@ -1,7 +1,7 @@
 //! E132：livelist 载体·按真实树数与内部扇出重算。
 //!
 //! E131 的数被用户拿去表了倾向，而三轮对抗第一轮的反推腿打中它两处建模错误，主 agent 现查坐实：
-//! ① 树数——E131 按「每头一棵数据树、没有池级树」数树表条目；已提交的 `first-txn-layout.md`
+//! ① 树数——E131 按「每头一棵数据树、没有池级树」数树表条目；已提交的 `layout/01-first-txn.md`
 //!   预想「extent 树 1、inode 树 2、分配记录树 3、记账树 4、中央映射树 5」⇒ 每头至少两棵数据树，外加三棵池级树；
 //! ② 内部扇出——E131 对所有层都用叶条目宽，而内部节点条目是 key 加一条 59 字节的子指针。
 //!
@@ -28,7 +28,7 @@ const TREE_TABLE_PAYLOAD: u64 = 16253;
 const TREE_TABLE_ENTRY: u64 = 8 + 2 + 2 + 2 + 86 + 8 + 8 + 8 + 76;
 /// 内部节点里一条子指针：头部 31 + 位置条目 14 × 2（D22 已定项 7）。
 const CHILD_POINTER_BYTES: u64 = 31 + 14 * 2;
-/// 每个头的数据树棵数（extent 树 + inode 树），已提交 first-txn-layout 第 47 行预想。
+/// 每个头的数据树棵数（extent 树 + inode 树），已提交 layout/01-first-txn 第 47 行预想。
 const DATA_TREES_PER_HEAD: u64 = 2;
 /// 池级树棵数（分配记录树 + 记账树 + 中央映射树），同一行预想。
 const POOL_TREES: u64 = 3;

@@ -6,7 +6,7 @@
 2. 自己去查：
    - `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 的 `fn mkfs`、`fn warm_up`、`fn publish_first_file`、`fn split_into_segments`，以及单测 `layer0_state_count_is_262162_with_zero_violations`
    - `research/results/e142-first-txn-dry-run-2026-09-13-warmup.out` 的 `name=warm_up`、`name=write_list`、`name=layer0` 三行
-   - `.claude/kb/first-txn-layout.md` 零与八两节
+   - `.claude/kb/layout/01-first-txn.md` 零与八两节
    - `.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14（切换 / 回退各写什么）
 
 ## 要回答的（按材料第三节的判据编号）

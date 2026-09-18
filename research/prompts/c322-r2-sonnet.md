@@ -4,7 +4,7 @@
 
 1. 背景材料：`research/prompts/_c322-r2-background.md`（正文 + 小节清单 + 附录）。
 2. 第一轮：`research/prompts/c322-r1-main-verification.md`（判决）、`research/prompts/c322-r1-opus-output.md`（撞号那一格的构造在第四节）。
-3. 自己去查（引用时写命令与行号）：`.claude/kb/decisions/18-块里携带什么信息.md` 第 879 行附近（实例表「行怎么写」）、`.claude/kb/first-txn-layout.md` 第 389–393 行、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14（管理员回退那一句）、`.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 16；源码 `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs`。
+3. 自己去查（引用时写命令与行号）：`.claude/kb/decisions/18-块里携带什么信息.md` 第 879 行附近（实例表「行怎么写」）、`.claude/kb/layout/01-first-txn.md` 第 389–393 行、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14（管理员回退那一句）、`.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 16；源码 `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs`。
 
 ## 要做的
 

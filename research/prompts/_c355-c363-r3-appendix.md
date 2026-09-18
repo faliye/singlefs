@@ -445,7 +445,7 @@ C282（环里最旧根没有定义） 的定义与 C283（准入失败时不先�
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:277-299`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:277-299`（整段抄，未转述）**
 
 ```markdown
 ## 五、空间记账与分配

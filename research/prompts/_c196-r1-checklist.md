@@ -304,7 +304,7 @@
 | ### 2026-09-07（其二） | 不抄 | 与 map_sep 臂无关 |
 | ### 2026-09-07 | 不抄 | 与 map_sep 臂无关 |
 
-### 小节清单：`.claude/kb/first-txn-layout.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/layout/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -328,7 +328,7 @@
 | ### 2026-09-03（其二） | 不抄 | 与映射、根记录、mkfs 写清单无关 |
 | ### 2026-09-03 | 不抄 | 与映射、根记录、mkfs 写清单无关 |
 
-### 小节清单：`.claude/kb/milestone-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/milestone/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

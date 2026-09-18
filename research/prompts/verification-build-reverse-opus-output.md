@@ -255,7 +255,7 @@ publication. D22 item 7 makes the root record always indirect through a tree-tab
 publication must write one. The tree-table unit is an index node, and D18 item 7 gives the index-node
 class identity segment a field set with no widths, verbatim "widths follow the implementation". D22
 item 7 carries its own 2026-09-03 warning that its capacity figure of 267 must be recomputed and
-cannot be computed today for exactly this reason. first-txn-layout lists the tree-table unit header
+cannot be computed today for exactly this reason. layout/01-first-txn lists the tree-table unit header
 as one of five shape-settled, width-unsettled segments that deliberately carry no open-item number,
 so gate stage 31 (every open item must have judged whether it changes the first transaction's bytes)
 says nothing about it, and P6 step 0 does not settle it because step 0's list is the four F6 open
@@ -455,7 +455,7 @@ publication must write a tree-table unit, because D22 item 7 makes the root reco
 through one. The tree-table unit is an index node; D18 item 7 defines the index-node class identity
 segment as a field set with no widths ("widths follow the implementation"). D22 item 7 itself
 carries a 2026-09-03 warning that it can no longer compute its own capacity figure for exactly this
-reason. first-txn-layout classifies the tree-table unit header as one of five shape-settled,
+reason. layout/01-first-txn classifies the tree-table unit header as one of five shape-settled,
 width-unsettled segments that deliberately carry no open-item number, so gate stage 31 cannot speak
 about it and P6 step 0 does not settle it (step 0's list is the four F6 open items plus two D13
 items). Break.

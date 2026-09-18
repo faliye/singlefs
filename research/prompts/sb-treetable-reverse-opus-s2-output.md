@@ -29,7 +29,7 @@ grep -rn "tree_table\|treetable\|tree-table" .              →  见下表源码
 | `decisions/22-单元原子性怎么合成.md` | 26 | 已定项 2 / 7 / 8、未定项 9 |
 | `checks-owed.md` | 21 | C196、C231、C241、C225、C224、C232 |
 | `decisions/08-核心索引结构.md` | 12 | **已定项 8（树表条目 121 字节，2026-09-06 用户定案）** |
-| `first-txn-layout.md` | 6 | 第 20 / 21 / 107 / 151 / 156 行 |
+| `layout/01-first-txn.md` | 6 | 第 20 / 21 / 107 / 151 / 156 行 |
 | `verification-build.md` | 5 | 第 47 / 71 / 222 / 223 行 |
 | **`decisions/15-格式冻结政策.md`** | **4** | **已定项 2（2026-08-29 用户定案）+ 冻结判定表那一行** |
 | `invariants.md` | 4 | I-7.8、I-9.1、I-9.11、第 248 行前置 |
@@ -448,7 +448,7 @@ grep -rn "自举" .claude/kb/ --include=*.md | grep -v history
 | `experiments/112-旧写者遇到不认识的树.md` | 全文 |
 | `experiments/87-固定结构的放置.md` | 全文 |
 | `checks-owed.md` | C196、C224、C225、C231、C232、C241 |
-| `first-txn-layout.md` | 第 20–22、107、142–200 |
+| `layout/01-first-txn.md` | 第 20–22、107、142–200 |
 | 规则 | `.claude/rules/fs-design.md`（格式分支判据、教条在格式层的形态）、`.claude/rules/format-evolution.md`（冻结触发点那一节）、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`（失败条款三步） |
 
 **没搜的**（说清楚，免得被当成搜过）：
@@ -533,7 +533,7 @@ grep -rn "自举" .claude/kb/ --include=*.md | grep -v history
 
 4. **D18（块里携带什么信息） 第 367 行的明文泄漏表里有一行 `| **超级块** | 树表表长 ⇒ 快照与可写头的条数 | D15（格式冻结政策） 已定项 2 |`。**
    第一次全文 `泄漏` 零命中。这是 D15（格式冻结政策） 已定项 2 在仓里的**第三个下游消费者**
-   （前两个是 `first-txn-layout.md:21` 与 D22（单元原子性怎么合成） 未定项 9 正文），
+   （前两个是 `layout/01-first-txn.md:21` 与 D22（单元原子性怎么合成） 未定项 9 正文），
    而它是一张 D18（块里携带什么信息） 已定项 13 明写「要写进定案，不许含糊」的表。
    ⇒ **T 定案时这一行要跟着改**（超级块不再持有树表表长），
    否则就是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`

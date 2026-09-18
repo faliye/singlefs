@@ -1,7 +1,7 @@
 //! 第三部分：层 0 全量状态数。闭式与 crates/singlefs-harness/src/crash.rs 的
 //! `closed_form_state_count` 逐字同型：1 + Σ(2^|段| − 1)（D13 已定项 4 切段）。
 //! 四个臂：里程碑步 0 自己的模型 / 空发布按 D16 已定项 9 写 c_max 单元 / 再加上
-//! first-txn-layout.md 八末尾那条 ⚠️ 的超级块合并 / 并行线一那次 70 单元的发布。
+//! layout/01-first-txn.md 八末尾那条 ⚠️ 的超级块合并 / 并行线一那次 70 单元的发布。
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind { UserVisible, Empty, Rollback, WriteRow }
@@ -23,7 +23,7 @@ fn closed_form(segments: &[usize]) -> u128 {
 
 /// `empty_writes_units`：空发布写不写 c_max 个单元（D16 已定项 9）。
 /// `merge_superblock`：上一次发布的超级块槽写与这次的单元写落不落同一段
-/// （first-txn-layout.md 八末尾那条 ⚠️；里程碑步 0 的「基线 = 这次发布之前的全部写都持久」等于 false）。
+/// （layout/01-first-txn.md 八末尾那条 ⚠️；里程碑步 0 的「基线 = 这次发布之前的全部写都持久」等于 false）。
 fn segments(empty_writes_units: bool, merge_superblock: bool) -> Vec<usize> {
     let mut out = Vec::new();
     let mut carried = 0usize;

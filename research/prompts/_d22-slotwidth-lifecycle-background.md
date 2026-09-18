@@ -11,7 +11,7 @@ D2（RAID 条带策略） 已定硬要求 2 说的「两个生命周期不同的
 
 这句话今天**没有任何落点**——它不是 D22 的未定项（D22 的未定项只有 6 与 9），
 也不是 checks-owed 里的一条 C 号（`grep -n "槽宽\|E34" .claude/kb/checks-owed.md` 零命中），
-`first-txn-layout.md` 里根环那一行的状态是「已定」。
+`layout/01-first-txn.md` 里根环那一行的状态是「已定」。
 ⇒ 它只活在一段散文里，门禁阶段 31（每个未定项有没有判过改不改第一个事务的字节）
 与 60（未定项有没有被别处定了）都看不见它。
 
@@ -157,7 +157,7 @@ D2（RAID 条带策略）「写的粒度」一节已定，两条硬要求都写�
 | D2（RAID 条带策略） 的状态是「已定（14 项全定）」 | `grep -n "^| D2（" .claude/kb/decisions.md` |
 | D22（单元原子性怎么合成） 的未定项只有 6 与 9 两条 | 读 D22 未定项表 |
 | checks-owed.md 里没有任何一条 C 号说这件事 | `grep -n "槽宽\|E34" .claude/kb/checks-owed.md` 只命中 C47（根槽没按判定宽度对齐），那条管的是**起始偏移对齐**，不是槽宽取哪个量 |
-| `first-txn-layout.md` 里根环那一行写着「已定」，指向 D22（单元原子性怎么合成） 已定项 2 | `grep -n "根环" .claude/kb/first-txn-layout.md` |
+| `layout/01-first-txn.md` 里根环那一行写着「已定」，指向 D22（单元原子性怎么合成） 已定项 2 | `grep -n "根环" .claude/kb/layout/01-first-txn.md` |
 | 欠账现有 195 条 | `bash .claude/gate.d/10-kb-rot.sh` |
 
 **一处主 agent 现算的算术（不是实验，谁都可以复核）**：C82（io_min 不在挂载比对清单） 提议的那道挂载闸是

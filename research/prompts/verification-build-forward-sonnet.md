@@ -46,7 +46,7 @@ F5. D13 item 2 (settled, user decision 2026-08-31): commits are serial in the fi
     version runs on 2 disks. D9 item 10 (settled): encryption is not in the first runnable
     version, only its format fields are reserved.
 
-F6. first-txn-layout.md (2026-09-03): "the first transaction" means mkfs, then write one
+F6. layout/01-first-txn.md (2026-09-03): "the first transaction" means mkfs, then write one
     small file, then publish once. No directories, snapshots, reflink, compression,
     encryption. Every byte segment points to a decision item. Four open items are judged
     "changes the bytes of the first transaction: yes": D22 open item 9 (superblock field

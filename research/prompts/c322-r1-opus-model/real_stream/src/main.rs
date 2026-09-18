@@ -130,7 +130,7 @@ fn record_first_mount_stream() -> (MemoryPool, Vec<RetainedOperation>) {
     (base, operations[mkfs_operation_count..].to_vec())
 }
 
-/// 写表里每一条的名字：first-txn-layout.md 零那张写清单的步号（a1 / w1..w6 / t1..t11），带盘号。
+/// 写表里每一条的名字：layout/01-first-txn.md 零那张写清单的步号（a1 / w1..w6 / t1..t11），带盘号。
 fn layout_labels(writes: &[RetainedWrite]) -> Vec<String> {
     let superblock_tags = ["a1", "a1", "w3", "w3", "w6", "w6", "t11", "t11"];
     let journal_tags = ["w1", "w1", "w4", "w4", "t9", "t9"];

@@ -16,7 +16,7 @@
 | 六 | 第一版 `locality_id` 恒为 0；加密开启时它会新增第一处「用户对象语义类别」的泄漏；今天它没有盘上的明文表达（自描述头五元组不含它） | D14（双轨（大小文件 / 持久临时）） 那一节「三轮论证的经过与第三轮判决前的正文」 |
 | 七 | 冻结分层第 3 层是各 keyspace 的 key 编码（含 `locality_id`）；今天一层都没冻 | D15（格式冻结政策） 的分层 |
 | 八 | I-9.9 locality 三值对照：记录的 `locality_id` == 该对象每条 extent key 的首段；extent 树未经重建时输出红 / 绿，超级块 `map_provenance` 标 rebuilt 时两侧同源、输出「不可判定」，不许输出「通过」 | `invariants.md` 的 I-9 一节 |
-| 九 | 第一个事务：inode 记录偏移 16 的 `locality_id` 写 0；extent 叶记录 key = (0, 1, 0) | `first-txn-layout.md` 对应两行 |
+| 九 | 第一个事务：inode 记录偏移 16 的 `locality_id` 写 0；extent 叶记录 key = (0, 1, 0) | `layout/01-first-txn.md` 对应两行 |
 | 十 | `.claude/rules/fs-design.md`「不为省空间牺牲自包含」一节逐字：「⚠️ **这条不是「随便加字段」**。它管的是**已经论证过有用**的字段该不该为省空间而砍，不管「要不要加这个字段」——后者仍然要各自给理由。」 | 项目规则（整句抄在这里） |
 
 ## 二、问
@@ -255,7 +255,7 @@
 
 
 
-### 小节清单：`.claude/kb/first-txn-layout.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/layout/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -938,7 +938,7 @@ D8（核心索引结构） 已定项 3 付过），**破第一句**（判据住 
 且 D15（格式冻结政策） 把 `locality_id` 逐字列进冻结分层的第 3 层「各 keyspace 的 key 编码」⇒ 它已经在冻结清单里、只等冻结请求。⚠️ **不是「已被冻结」**：今天一层都没冻——D15（格式冻结政策） 冻结前清单第 7 项要求每条未定分项都带「动不动格式」的判定，而 C224（未定分项没有「动不动格式」的判定） 现查全仓一条都没写过 ⇒ 冻结请求当场判红），
 **掏空第二句**（`locality_id` 创建时从父目录继承、改名时故意不更新——而它过硬要求 5 靠的正是这一点）。
 ⚠️ **另有两条各自独立、都不依赖收益数据的**：
-① **第一版它恒为 0**（[first-txn-layout.md](../first-txn-layout.md) 逐字「locality_id（第一版取 0）」、
+① **第一版它恒为 0**（[layout/01-first-txn.md](../layout/01-first-txn.md) 逐字「locality_id（第一版取 0）」、
 D8（核心索引结构） 已定项 6 字段表逐字「locality_id（第一版无父目录取 0）」、
 D8（核心索引结构） 已定项 3 逐字「⚠️ 连带：第一版没有目录，而这个值按本项从父目录继承 ⇒
 **没有父目录时取什么，也要一起定**」）⇒ 第一版每个对象同值，判据没有判别力，
@@ -1028,12 +1028,12 @@ nlink == dirent 条数的门（dirent 树存在）今天没有输入，写不成
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:237-276`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:237-276`（整段抄，未转述）**
 
 ```markdown
 ## 四、文件元数据（inode）
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 3。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 3。
 
 D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树的叶是码 3 打包记录单元（打包记录类型 2），内部节点是码 2、根恒为码 2，记录定长 140。第一个事务写一个码 2 根（t4）、一个码 3 叶（t3）、一条记录、一条水位统计量。
 
@@ -1061,7 +1061,7 @@ D8（核心索引结构） 已定项 6（2026-09-05）定了整段：inode 树�
 
 ### 四·二、extent 树（2026-09-10 新增，此前这张表里没有它）
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 3。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 3。
 
 | 段 | 字段 | 宽度 | 第一个事务里的值 | 指向 | 状态 |
 |---|---|---|---|---|---|

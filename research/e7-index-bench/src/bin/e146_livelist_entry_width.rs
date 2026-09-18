@@ -18,7 +18,7 @@ const NODE_POINTER_BYTES: u64 = 83;
 const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// 树表一个单元装几条，取 D22（单元原子性怎么合成） 已定项 7 的口径 ⌊(16384 − 131) / 200⌋ = 81。⚠️ 它随条目宽变，改 TREE_TABLE_ENTRY_BYTES 要一起改这一行。
 const TREE_TABLE_ENTRIES_PER_UNIT: u64 = 81;
-/// first-txn-layout.md 第 1 版树表的条目数：2026-09-13 用户定案后 7（extent、inode、分配记录、记账、映射，加 day-1 注册的 livelist 与稀疏旁表）；本实验建模时是 5，两处都装得进 112 条的单元。
+/// layout/01-first-txn.md 第 1 版树表的条目数：2026-09-13 用户定案后 7（extent、inode、分配记录、记账、映射，加 day-1 注册的 livelist 与稀疏旁表）；本实验建模时是 5，两处都装得进 112 条的单元。
 const TREE_TABLE_FIRST_VERSION_ENTRIES: u64 = 7;
 /// D6 已定项 3：共享树的 key 以头的树 ID 打头。
 const HEAD_TREE_IDENTIFIER_BYTES: u64 = 8;

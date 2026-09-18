@@ -112,10 +112,10 @@ mode=geometry IDENTICAL
 grep -rn "children" .claude/kb/*.md .claude/kb/decisions/*.md .claude/kb/experiments/*.md | grep -v history
 ```
 
-命中 5 处，全部是语义定义或计数规则的讨论：`05-快照-空间记账机制.md:153`「判据是 O(1) 子计数 `children > 1` → 拒绝」、`:155`「`children` 把从这个快照克隆出去的可写头也算上」、`:166`（同一句的引用）、`06-快照实现模型.md:240`（同一句的转述）、`checks-owed.md:251`（C270（分叉点闸的子计数数不数克隆），管的是「数不数克隆」这条**规则**，不是**存在哪**）。`first-txn-layout.md` 与 `invariants.md` 里 `grep -n "children"` **零命中**。
+命中 5 处，全部是语义定义或计数规则的讨论：`05-快照-空间记账机制.md:153`「判据是 O(1) 子计数 `children > 1` → 拒绝」、`:155`「`children` 把从这个快照克隆出去的可写头也算上」、`:166`（同一句的引用）、`06-快照实现模型.md:240`（同一句的转述）、`checks-owed.md:251`（C270（分叉点闸的子计数数不数克隆），管的是「数不数克隆」这条**规则**，不是**存在哪**）。`layout/01-first-txn.md` 与 `invariants.md` 里 `grep -n "children"` **零命中**。
 
 ```
-grep -n "origin" .claude/kb/decisions/*.md .claude/kb/checks-owed.md .claude/kb/invariants.md .claude/kb/first-txn-layout.md | grep -v history
+grep -n "origin" .claude/kb/decisions/*.md .claude/kb/checks-owed.md .claude/kb/invariants.md .claude/kb/layout/01-first-txn.md | grep -v history
 ```
 
 命中的全部是「origin 快照」「origin.txg」这类**语义指称**（`05-快照-空间记账机制.md:152,157,162,170`、`06-快照实现模型.md:26,90,214`），没有一处给「从一个克隆头指回它的 origin」这件事分配一个盘上字段。`checks-owed.md:252`（C271（livelist 的 FREE 在什么时刻记没有定义））自己写着「过滤用的『克隆时刻』要一个固定不变的字段」——这是一句**要账**的话，不是登记。`D8（核心索引结构） 已定项 8` 的字段表（`08-核心索引结构.md:76,466,471`）逐字是「树 ID 8 打头 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 头 ID 8 + 预留 24」，里面没有 `children` 也没有 origin 链接。

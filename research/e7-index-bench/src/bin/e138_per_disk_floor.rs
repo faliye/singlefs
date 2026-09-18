@@ -352,14 +352,14 @@ impl Simulation {
         self.random_state.wrapping_mul(0x2545_F491_4F6C_DD1D)
     }
 
-    /// 区域 = txg mod R，区内槽 = ⌊txg / R⌋ mod S（区内公式是 first-txn-layout.md 的预想）。
+    /// 区域 = txg mod R，区内槽 = ⌊txg / R⌋ mod S（区内公式是 layout/01-first-txn.md 的预想）。
     fn slot_index(&self, txg: u64) -> usize {
         let region = txg % REGION_COUNT;
         let slot_within_region = (txg / REGION_COUNT) % self.slots_per_region;
         usize::try_from(region * self.slots_per_region + slot_within_region).expect("槽号装得进 usize")
     }
 
-    /// 区域 0、2 在盘 0，区域 1 在盘 1（first-txn-layout.md 的预想归属）。
+    /// 区域 0、2 在盘 0，区域 1 在盘 1（layout/01-first-txn.md 的预想归属）。
     fn disk_of_slot(&self, slot: usize) -> usize {
         let region = slot as u64 / self.slots_per_region;
         if region == 1 { 1 } else { 0 }

@@ -325,14 +325,14 @@ W 非 0"，而原文明确说的是"**只在同一批写出的行里**至多一�
 ### 5.2 P9「里程碑步 5」引用的文件不在本轮小节清单/附录覆盖范围内
 
 **P9 提到**："里程碑步 5 把 C199 列成冻它之前要先还的账"——这句话指向的应该是
-`.claude/kb/milestone-first-txn.md` 这份文件，但**本轮的小节清单只覆盖了
-D23、D18、D16、invariants.md、E37、E104、checks-owed.md 七个文件，milestone-first-txn.md
+`.claude/kb/milestone/01-first-txn.md` 这份文件，但**本轮的小节清单只覆盖了
+D23、D18、D16、invariants.md、E37、E104、checks-owed.md 七个文件，milestone/01-first-txn.md
 不在其中，附录里也没有这份文件的任何引文**。
 
 ⇒ 我**无法在本轮材料范围内核实**"里程碑步 5"这句话的字面是否准确。这不影响我对
 判据 1–6 的任何一格判定（因为我的判定全部基于 D23/D18/D16/I-8.3/E37/E104/checks-owed
 这几份已经核对过的原文），但按 `three-way-inference.md` 的引用纪律，这是一处覆盖缺口，
-应该记下：**若这一轮之后要真正推进 C199 的还账，milestone-first-txn.md 里这句引用
+应该记下：**若这一轮之后要真正推进 C199 的还账，milestone/01-first-txn.md 里这句引用
 需要单独核实一遍**。
 
 ### 5.3 P7 的压缩（轻微，不影响判定）

@@ -830,7 +830,7 @@ description: <什么时候该派它出去。主模型只看这一句来挑，所
 而那一轮的枢纽问题正是「销毁快照是不是一次全盘遍历」——材料因此把一个假前提发给了三条腿，
 是正推腿自己去读原文才捞回来的。脚本给那段正文单独发一行并标出行区间，
 自证会红：`kb-sections.py --selftest`，再用 `KB_SECTIONS_NO_PREAMBLE=1` 强制走回旧行为。
-一级标题同样要有自己的行：顶上是一级标题的文件（`checks-owed.md`、`invariants.md`、`first-txn-layout.md` 等），此前那个一级标题下的正文在清单上一行都没有——`checks-owed.md` 整张欠账表就住在那里（C273（小节清单不认一级标题），自证用 `KB_SECTIONS_NO_H1=1`）。
+一级标题同样要有自己的行：顶上是一级标题的文件（`checks-owed.md`、`invariants.md`、`layout/01-first-txn.md` 等），此前那个一级标题下的正文在清单上一行都没有——`checks-owed.md` 整张欠账表就住在那里（C273（小节清单不认一级标题），自证用 `KB_SECTIONS_NO_H1=1`）。
 
 ⚠️ **附录用 `research/scripts/quote-kb.py --checklist 清单.md 出口.md 取法…` 抽，清单与附录由脚本绑住。**
 清单与附录此前是两处分别生成的，没有任何东西绑住它们：2026-09-10 一轮材料的清单把一整节标成「抄」，

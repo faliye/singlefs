@@ -30,7 +30,7 @@
 | D22（单元原子性怎么合成） 已定项 16 | `grep -n '已定项 16' .claude/kb/decisions/22-单元原子性怎么合成.md` | 索引 232、正文 1003–1019；定案句 1005（「槽世代号从 1 起、每写一次 +1，下一次写的槽 = 世代号 mod 2，择槽取校验和过且世代号最大的」） |
 | D16（发布语义） 已定项 1（抬 F） | `grep -n '^| 准入 ' .claude/kb/decisions/16-发布语义.md` | 小节从 358 行起；准入那一行在 377（附录整行抄） |
 | D16（发布语义） 已定项 8（暖机） | `sed -n '205,207p' .claude/kb/decisions/16-发布语义.md` | 定案句 207 |
-| first-txn-layout.md 第 389–393 行 | `sed -n '389,393p' .claude/kb/first-txn-layout.md` | 389 取号、390 空发布、391 普通发布、392 实例切换 / 管理员回退、393 抬 F 的空发布 |
+| layout/01-first-txn.md 第 389–393 行 | `sed -n '389,393p' .claude/kb/layout/01-first-txn.md` | 389 取号、390 空发布、391 普通发布、392 实例切换 / 管理员回退、393 抬 F 的空发布 |
 | D28（挂载期承诺量） 已定项 3 | `sed -n '78,95p' .claude/kb/decisions/28-挂载期承诺量.md` | 切换预留是内存里的量；D18 第 879 行把「实例切换的预留拿得到」列在可写挂载的准入里、拿不到就只读，而「只读挂载不取号」 |
 | 今天的取号 | `grep -n 'SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION\|fn superblock_generation_for_publish\|fn acquire_instance\|let slot_index' crates/singlefs-core/src/transaction.rs` | 49 常量 2；129 槽 = 世代号 mod 2；176–177 发布之后 = txg + 2；181–187 `acquire_instance` 写那个常量 |
 | 今天择超级块 | `grep -n 'pub fn choose_superblock\|if one.slot_generation' crates/singlefs-core/src/recovery.rs` | 191 起；210 `one.slot_generation > zero.slot_generation`（相等取槽 0）；各盘只比 fsid 与设备数，返回第一块盘择到的那一份 |
@@ -39,7 +39,7 @@
 | checker 有没有已发布谓词 | `grep -n 'I-1.2' crates/singlefs-checker/src/*.rs` | 0 行 |
 | 层 0 把 I-7.7 钉成 2 | `grep -n 'expected_violated' crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs` | 107 |
 
-背景材料附录与今天的 kb 逐字节核对（命令 `diff <(sed -n 'Np' kb 文件) <(sed -n 'Mp' 背景材料)`，9 处全 `SAME`）：D18:879 = 背景 1227；D22:1005 = 910；D23:691 = 800；D23:1206 = 815；D23:1240 = 849；D16:207 = 932；D16:289 = 980；invariants.md:53 = 1016；first-txn-layout.md:389–393 = 1107–1111。下面引这几行时只写「kb 文件:行」，整行就是背景材料附录那一份；背景材料没抄的（D16:377、fs-design.md:23）在文末「附录」整行抄。
+背景材料附录与今天的 kb 逐字节核对（命令 `diff <(sed -n 'Np' kb 文件) <(sed -n 'Mp' 背景材料)`，9 处全 `SAME`）：D18:879 = 背景 1227；D22:1005 = 910；D23:691 = 800；D23:1206 = 815；D23:1240 = 849；D16:207 = 932；D16:289 = 980；invariants.md:53 = 1016；layout/01-first-txn.md:389–393 = 1107–1111。下面引这几行时只写「kb 文件:行」，整行就是背景材料附录那一份；背景材料没抄的（D16:377、fs-design.md:23）在文末「附录」整行抄。
 
 ## 二、K2：回退途中崩溃，超级块已带新号
 
@@ -51,7 +51,7 @@
 ### 构造（甲″，管理员回退）
 
 - 前态：第一个事务写完之后实例 1 非干净结束。两盘超级块槽 0 = (世代号 4, 实例 1)、槽 1 = (5, 1)；根环 (0, 0) (1, 1) (1, 2) (1, 3)；journal 里是实例 1 的记录。管理员选 R_old = (1, 1)。
-- 写流（模型 K 按 first-txn-layout.md:392 的预想段序列建）：[acquire_superblock × 2 盘] 屏障 [rows_unit × 2 盘（回退行 (1, 1, 0)，flags bit0）+ rollback_cow_unit × 2 盘] 屏障 [rows_record × 2] 屏障 [rows_root FUA，txg 4，区域 1 → 盘 1] [rows_superblock × 2] 屏障 [暖机记录 × 2] 屏障 [warm_up_2_root，txg 5，盘 0] [超级块 × 2]，段序列 `[2, 4, 2, 1, 2, 2, 1, 2]`。
+- 写流（模型 K 按 layout/01-first-txn.md:392 的预想段序列建）：[acquire_superblock × 2 盘] 屏障 [rows_unit × 2 盘（回退行 (1, 1, 0)，flags bit0）+ rollback_cow_unit × 2 盘] 屏障 [rows_record × 2] 屏障 [rows_root FUA，txg 4，区域 1 → 盘 1] [rows_superblock × 2] 屏障 [暖机记录 × 2] 屏障 [warm_up_2_root，txg 5，盘 0] [超级块 × 2]，段序列 `[2, 4, 2, 1, 2, 2, 1, 2]`。
 - 状态 R1 的持久写集合：{acquire_superblock@disk0, acquire_superblock@disk1}。两盘择到的超级块都是实例 2；根环、journal、单元里没有任何带 2 的东西；回退行、回退根都没落。
 - `k-model.out` 第 27–35 行整行抄：
 
@@ -149,7 +149,7 @@ PATH_EXAMPLE path=empty_publish_before_recovery_rows arm=jia_double_prime first_
 
 - 最小持久写集合：{acquire_superblock@disk0, acquire_superblock@disk1, f_raise_record@disk0, f_raise_record@disk1, f_raise_root}。新实例的根 (2, 4) 落了，写行那次发布没落。
 - 下一次挂载选 (2, 4)，写行只给 [2, 3)；实例 1 从此没有行，它非干净结束时留下的孤儿（写序 (1, 1)、诞生 txg 4）落进「i < i_now 且无行 ⇒ 已发布」。67 = 63 + 3 + 1：抬 F 那个根落了之后、写行那个根落之前的全部状态。
-- 四条臂都是 67，与取号那一步无关。D18:879「与第一个新根同一次发布」已经不许这个次序；D16:377 的准入行没说恢复那次挂载除外；first-txn-layout.md:393「抬 F 的空发布」一行只写「与暖机的空发布同型」，没写它与写行那次发布谁先。建议八那张表的「实例切换 / 管理员回退」一行与要补的「非干净结束之后的可写挂载」一行写明「写行那次发布是本实例的第一次发布，抬 F 只排在暖机之后」；层 0 覆盖这几条路径之后加一条计数：本实例的第一个根落了而旧实例无行的状态数必须为 0。
+- 四条臂都是 67，与取号那一步无关。D18:879「与第一个新根同一次发布」已经不许这个次序；D16:377 的准入行没说恢复那次挂载除外；layout/01-first-txn.md:393「抬 F 的空发布」一行只写「与暖机的空发布同型」，没写它与写行那次发布谁先。建议八那张表的「实例切换 / 管理员回退」一行与要补的「非干净结束之后的可写挂载」一行写明「写行那次发布是本实例的第一次发布，抬 F 只排在暖机之后」；层 0 覆盖这几条路径之后加一条计数：本实例的第一个根落了而旧实例无行的状态数必须为 0。
 
 ## 四、K4：三种 I-7.7 改写各判什么
 
@@ -276,7 +276,7 @@ GENERATION arm=yi_prime rule=TodayConstantTwoThenTxgPlusTwo reading=FirstDiskCho
 
 ## 六、按跑前写死的条款怎么判（攻方的读法）
 
-- 失败条款（Q1 的转述与 D18:879、first-txn-layout.md:392 对不上）：不触发。两处与背景材料附录逐字节相同（一），Q1 引的两句都是这两行里的原样子串。
+- 失败条款（Q1 的转述与 D18:879、layout/01-first-txn.md:392 对不上）：不触发。两处与背景材料附录逐字节相同（一），Q1 引的两句都是这两行里的原样子串。
 - K1 不归这条腿。顺带：A 段在甲下用第二套独立代码重做出第一轮那个撞号，三条非首次挂载路径各 15 个、最小持久写集合 {rows_unit@disk0}（`k-model.out` 第 10、19、28 行），与第一轮模型 B 同数。
 - K2：不触发反向接受条款第 2 句，甲″ 与乙′ 在这一格同形（字面 21 / 20 个状态都违反，语义 0 / 0）。让步的是那一句，不是取号（二）。
 - K3：路径那一问不触发。字面那一句由模型 R 的状态触发，但不分辨臂，按「打中不分辨臂 ⇒ 把共用前提另立一笔账先修」不拿它判甲″ 出局。若照字面判甲″ 出局，乙′ 在同一格同样中，两条候选一起出局，只剩参照臂丙；而丙那份超级块提示照样是每盘两槽、同一个择槽规则，病根不动。

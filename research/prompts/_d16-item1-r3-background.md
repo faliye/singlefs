@@ -746,7 +746,7 @@ E7RESULT name=near_full arm=G_floor_per_disk s=16 empty_cost=5 reserve=40 residu
 4. 实例切换不建；它自己的挂载时预留与保留池叠加没有量。
 5. 空发布开销只取 1 与 5 两档常数；真实开销随树高涨，挂载后保留池可能不再够。
 6. 容量 4000 块：`df` 少报的块数占容量的比例搬不到真盘上，只报块数与字节数。
-7. 槽位公式与盘归属用的是 first-txn-layout.md 的预想；只有两块盘。
+7. 槽位公式与盘归属用的是 layout/01-first-txn.md 的预想；只有两块盘。
 8. **世界里没有「活化区间内崩溃、不丢盘」这一格**：`torn_newest` 在崩溃之前已经把 F 推到两块盘都生效。恢复时生效值怎么取只由单测 `recovery_does_not_activate_floor_carried_on_only_one_disk` 钉着。
 9. **「按盘取上限」没被测到**（判据 2 的 G_txgcap 为 0）：要测它，得有「写失败跳号之后再抬 F」的世界。
 10. 臂 G 输的机制是推的；「一律做满 7 次」那一形没有量。

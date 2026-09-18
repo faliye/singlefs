@@ -1160,7 +1160,7 @@ D 条写着「项的大小由记录类型决定」。现役参照：XFS 有 `XFS
 
 **今天还冻不了，挡着的是**（冻结前清单第 1 项会红的那几行，外加它看不见的一样）：
 
-1. 点名项 56 字节只定了总宽，构成只有 [first-txn-layout.md](../first-txn-layout.md)「六、journal」的预想表；也没给加密字段留位——
+1. 点名项 56 字节只定了总宽，构成只有 [layout/01-first-txn.md](../layout/01-first-txn.md)「六、journal」的预想表；也没给加密字段留位——
    D23（journal 的角色与格式） 已定项 1 的 D 条「项的大小由记录类型决定」管着这件事。
 2. 记录头登记的格式常量是 78，三笔增量落地后是 95（C94（登记的格式常量与后来的定案对不上））。
 3. spec 文件不存在，与 C119（两个冻结组件没有 spec 文件） 同形。
@@ -1911,12 +1911,12 @@ C248（树表单元的自举豁免没写过）。
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:28-76`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:28-76`（整段抄，未转述）**
 
 ```markdown
 ## 零、盘面地图与第一个事务的写清单
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 1 到步 5 共用。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 1 到步 5 共用。
 
 **两块盘、同构、`physical_block_size` = 512**（D2（RAID 条带策略） 已定项 9 定第一版跑 2 块盘；
 512 是本机 `nvme0n1` 现查的值，D22（单元原子性怎么合成） 未定项 9 那一节逐字「同构 512 池上槽就是 512」）。
@@ -1965,12 +1965,12 @@ t9 点名 16 个落点 = t1..t8 每个两盘。**第一个事务里没有释放*
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:77-144`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:77-144`（整段抄，未转述）**
 
 ```markdown
 ## 一、mkfs 已经种下的（第一个事务之前就在盘上）
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 1。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 1。
 
 | 段 | 字段 | 宽度 | 指向 | 状态 |
 |---|---|---|---|---|
@@ -2038,12 +2038,12 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:286-326`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:286-326`（整段抄，未转述）**
 
 ```markdown
 ## 六、journal
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 5。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 5。
 
 | 字段 | 宽度 | 第一个事务里的值 | 指向 | 状态 |
 |---|---|---|---|---|
@@ -2084,12 +2084,12 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ```
 
-**出处 `.claude/kb/first-txn-layout.md:327-352`（整段抄，未转述）**
+**出处 `.claude/kb/layout/01-first-txn.md:327-352`（整段抄，未转述）**
 
 ```markdown
 ## 七、发布（根记录与根槽）
 
-**里程碑**：[milestone-first-txn.md](milestone-first-txn.md) 步 5（mkfs 种下的第 0 代与树表单元第 0 版归步 1）。
+**里程碑**：[milestone/01-first-txn.md](milestone/01-first-txn.md) 步 5（mkfs 种下的第 0 代与树表单元第 0 版归步 1）。
 
 | 字段 | 宽度 | 第一个事务里的值 | 指向 | 状态 |
 |---|---|---|---|---|
@@ -2115,7 +2115,7 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 
 ```
 
-**出处 `.claude/kb/milestone-first-txn.md:148-175`（整段抄，未转述）**
+**出处 `.claude/kb/milestone/01-first-txn.md:148-175`（整段抄，未转述）**
 
 ```markdown
 ## 步 5　一次发布
@@ -2139,7 +2139,7 @@ mkfs 把第 0 代根写进三个区域各自的槽 0，一共 **3 份**；第 n 
 - 记录的点名项数等于这次新写的单元数；反向链指向 mkfs 那条空环状态。
 - 变异：摘掉第二道屏障，步 7 的 harness 用例判红（E77（发布的持久顺序） 那两条）；`CommitStep` 少写一个臂，编译不过。
 
-**写出的字节**：[first-txn-layout.md](first-txn-layout.md)「六、journal」「七、发布」；整个事务的写清单（21 条写请求）在「零、盘面地图与第一个事务的写清单」。
+**写出的字节**：[layout/01-first-txn.md](layout/01-first-txn.md)「六、journal」「七、发布」；整个事务的写清单（21 条写请求）在「零、盘面地图与第一个事务的写清单」。
 
 **会碰到的决策点**：C94（登记的格式常量与后来的定案对不上）（记录头登记值取哪个数）；
 C199（实例代号递增与 jsn 断号即止互相矛盾）；D16（发布语义） 已定项 3（journal 记录格式是四层之外的独立冻结组件；冻它之前 C199（实例代号递增与 jsn 断号即止互相矛盾） 要先还）；
@@ -2148,7 +2148,7 @@ D16（发布语义） 已定项 1（根记录带回退下界 F 8 字节，242 �
 
 ```
 
-**出处 `.claude/kb/milestone-first-txn.md:176-199`（整段抄，未转述）**
+**出处 `.claude/kb/milestone/01-first-txn.md:176-199`（整段抄，未转述）**
 
 ```markdown
 ## 步 6　读回来：冷启动恢复

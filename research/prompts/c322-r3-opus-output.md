@@ -281,7 +281,7 @@ G2_AUDIT device=0 offset=4096 written_generation=5 written_instance=1 highest_se
 G2_AUDIT device=1 offset=4096 written_generation=5 written_instance=1 highest_self_verified_before=4 generation_by_G2=5 offset_by_G2=4096 matches=true
 ```
 
-- 第一个事务的字节：不变。G2 在那条流上写出的世代号是 2、3、4、5，落槽 0、1、0、1，与今天的实现逐条相同（8 行 `matches=true`），即 first-txn-layout.md 零那张写清单的 a1、w3、w6、t11。
+- 第一个事务的字节：不变。G2 在那条流上写出的世代号是 2、3、4、5，落槽 0、1、0、1，与今天的实现逐条相同（8 行 `matches=true`），即 layout/01-first-txn.md 零那张写清单的 a1、w3、w6、t11。
 - 层 0 钉的数：I-7.7 违例 2 → 0（① + ② 按每盘最大；按择到的也是 0，按每个槽是 6）。`first_transaction_step_seven_layer0.rs` 第 107 行那条断言要跟着改。
 - 坏镜像语料：I-7.7 那一份要换（「四、T4」最后一条）。
 - 代码：transaction.rs 49、176–177（世代号按每盘自证过的槽算）、181–187（取号的 max 取全部自证过的槽 ∪ 根环）；recovery.rs `choose_superblock` 只给几何；checker walk.rs 541–548、577–587 换成 ① ②，另加码 1 / 码 3 头与 journal 环的扫描。回卷若按攻方倾向删掉，D18:879 那一句与 P 第 1 句的第二条实现义务一起删。

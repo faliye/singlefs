@@ -496,7 +496,7 @@
 | ### 2026-09-13 | 不抄 | 历史版本 |
 | ### 2026-09-03 | 不抄 | 历史版本 |
 
-### 小节清单：`.claude/kb/first-txn-layout.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/layout/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

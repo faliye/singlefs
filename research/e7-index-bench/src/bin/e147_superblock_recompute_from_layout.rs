@@ -1,6 +1,6 @@
 //! E147：超级块字段表按第一个事务字节表重算——D22（单元原子性怎么合成） 已定项 9 挡路条 ③ 那两句「四格数字不可引用」之后的可引用数。
 //!
-//! first-txn-layout.md 第一节的超级块预想字段表逐行抄进 `SUPERBLOCK_ROWS`，算 512 字节槽的余量与撕裂态，
+//! layout/01-first-txn.md 第一节的超级块预想字段表逐行抄进 `SUPERBLOCK_ROWS`，算 512 字节槽的余量与撕裂态，
 //! 再给挡路条 ② 还没定的三格各算一个变体。只报数不判输赢；判据与失败条款在 `research/prompts/e147-preregistration.md`。
 
 use e7_index_bench::Emitter;
@@ -35,7 +35,7 @@ impl Segment {
 
 const SEGMENTS: [Segment; 5] = [Segment::Bootstrap, Segment::EncryptionReserve, Segment::Geometry, Segment::Tunable, Segment::Runtime];
 
-/// first-txn-layout.md「超级块预想字段表」逐行：段、字段、宽。
+/// layout/01-first-txn.md「超级块预想字段表」逐行：段、字段、宽。
 const SUPERBLOCK_ROWS: [(Segment, &str, u64); 39] = [
     (Segment::Bootstrap, "magic", 4),
     (Segment::Bootstrap, "format_version", 2),
@@ -184,7 +184,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// 绝对值断言 1：五段与总计按 first-txn-layout.md 表后合计钉住（413，512 槽内余 99）。
+    /// 绝对值断言 1：五段与总计按 layout/01-first-txn.md 表后合计钉住（413，512 槽内余 99）。
     #[test]
     fn segments_and_total_match_the_layout_table() {
         assert_eq!(segment_bytes(Segment::Bootstrap), 166);

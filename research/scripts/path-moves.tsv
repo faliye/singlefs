@@ -1,0 +1,9 @@
+# 文件与目录搬迁登记表：每次搬一个文件或目录，在这里加一行。四列用制表符分隔：旧路径、新路径（都从仓库根写）、日期、依据。
+# 规则见 .claude/rules/path-moves.md：路径不在冻结范围内，搬了之后全仓（含 research/prompts/、research/results/、records/）指向旧路径的地方一次改成新路径；
+# 改写用 research/scripts/rewrite-moved-paths.py --apply，门禁 64 号用同一个脚本的 --check 查全仓不再出现这里登记的旧路径。
+.claude/kb/milestone-first-txn.md	.claude/kb/milestone/01-first-txn.md	2026-09-16	里程碑文件收进 milestone/（提交 d2aeb7d）
+.claude/kb/2026-09-decisions-history.md	.claude/kb/decisions-history/2026-09.md	2026-09-12	决策变更史原文按月放进 decisions-history/（提交 2e0ec02）
+.claude/kb/first-txn-layout.md	.claude/kb/layout/01-first-txn.md	2026-09-17	用户定案：按里程碑递增的字节布局表放进 layout/ 目录、与 milestone/ 同号
+.claude/kb/second-txn-layout.md	.claude/kb/layout/02-second-txn.md	2026-09-17	同上
+.claude/agents/agent-common.md	.claude/agent-common.md	2026-09-18	用户定案：搬进 .claude/agents/ 之后退回原位置（doc-lint 要求那里每个文件都是带 frontmatter 的 agent 定义），同日搬进又搬回，那一次搬进没有提交
+.claude/agents/main-agent.md	.claude/main-agent.md	2026-09-18	同上

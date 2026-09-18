@@ -6,7 +6,7 @@
 2. 自己去查：
    - `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs` 的 `fn mkfs`、`fn warm_up`、`fn publish_first_file`、`fn split_into_segments`、`fn enumerate_layer0`（root_index 怎么取）
    - `research/results/e142-first-txn-dry-run-2026-09-13-warmup.out` 全部 68 行
-   - `.claude/kb/first-txn-layout.md` 八（登记表）与零（写清单）
+   - `.claude/kb/layout/01-first-txn.md` 八（登记表）与零（写清单）
    - `.claude/kb/checks-owed.md` 的 C316、C220、C8 三行与已还清表里的 C313
    - `.claude/kb/decisions/22-单元原子性怎么合成.md` 未定项 6 与乙问（zoned 上固定结构能不能原地轮转）——第 5 问要用
 

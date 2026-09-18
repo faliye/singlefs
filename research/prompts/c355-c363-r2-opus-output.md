@@ -5,7 +5,7 @@
 
 ## 〇、口径
 
-- **kb 行号**：工作区 2026-09-16 17:1x UTC 现查、17:4x UTC 收尾前逐行复核一次（`28-挂载期承诺量.md`、`03-空间分配.md`、`first-txn-layout.md` 在工作区有别的会话没提交的改动，行号以那一刻为准）。
+- **kb 行号**：工作区 2026-09-16 17:1x UTC 现查、17:4x UTC 收尾前逐行复核一次（`28-挂载期承诺量.md`、`03-空间分配.md`、`layout/01-first-txn.md` 在工作区有别的会话没提交的改动，行号以那一刻为准）。
 - **crates/ 行号**：提交 `fbae43e`（`git show fbae43e:路径`）。`fbae43e` 只有 `publish_first_file`，覆盖写与空发布都还不在提交里。
 - **模型**（`research/prompts/c355-c363-r2-opus-model/`，只用 std，三个都是确定性纯计算，跑两遍一样只说明没有隐藏状态；证据强度来自每个二进制开头的手算锚点断言与第七节的变异）：
 
@@ -81,7 +81,7 @@
 读码（`git show fbae43e:…`）：
 - `crates/singlefs-core/src/allocator.rs:270` 用户数据落点只取 `self.devices[0]` 的空闲图，`:294` 开段只看盘 0，`:253`–`:265` 的 `record` 给每块盘同号 `mark_allocated`。
 - `crates/singlefs-core/src/make_filesystem.rs:125` 几何检查只取最小那块盘（`let smallest = …min()`），不要求等大；`crates/singlefs-harness/src/scenario.rs:78` 每块盘按自己的 `size_in_bytes` 建 `DeviceFreeMap`。
-- `first-txn-layout.md:34` 整行「全部固定结构两盘各一份、设备内偏移相同。落点坐标全池一个：(设备身份 4 字节, 16 KiB 槽号 6 字节)，」。
+- `layout/01-first-txn.md:34` 整行「全部固定结构两盘各一份、设备内偏移相同。落点坐标全池一个：(设备身份 4 字节, 16 KiB 槽号 6 字节)，」。
 
 推出（纯代码推导，没另跑）：
 1. **两块等大的盘**：每次分配两盘标同一个号、固定结构同偏移 ⇒ 任何时刻 `devices[0].free_slots() == devices[1].free_slots()`；切换预留按设备各一份也相同。于是 a₀ = a₁，丙′ 的 `a − c ≥ 2u` 与乙的 `2a − 2c ≥ 4u` 是同一个不等式，**丙′ 在这个实现上买不到任何一格**。

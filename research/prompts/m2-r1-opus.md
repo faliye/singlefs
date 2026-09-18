@@ -3,7 +3,7 @@
 ## 先读
 
 1. 背景材料：`research/prompts/_m2-r1-background.md`（正文 + 小节清单 + 附录；里程碑全文在附录第一段）。
-2. 自己去查（行号写 kb 文件的，去 kb 文件里现查）：`.claude/kb/decisions/16-发布语义.md` 已定项 1 那张表与已定项 8、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14（回退例外、影子账）与已定项 7、`.claude/kb/decisions/28-挂载期承诺量.md` 已定项 1 第九项、`.claude/kb/decisions/13-验证路线.md` 已定项 4 与「崩溃点重放要分三层」、`.claude/kb/first-txn-layout.md` 八那张段序列登记表、`crates/singlefs-harness/src/crash.rs`（`closed_form_state_count`、`enumerate_layer0`）与 `crates/singlefs-harness/src/segments.rs`（只读）。
+2. 自己去查（行号写 kb 文件的，去 kb 文件里现查）：`.claude/kb/decisions/16-发布语义.md` 已定项 1 那张表与已定项 8、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14（回退例外、影子账）与已定项 7、`.claude/kb/decisions/28-挂载期承诺量.md` 已定项 1 第九项、`.claude/kb/decisions/13-验证路线.md` 已定项 4 与「崩溃点重放要分三层」、`.claude/kb/layout/01-first-txn.md` 八那张段序列登记表、`crates/singlefs-harness/src/crash.rs`（`closed_form_state_count`、`enumerate_layer0`）与 `crates/singlefs-harness/src/segments.rs`（只读）。
 
 ## 要攻的
 

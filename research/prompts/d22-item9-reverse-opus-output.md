@@ -434,7 +434,7 @@ E7RESULT name=budget dev_unit=code2_index  wide=0 map_sep=0 merge_ptrs=0 total=5
 2. **未定项 9 用了省略号。** 材料第 1 节挡路条 ③ 抄成
    「（段二除树表单元指针外的 68 + 段三 36 + 段四 12 + 槽世代号 8）……④」，
    而原文（`:579`）逐字是
-   「（段二除树表单元指针外的 68 + 段三 36 + 段四 12 + 槽世代号 8），[first-txn-layout.md](../first-txn-layout.md) 把它们整行标着未定；④」。
+   「（段二除树表单元指针外的 68 + 段三 36 + 段四 12 + 槽世代号 8），[layout/01-first-txn.md](../layout/01-first-txn.md) 把它们整行标着未定；④」。
    被省掉的是落点。**更大的一半是**：第 1 节只抄了「四条挡路条」那一段，
    而未定项 9 那一格里 2026-09-07 / 09-08 / 09-09 三轮收窄的正文全在格子里，
    H4 引的「② 缺的第 9 项塌了一半」就住在那里——**材料没抄，而它直接反证 W 的第 2 步。**
@@ -451,7 +451,7 @@ E7RESULT name=budget dev_unit=code2_index  wide=0 map_sep=0 merge_ptrs=0 total=5
 | `w_max` / `g` / MAC 长度声明其实不必进超级块 | D2 已定项 6 / 8 正文、I-6.6、E115 `REQUIRED` | **构造不出**，三条都明文要求进超级块 |
 | feature bits 96 字节可以压窄 | D15 已定项 2 与冻结政策全文 | **构造不出**，D15 逐字「三个 bitmap 各 256 位」 |
 | 已定项 8 里另有一句定了超级块槽宽 | `.claude/kb/decisions/22-单元原子性怎么合成.md:505-530` 全节 | **没有**。只有「每盘至少 2 个槽」 |
-| 别处（invariants / first-txn-layout / verification-build）定过超级块槽宽 | `grep -rn "超级块" .claude/kb/ \| grep -E "槽宽\|512\|physical_block_size"` | **零命中**。唯一一处是 C212 那句「跟着根槽走」 |
+| 别处（invariants / layout/01-first-txn / verification-build）定过超级块槽宽 | `grep -rn "超级块" .claude/kb/ \| grep -E "槽宽\|512\|physical_block_size"` | **零命中**。唯一一处是 C212 那句「跟着根槽走」 |
 | 中央映射必须单占一个指针（`map_sep=1` 是否强制） | D19 已定项 5 正文、D19 未定项 6 | **判不了**。D19 已定项 5 定了它是唯一入口，没定它的根挂哪；`e115_superblock_completeness.rs:154` 的注释逐字「否则它借树表的一行，槽里 0 字节」，两种都没被排除 ⇒ 这不是反例，是又一个未定量在撑着 W 的「三格已经爆」 |
 
 ---

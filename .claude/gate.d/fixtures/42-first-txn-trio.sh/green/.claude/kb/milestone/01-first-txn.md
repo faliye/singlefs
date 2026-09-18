@@ -8,7 +8,7 @@
 
 ## 步 1　样本步
 
-**写出的字节**：[first-txn-layout.md](first-txn-layout.md)「一、样本节」。
+**写出的字节**：[layout/01-first-txn.md](layout/01-first-txn.md)「一、样本节」。
 
 **会碰到的决策点**：D400（样本挂钩） 未定项 1。
 

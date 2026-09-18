@@ -185,6 +185,6 @@ E102 第二版：cap(90, 56) = 583（区间 [65, 120]）、cap(90, 140) = 233（
 
 D9 已定项 6 那一行；D18 已定项 3 / 7 / 8 / 10 的相关句；D18:461 的悬空引用；D21 已定项 4 挂注；
 新增 I-1.6（类标签登记且三处相等 + P5 四条）；I-1 注按登记表穷举；I-2.3 射程扩到码 3；I-6.2 按码分；
-first-txn-layout.md（flags 行、五元组拆五行、第 59 行转已定）；verification-build.md 第 8 问关闭；
+layout/01-first-txn.md（flags 行、五元组拆五行、第 59 行转已定）；verification-build.md 第 8 问关闭；
 checks-owed：C98 登记位那半还掉、C99 按 P4 改自证条款、新立 P7 的七笔；E83 / E84 / E98 口径注；
 **E102 已跑并按第二版更新**（9 单测 / 8 变异 / 39 行）；decisions-history 一条。

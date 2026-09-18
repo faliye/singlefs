@@ -79,7 +79,7 @@ $ ls /home/fy5090/code/singlefs/research/prompts/ | grep -c '^e153'
 - `.claude/kb/decisions/08-核心索引结构.md`：第 455–516 行
 - `.claude/kb/decisions/18-块里携带什么信息.md`：第 917–965 行
 - `.claude/kb/checks-owed.md`：第 150、159、309 行（grep）
-- `.claude/kb/first-txn-layout.md`：第 151、378 行（grep）
+- `.claude/kb/layout/01-first-txn.md`：第 151、378 行（grep）
 - `.claude/kb/milestone/02-second-txn.md`：第 40、42、54、156、374 行（grep，每行前 300 字符）
 - `.claude/kb/experiments.md`：只取 E79、E131、E132 的简称
 - 误读：上一节列的实验页与 `experiments-history.md` 的几行

@@ -12,7 +12,7 @@
 
 | 模型里怎么做 | 照的行 |
 |---|---|
-| 根环 3 个区域，槽位 `(txg mod 3, (txg div 3) mod S)`，S = 8（第一版取值；s3 另用 S = 4）；区域归属 0 / 1 / 0 | `22-单元原子性怎么合成.md:1005`、`:1013`；`first-txn-layout.md:43` |
+| 根环 3 个区域，槽位 `(txg mod 3, (txg div 3) mod S)`，S = 8（第一版取值；s3 另用 S = 4）；区域归属 0 / 1 / 0 | `22-单元原子性怎么合成.md:1005`、`:1013`；`layout/01-first-txn.md:43` |
 | mkfs 在三个区域的槽 0 各放一份 txg 0 的根 | `22-单元原子性怎么合成.md:229` |
 | 每次发布先写单元、再写记录、最后写根槽；「已发布」= 根槽写成；「已确认」= 根槽写成、且那一刻本实例写成的根已覆盖两块盘 | `16-发布语义.md:287`、`:207` |
 | 严格暖机：新实例（挂载、切换、回退）先推空发布，直到本实例的根覆盖两块盘，用户事务排在后面；宽读法（用户事务紧跟新实例的第一个根）只当对照 | `16-发布语义.md:207`；`22-单元原子性怎么合成.md:1014` |
@@ -379,7 +379,7 @@ example name=s9_plain_crash_strict arm=A min_by=fs fs=2 script=[p(1) crash mount
 
 先说把整张表压扁的一件事（推理，条款指路）：丙只在一处比甲 / 乙少保证——一个已发布、已确认的号，在一次 0 故障的回退之后被新对象再用一次，新旧对象的出生代不同。盘上凡是随根回退的结构，回退之后都回到 R_old 那一版，被抛弃的对象不在里面（`23-journal的角色与格式.md:1206`「全部记账统计量的现行值从 R_old 那棵账重新载入」；实例表随根分版本，`18-块里携带什么信息.md:879`）。所以要找的消费者必须同时满足三件事：① 只看号、不看出生代；② 不随根回退（住在根环之外，或者在盘外）；③ 今天有条款定义它。
 
-查法：在 `decisions/`、`invariants.md`、`checks-owed.md`、`verification-build.md`、`first-txn-layout.md`、`milestone-first-txn.md` 里 `grep -rn`「只存号 / 按 inode 号 / inode 号作 / 按号作 / key = inode / inode 号为 / 对象 ID 作 / 按对象号 / (树 ID, inode) / (树, inode)」，命中 7 处，逐条读了上下文；再把第一轮与材料列过的消费者、这一轮新建的 journal 结构逐个过一遍。
+查法：在 `decisions/`、`invariants.md`、`checks-owed.md`、`verification-build.md`、`layout/01-first-txn.md`、`milestone/01-first-txn.md` 里 `grep -rn`「只存号 / 按 inode 号 / inode 号作 / 按号作 / key = inode / inode 号为 / 对象 ID 作 / 按对象号 / (树 ID, inode) / (树, inode)」，命中 7 处，逐条读了上下文；再把第一轮与材料列过的消费者、这一轮新建的 journal 结构逐个过一遍。
 
 | 候选 | 只认号？ | 随根回退？ | 住在哪 | 判 |
 |---|---|---|---|---|
@@ -391,7 +391,7 @@ example name=s9_plain_crash_strict arm=A min_by=fs fs=2 script=[p(1) crash mount
 | 稀疏旁表：条目 key = 中央映射 key 27 | 否 | 随根 | `05-快照-空间记账机制.md:244` | 不认号 |
 | 中央映射树 | 否 | 根住根记录，随根 | `19-块指针的结构与宽度预算.md:98` | 不认号 |
 | journal 记录的点名项（位置条目 × 2、类标签、出生树、出生 txg、key 尾段、flags） | 否：一个字段都不含 inode 号 | 不随根（留在环里） | `23-journal的角色与格式.md:696` | 不带号 |
-| 超级块 | 字段表里没有与 inode 号有关的字段（`first-txn-layout.md` 第 95–152 行那一段 grep「inode」零命中） | 不随根 | `first-txn-layout.md` 超级块字段表；`22-单元原子性怎么合成.md` 已定项 9 | 不适用 |
+| 超级块 | 字段表里没有与 inode 号有关的字段（`layout/01-first-txn.md` 第 95–152 行那一段 grep「inode」零命中） | 不随根 | `layout/01-first-txn.md` 超级块字段表；`22-单元原子性怎么合成.md` 已定项 9 | 不适用 |
 | 墓碑区间记录（对象 ID + 对象出生代 + 区间） | 否：带出生代 | 随写者树 | `18-块里携带什么信息.md:749` | 不失效 |
 | I-9.6「水位 > 该树全部墓碑记录的对象 ID」 | 是（只看对象 ID） | checker 遍历侧看的是可达的墓碑 | `invariants.md:262` | 按遍历侧读不失效。有人按扫描侧读（把被抛弃时间线还没回收的墓碑单元也算进来），丙在 0 故障回退之后会红——要写明「已发布的墓碑」（第一轮已提），它是 checker 的措辞问题，不是运行时消费者 |
 | checker 的 I-9.10（按 inode 号把数据单元接到 inode 记录上，再比出生代；`crates/singlefs-checker/src/walk.rs:740` 起） | 按号接、再比出生代 | 单镜像、只看可达 | `invariants.md` I-9.10 那一行 | 可达集里没有被抛弃对象；它比的正是出生代 |
@@ -408,7 +408,7 @@ example name=s9_plain_crash_strict arm=A min_by=fs fs=2 script=[p(1) crash mount
 
 ## 四、U3：代价，以及 AJ / CJ 在回退与挂载时要读的 journal 量
 
-记号：J = journal 环的记录槽数 = 环长 ÷ 4096（第一版默认环 768 MiB ⇒ J = 196608，`first-txn-layout.md:45`；环长是 mkfs 参数、约束「环 ≤ 设备容量 ÷ 4」，`23-journal的角色与格式.md:1270` ⇒ J ≤ 设备容量 ÷ 16384）；R·S = 根槽数（第一版 3 × 8 = 24）；d_tt = 树表层数（≤ 109 棵树 1 层，≤ 109² 棵 2 层，`08-核心索引结构.md:466`）；H = 可写头数；d_acct = 记账树高；N_pub(T_old) = 环里还读得出记录的、txg > T_old 的发布次数；r = 一次发布写的记录条数（空发布 1）。一次节点读 16 KiB。
+记号：J = journal 环的记录槽数 = 环长 ÷ 4096（第一版默认环 768 MiB ⇒ J = 196608，`layout/01-first-txn.md:45`；环长是 mkfs 参数、约束「环 ≤ 设备容量 ÷ 4」，`23-journal的角色与格式.md:1270` ⇒ J ≤ 设备容量 ÷ 16384）；R·S = 根槽数（第一版 3 × 8 = 24）；d_tt = 树表层数（≤ 109 棵树 1 层，≤ 109² 棵 2 层，`08-核心索引结构.md:466`）；H = 可写头数；d_acct = 记账树高；N_pub(T_old) = 环里还读得出记录的、txg > T_old 的发布次数；r = 一次发布写的记录条数（空发布 1）。一次节点读 16 KiB。
 
 | 臂 | 格式字节 | 改第一个事务的字节 | 回退时多读 | 每次挂载多读 | 发号路径 |
 |---|---|---|---|---|---|
@@ -576,7 +576,7 @@ cmp "${TMPDIR:-/tmp}/c143r2_model.rerun.out" c143r2_model.out && echo IDENTICAL
 **`22-单元原子性怎么合成.md:1014`**
 
 ```text
-5. **暖机空发布 2 次、第一个事务 txg 3 是格式常量**，不是运行时谓词（`format-const` WARM_UP_EMPTY_PUBLISHES = 2、FIRST_TRANSACTION_TXG = 3，登记在 [first-txn-layout.md](../first-txn-layout.md) 八）。依据：D16（发布语义） 已定项 8 要求「推到本实例的根覆盖两块盘为止」，而在 0 / 1 / 0 的归属下 txg 1 落区域 1（盘 1）、txg 2 落区域 2（盘 0），两次正好覆盖两块盘 ⇒ 次数由归属唯一确定，写成常量比写成运行时谓词少一条只有一个取值的分支。⚠️ 归属改了这两个常量要重算（加盘或开条带表时）。
+5. **暖机空发布 2 次、第一个事务 txg 3 是格式常量**，不是运行时谓词（`format-const` WARM_UP_EMPTY_PUBLISHES = 2、FIRST_TRANSACTION_TXG = 3，登记在 [layout/01-first-txn.md](../layout/01-first-txn.md) 八）。依据：D16（发布语义） 已定项 8 要求「推到本实例的根覆盖两块盘为止」，而在 0 / 1 / 0 的归属下 txg 1 落区域 1（盘 1）、txg 2 落区域 2（盘 0），两次正好覆盖两块盘 ⇒ 次数由归属唯一确定，写成常量比写成运行时谓词少一条只有一个取值的分支。⚠️ 归属改了这两个常量要重算（加盘或开条带表时）。
 ```
 
 **`16-发布语义.md:207`**

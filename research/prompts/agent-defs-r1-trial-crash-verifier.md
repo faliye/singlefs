@@ -82,7 +82,7 @@ $ awk -F'\t' -v me=crash-verifier '$1 !~ /^#/ && NF == 3 { n = split($2, owners,
 EXITCODE=0
 ```
 两条 `states=closed_form`、`violations=0`、`exhaustive=true` 都对上；第二条流的 `789555` 与
-`.claude/kb/first-txn-layout.md:401`、`.claude/kb/milestone/02-second-txn.md:58` 里现查到的「到 C（26 段、789555）」逐字相符
+`.claude/kb/layout/01-first-txn.md:401`、`.claude/kb/milestone/02-second-txn.md:58` 里现查到的「到 C（26 段、789555）」逐字相符
 （这两份 kb 文件在开跑时的 `git status` 里已经是 `M`，即工作区正在被改的文件之一）。
 
 ### 55-qemu-first-transaction.sh（QEMU 真设备）—— 原样抄的 ✓ 行

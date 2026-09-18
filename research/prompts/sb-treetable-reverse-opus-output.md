@@ -76,8 +76,8 @@ D22（单元原子性怎么合成） 已定项 8 第 3 条整行抄（`decisions
 ⇒ **mkfs 之后盘上已经有 R × S 份第 0 代根记录**，而根记录恒带树表单元指针（D22（单元原子性怎么合成） 已定项 7 字段表那一行「树表单元指针 | **59**」）。
 「还没发布过」这个态在本工程不存在——mkfs 自己就完成了第 0 代发布。没有「先有超级块、还没有根记录」的窗口。
 
-⚠️ **顺带查出一处 `first-txn-layout.md` 的漏行**（不是本问的答案，但要记）：
-`first-txn-layout.md:152` 有「实例表单元（第一片，mkfs 写出）」这一行，
+⚠️ **顺带查出一处 `layout/01-first-txn.md` 的漏行**（不是本问的答案，但要记）：
+`layout/01-first-txn.md:152` 有「实例表单元（第一片，mkfs 写出）」这一行，
 而**没有对应的「树表单元（mkfs 写出）」行**——第 0 代根记录的 59 字节指针必然指到一个 mkfs 写出的树表单元，
 那个单元的字节今天在这张表里一行都没有。
 
@@ -401,7 +401,7 @@ D22（单元原子性怎么合成） 未定项 9 的「改第一个事务的字�
 ## 8. 搜过但没写进上面的地方（列出来，免得被当成没搜）
 
 `.claude/kb/decisions/` 下 01 / 02 / 03 / 05 / 06 / 08 / 09 / 12 / 13 / 15 / 16 / 18 / 19 / 21 / 22 / 23 / 26 / 27，
-`invariants.md` 全表（I-1 到 I-9），`checks-owed.md` 全表，`first-txn-layout.md` 全文，
+`invariants.md` 全表（I-1 到 I-9），`checks-owed.md` 全表，`layout/01-first-txn.md` 全文，
 `verification-build.md` 全文，`decisions-history.md` 中「树 ID 水位」「开放列表」两族命中，
 `research/e7-index-bench/src/bin/e115_superblock_completeness.rs`。
 关键词：树表 / tree_table / 中央映射 / 扫描重建 / fsck / 超级块 + 加密 / 根环 / 自举。

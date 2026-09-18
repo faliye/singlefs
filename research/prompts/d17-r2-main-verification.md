@@ -53,7 +53,7 @@
 ## 五、写回哪里
 
 - D17（实现分层与第三方管道） 已定项 2（条款五条 + 依据 + 射程）；标题改已定。
-- first-txn-layout 八：判据改「集合」、段序列改抄 `name=segments`、加抬 F 一行、改 ⚠️ 射程；milestone 两行改链到八。
+- layout/01-first-txn 八：判据改「集合」、段序列改抄 `name=segments`、加抬 F 一行、改 ⚠️ 射程；milestone 两行改链到八。
 - E142 第四次跑加 `name=segments` 四行、单测、变异 M20、G19 改 11 次操作。
 - checks-owed：C220 → 已还清；C316 收窄；D12 要还的债第 3 条加等价类数 = 1。
 - decisions-history 2026-09 其三十三。

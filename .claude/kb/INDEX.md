@@ -17,7 +17,7 @@
 | [tooling.md](tooling.md) | 工具与环境事实：本地 LLM、Rust 工具链、QEMU harness 的现状与缺口 |
 | [vm-harness.md](vm-harness.md) | 怎么把一个实验送进虚机在**真块设备**上跑：三个前置、卫生检查、虚机里多了哪条校验路径 |
 | [verification-build.md](verification-build.md) | 三样验证手段（checker、事务层、崩溃点重放）怎么落地：各自消费哪些已定条款、被哪些未定项挡着、能从 research/ 抬走什么、第一版最小范围、待用户定案的问题 |
-| [first-txn-layout.md](first-txn-layout.md) | 第一个事务写出哪些字节：每段每字段指向一条决策分项，给宽度与取值；段序列登记表也在这里 |
+| [layout/01-first-txn.md](layout/01-first-txn.md) | 第一个事务写出哪些字节：每段每字段指向一条决策分项，给宽度与取值；段序列登记表也在这里 |
 | [milestone/](milestone/) | 里程碑规划，每个里程碑一个文件（`NN-简称.md`）：每步写设想实现什么、预想的细节、验收标准、写出的字节、会碰到的决策点；按当时判断写，每步开工前回来改 |
 
 ## 不是编号的记号

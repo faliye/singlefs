@@ -85,7 +85,7 @@ grep -rc "\b11881\b" . → 5 处
 ```
 grep -rln "树表条目\|树表单元每层\|每层.*棵" .claude/kb --include="*.md" | grep -v -- "-history"
 ```
-→ 22 个非 history 文件。逐一读完（`decisions.md`、`05/06/08/18/19/22/26-*.md`、`experiments/128/131/132/133/134/136/142/145/146-*.md`、`experiments.md`、`first-txn-layout.md`、`invariants.md`、`milestone/01/02-*.md`）后，找到 **2 处真正的"更早一代残留"**（145/112，不含字面 148，是 2026-09-14 之前那一代）：
+→ 22 个非 history 文件。逐一读完（`decisions.md`、`05/06/08/18/19/22/26-*.md`、`experiments/128/131/132/133/134/136/142/145/146-*.md`、`experiments.md`、`layout/01-first-txn.md`、`invariants.md`、`milestone/01/02-*.md`）后，找到 **2 处真正的"更早一代残留"**（145/112，不含字面 148，是 2026-09-14 之前那一代）：
 
 ### 找到的问题（要改 / 要人看）
 
@@ -116,7 +116,7 @@ sed -n '159p;575p' .claude/kb/checks-owed.md
 
 ## 三、`stale=` 候选核验
 
-已登记（`.claude/kb/first-txn-layout.md:378`）：
+已登记（`.claude/kb/layout/01-first-txn.md:378`）：
 ```
 <!-- format-const: TREE_TABLE_ENTRY_BYTES = 200 stale=expect("148")|预留 24 非零|树表条目预留 24|TREE_TABLE_ENTRY_BYTES, 148|7 × 148|1036|每层 109|109²|预留剩 24|[147] = 1 -->
 ```
@@ -130,7 +130,7 @@ done
 ```
 **9 个串在门禁范围内均 0 命中**（唯一命中都是标记自身或规则文件里的举例反引号，两者都不在门禁扫描的 `kb_files`/`srcs` 集合里）。**结论：已登记的 9 个 stale= 串全部合格，不需要追加或修正。**
 
-我**没有**新增候选：checks-owed.md 里"112 棵/层"目前还不满足"命中 0 次才给"（上面 ① 处仍然命中），要先改掉 ① 才能把"112 棵/层"或"145 字节条目算成 112"这类串登记进 stale=；改完之后可以追加，登记位建议仍用 `first-txn-layout.md:378` 那一条（同一常量不能开第二处登记位）。
+我**没有**新增候选：checks-owed.md 里"112 棵/层"目前还不满足"命中 0 次才给"（上面 ① 处仍然命中），要先改掉 ① 才能把"112 棵/层"或"145 字节条目算成 112"这类串登记进 stale=；改完之后可以追加，登记位建议仍用 `layout/01-first-txn.md:378` 那一条（同一常量不能开第二处登记位）。
 
 ## 四、试跑观察
 

@@ -9,7 +9,7 @@
    - `.claude/kb/decisions/02-RAID条带策略.md` 硬要求 1、已定项 15、已定项 19
    - `.claude/kb/experiments/126-超级块槽宽四条候选的代价.md`、`research/e7-index-bench/src/bin/e126_superblock_slot_width.rs`、`research/results/e126-*.out`；`.claude/kb/experiments/34-根环槽几何.md`
    - `.claude/kb/checks-owed.md` 里 C212 那一行与它点名的三条候选
-   - `.claude/kb/first-txn-layout.md` 零、一两节；`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 4「512 这个数不由本工程定」那一节
+   - `.claude/kb/layout/01-first-txn.md` 零、一两节；`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 4「512 这个数不由本工程定」那一节
 
 ## 要攻的
 

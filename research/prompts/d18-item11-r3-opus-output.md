@@ -488,7 +488,7 @@ MAC 是认证标签，不是缓存：重算它要密钥，而且要先信任被�
 | `.claude/kb/decisions/08-核心索引结构.md:323` | 有 |
 | `.claude/kb/decisions/18-块里携带什么信息.md:150 / 279 / 283` | 有 |
 | `.claude/kb/experiments/102-单元类登记表与打包记录单元.md:3` | 有 |
-| `.claude/kb/first-txn-layout.md:59` | 有 |
+| `.claude/kb/layout/01-first-txn.md:59` | 有 |
 | `research/e7-index-bench/src/bin/e102_unit_class_registry.rs:1` | 有 |
 | `.claude/kb/decisions-history.md:29` | 没有 |
 | `.claude/kb/decisions-history.md:34` | 没有 |

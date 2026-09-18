@@ -438,11 +438,11 @@ D14 未定项 1 反过来逐字拿「D15 未定项 1 的正文逐字把 D14 这�
 
 > 升格前它没有编号、不在 [checks-owed.md](../checks-owed.md) 里、也不是任何一条分项，于是「映射条目的编码没定」这处格式级空白**没有任何未定项承载它**，门禁阶段 31（每个未定项有没有判过改不改第一个事务的字节）对它一个字都说不出来——正是 C66（格式级空白没有分项号） 立账要防的形态。
 
-⇒ 一处真的格式级空白，本该有：**一个 C 号**、或 `first-txn-layout.md` 里一行标着未定的字段、
+⇒ 一处真的格式级空白，本该有：**一个 C 号**、或 `layout/01-first-txn.md` 里一行标着未定的字段、
 或一条不变量。现查：
 
 ```
-grep -rn "轨道位\|第二轨" .claude/kb/checks-owed.md .claude/kb/first-txn-layout.md .claude/kb/invariants.md
+grep -rn "轨道位\|第二轨" .claude/kb/checks-owed.md .claude/kb/layout/01-first-txn.md .claude/kb/invariants.md
 ```
 
 **零命中。** 「格式级第二轨」在全仓只出现 6 处，全部在 `decisions.md` 索引行、
@@ -454,7 +454,7 @@ grep -rn "轨道位\|第二轨" .claude/kb/checks-owed.md .claude/kb/first-txn-l
 
 | 解释 | 支持它的 |
 |---|---|
-| **这一格根本不是格式级空白**，所以没有欠账载体 | D14 已定「不做格式级第二轨」；`first-txn-layout.md` 里没有任何字段指向它 |
+| **这一格根本不是格式级空白**，所以没有欠账载体 | D14 已定「不做格式级第二轨」；`layout/01-first-txn.md` 里没有任何字段指向它 |
 | **它是空白，只是没人立账**，正是 C66 要防的形态 | D19 未定项 6 刚刚在 2026-09-08 因为同一个毛病被升格 |
 
 **分辨这两种的事实**：C66 那一类空白的判据是「**第一个事务写不出这几个字节**」。

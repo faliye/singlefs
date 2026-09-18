@@ -100,7 +100,7 @@ impl FirstPublish {
             | FirstPublish::EmptyPublishBeforeRecoveryRows => 1,
         }
     }
-    /// 取号之前根环里最大的 txg：mkfs 之后 0；第一个事务之后 3（first-txn-layout.md 零的 t10）。
+    /// 取号之前根环里最大的 txg：mkfs 之后 0；第一个事务之后 3（layout/01-first-txn.md 零的 t10）。
     const fn highest_root_txg_before(self) -> u64 {
         match self {
             FirstPublish::WarmUpEmptyPublish => 0,
@@ -146,7 +146,7 @@ fn empty_publish_steps(instance: u32, txg: u64, root_disk: usize, labels: [&'sta
     ]
 }
 
-/// 写行那次发布（first-txn-layout.md 第 392 行的预想段序列）：[实例表单元 + 另一个 COW 单元] 屏障 [记录] 屏障 [根 FUA] [超级块]。
+/// 写行那次发布（layout/01-first-txn.md 第 392 行的预想段序列）：[实例表单元 + 另一个 COW 单元] 屏障 [记录] 屏障 [根 FUA] [超级块]。
 /// 根的标签恒为 "rows_root"：它挂的实例表里有这次写的行。
 fn rows_publish_steps(instance: u32, txg: u64, root_disk: usize, second_unit: [&'static str; 2]) -> Vec<Step> {
     vec![
@@ -683,7 +683,7 @@ struct HistoryState {
 }
 
 impl HistoryState {
-    /// 第一个事务写完（first-txn-layout.md 零的 w6 / t11）：两盘槽 0 = 世代号 4、槽 1 = 世代号 5，都是实例 1；根环 (0,0)(1,1)(1,2)(1,3)。
+    /// 第一个事务写完（layout/01-first-txn.md 零的 w6 / t11）：两盘槽 0 = 世代号 4、槽 1 = 世代号 5，都是实例 1；根环 (0,0)(1,1)(1,2)(1,3)。
     fn after_first_transaction() -> Self {
         let disk_slots = [
             SlotContent { generation: 4, instance: 1 },

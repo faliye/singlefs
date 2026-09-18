@@ -213,7 +213,7 @@ $ bash .claude/gate.d/21-decision-items-sync.sh --write
    → 按「改不改变第一个事务写出的字节」这把尺判一次，在该分项的登记行里写「改第一个事务的字节：是/否/无对象（YYYY-MM-DD，依据：…）」
 ```
 这也是这一轮写出来的（该行是我按规格新增的）。**未修**：判断根记录字段表翻回未定之后改不改第一个事务的字节，
-是一次需要读 D22 正文、first-txn-layout.md 现状再下判断的实质性决定，不是规格给定的句子，按定义不做这个判断。
+是一次需要读 D22 正文、layout/01-first-txn.md 现状再下判断的实质性决定，不是规格给定的句子，按定义不做这个判断。
 
 ### 33-mutation-tables.sh
 
@@ -269,10 +269,10 @@ bc6c98b9e18dcde8c73857292095ea8298d1ded4f36ac8921cdc23aa0603d999  .claude/kb/exp
 dffab10ae4bffee56bf184d842389361f317a4fba5565cf0ac5d725a6f5ff37e  .claude/kb/experiments/79-根记录的容量.md
 153e6e0ac24fdaedb9e8fc05dfe566af806f4f2bdcc6376ad96620a6d643e512  .claude/kb/experiments/97-记账与分配记录的条目编码.md
 08872acdd79ec3c6a1ffa7f3bdfcf9c7c99853d0a0683dec0efed86e02341eed  .claude/kb/experiments/99-writebuffer条目与seq的去重.md
-7a4253628c6eb1954ad4e87209a88801f35ffdbb6c5cf9c181c0afbae032b41a  .claude/kb/first-txn-layout.md
+7a4253628c6eb1954ad4e87209a88801f35ffdbb6c5cf9c181c0afbae032b41a  .claude/kb/layout/01-first-txn.md
 40a71f9decf44ce100927047555d6db31ab33c468a60e6b2d01a8fe84750577b  .claude/kb/milestone/01-first-txn.md
 d65462ae2a6684b137f720738475354a15eda921f38e0d37643ad998a0d789a3  .claude/kb/milestone/02-second-txn.md
-b6d2ea9b0c22c9af8d0d1652d26a0c85761a15a11ef6cdb31def270712c7071e  .claude/kb/second-txn-layout.md
+b6d2ea9b0c22c9af8d0d1652d26a0c85761a15a11ef6cdb31def270712c7071e  .claude/kb/layout/02-second-txn.md
 6c5521c66fba283d6e199ecdc6a2ce75d22bf9ff5d675fffa9ecdd4f35033e3b  .claude/kb/verification-build.md
 fe6677ebd33e1e25423f6a9d3be4e44143e21ab6b7a07238869d33d47ffda646  .claude/rules/three-way-inference.md
 344ed8cf941c11449dfe88c59dd789fae70e0170cf10f81f7f7e50583133e934  .claude/kb/decisions.md

@@ -114,7 +114,7 @@ if bad:
         print("      " + b)                                              # gate-lint:detail
     print("  → 怎么办：加错了就改那个数；若是刚加了一行字段，那么**同一轮要一起改的还有**——")
     print("    该决策索引表那一行里的合计、这一节的 format-const 标记、")
-    print("    [first-txn-layout.md] 对应那一节，以及全仓引过这个数的地方")
+    print("    [layout/01-first-txn.md] 对应那一节，以及全仓引过这个数的地方")
     print("    （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`：撤回一个数要当场回扫谁在引它）。")
     sys.exit(1)
 

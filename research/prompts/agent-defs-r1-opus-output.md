@@ -289,7 +289,7 @@ E7RESULT name=gap id=G4 text=根记录字段序：D22已定项7的表与字节�
 | ② `relabel-item.py` 连 `research/mutations/*.tsv` 的原文与替换文两列一起改 | 不中（锚点跟着源码变） | 仍中：产物要 `experiment-runner` 重跑 |
 | ③ relabel 与 22 号都不再扫 `research/**/*.rs` | 不中 | 不中；代价是实验源码里的分项标签从此没人核 |
 
-**同一步还会改到别的会话没提交的文件**（共用约束第 27 行「看到别人没提交的改动不碰、不修」）：约 03:01 UTC 在又一份副本上按同样的内存翻状态对 D22 已定项 7 做 `--dry-run`，列出 57 个要改写的文件；与真仓 `git status --porcelain` 的路径求交集得 8 个：`.claude/kb/decisions-history/2026-09.md`、`.claude/kb/decisions-history.md`、`.claude/kb/experiments-history.md`、`.claude/kb/first-txn-layout.md`、`.claude/kb/milestone/02-second-txn.md`、`.claude/kb/second-txn-layout.md`、`.claude/kb/verification-build.md`、`research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`（这一次是一条临时命令，没进模型目录；数随别的会话的进度变，02:51 那次是 56 个文件）。
+**同一步还会改到别的会话没提交的文件**（共用约束第 27 行「看到别人没提交的改动不碰、不修」）：约 03:01 UTC 在又一份副本上按同样的内存翻状态对 D22 已定项 7 做 `--dry-run`，列出 57 个要改写的文件；与真仓 `git status --porcelain` 的路径求交集得 8 个：`.claude/kb/decisions-history/2026-09.md`、`.claude/kb/decisions-history.md`、`.claude/kb/experiments-history.md`、`.claude/kb/layout/01-first-txn.md`、`.claude/kb/milestone/02-second-txn.md`、`.claude/kb/second-txn-layout.md`、`.claude/kb/verification-build.md`、`research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`（这一次是一条临时命令，没进模型目录；数随别的会话的进度变，02:51 那次是 56 个文件）。
 
 **附（不归定义，报主 agent）**：同一次 relabel 改写了变更史里的过去时条目。命令与原样输出：
 

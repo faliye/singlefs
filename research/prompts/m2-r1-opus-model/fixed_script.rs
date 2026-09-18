@@ -74,7 +74,7 @@ fn build_script() -> Vec<Publish> {
     let mut script: Vec<Publish> = Vec::new();
     // ---- 实例 1：mkfs 之后第一次可写挂载 ----
     // 写行区间 [max(所选根的实例, 1), 新实例) = [1, 1) 是空的 ⇒ 没有写行那次发布
-    // （first-txn-layout.md 八「第一次之后的可写挂载（写行）」那一行逐字：实例 0 不写）。
+    // （layout/01-first-txn.md 八「第一次之后的可写挂载（写行）」那一行逐字：实例 0 不写）。
     let (warm1, next) = warm_up_empty_publishes(1, false);
     for txg in &warm1 {
         script.push(Publish {
@@ -145,7 +145,7 @@ fn closed_form(segments: &[usize]) -> u128 {
     1 + segments.iter().map(|n| (1u128 << n) - 1).sum::<u128>()
 }
 
-/// 把一条发布序列切成录制流的段（first-txn-layout.md 八的形状 + 末尾那条 ⚠️：
+/// 把一条发布序列切成录制流的段（layout/01-first-txn.md 八的形状 + 末尾那条 ⚠️：
 /// 发布与下一次发布之间没有屏障 ⇒ 上一次发布的超级块槽写与这次的单元写落在同一段）。
 /// 返回每一段的写请求数。
 fn segments_of(script: &[Publish], empty_publish_writes_units: bool) -> Vec<usize> {

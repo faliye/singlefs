@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # gate-stage: 决策里定的字段有没有漏投影进第一个事务的表
 #
-# `32-first-txn-fields.sh` 查的是**正向**：[first-txn-layout.md] 表里每个字段都指得到一条真实分项。
+# `32-first-txn-fields.sh` 查的是**正向**：[layout/01-first-txn.md] 表里每个字段都指得到一条真实分项。
 # **反向没人查**：一条分项的字段表里新加了一行，而投影表没跟着加。
 #
 # ⚠️ **这条是实测出来的**（2026-09-07）：D8（核心索引结构）已定项 8 ② 于 2026-09-06 把
 # **树 ID 水位 8 字节**加进根记录（D22 已定项 7 的字段表当天就加了这一行，合计 186 → 194），
-# 而 [first-txn-layout.md] 第七节「发布（根记录与根槽）」那张表一个字没动 —— 漏了整整一行，
+# 而 [layout/01-first-txn.md] 第七节「发布（根记录与根槽）」那张表一个字没动 —— 漏了整整一行，
 # 正向检查全程判绿，因为它只问「表里已有的字段指不指得到分项」。
 #
 # 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
 #   1. 只认表头恰好是 `| 字段 | 宽 |` 或 `| 字段 | 宽度 |` 的表。散在段落里的字段定义抓不到。
-#   2. **只检查已经被投影过的分项**——[first-txn-layout.md] 里出现过 `D<n>（简称） 已定项 <k>` 的那些。
-#      理由：不是每条分项都属于第一个事务（口径见 [first-txn-layout.md] 开头：不含快照、加密、目录树），
+#   2. **只检查已经被投影过的分项**——[layout/01-first-txn.md] 里出现过 `D<n>（简称） 已定项 <k>` 的那些。
+#      理由：不是每条分项都属于第一个事务（口径见 [layout/01-first-txn.md] 开头：不含快照、加密、目录树），
 #      对没被投影的分项要求投影会假红。**代价是：一条从头到尾就没进过投影表的分项，本阶段一个字也不说。**
 #   3. 字段名按子串比对，只判「在不在」，不判宽度值对不对（宽度归 27-format-constants 与 C94）。
 #
@@ -20,7 +20,7 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-FTL=.claude/kb/first-txn-layout.md
+FTL=.claude/kb/layout/01-first-txn.md
 [[ -f "$FTL" && -d .claude/kb/decisions ]] || { echo "  ! 找不到 $FTL 或 decisions/，本阶段跳过"; exit 77; }
 
 python3 - "$FTL" <<'PY'

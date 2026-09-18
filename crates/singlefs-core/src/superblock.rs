@@ -1,5 +1,5 @@
 //! 超级块（D22（单元原子性怎么合成） 已定项 9 / 已定项 15 / 已定项 16）：481 字节住 4096 字节的槽，每盘两槽轮换，
-//! 整槽校验和罩 4096 含补齐、自身按 0 参与。字段顺序照 `first-txn-layout.md` 一那一节的字段表。
+//! 整槽校验和罩 4096 含补齐、自身按 0 参与。字段顺序照 `layout/01-first-txn.md` 一那一节的字段表。
 
 use singlefs_format::{
     journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,

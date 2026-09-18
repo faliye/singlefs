@@ -20,7 +20,7 @@
 | 命令 | 命中 | 说明 |
 |---|---|---|
 | `grep -rn "克隆祖先表" .claude/kb/ \| wc -l` | **16** | 全部命中在 D9 / D18 / D26 / C110 / E90 / 变更史；**没有一处给它字段或结构** |
-| `grep -c "克隆祖先表" .claude/kb/first-txn-layout.md` | **0** | 第一个事务的字段表里一个字都没有 |
+| `grep -c "克隆祖先表" .claude/kb/layout/01-first-txn.md` | **0** | 第一个事务的字段表里一个字都没有 |
 | `grep -c "克隆祖先表" .claude/kb/invariants.md` | **0** | 67 条不变量零处提到 |
 | `grep -c "克隆祖先表" .claude/kb/decisions.md` | **0** | 决策索引零处 |
 | `grep -rn "嵌套区间标号" .claude/kb/ \| wc -l` | **26** | 同上三个文件也都是 **0 / 0 / 0** |

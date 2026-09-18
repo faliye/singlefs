@@ -2,7 +2,7 @@
 
 材料：`research/prompts/_c322-r3-body.md`（50 行）、`_c322-r3-checklist.md`（第二轮清单，D16（发布语义） 已定项 1 一行改标「抄」）、`_c322-r3-appendix.md`（18 段，含 C322 / C113 / C314 三行欠账），三份拼成 `_c322-r3-background.md` 发给两条云端腿；本地腿的英文提示 `c322-r3-local.md` 自足。
 
-⚠️ 本地腿提示漏了一条事实：mkfs 在每盘两槽都写世代号 1（first-txn-layout.md 八 mkfs 一行「[m4 超级块槽 × 2 盘 × 2 槽 = 4，都是世代号 1]」）。两次抽样的第 6 问都据此推出「首次取号写世代号 1」，那一格作废，改按主 agent 的算术与辩方腿的数判。提示不改（证据），缺的事实记在这里。
+⚠️ 本地腿提示漏了一条事实：mkfs 在每盘两槽都写世代号 1（layout/01-first-txn.md 八 mkfs 一行「[m4 超级块槽 × 2 盘 × 2 槽 = 4，都是世代号 1]」）。两次抽样的第 6 问都据此推出「首次取号写世代号 1」，那一格作废，改按主 agent 的算术与辩方腿的数判。提示不改（证据），缺的事实记在这里。
 
 ## 一、本地腿（两次抽样：`c322-r3-local-output-s1.md` 189 秒 445 词、`-s2.md` 153 秒 653 词；字词损坏闸两次都过）
 
@@ -13,7 +13,7 @@
 | 3（T3 改写句） | 「P5 opens a hole」：崩在回退发布之前，下一次挂载得 X+2 而不是 X+1 | 同；另说「the correct state should have the previous code」 | 两次说的都是 P 第 5 句自己写明的「让下一次取号跳过一个号」，不是判据的触发观测（下一次挂载的所选根、施加集合、谓词判定与「没发起回退」不同）。s2「应当是旧号」没有条款依据：D18（块里携带什么信息） 第 879 行只写「从 1 起、0 无效」与写行范围 [所选根的实例, 新实例)，不要求实例代号连续，被跳过的号按写行规则得一行（第二轮核实二 K2 格已现查）。记「没打中」 |
 | 4（T4 checker） | 做得出；「flag a legitimate state where a unit has an instance higher than the largest superblock instance code」；根记录读不出时报不适用算漏报 | 做得出；「no legitimate images it would flag」「no collision images it would miss」 | s1 两句都核不通：甲″ 下单元号大于各盘超级块最大号的状态不可达，那不是合法状态；读不全报「不适用」是 P 第 4 句写明的处理，不算「成立」，不是漏报。s2 的例子（超级块 5 与 4、单元带 5 ⇒ ② 红）判得对。两次合起来没有有效的误报或漏报镜像，记「没打中」 |
 | 5（T5 辩四条排除） | G1「higher generations are always safe」；择到的那一份「rewrite-back writes are visible in the chosen slot」；乙′「improving crash safety」；旧改写「does not miss collision images when codes differ」 | 同向；多一句乙′「device 0's superblock is durable and usable」 | 四条都核不通。G1：没算 D22（单元原子性怎么合成） 已定项 16「下一次写的槽 = 世代号 mod 2」——滞后盘一次跳 2 落回自己择到的那一槽，第二轮的排除理由正在这里。择到的那一份：复述了排除理由里的依赖（回卷写先于单元），没有给出全部槽读法的一个误报。乙′：没有说出甲″ 做不到的具体好处（甲″ 屏障之后两盘都持久）。旧改写：撞号镜像两盘超级块相等（实例 1、1），「不等时才查」恰好放过它。两次都辩不动 |
-| 6（T6 代价） | 改字节：「first acquisition writes generation 1」；P4 把只落一盘的 2 个状态都判红 | 改字节：同；P4 判红 0 个 | 字节那半作废（提示缺 mkfs 写世代 1）。按 G2：mkfs 写世代 1 ⇒ 取号写 2 ⇒ 暖机写 3、4 ⇒ 第一个事务写 5，与今天逐项相同，首次挂载路径的字节不变（主 agent 按 first-txn-layout.md 八 mkfs 一行与 D22 已定项 16 算）。判红数 s2 的 0 对：那两个状态里较大的号（实例 1）不出现在任何根、记录、单元（根环只有 mkfs 写的实例 0 根），① ② 都成立；s1「the larger code appears in root records」核不通 |
+| 6（T6 代价） | 改字节：「first acquisition writes generation 1」；P4 把只落一盘的 2 个状态都判红 | 改字节：同；P4 判红 0 个 | 字节那半作废（提示缺 mkfs 写世代 1）。按 G2：mkfs 写世代 1 ⇒ 取号写 2 ⇒ 暖机写 3、4 ⇒ 第一个事务写 5，与今天逐项相同，首次挂载路径的字节不变（主 agent 按 layout/01-first-txn.md 八 mkfs 一行与 D22 已定项 16 算）。判红数 s2 的 0 对：那两个状态里较大的号（实例 1）不出现在任何根、记录、单元（根环只有 mkfs 写的实例 0 根），① ② 都成立；s1「the larger code appears in root records」核不通 |
 
 本地腿小结：T1–T5 两次都没有有效打中；T6 字节那半因提示缺一条事实作废，判红数 s2 对。
 
@@ -21,7 +21,7 @@
 
 | 格 | 腿说 | 主 agent 核 |
 |---|---|---|
-| 前提复核 | D22（单元原子性怎么合成） 已定项 16、D23（journal 的角色与格式） 已定项 16 与 14、D18（块里携带什么信息） 第 879 行、first-txn-layout.md 第 389–393 行、源码行号逐条与材料一致，失败条款不触发 | 与主 agent 前两轮现查一致；`crates/singlefs-checker/src/walk.rs` 今天的两条 I-7.7 判据（各盘择到的实例代号全相等、都不低于根环最大）现查在 |
+| 前提复核 | D22（单元原子性怎么合成） 已定项 16、D23（journal 的角色与格式） 已定项 16 与 14、D18（块里携带什么信息） 第 879 行、layout/01-first-txn.md 第 389–393 行、源码行号逐条与材料一致，失败条款不触发 | 与主 agent 前两轮现查一致；`crates/singlefs-checker/src/walk.rs` 今天的两条 I-7.7 判据（各盘择到的实例代号全相等、都不低于根环最大）现查在 |
 | T5 G1 | 辩不动：上下文把主语锁在单盘（「每盘恒 2 个槽」、D23 已定项 16「一次超级块槽写，世代号 +1」）；滞后盘上打破两槽交替「只覆写较旧那份」；还要推翻一条用户定案 | 与第二轮核实三 K5 格同向，核过 |
 | T5 择到的那一份 | 部分辩成：「回卷写不晚于单元」是甲″ 核心保证的直接推论，不是额外的脆弱假设；但仍取全部槽——checker 不该依赖实现内部的时序承诺，且 checker 本来就读两槽、读取零成本 | 部分辩护成立：P 第 1 句本来就把「回卷写发生在任何单元之前」列为实现义务，第二轮判决第 3 条「靠这条次序」的措辞把它说成了另一条假设，这句在交用户的说明里改掉。零成本现查：`crates/singlefs-checker/src/image.rs` 的 `chosen_superblocks` 逐盘读槽 0 与槽 1 再择一份。腿引「D13（验证路线） 已定项 5：O2 是独立解析器 + checker，不信任实现」转述不准——那一项现查标题是「只共享一份从 kb 生成的常量」；「checker 不依赖实现的时序承诺」由 checker 的形态（独立解析、只共享常量）撑着，仍然成立。结论不反转 |
 | T5 乙′ | 辩不动：乙′ 少掉的可达状态都是良性的；「失败域更清晰」是未验证的猜测，不采信 | 核过：少掉的是 {只落盘 1}，两轮都判合法、不误报 |
@@ -29,7 +29,7 @@
 | T6 字节 | 首次挂载 G2 写出 2、3、4、5，与今天相同 | 与本文件一 T6 格的算术相同 |
 | T6 段序列 | 首次挂载 262165 不变；八那张表改写「实例切换 / 管理员回退」、新增「非干净结束之后的可写挂载」、「抬 F 的空发布」一行写明次序 | 暖机第一步就是屏障（`crates/singlefs-core/src/transaction.rs` 第 214 行），核过 |
 | T6 层 0 | I-7.7 违例 2 → 0，别处不新增红：层 0 切段「前面的段全持久」让「某个根、记录、单元带实例 1」只出现在取号段全持久之后 | 推理核过 |
-| T6 改动量 | 代码 4 个文件（transaction.rs、recovery.rs、image.rs、walk.rs，walk.rs 新增 journal 记录与单元写序两类扫描）；条款：D18 第 879 行、D23 已定项 14、invariants.md I-7.7、first-txn-layout.md 八、checks-owed.md（C322 还清、新欠账一笔），D22 已定项 16 不改 | 与主 agent 写回清单草稿对得上；屏障句腿放在 D18 第 879 行，主 agent 草稿放在 D23 已定项 16，两处择一、另一处指过去，写回时定 |
+| T6 改动量 | 代码 4 个文件（transaction.rs、recovery.rs、image.rs、walk.rs，walk.rs 新增 journal 记录与单元写序两类扫描）；条款：D18 第 879 行、D23 已定项 14、invariants.md I-7.7、layout/01-first-txn.md 八、checks-owed.md（C322 还清、新欠账一笔），D22 已定项 16 不改 | 与主 agent 写回清单草稿对得上；屏障句腿放在 D18 第 879 行，主 agent 草稿放在 D23 已定项 16，两处择一、另一处指过去，写回时定 |
 
 辩方腿小结：四条排除三条辩不动，一条部分辩成而不反转结论；T6 的数与主 agent 相同。
 

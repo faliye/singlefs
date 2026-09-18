@@ -131,7 +131,7 @@ whiteout 只在节点重写合并 bset 时清除，**不许有别的清除路径
 意图机制的形态是**盘上一条 key（住 logged_ops 树）+ 幂等目标态 + 与最后一批工作同事务提交**。
 **乙 拿不到「零结构」**，它拿到的是「结构换了个名字，并且换进了一个今天同样没有落点的地方」——
 `logged_ops` 全仓只在 `08:270` 与 `26:89`、`26:108` 出现，
-在 checks-owed / first-txn-layout / invariants / verification-build 四个文件里同样**各 0 次**。
+在 checks-owed / layout/01-first-txn / invariants / verification-build 四个文件里同样**各 0 次**。
 
 **更硬的一层**：D8 硬要求逐字「**意图声明目标状态，绝不声明增量**」（`08:286`）。
 一次可续做的全树遍历，它的「目标状态」不能是「已经扫到 key K」（那是增量）；
@@ -379,13 +379,13 @@ H 正在死、它们又从来不进 deadlist（`birth > prev_snap_txg` 走的是
 
 ## 6. 复核立项那句 grep：**窄的那半成立，宽的那半不成立**
 
-材料 `:9-11` 与 `06:152` 逐字：「`livelist` 在 checks-owed.md / first-txn-layout.md /
+材料 `:9-11` 与 `06:152` 逐字：「`livelist` 在 checks-owed.md / layout/01-first-txn.md /
 invariants.md / verification-build.md 四个文件里**各出现 0 次**，
 **全仓只有 D5 与 D6 两处提到它**，两处都说它必做」。
 
 ### 6.1 换名字重搜：四个文件那一半**站得住**
 
-现查（2026-09-10，`grep -rn` 于 `.claude/kb/{checks-owed,first-txn-layout,invariants,verification-build}.md`）：
+现查（2026-09-10，`grep -rn` 于 `.claude/kb/{checks-owed,layout/01-first-txn,invariants,verification-build}.md`）：
 
 | 搜什么 | 四文件命中 |
 |---|---|

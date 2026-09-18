@@ -252,7 +252,7 @@ enum CommitStep {
 | # | 出处 | 「步骤集合」是什么 |
 |---|---|---|
 | 1 | D13（验证路线） 第 124-131 行 | 七个成员，无屏障、无 journal 记录、无超级块槽 |
-| 2 | `.claude/kb/milestone-first-txn.md` 第 155 行逐字「- `CommitStep` **预想**五个臂：写单元、屏障、写记录、屏障、FUA 写根槽。状态机每前进一步都经过录制器。」 | 五个臂，**有**屏障与 journal 记录，**没有**超级块槽 |
+| 2 | `.claude/kb/milestone/01-first-txn.md` 第 155 行逐字「- `CommitStep` **预想**五个臂：写单元、屏障、写记录、屏障、FUA 写根槽。状态机每前进一步都经过录制器。」 | 五个臂，**有**屏障与 journal 记录，**没有**超级块槽 |
 | 3 | E142（第一个事务的干跑） 写清单 / 材料 P4 | 单元、屏障、记录、屏障、根槽 FUA、**超级块槽轮换** |
 | 4 | C220（等价类仍是 2 与降级为待证互相欠着） 的门禁形态逐字「D13（验证路线） 的 `CommitStep` 枚举是封闭的 ⇒ **枚举成员数**与「等价类数」这个断言要在同一处对上，对不上判红」 | 等价类数由**成员数**给出（旧的「2」对应的是根步骤那两个互斥变体 `CasRootPointer` / `AppendRootRecord`） |
 
@@ -313,7 +313,7 @@ enum CommitStep {
 
 ### 5.3 门禁还缺一个更基本的东西：没有代码可 grep
 
-D13（验证路线）「一」那道门禁的形态是「改这个共享定义的 diff 门禁 grep 得到」。现查（2026-09-13）：`grep -rn "CommitStep" --include=*.rs .` 在整个仓里**零命中**——`CommitStep` 今天只出现在 markdown 里（13 份 kb 与 records 文件，含 `.claude/kb/decisions/13-验证路线.md`、`.claude/kb/decisions/26-后台整理与放置回收.md`、`.claude/kb/milestone-first-txn.md`、`.claude/kb/verification-build.md`、`.claude/kb/checks-owed.md`），外加 research/prompts 下的历轮材料。没有那个 `enum`，就没有「编译器强制所有引用处补分支」，也没有「所有引用处」。
+D13（验证路线）「一」那道门禁的形态是「改这个共享定义的 diff 门禁 grep 得到」。现查（2026-09-13）：`grep -rn "CommitStep" --include=*.rs .` 在整个仓里**零命中**——`CommitStep` 今天只出现在 markdown 里（13 份 kb 与 records 文件，含 `.claude/kb/decisions/13-验证路线.md`、`.claude/kb/decisions/26-后台整理与放置回收.md`、`.claude/kb/milestone/01-first-txn.md`、`.claude/kb/verification-build.md`、`.claude/kb/checks-owed.md`），外加 research/prompts 下的历轮材料。没有那个 `enum`，就没有「编译器强制所有引用处补分支」，也没有「所有引用处」。
 
 ⚠️ **而这个不存在的枚举已经被一条用户定案消费过了**：D26（后台整理与放置回收） 已定项 2 第 51 行逐字「**已定（2026-09-06，用户定案）：不新增 `CommitStep` 成员；意图的目标态写成「R 内不存在分配代 ≤ `c0` 且未释放的落点」。**」——「整理算不算新的结构等价类」这一问，仓里是拿「加不加 `CommitStep` 成员」判的，而判的时候枚举里既没有屏障、也没有 journal 记录、也没有超级块槽。**同一份枚举既当过判据，又装不下今天在跑的协议。**
 
@@ -425,7 +425,7 @@ D13（验证路线）「一」那道门禁的形态是「改这个共享定义�
 | 15 | `grep -n "\| C313 " .claude/kb/checks-owed.md` | 第 299 行：FUA 边界两读法 65543 / 65546 |
 | 16 | `grep -n "\| C8 \|\| C6 " .claude/kb/checks-owed.md` | 第 20 行（C6（块层语义假设写错））、第 22 行（C8（门禁范围判不出来）） |
 | 17 | `sed -n '243,262p' .claude/kb/decisions/22-单元原子性怎么合成.md` | D22（单元原子性怎么合成） 已定项 2 根环参数表（R=3、区域 = txg mod R、槽宽 = physical_block_size、S 下界 4） |
-| 18 | `sed -n '145,172p' .claude/kb/milestone-first-txn.md` | 第 155 行「`CommitStep` **预想**五个臂」、第 161 行「发布后再更新超级块的 tail 槽」、第 164 行验收标准的录制器流 |
+| 18 | `sed -n '145,172p' .claude/kb/milestone/01-first-txn.md` | 第 155 行「`CommitStep` **预想**五个臂」、第 161 行「发布后再更新超级块的 tail 槽」、第 164 行验收标准的录制器流 |
 | 19 | `grep -n "CommitStep" .claude/kb/decisions/26-后台整理与放置回收.md` | 第 51 行：D26（后台整理与放置回收） 已定项 2（2026-09-06 用户定案）「不新增 `CommitStep` 成员」 |
 
 **算术两处，都写明来源**：

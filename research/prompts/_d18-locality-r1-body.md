@@ -16,7 +16,7 @@
 | 六 | 第一版 `locality_id` 恒为 0；加密开启时它会新增第一处「用户对象语义类别」的泄漏；今天它没有盘上的明文表达（自描述头五元组不含它） | D14（双轨（大小文件 / 持久临时）） 那一节「三轮论证的经过与第三轮判决前的正文」 |
 | 七 | 冻结分层第 3 层是各 keyspace 的 key 编码（含 `locality_id`）；今天一层都没冻 | D15（格式冻结政策） 的分层 |
 | 八 | I-9.9 locality 三值对照：记录的 `locality_id` == 该对象每条 extent key 的首段；extent 树未经重建时输出红 / 绿，超级块 `map_provenance` 标 rebuilt 时两侧同源、输出「不可判定」，不许输出「通过」 | `invariants.md` 的 I-9 一节 |
-| 九 | 第一个事务：inode 记录偏移 16 的 `locality_id` 写 0；extent 叶记录 key = (0, 1, 0) | `first-txn-layout.md` 对应两行 |
+| 九 | 第一个事务：inode 记录偏移 16 的 `locality_id` 写 0；extent 叶记录 key = (0, 1, 0) | `layout/01-first-txn.md` 对应两行 |
 | 十 | `.claude/rules/fs-design.md`「不为省空间牺牲自包含」一节逐字：「⚠️ **这条不是「随便加字段」**。它管的是**已经论证过有用**的字段该不该为省空间而砍，不管「要不要加这个字段」——后者仍然要各自给理由。」 | 项目规则（整句抄在这里） |
 
 ## 二、问

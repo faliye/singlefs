@@ -4,7 +4,7 @@
 
 1. 背景材料：`research/prompts/_c322-r3-background.md`（正文 + 小节清单 + 附录）。
 2. 前两轮：`research/prompts/c322-r2-main-verification.md`（第二轮判决在第四节）、`research/prompts/c322-r2-opus-output.md`（五那一节是世代号与读法的数）、`research/prompts/c322-r2-sonnet-output.md`、`research/prompts/c322-r1-main-verification.md`。
-3. 自己去查（引用时写命令与行号）：`.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 16、`.claude/kb/decisions/18-块里携带什么信息.md` 第 879 行、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14 与 16、`.claude/kb/first-txn-layout.md` 八；源码 `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs`。
+3. 自己去查（引用时写命令与行号）：`.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 16、`.claude/kb/decisions/18-块里携带什么信息.md` 第 879 行、`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 14 与 16、`.claude/kb/layout/01-first-txn.md` 八；源码 `crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs`。
 
 ## 要做的
 

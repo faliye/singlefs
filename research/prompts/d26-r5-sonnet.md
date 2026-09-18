@@ -7,13 +7,13 @@
    - `research/results/e127-group-identity-under-split-merge-2026-09-13.out` 全部 101 行（grid 行里有每格的 knob、节点数、分裂合并数）
    - `research/e7-index-bench/src/bin/e127_group_identity_under_split_merge.rs` 里 `split_at`、`merge_at`、`step_node_count_group`、`step_key_interval` 四个函数——节点数分组的组身份怎么继承、怎么重落
    - `.claude/kb/decisions/26-后台整理与放置回收.md` 未定项 4 那一行的全文与「2026-09-10 E95 跑完之后这一项挪到哪」一节
-   - `.claude/kb/first-txn-layout.md` 里索引节点（码 2）的头字段表——第 3 问要用
+   - `.claude/kb/layout/01-first-txn.md` 里索引节点（码 2）的头字段表——第 3 问要用
    - `.claude/kb/decisions/08-核心索引结构.md` 已定项 3（`locality_id`）与已定项 6
 
 ## 要回答的（按材料第三节的判据编号）
 
 - **3-1（最值钱）**：E127 的节点数分组臂是不是「存组身份」最有利的实现；材料第 1 问举的两种形态（组满切半、按热度重排）各自要不要盘上字段、在 E127 的模型里有没有理由好 20% 以上。给推导，不给感觉。
-- **3-2**：同父兄弟这种组在本工程的树里放置器读不读得到（引 D8 / first-txn-layout 的指针结构），要不要字段。
+- **3-2**：同父兄弟这种组在本工程的树里放置器读不读得到（引 D8 / layout/01-first-txn 的指针结构），要不要字段。
 - **3-3**：格式部分判「不存」之后，第一个事务的索引节点字节还有没有一处依赖这一项；P1 的三问各自的答案。
 - **3-4**：E95 那句「格式臂减半」该不该改写。
 - **3-5**：与 D8 已定项 3、D11 已定项 1、D26 已定项 2 有没有逐字矛盾。

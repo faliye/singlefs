@@ -267,7 +267,7 @@
 | ### 与其他决策的连锁 | 不抄 | 不涉根环参数、择根与固定结构放置 |
 | ## 历史版本 | 不抄 | 历史版本，正文只写现状 |
 
-### 小节清单：`.claude/kb/first-txn-layout.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/layout/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
@@ -292,7 +292,7 @@
 | ### 2026-09-03（其二） | 不抄 | 变更史条目 |
 | ### 2026-09-03 | 不抄 | 变更史条目 |
 
-### 小节清单：`.claude/kb/milestone-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/milestone/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

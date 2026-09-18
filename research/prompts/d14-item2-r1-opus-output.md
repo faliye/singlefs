@@ -12,7 +12,7 @@
 已读（续）：`.claude/kb/decisions/02-RAID条带策略.md`、`26-后台整理与放置回收.md`、
 `09-加密.md`、`18-块里携带什么信息.md`、`25-目标负载优先级.md`、`27-小数据打包容器.md`、
 `05-快照-空间记账机制.md`（已定项 3 / 4 / 5）、`08-核心索引结构.md`（已定项 3）、
-`.claude/kb/checks-owed.md` C65、`.claude/kb/first-txn-layout.md`、`.claude/kb/invariants.md` I-9.9。
+`.claude/kb/checks-owed.md` C65、`.claude/kb/layout/01-first-txn.md`、`.claude/kb/invariants.md` I-9.9。
 
 ---
 
@@ -132,7 +132,7 @@ D8（核心索引结构） 已定项 3 逐字：
 
 > **key = `(locality_id, inode, offset)`**，`locality_id` 在创建时从父目录继承，**改名时故意不更新**。
 
-`.claude/kb/first-txn-layout.md` 逐字（第一个事务的 inode 记录）：
+`.claude/kb/layout/01-first-txn.md` 逐字（第一个事务的 inode 记录）：
 
 > | inode 记录（偏移 16） | locality_id（第一版取 0） | 8 | D8（核心索引结构） 已定项 6 | 已定 |
 

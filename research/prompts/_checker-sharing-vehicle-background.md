@@ -88,7 +88,7 @@ F12. The gate's Show-me-test stage recognizes implementation code only under cra
 P1 (answer to D13 open item 5). The checker crate and the core crate share exactly one artifact:
     a constants module generated from the kb's field tables by a generator script (kb to Rust),
     consumed by both and never hand-edited; gate stage 27 is extended so every width in
-    first-txn-layout.md is a registered format constant, and the generated module is regenerated
+    layout/01-first-txn.md is a registered format constant, and the generated module is regenerated
     and diffed by the gate. Nothing else is shared: no types (each crate has its own newtypes), no
     parsing, no traversal, no checksum implementation (the checker uses an independent CRC32C
     implementation or a different crate), no accounting code. Runtime-probed values, in particular

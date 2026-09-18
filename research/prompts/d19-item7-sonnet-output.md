@@ -7,7 +7,7 @@
 `.claude/kb/decisions/05-快照-空间记账机制.md`、`06-快照实现模型.md`、`08-核心索引结构.md`、
 `09-加密.md`、`18-块里携带什么信息.md`、`19-块指针的结构与宽度预算.md`、`21-权威态与派生态的分界.md`、
 `26-后台整理与放置回收.md`、`.claude/kb/checks-owed.md`、`.claude/kb/invariants.md`、
-`.claude/kb/first-txn-layout.md`、`.claude/kb/experiments/31-AAD缺快照维.md`、
+`.claude/kb/layout/01-first-txn.md`、`.claude/kb/experiments/31-AAD缺快照维.md`、
 `.claude/kb/experiments/90-树ID进AAD与跨头共享.md`。
 
 ---
