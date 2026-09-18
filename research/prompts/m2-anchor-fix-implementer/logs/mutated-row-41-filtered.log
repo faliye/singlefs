@@ -1,0 +1,26 @@
+
+running 1 test
+test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+
+failures:
+
+---- raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it stdout ----
+
+thread 'raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it' (681844) panicked at crates/singlefs-harness/tests/second_transaction_step_five_reuse.rs:198:5:
+assertion `left == right` failed: 复用时那条记录改写
+  left: (CheckpointTxg(3), true, 1)
+ right: (CheckpointTxg(17), false, 2)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.43s
+
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-anchor-fix/copy/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-anchor-fix/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-anchor-fix/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.40s
+     Running tests/second_transaction_step_five_reuse.rs (/tmp/claude-1000/m2-anchor-fix/copy-target/debug/deps/second_transaction_step_five_reuse-71fb233551ddc3ff)
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_step_five_reuse`

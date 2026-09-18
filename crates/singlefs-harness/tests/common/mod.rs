@@ -13,8 +13,8 @@ use singlefs_core::make_filesystem::{
 };
 use singlefs_core::superblock::FormatTimeGeometry;
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
-    WarmUpOutput,
+    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
+    PublishError, TransactionOutput, WarmUpOutput,
 };
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 use singlefs_harness::crash::MemoryPool;
@@ -88,49 +88,67 @@ impl Drop for BuiltPool {
     }
 }
 
-impl BuiltPool {
-    /// 整条录制流带内容。
-    pub fn retained_operations(&self) -> Vec<RetainedOperation> {
-        self.stream.retained_operations()
-    }
-    /// 把整条流施加到内存镜像上：与文件镜像同一份字节。
-    pub fn memory_pool(&self) -> MemoryPool {
-        let mut pool =
-            MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
-        pool.apply(&self.retained_operations());
-        pool
-    }
-    /// 只施加 mkfs 那 13 步：层 0 枚举的基线。
-    pub fn memory_pool_after_mkfs(&self) -> MemoryPool {
-        let mut pool =
-            MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
-        pool.apply(&self.retained_operations()[..self.mkfs_operation_count]);
-        pool
-    }
-    /// 冷启动：丢掉进程内的设备句柄，按路径重新打开镜像。
-    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
-        drop(self.devices.take());
-        self.paths
-            .iter()
-            .enumerate()
-            .map(|(index, path)| {
-                let device = FileBackedBlockDevice::open_or_create(
-                    path,
-                    IMAGE_BYTES,
-                    PhysicalBlockSizeInBytes(512),
-                )
-                .expect("重开镜像");
-                (
-                    DeviceIdentity(u32::try_from(index).expect("设备号")),
-                    device,
-                )
-            })
-            .collect()
-    }
+/// 把一段录制流施加到两块空内存盘上：与文件镜像同一份字节。
+fn memory_pool_of(operations: &[RetainedOperation]) -> MemoryPool {
+    let mut pool = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
+    pool.apply(operations);
+    pool
 }
 
-pub fn build_pool(tag: &str) -> BuiltPool {
-    let parameters = parameters();
+/// 按路径重开镜像，写照旧录进同一条流。
+fn reopen_recorded_images(
+    paths: &[PathBuf],
+    stream: &SharedStream,
+) -> Vec<(DeviceIdentity, Recorded)> {
+    paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let file = FileBackedBlockDevice::open_or_create(
+                path,
+                IMAGE_BYTES,
+                PhysicalBlockSizeInBytes(512),
+            )
+            .expect("重开镜像");
+            let identity = DeviceIdentity(u32::try_from(index).expect("设备号"));
+            (
+                identity,
+                RecordingBlockDevice::with_shared_stream(identity, file, stream.clone()),
+            )
+        })
+        .collect()
+}
+
+/// 按路径重开镜像，不录。
+fn reopen_cold_images(paths: &[PathBuf]) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
+    paths
+        .iter()
+        .enumerate()
+        .map(|(index, path)| {
+            let device = FileBackedBlockDevice::open_or_create(
+                path,
+                IMAGE_BYTES,
+                PhysicalBlockSizeInBytes(512),
+            )
+            .expect("重开镜像");
+            (
+                DeviceIdentity(u32::try_from(index).expect("设备号")),
+                device,
+            )
+        })
+        .collect()
+}
+
+/// 两个新建的全零文件镜像上 mkfs，录制流开内容保留：返回镜像路径、录着的设备、流、mkfs 写出的东西与 mkfs 占了流里几步。
+fn formatted_recorded_images(
+    tag: &str,
+) -> (
+    Vec<PathBuf>,
+    Vec<(DeviceIdentity, Recorded)>,
+    SharedStream,
+    MakeFilesystemOutput,
+    usize,
+) {
     let stream = SharedStream::retaining_contents();
     let mut paths = Vec::new();
     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
@@ -152,13 +170,206 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         ));
         paths.push(path);
     }
-    let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
+    let genesis = make_filesystem(&parameters(), &mut devices).expect("mkfs");
     let mkfs_operation_count = stream.operations().len();
+    (paths, devices, stream, genesis, mkfs_operation_count)
+}
+
+impl BuiltPool {
+    /// 整条录制流带内容。
+    pub fn retained_operations(&self) -> Vec<RetainedOperation> {
+        self.stream.retained_operations()
+    }
+    /// 把整条流施加到内存镜像上：与文件镜像同一份字节。
+    pub fn memory_pool(&self) -> MemoryPool {
+        memory_pool_of(&self.retained_operations())
+    }
+    /// 只施加 mkfs 那 13 步：层 0 枚举的基线。
+    pub fn memory_pool_after_mkfs(&self) -> MemoryPool {
+        memory_pool_of(&self.retained_operations()[..self.mkfs_operation_count])
+    }
+    /// 重开镜像并继续录进同一条流：进程重开之后的可写挂载与发布都要进层 0 的整条流（里程碑「第二个事务」步 0 / 步 3）。
+    pub fn reopen_recorded(&mut self) -> Vec<(DeviceIdentity, Recorded)> {
+        drop(self.devices.take());
+        reopen_recorded_images(&self.paths, &self.stream)
+    }
+
+    /// 冷启动：丢掉进程内的设备句柄，按路径重新打开镜像。
+    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
+        drop(self.devices.take());
+        reopen_cold_images(&self.paths)
+    }
+}
+
+/// 只做过 mkfs 的池：没取过号、一个文件都没发布（里程碑「第二个事务」步 3：只做过 mkfs 的池也允许可写挂载，2026-09-17 用户定）。
+pub struct FormattedPool {
+    pub paths: Vec<PathBuf>,
+    /// `take` 出去就是「进程退出、镜像关掉」。
+    pub devices: Option<Vec<(DeviceIdentity, Recorded)>>,
+    pub stream: SharedStream,
+    pub genesis: MakeFilesystemOutput,
+    pub mkfs_operation_count: usize,
+}
+
+impl Drop for FormattedPool {
+    fn drop(&mut self) {
+        for path in &self.paths {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+impl FormattedPool {
+    pub fn retained_operations(&self) -> Vec<RetainedOperation> {
+        self.stream.retained_operations()
+    }
+    pub fn memory_pool(&self) -> MemoryPool {
+        memory_pool_of(&self.retained_operations())
+    }
+    pub fn memory_pool_after_mkfs(&self) -> MemoryPool {
+        memory_pool_of(&self.retained_operations()[..self.mkfs_operation_count])
+    }
+    pub fn reopen_recorded(&mut self) -> Vec<(DeviceIdentity, Recorded)> {
+        drop(self.devices.take());
+        reopen_recorded_images(&self.paths, &self.stream)
+    }
+    pub fn reopen_cold(&mut self) -> Vec<(DeviceIdentity, FileBackedBlockDevice)> {
+        drop(self.devices.take());
+        reopen_cold_images(&self.paths)
+    }
+}
+
+/// 一个崩溃状态的两块内存盘：mkfs 之后的基线再施加持久了的那几条写，外面包录制器、录进一条新流（挂载之后流里多一步就是发了写或屏障）。
+pub fn crash_state_devices(
+    base: &MemoryPool,
+    writes: &[singlefs_harness::crash::RetainedWrite],
+    persisted: &[bool],
+    stream: &SharedStream,
+) -> Vec<(
+    DeviceIdentity,
+    RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+)> {
+    base.devices
+        .iter()
+        .map(|(identity, sparse)| {
+            let mut device = singlefs_harness::crash::SparseBlockDevice::new(
+                IMAGE_BYTES,
+                PhysicalBlockSizeInBytes(512),
+            );
+            device.image = sparse.clone();
+            for (write, is_persisted) in writes.iter().zip(persisted) {
+                if *is_persisted && write.device == *identity {
+                    device.image.write(write.offset, &write.bytes);
+                }
+            }
+            (
+                *identity,
+                RecordingBlockDevice::with_shared_stream(*identity, device, stream.clone()),
+            )
+        })
+        .collect()
+}
+
+/// 这几块内存盘此刻的整份镜像。
+pub fn memory_pool_of_sparse_devices(
+    devices: &[(
+        DeviceIdentity,
+        RecordingBlockDevice<singlefs_harness::crash::SparseBlockDevice>,
+    )],
+) -> MemoryPool {
+    MemoryPool {
+        devices: devices
+            .iter()
+            .map(|(identity, device)| (*identity, device.inner().image.clone()))
+            .collect(),
+        device_size_in_bytes: IMAGE_BYTES,
+    }
+}
+
+/// 盘上可比的一份快照：两盘各两个超级块槽的原样字节、根环里全部自证过的根、录制流里已有几步。挂载或抬 F 被拒之后与拒之前逐项相等，
+/// 才算「在任何写之前拒绝」（录制流不多一步 = 一个写、一道屏障都没发）。
+#[derive(Debug, PartialEq, Eq)]
+pub struct DiskSnapshot {
+    pub superblock_slots: Vec<Vec<u8>>,
+    pub readable_roots: Vec<singlefs_core::root_record::RootRecord>,
+    pub recorded_operations: usize,
+}
+
+pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot {
+    use singlefs_core::recovery::PoolReader;
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    let slot_bytes = usize::try_from(singlefs_format::SUPERBLOCK_SLOT_BYTES).expect("4096");
+    let mut superblock_slots = Vec::new();
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        for offset in [0, spacing] {
+            superblock_slots.push(
+                PoolReader::read(
+                    image,
+                    device,
+                    singlefs_core::address::DeviceOffsetInBytes(offset),
+                    slot_bytes,
+                )
+                .expect("超级块槽读得到"),
+            );
+        }
+    }
+    let superblock = singlefs_core::recovery::choose_superblock(image).expect("超级块");
+    DiskSnapshot {
+        superblock_slots,
+        readable_roots: singlefs_core::recovery::readable_roots(
+            image,
+            &superblock.region_devices,
+            &superblock.geometry,
+            &superblock.filesystem_identifier,
+        ),
+        recorded_operations: stream.operations().len(),
+    }
+}
+
+/// 第一个事务之后，在同一个进程里对同一个文件覆盖写一次（发布 B 起的每一次覆盖写走这一条）：
+/// 错误原样交回，要不要 `expect` 由调用方定。
+pub fn publish_overwrite_in_process(
+    pool: &mut BuiltPool,
+    previous: &TransactionOutput,
+    content: &[u8],
+    write_time_seconds: u64,
+    instance: InstanceGeneration,
+) -> Result<TransactionOutput, PublishError> {
+    let publish_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    publish_overwrite(
+        &mut writer,
+        &mut pool.allocator,
+        previous,
+        FirstFile {
+            content,
+            write_time_seconds,
+        },
+        instance,
+    )
+}
+
+pub fn format_pool(tag: &str) -> FormattedPool {
+    let (paths, devices, stream, genesis, mkfs_operation_count) = formatted_recorded_images(tag);
+    FormattedPool {
+        paths,
+        devices: Some(devices),
+        stream,
+        genesis,
+        mkfs_operation_count,
+    }
+}
+
+pub fn build_pool(tag: &str) -> BuiltPool {
+    let parameters = parameters();
+    let (paths, mut devices, stream, genesis, mkfs_operation_count) =
+        formatted_recorded_images(tag);
     let mut allocator = PoolAllocator::new(vec![
         DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
         DeviceFreeMap::new(DeviceIdentity(1), IMAGE_BYTES),
     ]);
-    allocator.mark_format_time_units(&[
+    allocator.mark_format_time_units(
         Placement {
             slot: INSTANCE_TABLE_SLOT,
             span: 2,
@@ -167,7 +378,7 @@ pub fn build_pool(tag: &str) -> BuiltPool {
             slot: TREE_TABLE_GENESIS_SLOT,
             span: 1,
         },
-    ]);
+    );
     let content = file_content();
     let (warm_up, output) = {
         let mut pool = PoolWriter::new(&parameters, &mut devices);

@@ -1,0 +1,32 @@
+Fri Sep 18 04:06:07 AM UTC 2026
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/probe-fixed/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.79s
+     Running tests/opus_probe_pristine.rs (/tmp/claude-1000/impl-m2-wave2-fixes/targets/probe-fixed/release/deps/opus_probe_pristine-7f8d9b04c9d04b7f)
+
+running 2 tests
+test pristine_instance_table_rows_overflow_after_acquisition ... mount=100 instance=101 rows=100 base=280 planned=2 records_after=280
+mount=200 instance=201 rows=200 base=280 planned=2 records_after=280
+mount=300 instance=301 rows=300 base=280 planned=2 records_after=280
+mount=368 instance=369 rows=368 base=280 planned=2 records_after=280
+mount=369 instance=370 rows=369 base=280 planned=2 records_after=280
+
+thread 'pristine_instance_table_rows_overflow_after_acquisition' (807857) panicked at crates/singlefs-harness/tests/opus_probe_pristine.rs:32:45:
+mount=370 refused InstanceTableRowsExceedOnePageSecondPageUnsupported { instance_to_acquire: InstanceGeneration(371), rows_in_version: 369, rows_to_write: 1, records_per_page: 370 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test pristine_reuse_with_a_different_span_leaves_an_overlapping_record_and_the_next_mount_panics ... 
+thread 'pristine_reuse_with_a_different_span_leaves_an_overlapping_record_and_the_next_mount_panics' (808575) panicked at crates/singlefs-harness/tests/opus_probe_pristine.rs:81:5:
+20 次挂载都没 panic
+FAILED
+
+failures:
+
+failures:
+    pristine_instance_table_rows_overflow_after_acquisition
+    pristine_reuse_with_a_different_span_leaves_an_overlapping_record_and_the_next_mount_panics
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.86s
+
+error: test failed, to rerun pass `-p singlefs-harness --test opus_probe_pristine`
+exit=101
+Fri Sep 18 04:06:42 AM UTC 2026

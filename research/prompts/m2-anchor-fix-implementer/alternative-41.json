@@ -1,0 +1,8 @@
+[
+ "步 5：复用时追加记录而不改写（同盘同槽两条）",
+ "crates/singlefs-core/src/allocator.rs",
+ "                RecordAtThePlacementSlot::RewrittenFromReclaimed => {}\\n                RecordAtThePlacementSlot::Absent => {",
+ "                RecordAtThePlacementSlot::RewrittenFromReclaimed | RecordAtThePlacementSlot::Absent => {",
+ "-p singlefs-harness --test second_transaction_step_five_reuse -- raising_the_floor_to_the_first",
+ "raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it"
+]

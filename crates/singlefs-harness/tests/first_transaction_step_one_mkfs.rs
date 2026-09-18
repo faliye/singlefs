@@ -260,7 +260,7 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
     assert_eq!(
         segment_sizes_text(&segments),
         "4+1+1+1+4",
-        "first-txn-layout.md 八 mkfs 那一行"
+        "layout/01-first-txn.md 八 mkfs 那一行"
     );
     assert_eq!(
         segment_kinds_text(&segments),
@@ -272,6 +272,82 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
         StreamIntegrity::Consistent { operations: 13 }
     );
     remove_images(&pool);
+}
+
+/// 第一版两块盘时根环区域归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7：不是 mkfs 参数），参数给别的归属就在任何写之前拒绝
+/// （m2-emptypool-nonempty-r1 云端攻方腿 Z3-B）：[0, 1, 1] 与 [1, 0, 0] 各一次 ⇒ 返回 `RegionDevicesNotTheFirstVersionLayout`，
+/// 录制流一步没有、两块盘的超级块槽 0 与三个区域的根槽 0 全是 0。
+#[test]
+fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
+    for (tag, layout) in [
+        (
+            "layout-011",
+            [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(1)],
+        ),
+        (
+            "layout-100",
+            [DeviceIdentity(1), DeviceIdentity(0), DeviceIdentity(0)],
+        ),
+    ] {
+        let stream = SharedStream::new();
+        let mut devices = Vec::new();
+        let mut paths = Vec::new();
+        for device_number in 0..2u32 {
+            let path = image_path(tag, device_number);
+            let file = FileBackedBlockDevice::open_or_create(
+                &path,
+                IMAGE_BYTES,
+                PhysicalBlockSizeInBytes(512),
+            )
+            .expect("建镜像");
+            devices.push((
+                DeviceIdentity(device_number),
+                RecordingBlockDevice::with_shared_stream(
+                    DeviceIdentity(device_number),
+                    file,
+                    stream.clone(),
+                ),
+            ));
+            paths.push(path);
+        }
+        let mut layout_parameters = parameters();
+        layout_parameters.region_devices = layout;
+        let result = make_filesystem(&layout_parameters, &mut devices);
+        assert!(
+            matches!(
+                result,
+                Err(MakeFilesystemError::RegionDevicesNotTheFirstVersionLayout { region_devices })
+                    if region_devices == layout
+            ),
+            "{layout:?} 不是第一版写死的 0 / 1 / 0：{:?}",
+            result.as_ref().err()
+        );
+        assert!(stream.operations().is_empty(), "拒绝之前一个字节都没写");
+        let spacing = FormatTimeGeometry::slot_spacing_for(512);
+        for (identity, device) in &devices {
+            assert!(
+                read(
+                    device,
+                    0,
+                    usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096")
+                )
+                .iter()
+                .all(|byte| *byte == 0),
+                "盘 {identity:?} 的超级块槽 0 全零"
+            );
+            for region in 0..3 {
+                let offset = slot_offset(RootRingSlot { region, slot: 0 }, spacing);
+                assert!(
+                    read(device, offset.0, 512).iter().all(|byte| *byte == 0),
+                    "盘 {identity:?} 上区域 {region} 的根槽 0 全零"
+                );
+            }
+        }
+        drop(devices);
+        for path in paths {
+            std::fs::remove_file(path).expect("清理镜像");
+        }
+    }
 }
 
 #[test]

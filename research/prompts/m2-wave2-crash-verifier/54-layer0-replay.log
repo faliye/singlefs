@@ -1,0 +1,11 @@
+START 2026-09-18T04:22:54Z
+HEAD=502ba80e8065351d968d061b8dd28698e3463c8d
+diff_sha256=3f8c687aa3a1205560405ef9776aa1d851d2efe0915441efe2f1e3cb3af64a73  -
+untracked_sha256=80072461fb071a68bda2b77051358137aeffcf3d514256039f61a9f4a5f4bbee  -
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=4 no_file=262158 file_read=1842255 failed=0 journal_differing=24 verification_ran=42 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 I-1.3=2104413/0/0 I-1.4=2104413/0/0 I-1.6=2104413/0/0 I-1.7=2104413/0/0 I-2.1=2104413/0/0 I-2.3=2104413/0/0 I-2.4=2104413/0/0 I-2.5=2104413/0/0 I-3.1=1842252/0/262161 I-3.8=2104413/0/0 I-3.9=1842252/0/262161 I-4.8=2104413/0/0 I-5.1=2104413/0/0 I-5.2=1842252/0/262161 I-5.4=1842252/0/262161 I-7.1=2104413/0/0 I-7.2=2104413/0/0 I-7.4=2104413/0/0 I-7.6=2104413/0/0 I-7.7=2104413/0/0 I-7.8=2104413/0/0 I-9.1=1842252/0/262161 I-9.2=1842252/0/262161 I-9.4=1842252/0/262161 I-9.7=1842252/0/262161 I-9.10=1842252/0/262161 I-9.13=1842252/0/262161 I-9.14=1580105/0/524308 first_violation=none
+exit=0
+END 2026-09-18T08:13:43Z
+HEAD=502ba80e8065351d968d061b8dd28698e3463c8d
+diff_sha256=0fffa176b1cfe37883a35c77cafa832e97aebe3dcc7b691a964cd0066203eb58  -
+untracked_sha256=6510e5b47a1b9d28f805cd591b0cf4cfca0a4bb090059a19de14cd8ef950a941  -

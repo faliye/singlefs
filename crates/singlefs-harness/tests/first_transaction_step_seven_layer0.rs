@@ -15,7 +15,7 @@ use singlefs_harness::crash::{
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::RecordedOperationKind;
 
-/// oracle 那一半：产物第 45 行逐字 `states=262165 … violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=9
+/// oracle 那一半：产物第 45 行逐字 `states=262165 … violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6
 /// verification_failed=0 first_violation=none`，第 48 行 `differing_states=3`。
 #[derive(Debug, PartialEq, Eq)]
 struct OracleCounts {
@@ -74,8 +74,10 @@ fn checker_line(tally: &Layer0Tally) -> String {
     )
 }
 
-/// checker 与记录核对器那一半的钉死值。只在根槽 txg 3 已持久的状态上才走得到记账树与 inode 树，那 8 条只在这些状态上评估；
-/// 其余 15 条每个状态都评估。违例只许出现在 I-7.7（超级块实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
+/// checker 与记录核对器那一半的钉死值。只在根槽 txg 3 已持久的状态上才走得到记账树、inode 树与分配记录树，那 10 条只在这些状态上评估
+/// （I-5.4（分配记录罩住的槽互不相交） 在其中：种子根与暖机根指着的第 0 版树表是空的，没有分配记录树）；
+/// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到；其余 18 条每个状态都评估。
+/// 违例只许出现在 I-7.7（超级块实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
 /// 取号只落了一块盘的那 2 个状态里两份超级块的实例代号不等。
 fn assert_checker_counts(tally: &Layer0Tally, every_state: u64, root_persisted_states: u64) {
     assert_eq!(
@@ -87,10 +89,16 @@ fn assert_checker_counts(tally: &Layer0Tally, every_state: u64, root_persisted_s
         "记录核对器两条判据在已定的持久顺序下恒 0"
     );
     let only_under_the_new_root = [
-        "I-3.1", "I-5.2", "I-9.1", "I-9.2", "I-9.4", "I-9.7", "I-9.10", "I-9.13",
+        "I-3.1", "I-3.9", "I-5.2", "I-5.4", "I-9.1", "I-9.2", "I-9.4", "I-9.7", "I-9.10", "I-9.13",
     ];
+    // I-9.14 要同一棵树的条目出现在两个树表单元里才比得出来，而这条流上只有第一个事务写树表：mkfs 种的第 0 版树表是空的、
+    // 两次暖机空发布不写树表 ⇒ 每个状态都报「不适用」，一个状态都评估不到。跨根比得出来的流在
+    // `second_transaction_step_zero_layer0.rs`（发布 B 起每次发布都重写树表），那里它真被评估过。
+    let never_comparable_on_this_stream = ["I-9.14"];
     for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
-        let expected_evaluated = if only_under_the_new_root.contains(&invariant) {
+        let expected_evaluated = if never_comparable_on_this_stream.contains(&invariant) {
+            0
+        } else if only_under_the_new_root.contains(&invariant) {
             root_persisted_states
         } else {
             every_state
@@ -185,7 +193,7 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
             file_read_states: 7,
             failed_states: 0,
             journal_differing_states: 3,
-            verification_ran_states: 9,
+            verification_ran_states: 6,
             verification_failed_states: 0,
             first_violation: None,
         }
@@ -218,7 +226,7 @@ fn layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_fu
             file_read_states: 7,
             failed_states: 0,
             journal_differing_states: 3,
-            verification_ran_states: 9,
+            verification_ran_states: 6,
             verification_failed_states: 0,
             first_violation: None,
         },

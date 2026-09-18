@@ -1,0 +1,1595 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_probe_z1.rs (target/release/deps/opus_probe_z1-e4b2a4538148a454)
+
+running 1 test
+test z1b_sweep ... h=(0,0,0) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=2 base=38 reclaimed=0 planned=1 exact=[Some(48), Some(56)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=3 base=56 reclaimed=0 planned=2 exact=[Some(66), Some(74), Some(82)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=4 base=82 reclaimed=0 planned=2 exact=[Some(92), Some(100), Some(108)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=5 base=108 reclaimed=0 planned=2 exact=[Some(118), Some(126), Some(134)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=6 base=134 reclaimed=0 planned=2 exact=[Some(144), Some(152), Some(160)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=7 base=160 reclaimed=0 planned=2 exact=[Some(170), Some(178), Some(186)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=8 base=186 reclaimed=0 planned=2 exact=[Some(196), Some(204), Some(212)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=9 base=212 reclaimed=0 planned=2 exact=[Some(222), Some(230), Some(238)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=10 base=238 reclaimed=20 planned=2 exact=[Some(248), Some(256), Some(264)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=11 base=264 reclaimed=48 planned=2 exact=[Some(264), Some(264), Some(272)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=12 base=272 reclaimed=56 planned=2 exact=[Some(272), Some(272), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=13 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=14 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=15 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=16 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=17 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=18 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=19 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=20 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=21 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=22 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=23 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=24 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=25 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=26 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=27 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=28 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=29 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,0) mount=30 base=280 reclaimed=64 planned=2 exact=[Some(280), Some(280), Some(280)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=2 base=54 reclaimed=0 planned=1 exact=[Some(64), Some(72)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=3 base=88 reclaimed=0 planned=1 exact=[Some(98), Some(106)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=4 base=122 reclaimed=0 planned=1 exact=[Some(132), Some(140)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=5 base=156 reclaimed=0 planned=1 exact=[Some(166), Some(174)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=6 base=190 reclaimed=0 planned=1 exact=[Some(200), Some(208)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=7 base=224 reclaimed=0 planned=1 exact=[Some(234), Some(242)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=8 base=258 reclaimed=0 planned=1 exact=[Some(268), Some(276)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=9 base=292 reclaimed=12 planned=1 exact=[Some(302), Some(310)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=10 base=324 reclaimed=44 planned=1 exact=[Some(326), Some(328)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=11 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=12 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=13 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=14 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=15 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=16 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=17 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=18 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=19 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=20 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=21 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=22 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=23 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=24 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=25 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=26 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=27 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=28 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=29 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,1) mount=30 base=342 reclaimed=62 planned=1 exact=[Some(342), Some(342)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+h=(0,0,2) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=2 base=70 reclaimed=0 planned=2 exact=[Some(80), Some(88), Some(96)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=3 base=128 reclaimed=0 planned=1 exact=[Some(138), Some(146)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=4 base=178 reclaimed=0 planned=2 exact=[Some(188), Some(196), Some(204)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=5 base=236 reclaimed=0 planned=1 exact=[Some(246), Some(254)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=6 base=286 reclaimed=0 planned=2 exact=[Some(296), Some(304), Some(312)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=7 base=344 reclaimed=52 planned=1 exact=[Some(346), Some(348)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=8 base=376 reclaimed=76 planned=2 exact=[Some(376), Some(376), Some(380)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,2) mount=9 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,0,3) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=2 base=86 reclaimed=0 planned=1 exact=[Some(96), Some(104)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=3 base=152 reclaimed=0 planned=2 exact=[Some(162), Some(170), Some(178)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=4 base=226 reclaimed=0 planned=2 exact=[Some(236), Some(244), Some(252)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=5 base=300 reclaimed=0 planned=2 exact=[Some(310), Some(318), Some(326)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=6 base=374 reclaimed=68 planned=2 exact=[Some(376), Some(378), Some(386)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=7 base=428 reclaimed=124 planned=2 exact=[Some(428), Some(428), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,3) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,0,5) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=2 base=118 reclaimed=0 planned=2 exact=[Some(128), Some(136), Some(144)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=3 base=224 reclaimed=0 planned=1 exact=[Some(234), Some(242)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=4 base=322 reclaimed=0 planned=2 exact=[Some(332), Some(340), Some(348)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=5 base=428 reclaimed=100 planned=1 exact=[Some(430), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=6 base=502 reclaimed=166 planned=2 exact=[Some(502), Some(502), Some(506)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,5) mount=7 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,0,8) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=2 base=166 reclaimed=0 planned=2 exact=[Some(176), Some(184), Some(192)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=3 base=320 reclaimed=0 planned=1 exact=[Some(330), Some(338)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=4 base=466 reclaimed=116 planned=2 exact=[Some(468), Some(470), Some(478)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=5 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=6 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=7 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=8 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=9 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=10 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=11 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=12 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=13 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=14 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=15 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=16 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=17 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=18 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=19 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=20 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=21 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=22 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=23 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=24 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=25 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=26 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=27 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=28 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=29 base=590 reclaimed=240 planned=1 exact=[Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,8) mount=30 base=590 reclaimed=240 planned=2 exact=[Some(590), Some(590), Some(590)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,0,12) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,12) mount=2 base=230 reclaimed=0 planned=1 exact=[Some(240), Some(248)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,12) mount=3 base=440 reclaimed=68 planned=2 exact=[Some(442), Some(444), Some(452)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,12) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,0,20) mount=1 base=20 reclaimed=0 planned=1 exact=[Some(30), Some(38)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,20) mount=2 base=358 reclaimed=0 planned=2 exact=[Some(368), Some(376), Some(384)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,20) mount=3 base=704 reclaimed=340 planned=1 exact=[Some(706), Some(706)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,0,20) mount=3 in-session overwrite refused: before=810 upper=826 exact=[Some(824)] in_session_true_refusal
+h=(0,0,20) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,1,0) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=2 base=54 reclaimed=0 planned=2 exact=[Some(64), Some(72), Some(80)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=3 base=80 reclaimed=0 planned=2 exact=[Some(90), Some(98), Some(106)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=4 base=106 reclaimed=0 planned=2 exact=[Some(116), Some(124), Some(132)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=5 base=132 reclaimed=0 planned=2 exact=[Some(142), Some(150), Some(158)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=6 base=158 reclaimed=0 planned=2 exact=[Some(168), Some(176), Some(184)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=7 base=184 reclaimed=0 planned=2 exact=[Some(194), Some(202), Some(210)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=8 base=210 reclaimed=0 planned=2 exact=[Some(220), Some(228), Some(236)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=9 base=236 reclaimed=20 planned=2 exact=[Some(246), Some(254), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=10 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=11 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=12 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=13 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=14 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=15 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=16 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=17 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=18 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=19 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=20 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=21 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=22 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=23 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=24 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=25 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=26 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=27 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=28 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=29 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,0) mount=30 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,1,1) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=2 base=70 reclaimed=0 planned=1 exact=[Some(80), Some(88)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=3 base=104 reclaimed=0 planned=1 exact=[Some(114), Some(122)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=4 base=138 reclaimed=0 planned=1 exact=[Some(148), Some(156)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=5 base=172 reclaimed=0 planned=1 exact=[Some(182), Some(190)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=6 base=206 reclaimed=0 planned=1 exact=[Some(216), Some(224)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=7 base=240 reclaimed=0 planned=1 exact=[Some(250), Some(258)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=8 base=274 reclaimed=2 planned=1 exact=[Some(284), Some(292)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=9 base=306 reclaimed=26 planned=1 exact=[Some(316), Some(324)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=10 base=338 reclaimed=58 planned=1 exact=[Some(340), Some(340)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=11 base=350 reclaimed=70 planned=1 exact=[Some(350), Some(350)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,1) mount=12 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,1,2) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=2 base=86 reclaimed=0 planned=1 exact=[Some(96), Some(104)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=3 base=136 reclaimed=0 planned=2 exact=[Some(146), Some(154), Some(162)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=4 base=194 reclaimed=0 planned=1 exact=[Some(204), Some(212)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=5 base=244 reclaimed=0 planned=2 exact=[Some(254), Some(262), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=6 base=302 reclaimed=10 planned=1 exact=[Some(312), Some(320)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=7 base=350 reclaimed=50 planned=2 exact=[Some(352), Some(352), Some(354)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=8 base=382 reclaimed=90 planned=1 exact=[Some(382), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,2) mount=9 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,1,3) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=2 base=102 reclaimed=0 planned=2 exact=[Some(112), Some(120), Some(128)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=3 base=176 reclaimed=0 planned=2 exact=[Some(186), Some(194), Some(202)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=4 base=250 reclaimed=0 planned=2 exact=[Some(260), Some(268), Some(276)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=5 base=324 reclaimed=20 planned=2 exact=[Some(334), Some(342), Some(350)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=6 base=394 reclaimed=90 planned=2 exact=[Some(396), Some(396), Some(398)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=7 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=8 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=9 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=10 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=11 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=12 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=13 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=14 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=15 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=16 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=17 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=18 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=19 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=20 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=21 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=22 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=23 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=24 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=25 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=26 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=27 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=28 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=29 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,3) mount=30 base=440 reclaimed=136 planned=2 exact=[Some(440), Some(440), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,1,5) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=2 base=134 reclaimed=0 planned=1 exact=[Some(144), Some(152)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=3 base=232 reclaimed=0 planned=2 exact=[Some(242), Some(250), Some(258)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=4 base=338 reclaimed=10 planned=1 exact=[Some(348), Some(356)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=5 base=434 reclaimed=98 planned=2 exact=[Some(436), Some(436), Some(438)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=6 base=508 reclaimed=180 planned=1 exact=[Some(508), Some(508)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,5) mount=7 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,1,8) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=2 base=182 reclaimed=0 planned=1 exact=[Some(192), Some(200)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=3 base=328 reclaimed=0 planned=2 exact=[Some(338), Some(346), Some(354)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=4 base=482 reclaimed=132 planned=1 exact=[Some(484), Some(484)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=5 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=6 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=7 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=8 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=9 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=10 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=11 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=12 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=13 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=14 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=15 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=16 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=17 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=18 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=19 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=20 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=21 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=22 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=23 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=24 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=25 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=26 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=27 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=28 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=29 base=592 reclaimed=242 planned=2 exact=[Some(592), Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,8) mount=30 base=592 reclaimed=242 planned=1 exact=[Some(592), Some(592)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,1,12) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,12) mount=2 base=246 reclaimed=0 planned=2 exact=[Some(256), Some(264), Some(272)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,12) mount=3 base=464 reclaimed=100 planned=2 exact=[Some(466), Some(466), Some(468)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,12) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,1,20) mount=1 base=28 reclaimed=0 planned=2 exact=[Some(38), Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,20) mount=2 base=374 reclaimed=10 planned=1 exact=[Some(384), Some(392)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,1,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,2,0) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=2 base=54 reclaimed=0 planned=2 exact=[Some(64), Some(72), Some(80)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=3 base=80 reclaimed=0 planned=2 exact=[Some(90), Some(98), Some(106)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=4 base=106 reclaimed=0 planned=2 exact=[Some(116), Some(124), Some(132)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=5 base=132 reclaimed=0 planned=2 exact=[Some(142), Some(150), Some(158)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=6 base=158 reclaimed=0 planned=2 exact=[Some(168), Some(176), Some(184)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=7 base=184 reclaimed=0 planned=2 exact=[Some(194), Some(202), Some(210)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=8 base=210 reclaimed=0 planned=2 exact=[Some(220), Some(228), Some(236)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=9 base=236 reclaimed=18 planned=2 exact=[Some(246), Some(254), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=10 base=262 reclaimed=46 planned=2 exact=[Some(262), Some(262), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=11 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=12 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=13 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=14 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=15 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=16 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=17 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=18 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=19 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=20 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=21 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=22 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=23 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=24 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=25 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=26 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=27 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=28 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=29 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,0) mount=30 base=270 reclaimed=54 planned=2 exact=[Some(270), Some(270), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,1) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=2 base=70 reclaimed=0 planned=1 exact=[Some(80), Some(88)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=3 base=104 reclaimed=0 planned=1 exact=[Some(114), Some(122)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=4 base=138 reclaimed=0 planned=1 exact=[Some(148), Some(156)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=5 base=172 reclaimed=0 planned=1 exact=[Some(182), Some(190)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=6 base=206 reclaimed=0 planned=1 exact=[Some(216), Some(224)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=7 base=240 reclaimed=0 planned=1 exact=[Some(250), Some(258)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=8 base=274 reclaimed=2 planned=1 exact=[Some(284), Some(292)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=9 base=306 reclaimed=26 planned=1 exact=[Some(316), Some(324)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=10 base=338 reclaimed=58 planned=1 exact=[Some(340), Some(340)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,1) mount=11 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,2) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=2 base=86 reclaimed=0 planned=1 exact=[Some(96), Some(104)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=3 base=136 reclaimed=0 planned=2 exact=[Some(146), Some(154), Some(162)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=4 base=194 reclaimed=0 planned=1 exact=[Some(204), Some(212)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=5 base=244 reclaimed=0 planned=2 exact=[Some(254), Some(262), Some(270)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=6 base=302 reclaimed=10 planned=1 exact=[Some(312), Some(320)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=7 base=350 reclaimed=50 planned=2 exact=[Some(352), Some(352), Some(352)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=8 base=376 reclaimed=84 planned=1 exact=[Some(376), Some(376)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=9 base=376 reclaimed=76 planned=2 exact=[Some(376), Some(376), Some(380)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,2) mount=10 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,3) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=2 base=102 reclaimed=0 planned=2 exact=[Some(112), Some(120), Some(128)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=3 base=176 reclaimed=0 planned=2 exact=[Some(186), Some(194), Some(202)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=4 base=250 reclaimed=0 planned=2 exact=[Some(260), Some(268), Some(276)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=5 base=324 reclaimed=18 planned=2 exact=[Some(334), Some(342), Some(350)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=6 base=396 reclaimed=92 planned=2 exact=[Some(398), Some(398), Some(398)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=7 base=436 reclaimed=132 planned=2 exact=[Some(436), Some(436), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,3) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,5) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=2 base=134 reclaimed=0 planned=1 exact=[Some(144), Some(152)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=3 base=232 reclaimed=0 planned=2 exact=[Some(242), Some(250), Some(258)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=4 base=338 reclaimed=10 planned=1 exact=[Some(348), Some(356)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=5 base=434 reclaimed=98 planned=2 exact=[Some(436), Some(436), Some(436)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=6 base=502 reclaimed=174 planned=1 exact=[Some(502), Some(502)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=7 base=502 reclaimed=166 planned=2 exact=[Some(502), Some(502), Some(506)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,5) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,8) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,8) mount=2 base=182 reclaimed=0 planned=1 exact=[Some(192), Some(200)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,8) mount=3 base=328 reclaimed=0 planned=2 exact=[Some(338), Some(346), Some(354)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,8) mount=4 base=482 reclaimed=132 planned=1 exact=[Some(484), Some(484)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,8) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,12) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,12) mount=2 base=246 reclaimed=0 planned=2 exact=[Some(256), Some(264), Some(272)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,12) mount=3 base=464 reclaimed=100 planned=2 exact=[Some(466), Some(466), Some(466)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,12) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,2,20) mount=1 base=36 reclaimed=0 planned=1 exact=[Some(46), Some(54)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,20) mount=2 base=374 reclaimed=10 planned=1 exact=[Some(384), Some(392)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,2,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(0,3,0) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=2 base=62 reclaimed=0 planned=1 exact=[Some(72), Some(80)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=3 base=80 reclaimed=0 planned=2 exact=[Some(90), Some(98), Some(106)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=4 base=106 reclaimed=0 planned=2 exact=[Some(116), Some(124), Some(132)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=5 base=132 reclaimed=0 planned=2 exact=[Some(142), Some(150), Some(158)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=6 base=158 reclaimed=0 planned=2 exact=[Some(168), Some(176), Some(184)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=7 base=184 reclaimed=0 planned=2 exact=[Some(194), Some(202), Some(210)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=8 base=210 reclaimed=0 planned=2 exact=[Some(220), Some(228), Some(236)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=9 base=236 reclaimed=18 planned=2 exact=[Some(246), Some(254), Some(262)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=10 base=262 reclaimed=44 planned=2 exact=[Some(272), Some(280), Some(288)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=11 base=288 reclaimed=72 planned=2 exact=[Some(288), Some(288), Some(296)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=12 base=296 reclaimed=80 planned=2 exact=[Some(296), Some(296), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=13 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=14 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=15 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=16 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=17 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=18 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=19 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=20 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=21 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=22 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=23 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=24 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=25 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=26 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=27 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=28 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=29 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,0) mount=30 base=304 reclaimed=88 planned=2 exact=[Some(304), Some(304), Some(304)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,1) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=2 base=78 reclaimed=0 planned=1 exact=[Some(88), Some(96)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=3 base=112 reclaimed=0 planned=1 exact=[Some(122), Some(130)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=4 base=146 reclaimed=0 planned=1 exact=[Some(156), Some(164)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=5 base=180 reclaimed=0 planned=1 exact=[Some(190), Some(198)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=6 base=214 reclaimed=0 planned=1 exact=[Some(224), Some(232)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=7 base=248 reclaimed=0 planned=1 exact=[Some(258), Some(266)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=8 base=282 reclaimed=10 planned=1 exact=[Some(292), Some(300)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=9 base=314 reclaimed=34 planned=1 exact=[Some(324), Some(332)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=10 base=346 reclaimed=66 planned=1 exact=[Some(348), Some(348)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,1) mount=11 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,2) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=2 base=94 reclaimed=0 planned=2 exact=[Some(104), Some(112), Some(120)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=3 base=152 reclaimed=0 planned=1 exact=[Some(162), Some(170)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=4 base=202 reclaimed=0 planned=2 exact=[Some(212), Some(220), Some(228)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=5 base=260 reclaimed=0 planned=1 exact=[Some(270), Some(278)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=6 base=310 reclaimed=18 planned=2 exact=[Some(320), Some(328), Some(336)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=7 base=366 reclaimed=74 planned=1 exact=[Some(368), Some(368)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,2) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,3) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=2 base=110 reclaimed=0 planned=1 exact=[Some(120), Some(128)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=3 base=176 reclaimed=0 planned=2 exact=[Some(186), Some(194), Some(202)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=4 base=250 reclaimed=0 planned=2 exact=[Some(260), Some(268), Some(276)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=5 base=324 reclaimed=18 planned=2 exact=[Some(334), Some(342), Some(350)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=6 base=396 reclaimed=90 planned=2 exact=[Some(398), Some(398), Some(398)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,3) mount=7 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,5) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,5) mount=2 base=142 reclaimed=0 planned=2 exact=[Some(152), Some(160), Some(168)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,5) mount=3 base=248 reclaimed=0 planned=1 exact=[Some(258), Some(266)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,5) mount=4 base=346 reclaimed=18 planned=2 exact=[Some(356), Some(364), Some(372)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,5) mount=5 base=450 reclaimed=122 planned=1 exact=[Some(452), Some(452)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,5) mount=6 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,8) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,8) mount=2 base=190 reclaimed=0 planned=2 exact=[Some(200), Some(208), Some(216)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,8) mount=3 base=344 reclaimed=10 planned=1 exact=[Some(354), Some(362)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,8) mount=4 base=488 reclaimed=138 planned=2 exact=[Some(490), Some(490), Some(490)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,8) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,12) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,12) mount=2 base=254 reclaimed=0 planned=1 exact=[Some(264), Some(272)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,12) mount=3 base=464 reclaimed=92 planned=2 exact=[Some(466), Some(466), Some(466)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,12) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(0,3,20) mount=1 base=44 reclaimed=0 planned=1 exact=[Some(54), Some(62)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,20) mount=2 base=382 reclaimed=18 planned=2 exact=[Some(392), Some(400), Some(408)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(0,3,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,0) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=2 base=358 reclaimed=0 planned=2 exact=[Some(368), Some(376), Some(384)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=3 base=384 reclaimed=34 planned=2 exact=[Some(394), Some(402), Some(410)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=4 base=410 reclaimed=82 planned=2 exact=[Some(420), Some(428), Some(436)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=5 base=436 reclaimed=130 planned=2 exact=[Some(438), Some(438), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=6 base=440 reclaimed=156 planned=2 exact=[Some(450), Some(458), Some(466)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=7 base=466 reclaimed=204 planned=2 exact=[Some(476), Some(484), Some(492)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=8 base=492 reclaimed=252 planned=2 exact=[Some(494), Some(494), Some(496)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,0) mount=9 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,1) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,1) mount=2 base=374 reclaimed=2 planned=1 exact=[Some(384), Some(392)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,1) mount=3 base=406 reclaimed=48 planned=1 exact=[Some(416), Some(424)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,1) mount=4 base=438 reclaimed=94 planned=1 exact=[Some(448), Some(456)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,1) mount=5 base=470 reclaimed=140 planned=1 exact=[Some(472), Some(472)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,1) mount=6 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,2) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,2) mount=2 base=390 reclaimed=18 planned=1 exact=[Some(400), Some(408)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,2) mount=3 base=436 reclaimed=78 planned=2 exact=[Some(446), Some(454), Some(462)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,2) mount=4 base=490 reclaimed=154 planned=1 exact=[Some(492), Some(492)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,2) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,3) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,3) mount=2 base=406 reclaimed=34 planned=2 exact=[Some(416), Some(424), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,3) mount=3 base=474 reclaimed=124 planned=2 exact=[Some(476), Some(476), Some(478)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,3) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,5) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,5) mount=2 base=438 reclaimed=66 planned=1 exact=[Some(448), Some(456)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,5) mount=3 base=526 reclaimed=168 planned=2 exact=[Some(528), Some(528), Some(530)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,5) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,8) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,8) mount=2 base=486 reclaimed=114 planned=1 exact=[Some(496), Some(504)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,8) mount=3 base=616 reclaimed=258 planned=2 exact=[Some(618), Some(618), Some(620)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,8) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,12) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,12) mount=2 base=550 reclaimed=178 planned=2 exact=[Some(552), Some(552), Some(554)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,12) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,0,20) mount=1 base=340 reclaimed=0 planned=1 exact=[Some(350), Some(358)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,20) mount=2 base=678 reclaimed=306 planned=1 exact=[Some(680), Some(680)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,0,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,0) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=2 base=366 reclaimed=2 planned=1 exact=[Some(376), Some(384)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=3 base=384 reclaimed=34 planned=2 exact=[Some(394), Some(402), Some(410)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=4 base=410 reclaimed=82 planned=2 exact=[Some(420), Some(428), Some(436)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=5 base=436 reclaimed=130 planned=2 exact=[Some(438), Some(438), Some(440)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=6 base=440 reclaimed=156 planned=2 exact=[Some(450), Some(458), Some(466)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=7 base=466 reclaimed=204 planned=2 exact=[Some(476), Some(484), Some(492)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=8 base=492 reclaimed=252 planned=2 exact=[Some(494), Some(494), Some(496)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,0) mount=9 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,1) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,1) mount=2 base=382 reclaimed=18 planned=1 exact=[Some(392), Some(400)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,1) mount=3 base=414 reclaimed=64 planned=1 exact=[Some(424), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,1) mount=4 base=446 reclaimed=110 planned=1 exact=[Some(456), Some(464)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,1) mount=5 base=478 reclaimed=156 planned=1 exact=[Some(480), Some(480)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,1) mount=6 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,2) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,2) mount=2 base=398 reclaimed=34 planned=2 exact=[Some(408), Some(416), Some(424)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,2) mount=3 base=452 reclaimed=110 planned=1 exact=[Some(462), Some(470)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,2) mount=4 base=498 reclaimed=170 planned=2 exact=[Some(500), Some(500), Some(502)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,2) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,3) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,3) mount=2 base=414 reclaimed=50 planned=1 exact=[Some(424), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,3) mount=3 base=474 reclaimed=124 planned=2 exact=[Some(476), Some(476), Some(478)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,3) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,5) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,5) mount=2 base=446 reclaimed=82 planned=2 exact=[Some(456), Some(464), Some(472)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,5) mount=3 base=542 reclaimed=200 planned=1 exact=[Some(544), Some(544)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,5) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,8) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,8) mount=2 base=494 reclaimed=130 planned=2 exact=[Some(496), Some(496), Some(498)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,8) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,12) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,12) mount=2 base=558 reclaimed=194 planned=1 exact=[Some(560), Some(560)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,12) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,1,20) mount=1 base=348 reclaimed=0 planned=1 exact=[Some(358), Some(366)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,20) mount=2 base=686 reclaimed=322 planned=2 exact=[Some(688), Some(688), Some(690)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,1,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,0) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=2 base=382 reclaimed=34 planned=2 exact=[Some(392), Some(400), Some(408)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=3 base=408 reclaimed=82 planned=2 exact=[Some(418), Some(426), Some(434)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=4 base=434 reclaimed=130 planned=2 exact=[Some(436), Some(436), Some(438)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=5 base=438 reclaimed=156 planned=2 exact=[Some(448), Some(456), Some(464)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=6 base=464 reclaimed=204 planned=2 exact=[Some(474), Some(482), Some(490)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=7 base=490 reclaimed=252 planned=2 exact=[Some(492), Some(492), Some(494)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,0) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,1) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,1) mount=2 base=398 reclaimed=50 planned=1 exact=[Some(408), Some(416)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,1) mount=3 base=430 reclaimed=96 planned=1 exact=[Some(440), Some(448)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,1) mount=4 base=462 reclaimed=142 planned=1 exact=[Some(464), Some(464)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,1) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,2) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,2) mount=2 base=414 reclaimed=66 planned=1 exact=[Some(424), Some(432)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,2) mount=3 base=460 reclaimed=126 planned=2 exact=[Some(462), Some(462), Some(464)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,2) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,3) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,3) mount=2 base=430 reclaimed=82 planned=2 exact=[Some(440), Some(448), Some(456)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,3) mount=3 base=498 reclaimed=172 planned=2 exact=[Some(500), Some(500), Some(502)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,3) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,5) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,5) mount=2 base=462 reclaimed=114 planned=1 exact=[Some(472), Some(480)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,5) mount=3 base=550 reclaimed=216 planned=2 exact=[Some(552), Some(552), Some(554)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,5) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,8) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,8) mount=2 base=510 reclaimed=162 planned=1 exact=[Some(512), Some(512)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,8) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,12) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,12) mount=2 base=574 reclaimed=226 planned=2 exact=[Some(576), Some(576), Some(578)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,12) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,2,20) mount=1 base=356 reclaimed=0 planned=2 exact=[Some(366), Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,20) mount=2 base=702 reclaimed=338 planned=1 exact=[Some(704), Some(704)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,2,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,0) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=2 base=382 reclaimed=34 planned=2 exact=[Some(392), Some(400), Some(408)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=3 base=408 reclaimed=82 planned=2 exact=[Some(418), Some(426), Some(434)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=4 base=434 reclaimed=130 planned=2 exact=[Some(436), Some(436), Some(438)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=5 base=438 reclaimed=156 planned=2 exact=[Some(448), Some(456), Some(464)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=6 base=464 reclaimed=204 planned=2 exact=[Some(474), Some(482), Some(490)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=7 base=490 reclaimed=252 planned=2 exact=[Some(492), Some(492), Some(494)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,0) mount=8 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,1) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,1) mount=2 base=396 reclaimed=48 planned=1 exact=[Some(406), Some(414)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,1) mount=3 base=428 reclaimed=94 planned=1 exact=[Some(438), Some(446)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,1) mount=4 base=460 reclaimed=140 planned=1 exact=[Some(462), Some(462)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,1) mount=5 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,2) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,2) mount=2 base=412 reclaimed=64 planned=1 exact=[Some(422), Some(430)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,2) mount=3 base=458 reclaimed=124 planned=2 exact=[Some(460), Some(460), Some(462)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,2) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,3) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,3) mount=2 base=428 reclaimed=80 planned=2 exact=[Some(438), Some(446), Some(454)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,3) mount=3 base=496 reclaimed=170 planned=2 exact=[Some(498), Some(498), Some(500)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,3) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,5) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,5) mount=2 base=460 reclaimed=112 planned=1 exact=[Some(470), Some(478)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,5) mount=3 base=548 reclaimed=214 planned=2 exact=[Some(550), Some(550), Some(552)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,5) mount=4 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,8) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,8) mount=2 base=508 reclaimed=160 planned=1 exact=[Some(510), Some(510)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,8) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,12) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,12) mount=2 base=572 reclaimed=224 planned=2 exact=[Some(574), Some(574), Some(576)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,12) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(20,3,20) mount=1 base=364 reclaimed=2 planned=1 exact=[Some(374), Some(382)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,20) mount=2 base=700 reclaimed=336 planned=1 exact=[Some(702), Some(702)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(20,3,20) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,0) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,0) mount=2 base=664 reclaimed=300 planned=2 exact=[Some(666), Some(666), Some(668)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,1) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,2) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,3) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,5) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,8) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,12) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,0,20) mount=1 base=660 reclaimed=274 planned=2 exact=[Some(662), Some(662), Some(664)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,0) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,0) mount=2 base=670 reclaimed=306 planned=2 exact=[Some(672), Some(672), Some(674)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,1) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,2) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,3) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,5) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,8) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,12) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,1,20) mount=1 base=668 reclaimed=290 planned=1 exact=[Some(670), Some(670)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,1,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,0) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,0) mount=2 base=678 reclaimed=322 planned=1 exact=[Some(680), Some(680)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,1) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,2) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,3) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,5) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,8) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,12) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,2,20) mount=1 base=676 reclaimed=306 planned=1 exact=[Some(678), Some(678)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,2,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,0) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,0) mount=2 base=688 reclaimed=348 planned=2 exact=[Some(690), Some(690), Some(692)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,1) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,2) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,3) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,5) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,8) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,12) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(40,3,20) mount=1 base=684 reclaimed=322 planned=2 exact=[Some(686), Some(686), Some(688)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(40,3,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,0) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,0) mount=2 base=726 reclaimed=354 planned=2 exact=[Some(728), Some(728), Some(730)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,1) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,2) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,3) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,5) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,8) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,12) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,0,20) mount=1 base=724 reclaimed=338 planned=1 exact=[Some(726), Some(726)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,0,20) mount=1 in-session overwrite refused: before=802 upper=818 exact=[Some(816)] in_session_true_refusal
+h=(44,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,0) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,0) mount=2 base=734 reclaimed=370 planned=1 exact=[Some(736), Some(736)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,1) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,2) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,3) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,5) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,8) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,12) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,1,20) mount=1 base=732 reclaimed=354 planned=1 exact=[Some(734), Some(734)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,1,20) mount=1 in-session overwrite refused: before=810 upper=826 exact=[Some(824)] in_session_true_refusal
+h=(44,1,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,0) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,0) mount=2 base=744 reclaimed=396 planned=2 exact=[Some(746), Some(746), Some(748)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,1) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,2) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,3) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,5) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,8) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,12) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,2,20) mount=1 base=740 reclaimed=370 planned=2 exact=[Some(742), Some(742), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,2,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(812)] IN_SESSION_FALSE_REFUSAL
+h=(44,2,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,0) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,0) mount=2 base=750 reclaimed=402 planned=2 exact=[Some(752), Some(752), Some(754)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,1) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,2) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,3) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,5) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,8) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,12) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(44,3,20) mount=1 base=748 reclaimed=386 planned=1 exact=[Some(750), Some(750)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(44,3,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,0) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,0) mount=2 base=742 reclaimed=370 planned=1 exact=[Some(744), Some(744)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,1) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,2) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,3) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,5) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,8) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,12) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,0,20) mount=1 base=740 reclaimed=354 planned=1 exact=[Some(742), Some(742)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,0,20) mount=1 in-session overwrite refused: before=804 upper=820 exact=[Some(818)] in_session_true_refusal
+h=(45,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,0) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,0) mount=2 base=752 reclaimed=396 planned=2 exact=[Some(754), Some(754), Some(756)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,1) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,2) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,3) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,5) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,8) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,12) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,1,20) mount=1 base=748 reclaimed=370 planned=2 exact=[Some(750), Some(750), Some(752)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,1,20) mount=1 in-session overwrite refused: before=806 upper=822 exact=[Some(820)] in_session_true_refusal
+h=(45,1,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,0) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,0) mount=2 base=758 reclaimed=402 planned=2 exact=[Some(760), Some(760), Some(762)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,1) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,2) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,3) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,5) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,8) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,12) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,2,20) mount=1 base=756 reclaimed=386 planned=1 exact=[Some(758), Some(758)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,2,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,0) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,0) mount=2 base=766 reclaimed=418 planned=1 exact=[Some(768), Some(768)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,1) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,2) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,3) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,5) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,8) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,12) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(45,3,20) mount=1 base=764 reclaimed=402 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(45,3,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(45,3,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,0) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,0) mount=2 base=760 reclaimed=396 planned=2 exact=[Some(762), Some(762), Some(764)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,1) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,2) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,3) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,5) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,8) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,12) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,0,20) mount=1 base=756 reclaimed=370 planned=2 exact=[Some(758), Some(758), Some(760)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,0,20) mount=1 in-session overwrite refused: before=800 upper=816 exact=[Some(814)] in_session_true_refusal
+h=(46,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,0) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,0) mount=2 base=766 reclaimed=402 planned=2 exact=[Some(768), Some(768), Some(770)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,1) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,2) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,3) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,5) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,8) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,12) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,1,20) mount=1 base=764 reclaimed=386 planned=1 exact=[Some(766), Some(766)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,1,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(46,1,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,0) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,0) mount=2 base=774 reclaimed=418 planned=1 exact=[Some(776), Some(776)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,1) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,2) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,3) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,5) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,8) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,12) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,2,20) mount=1 base=772 reclaimed=402 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,2,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(46,2,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,0) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,0) mount=2 base=784 reclaimed=444 planned=2 exact=[Some(786), Some(786), Some(788)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,1) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,2) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,3) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,5) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,8) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,8) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(46,3,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,12) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,12) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(46,3,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(46,3,20) mount=1 base=780 reclaimed=418 planned=2 exact=[Some(782), Some(782), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(46,3,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(46,3,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,0) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,0) mount=2 base=774 reclaimed=402 planned=2 exact=[Some(776), Some(776), Some(778)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,1) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,2) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,3) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,5) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,8) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,12) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,0,20) mount=1 base=772 reclaimed=386 planned=1 exact=[Some(774), Some(774)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,0,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(47,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,0) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,0) mount=2 base=782 reclaimed=418 planned=1 exact=[Some(784), Some(784)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,1) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,2) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,3) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,5) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,8) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,12) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,12) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(47,1,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(47,1,20) mount=1 base=780 reclaimed=402 planned=1 exact=[Some(782), Some(782)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(47,1,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(47,1,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(47,2,0) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,1) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,2) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,3) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,5) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,8) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,12) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,2,20) mount=1 base=788 reclaimed=418 planned=2 exact=[Some(790), Some(790), Some(792)] upper=Some((2, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_2
+h=(47,3,0) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,1) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,2) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,3) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,5) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,8) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,12) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(47,3,20) mount=1 base=796 reclaimed=434 planned=1 exact=[Some(798), Some(798)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,0) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,0) mount=2 base=790 reclaimed=418 planned=1 exact=[Some(792), Some(792)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,0) mount=3 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,1) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,1) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,2) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,2) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,3) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,3) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,5) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,5) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,8) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,8) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(48,0,8) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,12) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,12) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(48,0,12) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+
+thread 'z1b_sweep' (3687185) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+h=(48,0,20) mount=1 base=788 reclaimed=402 planned=1 exact=[Some(790), Some(790)] upper=None deduct=None exact_refusal=None path=None class=ok status=mounted
+h=(48,0,20) mount=1 in-session overwrite refused: before=798 upper=814 exact=[Some(800)] IN_SESSION_FALSE_REFUSAL
+h=(48,0,20) mount=2 BEFORE_ADMISSION status=panicked 跨度里有已分配的槽
+h=(48,1,0) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,1) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,2) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,3) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,5) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,8) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,12) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,1,20) mount=1 base=796 reclaimed=418 planned=2 exact=[Some(798), Some(798), Some(800)] upper=Some((1, 814)) deduct=None exact_refusal=None path=None class=FALSE_REFUSAL status=refused_warm_up_1
+h=(48,2,0) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,1) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,2) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,3) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,5) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,8) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,12) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,2,20) mount=1 base=804 reclaimed=434 planned=1 exact=[Some(806), Some(806)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,0) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,1) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,2) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,3) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,5) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,8) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,12) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(48,3,20) mount=1 base=812 reclaimed=450 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,0) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,1) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,2) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,3) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,5) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,8) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,12) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,0,20) mount=1 base=804 reclaimed=418 planned=2 exact=[Some(806), Some(806), Some(808)] upper=Some((0, 814)) deduct=None exact_refusal=None path=Some((0, 814)) class=FALSE_REFUSAL PATH_REFUSES_AFTER_ACQ_IF_PREACQ_EXACT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,0) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,1) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,2) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,3) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,5) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,8) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,12) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,1,20) mount=1 base=812 reclaimed=434 planned=1 exact=[Some(814), Some(814)] upper=Some((0, 822)) deduct=None exact_refusal=Some((0, 814)) path=Some((0, 822)) class=LEAK_DEDUCT PATH_REFUSES_AFTER_ACQ_IF_PREACQ_DEDUCT status=refused_row
+h=(49,2,0) setup empty refused
+h=(49,2,1) setup empty refused
+h=(49,2,2) setup empty refused
+h=(49,2,3) setup empty refused
+h=(49,2,5) setup empty refused
+h=(49,2,8) setup empty refused
+h=(49,2,12) setup empty refused
+h=(49,2,20) setup empty refused
+h=(49,3,0) setup empty refused
+h=(49,3,1) setup empty refused
+h=(49,3,2) setup empty refused
+h=(49,3,3) setup empty refused
+h=(49,3,5) setup empty refused
+h=(49,3,8) setup empty refused
+h=(49,3,12) setup empty refused
+h=(49,3,20) setup empty refused
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 77.93s
+
+
+real	1m17.943s
+user	1m17.843s
+sys	0m0.070s
+exit=0

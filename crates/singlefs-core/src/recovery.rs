@@ -23,24 +23,27 @@ use crate::address::{
 use crate::allocator::AllocationRecord;
 use crate::block_device::BlockDevice;
 use crate::checksum::crc32_castagnoli;
+use crate::instance_table::InstanceTableRecords;
 use crate::journal::JournalRecord;
 use crate::make_filesystem::TREE_TABLE_KEY_WIDTH;
 use crate::pointer::{DataPointer, LocationEntry, NodePointer};
 use crate::records::{
-    mapping_key_for_data, parse_extent_record, parse_inode_internal_entry, parse_mapping_entry,
-    AccountingEntry, InodeRecord, TreeTableEntry, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION,
-    TREE_KIND_DEADLIST, TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST,
-    TREE_KIND_SPARSE_SIDE_TABLE,
+    mapping_key_for_data, mapping_key_for_node, parse_extent_record, parse_inode_internal_entry,
+    parse_mapping_entry, AccountingEntry, InodeRecord, TreeTableEntry, TREE_KIND_ACCOUNTING,
+    TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST, TREE_KIND_EXTENT, TREE_KIND_INODE,
+    TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
 };
 use crate::root_record::RootRecord;
+use crate::root_ring::target_for_publish;
 use crate::root_ring::{slot_offset, RootRingSlot};
 use crate::superblock::{FormatTimeGeometry, Superblock};
-use crate::transaction::FIRST_INODE_NUMBER;
+use crate::transaction::{PublishedUnit, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER};
 use crate::unit::{
     data_unit_payload, parse_data_unit, parse_index_node, parse_packed_unit,
     unit_filesystem_identifier, IndexNodeHeader, PACKED_TYPE_INODE, PACKED_TYPE_INSTANCE_TABLE,
     UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
 };
+use crate::write_accounting::WritesByStructureKind;
 
 /// 恢复路径读盘的口子。两个实现：文件后端的池（`Vec<(DeviceIdentity, Device)>`）与层 0 枚举出的崩溃镜像（harness）。
 pub trait PoolReader {
@@ -156,6 +159,9 @@ pub struct JournalScanReport {
     pub prefix_applied: usize,
     pub verification_passed: usize,
     pub verification_failed: usize,
+    /// 这次恢复施加的记录里最大的事务号（空发布的事务号 0 不进 max，D23（journal 的角色与格式） 已定项 19 ①）；
+    /// 可写挂载给上一个实例写行时 W 取它（D18（块里携带什么信息） 已定项 11 的行记录）。
+    pub maximum_applied_transaction: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -297,6 +303,445 @@ pub fn choose_root(reader: &dyn PoolReader, superblock: &Superblock) -> Option<R
     best
 }
 
+/// 根环全部自证过的根里最大的 checkpoint_txg：新实例的第一次发布取 max(它, 环里全部自证通过的记录的 checkpoint_txg) + 1
+/// （D23（journal 的角色与格式） 已定项 14 第 3 条）；一条都没有时 None。
+#[must_use]
+pub fn highest_root_txg<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    geometry: &FormatTimeGeometry,
+    filesystem_identifier: &[u8; 16],
+) -> Option<CheckpointTxg> {
+    let mut highest: Option<CheckpointTxg> = None;
+    visit_valid_roots(
+        reader,
+        region_devices,
+        geometry,
+        filesystem_identifier,
+        |root| {
+            highest = Some(highest.map_or(root.checkpoint_txg, |current| {
+                current.max(root.checkpoint_txg)
+            }));
+        },
+    );
+    highest
+}
+
+/// 根环里全部自证过的根，每个可读根槽一条（回退候选集与影子账从这里取）。
+#[must_use]
+pub fn readable_roots<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    geometry: &FormatTimeGeometry,
+    filesystem_identifier: &[u8; 16],
+) -> Vec<RootRecord> {
+    let mut roots = Vec::new();
+    visit_valid_roots(
+        reader,
+        region_devices,
+        geometry,
+        filesystem_identifier,
+        |root| roots.push(root),
+    );
+    roots
+}
+
+/// 生效的回退下界 F（D16（发布语义） 已定项 1「生效」那一行：恢复后生效值 = 各幸存盘所带 F 最大值的最小值）；
+/// 一块盘上一条根都没有就不算它，一条根都没有时 0。根落在哪块盘按它的 txg 算区域（与写者同一条公式）。
+#[must_use]
+pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
+    reader: &Reader,
+    region_devices: &[DeviceIdentity; 3],
+    geometry: &FormatTimeGeometry,
+    filesystem_identifier: &[u8; 16],
+) -> CheckpointTxg {
+    let mut highest_per_device: BTreeMap<DeviceIdentity, CheckpointTxg> = BTreeMap::new();
+    for root in readable_roots(reader, region_devices, geometry, filesystem_identifier) {
+        let device = region_devices
+            [usize::try_from(target_for_publish(root.checkpoint_txg).region).expect("区域号")];
+        let highest = highest_per_device
+            .entry(device)
+            .or_insert(root.rollback_floor);
+        *highest = (*highest).max(root.rollback_floor);
+    }
+    highest_per_device
+        .values()
+        .copied()
+        .min()
+        .unwrap_or(CheckpointTxg(0))
+}
+
+/// 一条根引用的分配记录（树表 → 分配记录树根节点）：回退的影子账要读每条被抛弃根的账。第 0 代树表（没有分配记录树）给空。
+///
+/// # Errors
+/// 树表或分配记录树根读不到、解不开。
+pub fn allocation_records_under_root(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+) -> Result<Vec<AllocationRecord>, RecoveryFailure> {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+    let tree_table =
+        parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "树表单元",
+        })?;
+    let mut allocation_pointer = None;
+    for bytes in &tree_table.entries {
+        let entry = TreeTableEntry::parse(bytes).ok_or(RecoveryFailure::UnitMalformed {
+            what: "树表条目",
+        })?;
+        if entry.kind == TREE_KIND_ALLOCATION {
+            allocation_pointer = Some(entry.root);
+        }
+    }
+    let Some(allocation_pointer) = allocation_pointer else {
+        return Ok(Vec::new());
+    };
+    let allocation_bytes =
+        read_unit_via_locations(reader, &allocation_pointer.locations, node_bytes)?;
+    let allocation_node =
+        parse_index_node(&allocation_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "分配记录树根",
+        })?;
+    // 第一版的分配记录树只有一个节点（层 0），多层的树这条路还不会走（里程碑「第二个事务」步 6 的欠账）；
+    // 读到层 > 0 的根就报格式错，不把内部节点的指针当分配记录解。
+    if allocation_node.level != 0 {
+        return Err(RecoveryFailure::UnitMalformed {
+            what: "分配记录树根不止一层",
+        });
+    }
+    Ok(allocation_node
+        .entries
+        .iter()
+        .map(|bytes| AllocationRecord::parse(bytes))
+        .collect())
+}
+
+/// 一条根指着的实例表（行与链指针）；单元读不出或解不开都是 `None`（读不出的由走读另报）。
+#[must_use]
+pub fn instance_table_of_root(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+) -> Option<InstanceTableRecords> {
+    let data_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
+    let bytes = read_unit_via_locations(reader, &root.instance_table.locations, data_bytes).ok()?;
+    InstanceTableRecords::parse(&bytes)
+}
+
+/// 一条根指着的树表是不是 0 条（mkfs 的第 0 代树表，第一次可写挂载的暖机根照抄它）：这条根下面还没有发布过文件版本。
+///
+/// # Errors
+/// 树表单元读不到、解不开。
+pub fn tree_table_has_no_entries(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+) -> Result<bool, RecoveryFailure> {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+    let tree_table =
+        parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "树表单元",
+        })?;
+    Ok(tree_table.entries.is_empty())
+}
+
+/// 所选根的实例在它自己指着的实例表里有回退行时，回退行的 W（D23（journal 的角色与格式） 已定项 14 前缀第五条：
+/// 该实例的记录只施加到 W 为止）；没有回退行、实例表读不出或解不开都是 `None`。
+#[must_use]
+pub fn rollback_high_water_of_root(reader: &dyn PoolReader, root: &RootRecord) -> Option<u64> {
+    instance_table_of_root(reader, root)?
+        .rows
+        .iter()
+        .find(|row| row.instance == root.instance && row.is_rollback)
+        .map(|row| row.applied_transaction_high_water)
+}
+
+/// 从盘上按所选根重建出来的上一版。
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "一次挂载只重建一个，两个成员差几百字节按值搬无所谓；装箱只多一层解引用"
+)]
+pub enum RebuiltVersion {
+    /// 树表 0 条：所选根下面还没有发布过文件版本（mkfs 的第 0 代根、第一次可写挂载的暖机根），这一版只有根自己指着的两个单元。
+    WithoutFile,
+    WithFile(TransactionOutput),
+}
+
+/// 重建上一版没做成。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RebuildVersionFailure {
+    /// 单元读不到、解不开，或走读同款的判定判红。
+    Walk(RecoveryFailure),
+    /// 所选根下面有文件版本，而调用方拿不出一条记录顶着这一版（环里一条自证过的记录都没有）。
+    NoRecordStandingForFileVersion,
+}
+
+impl From<RecoveryFailure> for RebuildVersionFailure {
+    fn from(failure: RecoveryFailure) -> Self {
+        RebuildVersionFailure::Walk(failure)
+    }
+}
+
+/// 从盘上按所选根重建「上一版」：全部角色的单元字节、指针、树表、分配记录、记账行与 inode 记录，交给发布路径当上一版
+/// （照抄没重写的角色、经映射释放被换下的角色都靠它；可写挂载在恢复之后调）。`record_standing_for_root` 是所选根自己那条记录
+/// （读不出时由调用方顶一条；树表 0 条时用不到）。
+///
+/// # Errors
+/// 树表不是 0 条而 `record_standing_for_root` 是 `None` ⇒ `NoRecordStandingForFileVersion`；单元读不到或解不开 ⇒ 走读同款的错。
+pub fn rebuild_version(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+    record_standing_for_root: Option<JournalRecord>,
+) -> Result<RebuiltVersion, RebuildVersionFailure> {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    let data_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
+    let instance_table_bytes =
+        read_unit_via_locations(reader, &root.instance_table.locations, data_bytes)?;
+    let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+    let tree_table =
+        parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "树表单元",
+        })?;
+    if tree_table.entries.is_empty() {
+        return Ok(RebuiltVersion::WithoutFile);
+    }
+    let record =
+        record_standing_for_root.ok_or(RebuildVersionFailure::NoRecordStandingForFileVersion)?;
+    let record_bytes = record.to_bytes();
+    let mut tree_table_entries = Vec::with_capacity(tree_table.entries.len());
+    for bytes in &tree_table.entries {
+        tree_table_entries.push(TreeTableEntry::parse(bytes).ok_or(
+            RecoveryFailure::UnitMalformed {
+                what: "树表条目"
+            },
+        )?);
+    }
+    let pointer_of = |kind: u16| {
+        tree_table_entries
+            .iter()
+            .find(|entry| entry.kind == kind)
+            .map(|entry| entry.root)
+            .ok_or(RecoveryFailure::UnitMalformed {
+                what: "树表里没有那棵树",
+            })
+    };
+    let extent_pointer = pointer_of(TREE_KIND_EXTENT)?;
+    let inode_root_pointer = pointer_of(TREE_KIND_INODE)?;
+    let allocation_pointer = pointer_of(TREE_KIND_ALLOCATION)?;
+    let accounting_pointer = pointer_of(TREE_KIND_ACCOUNTING)?;
+    let read_node = |pointer: &NodePointer, what: &'static str| {
+        let bytes = read_unit_via_locations(reader, &pointer.locations, node_bytes)?;
+        let node =
+            parse_index_node(&bytes).map_err(|_error| RecoveryFailure::UnitMalformed { what })?;
+        Ok::<(Vec<u8>, IndexNodeHeader), RecoveryFailure>((bytes, node))
+    };
+    let (extent_bytes, extent_node) = read_node(&extent_pointer, "extent 树根")?;
+    let (_, data_pointer) = parse_extent_record(extent_node.entries.first().ok_or(
+        RecoveryFailure::UnitMalformed {
+            what: "extent 树根没有记录",
+        },
+    )?);
+    let data_unit_bytes = read_unit_via_locations(reader, &data_pointer.locations, data_bytes)?;
+    let (inode_root_bytes, inode_root_node) = read_node(&inode_root_pointer, "inode 树根")?;
+    let (_, _, inode_leaf_pointer) =
+        parse_inode_internal_entry(inode_root_node.entries.first().ok_or(
+            RecoveryFailure::UnitMalformed {
+                what: "inode 树根没有条目",
+            },
+        )?);
+    let inode_leaf_bytes =
+        read_unit_via_locations(reader, &inode_leaf_pointer.locations, data_bytes)?;
+    let inode_leaf =
+        parse_packed_unit(&inode_leaf_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "inode 叶容器",
+        })?;
+    let inode_record = InodeRecord::parse(inode_leaf.records.first().ok_or(
+        RecoveryFailure::UnitMalformed {
+            what: "inode 叶容器没有记录",
+        },
+    )?)
+    .ok_or(RecoveryFailure::UnitMalformed {
+        what: "inode 记录"
+    })?;
+    let (allocation_bytes, allocation_node) = read_node(&allocation_pointer, "分配记录树根")?;
+    let allocation_records: Vec<AllocationRecord> = allocation_node
+        .entries
+        .iter()
+        .map(|bytes| AllocationRecord::parse(bytes))
+        .collect();
+    let (accounting_bytes, accounting_node) = read_node(&accounting_pointer, "记账树根")?;
+    let accounting_entries: Vec<AccountingEntry> = accounting_node
+        .entries
+        .iter()
+        .map(|bytes| AccountingEntry::parse(bytes))
+        .collect();
+    let (mapping_bytes, mapping_node) = read_node(&root.mapping_root, "映射树根")?;
+    let mapping_keys: Vec<Vec<u8>> = mapping_node
+        .entries
+        .iter()
+        .map(|entry| parse_mapping_entry(entry).0)
+        .collect();
+    let mapped_units = vec![
+        (
+            TransactionUnit::Data,
+            mapping_key_for_data(data_pointer.head, data_pointer.write_order),
+        ),
+        (
+            TransactionUnit::ExtentRoot,
+            mapping_key_for_node(UNIT_CLASS_INDEX_NODE, extent_pointer),
+        ),
+        (
+            TransactionUnit::InodeLeaf,
+            mapping_key_for_node(UNIT_CLASS_PACKED, inode_leaf_pointer),
+        ),
+        (
+            TransactionUnit::InodeRoot,
+            mapping_key_for_node(UNIT_CLASS_INDEX_NODE, inode_root_pointer),
+        ),
+        (
+            TransactionUnit::AllocationTree,
+            mapping_key_for_node(UNIT_CLASS_INDEX_NODE, allocation_pointer),
+        ),
+        (
+            TransactionUnit::AccountingTree,
+            mapping_key_for_node(UNIT_CLASS_INDEX_NODE, accounting_pointer),
+        ),
+    ];
+    let unit =
+        |identity: TransactionUnit, locations: &[LocationEntry; 2], bytes: Vec<u8>| PublishedUnit {
+            slot: locations[0].slot,
+            identity,
+            bytes,
+        };
+    let units = vec![
+        unit(
+            TransactionUnit::Data,
+            &data_pointer.locations,
+            data_unit_bytes,
+        ),
+        unit(
+            TransactionUnit::ExtentRoot,
+            &extent_pointer.locations,
+            extent_bytes,
+        ),
+        unit(
+            TransactionUnit::InodeLeaf,
+            &inode_leaf_pointer.locations,
+            inode_leaf_bytes,
+        ),
+        unit(
+            TransactionUnit::InodeRoot,
+            &inode_root_pointer.locations,
+            inode_root_bytes,
+        ),
+        unit(
+            TransactionUnit::AllocationTree,
+            &allocation_pointer.locations,
+            allocation_bytes,
+        ),
+        unit(
+            TransactionUnit::AccountingTree,
+            &accounting_pointer.locations,
+            accounting_bytes,
+        ),
+        unit(
+            TransactionUnit::MappingTree,
+            &root.mapping_root.locations,
+            mapping_bytes,
+        ),
+        unit(
+            TransactionUnit::TreeTable,
+            &root.tree_table.locations,
+            tree_table_bytes,
+        ),
+        unit(
+            TransactionUnit::InstanceTable,
+            &root.instance_table.locations,
+            instance_table_bytes,
+        ),
+    ];
+    Ok(RebuiltVersion::WithFile(TransactionOutput {
+        root: *root,
+        record,
+        record_bytes,
+        units,
+        rewritten: Vec::new(),
+        data_pointer,
+        mapping_keys,
+        allocation_records,
+        accounting_entries,
+        tree_table_entries,
+        inode_record,
+        mapped_units,
+        released: Vec::new(),
+        key_order_mismatches: 0,
+        writes: WritesByStructureKind::NOTHING_WRITTEN,
+    }))
+}
+
+/// 一条根的树表里用户可见的两棵树（inode 树、extent 树）的根指针，取树表条目里那 86 字节的盘上原样；树表里没有那棵树的条目时 `None`。
+/// 抬 F 的上限要数「非空」的有效根：一条有效根算非空 ⟺ 这两样与它前一条有效根的不同（D16（发布语义） 已定项 1「非空」从盘上怎么认，
+/// 2026-09-17 用户定案）；树表单元自己的落点每次发布都变，不拿它比。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UserVisibleTreeRootPointers {
+    pub inode_tree: Option<Vec<u8>>,
+    pub extent_tree: Option<Vec<u8>>,
+}
+
+impl UserVisibleTreeRootPointers {
+    /// 树表里没有这两棵树的条目（mkfs 的第 0 代树表就是这样）：最旧的有效根没有前一条时拿它比。
+    pub const ABSENT: Self = Self {
+        inode_tree: None,
+        extent_tree: None,
+    };
+}
+
+/// 读一条根的树表，取 inode 树与 extent 树的根指针盘上字节。
+///
+/// # Errors
+/// 树表单元读不到、解不开；树表条目解不开、种类没登记，或同一种树出现两条。
+pub fn user_visible_tree_root_pointers(
+    reader: &dyn PoolReader,
+    root: &RootRecord,
+) -> Result<UserVisibleTreeRootPointers, RecoveryFailure> {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+    let tree_table =
+        parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+            what: "树表单元",
+        })?;
+    let mut pointers = UserVisibleTreeRootPointers::ABSENT;
+    for entry_bytes in &tree_table.entries {
+        let entry = TreeTableEntry::parse(entry_bytes).ok_or(RecoveryFailure::UnitMalformed {
+            what: "树表条目",
+        })?;
+        let slot_for_this_tree = match entry.kind {
+            TREE_KIND_INODE => &mut pointers.inode_tree,
+            TREE_KIND_EXTENT => &mut pointers.extent_tree,
+            TREE_KIND_ALLOCATION
+            | TREE_KIND_ACCOUNTING
+            | TREE_KIND_LIVELIST
+            | TREE_KIND_SPARSE_SIDE_TABLE
+            | TREE_KIND_DEADLIST => continue,
+            _ => {
+                return Err(RecoveryFailure::UnitMalformed {
+                    what: "树的种类没登记",
+                })
+            }
+        };
+        if slot_for_this_tree
+            .replace(TreeTableEntry::root_pointer_bytes(entry_bytes).to_vec())
+            .is_some()
+        {
+            return Err(RecoveryFailure::UnitMalformed {
+                what: "树表里同一种树有两条",
+            });
+        }
+    }
+    Ok(pointers)
+}
+
 /// 根环全部自证过的根里最大的实例代号（取号的 max 里「根环里全部根记录的实例代号」那一半）；一条都没有时 None。
 #[must_use]
 pub fn highest_root_instance<Reader: PoolReader + ?Sized>(
@@ -379,6 +824,7 @@ pub fn replay_journal(
     ring_bytes: u64,
     records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
     verify_named_units: bool,
+    rollback_high_water: Option<u64>,
 ) -> (JournalScanReport, RootRecord) {
     let mut report = JournalScanReport {
         valid_records: records.len(),
@@ -386,21 +832,46 @@ pub fn replay_journal(
         prefix_applied: 0,
         verification_passed: 0,
         verification_failed: 0,
+        maximum_applied_transaction: 0,
     };
     let water = (root.instance, root.checkpoint_txg);
     let mut rebuilt = *root;
+    // 前缀规则不跨实例边界（D23（journal 的角色与格式） 已定项 14 第 1 条）：链从所选根覆盖的最后一条记录之后接，
+    // 下一条的实例代号与所选根不同即停——所以只有所选根自己那个实例的记录是候选；所选根是 mkfs 的第 0 代根时一条都不施加。
     let mut above: Vec<&JournalRecord> = records
         .values()
-        .filter(|record| (record.instance, record.checkpoint_txg) > water)
+        .filter(|record| {
+            record.instance == root.instance && (record.instance, record.checkpoint_txg) > water
+        })
         .collect();
     above.sort_by_key(|record| (record.instance, record.counter));
     report.above_water = above.len();
     let in_flight_limit =
         usize::try_from(journal_in_flight_record_limit(ring_bytes)).expect("在飞上限");
-    let mut expected_next: Option<(InstanceGeneration, u64)> = None;
+    // 链首接在所选根自己那条记录（同实例、checkpoint_txg 相等）之后；那条记录读不出（两份都撕了）时不知道它的 jsn，
+    // 链首只能是 checkpoint_txg = 根的 txg + 1 的那条（第一版一次发布一条记录、txg 每次加一）：水位之上最小的那条若 txg 更大，
+    // 中间就少了一条，断号即止照样成立（里程碑「第二个事务」步 3 三方第一轮攻方腿打中：无锚点时无条件接上会跳过撕掉的一条）。
+    let root_own_record_counter = records
+        .values()
+        .find(|record| {
+            record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg
+        })
+        .map(|record| record.counter);
+    let mut expected_next: Option<(InstanceGeneration, u64)> =
+        root_own_record_counter.map(|counter| (root.instance, counter + 1));
+    let chain_start_txg_without_anchor = CheckpointTxg(root.checkpoint_txg.0 + 1);
     for record in above.into_iter().take(in_flight_limit) {
         if let Some(expected_key) = expected_next {
             if (record.instance, record.counter) != expected_key {
+                break;
+            }
+        } else if record.checkpoint_txg != chain_start_txg_without_anchor {
+            break;
+        }
+        // 前缀第五条：所选根的实例有回退行时只施加到回退行的 W 为止——W = 0 就是「之后的一个都不算」，
+        // 空发布（事务号 0）也不许把根推过 T_old。
+        if let Some(high_water) = rollback_high_water {
+            if high_water == 0 || record.transaction > high_water {
                 break;
             }
         }
@@ -429,6 +900,8 @@ pub fn replay_journal(
         }
         report.verification_passed += 1;
         report.prefix_applied += 1;
+        report.maximum_applied_transaction =
+            report.maximum_applied_transaction.max(record.transaction);
         rebuilt = RootRecord {
             filesystem_identifier: rebuilt.filesystem_identifier,
             instance: record.instance,
@@ -897,6 +1370,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
                 superblock.geometry.journal_ring_bytes,
                 &records,
                 policy == JournalPolicy::Consult,
+                rollback_high_water_of_root(reader, &root),
             )
         }
         JournalPolicy::Ignore => (JournalScanReport::default(), root),

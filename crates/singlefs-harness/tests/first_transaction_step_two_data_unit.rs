@@ -86,7 +86,7 @@ fn mkfs_pool(tag: &str) -> Pool {
         DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
         DeviceFreeMap::new(DeviceIdentity(1), IMAGE_BYTES),
     ]);
-    allocator.mark_format_time_units(&[
+    allocator.mark_format_time_units(
         Placement {
             slot: INSTANCE_TABLE_SLOT,
             span: 2,
@@ -95,7 +95,7 @@ fn mkfs_pool(tag: &str) -> Pool {
             slot: TREE_TABLE_GENESIS_SLOT,
             span: 1,
         },
-    ]);
+    );
     Pool {
         paths,
         devices,

@@ -525,6 +525,31 @@ pub struct Layer0Tally {
     pub checker_evaluated_states: BTreeMap<&'static str, u64>,
     pub checker_violated_states: BTreeMap<&'static str, u64>,
     pub checker_first_violation: BTreeMap<&'static str, String>,
+    /// checker 报「不适用」（这条不变量判的代码在这个状态上没跑到）的状态数：与评估过的状态数分开报，阴性结果不与「没跑到」混在一起
+    /// （里程碑「第二个事务」步 6 验收第 3 条）；每条不变量的评估过 + 不适用 = `states`。
+    pub checker_not_applicable_states: BTreeMap<&'static str, u64>,
+}
+
+impl Layer0Tally {
+    /// checker 那一半按不变量报成一段：`I-x.y=评估过/判违例/不适用`，次序照 checker 的清单。
+    #[must_use]
+    pub fn checker_counts_by_invariant(&self) -> String {
+        let count_of = |counts: &BTreeMap<&'static str, u64>, invariant: &str| {
+            counts.get(invariant).copied().unwrap_or(0)
+        };
+        singlefs_checker::image::IMPLEMENTED_INVARIANTS
+            .iter()
+            .map(|invariant| {
+                format!(
+                    "{invariant}={}/{}/{}",
+                    count_of(&self.checker_evaluated_states, invariant),
+                    count_of(&self.checker_violated_states, invariant),
+                    count_of(&self.checker_not_applicable_states, invariant)
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(" ")
+    }
 }
 
 /// oracle（E77（发布的持久顺序） 判据 1）：读回的内容要对；根槽已持久就不许恢复到旧态；走读不许失败。
@@ -749,7 +774,12 @@ pub fn evaluate_state_for_versions(
                     .entry(invariant)
                     .or_insert(detail);
             }
-            InvariantVerdict::NotApplicable(_) => {}
+            InvariantVerdict::NotApplicable(_) => {
+                *tally
+                    .checker_not_applicable_states
+                    .entry(invariant)
+                    .or_insert(0) += 1;
+            }
         }
     }
     let records = check_records(&image, consulted.effective_root);
@@ -792,6 +822,29 @@ pub fn enumerate_layer0_selecting_versions(
     versions: &[PublishedVersion],
     expand: &dyn Fn(usize, &[usize]) -> bool,
 ) -> Layer0Tally {
+    enumerate_layer0_selecting_versions_observing_each_state(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expand,
+        &mut |_crash_image, _consulted_report| {},
+    )
+}
+
+/// 同上，每个状态评完之后把这个崩溃镜像与看 journal 那一遍恢复的报告交给 `observe_state`：
+/// 用例按自己独立算的谓词逐状态核恢复（预置的残留记录该不该施加、改坏 tail 之后终态与没改坏的是否逐项相等）。
+#[must_use]
+pub fn enumerate_layer0_selecting_versions_observing_each_state(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[PublishedVersion],
+    expand: &dyn Fn(usize, &[usize]) -> bool,
+    observe_state: &mut dyn FnMut(&CrashImage<'_>, &RecoveryReport),
+) -> Layer0Tally {
     let mut tally = Layer0Tally::default();
     let mut persisted_before = vec![false; writes.len()];
     for (segment_index, segment) in segments.iter().enumerate() {
@@ -804,13 +857,21 @@ pub fn enumerate_layer0_selecting_versions(
                         persisted[*write_index] = true;
                     }
                 }
-                evaluate_state_for_versions(
+                let consulted_report = evaluate_state_for_versions(
                     base,
                     writes,
-                    persisted,
+                    persisted.clone(),
                     judged_root_index,
                     versions,
                     &mut tally,
+                );
+                observe_state(
+                    &CrashImage {
+                        base,
+                        writes,
+                        persisted,
+                    },
+                    &consulted_report,
                 );
             }
         }
@@ -818,13 +879,21 @@ pub fn enumerate_layer0_selecting_versions(
             persisted_before[*write_index] = true;
         }
     }
-    evaluate_state_for_versions(
+    let consulted_report = evaluate_state_for_versions(
         base,
         writes,
-        persisted_before,
+        persisted_before.clone(),
         judged_root_index,
         versions,
         &mut tally,
+    );
+    observe_state(
+        &CrashImage {
+            base,
+            writes,
+            persisted: persisted_before,
+        },
+        &consulted_report,
     );
     tally
 }

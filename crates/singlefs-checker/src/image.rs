@@ -33,16 +33,17 @@ pub enum InvariantVerdict {
 }
 
 /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
-pub const IMPLEMENTED_INVARIANTS: [&str; 23] = [
+pub const IMPLEMENTED_INVARIANTS: [&str; 29] = [
     "I-1.1", "I-1.3", "I-1.4", "I-1.6", "I-1.7", "I-2.1", "I-2.3", "I-2.4", "I-2.5", "I-3.1",
-    "I-5.1", "I-5.2", "I-7.1", "I-7.2", "I-7.6", "I-7.7", "I-7.8", "I-9.1", "I-9.2", "I-9.4",
-    "I-9.7", "I-9.10", "I-9.13",
+    "I-3.8", "I-3.9", "I-4.8", "I-5.1", "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.4", "I-7.6",
+    "I-7.7", "I-7.8", "I-9.1", "I-9.2", "I-9.4", "I-9.7", "I-9.10", "I-9.13", "I-9.14",
 ];
 
 /// 判定累加器：每条不变量记评估了几次、第一处违例、以及整条不适用的理由。
 #[derive(Default)]
 pub struct Judgements {
     evaluated: BTreeMap<&'static str, u64>,
+    violations: BTreeMap<&'static str, u64>,
     first_violation: BTreeMap<&'static str, String>,
     not_applicable: BTreeMap<&'static str, &'static str>,
 }
@@ -56,8 +57,15 @@ impl Judgements {
         );
         *self.evaluated.entry(invariant).or_insert(0) += 1;
         if !holds {
+            *self.violations.entry(invariant).or_insert(0) += 1;
             self.first_violation.entry(invariant).or_insert_with(detail);
         }
+    }
+
+    /// 到此为止判了几次违例：走读一条候选根前后各读一次，差就是这条根引用的单元里对不上的那些（I-7.4、I-4.8 按根判）。
+    #[must_use]
+    pub fn violation_count(&self, invariant: &'static str) -> u64 {
+        self.violations.get(invariant).copied().unwrap_or(0)
     }
     /// 这个镜像上整条不适用（例如第 0 代根下面没有记账树）。已经评估过的不改。
     pub fn not_applicable(&mut self, invariant: &'static str, reason: &'static str) {

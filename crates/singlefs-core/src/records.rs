@@ -3,7 +3,8 @@
 
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY,
-    INODE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, TREE_TABLE_ENTRY_BYTES,
+    INODE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES,
+    TREE_TABLE_ENTRY_BYTES,
 };
 
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, TreeIdentifier};
@@ -254,6 +255,9 @@ pub const TREE_KIND_LIVELIST: u16 = 6;
 pub const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 pub const TREE_KIND_DEADLIST: u16 = 8;
 
+/// 树表条目里根指针的起点：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2（`singlefs_format::TREE_TABLE_ENTRY_BYTES` 的字段表）。
+const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
+
 /// 树表条目 200：树 ID 8（打头 = key）+ 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TreeTableEntry {
@@ -273,6 +277,10 @@ impl TreeTableEntry {
         writer.put_u16(u16::try_from(TREE_TABLE_ENTRY_BYTES).expect("200"));
         writer.put_u16(self.kind);
         writer.put_u16(0);
+        writer.assert_position(
+            u64::try_from(TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES).expect("14"),
+            "树表条目的根指针",
+        );
         self.root.write_to(&mut writer);
         writer.put_u64(0); // previous_snapshot_txg：0 = 不适用
         writer.put_u64(self.birth_txg.0);
@@ -280,6 +288,14 @@ impl TreeTableEntry {
         writer.skip(76);
         writer.assert_position(TREE_TABLE_ENTRY_BYTES, "树表条目");
         writer.into_bytes()
+    }
+    /// 一条条目盘上字节里根指针那 86 字节的原样（逐字节比两条根指针用；解析成 `NodePointer` 会丢掉第一版恒 0 的 MAC / nonce 那几段）。
+    /// 调用方要先用 `parse` 核过这是一条合法的 200 字节条目。
+    #[must_use]
+    pub fn root_pointer_bytes(entry_bytes: &[u8]) -> &[u8] {
+        &entry_bytes[TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
+            ..TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
+                + usize::try_from(NODE_POINTER_BYTES).expect("86")]
     }
     /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零都判不可用。
     #[must_use]
@@ -360,7 +376,8 @@ mod tests {
             inode: 1,
             object_birth: CheckpointTxg(3),
             size: 3000,
-            change_count: 1,
+            // 第一个事务那条记录的取值：改动计数 = 这次发布的 checkpoint_txg 3（增补 2 第 11 行）。
+            change_count: 3,
             write_time_seconds: 1_788_000_000,
         };
         let bytes = record.to_bytes();

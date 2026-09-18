@@ -1,0 +1,50 @@
+{
+ "32": [
+  "步 4：只写被退回的实例那一行、不写中间实例行",
+  "crates/singlefs-core/src/mount.rs",
+  "    (first_row_instance..instance_to_acquire.0)",
+  "    (first_row_instance..first_row_instance + 1)",
+  "-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_the_first_root",
+  "rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content"
+ ],
+ "37": [
+  "步 4：checker 的 I-3.1 并集不按实例表排除被抛弃的根",
+  "crates/singlefs-checker/src/walk.rs",
+  "            *index == newest_index || (!abandoned && !below_floor)",
+  "            *index == newest_index || !below_floor",
+  "-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_the_first_root",
+  "rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content"
+ ],
+ "42": [
+  "步 5：checker 的候选集不按 F 收（F 之下的根照走）",
+  "crates/singlefs-checker/src/walk.rs",
+  "            *index == newest_index || (!abandoned && !below_floor)",
+  "            *index == newest_index || !abandoned",
+  "-p singlefs-harness --test second_transaction_step_five_reuse -- raising_the_floor_to_the_first",
+  "raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it"
+ ],
+ "41": [
+  "步 5：复用时追加记录而不改写（同盘同槽两条）",
+  "crates/singlefs-core/src/allocator.rs",
+  "            existing.span_slots = u16::try_from(placement.span).expect(\"跨度 2 字节\");\\n            existing.generation = generation;\\n            existing.is_released = false;",
+  "            records.push(AllocationRecord {\\n                device,\\n                slot: placement.slot,\\n                span_slots: u16::try_from(placement.span).expect(\"跨度 2 字节\"),\\n                generation,\\n                is_released: false,\\n            });",
+  "-p singlefs-harness --test second_transaction_step_five_reuse -- raising_the_floor_to_the_first",
+  "raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it"
+ ],
+ "69": [
+  "步 3：树表 0 条的一版上要写行时，拒绝挪到取号之后（超级块已写进新号才返回）",
+  "crates/singlefs-core/src/mount.rs",
+  "    refuse_instance_rows_on_version_without_file(&start, instance_to_acquire)?;\\n    refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(parameters, &start)?;\\n    refuse_publishes_before_acquisition_that_do_not_pass_admission(\\n        &allocator,\\n        &start,\\n        instance_to_acquire,\\n        rows_written.len(),\\n        warm_up_publishes_planned.len(),\\n    )?;\\n    let instance = acquire_expected_instance(&mut pool, instance_to_acquire).map_err(\\n        |failure| match failure {\\n            ExpectedInstanceAcquisitionFailed::InstanceGenerationChangedBeforeWrite {\\n                expected,\\n                recomputed,\\n            } => MountError::InstanceGenerationChangedBeforeAcquisition {\\n                expected,\\n                recomputed,\\n            },\\n            ExpectedInstanceAcquisitionFailed::Acquisition(acquisition) => {\\n                MountError::Acquisition(acquisition)\\n            }\\n        },\\n    )?;\\n",
+  "    refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(parameters, &start)?;\\n    refuse_publishes_before_acquisition_that_do_not_pass_admission(\\n        &allocator,\\n        &start,\\n        instance_to_acquire,\\n        rows_written.len(),\\n        warm_up_publishes_planned.len(),\\n    )?;\\n    let instance = acquire_expected_instance(&mut pool, instance_to_acquire).map_err(\\n        |failure| match failure {\\n            ExpectedInstanceAcquisitionFailed::InstanceGenerationChangedBeforeWrite {\\n                expected,\\n                recomputed,\\n            } => MountError::InstanceGenerationChangedBeforeAcquisition {\\n                expected,\\n                recomputed,\\n            },\\n            ExpectedInstanceAcquisitionFailed::Acquisition(acquisition) => {\\n                MountError::Acquisition(acquisition)\\n            }\\n        },\\n    )?;\\n    refuse_instance_rows_on_version_without_file(&start, instance_to_acquire)?;\\n",
+  "-p singlefs-harness --test second_transaction_step_three_formatted_pool -- writable_mount_after_a_crash_right_after_acquiring",
+  "writable_mount_after_a_crash_right_after_acquiring_an_instance_is_refused_before_acquiring_again"
+ ],
+ "107": [
+  "增补 2 第 20a 行：写行那次发布的准入不在取号之前算（取号之后发布才被拒，实例代号已经烧掉）",
+  "crates/singlefs-core/src/mount.rs",
+  "    refuse_publishes_before_acquisition_that_do_not_pass_admission(\\n        &allocator,\\n        &start,\\n        instance_to_acquire,\\n        rows_written.len(),\\n        warm_up_publishes_planned.len(),\\n    )?;\\n",
+  "    // 变异：写行那次发布的准入不在取号之前算\\n",
+  "-p singlefs-harness --test second_transaction_supplement_two_row_publish_admission -- a_writable_mount_that_cannot_publish",
+  "a_writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is_acquired"
+ ]
+}

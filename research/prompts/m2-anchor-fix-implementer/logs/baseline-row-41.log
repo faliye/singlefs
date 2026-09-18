@@ -1,0 +1,8 @@
+
+running 1 test
+test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.57s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_step_five_reuse.rs (/tmp/claude-1000/m2-anchor-fix/copy-target/debug/deps/second_transaction_step_five_reuse-71fb233551ddc3ff)

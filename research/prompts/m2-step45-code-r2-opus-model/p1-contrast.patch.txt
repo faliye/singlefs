@@ -1,0 +1,9 @@
+# 只在副本上做的 P1 对照补丁（crates/singlefs-core/src/mount.rs，mount_rollback 里）：
+# 把 P2 那三行换成 P1，量同一段历史上两种取法的差。
+-    let highest_counter = records
+-        .values()
+-        .map(|record| record.counter)
+-        .max()
+-        .unwrap_or(0);
+-    let next_counter = highest_counter + 1;
++    let next_counter = own_record.counter + 1;

@@ -1,0 +1,98 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-emptypool-nonempty-r1-opus/copy/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-emptypool-nonempty-r1-opus/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.50s
+     Running tests/opus_attack_emptypool.rs (target/debug/deps/opus_attack_emptypool-cee7bd687f620992)
+
+running 9 tests
+test v2_scope_mount_a_formatted_pool_write_nothing_exit_cleanly_then_every_later_writable_mount_is_refused ... V2 first mount -> Ok(instance 1 row_txg 1 warm_ups 1)
+V2 remount attempt 0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+V2 remount attempt 1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+V2 cold recovery -> NoFile { root: (InstanceGeneration(1), CheckpointTxg(2)) }
+ok
+test z1_raising_the_floor_after_it_fell_back_is_refused_on_a_legitimately_reused_tree_table ... Z1F damage_txg16=false E_data_slot=50178 floor_after_remount=11 genesis_root_tree_table_slot=50178 genesis_pointers=Err(UnitUnreadable { slot: SlotNumber(50178) }) raise_to_12 -> Ok((12, 3))
+Z1F damage_txg16=true E_data_slot=50178 floor_after_remount=0 genesis_root_tree_table_slot=50178 genesis_pointers=Err(UnitUnreadable { slot: SlotNumber(50178) }) raise_to_12 -> Err("RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { root: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, failure: UnitUnreadable { slot: SlotNumber(50178) } }")
+ok
+test z1_writing_back_identical_content_still_changes_both_pointers ... Z1S same content txg 4 vs 5: inode differing byte offsets [42, 54, 60, 61, 62, 63, 68, 74, 75, 76, 77]; extent differing byte offsets [42, 54, 60, 61, 62, 63, 68, 74, 75, 76, 77]
+ok
+test z2_transient_superblock_read_errors_split_the_refusal_number_from_the_acquired_number ... Z2 failing_reads_per_device=[] failed=[[], []] -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2)); disk_changed=false; superblock (device, instance, generation)=[(0, 1, 2), (0, 0, 1), (1, 1, 2), (1, 0, 1)]
+Z2 failing_reads_per_device=[1] failed=[[1], [1]] -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2)); disk_changed=false; superblock (device, instance, generation)=[(0, 1, 2), (0, 0, 1), (1, 1, 2), (1, 0, 1)]
+
+thread 'z2_transient_superblock_read_errors_split_the_refusal_number_from_the_acquired_number' (1346493) panicked at crates/singlefs-core/src/mount.rs:820:13:
+取号之前 refuse_instance_rows_on_version_without_file 按同一个号核过：树表 0 条的一版上要写的行为空
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Z2 failing_reads_per_device=[1, 2] failed=[[1, 2], [1, 2]] -> panic: 取号之前 refuse_instance_rows_on_version_without_file 按同一个号核过：树表 0 条的一版上要写的行为空; disk_changed=true; superblock (device, instance, generation)=[(0, 1, 2), (0, 2, 3), (1, 1, 2), (1, 2, 3)]
+
+thread 'z2_transient_superblock_read_errors_split_the_refusal_number_from_the_acquired_number' (1346493) panicked at crates/singlefs-core/src/mount.rs:820:13:
+取号之前 refuse_instance_rows_on_version_without_file 按同一个号核过：树表 0 条的一版上要写的行为空
+Z2 failing_reads_per_device=[2] failed=[[2], [2]] -> panic: 取号之前 refuse_instance_rows_on_version_without_file 按同一个号核过：树表 0 条的一版上要写的行为空; disk_changed=true; superblock (device, instance, generation)=[(0, 1, 2), (0, 2, 3), (1, 1, 2), (1, 2, 3)]
+ok
+test z3_allocator_and_the_next_two_overwrites_match_between_the_two_paths ... Z3N allocators_equal_after_first_file=true streams_after_mkfs_equal=true allocators_equal_after_two_overwrites=true outputs_equal=true
+ok
+test z3_first_file_after_two_superblock_faults_lands_under_a_newer_empty_root ... Z3F first-mount segments [2, 2, 1, 2, 2, 1, 2]
+Z3F after faults: chosen superblock slot_generation=1 journal_instance=0 readable_roots=[(0, 0), (0, 0), (0, 0)]
+Z3F remount -> Ok(instance 1 row_txg 2 warm_ups 2)
+Z3F row_publish (inst 1, txg 2, jsn 2); warm-ups [(3, 3), (4, 4)]; current (txg 4, jsn 4)
+Z3F publish_first_file returned Ok: root (inst 1, txg 3), jsn 3
+Z3F cold recovery (Consult) -> NoFile { root: (InstanceGeneration(1), CheckpointTxg(4)) }
+Z3F cold recovery (Ignore) -> NoFile { root: (InstanceGeneration(1), CheckpointTxg(4)) }
+Z3F checker I-3.1 NotApplicable("最新的根下面还没有记账树（第 0 代树表）")
+Z3F checker I-5.2 NotApplicable("最新的根下面还没有记账树（第 0 代树表）")
+ok
+test z3_region_assignments_accepted_by_mkfs_change_the_zero_unit_publish_count ... Z3R regions=[0, 1, 0] mount=Ok(instance 1 row_txg 1 warm_ups 1) newest_before_file=(1, 2) jsn 2 first_file=(1, 3) jsn 3 root_writes(index, instance, txg)=[(4, 1, 1), (9, 1, 2), (30, 1, 3)] segments=[2, 2, 1, 2, 2, 1, 18, 2, 1, 2] recover="FileRead(InstanceGeneration(1), CheckpointTxg(3)) content_ok=true" fast_states=22 oracle_violations=0 first=None ignored_violations=0 record_checker=(0, 0) checker_violations=[]
+Z3R regions=[0, 1, 1] mount=Ok(instance 1 row_txg 1 warm_ups 2) newest_before_file=(1, 3) jsn 3 first_file=(1, 3) jsn 3 root_writes(index, instance, txg)=[(4, 1, 1), (9, 1, 2), (14, 1, 3), (35, 1, 3)] segments=[2, 2, 1, 2, 2, 1, 2, 2, 1, 18, 2, 1, 2] recover="FileRead(InstanceGeneration(1), CheckpointTxg(3)) content_ok=true" fast_states=29 oracle_violations=7 first=Some("第 3 代根下面有文件却报没有（持久的写：superblock_slot|superblock_slot|journal_record|journal_record|root_record_fua|superblock_slot|superblock_slot|journal_record|journal_record|root_record_fua|superblock_slot|superblock_slot|journal_record）") ignored_violations=4 record_checker=(1, 3) checker_violations=["I-7.8=4:根环水位最大 11，盘上出现过的最大树 ID 15"]
+Z3R regions=[1, 0, 0] mount=Ok(instance 1 row_txg 1 warm_ups 2) newest_before_file=(1, 3) jsn 3 first_file=(1, 3) jsn 3 root_writes(index, instance, txg)=[(4, 1, 1), (9, 1, 2), (14, 1, 3), (35, 1, 3)] segments=[2, 2, 1, 2, 2, 1, 2, 2, 1, 18, 2, 1, 2] recover="FileRead(InstanceGeneration(1), CheckpointTxg(3)) content_ok=true" fast_states=29 oracle_violations=7 first=Some("第 3 代根下面有文件却报没有（持久的写：superblock_slot|superblock_slot|journal_record|journal_record|root_record_fua|superblock_slot|superblock_slot|journal_record|journal_record|root_record_fua|superblock_slot|superblock_slot|journal_record）") ignored_violations=4 record_checker=(1, 3) checker_violations=["I-7.8=4:根环水位最大 11，盘上出现过的最大树 ID 15"]
+Z3R regions=[0, 0, 1] mount=Ok(instance 1 row_txg 1 warm_ups 1) newest_before_file=(1, 2) jsn 2 first_file=(1, 3) jsn 3 root_writes(index, instance, txg)=[(4, 1, 1), (9, 1, 2), (30, 1, 3)] segments=[2, 2, 1, 2, 2, 1, 18, 2, 1, 2] recover="FileRead(InstanceGeneration(1), CheckpointTxg(3)) content_ok=true" fast_states=22 oracle_violations=0 first=None ignored_violations=0 record_checker=(0, 0) checker_violations=[]
+ok
+test z3_writable_remount_on_crash_states_of_the_first_mount_stream ... Z3STATE seg0 mask0x0 -> Ok(instance 1 row_txg 1 warm_ups 1)
+Z3STATE seg0 mask0x1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg0 mask0x2 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg1 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg1 mask0x1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg1 mask0x2 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg2 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (0, 0), rows [1, 2))
+Z3STATE seg3 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 1), rows [1, 2))
+Z3STATE seg3 mask0x1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 1), rows [1, 2))
+Z3STATE seg3 mask0x2 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 1), rows [1, 2))
+Z3STATE seg4 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 1), rows [1, 2))
+Z3STATE seg4 mask0x1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg4 mask0x2 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg5 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x3 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x271a -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x4e31 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x7548 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x9c5f -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0xc376 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0xea8d -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x111a4 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x138bb -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x15fd2 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x186e9 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x1ae00 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x1d517 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x1fc2e -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x22345 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x24a5c -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x27173 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x2988a -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x2bfa1 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x2e6b8 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x30dcf -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x334e6 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x35bfd -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg6 mask0x38314 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg7 mask0x0 -> InstanceRowsOnVersionWithoutFileUnsupported(chosen (1, 2), rows [1, 2))
+Z3STATE seg7 mask0x1 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE seg7 mask0x2 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE seg8 mask0x0 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE seg9 mask0x0 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE seg9 mask0x1 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE seg9 mask0x2 -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3STATE all -> Ok(instance 2 row_txg 4 warm_ups 1)
+Z3TALLY {"InstanceRowsOnVersionWithoutFileUnsupported": 38, "Ok": 8}
+ok
+test z4_third_stream_enumerates_the_same_crash_images_as_the_first_transaction_stream ... Z4 base_equal=true writes_equal=true segments_equal=true writes=33 write_bytes=386560 segments=[2, 2, 1, 2, 2, 1, 18, 2, 1, 2]
+ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.89s
+

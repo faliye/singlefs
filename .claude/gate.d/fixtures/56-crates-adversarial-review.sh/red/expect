@@ -1,3 +1,4 @@
 exit=1
-want=没有三方判决点名
-want=crates/demo/src/lib.rs
+want=crates 改动里 2 个文件没有三方判决点名
+want=      crates/demo/src/lib.rs
+want=      crates/demo/src/other.rs

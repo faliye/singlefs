@@ -1,0 +1,124 @@
+--- transaction.rs.orig	2026-09-18 02:44:01.880486007 +0000
++++ repo/crates/singlefs-core/src/transaction.rs	2026-09-18 02:56:47.524864351 +0000
+@@ -1272,7 +1272,53 @@
+     allocator: &PoolAllocator,
+     rewritten: &[TransactionUnit],
+ ) -> Result<(), PublishError> {
+-    admission_of_one_publish(allocator, allocator.records().len(), rewritten)
++    // OPUS-PROBE 改法臂（副本）：0 = 原样；1 = 抵扣已回收（两处）；2 = 取号之前真分配、发布路径原样；3 = 两处都真分配。
++    match OPUS_ADMISSION_MODE.with(std::cell::Cell::get) {
++        1 => {
++            let upper = rewritten.len() * allocator.devices.len();
++            let credited = upper.min(allocator.opus_probe_reclaimed_count());
++            opus_probe_check_records(allocator.records().len() + upper - credited)?;
++            admission_of_one_publish(allocator, 0, rewritten)
++        }
++        3 => {
++            let after = opus_probe_exact_after_roles(allocator, rewritten).unwrap_or(usize::MAX);
++            opus_probe_check_records(after)?;
++            admission_of_one_publish(allocator, 0, rewritten)
++        }
++        _ => admission_of_one_publish(allocator, allocator.records().len(), rewritten),
++    }
++}
++
++thread_local! {
++    pub static OPUS_ADMISSION_MODE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
++}
++
++fn opus_probe_check_records(records_after_this_publish: usize) -> Result<(), PublishError> {
++    let allocation_node_capacity = index_node_entry_capacity(
++        usize::try_from(ALLOCATION_RECORD_KEY_BYTES).expect("10"),
++        usize::try_from(ALLOCATION_RECORD_BYTES).expect("20"),
++    );
++    if records_after_this_publish > allocation_node_capacity {
++        return Err(PublishError::AllocationRecordsExceedOneNode {
++            records: records_after_this_publish,
++            capacity: allocation_node_capacity,
++        });
++    }
++    Ok(())
++}
++
++fn opus_probe_exact_after_roles(allocator: &PoolAllocator, roles: &[TransactionUnit]) -> Option<usize> {
++    let mut copy = allocator.clone();
++    for identity in roles {
++        let placement = match identity.placement() {
++            PlacementRule::UserData => copy.allocate_user_data(CheckpointTxg(0)),
++            PlacementRule::CommitGenerated(footprint) => {
++                copy.allocate_commit_generated(footprint, CheckpointTxg(0))
++            }
++        };
++        placement?;
++    }
++    Some(copy.records().len())
+ }
+ 
+ /// 接连几次发布的准入，在第一次动分配器之前一次算完：按次序逐次走 `publish_admission` 那两条，前面几次要新增的分配记录
+@@ -1285,6 +1331,27 @@
+     allocator: &PoolAllocator,
+     shapes: &[PublishShape],
+ ) -> Result<(), PublishSequenceRefusal> {
++    let mode = OPUS_ADMISSION_MODE.with(std::cell::Cell::get);
++    if mode == 2 || mode == 3 {
++        let exact = opus_probe_exact_record_counts(allocator, shapes);
++        for (publish_index, count) in exact.iter().enumerate() {
++            let after = count.unwrap_or(usize::MAX);
++            opus_probe_check_records(after).map_err(|cause| PublishSequenceRefusal { publish_index, cause })?;
++        }
++        return Ok(());
++    }
++    if mode == 1 {
++        let mut remaining = allocator.opus_probe_reclaimed_count();
++        let mut records = allocator.records().len();
++        for (publish_index, shape) in shapes.iter().enumerate() {
++            let upper = shape.rewritten_roles().len() * allocator.devices.len();
++            let credited = upper.min(remaining);
++            remaining -= credited;
++            records += upper - credited;
++            opus_probe_check_records(records).map_err(|cause| PublishSequenceRefusal { publish_index, cause })?;
++        }
++        return Ok(());
++    }
+     let mut records_before_this_publish = allocator.records().len();
+     for (publish_index, shape) in shapes.iter().enumerate() {
+         let rewritten = shape.rewritten_roles();
+@@ -1299,6 +1366,38 @@
+     Ok(())
+ }
+ 
++/// OPUS-PROBE（副本插桩，只读）：在分配器的拷贝上按形状逐个角色真分配一遍，交回每一次之后的分配记录条数；
++/// 某次分配不出来就在那一次交回 None 并停。释放只改写记录、不动位图，不影响落点，所以这里不做释放。
++#[must_use]
++pub fn opus_probe_exact_record_counts(
++    allocator: &PoolAllocator,
++    shapes: &[PublishShape],
++) -> Vec<Option<usize>> {
++    let mut copy = allocator.clone();
++    let mut counts = Vec::new();
++    for shape in shapes {
++        let mut ok = true;
++        for identity in shape.rewritten_roles() {
++            let placement = match identity.placement() {
++                PlacementRule::UserData => copy.allocate_user_data(CheckpointTxg(0)),
++                PlacementRule::CommitGenerated(footprint) => {
++                    copy.allocate_commit_generated(footprint, CheckpointTxg(0))
++                }
++            };
++            if placement.is_none() {
++                ok = false;
++                break;
++            }
++        }
++        if !ok {
++            counts.push(None);
++            return counts;
++        }
++        counts.push(Some(copy.records().len()));
++    }
++    counts
++}
++
+ /// 一串发布的准入里第几次算不过（从 0 数）、为什么。
+ #[derive(Debug)]
+ pub struct PublishSequenceRefusal {

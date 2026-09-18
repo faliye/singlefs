@@ -1,0 +1,188 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/opus_probe_z1.rs (target/release/deps/opus_probe_z1-e4b2a4538148a454)
+
+running 1 test
+test z1a_instance_table_rows_overflow_after_acquisition ... z1a per_session_overwrites=1
+mount=1 instance=2 rows_before=0 rows_after=1 base=20 reclaimed=0 planned=1 real=[30, 38] upper_refusal=None
+mount=2 instance=3 rows_before=1 rows_after=2 base=54 reclaimed=0 planned=1 real=[64, 72] upper_refusal=None
+mount=3 instance=4 rows_before=2 rows_after=3 base=88 reclaimed=0 planned=1 real=[98, 106] upper_refusal=None
+mount=50 instance=51 rows_before=49 rows_after=50 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=100 instance=101 rows_before=99 rows_after=100 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=150 instance=151 rows_before=149 rows_after=150 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=200 instance=201 rows_before=199 rows_after=200 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=250 instance=251 rows_before=249 rows_after=250 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=300 instance=301 rows_before=299 rows_after=300 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=350 instance=351 rows_before=349 rows_after=350 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=366 instance=367 rows_before=365 rows_after=366 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=367 instance=368 rows_before=366 rows_after=367 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=368 instance=369 rows_before=367 rows_after=368 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+mount=369 instance=370 rows_before=368 rows_after=369 base=342 reclaimed=62 planned=1 real=[342, 342] upper_refusal=None
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3683065) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::slice::index::slice_index_fail
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic.rs:177:9
+   3: <core::ops::range::Range<usize> as core::slice::index::SliceIndex<[u8]>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:427:13
+   4: <[u8] as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:32:15
+   5: <alloc::vec::Vec<u8> as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:3888:9
+   6: <singlefs_core::bytes::ByteWriter>::put
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/bytes.rs:18:19
+   7: singlefs_core::unit::build_packed_unit
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/unit.rs:111:16
+   8: singlefs_core::transaction::publish_admitted::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1676:24
+   9: singlefs_core::transaction::publish_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1256:19
+  10: singlefs_core::mount::publish_rows_on_file_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:713:5
+  11: singlefs_core::mount::establish_instance::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1009:35
+  12: singlefs_core::mount::mount_writable::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1141:5
+  13: opus_probe_z1::opus_probe_common::remount::{closure#0}
+             at ./tests/opus_probe_common.rs:149:51
+  14: <opus_probe_z1::opus_probe_common::remount::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  15: <core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic/unwind_safe.rs:275:9
+  16: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:576:43
+  17: std::panicking::catch_unwind::<core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>, core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:544:19
+  18: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panic.rs:359:14
+  19: opus_probe_z1::opus_probe_common::remount
+             at ./tests/opus_probe_common.rs:149:18
+  20: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition
+             at ./tests/opus_probe_z1.rs:88:23
+  21: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0}
+             at ./tests/opus_probe_z1.rs:80:56
+  22: <opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  23: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+mount=370 PANICKED instance_to_acquire=371 rows_before=369 rows_to_write>=1 base=342 planned=1 exact=[Some(342), Some(342)] upper_refusal=None
+panic message: range end index 32784 out of range for slice of length 32768
+superblock instances before this mount: [(0, [370, 370]), (1, [370, 370])]
+superblock instances after the panic:   [(0, [370, 371]), (1, [370, 371])]
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3683065) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::slice::index::slice_index_fail
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic.rs:177:9
+   3: <core::ops::range::Range<usize> as core::slice::index::SliceIndex<[u8]>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:427:13
+   4: <[u8] as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:32:15
+   5: <alloc::vec::Vec<u8> as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:3888:9
+   6: <singlefs_core::bytes::ByteWriter>::put
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/bytes.rs:18:19
+   7: singlefs_core::unit::build_packed_unit
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/unit.rs:111:16
+   8: singlefs_core::transaction::publish_admitted::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1676:24
+   9: singlefs_core::transaction::publish_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1256:19
+  10: singlefs_core::mount::publish_rows_on_file_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:713:5
+  11: singlefs_core::mount::establish_instance::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1009:35
+  12: singlefs_core::mount::mount_writable::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1141:5
+  13: opus_probe_z1::opus_probe_common::remount::{closure#0}
+             at ./tests/opus_probe_common.rs:149:51
+  14: <opus_probe_z1::opus_probe_common::remount::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  15: <core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic/unwind_safe.rs:275:9
+  16: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:576:43
+  17: std::panicking::catch_unwind::<core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>, core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:544:19
+  18: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panic.rs:359:14
+  19: opus_probe_z1::opus_probe_common::remount
+             at ./tests/opus_probe_common.rs:149:18
+  20: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition
+             at ./tests/opus_probe_z1.rs:133:35
+  21: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0}
+             at ./tests/opus_probe_z1.rs:80:56
+  22: <opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  23: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+retry=1 instance_to_acquire=372 rows_before=369 -> panicked: range end index 32784 out of range for slice of length 32768; superblock instances now [(0, [371, 372]), (1, [371, 372])]
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3683065) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panicking.rs:80:14
+   2: core::slice::index::slice_index_fail
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic.rs:177:9
+   3: <core::ops::range::Range<usize> as core::slice::index::SliceIndex<[u8]>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:427:13
+   4: <[u8] as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/slice/index.rs:32:15
+   5: <alloc::vec::Vec<u8> as core::ops::index::IndexMut<core::ops::range::Range<usize>>>::index_mut
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/alloc/src/vec/mod.rs:3888:9
+   6: <singlefs_core::bytes::ByteWriter>::put
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/bytes.rs:18:19
+   7: singlefs_core::unit::build_packed_unit
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/unit.rs:111:16
+   8: singlefs_core::transaction::publish_admitted::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1676:24
+   9: singlefs_core::transaction::publish_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/transaction.rs:1256:19
+  10: singlefs_core::mount::publish_rows_on_file_version::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:713:5
+  11: singlefs_core::mount::establish_instance::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1009:35
+  12: singlefs_core::mount::mount_writable::<singlefs_harness::crash::SparseBlockDevice>
+             at /tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core/src/mount.rs:1141:5
+  13: opus_probe_z1::opus_probe_common::remount::{closure#0}
+             at ./tests/opus_probe_common.rs:149:51
+  14: <opus_probe_z1::opus_probe_common::remount::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  15: <core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/panic/unwind_safe.rs:275:9
+  16: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:576:43
+  17: std::panicking::catch_unwind::<core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>, core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panicking.rs:544:19
+  18: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<opus_probe_z1::opus_probe_common::remount::{closure#0}>, core::result::Result<singlefs_core::mount::Mounted, singlefs_core::mount::MountError>>
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/std/src/panic.rs:359:14
+  19: opus_probe_z1::opus_probe_common::remount
+             at ./tests/opus_probe_common.rs:149:18
+  20: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition
+             at ./tests/opus_probe_z1.rs:133:35
+  21: opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0}
+             at ./tests/opus_probe_z1.rs:80:56
+  22: <opus_probe_z1::z1a_instance_table_rows_overflow_after_acquisition::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+  23: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/88d9e12ae178fab0fb5cc050a94da85685d449ea/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+retry=2 instance_to_acquire=373 rows_before=369 -> panicked: range end index 32784 out of range for slice of length 32768; superblock instances now [(0, [372, 373]), (1, [372, 373])]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 32.17s
+

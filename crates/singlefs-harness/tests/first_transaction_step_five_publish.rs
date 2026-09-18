@@ -1,5 +1,5 @@
 //! 里程碑「第一个事务」步 3 / 步 4 / 步 5 的验收：mkfs → 取号 → 暖机两次 → 第一个事务，落到两个文件镜像上，
-//! 录制流按路径切段与 E142（第一个事务的干跑） 第八次跑的产物 `research/results/e142-first-txn-dry-run-2026-09-16-tree-table-200.out`
+//! 录制流按路径切段与 E142（第一个事务的干跑） 第九次跑的产物 `research/results/e142-first-txn-dry-run-2026-09-16-instance-boundary.out`
 //! 逐字对（`name=segments` 五行、`name=root_record` 的反向链、`name=accounting` 的数），盘上的每个单元都由 checker 另一份解析判过。
 
 use std::collections::BTreeSet;
@@ -149,7 +149,7 @@ fn build_pool(tag: &str) -> BuiltPool {
         DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES),
         DeviceFreeMap::new(DeviceIdentity(1), IMAGE_BYTES),
     ]);
-    allocator.mark_format_time_units(&[
+    allocator.mark_format_time_units(
         Placement {
             slot: INSTANCE_TABLE_SLOT,
             span: 2,
@@ -158,7 +158,7 @@ fn build_pool(tag: &str) -> BuiltPool {
             slot: TREE_TABLE_GENESIS_SLOT,
             span: 1,
         },
-    ]);
+    );
     let content = file_content();
     let (warm_up, output) = {
         let mut pool = PoolWriter::new(&parameters, &mut devices);
@@ -243,7 +243,9 @@ fn read_journal_record(pool: &BuiltPool, identity: DeviceIdentity, counter: u64)
 
 fn unit_length(identity: TransactionUnit) -> usize {
     match identity {
-        TransactionUnit::Data | TransactionUnit::InodeLeaf => 32768,
+        TransactionUnit::Data | TransactionUnit::InodeLeaf | TransactionUnit::InstanceTable => {
+            32768
+        }
         TransactionUnit::ExtentRoot
         | TransactionUnit::InodeRoot
         | TransactionUnit::AllocationTree
@@ -548,7 +550,9 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
                     .kind;
                 key_schema_for_tree_kind(kind).expect("有节点的树都有 key 形态")
             }
-            TransactionUnit::Data | TransactionUnit::InodeLeaf => unreachable!("上面按类跳过了"),
+            TransactionUnit::Data | TransactionUnit::InodeLeaf | TransactionUnit::InstanceTable => {
+                unreachable!("上面按类跳过了")
+            }
         };
         check_index_node_keys(&view, schema).expect("key 区间贴紧、条目严格递增");
         assert_eq!(
@@ -683,7 +687,9 @@ fn inode_and_extent_lookups_from_the_root_read_the_first_file_back() {
             inode: FIRST_INODE_NUMBER,
             object_birth: CheckpointTxg(3),
             size: 3000,
-            change_count: 1,
+            // 改动计数 = 最后一次改动所在发布的 checkpoint_txg（D8（核心索引结构） 已定项 6 偏移 88）：
+            // 第一个事务发布在 txg 3（增补 2 第 11 行，2026-09-18 用户定案；此前钉的 1 是暖机把 txg 推到 3 之前的值）。
+            change_count: 3,
             write_time_seconds: FIXED_WRITE_TIME_SECONDS
         },
         "逐字段回读等于写入"
@@ -870,15 +876,16 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
             .iter()
             .filter(|record| record.generation == CheckpointTxg(0))
             .count(),
-        4,
-        "mkfs 的 m1 / m2 分配代 0"
+        2,
+        "mkfs 的 m1 分配代 0；m2（第 0 版树表）被 A 换下，记录改写成已释放、释放代 3"
     );
     assert_eq!(
         records
             .iter()
             .filter(|record| record.generation == CheckpointTxg(3))
             .count(),
-        16
+        18,
+        "A 的八个落点各两盘 16 条，加 m2 那两条改写成释放代 3"
     );
     assert_eq!(
         records
@@ -946,12 +953,16 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
     assert_eq!(value_of(STATISTIC_INODE_WATERMARK), 2);
     for statistic in [
         STATISTIC_UNRECLAIMABLE_BYTES,
-        STATISTIC_DEFER_QUEUE_BYTES,
         STATISTIC_PENDING_DELETE_BYTES,
         STATISTIC_COMMITTED_RESERVATION_BYTES,
     ] {
-        assert_eq!(value_of(statistic), 0, "准入四项 day-1 写 0 行");
+        assert_eq!(value_of(statistic), 0, "准入三项 day-1 写 0 行");
     }
+    assert_eq!(
+        value_of(STATISTIC_DEFER_QUEUE_BYTES),
+        16384,
+        "defer 待释放 = mkfs 那片第 0 版树表单元（1 槽）：A 重写树表把它换下（D3 已定项 7）"
+    );
     for statistic in [
         STATISTIC_ALLOCATED_BYTES,
         STATISTIC_FREE_BYTES,

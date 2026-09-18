@@ -116,12 +116,11 @@ fn main() {
             )
         })
         .collect();
-    run_first_transaction(&parameters, &mut devices, &stream, |_devices| {}).unwrap_or_else(
-        |reason| {
+    run_first_transaction(&parameters, &mut devices, &stream, |_point, _devices| {})
+        .unwrap_or_else(|reason| {
             eprintln!("宿主重跑写路失败：{reason}");
             std::process::exit(2)
-        },
-    );
+        });
     let operations = stream.retained_operations();
     let mut every_device_matches = true;
     let mut emitted = 0u64;

@@ -1,0 +1,74 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_probe_overlap.rs (target/release/deps/opus_probe_overlap-01a059a3477af9b6)
+
+running 1 test
+test overlapping_records_after_reuse_panic_the_next_mount ... per_session=0: 60 mounts, no panic; overlap seen = false
+per_session=1: 60 mounts, no panic; overlap seen = false
+FIRST OVERLAP after per_session=2 mount=8 overwrite=1: publish txg=38 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50180), (ExtentRoot, 50318), (InodeLeaf, 50320), (InodeRoot, 50322), (AllocationTree, 50323), (AccountingTree, 50324), (MappingTree, 50325), (TreeTable, 50326)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50320), span_slots: 2, generation: CheckpointTxg(38), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50321), span_slots: 1, generation: CheckpointTxg(7), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3342336)，遍历全部有效根得到 2850816\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+per_session=2 mount=9 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+FIRST OVERLAP after per_session=3 mount=7 overwrite=1: publish txg=41 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50182), (ExtentRoot, 50318), (InodeLeaf, 50320), (InodeRoot, 50322), (AllocationTree, 50323), (AccountingTree, 50324), (MappingTree, 50325), (TreeTable, 50326)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50320), span_slots: 2, generation: CheckpointTxg(41), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50321), span_slots: 1, generation: CheckpointTxg(7), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3375104)，遍历全部有效根得到 2916352\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=3 mount=8 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+per_session=4: 60 mounts, no panic; overlap seen = false
+FIRST OVERLAP after per_session=5 mount=6 overwrite=1: publish txg=44 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50186), (ExtentRoot, 50318), (InodeLeaf, 50320), (InodeRoot, 50322), (AllocationTree, 50323), (AccountingTree, 50324), (MappingTree, 50325), (TreeTable, 50326)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50320), span_slots: 2, generation: CheckpointTxg(44), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50321), span_slots: 1, generation: CheckpointTxg(7), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3768320)，遍历全部有效根得到 3276800\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=5 mount=7 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+FIRST OVERLAP after per_session=6 mount=6 overwrite=1: publish txg=50 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50192), (ExtentRoot, 50318), (InodeLeaf, 50320), (InodeRoot, 50322), (AllocationTree, 50323), (AccountingTree, 50324), (MappingTree, 50325), (TreeTable, 50326)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50320), span_slots: 2, generation: CheckpointTxg(50), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50321), span_slots: 1, generation: CheckpointTxg(7), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3833856)，遍历全部有效根得到 3178496\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=6 mount=7 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+per_session=8: 60 mounts, no panic; overlap seen = false
+FIRST OVERLAP after per_session=10 mount=4 overwrite=8: publish txg=49 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50194), (ExtentRoot, 50307), (InodeLeaf, 50308), (InodeRoot, 50310), (AllocationTree, 50311), (AccountingTree, 50312), (MappingTree, 50313), (TreeTable, 50314)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50308), span_slots: 2, generation: CheckpointTxg(49), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50309), span_slots: 1, generation: CheckpointTxg(5), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(5177344)，遍历全部有效根得到 3637248\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=10 mount=5 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+FIRST OVERLAP after per_session=12 mount=3 overwrite=11: publish txg=45 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50306), (ExtentRoot, 50591), (InodeLeaf, 50592), (InodeRoot, 50594), (AllocationTree, 50595), (AccountingTree, 50596), (MappingTree, 50597), (TreeTable, 50598)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50306), span_slots: 2, generation: CheckpointTxg(45), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50307), span_slots: 1, generation: CheckpointTxg(5), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(5832704)，遍历全部有效根得到 3702784\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=12 mount=4 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+FIRST OVERLAP after per_session=16 mount=3 overwrite=16: publish txg=57 rewritten=[Data, ExtentRoot, InodeLeaf, InodeRoot, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(Data, 50244), (ExtentRoot, 50819), (InodeLeaf, 50820), (InodeRoot, 50822), (AllocationTree, 50823), (AccountingTree, 50824), (MappingTree, 50825), (TreeTable, 50826)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 2, generation: CheckpointTxg(57), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(6586368)，遍历全部有效根得到 3801088\")"]
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=16 mount=4 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+FIRST OVERLAP after per_session=20 mount=3 (row/warm-up): publish txg=49 rewritten=[InstanceTable, AllocationTree, AccountingTree, MappingTree, TreeTable] units=[(AllocationTree, 50370), (AccountingTree, 50371), (MappingTree, 50372), (TreeTable, 50373), (InstanceTable, 50368)]
+  overlapping records on device 0: AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50368), span_slots: 2, generation: CheckpointTxg(49), is_released: false }  and  AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50369), span_slots: 1, generation: CheckpointTxg(13), is_released: true }
+  checker on the image right after this publish: 28 verdicts, non-green: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3866624)，遍历全部有效根得到 3702784\")"]
+per_session=20 mount=3 overwrite refused AllocationRecordsExceedOneNode { records: 826, capacity: 812 }
+
+thread 'overlapping_records_after_reuse_panic_the_next_mount' (3685871) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+per_session=20 mount=4 PANICKED at mount: 跨度里有已分配的槽; overlap seen before = true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.14s
+
+
+real	0m22.154s
+user	0m22.125s
+sys	0m0.027s

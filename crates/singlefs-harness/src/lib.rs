@@ -15,8 +15,11 @@ use singlefs_core::block_device::{
 
 pub mod crash;
 pub mod device_log;
+pub mod first_transaction_regions;
+pub mod hexadecimal;
 pub mod scenario;
 pub mod segments;
+pub mod sha256;
 
 /// 一条录制流里能出现的操作种类，封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

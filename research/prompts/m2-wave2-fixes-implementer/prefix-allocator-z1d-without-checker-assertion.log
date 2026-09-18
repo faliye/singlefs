@@ -1,0 +1,27 @@
+Fri Sep 18 04:13:07 AM UTC 2026
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/prefix-allocator/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running tests/second_transaction_supplement_two_reused_record_overlap.rs (/tmp/claude-1000/impl-m2-wave2-fixes/targets/prefix-allocator/debug/deps/second_transaction_supplement_two_reused_record_overlap-6a4a79a256df819c)
+
+running 1 test
+test reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds ... FAILED
+
+failures:
+
+---- reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds stdout ----
+
+thread 'reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds' (1157036) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_reused_record_overlap.rs:177:21:
+assertion `left == right` failed: 盘 DeviceIdentity(0)：50321 那条被新记录罩住，随这次分配删掉
+  left: Some(AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50321), span_slots: 1, generation: CheckpointTxg(7), is_released: true })
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.91s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_reused_record_overlap`
+exit=101
+Fri Sep 18 04:13:21 AM UTC 2026

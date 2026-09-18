@@ -1,0 +1,39 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_probe_z1.rs (target/release/deps/opus_probe_z1-e4b2a4538148a454)
+
+running 1 test
+test z1a_instance_table_rows_overflow_after_acquisition ... z1a per_session_overwrites=8
+mount=1 instance=2 rows_before=0 rows_after=1 base=20 reclaimed=0 planned=1 real=[30, 38] upper_refusal=None
+mount=2 instance=3 rows_before=1 rows_after=2 base=166 reclaimed=0 planned=2 real=[176, 184, 192] upper_refusal=None
+mount=3 instance=4 rows_before=2 rows_after=3 base=320 reclaimed=0 planned=1 real=[330, 338] upper_refusal=None
+mount=50 instance=51 rows_before=49 rows_after=50 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=100 instance=101 rows_before=99 rows_after=100 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=150 instance=151 rows_before=149 rows_after=150 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=200 instance=201 rows_before=199 rows_after=200 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=250 instance=251 rows_before=249 rows_after=250 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=300 instance=301 rows_before=299 rows_after=300 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=350 instance=351 rows_before=349 rows_after=350 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=366 instance=367 rows_before=365 rows_after=366 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=367 instance=368 rows_before=366 rows_after=367 base=590 reclaimed=240 planned=1 real=[590, 590] upper_refusal=None
+mount=368 instance=369 rows_before=367 rows_after=368 base=590 reclaimed=240 planned=2 real=[590, 590, 590] upper_refusal=None
+mount=369 instance=370 rows_before=368 rows_after=369 base=590 reclaimed=240 planned=1 real=[590, 590] upper_refusal=None
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3942561) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+mount=370 PANICKED instance_to_acquire=371 rows_before=369 rows_to_write>=1 base=590 planned=2 exact=[Some(590), Some(590), Some(590)] upper_refusal=None
+panic message: range end index 32784 out of range for slice of length 32768
+superblock instances before this mount: [(0, [370, 370]), (1, [370, 370])]
+superblock instances after the panic:   [(0, [370, 371]), (1, [370, 371])]
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3942561) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+retry=1 instance_to_acquire=372 rows_before=369 -> panicked: range end index 32784 out of range for slice of length 32768; superblock instances now [(0, [371, 372]), (1, [371, 372])]
+
+thread 'z1a_instance_table_rows_overflow_after_acquisition' (3942561) panicked at crates/singlefs-core/src/bytes.rs:18:19:
+range end index 32784 out of range for slice of length 32768
+retry=2 instance_to_acquire=373 rows_before=369 -> panicked: range end index 32784 out of range for slice of length 32768; superblock instances now [(0, [372, 373]), (1, [372, 373])]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 35.86s
+

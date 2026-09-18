@@ -1,13 +1,15 @@
-//! checker 的已知坏镜像语料（C13（checker 判定失效））：第一版判的 23 条不变量，每条配一份「改坏了正好触发它」的镜像。
-//! 每份都从写完第一个事务的干净镜像出发，改一处；要让被改的那一条之前的判定不先挡住，被改的单元重封校验和，
-//! 再把新的整单元校验和沿引用链一路补到根记录（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
+//! checker 的已知坏镜像语料（C13（checker 判定失效））：第一版判的 29 条不变量，每条配一份「改坏了正好触发它」的镜像。
+//! 每份都从一份干净镜像出发（写完第一个事务的，或再覆盖写一次的），改一处；要让被改的那一条之前的判定不先挡住，
+//! 被改的单元重封校验和，再把新的整单元校验和沿引用链一路补到根记录（父节点里的位置条目、中央映射条目、根槽的自证校验和）。
 
 mod common;
 
-use common::build_pool;
+use common::{build_pool, publish_overwrite_in_process, FIXED_WRITE_TIME_SECONDS};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+};
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::recovery::PoolReader;
 use singlefs_harness::crash::MemoryPool;
@@ -27,10 +29,40 @@ const UNITS: [(u64, usize); 10] = [
     (50247, 16384),
     (50248, 16384),
 ];
+/// 再覆盖写一次（发布 B，txg 4）之后单元区里的单元：A 的十个槽仍在盘上（根环里 A 的根还引用着它们），加上 B 写出的八个
+/// （落点由 `second_transaction_step_one_overwrite.rs` 的验收钉住）。
+const UNITS_AFTER_OVERWRITE: [(u64, usize); 18] = [
+    (50176, 32768),
+    (50178, 16384),
+    (50180, 32768),
+    (50182, 32768),
+    (50240, 16384),
+    (50242, 32768),
+    (50244, 16384),
+    (50245, 16384),
+    (50246, 16384),
+    (50247, 16384),
+    (50248, 16384),
+    (50249, 16384),
+    (50250, 32768),
+    (50252, 16384),
+    (50253, 16384),
+    (50254, 16384),
+    (50255, 16384),
+    (50256, 16384),
+];
+/// 发布 B 写出的分配记录树与树表（I-3.9 与 I-9.14 那两份坏镜像改的就是这两个单元）。
+const ALLOCATION_TREE_AFTER_OVERWRITE: u64 = 50253;
+const TREE_TABLE_AFTER_OVERWRITE: u64 = 50256;
+const INSTANCE_TABLE: u64 = 50176;
+/// mkfs 种下的第 0 版树表单元：第一个文件版本换下它之后只有第 0 代根还引用。
+const GENESIS_TREE_TABLE: u64 = 50178;
 const DATA_UNIT: u64 = 50180;
 const EXTENT_ROOT: u64 = 50240;
 const INODE_LEAF: u64 = 50242;
 const INODE_ROOT: u64 = 50244;
+/// 第一个事务（A）写出的分配记录树：发布 B 之后只有 A 的根还指着它。
+const ALLOCATION_TREE: u64 = 50245;
 const ACCOUNTING_ROOT: u64 = 50246;
 const TREE_TABLE: u64 = 50248;
 
@@ -105,12 +137,13 @@ fn replace_all(haystack: &mut [u8], needle: &[u8], replacement: &[u8]) -> bool {
 }
 
 /// 一个单元（两盘同槽）的整单元校验和从 old 变成 new：把引用它的位置条目逐个补上，被补的单元重封、再往上补，直到根槽。
-fn propagate(pool: &mut MemoryPool, mut changes: Vec<(u64, u32, u32)>) {
+/// `units` 是这份镜像单元区里的单元表：写完第一个事务的是 `UNITS`，再覆盖写一次的是 `UNITS_AFTER_OVERWRITE`。
+fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u64, u32, u32)>) {
     while let Some((slot, old, new)) = changes.pop() {
         if old == new {
             continue;
         }
-        for (container, length) in UNITS {
+        for (container, length) in units.iter().copied() {
             if container == slot {
                 continue;
             }
@@ -152,8 +185,14 @@ fn propagate(pool: &mut MemoryPool, mut changes: Vec<(u64, u32, u32)>) {
 }
 
 /// 改一个单元（两盘一起改）：`reseal` 为真时重封它的两道校验和；新的整单元校验和沿引用链补上去。
-fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), reseal: bool) {
-    let length = UNITS
+fn mutate_unit_of(
+    pool: &mut MemoryPool,
+    units: &[(u64, usize)],
+    slot: u64,
+    change: impl Fn(&mut Vec<u8>),
+    reseal: bool,
+) {
+    let length = units
         .iter()
         .find(|(start, _)| *start == slot)
         .expect("登记过的单元")
@@ -169,8 +208,14 @@ fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), 
     }
     propagate(
         pool,
+        units,
         vec![(slot, crc32_castagnoli(&before), crc32_castagnoli(&bytes))],
     );
+}
+
+/// 写完第一个事务那份镜像上改一个单元。
+fn mutate_unit(pool: &mut MemoryPool, slot: u64, change: impl Fn(&mut Vec<u8>), reseal: bool) {
+    mutate_unit_of(pool, &UNITS, slot, change, reseal);
 }
 
 fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
@@ -207,6 +252,63 @@ fn tree_table_entry_offset(index: usize) -> usize {
     131 + 200 * index
 }
 
+/// 一条树表条目里诞生 txg 那 8 字节的偏移：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8
+/// （D8（核心索引结构） 已定项 8 的字段表）。
+const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
+/// 分配记录树叶（key 宽 10）：条目数在 82 + 2 × 10、条目区从 115 + 2 × 10 起，每条 20 = key (设备 4, 槽号 6) +
+/// value (跨度段 2，最高位是已释放标志, 分配代或释放代 8)。
+const ALLOCATION_NODE_ENTRY_COUNT_OFFSET: usize = 102;
+const ALLOCATION_NODE_ENTRY_START: usize = 135;
+const ALLOCATION_RECORD_BYTES: usize = 20;
+const ALLOCATION_RECORD_RELEASED_FLAG: u16 = 0x8000;
+
+fn get_u64(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
+}
+
+/// 分配记录树叶里，把代字段等于 `from` 的已释放记录改成 `to`；返回改了几条。
+fn rewrite_released_generations(bytes: &mut [u8], from: u64, to: u64) -> usize {
+    let count = usize::from(u16::from_le_bytes([
+        bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
+        bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
+    ]));
+    let mut rewritten = 0;
+    for index in 0..count {
+        let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
+        let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
+        if span_field & ALLOCATION_RECORD_RELEASED_FLAG != 0 && get_u64(bytes, record + 12) == from
+        {
+            set_u64(bytes, record + 12, to);
+            rewritten += 1;
+        }
+    }
+    rewritten
+}
+
+/// 分配记录树叶里槽号是 `slot` 的记录（两盘各一条）跨度改成 `span_slots`，已释放标志照留；返回改了几条。
+fn set_allocation_record_span(bytes: &mut [u8], slot: u64, span_slots: u16) -> usize {
+    let count = usize::from(u16::from_le_bytes([
+        bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET],
+        bytes[ALLOCATION_NODE_ENTRY_COUNT_OFFSET + 1],
+    ]));
+    let mut rewritten = 0;
+    for index in 0..count {
+        let record = ALLOCATION_NODE_ENTRY_START + ALLOCATION_RECORD_BYTES * index;
+        let mut slot_bytes = [0u8; 8];
+        slot_bytes[..6].copy_from_slice(&bytes[record + 4..record + 10]);
+        if u64::from_le_bytes(slot_bytes) == slot {
+            let span_field = u16::from_le_bytes([bytes[record + 10], bytes[record + 11]]);
+            set_u16(
+                bytes,
+                record + 10,
+                (span_field & ALLOCATION_RECORD_RELEASED_FLAG) | span_slots,
+            );
+            rewritten += 1;
+        }
+    }
+    rewritten
+}
+
 /// 一份坏镜像：它要让哪一条判违例，以及怎么从干净镜像改出来。
 type Mutation = Box<dyn Fn(&mut MemoryPool)>;
 
@@ -235,6 +337,28 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
         record
     };
     vec![
+        // 第 0 代根（暖机 txg 1、2）引用的 mkfs 树表单元（50178，A 换下之后只有它们引用）内容改掉再重封：那条候选根指着的块被复用。
+        (
+            "I-7.4",
+            Box::new(|image: &mut MemoryPool| {
+                let mut unit = read(image, 0, GENESIS_TREE_TABLE * SLOT, 16384);
+                set_u64(&mut unit, 42, 77);
+                reseal_unit(&mut unit);
+                for device in DEVICES {
+                    write(image, device, GENESIS_TREE_TABLE * SLOT, &unit);
+                }
+            }),
+        ),
+        // 同一个单元的头抹成零、不重封：从第 0 代根出发的遍历读不到它。
+        (
+            "I-4.8",
+            Box::new(|image: &mut MemoryPool| {
+                let erased = vec![0u8; 16384];
+                for device in DEVICES {
+                    write(image, device, GENESIS_TREE_TABLE * SLOT, &erased);
+                }
+            }),
+        ),
         // 数据单元五元组里的锚点偏移改成 32768（extent key 的偏移是 0）。
         (
             "I-1.1",
@@ -473,6 +597,27 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 136 + 8, 2), true)
             }),
         ),
+        // 实例表里多一行 (1, 3, 0)：行的实例代号等于挂载根的实例 1，不「低于」；链指针记录仍在末尾、行仍唯一，红的只有那一半。
+        (
+            "I-3.8",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit(
+                    image,
+                    INSTANCE_TABLE,
+                    |bytes| {
+                        let chain_record: Vec<u8> = bytes[136..224].to_vec();
+                        let mut row = vec![0u8; 88];
+                        row[1..5].copy_from_slice(&1u32.to_le_bytes());
+                        row[5..13].copy_from_slice(&3u64.to_le_bytes());
+                        bytes[136..224].copy_from_slice(&row);
+                        bytes[224..312].copy_from_slice(&chain_record);
+                        set_u16(bytes, 69, 2);
+                        set_u16(bytes, 8, 176);
+                    },
+                    true,
+                );
+            }),
+        ),
         // 类型 2 容器的记录数与声明长度都改成 0。
         (
             "I-9.13",
@@ -492,19 +637,208 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
     ]
 }
 
+/// 发布 B（txg 4）之后的干净镜像：A 的八个单元（十个落点）在这次发布里改写成已释放、释放代 4，树表是 B 写的那一版，
+/// A 那一版仍被根环里 A 的根指着。I-3.9（释放代落在停止引用它的那一格区间里）与 I-9.14（树表条目的诞生 txg 跨根不变）
+/// 要的跨根比较到这里才有内容：写完第一个事务的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
+/// 两次暖机空发布不写树表），I-9.14 在那份镜像上报「不适用」。
+fn image_after_the_overwrite(tag: &str) -> MemoryPool {
+    let mut pool = build_pool(tag);
+    let previous = pool.output.clone();
+    // 第二次写的内容与第一次不同长、不同字节；具体哪些字节这里不承重（落点与释放代由步 1 的验收钉住）。
+    let content: Vec<u8> = (0..4100usize)
+        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
+        .collect();
+    let second = publish_overwrite_in_process(
+        &mut pool,
+        &previous,
+        &content,
+        FIXED_WRITE_TIME_SECONDS + 60,
+        InstanceGeneration(1),
+    )
+    .expect("覆盖写");
+    assert_eq!(
+        second.root.checkpoint_txg,
+        CheckpointTxg(4),
+        "发布 B 是 txg 4"
+    );
+    pool.memory_pool()
+}
+
+/// C374（释放代与树表诞生 txg 只有验收断言盯着） 立的那两条各一份坏镜像，都从发布 B 之后的干净镜像出发改一处。
+fn known_bad_images_after_the_overwrite() -> Vec<(&'static str, Mutation)> {
+    vec![
+        // 发布 B 那次的释放代写成上一次发布的 txg（4 → 3）：A 的十个落点两盘各一条，十六条一起改。
+        (
+            "I-3.9",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit_of(
+                    image,
+                    &UNITS_AFTER_OVERWRITE,
+                    ALLOCATION_TREE_AFTER_OVERWRITE,
+                    |bytes| {
+                        assert_eq!(
+                            rewrite_released_generations(bytes, 4, 3),
+                            16,
+                            "A 的八个单元十个落点、两盘各一条"
+                        );
+                    },
+                    true,
+                );
+            }),
+        ),
+        // 树表里 extent 树（树 ID 11）那条的诞生 txg 改成跟着这次发布的 txg（3 → 4）：A 写的那一版树表里仍是 3。
+        (
+            "I-9.14",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit_of(
+                    image,
+                    &UNITS_AFTER_OVERWRITE,
+                    TREE_TABLE_AFTER_OVERWRITE,
+                    |bytes| {
+                        let birth_txg =
+                            tree_table_entry_offset(0) + TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET;
+                        assert_eq!(get_u64(bytes, birth_txg), 3, "extent 树的诞生 txg 本来是 3");
+                        set_u64(bytes, birth_txg, 4);
+                    },
+                    true,
+                );
+            }),
+        ),
+    ]
+}
+
+/// I-5.4（分配记录罩住的槽互不相交） 的坏镜像，都从发布 B 之后的干净镜像出发、把 A 的 inode 树根那个落点（槽 50244、跨 1）的记录
+/// 跨度改成 2（已释放标志照留），两盘各一条——它罩住的 50245 上另有一条记录（A 的分配记录树那个落点）。
+/// 这是代码三方第二轮 Z1-d 在盘上的形状（复用时跨度变了、新记录罩住的旧记录留着）；树里的引用一个没动，I-5.1（物理范围不重叠） 看不见它。
+fn known_bad_images_of_overlapping_allocation_records() -> Vec<(&'static str, Mutation)> {
+    vec![
+        // 改在 B 写的那棵账里（最新根下面）：两条都是已释放、释放代 4 的记录。
+        (
+            "I-5.4",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit_of(
+                    image,
+                    &UNITS_AFTER_OVERWRITE,
+                    ALLOCATION_TREE_AFTER_OVERWRITE,
+                    |bytes| {
+                        assert_eq!(
+                            set_allocation_record_span(bytes, INODE_ROOT, 2),
+                            2,
+                            "A 的 inode 树根那一个落点，两盘各一条"
+                        );
+                    },
+                    true,
+                );
+            }),
+        ),
+        // 改在 A 写的那棵账里（只有 A 的根指着它，B 之后 A 的根仍在候选集里）：两条都是仍分配、分配代 3 的记录。
+        // 「候选集里每条有效根」那个量词靠它：只判最新根那棵账的 checker 在这份镜像上判成立。
+        (
+            "I-5.4",
+            Box::new(|image: &mut MemoryPool| {
+                mutate_unit_of(
+                    image,
+                    &UNITS_AFTER_OVERWRITE,
+                    ALLOCATION_TREE,
+                    |bytes| {
+                        assert_eq!(
+                            set_allocation_record_span(bytes, INODE_ROOT, 2),
+                            2,
+                            "A 的 inode 树根那一个落点，两盘各一条"
+                        );
+                    },
+                    true,
+                );
+            }),
+        ),
+    ]
+}
+
+/// I-5.4 那份坏镜像**只**红在 I-5.4 上：别的不变量跟着红，就说明镜像改宽了，判别力算不到这一条头上。
 #[test]
-fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
-    let clean = build_pool("known-bad").memory_pool();
+fn an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant()
+{
+    let clean = image_after_the_overwrite("known-bad-overlapping-records");
+    assert_eq!(
+        verdict(&clean, "I-5.4"),
+        InvariantVerdict::Holds,
+        "发布 B 之后的干净镜像上 I-5.4 要真被评估过且成立"
+    );
+    let images_and_where_they_are_changed =
+        ["B 写的那棵账（最新根）", "A 写的那棵账（更早的候选根）"];
+    let bad_images = known_bad_images_of_overlapping_allocation_records();
+    assert_eq!(bad_images.len(), images_and_where_they_are_changed.len());
+    for ((invariant, mutation), where_changed) in bad_images
+        .into_iter()
+        .zip(images_and_where_they_are_changed)
+    {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        let violated: Vec<&str> = verdicts
+            .iter()
+            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+            .map(|(name, _)| *name)
+            .collect();
+        assert_eq!(
+            violated,
+            [invariant],
+            "改在{where_changed}：判红的该只有 {invariant}：{verdicts:?}"
+        );
+    }
+}
+
+/// C374 那两条：发布 B 之后的干净镜像上每条不变量都成立，两份坏镜像各自**只**红在自己那一条上
+/// （别的不变量跟着红就说明镜像改宽了，判别力算不到这一条头上）。
+#[test]
+fn each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite() {
+    let clean = image_after_the_overwrite("known-bad-after-overwrite");
     for (invariant, found) in check_pool_image(&clean) {
         assert_eq!(
             found,
             InvariantVerdict::Holds,
-            "干净镜像上 {invariant} 要成立"
+            "发布 B 之后的干净镜像上 {invariant} 要真被评估过且成立"
         );
     }
+    for (invariant, mutation) in known_bad_images_after_the_overwrite() {
+        let mut image = clean.clone();
+        mutation(&mut image);
+        let verdicts = check_pool_image(&image);
+        let violated: Vec<&str> = verdicts
+            .iter()
+            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+            .map(|(name, _)| *name)
+            .collect();
+        assert_eq!(
+            violated,
+            [invariant],
+            "判红的该只有 {invariant}：{verdicts:?}"
+        );
+    }
+}
+
+#[test]
+fn the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target() {
+    let clean = build_pool("known-bad").memory_pool();
+    for (invariant, found) in check_pool_image(&clean) {
+        let expected = if invariant == "I-9.14" {
+            // 写完第一个事务的镜像上只有 A 的根有树表条目：没有一棵树的条目出现在两个树表单元里，跨根比不出来。
+            // 这一条的坏镜像在发布 B 之后那一份上（`each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite`）。
+            InvariantVerdict::NotApplicable(
+                "没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来",
+            )
+        } else {
+            InvariantVerdict::Holds
+        };
+        assert_eq!(found, expected, "干净镜像上 {invariant} 的判定");
+    }
     let cases = known_bad_images(&clean);
-    let targets: std::collections::BTreeSet<&str> =
-        cases.iter().map(|(invariant, _)| *invariant).collect();
+    let targets: std::collections::BTreeSet<&str> = cases
+        .iter()
+        .chain(known_bad_images_after_the_overwrite().iter())
+        .chain(known_bad_images_of_overlapping_allocation_records().iter())
+        .map(|(invariant, _)| *invariant)
+        .collect();
     let listed: std::collections::BTreeSet<&str> = singlefs_checker::image::IMPLEMENTED_INVARIANTS
         .iter()
         .copied()
@@ -538,4 +872,24 @@ fn adjust_accounting(bytes: &mut [u8], statistic: u16, device: u32, delta: u64) 
         }
     }
     panic!("记账树里没有 ({statistic}, {device}) 这一行");
+}
+
+/// 只被最新根引用的单元被盖（A 的数据单元改内容重封，暖机根与种子根都不引用它）：I-7.4 在最新根那一格也要红，
+/// 不能只在更早的候选根上判（步 6 checker 三方第一轮本地攻方腿：两条不变量都写「候选集里每一条根」，最新根也在候选集里；
+/// 根环种子 24 条 txg 0 的根让「候选集只剩最新根」构造不出来，所以用这一格钉最新根那一次判定）。
+#[test]
+fn reused_unit_referenced_only_by_the_newest_root_makes_the_reuse_invariant_red() {
+    let mut image = build_pool("known-bad-newest-only").memory_pool();
+    // 直接改盘上的单元、不把新校验和传播进位置条目：这就是「块被别的对象盖了」在盘上的样子。
+    let mut unit = read(&image, 0, DATA_UNIT * SLOT, 32768);
+    set_u64(&mut unit, 100, 77);
+    reseal_unit(&mut unit);
+    for device in DEVICES {
+        write(&mut image, device, DATA_UNIT * SLOT, &unit);
+    }
+    assert!(
+        matches!(verdict(&image, "I-7.4"), InvariantVerdict::Violated(_)),
+        "只被 A 引用的数据单元被盖，I-7.4 要在最新根上判红：{:?}",
+        verdict(&image, "I-7.4")
+    );
 }

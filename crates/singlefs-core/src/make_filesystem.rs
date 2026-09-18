@@ -34,6 +34,9 @@ pub const INSTANCE_TABLE_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT);
 pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
 /// 树表单元的 key = 树 ID，8 字节。
 pub const TREE_TABLE_KEY_WIDTH: usize = 8;
+/// 第一版两块盘时根环三个区域的归属：区域 0 → 盘 0、区域 1 → 盘 1、区域 2 → 盘 0（D2（RAID 条带策略） 已定项 7，写死、不是 mkfs 参数）。
+pub const FIRST_VERSION_REGION_DEVICES: [DeviceIdentity; 3] =
+    [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)];
 
 /// mkfs 的参数：fsid 与时间戳都是参数，同参数两次 mkfs 逐字节相同（里程碑步 1 验收）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,6 +68,12 @@ pub enum MakeFilesystemError {
     RegionDeviceMissing {
         region: u64,
         device: DeviceIdentity,
+    },
+    /// 第一版两块盘时根环三个区域的归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7，2026-09-14 用户定案：不是 mkfs 参数），
+    /// 参数给的不是它：暖机次数与第一个事务的 txg 3 都压在这个归属上（m2-emptypool-nonempty-r1 云端攻方腿 Z3-B：[0, 1, 1] 下暖机要推两次、
+    /// 第一个文件版本与暖机撞在同一个 (实例, txg) 上）。
+    RegionDevicesNotTheFirstVersionLayout {
+        region_devices: [DeviceIdentity; 3],
     },
     BlockDevice(BlockDeviceError),
 }
@@ -151,6 +160,11 @@ fn check_geometry(
                 device: *device,
             });
         }
+    }
+    if devices.len() == 2 && parameters.region_devices != FIRST_VERSION_REGION_DEVICES {
+        return Err(MakeFilesystemError::RegionDevicesNotTheFirstVersionLayout {
+            region_devices: parameters.region_devices,
+        });
     }
     Ok(())
 }

@@ -1,0 +1,23 @@
+1a
+After a remount, rebuild_from_records marks every slot with an allocation record as allocated, then reclaim_released_up_to reclaims only released slots with generation <= floor. A slot released with generation <= floor will be reclaimed, and if a root in the candidate set references it, the root's checkpoint_txg must be >= floor (since floor is F_生效), but the release generation is <= floor, so the root was created after the release, meaning it does not reference the slot. Thus, no reclaimable slot is referenced by a candidate set root, and no unreclaimable slot remains allocated. This is refuted by: a sequence where a root with checkpoint_txg=10 is created, then a slot is released at generation=15, then F_生效 is raised to 20, and remount occurs; the root is not in the candidate set (10<20), and the slot is reclaimed, so no inconsistency.
+
+1b
+Yes. With 3 regions (72 slots total), publish a root to region 0 at txg=100 with rollback_floor=99, then publish a root to region 1 at txg=200 with rollback_floor=199, and never publish to region 0 again. The oldest valid root is checkpoint_txg=100 (on device 0), and F_生效=min(99,199)=99. A slot released at generation=100 should be reclaimable by D1 (max(99,100)=100), but the code uses F_生效=99 so it is not reclaimed. This is refuted by: after publishing the two roots as described, a slot released at generation=100 is not reclaimed by reclaim_released_up_to(99), but D1 requires it to be reclaimable.
+
+1c
+No reachable case exists. The reclaimed set stores only the starting slot of a placement, not individual slots in the span. When reclaiming a span, mark_reclaimed clears the entire span. When reusing part of the span, only the starting slot is removed from the reclaimed set, and the bitmap is updated for the reused portion; unused portions remain reclaimed but are not tracked in the reclaimed set. This is refuted by: releasing a span of 2 slots starting at 10 (reclaimed set has (device,10)), then reusing only slot 10 (reclaimed set loses (device,10), bitmap sets slot 10 allocated, slot 11 remains reclaimed but not in reclaimed set), and no inconsistency occurs.
+
+1d
+A sequence where a placement of span 2 is allocated (allocated_slots=2), then released without updating deferred_slots (so deferred_slots=0), and before remount, a user write allocates the same slots. After remount, rebuild_from_records marks the slots as allocated (allocated_slots=2), but a full record scan shows one released record (deferred_slots=2) and no allocated records, so allocated_slots and deferred_slots diverge. This is refuted by: allocating a span of 2, releasing it without calling mark_released, and before remount, the allocated_slots=2 and deferred_slots=0 while a record scan shows deferred_slots=2.
+
+2a
+Yes, it can be silently counted as empty. If a journal record is torn and not present in the records map passed to F8, F8 will not include the root in non_empty, causing the 4th-newest search to use a fallback value. This is refuted by: a journal with four non-empty roots, but one record is torn (missing in the records map), so F8 counts it as empty and uses the smallest checkpoint_txg from valid as fallback, changing the ceiling.
+
+2b
+Transaction 0 is reserved exclusively for empty publishes (as stated in F11), and user-visible publishes use nonzero transaction numbers. Thus, F8's filter correctly counts only user-visible states. This is refuted by: a user-visible publish using transaction 0, which would cause F8 to incorrectly count it as empty.
+
+2c
+Yes. Device 0 has roots with rollback_floor=10 (txg=100) and 20 (txg=200), device 1 has a root with rollback_floor=15 (txg=150). F9=min(max(10,20),15)=15, F10=20 (newest root's rollback_floor). D1 requires F_生效 to be F9=15 for reclaiming. This is refuted by: the state described, where F9=15 and F10=20, and D1 specifies F_生效 as the min over devices of max rollback_floor per device.
+
+2d
+No, the reclaim result is discarded on remount. F11's reclaim is in-memory before any publish, and the subsequent publishes are empty checkpoints with no user data. Between reclaim and the first publish, user writes could allocate reclaimed slots, but on remount, rebuild_from_records marks all historical slots as allocated, then reclaim_released_up_to reclaims only released slots with generation <= floor, so the user-allocated slots remain allocated. This is refuted by: after reclaiming a slot, a user write allocates it, then a crash occurs; on remount, rebuild_from_records marks it as allocated and reclaim_released_up_to does not reclaim it, so the slot is correctly allocated.

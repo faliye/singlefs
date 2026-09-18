@@ -59,15 +59,23 @@ pub struct FirstTransactionRun {
     pub policy_mismatches: u64,
 }
 
-/// 整条路。`before_publish` 在暖机之后、第一个事务之前被叫一次（虚机档在这里给某块盘装上「漏一道屏障」）。
+/// 整条路上调用方被叫到的两处。
+pub enum ScenarioPoint {
+    /// 取号写完、那道屏障做完，暖机还没开始（同一个写入口接着暖机，这里不另发屏障）。
+    AfterInstanceAcquisition,
+    /// 暖机之后、第一个事务之前（虚机档在这里给某块盘装上「漏一道屏障」）。
+    BeforeFirstTransaction,
+}
+
+/// 整条路。`at_point` 在 `ScenarioPoint` 的两处各被叫一次：虚机档在两处给设备一层的计数拍快照，暖机与第一个事务各自的写就是快照之差。
 pub fn run_first_transaction<
     Device: BlockDevice,
-    BeforePublish: FnMut(&mut [(DeviceIdentity, Device)]),
+    AtPoint: FnMut(ScenarioPoint, &mut [(DeviceIdentity, Device)]),
 >(
     parameters: &MakeFilesystemParameters,
     devices: &mut [(DeviceIdentity, Device)],
     stream: &SharedStream,
-    mut before_publish: BeforePublish,
+    mut at_point: AtPoint,
 ) -> Result<FirstTransactionRun, String> {
     let genesis =
         make_filesystem(parameters, devices).map_err(|error| format!("mkfs：{error:?}"))?;
@@ -78,7 +86,7 @@ pub fn run_first_transaction<
             .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
             .collect(),
     );
-    allocator.mark_format_time_units(&[
+    allocator.mark_format_time_units(
         Placement {
             slot: INSTANCE_TABLE_SLOT,
             span: 2,
@@ -87,17 +95,18 @@ pub fn run_first_transaction<
             slot: TREE_TABLE_GENESIS_SLOT,
             span: 1,
         },
-    ]);
+    );
     let content = first_file_content();
     let (instance, warm_up_output) = {
         let mut pool = PoolWriter::new(parameters, &mut *devices);
         let instance = acquire_instance(&mut pool).map_err(|error| format!("取号：{error:?}"))?;
+        at_point(ScenarioPoint::AfterInstanceAcquisition, &mut *pool.devices);
         let warm = warm_up(&mut pool, &genesis.root, instance)
             .map_err(|error| format!("暖机：{error:?}"))?;
         (instance, warm)
     };
     assert_eq!(instance, InstanceGeneration(1));
-    before_publish(devices);
+    at_point(ScenarioPoint::BeforeFirstTransaction, devices);
     let mut pool = PoolWriter::new(parameters, devices);
     let output = publish_first_file(
         &mut pool,

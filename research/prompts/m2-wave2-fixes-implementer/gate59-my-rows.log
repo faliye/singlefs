@@ -1,0 +1,12 @@
+Fri Sep 18 04:11:56 AM UTC 2026
+  ✓ crates/mutations.tsv:121 Z1-d：复用时新记录罩住的已回收记录不删（I-5.4 要红）：reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds 红了
+  ✓ crates/mutations.tsv:122 Z1-d：新落点罩住没回收的记录不断言：placement_over_record_that_was_not_reclaimed_is_asserted_on_the_records 红了
+  ✓ crates/mutations.tsv:123 I-5.4：checker 判不出分配记录重叠：an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant 红了
+  ✓ crates/mutations.tsv:124 I-5.4：只判最新根那棵账：an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant 红了
+  ✓ crates/mutations.tsv:125 Z1-a：取号之前不算实例表：writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition 红了
+  ✓ crates/mutations.tsv:126 Z1-a：实例表准入漏算链指针：writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition 红了
+  ✓ crates/mutations.tsv:127 Z1-a：实例表准入把正好写满一片也拒掉：mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it 红了
+  ✓ crates/mutations.tsv:128 Z1-a：实例表准入按每次挂载只写一行算：mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it 红了
+rows=8 failures=0
+exit=0
+Fri Sep 18 04:12:27 AM UTC 2026

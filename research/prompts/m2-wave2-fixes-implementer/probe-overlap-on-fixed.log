@@ -1,0 +1,51 @@
+Fri Sep 18 04:05:33 AM UTC 2026
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/probe-fixed/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/probe-fixed/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/probe-fixed/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/impl-m2-wave2-fixes/copies/probe-fixed/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.78s
+     Running tests/opus_probe_overlap_on_fixed.rs (/tmp/claude-1000/impl-m2-wave2-fixes/targets/probe-fixed/release/deps/opus_probe_overlap_on_fixed-488da077f6991ff6)
+
+running 2 tests
+test overlap_pinpoint_per_session_two ... checker after first transaction: []
+mount=1 instance=2 checker after mount: []
+mount=1 overwrite=1 txg=6 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=1 overwrite=2 txg=7 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=2 instance=3 checker after mount: []
+mount=2 overwrite=1 txg=11 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=2 overwrite=2 txg=12 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=3 instance=4 checker after mount: []
+mount=3 overwrite=1 txg=15 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=3 overwrite=2 txg=16 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=4 instance=5 checker after mount: []
+mount=4 overwrite=1 txg=20 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=4 overwrite=2 txg=21 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=5 instance=6 checker after mount: []
+mount=5 overwrite=1 txg=24 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=5 overwrite=2 txg=25 overlaps_dev0=[] checker_before=[] checker_after=[]
+mount=6 instance=7 checker after mount: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 2850816\")"]
+mount=6 overwrite=1 txg=29 overlaps_dev0=[] checker_before=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 2850816\")"] checker_after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3194880)，遍历全部有效根得到 2850816\")"]
+mount=6 overwrite=2 txg=30 overlaps_dev0=[] checker_before=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3194880)，遍历全部有效根得到 2850816\")"] checker_after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3358720)，遍历全部有效根得到 2850816\")"]
+mount=7 instance=8 checker after mount: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3014656)，遍历全部有效根得到 2850816\")"]
+mount=7 overwrite=1 txg=33 overlaps_dev0=[] checker_before=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3014656)，遍历全部有效根得到 2850816\")"] checker_after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3178496)，遍历全部有效根得到 2949120\")"]
+mount=7 overwrite=2 txg=34 overlaps_dev0=[] checker_before=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3178496)，遍历全部有效根得到 2949120\")"] checker_after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3342336)，遍历全部有效根得到 2949120\")"]
+mount=8 instance=9 checker after mount: ["I-3.1: Violated(\"盘 0：记账的已分配 Some(3178496)，遍历全部有效根得到 2850816\")"]
+mount=8 overwrite=1 txg=38 overlaps_dev0=[] checker_before=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3178496)，遍历全部有效根得到 2850816\")"] checker_after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(3342336)，遍历全部有效根得到 2850816\")"]
+mount=9 mounted (no panic)
+mount=10 did not panic
+ok
+test overlapping_records_after_reuse_panic_the_next_mount ... per_session=2: 60 mounts, no panic; overlap seen = false
+per_session=3: 60 mounts, no panic; overlap seen = false
+per_session=5: 60 mounts, no panic; overlap seen = false
+per_session=6: 60 mounts, no panic; overlap seen = false
+per_session=10: 60 mounts, no panic; overlap seen = false
+per_session=12 mount=8 refused WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(9), warm_up_publish_index: 2, warm_up_publishes_planned: 2, cause: AllocationRecordsExceedOneNode { records: 818, capacity: 812 } }
+per_session=16 mount=4 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(5), cause: AllocationRecordsExceedOneNode { records: 818, capacity: 812 } }
+per_session=20 mount=3 overwrite refused AllocationRecordsExceedOneNode { records: 824, capacity: 812 }
+per_session=20 mount=4 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(5), cause: AllocationRecordsExceedOneNode { records: 818, capacity: 812 } }
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 30.92s
+
+exit=0
+Fri Sep 18 04:06:07 AM UTC 2026

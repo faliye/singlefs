@@ -1,0 +1,48 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/first_transaction_step_seven_layer0.rs (target/release/deps/first_transaction_step_seven_layer0-3f7400db40a77e66)
+
+running 6 tests
+test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+FINAL I-1.1 Holds
+FINAL I-1.3 Holds
+FINAL I-1.4 Holds
+FINAL I-1.6 Holds
+FINAL I-1.7 Holds
+FINAL I-2.1 Holds
+FINAL I-2.3 Holds
+FINAL I-2.4 Holds
+FINAL I-2.5 Holds
+FINAL I-3.1 Holds
+FINAL I-3.8 Holds
+FINAL I-3.9 Holds
+FINAL I-4.8 Holds
+FINAL I-5.1 Holds
+FINAL I-5.2 Holds
+FINAL I-5.4 Holds
+FINAL I-7.1 Holds
+FINAL I-7.2 Holds
+FINAL I-7.4 Holds
+FINAL I-7.6 Holds
+FINAL I-7.7 Holds
+FINAL I-7.8 Holds
+FINAL I-9.1 Holds
+FINAL I-9.2 Holds
+FINAL I-9.4 Holds
+FINAL I-9.7 Holds
+FINAL I-9.10 Holds
+FINAL I-9.13 Holds
+FINAL I-9.14 NotApplicable("没有一棵树的树表条目出现在两个不同的树表单元里：跨根比不出来")
+test checker_report_on_the_final_image ... ok
+test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... ok
+CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=22/0 I-1.3=22/0 I-1.4=22/0 I-1.6=22/0 I-1.7=22/0 I-2.1=22/0 I-2.3=22/0 I-2.4=22/0 I-2.5=22/0 I-3.1=4/0 I-3.8=22/0 I-3.9=4/0 I-4.8=22/0 I-5.1=22/0 I-5.2=4/0 I-5.4=4/0 I-7.1=22/0 I-7.2=22/0 I-7.4=22/0 I-7.6=22/0 I-7.7=22/0 I-7.8=22/0 I-9.1=4/0 I-9.2=4/0 I-9.4=4/0 I-9.7=4/0 I-9.10=4/0 I-9.13=4/0 I-9.14=0/0
+CHECKER_FIRST {}
+test layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape ... ok
+test removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker ... ok
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations has been running for over 60 seconds
+LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-1.3=262165/0 I-1.4=262165/0 I-1.6=262165/0 I-1.7=262165/0 I-2.1=262165/0 I-2.3=262165/0 I-2.4=262165/0 I-2.5=262165/0 I-3.1=4/0 I-3.8=262165/0 I-3.9=4/0 I-4.8=262165/0 I-5.1=262165/0 I-5.2=4/0 I-5.4=4/0 I-7.1=262165/0 I-7.2=262165/0 I-7.4=262165/0 I-7.6=262165/0 I-7.7=262165/0 I-7.8=262165/0 I-9.1=4/0 I-9.2=4/0 I-9.4=4/0 I-9.7=4/0 I-9.10=4/0 I-9.13=4/0 I-9.14=0/0
+CHECKER_FIRST {}
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 203.84s
+

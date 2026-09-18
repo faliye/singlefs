@@ -1,0 +1,16 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ 改法 P1（只在攻方腿自己的副本上量过、被攻过零轮）@@
+-    let newest_rollback_floor = u64::from_le_bytes(
+-        roots[newest_index].2.record_bytes[130..138]
+-            .try_into()
+-            .expect("8 字节"),
+-    );
++    // F_生效 = 各幸存盘所带 F 最大值的最小值（D16 已定项 1「生效」那一行），不是最新根自己带的 F。
++    let mut highest_floor_by_device: BTreeMap<u32, u64> = BTreeMap::new();
++    for (region, _, root) in &roots {
++        let device = geometry.region_devices[usize::try_from(*region).expect("区域号")];
++        let entry = highest_floor_by_device.entry(device).or_insert(0);
++        *entry = (*entry).max(root.rollback_floor);
++    }
++    let newest_rollback_floor = highest_floor_by_device.values().copied().min().unwrap_or(0);

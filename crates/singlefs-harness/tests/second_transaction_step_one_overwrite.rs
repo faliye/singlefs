@@ -60,18 +60,11 @@ fn try_overwrite(
     pool: &mut BuiltPool,
     previous: &TransactionOutput,
 ) -> Result<TransactionOutput, PublishError> {
-    let parameters = parameters();
-    let content = second_content();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
-    publish_overwrite(
-        &mut writer,
-        &mut pool.allocator,
+    common::publish_overwrite_in_process(
+        pool,
         previous,
-        FirstFile {
-            content: &content,
-            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60,
-        },
+        &second_content(),
+        FIXED_WRITE_TIME_SECONDS + 60,
         InstanceGeneration(1),
     )
 }
@@ -218,8 +211,16 @@ fn release_rewrites_the_first_versions_records_and_accounting_moves_them_into_th
             assert!(!record.is_released);
             assert_eq!(record.generation, CheckpointTxg(4), "分配代 = B 的 txg");
             fresh_count += 1;
+        } else if record.slot == SlotNumber(50178) {
+            assert!(record.is_released, "mkfs 的第 0 版树表被 A 换下、已释放");
+            assert_eq!(record.generation, CheckpointTxg(3), "释放代 = A 的 txg");
+            format_time_count += 1;
         } else {
-            assert_eq!(record.generation, CheckpointTxg(0), "mkfs 的单元分配代 0");
+            assert_eq!(
+                record.generation,
+                CheckpointTxg(0),
+                "mkfs 的实例表单元分配代 0"
+            );
             format_time_count += 1;
         }
     }
@@ -246,8 +247,8 @@ fn release_rewrites_the_first_versions_records_and_accounting_moves_them_into_th
         );
         assert_eq!(
             value(STATISTIC_DEFER_QUEUE_BYTES),
-            10 * SLOT_BYTES,
-            "defer 待释放 = A 的八个单元 10 槽"
+            11 * SLOT_BYTES,
+            "defer 待释放 = A 的八个单元 10 槽 + A 换下的 mkfs 树表 1 槽"
         );
         assert_eq!(
             value(STATISTIC_FREE_BYTES),
@@ -322,7 +323,8 @@ fn cold_start_reads_the_second_content_and_the_pool_checker_stays_green() {
             above_water: 0,
             prefix_applied: 0,
             verification_passed: 0,
-            verification_failed: 0
+            verification_failed: 0,
+            maximum_applied_transaction: 0
         },
         "暖机两条 + A + B 四条记录，没有一条高于所选根"
     );
@@ -450,7 +452,8 @@ fn release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not
     let mut pool = build_pool("release-via-mapping");
     let first = pool.output.clone();
     let via_mapping =
-        placements_to_release_via_mapping(&first, &pool.allocator).expect("A 的六条映射都在");
+        placements_to_release_via_mapping(&first, &pool.allocator, &TransactionUnit::IN_BUMP_ORDER)
+            .expect("A 的六条映射都在");
     assert_eq!(
         via_mapping,
         first.placements(),
@@ -568,14 +571,14 @@ fn repeated_overwrites_report_a_full_allocation_node_instead_of_panicking() {
             .iter()
             .filter(|record| record.is_released)
             .count(),
-        16 * 49,
-        "报错在动分配器之前：最后一版的八个落点没被释放"
+        16 * 49 + 2,
+        "报错在动分配器之前：最后一版的八个落点没被释放（加 mkfs 树表那两条，A 换下的）"
     );
 }
 
-/// 可再分配谓词（D16（发布语义） 已定项 1「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）在步 5 之前没有实现：这条用例把今天的形态钉住——
-/// 释放过的落点一个都不再发出去、defer 只增不减、空闲随分配单调减。它是 C22（刚释放的块立即重分配）的弱形态：把 `mark_released` 改成清位图（立即复用）它红；
-/// 步 5 把回收接上那天它也必须红（defer 会减、50180 会回来），到时改成按谓词判。
+/// 可再分配谓词（D16（发布语义） 已定项 1「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）：F 不抬（恒 0）时一个已释放的落点都回不来——
+/// 这条用例把 F = 0 的形态钉住：释放过的落点一个都不再发出去、defer 只增不减、空闲随分配单调减。它是 C22（刚释放的块立即重分配）的弱形态：
+/// 把 `mark_released` 改成清位图（立即复用）它红；抬 F 之后的回收与复用在步 5 的用例里（`second_transaction_step_five_reuse.rs`）。
 #[test]
 fn released_placements_are_not_handed_out_again_before_reclaim_exists() {
     let mut pool = build_pool("no-reclaim-yet");
@@ -588,8 +591,8 @@ fn released_placements_are_not_handed_out_again_before_reclaim_exists() {
     let device_map = &pool.allocator.devices[0];
     assert_eq!(
         device_map.deferred_slots(),
-        20,
-        "A 与 B 的 20 槽都在 defer 队列里，一个都没放回"
+        21,
+        "A 与 B 的 20 槽加 mkfs 树表那 1 槽都在 defer 队列里，一个都没放回"
     );
     assert_eq!(
         device_map.allocated_slots(),
@@ -759,7 +762,11 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
         "失败的发布退回：A 的记录没改写成已释放、B 的数据单元没留下记录"
     );
     let device_map = &pool.allocator.devices[0];
-    assert_eq!(device_map.deferred_slots(), 0, "A 的落点没进 defer 队列");
+    assert_eq!(
+        device_map.deferred_slots(),
+        1,
+        "A 的落点没进 defer 队列；队列里只有 A 换下的 mkfs 树表那 1 槽"
+    );
     assert!(
         device_map.is_free(SlotNumber(50182)),
         "B 拿到过的数据槽退回去了"

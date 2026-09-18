@@ -1,0 +1,35 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.74s
+     Running tests/opus_probe_z1_fixes.rs (target/release/deps/opus_probe_z1_fixes-5eebb875833f62d4)
+
+running 1 test
+test z1_fix_arms_write_until_refused_then_remount ... mode=0 mount=1 base=20 reclaimed=0 exact=[Some(30), Some(38)] mounted instance=2 records_after_each=[30, 38]
+  wrote 48 then refused: AllocationRecordsExceedOneNode { records: 822, capacity: 812 }
+mode=0 mount=2 base=806 reclaimed=420 exact=[Some(808), Some(808)] refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(3), cause: AllocationRecordsExceedOneNode { records: 816, capacity: 812 } }
+mode=1 mount=1 base=20 reclaimed=0 exact=[Some(30), Some(38)] mounted instance=2 records_after_each=[30, 38]
+  wrote 48 then refused: AllocationRecordsExceedOneNode { records: 822, capacity: 812 }
+mode=1 mount=2 base=806 reclaimed=420 exact=[Some(808), Some(808)] mounted instance=3 records_after_each=[808, 808]
+
+thread 'z1_fix_arms_write_until_refused_then_remount' (3940881) panicked at crates/singlefs-core/src/unit.rs:160:5:
+条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+  wrote 14 then the next overwrite PANICKED (records before=808, reclaimed=180)
+
+thread 'z1_fix_arms_write_until_refused_then_remount' (3940881) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+mode=1 mount=3  PANICKED 跨度里有已分配的槽
+mode=2 mount=1 base=20 reclaimed=0 exact=[Some(30), Some(38)] mounted instance=2 records_after_each=[30, 38]
+  wrote 48 then refused: AllocationRecordsExceedOneNode { records: 822, capacity: 812 }
+mode=2 mount=2 base=806 reclaimed=420 exact=[Some(808), Some(808)] refused Publish(AllocationRecordsExceedOneNode { records: 816, capacity: 812 }) INSTANCE_BURNED
+mode=3 mount=1 base=20 reclaimed=0 exact=[Some(30), Some(38)] mounted instance=2 records_after_each=[30, 38]
+  wrote 48 then refused: AllocationRecordsExceedOneNode { records: 822, capacity: 812 }
+mode=3 mount=2 base=806 reclaimed=420 exact=[Some(808), Some(808)] mounted instance=3 records_after_each=[808, 808]
+  wrote 14 then refused: AllocationRecordsExceedOneNode { records: 814, capacity: 812 }
+
+thread 'z1_fix_arms_write_until_refused_then_remount' (3940881) panicked at crates/singlefs-core/src/allocator.rs:375:9:
+跨度里有已分配的槽
+mode=3 mount=3  PANICKED 跨度里有已分配的槽
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.81s
+

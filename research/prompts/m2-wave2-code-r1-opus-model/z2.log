@@ -1,0 +1,22 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_probe_z2.rs (target/release/deps/opus_probe_z2-a10f28a714f8e7c4)
+
+running 3 tests
+test z2a_control_retry_the_same_publish ... control: first try err=true failure entries=1 sum=WriteCallsAndBytes { write_calls: 41, written_bytes: 685056 } device=WriteCallsAndBytes { write_calls: 41, written_bytes: 685056 }
+control remount: mounted, chosen root txg=5
+ok
+test z2a_failure_after_the_root_is_durable_then_a_different_publish ... B: txg=4 units=[(Data, 50182), (ExtentRoot, 50249), (InodeLeaf, 50250), (InodeRoot, 50252), (AllocationTree, 50253), (AccountingTree, 50254), (MappingTree, 50255), (TreeTable, 50256)]
+C result: Err("BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的设备写错\" }))")
+C failure account: total=WriteCallsAndBytes { write_calls: 20, written_bytes: 340480 } root_slot=WriteCallsAndBytes { write_calls: 1, written_bytes: 512 } superblock=WriteCallsAndBytes { write_calls: 1, written_bytes: 4096 } journal=WriteCallsAndBytes { write_calls: 2, written_bytes: 8192 }
+E result: Err("BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的设备写错\" }))")
+failure accounts: 2 entries, sum=WriteCallsAndBytes { write_calls: 28, written_bytes: 471552 }; device level in window=WriteCallsAndBytes { write_calls: 28, written_bytes: 471552 }; equal=true
+checker on the image now: ["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+remount: REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+ok
+test z2b_two_failures_then_success_and_a_failure_before_any_write ... results: first=Some("BlockDevice(InputOutput(Custom { kind: O") second=Some("BlockDevice(InputOutput(Custom { kind: O") before_any_write=Some("ContentExceedsDataUnit { bytes: 40000, capacity: 32634 }")
+failed publishes: 3; failure account entries: 2; per entry totals: [WriteCallsAndBytes { write_calls: 5, written_bytes: 131072 }, WriteCallsAndBytes { write_calls: 16, written_bytes: 327680 }]
+sum(failure accounts)+success=WriteCallsAndBytes { write_calls: 42, written_bytes: 803328 }; device level=WriteCallsAndBytes { write_calls: 42, written_bytes: 803328 }
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+

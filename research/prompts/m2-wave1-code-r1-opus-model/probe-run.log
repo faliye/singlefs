@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_probe_y1_y2_y3.rs (target/debug/deps/opus_probe_y1_y2_y3-43029049b9775fc9)
+
+running 4 tests
+test y1_user_data_lands_inside_the_cluster_segment_that_the_fallback_closed ... PROBE y1 open_segment_after_A=50240
+PROBE y1 fallback_at_publish=7 open_segment_now=None
+PROBE y1 reclaimed_placements=57
+PROBE y1 free_slots_inside_that_segment=[50240, 50241, 50242, 50243, 50244, 50245, 50246, 50247, 50248, 50249, 50250, 50251, 50252, 50253, 50254, 50255, 50256, 50257, 50258, 50259, 50260, 50261, 50262, 50263, 50264, 50265, 50266, 50267, 50268, 50269, 50270, 50271, 50272, 50273, 50274, 50275, 50276, 50277, 50278, 50279, 50280, 50281, 50282, 50283, 50284, 50285, 50286, 50287, 50288, 50289, 50290, 50291, 50292, 50293, 50294, 50295, 50296]
+PROBE y1 data_slot=50240 commit_generated_of_the_same_publish_in_that_segment=[("ExtentRoot", 50242), ("InodeLeaf", 50244), ("InodeRoot", 50243), ("AllocationTree", 50246), ("AccountingTree", 50247), ("MappingTree", 50248), ("TreeTable", 50249)]
+ok
+test y1b_the_accounting_row_counts_segments_the_allocator_will_never_open ... PROBE y1b isolated_segment=50304 empty_segments_row_before=3310 empty_segments_row_after=3310 lowest_empty_segment_now=Some(50368) open_segment_before=Some(SlotNumber(50240))
+ok
+test y2_a_refused_row_publish_leaves_the_bumped_instance_generation_on_disk ... PROBE y2 refused_at_publish=50 failure=AllocationRecordsExceedOneNode { records: 820, capacity: 812 } records=804
+PROBE y2 mount=Some(Publish(AllocationRecordsExceedOneNode { records: 814, capacity: 812 })) instance_before=[1, 1] instance_after=[2, 2] operations_added=3
+ok
+test y3_a_failed_publish_and_its_retry_break_the_per_publish_equality_with_the_device_layer ... PROBE y3 first_attempt=Some(BlockDevice(OutOfRange { offset: DeviceOffsetInBytes(823296000), length: 32768, device_size: 4294967296 }))
+PROBE y3 by_kind_write_calls=21 by_kind_written_bytes=344576 device_attempted_writes=26 device_attempted_bytes=475648 device_landed_writes=25 device_landed_bytes=442880
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s
+

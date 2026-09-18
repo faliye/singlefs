@@ -1,0 +1,8 @@
+
+running 1 test
+test rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.46s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_step_four_rollback.rs (/tmp/claude-1000/m2-anchor-fix/copy-target/debug/deps/second_transaction_step_four_rollback-56ab28b4b4ba20de)

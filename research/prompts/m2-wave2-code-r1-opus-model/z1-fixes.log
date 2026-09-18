@@ -1,0 +1,45 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-wave2-code-r1-opus/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.37s
+     Running tests/opus_probe_z1_fixes.rs (target/release/deps/opus_probe_z1_fixes-5eebb875833f62d4)
+
+running 1 test
+test z1_fix_arms_on_the_swept_cells ... mode=0 h=(48,1,0) mount=1 refused WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), warm_up_publish_index: 1, warm_up_publishes_planned: 2, cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=1 h=(48,1,0) mount=1 mounted instance=2 records_after_each=[798, 798, 800] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=2 h=(48,1,0) mount=1 mounted instance=2 records_after_each=[798, 798, 800] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=3 h=(48,1,0) mount=1 mounted instance=2 records_after_each=[798, 798, 800] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=0 h=(47,2,0) mount=1 refused WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), warm_up_publish_index: 2, warm_up_publishes_planned: 2, cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=1 h=(47,2,0) mount=1 mounted instance=2 records_after_each=[790, 790, 792] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=2 h=(47,2,0) mount=1 mounted instance=2 records_after_each=[790, 790, 792] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=3 h=(47,2,0) mount=1 mounted instance=2 records_after_each=[790, 790, 792] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=0 h=(47,3,0) mount=1 refused WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), warm_up_publish_index: 1, warm_up_publishes_planned: 1, cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=1 h=(47,3,0) mount=1 mounted instance=2 records_after_each=[798, 798] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=2 h=(47,3,0) mount=1 mounted instance=2 records_after_each=[798, 798] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=3 h=(47,3,0) mount=1 mounted instance=2 records_after_each=[798, 798] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=0 h=(49,0,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=1 h=(49,0,0) mount=1 mounted instance=2 records_after_each=[806, 806, 808] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=2 h=(49,0,0) mount=1 refused Publish(AllocationRecordsExceedOneNode { records: 814, capacity: 812 }) superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 2]), (1, [1, 2])] INSTANCE_BURNED
+mode=3 h=(49,0,0) mount=1 mounted instance=2 records_after_each=[806, 806, 808] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=0 h=(48,2,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=1 h=(48,2,0) mount=1 mounted instance=2 records_after_each=[806, 806] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=2 h=(48,2,0) mount=1 refused Publish(AllocationRecordsExceedOneNode { records: 814, capacity: 812 }) superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 2]), (1, [1, 2])] INSTANCE_BURNED
+mode=3 h=(48,2,0) mount=1 mounted instance=2 records_after_each=[806, 806] superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [2, 2]), (1, [2, 2])]
+mode=0 h=(49,1,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 822, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+
+thread 'z1_fix_arms_on_the_swept_cells' (3937256) panicked at crates/singlefs-core/src/unit.rs:160:5:
+条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+mode=1 h=(49,1,0) mount=1 PANICKED 条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里 superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 2]), (1, [1, 2])] INSTANCE_BURNED
+mode=2 h=(49,1,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=3 h=(49,1,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=0 h=(48,3,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 822, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+
+thread 'z1_fix_arms_on_the_swept_cells' (3937256) panicked at crates/singlefs-core/src/unit.rs:160:5:
+条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里
+mode=1 h=(48,3,0) mount=1 PANICKED 条目装不进一个节点：写者要先按 index_node_entry_capacity 判、报错，不许走到这里 superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 2]), (1, [1, 2])] INSTANCE_BURNED
+mode=2 h=(48,3,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+mode=3 h=(48,3,0) mount=1 refused RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceedOneNode { records: 814, capacity: 812 } } superblocks [(0, [1, 1]), (1, [1, 1])] -> [(0, [1, 1]), (1, [1, 1])]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.66s
+

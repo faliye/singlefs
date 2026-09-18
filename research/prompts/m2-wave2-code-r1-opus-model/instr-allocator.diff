@@ -1,0 +1,15 @@
+--- allocator.rs.orig	2026-09-18 02:44:01.879915789 +0000
++++ repo/crates/singlefs-core/src/allocator.rs	2026-09-18 02:44:01.889772710 +0000
+@@ -883,6 +883,12 @@
+     pub fn cluster_segments(&self) -> &BTreeSet<SlotNumber> {
+         &self.cluster_segments
+     }
++
++    /// OPUS-PROBE（副本插桩，只读）：已回收、还没被复用的落点条数（每盘一条算一条）。
++    #[must_use]
++    pub fn opus_probe_reclaimed_count(&self) -> usize {
++        self.reclaimed.len()
++    }
+ }
+ 
+ #[cfg(test)]

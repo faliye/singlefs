@@ -1,5 +1,5 @@
 //! 里程碑「第一个事务」步 6 的验收：进程外重开两个镜像走完整的挂载路径读出那个文件；坏字节探针与 E142（第一个事务的干跑）
-//! 第八次跑产物 `research/results/e142-first-txn-dry-run-2026-09-16-tree-table-200.out` 的 `name=recover_full` / `name=probe` 行逐字对。
+//! 第九次跑产物 `research/results/e142-first-txn-dry-run-2026-09-16-instance-boundary.out` 的 `name=recover_full` / `name=probe` 行逐字对。
 
 mod common;
 
@@ -39,7 +39,8 @@ fn cold_start_reopens_the_images_and_reads_the_file_back_choosing_instance_one_t
             above_water: 0,
             prefix_applied: 0,
             verification_passed: 0,
-            verification_failed: 0
+            verification_failed: 0,
+            maximum_applied_transaction: 0
         },
         "全环扫描到三条记录，没有一条高于所选根的水位"
     );

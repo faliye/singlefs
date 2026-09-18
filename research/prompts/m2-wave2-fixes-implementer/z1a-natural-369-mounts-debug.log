@@ -1,0 +1,17 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_two_instance_table_page_full.rs (/tmp/claude-1000/impl-m2-wave2-fixes/main-target/debug/deps/second_transaction_supplement_two_instance_table_page_full-d260700c12d6cabe)
+
+running 3 tests
+test a_mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it ... ok
+test a_rollback_counts_the_rows_of_the_table_it_rolls_back_to ... ok
+test writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition has been running for over 60 seconds
+test writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 297.01s
+
+
+real	4m57.023s
+user	5m0.372s
+sys	0m0.044s
+
+[exited with code 0]
