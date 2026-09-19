@@ -1,0 +1,186 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/c381-r1-opus/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/c381-r1-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:210:9
+    |
+210 |     let mut record = |result: Result<TransactionOutput, PublishError>, content: Option<Vec<u8>>, previous: &TransactionOutput, curr...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `stage_of_c_write` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:309:8
+    |
+309 | pub fn stage_of_c_write(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<&'static str> {
+    |        ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "c381_k2") generated 2 warnings (run `cargo fix --test "c381_k2" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 7.13s
+     Running tests/c381_k2.rs (target/release/deps/c381_k2-74d41dbdc7aa0479)
+
+running 1 test
+test phase_b_two_faults_no_power_cut ... progress 1/84 (arm 甲 k 18) at 1044.774893242s
+progress 2/84 (arm 甲 k 20) at 1054.84709583s
+progress 3/84 (arm 甲 k 19) at 1070.746470943s
+progress 4/84 (arm 甲 k 17) at 1083.283561963s
+progress 5/84 (arm 甲 k 5) at 1104.355999567s
+progress 6/84 (arm 甲 k 15) at 1109.240731162s
+progress 7/84 (arm 甲 k 12) at 1112.01308927s
+progress 8/84 (arm 甲 k 4) at 1113.314492869s
+progress 9/84 (arm 甲 k 13) at 1115.321258222s
+progress 10/84 (arm 甲 k 2) at 1117.027332748s
+progress 11/84 (arm 甲 k 7) at 1119.077206347s
+progress 12/84 (arm 乙 k 2) at 1122.538430165s
+progress 13/84 (arm 甲 k 8) at 1132.344237416s
+progress 14/84 (arm 甲 k 6) at 1135.455546034s
+progress 15/84 (arm 甲 k 9) at 1135.83329457s
+progress 16/84 (arm 甲 k 11) at 1140.581001965s
+progress 17/84 (arm 甲 k 14) at 1142.669004033s
+progress 18/84 (arm 乙 k 0) at 1146.496731379s
+progress 19/84 (arm 甲 k 10) at 1147.686600308s
+progress 20/84 (arm 甲 k 16) at 1151.308531194s
+progress 21/84 (arm 甲 k 0) at 1152.131866406s
+progress 22/84 (arm 甲 k 3) at 1155.382483469s
+progress 23/84 (arm 甲 k 1) at 1160.347974578s
+progress 24/84 (arm 乙 k 1) at 1171.25691824s
+progress 25/84 (arm 乙 k 17) at 1883.266650291s
+progress 26/84 (arm 乙 k 18) at 1908.466519904s
+progress 27/84 (arm 乙 k 16) at 1981.064332873s
+progress 28/84 (arm 乙 k 19) at 2031.203830747s
+progress 29/84 (arm 乙 k 5) at 2037.786481619s
+progress 30/84 (arm 乙 k 6) at 2042.957546344s
+progress 31/84 (arm 乙 k 12) at 2046.173602646s
+progress 32/84 (arm 乙 k 8) at 2049.574435686s
+progress 33/84 (arm 乙 k 11) at 2062.945858698s
+progress 34/84 (arm 丙 k 2) at 2071.654390185s
+progress 35/84 (arm 乙 k 20) at 2076.855145042s
+progress 36/84 (arm 乙 k 3) at 2079.538697124s
+progress 37/84 (arm 乙 k 4) at 2108.368972148s
+progress 38/84 (arm 乙 k 9) at 2116.112123135s
+progress 39/84 (arm 乙 k 7) at 2127.325761909s
+progress 40/84 (arm 丙 k 3) at 2132.684205171s
+progress 41/84 (arm 丙 k 1) at 2135.741145476s
+progress 42/84 (arm 乙 k 13) at 2141.453230919s
+progress 43/84 (arm 丙 k 0) at 2145.309958122s
+progress 44/84 (arm 丙 k 5) at 2156.65358865s
+progress 45/84 (arm 乙 k 10) at 2158.84421634s
+progress 46/84 (arm 乙 k 14) at 2161.379958078s
+progress 47/84 (arm 丙 k 4) at 2171.685014155s
+progress 48/84 (arm 乙 k 15) at 2181.152086611s
+progress 49/84 (arm 丙 k 17) at 2563.056771027s
+progress 50/84 (arm 丙 k 20) at 2569.621562902s
+progress 51/84 (arm 丙 k 18) at 2609.039973278s
+progress 52/84 (arm 丙 k 19) at 2612.86228355s
+progress 53/84 (arm 丙 k 16) at 2689.526659278s
+progress 54/84 (arm 丙 k 12) at 2704.770320235s
+progress 55/84 (arm 丙 k 10) at 2730.181334102s
+progress 56/84 (arm 丙 k 13) at 2751.901335296s
+progress 57/84 (arm 丙 k 9) at 2756.519204224s
+progress 58/84 (arm 丙 k 14) at 2769.041362661s
+progress 59/84 (arm 丙 k 6) at 2787.034125519s
+progress 60/84 (arm 丙 k 15) at 2816.204307835s
+progress 61/84 (arm 丙 k 7) at 2834.052294143s
+progress 62/84 (arm 丁 k 2) at 2864.909857122s
+progress 63/84 (arm 丙 k 8) at 2865.972757621s
+progress 64/84 (arm 丙 k 11) at 2893.901451819s
+progress 65/84 (arm 丁 k 6) at 3024.224137591s
+progress 66/84 (arm 丁 k 0) at 3033.652476442s
+progress 67/84 (arm 丁 k 3) at 3035.541066708s
+progress 68/84 (arm 丁 k 8) at 3039.461581991s
+progress 69/84 (arm 丁 k 7) at 3048.51693644s
+progress 70/84 (arm 丁 k 1) at 3054.271008816s
+progress 71/84 (arm 丁 k 4) at 3074.616469265s
+progress 72/84 (arm 丁 k 5) at 3075.813190241s
+progress 73/84 (arm 丁 k 9) at 3313.721923378s
+progress 74/84 (arm 丁 k 10) at 3317.981841324s
+progress 75/84 (arm 丁 k 11) at 3339.418001918s
+progress 76/84 (arm 丁 k 17) at 3370.136498078s
+progress 77/84 (arm 丁 k 12) at 3370.600783182s
+progress 78/84 (arm 丁 k 13) at 3377.84416302s
+progress 79/84 (arm 丁 k 19) at 3394.928427232s
+progress 80/84 (arm 丁 k 14) at 3397.837924434s
+progress 81/84 (arm 丁 k 15) at 3401.050209175s
+progress 82/84 (arm 丁 k 18) at 3424.742012497s
+progress 83/84 (arm 丁 k 20) at 3424.759209923s
+progress 84/84 (arm 丁 k 16) at 3426.928059008s
+===== 阶段 B：序列长 0–3（156 条），C 之后再一次瞬时错=true，断电=false；耗时 3426.930935884s
+[甲 S1] runs=130672 {"CLEAN": 121968, "OTHER_RED": 8704}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry, Remount] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 7)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 4)
+[甲 S2] runs=23695 {"CLEAN": 18471, "OTHER_RED": 5224}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Retry, Remount] later_fault=Some(34) steps=["err(BlockDevice)", "err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 7)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Retry] later_fault=Some(34) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 4)
+[甲 S3] runs=15528 {"CLEAN": 13948, "OTHER_RED": 852, "OVERWRITE": 728}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Retry, Retry, Remount] later_fault=Some(58) steps=["err(BlockDevice)", "ok(txg 5)", "err(BlockDevice)", "remount ok(chosen 5)"] remount=ok(chosen 8)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Remount] later_fault=Some(46) steps=["err(BlockDevice)", "remount err(Publish(BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的瞬时写错\" }))))"] remount=ok(chosen 6)
+    OVERWRITE remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50184) }) crash=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] after=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+        first: k=19 crash_at=none actions=[Other] later_fault=Some(22) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50184) })
+    OVERWRITE remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) }) crash=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] after=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+        first: k=19 crash_at=none actions=[Empty] later_fault=Some(22) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+    OVERWRITE remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50258) }) crash=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] after=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+        first: k=19 crash_at=none actions=[Retry] later_fault=Some(26) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50258) })
+    OVERWRITE remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50260) }) crash=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] after=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+        first: k=19 crash_at=none actions=[Retry] later_fault=Some(28) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50260) })
+    OVERWRITE remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50264) }) crash=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] after=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+        first: k=19 crash_at=none actions=[Retry] later_fault=Some(36) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50264) })
+    OVERWRITE remount=ok crash=["I-2.1", "I-4.8", "I-7.4"] after=["I-2.1", "I-4.8", "I-7.4"]
+        first: k=19 crash_at=none actions=[Retry] later_fault=Some(25) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 5)
+[乙 S1] runs=130672 {"CLEAN": 114576, "OTHER_RED": 16096}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Remount] later_fault=Some(26) steps=["err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 8)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry] later_fault=Some(18) steps=["err(BlockDevice)", "uncertain(txg 5)"] remount=ok(chosen 4)
+[乙 S2] runs=17188 {"CLEAN": 4172, "OTHER_RED": 13016}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Retry] later_fault=Some(36) steps=["uncertain(txg 5)", "ok(txg 6)"] remount=ok(chosen 6)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Remount, Retry] later_fault=Some(77) steps=["uncertain(txg 5)", "remount ok(chosen 4)", "uncertain(txg 8)"] remount=ok(chosen 7)
+[乙 S3] runs=14584 {"CLEAN": 12894, "OTHER_RED": 1690}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Remount] later_fault=Some(45) steps=["ok(txg 5)", "remount ok(chosen 5)"] remount=ok(chosen 8)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Retry] later_fault=Some(37) steps=["ok(txg 5)", "uncertain(txg 6)"] remount=ok(chosen 5)
+[丙 S1] runs=130672 {"CLEAN": 117456, "OTHER_RED": 13216}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry, Remount] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 7)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 4)
+[丙 S2] runs=11543 {"CLEAN": 4037, "OTHER_RED": 7506}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Remount, Retry, Remount] later_fault=Some(77) steps=["err(BlockDevice)", "remount ok(chosen 4)", "err(BlockDevice)", "remount ok(chosen 7)"] remount=ok(chosen 10)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Remount] later_fault=Some(43) steps=["err(BlockDevice)", "remount err(Publish(BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的瞬时写错\" }))))"] remount=ok(chosen 5)
+[丙 S3] runs=7080 {"CLEAN": 6512, "OTHER_RED": 568}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Remount, Retry, Remount] later_fault=Some(67) steps=["err(BlockDevice)", "remount ok(chosen 5)", "err(BlockDevice)", "remount ok(chosen 7)"] remount=ok(chosen 10)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Remount] later_fault=Some(46) steps=["err(BlockDevice)", "remount err(Publish(BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的瞬时写错\" }))))"] remount=ok(chosen 6)
+[丁 S1] runs=130672 {"CLEAN": 121968, "OTHER_RED": 8704}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry, Remount] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 7)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=0 crash_at=none actions=[Retry] later_fault=Some(18) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 4)
+[丁 S2] runs=23695 {"CLEAN": 17855, "OTHER_RED": 5840}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Retry, Remount] later_fault=Some(34) steps=["err(BlockDevice)", "err(BlockDevice)", "remount ok(chosen 4)"] remount=ok(chosen 7)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=16 crash_at=none actions=[Retry] later_fault=Some(34) steps=["err(BlockDevice)", "err(BlockDevice)"] remount=ok(chosen 4)
+[丁 S3] runs=15528 {"CLEAN": 14676, "OTHER_RED": 852}
+    OTHER_RED remount=ok crash=["I-3.1"] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Retry, Retry, Remount] later_fault=Some(58) steps=["err(BlockDevice)", "ok(txg 5)", "err(BlockDevice)", "remount ok(chosen 5)"] remount=ok(chosen 8)
+    OTHER_RED remount=ok crash=[] after=["I-3.1"]
+        first: k=19 crash_at=none actions=[Remount] later_fault=Some(46) steps=["err(BlockDevice)", "remount err(Publish(BlockDevice(InputOutput(Custom { kind: Other, error: \"注入的瞬时写错\" }))))"] remount=ok(chosen 6)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 3426.94s
+

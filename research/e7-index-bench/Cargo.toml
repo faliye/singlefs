@@ -420,3 +420,7 @@ path = "src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs"
 [[bin]]
 name = "e155-fsync-write-volume"
 path = "src/bin/e155_fsync_write_volume.rs"
+
+[[bin]]
+name = "e155-second-run-fsync-write-volume"
+path = "src/bin/e155_second_run_fsync_write_volume.rs"

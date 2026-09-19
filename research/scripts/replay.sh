@@ -169,6 +169,7 @@ E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
 E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out|exact
 E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out|exact
 E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-17-stage4.out|exact
+E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-19-stage2.out|exact
 TSV
 )
 

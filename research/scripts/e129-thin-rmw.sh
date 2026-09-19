@@ -28,7 +28,9 @@ for v in "${SUDO_PASS_A:-}" "${SUDO_PASS_B:-}"; do
   printf '%s\n' "$v" | sudo -S -p '' true 2>/dev/null && { PASS="$v"; break; }
 done
 [ -n "$PASS" ] || { echo "E7RESULT name=fatal reason=no_sudo"; exit 3; }
-S() { printf '%s\n' "$PASS" | sudo -S -p '' "$@"; }
+S() {
+  printf '%s\n' "$PASS" | sudo -S -p '' "$@"
+}
 
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e129t.XXXXXX")"
 POOL=sfs_e129_pool; TH=sfs_e129_thin; SN=sfs_e129_snap
@@ -49,7 +51,9 @@ DATA_MB=64; META_MB=8; VOL_SECT=$(( 16 * 1024 ))   # 8 MiB 的卷
 ROUNDS=5
 emit "name=config block_sectors=$BLK_SECT block_bytes=$BLK_BYTES data_mb=$DATA_MB rounds=$ROUNDS"
 
-written_sectors() { awk '{print $7}' "/sys/block/$(basename "$1")/stat"; }
+written_sectors() {
+  awk '{print $7}' "/sys/block/$(basename "$1")/stat"
+}
 
 setup_pool() {
   truncate -s "${META_MB}M" "$W/meta.img"; truncate -s "${DATA_MB}M" "$W/data.img"

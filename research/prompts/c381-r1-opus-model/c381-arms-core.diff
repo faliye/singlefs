@@ -1,0 +1,361 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -8,6 +8,19 @@
+ //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
+ 
+ use std::collections::BTreeMap;
++use std::cell::Cell as C381Cell;
++
++thread_local! {
++    /// C381 攻方副本：臂选择（0 甲「一律退回」、1 乙「按段分」、2 丙「失败即停」、3 丁「扣住」），按线程。
++    pub static C381_ARM: C381Cell<u8> = const { C381Cell::new(0) };
++}
++#[must_use]
++pub fn c381_arm() -> u8 {
++    C381_ARM.with(C381Cell::get)
++}
++pub fn set_c381_arm(arm: u8) {
++    C381_ARM.with(|cell| cell.set(arm));
++}
+ 
+ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_BYTES,
+@@ -99,6 +112,8 @@
+     /// 落盘阶段中途失败的发布各自已记的写，一次失败一份，按失败的先后排（增补 2 第 20b 行）。成功发布的账是两次快照之差、只在成功路径上取，
+     /// 失败那次落盘的写不属于任何一次成功发布 ⇒ 不交出去就与设备一层的合计对不上。另立一份、不并进任何一次成功发布的账。
+     writes_of_failed_publishes: Vec<WritesByStructureKind>,
++    /// C381 攻方副本：上一次落盘失败停在哪一段（1 = S1 单元 / 第一道屏障，2 = S2 记录 / 第二道屏障 / 根槽，3 = S3 超级块槽）与那次的版本。
++    pub c381_last_failure: Option<(u8, Box<TransactionOutput>)>,
+ }
+ 
+ impl<'pool, Device: BlockDevice> PoolWriter<'pool, Device> {
+@@ -113,6 +128,7 @@
+             has_writes_since_barrier: true,
+             writes_by_structure_kind: WritesByStructureKind::NOTHING_WRITTEN,
+             writes_of_failed_publishes: Vec::new(),
++            c381_last_failure: None,
+         }
+     }
+ }
+@@ -965,6 +981,12 @@
+         previous_record: Option<(CheckpointTxg, u64)>,
+     },
+     BlockDevice(BlockDeviceError),
++    /// C381 攻方副本，乙 S2：结局不确定；交回这次的版本，写入口只许以它为上一版、txg + 1、同内容重发。
++    C381OutcomeUncertain { cause: BlockDeviceError, version: Box<TransactionOutput> },
++    /// C381 攻方副本，乙：结局不确定期间发别的。
++    C381OnlyRetryAllowed { pending_txg: CheckpointTxg },
++    /// C381 攻方副本，丙：写入口已作废。
++    C381WriterStopped,
+ }
+ 
+ impl From<BlockDeviceError> for PublishError {
+@@ -1232,6 +1254,19 @@
+     plan: PublishPlan<'_>,
+     previous: Option<&TransactionOutput>,
+ ) -> Result<TransactionOutput, PublishError> {
++    if c381_arm() == 2 && allocator.c381.stopped {
++        return Err(PublishError::C381WriterStopped);
++    }
++    if c381_arm() == 1 || c381_arm() == 4 {
++        if let Some((pending_txg, content)) = &allocator.c381.uncertain {
++            let is_the_retry = plan.txg.0 == pending_txg.0 + 1
++                && previous.map(|version| version.root.checkpoint_txg) == Some(*pending_txg)
++                && plan.file.as_ref().map(|file| file.content.to_vec()) == *content;
++            if !is_the_retry {
++                return Err(PublishError::C381OnlyRetryAllowed { pending_txg: *pending_txg });
++            }
++        }
++    }
+     let rewritten = plan.rewritten_roles();
+     // 释放判定路径先于准入：它只查不改（D19（块指针的结构与宽度预算） 已定项 5 第 1 条），查不到就整次发布不做。
+     let release = match previous {
+@@ -1255,11 +1290,67 @@
+     publish_admission(allocator, &rewritten)?;
+     // 整个分配器拷一份、失败就换回去：第一版每次发布约 450 KiB 的拷贝（两盘各一张 211968 位的位图），换来失败路径不留半新的池。
+     let allocator_before_this_publish = allocator.clone();
++    pool.c381_last_failure = None;
+     let outcome = publish_admitted(pool, allocator, &plan, previous, &rewritten, &release);
+-    if outcome.is_err() {
+-        *allocator = allocator_before_this_publish;
++    let arm = c381_arm();
++    match outcome {
++        Ok(output) => {
++            if arm == 1 || arm == 4 {
++                allocator.c381.uncertain = None;
++            }
++            if arm == 3 {
++                allocator.c381_release_holds_below(output.root.checkpoint_txg);
++            }
++            Ok(output)
++        }
++        Err(error) => {
++            let failure = pool.c381_last_failure.take();
++            let state = allocator.c381.clone();
++            let raw_stage = failure.as_ref().map_or(0, |(stage, _)| *stage);
++            // 乙′（臂 4，攻方提的改法）：S2 里记录那一步失败按 S1 退回，只有根槽 FUA 报错才按乙的「结局不确定」；其余同乙。
++            let (arm, stage) = match (arm, raw_stage) {
++                (4, 2) => (1, 1),
++                (4, other) => (1, if other == 4 { 2 } else { other }),
++                (_, 4) => (arm, 2),
++                (_, other) => (arm, other),
++            };
++            match (arm, stage, failure, error) {
++                // 乙 S2：不退回，结局不确定。
++                (1, 2, Some((_, version)), PublishError::BlockDevice(cause)) => {
++                    allocator.c381.uncertain = Some((version.root.checkpoint_txg, plan.file.as_ref().map(|file| file.content.to_vec())));
++                    Err(PublishError::C381OutcomeUncertain { cause, version })
++                }
++                // 乙 S3：不退回，这次发布成立。
++                (1, 3, Some((_, version)), PublishError::BlockDevice(_)) => {
++                    allocator.c381.uncertain = None;
++                    Ok(*version)
++                }
++                // 丙 S2 / S3：退回（无所谓），写入口作废。
++                (2, 2 | 3, _, error) => {
++                    *allocator = allocator_before_this_publish;
++                    allocator.c381 = state;
++                    allocator.c381.stopped = true;
++                    Err(error)
++                }
++                // 丁 S2 / S3：退回，这次占过的槽扣住到一个 txg 更大的根落盘。
++                (3, 2 | 3, Some((_, version)), error) => {
++                    *allocator = allocator_before_this_publish;
++                    allocator.c381 = state.clone();
++                    // 扣住表按原样恢复（上面整份换回时连扣住位一起换回了），再加这次的。
++                    for identity in &version.rewritten {
++                        let unit = version.unit(*identity);
++                        allocator.c381_hold(Placement { slot: unit.slot, span: identity.span_slots() }, version.root.checkpoint_txg);
++                    }
++                    Err(error)
++                }
++                (_, _, _, error) => {
++                    *allocator = allocator_before_this_publish;
++                    allocator.c381 = state;
++                    Err(error)
++                }
++            }
++        }
+     }
+-    outcome
+ }
+ 
+ /// 一次发布的准入里与这次写什么内容无关的那两条：分配记录树与记账树第一版各只有一个节点（分裂不做），这次发布之后都要装得下。
+@@ -2096,7 +2187,9 @@
+     // 中途失败时这次已记的写要交出去（增补 2 第 20b 行）：六步收在一个闭包里，失败在这里记账再把错原样交回——
+     // 账是两次快照之差、只在成功路径上取，失败那次落盘的写不交出去就不属于任何一次发布，与设备一层的合计对不上。
+     let writes_before_this_publish = pool.writes_by_structure_kind.clone();
++    let stage = std::cell::Cell::new(1u8);
+     let persist = |writer: &mut PoolWriter<'_, Device>| -> Result<(), BlockDeviceError> {
++        stage.set(1);
+         for unit in &written_units {
+             writer.perform(CommitStep::WriteUnitToEveryDevice {
+                 slot: unit.slot,
+@@ -2105,26 +2198,32 @@
+             })?;
+         }
+         writer.perform(CommitStep::Barrier)?;
++        stage.set(2);
+         writer.perform(CommitStep::WriteJournalRecordToEveryDevice {
+             counter: plan.counter,
+             record: &record_bytes,
+         })?;
+         writer.perform(CommitStep::Barrier)?;
++        // 4 = S2 里根槽 FUA 那一步（乙′ 把它与记录那一步分开）。
++        stage.set(4);
+         writer.perform(CommitStep::WriteRootRecordForceUnitAccess {
+             checkpoint_txg: txg,
+             root_slot: &root_slot,
+         })?;
++        stage.set(3);
+         writer.perform(CommitStep::RotateSuperblockSlots {
+             journal_tail: plan.counter,
+             journal_instance: instance,
+         })
+     };
+-    if let Err(cause) = persist(pool) {
++    let persisted = persist(pool);
++    if let Err(cause) = &persisted {
+         pool.count_failed_publish(&writes_before_this_publish);
+-        return Err(PublishError::BlockDevice(cause));
++        let _ = cause;
+     }
++    let failed_stage = stage.get();
+ 
+-    Ok(TransactionOutput {
++    let output = TransactionOutput {
+         root,
+         record,
+         record_bytes,
+@@ -2142,7 +2241,14 @@
+         writes: pool
+             .writes_by_structure_kind
+             .since(&writes_before_this_publish),
+-    })
++    };
++    match persisted {
++        Ok(()) => Ok(output),
++        Err(cause) => {
++            pool.c381_last_failure = Some((failed_stage, Box::new(output)));
++            Err(PublishError::BlockDevice(cause))
++        }
++    }
+ }
+ 
+ #[cfg(test)]
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -767,8 +767,25 @@
+                 PublishShape::EMPTY_PUBLISH,
+                 "暖机这次空发布的形状与取号之前算准入用的那一个相同（不写文件版本、实例表照抄）"
+             );
+-            publish_version(pool, allocator, plan, Some(current_file_version))
+-                .map(PoolVersion::WithFile)
++            match publish_version(pool, allocator, plan, Some(current_file_version)) {
++                // C381 攻方副本，乙 S2：以不确定的那一版为上一版、txg + 1 重发同一份（空）内容，只重发一次。
++                Err(PublishError::C381OutcomeUncertain { version, .. }) => {
++                    let retry_plan = PublishPlan {
++                        txg: CheckpointTxg(version.root.checkpoint_txg.0 + 1),
++                        counter: version.record.counter + 1,
++                        transaction: 0,
++                        instance,
++                        back_chain: back_chain_of(&version.record_bytes),
++                        file: None,
++                        instance_table: InstanceTablePlan::Carry(version.root.instance_table),
++                        tree_birth_txg: version.tree_birth_txg(),
++                        tree_identifier_watermark: version.root.tree_identifier_watermark,
++                        rollback_floor: version.root.rollback_floor,
++                    };
++                    publish_version(pool, allocator, retry_plan, Some(&*version)).map(PoolVersion::WithFile)
++                }
++                other => other.map(PoolVersion::WithFile),
++            }
+         }
+         PoolVersion::WithoutFile(current_version_without_file) => publish_without_units(
+             pool,
+@@ -1059,11 +1076,11 @@
+     let mut current = row_publish.clone();
+     let mut warm_up_publishes = Vec::new();
+     for planned_txg in &warm_up_publishes_planned {
+-        assert_eq!(
++        if !matches!(crate::transaction::c381_arm(), 1 | 4) { assert_eq!(
+             CheckpointTxg(current.root().checkpoint_txg.0 + 1),
+             *planned_txg,
+             "这次空发布要用的 txg 与计划里的那一个相同：`publish_empty_after` 取的是现行那一版的 txg 加一，计划也是逐个加一"
+-        );
++        ); }
+         let next = publish_empty_after(&mut pool, &mut allocator, &current, instance)?;
+         warm_up_publishes.push(next.clone());
+         current = next;
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -203,6 +203,9 @@
+     /// 正好开到刚回收空的那一段，崩在两条带新 F 的根之间时 F 之下的根仍是候选、它们的单元已被盖）。只住内存。
+     held_until_floor_takes_effect: Vec<bool>,
+     held_per_segment: Vec<u64>,
++    /// C381 攻方副本：丁臂扣住的槽（只住内存）。
++    c381_held: Vec<bool>,
++    c381_held_per_segment: Vec<u64>,
+ }
+ 
+ impl DeviceFreeMap {
+@@ -229,6 +232,8 @@
+                     .expect("单元区槽数")
+             ],
+             held_per_segment: vec![0; usize::try_from(segments).expect("段数")],
++            c381_held: vec![false; usize::try_from(unit_area_slots).expect("单元区槽数")],
++            c381_held_per_segment: vec![0; usize::try_from(segments).expect("段数")],
+         }
+     }
+ 
+@@ -243,6 +248,19 @@
+             && !self.allocated[Self::index(slot)]
+             && !self.isolated[Self::index(slot)]
+             && !self.held_until_floor_takes_effect[Self::index(slot)]
++            && !self.c381_held[Self::index(slot)]
++    }
++
++    /// C381 攻方副本：丁臂扣住 / 放开一个落点。
++    pub fn c381_set_hold(&mut self, slot: SlotNumber, span: u64, held: bool) {
++        let start = Self::index(slot);
++        for index in start..start + usize::try_from(span).expect("跨度") {
++            if self.c381_held[index] != held {
++                self.c381_held[index] = held;
++                let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
++                if held { self.c381_held_per_segment[segment] += 1 } else { self.c381_held_per_segment[segment] -= 1 }
++            }
++        }
+     }
+ 
+     #[must_use]
+@@ -315,7 +333,7 @@
+     #[must_use]
+     pub fn is_blocked_for_commit_generated(&self, slot: SlotNumber) -> bool {
+         let index = Self::index(slot);
+-        self.allocated[index] || self.isolated[index] || self.held_until_floor_takes_effect[index]
++        self.allocated[index] || self.isolated[index] || self.held_until_floor_takes_effect[index] || self.c381_held[index]
+     }
+ 
+     /// F 在每块盘上生效之后把扣住的槽放开。
+@@ -425,6 +443,7 @@
+                 self.used_per_segment[*segment] == 0
+                     && self.isolated_per_segment[*segment] == 0
+                     && self.held_per_segment[*segment] == 0
++                    && self.c381_held_per_segment[*segment] == 0
+             })
+             .map(|segment| {
+                 SlotNumber(
+@@ -576,9 +595,45 @@
+     /// mkfs 写出的第 0 版树表单元的落点：第一个文件版本重写树表时把它释放（COW 换下的单元进 defer 队列，D3（空间分配） 已定项 7）；
+     /// 重开之后上一版从盘上重建、释放经映射与根记录走，这里留空。
+     format_time_tree_table: Option<Placement>,
++    /// C381 攻方副本：臂的写入口状态，挂在分配器上（跨 `PoolWriter` 活着；重开时随分配器重建清空）。
++    pub c381: C381State,
++}
++
++/// C381 攻方副本：乙的「结局不确定」、丙的「写入口作废」、丁的扣住表。
++#[derive(Clone, Debug, Default)]
++pub struct C381State {
++    /// 乙：S2 失败那次的 txg 与内容（`None` = 空发布）；重发成功之前只许 txg + 1、上一版是它、内容相同的一次。
++    pub uncertain: Option<(CheckpointTxg, Option<Vec<u8>>)>,
++    /// 丙：S2 / S3 失败之后这次挂载不许再发布。
++    pub stopped: bool,
++    /// 丁：扣住的落点与失败那次的 txg；一个 txg 更大的根落盘之后放开。
++    pub holds: Vec<(Placement, CheckpointTxg)>,
+ }
+ 
+ impl PoolAllocator {
++    /// C381 攻方副本：丁扣住 / 放开。
++    pub fn c381_hold(&mut self, placement: Placement, txg: CheckpointTxg) {
++        for device in &mut self.devices {
++            device.c381_set_hold(placement.slot, placement.span, true);
++        }
++        self.c381.holds.push((placement, txg));
++    }
++    pub fn c381_release_holds_below(&mut self, landed: CheckpointTxg) {
++        let (release, keep): (Vec<_>, Vec<_>) = self.c381.holds.iter().copied().partition(|(_, txg)| *txg < landed);
++        for (placement, _) in &release {
++            for device in &mut self.devices {
++                device.c381_set_hold(placement.slot, placement.span, false);
++            }
++        }
++        // 同一个槽被两次失败都扣过的，放开一条之后若另一条还在，重新扣上。
++        for (placement, _) in &keep {
++            for device in &mut self.devices {
++                device.c381_set_hold(placement.slot, placement.span, true);
++            }
++        }
++        self.c381.holds = keep;
++    }
++
+     #[must_use]
+     pub fn new(devices: Vec<DeviceFreeMap>) -> Self {
+         Self {
+@@ -590,6 +645,7 @@
+             records: Vec::new(),
+             reclaimed: BTreeSet::new(),
+             format_time_tree_table: None,
++            c381: C381State::default(),
+         }
+     }
+ 

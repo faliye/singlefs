@@ -6,5 +6,7 @@ want=ghost
 want=没有定义
 want=没注册 Bash 检出 hook
 want=没注册续派闸
+want=没注册续做闸
 want=没有 omitClaudeMd: true
 want=没有「开工先读：」一行
+want=没注册按模式找进程的钩子

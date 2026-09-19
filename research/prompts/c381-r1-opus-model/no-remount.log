@@ -1,0 +1,54 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/c381-r1-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:210:9
+    |
+210 |     let mut record = |result: Result<TransactionOutput, PublishError>, content: Option<Vec<u8>>, previous: &TransactionOutput, curr...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `stage_of_c_write` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:309:8
+    |
+309 | pub fn stage_of_c_write(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<&'static str> {
+    |        ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `sweep` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:318:8
+    |
+318 | pub fn sweep<F: Fn(&MakeFilesystemParameters, &Snapshot, u8, u64) -> Vec<(String, Outcome)> + Sync>(arms: &[u8], c_writes: u64, bod...
+    |        ^^^^^
+
+warning: `singlefs-harness` (test "c381_k2d") generated 3 warnings (run `cargo fix --test "c381_k2d" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.41s
+     Running tests/c381_k2d.rs (/tmp/claude-1000/c381-r1-opus/target2/release/deps/c381_k2d-6dd16c84816f3910)
+
+running 1 test
+不带 Remount 的序列 85 条
+test b_prime_without_remount has been running for over 60 seconds
+progress arm 甲 k 16
+[甲 k=16] 不带重开的段 3409，断电那一刻已红 0；第一例 
+progress arm 甲 k 17
+[甲 k=17] 不带重开的段 3409，断电那一刻已红 0；第一例 
+progress arm 甲 k 18
+[甲 k=18] 不带重开的段 3409，断电那一刻已红 0；第一例 
+progress arm 乙 k 16
+[乙 k=16] 不带重开的段 1669，断电那一刻已红 774；第一例 crash_at=None actions=[Retry] steps=["uncertain(txg 5)", "ok(txg 6)"] ["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 540672\")"]
+progress arm 乙 k 17
+[乙 k=17] 不带重开的段 1669，断电那一刻已红 774；第一例 crash_at=None actions=[Retry] steps=["uncertain(txg 5)", "ok(txg 6)"] ["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 540672\")"]
+progress arm 乙 k 18
+[乙 k=18] 不带重开的段 1669，断电那一刻已红 774；第一例 crash_at=None actions=[Retry] steps=["uncertain(txg 5)", "ok(txg 6)"] ["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 540672\")"]
+progress arm 乙′ k 16
+[乙′ k=16] 不带重开的段 3409，断电那一刻已红 0；第一例 
+progress arm 乙′ k 17
+[乙′ k=17] 不带重开的段 3409，断电那一刻已红 0；第一例 
+progress arm 乙′ k 18
+[乙′ k=18] 不带重开的段 1669，断电那一刻已红 774；第一例 crash_at=None actions=[Retry] steps=["uncertain(txg 5)", "ok(txg 6)"] ["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 540672\")"]
+test b_prime_without_remount ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1830.59s
+

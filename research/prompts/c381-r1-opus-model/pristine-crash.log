@@ -1,0 +1,42 @@
+[甲] k=None later=[] actions=[] crash=Some(17) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=18 writes=18
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[乙] k=None later=[] actions=[] crash=Some(17) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=18 writes=18
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[丙] k=None later=[] actions=[] crash=Some(17) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=18 writes=18
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[丁] k=None later=[] actions=[] crash=Some(17) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=18 writes=18
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+test single ... ok
+[甲] k=None later=[] actions=[] crash=Some(18) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=19 writes=19
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[乙] k=None later=[] actions=[] crash=Some(18) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=19 writes=19
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[丙] k=None later=[] actions=[] crash=Some(18) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=19 writes=19
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+[丁] k=None later=[] actions=[] crash=Some(18) lying=false
+  steps=["err(BlockDevice)"] writes_after_c=19 writes=19
+  checker@crash=[]
+  remount=ok(chosen 4)
+  checker@after=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976\")"]
+test single ... ok

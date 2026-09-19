@@ -42,7 +42,9 @@ for v in "${SUDO_PASS_A:-}" "${SUDO_PASS_B:-}"; do
   printf '%s\n' "$v" | sudo -S -p '' true 2>/dev/null && { PASS="$v"; break; }
 done
 [ -n "$PASS" ] || { echo "E7RESULT name=fatal reason=no_sudo"; exit 3; }
-S() { printf '%s\n' "$PASS" | sudo -S -p '' "$@"; }
+S() {
+  printf '%s\n' "$PASS" | sudo -S -p '' "$@"
+}
 
 W="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-e72.XXXXXX")"
 LOOPS=()

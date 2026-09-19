@@ -1,3 +1,5 @@
 exit=1
 want=补上第二个参数
 want=research/scripts/ 或 .claude/hooks/ 里有不带出路的拒绝
+want=外面拿不到这个值
+want=里有违反 shell 纪律的写法

@@ -6,9 +6,12 @@
 #   ② `.claude/hooks/write-guard.sh --selftest` 通过（自证里有走真实 stdin 入口的情形）；
 #   ③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；
 #   ④ 表里每个 agent 名都有定义，每行至少两列；
-#   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（按模式找进程与没超时的等待循环记进检出记录、一律放行：hook 只检出，结不结束由主 agent 判断）；
+#   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook，且它的 `--selftest` 通过（没超时的等待循环、run_in_background 里又自己放后台记进检出记录，一律放行：在跑的命令结不结束由主 agent 判断）；
 #   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook，且它的 `--selftest` 通过（派执行员没点名岔路、续做没写还差的行会被拒）；
-#   ⑦ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）。
+#   ⑦ PreToolUse 里有一条 matcher 覆盖 SendMessage、命令指向 `continuation-guard.sh` 的 hook，且它的 `--selftest` 通过（给最近一次任务通知是 failed 或 killed 的子 agent 续做会被拒，上下文多大不拦）；
+#   ⑧ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）；
+#   ⑨ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向上游 SOP 的 `claude-hooks/pattern-process-guard.sh` 的 hook，且那个文件在
+#     （按模式找进程在执行前拒绝；它的判别力由上游 selftest 的样本管，门禁「门禁自检」阶段跑它，这里只查注册着、文件在）。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
 # 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
@@ -61,6 +64,25 @@ if entries is not None:
         failed = True
         print(f"  ✗ {settings_path} 没注册续派闸：PreToolUse 里没有 matcher 覆盖 Agent、命令指向 runner-dispatch-guard.sh 的一条")
         print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Agent|Task"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/runner-dispatch-guard.sh"。')
+    continuation_registered = [entry for entry in entries
+                               if matcher_covers(entry.get("matcher", ""), "SendMessage")
+                               and any("continuation-guard.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not continuation_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册续做闸：PreToolUse 里没有 matcher 覆盖 SendMessage、命令指向 continuation-guard.sh 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "SendMessage"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/continuation-guard.sh"。')
+    pattern_guard = "singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh"
+    pattern_guard_registered = [entry for entry in entries
+                                if matcher_covers(entry.get("matcher", ""), "Bash")
+                                and any(pattern_guard in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not pattern_guard_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册按模式找进程的钩子：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 {pattern_guard} 的一条")
+        print('     → 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/' + pattern_guard + '"（写法见 .claude/singlefs-ai-sop/rules/command-safety.md「pkill -f / killall 一律禁用」）。')
+    elif not os.path.isfile(os.path.join(".claude", pattern_guard)):
+        failed = True
+        print(f"  ✗ 注册了按模式找进程的钩子，文件 .claude/{pattern_guard} 却不在：会话里每条 Bash 命令都会报钩子错")
+        print("     → 怎么办：规范副本旧于 0.0.52 或没装全，按 CLAUDE.md「规范从哪来」那一行重新同步副本、跑 install.sh。")
 table_path = ".claude/hooks/agent-write-scope.tsv"
 patterns_by_agent, malformed = {}, []
 if os.path.isfile(table_path):
@@ -152,4 +174,11 @@ if [[ $dispatch_rc -ne 0 ]]; then
   echo "     → 怎么办：修 .claude/hooks/runner-dispatch-guard.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
   exit 1
 fi
-echo "  ✓ 写范围闸、Bash 检出 hook 与续派闸注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"
+continuation_output="$(bash "$(dirname "$HOOK")/continuation-guard.sh" --selftest 2>&1)"; continuation_rc=$?
+if [[ $continuation_rc -ne 0 ]]; then
+  echo "  ✗ continuation-guard.sh 的自证没过："
+  printf '%s\n' "$continuation_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/continuation-guard.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+echo "  ✓ 写范围闸、Bash 检出 hook、续派闸与续做闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"

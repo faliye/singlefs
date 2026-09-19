@@ -1,0 +1,13 @@
+[甲] 原历史：E 从 B: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+    remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+    checker@after=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+[甲] E 从调用方手里的现行版: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+    remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+    checker@after=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+[甲] 对照：原样重发 C: steps=["err(BlockDevice)", "ok(txg 5)"] writes=42 crash_at=None
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[乙] 原历史：E 从 B: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)

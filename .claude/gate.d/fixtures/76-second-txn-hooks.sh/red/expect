@@ -1,0 +1,8 @@
+exit=1
+want=「样本形态乙」指里程碑步 1，而步 1 的「写出的字节」没点名这一行
+want=点名「九、没有这一节」
+want=用例文件 sample_step_missing.rs 在 crates/*/tests/ 下不存在
+want=点名的用例 sample_function_that_was_renamed 在同一格点名的文件里找不到 fn
+want=有一行标着里程碑「第二个事务」步 2，而步 2 的「写出的字节」没点名「八、」那一节
+want=步 3 点名 .claude/kb/layout/02-second-txn.md「样本形态甲」，而那一行的「里程碑那一步」里没有步 3
+want=步 3 的「写出的字节」点名了「八、」那一节，而那张表里没有一行标「里程碑「第二个事务」步 3」

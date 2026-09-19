@@ -1,0 +1,102 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/c381-r1-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:210:9
+    |
+210 |     let mut record = |result: Result<TransactionOutput, PublishError>, content: Option<Vec<u8>>, previous: &TransactionOutput, curr...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `Other` and `Remount` are never constructed
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:130:5
+    |
+124 | pub enum Action {
+    |          ------ variants in this enum
+...
+130 |     Other,
+    |     ^^^^^
+...
+134 |     Remount,
+    |     ^^^^^^^
+    |
+    = note: `Action` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `ACTIONS` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:136:11
+    |
+136 | pub const ACTIONS: [Action; 5] = [Action::Retry, Action::Empty, Action::Other, Action::EmptyFromB, Action::Remount];
+    |           ^^^^^^^
+
+warning: function `stage_of_c_write` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:309:8
+    |
+309 | pub fn stage_of_c_write(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<&'static str> {
+    |        ^^^^^^^^^^^^^^^^
+
+warning: function `sweep` is never used
+   --> crates/singlefs-harness/tests/c381_probe_common.rs:318:8
+    |
+318 | pub fn sweep<F: Fn(&MakeFilesystemParameters, &Snapshot, u8, u64) -> Vec<(String, Outcome)> + Sync>(arms: &[u8], c_writes: u64, bod...
+    |        ^^^^^
+
+warning: `singlefs-harness` (test "c381_k4") generated 5 warnings (run `cargo fix --test "c381_k4" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.69s
+     Running tests/c381_k4.rs (/tmp/claude-1000/c381-r1-opus/target2/release/deps/c381_k4-2cc1bbacd2eb5e80)
+
+running 1 test
+test k4_original_history_per_arm ... C 无故障：C 共 21 次写；步骤 ["ok(txg 5)"]；耗时 70.572825ms
+[甲] 原历史：E 从 B: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+    remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+    checker@after=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+[甲] E 从调用方手里的现行版: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+    remount=REFUSED Recovery(UnitUnreadable { slot: SlotNumber(50257) })
+    checker@after=["I-2.1: Violated(\"树 11（种类 1）的根 在盘 0 槽 50257 的那一份与位置条目里的校验和对不上\")", "I-3.1: Violated(\"盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136\")", "I-4.8: Violated(\"最新根（txg 5）出发的遍历有单元对不上或读不出\")", "I-7.2: Violated(\"最新的根走不完：树 11（种类 1）的根 两份都读不到对得上的；树 12（种类 2）的根 两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的\")", "I-7.4: Violated(\"最新根（txg 5）引用的单元已被复用或抹头（校验和对不上或头用不了）\")"]
+[甲] 对照：原样重发 C: steps=["err(BlockDevice)", "ok(txg 5)"] writes=42 crash_at=None
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[乙] 原历史：E 从 B: steps=["ok(txg 5)", "err(ReleaseTargetAlreadyReleased)"] writes=21 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[乙] E 从调用方手里的现行版: steps=["ok(txg 5)", "uncertain(txg 6)"] writes=30 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[乙] 对照：原样重发 C: steps=["ok(txg 5)", "ok(txg 6)"] writes=42 crash_at=None
+    checker@crash=[]
+    remount=ok(chosen 6)
+    checker@after=[]
+[丙] 原历史：E 从 B: steps=["err(BlockDevice)", "err(C381WriterStopped)"] writes=21 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[丙] E 从调用方手里的现行版: steps=["err(BlockDevice)", "err(C381WriterStopped)"] writes=21 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[丙] 对照：原样重发 C: steps=["err(BlockDevice)", "err(C381WriterStopped)"] writes=21 crash_at=None
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[丁] 原历史：E 从 B: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[丁] E 从调用方手里的现行版: steps=["err(BlockDevice)", "err(BlockDevice)"] writes=30 crash_at=Some(29)
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+[丁] 对照：原样重发 C: steps=["err(BlockDevice)", "ok(txg 5)"] writes=42 crash_at=None
+    checker@crash=[]
+    remount=ok(chosen 5)
+    checker@after=[]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
