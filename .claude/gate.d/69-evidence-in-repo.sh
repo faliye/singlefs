@@ -16,6 +16,9 @@
 #   而且它的 mtime 不早于那份源码。一个这样的产物都没有、或最新的那份比源码旧 ⇒ 红。
 #   只改了 // 注释的装置源码（与基准比，增删的每一行都是 // 注释或空行）不判、在成功行里逐个列名：
 #   path-moves.md 要求全仓改路径，注释里的路径改了碰不到产物（2026-09-18 实测六份装置因此误判）。
+#   按要求才跑的实验（research/on-request-experiments.tsv 登记的实验号，例：E152 按里程碑、用户说跑才跑）不要求新产物：
+#   装置改了、产物旧时改查它的实验页（.claude/kb/experiments/<号>-*.md）写没写「没有正式跑」或「未正式跑」，写了就在成功行列名，没写 ⇒ 红。
+#   用户 2026-09-19 定：E152 本质上是用户要跑才跑的里程碑性能对比，每次改装置都跑没有意义。
 # 判据二「证据指向仓外」：下面这些文件里，把 /tmp 路径当依据引用 ⇒ 红。认的形态是
 #   「依据 / 证据 / 出处 / 产物 / 报告 / 原件 / 结论 / 存档 / 留档 / 留存 / 记录 / 落点 / 见 / 详见 / 参见」
 #   之后隔至多两个空白、至多一个连接记号（是 / 在 / 为 / ： / : / = / →）、至多两个空白，再（可带一个 ` 或 「）接上 /tmp/ 路径。
@@ -82,6 +85,27 @@ source_forms = (
     (re.compile(r"^research/mutations/e([0-9]+)_[^/]*\.tsv$"), "变异表"),
 )
 product_form = re.compile(r"^e([0-9]+)(?![0-9])")
+on_request_list = "research/on-request-experiments.tsv"
+on_request_numbers = set()
+if os.path.isfile(on_request_list):
+    with open(on_request_list, encoding="utf-8") as handle:
+        for line in handle:
+            cells = line.split("#", 1)[0].split("\t")
+            if cells[0].strip():
+                on_request_numbers.add(cells[0].strip().lstrip("Ee"))
+not_run_note = re.compile(r"没有正式跑|未正式跑")
+
+def experiment_page_says_not_run(number):
+    """按要求才跑的实验，实验页里有没有写明「装置改过、之后没有正式跑」。"""
+    directory = os.path.join(kb_dir, "experiments")
+    if not os.path.isdir(directory):
+        return False
+    for file_name in os.listdir(directory):
+        if re.match(rf"^{number}-", file_name):
+            with open(os.path.join(directory, file_name), encoding="utf-8", errors="replace") as handle:
+                if not_run_note.search(handle.read()):
+                    return True
+    return False
 
 # ── 判据一：改动范围里的实验装置与变异表，要有一份不比它旧的产物 ───────────
 changed_sources = []
@@ -126,12 +150,20 @@ def changes_only_comments(path):
 
 unstored_runs = []
 comment_only_sources = []
+on_request_not_run = []
+on_request_missing_note = []
 for path, number, kind in changed_sources:
     if kind == "装置源码" and changes_only_comments(path):
         comment_only_sources.append(path)
         continue
     source_modified_at = os.path.getmtime(path)
     newest = newest_product_by_number.get(number)
+    if number in on_request_numbers and (newest is None or newest[1] < source_modified_at):
+        if experiment_page_says_not_run(number):
+            on_request_not_run.append(f"E{number}（{path}）")
+        else:
+            on_request_missing_note.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：E{number} 按要求才跑，实验页没写明装置改过之后没有正式跑")
+        continue
     if newest is None:
         unstored_runs.append(f"{path}（{kind}，改于 {moment(source_modified_at)}）：{results_dir} 下一份 E{number} 的产物都没有")
     elif newest[1] < source_modified_at:
@@ -189,6 +221,13 @@ if unstored_runs:
     print(f"     → 怎么办：跑一次把产物存进 {results_dir}/，并在 research/scripts/replay.sh 把这个实验的登记行指到它。")
     print("               这一跑已经跑过、产物还在 /tmp 的草稿目录里，就现在拷进来（会话一重启那个目录就没了）；")
     print("               只改了 // 注释的装置本阶段不判；改了字符串里的路径，照 .claude/rules/path-moves.md 第 4 条连同留存产物一起改，复跑仍逐字相同。")
+if on_request_missing_note:
+    failed = True
+    print("  ✗ 这些按要求才跑的实验装置改了、没有新产物，实验页也没写明之后没有正式跑：")  # gate-lint:summary
+    for entry in on_request_missing_note:
+        print(f"     {entry}")  # gate-lint:detail
+    print("     → 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；")
+    print("               在实验页写一句「装置某日改过（改了什么），之后没有正式跑」，要数的时候等用户说跑。")
 if outside_citations:
     failed = True
     print("  ✗ 这些地方把 /tmp 下的东西当依据引用了——那是会话自己的草稿目录，一重启就没了，三个月后没人核得动：")  # gate-lint:summary
@@ -206,4 +245,6 @@ if not changed_sources:
 print(f"    没判 {skipped_prompt_files} 份 {prompts_dir} 下这一轮没新写的 .md（登记在 .claude/doc-lint-exclude 的原样保存证据，改不得）")
 if comment_only_sources:
     print(f"    没判 {len(comment_only_sources)} 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：{'、'.join(comment_only_sources)}")
+if on_request_not_run:
+    print(f"    没要求重跑 {len(on_request_not_run)} 份按要求才跑的实验（装置比产物新，实验页写明了没有正式跑）：{'、'.join(on_request_not_run)}")
 PY

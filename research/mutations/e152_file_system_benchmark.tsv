@@ -14,3 +14,13 @@ M13_summed_counters_drop_second_member_reads	read_sectors: self.read_sectors + o
 M14_raid_recovery_not_noticed	mdstat_text.contains("resync") || mdstat_text.contains("recovery")	mdstat_text.contains("resync")
 M15_bcachefs_devices_joined_with_comma	let bcachefs_devices = device_paths.join(":");	let bcachefs_devices = device_paths.join(",");
 M16_software_raid_without_assume_clean	"--bitmap=none", "--assume-clean", "--run"	"--bitmap=none", "--run"
+M17_containment_comparison_direction_flipped	Some(outer_value >= inner_value)	Some(outer_value <= inner_value)
+M18_containment_equal_phases_not_contained	Some(outer_value >= inner_value)	Some(outer_value > inner_value)
+M19_containment_fields_read_root_txg_instead_of_child_nanoseconds	fields.get("nanoseconds")?	fields.get("root_txg")?
+M20_summarize_keeps_rounds_judged_not_contained	Some("false") => Err("outer_does_not_contain_inner".to_string()),	Some("false") => wall_clock_milliseconds,
+M21_summarize_keeps_rounds_without_containment_field	None => Err("missing_second_transaction_outer_contains_inner".to_string()),	None => wall_clock_milliseconds,
+M22_summarize_keeps_rounds_with_containment_not_available	Some("NA") => Err("containment_not_available".to_string()),	Some("NA") => wall_clock_milliseconds,
+M23_inner_metric_reads_outer_phase_field	nanoseconds_as("second_transaction_inner_nanoseconds", 1e6)	nanoseconds_as("second_transaction_nanoseconds", 1e6)
+M24_arrival_reader_drops_first_line	for line in reader.lines() {	for line in reader.lines().skip(1) {
+M25_arrival_timestamps_count_backwards	ArrivedLine { at_nanoseconds: started.elapsed().as_nanos(), text }	ArrivedLine { at_nanoseconds: u128::MAX - started.elapsed().as_nanos(), text }
+M26_phase_ignores_earlier_arrival	(Some(later_value), Some(earlier_value)) => Some(later_value - earlier_value),	(Some(later_value), Some(_earlier_value)) => Some(later_value),

@@ -1,0 +1,5 @@
+exit=1
+want=research/relay-sample/src/main.rs:10
+want=取时间 .elapsed(  输出 println!
+want=✗ 有 1 处读子进程输出的循环一边给行打时间戳一边转打（扫了 1 个文件、1 个读子进程输出的循环、豁免 0 处
+want=→ 怎么办

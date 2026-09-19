@@ -13,6 +13,11 @@ printf 'E7RESULT name=e901 rows=1\n' > research/results/e901-stale-product-2026-
 printf '// 字段表见 first-layout.md\nfn main() { println!("e907"); }\n' > research/e7-index-bench/src/bin/e907_comment_and_code.rs
 printf 'E7RESULT name=e907 rows=1\n' > research/results/e907-comment-and-code-2026-09-01.out
 printf '# 欠账\n\n| C901 | 样本欠账 | 还没还 |\n\n## 历史版本\n' > .claude/kb/sample-owed.md
+mkdir -p .claude/kb/experiments
+printf 'E908\t样本：按要求才跑\n' > research/on-request-experiments.tsv
+printf 'fn main() { println!("e908"); }\n' > research/e7-index-bench/src/bin/e908_on_request_no_note.rs
+printf 'E7RESULT name=e908 rows=1\n' > research/results/e908-on-request-no-note-2026-09-01.out
+printf '# E908 样本\n\n装置改过。\n\n## 历史版本\n' > .claude/kb/experiments/908-on-request-no-note.md
 git add -A && git commit -qm base
 printf 'fn main() { println!("e901 改过了"); }\n' > research/e7-index-bench/src/bin/e901_stale_product.rs
 printf '// 字段表见 layout/01-first.md\nfn main() { println!("e907 改过了"); }\n' > research/e7-index-bench/src/bin/e907_comment_and_code.rs
@@ -31,4 +36,7 @@ cat > research/prompts/newround-r1-opus.md <<'EOF'
 2. 实现员报告 `/tmp/claude-1000/sample-impl/report.md`（它自己列的设计判断）。
 EOF
 touch -d '2026-09-01T00:00:00Z' research/results/e901-stale-product-2026-09-01.out research/results/e907-comment-and-code-2026-09-01.out
+printf 'fn main() { println!("e908 改过了"); }\n' > research/e7-index-bench/src/bin/e908_on_request_no_note.rs
+touch -d '2026-09-01T00:00:00Z' research/results/e908-on-request-no-note-2026-09-01.out
+touch -d '2026-09-05T00:00:00Z' research/e7-index-bench/src/bin/e908_on_request_no_note.rs
 touch -d '2026-09-05T00:00:00Z' research/e7-index-bench/src/bin/e901_stale_product.rs research/mutations/e902_no_product.tsv research/e7-index-bench/src/bin/e907_comment_and_code.rs

@@ -30,6 +30,11 @@ cat > research/prompts/oldround-r1-opus.md <<'EOF'
 
 报告原件的依据：/tmp/claude-1000/oldround-r1-opus/report.md
 EOF
+mkdir -p .claude/kb/experiments
+printf 'E906\t样本：按要求才跑\n' > research/on-request-experiments.tsv
+printf 'fn main() { println!("e906"); }\n' > research/e7-index-bench/src/bin/e906_on_request.rs
+printf 'E7RESULT name=e906 rows=1\n' > research/results/e906-on-request-2026-09-01.out
+printf '# E906 样本\n\n装置 2026-09-05 改过，之后没有正式跑。\n\n## 历史版本\n' > .claude/kb/experiments/906-on-request.md
 git add -A && git commit -qm base
 printf 'fn main() { println!("e903 改过了"); }\n' > research/e7-index-bench/src/bin/e903_fresh_product.rs
 printf '// 字段表见 layout/01-first.md\nfn main() { println!("e905"); }\n' > research/e7-index-bench/src/bin/e905_comment_only.rs
@@ -41,4 +46,7 @@ cat > research/prompts/newround-r2-sonnet.md <<'EOF'
 EOF
 touch -d '2026-09-01T00:00:00Z' research/results/e904-untouched-2026-09-01.out research/e7-index-bench/src/bin/e904_untouched.rs research/results/e905-comment-only-2026-09-01.out
 touch -d '2026-09-05T00:00:00Z' research/e7-index-bench/src/bin/e903_fresh_product.rs
+printf 'fn main() { println!("e906 改过了"); }\n' > research/e7-index-bench/src/bin/e906_on_request.rs
+touch -d '2026-09-01T00:00:00Z' research/results/e906-on-request-2026-09-01.out
+touch -d '2026-09-05T00:00:00Z' research/e7-index-bench/src/bin/e906_on_request.rs
 touch -d '2026-09-06T00:00:00Z' research/results/e903-fresh-product-2026-09-06.out

@@ -8,3 +8,5 @@ want=.claude/kb/sample-owed.md:3：…| 样本欠账 | 2026-09-18 还清，依�
 want=research/prompts/newround-r1-opus.md:4：…2. 实现员报告 `/tmp/claude-1000/sample-impl/report.md
 want=引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径
 want=research/e7-index-bench/src/bin/e907_comment_and_code.rs（装置源码，改于 2026-09-05 00:00）：最新的 E907 产物 research/results/e907-comment-and-code-2026-09-01.out 还是 2026-09-01 00:00 那份
+want=research/e7-index-bench/src/bin/e908_on_request_no_note.rs（装置源码，改于 2026-09-05 00:00）：E908 按要求才跑，实验页没写明装置改过之后没有正式跑
+want=→ 怎么办：不用跑（research/on-request-experiments.tsv 里的实验只在用户说跑时才跑）；

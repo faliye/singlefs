@@ -1059,7 +1059,60 @@ fn reemit_inner_line(at_nanoseconds: u128, inner_body: &str) -> String {
     format!("at_nanoseconds={at_nanoseconds} inner={without_name}")
 }
 
-/// 登记第四节 singlefs 那一段：门禁 55 号那个真设备二进制当子进程跑，按结果行到达的时刻切两段挂钟。
+/// 子进程的一行输出，连同它从管道里读出来的那一刻（从起点算的纳秒）。
+#[derive(Debug, PartialEq, Eq)]
+struct ArrivedLine {
+    at_nanoseconds: u128,
+    text: String,
+}
+
+/// 把子进程的输出一口气读到 EOF，每行记下读出来那一刻；签名里不给任何输出句柄，读的循环里就写不出转打。
+/// 为什么：虚机里转打一行走串口要阻塞几毫秒，而子进程往管道里写不被挡，边读边打时后面每行的时刻都带着前面的打印积压。
+fn read_lines_with_arrival_times<Reader: BufRead>(reader: Reader, started: Instant) -> std::io::Result<Vec<ArrivedLine>> {
+    let mut arrived_lines = Vec::new();
+    for line in reader.lines() {
+        let text = line?;
+        arrived_lines.push(ArrivedLine { at_nanoseconds: started.elapsed().as_nanos(), text });
+    }
+    Ok(arrived_lines)
+}
+
+/// 两个到达时刻之差；缺一个就没有这一段。
+fn phase_nanoseconds(later: Option<u128>, earlier: Option<u128>) -> Option<u128> {
+    match (later, earlier) {
+        (Some(later_value), Some(earlier_value)) => Some(later_value - earlier_value),
+        (Some(_), None) | (None, Some(_)) | (None, None) => None,
+    }
+}
+
+/// 外层按行到达时刻切的那一段包不包住子进程自己计的那一段（外层 ≥ 里层为真）；缺一个值就判不了。
+/// 子进程先打 `transaction` 行、再开始计时、做发布 B、停表、最后才打 `second_transaction` 行，所以两行到达的间隔物理上不会小于它自己计的数。
+fn outer_phase_contains_inner_phase(outer_nanoseconds: Option<u128>, inner_nanoseconds: Option<u128>) -> Option<bool> {
+    match (outer_nanoseconds, inner_nanoseconds) {
+        (Some(outer_value), Some(inner_value)) => Some(outer_value >= inner_value),
+        (Some(_), None) | (None, Some(_)) | (None, None) => None,
+    }
+}
+
+/// `singlefs_timing` 行末尾的两个字段：子进程在 `name=second_transaction` 行里自己计的纳秒，与外层那一段包不包住它。
+fn second_transaction_containment_fields(
+    outer_nanoseconds: Option<u128>,
+    second_transaction_fields: Option<&BTreeMap<String, String>>,
+) -> String {
+    let inner_nanoseconds =
+        second_transaction_fields.and_then(|fields| fields.get("nanoseconds")?.parse::<u128>().ok());
+    let containment = outer_phase_contains_inner_phase(outer_nanoseconds, inner_nanoseconds);
+    format!(
+        "second_transaction_inner_nanoseconds={} second_transaction_outer_contains_inner={}",
+        inner_nanoseconds.map_or_else(|| "NA".to_string(), |nanoseconds| nanoseconds.to_string()),
+        containment.map_or_else(|| "NA".to_string(), |contains| contains.to_string())
+    )
+}
+
+/// 登记第四节 singlefs 那一段（第十二节起模式换成 `second-transaction`）：门禁 55 号那个真设备二进制当子进程跑，
+/// 按结果行到达的时刻切三段挂钟：第一个事务的写路（mkfs + 取号 + 暖机 + 第一个事务）、第二个事务（覆盖写 B）、冷恢复；
+/// B 交给设备的写请求、字节、屏障、FUA 从它自己报的那一行取（程序计数，门禁 55 号已证录制流与设备侧日志逐项相等）。
+/// 子进程的输出先读到 EOF 再转打（`read_lines_with_arrival_times`）；外层第二个事务那一段与子进程自己计的数比一次包含关系，一并报出。
 fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), GuestFailure> {
     let before = device_paths
         .iter()
@@ -1068,19 +1121,27 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
     let started = Instant::now();
     let mut child = Command::new(SINGLEFS_DEVICE_BINARY)
         .args(device_paths)
-        .arg("direct")
+        .arg("second-transaction")
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|error| GuestFailure::new("singlefs_start", error.to_string()))?;
     let child_output = child.stdout.take().expect("刚用 Stdio::piped() 起的子进程一定有 stdout");
+    let arrived_lines = read_lines_with_arrival_times(BufReader::new(child_output), started)
+        .map_err(|error| GuestFailure::new("singlefs_read", error.to_string()))?;
+    let status = child.wait().map_err(|error| GuestFailure::new("singlefs_wait", error.to_string()))?;
+    let after = device_paths
+        .iter()
+        .map(|path| read_block_layer_counters(path))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut geometry_at = None;
     let mut transaction_at = None;
+    let mut second_transaction_at = None;
+    let mut second_transaction_fields: Option<BTreeMap<String, String>> = None;
     let mut recovery_at = None;
     let mut content_matches = false;
-    for line in BufReader::new(child_output).lines() {
-        let line = line.map_err(|error| GuestFailure::new("singlefs_read", error.to_string()))?;
-        let at_nanoseconds = started.elapsed().as_nanos();
-        let Some(inner_body) = line.strip_prefix("E7RESULT ") else {
+    for arrived_line in &arrived_lines {
+        let at_nanoseconds = arrived_line.at_nanoseconds;
+        let Some(inner_body) = arrived_line.text.strip_prefix("E7RESULT ") else {
             continue;
         };
         if inner_body.starts_with("name=geometry ") {
@@ -1089,17 +1150,21 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
         if inner_body.starts_with("name=transaction ") {
             transaction_at = Some(at_nanoseconds);
         }
+        if inner_body.starts_with("name=second_transaction ") {
+            second_transaction_at = Some(at_nanoseconds);
+            second_transaction_fields = Some(
+                parse_key_values(inner_body)
+                    .into_iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect(),
+            );
+        }
         if inner_body.starts_with("name=recover_cold ") {
             recovery_at = Some(at_nanoseconds);
             content_matches = inner_body.contains("content_matches=true");
         }
         emitter.emit("singlefs_inner", &reemit_inner_line(at_nanoseconds, inner_body));
     }
-    let status = child.wait().map_err(|error| GuestFailure::new("singlefs_wait", error.to_string()))?;
-    let after = device_paths
-        .iter()
-        .map(|path| read_block_layer_counters(path))
-        .collect::<Result<Vec<_>, _>>()?;
     let per_device: Vec<String> = after
         .iter()
         .zip(&before)
@@ -1112,18 +1177,37 @@ fn run_singlefs(device_paths: &[String], emitter: &mut Emitter) -> Result<(), Gu
             )
         })
         .collect();
-    let phase = |later: Option<u128>, earlier: Option<u128>| match (later, earlier) {
-        (Some(later_value), Some(earlier_value)) => (later_value - earlier_value).to_string(),
-        (_, _) => "NA".to_string(),
+    let phase = |later: Option<u128>, earlier: Option<u128>| {
+        phase_nanoseconds(later, earlier).map_or_else(|| "NA".to_string(), |nanoseconds| nanoseconds.to_string())
+    };
+    // B 两盘合计的写请求、字节、屏障与 FUA：从二进制自己报的 `name=second_transaction` 行里逐盘相加；那一行没到就写 NA。
+    let second_sum = |suffix: &str| -> String {
+        second_transaction_fields
+            .as_ref()
+            .and_then(|fields| {
+                let first = fields.get(&format!("device_0_{suffix}"))?.parse::<u64>().ok()?;
+                let second = fields.get(&format!("device_1_{suffix}"))?.parse::<u64>().ok()?;
+                Some((first + second).to_string())
+            })
+            .unwrap_or_else(|| "NA".to_string())
     };
     emitter.emit(
         "singlefs_timing",
         &format!(
-            "write_path_nanoseconds={} recovery_nanoseconds={} child_exit={} content_matches={content_matches} {}",
+            "write_path_nanoseconds={} second_transaction_nanoseconds={} recovery_nanoseconds={} second_transaction_writes_both_devices={} second_transaction_written_bytes_both_devices={} second_transaction_barriers_both_devices={} second_transaction_force_unit_access_writes_both_devices={} child_exit={} content_matches={content_matches} {} {}",
             phase(transaction_at, geometry_at),
-            phase(recovery_at, transaction_at),
+            phase(second_transaction_at, transaction_at),
+            phase(recovery_at, second_transaction_at.or(transaction_at)),
+            second_sum("writes"),
+            second_sum("written_bytes"),
+            second_sum("barriers"),
+            second_sum("force_unit_access_writes"),
             status.code().map_or_else(|| "signal".to_string(), |code| code.to_string()),
-            per_device.join(" ")
+            per_device.join(" "),
+            second_transaction_containment_fields(
+                phase_nanoseconds(second_transaction_at, transaction_at),
+                second_transaction_fields.as_ref()
+            )
         ),
     );
     if !status.success() || !content_matches {
@@ -1406,6 +1490,20 @@ fn divided(numerator: Result<f64, String>, denominator: Result<f64, String>, sca
     Ok(numerator? / denominator? * scale)
 }
 
+/// 第二个事务的外层挂钟只收包含检查判真的轮：判假、判不了（NA）、这一行没有这个字段，都照排除的格子报出理由，不进中位。
+fn second_transaction_wall_clock_if_contained(
+    outer_contains_inner: Option<&str>,
+    wall_clock_milliseconds: Result<f64, String>,
+) -> Result<f64, String> {
+    match outer_contains_inner {
+        Some("true") => wall_clock_milliseconds,
+        Some("false") => Err("outer_does_not_contain_inner".to_string()),
+        Some("NA") => Err("containment_not_available".to_string()),
+        Some(_) => Err("not_a_boolean_second_transaction_outer_contains_inner".to_string()),
+        None => Err("missing_second_transaction_outer_contains_inner".to_string()),
+    }
+}
+
 fn metric_readings(fields: &BTreeMap<&str, &str>) -> Vec<MetricReading> {
     let nanoseconds_as = |key: &str, scale: f64| number_field(fields, key).map(|nanoseconds| nanoseconds / scale);
     match fields.get("name").copied() {
@@ -1452,7 +1550,24 @@ fn metric_readings(fields: &BTreeMap<&str, &str>) -> Vec<MetricReading> {
         ],
         Some("singlefs_timing") => vec![
             metric_reading("singlefs_write_path_milliseconds", nanoseconds_as("write_path_nanoseconds", 1e6), false),
+            metric_reading(
+                "singlefs_second_transaction_milliseconds",
+                second_transaction_wall_clock_if_contained(
+                    fields.get("second_transaction_outer_contains_inner").copied(),
+                    nanoseconds_as("second_transaction_nanoseconds", 1e6),
+                ),
+                false,
+            ),
+            metric_reading(
+                "singlefs_second_transaction_inner_milliseconds",
+                nanoseconds_as("second_transaction_inner_nanoseconds", 1e6),
+                false,
+            ),
             metric_reading("singlefs_recovery_milliseconds", nanoseconds_as("recovery_nanoseconds", 1e6), false),
+            metric_reading("singlefs_second_transaction_writes_both_devices", number_field(fields, "second_transaction_writes_both_devices"), false),
+            metric_reading("singlefs_second_transaction_written_bytes_both_devices", number_field(fields, "second_transaction_written_bytes_both_devices"), false),
+            metric_reading("singlefs_second_transaction_barriers_both_devices", number_field(fields, "second_transaction_barriers_both_devices"), false),
+            metric_reading("singlefs_second_transaction_force_unit_access_writes_both_devices", number_field(fields, "second_transaction_force_unit_access_writes_both_devices"), false),
             metric_reading(
                 "singlefs_read_bytes_both_devices",
                 number_field(fields, "device_0_read_bytes")
@@ -1906,5 +2021,128 @@ E7RESULT name=done emitted=3\n";
         assert_eq!(output.iter().filter(|line| line.contains("name=summary_failed_round")).count(), 0);
         assert_eq!(output.len(), 4);
         assert_eq!(output.last(), Some(&"E7RESULT name=summary_done emitted=4".to_string()));
+    }
+
+    #[test]
+    fn arrival_reader_returns_every_child_line_in_order_with_nondecreasing_timestamps() {
+        let child_output = "E7RESULT name=transaction root_txg=3\nnot a result line\nE7RESULT name=second_transaction nanoseconds=6608505\nE7RESULT name=done emitted=3";
+        let started = Instant::now();
+        let arrived_lines = read_lines_with_arrival_times(child_output.as_bytes(), started).expect("内存里的输入读不出错");
+        let read_finished_nanoseconds = started.elapsed().as_nanos();
+        let texts: Vec<&str> = arrived_lines.iter().map(|arrived_line| arrived_line.text.as_str()).collect();
+        assert_eq!(
+            texts,
+            [
+                "E7RESULT name=transaction root_txg=3",
+                "not a result line",
+                "E7RESULT name=second_transaction nanoseconds=6608505",
+                "E7RESULT name=done emitted=3"
+            ],
+            "四行全要、次序不变，不是结果行的也要，末行没有换行也要"
+        );
+        for adjacent_pair in arrived_lines.windows(2) {
+            assert!(
+                adjacent_pair[0].at_nanoseconds <= adjacent_pair[1].at_nanoseconds,
+                "读出次序上的时刻不许倒退：{arrived_lines:?}"
+            );
+        }
+        assert!(
+            arrived_lines.iter().all(|arrived_line| arrived_line.at_nanoseconds <= read_finished_nanoseconds),
+            "每行的时刻都早于读完那一刻 {read_finished_nanoseconds}：{arrived_lines:?}"
+        );
+    }
+
+    #[test]
+    fn outer_phase_contains_inner_phase_when_equal_or_larger_and_not_when_smaller_or_missing() {
+        assert_eq!(outer_phase_contains_inner_phase(Some(6_608_505), Some(6_608_505)), Some(true), "相等算包住");
+        assert_eq!(
+            outer_phase_contains_inner_phase(Some(16_327_481), Some(6_368_614)),
+            Some(true),
+            "外层 16.33 ms 包住里层 6.37 ms"
+        );
+        assert_eq!(
+            outer_phase_contains_inner_phase(Some(1_991_507), Some(6_608_505)),
+            Some(false),
+            "外层 1.99 ms 包不住里层 6.61 ms（2026-09-17 第二次正式跑第 2 轮）"
+        );
+        assert_eq!(outer_phase_contains_inner_phase(None, Some(6_608_505)), None, "外层缺值判不了");
+        assert_eq!(outer_phase_contains_inner_phase(Some(1_991_507), None), None, "里层缺值判不了");
+    }
+
+    #[test]
+    fn second_transaction_containment_fields_compare_the_arrival_phase_with_the_child_nanoseconds_field() {
+        assert_eq!(phase_nanoseconds(Some(43_231_321), Some(41_239_814)), Some(1_991_507), "两行到达时刻之差");
+        assert_eq!(phase_nanoseconds(Some(43_231_321), None), None);
+        let child_fields: BTreeMap<String, String> =
+            parse_key_values("name=second_transaction root_txg=4 transaction=2 released=8 nanoseconds=6608505 operations=23")
+                .into_iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect();
+        assert_eq!(
+            second_transaction_containment_fields(Some(1_991_507), Some(&child_fields)),
+            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=false"
+        );
+        assert_eq!(
+            second_transaction_containment_fields(Some(16_327_481), Some(&child_fields)),
+            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=true"
+        );
+        assert_eq!(
+            second_transaction_containment_fields(None, Some(&child_fields)),
+            "second_transaction_inner_nanoseconds=6608505 second_transaction_outer_contains_inner=NA"
+        );
+        assert_eq!(
+            second_transaction_containment_fields(Some(1_991_507), None),
+            "second_transaction_inner_nanoseconds=NA second_transaction_outer_contains_inner=NA",
+            "子进程的 second_transaction 行没到"
+        );
+    }
+
+    #[test]
+    fn summarize_keeps_second_transaction_wall_clock_only_for_rounds_whose_outer_phase_contains_inner() {
+        let round_block = |round_number: u32, outer_nanoseconds: u64, inner_nanoseconds: u64, containment_field: &str| {
+            format!(
+                "E152RUN configuration=singlefs round={round_number} attempt=1 host_load1=2.0 vm_exit=0\n\
+E7RESULT name=singlefs_timing configuration=singlefs round={round_number} second_transaction_nanoseconds={outer_nanoseconds} second_transaction_inner_nanoseconds={inner_nanoseconds}{containment_field}\n\
+E7RESULT name=done emitted=2\n"
+            )
+        };
+        let product = [
+            round_block(1, 16_000_000, 6_000_000, " second_transaction_outer_contains_inner=true"),
+            round_block(2, 2_000_000, 6_500_000, " second_transaction_outer_contains_inner=false"),
+            round_block(3, 12_000_000, 6_200_000, " second_transaction_outer_contains_inner=true"),
+            round_block(4, 3_000_000, 6_100_000, ""),
+            round_block(5, 14_000_000, 6_400_000, " second_transaction_outer_contains_inner=true"),
+        ]
+        .concat();
+        let output = summarize_product(&product);
+        let wall_clock_lines: Vec<&str> = output
+            .iter()
+            .map(String::as_str)
+            .filter(|line| line.contains("metric=singlefs_second_transaction_milliseconds "))
+            .collect();
+        assert_eq!(
+            wall_clock_lines,
+            [
+                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_second_transaction_milliseconds round=2 reason=outer_does_not_contain_inner",
+                "E7RESULT name=summary_excluded configuration=singlefs metric=singlefs_second_transaction_milliseconds round=4 reason=missing_second_transaction_outer_contains_inner",
+                "E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_milliseconds rounds=3 median=14.000 minimum=12.000 maximum=16.000 spread_percent=28.6 stability=unstable values=1:16.000,3:12.000,5:14.000",
+            ],
+            "判假与缺字段的两轮照排除的格子报，只有三轮进中位：{output:#?}"
+        );
+        let inner_lines: Vec<&str> = output
+            .iter()
+            .map(String::as_str)
+            .filter(|line| line.contains("metric=singlefs_second_transaction_inner_milliseconds "))
+            .collect();
+        assert_eq!(
+            inner_lines,
+            ["E7RESULT name=summary configuration=singlefs metric=singlefs_second_transaction_inner_milliseconds rounds=5 median=6.200 minimum=6.000 maximum=6.500 spread_percent=8.1 stability=stable values=1:6.000,2:6.500,3:6.200,4:6.100,5:6.400"],
+            "子进程自己计的数不看包含检查，五轮都进：{output:#?}"
+        );
+        assert_eq!(
+            second_transaction_wall_clock_if_contained(Some("NA"), Ok(2.0)),
+            Err("containment_not_available".to_string()),
+            "判不了的轮也不收"
+        );
     }
 }

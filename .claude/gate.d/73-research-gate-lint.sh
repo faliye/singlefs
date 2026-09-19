@@ -19,5 +19,5 @@ if GATE_LINT_DIR="${TARGETS[0]}" bash "$LINT" "${TARGETS[@]:1}"; then
   exit 0
 fi
 echo "  ✗ research/scripts/ 或 .claude/hooks/ 里有不带出路的拒绝（上面逐处列出）"
-echo "     → 怎么办：照 .claude/singlefs-ai-sop/rules/sop-first.md「每一条拒绝都必须给出下一步」补出路：die 加第二个参数，bad 后五行内写 howto，打印的 ✗ 之后跟一行 →"
+echo "     → 怎么办：照 .claude/singlefs-ai-sop/rules/sop-first.md「每一条拒绝都必须给出下一步」补出路：die 加第二个参数，bad 后五行内写 howto，直接打印的拒绝之后跟一行以箭头开头的出路"
 exit 1

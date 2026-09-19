@@ -257,3 +257,25 @@ fio 公共参数：`--thread --output-format=terse --terse-version=3`，其余�
 - 判据与作废条款逐条照第十二节：B 的段序列 `16+2+1+2`、两盘合计 21 次写请求 / 344 576 字节 / 4 次屏障 / 1 次 FUA，冷恢复读回第二版、根 1:4。**触发的观测**：任一轮 `name=second_transaction` 行的 `segments=` 或四个计数与之不同 ⇒ bump 路的跳过循环改变了发布 B 的落点或写数，那一轮作废、如实记下并回查 `allocate_commit_generated`；`content_matches=false` ⇒ 作废。
 - 与第十二节那次比：两次的写数必须逐字相同（跳过循环在发布 B 上不应碰到任何被挡的槽）；挂钟两次各报 5 轮中位与离散，不合并、不取平均，差异只写观测，不下「变快 / 变慢」的结论——第十二节那次第二个事务挂钟的离散已是 186%。**触发的观测**：写数不同 ⇒ 上一条作废条款；挂钟中位差得比两次各自的离散还大 ⇒ 照报，写明两次宿主负载。
 - 宿主上可能同时在跑门禁 54 号（层 0 全量，`nice -n 19`，一个核）：照第七节逐轮记 1 分钟负载，照跑照记。
+
+## 十四、装置改动：读子进程输出与计时分开（2026-09-17 JST 写，改动之后只有一次冒烟跑，没有正式跑）
+
+**为什么改**：第三、第四次正式跑之后发现，来宾程序 `run_singlefs` 在读子进程输出的循环里先给一行打时间戳、再把它转打到串口、才读下一行，子进程写管道不被挡，所以时间戳里混进前面几行的打印积压（最多 25.8 ms）。第四节与第十二节第 2 条「按结果行到达的时刻切三段挂钟」因此在那四次跑里都带着积压：两次第二个事务的跑 10 轮里 9 轮外层切出的挂钟小于子进程自己计的纳秒，物理上不可能。逐轮数与证据行在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`「这几个数说明什么（第二个事务，与两盘镜像的六家比）」一节第 4 条。第四到第十三节的判据与已有四份产物不改、不重算。
+
+**改了什么**（`research/e7-index-bench/src/bin/e152_file_system_benchmark.rs`、`research/scripts/e152-tables.py`）：
+
+1. `read_lines_with_arrival_times` 把子进程输出读到 EOF、每行记下读出来那一刻，签名里没有输出句柄；读完之后 `run_singlefs` 才按原次序、原格式转打 `singlefs_inner` 行、再切三段。三段挂钟的定义不变，仍是行到达时刻之差。
+2. `singlefs_timing` 行末尾加两个字段：`second_transaction_inner_nanoseconds`（子进程 `name=second_transaction` 行的 `nanoseconds=`）与 `second_transaction_outer_contains_inner`（外层切出的第二个事务那一段 ≥ 子进程自己计的数为 true，缺值 NA）。
+3. 宿主汇总：`singlefs_second_transaction_milliseconds` 只收 `second_transaction_outer_contains_inner=true` 的轮，false、NA、字段不存在、不是布尔值四种都报一行 `name=summary_excluded` 带理由、不进中位；新增指标 `singlefs_second_transaction_inner_milliseconds`，5 轮都收。
+4. `e152-tables.py` 的 singlefs 表加一列「发布 B（二进制自己计）ms」，产物里没有这个指标写「—」。
+5. 单测 22 → 26、变异 16 → 26，26 条全抓、0 条无效、0 条没红（`research/mutations/e152_file_system_benchmark.tsv` M17–M26）。
+
+**从下一次正式跑起的判据（跑前写死）**：
+
+- 每轮 `second_transaction_outer_contains_inner=true`。**触发的观测**：任一轮 false 或 NA ⇒ 那一轮的外层挂钟不进中位（汇总自动排除并报 `summary_excluded`），如实记下，回查 `run_singlefs` 是不是又在读的循环里转打、或子进程的计时点挪了位置；5 轮里过半被排除 ⇒ 外层第二个事务那一格整格不报。
+- 和六家比每次持久化的挂钟时，singlefs 取 `singlefs_second_transaction_inner_milliseconds`：它只罩发布 B，与六家「每次单独计时、只罩那一次操作」同口径；外层那一格多罩从分配记录重建分配器、切段与打印结果行，只作包含自检。
+- 第一段（mkfs + 取号 + 暖机 + 第一个事务）与冷恢复那一段没有子进程自己计的数可比，只靠第 1 条的读与转打分开；它们仍是行到达时刻之差。**触发的观测**：子进程连着打出、中间没有计算的几行（`segments`、`device_calls`、`transaction`）到达时刻跨度超过 1 ms ⇒ 读的循环里又有了阻塞，那一轮第一段不进中位、回查。
+
+**冒烟跑**（改动之后、这一节写之前，产物不留存，放在会话暂存目录）：`E152_ROUNDS=1 E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh <暂存目录>/e152-smoke-relay-timing.out`，一轮一次过，`vm_exit=0`，宿主负载 1.99。从第一行 `segments` 到 `transaction` 行 9 行跨 24 µs（改之前的跑里最多 25.8 ms）；外层第二个事务 6 632 915 ns，子进程自己计的 6 575 144 ns，`second_transaction_outer_contains_inner=true`；`content_matches=true`，根 1:4。
+
+**它答不了的**：包含自检只查外层包不包住里层，两边一起偏查不出；子进程自己计的纳秒只有这一条路，没有第二条路核过。
