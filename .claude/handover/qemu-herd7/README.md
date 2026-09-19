@@ -25,12 +25,12 @@
 
 规则与 skill 是整份原样拷来的，上表写的是其中与 QEMU / herd7 有关的段落，其余段落 SOP 还留着。
 
-## singlefs 下次同步 SOP 之前要改的
+## SOP 删掉这些之后要改的几处
 
-SOP 删掉这些之后，照旧同步会在这几处红或者失效：
-
-- `.claude/gate.d/55-qemu-first-transaction.sh` 头部的 `# gate-covers: QEMU 真实负载`：SOP 未实现清单里已经没有这个键，gate.sh 会判「写了清单里没有的项」。
-- `.claude/scripts/lkmm.sh`：它转发到的共享脚本已删，跑它只会报「找不到共享脚本」。
-- `.claude/install-owned` 里 `litmus/commit-publish.litmus` 与 `litmus/commit-publish-nofence.litmus` 两行：SOP 不再铺 litmus，install.sh 会判「接管清单写了不铺的路径」。
-- `litmus/` 下六份 litmus 从此没有任何阶段判：共享门禁不再跑 LKMM。要继续判，就把上面的 `lkmm.sh` 接成本项目自己的阶段。
-- `CLAUDE.md` 与 `README.md` 里跑 `bash .claude/scripts/lkmm.sh` 的那几行。
+| 哪一处 | 为什么要改 | 状态（2026-09-18 现查） |
+|---|---|---|
+| `.claude/gate.d/55-qemu-first-transaction.sh` 头部的 `# gate-covers: QEMU 真实负载` | SOP 未实现清单里已经没有这个键，gate.sh 会判「写了清单里没有的项」 | 已改：头部写明不声明 gate-covers 及理由 |
+| `.claude/scripts/lkmm.sh` | 它原来转发到的共享脚本已删 | 已改：本项目自己维护的整份脚本，只 source SOP 的 `lib.sh` |
+| `litmus/` 下六份 litmus | 共享门禁不再跑 LKMM，没有任何阶段判它们 | 已改：接成本项目的阶段 `.claude/gate.d/57-lkmm.sh` |
+| `CLAUDE.md` 与 `README.md` 里跑 `bash .claude/scripts/lkmm.sh` 的那几行 | 指向的脚本曾经失效 | 不用改：`README.md` 那几行调的就是上面那份本地脚本；`CLAUDE.md` 里已经没有这一行 |
+| `.claude/install-owned` 里 `litmus/commit-publish.litmus` 与 `litmus/commit-publish-nofence.litmus` 两行 | SOP 的模板里已经没有 litmus，`install.sh` 对「接管清单写了而根本不铺的路径」判红（`.claude/singlefs-ai-sop/install.sh` 第 215–219 行） | 已改（2026-09-18）：两行删掉；litmus 由 57 号阶段管，不再需要接管声明 |

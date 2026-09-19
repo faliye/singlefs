@@ -46,7 +46,7 @@ else
   # ── 到这里说明要复制一份 ──
   SRC="/boot/vmlinuz-$(uname -r)"
   [[ -e "$SRC" ]] || { SRC="$(ls -1 /boot/vmlinuz-* 2>/dev/null | tail -1)"; }
-  [[ -n "$SRC" && -e "$SRC" ]] || die "/boot 下找不到任何内核镜像"
+  [[ -n "$SRC" && -e "$SRC" ]] || die "/boot 下找不到任何内核镜像" "装一个内核（对应发行版的 linux-image 包），或者 SINGLEFS_KERNEL=/path/to/bzImage 指一个现成的。"
 fi
 
 [[ -f "$REPO/.env" ]] || die "需要 sudo 复制内核，但 $REPO/.env 不在。手动做一次：
@@ -60,15 +60,15 @@ for v in "${SUDO_PASS_A:-}" "${SUDO_PASS_B:-}"; do
   [[ -z "$v" ]] && continue
   if printf '%s\n' "$v" | sudo -S -p '' true 2>/dev/null; then PASS="$v"; break; fi
 done
-[[ -n "$PASS" ]] || die ".env 里的口令都不通过 sudo 校验"
+[[ -n "$PASS" ]] || die ".env 里的口令都不通过 sudo 校验" "检查 $REPO/.env 里 SUDO_PASS_A / SUDO_PASS_B 是不是最新口令；改完重跑，或者手动 sudo cp $SRC $DEST 再 sudo chown \$USER $DEST。"
 
 printf '%s\n' "$PASS" | sudo -S -p '' cp "$SRC" "$DEST" 2>/dev/null
 printf '%s\n' "$PASS" | sudo -S -p '' chown "$(id -u):$(id -g)" "$DEST" 2>/dev/null
 
 # **回读确认，不靠退出码**（command-safety：改状态的命令要回读实际状态）
-[[ -r "$DEST" ]] || die "复制之后 $DEST 仍不可读"
+[[ -r "$DEST" ]] || die "复制之后 $DEST 仍不可读" "检查 $DEST_DIR 的挂载权限（noexec/nosuid 之类不影响可读性，但确认目录本身可写可读），或者手动跑 sudo cp $SRC $DEST && sudo chown \$USER $DEST 看具体报什么错。"
 SRC_SZ="$(printf '%s\n' "$PASS" | sudo -S -p '' stat -c%s "$SRC" 2>/dev/null)"
 DST_SZ="$(stat -c%s "$DEST" 2>/dev/null)"
-[[ -n "$SRC_SZ" && "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 ${SRC_SZ:-?} 目标 ${DST_SZ:-?}"
+[[ -n "$SRC_SZ" && "$SRC_SZ" == "$DST_SZ" ]] || die "大小对不上：源 ${SRC_SZ:-?} 目标 ${DST_SZ:-?}" "复制过程可能被打断或者 $SRC 中途变了；删掉 $DEST 重跑这个脚本。"
 
 printf '%s\n' "$DEST"

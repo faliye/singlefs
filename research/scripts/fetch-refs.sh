@@ -35,13 +35,13 @@ while IFS='|' read -r name url who; do
   path="$DEST/$name"
   if [[ "$mode" != "--check" && ! -s "$path" ]]; then
     if ! curl -sSL --max-time 120 -o "$path.part" "$url"; then
-      echo "  ✗ $name  下载失败：$url" >&2; rm -f "$path.part"; miss=$((miss+1)); continue
+      echo "  ✗ $name  下载失败：$url" >&2; rm -f "$path.part"; miss=$((miss+1)); continue  # gate-lint:detail
     fi
     # 下到一页 HTML 错误页也会是 200，所以认文件类型，不认退出码
     # 末段不许是 `grep -q`（门禁阶段 41）：先落到变量再判。
     ftype=$(file -b "$path.part" || true)
     if ! grep -qi pdf <<<"$ftype"; then
-      echo "  ✗ $name  下回来的不是 PDF（$(file -b "$path.part" | cut -c1-40)）：$url" >&2
+      echo "  ✗ $name  下回来的不是 PDF（$(file -b "$path.part" | cut -c1-40)）：$url" >&2  # gate-lint:detail
       rm -f "$path.part"; miss=$((miss+1)); continue
     fi
     mv "$path.part" "$path"
@@ -51,9 +51,14 @@ while IFS='|' read -r name url who; do
     printf '  ✓ %-38s %8s 字节  sha256=%s  引用方 %s\n' "$name" "$(stat -c%s "$path")" "$(sha256sum "$path" | cut -c1-16)" "$who"
     ok=$((ok+1))
   else
-    printf '  ✗ %-38s 本机没有，引用方 %s ⇒ 那些引用只能当线索\n' "$name" "$who"; miss=$((miss+1))
+    printf '  ✗ %-38s 本机没有，引用方 %s ⇒ 那些引用只能当线索\n' "$name" "$who"; miss=$((miss+1))  # gate-lint:detail
   fi
 done <<<"$LIST"
 
 echo "在本机 $ok 份／缺 $miss 份  目录 $DEST"
-[[ $miss -eq 0 ]] || exit 1
+if [[ $miss -ne 0 ]]; then
+  echo "  → 怎么办：对着上面逐条列出的 ✗，下载失败的重跑一遍（网络问题多试几次）；" \
+       "下回来不是 PDF 的，去本脚本 LIST 里那一行对应的 URL 手动看一眼是不是页面搬家了，换成新地址；" \
+       "本机没有的那几份先跑 'bash research/scripts/fetch-refs.sh'（不带 --check）去下载。"
+  exit 1
+fi

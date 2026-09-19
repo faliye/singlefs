@@ -209,18 +209,18 @@ def selftest(words):
     bad = 0
     for w in SELFTEST_RED:
         if not splice_of(w, words):
-            print("  ✗ 红样本没被抓到：%s" % w); bad += 1
+            print("  ✗ 红样本没被抓到：%s" % w); bad += 1  # gate-lint:detail
     for w in SELFTEST_GREEN:
         s = splice_of(w, words)
         if s:
-            print("  ✗ 绿样本被误判：%s -> %s" % (w, s)); bad += 1
+            print("  ✗ 绿样本被误判：%s -> %s" % (w, s)); bad += 1  # gate-lint:detail
     for w in SELFTEST_SHORT_RED:
         if not self_tail_repeat(w, words, 4):
-            print("  ✗ 短词红样本没被抓到：%s" % w); bad += 1
+            print("  ✗ 短词红样本没被抓到：%s" % w); bad += 1  # gate-lint:detail
     for w in SELFTEST_SHORT_GREEN:
         s = self_tail_repeat(w, words, 4) if w not in words else None
         if s:
-            print("  ✗ 短词绿样本被误判：%s -> %s" % (w, s)); bad += 1
+            print("  ✗ 短词绿样本被误判：%s -> %s" % (w, s)); bad += 1  # gate-lint:detail
     if bad:
         print("  ✗ oov-check 自检未通过：%d 个样本判错" % bad)
         print("     → 怎么办： 改 splice_of 的六条规则与 self_tail_repeat，改完把两组样本都跑一遍；"

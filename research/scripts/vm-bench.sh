@@ -20,7 +20,12 @@ VM_DISK_MB="${VM_DISK_MB:-4096}"
 VM_DISKS="${VM_DISKS:-1}"
 VM_TIMEOUT="${VM_TIMEOUT:-900}"
 
-die() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+die() {
+  printf '  \033[31m✗\033[0m %s\n' "$1" >&2
+  shift
+  [[ $# -gt 0 ]] && printf '     \033[33m→ 怎么办：\033[0m%s\n' "$*" >&2
+  exit 1
+}
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 say() { printf '%s\n' "$*"; }
 
@@ -170,11 +175,11 @@ cleanup_work() {
 trap cleanup_work EXIT
 
 say ""; say "══ 虚机 benchmark harness ══"
-command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失"
-[[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟"
-command -v busybox >/dev/null || die "busybox 缺失（apt install busybox-static）"
-command -v cpio >/dev/null || die "cpio 缺失"
-KERNEL="$(find_kernel)" || die "找不到可读的内核镜像。SINGLEFS_KERNEL=/path/to/bzImage 指定，或 sudo chmod +r /boot/vmlinuz-\$(uname -r)"
+command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失" "装 qemu-system-x86（apt install qemu-system-x86），装完重跑。"
+[[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟" "把当前用户加进 kvm 组（sudo usermod -aG kvm \$USER，重新登录生效），确认 /dev/kvm 存在；不接受回退到软件模拟。"
+command -v busybox >/dev/null || die "busybox 缺失（apt install busybox-static）" "装完 busybox-static 重跑这个脚本。"
+command -v cpio >/dev/null || die "cpio 缺失" "装 cpio（apt install cpio），装完重跑。"
+KERNEL="$(find_kernel)" || die "找不到可读的内核镜像。SINGLEFS_KERNEL=/path/to/bzImage 指定，或 sudo chmod +r /boot/vmlinuz-\$(uname -r)" "按提示设 SINGLEFS_KERNEL 或修好 /boot 下内核镜像的读权限，然后重跑。"
 ok "内核 $KERNEL"
 ok "虚机 ${VM_MEM}M 内存 / ${VM_CPUS} vCPU / ${VM_DISK_MB}M virtio 盘"
 if [[ -n "${VM_EXTRA_ROOT:-}" ]]; then
@@ -197,11 +202,11 @@ if [[ "${1:-}" == "--selftest" ]]; then
   printf '#!/bin/sh\nexit 7\n'  > "$tmp/bad";  chmod +x "$tmp/bad"
   printf '#!/bin/sh\n[ -b "$1" ] || exit 9\nsz=$(/bin/busybox blockdev --getsize64 "$1" 2>/dev/null)\necho "VMBENCH_DISK_BYTES=$sz"\n[ "$sz" -gt 0 ] || exit 10\nexit 0\n' > "$tmp/disk"; chmod +x "$tmp/disk"
   fail=0
-  g_ok="$(run_one "$tmp/ok" "$KERNEL")"    || { die "成功用例：读不到退出标记"; }
-  [[ "$g_ok" == 0 ]] && ok "成功用例 → 0" || { printf '  ✗ 成功用例 → %s，期望 0\n' "$g_ok"; fail=1; }
-  g_bad="$(run_one "$tmp/bad" "$KERNEL")"  || { die "失败用例：读不到退出标记"; }
-  [[ "$g_bad" == 7 ]] && ok "失败用例 → 7（harness 认得出失败）" || { printf '  ✗ 失败用例 → %s，期望 7 —— harness 会把失败当成成功\n' "$g_bad"; fail=1; }
-  g_dsk="$(run_one "$tmp/disk" "$KERNEL")" || { die "盘用例：读不到退出标记"; }
+  g_ok="$(run_one "$tmp/ok" "$KERNEL")"    || { die "成功用例：读不到退出标记" "虚机可能没跑起来；去 \$VM_LOGPTR 指的日志文件里看控制台尾部，确认内核与 busybox 能正常启动。"; }
+  [[ "$g_ok" == 0 ]] && ok "成功用例 → 0" || { printf '  ✗ 成功用例 → %s，期望 0\n' "$g_ok"; printf '     → 怎么办：run_one 抓取退出码的路径可能坏了，去看控制台日志确认来宾真的执行了 /tmp/ok 并 exit 0。\n'; fail=1; }
+  g_bad="$(run_one "$tmp/bad" "$KERNEL")"  || { die "失败用例：读不到退出标记" "虚机可能没跑起来；去 \$VM_LOGPTR 指的日志文件里看控制台尾部，确认内核与 busybox 能正常启动。"; }
+  [[ "$g_bad" == 7 ]] && ok "失败用例 → 7（harness 认得出失败）" || { printf '  ✗ 失败用例 → %s，期望 7 —— harness 会把失败当成成功\n' "$g_bad"; printf '     → 怎么办：这说明 harness 抓退出码的机制本身坏了（可能把所有退出码都读成 0），修好 run_one 里的抓取逻辑再重跑 --selftest。\n'; fail=1; }
+  g_dsk="$(run_one "$tmp/disk" "$KERNEL")" || { die "盘用例：读不到退出标记" "虚机可能没跑起来，或者没有挂上盘；去 \$VM_LOGPTR 指的日志文件里看控制台尾部，确认 VM_DISKS 设置正确。"; }
   if [[ "$g_dsk" == 0 ]]; then
     bytes="$(sed -n 's/.*VMBENCH_DISK_BYTES=\([0-9]\+\).*/\1/p' "$(cat "$VM_LOGPTR")" | tail -1)"
     # 读不到 ≠ 读到 0（rules/test-discipline.md）：抓不到这个数就是抓取路径坏了，
@@ -209,22 +214,26 @@ if [[ "${1:-}" == "--selftest" ]]; then
     if [[ -n "$bytes" && "$bytes" -gt 0 ]]; then
       ok "盘用例 → 0，虚机里看到 /dev/vda $bytes 字节"
     else
-      printf '  ✗ 盘用例退出码 0，但从控制台读不到 VMBENCH_DISK_BYTES —— 结果抓取路径坏了\n'; fail=1
+      printf '  ✗ 盘用例退出码 0，但从控制台读不到 VMBENCH_DISK_BYTES —— 结果抓取路径坏了\n'
+      printf '     → 怎么办：检查抓取正则（sed 那句 VMBENCH_DISK_BYTES=）与控制台实际输出格式是否还对得上；这条路径坏了，主路径抓 E7RESULT 也会一起坏。\n'
+      fail=1
     fi
   else
-    printf '  ✗ 盘用例 → %s（9=不是块设备，10=大小为 0，200=根本没有 /dev/vda）\n' "$g_dsk"; fail=1
+    printf '  ✗ 盘用例 → %s（9=不是块设备，10=大小为 0，200=根本没有 /dev/vda）\n' "$g_dsk"
+    printf '     → 怎么办：9 就检查虚机是否真的挂了 /dev/vda（VM_DISKS、-drive 参数）；10 就检查盘镜像文件大小是不是 0；200 就是设备节点没建出来，去看 initramfs 的 mdev 规则。\n'
+    fail=1
   fi
   rm -rf "$tmp"
   say ""
-  [[ $fail -eq 0 ]] || die "harness 自检未通过"
+  [[ $fail -eq 0 ]] || die "harness 自检未通过" "看上面每一条 ✗ 各自的原因（退出码不符 / 抓不到磁盘大小），从最前面那条修起，修完重跑 --selftest。"
   ok "自检通过：退出码如实传回，且虚机里确实有一块可用的盘"
   exit 0
 fi
 
-[[ $# -ge 1 ]] || die "用法：vm-bench.sh <静态二进制> [参数...]   或   vm-bench.sh --selftest"
+[[ $# -ge 1 ]] || die "用法：vm-bench.sh <静态二进制> [参数...]   或   vm-bench.sh --selftest" "带上要跑的静态二进制路径作为第一个参数，或者先用 --selftest 验证 harness 本身。"
 BIN="$1"; shift
-[[ -x "$BIN" ]] || die "二进制不可执行：$BIN"
-rc="$(run_one "$BIN" "$KERNEL" "$@")" || { printf '  ✗ 读不到退出标记，判定不明，整轮作废\n'; [[ -s "$VM_LOGPTR" ]] && tail -20 "$(cat "$VM_LOGPTR")" | sed 's/^/        /'; exit 1; }
+[[ -x "$BIN" ]] || die "二进制不可执行：$BIN" "确认路径正确并 chmod +x 这个文件；它必须是静态链接的，initramfs 里没有动态链接器。"
+rc="$(run_one "$BIN" "$KERNEL" "$@")" || { printf '  ✗ 读不到退出标记，判定不明，整轮作废\n'; printf '     → 怎么办：虚机可能没启动完就超时了；去下面打出的控制台尾部日志确认内核与二进制路径正确、initramfs 有没有打包漏东西。\n'; [[ -s "$VM_LOGPTR" ]] && tail -20 "$(cat "$VM_LOGPTR")" | sed 's/^/        /'; exit 1; }
 LOG="$(cat "$VM_LOGPTR")"
 # 不锚定行首：第一行会被 BIOS 的控制台转义序列顶掉行首（实测 "Booting from ROM..^[c^[[?7l^[[2J"），
 # 锚定 ^ 会把它静默漏掉。
@@ -232,17 +241,19 @@ mapfile -t LINES < <(grep -ao 'E7RESULT .*' "$LOG" | tr -d '\r')
 n=${#LINES[@]}
 printf '%s\n' "${LINES[@]}"
 
-if [[ "$rc" != 0 ]]; then printf '  ✗ 退出码 %s\n' "$rc"; tail -30 "$LOG" | sed 's/^/        /'; exit 1; fi
+if [[ "$rc" != 0 ]]; then printf '  ✗ 退出码 %s\n' "$rc"; printf '     → 怎么办：这是被测程序自己的失败，不是 harness 的问题；去下面打出的控制台尾部日志定位它在哪一步返回了非零。\n'; tail -30 "$LOG" | sed 's/^/        /'; exit 1; fi
 
 # 完整性校验：被测程序在收尾行报出它发了多少条，抓到的条数必须相等。
 # 少一条就说明控制台吞了结果——不设这道闸，实验会静默地少一项而没人知道。
 declared="$(printf '%s\n' "${LINES[@]}" | sed -n 's/.*name=done emitted=\([0-9]\+\).*/\1/p' | tail -1)"
 if [[ -z "$declared" ]]; then
   printf '  ✗ 抓到 %s 条结果，但没有收尾行（name=done）—— 判定不明，整轮作废\n' "$n"
+  printf '     → 怎么办：被测程序要在收尾时发一行 E7RESULT name=done emitted=<总条数>；去下面的控制台尾部日志确认它真的发了这一行、格式对不对。\n'
   tail -20 "$LOG" | sed 's/^/        /'; exit 1
 fi
 if [[ "$n" -ne "$declared" ]]; then
   printf '  ✗ 结果条数对不上：程序声称发了 %s 条，宿主只抓到 %s 条 —— 控制台吞了结果，整轮作废\n' "$declared" "$n"
+  printf '     → 怎么办：控制台缓冲区可能溢出、或者某一行被转义序列顶掉了行首（本脚本抓 E7RESULT 已经不锚定行首，检查有没有新增的抓取路径还在锚定）；减小单轮输出量或修抓取正则后重跑。\n'
   exit 1
 fi
 # ⚠️ **屏蔽了 CPU 特性的那一档，必须自带已知答案测试。**
@@ -257,6 +268,7 @@ if [[ "${VM_CPU:-}" == *,-* ]]; then
   kat_bad="$(printf '%s\n' "${LINES[@]}" | grep -c 'name=kat .*ok=false')"
   if [[ "$kat_bad" -gt 0 ]]; then
     printf '  ✗ VM_CPU=%s 屏蔽了特性，而已知答案测试有 %s 条判负 —— 这一档算的不是那个算法，整轮作废\n' "$VM_CPU" "$kat_bad"
+    printf '     → 怎么办：去看下面列出的 kat 明细，确认屏蔽的 CPU 特性有没有被算法探测到别的等价指令绕过去（比如摘掉 aes 位但没摘 vaes）；需要的话把 VM_CPU 屏蔽的特性范围改大。\n'
     printf '%s\n' "${LINES[@]}" | grep 'name=kat ' | sed 's/^/        /'
     exit 1
   fi

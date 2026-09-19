@@ -149,10 +149,14 @@ if __name__ == '__main__':
         for name, anchor in SELFTEST:
             p = os.path.join(d, name)
             if not os.path.exists(p):
-                print(f'  ✗ {name} 不在本机'); bad += 1; continue
+                print(f'  ✗ {name} 不在本机'); bad += 1; continue  # gate-lint:detail
             t = ' '.join(pdf_text(p).split())
             hit = anchor in t
-            print(f'  {"✓" if hit else "✗"} {name}  锚点句「{anchor}」{"命中" if hit else "抽不出 ⇒ 抽取器对这份 PDF 失效"}')
+            print(f'  {"✓" if hit else "✗"} {name}  锚点句「{anchor}」{"命中" if hit else "抽不出 ⇒ 抽取器对这份 PDF 失效"}')  # gate-lint:detail
             bad += 0 if hit else 1
+        if bad:
+            print(f'  ✗ 自检未通过：{bad} 处')
+            print('     → 怎么办：本机没有的文献先跑 research/scripts/fetch-refs.sh 固定下来；'
+                  '锚点抽不出的，去看这份 PDF 是不是用了双字节 CID 字体（抽取器只支持单字节），或者原文措辞变了要换一句还在的锚点。')
         sys.exit(1 if bad else 0)
     sys.stdout.write(pdf_text(sys.argv[1]))

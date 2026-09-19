@@ -199,8 +199,8 @@ def selftest(hook_dir):
     if failures:
         print("    → 看 decide_overwrite() / decide_scope() 与入口；WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_SCOPE 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过：未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
-          f"范围外与 .. 绕路与未登记的项目 agent 拒绝；拒绝都记进检出记录（查了 {len(cases)} 种情形）")
+    print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 与内置 agent 放行、范围内放行、"
+          "范围外与 .. 绕路与未登记的项目 agent 拒绝；拒绝都记进检出记录")
     return 0
 
 hook_dir = sys.argv[1]

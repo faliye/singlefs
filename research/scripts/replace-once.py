@@ -19,9 +19,9 @@ import tempfile
 def replace_once(path, old_text, new_text):
     """返回 (退出码, 说明)。只有退出码 0 时文件被改过。"""
     if old_text == '':
-        return 2, '旧串是空串，拒绝：空串在每个位置都命中'
+        return 2, '旧串是空串，拒绝：空串在每个位置都命中\n     → 把旧串换成文件里真实存在、唯一定位那处的一段文字'
     if not os.path.isfile(path):
-        return 2, f'找不到文件 {path}'
+        return 2, f'找不到文件 {path}\n     → 检查路径是否写对（相对路径相对当前工作目录），文件是否已经被别的进程删掉或改名'
     with open(path, encoding='utf-8') as handle:
         content = handle.read()
     occurrences = content.count(old_text)
@@ -85,6 +85,7 @@ def main(arguments):
     path, old_text, new_text = arguments
     code, message = replace_once(path, old_text, new_text)
     print(('  ✓ ' if code == 0 else '  ✗ ') + message)
+    # → 怎么办：message 本身已经带着下一步（见 replace_once 各分支的返回值），这里不重复打印
     return code
 
 

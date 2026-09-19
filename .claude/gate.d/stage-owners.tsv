@@ -62,3 +62,4 @@
 69-evidence-in-repo.sh	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，是执行员跑完自己那一个实验就该核的（与 40、85、88 同一批）；kb 里把依据写成 /tmp 路径，是书记员写回时该核的；research/prompts/ 那一半（提示、报告与判决）由主 agent 写，提交前核
 71-agent-def-flow-only.sh	gate-triage	定义与共用约束只由主 agent 改（共用约束「不做」一节不许子 agent 改 .claude/agents/），没有哪个子 agent 写完会先跑它；提交前核
 72-agent-def-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名（形态照 56 号）
+73-research-gate-lint.sh	gate-triage	研究脚本与 hook 由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核

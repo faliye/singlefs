@@ -23,19 +23,19 @@ pass=0; fail=0
 ck() { # ck <决策> <说的是什么> <文件> <ERE 模式>
   local d="$1" what="$2" f="$3" pat="$4"
   if [[ ! -f "$f" ]]; then
-    printf '  ✗ %-6s %-42s 源码不在：%s\n' "$d" "$what" "$f"; fail=$((fail+1)); return
+    printf '  ✗ %-6s %-42s 源码不在：%s\n' "$d" "$what" "$f"; fail=$((fail+1)); return  # gate-lint:detail
   fi
   if grep -qE "$pat" "$f"; then
     printf '  ✓ %-6s %s\n' "$d" "$what"; pass=$((pass+1))
   else
-    printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$f"; fail=$((fail+1))
+    printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$f"; fail=$((fail+1))  # gate-lint:detail
   fi
 }
 ckn() { # ckn <决策> <说的是什么> <期望数> <实测命令>
   local d="$1" what="$2" want="$3"; shift 3
   local got; got=$(eval "$@" 2>/dev/null)
   if [[ "$got" == "$want" ]]; then printf '  ✓ %-6s %s（%s）\n' "$d" "$what" "$got"; pass=$((pass+1))
-  else printf '  ✗ %-6s %-42s 期望 %s，实测 %s\n' "$d" "$what" "$want" "${got:-取不到}"; fail=$((fail+1)); fi
+  else printf '  ✗ %-6s %-42s 期望 %s，实测 %s\n' "$d" "$what" "$want" "${got:-取不到}"; fail=$((fail+1)); fi  # gate-lint:detail
 }
 
 echo "══ 外部引用复核 ══"
@@ -144,10 +144,10 @@ pdftxt() { # pdftxt <pdf 名> —— 抽一次缓存一次，打印缓存路径�
 ckdoc() { # ckdoc <决策> <说的是什么> <pdf 名> <ERE 模式>
   local d="$1" what="$2" name="$3" pat="$4" txt
   if [[ ! -f "$DOCS/$name" ]]; then
-    printf '  ✗ %-6s %-42s 文献不在本机：%s ⇒ 跑 research/scripts/fetch-refs.sh\n' "$d" "$what" "$DOCS/$name"
+    printf '  ✗ %-6s %-42s 文献不在本机：%s ⇒ 跑 research/scripts/fetch-refs.sh\n' "$d" "$what" "$DOCS/$name"  # gate-lint:detail
     fail=$((fail+1)); return
   fi
-  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }
+  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }  # gate-lint:detail
   # 原文按栏排版，一句话常被折成多行、还会在断行处加连字符（per-\nformance）⇒
   # 先接行、去掉断行连字符、再把空白压成单空格。**只在这份规范化文本上匹配**，
   # 所以模式里不要指望能对上原文的换行。
@@ -157,15 +157,15 @@ ckdoc() { # ckdoc <决策> <说的是什么> <pdf 名> <ERE 模式>
   if grep -qE "$pat" <<<"$flat"; then
     printf '  ✓ %-6s %s\n' "$d" "$what"; pass=$((pass+1))
   else
-    printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$name"; fail=$((fail+1))
+    printf '  ✗ %-6s %-42s 模式没命中：%s\n' "$d" "$what" "$name"; fail=$((fail+1))  # gate-lint:detail
   fi
 }
 ckdocn() { # ckdocn <决策> <说的是什么> <pdf 名> <ERE 模式> <期望命中数>
   local d="$1" what="$2" name="$3" pat="$4" want="$5" txt got
   if [[ ! -f "$DOCS/$name" ]]; then
-    printf '  ✗ %-6s %-42s 文献不在本机：%s\n' "$d" "$what" "$DOCS/$name"; fail=$((fail+1)); return
+    printf '  ✗ %-6s %-42s 文献不在本机：%s\n' "$d" "$what" "$DOCS/$name"; fail=$((fail+1)); return  # gate-lint:detail
   fi
-  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }
+  txt="$(pdftxt "$name")" || { printf '  ✗ %-6s %-42s 抽取失败：%s\n' "$d" "$what" "$name"; fail=$((fail+1)); return; }  # gate-lint:detail
   got=$(grep -oiE "$pat" "$txt" | wc -l)
   if [[ "$got" == "$want" ]]; then printf '  ✓ %-6s %s（%s 次）\n' "$d" "$what" "$got"; pass=$((pass+1))
   else printf '  ✗ %-6s %-42s 期望 %s 次，实测 %s 次\n' "$d" "$what" "$want" "$got"; fail=$((fail+1)); fi

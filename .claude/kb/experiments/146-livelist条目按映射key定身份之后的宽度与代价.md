@@ -109,6 +109,9 @@ E7RESULT name=verdict pad_entry_bytes=35 legacy_entry_bytes=24 pad_leaf_fanout=4
 
 ## 历史版本
 
+### 2026-09-16
+- 树表条目 148 → 200（D8（核心索引结构） 已定项 8，2026-09-16 用户定案加宽），装置的 `TREE_TABLE_ENTRY_BYTES` 跟着改，产物从 `research/results/e146-livelist-entry-width-2026-09-14-round2.out` 换成 `research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out`；哪几行变了见 [experiments-history.md](../experiments-history.md) 2026-09-16（其一）。
+
 ### 2026-09-14
 - 树表条目 145 → 148（D8（核心索引结构） 已定项 8 的树表条目 2026-09-14 用户定案重排并加头 ID 8、根指针从 83 到 86，`format-const: TREE_TABLE_ENTRY_BYTES = 148`，门禁阶段「格式常量在 kb 与实验源码之间同步」当天判红）重跑：
   产物换成 `research/results/e146-livelist-entry-width-2026-09-14-round2.out`，130 行里 **6 行**变——`name=config` 的 `tree_table_entry` 145→148，5 行 `name=first_transaction` 的 `day1_null_root_bytes` 145→148（两棵树那臂 290→296）与 `day1_root_required_bytes` 16638→16641（两棵树 33276→33282）；

@@ -17,14 +17,19 @@ VM_TIMEOUT="${VM_TIMEOUT:-180}"
 UNIFORM=0
 [[ "${1:-}" == "--uniform" ]] && UNIFORM=1
 
-die() { printf '  \033[31m✗\033[0m %s\n' "$*" >&2; exit 1; }
+die() {
+  printf '  \033[31m✗\033[0m %s\n' "$1" >&2
+  shift
+  [[ $# -gt 0 ]] && printf '     \033[33m→ 怎么办：\033[0m%s\n' "$*" >&2
+  exit 1
+}
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 say() { printf '%s\n' "$*"; }
 
-command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失"
-[[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟"
-command -v busybox >/dev/null || die "busybox 缺失"
-command -v cpio >/dev/null || die "cpio 缺失"
+command -v qemu-system-x86_64 >/dev/null || die "qemu-system-x86_64 缺失" "装 qemu-system-x86（Debian/Ubuntu：apt install qemu-system-x86），装完重跑这个脚本。"
+[[ -r /dev/kvm && -w /dev/kvm ]] || die "/dev/kvm 不可读写 —— 不降级到软件模拟" "把当前用户加进 kvm 组（sudo usermod -aG kvm \$USER，重新登录生效），确认 /dev/kvm 存在；不接受回退到软件模拟，那样测不出真实设备行为。"
+command -v busybox >/dev/null || die "busybox 缺失" "装 busybox-static（apt install busybox-static），装完重跑。"
+command -v cpio >/dev/null || die "cpio 缺失" "装 cpio（apt install cpio），装完重跑。"
 # 内核与模块树必须同版本：本机 /boot 里有 4 个内核而多数不可读，
 # 「第一个可读的」挑出来的那个未必有配套模块树，insmod 会因 vermagic 不符全部失败，
 # 表现为「来宾一个设备都看不到」——看上去像模拟不成立，其实是挑错了内核。
@@ -35,7 +40,7 @@ for k in /boot/vmlinuz-*; do
   [[ -d "/lib/modules/$v" ]] || continue
   KERNEL="$k"; KVER="$v"; break
 done
-[[ -n "$KERNEL" ]] || die "找不到「可读且有配套模块树」的内核。候选：$(ls /boot/vmlinuz-* 2>/dev/null | tr '\n' ' ')"
+[[ -n "$KERNEL" ]] || die "找不到「可读且有配套模块树」的内核。候选：$(ls /boot/vmlinuz-* 2>/dev/null | tr '\n' ' ')" "去 /boot 下找一个当前用户可读、且 /lib/modules/<版本号> 存在的内核；缺配套模块树就装对应版本的 linux-modules 包，或换一个已装模块树的内核版本。"
 say "  内核 $KERNEL（模块树 /lib/modules/$KVER）"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmgeom.XXXXXX")"
@@ -47,21 +52,21 @@ cp "$(command -v busybox)" "$IRD/bin/busybox"
 
 # NVMe 在本机内核里是模块（CONFIG_BLK_DEV_NVME=m），极简 initramfs 里没有它就一个盘也看不见。
 # 按 modprobe --show-depends 给的顺序塞进去；busybox insmod 不认 .zst，宿主先解压。
-command -v zstd >/dev/null || die "zstd 缺失（解压内核模块要用）"
+command -v zstd >/dev/null || die "zstd 缺失（解压内核模块要用）" "装 zstd（apt install zstd），装完重跑。"
 mkdir -p "$IRD/mods"
 modorder="$IRD/mods/order"
 : > "$modorder"
 while read -r kop _; do
-  [[ -r "$kop" ]] || die "模块不可读：$kop"
+  [[ -r "$kop" ]] || die "模块不可读：$kop" "检查这个模块文件的权限（sudo chmod +r 或确认当前用户能读 /lib/modules），或者重装对应内核的模块包。"
   # 模块树可能是压缩的（.zst）也可能不是——本机两种都有，写死一种会在另一种上失败
   case "$kop" in
-    *.zst) base="$(basename "$kop" .zst)"; zstd -dqf "$kop" -o "$IRD/mods/$base" || die "解压失败：$kop" ;;
-    *.ko)  base="$(basename "$kop")";      cp "$kop" "$IRD/mods/$base" || die "拷贝失败：$kop" ;;
-    *)     die "不认识的模块格式：$kop" ;;
+    *.zst) base="$(basename "$kop" .zst)"; zstd -dqf "$kop" -o "$IRD/mods/$base" || die "解压失败：$kop" "确认 zstd 装的是完整版本（zstd --version），并检查这个 .ko.zst 文件本身没有损坏（重装模块包）。" ;;
+    *.ko)  base="$(basename "$kop")";      cp "$kop" "$IRD/mods/$base" || die "拷贝失败：$kop" "检查目标目录 $IRD/mods 的可写权限与磁盘剩余空间（df -h $IRD）。" ;;
+    *)     die "不认识的模块格式：$kop" "modprobe --show-depends 给出的这一项既不是 .ko 也不是 .ko.zst；确认内核模块打包方式（是否还有 .ko.xz / .ko.gz），需要的话给这个 case 补一条分支。" ;;
   esac
   printf '%s\n' "$base" >> "$modorder"
 done < <(modprobe -S "$KVER" --show-depends nvme 2>/dev/null | sed 's/^insmod //')
-[[ -s "$modorder" ]] || die "拿不到 nvme 模块依赖链"
+[[ -s "$modorder" ]] || die "拿不到 nvme 模块依赖链" "确认内核 $KVER 确实带 nvme 模块（modprobe -S $KVER --show-depends nvme 手动跑一遍看报什么错），或换一个带 nvme 支持的内核版本。"
 say "  initramfs 内核模块：$(tr '\n' ' ' < "$modorder")"
 
 # 来宾侧：逐个块设备读 /sys 里的几何，每读一个报一条，收尾报总条数（完整性闸）
@@ -136,11 +141,11 @@ cp "$LOGF" "$KEEP" 2>/dev/null && say "  控制台日志留在 $KEEP"
 mapfile -t LINES < <(grep -ao 'GEOM dev=.*' "$LOGF" | tr -d '\r')
 declared="$(grep -ao 'GEOM done emitted=[0-9]*' "$LOGF" | tr -d '\r' | sed -n 's/.*emitted=\([0-9]\+\).*/\1/p' | tail -1)"
 n=${#LINES[@]}
-[[ -n "$declared" ]] || { cp "$LOGF" "${TMPDIR:-/tmp}/vmgeom-fail.log"; die "读不到完成标记 —— 整轮作废。日志：${TMPDIR:-/tmp}/vmgeom-fail.log"; }
-[[ "$n" -eq "$declared" ]] || die "完整性闸：抓到 $n 条，来宾声称发了 $declared 条 —— 整轮作废"
+[[ -n "$declared" ]] || { cp "$LOGF" "${TMPDIR:-/tmp}/vmgeom-fail.log"; die "读不到完成标记 —— 整轮作废。日志：${TMPDIR:-/tmp}/vmgeom-fail.log" "去这份日志里看来宾卡在哪一步（insmod 失败、找不到设备节点都是常见原因），修完重跑整个脚本，不要只重跑这一轮。"; }
+[[ "$n" -eq "$declared" ]] || die "完整性闸：抓到 $n 条，来宾声称发了 $declared 条 —— 整轮作废" "去 $KEEP 里看控制台日志，确认是不是抓取路径丢了行（rules/command-safety.md「结果抓取要有完整性闸」），排查完重跑整个脚本。"
 # 0/0 也要拦：读不到 ≠ 读到 0（rules/test-discipline.md）。来宾一个块设备都没看到，
 # 说明驱动没起来或命名不对，而不是「几何都一样」。
-[[ "$n" -ge 1 ]] || die "来宾一个 nvme 块设备都没看到（emitted=0）—— 整轮作废，不是阴性结果"
+[[ "$n" -ge 1 ]] || die "来宾一个 nvme 块设备都没看到（emitted=0）—— 整轮作废，不是阴性结果" "去 $KEEP 里看 insmod 是否成功、/sys 下有没有 nvme 设备节点；驱动没起来就查 vermagic 是否与内核匹配，修完重跑整个脚本。"
 ok "完整性闸通过：$n/$declared 条"
 say ""
 printf '%s\n' "${LINES[@]}" | sed 's/^/  /'
@@ -149,8 +154,8 @@ distinct="$(printf '%s\n' "${LINES[@]}" | sed 's/^GEOM dev=[a-z0-9]* //' | sort 
 say "  来宾看到的不同几何种数：$distinct"
 if [[ $UNIFORM -eq 1 ]]; then
   [[ "$distinct" -eq 1 ]] && ok "阴性对照通过：同构档塌成 1 种几何 ⇒ 读取路径有判别力" \
-    || die "阴性对照失败：同构档看到 $distinct 种几何 —— 读取路径在回声参数，异构档的结论作废"
+    || die "阴性对照失败：同构档看到 $distinct 种几何 —— 读取路径在回声参数，异构档的结论作废" "去 $KEEP 里看每个设备读到的原始几何值是不是来自命令行参数而不是 /sys；查一下读取路径（init 脚本里的 GEOM dev= 那段）是不是把某个字段读成了常量。"
 else
   [[ "$distinct" -ge 2 ]] && ok "异构档：来宾确实看到 $distinct 种不同几何" \
-    || die "异构档只看到 $distinct 种几何 —— 来宾没能区分，模拟不成立"
+    || die "异构档只看到 $distinct 种几何 —— 来宾没能区分，模拟不成立" "确认三个命名空间的 -device 参数（NS_ARGS）几何真的不同（各自的 size/logical_block_size 之类），去 $KEEP 里核对来宾读到的值；参数本身相同就先把参数改开。"
 fi

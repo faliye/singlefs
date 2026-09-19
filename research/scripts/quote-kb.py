@@ -281,12 +281,16 @@ def selftest():
     got = build(specs)
     bad = verify(specs, got)
     if bad:
-        print(f"  ✗ 自检：干净那轮就对不上——{bad}"); return 1
+        print(f"  ✗ 自检：干净那轮就对不上——{bad}")
+        print("     → 怎么办：build() 或 verify() 逻辑坏了——干净输入本该逐字节一致，去看这两个函数最近的改动。")
+        return 1
     os.environ['QUOTE_KB_CORRUPT'] = '1'
     bad = verify(specs, build(specs))
     del os.environ['QUOTE_KB_CORRUPT']
     if not bad:
-        print("  ✗ 自检：抄漏一行时回读比对**没有**判红，这道闸是摆设"); return 1
+        print("  ✗ 自检：抄漏一行时回读比对**没有**判红，这道闸是摆设")
+        print("     → 怎么办：QUOTE_KB_CORRUPT 注入的坏输入应该被 verify() 抓住；去看 verify() 的比对逻辑是不是被改松了。")
+        return 1
     ck = os.path.join(os.path.dirname(src), 'checklist.md')
     with open(ck, 'w', encoding='utf-8') as f:
         f.write(f"### 小节清单：`{src}`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n"
@@ -294,16 +298,26 @@ def selftest():
                 "| #### 带代码块的 | 不抄 | 样本 |\n")
     two = [f'{src}@#### 已定项 5', f'{src}@#### 已定项 6']
     if check_checklist(ck, build(two)):
-        print("  ✗ 自检：清单与附录对得上时竟然判红"); return 1
+        print("  ✗ 自检：清单与附录对得上时竟然判红")
+        print("     → 怎么办：check_checklist() 误判了对得上的情况，去看它逐节比对小节标题的逻辑。")
+        return 1
     if not check_checklist(ck, build(two[:1])):
-        print("  ✗ 自检：清单标了抄而附录里没有，比对**没有**判红（C262 那个形态）"); return 1
+        print("  ✗ 自检：清单标了抄而附录里没有，比对**没有**判红（C262 那个形态）")
+        print("     → 怎么办：check_checklist() 该抓的缺节漏判了，去看它是不是漏比对了某个标记「抄」的小节。")
+        return 1
     if check_checklist_reverse(ck, build(two)):
-        print("  ✗ 自检：清单标「不抄」的小节没被带进附录，反向核对却判红"); return 1
+        print("  ✗ 自检：清单标「不抄」的小节没被带进附录，反向核对却判红")
+        print("     → 怎么办：check_checklist_reverse() 误报了，去看它判断「标题是否被行区间连带抄进附录」的逻辑。")
+        return 1
     leaked = check_checklist_reverse(ck, build(two + [f'{src}:8-13']))
     if not leaked:
-        print("  ✗ 自检：一个行区间把「不抄」的小节标题连带抄进了附录，反向核对**没有**判红（C320）"); return 1
+        print("  ✗ 自检：一个行区间把「不抄」的小节标题连带抄进了附录，反向核对**没有**判红（C320）")
+        print("     → 怎么办：check_checklist_reverse() 该抓的泄漏漏判了，去看它扫附录内容找标题行的逻辑。")
+        return 1
     if leaked != [(src, '#### 带代码块的')]:
-        print(f"  ✗ 自检：反向核对命中的不是预期那一节——{leaked}"); return 1
+        print(f"  ✗ 自检：反向核对命中的不是预期那一节——{leaked}")
+        print("     → 怎么办：check_checklist_reverse() 命中的节不对，去比对它返回的 (文件, 标题) 元组构造逻辑。")
+        return 1
     print("  ✓ 自检：反向核对——「不抄」的小节没被带进附录时是绿的，被行区间连带带进去时判红（C320）")
     src2 = os.path.join(os.path.dirname(src), 'sample2.md')
     with open(src2, 'w', encoding='utf-8') as f:
@@ -313,16 +327,22 @@ def selftest():
                 "| #### 带代码块的 | 抄 | 样本二 |\n")
     cross_file = check_checklist_reverse(ck, build([f'{src2}@#### 带代码块的']))
     if cross_file:
-        print(f"  ✗ 自检：另一个文件里同名标题合法抄进来，反向核对却误报到别的文件头上——{cross_file}"); return 1
+        print(f"  ✗ 自检：另一个文件里同名标题合法抄进来，反向核对却误报到别的文件头上——{cross_file}")
+        print("     → 怎么办：check_checklist_reverse() 按文件收窄的逻辑坏了，去看它是不是没把文件名带进匹配条件。")
+        return 1
     print("  ✓ 自检：反向核对按文件收窄，不同文件里同名的通用小标题不会互相误报")
     _, _, bare = pick(f'{src}@### 未定项')
     if bare != ['### 未定项', '', '裸标题下的表', '']:
-        print(f"  ✗ 自检：裸标题「### 未定项」取错了——{bare}"); return 1
+        print(f"  ✗ 自检：裸标题「### 未定项」取错了——{bare}")
+        print("     → 怎么办：pick() 处理裸标题（没有括注）与带括注的同前缀标题共存时的匹配逻辑坏了，去查它怎么选中确切的那一节。")
+        return 1
     print("  ✓ 自检：三种取法（含带代码块的条款）都逐字节一致，且抄漏一行时判红")
     print("  ✓ 自检：裸标题与同前缀的带括注标题并存时，精确匹配取到裸标题那一节")
     _, _, fenced = pick(f'{src}@#### 代码块里有井号')
     if '栅栏之后那一行' not in fenced:
-        print(f"  ✗ 自检：代码栅栏里的 `# 注释` 把整节截断了（只取到 {len(fenced)} 行）"); return 1
+        print(f"  ✗ 自检：代码栅栏里的 `# 注释` 把整节截断了（只取到 {len(fenced)} 行）")
+        print("     → 怎么办：pick() 把代码栅栏内的 `#` 行误判成了标题行，去查它判断「是否在代码块内」的状态机。")
+        return 1
     print("  ✓ 自检：代码栅栏里的 `#` 行不被当成标题，整节取全")
     cited_root = tempfile.mkdtemp()
     os.makedirs(os.path.join(cited_root, '.claude/kb/decisions'))
@@ -335,11 +355,15 @@ def selftest():
                 "| ## D99 样本 —— 已定 | 不抄 | 样本 |\n")
     lacking = check_cited(cited_checklist, cited_body, cited_root)
     if lacking != ['.claude/kb/checks-owed.md']:
-        print(f"  ✗ 自检：正文提到 C1 而清单里没有 checks-owed.md，--cited 应当只报它一个，实报 {lacking}"); return 1
+        print(f"  ✗ 自检：正文提到 C1 而清单里没有 checks-owed.md，--cited 应当只报它一个，实报 {lacking}")
+        print("     → 怎么办：check_cited() 从正文里识别 D/E/C/I 编号、映射到 kb 文件的逻辑坏了，去查它的编号 → 文件映射表。")
+        return 1
     with open(cited_checklist, 'a', encoding='utf-8') as f:
         f.write("\n### 小节清单：`.claude/kb/checks-owed.md`\n\n| 小节 | 抄 / 不抄 | 理由 |\n|---|---|---|\n")
     if check_cited(cited_checklist, cited_body, cited_root):
-        print("  ✗ 自检：清单补齐之后 --cited 仍然报缺"); return 1
+        print("  ✗ 自检：清单补齐之后 --cited 仍然报缺")
+        print("     → 怎么办：check_cited() 没有正确识别出清单已经补齐，去查它判断「这个文件是否已有小节清单」的逻辑。")
+        return 1
     print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 
