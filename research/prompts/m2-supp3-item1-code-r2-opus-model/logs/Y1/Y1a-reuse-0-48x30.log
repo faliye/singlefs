@@ -1,0 +1,52 @@
+
+running 1 test
+NEW seed=0 pos=Operation(5) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 1032192")] panic=None
+NEW seed=1 pos=Operation(11) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088")] panic=None
+NEW seed=2 pos=Operation(14) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1720320)，遍历全部有效根得到 1654784")] panic=None
+NEW seed=3 pos=Operation(11) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1130496")] panic=None
+NEW seed=4 pos=Operation(11) op=Some(CloseAndMountRollback) violations=[("I-3.1", "盘 0：记账的已分配 Some(1359872)，遍历全部有效根得到 1294336")] panic=None
+NEW seed=5 pos=Operation(4) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656")] panic=None
+NEW seed=6 pos=Operation(9) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1458176")] panic=None
+NEW seed=7 pos=Operation(6) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1261568")] panic=None
+NEW seed=8 pos=Operation(13) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1720320)，遍历全部有效根得到 1654784")] panic=None
+NEW seed=9 pos=Operation(7) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1458176")] panic=None
+NEW seed=10 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1130496")] panic=None
+NEW seed=11 pos=Operation(5) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(835584)，遍历全部有效根得到 770048")] panic=None
+NEW seed=12 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(835584)，遍历全部有效根得到 770048")] panic=None
+NEW seed=13 pos=Operation(13) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1622016")] panic=None
+NEW seed=14 pos=Operation(14) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1622016")] panic=None
+NEW seed=15 pos=Operation(9) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(835584)，遍历全部有效根得到 770048")] panic=None
+NEW seed=17 pos=Operation(10) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1441792)，遍历全部有效根得到 1376256")] panic=None
+NEW seed=19 pos=Operation(5) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656")] panic=None
+NEW seed=20 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136")] panic=None
+NEW seed=21 pos=Operation(10) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1949696")] panic=None
+NEW seed=22 pos=Operation(1) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136")] panic=None
+NEW seed=23 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=24 pos=Operation(14) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1359872")] panic=None
+NEW seed=25 pos=Operation(7) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1130496")] panic=None
+NEW seed=26 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1130496")] panic=None
+NEW seed=27 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1359872")] panic=None
+NEW seed=28 pos=Operation(1) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136")] panic=None
+NEW seed=29 pos=Operation(12) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1261568")] panic=None
+NEW seed=31 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=32 pos=Operation(5) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=33 pos=Operation(4) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656")] panic=None
+NEW seed=34 pos=Operation(4) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=35 pos=Operation(11) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1605632)，遍历全部有效根得到 1507328")] panic=None
+NEW seed=36 pos=Operation(10) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1622016")] panic=None
+NEW seed=37 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1261568")] panic=None
+NEW seed=38 pos=Operation(9) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656")] panic=None
+NEW seed=39 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976")] panic=None
+NEW seed=40 pos=Operation(8) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656")] panic=None
+NEW seed=41 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976")] panic=None
+NEW seed=42 pos=Operation(5) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=43 pos=Operation(9) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(737280)，遍历全部有效根得到 671744")] panic=None
+NEW seed=44 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352")] panic=None
+NEW seed=45 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136")] panic=None
+NEW seed=46 pos=Operation(3) op=Some(CloseAndMountWritable) violations=[("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 475136")] panic=None
+NEW seed=47 pos=Operation(5) op=Some(CloseAndMountRollback) violations=[("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976")] panic=None
+SUMMARY first=0 seeds=48 ops=30 weights=偏向抬 F 之后的复用（第 121 行那一类的取样点） {"completed": 3, "new:CheckerViolations { invariants: [\"I-3.1\"] }": 45}
+test opus_r2_gap_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+

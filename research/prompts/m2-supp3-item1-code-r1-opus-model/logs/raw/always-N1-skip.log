@@ -1,0 +1,1012 @@
+# id N1 env ['OPUS_SEEDS=1000', 'OPUS_OPS=30'] exit 0 30.8s
+
+running 1 test
+OPUS seed 0 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1671168")]
+OPUS seed 1 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 2686976")]
+OPUS seed 2 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2719744")]
+OPUS seed 3 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 4 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2867200)，遍历全部有效根得到 2850816")]
+OPUS seed 5 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 6 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 7 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 8 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 9 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 10 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 11 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2097152")]
+OPUS seed 12 rollbacks_ok 5 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1474560")]
+OPUS seed 13 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2555904")]
+OPUS seed 14 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 15 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2179072)，遍历全部有效根得到 2195456")] panic None
+OPUS seed 16 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 17 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 18 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 19 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 20 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(27) violations [("I-3.1", "盘 0：记账的已分配 Some(851968)，遍历全部有效根得到 753664")]
+OPUS seed 21 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 1081344")]
+OPUS seed 22 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 23 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 24 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 25 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 688128")]
+OPUS seed 26 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(17) violations [("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1703936")] panic None
+OPUS seed 27 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 28 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 29 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1736704")]
+OPUS seed 30 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 31 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 32 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1179648")]
+OPUS seed 33 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 34 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1146880")]
+OPUS seed 35 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2031616")]
+OPUS seed 36 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 37 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2260992)，遍历全部有效根得到 2097152")]
+OPUS seed 38 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(23) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2457600")] panic None
+OPUS seed 39 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 40 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 41 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(868352)，遍历全部有效根得到 851968")]
+OPUS seed 42 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 43 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1933312")]
+OPUS seed 44 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 45 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2129920")]
+OPUS seed 46 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(18) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 47 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+OPUS seed 48 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2949120")]
+OPUS seed 49 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 50 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 51 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 52 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 53 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2998272)，遍历全部有效根得到 2981888")]
+OPUS seed 54 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 55 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 56 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(17) violations [("I-3.1", "盘 0：记账的已分配 Some(1622016)，遍历全部有效根得到 1638400")] panic None
+OPUS seed 57 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 58 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 59 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 60 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 61 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 1900544")]
+OPUS seed 62 rollbacks_ok 0 raises_ok 4 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 63 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 64 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2228224")]
+OPUS seed 65 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2883584)，遍历全部有效根得到 2555904")]
+OPUS seed 66 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 1998848")]
+OPUS seed 67 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 68 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(18) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 69 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(21) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 70 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(15) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1966080")]
+OPUS seed 71 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(22) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 72 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 73 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 74 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1474560")]
+OPUS seed 75 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 76 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 77 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2932736)，遍历全部有效根得到 2654208")]
+OPUS seed 78 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 79 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 80 rollbacks_ok 2 raises_ok 1 :: KnownRed1 at Operation(21) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1441792)，遍历全部有效根得到 1343488")]
+OPUS seed 81 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1572864")]
+OPUS seed 82 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2359296")]
+OPUS seed 83 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 84 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2867200)，遍历全部有效根得到 2588672")]
+OPUS seed 85 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 86 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 1081344")]
+OPUS seed 87 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 88 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2523136")]
+OPUS seed 89 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1409024")]
+OPUS seed 90 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 91 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 92 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(868352)，遍历全部有效根得到 851968")]
+OPUS seed 93 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 94 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1933312")] panic None
+OPUS seed 95 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 96 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2998272)，遍历全部有效根得到 2981888")]
+OPUS seed 97 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1867776")] panic None
+OPUS seed 98 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 99 rollbacks_ok 1 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountRollback) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 100 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 101 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 102 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 103 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 104 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 105 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1081344")]
+OPUS seed 106 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 107 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1179648")]
+OPUS seed 108 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 109 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 110 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 111 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 3047424")]
+OPUS seed 112 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 113 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 114 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(8) after Some(PublishOverwrite) newest_txg Some(13) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 115 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 116 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(20) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1933312")] panic None
+OPUS seed 117 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 118 rollbacks_ok 4 raises_ok 2 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1015808)，遍历全部有效根得到 851968")]
+OPUS seed 119 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(26) after Some(CloseAndMountRollback) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2424832)，遍历全部有效根得到 2195456")]
+OPUS seed 120 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 121 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 122 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1540096")] panic None
+OPUS seed 123 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1933312")]
+OPUS seed 124 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(20) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 125 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 126 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 127 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 128 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 1802240")]
+OPUS seed 129 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2670592)，遍历全部有效根得到 2686976")] panic None
+OPUS seed 130 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(19) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 131 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 132 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1441792")] panic None
+OPUS seed 133 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 134 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 1900544")]
+OPUS seed 135 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 136 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 137 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2392064")] panic None
+OPUS seed 138 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1966080")]
+OPUS seed 139 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 140 rollbacks_ok 4 raises_ok 2 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1835008)，遍历全部有效根得到 1507328")]
+OPUS seed 141 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 142 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1720320)，遍历全部有效根得到 1703936")]
+OPUS seed 143 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2179072)，遍历全部有效根得到 2162688")]
+OPUS seed 144 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1933312")]
+OPUS seed 145 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(12) after Some(CloseAndMountWritable) newest_txg Some(13) violations [("I-3.1", "盘 0：记账的已分配 Some(1294336)，遍历全部有效根得到 1310720")] panic None
+OPUS seed 146 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2326528")]
+OPUS seed 147 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 148 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3227648)，遍历全部有效根得到 3211264")]
+OPUS seed 149 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 150 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 151 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 152 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 153 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 154 rollbacks_ok 2 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2392064")] panic None
+OPUS seed 155 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2768896)，遍历全部有效根得到 2752512")]
+OPUS seed 156 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 157 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 158 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2064384")] panic None
+OPUS seed 159 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 160 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2555904")]
+OPUS seed 161 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 162 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 163 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 164 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 165 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1409024")]
+OPUS seed 166 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(21) after Some(RaiseRollbackFloor) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1703936)，遍历全部有效根得到 1605632")]
+OPUS seed 167 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 168 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(11) after Some(CloseAndMountWritable) newest_txg Some(13) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 169 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2621440")]
+OPUS seed 170 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 171 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2195456")]
+OPUS seed 172 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 173 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 174 rollbacks_ok 1 raises_ok 1 :: KnownRed1 at Operation(10) after Some(RaiseRollbackFloor) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1376256)，遍历全部有效根得到 1277952")]
+OPUS seed 175 rollbacks_ok 4 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1622016)，遍历全部有效根得到 1638400")] panic None
+OPUS seed 176 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(753664)，遍历全部有效根得到 655360")]
+OPUS seed 177 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1835008")]
+OPUS seed 178 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 179 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1867776")]
+OPUS seed 180 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 181 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 182 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 183 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 688128")]
+OPUS seed 184 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 185 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 186 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 187 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(22) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 188 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 189 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1146880")]
+OPUS seed 190 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 191 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2326528")] panic None
+OPUS seed 192 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 193 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 194 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 195 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1802240")]
+OPUS seed 196 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(18) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1802240")]
+OPUS seed 197 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1458176)，遍历全部有效根得到 1441792")]
+OPUS seed 198 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 199 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 200 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 201 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 202 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2932736)，遍历全部有效根得到 2916352")]
+OPUS seed 203 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 204 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 205 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2949120")]
+OPUS seed 206 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 207 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(32) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 208 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 209 rollbacks_ok 2 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(32) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 210 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 211 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(1835008)，遍历全部有效根得到 1736704")]
+OPUS seed 212 rollbacks_ok 2 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1343488")] panic None
+OPUS seed 213 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2293760")] panic None
+OPUS seed 214 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 215 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(14) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1572864")]
+OPUS seed 216 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 217 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1359872)，遍历全部有效根得到 1343488")]
+OPUS seed 218 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 219 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 2031616")] panic None
+OPUS seed 220 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+OPUS seed 221 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 222 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(20) violations [("I-3.1", "盘 0：记账的已分配 Some(1458176)，遍历全部有效根得到 1474560")] panic None
+OPUS seed 223 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 224 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3096576)，遍历全部有效根得到 3080192")]
+OPUS seed 225 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2523136")]
+OPUS seed 226 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 227 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 228 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 229 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 230 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(25) after Some(RaiseRollbackFloor) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(1507328)，遍历全部有效根得到 1409024")]
+OPUS seed 231 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 232 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 233 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 234 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(9) after Some(CloseAndMountRollback) newest_txg Some(14) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 235 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2801664)，遍历全部有效根得到 2785280")]
+OPUS seed 236 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 237 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 238 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1769472")] panic None
+OPUS seed 239 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2228224")]
+OPUS seed 240 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1654784)，遍历全部有效根得到 1638400")]
+OPUS seed 241 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 242 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2490368")] panic None
+OPUS seed 243 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 1933312")]
+OPUS seed 244 rollbacks_ok 3 raises_ok 1 :: Completed
+OPUS seed 245 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(13) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1196032)，遍历全部有效根得到 1179648")]
+OPUS seed 246 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 247 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 248 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 249 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2523136")] panic None
+OPUS seed 250 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 251 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 252 rollbacks_ok 4 raises_ok 0 :: Completed
+OPUS seed 253 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 254 rollbacks_ok 2 raises_ok 1 :: KnownRed1 at Operation(15) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1867776)，遍历全部有效根得到 1769472")]
+OPUS seed 255 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1441792")] panic None
+OPUS seed 256 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(20) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 2031616")] panic None
+OPUS seed 257 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 258 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 259 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 260 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1966080")]
+OPUS seed 261 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 262 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(13) after Some(CloseAndMountWritable) newest_txg Some(20) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2359296")] panic None
+OPUS seed 263 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(802816)，遍历全部有效根得到 786432")]
+OPUS seed 264 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 265 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1474560")]
+OPUS seed 266 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 267 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 983040")]
+OPUS seed 268 rollbacks_ok 3 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountRollback) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1867776")] panic None
+OPUS seed 269 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2654208)，遍历全部有效根得到 2228224")]
+OPUS seed 270 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3194880)，遍历全部有效根得到 2850816")]
+OPUS seed 271 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 272 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(29) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2129920")]
+OPUS seed 273 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 274 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 275 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1933312")]
+OPUS seed 276 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 277 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 278 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 279 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 280 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(21) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 281 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2326528")]
+OPUS seed 282 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 283 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 284 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(13) after Some(CloseAndMountWritable) newest_txg Some(17) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 285 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 286 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 287 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(23) after Some(RaiseRollbackFloor) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(1736704)，遍历全部有效根得到 1638400")]
+OPUS seed 288 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 289 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 290 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 291 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 292 rollbacks_ok 2 raises_ok 1 :: KnownRed1 at Operation(15) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1769472)，遍历全部有效根得到 1671168")]
+OPUS seed 293 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 294 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 295 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2359296")]
+OPUS seed 296 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 297 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 298 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 299 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 300 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 301 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 302 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 303 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 304 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2129920")]
+OPUS seed 305 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 306 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(24) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 307 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 308 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 983040")]
+OPUS seed 309 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 310 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(29) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 311 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(540672)，遍历全部有效根得到 425984")]
+OPUS seed 312 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2949120")]
+OPUS seed 313 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 314 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 315 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 316 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 317 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1998848")]
+OPUS seed 318 rollbacks_ok 3 raises_ok 2 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2179072)，遍历全部有效根得到 2162688")]
+OPUS seed 319 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 320 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 321 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 322 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 323 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3555328)，遍历全部有效根得到 3211264")]
+OPUS seed 324 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 325 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1867776)，遍历全部有效根得到 1703936")]
+OPUS seed 326 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 327 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 328 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 329 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 330 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1359872)，遍历全部有效根得到 1343488")]
+OPUS seed 331 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(PublishOverwrite) newest_txg Some(21) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50305) 跨 1）相交的记录（槽 SlotNumber(50304)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 332 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1556480)，遍历全部有效根得到 1474560")]
+OPUS seed 333 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 334 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 335 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 336 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 337 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1589248)，遍历全部有效根得到 1572864")]
+OPUS seed 338 rollbacks_ok 3 raises_ok 1 :: Completed
+OPUS seed 339 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 340 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 341 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(868352)，遍历全部有效根得到 851968")]
+OPUS seed 342 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 343 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 344 rollbacks_ok 2 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1933312")] panic None
+OPUS seed 345 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 346 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 347 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 348 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 349 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 350 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2883584")]
+OPUS seed 351 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 352 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 353 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(835584)，遍历全部有效根得到 557056")]
+OPUS seed 354 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(24) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1703936)，遍历全部有效根得到 1605632")]
+OPUS seed 355 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 1998848")]
+OPUS seed 356 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1474560")]
+OPUS seed 357 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 358 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(16) after Some(RaiseRollbackFloor) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2392064)，遍历全部有效根得到 2129920")]
+OPUS seed 359 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 360 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 361 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(12) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1867776")]
+OPUS seed 362 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 363 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 364 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(31) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 365 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 366 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 367 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 368 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 369 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(29) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1835008")]
+OPUS seed 370 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 371 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 720896")]
+OPUS seed 372 rollbacks_ok 4 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1998848")] panic None
+OPUS seed 373 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 374 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 375 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 376 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 377 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 3047424")]
+OPUS seed 378 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 379 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1605632")]
+OPUS seed 380 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 381 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(24) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50381) 跨 1）相交的记录（槽 SlotNumber(50380)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 382 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2523136")]
+OPUS seed 383 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 384 rollbacks_ok 2 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(32) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 385 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2064384")] panic None
+OPUS seed 386 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 387 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1589248)，遍历全部有效根得到 1605632")] panic None
+OPUS seed 388 rollbacks_ok 2 raises_ok 3 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(34) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 2097152")] panic None
+OPUS seed 389 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2244608)，遍历全部有效根得到 2228224")]
+OPUS seed 390 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2883584")]
+OPUS seed 391 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1441792")] panic None
+OPUS seed 392 rollbacks_ok 5 raises_ok 0 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2129920")]
+OPUS seed 393 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 394 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(29) after Some(CloseAndMountRollback) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(1409024)，遍历全部有效根得到 1245184")]
+OPUS seed 395 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2326528")]
+OPUS seed 396 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 397 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 398 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 399 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040")]
+OPUS seed 400 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 401 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 402 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 403 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 404 rollbacks_ok 2 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountRollback) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 405 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2670592)，遍历全部有效根得到 2654208")]
+OPUS seed 406 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1802240")]
+OPUS seed 407 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 408 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 409 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(22) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 410 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 411 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1310720")]
+OPUS seed 412 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2523136)，遍历全部有效根得到 2424832")]
+OPUS seed 413 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 414 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 415 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(20) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1228800)，遍历全部有效根得到 1212416")]
+OPUS seed 416 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 417 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 418 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 419 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1409024")]
+OPUS seed 420 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 421 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2834432)，遍历全部有效根得到 2490368")]
+OPUS seed 422 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(32) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 423 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 424 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1720320)，遍历全部有效根得到 1703936")]
+OPUS seed 425 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1507328")]
+OPUS seed 426 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 427 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 428 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2703360)，遍历全部有效根得到 2686976")]
+OPUS seed 429 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 430 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2293760")]
+OPUS seed 431 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 432 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1736704")]
+OPUS seed 433 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 434 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 435 rollbacks_ok 2 raises_ok 1 :: KnownRed1 at Operation(17) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1048576")]
+OPUS seed 436 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 437 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 438 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1392640)，遍历全部有效根得到 1212416")]
+OPUS seed 439 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 440 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(16) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 441 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 442 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1867776")]
+OPUS seed 443 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 444 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1540096")]
+OPUS seed 445 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 446 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 447 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 448 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(21) after Some(PublishOverwrite) newest_txg Some(13) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 449 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2326528")]
+OPUS seed 450 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 451 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(35) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2424832")]
+OPUS seed 452 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 453 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1064960)，遍历全部有效根得到 884736")]
+OPUS seed 454 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 455 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 456 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1228800)，遍历全部有效根得到 1212416")]
+OPUS seed 457 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2162688)，遍历全部有效根得到 2064384")]
+OPUS seed 458 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(18) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 459 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 460 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2768896)，遍历全部有效根得到 2424832")]
+OPUS seed 461 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2555904")]
+OPUS seed 462 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 463 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 464 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 1769472")]
+OPUS seed 465 rollbacks_ok 4 raises_ok 0 :: Completed
+OPUS seed 466 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 467 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 468 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 469 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1409024")]
+OPUS seed 470 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 471 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 472 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 473 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(1572864)，遍历全部有效根得到 1343488")]
+OPUS seed 474 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 475 rollbacks_ok 2 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1835008")] panic None
+OPUS seed 476 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 477 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 478 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 479 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 480 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 481 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 482 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 483 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 484 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2768896)，遍历全部有效根得到 2424832")]
+OPUS seed 485 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2703360)，遍历全部有效根得到 2424832")]
+OPUS seed 486 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 487 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 488 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3096576)，遍历全部有效根得到 2752512")]
+OPUS seed 489 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2686976")]
+OPUS seed 490 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1671168")]
+OPUS seed 491 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 492 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 493 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 494 rollbacks_ok 2 raises_ok 2 :: Completed
+OPUS seed 495 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 496 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 497 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2244608)，遍历全部有效根得到 2228224")]
+OPUS seed 498 rollbacks_ok 2 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 499 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2998272)，遍历全部有效根得到 2981888")]
+OPUS seed 500 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1998848")]
+OPUS seed 501 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 2064384")]
+OPUS seed 502 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 503 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 504 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 505 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2162688")]
+OPUS seed 506 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(16) after Some(CloseAndMountRollback) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1540096")] panic None
+OPUS seed 507 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2129920")]
+OPUS seed 508 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(835584)，遍历全部有效根得到 720896")]
+OPUS seed 509 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1769472")] panic None
+OPUS seed 510 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2293760")]
+OPUS seed 511 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 512 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2195456")]
+OPUS seed 513 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1966080")]
+OPUS seed 514 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 515 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 516 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 517 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 1802240")]
+OPUS seed 518 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 519 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 2883584")]
+OPUS seed 520 rollbacks_ok 0 raises_ok 3 :: Completed
+OPUS seed 521 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 917504")]
+OPUS seed 522 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 523 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 524 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2523136)，遍历全部有效根得到 2457600")]
+OPUS seed 525 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2883584")]
+OPUS seed 526 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 527 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 528 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1900544")]
+OPUS seed 529 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 530 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(17) violations [("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1703936")] panic None
+OPUS seed 531 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 532 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 533 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 534 rollbacks_ok 4 raises_ok 0 :: Completed
+OPUS seed 535 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 536 rollbacks_ok 3 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(19) after Some(CloseAndMountRollback) newest_txg Some(31) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 537 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(17) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 538 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 539 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 540 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1474560")]
+OPUS seed 541 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 542 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 543 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(14) violations [("I-3.1", "盘 0：记账的已分配 Some(1294336)，遍历全部有效根得到 1310720")] panic None
+OPUS seed 544 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 545 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1392640)，遍历全部有效根得到 1409024")] panic None
+OPUS seed 546 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 547 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 548 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(13) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 549 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 550 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(606208)，遍历全部有效根得到 589824")]
+OPUS seed 551 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+OPUS seed 552 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2801664)，遍历全部有效根得到 2785280")]
+OPUS seed 553 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 554 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 555 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1081344")]
+OPUS seed 556 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 557 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2326528")]
+OPUS seed 558 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 559 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(14) after Some(PublishOverwrite) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50369) 跨 1）相交的记录（槽 SlotNumber(50368)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 560 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2326528")] panic None
+OPUS seed 561 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 562 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 563 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(25) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1409024")]
+OPUS seed 564 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(PublishOverwrite) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 565 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 566 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 567 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 568 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2621440)，遍历全部有效根得到 2293760")]
+OPUS seed 569 rollbacks_ok 1 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(24) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 570 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 571 rollbacks_ok 1 raises_ok 3 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(1228800)，遍历全部有效根得到 1245184")] panic None
+OPUS seed 572 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 573 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 574 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 1966080")]
+OPUS seed 575 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 576 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3260416)，遍历全部有效根得到 3276800")] panic None
+OPUS seed 577 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 578 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 579 rollbacks_ok 1 raises_ok 4 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(33) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 580 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2670592)，遍历全部有效根得到 2654208")]
+OPUS seed 581 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(16) after Some(RaiseRollbackFloor) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1769472)，遍历全部有效根得到 1671168")]
+OPUS seed 582 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2555904")]
+OPUS seed 583 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 584 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(18) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2867200)，遍历全部有效根得到 2850816")]
+OPUS seed 585 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 1769472")]
+OPUS seed 586 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 587 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 588 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 589 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1589248)，遍历全部有效根得到 1605632")] panic None
+OPUS seed 590 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 591 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(18) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 2097152")]
+OPUS seed 592 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 593 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 594 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 595 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 596 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 597 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 598 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 599 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2457600")]
+OPUS seed 600 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(24) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 2097152")]
+OPUS seed 601 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 3014656")]
+OPUS seed 602 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(18) after Some(RaiseRollbackFloor) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2719744)，遍历全部有效根得到 2555904")]
+OPUS seed 603 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 1998848")]
+OPUS seed 604 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2949120")]
+OPUS seed 605 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2097152")]
+OPUS seed 606 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2555904")]
+OPUS seed 607 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2555904")]
+OPUS seed 608 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 609 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 610 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 611 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2801664)，遍历全部有效根得到 2785280")]
+OPUS seed 612 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(26) after Some(RaiseRollbackFloor) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1867776)，遍历全部有效根得到 1769472")]
+OPUS seed 613 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 614 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2359296")]
+OPUS seed 615 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 616 rollbacks_ok 1 raises_ok 2 :: KnownRed1 at Operation(11) after Some(RaiseRollbackFloor) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1409024)，遍历全部有效根得到 1310720")]
+OPUS seed 617 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 618 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 619 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2228224")] panic None
+OPUS seed 620 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 621 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 622 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2392064)，遍历全部有效根得到 2162688")]
+OPUS seed 623 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2719744")]
+OPUS seed 624 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1933312")] panic None
+OPUS seed 625 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(31) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 626 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1245184")]
+OPUS seed 627 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 628 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2129920")]
+OPUS seed 629 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 630 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 631 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(27) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 632 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 633 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1343488")] panic None
+OPUS seed 634 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 635 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 3014656")]
+OPUS seed 636 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(13) violations [("I-3.1", "盘 0：记账的已分配 Some(1294336)，遍历全部有效根得到 1310720")] panic None
+OPUS seed 637 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(23) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1867776")] panic None
+OPUS seed 638 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 639 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 640 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 641 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 642 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(18) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1998848")]
+OPUS seed 643 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 644 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 645 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 646 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 647 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 648 rollbacks_ok 2 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 649 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 650 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 753664")]
+OPUS seed 651 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 652 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 653 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 654 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 655 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1802240")]
+OPUS seed 656 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 657 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 658 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 659 rollbacks_ok 1 raises_ok 1 :: KnownRed1 at Operation(26) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1703936)，遍历全部有效根得到 1605632")]
+OPUS seed 660 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 661 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1343488")] panic None
+OPUS seed 662 rollbacks_ok 1 raises_ok 3 :: Completed
+OPUS seed 663 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 664 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(23) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2064384")] panic None
+OPUS seed 665 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 666 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 667 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 668 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 2097152")]
+OPUS seed 669 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 670 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 671 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1687552)，遍历全部有效根得到 1703936")] panic None
+OPUS seed 672 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 673 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 674 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(27) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 675 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1998848")]
+OPUS seed 676 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 2064384")]
+OPUS seed 677 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 678 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(21) after Some(CloseAndMountRollback) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1900544")] panic None
+OPUS seed 679 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2932736)，遍历全部有效根得到 2588672")]
+OPUS seed 680 rollbacks_ok 3 raises_ok 1 :: Completed
+OPUS seed 681 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 682 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2162688")] panic None
+OPUS seed 683 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 684 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 685 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 686 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 687 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2555904")]
+OPUS seed 688 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 1802240")]
+OPUS seed 689 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 690 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 691 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 692 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(442368)，遍历全部有效根得到 327680")]
+OPUS seed 693 rollbacks_ok 1 raises_ok 1 :: KnownRed1 at Operation(14) after Some(RaiseRollbackFloor) newest_txg Some(16) violations [("I-3.1", "盘 0：记账的已分配 Some(1376256)，遍历全部有效根得到 1277952")]
+OPUS seed 694 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 695 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 696 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 2195456")]
+OPUS seed 697 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 698 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1671168")]
+OPUS seed 699 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 700 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 701 rollbacks_ok 1 raises_ok 2 :: KnownRed1 at Operation(21) after Some(RaiseRollbackFloor) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2162688)，遍历全部有效根得到 2064384")]
+OPUS seed 702 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 703 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 704 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 705 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 706 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2654208")] panic None
+OPUS seed 707 rollbacks_ok 3 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 2031616")] panic None
+OPUS seed 708 rollbacks_ok 5 raises_ok 1 :: Completed
+OPUS seed 709 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1867776)，遍历全部有效根得到 1703936")]
+OPUS seed 710 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 711 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 712 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(21) after Some(RaiseRollbackFloor) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1638400)，遍历全部有效根得到 1540096")]
+OPUS seed 713 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 714 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 715 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1327104)，遍历全部有效根得到 1048576")]
+OPUS seed 716 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1998848")] panic None
+OPUS seed 717 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 718 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 719 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3325952)，遍历全部有效根得到 3309568")]
+OPUS seed 720 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 721 rollbacks_ok 3 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 1015808")] panic None
+OPUS seed 722 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2506752)，遍历全部有效根得到 2490368")]
+OPUS seed 723 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 724 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(18) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 725 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(22) after Some(PublishOverwrite) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 726 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 2097152")] panic None
+OPUS seed 727 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 728 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(24) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 729 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2719744")]
+OPUS seed 730 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2785280")]
+OPUS seed 731 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 732 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 733 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2244608)，遍历全部有效根得到 2228224")]
+OPUS seed 734 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 735 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2129920")]
+OPUS seed 736 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1769472")] panic None
+OPUS seed 737 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 2424832")]
+OPUS seed 738 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 739 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 740 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 3047424")]
+OPUS seed 741 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 742 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 743 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 744 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 688128")]
+OPUS seed 745 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 746 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 747 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 748 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(29) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2588672")]
+OPUS seed 749 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 1966080")]
+OPUS seed 750 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(15) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 751 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 752 rollbacks_ok 2 raises_ok 1 :: KnownRed1 at Operation(19) after Some(RaiseRollbackFloor) newest_txg Some(20) violations [("I-3.1", "盘 0：记账的已分配 Some(1474560)，遍历全部有效根得到 1376256")]
+OPUS seed 753 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 754 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 755 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 756 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(20) after Some(RaiseRollbackFloor) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1654784)，遍历全部有效根得到 1638400")]
+OPUS seed 757 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 758 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2064384")] panic None
+OPUS seed 759 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 760 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 761 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(21) after Some(PublishOverwrite) newest_txg Some(19) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 762 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3096576)，遍历全部有效根得到 3080192")]
+OPUS seed 763 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 764 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 765 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 766 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 767 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1376256")]
+OPUS seed 768 rollbacks_ok 1 raises_ok 4 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 769 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2899968)，遍历全部有效根得到 2621440")]
+OPUS seed 770 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2801664)，遍历全部有效根得到 2785280")]
+OPUS seed 771 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+OPUS seed 772 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 773 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 774 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(27) violations [("I-3.1", "盘 0：记账的已分配 Some(1900544)，遍历全部有效根得到 1736704")]
+OPUS seed 775 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 776 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2326528")]
+OPUS seed 777 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 778 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 779 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 2097152")] panic None
+OPUS seed 780 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 781 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 782 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 783 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 784 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(26) after Some(RaiseRollbackFloor) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1867776)，遍历全部有效根得到 1703936")]
+OPUS seed 785 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 786 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2703360)，遍历全部有效根得到 2686976")]
+OPUS seed 787 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(24) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1933312")]
+OPUS seed 788 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 789 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3194880)，遍历全部有效根得到 3178496")]
+OPUS seed 790 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 791 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 792 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 793 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(22) after Some(PublishOverwrite) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 794 rollbacks_ok 3 raises_ok 2 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2129920)，遍历全部有效根得到 1802240")]
+OPUS seed 795 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 796 rollbacks_ok 2 raises_ok 2 :: Completed
+OPUS seed 797 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(30) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 798 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(31) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 799 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 800 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 801 rollbacks_ok 1 raises_ok 3 :: KnownRed0 at Operation(17) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 2424832")]
+OPUS seed 802 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2719744")]
+OPUS seed 803 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 804 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 805 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(34) violations [("I-3.1", "盘 0：记账的已分配 Some(2490368)，遍历全部有效根得到 2326528")]
+OPUS seed 806 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 2883584")]
+OPUS seed 807 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+OPUS seed 808 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 809 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 2031616")] panic None
+OPUS seed 810 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2129920")]
+OPUS seed 811 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 812 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+OPUS seed 813 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(17) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2129920")]
+OPUS seed 814 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 815 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+OPUS seed 816 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(27) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(458752)，遍历全部有效根得到 262144")]
+OPUS seed 817 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 818 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 819 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 820 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 821 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 822 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 823 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 824 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 825 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2031616)，遍历全部有效根得到 1703936")]
+OPUS seed 826 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 827 rollbacks_ok 2 raises_ok 2 :: Completed
+OPUS seed 828 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1605632")]
+OPUS seed 829 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 830 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 831 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1589248)，遍历全部有效根得到 1605632")] panic None
+OPUS seed 832 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 833 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 834 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 835 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1507328")]
+OPUS seed 836 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 837 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2670592)，遍历全部有效根得到 2654208")]
+OPUS seed 838 rollbacks_ok 0 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1835008")] panic None
+OPUS seed 839 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1458176)，遍历全部有效根得到 1441792")]
+OPUS seed 840 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 841 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(18) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 917504")]
+OPUS seed 842 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(22) after Some(RaiseRollbackFloor) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2818048)，遍历全部有效根得到 2752512")]
+OPUS seed 843 rollbacks_ok 1 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(33) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 844 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1359872)，遍历全部有效根得到 1343488")]
+OPUS seed 845 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 846 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1769472")] panic None
+OPUS seed 847 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1130496)，遍历全部有效根得到 1114112")]
+OPUS seed 848 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 849 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(PublishOverwrite) newest_txg Some(31) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50433) 跨 1）相交的记录（槽 SlotNumber(50432)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 850 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 851 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(22) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 852 rollbacks_ok 0 raises_ok 2 :: KnownRed0 at Operation(21) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2867200)，遍历全部有效根得到 2588672")]
+OPUS seed 853 rollbacks_ok 4 raises_ok 2 :: Completed
+OPUS seed 854 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(29) after Some(RaiseRollbackFloor) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2424832)，遍历全部有效根得到 2326528")]
+OPUS seed 855 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(28) after Some(RaiseRollbackFloor) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(2228224)，遍历全部有效根得到 2129920")]
+OPUS seed 856 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(31) violations [("I-3.1", "盘 0：记账的已分配 Some(2228224)，遍历全部有效根得到 2129920")]
+OPUS seed 857 rollbacks_ok 2 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1523712)，遍历全部有效根得到 1540096")] panic None
+OPUS seed 858 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 859 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2031616)，遍历全部有效根得到 1933312")]
+OPUS seed 860 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(24) after Some(CloseAndMountWritable) newest_txg Some(14) violations [("I-3.1", "盘 0：记账的已分配 Some(1458176)，遍历全部有效根得到 1474560")] panic None
+OPUS seed 861 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1802240")]
+OPUS seed 862 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2670592)，遍历全部有效根得到 2490368")]
+OPUS seed 863 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 864 rollbacks_ok 4 raises_ok 1 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 1015808")]
+OPUS seed 865 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountRollback) newest_txg Some(27) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 866 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 867 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(18) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2768896)，遍历全部有效根得到 2752512")]
+OPUS seed 868 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 869 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2965504)，遍历全部有效根得到 2949120")]
+OPUS seed 870 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 871 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 872 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 873 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 874 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 875 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 876 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(17) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 877 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 878 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 879 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 880 rollbacks_ok 2 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(34) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1966080")] panic None
+OPUS seed 881 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2326528)，遍历全部有效根得到 2162688")]
+OPUS seed 882 rollbacks_ok 1 raises_ok 3 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountRollback) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1425408)，遍历全部有效根得到 1441792")] panic None
+OPUS seed 883 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(16) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1851392)，遍历全部有效根得到 1835008")]
+OPUS seed 884 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 885 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(15) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1392640)，遍历全部有效根得到 1114112")]
+OPUS seed 886 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1753088)，遍历全部有效根得到 1736704")]
+OPUS seed 887 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 888 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 889 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2998272)，遍历全部有效根得到 2686976")]
+OPUS seed 890 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1933312")]
+OPUS seed 891 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 892 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 893 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(20) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 425984")]
+OPUS seed 894 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1622016)，遍历全部有效根得到 1638400")] panic None
+OPUS seed 895 rollbacks_ok 3 raises_ok 1 :: KnownRed0 at Operation(26) after Some(CloseAndMountRollback) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1867776")]
+OPUS seed 896 rollbacks_ok 0 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(14) after Some(CloseAndMountWritable) newest_txg Some(19) violations [("I-3.1", "盘 0：记账的已分配 Some(1589248)，遍历全部有效根得到 1605632")] panic None
+OPUS seed 897 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(14) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 2097152")]
+OPUS seed 898 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(19) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 899 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(26) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 900 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 901 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 902 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 903 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2113536)，遍历全部有效根得到 2097152")]
+OPUS seed 904 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2342912)，遍历全部有效根得到 2326528")]
+OPUS seed 905 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 906 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 907 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 908 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 909 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 910 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 911 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 912 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 913 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2736128)，遍历全部有效根得到 2392064")]
+OPUS seed 914 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 915 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 916 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 917 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 918 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 919 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(13) after Some(CloseAndMountWritable) newest_txg Some(11) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 920 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 921 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 922 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(24) after Some(PublishOverwrite) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 923 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 924 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 925 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 926 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3129344)，遍历全部有效根得到 3112960")]
+OPUS seed 927 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 928 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 929 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(23) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3063808)，遍历全部有效根得到 3047424")]
+OPUS seed 930 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 931 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(19) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2768896)，遍历全部有效根得到 2752512")]
+OPUS seed 932 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 933 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(30) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50381) 跨 1）相交的记录（槽 SlotNumber(50380)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 934 rollbacks_ok 2 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountRollback) newest_txg Some(27) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 935 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 936 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2293760")]
+OPUS seed 937 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(20) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2637824)，遍历全部有效根得到 2621440")]
+OPUS seed 938 rollbacks_ok 1 raises_ok 0 :: Completed
+OPUS seed 939 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 940 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 941 rollbacks_ok 2 raises_ok 0 :: Completed
+OPUS seed 942 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 943 rollbacks_ok 2 raises_ok 2 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2392064")]
+OPUS seed 944 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 945 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(27) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2031616")]
+OPUS seed 946 rollbacks_ok 0 raises_ok 1 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3096576)，遍历全部有效根得到 3080192")]
+OPUS seed 947 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 948 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2523136")]
+OPUS seed 949 rollbacks_ok 1 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2490368")] panic None
+OPUS seed 950 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(24) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(3031040)，遍历全部有效根得到 3014656")]
+OPUS seed 951 rollbacks_ok 2 raises_ok 1 :: Completed
+OPUS seed 952 rollbacks_ok 3 raises_ok 1 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(25) violations [("I-3.1", "盘 0：记账的已分配 Some(1949696)，遍历全部有效根得到 1966080")] panic None
+OPUS seed 953 rollbacks_ok 0 raises_ok 3 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(23) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 954 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(27) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2703360)，遍历全部有效根得到 2686976")]
+OPUS seed 955 rollbacks_ok 1 raises_ok 1 :: Completed
+OPUS seed 956 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(25) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 957 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(16) after Some(CloseAndMountWritable) newest_txg Some(20) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 958 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(29) after Some(PublishOverwrite) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 959 rollbacks_ok 0 raises_ok 3 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(29) violations [("I-3.1", "盘 0：记账的已分配 Some(2916352)，遍历全部有效根得到 2752512")]
+OPUS seed 960 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 961 rollbacks_ok 2 raises_ok 1 :: KnownRed0 at Operation(28) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1556480)，遍历全部有效根得到 1540096")]
+OPUS seed 962 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 963 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 964 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 965 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 966 rollbacks_ok 0 raises_ok 1 :: Completed
+OPUS seed 967 rollbacks_ok 4 raises_ok 0 :: KnownRed0 at Operation(16) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1638400")]
+OPUS seed 968 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(29) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2572288)，遍历全部有效根得到 2326528")]
+OPUS seed 969 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 970 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 971 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(26) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2703360)，遍历全部有效根得到 2686976")]
+OPUS seed 972 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(19) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 2195456")]
+OPUS seed 973 rollbacks_ok 1 raises_ok 2 :: NewFinding CheckerViolations { invariants: ["I-3.1"] } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(22) violations [("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1835008")] panic None
+OPUS seed 974 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 975 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 976 rollbacks_ok 0 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(20) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 977 rollbacks_ok 3 raises_ok 0 :: Completed
+OPUS seed 978 rollbacks_ok 1 raises_ok 1 :: KnownRed0 at Operation(15) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2523136")]
+OPUS seed 979 rollbacks_ok 1 raises_ok 0 :: KnownRed0 at Operation(21) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2867200)，遍历全部有效根得到 2850816")]
+OPUS seed 980 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 981 rollbacks_ok 1 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(26) after Some(CloseAndMountWritable) newest_txg Some(28) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 982 rollbacks_ok 2 raises_ok 0 :: KnownRed0 at Operation(22) after Some(CloseAndMountRollback) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1474560")]
+OPUS seed 983 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 984 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 985 rollbacks_ok 0 raises_ok 2 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(18) after Some(CloseAndMountWritable) newest_txg Some(19) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 986 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(23) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2375680)，遍历全部有效根得到 2031616")]
+OPUS seed 987 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 988 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(22) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 989 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountRollback) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(1884160)，遍历全部有效根得到 1605632")]
+OPUS seed 990 rollbacks_ok 0 raises_ok 0 :: KnownRed0 at Operation(28) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(3293184)，遍历全部有效根得到 2949120")]
+OPUS seed 991 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 992 rollbacks_ok 3 raises_ok 0 :: KnownRed0 at Operation(25) after Some(PublishOverwrite) newest_txg Some(26) violations [("I-3.1", "盘 0：记账的已分配 Some(2408448)，遍历全部有效根得到 2392064")]
+OPUS seed 993 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 994 rollbacks_ok 0 raises_ok 2 :: Completed
+OPUS seed 995 rollbacks_ok 1 raises_ok 1 :: NewFinding Panic { location: "crates/singlefs-core/src/allocator.rs:529" } at Operation(19) after Some(CloseAndMountRollback) newest_txg Some(25) violations [] panic Some(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:529", message: "盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了" })
+OPUS seed 996 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS seed 997 rollbacks_ok 1 raises_ok 2 :: KnownRed0 at Operation(20) after Some(CloseAndMountWritable) newest_txg Some(28) violations [("I-3.1", "盘 0：记账的已分配 Some(2539520)，遍历全部有效根得到 2195456")]
+OPUS seed 998 rollbacks_ok 1 raises_ok 2 :: Completed
+OPUS seed 999 rollbacks_ok 0 raises_ok 0 :: Completed
+OPUS-SUMMARY first 0 seeds 1000 ops 30: completed 467 known0 363 known1 10 new 160
+test opus_probe_per_seed_endings ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.50s
+
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-D/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-D/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.33s
+     Running tests/opus_probe.rs (/tmp/claude-1000/m2-supp3-item1-r1-opus/target-D/release/deps/opus_probe-51757e8087ed3043)

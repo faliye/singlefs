@@ -1,0 +1,4 @@
+# 攻方腿（Opus）m2-supp3-item1-code-r2 · Y5：层 0 并行的变异，五段制表符分隔——编号、变异名、文件、原文、替换文（\n 表示换行）。只在仓副本上施加。
+Y5m1	并片不等前面的片：收到哪片就按片号从小到大并掉手上等着的（不等空缺）	crates/singlefs-harness/src/crash.rs	            while let Some(in_order) = waiting_for_earlier_slices.remove(&next_slice_to_merge) {	            while let Some(in_order) = waiting_for_earlier_slices.pop_first().map(|(_, slice)| slice) {
+Y5m2	并片时「不看 journal 那一遍的第一处」取后面那一片的	crates/singlefs-harness/src/crash.rs	        if self.first_ignored_violation.is_none() {\n            self.first_ignored_violation = first_ignored_violation;\n        }	        if first_ignored_violation.is_some() {\n            self.first_ignored_violation = first_ignored_violation;\n        }
+Y5m3	不管线程数设了多少只起 1 个工作线程	crates/singlefs-harness/src/crash.rs	    let spawned_worker_threads = parallelism.worker_threads.get().min(slices.len());	    let spawned_worker_threads = 1usize.min(slices.len());

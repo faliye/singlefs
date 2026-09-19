@@ -1,0 +1,12 @@
+diff -ru pristine/crates/singlefs-harness/src/history.rs slot-D/crates/singlefs-harness/src/history.rs
+--- pristine/crates/singlefs-harness/src/history.rs	2026-09-18 14:59:31.384281618 +0000
++++ slot-D/crates/singlefs-harness/src/history.rs	2026-09-18 15:44:36.982020474 +0000
+@@ -1562,7 +1562,7 @@
+             }
+             outcomes.push(outcome);
+             let stream_length = stream.operation_count();
+-            if stream_length == checked_stream_length {
++            if std::env::var_os("OPUS_ALWAYS_CHECK").is_none() && stream_length == checked_stream_length {
+                 tally.checker_runs_skipped_because_nothing_was_written += 1;
+             } else {
+                 image = pool.image();

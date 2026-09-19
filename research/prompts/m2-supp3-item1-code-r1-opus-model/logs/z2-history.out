@@ -1,0 +1,35 @@
+== BASE
+OPUS-Z2 step 0 CloseAndMountWritable -> Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+OPUS-Z2 step 1 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 2 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 3 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 4 RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3 }) -> Applied(RaisedFloor { new_floor: CheckpointTxg(3), publishes: 2, reclaimed_placements: 1, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 ending Completed
+== A1
+OPUS-Z2 step 0 CloseAndMountWritable -> Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+OPUS-Z2 step 1 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 2 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 3 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 4 RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3 }) -> Applied(RaisedFloor { new_floor: CheckpointTxg(3), publishes: 2, reclaimed_placements: 0, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 ending KnownRed form 1 at Operation(4) after Some(RaiseRollbackFloor) newest_txg Some(10) violations [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040")]
+== A2
+OPUS-Z2 step 0 CloseAndMountWritable -> Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+OPUS-Z2 step 1 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 2 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 3 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 4 RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3 }) -> Applied(RaisedFloor { new_floor: CheckpointTxg(3), publishes: 2, reclaimed_placements: 0, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 ending KnownRed form 1 at Operation(4) after Some(RaiseRollbackFloor) newest_txg Some(10) violations [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040")]
+== A5
+OPUS-Z2 step 0 CloseAndMountWritable -> Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+OPUS-Z2 step 1 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 2 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 3 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 4 RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3 }) -> Applied(RaisedFloor { new_floor: CheckpointTxg(3), publishes: 2, reclaimed_placements: 1, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 ending KnownRed form 1 at Operation(4) after Some(RaiseRollbackFloor) newest_txg Some(10) violations [("I-3.1", "盘 0：记账的已分配 Some(983040)，遍历全部有效根得到 884736")]
+== A8
+OPUS-Z2 step 0 CloseAndMountWritable -> Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+OPUS-Z2 step 1 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 2 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 3 PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 2999 }, fill_seed: 1 }) -> Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 step 4 RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 3 }) -> Applied(RaisedFloor { new_floor: CheckpointTxg(3), publishes: 2, reclaimed_placements: 0, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+OPUS-Z2 ending KnownRed form 1 at Operation(4) after Some(RaiseRollbackFloor) newest_txg Some(10) violations [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040")]

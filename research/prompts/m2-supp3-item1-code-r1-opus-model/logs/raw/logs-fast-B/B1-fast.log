@@ -1,0 +1,77 @@
+
+running 1 test
+── 随机历史快档 ──
+种子 [0, 96)，每段 30 步
+历史 96 段：跑完 53、以已知红收尾 {0: 43}、新发现 0；根环转过一圈的 59 段；最高 txg 37
+  操作 PublishFirstFile：Ok 24、Err 62、前提不满足没调 57
+  操作 PublishOverwrite：Ok 610、Err 173、前提不满足没调 468
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 65
+  操作 CloseAndMountWritable：Ok 326、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 111、Err 199、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 45、Err 164、前提不满足没调 140
+  操作 ColdStartRecover：Ok 98、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 88 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 517 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 51 次
+  内容长度 载荷容量：入口被调 71 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 67 次
+  内容长度 载荷容量 − 1：入口被调 75 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：130 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：7 次
+  Err 成员 MountError::RollbackTargetNotInRing：62 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：129 次
+  Err 成员 PublishError::ContentExceedsDataUnit：177 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：58 次
+  前提不满足（没有可写会话）：672 次
+  前提不满足（现行版本带文件）：34 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 FileRead：79 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 8 次、最多试挂载 12 次
+  抬 F 回收到落点 31 次、共回收 817 个落点；复用已释放的记录 216 条（其中跨度变了 46 条）；已释放的记录被删 2 条
+  checker 跑了 1219 次；一个写都没发、沿用上一次结论的 1518 步
+  I-1.1：判绿 1219 次、不适用 0 次
+  I-1.3：判绿 1219 次、不适用 0 次
+  I-1.4：判绿 1219 次、不适用 0 次
+  I-1.6：判绿 1219 次、不适用 0 次
+  I-1.7：判绿 1219 次、不适用 0 次
+  I-2.1：判绿 1219 次、不适用 0 次
+  I-2.3：判绿 1219 次、不适用 0 次
+  I-2.4：判绿 1219 次、不适用 0 次
+  I-2.5：判绿 1219 次、不适用 0 次
+  I-3.1：判绿 1073 次、不适用 103 次
+  I-3.8：判绿 1219 次、不适用 0 次
+  I-3.9：判绿 1116 次、不适用 103 次
+  I-4.8：判绿 1219 次、不适用 0 次
+  I-5.1：判绿 1219 次、不适用 0 次
+  I-5.2：判绿 1116 次、不适用 103 次
+  I-5.4：判绿 1116 次、不适用 103 次
+  I-7.1：判绿 1219 次、不适用 0 次
+  I-7.2：判绿 1219 次、不适用 0 次
+  I-7.4：判绿 1219 次、不适用 0 次
+  I-7.6：判绿 1219 次、不适用 0 次
+  I-7.7：判绿 1219 次、不适用 0 次
+  I-7.8：判绿 1219 次、不适用 0 次
+  I-9.1：判绿 1116 次、不适用 103 次
+  I-9.2：判绿 1116 次、不适用 103 次
+  I-9.4：判绿 1116 次、不适用 103 次
+  I-9.7：判绿 1116 次、不适用 103 次
+  I-9.10：判绿 1116 次、不适用 103 次
+  I-9.13：判绿 1116 次、不适用 103 次
+  I-9.14：判绿 1044 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：43 段；前几个种子 [(0, Operation(22)), (2, Operation(27)), (4, Operation(28)), (11, Operation(24)), (12, Operation(18)), (16, Operation(18)), (17, Operation(19)), (21, Operation(20))]
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+用时 3.9 秒
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 3.88s
+
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-B/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-B/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-B/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r1-opus/slot-B/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.31s
+     Running tests/second_transaction_supplement_three_random_history.rs (/tmp/claude-1000/m2-supp3-item1-r1-opus/target-B/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)

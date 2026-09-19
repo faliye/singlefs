@@ -1,0 +1,74 @@
+
+running 1 test
+test random_histories_large_tier_seeds_and_length_from_the_environment has been running for over 60 seconds
+── 随机历史大档 ──
+种子 [0, 3000)，每段 40 步
+历史 3000 段：跑完 1041、以已知红收尾 {0: 1929, 1: 30}、新发现 0；根环转过一圈的 2102 段；最高 txg 50
+  操作 PublishFirstFile：Ok 681、Err 2276、前提不满足没调 1968
+  操作 PublishOverwrite：Ok 21597、Err 3612、前提不满足没调 19793
+  操作 PublishWithoutUnits：Ok 376、Err 0、前提不满足没调 1896
+  操作 CloseAndMountWritable：Ok 10180、Err 4151、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 3701、Err 6186、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 2018、Err 5548、前提不满足没调 6344
+  操作 ColdStartRecover：Ok 4004、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 2858 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 16802 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 2010 次
+  内容长度 载荷容量：入口被调 2277 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 2022 次
+  内容长度 载荷容量 − 1：入口被调 2197 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：4151 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：1269 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：4279 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：100 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：268 次
+  Err 成员 MountError::RollbackTargetNotInRing：1940 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：3878 次
+  Err 成员 PublishError::ContentExceedsDataUnit：3724 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：2164 次
+  前提不满足（没有可写会话）：27492 次
+  前提不满足（现行版本带文件）：941 次
+  前提不满足（现行版本树表 0 条）：1568 次
+  冷启动结局 FileRead：2495 次
+  冷启动结局 NoFile：1509 次
+  一次挂载里最多写出 29 条根；一段历史里最多挂载成功 10 次、最多试挂载 19 次
+  抬 F 回收到落点 1315 次、共回收 33567 个落点；复用已释放的记录 10102 条（其中跨度变了 2750 条）；已释放的记录被删 492 条
+  checker 跑了 41553 次；一个写都没发、沿用上一次结论的 55778 步
+  I-1.1：判绿 41553 次、不适用 0 次
+  I-1.3：判绿 41553 次、不适用 0 次
+  I-1.4：判绿 41553 次、不适用 0 次
+  I-1.6：判绿 41553 次、不适用 0 次
+  I-1.7：判绿 41553 次、不适用 0 次
+  I-2.1：判绿 41553 次、不适用 0 次
+  I-2.3：判绿 41553 次、不适用 0 次
+  I-2.4：判绿 41553 次、不适用 0 次
+  I-2.5：判绿 41553 次、不适用 0 次
+  I-3.1：判绿 36245 次、不适用 3349 次
+  I-3.8：判绿 41553 次、不适用 0 次
+  I-3.9：判绿 38204 次、不适用 3349 次
+  I-4.8：判绿 41553 次、不适用 0 次
+  I-5.1：判绿 41553 次、不适用 0 次
+  I-5.2：判绿 38204 次、不适用 3349 次
+  I-5.4：判绿 38204 次、不适用 3349 次
+  I-7.1：判绿 41553 次、不适用 0 次
+  I-7.2：判绿 41553 次、不适用 0 次
+  I-7.4：判绿 41553 次、不适用 0 次
+  I-7.6：判绿 41553 次、不适用 0 次
+  I-7.7：判绿 41553 次、不适用 0 次
+  I-7.8：判绿 41553 次、不适用 0 次
+  I-9.1：判绿 38204 次、不适用 3349 次
+  I-9.2：判绿 38204 次、不适用 3349 次
+  I-9.4：判绿 38204 次、不适用 3349 次
+  I-9.7：判绿 38204 次、不适用 3349 次
+  I-9.10：判绿 38204 次、不适用 3349 次
+  I-9.13：判绿 38204 次、不适用 3349 次
+  I-9.14：判绿 36010 次、不适用 5543 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：1929 段；前几个种子 [(0, Operation(22)), (1, Operation(24)), (2, Operation(27)), (3, Operation(38)), (4, Operation(25)), (7, Operation(30)), (8, Operation(39)), (9, Operation(34))]
+已知红第 1 条（增补 2 收口表第 43 行）：30 段；前几个种子 [(80, Operation(21)), (174, Operation(10)), (254, Operation(15)), (292, Operation(15)), (435, Operation(17)), (556, Operation(37)), (616, Operation(11)), (659, Operation(26))]
+用时 254.2 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 254.26s
+
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
+     Running tests/second_transaction_supplement_three_random_history.rs (/tmp/claude-1000/m2-supp3-item1-r1-opus/target-B/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)

@@ -1,0 +1,32 @@
+
+running 1 test
+NEWRAISE seed=2 step=15 F=5 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1916928)，遍历全部有效根得到 1638400")]
+GAP seed=4 step=17 F=12 in_gap=true gaps=[step11:(2,10)->(10,13)] ring_before=Some([(20, 4), (19, 4), (18, 4), (17, 4), (16, 4), (15, 4), (14, 3), (13, 3), (12, 2), (11, 2), (10, 2), (9, 2), (8, 1), (7, 1), (6, 1), (5, 1)]) overcount_bytes=Some(1097728)
+NEWRAISE seed=5 step=14 F=9 in_gap=false gaps=[step2:(1,5)->(5,6)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2441216)，遍历全部有效根得到 1671168")]
+NEWRAISE seed=6 step=12 F=6 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1474560")]
+NEWRAISE seed=7 step=15 F=8 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 1835008")]
+NEWRAISE seed=9 step=11 F=10 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2211840)，遍历全部有效根得到 1212416")]
+NEWRAISE seed=11 step=11 F=8 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1622016)，遍历全部有效根得到 1114112")]
+NEWRAISE seed=12 step=12 F=12 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2244608)，遍历全部有效根得到 1441792")]
+NEWRAISE seed=15 step=16 F=7 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1622016)，遍历全部有效根得到 1212416")]
+NEWRAISE seed=16 step=8 F=4 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1392640)，遍历全部有效根得到 1212416")]
+NEWRAISE seed=17 step=7 F=4 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1294336)，遍历全部有效根得到 1114112")]
+NEWRAISE seed=18 step=15 F=7 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2080768)，遍历全部有效根得到 1671168")]
+NEWRAISE seed=20 step=20 F=7 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 1966080")]
+NEWRAISE seed=21 step=13 F=11 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2473984)，遍历全部有效根得到 1310720")]
+NEWRAISE seed=23 step=9 F=3 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1785856)，遍历全部有效根得到 1769472")]
+NEWRAISE seed=24 step=25 F=11 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2605056)，遍历全部有效根得到 1507328")]
+NEWRAISE seed=25 step=12 F=7 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 1540096")]
+NEWRAISE seed=34 step=13 F=4 in_gap=false gaps=[step5:(2,8)->(8,11)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2015232)，遍历全部有效根得到 1835008")]
+NEWRAISE seed=35 step=7 F=4 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1294336)，遍历全部有效根得到 1114112")]
+NEWRAISE seed=36 step=14 F=3 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2310144)，遍历全部有效根得到 2293760")]
+NEWRAISE seed=40 step=20 F=3 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2260992")]
+NEWRAISE seed=42 step=16 F=4 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2277376)，遍历全部有效根得到 2162688")]
+NEWRAISE seed=45 step=22 F=3 in_gap=false gaps=[] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1802240")]
+NEWRAISE seed=46 step=11 F=4 in_gap=false gaps=[step2:(1,3)->(3,4)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1490944)，遍历全部有效根得到 1376256")]
+NEWRAISE seed=47 step=16 F=3 in_gap=false gaps=[step5:(2,6)->(6,9)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(2048000)，遍历全部有效根得到 2031616")]
+SUMMARY first=0 seeds=48 ops=30 weights=偏向抬 F 之后的复用（第 121 行那一类的取样点） {"completed": 2, "form1_in_gap=true": 1, "known_red_0": 21, "known_red_1": 1, "new:CheckerViolations { invariants: [\"I-3.1\"] }": 24}
+test opus_r2_gap_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.93s
+

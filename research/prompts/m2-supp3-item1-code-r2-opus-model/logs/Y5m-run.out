@@ -1,0 +1,9 @@
+restored
+Y5m1 lib exit 0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.04s
+Y5m1 integration red 10 / 10 ; last: test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.73s
+Y5m2 lib exit 0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.02s
+Y5m2 integration red 0 / 10 ; last: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 3.97s
+Y5m3 lib exit 0 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.03s
+Y5m3 integration red 0 / 10 ; last: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 2.61s
+
+[exited with code 0]

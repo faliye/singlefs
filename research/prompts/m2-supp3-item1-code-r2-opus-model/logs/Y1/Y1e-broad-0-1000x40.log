@@ -1,0 +1,18 @@
+
+running 1 test
+test opus_r2_gap_probe has been running for over 60 seconds
+GAP seed=80 step=21 F=8 in_gap=true gaps=[step5:(2,8)->(8,9),step6:(2,7)->(7,11)] ring_before=Some([(19, 5), (18, 5), (17, 5), (16, 5), (15, 5), (14, 4), (13, 4), (12, 4), (11, 4), (10, 3), (9, 3), (8, 2), (7, 2), (6, 2), (5, 2), (4, 2)]) overcount_bytes=Some(98304)
+NEWRAISE seed=174 step=10 F=6 in_gap=true gaps=[step3:(2,4)->(4,7)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1376256)，遍历全部有效根得到 1277952")]
+GAP seed=254 step=15 F=4 in_gap=true gaps=[step2:(1,3)->(3,6),step6:(2,6)->(6,9)] ring_before=Some([(19, 4), (18, 4), (17, 4), (16, 4), (15, 4), (14, 4), (13, 4), (12, 4), (11, 4), (10, 3), (9, 3), (8, 2), (7, 2), (6, 2), (5, 1), (4, 1)]) overcount_bytes=Some(98304)
+GAP seed=292 step=15 F=4 in_gap=true gaps=[step1:(1,3)->(3,5),step7:(2,10)->(10,14)] ring_before=Some([(20, 5), (19, 5), (18, 5), (17, 4), (16, 4), (15, 4), (14, 4), (13, 3), (12, 3), (11, 3), (10, 2), (9, 2), (8, 2), (7, 2), (6, 2), (5, 2)]) overcount_bytes=Some(98304)
+NEWRAISE seed=435 step=17 F=14 in_gap=true gaps=[step10:(2,5)->(5,13),step12:(2,4)->(4,15)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1048576")]
+NEWRAISE seed=616 step=11 F=4 in_gap=true gaps=[step2:(1,3)->(3,5)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1409024)，遍历全部有效根得到 1310720")]
+NEWRAISE seed=693 step=14 F=5 in_gap=true gaps=[step5:(1,4)->(4,7)] lands=Some(false) turned=false violations=[("I-3.1", "盘 0：记账的已分配 Some(1376256)，遍历全部有效根得到 1277952")]
+GAP seed=701 step=21 F=5 in_gap=true gaps=[step5:(1,3)->(3,6)] ring_before=Some([(20, 3), (19, 3), (18, 3), (17, 3), (16, 3), (15, 3), (14, 3), (13, 3), (12, 3), (11, 3), (10, 2), (9, 2), (8, 2), (7, 2), (6, 2), (5, 1)]) overcount_bytes=Some(98304)
+GAP seed=752 step=19 F=6 in_gap=true gaps=[step9:(2,5)->(5,9),step11:(4,9)->(9,11)] ring_before=Some([(18, 5), (17, 5), (16, 5), (15, 5), (14, 5), (13, 5), (12, 5), (11, 5), (10, 4), (9, 4), (8, 3), (7, 3), (6, 3), (5, 2), (4, 2), (3, 1)]) overcount_bytes=Some(98304)
+GAP seed=832 step=33 F=9 in_gap=true gaps=[step26:(3,7)->(7,16)] ring_before=Some([(21, 5), (20, 5), (19, 5), (18, 5), (17, 5), (16, 5), (15, 4), (14, 4), (13, 4), (12, 4), (11, 4), (10, 3), (9, 3), (8, 3), (7, 3), (6, 3)]) overcount_bytes=Some(98304)
+SUMMARY first=0 seeds=1000 ops=40 weights=各类操作都抽（快档、大档） {"completed": 362, "form1_in_gap=true": 6, "known_red_0": 628, "known_red_1": 6, "new:CheckerViolations { invariants: [\"I-3.1\"] }": 4}
+test opus_r2_gap_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 72.27s
+

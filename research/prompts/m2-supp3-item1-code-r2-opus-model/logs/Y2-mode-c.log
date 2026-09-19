@@ -1,0 +1,88 @@
+
+running 1 test
+Y2 mode=c tier=fast new_findings=1 mount_rewrites=14 other_rewrites=34 mount_records=3841
+  种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）
+  历史 96 段：跑完 34、以已知红收尾 {0: 44, 1: 1}、新发现 17；根环转过一圈的 49 段；最高 txg 29
+    操作 PublishFirstFile：Ok 24、Err 55、前提不满足没调 56
+    操作 PublishOverwrite：Ok 589、Err 92、前提不满足没调 453
+    操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 58
+    操作 CloseAndMountWritable：Ok 300、Err 92、前提不满足没调 0
+    操作 CloseAndMountRollback：Ok 105、Err 189、前提不满足没调 0
+    操作 RaiseRollbackFloor：Ok 32、Err 146、前提不满足没调 137
+    操作 ColdStartRecover：Ok 92、Err 0、前提不满足没调 0
+    内容长度 0 字节：入口被调 78 次、发成 76 次
+    内容长度 [1, 载荷容量 − 2]：入口被调 446 次、发成 415 次
+    内容长度 数据单元整宽 32768（装不下）：入口被调 45 次、发成 0 次
+    内容长度 载荷容量：入口被调 67 次、发成 63 次
+    内容长度 载荷容量 + 1（装不下）：入口被调 59 次、发成 0 次
+    内容长度 载荷容量 − 1：入口被调 65 次、发成 59 次
+    Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+    Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+    Err 成员 MountError::RollbackFloorAboveCeiling：112 次
+    Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：5 次
+    Err 成员 MountError::RollbackTargetNotInRing：59 次
+    Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：125 次
+    Err 成员 PublishError::ContentExceedsDataUnit：96 次
+    Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：51 次
+    前提不满足（没有可写会话）：652 次
+    前提不满足（现行版本带文件）：28 次
+    前提不满足（现行版本树表 0 条）：24 次
+    冷启动结局 FileRead：73 次
+    冷启动结局 NoFile：19 次
+    一次挂载里最多写出 13 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+    抬 F 回收到落点 21 次、共回收 592 个落点；复用已释放的记录 34 条（其中跨度变了 10 条）；已释放的记录被罩住起点 0 条、被删 0 条
+    checker 跑了 1153 次；一个写都没发、沿用上一次结论的 1370 步
+    I-1.1：判绿 1153 次、不适用 0 次
+    I-1.3：判绿 1153 次、不适用 0 次
+    I-1.4：判绿 1153 次、不适用 0 次
+    I-1.6：判绿 1153 次、不适用 0 次
+    I-1.7：判绿 1153 次、不适用 0 次
+    I-2.1：判绿 1153 次、不适用 0 次
+    I-2.3：判绿 1153 次、不适用 0 次
+    I-2.4：判绿 1153 次、不适用 0 次
+    I-2.5：判绿 1153 次、不适用 0 次
+Y2 mode=c tier=reuse new_findings=1 mount_rewrites=14 other_rewrites=66 mount_records=1979
+  种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+  历史 48 段：跑完 2、以已知红收尾 {0: 17, 1: 1}、新发现 28；根环转过一圈的 27 段；最高 txg 28
+    操作 PublishFirstFile：Ok 5、Err 8、前提不满足没调 2
+    操作 PublishOverwrite：Ok 398、Err 56、前提不满足没调 25
+    操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 8
+    操作 CloseAndMountWritable：Ok 183、Err 4、前提不满足没调 0
+    操作 CloseAndMountRollback：Ok 10、Err 7、前提不满足没调 0
+    操作 RaiseRollbackFloor：Ok 50、Err 131、前提不满足没调 7
+    操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+    内容长度 0 字节：入口被调 65 次、发成 64 次
+    内容长度 [1, 载荷容量 − 2]：入口被调 263 次、发成 259 次
+    内容长度 数据单元整宽 32768（装不下）：入口被调 29 次、发成 0 次
+    内容长度 载荷容量：入口被调 40 次、发成 38 次
+    内容长度 载荷容量 + 1（装不下）：入口被调 28 次、发成 0 次
+    内容长度 载荷容量 − 1：入口被调 42 次、发成 42 次
+    Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：4 次
+    Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+    Err 成员 MountError::RollbackFloorAboveCeiling：94 次
+    Err 成员 MountError::RollbackTargetNotInRing：3 次
+    Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+    Err 成员 PublishError::ContentExceedsDataUnit：56 次
+    Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：8 次
+    前提不满足（没有可写会话）：35 次
+    前提不满足（现行版本带文件）：7 次
+    冷启动结局 FileRead：6 次
+    冷启动结局 NoFile：1 次
+    一次挂载里最多写出 16 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+    抬 F 回收到落点 32 次、共回收 814 个落点；复用已释放的记录 66 条（其中跨度变了 22 条）；已释放的记录被罩住起点 0 条、被删 0 条
+    checker 跑了 694 次；一个写都没发、沿用上一次结论的 255 步
+    I-1.1：判绿 694 次、不适用 0 次
+    I-1.3：判绿 694 次、不适用 0 次
+    I-1.4：判绿 694 次、不适用 0 次
+    I-1.6：判绿 694 次、不适用 0 次
+    I-1.7：判绿 694 次、不适用 0 次
+    I-2.1：判绿 694 次、不适用 0 次
+    I-2.3：判绿 694 次、不适用 0 次
+    I-2.4：判绿 694 次、不适用 0 次
+    I-2.5：判绿 694 次、不适用 0 次
+    I-3.1：判绿 664 次、不适用 12 次
+    I-3.8：判绿 694 次、不适用 0 次
+test opus_r2_y2_mount_only_generation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.94s
+

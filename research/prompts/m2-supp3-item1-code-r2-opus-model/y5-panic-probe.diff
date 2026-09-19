@@ -1,0 +1,49 @@
+--- slotY5/crates/singlefs-harness/src/crash.rs	2026-09-18 19:46:28.095163762 +0000
++++ slotY5p/crates/singlefs-harness/src/crash.rs	2026-09-18 21:05:27.303446161 +0000
+@@ -775,6 +775,13 @@
+     tally: &mut Layer0Tally,
+ ) -> RecoveryReport {
+     let root_persisted = persisted[judged_root_index];
++    // 攻方探针：OPUS_PANIC_AT="k1,k2" 时持久写数等于 k1 / k2 的状态 panic，消息里带那个数（只在副本上）。
++    if let Ok(list) = std::env::var("OPUS_PANIC_AT") {
++        let persisted_count = persisted.iter().filter(|p| **p).count();
++        if list.split(',').any(|k| k.parse::<usize>().ok() == Some(persisted_count)) {
++            panic!("OPUS_PANIC persisted_count={persisted_count}");
++        }
++    }
+     let newest_persisted = newest_persisted_root(writes, &persisted);
+     let image = CrashImage {
+         base,
+--- slotY5/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs	2026-09-18 20:56:57.039889439 +0000
++++ slotY5p/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs	2026-09-18 21:05:57.255475001 +0000
+@@ -1372,3 +1372,30 @@
+     }
+     println!("OPUS_Y5_SUMMARY trials={trials} first_trial={first_trial} states={total_states} trials_with_violations={trials_with_violations} trials_with_checker_violations={trials_with_checker_violations}");
+ }
++
++/// 攻方探针：同一段流、同一组会 panic 的状态，单线程原写法与并行版各跑一次，各自 catch_unwind，报 panic 载荷。
++#[test]
++#[ignore = "攻方探针"]
++fn opus_r2_panic_payloads() {
++    let prepared = prepare("opus-y5-panic", Script::ReuseAfterRaisingFloor);
++    let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
++    let threads: usize = std::env::var("OPUS_THREADS").map_or(8, |t| t.parse().unwrap());
++    let text = |payload: Box<dyn std::any::Any + Send>| {
++        payload.downcast_ref::<String>().cloned().or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string())).unwrap_or_default()
++    };
++    if std::env::var("OPUS_LIST").is_ok() {
++        let mut counts = Vec::new();
++        let _ = opus_reference_walk(&prepared.base, &prepared.writes, &prepared.segments, prepared.judged_root_index, &prepared.versions, &expand, &mut |image, _| counts.push(image.persisted.iter().filter(|p| **p).count()));
++        println!("OPUS_COUNTS {:?}", counts);
++        return;
++    }
++    let reference = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++        opus_reference_walk(&prepared.base, &prepared.writes, &prepared.segments, prepared.judged_root_index, &prepared.versions, &expand, &mut |_, _| {})
++    }));
++    println!("OPUS_PANIC reference payload={:?}", reference.err().map(text));
++    let parallel = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++        enumerate_layer0_in_state_slices(&prepared.base, &prepared.writes, &prepared.segments, prepared.judged_root_index, &prepared.versions, &expand,
++            Layer0Parallelism { worker_threads: NonZeroUsize::new(threads).unwrap(), worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller, slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MIN) }, None)
++    }));
++    println!("OPUS_PANIC parallel threads={threads} payload={:?}", parallel.err().map(text));
++}

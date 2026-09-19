@@ -1,0 +1,14 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1-r2-opus/slotY5m/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.74s
+     Running unittests src/lib.rs (target/release/deps/singlefs_harness-324bc1006f1fc5cf)
+
+running 6 tests
+test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 0.03s
+

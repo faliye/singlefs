@@ -1,0 +1,8 @@
+
+running 1 test
+GAP seed=80 step=21 F=8 in_gap=true gaps=[step5:(2,8)->(8,9),step6:(2,7)->(7,11)] ring_before=Some([(19, 5), (18, 5), (17, 5), (16, 5), (15, 5), (14, 4), (13, 4), (12, 4), (11, 4), (10, 3), (9, 3), (8, 2), (7, 2), (6, 2), (5, 2), (4, 2)]) overcount_bytes=Some(98304)
+SUMMARY first=0 seeds=96 ops=30 weights=各类操作都抽（快档、大档） {"completed": 44, "form1_in_gap=true": 1, "known_red_0": 51, "known_red_1": 1}
+test opus_r2_gap_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.51s
+

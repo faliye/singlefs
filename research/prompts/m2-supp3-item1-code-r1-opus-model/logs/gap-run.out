@@ -1,0 +1,11 @@
+A1 GAP-SUMMARY first 0 seeds 96 ops 30: form1 18 in_gap 1 not_in_gap 17
+A2 GAP-SUMMARY first 0 seeds 96 ops 30: form1 18 in_gap 1 not_in_gap 17
+A5 GAP-SUMMARY first 0 seeds 96 ops 30: form1 20 in_gap 1 not_in_gap 19
+A8 GAP-SUMMARY first 0 seeds 96 ops 30: form1 20 in_gap 1 not_in_gap 19
+A2 GAP-SUMMARY first 0 seeds 1000 ops 30: form1 227 in_gap 9 not_in_gap 218
+# 16:05Z 以上 A8（96x30）与 A2（1000x30）两行在 checker 残留 A5 变异的副本上跑出（run-gap.sh 还原用 mv 没 touch，cargo 没重编 checker），作废；下面重跑。
+A8 GAP-SUMMARY first 0 seeds 96 ops 30: form1 18 in_gap 1 not_in_gap 17
+A2 GAP-SUMMARY first 0 seeds 1000 ops 30: form1 196 in_gap 9 not_in_gap 187
+A1 GAP-SUMMARY first 0 seeds 1000 ops 30: form1 196 in_gap 9 not_in_gap 187
+# 16:12Z 第一轮 A5（96x30）也作废：它在 A2 之后跑，mount.rs 还原没 touch，core 里还是 A2；下面重跑。
+A5 GAP-SUMMARY first 0 seeds 96 ops 30: form1 20 in_gap 1 not_in_gap 19

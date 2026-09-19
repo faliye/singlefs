@@ -1,0 +1,8 @@
+
+running 1 test
+GAP seed=4 step=17 F=12 in_gap=true gaps=[step11:(2,10)->(10,13)] ring_before=Some([(20, 4), (19, 4), (18, 4), (17, 4), (16, 4), (15, 4), (14, 3), (13, 3), (12, 2), (11, 2), (10, 2), (9, 2), (8, 1), (7, 1), (6, 1), (5, 1)]) overcount_bytes=Some(98304)
+SUMMARY first=0 seeds=48 ops=30 weights=偏向抬 F 之后的复用（第 121 行那一类的取样点） {"completed": 20, "form1_in_gap=true": 1, "known_red_0": 27, "known_red_1": 1}
+test opus_r2_gap_probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.64s
+

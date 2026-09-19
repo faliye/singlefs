@@ -1,0 +1,33 @@
+
+running 1 test
+
+thread 'opus_r2_panic_payloads' (3597543) panicked at crates/singlefs-harness/src/crash.rs:782:13:
+OPUS_PANIC persisted_count=28
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+OPUS_PANIC reference payload=Some("OPUS_PANIC persisted_count=28")
+LAYER0_PARALLEL_START states=108 slices=108 states_per_slice=1 worker_threads=8 configured_worker_threads=8 worker_threads_source=given_by_caller
+LAYER0_PROGRESS slice=1/108 states=[0,1) segments=0..=0 finished_slices=1/108 finished_states=1/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=2/108 states=[1,2) segments=0..=0 finished_slices=2/108 finished_states=2/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=5/108 states=[4,5) segments=1..=1 finished_slices=3/108 finished_states=3/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=4/108 states=[3,4) segments=1..=1 finished_slices=4/108 finished_states=4/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=3/108 states=[2,3) segments=0..=0 finished_slices=5/108 finished_states=5/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=7/108 states=[6,7) segments=2..=2 finished_slices=6/108 finished_states=6/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=6/108 states=[5,6) segments=1..=1 finished_slices=7/108 finished_states=7/108 elapsed_seconds=0.0
+
+thread '<unnamed>' (3597549) panicked at crates/singlefs-harness/src/crash.rs:782:13:
+OPUS_PANIC persisted_count=28
+LAYER0_PROGRESS slice=8/108 states=[7,8) segments=3..=3 finished_slices=8/108 finished_states=8/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=9/108 states=[8,9) segments=3..=3 finished_slices=9/108 finished_states=9/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=10/108 states=[9,10) segments=3..=3 finished_slices=10/108 finished_states=10/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=11/108 states=[10,11) segments=4..=4 finished_slices=11/108 finished_states=11/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=12/108 states=[11,12) segments=4..=4 finished_slices=12/108 finished_states=12/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=14/108 states=[13,14) segments=5..=5 finished_slices=13/108 finished_states=13/108 elapsed_seconds=0.0
+LAYER0_PROGRESS slice=13/108 states=[12,13) segments=4..=4 finished_slices=14/108 finished_states=14/108 elapsed_seconds=0.0
+
+thread 'opus_r2_panic_payloads' (3597543) panicked at crates/singlefs-harness/src/crash.rs:1259:39:
+a scoped thread panicked
+OPUS_PANIC parallel threads=8 payload=Some("a scoped thread panicked")
+test opus_r2_panic_payloads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.54s
+
