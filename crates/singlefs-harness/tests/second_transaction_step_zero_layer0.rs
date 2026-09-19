@@ -6,6 +6,8 @@
 
 mod common;
 
+use std::num::{NonZeroU64, NonZeroUsize};
+
 use common::{build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration, SlotNumber};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
@@ -15,16 +17,18 @@ use singlefs_core::mount::{
 };
 use singlefs_core::recovery::{
     choose_superblock, recover, scan_journal, JournalPolicy, PoolReader, RecoveryOutcome,
+    RecoveryReport,
 };
 use singlefs_core::superblock::Superblock;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_core::unit::{UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
 use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES};
 use singlefs_harness::crash::{
-    closed_form_state_count, enumerate_layer0_selecting_versions,
+    closed_form_state_count, enumerate_layer0_in_state_slices, enumerate_layer0_selecting_versions,
     enumerate_layer0_selecting_versions_observing_each_state, enumerate_layer0_versions,
-    evaluate_state_for_versions, writes_and_segments, CrashImage, Layer0Tally, MemoryPool,
-    PublishedVersion, RetainedWrite,
+    evaluate_state_for_versions, writes_and_segments, CrashImage, Layer0Parallelism,
+    Layer0SliceLength, Layer0Tally, Layer0WorkerThreadsSource, MemoryPool, PublishedVersion,
+    RetainedWrite,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::RetainedOperation;
@@ -466,6 +470,67 @@ fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_r
     );
     assert!(tally.file_read_states > 0 && tally.no_file_states > 0);
     assert_checker_and_record_checker_clean(&tally);
+}
+
+/// 层 0 按状态序号区间切片、多线程跑（2026-09-18 用户定：测试与崩溃检测优先多线程）：到 E 的固定脚本、平时跑的那 108 个状态，
+/// 切成每片 1 个状态、8 个线程抢着跑，与整条流 1 片、1 个线程逐个跑相比，计数逐项相同、「第一处违例」是序号最小的那一处、
+/// 观察者按同一个次序看到同一串持久集合。版本表故意把 B（实例 1 第 4 代）的内容换成 C 的，让违例散在很多个状态上，「第一处」才有得选。
+#[test]
+fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread(
+) {
+    let prepared = prepare("layer0-slices-merge", Script::ReuseAfterRaisingFloor);
+    let mut versions_with_the_wrong_second_content = prepared.versions.clone();
+    versions_with_the_wrong_second_content
+        .iter_mut()
+        .find(|version| {
+            version.instance == InstanceGeneration(1) && version.checkpoint_txg == CheckpointTxg(4)
+        })
+        .expect("版本表里有 B 那一版")
+        .content = third_content();
+    let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;
+    let run = |parallelism: Layer0Parallelism| {
+        let mut observed_persisted_sets: Vec<Vec<bool>> = Vec::new();
+        let tally = enumerate_layer0_in_state_slices(
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            prepared.judged_root_index,
+            &versions_with_the_wrong_second_content,
+            &expand,
+            parallelism,
+            Some(
+                &mut |crash_image: &CrashImage<'_>, _consulted_report: &RecoveryReport| {
+                    observed_persisted_sets.push(crash_image.persisted.clone());
+                },
+            ),
+        );
+        (tally, observed_persisted_sets)
+    };
+    let (one_slice_tally, one_slice_order) = run(Layer0Parallelism {
+        worker_threads: NonZeroUsize::MIN,
+        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
+        slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MAX),
+    });
+    let (one_state_slices_tally, one_state_slices_order) = run(Layer0Parallelism {
+        worker_threads: NonZeroUsize::new(8).expect("8 不是 0"),
+        worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller,
+        slice_length: Layer0SliceLength::StatesPerSlice(NonZeroU64::MIN),
+    });
+    assert_eq!(one_slice_tally.states, 108, "平时跑的那 108 个状态");
+    assert!(
+        one_slice_tally.violations >= 2 && one_slice_tally.ignored_violations >= 2,
+        "B 的内容换掉之后违例散在多个状态上：{} 个、不看 journal 那一遍 {} 个",
+        one_slice_tally.violations,
+        one_slice_tally.ignored_violations
+    );
+    assert_eq!(
+        one_state_slices_order, one_slice_order,
+        "观察者按序号次序看到同一串持久集合"
+    );
+    assert_eq!(
+        one_state_slices_tally, one_slice_tally,
+        "计数与每一处「第一处」都逐项相同"
+    );
 }
 
 /// 全量：固定脚本到 E 为止 54 段、闭式 2 104 413 个状态（八个 18 写段各 262143、七个 10 写段各 1023、两个 4 写段各 15，其余 2 写段各 3、1 写段各 1）。

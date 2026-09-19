@@ -17,6 +17,7 @@ pub mod crash;
 pub mod device_log;
 pub mod first_transaction_regions;
 pub mod hexadecimal;
+pub mod history;
 pub mod scenario;
 pub mod segments;
 pub mod sha256;
@@ -121,6 +122,11 @@ impl SharedStream {
     #[must_use]
     pub fn operations(&self) -> Vec<RecordedOperation> {
         self.0.borrow().operations.clone()
+    }
+    /// 流里已有几步（不拷整条流）：随机历史拿它判「这一步发没发写」。
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.0.borrow().operations.len()
     }
     /// 每一步连同它的内容；没开内容保留的流里 `contents` 全是 None。
     #[must_use]
