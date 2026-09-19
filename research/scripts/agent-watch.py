@@ -46,6 +46,24 @@ DEFAULT_DETECTIONS = "/tmp/claude-1000/agent-hook-detections.jsonl"
 WAIT_LOOP_PATTERN = re.compile(r"\b(until|while)\b[\s\S]*\bsleep\b")
 BANNED_COMMAND_PATTERN = re.compile(r"\bpgrep\s+-f\b|\bpkill\s+-f\b|\bkillall\b")
 BROKEN_DETECTION = os.environ.get("AGENT_WATCH_BREAK", "")
+# 禁用命令只报这个窗口里发出的：看门狗每次起都从头读会话记录，窗外的旧命令会让每一次重起当场退出、再也盯不住那个 agent。
+BANNED_COMMAND_WINDOW_SECONDS = 600
+HEREDOC_START_PATTERN = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def command_without_heredoc_bodies(command):
+    """去掉 heredoc 的正文，只留真会执行的那几行：往报告里写的一句「pgrep -f 会命中自己」不是在用它。"""
+    if BROKEN_DETECTION == "heredoc":
+        return command
+    kept, terminators = [], []
+    for line in command.split("\n"):
+        if terminators:
+            if line.strip() == terminators[0]:
+                terminators.pop(0)
+            continue
+        kept.append(line)
+        terminators.extend(match.group(2) for match in HEREDOC_START_PATTERN.finditer(line))
+    return "\n".join(kept)
 STOP_AFTER_LAST_RECORD_SECONDS = 30  # 停在工具中途时，被停之后还可能落几条收尾记录
 NO_WAKE_GRACE_SECONDS = 60           # 结束本轮之后，完成通知可能还在路上
 BACKGROUND_STARTED = re.compile(r"^Command running in background with ID: (\w+)")
@@ -226,6 +244,10 @@ class AgentTranscript:
                             last_kind = "interrupted"
                 elif isinstance(content, str) and "[Request interrupted" in content:
                     last_kind = "interrupted"
+                # 交回之后来的续做消息（origin 是 coordinator）：还没调工具也已经不算交回——续做的头几秒它在想，看门狗不能当场报「全部交回」退出。
+                # 后台任务的完成通知（origin 是 task-notification）不算：它叫醒之后要是又调工具，上面按调工具撤销。
+                if (record.get("origin") or {}).get("kind") == "coordinator" and BROKEN_DETECTION != "resume":
+                    is_handed_back = False
         self.pending_tool = max(pending_by_id.values(), key=lambda item: item[0]) if pending_by_id else None
         if last_kind == "interrupted":
             self.state = "被停"
@@ -369,7 +391,6 @@ def agent_alerts(transcript, now, thresholds):
         alerts.append(("无动静", f"最后一条记录在 {format_duration((now - transcript.last_timestamp).total_seconds())} 以前，没有工具在跑",
                        "主 agent 判断：模型调用是不是卡住或撞了限额；看会话记录最后几条，再决定等、发消息续做、还是停掉重派"))
     recent_entries = transcript.bash_commands[-10:]
-    recent_commands = [entry[1] for entry in recent_entries]
     if BROKEN_DETECTION != "repeat":
         counts = {}
         for _, command, output, _ in recent_entries:
@@ -382,8 +403,11 @@ def agent_alerts(transcript, now, thresholds):
                 alerts.append(("同一命令反复且输出不变", f"最近 10 次命令里这条出现 {count} 次，每次输出一模一样：{command[:160]}",
                                "定期复检输出会变，一模一样多半是在等一个不会变的结果；主 agent 判断要不要发消息让它换个看法，还是接着等"))
     if BROKEN_DETECTION != "banned":
-        for command in recent_commands:
-            if BANNED_COMMAND_PATTERN.search(command):
+        banned_window_seconds = max(BANNED_COMMAND_WINDOW_SECONDS, 2 * thresholds.interval_seconds)
+        for issued_at, command, _, _ in recent_entries:
+            if BROKEN_DETECTION != "bannedwindow" and (now - issued_at).total_seconds() > banned_window_seconds:
+                continue
+            if BANNED_COMMAND_PATTERN.search(command_without_heredoc_bodies(command)):
                 alerts.append(("禁用命令", f"用了按模式匹配的进程命令：{command[:160]}",
                                "pgrep -f / pkill -f 会命中自己所在的 shell（command-safety.md）；主 agent 判断它等的或要杀的是哪个进程，再发消息让它改用写死的 pid"))
                 break
@@ -656,7 +680,7 @@ def iso_minutes_ago(minutes):
     return (datetime.now(timezone.utc).timestamp() - minutes * 60)
 
 
-def record_at(minutes_ago, role, content, stop_reason=None, message_id=None, usage=None):
+def record_at(minutes_ago, role, content, stop_reason=None, message_id=None, usage=None, origin_kind=None):
     stamp = datetime.fromtimestamp(iso_minutes_ago(minutes_ago), timezone.utc).isoformat().replace("+00:00", "Z")
     message = {"role": role, "content": content}
     if stop_reason:
@@ -665,7 +689,10 @@ def record_at(minutes_ago, role, content, stop_reason=None, message_id=None, usa
         message["id"] = message_id
     if usage:
         message["usage"] = usage
-    return {"timestamp": stamp, "type": role, "message": message}
+    record = {"timestamp": stamp, "type": role, "message": message}
+    if origin_kind:
+        record["origin"] = {"kind": origin_kind}
+    return record
 
 
 def bash_use(minutes_ago, tool_id, command, message_id):
@@ -687,7 +714,7 @@ def handback_records(minutes_ago, tool_id, message_id):
 
 def selftest():
     work = tempfile.mkdtemp(prefix="agent-watch-selftest-")
-    thresholds = argparse.Namespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3,
+    thresholds = argparse.Namespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3, interval_seconds=240,
                                     process_report_minutes=0.02, process_stale_minutes=0.05, process_max_minutes=600,
                                     not_started_minutes=5, active_minutes=600)
     session = os.path.join(work, "session")
@@ -703,6 +730,14 @@ def selftest():
                                             record_at(2.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m2"),
                                             record_at(2, "user", "续做：再补一格"), bash_use(1, "t2", "ls", "m3"), bash_result(0.9, "t2")],
                      {"agentType": "experiment-runner", "description": "交回之后被续做"})
+    write_transcript(session, "resumedthinking", [*handback_records(3, "h1", "m1"),
+                                                  record_at(2.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m2"),
+                                                  record_at(0.2, "user", "续做：按判决改", origin_kind="coordinator")],
+                     {"agentType": "implementation-writer", "description": "交回之后刚被续做、还没调工具"})
+    write_transcript(session, "notifiedafterhandback", [*handback_records(3, "h1", "m1"),
+                                                        record_at(2.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m2"),
+                                                        record_at(0.2, "user", "[SYSTEM NOTIFICATION - NOT USER INPUT] 后台任务跑完了", origin_kind="task-notification")],
+                     {"agentType": "implementation-writer", "description": "交回之后收到后台任务的完成通知"})
     write_transcript(session, "waitloop", [bash_use(5, "t1", 'until grep -q "^exit=" log; do sleep 10; done', "m1")])
     write_transcript(session, "longtool", [bash_use(20, "t1", "cargo test --release", "m1")])
     write_transcript(session, "healthy", [bash_use(0.5, "t1", "cargo build", "m1")])
@@ -717,6 +752,12 @@ def selftest():
                              record_at(2.9 - index * 0.5, "user", [{"type": "tool_result", "tool_use_id": f"g{index}", "content": f"第 {index} 行"}])]
     write_transcript(session, "repeatchanging", changing_records)
     write_transcript(session, "banned", [bash_use(1, "t1", "pgrep -f e154-binary", "m1"), bash_result(0.9, "t1")])
+    write_transcript(session, "bannedheredoc", [bash_use(1, "t1", "cat >> report.md <<'EOF'\n等进程别用 pgrep -f，它会命中自己\nEOF\nls", "m1"),
+                                                bash_result(0.9, "t1")])
+    write_transcript(session, "bannedafterheredoc", [bash_use(1, "t1", "cat > note.md <<EOF\n说明\nEOF\npgrep -f e154-binary", "m1"),
+                                                     bash_result(0.9, "t1")])
+    write_transcript(session, "bannedold", [bash_use(60, "t1", "pgrep -f e154-binary", "m1"), bash_result(59.9, "t1"),
+                                            bash_use(1, "t2", "ls", "m2"), bash_result(0.9, "t2")])
     write_transcript(session, "idle", [bash_use(40, "t1", "ls", "m1"), bash_result(39, "t1")])
     write_transcript(session, "interrupted", [bash_use(40, "t1", "ls", "m1"), bash_result(39, "t1"),
                                               record_at(39, "user", [{"type": "text", "text": "[Request interrupted by user]"}])])
@@ -777,7 +818,7 @@ def selftest():
     expectations = {
         "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
         "stoppedidle": set(), "stoppedcontinued": set(), "stoppedtwice": set(), "wokenup": set(), "nowake": {"结束本轮却不会醒"},
-        "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "idle": {"无动静"},
+        "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
     }
     now = datetime.now(timezone.utc)
     for agent_id, wanted in expectations.items():
@@ -786,7 +827,7 @@ def selftest():
         if got != wanted:
             failures.append(f"子 agent {agent_id}：应当告警 {sorted(wanted) or '无'}，实际 {sorted(got) or '无'}")
     wanted_done = {"finished": True, "interrupted": True, "stoppedidle": True, "waiting": False, "continued": False, "healthy": False,
-                   "stoppedcontinued": False, "stoppedtwice": True, "nowake": False, "wokenup": False}
+                   "stoppedcontinued": False, "stoppedtwice": True, "nowake": False, "wokenup": False, "resumedthinking": False, "notifiedafterhandback": True}
     for agent_id, wanted in wanted_done.items():
         transcript = AgentTranscript(agent_id, find_transcript(agent_id, session))
         if transcript.is_done() != wanted:

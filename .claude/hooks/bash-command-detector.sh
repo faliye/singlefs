@@ -19,11 +19,14 @@
 #      「结束本轮、手里没有在跑的后台任务、也没交回」告警兜）；引号里当数据用的 `&`（sed 替换串、URL 参数）会误记，
 #      不能一概跳过引号，`bash -c '… &'` 里的 `&` 是真放后台；`… & (wait)`、`bash -c '… &'; wait` 这种等不到的 `wait` 认不出。
 # 主 agent 的看门狗（research/scripts/agent-watch.py watch）每 15 秒读一次检出记录，读到本会话的检出就退出、叫醒主 agent。
-# 只看顶层命令文本；命令里只是带着这些字（heredoc 里的测试数据）也会被记一条，主 agent 看了判断即可。
+# 三种检出都先剥掉喂给非 shell 命令的 heredoc 正文（往报告里写一句「别用 pgrep -f」不是在用它；2026-09-18 撞过，
+# `records/2026-09-16-subagent拆分提案.md` 第二十五节）；喂给 bash / sh 的 heredoc 正文照查。其余只看顶层命令文本，
+# 引号里当数据写的这些字（`echo "pgrep -f"`）也会被记一条，主 agent 看了判断即可。
 #
 #   bash-command-detector.sh             # 从 stdin 读 hook 的 JSON，永远退出 0
-#   bash-command-detector.sh --selftest  # 走一遍检出与不检出；BASH_COMMAND_DETECTOR_DISABLE_CHECK=1 或
-#                                        # BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND=1（只关第三种）时自检必须判红
+#   bash-command-detector.sh --selftest  # 走一遍检出与不检出；BASH_COMMAND_DETECTOR_DISABLE_CHECK=1、
+#                                        # BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND=1（只关第三种）或
+#                                        # BASH_COMMAND_DETECTOR_KEEP_HEREDOC_BODIES=1（前两种不剥 heredoc 正文）时自检必须判红
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 agent-write-scope.sh 同一个坑）。
@@ -78,9 +81,10 @@ def findings_for(command, run_in_background=False):
     if os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1":
         return []
     findings = []
-    if PATTERN_PROCESS_COMMAND.search(command):
+    executed = command if os.environ.get("BASH_COMMAND_DETECTOR_KEEP_HEREDOC_BODIES") == "1" else strip_data_heredocs(command)
+    if PATTERN_PROCESS_COMMAND.search(executed):
         findings.append("按模式匹配的进程命令（pgrep -f / pkill -f / killall）")
-    if WAIT_LOOP.search(command) and not re.search(r"\btimeout\b", command):
+    if WAIT_LOOP.search(executed) and not re.search(r"\btimeout\b", executed):
         findings.append("没有 timeout 的等待循环")
     if run_in_background and puts_itself_in_background(command) and os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_SELF_BACKGROUND") != "1":
         findings.append("run_in_background 里又自己放后台（nohup / setsid / disown / 后面没有 wait 的 &）：完成通知当场发出，跑完的那个不会叫醒你")
@@ -119,6 +123,10 @@ def selftest(hook_dir):
         ("pgrep -f", "pgrep -f e154-binary", 1),
         ("pkill -f", "pkill -f cargo", 1),
         ("killall", "killall cargo", 1),
+        ("写进报告的 heredoc 正文里提到 pgrep -f", "cat >> report.md <<'EOF'\n等进程别用 pgrep -f，它会命中自己\nEOF", 0),
+        ("写进笔记的 heredoc 正文里是一段没超时的等待循环", "cat > note.md <<'EOF'\nuntil grep -q done log; do sleep 10; done\nEOF", 0),
+        ("喂给 bash 的 heredoc 里真用 pgrep -f", "bash <<'EOF'\npgrep -f e154-binary\nEOF", 1),
+        ("heredoc 之后的命令里用 pgrep -f", "cat > note.md <<EOF\n说明\nEOF\npgrep -f e154-binary", 1),
         ("后台起的 nohup … & 加 disown", "nohup nice -n 19 bash gate.sh > gate.log 2>&1 & echo $!; disown", 1, True),
         ("后台起的命令末尾单独一个 &", "bash cache-keepalive.sh > keepalive.log 2>&1 &", 1, True),
         ("后台起的命令只有 2>&1、|& 与 &&", "cargo build 2>&1 | tail -3 && echo ok; make |& tee out", 0, True),
@@ -168,9 +176,9 @@ def selftest(hook_dir):
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
     if failures:
-        print("    → 看 findings_for() 与 record()；BASH_COMMAND_DETECTOR_DISABLE_CHECK 或 _DISABLE_SELF_BACKGROUND 设着的话这里本来就该红")
+        print("    → 看 findings_for() 与 record()；BASH_COMMAND_DETECTOR_DISABLE_CHECK、_DISABLE_SELF_BACKGROUND 或 _KEEP_HEREDOC_BODIES 设着的话这里本来就该红")
         return 1
-    print(f"  ✓ 自检通过：按模式找进程、没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 与前台的 & 不记，入口一律放行（查了 {len(results)} 种）")
+    print(f"  ✓ 自检通过：按模式找进程、没超时的等待循环、run_in_background 里又自己放后台记进检出记录，普通命令、重定向里的 & 、前台的 & 与写进文件的 heredoc 正文不记，入口一律放行（查了 {len(results)} 种）")
     return 0
 
 def main():

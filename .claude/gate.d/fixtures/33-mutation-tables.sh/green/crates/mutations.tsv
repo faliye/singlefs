@@ -1,0 +1,2 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+M_分配代取发布代	crates/demo/src/lib.rs	    transaction_generation\n}	    transaction_generation - 1\n}	-p demo	published_generation_is_the_transaction_generation

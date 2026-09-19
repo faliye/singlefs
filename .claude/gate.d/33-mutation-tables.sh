@@ -8,6 +8,10 @@
 # 结论留下了而产生结论的装置没留下，正是 2026-08-29 审计实测过的失败形态；
 # 2026-09-03 把最后 19 张欠表补齐后，用这条阶段拦住它再欠回去）。
 #
+# `crates/mutations.tsv`（门禁 59 号的表，六段）的锚点也在这里数：59 号开跑前的预扫查的是同一件事，
+# 而 59 号整道要跑几个钟头，改 `crates/` 的实现员不跑它。2026-09-18 第二波修复改掉 4 行锚点、另有 2 行更早就坏了，
+# 实现员只核了自己追加的 8 行，到崩溃验证员跑 59 号才整表退出（`records/2026-09-16-subagent拆分提案.md` 第三十二节）。
+#
 # ⚠️ **这条阶段不跑变异**（跑一遍全部表要逐条重编译，量级是小时）。
 # 「表今天还会不会红」由每轮改动实验代码时手跑 `research/scripts/mutate.sh` 证明，
 # 复跑记录见各实验正文的「口径与复跑」——本阶段只保证装置在、形状对，不冒充跑过。
@@ -61,10 +65,40 @@ for b in bad:
     print("BAD", *b, sep="\t")
 PY
 )"
+# ── crates/mutations.tsv 的锚点（六段：变异名、文件、原文、替换文、cargo test 参数、必须红的测试名）──
+# 口径与 59 号的预扫一致：原文里的 \n 还原成换行，在「文件」那一段指的源码里恰好命中一次；文件不在也算腐化。
+crates_report=""
+if [[ -f crates/mutations.tsv ]]; then
+  crates_report="$(python3 - <<'PY'
+checked = 0
+for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"), 1):
+    line = line.rstrip("\n")
+    if not line or line.startswith("#"):
+        continue
+    fields = line.split("\t")
+    if len(fields) != 6:
+        print("CRATES_BAD", line_number, fields[0], "不是六段", sep="\t")
+        continue
+    checked += 1
+    name, path, original = fields[0], fields[1], fields[2].replace("\\n", "\n")
+    try:
+        source = open(path, encoding="utf-8").read()
+    except FileNotFoundError:
+        print("CRATES_BAD", line_number, name, f"文件 {path} 不存在", sep="\t")
+        continue
+    hits = source.count(original)
+    if hits != 1:
+        print("CRATES_BAD", line_number, name, f"原文在 {path} 里命中 {hits} 次", sep="\t")
+print("CRATES_CHECKED", checked)
+PY
+)"
+fi
+crates_checked="$(sed -n 's/^CRATES_CHECKED //p' <<<"$crates_report")"
+mapfile -t crates_bad < <(grep '^CRATES_BAD' <<<"$crates_report")
 anchor_checked="$(sed -n 's/^CHECKED //p' <<<"$anchor_report")"
 mapfile -t anchor_bad < <(grep '^BAD' <<<"$anchor_report")
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]})); then
   if ((${#missing[@]})); then
     echo "  ✗ 这些实验二进制没有同名变异表："   # gate-lint:detail
     printf '      %s\n' "${missing[@]}"
@@ -81,10 +115,21 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]})); then
     done < <(printf '%s\n' "${anchor_bad[@]}")
     echo "    命中 0 次：源码改过而表没跟；命中多次：原文要多带一行上下文才唯一。"
   fi
-  echo "  → 怎么办：缺表的写 research/mutations/<bin名>.tsv（每行：变异名<TAB>原文<TAB>替换文）；"
-  echo "    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，"
-  echo "    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。"
+  if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]})); then
+    echo "  → 怎么办：缺表的写 research/mutations/<bin名>.tsv（每行：变异名<TAB>原文<TAB>替换文）；"
+    echo "    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，"
+    echo "    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。"
+  fi
+  if ((${#crates_bad[@]})); then
+    echo "  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 59 号预扫会整张表退出，一条都不跑）："
+    while IFS=$'\t' read -r _ lineno name why; do
+      printf '      第 %s 行 %s：%s\n' "$lineno" "$name" "$why"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_bad[@]}")
+    echo "    → crates 这张表：把原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \\n），改完单跑那几行证明点名的测试红。"
+  fi
   exit 1
 fi
 n=$(ls "$BIN_DIR"/*.rs | wc -l)
-echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次（本阶段不跑变异，只验装置在、锚点对得上）"
+crates_summary="；没有 crates/mutations.tsv"
+[[ -f crates/mutations.tsv ]] && crates_summary="；crates/mutations.tsv ${crates_checked} 条的原文各命中源码一次"
+echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上）"

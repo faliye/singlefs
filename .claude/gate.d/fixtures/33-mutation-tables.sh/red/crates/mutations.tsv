@@ -1,0 +1,2 @@
+# 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
+M_锚点腐化	crates/demo/src/lib.rs	    transaction_txg\n}	    transaction_txg - 1\n}	-p demo	published_generation_is_the_transaction_generation

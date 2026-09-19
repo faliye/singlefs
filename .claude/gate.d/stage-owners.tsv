@@ -17,7 +17,7 @@
 31-blocking-verdict.sh	kb-scribe	未定项判没判过挡不挡第一个事务
 32-first-txn-fields.sh	kb-scribe	字节表字段指向真实分项
 32-history-ordinal.sh	kb-scribe	新增历史条目撞号
-33-mutation-tables.sh	experiment-runner,kb-scribe	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑
+33-mutation-tables.sh	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员改完就跑（59 号要几个钟头，实现员不跑）
 34-experiment-index-sync.sh	experiment-runner	实验索引行与正文标题
 35-user-verdict-owed.sh	kb-scribe	动了用户定案要记欠账
 36-invariant-count-cross-file.sh	kb-scribe	不变量条数跨文件
