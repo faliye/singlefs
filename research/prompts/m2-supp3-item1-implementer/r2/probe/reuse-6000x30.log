@@ -1,0 +1,8 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r2/base/repo/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r2/base/repo/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r2/base/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r2/base/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.70s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+running 1 test

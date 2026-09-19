@@ -1,0 +1,23 @@
+
+running 1 test
+test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... FAILED
+
+failures:
+
+---- an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding stdout ----
+
+thread 'an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding' (3086802) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:371:5:
+不经回退的抬 F 之后 I-3.1 多算要是新发现：KnownRed { form: 1, observation: FailureObservation { position: Operation(4), operation_kind: Some(RaiseRollbackFloor), violations: [("I-3.1", "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040")], panic: None, newest_ring_root_txg: Some(10), root_ring_slot_count: Some(24), harness_judgement: None, raised_floor_lands_only_on_abandoned_roots: Some(false) } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.61s
+
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1/singlefs-mutation-replay-mixv_zqy/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1/singlefs-mutation-replay-mixv_zqy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.54s
+     Running tests/second_transaction_supplement_three_random_history.rs (/tmp/claude-1000/m2-supp3-item1/gate59-target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`

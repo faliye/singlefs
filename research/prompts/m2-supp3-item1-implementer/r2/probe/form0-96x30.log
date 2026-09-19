@@ -1,0 +1,60 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r2/probe/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.99s
+     Running tests/scratch_form0_decidability.rs (target/release/deps/scratch_form0_decidability-d5d6d500b7236520)
+
+running 1 test
+FORM0 seed 0 at Operation(22) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 1 at Operation(24) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(21) unreferenced_released {0: 21, 1: 21} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 2 at Operation(27) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 4 at Operation(25) rollbacks_ok 0 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 11 at Operation(21) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(17) unreferenced_released {0: 17, 1: 17} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 12 at Operation(18) rollbacks_ok 5 raises_ok 0 :: over_count_slots_device0 Some(17) unreferenced_released {0: 17, 1: 17} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 13 at Operation(24) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 16 at Operation(18) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 17 at Operation(19) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 20 at Operation(24) rollbacks_ok 3 raises_ok 1 :: over_count_slots_device0 Some(6) unreferenced_released {0: 6, 1: 6} released_only_by_non_candidate_ring_roots {0: 1, 1: 1} floor 3 newest_txg 27 unreadable_roots 0
+FORM0 seed 21 at Operation(16) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 25 at Operation(22) rollbacks_ok 4 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 29 at Operation(28) rollbacks_ok 1 raises_ok 1 :: over_count_slots_device0 Some(7) unreferenced_released {0: 7, 1: 7} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 32 at Operation(20) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 34 at Operation(21) rollbacks_ok 4 raises_ok 0 :: over_count_slots_device0 Some(17) unreferenced_released {0: 17, 1: 17} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 35 at Operation(25) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 36 at Operation(26) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 37 at Operation(17) rollbacks_ok 1 raises_ok 2 :: over_count_slots_device0 Some(10) unreferenced_released {0: 21, 1: 21} released_only_by_non_candidate_ring_roots {} floor 4 newest_txg 28 unreadable_roots 0
+FORM0 seed 41 at Operation(24) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 43 at Operation(29) rollbacks_ok 4 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 44 at Operation(19) rollbacks_ok 0 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 45 at Operation(29) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(11) unreferenced_released {0: 11, 1: 11} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 47 at Operation(23) rollbacks_ok 1 raises_ok 1 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 1 newest_txg 26 unreadable_roots 0
+FORM0 seed 48 at Operation(24) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 49 at Operation(25) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 50 at Operation(21) rollbacks_ok 0 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 53 at Operation(24) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 54 at Operation(28) rollbacks_ok 2 raises_ok 1 :: over_count_slots_device0 Some(4) unreferenced_released {0: 43, 1: 43} released_only_by_non_candidate_ring_roots {} floor 11 newest_txg 35 unreadable_roots 0
+FORM0 seed 60 at Operation(28) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 61 at Operation(18) rollbacks_ok 1 raises_ok 1 :: over_count_slots_device0 Some(13) unreferenced_released {0: 11, 1: 11} released_only_by_non_candidate_ring_roots {0: 2, 1: 2} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 62 at Operation(28) rollbacks_ok 1 raises_ok 4 :: over_count_slots_device0 Some(10) unreferenced_released {0: 31, 1: 31} released_only_by_non_candidate_ring_roots {} floor 11 newest_txg 35 unreadable_roots 0
+FORM0 seed 63 at Operation(22) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 64 at Operation(19) rollbacks_ok 1 raises_ok 1 :: over_count_slots_device0 Some(11) unreferenced_released {0: 11, 1: 11} released_only_by_non_candidate_ring_roots {} floor 2 newest_txg 28 unreadable_roots 0
+FORM0 seed 65 at Operation(22) rollbacks_ok 1 raises_ok 2 :: over_count_slots_device0 Some(20) unreferenced_released {0: 21, 1: 21} released_only_by_non_candidate_ring_roots {} floor 3 newest_txg 28 unreadable_roots 0
+FORM0 seed 66 at Operation(24) rollbacks_ok 2 raises_ok 1 :: over_count_slots_device0 Some(6) unreferenced_released {0: 34, 1: 34} released_only_by_non_candidate_ring_roots {0: 4, 1: 4} floor 7 newest_txg 31 unreadable_roots 0
+FORM0 seed 68 at Operation(25) rollbacks_ok 3 raises_ok 1 :: over_count_slots_device0 Some(16) unreferenced_released {0: 22, 1: 22} released_only_by_non_candidate_ring_roots {0: 2, 1: 2} floor 6 newest_txg 31 unreadable_roots 0
+FORM0 seed 70 at Operation(15) rollbacks_ok 2 raises_ok 1 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 74 at Operation(27) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 77 at Operation(24) rollbacks_ok 0 raises_ok 0 :: over_count_slots_device0 Some(17) unreferenced_released {0: 17, 1: 17} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 81 at Operation(28) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(13) unreferenced_released {0: 11, 1: 11} released_only_by_non_candidate_ring_roots {0: 2, 1: 2} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 82 at Operation(26) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 83 at Operation(20) rollbacks_ok 3 raises_ok 1 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 84 at Operation(24) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(17) unreferenced_released {0: 17, 1: 17} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 28 unreadable_roots 0
+FORM0 seed 86 at Operation(29) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 87 at Operation(21) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 88 at Operation(26) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 89 at Operation(21) rollbacks_ok 2 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 92 at Operation(26) rollbacks_ok 3 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 93 at Operation(18) rollbacks_ok 1 raises_ok 0 :: over_count_slots_device0 Some(1) unreferenced_released {0: 1, 1: 1} released_only_by_non_candidate_ring_roots {} floor 0 newest_txg 26 unreadable_roots 0
+FORM0 seed 94 at Operation(26) rollbacks_ok 1 raises_ok 1 :: over_count_slots_device0 Some(14) unreferenced_released {0: 66, 1: 66} released_only_by_non_candidate_ring_roots {0: 4, 1: 4} floor 12 newest_txg 37 unreadable_roots 0
+SUMMARY first 0 seeds 96 ops 30: form0 50 released_only_by_non_candidate_ring_roots_empty 44 nonempty 6 no_unreferenced_released 0
+test scratch_form0 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.62s
+

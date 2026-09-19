@@ -1,0 +1,493 @@
+
+══ cargo fmt --check ══
+  ✓ 格式通过
+
+══ cargo clippy ══
+    Checking singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+  ✓ clippy 通过
+
+══ cargo build ══
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.57s
+  ✓ 构建通过
+
+══ cargo test ══
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_checker-68797fa85c855dfd)
+
+running 3 tests
+test tests::bitwise_crc32c_matches_the_published_check_value ... ok
+test tests::declared_only_width_stays_distinguishable_from_probed ... ok
+test tests::garbage_slots_are_rejected_with_the_right_reason ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/singlefs_core-1133d274220e6ae8)
+
+running 46 tests
+test address::tests::journal_sequence_numbers_order_by_instance_then_counter ... ok
+test address::tests::slot_number_converts_to_offset_by_the_placement_granularity ... ok
+test allocator::tests::commit_generated_bump_skips_a_slot_isolated_after_the_segment_was_opened ... ok
+test allocator::tests::accounting_deltas_are_maintained_incrementally ... ok
+test allocator::tests::first_transaction_placements_follow_the_byte_table ... ok
+test block_device::tests::aligned_scratch_starts_on_a_4096_boundary_for_every_length ... ok
+test allocator::tests::rebuild_from_records_remembers_the_genesis_tree_table_until_it_is_released ... ok
+test allocator::tests::placement_over_record_that_was_not_reclaimed_is_asserted_on_the_records ... ok
+test allocator::tests::unit_area_of_a_4_gib_image_has_211968_slots_in_3312_segments ... ok
+test block_device::tests::unaligned_and_out_of_range_requests_are_rejected_before_touching_the_file ... ok
+test bytes::tests::fields_round_trip_in_little_endian_order ... ok
+test allocator::tests::releasing_a_placement_keeps_the_slots_occupied_and_moves_them_into_the_defer_queue ... ok
+test block_device::tests::queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none ... ok
+test allocator::tests::one_slot_placement_inside_reclaimed_two_slot_record_deletes_that_record ... ok
+test checksum::tests::crc32c_matches_the_published_check_value ... ok
+test checksum::tests::wide_checksum_field_is_crc_then_zeroes_and_ignores_its_own_bytes ... ok
+test mount::non_empty_root_tests::root_is_non_empty_when_either_user_visible_tree_pointer_differs_from_the_previous_valid_root ... ok
+test mount::reclaim_floor_tests::reclaim_floor_takes_the_larger_of_the_effective_floor_and_the_oldest_valid_ring_root ... ok
+test allocator::tests::reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_rewrites_the_first_and_deletes_the_second ... ok
+test pointer::tests::node_pointer_is_86_bytes_and_round_trips ... ok
+test records::tests::mapping_keys_order_by_field_not_by_bytes ... ok
+test journal::tests::record_is_4096_with_a_307_byte_header_and_round_trips ... ok
+test records::tests::widths_of_every_record_match_the_byte_table ... ok
+test recovery::allocation_records_per_device_tests::fewer_than_the_first_transaction_placements_is_rejected ... ok
+test recovery::allocation_records_per_device_tests::placement_recorded_on_one_device_only_is_rejected_even_when_the_total_is_even ... ok
+test recovery::allocation_records_per_device_tests::first_transaction_shape_is_one_record_per_placement_per_device ... ok
+test recovery::allocation_records_per_device_tests::release_rewritten_on_one_device_only_is_rejected ... ok
+test recovery::allocation_records_per_device_tests::two_records_for_the_same_slot_on_the_same_device_are_rejected ... ok
+test root_ring::tests::regions_sit_at_1_4_7_mebibytes_and_publishes_rotate_across_regions ... ok
+test recovery::allocation_records_per_device_tests::unknown_device_or_missing_device_is_rejected ... ok
+test root_record::tests::root_record_is_371_bytes_with_the_checksum_at_138_and_round_trips ... ok
+test superblock::tests::slot_spacing_rounds_4096_up_to_a_multiple_of_minimum_input_output_size ... ok
+test transaction::tests::birth_sequences_count_per_tree_and_per_checkpoint_from_zero ... ok
+test transaction::tests::every_transaction_unit_names_its_class_tree_and_placement_rule ... ok
+test transaction::tests::reversing_eight_extent_keys_counts_seven_mismatches_and_one_key_counts_zero ... ok
+test superblock::tests::corrupted_slot_and_unknown_incompat_bit_are_both_unmountable ... ok
+test superblock::tests::superblock_is_481_bytes_in_a_4096_slot_and_round_trips ... ok
+test write_accounting::tests::since_keeps_only_the_later_writes_and_total_adds_every_counted_kind ... ok
+test write_accounting::tests::report_order_lists_every_kind_once_so_the_reported_kinds_add_up_to_the_total ... ok
+test allocator::tests::user_data_does_not_land_in_a_cluster_segment_that_the_fallback_closed ... ok
+test unit::tests::empty_tree_table_node_has_key_width_at_51_and_a_sealed_header ... ok
+test block_device::tests::write_then_read_returns_the_same_bytes_and_zero_fill_elsewhere ... ok
+test unit::tests::packed_unit_places_records_at_136_and_seals_both_checksums ... ok
+test block_device::tests::direct_input_output_backend_round_trips_aligned_and_rejects_unaligned_requests ... ok
+test unit::tests::the_three_parsers_round_trip_their_builders_and_refuse_a_damaged_header ... ok
+test transaction::tests::second_file_object_in_the_same_checkpoint_continues_birth_sequences_instead_of_restarting_at_zero ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/singlefs_format-dbbb0064ae005468)
+
+running 3 tests
+test tests::tree_identifiers_start_after_kind_codes_and_watermark_follows_the_last ... ok
+test tests::superblock_fits_in_the_slot_with_room_for_one_more_pointer ... ok
+test tests::widths_match_the_first_transaction_byte_table ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/singlefs_harness-ed0b65334d8d5632)
+
+running 18 tests
+test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+test segments::tests::writes_classify_by_their_landing_zone ... ok
+test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+test tests::stream_lines_are_stable_text ... ok
+test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/bin/first_transaction_device_log_check.rs (target/debug/deps/first_transaction_device_log_check-c087645c5f49f873)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/first_transaction_on_device.rs (target/debug/deps/first_transaction_on_device-e8c510422433a824)
+
+running 6 tests
+test tests::pool_writes_between_adds_the_differences_of_every_device ... ok
+test tests::device_call_counts_subtract_field_by_field_and_describe_with_the_device_index ... ok
+test tests::device_window_check_matches_only_when_both_write_calls_and_bytes_are_equal ... ok
+test tests::publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros ... ok
+test tests::second_file_content_differs_from_the_first_in_length_and_bytes ... ok
+test tests::second_instance_mode_mounts_writes_the_row_warms_up_publishes_the_third_version_and_every_window_matches ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src/bin/first_transaction_region_bytes.rs (target/debug/deps/first_transaction_region_bytes-f1a32f8368ed7e12)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-c6985e704d51434b)
+
+running 4 tests
+test reused_unit_referenced_only_by_the_newest_root_makes_the_reuse_invariant_red ... ok
+test each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite ... ok
+test an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant ... ok
+test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s
+
+     Running tests/first_transaction_region_bytes.rs (target/debug/deps/first_transaction_region_bytes-6c9fd8409ff1da8a)
+
+running 4 tests
+test the_region_table_lists_the_twenty_one_registered_regions_in_order ... ok
+test the_region_table_matches_the_writes_the_first_transaction_really_issues ... ok
+test flipping_one_bit_of_the_change_count_moves_only_that_regions_digest ... ok
+test running_the_same_pipeline_twice_gives_byte_identical_result_lines ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/first_transaction_step_five_publish.rs (target/debug/deps/first_transaction_step_five_publish-e2272d8186c07ea3)
+
+running 8 tests
+test recorded_paths_match_the_registered_segment_sequences ... ok
+test central_mapping_holds_six_entries_rebuilt_from_the_named_entries_and_excludes_itself ... ok
+test allocation_and_accounting_trees_carry_the_byte_table_numbers ... ok
+test root_slots_superblocks_and_journal_ring_hold_the_published_state ... ok
+test tree_table_holds_seven_entries_keyed_by_tree_identifier ... ok
+test mutations_are_caught_by_the_check_that_owns_them ... ok
+test inode_and_extent_lookups_from_the_root_read_the_first_file_back ... ok
+test every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_hold ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/first_transaction_step_one_mkfs.rs (target/debug/deps/first_transaction_step_one_mkfs-5df76148efa87ecc)
+
+running 7 tests
+test ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write ... ok
+test region_layout_other_than_zero_one_zero_is_refused_before_any_write ... ok
+test recorded_stream_matches_the_registered_mkfs_segment_sequence ... ok
+test checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolates_a_torn_slot ... ok
+test both_superblock_slots_verify_with_the_same_generation_and_a_corrupt_slot_loses_the_choice ... ok
+test same_parameters_twice_give_byte_identical_images ... ok
+test units_named_by_the_root_pass_their_own_header_checks ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/first_transaction_step_seven_layer0.rs (target/debug/deps/first_transaction_step_seven_layer0-4a0c76245db2628c)
+
+running 6 tests
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ignored, 全量 262165 个状态要一两分钟，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑
+test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+test checker_report_on_the_final_image ... ok
+test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... ok
+test layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape ... ok
+test removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running tests/first_transaction_step_six_recovery.rs (target/debug/deps/first_transaction_step_six_recovery-c6bb6dae956a4d1b)
+
+running 4 tests
+test named_unit_verification_keeps_a_damaged_transaction_out_of_the_rebuilt_root ... ok
+test torn_journal_record_truncates_the_prefix_but_recovery_still_completes ... ok
+test probes_behave_as_milestone_step_six_expects ... ok
+test cold_start_reopens_the_images_and_reads_the_file_back_choosing_instance_one_txg_three ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/first_transaction_step_two_data_unit.rs (target/debug/deps/first_transaction_step_two_data_unit-602ccf57327fff13)
+
+running 3 tests
+test exactly_two_new_allocation_records_whose_slot_matches_the_recorded_write_offsets ... ok
+test corrupting_payload_or_header_is_caught_by_the_matching_checksum ... ok
+test data_unit_reads_back_from_both_devices_with_content_then_zeroes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/instance_acquisition.rs (target/debug/deps/instance_acquisition-2512b41fac9ab251)
+
+running 4 tests
+test barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices ... ok
+test failed_superblock_write_on_the_second_disk_rolls_the_first_disk_back_and_leaves_the_second_untouched ... ok
+test failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number_is_never_handed_out_again ... ok
+test second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisition_gets_three ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/publish_order_matches_litmus.rs (target/debug/deps/publish_order_matches_litmus-b425651e44cffebe)
+
+running 1 test
+test litmus_writer_threads_follow_the_recorded_publish_order ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/second_transaction_step_five_reuse.rs (target/debug/deps/second_transaction_step_five_reuse-71fb233551ddc3ff)
+
+running 11 tests
+test raising_the_floor_on_a_current_version_without_a_rewritten_instance_table_unit_is_refused_instead_of_panicking ... ok
+test slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect ... ok
+test torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling ... ok
+test raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable ... ok
+test the_rollback_publish_is_compared_with_the_previous_valid_root_and_not_with_the_abandoned_root_before_it ... ok
+test raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused ... ok
+test raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable ... ok
+test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... ok
+test reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red ... ok
+test roots_below_a_floor_carried_by_only_one_device_remain_rollback_candidates ... ok
+test one_device_carrying_the_floor_alone_does_not_take_effect_on_remount ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s
+
+     Running tests/second_transaction_step_four_rollback.rs (target/debug/deps/second_transaction_step_four_rollback-56ab28b4b4ba20de)
+
+running 7 tests
+test the_rollback_row_caps_the_prefix_of_the_chosen_roots_instance_at_its_high_water ... ok
+test rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write ... ok
+test rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content ... ok
+test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ok
+test rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation ... ok
+test without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_data_slots_and_a_recovery_onto_the_abandoned_root_reads_a_torn_unit ... ok
+test rolling_back_onto_an_abandoned_timeline_or_a_missing_root_is_refused ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running tests/second_transaction_step_one_overwrite.rs (target/debug/deps/second_transaction_step_one_overwrite-1ec8abe29c834558)
+
+running 10 tests
+test content_larger_than_a_data_unit_payload_is_refused_before_anything_is_touched ... ok
+test release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_instead_of_panicking ... ok
+test release_rewrites_the_first_versions_records_and_accounting_moves_them_into_the_defer_queue ... ok
+test overwrite_publishes_the_second_version_through_the_same_commit_shape ... ok
+test released_placements_are_not_handed_out_again_before_reclaim_exists ... ok
+test publish_running_out_of_space_midway_leaves_the_allocator_as_it_was ... ok
+test damage_probes_after_the_overwrite_tell_the_new_unit_from_the_released_one ... ok
+test release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not_released ... ok
+test cold_start_reads_the_second_content_and_the_pool_checker_stays_green ... ok
+test repeated_overwrites_report_a_full_allocation_node_instead_of_panicking ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+     Running tests/second_transaction_step_three_formatted_pool.rs (target/debug/deps/second_transaction_step_three_formatted_pool-4b0b81f1ccf4faad)
+
+running 6 tests
+test first_file_version_after_a_third_zero_unit_publish_is_refused_before_any_write ... ok
+test transient_superblock_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write ... ok
+test writable_mount_after_a_crash_right_after_acquiring_an_instance_is_refused_before_acquiring_again ... ok
+test writable_mount_after_a_crash_between_warm_up_and_the_first_file_is_refused_before_acquiring_an_instance ... ok
+test formatted_pool_mount_starting_after_a_leftover_record_is_refused_before_acquiring_an_instance ... ok
+test writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+     Running tests/second_transaction_step_three_formatted_pool_layer0.rs (target/debug/deps/second_transaction_step_three_formatted_pool_layer0-8e7b3739ae22ed0e)
+
+running 3 tests
+test the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence ... ok
+test formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_first_transaction_stream ... ok
+test every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+     Running tests/second_transaction_step_three_second_instance.rs (target/debug/deps/second_transaction_step_three_second_instance-996fe7994437d7f7)
+
+running 6 tests
+test one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_later_records_are_intact ... ok
+test damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_other_device ... ok
+test checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_root ... ok
+test stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row ... ok
+test torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg ... ok
+test remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+
+     Running tests/second_transaction_step_zero_layer0.rs (target/debug/deps/second_transaction_step_zero_layer0-7e98400ca775ebc4)
+
+running 7 tests
+test full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean ... ignored, 全量 2104413 个状态、每个两遍恢复 + checker，debug 下半小时以上；门禁 54 号在 release 下跑
+test targeted_controls_on_the_second_publish_go_red_where_they_should ... ok
+test the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence ... ok
+test the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence ... ok
+test stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state ... ok
+test residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it ... ok
+test every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims ... ok
+
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 8.27s
+
+     Running tests/second_transaction_supplement_one_write_accounting.rs (target/debug/deps/second_transaction_supplement_one_write_accounting-7969d6c1aee3b8a4)
+
+running 3 tests
+test first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table ... ok
+test publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_adds_up ... ok
+test writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_writes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+
+running 6 tests
+test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+── 随机历史快档 ──
+种子 [0, 96)，每段 30 步
+历史 96 段：跑完 45、以已知红收尾 {0: 50, 1: 1}、新发现 0；根环转过一圈的 62 段；最高 txg 37
+  操作 PublishFirstFile：Ok 24、Err 62、前提不满足没调 56
+  操作 PublishOverwrite：Ok 655、Err 104、前提不满足没调 456
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 64
+  操作 CloseAndMountWritable：Ok 321、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 112、Err 192、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 42、Err 156、前提不满足没调 142
+  操作 ColdStartRecover：Ok 97、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 87 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 502 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 50 次
+  内容长度 载荷容量：入口被调 70 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 66 次
+  内容长度 载荷容量 − 1：入口被调 70 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：122 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：5 次
+  Err 成员 MountError::RollbackTargetNotInRing：61 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：125 次
+  Err 成员 PublishError::ContentExceedsDataUnit：108 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：58 次
+  前提不满足（没有可写会话）：660 次
+  前提不满足（现行版本带文件）：34 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 FileRead：78 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 31 次、共回收 852 个落点；复用已释放的记录 234 条（其中跨度变了 52 条）；已释放的记录被删 4 条
+  checker 跑了 1257 次；一个写都没发、沿用上一次结论的 1421 步
+  I-1.1：判绿 1257 次、不适用 0 次
+  I-1.3：判绿 1257 次、不适用 0 次
+  I-1.4：判绿 1257 次、不适用 0 次
+  I-1.6：判绿 1257 次、不适用 0 次
+  I-1.7：判绿 1257 次、不适用 0 次
+  I-2.1：判绿 1257 次、不适用 0 次
+  I-2.3：判绿 1257 次、不适用 0 次
+  I-2.4：判绿 1257 次、不适用 0 次
+  I-2.5：判绿 1257 次、不适用 0 次
+  I-3.1：判绿 1103 次、不适用 103 次
+  I-3.8：判绿 1257 次、不适用 0 次
+  I-3.9：判绿 1154 次、不适用 103 次
+  I-4.8：判绿 1257 次、不适用 0 次
+  I-5.1：判绿 1257 次、不适用 0 次
+  I-5.2：判绿 1154 次、不适用 103 次
+  I-5.4：判绿 1154 次、不适用 103 次
+  I-7.1：判绿 1257 次、不适用 0 次
+  I-7.2：判绿 1257 次、不适用 0 次
+  I-7.4：判绿 1257 次、不适用 0 次
+  I-7.6：判绿 1257 次、不适用 0 次
+  I-7.7：判绿 1257 次、不适用 0 次
+  I-7.8：判绿 1257 次、不适用 0 次
+  I-9.1：判绿 1154 次、不适用 103 次
+  I-9.2：判绿 1154 次、不适用 103 次
+  I-9.4：判绿 1154 次、不适用 103 次
+  I-9.7：判绿 1154 次、不适用 103 次
+  I-9.10：判绿 1154 次、不适用 103 次
+  I-9.13：判绿 1154 次、不适用 103 次
+  I-9.14：判绿 1082 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：50 段；前几个种子 [(0, Operation(22)), (1, Operation(24)), (2, Operation(27)), (4, Operation(25)), (11, Operation(21)), (12, Operation(18)), (13, Operation(24)), (16, Operation(18))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
+用时 25.7 秒
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+
+test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 25.72s
+
+     Running tests/second_transaction_supplement_two_accounting_node_full.rs (target/debug/deps/second_transaction_supplement_two_accounting_node_full-b776b09bf4054662)
+
+running 2 tests
+test eightieth_device_overflows_the_accounting_node_and_the_publish_is_refused_before_anything_is_written ... ok
+test seventy_nine_devices_fill_the_accounting_node_exactly_and_still_publish ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/second_transaction_supplement_two_commit_generated_fallback.rs (target/debug/deps/second_transaction_supplement_two_commit_generated_fallback-afc8cbd1b5a3fe50)
+
+running 4 tests
+test fallback_skips_a_slot_isolated_by_the_shadow_ledger ... ok
+test publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_on_every_device ... ok
+test raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold ... ok
+test raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold_stays_in_the_process ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running tests/second_transaction_supplement_two_instance_table_page_full.rs (target/debug/deps/second_transaction_supplement_two_instance_table_page_full-d260700c12d6cabe)
+
+running 3 tests
+test mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it ... ok
+test rollback_counts_the_rows_of_the_table_it_rolls_back_to ... ok
+test writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s
+
+     Running tests/second_transaction_supplement_two_reused_record_overlap.rs (target/debug/deps/second_transaction_supplement_two_reused_record_overlap-6a4a79a256df819c)
+
+running 1 test
+test reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.13s
+
+     Running tests/second_transaction_supplement_two_row_publish_admission.rs (target/debug/deps/second_transaction_supplement_two_row_publish_admission-1fb13e601148edd8)
+
+running 3 tests
+test writable_mount_whose_first_warm_up_publish_does_not_fit_is_refused_before_the_instance_is_acquired ... ok
+test writable_mount_whose_second_warm_up_publish_does_not_fit_is_refused_before_the_instance_is_acquired ... ok
+test writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is_acquired ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/second_transaction_supplement_two_unequal_devices.rs (target/debug/deps/second_transaction_supplement_two_unequal_devices-927c7e16a1fb9102)
+
+running 3 tests
+test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... ok
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... ok
+test filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running tests/second_transaction_supplement_two_warm_up_counter.rs (target/debug/deps/second_transaction_supplement_two_warm_up_counter-dc4d0f91abc4fee1)
+
+running 1 test
+test warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests singlefs_checker
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests singlefs_core
+
+running 1 test
+test crates/singlefs-core/src/address.rs - address (line 3) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+   Doc-tests singlefs_format
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests singlefs_harness
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+  ✓ 单测通过
+exit 0

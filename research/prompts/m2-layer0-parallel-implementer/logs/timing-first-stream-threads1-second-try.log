@@ -1,0 +1,84 @@
+RUN_START 2026-09-18T19:14:27Z threads=1 test=first_transaction_step_seven_layer0::layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations
+RUN_START_UPTIME  19:14:27 up 9 days, 10:16,  7 users,  load average: 18.99, 25.69, 15.70
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/first_transaction_step_seven_layer0.rs (target/release/deps/first_transaction_step_seven_layer0-3f7400db40a77e66)
+
+running 1 test
+LAYER0_PARALLEL_START states=262165 slices=64 states_per_slice=4097 worker_threads=1 configured_worker_threads=1 worker_threads_source=environment_variable
+LAYER0_PROGRESS slice=1/64 states=[0,4097) segments=0..=6 finished_slices=1/64 finished_states=4097/262165 elapsed_seconds=3.2
+LAYER0_PROGRESS slice=2/64 states=[4097,8194) segments=6..=6 finished_slices=2/64 finished_states=8194/262165 elapsed_seconds=6.3
+LAYER0_PROGRESS slice=3/64 states=[8194,12291) segments=6..=6 finished_slices=3/64 finished_states=12291/262165 elapsed_seconds=9.5
+LAYER0_PROGRESS slice=4/64 states=[12291,16388) segments=6..=6 finished_slices=4/64 finished_states=16388/262165 elapsed_seconds=12.6
+LAYER0_PROGRESS slice=5/64 states=[16388,20485) segments=6..=6 finished_slices=5/64 finished_states=20485/262165 elapsed_seconds=15.8
+LAYER0_PROGRESS slice=6/64 states=[20485,24582) segments=6..=6 finished_slices=6/64 finished_states=24582/262165 elapsed_seconds=19.0
+LAYER0_PROGRESS slice=7/64 states=[24582,28679) segments=6..=6 finished_slices=7/64 finished_states=28679/262165 elapsed_seconds=22.1
+LAYER0_PROGRESS slice=8/64 states=[28679,32776) segments=6..=6 finished_slices=8/64 finished_states=32776/262165 elapsed_seconds=25.3
+LAYER0_PROGRESS slice=9/64 states=[32776,36873) segments=6..=6 finished_slices=9/64 finished_states=36873/262165 elapsed_seconds=28.4
+LAYER0_PROGRESS slice=10/64 states=[36873,40970) segments=6..=6 finished_slices=10/64 finished_states=40970/262165 elapsed_seconds=31.6
+LAYER0_PROGRESS slice=11/64 states=[40970,45067) segments=6..=6 finished_slices=11/64 finished_states=45067/262165 elapsed_seconds=34.8
+LAYER0_PROGRESS slice=12/64 states=[45067,49164) segments=6..=6 finished_slices=12/64 finished_states=49164/262165 elapsed_seconds=37.9
+LAYER0_PROGRESS slice=13/64 states=[49164,53261) segments=6..=6 finished_slices=13/64 finished_states=53261/262165 elapsed_seconds=41.1
+LAYER0_PROGRESS slice=14/64 states=[53261,57358) segments=6..=6 finished_slices=14/64 finished_states=57358/262165 elapsed_seconds=44.2
+LAYER0_PROGRESS slice=15/64 states=[57358,61455) segments=6..=6 finished_slices=15/64 finished_states=61455/262165 elapsed_seconds=47.4
+LAYER0_PROGRESS slice=16/64 states=[61455,65552) segments=6..=6 finished_slices=16/64 finished_states=65552/262165 elapsed_seconds=50.6
+LAYER0_PROGRESS slice=17/64 states=[65552,69649) segments=6..=6 finished_slices=17/64 finished_states=69649/262165 elapsed_seconds=53.7
+LAYER0_PROGRESS slice=18/64 states=[69649,73746) segments=6..=6 finished_slices=18/64 finished_states=73746/262165 elapsed_seconds=56.9
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations has been running for over 60 seconds
+LAYER0_PROGRESS slice=19/64 states=[73746,77843) segments=6..=6 finished_slices=19/64 finished_states=77843/262165 elapsed_seconds=60.0
+LAYER0_PROGRESS slice=20/64 states=[77843,81940) segments=6..=6 finished_slices=20/64 finished_states=81940/262165 elapsed_seconds=63.2
+LAYER0_PROGRESS slice=21/64 states=[81940,86037) segments=6..=6 finished_slices=21/64 finished_states=86037/262165 elapsed_seconds=66.3
+LAYER0_PROGRESS slice=22/64 states=[86037,90134) segments=6..=6 finished_slices=22/64 finished_states=90134/262165 elapsed_seconds=69.5
+LAYER0_PROGRESS slice=23/64 states=[90134,94231) segments=6..=6 finished_slices=23/64 finished_states=94231/262165 elapsed_seconds=72.6
+LAYER0_PROGRESS slice=24/64 states=[94231,98328) segments=6..=6 finished_slices=24/64 finished_states=98328/262165 elapsed_seconds=75.8
+LAYER0_PROGRESS slice=25/64 states=[98328,102425) segments=6..=6 finished_slices=25/64 finished_states=102425/262165 elapsed_seconds=79.0
+LAYER0_PROGRESS slice=26/64 states=[102425,106522) segments=6..=6 finished_slices=26/64 finished_states=106522/262165 elapsed_seconds=82.1
+LAYER0_PROGRESS slice=27/64 states=[106522,110619) segments=6..=6 finished_slices=27/64 finished_states=110619/262165 elapsed_seconds=85.3
+LAYER0_PROGRESS slice=28/64 states=[110619,114716) segments=6..=6 finished_slices=28/64 finished_states=114716/262165 elapsed_seconds=88.4
+LAYER0_PROGRESS slice=29/64 states=[114716,118813) segments=6..=6 finished_slices=29/64 finished_states=118813/262165 elapsed_seconds=91.6
+LAYER0_PROGRESS slice=30/64 states=[118813,122910) segments=6..=6 finished_slices=30/64 finished_states=122910/262165 elapsed_seconds=94.7
+LAYER0_PROGRESS slice=31/64 states=[122910,127007) segments=6..=6 finished_slices=31/64 finished_states=127007/262165 elapsed_seconds=97.9
+LAYER0_PROGRESS slice=32/64 states=[127007,131104) segments=6..=6 finished_slices=32/64 finished_states=131104/262165 elapsed_seconds=101.1
+LAYER0_PROGRESS slice=33/64 states=[131104,135201) segments=6..=6 finished_slices=33/64 finished_states=135201/262165 elapsed_seconds=104.2
+LAYER0_PROGRESS slice=34/64 states=[135201,139298) segments=6..=6 finished_slices=34/64 finished_states=139298/262165 elapsed_seconds=107.4
+LAYER0_PROGRESS slice=35/64 states=[139298,143395) segments=6..=6 finished_slices=35/64 finished_states=143395/262165 elapsed_seconds=110.6
+LAYER0_PROGRESS slice=36/64 states=[143395,147492) segments=6..=6 finished_slices=36/64 finished_states=147492/262165 elapsed_seconds=113.7
+LAYER0_PROGRESS slice=37/64 states=[147492,151589) segments=6..=6 finished_slices=37/64 finished_states=151589/262165 elapsed_seconds=116.9
+LAYER0_PROGRESS slice=38/64 states=[151589,155686) segments=6..=6 finished_slices=38/64 finished_states=155686/262165 elapsed_seconds=120.1
+LAYER0_PROGRESS slice=39/64 states=[155686,159783) segments=6..=6 finished_slices=39/64 finished_states=159783/262165 elapsed_seconds=123.2
+LAYER0_PROGRESS slice=40/64 states=[159783,163880) segments=6..=6 finished_slices=40/64 finished_states=163880/262165 elapsed_seconds=126.4
+LAYER0_PROGRESS slice=41/64 states=[163880,167977) segments=6..=6 finished_slices=41/64 finished_states=167977/262165 elapsed_seconds=129.6
+LAYER0_PROGRESS slice=42/64 states=[167977,172074) segments=6..=6 finished_slices=42/64 finished_states=172074/262165 elapsed_seconds=132.7
+LAYER0_PROGRESS slice=43/64 states=[172074,176171) segments=6..=6 finished_slices=43/64 finished_states=176171/262165 elapsed_seconds=135.9
+LAYER0_PROGRESS slice=44/64 states=[176171,180268) segments=6..=6 finished_slices=44/64 finished_states=180268/262165 elapsed_seconds=139.1
+LAYER0_PROGRESS slice=45/64 states=[180268,184365) segments=6..=6 finished_slices=45/64 finished_states=184365/262165 elapsed_seconds=142.2
+LAYER0_PROGRESS slice=46/64 states=[184365,188462) segments=6..=6 finished_slices=46/64 finished_states=188462/262165 elapsed_seconds=145.4
+LAYER0_PROGRESS slice=47/64 states=[188462,192559) segments=6..=6 finished_slices=47/64 finished_states=192559/262165 elapsed_seconds=148.6
+LAYER0_PROGRESS slice=48/64 states=[192559,196656) segments=6..=6 finished_slices=48/64 finished_states=196656/262165 elapsed_seconds=151.7
+LAYER0_PROGRESS slice=49/64 states=[196656,200753) segments=6..=6 finished_slices=49/64 finished_states=200753/262165 elapsed_seconds=154.9
+LAYER0_PROGRESS slice=50/64 states=[200753,204850) segments=6..=6 finished_slices=50/64 finished_states=204850/262165 elapsed_seconds=158.1
+LAYER0_PROGRESS slice=51/64 states=[204850,208947) segments=6..=6 finished_slices=51/64 finished_states=208947/262165 elapsed_seconds=161.2
+LAYER0_PROGRESS slice=52/64 states=[208947,213044) segments=6..=6 finished_slices=52/64 finished_states=213044/262165 elapsed_seconds=164.4
+LAYER0_PROGRESS slice=53/64 states=[213044,217141) segments=6..=6 finished_slices=53/64 finished_states=217141/262165 elapsed_seconds=167.6
+LAYER0_PROGRESS slice=54/64 states=[217141,221238) segments=6..=6 finished_slices=54/64 finished_states=221238/262165 elapsed_seconds=170.7
+LAYER0_PROGRESS slice=55/64 states=[221238,225335) segments=6..=6 finished_slices=55/64 finished_states=225335/262165 elapsed_seconds=173.9
+LAYER0_PROGRESS slice=56/64 states=[225335,229432) segments=6..=6 finished_slices=56/64 finished_states=229432/262165 elapsed_seconds=177.1
+LAYER0_PROGRESS slice=57/64 states=[229432,233529) segments=6..=6 finished_slices=57/64 finished_states=233529/262165 elapsed_seconds=180.3
+LAYER0_PROGRESS slice=58/64 states=[233529,237626) segments=6..=6 finished_slices=58/64 finished_states=237626/262165 elapsed_seconds=183.4
+LAYER0_PROGRESS slice=59/64 states=[237626,241723) segments=6..=6 finished_slices=59/64 finished_states=241723/262165 elapsed_seconds=186.6
+LAYER0_PROGRESS slice=60/64 states=[241723,245820) segments=6..=6 finished_slices=60/64 finished_states=245820/262165 elapsed_seconds=189.8
+LAYER0_PROGRESS slice=61/64 states=[245820,249917) segments=6..=6 finished_slices=61/64 finished_states=249917/262165 elapsed_seconds=192.9
+LAYER0_PROGRESS slice=62/64 states=[249917,254014) segments=6..=6 finished_slices=62/64 finished_states=254014/262165 elapsed_seconds=196.1
+LAYER0_PROGRESS slice=63/64 states=[254014,258111) segments=6..=6 finished_slices=63/64 finished_states=258111/262165 elapsed_seconds=199.3
+LAYER0_PROGRESS slice=64/64 states=[258111,262165) segments=6..=all_persisted finished_slices=64/64 finished_states=262165/262165 elapsed_seconds=202.4
+LAYER0_PARALLEL_FINISHED states=262165 slices=64 worker_threads=1 configured_worker_threads=1 worker_threads_source=environment_variable elapsed_seconds=202.4
+LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-1.3=262165/0 I-1.4=262165/0 I-1.6=262165/0 I-1.7=262165/0 I-2.1=262165/0 I-2.3=262165/0 I-2.4=262165/0 I-2.5=262165/0 I-3.1=4/0 I-3.8=262165/0 I-3.9=4/0 I-4.8=262165/0 I-5.1=262165/0 I-5.2=4/0 I-5.4=4/0 I-7.1=262165/0 I-7.2=262165/0 I-7.4=262165/0 I-7.6=262165/0 I-7.7=262165/0 I-7.8=262165/0 I-9.1=4/0 I-9.2=4/0 I-9.4=4/0 I-9.7=4/0 I-9.10=4/0 I-9.13=4/0 I-9.14=0/0
+CHECKER_FIRST {}
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 202.43s
+
+RUN_EXIT 0
+RUN_WALL_SECONDS 202.45
+RUN_END 2026-09-18T19:17:50Z
+RUN_END_UPTIME  19:17:50 up 9 days, 10:19,  7 users,  load average: 1.60, 13.43, 12.79

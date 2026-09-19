@@ -1,0 +1,883 @@
+== 基线 --lib 退出码 0，2 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== 基线 second_transaction_supplement_three_random_history 退出码 101，38 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+== 随机源换一个混合常数（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence' (3831715) panicked at crates/singlefs-harness/src/history.rs:2056:9:
+    | assertion `left == right` failed
+    |   left: 14692572579270306168
+    |  right: 16294208416658607535
+== 生成不看种子（crates/singlefs-harness/src/history.rs；--lib）退出码 0，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== 收缩的窗口取最后一个还失败的（crates/singlefs-harness/src/history.rs；--lib）退出码 0，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== I-3.1 文字里读遍历那个数的锚换掉（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail' (3832483) panicked at crates/singlefs-harness/src/history.rs:2127:9:
+    | assertion `left == right` failed
+    |   left: None
+    |  right: Some((3031040, 2850816))
+== 已知红第 0 条的方向反了（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，37 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (3833125) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3833123) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 根环转圈的门槛抬高一格（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，37 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (3834119) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3834117) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 写入时间取系统时钟（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，39 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... FAILED
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice' (3835025) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:212:5:
+    | 每一步之后的镜像逐字节相同
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3835024) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 稀疏盘按区间读少拷最后一个扇区（crates/singlefs-harness/src/crash.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... FAILED
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector' (3835744) panicked at crates/singlefs-harness/src/crash.rs:955:9:
+    | assertion `left == right` failed
+    |   left: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    |  right: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
+== 全部跑完
+== 第二轮（修过两条单测之后）
+== 基线 --lib 退出码 0，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== 生成不看种子（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... FAILED
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not' (3836859) panicked at crates/singlefs-harness/src/history.rs:2069:9:
+    | assertion `left != right` failed: 只比操作序列：历史里带着种子，整个比的话种子不同就恒不等
+    |   left: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+    |  right: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+== 收缩的窗口取最后一个还失败的（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... FAILED
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::shrinking_keeps_only_the_steps_the_failure_needs' (3837090) panicked at crates/singlefs-harness/src/history.rs:2129:9:
+    | assertion `left == right` failed: 按窗口并行试与一块一块按次序试，收到同一个结果
+    |   left: [RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 0 }), ColdStartRecover]
+    |  right: [PublishWithoutUnits, ColdStartRecover]
+== 全部跑完
+== 第三轮（最终代码 sha256 652fad… / f6374d…，全部重跑）
+652faddbcc7323d9296777ede2e27443993d7b3fde26a5fbea874600cab5bb6c  repo/crates/singlefs-harness/src/history.rs
+f6374d395d49aa89721beab2021a573eb1a94d01840e47bbce6eb7569794ec80  repo/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+== 基线 --lib 退出码 0，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== 基线 second_transaction_supplement_three_random_history 退出码 101，27 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+== 随机源换一个混合常数（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence' (4105407) panicked at crates/singlefs-harness/src/history.rs:2057:9:
+    | assertion `left == right` failed
+    |   left: 14692572579270306168
+    |  right: 16294208416658607535
+== 生成不看种子（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... FAILED
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not' (4105641) panicked at crates/singlefs-harness/src/history.rs:2070:9:
+    | assertion `left != right` failed: 只比操作序列：历史里带着种子，整个比的话种子不同就恒不等
+    |   left: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+    |  right: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+== 收缩的窗口取最后一个还失败的（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... FAILED
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::shrinking_keeps_only_the_steps_the_failure_needs' (4105872) panicked at crates/singlefs-harness/src/history.rs:2130:9:
+    | assertion `left == right` failed: 按窗口并行试与一块一块按次序试，收到同一个结果
+    |   left: [RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 0 }), ColdStartRecover]
+    |  right: [PublishWithoutUnits, ColdStartRecover]
+== I-3.1 文字里读遍历那个数的锚换掉（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail' (4106101) panicked at crates/singlefs-harness/src/history.rs:2140:9:
+    | assertion `left == right` failed
+    |   left: None
+    |  right: Some((3031040, 2850816))
+== 稀疏盘按区间读少拷最后一个扇区（crates/singlefs-harness/src/crash.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... FAILED
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector' (4106329) panicked at crates/singlefs-harness/src/crash.rs:955:9:
+    | assertion `left == right` failed
+    |   left: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    |  right: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
+== 已知红第 0 条的方向反了（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (4106980) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4106978) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 根环转圈的门槛抬高一格（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，27 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (4107699) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4107697) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 写入时间取系统时钟（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，27 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... FAILED
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice' (4108741) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:212:5:
+    | 每一步之后的镜像逐字节相同
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4108740) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 全部跑完
+== 第四轮（最终代码，全部重跑）
+c6937bbf132676c2d49a672bfc9a35096239693144eb69993d6c91571871d690  repo/crates/singlefs-harness/src/history.rs
+f6374d395d49aa89721beab2021a573eb1a94d01840e47bbce6eb7569794ec80  repo/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+f2612b1c413c3b46fc28a6b19a47433b89657da45ebf5d0444e9790367d7cbc6  repo/crates/singlefs-harness/src/crash.rs
+== 基线 --lib 退出码 0，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+== 基线 second_transaction_supplement_three_random_history 退出码 101，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+== 随机源换一个混合常数（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence' (4112041) panicked at crates/singlefs-harness/src/history.rs:2078:9:
+    | assertion `left == right` failed
+    |   left: 14692572579270306168
+    |  right: 16294208416658607535
+== 生成不看种子（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... FAILED
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not' (4112275) panicked at crates/singlefs-harness/src/history.rs:2091:9:
+    | assertion `left != right` failed: 只比操作序列：历史里带着种子，整个比的话种子不同就恒不等
+    |   left: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+    |  right: [PublishOverwrite(ContentChoice { length: InsideOneDataUnit { selector: 487617019471545679 }, fill_seed: 1961750202426094747 }), ColdStartRecover, CloseAndMountWritable, PublishOverwrite(ContentChoice { length: OneByteAboveDataUnitPayloadCapacity, fill_seed: 7313543279846440201 }), PublishOv
+== 收缩的窗口取最后一个还失败的（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... FAILED
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::shrinking_keeps_only_the_steps_the_failure_needs' (4112506) panicked at crates/singlefs-harness/src/history.rs:2151:9:
+    | assertion `left == right` failed: 按窗口并行试与一块一块按次序试，收到同一个结果
+    |   left: [RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 0 }), ColdStartRecover]
+    |  right: [PublishWithoutUnits, ColdStartRecover]
+== I-3.1 文字里读遍历那个数的锚换掉（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail' (4112735) panicked at crates/singlefs-harness/src/history.rs:2161:9:
+    | assertion `left == right` failed
+    |   left: None
+    |  right: Some((3031040, 2850816))
+== 稀疏盘按区间读少拷最后一个扇区（crates/singlefs-harness/src/crash.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... FAILED
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+    | thread 'crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector' (4112963) panicked at crates/singlefs-harness/src/crash.rs:955:9:
+    | assertion `left == right` failed
+    |   left: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+    |  right: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 
+== 已知红第 0 条的方向反了（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (4113580) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4113578) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 根环转圈的门槛抬高一格（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，27 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... FAILED
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form' (4114264) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:157:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(21), operation_kind: Some(PublishOverwrite), violations: [("I-3.1", "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088")], panic: None, newest_ring_root_txg: Some(26), root_rin
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4114262) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 写入时间取系统时钟（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... FAILED
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice' (4114901) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:212:5:
+    | 每一步之后的镜像逐字节相同
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4114900) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:130:5:
+== 全部跑完
+== 第五轮（打补丁之后，清单第 1 条的判定）
+5e715bbe3b8d4a0b2a3e73d1485a35171c4f97e96b2adf889fbdb5f50b0d0d46  repo/crates/singlefs-harness/src/history.rs
+== 基线 second_transaction_supplement_three_random_history 退出码 0，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+== 已知红第 1 条认错操作种类（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，26 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... FAILED
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form' (4131022) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:226:9:
+    | 要以已知红收尾：NewFinding { signature: CheckerViolations { invariants: ["I-3.1"] }, observation: FailureObservation { position: Operation(10), operation_kind: Some(RaiseRollbackFloor), violations: [("I-3.1", "盘 0：记账的已分配 Some(1441792)，遍历全部有效根得到 1343488")], panic: None, newest_ring_root_txg: Some(22), root_r
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (4131023) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:132:5:
+== 已知红第 1 条不排除转过圈的（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 0，27 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+== 全部跑完
+== 第六轮（代码三方第一轮之后的改法；新测试）
+ea22c355736a69a1791ae9d669c8ad1d37adaf8aed50fea57dbe3e8d7452f56b  repo/crates/singlefs-harness/src/history.rs
+f57410ec6068c51d8957aad013050caab8888317a5b7f9bc06a032c8dd236c81  repo/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+== 基线 --lib 退出码 0，1 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+  test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+  test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... ok
+  test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+  test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+  test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+== 基线 second_transaction_supplement_three_random_history 退出码 0，35 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+== 分配代判定不看下界（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+  test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+  test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... ok
+  test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... FAILED
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+  test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+    | thread 'history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported' (3073717) panicked at crates/singlefs-harness/src/history.rs:2636:9:
+    | assertion `left == right` failed: 复用改写的那一条还写着释放代 5
+    |   left: []
+    |  right: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50178), span_slots: 1, generation: CheckpointTxg(5), is_released: false }]
+== 读回文件也算执行器判的失败（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+  test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+  test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+  test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... FAILED
+  test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+  test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+  test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+    | thread 'history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not' (3073966) panicked at crates/singlefs-harness/src/history.rs:2675:9:
+    | assertion `left == right` failed
+    |   left: Some(ColdStartRecoveryFailedOnCheckerGreenImage { outcome: "FileRead" })
+    |  right: None
+== 读回报错不算执行器判的失败（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+  test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+  test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... FAILED
+  test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+  test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+    | thread 'history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not' (3074217) panicked at crates/singlefs-harness/src/history.rs:2663:9:
+    | assertion `left == right` failed
+    |   left: None
+    |  right: Some(ColdStartRecoveryFailedOnCheckerGreenImage { outcome: "Failed" })
+== 已知红不排除执行器判的失败（crates/singlefs-harness/src/history.rs；--lib）退出码 101，0 秒
+  test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+  test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+  test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+  test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+  test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... ok
+  test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+  test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+  test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back ... ok
+  test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+  test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+  test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+  test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+  test history::tests::failed_cold_start_read_back_is_a_harness_judgement_and_the_other_read_backs_are_not ... ok
+  test history::tests::harness_judgement_is_never_classified_as_a_known_red_form ... FAILED
+  test history::tests::record_rewritten_by_a_publish_that_keeps_its_old_generation_is_reported ... ok
+  test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+  test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+  test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+  test segments::tests::writes_classify_by_their_landing_zone ... ok
+  test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+  test tests::stream_lines_are_stable_text ... ok
+  test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+  test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+  test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+  test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+  test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+    | thread 'history::tests::harness_judgement_is_never_classified_as_a_known_red_form' (3074469) panicked at crates/singlefs-harness/src/history.rs:2712:13:
+== 被抛弃的判定把 txg = T 的根也算上（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，34 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+    | thread 'an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding' (3075102) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:352:5:
+    | assertion `left == right` failed: txg 3 那条根是实例 1 的有效根，不在任何回退留下的空档里
+    |   left: Some(true)
+    |  right: Some(false)
+== 已知红第 1 条不看空档（第 139 行同一处）（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，34 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+    | thread 'an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding' (3075908) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:371:5:
+== 复用取样点不抬 F（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，34 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... FAILED
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+    | thread 'reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms' (3076845) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:191:5:
+== 正好装满载荷容量也报装不下（B1）（crates/singlefs-core/src/transaction.rs；second_transaction_supplement_three_random_history）退出码 101，32 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3077911) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:112:9:
+== 全部跑完
+== 第七轮（代码三方第二轮之后：挂载写出的发布比分配代）
+3e2955378e34a93e015e925846826664ef1ab462c399dd82e5bf2af74a89b08f  repo/crates/singlefs-harness/src/history.rs
+05660861846fb051509db76c13fb3faf7720e77510dd16764c13459bdbe70358  repo/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+== 基线 second_transaction_supplement_three_random_history 退出码 101，33 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... ok
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+== 挂载写出的发布不数比过几次（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，34 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked' (3672252) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:429:5:
+    | assertion `left == right` failed: 写行与一次暖机都带文件，逐次比过
+    |   left: NoPublishWithFile
+    |  right: Compared { publishes: 2 }
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3672250) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:112:9:
+== 挂载写出的发布不数复用（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，32 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+    | thread 'row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked' (3673082) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:434:5:
+    | thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3673080) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:112:9:
+== 全部跑完
+== 第七轮作废：副本用 rsync -a 拷回，transaction.rs 的 mtime 回到比第六轮 B1 那次编译更早，cargo 用了带 B1 的旧产物（基线快档红在内容长度那一条）；删副本重拷再跑
+== 第七轮重跑（新副本）
+3e2955378e34a93e015e925846826664ef1ab462c399dd82e5bf2af74a89b08f  repo/crates/singlefs-harness/src/history.rs
+05660861846fb051509db76c13fb3faf7720e77510dd16764c13459bdbe70358  repo/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+090665c38aa21c29e18f8c9b385a8f09bb94e75d5c2c023752cab1e3d9be323c  repo/crates/singlefs-core/src/transaction.rs
+== 基线 second_transaction_supplement_three_random_history 退出码 0，35 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... ok
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+== 挂载写出的发布不数比过几次（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，35 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+    | thread 'row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked' (3676899) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:429:5:
+    | assertion `left == right` failed: 写行与一次暖机都带文件，逐次比过
+    |   left: NoPublishWithFile
+    |  right: Compared { publishes: 2 }
+== 挂载写出的发布不数复用（crates/singlefs-harness/src/history.rs；second_transaction_supplement_three_random_history）退出码 101，34 秒
+  test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+  test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+  test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+  test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... FAILED
+  test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+  test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+  test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+  test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... ok
+  test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+    | thread 'row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked' (3677983) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:434:5:
+== 全部跑完

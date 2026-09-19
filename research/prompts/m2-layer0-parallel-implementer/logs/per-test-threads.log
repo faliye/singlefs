@@ -1,0 +1,21 @@
+test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+test checker_report_on_the_final_image ... FINAL I-1.1 Holds
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ignored, 全量 262165 个状态要一两分钟，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑
+test layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape ... LAYER0_PARALLEL_START states=22 slices=2 worker_threads=2 configured_worker_threads=32
+test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... ok
+test removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker ... LAYER0_PARALLEL_START states=25 slices=2 worker_threads=2 configured_worker_threads=32
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.12s
+test every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims ... LAYER0_PARALLEL_START states=108 slices=7 worker_threads=7 configured_worker_threads=32
+test full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean ... ignored, 全量 2104413 个状态、每个两遍恢复 + checker，debug 下半小时以上；门禁 54 号在 release 下跑
+test one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread ... LAYER0_PARALLEL_START states=108 slices=1 worker_threads=1 configured_worker_threads=1
+LAYER0_PARALLEL_START states=108 slices=108 worker_threads=8 configured_worker_threads=8
+test residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it ... LAYER0_PARALLEL_START states=31 slices=2 worker_threads=2 configured_worker_threads=32
+test stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state ... LAYER0_PARALLEL_START states=8 slices=1 worker_threads=1 configured_worker_threads=32
+test targeted_controls_on_the_second_publish_go_red_where_they_should ... ok
+test the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence ... ok
+test the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence ... ok
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.95s
+test every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims ... LAYER0_PARALLEL_START states=22 slices=2 worker_threads=2 configured_worker_threads=32
+test formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_first_transaction_stream ... ok
+test the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s

@@ -1,0 +1,5 @@
+  ✓ 锚点预扫：140 条变异，原文都恰好命中一次
+  ✓ 第 143 行 增补 3 第 1 件（代码三方第二轮第 1 条，形态 a）：只在挂载写出的写行与暖机里复用改写已回收记录时不改分配代：row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked 红了
+  ✓ 第 144 行 增补 3 第 1 件（代码三方第二轮第 1 条，形态 b）：挂载写出的写行与暖机里每次分配的分配代记成 txg − 1：row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked 红了
+  ✓ 第 145 行 增补 3 第 1 件（代码三方第二轮第 2 条，几何补取样点）：随机历史快档也判出「复用时新记录罩住的已回收记录不删」（第 121、130 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+exit 0

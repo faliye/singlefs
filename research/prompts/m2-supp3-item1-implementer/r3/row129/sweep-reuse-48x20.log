@@ -1,0 +1,160 @@
+
+running 1 test
+── 随机历史大档 ──
+种子 [0, 48)，每段 20 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 48 段：跑完 15、以已知红收尾 {0: 13, 1: 1}、新发现 19；根环转过一圈的 18 段；最高 txg 28
+  操作 PublishFirstFile：Ok 5、Err 7、前提不满足没调 2
+  操作 PublishOverwrite：Ok 365、Err 44、前提不满足没调 19
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 8
+  操作 CloseAndMountWritable：Ok 173、Err 2、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 9、Err 7、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 43、Err 124、前提不满足没调 5
+  操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 57 次、发成 56 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 241 次、发成 237 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 23 次、发成 0 次
+  内容长度 载荷容量：入口被调 40 次、发成 38 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 21 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 39 次、发成 39 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：2 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：87 次
+  Err 成员 MountError::RollbackTargetNotInRing：3 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+  Err 成员 PublishError::ContentExceedsDataUnit：44 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：7 次
+  前提不满足（没有可写会话）：27 次
+  前提不满足（现行版本带文件）：7 次
+  冷启动结局 FileRead：6 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 16 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+  抬 F 回收到落点 25 次、共回收 641 个落点；复用已释放的记录 36 条（其中跨度变了 10 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 420 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 643 次；一个写都没发、沿用上一次结论的 225 步
+  I-1.1：判绿 625 次、不适用 0 次
+  I-1.3：判绿 643 次、不适用 0 次
+  I-1.4：判绿 643 次、不适用 0 次
+  I-1.6：判绿 643 次、不适用 0 次
+  I-1.7：判绿 643 次、不适用 0 次
+  I-2.1：判绿 643 次、不适用 0 次
+  I-2.3：判绿 643 次、不适用 0 次
+  I-2.4：判绿 643 次、不适用 0 次
+  I-2.5：判绿 643 次、不适用 0 次
+  I-3.1：判绿 617 次、不适用 12 次
+  I-3.8：判绿 643 次、不适用 0 次
+  I-3.9：判绿 613 次、不适用 12 次
+  I-4.8：判绿 643 次、不适用 0 次
+  I-5.1：判绿 643 次、不适用 0 次
+  I-5.2：判绿 631 次、不适用 12 次
+  I-5.4：判绿 613 次、不适用 12 次
+  I-7.1：判绿 643 次、不适用 0 次
+  I-7.2：判绿 643 次、不适用 0 次
+  I-7.4：判绿 643 次、不适用 0 次
+  I-7.6：判绿 643 次、不适用 0 次
+  I-7.7：判绿 643 次、不适用 0 次
+  I-7.8：判绿 643 次、不适用 0 次
+  I-9.1：判绿 631 次、不适用 12 次
+  I-9.2：判绿 631 次、不适用 12 次
+  I-9.4：判绿 631 次、不适用 12 次
+  I-9.7：判绿 631 次、不适用 12 次
+  I-9.10：判绿 631 次、不适用 12 次
+  I-9.13：判绿 631 次、不适用 12 次
+  I-9.14：判绿 584 次、不适用 59 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：13 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (19, Operation(19)), (22, Operation(13)), (26, Operation(18)), (27, Operation(19)), (28, Operation(13)), (32, Operation(15))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }：第一个种子 2（同签名的种子 [2, 5, 6, 7, 9, 11, 12, 15, 16, 17, 18, 21, 23, 34, 35, 36, 42, 46]），在 Operation(16)（Some(PublishOverwrite)）之后
+  I-1.1：树 13（种类 3）的根：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）
+  I-3.9：盘 0 槽 50176 的分配记录带已释放标志（释放代 5），而候选集里每一条有效根都还引用它
+  I-5.4：txg 20 的根那棵分配记录树、盘 0：槽 50176 跨 2 的记录与槽 50176 跨 2 的记录罩住同一个槽
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+新发现 Panic { location: "crates/singlefs-core/src/allocator.rs:529" }：第一个种子 25（同签名的种子 [25]），在 Operation(13)（Some(CloseAndMountWritable)）之后
+  panic 在 crates/singlefs-core/src/allocator.rs:529：盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=25 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+每个新发现的种子：[(2, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (5, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (6, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (7, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (9, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (11, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (12, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (15, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (16, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (17, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (18, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (21, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (23, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (34, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (35, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (36, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (42, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (46, CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }), (25, Panic { location: "crates/singlefs-core/src/allocator.rs:529" })]
+用时 1.0 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.99s
+
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+thread 'random_histories_large_tier_seeds_and_length_from_the_environment' (3650578) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:466:5:
+「已知红」清单外的失败：
+种子 [0, 48)，每段 20 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 48 段：跑完 15、以已知红收尾 {0: 13, 1: 1}、新发现 19；根环转过一圈的 18 段；最高 txg 28
+  操作 PublishFirstFile：Ok 5、Err 7、前提不满足没调 2
+  操作 PublishOverwrite：Ok 365、Err 44、前提不满足没调 19
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 8
+  操作 CloseAndMountWritable：Ok 173、Err 2、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 9、Err 7、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 43、Err 124、前提不满足没调 5
+  操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 57 次、发成 56 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 241 次、发成 237 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 23 次、发成 0 次
+  内容长度 载荷容量：入口被调 40 次、发成 38 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 21 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 39 次、发成 39 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：2 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：87 次
+  Err 成员 MountError::RollbackTargetNotInRing：3 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+  Err 成员 PublishError::ContentExceedsDataUnit：44 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：7 次
+  前提不满足（没有可写会话）：27 次
+  前提不满足（现行版本带文件）：7 次
+  冷启动结局 FileRead：6 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 16 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+  抬 F 回收到落点 25 次、共回收 641 个落点；复用已释放的记录 36 条（其中跨度变了 10 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 420 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 643 次；一个写都没发、沿用上一次结论的 225 步
+  I-1.1：判绿 625 次、不适用 0 次
+  I-1.3：判绿 643 次、不适用 0 次
+  I-1.4：判绿 643 次、不适用 0 次
+  I-1.6：判绿 643 次、不适用 0 次
+  I-1.7：判绿 643 次、不适用 0 次
+  I-2.1：判绿 643 次、不适用 0 次
+  I-2.3：判绿 643 次、不适用 0 次
+  I-2.4：判绿 643 次、不适用 0 次
+  I-2.5：判绿 643 次、不适用 0 次
+  I-3.1：判绿 617 次、不适用 12 次
+  I-3.8：判绿 643 次、不适用 0 次
+  I-3.9：判绿 613 次、不适用 12 次
+  I-4.8：判绿 643 次、不适用 0 次
+  I-5.1：判绿 643 次、不适用 0 次
+  I-5.2：判绿 631 次、不适用 12 次
+  I-5.4：判绿 613 次、不适用 12 次
+  I-7.1：判绿 643 次、不适用 0 次
+  I-7.2：判绿 643 次、不适用 0 次
+  I-7.4：判绿 643 次、不适用 0 次
+  I-7.6：判绿 643 次、不适用 0 次
+  I-7.7：判绿 643 次、不适用 0 次
+  I-7.8：判绿 643 次、不适用 0 次
+  I-9.1：判绿 631 次、不适用 12 次
+  I-9.2：判绿 631 次、不适用 12 次
+  I-9.4：判绿 631 次、不适用 12 次
+  I-9.7：判绿 631 次、不适用 12 次
+  I-9.10：判绿 631 次、不适用 12 次
+  I-9.13：判绿 631 次、不适用 12 次
+  I-9.14：判绿 584 次、不适用 59 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：13 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (19, Operation(19)), (22, Operation(13)), (26, Operation(18)), (27, Operation(19)), (28, Operation(13)), (32, Operation(15))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }：第一个种子 2（同签名的种子 [2, 5, 6, 7, 9, 11, 12, 15, 16, 17, 18, 21, 23, 34, 35, 36, 42, 46]），在 Operation(16)（Some(PublishOverwrite)）之后
+  I-1.1：树 13（种类 3）的根：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）
+  I-3.9：盘 0 槽 50176 的分配记录带已释放标志（释放代 5），而候选集里每一条有效根都还引用它
+  I-5.4：txg 20 的根那棵分配记录树、盘 0：槽 50176 跨 2 的记录与槽 50176 跨 2 的记录罩住同一个槽
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+新发现 Panic { location: "crates/singlefs-core/src/allocator.rs:529" }：第一个种子 25（同签名的种子 [25]），在 Operation(13)（Some(CloseAndMountWritable)）之后
+  panic 在 crates/singlefs-core/src/allocator.rs:529：盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=25 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`

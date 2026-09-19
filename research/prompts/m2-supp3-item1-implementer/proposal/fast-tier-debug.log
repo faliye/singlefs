@@ -1,0 +1,73 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+
+running 1 test
+── 随机历史快档 ──
+种子 [0, 96)，每段 30 步
+历史 96 段：跑完 42、以已知红收尾 {0: 53, 1: 1}、新发现 0；根环转过一圈的 65 段；最高 txg 37
+  操作 PublishFirstFile：Ok 28、Err 62、前提不满足没调 51
+  操作 PublishOverwrite：Ok 679、Err 112、前提不满足没调 423
+  操作 PublishWithoutUnits：Ok 1、Err 0、前提不满足没调 61
+  操作 CloseAndMountWritable：Ok 337、Err 74、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 121、Err 184、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 44、Err 170、前提不满足没调 127
+  操作 ColdStartRecover：Ok 97、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 93 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 517 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 58 次
+  内容长度 载荷容量：入口被调 74 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 68 次
+  内容长度 载荷容量 − 1：入口被调 71 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：74 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：35 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：135 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：6 次
+  Err 成员 MountError::RollbackTargetNotInRing：62 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：115 次
+  Err 成员 PublishError::ContentExceedsDataUnit：116 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：58 次
+  前提不满足（没有可写会话）：608 次
+  前提不满足（现行版本带文件）：35 次
+  前提不满足（现行版本树表 0 条）：19 次
+  冷启动结局 FileRead：79 次
+  冷启动结局 NoFile：18 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 33 次、共回收 862 个落点；复用已释放的记录 240 条（其中跨度变了 56 条）；已释放的记录被删 4 条
+  checker 跑了 1306 次；一个写都没发、沿用上一次结论的 1361 步
+  I-1.1：判绿 1306 次、不适用 0 次
+  I-1.3：判绿 1306 次、不适用 0 次
+  I-1.4：判绿 1306 次、不适用 0 次
+  I-1.6：判绿 1306 次、不适用 0 次
+  I-1.7：判绿 1306 次、不适用 0 次
+  I-2.1：判绿 1306 次、不适用 0 次
+  I-2.3：判绿 1306 次、不适用 0 次
+  I-2.4：判绿 1306 次、不适用 0 次
+  I-2.5：判绿 1306 次、不适用 0 次
+  I-3.1：判绿 1155 次、不适用 97 次
+  I-3.8：判绿 1306 次、不适用 0 次
+  I-3.9：判绿 1209 次、不适用 97 次
+  I-4.8：判绿 1306 次、不适用 0 次
+  I-5.1：判绿 1306 次、不适用 0 次
+  I-5.2：判绿 1209 次、不适用 97 次
+  I-5.4：判绿 1209 次、不适用 97 次
+  I-7.1：判绿 1306 次、不适用 0 次
+  I-7.2：判绿 1306 次、不适用 0 次
+  I-7.4：判绿 1306 次、不适用 0 次
+  I-7.6：判绿 1306 次、不适用 0 次
+  I-7.7：判绿 1306 次、不适用 0 次
+  I-7.8：判绿 1306 次、不适用 0 次
+  I-9.1：判绿 1209 次、不适用 97 次
+  I-9.2：判绿 1209 次、不适用 97 次
+  I-9.4：判绿 1209 次、不适用 97 次
+  I-9.7：判绿 1209 次、不适用 97 次
+  I-9.10：判绿 1209 次、不适用 97 次
+  I-9.13：判绿 1209 次、不适用 97 次
+  I-9.14：判绿 1133 次、不适用 173 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：53 段；前几个种子 [(0, Operation(22)), (1, Operation(24)), (2, Operation(27)), (4, Operation(25)), (11, Operation(21)), (12, Operation(18)), (13, Operation(24)), (16, Operation(18))]
+已知红第 1 条（增补 2 收口表第 ？ 行（待主 agent 立行；随机历史第 1 件的新发现））：1 段；前几个种子 [(80, Operation(21))]
+用时 26.1 秒
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 26.08s
+

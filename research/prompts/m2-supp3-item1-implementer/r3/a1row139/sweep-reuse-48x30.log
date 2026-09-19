@@ -1,0 +1,72 @@
+
+running 1 test
+── 随机历史大档 ──
+种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 48 段：跑完 2、以已知红收尾 {0: 21, 1: 25}、新发现 0；根环转过一圈的 21 段；最高 txg 28
+  操作 PublishFirstFile：Ok 5、Err 7、前提不满足没调 2
+  操作 PublishOverwrite：Ok 370、Err 53、前提不满足没调 25
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 8
+  操作 CloseAndMountWritable：Ok 178、Err 4、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 9、Err 7、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 48、Err 126、前提不满足没调 7
+  操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 60 次、发成 59 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 243 次、发成 239 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 26 次、发成 0 次
+  内容长度 载荷容量：入口被调 40 次、发成 38 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 27 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 39 次、发成 39 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：4 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：89 次
+  Err 成员 MountError::RollbackTargetNotInRing：3 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+  Err 成员 PublishError::ContentExceedsDataUnit：53 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：7 次
+  前提不满足（没有可写会话）：35 次
+  前提不满足（现行版本带文件）：7 次
+  冷启动结局 FileRead：6 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 15 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+  抬 F 回收到落点 24 次、共回收 603 个落点；复用已释放的记录 0 条（其中跨度变了 0 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 431 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 658 次；一个写都没发、沿用上一次结论的 246 步
+  I-1.1：判绿 658 次、不适用 0 次
+  I-1.3：判绿 658 次、不适用 0 次
+  I-1.4：判绿 658 次、不适用 0 次
+  I-1.6：判绿 658 次、不适用 0 次
+  I-1.7：判绿 658 次、不适用 0 次
+  I-2.1：判绿 658 次、不适用 0 次
+  I-2.3：判绿 658 次、不适用 0 次
+  I-2.4：判绿 658 次、不适用 0 次
+  I-2.5：判绿 658 次、不适用 0 次
+  I-3.1：判绿 600 次、不适用 12 次
+  I-3.8：判绿 658 次、不适用 0 次
+  I-3.9：判绿 646 次、不适用 12 次
+  I-4.8：判绿 658 次、不适用 0 次
+  I-5.1：判绿 658 次、不适用 0 次
+  I-5.2：判绿 646 次、不适用 12 次
+  I-5.4：判绿 646 次、不适用 12 次
+  I-7.1：判绿 658 次、不适用 0 次
+  I-7.2：判绿 658 次、不适用 0 次
+  I-7.4：判绿 658 次、不适用 0 次
+  I-7.6：判绿 658 次、不适用 0 次
+  I-7.7：判绿 658 次、不适用 0 次
+  I-7.8：判绿 658 次、不适用 0 次
+  I-9.1：判绿 646 次、不适用 12 次
+  I-9.2：判绿 646 次、不适用 12 次
+  I-9.4：判绿 646 次、不适用 12 次
+  I-9.7：判绿 646 次、不适用 12 次
+  I-9.10：判绿 646 次、不适用 12 次
+  I-9.13：判绿 646 次、不适用 12 次
+  I-9.14：判绿 599 次、不适用 59 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：21 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (3, Operation(22)), (8, Operation(21)), (10, Operation(19)), (13, Operation(23)), (19, Operation(19)), (22, Operation(13))]
+已知红第 1 条（增补 2 收口表第 43 行）：25 段；前几个种子 [(2, Operation(15)), (4, Operation(17)), (5, Operation(14)), (6, Operation(12)), (7, Operation(15)), (9, Operation(11)), (11, Operation(11)), (12, Operation(12))]
+每个新发现的种子：[]
+用时 1.0 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.01s
+
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)

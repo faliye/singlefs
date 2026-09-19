@@ -1,0 +1,154 @@
+
+running 1 test
+── 随机历史大档 ──
+种子 [0, 96)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 96 段：跑完 3、以已知红收尾 {0: 49, 1: 1}、新发现 43；根环转过一圈的 49 段；最高 txg 28
+  操作 PublishFirstFile：Ok 8、Err 16、前提不满足没调 4
+  操作 PublishOverwrite：Ok 789、Err 129、前提不满足没调 52
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 12
+  操作 CloseAndMountWritable：Ok 361、Err 10、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 15、Err 15、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 88、Err 268、前提不满足没调 20
+  操作 ColdStartRecover：Ok 19、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 96 次、发成 95 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 559 次、发成 550 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 66 次、发成 0 次
+  内容长度 载荷容量：入口被调 78 次、发成 76 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 65 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 78 次、发成 76 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：10 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：92 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：176 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：1 次
+  Err 成员 MountError::RollbackTargetNotInRing：8 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：6 次
+  Err 成员 PublishError::ContentExceedsDataUnit：130 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：15 次
+  前提不满足（没有可写会话）：72 次
+  前提不满足（现行版本带文件）：11 次
+  前提不满足（现行版本树表 0 条）：5 次
+  冷启动结局 FileRead：18 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 16 条根；一段历史里最多挂载成功 8 次、最多试挂载 9 次
+  抬 F 回收到落点 45 次、共回收 1121 个落点；复用已释放的记录 0 条（其中跨度变了 0 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 887 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1357 次；一个写都没发、沿用上一次结论的 545 步
+  I-1.1：判绿 1357 次、不适用 0 次
+  I-1.3：判绿 1357 次、不适用 0 次
+  I-1.4：判绿 1357 次、不适用 0 次
+  I-1.6：判绿 1357 次、不适用 0 次
+  I-1.7：判绿 1357 次、不适用 0 次
+  I-2.1：判绿 1357 次、不适用 0 次
+  I-2.3：判绿 1357 次、不适用 0 次
+  I-2.4：判绿 1357 次、不适用 0 次
+  I-2.5：判绿 1357 次、不适用 0 次
+  I-3.1：判绿 1244 次、不适用 20 次
+  I-3.8：判绿 1357 次、不适用 0 次
+  I-3.9：判绿 1337 次、不适用 20 次
+  I-4.8：判绿 1357 次、不适用 0 次
+  I-5.1：判绿 1357 次、不适用 0 次
+  I-5.2：判绿 1337 次、不适用 20 次
+  I-5.4：判绿 1337 次、不适用 20 次
+  I-7.1：判绿 1357 次、不适用 0 次
+  I-7.2：判绿 1357 次、不适用 0 次
+  I-7.4：判绿 1357 次、不适用 0 次
+  I-7.6：判绿 1357 次、不适用 0 次
+  I-7.7：判绿 1357 次、不适用 0 次
+  I-7.8：判绿 1357 次、不适用 0 次
+  I-9.1：判绿 1337 次、不适用 20 次
+  I-9.2：判绿 1337 次、不适用 20 次
+  I-9.4：判绿 1337 次、不适用 20 次
+  I-9.7：判绿 1337 次、不适用 20 次
+  I-9.10：判绿 1337 次、不适用 20 次
+  I-9.13：判绿 1337 次、不适用 20 次
+  I-9.14：判绿 1243 次、不适用 114 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：49 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (3, Operation(22)), (8, Operation(21)), (10, Operation(19)), (13, Operation(23)), (19, Operation(19)), (22, Operation(13))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 CheckerViolations { invariants: ["I-3.1"] }：第一个种子 2（同签名的种子 [2, 5, 6, 7, 9, 11, 12, 15, 16, 17, 18, 20, 21, 23, 24, 25, 34, 35, 36, 40, 42, 45, 46, 47, 49, 50, 52, 56, 57, 60, 61, 62, 65, 66, 68, 77, 78, 79, 80, 82, 89, 91, 95]），在 Operation(15)（Some(RaiseRollbackFloor)）之后
+  I-3.1：盘 0：记账的已分配 Some(1736704)，遍历全部有效根得到 1638400
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+每个新发现的种子：[(2, CheckerViolations { invariants: ["I-3.1"] }), (5, CheckerViolations { invariants: ["I-3.1"] }), (6, CheckerViolations { invariants: ["I-3.1"] }), (7, CheckerViolations { invariants: ["I-3.1"] }), (9, CheckerViolations { invariants: ["I-3.1"] }), (11, CheckerViolations { invariants: ["I-3.1"] }), (12, CheckerViolations { invariants: ["I-3.1"] }), (15, CheckerViolations { invariants: ["I-3.1"] }), (16, CheckerViolations { invariants: ["I-3.1"] }), (17, CheckerViolations { invariants: ["I-3.1"] }), (18, CheckerViolations { invariants: ["I-3.1"] }), (20, CheckerViolations { invariants: ["I-3.1"] }), (21, CheckerViolations { invariants: ["I-3.1"] }), (23, CheckerViolations { invariants: ["I-3.1"] }), (24, CheckerViolations { invariants: ["I-3.1"] }), (25, CheckerViolations { invariants: ["I-3.1"] }), (34, CheckerViolations { invariants: ["I-3.1"] }), (35, CheckerViolations { invariants: ["I-3.1"] }), (36, CheckerViolations { invariants: ["I-3.1"] }), (40, CheckerViolations { invariants: ["I-3.1"] }), (42, CheckerViolations { invariants: ["I-3.1"] }), (45, CheckerViolations { invariants: ["I-3.1"] }), (46, CheckerViolations { invariants: ["I-3.1"] }), (47, CheckerViolations { invariants: ["I-3.1"] }), (49, CheckerViolations { invariants: ["I-3.1"] }), (50, CheckerViolations { invariants: ["I-3.1"] }), (52, CheckerViolations { invariants: ["I-3.1"] }), (56, CheckerViolations { invariants: ["I-3.1"] }), (57, CheckerViolations { invariants: ["I-3.1"] }), (60, CheckerViolations { invariants: ["I-3.1"] }), (61, CheckerViolations { invariants: ["I-3.1"] }), (62, CheckerViolations { invariants: ["I-3.1"] }), (65, CheckerViolations { invariants: ["I-3.1"] }), (66, CheckerViolations { invariants: ["I-3.1"] }), (68, CheckerViolations { invariants: ["I-3.1"] }), (77, CheckerViolations { invariants: ["I-3.1"] }), (78, CheckerViolations { invariants: ["I-3.1"] }), (79, CheckerViolations { invariants: ["I-3.1"] }), (80, CheckerViolations { invariants: ["I-3.1"] }), (82, CheckerViolations { invariants: ["I-3.1"] }), (89, CheckerViolations { invariants: ["I-3.1"] }), (91, CheckerViolations { invariants: ["I-3.1"] }), (95, CheckerViolations { invariants: ["I-3.1"] })]
+用时 1.9 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.90s
+
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+thread 'random_histories_large_tier_seeds_and_length_from_the_environment' (3662335) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:466:5:
+「已知红」清单外的失败：
+种子 [0, 96)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 96 段：跑完 3、以已知红收尾 {0: 49, 1: 1}、新发现 43；根环转过一圈的 49 段；最高 txg 28
+  操作 PublishFirstFile：Ok 8、Err 16、前提不满足没调 4
+  操作 PublishOverwrite：Ok 789、Err 129、前提不满足没调 52
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 12
+  操作 CloseAndMountWritable：Ok 361、Err 10、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 15、Err 15、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 88、Err 268、前提不满足没调 20
+  操作 ColdStartRecover：Ok 19、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 96 次、发成 95 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 559 次、发成 550 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 66 次、发成 0 次
+  内容长度 载荷容量：入口被调 78 次、发成 76 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 65 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 78 次、发成 76 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：10 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：92 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：176 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：1 次
+  Err 成员 MountError::RollbackTargetNotInRing：8 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：6 次
+  Err 成员 PublishError::ContentExceedsDataUnit：130 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：15 次
+  前提不满足（没有可写会话）：72 次
+  前提不满足（现行版本带文件）：11 次
+  前提不满足（现行版本树表 0 条）：5 次
+  冷启动结局 FileRead：18 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 16 条根；一段历史里最多挂载成功 8 次、最多试挂载 9 次
+  抬 F 回收到落点 45 次、共回收 1121 个落点；复用已释放的记录 0 条（其中跨度变了 0 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 887 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1357 次；一个写都没发、沿用上一次结论的 545 步
+  I-1.1：判绿 1357 次、不适用 0 次
+  I-1.3：判绿 1357 次、不适用 0 次
+  I-1.4：判绿 1357 次、不适用 0 次
+  I-1.6：判绿 1357 次、不适用 0 次
+  I-1.7：判绿 1357 次、不适用 0 次
+  I-2.1：判绿 1357 次、不适用 0 次
+  I-2.3：判绿 1357 次、不适用 0 次
+  I-2.4：判绿 1357 次、不适用 0 次
+  I-2.5：判绿 1357 次、不适用 0 次
+  I-3.1：判绿 1244 次、不适用 20 次
+  I-3.8：判绿 1357 次、不适用 0 次
+  I-3.9：判绿 1337 次、不适用 20 次
+  I-4.8：判绿 1357 次、不适用 0 次
+  I-5.1：判绿 1357 次、不适用 0 次
+  I-5.2：判绿 1337 次、不适用 20 次
+  I-5.4：判绿 1337 次、不适用 20 次
+  I-7.1：判绿 1357 次、不适用 0 次
+  I-7.2：判绿 1357 次、不适用 0 次
+  I-7.4：判绿 1357 次、不适用 0 次
+  I-7.6：判绿 1357 次、不适用 0 次
+  I-7.7：判绿 1357 次、不适用 0 次
+  I-7.8：判绿 1357 次、不适用 0 次
+  I-9.1：判绿 1337 次、不适用 20 次
+  I-9.2：判绿 1337 次、不适用 20 次
+  I-9.4：判绿 1337 次、不适用 20 次
+  I-9.7：判绿 1337 次、不适用 20 次
+  I-9.10：判绿 1337 次、不适用 20 次
+  I-9.13：判绿 1337 次、不适用 20 次
+  I-9.14：判绿 1243 次、不适用 114 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：49 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (3, Operation(22)), (8, Operation(21)), (10, Operation(19)), (13, Operation(23)), (19, Operation(19)), (22, Operation(13))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 CheckerViolations { invariants: ["I-3.1"] }：第一个种子 2（同签名的种子 [2, 5, 6, 7, 9, 11, 12, 15, 16, 17, 18, 20, 21, 23, 24, 25, 34, 35, 36, 40, 42, 45, 46, 47, 49, 50, 52, 56, 57, 60, 61, 62, 65, 66, 68, 77, 78, 79, 80, 82, 89, 91, 95]），在 Operation(15)（Some(RaiseRollbackFloor)）之后
+  I-3.1：盘 0：记账的已分配 Some(1736704)，遍历全部有效根得到 1638400
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`

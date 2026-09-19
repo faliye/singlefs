@@ -1,0 +1,86 @@
+MUTATION M4_checker_first_violation_from_later_slice START 2026-09-18T16:13:53Z  16:13:53 up 9 days,  7:16,  7 users,  load average: 116.67, 104.01, 75.04
+APPLIED crates/singlefs-harness/src/crash.rs
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-layer0-parallel/mutant/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.89s
+     Running unittests src/lib.rs (target/debug/deps/singlefs_harness-ed0b65334d8d5632)
+
+running 23 tests
+test crash::oracle_instance_tests::landing_on_the_lower_instance_of_the_same_txg_is_a_violation ... ok
+test device_log::tests::missing_flush_is_reported_as_the_first_divergence ... ok
+test segments::tests::writes_classify_by_their_landing_zone ... ok
+test tests::stream_count_gate_rejects_a_stream_that_lost_one_write ... ok
+test tests::stream_lines_are_stable_text ... ok
+test crash::tests::sparse_device_reads_zero_for_holes_and_flip_byte_only_touches_one_sector ... ok
+test crash::tests::zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back - should panic ... ok
+test crash::tests::the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment ... ok
+test tests::recorder_keeps_every_write_and_barrier_in_issue_order_with_kinds ... ok
+test segments::tests::barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment ... ok
+test history::tests::allocated_and_walked_bytes_are_read_from_the_checker_detail ... ok
+test hexadecimal::tests::hexadecimal_text_keeps_the_on_disk_byte_order_and_pads_each_byte_to_two_characters ... ok
+test crash::tests::worker_threads_come_from_the_environment_variable_before_available_parallelism ... ok
+test history::tests::the_same_seed_generates_the_same_history_and_another_seed_does_not ... ok
+test sha256::tests::flipping_one_bit_of_a_data_unit_sized_message_changes_the_digest ... ok
+test crash::oracle_instance_tests::newer_root_without_any_version_reporting_no_file_is_violation ... ok
+test crash::oracle_instance_tests::the_same_txg_from_two_instances_are_two_versions ... ok
+test crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation ... FAILED
+test history::tests::seeded_random_source_reproduces_the_splitmix64_reference_sequence ... ok
+test device_log::tests::log_of_write_flush_write_parses_into_the_same_three_events ... ok
+test history::tests::shrinking_keeps_only_the_steps_the_failure_needs ... ok
+test sha256::tests::sha256_matches_the_published_test_vectors ... ok
+test crash::tests::state_slices_cover_every_state_exactly_once_in_ordinal_order ... ok
+
+failures:
+
+---- crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation stdout ----
+
+thread 'crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation' (2296428) panicked at crates/singlefs-harness/src/crash.rs:1665:9:
+assertion `left == right` failed: 每条不变量的第一处各取最早有的那一片
+  left: {"I-1.1": "后面那一片的 I-1.1", "I-3.1": "后面那一片的 I-3.1"}
+ right: {"I-1.1": "前面那一片的 I-1.1", "I-3.1": "后面那一片的 I-3.1"}
+
+
+failures:
+    crash::tests::absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation
+
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `-p singlefs-harness --lib`
+     Running tests/first_transaction_step_seven_layer0.rs (target/debug/deps/first_transaction_step_seven_layer0-4a0c76245db2628c)
+
+running 6 tests
+test layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations ... ignored, 全量 262165 个状态要一两分钟，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑
+test checker_report_on_the_final_image ... ok
+test applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker ... ok
+test layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape ... ok
+test removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker ... ok
+test positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.88s
+
+     Running tests/second_transaction_step_three_formatted_pool_layer0.rs (target/debug/deps/second_transaction_step_three_formatted_pool_layer0-8e7b3739ae22ed0e)
+
+running 3 tests
+test the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence ... ok
+test formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_first_transaction_stream ... ok
+test every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.24s
+
+     Running tests/second_transaction_step_zero_layer0.rs (target/debug/deps/second_transaction_step_zero_layer0-7e98400ca775ebc4)
+
+running 8 tests
+test full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean ... ignored, 全量 2104413 个状态、每个两遍恢复 + checker，debug 下半小时以上；门禁 54 号在 release 下跑
+test the_fixed_script_through_the_third_publish_keeps_its_registered_segment_sequence ... ok
+test targeted_controls_on_the_second_publish_go_red_where_they_should ... ok
+test the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence ... ok
+test residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it ... ok
+test every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims ... ok
+test stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state ... ok
+test one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread ... ok
+
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 43.44s
+
+error: 1 target failed:
+    `-p singlefs-harness --lib`
+MUTATION M4_checker_first_violation_from_later_slice EXIT 101 END 2026-09-18T16:14:45Z
+RESTORED crates/singlefs-harness/src/crash.rs

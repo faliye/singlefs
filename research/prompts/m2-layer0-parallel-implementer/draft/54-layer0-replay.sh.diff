@@ -1,0 +1,107 @@
+--- original/gate.d/54-layer0-replay.sh	2026-09-17 10:46:09.632418192 +0000
++++ copy/.claude/gate.d/54-layer0-replay.sh	2026-09-18 16:07:49.086383485 +0000
+@@ -5,16 +5,63 @@
+ # 里程碑「第一个事务」步 7：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，每个状态跑三件事：步 6 的恢复与 oracle、
+ # 池级 checker（23 条不变量）、记录核对器（根在案而记录缺席、恢复自称新态而单元缺席）；三者的计数都由用例钉死。
+ # 全量 262165 个状态在 debug 下要几分钟，所以平时 `cargo test` 里那条用例标 ignored；这里在 release 下跑它，
+-# 把用例打印的 `LAYER0 …` 计数行报出来。exhaustive=true 才算全量，不是全量判红——层 0 全量是里程碑出口。
++# 把用例打印的 `LAYER0 …` 计数行与逐条不变量的 `CHECKER …` 行报出来。exhaustive=true 才算全量，不是全量判红——层 0 全量是里程碑出口。
+ # 判别力：用例自己对着产物的十个计数断言（states / violations / root_persisted … 逐字），oracle 的判别力由同文件的靶向阳性对照证明
+ # （根槽已持久而某个单元两份都没持久 ⇒ 8 个单元逐个都判红）。本阶段没有 fixtures 样本：判红要 cargo 真跑，装不进 fixtures 目录。
++#
++# 多线程（增补 2 收口表第 41 行；2026-09-18 用户定：测试与崩溃检测优先多线程）：crash.rs 按状态序号区间切片、多线程跑，
++# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——没设就取本机核数（nproc）。每跑完一片，用例打一行 `LAYER0_PROGRESS`（片号、序号区间、段号、
++# 已跑完的状态数），这里边跑边转到本阶段的输出里，不删；成功行里报实际起了几个工作线程。
++# 没显式把 SINGLEFS_LAYER0_THREADS 设成 1、而本机多于 1 核却只起了 1 个工作线程：判红（多半是线程数没传进去）。
+ set -uo pipefail
+ ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+ cd "$ROOT" 2>/dev/null || exit 2
+ [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+ 
++machine_cores="$(nproc)"
++if [[ -n "${SINGLEFS_LAYER0_THREADS:-}" ]]; then
++  threads_origin="显式设的"
++else
++  SINGLEFS_LAYER0_THREADS="$machine_cores"
++  threads_origin="没设，取本机核数"
++fi
++export SINGLEFS_LAYER0_THREADS
++
++# run_layer0_test_binary <测试二进制> <日志>：cargo 的整段输出进日志；`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
++run_layer0_test_binary() {
++  cargo test --release -p singlefs-harness --test "$1" -- --include-ignored --nocapture 2>&1 \
++    | tee "$2" \
++    | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
++    | sed -u 's/^/    /'
++  return "${PIPESTATUS[0]}"
++}
++
++# worker_threads_of_full_run <日志> <计数行>：计数行里的状态数对上的那一行 `LAYER0_PARALLEL_FINISHED`，取实际起的工作线程数。
++worker_threads_of_full_run() {
++  local states
++  states="$(sed -n 's/^[A-Z0-9]* states=\([0-9]*\) .*/\1/p' <<<"$2")"
++  grep "^LAYER0_PARALLEL_FINISHED states=$states " "$1" | head -1 | sed -n 's/.* worker_threads=\([0-9]*\) .*/\1/p'
++}
++
++# 没显式设成 1、本机多于 1 核却只起了 1 个工作线程（或根本没打收尾行）：判红。返回 0 表示线程数没问题。
++worker_threads_are_acceptable() { # <流的名字> <实际起的工作线程数>
++  if [[ -z "$2" ]]; then
++    echo "  ✗ $1：全量用例跑过了，却没打印状态数对得上的 LAYER0_PARALLEL_FINISHED 行，判不出起了几个工作线程"
++    echo "     → 怎么办：全量那条用例要经 crates/singlefs-harness/src/crash.rs 的 enumerate_layer0_in_state_slices 跑（它开跑与跑完各打一行 LAYER0_PARALLEL_*）；"
++    echo "                绕开它自己逐个跑状态的写法退回了单线程，改回去。"
++    return 1
++  fi
++  if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then
++    echo "  ✗ $1：本机 $machine_cores 核、SINGLEFS_LAYER0_THREADS=$SINGLEFS_LAYER0_THREADS（$threads_origin），全量枚举却只起了 1 个工作线程"
++    echo "     → 怎么办：看 crash.rs 的 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS、state_slices 切出来的片数够不够分给每个线程；"
++    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
++    return 1
++  fi
++  return 0
++}
++
+ log="$(mktemp)"
+-if ! cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --include-ignored --nocapture >"$log" 2>&1; then
++if ! run_layer0_test_binary first_transaction_step_seven_layer0 "$log"; then
+   tail -40 "$log"
+   echo "  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）"
+   echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --include-ignored --nocapture"
+@@ -23,6 +70,8 @@
+   exit 1
+ fi
+ line="$(grep '^LAYER0 ' "$log" | head -1)"
++checker_line="$(grep '^CHECKER .*=262165/' "$log" | head -1)"
++worker_threads="$(worker_threads_of_full_run "$log" "$line")"
+ rm -f "$log"
+ if [[ -z "$line" ]]; then
+   echo "  ✗ 用例跑过了，却没打印 LAYER0 计数行"
+@@ -34,10 +83,12 @@
+   echo "     → 怎么办：枚举到的状态数要等于闭式 1 + Σ(2^|段| − 1)；少了说明某一段没展开子集，去 crash.rs 的 enumerate_layer0 看。"
+   exit 1
+ fi
+-echo "  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器）：${line#LAYER0 }"
++worker_threads_are_acceptable "第一个事务那条流" "$worker_threads" || exit 1
++echo "  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；${worker_threads} 个工作线程，SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核）：${line#LAYER0 }"
++echo "  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：${checker_line#CHECKER }"
+ # 第二个事务（发布 B）：取号 → 暖机 → A → B 整条流，多版本 oracle（里程碑「第二个事务」步 0 / 步 6 在 B 上的那一半）。
+ log_b="$(mktemp)"
+-if ! cargo test --release -p singlefs-harness --test second_transaction_step_zero_layer0 -- --include-ignored --nocapture >"$log_b" 2>&1; then
++if ! run_layer0_test_binary second_transaction_step_zero_layer0 "$log_b"; then
+   tail -40 "$log_b"
+   echo "  ✗ 两次发布那条流的层 0 用例判红（上面是 cargo test 的尾部）"
+   echo "     → 怎么办：单跑看细节：cargo test --release -p singlefs-harness --test second_transaction_step_zero_layer0 -- --include-ignored --nocapture"
+@@ -46,6 +97,7 @@
+   exit 1
+ fi
+ line_b="$(grep '^LAYER0B ' "$log_b" | head -1)"
++worker_threads_b="$(worker_threads_of_full_run "$log_b" "$line_b")"
+ rm -f "$log_b"
+ if [[ -z "$line_b" ]]; then
+   echo "  ✗ 两次发布那条流的用例跑过了，却没打印 LAYER0B 计数行"
+@@ -57,4 +109,5 @@
+   echo "     → 怎么办：枚举到的状态数要等于闭式 1 + Σ(2^|段| − 1)；少了说明某一段没展开子集，去 crash.rs 的 enumerate_layer0_selecting_versions 看。"
+   exit 1
+ fi
+-echo "  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle）：${line_b#LAYER0B }"
++worker_threads_are_acceptable "两次发布那条流" "$worker_threads_b" || exit 1
++echo "  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；${worker_threads_b} 个工作线程，SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核）：${line_b#LAYER0B }"

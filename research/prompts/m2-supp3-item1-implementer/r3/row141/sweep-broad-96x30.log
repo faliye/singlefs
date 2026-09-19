@@ -1,0 +1,156 @@
+
+running 1 test
+── 随机历史大档 ──
+种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）
+历史 96 段：跑完 32、以已知红收尾 {0: 18, 1: 1}、新发现 45；根环转过一圈的 23 段；最高 txg 37
+  操作 PublishFirstFile：Ok 24、Err 44、前提不满足没调 51
+  操作 PublishOverwrite：Ok 402、Err 60、前提不满足没调 412
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 53
+  操作 CloseAndMountWritable：Ok 191、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 64、Err 157、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 20、Err 108、前提不满足没调 126
+  操作 ColdStartRecover：Ok 68、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 55 次、发成 54 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 325 次、发成 296 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 25 次、发成 0 次
+  内容长度 载荷容量：入口被调 42 次、发成 41 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 43 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 40 次、发成 35 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：74 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：3 次
+  Err 成员 MountError::RollbackTargetNotInRing：41 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：113 次
+  Err 成员 PublishError::ContentExceedsDataUnit：64 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：40 次
+  前提不满足（没有可写会话）：592 次
+  前提不满足（现行版本带文件）：26 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 Failed(RecoveryFailure::InvariantViolated（I-2.3）)：45 次
+  冷启动结局 FileRead：4 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 12 次、共回收 328 个落点；复用已释放的记录 116 条（其中跨度变了 20 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 509 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 804 次；一个写都没发、沿用上一次结论的 1171 步
+  I-1.1：判绿 804 次、不适用 0 次
+  I-1.3：判绿 804 次、不适用 0 次
+  I-1.4：判绿 804 次、不适用 0 次
+  I-1.6：判绿 804 次、不适用 0 次
+  I-1.7：判绿 804 次、不适用 0 次
+  I-2.1：判绿 804 次、不适用 0 次
+  I-2.3：判绿 804 次、不适用 0 次
+  I-2.4：判绿 804 次、不适用 0 次
+  I-2.5：判绿 804 次、不适用 0 次
+  I-3.1：判绿 682 次、不适用 103 次
+  I-3.8：判绿 804 次、不适用 0 次
+  I-3.9：判绿 701 次、不适用 103 次
+  I-4.8：判绿 804 次、不适用 0 次
+  I-5.1：判绿 804 次、不适用 0 次
+  I-5.2：判绿 701 次、不适用 103 次
+  I-5.4：判绿 701 次、不适用 103 次
+  I-7.1：判绿 804 次、不适用 0 次
+  I-7.2：判绿 804 次、不适用 0 次
+  I-7.4：判绿 804 次、不适用 0 次
+  I-7.6：判绿 804 次、不适用 0 次
+  I-7.7：判绿 804 次、不适用 0 次
+  I-7.8：判绿 804 次、不适用 0 次
+  I-9.1：判绿 701 次、不适用 103 次
+  I-9.2：判绿 701 次、不适用 103 次
+  I-9.4：判绿 701 次、不适用 103 次
+  I-9.7：判绿 701 次、不适用 103 次
+  I-9.10：判绿 701 次、不适用 103 次
+  I-9.13：判绿 701 次、不适用 103 次
+  I-9.14：判绿 629 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：18 段；前几个种子 [(4, Operation(25)), (16, Operation(18)), (21, Operation(16)), (29, Operation(28)), (34, Operation(21)), (35, Operation(25)), (43, Operation(29)), (45, Operation(29))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
+新发现 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }：第一个种子 0（同签名的种子 [0, 1, 2, 3, 7, 9, 11, 12, 13, 15, 17, 20, 25, 26, 27, 32, 36, 37, 38, 41, 42, 44, 48, 51, 54, 57, 61, 62, 63, 64, 66, 68, 69, 70, 73, 74, 77, 79, 81, 84, 86, 88, 89, 92, 93]），在 Operation(1)（Some(ColdStartRecover)）之后
+  执行器判出：checker 判绿的镜像上冷启动恢复报错：ColdStartRecoveryFailedOnCheckerGreenImage { outcome: "Failed(RecoveryFailure::InvariantViolated（I-2.3）)" }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=0 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+每个新发现的种子：[(0, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (1, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (2, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (3, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (7, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (9, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (11, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (12, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (13, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (15, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (17, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (20, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (25, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (26, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (27, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (32, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (36, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (37, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (38, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (41, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (42, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (44, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (48, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (51, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (54, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (57, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (61, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (62, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (63, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (64, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (66, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (68, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (69, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (70, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (73, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (74, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (77, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (79, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (81, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (84, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (86, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (88, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (89, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (92, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }), (93, HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" })]
+用时 1.7 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.74s
+
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+thread 'random_histories_large_tier_seeds_and_length_from_the_environment' (3657786) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:466:5:
+「已知红」清单外的失败：
+种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）
+历史 96 段：跑完 32、以已知红收尾 {0: 18, 1: 1}、新发现 45；根环转过一圈的 23 段；最高 txg 37
+  操作 PublishFirstFile：Ok 24、Err 44、前提不满足没调 51
+  操作 PublishOverwrite：Ok 402、Err 60、前提不满足没调 412
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 53
+  操作 CloseAndMountWritable：Ok 191、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 64、Err 157、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 20、Err 108、前提不满足没调 126
+  操作 ColdStartRecover：Ok 68、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 55 次、发成 54 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 325 次、发成 296 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 25 次、发成 0 次
+  内容长度 载荷容量：入口被调 42 次、发成 41 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 43 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 40 次、发成 35 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：74 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：3 次
+  Err 成员 MountError::RollbackTargetNotInRing：41 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：113 次
+  Err 成员 PublishError::ContentExceedsDataUnit：64 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：40 次
+  前提不满足（没有可写会话）：592 次
+  前提不满足（现行版本带文件）：26 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 Failed(RecoveryFailure::InvariantViolated（I-2.3）)：45 次
+  冷启动结局 FileRead：4 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 12 次、共回收 328 个落点；复用已释放的记录 116 条（其中跨度变了 20 条）；已释放的记录被罩住起点 0 条、被删 0 条
+  挂载写出的发布比过分配记录 509 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 804 次；一个写都没发、沿用上一次结论的 1171 步
+  I-1.1：判绿 804 次、不适用 0 次
+  I-1.3：判绿 804 次、不适用 0 次
+  I-1.4：判绿 804 次、不适用 0 次
+  I-1.6：判绿 804 次、不适用 0 次
+  I-1.7：判绿 804 次、不适用 0 次
+  I-2.1：判绿 804 次、不适用 0 次
+  I-2.3：判绿 804 次、不适用 0 次
+  I-2.4：判绿 804 次、不适用 0 次
+  I-2.5：判绿 804 次、不适用 0 次
+  I-3.1：判绿 682 次、不适用 103 次
+  I-3.8：判绿 804 次、不适用 0 次
+  I-3.9：判绿 701 次、不适用 103 次
+  I-4.8：判绿 804 次、不适用 0 次
+  I-5.1：判绿 804 次、不适用 0 次
+  I-5.2：判绿 701 次、不适用 103 次
+  I-5.4：判绿 701 次、不适用 103 次
+  I-7.1：判绿 804 次、不适用 0 次
+  I-7.2：判绿 804 次、不适用 0 次
+  I-7.4：判绿 804 次、不适用 0 次
+  I-7.6：判绿 804 次、不适用 0 次
+  I-7.7：判绿 804 次、不适用 0 次
+  I-7.8：判绿 804 次、不适用 0 次
+  I-9.1：判绿 701 次、不适用 103 次
+  I-9.2：判绿 701 次、不适用 103 次
+  I-9.4：判绿 701 次、不适用 103 次
+  I-9.7：判绿 701 次、不适用 103 次
+  I-9.10：判绿 701 次、不适用 103 次
+  I-9.13：判绿 701 次、不适用 103 次
+  I-9.14：判绿 629 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：18 段；前几个种子 [(4, Operation(25)), (16, Operation(18)), (21, Operation(16)), (29, Operation(28)), (34, Operation(21)), (35, Operation(25)), (43, Operation(29)), (45, Operation(29))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
+新发现 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }：第一个种子 0（同签名的种子 [0, 1, 2, 3, 7, 9, 11, 12, 13, 15, 17, 20, 25, 26, 27, 32, 36, 37, 38, 41, 42, 44, 48, 51, 54, 57, 61, 62, 63, 64, 66, 68, 69, 70, 73, 74, 77, 79, 81, 84, 86, 88, 89, 92, 93]），在 Operation(1)（Some(ColdStartRecover)）之后
+  执行器判出：checker 判绿的镜像上冷启动恢复报错：ColdStartRecoveryFailedOnCheckerGreenImage { outcome: "Failed(RecoveryFailure::InvariantViolated（I-2.3）)" }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=0 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`

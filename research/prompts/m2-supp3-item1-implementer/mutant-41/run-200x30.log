@@ -1,0 +1,234 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-supp3-item1/mutant-41/repo/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-supp3-item1/mutant-41/repo/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1/mutant-41/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1/mutant-41/repo/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.61s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+running 1 test
+种子 [0, 200)，每段 30 步
+历史 200 段：跑完 88、以已知红收尾 {0: 69}、新发现 43；根环转过一圈的 79 段；最高 txg 29
+  操作 PublishFirstFile：Ok 51、Err 174、前提不满足没调 118
+  操作 PublishOverwrite：Ok 1261、Err 211、前提不满足没调 948
+  操作 PublishWithoutUnits：Ok 14、Err 0、前提不满足没调 262
+  操作 CloseAndMountWritable：Ok 579、Err 159、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 169、Err 258、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 103、Err 341、前提不满足没调 274
+  操作 ColdStartRecover：Ok 218、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 164 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 1020 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 128 次
+  内容长度 载荷容量：入口被调 136 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 120 次
+  内容长度 载荷容量 − 1：入口被调 129 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：159 次
+  Err 成员 MountError::Publish(PublishError::ReleaseTargetAlreadyReleased)：2 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：96 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：245 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：18 次
+  Err 成员 MountError::RollbackTargetNotInRing：78 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：160 次
+  Err 成员 PublishError::ContentExceedsDataUnit：219 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：166 次
+  前提不满足（没有可写会话）：1338 次
+  前提不满足（现行版本带文件）：169 次
+  前提不满足（现行版本树表 0 条）：95 次
+  冷启动结局 FileRead：151 次
+  冷启动结局 NoFile：67 次
+  一次挂载里最多写出 17 条根；一段历史里最多挂载成功 9 次、最多试挂载 11 次
+  抬 F 回收到落点 62 次、共回收 1331 个落点；复用已释放的记录 66 条（其中跨度变了 34 条）；已释放的记录被删 0 条
+  checker 跑了 2379 次；一个写都没发、沿用上一次结论的 2961 步
+  I-1.1：判绿 2344 次、不适用 0 次
+  I-1.3：判绿 2379 次、不适用 0 次
+  I-1.4：判绿 2379 次、不适用 0 次
+  I-1.6：判绿 2379 次、不适用 0 次
+  I-1.7：判绿 2379 次、不适用 0 次
+  I-2.1：判绿 2379 次、不适用 0 次
+  I-2.3：判绿 2379 次、不适用 0 次
+  I-2.4：判绿 2379 次、不适用 0 次
+  I-2.5：判绿 2379 次、不适用 0 次
+  I-3.1：判绿 2097 次、不适用 212 次
+  I-3.8：判绿 2379 次、不适用 0 次
+  I-3.9：判绿 2132 次、不适用 212 次
+  I-4.8：判绿 2379 次、不适用 0 次
+  I-5.1：判绿 2379 次、不适用 0 次
+  I-5.2：判绿 2167 次、不适用 212 次
+  I-5.4：判绿 2132 次、不适用 212 次
+  I-7.1：判绿 2379 次、不适用 0 次
+  I-7.2：判绿 2379 次、不适用 0 次
+  I-7.4：判绿 2379 次、不适用 0 次
+  I-7.6：判绿 2379 次、不适用 0 次
+  I-7.7：判绿 2379 次、不适用 0 次
+  I-7.8：判绿 2379 次、不适用 0 次
+  I-9.1：判绿 2167 次、不适用 212 次
+  I-9.2：判绿 2167 次、不适用 212 次
+  I-9.4：判绿 2167 次、不适用 212 次
+  I-9.7：判绿 2167 次、不适用 212 次
+  I-9.10：判绿 2167 次、不适用 212 次
+  I-9.13：判绿 2167 次、不适用 212 次
+  I-9.14：判绿 2015 次、不适用 364 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：69 段；前几个种子 [(3, Operation(26)), (8, Operation(26)), (9, Operation(26)), (16, Operation(14)), (21, Operation(19)), (27, Operation(25)), (28, Operation(17)), (35, Operation(20))]
+新发现 Panic { location: "crates/singlefs-core/src/allocator.rs:529" }：第一个种子 2（同签名的种子 [2, 4, 12, 15, 114, 119, 174]），在 Operation(29)（Some(CloseAndMountRollback)）之后
+  panic 在 crates/singlefs-core/src/allocator.rs:529：盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了
+  最短复现：起点 AfterMakeFilesystem，13 步
+    0. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(1), publishes: 2 })
+    1. PublishFirstFile(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    4. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    5. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    9. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(3), publishes: 2 })
+    10. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    11. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 8833417059334059848 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(9), publishes: 2, reclaimed_placements: 42, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    12. CloseAndMountRollback(RingRoot { index_from_newest: 0 }) → （失败在这一步）
+新发现 CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }：第一个种子 0（同签名的种子 [0, 1, 7, 17, 25, 38, 42, 43, 50, 51, 53, 56, 69, 70, 80, 82, 84, 85, 86, 88, 97, 99, 124, 127, 129, 137, 143, 154, 160, 162, 168, 176, 177, 179, 183]），在 Operation(20)（Some(PublishOverwrite)）之后
+  I-1.1：树 13（种类 3）的根：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）
+  I-3.9：盘 0 槽 50176 的分配记录带已释放标志（释放代 7），而候选集里每一条有效根都还引用它
+  I-5.4：txg 23 的根那棵分配记录树、盘 0：槽 50176 跨 2 的记录与槽 50176 跨 2 的记录罩住同一个槽
+  最短复现：起点 AfterFirstFile，9 步
+    0. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    1. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+    4. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    5. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 17628629206118725206 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(6), publishes: 2, reclaimed_placements: 25, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 2, released_records_removed: 0 } })
+新发现 CheckerViolations { invariants: ["I-3.1"] }：第一个种子 188（同签名的种子 [188]），在 Operation(18)（Some(RaiseRollbackFloor)）之后
+  I-3.1：盘 0：记账的已分配 Some(1540096)，遍历全部有效根得到 1441792
+  最短复现：起点 AfterMakeFilesystem，10 步
+    0. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(1), publishes: 2 })
+    1. PublishFirstFile(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. CloseAndMountRollback(RingRoot { index_from_newest: 1 }) → Applied(Mounted { instance: InstanceGeneration(2), publishes: 3 })
+    4. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(3), publishes: 3 })
+    5. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    9. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 11831361945781580232 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(4), publishes: 2, reclaimed_placements: 1, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+用时 46.7 秒
+
+thread 'random_histories_large_tier_seeds_and_length_from_the_environment' (3072150) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:44:5:
+「已知红」清单外的失败：
+种子 [0, 200)，每段 30 步
+历史 200 段：跑完 88、以已知红收尾 {0: 69}、新发现 43；根环转过一圈的 79 段；最高 txg 29
+  操作 PublishFirstFile：Ok 51、Err 174、前提不满足没调 118
+  操作 PublishOverwrite：Ok 1261、Err 211、前提不满足没调 948
+  操作 PublishWithoutUnits：Ok 14、Err 0、前提不满足没调 262
+  操作 CloseAndMountWritable：Ok 579、Err 159、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 169、Err 258、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 103、Err 341、前提不满足没调 274
+  操作 ColdStartRecover：Ok 218、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 164 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 1020 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 128 次
+  内容长度 载荷容量：入口被调 136 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 120 次
+  内容长度 载荷容量 − 1：入口被调 129 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：159 次
+  Err 成员 MountError::Publish(PublishError::ReleaseTargetAlreadyReleased)：2 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：96 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：245 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：18 次
+  Err 成员 MountError::RollbackTargetNotInRing：78 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：160 次
+  Err 成员 PublishError::ContentExceedsDataUnit：219 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：166 次
+  前提不满足（没有可写会话）：1338 次
+  前提不满足（现行版本带文件）：169 次
+  前提不满足（现行版本树表 0 条）：95 次
+  冷启动结局 FileRead：151 次
+  冷启动结局 NoFile：67 次
+  一次挂载里最多写出 17 条根；一段历史里最多挂载成功 9 次、最多试挂载 11 次
+  抬 F 回收到落点 62 次、共回收 1331 个落点；复用已释放的记录 66 条（其中跨度变了 34 条）；已释放的记录被删 0 条
+  checker 跑了 2379 次；一个写都没发、沿用上一次结论的 2961 步
+  I-1.1：判绿 2344 次、不适用 0 次
+  I-1.3：判绿 2379 次、不适用 0 次
+  I-1.4：判绿 2379 次、不适用 0 次
+  I-1.6：判绿 2379 次、不适用 0 次
+  I-1.7：判绿 2379 次、不适用 0 次
+  I-2.1：判绿 2379 次、不适用 0 次
+  I-2.3：判绿 2379 次、不适用 0 次
+  I-2.4：判绿 2379 次、不适用 0 次
+  I-2.5：判绿 2379 次、不适用 0 次
+  I-3.1：判绿 2097 次、不适用 212 次
+  I-3.8：判绿 2379 次、不适用 0 次
+  I-3.9：判绿 2132 次、不适用 212 次
+  I-4.8：判绿 2379 次、不适用 0 次
+  I-5.1：判绿 2379 次、不适用 0 次
+  I-5.2：判绿 2167 次、不适用 212 次
+  I-5.4：判绿 2132 次、不适用 212 次
+  I-7.1：判绿 2379 次、不适用 0 次
+  I-7.2：判绿 2379 次、不适用 0 次
+  I-7.4：判绿 2379 次、不适用 0 次
+  I-7.6：判绿 2379 次、不适用 0 次
+  I-7.7：判绿 2379 次、不适用 0 次
+  I-7.8：判绿 2379 次、不适用 0 次
+  I-9.1：判绿 2167 次、不适用 212 次
+  I-9.2：判绿 2167 次、不适用 212 次
+  I-9.4：判绿 2167 次、不适用 212 次
+  I-9.7：判绿 2167 次、不适用 212 次
+  I-9.10：判绿 2167 次、不适用 212 次
+  I-9.13：判绿 2167 次、不适用 212 次
+  I-9.14：判绿 2015 次、不适用 364 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：69 段；前几个种子 [(3, Operation(26)), (8, Operation(26)), (9, Operation(26)), (16, Operation(14)), (21, Operation(19)), (27, Operation(25)), (28, Operation(17)), (35, Operation(20))]
+新发现 Panic { location: "crates/singlefs-core/src/allocator.rs:529" }：第一个种子 2（同签名的种子 [2, 4, 12, 15, 114, 119, 174]），在 Operation(29)（Some(CloseAndMountRollback)）之后
+  panic 在 crates/singlefs-core/src/allocator.rs:529：盘 DeviceIdentity(0) 上与新落点（槽 SlotNumber(50243) 跨 1）相交的记录（槽 SlotNumber(50242)）不是已回收的：分配器只发位图上空闲的槽，位图与记录分叉了
+  最短复现：起点 AfterMakeFilesystem，13 步
+    0. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(1), publishes: 2 })
+    1. PublishFirstFile(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    4. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    5. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    9. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(3), publishes: 2 })
+    10. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    11. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 8833417059334059848 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(9), publishes: 2, reclaimed_placements: 42, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    12. CloseAndMountRollback(RingRoot { index_from_newest: 0 }) → （失败在这一步）
+新发现 CheckerViolations { invariants: ["I-1.1", "I-3.9", "I-5.4"] }：第一个种子 0（同签名的种子 [0, 1, 7, 17, 25, 38, 42, 43, 50, 51, 53, 56, 69, 70, 80, 82, 84, 85, 86, 88, 97, 99, 124, 127, 129, 137, 143, 154, 160, 162, 168, 176, 177, 179, 183]），在 Operation(20)（Some(PublishOverwrite)）之后
+  I-1.1：树 13（种类 3）的根：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）
+  I-3.9：盘 0 槽 50176 的分配记录带已释放标志（释放代 7），而候选集里每一条有效根都还引用它
+  I-5.4：txg 23 的根那棵分配记录树、盘 0：槽 50176 跨 2 的记录与槽 50176 跨 2 的记录罩住同一个槽
+  最短复现：起点 AfterFirstFile，9 步
+    0. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    1. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(2), publishes: 2 })
+    4. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    5. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 17628629206118725206 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(6), publishes: 2, reclaimed_placements: 25, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 2, rewritten_with_changed_span: 2, released_records_removed: 0 } })
+新发现 CheckerViolations { invariants: ["I-3.1"] }：第一个种子 188（同签名的种子 [188]），在 Operation(18)（Some(RaiseRollbackFloor)）之后
+  I-3.1：盘 0：记账的已分配 Some(1540096)，遍历全部有效根得到 1441792
+  最短复现：起点 AfterMakeFilesystem，10 步
+    0. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(1), publishes: 2 })
+    1. PublishFirstFile(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    2. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    3. CloseAndMountRollback(RingRoot { index_from_newest: 1 }) → Applied(Mounted { instance: InstanceGeneration(2), publishes: 3 })
+    4. CloseAndMountWritable → Applied(Mounted { instance: InstanceGeneration(3), publishes: 3 })
+    5. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    6. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    7. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    8. PublishOverwrite(ContentChoice { length: Empty, fill_seed: 0 }) → Applied(Published { reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+    9. RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 11831361945781580232 }) → Applied(RaisedFloor { new_floor: CheckpointTxg(4), publishes: 2, reclaimed_placements: 1, reuse: RecordReuse { rewritten_from_released: 0, rewritten_with_changed_span: 0, released_records_removed: 0 } })
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.70s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`

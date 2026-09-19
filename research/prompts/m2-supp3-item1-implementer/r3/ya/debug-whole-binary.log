@@ -1,0 +1,310 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r3/ya/repo/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r3/ya/repo/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r3/ya/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item1/r3/ya/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.76s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+
+running 9 tests
+test random_histories_large_tier_seeds_and_length_from_the_environment ... ignored, 大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑
+test shrink_one_failing_seed_from_the_environment ... ignored, 收缩一个种子：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED 必给，SINGLEFS_RANDOM_HISTORY_OPERATIONS 默认 30，SINGLEFS_RANDOM_HISTORY_THREADS 默认全部核
+test an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding ... ok
+
+thread 'row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked' (3645359) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:416:5:
+assertion `left == right` failed: 今天的代码上这段跑完：挂载写出的发布里复用改写的记录，代都是那一次的 txg
+  left: NewFinding { signature: HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }, observation: FailureObservation { position: Operation(10), operation_kind: Some(CloseAndMountWritable), violations: [], panic: None, newest_ring_root_txg: Some(16), root_ring_slot_count: Some(24), harness_judgement: Some(AllocationGenerationIsNotThePublishTxg { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(6), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }], first_publish_txg: CheckpointTxg(15), last_publish_txg: CheckpointTxg(15) }), raised_floor_lands_only_on_abandoned_roots: None } }
+ right: Completed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked ... FAILED
+test raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form ... ok
+test turning_the_root_ring_with_overwrites_in_one_mount_ends_in_the_first_known_red_form ... ok
+test the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice ... ok
+── 随机历史：偏向抬 F 之后复用的取样点 ──
+种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 48 段：跑完 11、以已知红收尾 {0: 24, 1: 1}、新发现 12；根环转过一圈的 42 段；最高 txg 37
+  操作 PublishFirstFile：Ok 5、Err 11、前提不满足没调 2
+  操作 PublishOverwrite：Ok 481、Err 80、前提不满足没调 27
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 9
+  操作 CloseAndMountWritable：Ok 219、Err 4、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 11、Err 8、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 72、Err 162、前提不满足没调 7
+  操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 73 次、发成 71 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 318 次、发成 313 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 39 次、发成 0 次
+  内容长度 载荷容量：入口被调 55 次、发成 53 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 43 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 49 次、发成 49 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：4 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：125 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotInRing：3 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+  Err 成员 PublishError::ContentExceedsDataUnit：80 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：11 次
+  前提不满足（没有可写会话）：37 次
+  前提不满足（现行版本带文件）：8 次
+  冷启动结局 FileRead：6 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 28 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+  抬 F 回收到落点 52 次、共回收 1399 个落点；复用已释放的记录 510 条（其中跨度变了 118 条）；已释放的记录被罩住起点 10 条、被删 10 条
+  挂载写出的发布比过分配记录 530 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 836 次；一个写都没发、沿用上一次结论的 317 步
+  I-1.1：判绿 836 次、不适用 0 次
+  I-1.3：判绿 836 次、不适用 0 次
+  I-1.4：判绿 836 次、不适用 0 次
+  I-1.6：判绿 836 次、不适用 0 次
+  I-1.7：判绿 836 次、不适用 0 次
+  I-2.1：判绿 836 次、不适用 0 次
+  I-2.3：判绿 836 次、不适用 0 次
+  I-2.4：判绿 836 次、不适用 0 次
+  I-2.5：判绿 836 次、不适用 0 次
+  I-3.1：判绿 799 次、不适用 12 次
+  I-3.8：判绿 836 次、不适用 0 次
+  I-3.9：判绿 824 次、不适用 12 次
+  I-4.8：判绿 836 次、不适用 0 次
+  I-5.1：判绿 836 次、不适用 0 次
+  I-5.2：判绿 824 次、不适用 12 次
+  I-5.4：判绿 824 次、不适用 12 次
+  I-7.1：判绿 836 次、不适用 0 次
+  I-7.2：判绿 836 次、不适用 0 次
+  I-7.4：判绿 836 次、不适用 0 次
+  I-7.6：判绿 836 次、不适用 0 次
+  I-7.7：判绿 836 次、不适用 0 次
+  I-7.8：判绿 836 次、不适用 0 次
+  I-9.1：判绿 824 次、不适用 12 次
+  I-9.2：判绿 824 次、不适用 12 次
+  I-9.4：判绿 824 次、不适用 12 次
+  I-9.7：判绿 824 次、不适用 12 次
+  I-9.10：判绿 824 次、不适用 12 次
+  I-9.13：判绿 824 次、不适用 12 次
+  I-9.14：判绿 777 次、不适用 59 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：24 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (3, Operation(22)), (10, Operation(23)), (19, Operation(19)), (20, Operation(28)), (22, Operation(13)), (23, Operation(14))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }：第一个种子 2（同签名的种子 [2, 5, 7, 8, 9, 12, 21, 24, 25, 35, 36, 39]），在 Operation(21)（Some(CloseAndMountWritable)）之后
+  执行器判出：改写或新增的分配记录的代不是这次发布的 txg：AllocationGenerationIsNotThePublishTxg { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }], first_publish_txg: CheckpointTxg(25), last_publish_txg: CheckpointTxg(25) }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+用时 37.0 秒
+
+thread 'reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms' (3645358) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:186:5:
+「已知红」清单外的失败：
+种子 [0, 48)，每段 30 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）
+历史 48 段：跑完 11、以已知红收尾 {0: 24, 1: 1}、新发现 12；根环转过一圈的 42 段；最高 txg 37
+  操作 PublishFirstFile：Ok 5、Err 11、前提不满足没调 2
+  操作 PublishOverwrite：Ok 481、Err 80、前提不满足没调 27
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 9
+  操作 CloseAndMountWritable：Ok 219、Err 4、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 11、Err 8、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 72、Err 162、前提不满足没调 7
+  操作 ColdStartRecover：Ok 7、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 73 次、发成 71 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 318 次、发成 313 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 39 次、发成 0 次
+  内容长度 载荷容量：入口被调 55 次、发成 53 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 43 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 49 次、发成 49 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：4 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：37 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：125 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotInRing：3 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：4 次
+  Err 成员 PublishError::ContentExceedsDataUnit：80 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：11 次
+  前提不满足（没有可写会话）：37 次
+  前提不满足（现行版本带文件）：8 次
+  冷启动结局 FileRead：6 次
+  冷启动结局 NoFile：1 次
+  一次挂载里最多写出 28 条根；一段历史里最多挂载成功 8 次、最多试挂载 8 次
+  抬 F 回收到落点 52 次、共回收 1399 个落点；复用已释放的记录 510 条（其中跨度变了 118 条）；已释放的记录被罩住起点 10 条、被删 10 条
+  挂载写出的发布比过分配记录 530 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 836 次；一个写都没发、沿用上一次结论的 317 步
+  I-1.1：判绿 836 次、不适用 0 次
+  I-1.3：判绿 836 次、不适用 0 次
+  I-1.4：判绿 836 次、不适用 0 次
+  I-1.6：判绿 836 次、不适用 0 次
+  I-1.7：判绿 836 次、不适用 0 次
+  I-2.1：判绿 836 次、不适用 0 次
+  I-2.3：判绿 836 次、不适用 0 次
+  I-2.4：判绿 836 次、不适用 0 次
+  I-2.5：判绿 836 次、不适用 0 次
+  I-3.1：判绿 799 次、不适用 12 次
+  I-3.8：判绿 836 次、不适用 0 次
+  I-3.9：判绿 824 次、不适用 12 次
+  I-4.8：判绿 836 次、不适用 0 次
+  I-5.1：判绿 836 次、不适用 0 次
+  I-5.2：判绿 824 次、不适用 12 次
+  I-5.4：判绿 824 次、不适用 12 次
+  I-7.1：判绿 836 次、不适用 0 次
+  I-7.2：判绿 836 次、不适用 0 次
+  I-7.4：判绿 836 次、不适用 0 次
+  I-7.6：判绿 836 次、不适用 0 次
+  I-7.7：判绿 836 次、不适用 0 次
+  I-7.8：判绿 836 次、不适用 0 次
+  I-9.1：判绿 824 次、不适用 12 次
+  I-9.2：判绿 824 次、不适用 12 次
+  I-9.4：判绿 824 次、不适用 12 次
+  I-9.7：判绿 824 次、不适用 12 次
+  I-9.10：判绿 824 次、不适用 12 次
+  I-9.13：判绿 824 次、不适用 12 次
+  I-9.14：判绿 777 次、不适用 59 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：24 段；前几个种子 [(0, Operation(12)), (1, Operation(18)), (3, Operation(22)), (10, Operation(23)), (19, Operation(19)), (20, Operation(28)), (22, Operation(13)), (23, Operation(14))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(4, Operation(17))]
+新发现 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }：第一个种子 2（同签名的种子 [2, 5, 7, 8, 9, 12, 21, 24, 25, 35, 36, 39]），在 Operation(21)（Some(CloseAndMountWritable)）之后
+  执行器判出：改写或新增的分配记录的代不是这次发布的 txg：AllocationGenerationIsNotThePublishTxg { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }], first_publish_txg: CheckpointTxg(25), last_publish_txg: CheckpointTxg(25) }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=2 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms ... FAILED
+── 随机历史快档 ──
+种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）
+历史 96 段：跑完 41、以已知红收尾 {0: 47, 1: 1}、新发现 7；根环转过一圈的 60 段；最高 txg 35
+  操作 PublishFirstFile：Ok 24、Err 60、前提不满足没调 56
+  操作 PublishOverwrite：Ok 628、Err 101、前提不满足没调 456
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 63
+  操作 CloseAndMountWritable：Ok 314、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 109、Err 192、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 41、Err 154、前提不满足没调 142
+  操作 ColdStartRecover：Ok 96、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 85 次、发成 82 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 478 次、发成 443 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 49 次、发成 0 次
+  内容长度 载荷容量：入口被调 70 次、发成 66 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 64 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 67 次、发成 61 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：120 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：5 次
+  Err 成员 MountError::RollbackTargetNotInRing：61 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：125 次
+  Err 成员 PublishError::ContentExceedsDataUnit：105 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：56 次
+  前提不满足（没有可写会话）：660 次
+  前提不满足（现行版本带文件）：33 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 FileRead：77 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 30 次、共回收 836 个落点；复用已释放的记录 250 条（其中跨度变了 62 条）；已释放的记录被罩住起点 2 条、被删 2 条
+  挂载写出的发布比过分配记录 912 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1219 次；一个写都没发、沿用上一次结论的 1412 步
+  I-1.1：判绿 1219 次、不适用 0 次
+  I-1.3：判绿 1219 次、不适用 0 次
+  I-1.4：判绿 1219 次、不适用 0 次
+  I-1.6：判绿 1219 次、不适用 0 次
+  I-1.7：判绿 1219 次、不适用 0 次
+  I-2.1：判绿 1219 次、不适用 0 次
+  I-2.3：判绿 1219 次、不适用 0 次
+  I-2.4：判绿 1219 次、不适用 0 次
+  I-2.5：判绿 1219 次、不适用 0 次
+  I-3.1：判绿 1068 次、不适用 103 次
+  I-3.8：判绿 1219 次、不适用 0 次
+  I-3.9：判绿 1116 次、不适用 103 次
+  I-4.8：判绿 1219 次、不适用 0 次
+  I-5.1：判绿 1219 次、不适用 0 次
+  I-5.2：判绿 1116 次、不适用 103 次
+  I-5.4：判绿 1116 次、不适用 103 次
+  I-7.1：判绿 1219 次、不适用 0 次
+  I-7.2：判绿 1219 次、不适用 0 次
+  I-7.4：判绿 1219 次、不适用 0 次
+  I-7.6：判绿 1219 次、不适用 0 次
+  I-7.7：判绿 1219 次、不适用 0 次
+  I-7.8：判绿 1219 次、不适用 0 次
+  I-9.1：判绿 1116 次、不适用 103 次
+  I-9.2：判绿 1116 次、不适用 103 次
+  I-9.4：判绿 1116 次、不适用 103 次
+  I-9.7：判绿 1116 次、不适用 103 次
+  I-9.10：判绿 1116 次、不适用 103 次
+  I-9.13：判绿 1116 次、不适用 103 次
+  I-9.14：判绿 1044 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：47 段；前几个种子 [(0, Operation(22)), (1, Operation(24)), (2, Operation(27)), (4, Operation(25)), (11, Operation(21)), (12, Operation(18)), (13, Operation(24)), (16, Operation(18))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
+新发现 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }：第一个种子 7（同签名的种子 [7, 46, 62, 68, 69, 71, 94]），在 Operation(23)（Some(CloseAndMountWritable)）之后
+  执行器判出：改写或新增的分配记录的代不是这次发布的 txg：AllocationGenerationIsNotThePublishTxg { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }], first_publish_txg: CheckpointTxg(27), last_publish_txg: CheckpointTxg(27) }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=7 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+用时 45.6 秒
+
+thread 'random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation' (3645357) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:158:5:
+「已知红」清单外的失败：
+种子 [0, 96)，每段 30 步，比重：各类操作都抽（快档、大档）
+历史 96 段：跑完 41、以已知红收尾 {0: 47, 1: 1}、新发现 7；根环转过一圈的 60 段；最高 txg 35
+  操作 PublishFirstFile：Ok 24、Err 60、前提不满足没调 56
+  操作 PublishOverwrite：Ok 628、Err 101、前提不满足没调 456
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 63
+  操作 CloseAndMountWritable：Ok 314、Err 92、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 109、Err 192、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 41、Err 154、前提不满足没调 142
+  操作 ColdStartRecover：Ok 96、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 85 次、发成 82 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 478 次、发成 443 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 49 次、发成 0 次
+  内容长度 载荷容量：入口被调 70 次、发成 66 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 64 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 67 次、发成 61 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：92 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：34 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：120 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate（实例表里那个实例的行 T 更小：这是被抛弃时间线的根）：5 次
+  Err 成员 MountError::RollbackTargetNotInRing：61 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：125 次
+  Err 成员 PublishError::ContentExceedsDataUnit：105 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：56 次
+  前提不满足（没有可写会话）：660 次
+  前提不满足（现行版本带文件）：33 次
+  前提不满足（现行版本树表 0 条）：24 次
+  冷启动结局 FileRead：77 次
+  冷启动结局 NoFile：19 次
+  一次挂载里最多写出 23 条根；一段历史里最多挂载成功 9 次、最多试挂载 12 次
+  抬 F 回收到落点 30 次、共回收 836 个落点；复用已释放的记录 250 条（其中跨度变了 62 条）；已释放的记录被罩住起点 2 条、被删 2 条
+  挂载写出的发布比过分配记录 912 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1219 次；一个写都没发、沿用上一次结论的 1412 步
+  I-1.1：判绿 1219 次、不适用 0 次
+  I-1.3：判绿 1219 次、不适用 0 次
+  I-1.4：判绿 1219 次、不适用 0 次
+  I-1.6：判绿 1219 次、不适用 0 次
+  I-1.7：判绿 1219 次、不适用 0 次
+  I-2.1：判绿 1219 次、不适用 0 次
+  I-2.3：判绿 1219 次、不适用 0 次
+  I-2.4：判绿 1219 次、不适用 0 次
+  I-2.5：判绿 1219 次、不适用 0 次
+  I-3.1：判绿 1068 次、不适用 103 次
+  I-3.8：判绿 1219 次、不适用 0 次
+  I-3.9：判绿 1116 次、不适用 103 次
+  I-4.8：判绿 1219 次、不适用 0 次
+  I-5.1：判绿 1219 次、不适用 0 次
+  I-5.2：判绿 1116 次、不适用 103 次
+  I-5.4：判绿 1116 次、不适用 103 次
+  I-7.1：判绿 1219 次、不适用 0 次
+  I-7.2：判绿 1219 次、不适用 0 次
+  I-7.4：判绿 1219 次、不适用 0 次
+  I-7.6：判绿 1219 次、不适用 0 次
+  I-7.7：判绿 1219 次、不适用 0 次
+  I-7.8：判绿 1219 次、不适用 0 次
+  I-9.1：判绿 1116 次、不适用 103 次
+  I-9.2：判绿 1116 次、不适用 103 次
+  I-9.4：判绿 1116 次、不适用 103 次
+  I-9.7：判绿 1116 次、不适用 103 次
+  I-9.10：判绿 1116 次、不适用 103 次
+  I-9.13：判绿 1116 次、不适用 103 次
+  I-9.14：判绿 1044 次、不适用 175 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：47 段；前几个种子 [(0, Operation(22)), (1, Operation(24)), (2, Operation(27)), (4, Operation(25)), (11, Operation(21)), (12, Operation(18)), (13, Operation(24)), (16, Operation(18))]
+已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
+新发现 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }：第一个种子 7（同签名的种子 [7, 46, 62, 68, 69, 71, 94]），在 Operation(23)（Some(CloseAndMountWritable)）之后
+  执行器判出：改写或新增的分配记录的代不是这次发布的 txg：AllocationGenerationIsNotThePublishTxg { records: [AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(0), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50240), span_slots: 2, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50242), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50244), span_slots: 1, generation: CheckpointTxg(4), is_released: false }, AllocationRecord { device: DeviceIdentity(1), slot: SlotNumber(50245), span_slots: 1, generation: CheckpointTxg(4), is_released: false }], first_publish_txg: CheckpointTxg(27), last_publish_txg: CheckpointTxg(27) }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=7 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... FAILED
+
+failures:
+
+failures:
+    random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
+    reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms
+    row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked
+
+test result: FAILED. 4 passed; 3 failed; 2 ignored; 0 measured; 0 filtered out; finished in 45.60s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`
