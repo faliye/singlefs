@@ -6,8 +6,6 @@
 **这是 singlefs 的项目本地规则**，不在共享 SOP 里——文件系统的设计纪律只有本工程需要。
 共享规则在 `.claude/singlefs-ai-sop/rules/`。
 
-> 历史与依据：[rules-rationale/fs-design.md](../rules-rationale/fs-design.md)。**除非要查来历，别读它。**
-
 ## 从事务开始，不从功能开始
 
 写路径的硬核是 COW 提交机制，一切骑在它上面。任何新功能都是「一种新的事务」。

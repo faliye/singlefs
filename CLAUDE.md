@@ -2,8 +2,10 @@
 
 **一个从零设计的 COW 文件系统，Rust 实现。**
 现有 COW 文件系统是**设计输入**（它们的病历和解法），不是移植目标。
+**并行agent治理与上游sop治理**
+agent治理与上游sop治理，是另外一个重要的任务。因此遇到问题优先从流程、规范和门禁等方面着手解决问题，目的不是该一行代码，而是避免再发。
 
-当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，2026-09-16 建档，做到哪一步看那份文件）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）出口 2026-09-14 满足，代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
+当前里程碑：**「第二个事务」**（`.claude/kb/milestone/02-second-txn.md`，做到哪一步看那份文件）。上一个里程碑「第一个事务」（`.claude/kb/milestone/01-first-txn.md`）的出口已经满足，代码在 `crates/` 下四个 crate（格式常量、核心、验证装置、checker）。
 
 ## 任务从哪进
 
@@ -15,9 +17,9 @@
 
 ## 经验与约定写在哪
 
-别的会话、别的贡献者、派出去的 subagent 可能撞上的坑与约定，写进项目：规则（`.claude/rules/`）、agent 定义与 `.claude/agent-common.md`、kb、`records/`。私有 memory 只放用户个人的偏好（提交时间窗、回复语言这类）：它只在本机，别的贡献者看不到，定义开了 `omitClaudeMd` 的 subagent 也读不到（2026-09-17 用户定）。往本文件加内容之前先问它属于哪个 agent，属于就写进那个定义或共用约束。
+别的会话、别的贡献者、派出去的 subagent 可能撞上的坑与约定，写进项目：规则（`.claude/rules/`）、agent 定义与 `.claude/agent-common.md`、kb、`records/`。私有 memory 只放用户个人的偏好（提交时间窗、回复语言这类）：它只在本机，别的贡献者看不到，定义开了 `omitClaudeMd` 的 subagent 也读不到。往本文件加内容之前先问它属于哪个 agent，属于就写进那个定义或共用约束。
 
-subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身（2026-09-16 用户定）。定义、共用约束、三方流程与配套脚本用着发现问题就直接改，改完记进那份计划、跑相关门禁（26、47、62、63、89 与 doc-lint），不先问（2026-09-17 用户授权）。
+subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身。定义、共用约束、三方流程与配套脚本用着发现问题就直接改，改完记进那份计划、跑相关门禁（26、47、62、63、89 与 doc-lint），不先问。
 
 ## 规则（始终生效）
 
@@ -27,8 +29,10 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 @.claude/singlefs-ai-sop/rules/machine-first.md
 @.claude/singlefs-ai-sop/rules/code-discipline.md
 @.claude/singlefs-ai-sop/rules/writing-discipline.md
+@.claude/singlefs-ai-sop/rules/rules-discipline.md
 @.claude/singlefs-ai-sop/rules/design-doc-discipline.md
 @.claude/singlefs-ai-sop/rules/kb-discipline.md
+@.claude/singlefs-ai-sop/rules/rules-discipline.md
 @.claude/singlefs-ai-sop/rules/test-discipline.md
 @.claude/singlefs-ai-sop/rules/evidence-discipline.md
 @.claude/singlefs-ai-sop/rules/verify-before-claiming.md
@@ -43,7 +47,7 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | 上游仓 | `singlefs-ai-sop`，本机在兄弟目录 `../singlefs-ai-sop-zh`。同一份规范有多语言版本，**对外以 `-en` 为准**；本项目只接其中一份，不需要知道别的 |
 | 项目里的副本 | `.claude/singlefs-ai-sop/`（[README](.claude/singlefs-ai-sop/README.md)），是**拷贝，不是符号链接**；与上游同步靠重新拷贝一份：`rsync -a --exclude '.git' ../singlefs-ai-sop-zh/ .claude/singlefs-ai-sop/`，拷完 `diff -rq --exclude=.git ../singlefs-ai-sop-zh .claude/singlefs-ai-sop` 确认一致再刷版本戳（`cp -r` 会把上游的 `.git` 一起拷进副本，第二次同步时那些只读 object 报一屏 Permission denied） |
 | 版本戳 | `.singlefs-ai-sop-version`。门禁第一阶段拿它跟副本的 `VERSION` 比，对不上就红——那是在提醒「规矩变过了，先读再跑」 |
-| 怎么改 | 共享规则只能在**上游**改。从本仓的会话改上游**只往文件里填内容**（规则正文、脚本逻辑、三语译文那几行）：不跑 `bump.sh`、不动 `VERSION`、不改 MANIFEST / SOURCE-MANIFEST 与译文首行的溯源哈希、不写带版本号的 CHANGELOG 条目、不提交，这些归做发版的会话；填之前先看上游三语仓 `git status`，有人在发版就等它提交完，填完告诉发版会话填了哪些文件哪几段（2026-09-12 用户定）。发版之后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了，而且改它们等于改所有项目。上游的改动应当罕见：经常变说明规范本身没设计好；**作业在本仓，不在上游仓** |
+| 怎么改 | 共享规则只能在**上游**改。从本仓的会话改上游**只往文件里填内容**（规则正文、脚本逻辑、三语译文那几行）：不跑 `bump.sh`、不动 `VERSION`、不改 MANIFEST / SOURCE-MANIFEST 与译文首行的溯源哈希、不写带版本号的 CHANGELOG 条目、不提交，这些归做发版的会话；填之前先看上游三语仓 `git status`，有人在发版就等它提交完，填完告诉发版会话填了哪些文件哪几段。发版之后同步副本、跑 `bash .claude/singlefs-ai-sop/install.sh` 刷版本戳。**不许在 `.claude/singlefs-ai-sop/` 里就地改**——下次同步就没了，而且改它们等于改所有项目。上游的改动应当罕见：经常变说明规范本身没设计好；**作业在本仓，不在上游仓** |
 
 ## 项目本地规则
 
@@ -56,6 +60,8 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 @.claude/rules/path-moves.md
 
 共享 SOP 只管「项目怎么和 AI 协作」；只有本工程需要的纪律（文件系统怎么设计、压在本机资源上的流程）放 `.claude/rules/`，不往上游推。
+
+规则正文只写怎么做（`.claude/singlefs-ai-sop/rules/rules-discipline.md`）：实测、论证、定案日期不写进规则，经过要留就留在 `records/` 与 `.claude/kb/` 里已有的那一份。
 
 ## 项目本地事实
 
@@ -92,6 +98,6 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 
 ## 一句话版本
 
-- 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。第一个事务的代码是 2026-09-13 总审核把未定项集中交用户定案之后才开工的（`records/2026-09-13-总审核.md`）。
+- 先定决策，再写代码——未定项还开着就写下去的实现多半要返工。
 - 从事务开始，不从功能开始；第一个可运行目标是「正确提交一个事务」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
 - 门禁全绿**只构成第一个事务与里程碑「第二个事务」步 0 那条固定脚本（覆盖写、释放、重开写行、暖机、回退、抬 F、复用各一次）在模型层的崩溃一致性证据**——层 0 崩溃点重放（门禁 54 号）的负载是两条流：第一个事务，以及固定脚本到 E；checker 判 29 条不变量（第一版 23 条加 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交）；I-3.1（已分配统计对得上）、I-2.1（校验和与内容匹配） 与后加的六条里除 I-3.8（实例表行唯一且低于挂载根） 之外的五条按回退候选集判；候选集的下界取最新根自己带的 F 而不是 F_生效，一块盘的载体根坏掉之后会漏判，见里程碑步 6 现状）。

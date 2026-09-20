@@ -46,7 +46,7 @@ for mode in "${MODES[@]}"; do
   ( VM_DISKS=2 VM_DISK_MB=4096 VM_BLKLOGWRITES_DIR="$work/$mode" bash research/scripts/vm-bench.sh "$BIN" "$mode" >"$work/$mode/out.txt" 2>&1
     echo "$?" >"$work/$mode/vm-exit" ) &
 done
-wait
+wait  # shell-lint:exit-collected 每台虚机把退出码写进 $work/<模式>/vm-exit，紧接着按 MODES 的顺序逐个读
 
 checks=0
 for mode in "${MODES[@]}"; do
