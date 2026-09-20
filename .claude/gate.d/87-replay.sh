@@ -15,6 +15,17 @@
 # 当轮把 `GATE_REPLAY_FULL=1` 补跑了一次才发现：E58 的产物早已对不上（源码的指针载荷
 # 108 → 53 改过而产物没重跑），E17 在 release 下直接 panic 跑不起来——而默认档一直是绿的。
 set -uo pipefail
+
+# 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
+# 它判的是入库实验数今天还复现不复现得出来，输入是实验二进制、replay.sh 的表与留存产物；
+# research/prompts/ 是冻结证据，改它不可能改变任何实验的输出，所以不在前缀里。C8（范围判定）的粗粒度前身。
+scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$(cd "$(dirname "$0")/../.." && pwd)" crates/ research/e7-index-bench/ research/scripts/ research/results/)"
+scope_rc=$?
+if [[ "$scope_rc" != 0 ]]; then
+  echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
+  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。"
+  exit 77
+fi
 # ⚠️ **不许写死清单。** 第一版把 FAST 手抄成 22 个编号，此后新增的实验
 # （E40 起共 14 个）虽然进了 replay.sh 的表，却**一个都没被门禁跑过**，
 # 而本阶段仍旧打印「本次没跑：E9 E17 E20 E21」——**列出来的那句话本身是假的**。

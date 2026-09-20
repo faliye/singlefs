@@ -13,6 +13,17 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 
+# 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0——`exit 0` 的跳过在汇总里与「判过了」
+# 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。这是 C8（范围判定）的粗粒度前身：
+# 它只摘得掉「零行代码的改动」，摘不出别的，C8 照旧欠着。
+scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" crates/)"
+scope_rc=$?
+if [[ "$scope_rc" != 0 ]]; then
+  echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
+  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。"
+  exit 77
+fi
+
 TEST_BINARY="second_transaction_supplement_three_random_history"
 SECTIONS=("随机历史快档" "随机历史：偏向抬 F 之后复用的取样点" "随机历史：偏向抬 F 之后回退的取样点" "随机历史：逼近分配记录墙的取样点" "随机历史：小盘上逼近单元区墙的取样点")
 

@@ -15,6 +15,17 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
+
+# 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0——`exit 0` 的跳过在汇总里与「判过了」
+# 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。这是 C8（范围判定）的粗粒度前身：
+# 它只摘得掉「零行代码的改动」，摘不出别的，C8 照旧欠着。
+scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" crates/ research/scripts/vm-bench.sh)"
+scope_rc=$?
+if [[ "$scope_rc" != 0 ]]; then
+  echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
+  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；判据与前缀见 research/scripts/change-touches-crates.sh。"
+  exit 77
+fi
 [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
 
 fail() { echo "  ✗ $1"; echo "     → 怎么办：$2"; exit 1; }
