@@ -52,7 +52,7 @@ fn pool_after_the_first_transaction() -> (Devices, SharedStream) {
     (devices, stream)
 }
 
-/// 连着 `count` 次「取号之后崩溃」：每次取一个新号写进两块盘的超级块，写行那次发布没发出去。
+/// 连着 `count` 次「取号之后崩溃」：每次取一个新号写进两块盘的系统配置，写行那次发布没发出去。
 fn crash_right_after_acquisition(devices: &mut Devices, count: u32) {
     let publish_parameters = parameters();
     let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
@@ -74,7 +74,7 @@ fn rows_in_the_row_publish(mounted: &Mounted) -> usize {
         .len()
 }
 
-/// 两块盘四个超级块槽里自证过的那些槽写着的实例代号，按盘排。
+/// 两块盘四个系统配置槽里自证过的那些槽写着的实例代号，按盘排。
 fn superblock_instances(devices: &Devices) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
     let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
     DISKS
@@ -99,7 +99,7 @@ fn snapshot(devices: &Devices, stream: &SharedStream) -> DiskSnapshot {
     disk_snapshot(&memory_pool_of_sparse_devices(devices), stream)
 }
 
-/// 拒绝的那一次：错误成员与三个数对得上，盘上逐字节不变（超级块槽原样字节、根环里的根、录制流步数）、四个超级块槽的实例代号不变。
+/// 拒绝的那一次：错误成员与三个数对得上，盘上逐字节不变（系统配置槽原样字节、根环里的根、录制流步数）、四个系统配置槽的实例代号不变。
 fn assert_refused_before_acquisition(
     refused: Result<Mounted, MountError>,
     expected: (InstanceGeneration, usize, usize),
@@ -134,12 +134,12 @@ fn assert_refused_before_acquisition(
     assert_eq!(
         snapshot(devices, stream),
         *before,
-        "盘上逐字节不变：超级块槽、根环里的根、录制流步数（一个写、一道屏障都没发）"
+        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数（一个写、一道屏障都没发）"
     );
     assert_eq!(
         superblock_instances(devices),
         instances_before,
-        "两块盘超级块里的实例代号不变：号没烧"
+        "两块盘系统配置里的实例代号不变：号没烧"
     );
 }
 

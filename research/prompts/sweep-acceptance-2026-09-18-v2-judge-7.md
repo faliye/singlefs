@@ -78,12 +78,12 @@
 | D13 | .claude/kb/decisions/22-单元原子性怎么合成.md:659 | 事件句不改 | 段首逐字标注“逐字保留”的历史正文 |
 | D13 | .claude/kb/experiments.md:118 | 不相干 | E100 超级块设备表条目宽 24/40/64，不是树表 |
 | D13 | .claude/kb/experiments.md:150 | 不相干 | E132 五档条目宽指 livelist 扫描档（24–56），不是树表条目宽度值 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:1 | 不相干 | 设备表条目宽度实验标题 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:18 | 不相干 | 设备表条目宽度实验正文，不是树表 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:25 | 不相干 | 设备表条目宽度扫描说明，不是树表 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:42 | 不相干 | 设备表阴性对照条目宽 24，不是树表 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:44 | 不相干 | 设备表条目宽度未定档位说明，不是树表 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:74 | 不相干 | 设备表内联上限结论，24/40/64 档，不是树表 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:1 | 不相干 | 设备表条目宽度实验标题 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:18 | 不相干 | 设备表条目宽度实验正文，不是树表 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:25 | 不相干 | 设备表条目宽度扫描说明，不是树表 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:42 | 不相干 | 设备表阴性对照条目宽 24，不是树表 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:44 | 不相干 | 设备表条目宽度未定档位说明，不是树表 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:74 | 不相干 | 设备表内联上限结论，24/40/64 档，不是树表 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:22 | 不相干 | 三棵已定条目宽的树是节点头留位实验对象，非树表 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:24 | 不相干 | 节点头留位实验的通用扇出公式，不含具体值 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:51 | 不相干 | 三棵已定条目宽的树扇出结论，非树表 |

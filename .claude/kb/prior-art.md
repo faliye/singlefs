@@ -280,8 +280,8 @@ fscrypt 内核文档自己写明它不认证：
 
 | | OpenZFS | bcachefs |
 |---|---|---|
-| 加密范围 | **只加密 level 0 块**；间接块（blkptr 树）不加密 | 除超级块外全部加密 |
-| 认证结构 | 间接层用 SHA512(下层 MAC 集合) 聚合；objset 层两个 256 位 MAC（portable / local） | Poly1305 MAC 逐块，chain of trust 直到超级块 |
+| 加密范围 | **只加密 level 0 块**；间接块（blkptr 树）不加密 | 除系统配置外全部加密 |
+| 认证结构 | 间接层用 SHA512(下层 MAC 集合) 聚合；objset 层两个 256 位 MAC（portable / local） | Poly1305 MAC 逐块，chain of trust 直到系统配置 |
 | 算法 | AES-CCM / AES-GCM，128/192/256 位；认证辅助用 SHA512-HMAC | ChaCha20 + Poly1305，按 RFC 7539 的路子直接用密码原语 |
 | MAC 存哪 | `blk_cksum` 的后 128 位 | 元数据：明文头里的 128 位字段；数据：跟指针走 |
 | nonce 存哪 | 96 位 IV：64 位在 `DVA[2]` 第二个 word，32 位在 `blk_fill` 高 32 位 | 元数据：明文头的序号；数据：key 的 96 位 version number 加派生量（见 6.3） |
@@ -369,9 +369,9 @@ nonce 在**创建 inode 时**生成一次并写进盘上 context，此后每次�
 **对本工程的意义**：D9（加密） 把 fsid 从 AAD 移进 KDF，与这两家的分层一致——
 卷/文件身份进派生层，对象身份进逐单元层。见 [decisions.md](decisions.md) D9（加密） 已定项 8。
 
-### 6.6 明文超级块里的水位字段可被回滚，这是有现役演示的失败模式
+### 6.6 明文系统配置里的水位字段可被回滚，这是有现役演示的失败模式
 
-**2026-08-29 本机内核树现查。** dm-integrity 的 `recalc_sector` 住在明文超级块里，
+**2026-08-29 本机内核树现查。** dm-integrity 的 `recalc_sector` 住在明文系统配置里，
 它的文档自陈：
 
 > "legacy_recalculate — Allow recalculating of volumes with HMAC keys. This is disabled by
@@ -516,7 +516,7 @@ OptFS（SOSP 2013）把 ext4 的日志提交改成乐观协议，三件事：
 NoFS（FAST 2012，「Consistency Without Ordering」）走得更远：
 每个数据块带**反向指针**，读时靠反向指针判一致性，**完全不排序写**，并给了形式化模型。
 
-对本工程：`litmus/commit-publish.litmus` 钉住的是一次发布事件内部「先写块内容、再写超级块」这条序，
+对本工程：`litmus/commit-publish.litmus` 钉住的是一次发布事件内部「先写块内容、再写系统配置」这条序，
 不涉及发布频率。
 这两条成果说明该序有替代形态，代价各不相同。
 ⚠️ **NoFS 的反向指针与 D1（数据可移动性 / 反向索引） 的反向索引是两件不同的东西**：
@@ -564,7 +564,7 @@ NoFS 的是「每块自证属于谁」的一个字段，D1（数据可移动性 
 | **bucket gen 的适用范围限定为缓存数据** | §1.5：「we can reuse a bucket with **cached data** in it without finding and deleting all the data pointers by incrementing the generation number」 | [decisions.md](decisions.md) D1（数据可移动性 / 反向索引）：它只管失效不管搬运 |
 | **gen 绕回机制已被反向索引取代** | 状态清单 `need_gc_gens`：「Legacy state, retained for compatibility … **now effectively unused since the invalidate worker uses backpointers instead of generation bumping**」 | 与 D1（数据可移动性 / 反向索引） 已选的「反向索引 day-1」同向 |
 | **copygc 预留 8%，可配 5–20%** | §1.5 与 §9.1.10。且「Normal writes cannot dip into this reserve」，超过约 90% 容量时写延迟上升 | D3（空间分配） 的「空间预留用准入控制形态，量要小」有了一个可对比的量级：**别家是划 8% 不给用**，本工程选的是动态准入，差异要记明 |
-| **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9（加密） 的方向；但注意本工程 D9（加密） 预留了「超级块的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
+| **加密是全有全无，且只能在 mkfs 时开** | §2.1.2：「Encryption is all-or-nothing at the filesystem level: all data and metadata except the superblock is encrypted, and all data and metadata is authenticated … **Encryption can only be enabled at format time; it cannot be added to an existing filesystem**」 | 印证 D9（加密） 的方向；但注意本工程 D9（加密） 预留了「系统配置的 KDF 标识 + 主密钥槽」，目标是**能在既有文件系统上开加密**，这是与 bcachefs 的一处有意分歧 |
 | ⚠️ **`nocow` 写的数据在加密文件系统上是明文存储** | §2.1.2：「Data written with the `nocow` option is stored **unencrypted**, even on an encrypted filesystem. **This is a hard design incompatibility, not a policy choice**: ChaCha20 requires a unique nonce per (key, plaintext), and bcachefs stores the nonce externally alongside each data pointer」 | **这是 D9（加密） 与 D10（随机写 / 碎片化的真答案） 连锁那一条的实证**：本工程已定「任何绕过 COW 的快路径不许绕过加密；原地覆盖写会直接造成 nonce 重用」。bcachefs 遇到同一个约束，选择是**让 nocow 数据不加密**——本工程不接受这个交易，因此 D10（随机写 / 碎片化的真答案） 的任何候选都不许走原地覆盖写这条路 |
 | **挂载前必须解锁** | §4.2.3：「the passphrase is requested once the devices have been found and **before any attempt to mount**」；FAQ：未解锁挂载报 `Required key not available` | 是 D9（加密） 已定项 5 那条推理的前提之一 |
 
@@ -653,7 +653,7 @@ write buffer 对 accounting 与普通 key 在入 buffer、flush 去重、落 btr
 ⚠️ **与本工程的一处已知差异（`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 要求写下来）**：
 ZFS 的 label 是每盘 4 份、每份 256 KiB 的**固定区域**，uberblock 环恒占其中 128 KiB；
 而本工程的根环是 R 个区域按素数步长撒在盘上，**区域多大不是格式常量**——
-每区槽数 S 住超级块（D22（单元原子性怎么合成） 已定项 2 逐字「S 住超级块。**下界 1、上界由
+每区槽数 S 住系统配置（D22（单元原子性怎么合成） 已定项 2 逐字「S 住系统配置。**下界 1、上界由
 I-7.4（近 K 代块未被复用） 扣住的块数挂载时算**」）。⇒ 「抬槽宽 = 减槽数」这个等式在本工程
 **要先把「区域大小固定」写成条款**才成立，而仓里今天没有这条。
 
@@ -703,9 +703,9 @@ D21（权威态与派生态的分界） 已定项 3 ③ 逐字「用户要求的
 | 实现 | 扩展槽住哪 | 形态与宽度 | 装不下时 | 来源（2026-09-13 现查） | 与本工程的一处差异 |
 |---|---|---|---|---|---|
 | ext4 | inode 记录里固定字段之后的空间（`i_extra_isize` 记「Size of this inode - 128」，默认 256 字节 inode 里固定部分 160 字节，余下装 xattr） | 头 `ext4_xattr_ibody_header` 4 字节（magic 0xEA020000）+ 条目 `ext4_xattr_entry`（`e_name_len`、`e_name_index`、`e_value_offs`、`e_value_inum`、`e_value_size`、`e_hash`），值 4 字节对齐；内联数据是一条名为 `system.data` 的 xattr（`EXT4_INLINE_DATA_FL`） | 溢出到 `i_file_acl` 指向的一个独立块（「it is not possible for this block to contain a pointer to a second extended attribute block」）；值再大用 EA inode（`e_value_inum`，`EXT4_EA_INODE_FL`） | https://www.kernel.org/doc/html/latest/filesystems/ext4/inodes.html 、 https://www.kernel.org/doc/html/latest/filesystems/ext4/attributes.html | 槽在 inode 记录内、可按名字装任意键值；本工程的扩展点按 D1（数据可移动性 / 反向索引） 已定项 3「要么为空，要么是一个指向」，不内联数据 |
-| XFS | inode 字面区（`XFS_LITINO` = inode 大小 − 核心）由数据叉与属性叉共用，`di_forkoff`（「attr fork offs, <<3 for 64b align」，单位 8 字节）定属性叉起点；`di_aformat` 取 `XFS_DINODE_FMT_LOCAL / EXTENTS / BTREE` | 短形式：`xfs_attr_sf_hdr { totsize u16, count u8, padding u8 }` + `xfs_attr_sf_entry { namelen u8, valuelen u8, flags u8, nameval[] }`，「packed as tightly as possible so as to fit into the literal area of the inode」 | 属性叉换成 extents / btree 格式指向叶块、节点块、远程值块 | https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_format.h 、 https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_da_format.h | 叉起点是每 inode 一个可变偏移（`di_forkoff`）；本工程的扩展点起点由超级块声明的 N 与单元结构隐含，每单元不另存偏移 |
+| XFS | inode 字面区（`XFS_LITINO` = inode 大小 − 核心）由数据叉与属性叉共用，`di_forkoff`（「attr fork offs, <<3 for 64b align」，单位 8 字节）定属性叉起点；`di_aformat` 取 `XFS_DINODE_FMT_LOCAL / EXTENTS / BTREE` | 短形式：`xfs_attr_sf_hdr { totsize u16, count u8, padding u8 }` + `xfs_attr_sf_entry { namelen u8, valuelen u8, flags u8, nameval[] }`，「packed as tightly as possible so as to fit into the literal area of the inode」 | 属性叉换成 extents / btree 格式指向叶块、节点块、远程值块 | https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_format.h 、 https://raw.githubusercontent.com/torvalds/linux/master/fs/xfs/libxfs/xfs_da_format.h | 叉起点是每 inode 一个可变偏移（`di_forkoff`）；本工程的扩展点起点由系统配置声明的 N 与单元结构隐含，每单元不另存偏移 |
 | btrfs | fs 树里按 objectid 挂的条目：`XATTR_ITEM`（0x18，key 里带名字哈希）、`DIR_ITEM`（0x54）、`EXTENT_DATA`（0x6c，内联时「the remaining item bytes are the data bytes」） | 叶内变长条目：「header \| item 0 \| item 1 \| … \| free space \| data N \| … \| data 0」；内联数据上限 `max_inline` 「default: min(2048, page size)」，4 KiB sectorsize 时约 3900 字节 | 同哈希的 xattr 必须装进一个叶；数据超过 `max_inline` 走外部 extent | https://btrfs.readthedocs.io/en/latest/dev/On-disk-format.html 、 https://btrfs.readthedocs.io/en/latest/Administration.html | 扩展数据是索引树里的独立条目、可变长；本工程放在单元自描述头之后的定长配额里 |
-| ZFS | dnode（`DNODE_SHIFT 9`，512 字节）核心 64 字节之后的 bonus 缓冲：`DN_BONUS_SIZE(dnsize) = dnsize − DNODE_CORE_SIZE − (1 << SPA_BLKPTRSHIFT)`（512 字节 dnode 时 320），`dn_bonustype u8`、`dn_bonuslen u16` | bonus 装系统属性（SA）；类型由 `dn_bonustype` 声明 | 「Spill blocks are used to store system attribute data (i.e. file metadata) that does not fit in the dnode's bonus buffer」，`DNODE_FLAG_SPILL_BLKPTR (1 << 2)`，spill 指针占掉 bonus 末尾的一个 blkptr | https://raw.githubusercontent.com/openzfs/zfs/master/include/sys/dnode.h | 每对象槽宽是 dnode 大小减核心（可到 1 KiB 以上的 dnode）；本工程扩展点配额 N 由每条线在超级块声明、第一版为 0 |
+| ZFS | dnode（`DNODE_SHIFT 9`，512 字节）核心 64 字节之后的 bonus 缓冲：`DN_BONUS_SIZE(dnsize) = dnsize − DNODE_CORE_SIZE − (1 << SPA_BLKPTRSHIFT)`（512 字节 dnode 时 320），`dn_bonustype u8`、`dn_bonuslen u16` | bonus 装系统属性（SA）；类型由 `dn_bonustype` 声明 | 「Spill blocks are used to store system attribute data (i.e. file metadata) that does not fit in the dnode's bonus buffer」，`DNODE_FLAG_SPILL_BLKPTR (1 << 2)`，spill 指针占掉 bonus 末尾的一个 blkptr | https://raw.githubusercontent.com/openzfs/zfs/master/include/sys/dnode.h | 每对象槽宽是 dnode 大小减核心（可到 1 KiB 以上的 dnode）；本工程扩展点配额 N 由每条线在系统配置声明、第一版为 0 |
 | APFS | inode 记录值 `j_inode_val` 末尾的可变长扩展字段：`apfs_xf_blob { xf_num_exts u16, xf_used_data u16, xf_data[] }`，每个字段 `apfs_x_field { x_type u8, x_flags u8, x_size u16 }`；类型如 `DSTREAM = 8`、`NAME = 4`、`FINDER_INFO = 7`、`SPARSE_BYTES = 13` | 每字段 4 字节元数据 + 值；xattr 值 `apfs_xattr_val { flags u16, xdata_len u16, xdata[] }` | 嵌入上限 `APFS_XATTR_MAX_EMBEDDED_SIZE = 3804`（`XATTR_DATA_EMBEDDED = 2`），更大的走数据流（`XATTR_DATA_STREAM = 1`） | https://raw.githubusercontent.com/linux-apfs/linux-apfs-rw/master/apfs_raw.h （Apple 的 APFS Reference PDF 用 CID 字体，本机 `pdf-text.py` 抽不出文字，改核 Linux 驱动头文件） | 类型 + 长度的自描述字段列表，可装数据；本工程的扩展点只装一个指向 |
 
 **五家共有的形态**：都是「对象记录内一段有上限的空间 + 装不下时指向外部」，上限 320 字节（ZFS 512 字节 dnode）到约 3.9 KiB（btrfs 一叶、APFS 3804）。**没有一家把扩展槽做成「只许一个指向、不许内联」**——这是本工程 D1（数据可移动性 / 反向索引） 已定项 3 独有的形态，按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「没有任何现役实现走 X 这条路」是最值钱的一类外部信号：举证责任在本工程这边（理由记在 D1（数据可移动性 / 反向索引） 已定项 3 与 D21（权威态与派生态的分界） 硬约束 5）。

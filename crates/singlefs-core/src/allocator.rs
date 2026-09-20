@@ -634,7 +634,7 @@ impl PoolAllocator {
     }
 
     /// mkfs 写在单元区里的两个单元：每盘一条分配代 0 的分配记录（字节表五：20 条里 m1 / m2 各两条，分配代 0）。
-    /// 单元区之外的固定结构（超级块、根环、journal 环）不写分配记录、分配器不下探（D3（空间分配） 已定项 10 ④）。
+    /// 单元区之外的固定结构（系统配置、根环、journal 环）不写分配记录、分配器不下探（D3（空间分配） 已定项 10 ④）。
     pub fn mark_format_time_units(&mut self, instance_table: Placement, tree_table: Placement) {
         self.record(instance_table, CheckpointTxg(0));
         self.record(tree_table, CheckpointTxg(0));

@@ -34,7 +34,7 @@ fn reserved_bytes() -> usize {
     usize::try_from(NONCE_MAC_ALGORITHM_RESERVED_BYTES).expect("29")
 }
 
-/// 单元头里的 fsid 是 8 字节：超级块 fsid 的低 8 字节（D18（块里携带什么信息） 已定项 7）。
+/// 单元头里的 fsid 是 8 字节：系统配置 fsid 的低 8 字节（D18（块里携带什么信息） 已定项 7）。
 #[must_use]
 pub fn unit_filesystem_identifier(filesystem_identifier: &[u8; 16]) -> u64 {
     u64::from_le_bytes(filesystem_identifier[..8].try_into().expect("切了 8 字节"))

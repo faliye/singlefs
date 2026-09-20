@@ -585,7 +585,7 @@ struct ModelSession {
 pub struct IdealModel {
     geometry: ModelPoolGeometry,
     ring: BTreeMap<ModelRingPosition, ModelRoot>,
-    /// 取过的最大实例代号（超级块里的号；取号先于任何带新号的写，D23（journal 的角色与格式） 已定项 16）。
+    /// 取过的最大实例代号（系统配置里的号；取号先于任何带新号的写，D23（journal 的角色与格式） 已定项 16）。
     highest_acquired_instance: ModelInstanceGeneration,
     /// 发布过的最大 txg 与 jsn：不建崩溃，环里全部根与全部记录里的最大值就是它们（D23（journal 的角色与格式） 已定项 14 第 3 条）。
     highest_published_txg: ModelCheckpointTxg,

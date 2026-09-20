@@ -1,6 +1,6 @@
 //! checker：与实现只共享 `singlefs-format` 这一个常量模块（D13（验证路线） 已定项 5），
 //! CRC-32C、解析、校验各写一份，不从 `singlefs-core` 引任何东西。
-//! 步 1 能判的：超级块槽（magic / 整槽校验和 / incompat 位 / 世代号）、根记录槽（magic / 整槽校验和 / fsid / flags）、
+//! 步 1 能判的：系统配置槽（magic / 整槽校验和 / incompat 位 / 世代号）、根记录槽（magic / 整槽校验和 / fsid / flags）、
 //! 单元头（共同前缀 / 头校验和 / 载荷 CRC），以及「三个区域的槽 0 是不是同一份第 0 代根」。
 //! 步 3 / 步 4 / 步 5 加的：码 2 节点的头与条目（声明长度、key 宽、key 按字段序严格递增、区间贴紧）、码 3 容器的记录、
 //! journal 记录（`header_csum` 罩整条 4096、载荷 CRC、点名项、反向链口径）。
@@ -16,7 +16,7 @@ use singlefs_format::{
     SUPERBLOCK_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
-/// checker 自己解析出来的判定宽度：探测到的，或超级块声明的（探不到时报「声明值，未探测」，不许当成探到的）。
+/// checker 自己解析出来的判定宽度：探测到的，或系统配置声明的（探不到时报「声明值，未探测」，不许当成探到的）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecisionWidth {
     Probed { bytes: u32 },
@@ -114,7 +114,7 @@ pub enum Verdict {
     UnknownRecordType,
 }
 
-/// 超级块槽解出来的几个要紧字段。
+/// 系统配置槽解出来的几个要紧字段。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SuperblockView {
     pub filesystem_identifier: [u8; 16],
@@ -152,7 +152,7 @@ pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 
-/// 判一个超级块槽（4096 字节）。
+/// 判一个系统配置槽（4096 字节）。
 pub fn check_superblock_slot(slot: &[u8]) -> Result<SuperblockView, Verdict> {
     let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
     if slot.len() < slot_bytes {

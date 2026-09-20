@@ -3,7 +3,7 @@
 //! 程序以为自己发了什么（录制器），盘上实际收到了什么（设备侧日志），两条路不共享一行代码。
 //!
 //! 格式（Linux `drivers/md/dm-log-writes.c` 的 `struct log_write_super` / `struct log_write_entry`，小端）：
-//! 扇区 0 是超级块（magic 8、version 8、nr_entries 8、sectorsize 4）；条目从扇区 1 起，每条一个扇区的头
+//! 扇区 0 是系统配置（magic 8、version 8、nr_entries 8、sectorsize 4）；条目从扇区 1 起，每条一个扇区的头
 //! （sector 8、nr_sectors 8、flags 8、data_len 8，补齐到一个扇区），写条目的数据紧跟其后、占 nr_sectors 个扇区。
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
@@ -38,7 +38,7 @@ pub enum DeviceEvent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceLog {
     pub sector_bytes: u64,
-    /// 超级块里声明的条目数；超级块还没写过（全 0）时是 None。
+    /// 系统配置里声明的条目数；系统配置还没写过（全 0）时是 None。
     pub declared_entries: Option<u64>,
     pub events: Vec<DeviceEvent>,
 }
@@ -55,8 +55,8 @@ fn read_u64(bytes: &[u8], offset: usize) -> u64 {
     u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
 }
 
-/// 解析一份日志。超级块全 0 时按 512 字节扇区读、条目数由「头全 0 即止」数出来；
-/// 超级块在时 magic 与版本都要对，扇区宽取它声明的。
+/// 解析一份日志。系统配置全 0 时按 512 字节扇区读、条目数由「头全 0 即止」数出来；
+/// 系统配置在时 magic 与版本都要对，扇区宽取它声明的。
 pub fn parse_device_log(bytes: &[u8]) -> Result<DeviceLog, DeviceLogError> {
     let header_magic = if bytes.len() >= 8 {
         read_u64(bytes, 0)

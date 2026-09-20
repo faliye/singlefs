@@ -1,8 +1,8 @@
 //! 事务层（里程碑步 3 / 步 4 / 步 5）：一个共享的提交状态机 + 一个封闭的提交步骤枚举
 //! （D17（实现分层与第三方管道） 已定项 2；`.claude/rules/fs-design.md`「一个事务层，所有结构共用」）。
-//! 三条路径都从同一个枚举走：取号 = 逐盘一次超级块槽写 + 一道屏障（D23（journal 的角色与格式） 已定项 16，C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）；
-//! 暖机（D16（发布语义） 已定项 8）= 屏障 → 空记录 → 屏障 → 根槽 FUA → 超级块槽轮换；
-//! 第一个事务（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 超级块槽轮换。
+//! 三条路径都从同一个枚举走：取号 = 逐盘一次系统配置槽写 + 一道屏障（D23（journal 的角色与格式） 已定项 16，C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案）；
+//! 暖机（D16（发布语义） 已定项 8）= 屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
+//! 第一个事务（D16（发布语义） 已定项 7）= 单元写 × 8 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换。
 //! 覆盖写（里程碑「第二个事务」步 1 / 步 2）走同一条骨架：新数据单元 COW 到新落点、六个提交内生块与树表 COW 出新版本，
 //! 被换下的八个单元在同一次发布里释放（分配记录改写成已释放 + 释放代，条目不删，D3（空间分配） 已定项 7）。
 //! 每一步都经过块设备接口，录制器挂在那层（D17（实现分层与第三方管道） 已定项 5）。
@@ -81,7 +81,7 @@ pub enum CommitStep<'publish> {
         checkpoint_txg: CheckpointTxg,
         root_slot: &'publish [u8],
     },
-    /// 每盘一次超级块槽原地覆写：世代号 = 这块盘两槽里自证过的最大世代号 + 1，槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16，逐盘计）。
+    /// 每盘一次系统配置槽原地覆写：世代号 = 这块盘两槽里自证过的最大世代号 + 1，槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16，逐盘计）。
     RotateSuperblockSlots {
         journal_tail: u64,
         journal_instance: InstanceGeneration,
@@ -187,7 +187,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
         Ok(())
     }
 
-    /// 一块盘写一次超级块槽：世代号 = 这块盘两槽里自证过的最大世代号 + 1（两槽都读不出时从 1 起），槽 = 世代号 mod 2。
+    /// 一块盘写一次系统配置槽：世代号 = 这块盘两槽里自证过的最大世代号 + 1（两槽都读不出时从 1 起），槽 = 世代号 mod 2。
     fn write_superblock_slot(
         &mut self,
         index: usize,
@@ -230,7 +230,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
     }
 
     /// 落盘阶段中途失败的那次发布已记的写：落盘开始时的快照到此刻的差，记成失败账里的一份（增补 2 第 20b 行）。
-    /// 只有落盘那几步（写单元、屏障、journal 记录、根槽、超级块槽）里失败的发布才记，落盘阶段一次失败记一份，哪怕这一阶段
+    /// 只有落盘那几步（写单元、屏障、journal 记录、根槽、系统配置槽）里失败的发布才记，落盘阶段一次失败记一份，哪怕这一阶段
     /// 一个写都没记上就失败（那一份是空的）——份数就是这个写入口上落盘阶段失败过几次发布；准入、释放判定、分配、装单元这些
     /// 落盘之前的步骤里失败的发布一个写都没发，不记。
     fn count_failed_publish(&mut self, writes_before_this_publish: &WritesByStructureKind) {
@@ -293,7 +293,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
 /// 取号全或无失败之后回卷写的结局（D18（块里携带什么信息） 已定项 11：先把已经写出的那几份回卷成旧代号，回卷不成才只读挂载）。
 #[derive(Debug)]
 pub enum AcquisitionRollback {
-    /// 第一块盘的取号写就报错了：没有写出过带新号的超级块，没有要回卷的。
+    /// 第一块盘的取号写就报错了：没有写出过带新号的系统配置，没有要回卷的。
     NothingWritten,
     /// 已写出的那几份都回卷成了旧代号；这次挂载只读，盘上若还留着新号，下一次取号跳过它。
     RolledBack,
@@ -309,7 +309,7 @@ pub struct AcquisitionFailed {
     pub rollback: AcquisitionRollback,
 }
 
-/// 每块盘两槽里全部自证过（fsid 与本池相同）的超级块中最大的实例代号；一份都没有时是 mkfs 的 0。取号回卷时写回的旧号也是它。
+/// 每块盘两槽里全部自证过（fsid 与本池相同）的系统配置中最大的实例代号；一份都没有时是 mkfs 的 0。取号回卷时写回的旧号也是它。
 fn highest_superblock_instance<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
 ) -> InstanceGeneration {
@@ -343,8 +343,8 @@ pub fn instance_generation_to_acquire<Device: BlockDevice>(
 
 /// 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；2026-09-14 用户定案，
 /// C322（取号那一步的屏障怎么放没有条款） 三轮三方）：新号 = max(每块盘两槽里全部自证过的槽的实例代号, 根环里全部根记录的
-/// 实例代号) + 1；逐盘写一次超级块槽（世代号逐盘 +1）；两写之后一道屏障，屏障完成才把新号交出去，于是本实例的第一个
-/// 非超级块写一定排在它之后。首次挂载路径上它就是暖机开场那道：暖机那道屏障前面没有写，写入口不再发第二次，录制流与设备
+/// 实例代号) + 1；逐盘写一次系统配置槽（世代号逐盘 +1）；两写之后一道屏障，屏障完成才把新号交出去，于是本实例的第一个
+/// 非系统配置写一定排在它之后。首次挂载路径上它就是暖机开场那道：暖机那道屏障前面没有写，写入口不再发第二次，录制流与设备
 /// 收到的 FLUSH 数都与只发一道时相同。任一块盘的取号写或那道屏障报错 ⇒ 已写出的那几份回卷成旧代号（取号之前全部自证过的
 /// 槽中最大的实例代号），报失败。⚠️ D18（块里携带什么信息） 已定项 11 的「重试到 T_retry 用尽才算失败」这里没有做：
 /// 块设备报的第一个错就判失败（写路径上的重试全仓都还没有）。
@@ -358,7 +358,7 @@ pub fn acquire_instance<Device: BlockDevice>(
 /// 按调用方判定时算出的号取号没做成。
 #[derive(Debug)]
 pub enum ExpectedInstanceAcquisitionFailed {
-    /// 写之前重算出的号与调用方判定时算出的号不同（两次读超级块之间一次瞬时读错就够：读错的槽当作没有）：一个字节都没写。
+    /// 写之前重算出的号与调用方判定时算出的号不同（两次读系统配置之间一次瞬时读错就够：读错的槽当作没有）：一个字节都没写。
     InstanceGenerationChangedBeforeWrite {
         expected: InstanceGeneration,
         recomputed: InstanceGeneration,
@@ -367,7 +367,7 @@ pub enum ExpectedInstanceAcquisitionFailed {
 }
 
 /// 取号，号用调用方判定时算出的那一个（`instance_generation_to_acquire`）：写之前再算一遍，对不上就不写、报错返回——可写挂载在取号之前
-/// 按这个号判要写的行区间，号在判定与取号之间变了，判定就作废（m2-emptypool-nonempty-r1 云端攻方腿 Z2：两块盘第 2 次读超级块槽 0
+/// 按这个号判要写的行区间，号在判定与取号之间变了，判定就作废（m2-emptypool-nonempty-r1 云端攻方腿 Z2：两块盘第 2 次读系统配置槽 0
 /// 各报一次瞬时读错，判定看到号 1 放行、取号读到号 2 写进两盘）。
 ///
 /// # Errors
@@ -389,7 +389,7 @@ pub fn acquire_expected_instance<Device: BlockDevice>(
         .map_err(ExpectedInstanceAcquisitionFailed::Acquisition)
 }
 
-/// 取号的写那一半：逐盘写一次超级块槽，两写之后一道屏障；任一报错就把已写出的回卷成旧代号。
+/// 取号的写那一半：逐盘写一次系统配置槽，两写之后一道屏障；任一报错就把已写出的回卷成旧代号。
 fn write_acquired_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     instance: InstanceGeneration,
@@ -440,7 +440,7 @@ pub fn warm_up<Device: BlockDevice>(
 }
 
 /// 暖机的两次空发布，接在环里 jsn 计数器为 `last_journal_counter` 的那条记录之后：checkpoint_txg 照格式常量走 1、2
-/// （`WARM_UP_EMPTY_PUBLISHES`，D16（发布语义） 已定项 8），jsn 与超级块里的 tail 按记录号接着数、不取 txg
+/// （`WARM_UP_EMPTY_PUBLISHES`，D16（发布语义） 已定项 8），jsn 与系统配置里的 tail 按记录号接着数、不取 txg
 /// （D23（journal 的角色与格式） 已定项 18：tail 存 jsn 的 48 位计数器；已定项 14 第 3 条：计数器全池接着走；C366（暖机路径把 txg 写进计数器与 tail））。
 /// 空记录不点名任何单元、事务号 0、提交标记 1、新根段照 mkfs 的根（D16（发布语义） 已定项 9 / D23（journal 的角色与格式） 已定项 19），
 /// 根记录只改 checkpoint_txg 与实例代号。今天只有 `warm_up` 调它，环是空的、两个量按构造相等；给不相等的起点才分得出它们。
@@ -505,7 +505,7 @@ pub struct ZeroUnitPublishOutput {
     pub writes: WritesByStructureKind,
 }
 
-/// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 超级块槽轮换；
+/// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
 /// 空记录不点名任何单元、事务号 0、提交标记 1，新根段照上一版的根，根记录照上一版的根、只换 checkpoint_txg、实例代号与回退下界。
 /// 第一次可写挂载的暖机与「只做过 mkfs 的池」上的可写挂载都走它（第一个事务的字节不变）。
 ///
@@ -1273,7 +1273,7 @@ pub fn publish_version<Device: BlockDevice>(
 /// 一次发布的准入里与这次写什么内容无关的那两条：分配记录树与记账树第一版各只有一个节点（分裂不做），这次发布之后都要装得下。
 /// 只读——不动分配器、不发一个写，算不过时盘上逐字节不变。两处调它：发布路径在动分配器之前（`publish_version`）；
 /// 可写挂载在**取号之前**按这次挂载要发的那几次（写行 + 暖机）算一遍（`publish_sequence_admission`，增补 2 第 20a 行：
-/// 算不过就不许先把实例代号烧掉——取号是两次超级块槽写加一道屏障，之后再拒绝，池此后每试一次可写挂载就多烧一个代号）。
+/// 算不过就不许先把实例代号烧掉——取号是两次系统配置槽写加一道屏障，之后再拒绝，池此后每试一次可写挂载就多烧一个代号）。
 /// 两处读的是同一个内存里的分配器，取号不碰它，所以两次必定同答案；发布路径那一遍仍留着，它是动分配器之前的最后一道。
 ///
 /// # Errors
@@ -2103,7 +2103,7 @@ fn publish_admitted<Device: BlockDevice>(
     };
     let root_slot = root.to_slot(pool.root_slot_bytes());
 
-    // 持久顺序（D16（发布语义） 已定项 7）：这次重写的单元 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 超级块槽轮换。
+    // 持久顺序（D16（发布语义） 已定项 7）：这次重写的单元 → 屏障 → journal 记录 → 屏障 → 根槽 FUA → 系统配置槽轮换。
     // 中途失败时这次已记的写要交出去（增补 2 第 20b 行）：六步收在一个闭包里，失败在这里记账再把错原样交回——
     // 账是两次快照之差、只在成功路径上取，失败那次落盘的写不交出去就不属于任何一次发布，与设备一层的合计对不上。
     let writes_before_this_publish = pool.writes_by_structure_kind.clone();

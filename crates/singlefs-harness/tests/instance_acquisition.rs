@@ -13,10 +13,10 @@ use singlefs_core::block_device::{
 use singlefs_core::recovery::{choose_superblock, verified_superblock_slots};
 use singlefs_core::transaction::{acquire_instance, AcquisitionRollback, CommitStep, PoolWriter};
 
-/// 超级块两槽住在偏移 0 与 4096，都在这个界之下。
+/// 系统配置两槽住在偏移 0 与 4096，都在这个界之下。
 const SUPERBLOCK_SLOTS_END_OFFSET: u64 = 8192;
 
-/// 包在录制盘外面：按开关让屏障或超级块槽写报错，并数真正交给设备的屏障。
+/// 包在录制盘外面：按开关让屏障或系统配置槽写报错，并数真正交给设备的屏障。
 struct FaultInjectingDevice {
     inner: Recorded,
     fail_barriers: bool,
@@ -43,7 +43,7 @@ impl BlockDevice for FaultInjectingDevice {
         durability: WriteDurability,
     ) -> Result<(), BlockDeviceError> {
         if self.fail_superblock_writes && offset.0 < SUPERBLOCK_SLOTS_END_OFFSET {
-            return Err(injected("超级块槽写"));
+            return Err(injected("系统配置槽写"));
         }
         self.inner.write_at(offset, bytes, durability)
     }
@@ -82,7 +82,7 @@ fn wrap(built: &mut BuiltPool) -> Vec<(DeviceIdentity, FaultInjectingDevice)> {
         .collect()
 }
 
-/// 一块盘两槽里自证过的超级块：(世代号, 实例代号)，按世代号排好。
+/// 一块盘两槽里自证过的系统配置：(世代号, 实例代号)，按世代号排好。
 fn slots_of(
     devices: &[(DeviceIdentity, FaultInjectingDevice)],
     device: DeviceIdentity,
@@ -125,7 +125,7 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
     }
     assert_eq!(
         choose_superblock(&devices)
-            .expect("择超级块")
+            .expect("择系统配置")
             .journal_instance,
         InstanceGeneration(2),
         "择到的那一份带新号：取号的世代号若恒为 2，会被世代 5 的旧槽藏住、这里读回 1"

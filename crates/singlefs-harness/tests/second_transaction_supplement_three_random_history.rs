@@ -393,7 +393,7 @@ fn newest_root_on_the_image(image: &MemoryPool) -> ModelRootKey {
     let geometry = chosen_superblocks(image)
         .into_iter()
         .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))
-        .expect("历史里的盘上至少一块超级块自证过");
+        .expect("历史里的盘上至少一块系统配置自证过");
     let (_, _, newest) = valid_roots(image, &geometry)
         .into_iter()
         .max_by_key(|(_, _, view)| (view.checkpoint_txg, view.instance))

@@ -7,7 +7,7 @@
    - `.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 2（含 E34 那段张力）/ 已定三 / 已定项 16 / 已定项 8 / 已定项 9 / 已定项 15
    - `.claude/kb/decisions/20-承重面单元的原子性与自包含.md` 推论三与「现役实现全部自己合成撕裂检测」
    - `.claude/kb/decisions/02-RAID条带策略.md` 硬要求 1、已定项 15、已定项 19
-   - `.claude/kb/experiments/126-超级块槽宽四条候选的代价.md`、`research/e7-index-bench/src/bin/e126_superblock_slot_width.rs`、`research/results/e126-*.out`；`.claude/kb/experiments/34-根环槽几何.md`
+   - `.claude/kb/experiments/126-系统配置槽宽四条候选的代价.md`、`research/e7-index-bench/src/bin/e126_superblock_slot_width.rs`、`research/results/e126-*.out`；`.claude/kb/experiments/34-根环槽几何.md`
    - `.claude/kb/checks-owed.md` 里 C212 那一行与它点名的三条候选
    - `.claude/kb/layout/01-first-txn.md` 零、一两节；`.claude/kb/decisions/23-journal的角色与格式.md` 已定项 4「512 这个数不由本工程定」那一节
 

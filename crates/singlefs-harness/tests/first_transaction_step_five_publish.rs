@@ -428,7 +428,7 @@ fn root_slots_superblocks_and_journal_ring_hold_the_published_state() {
         (0, 0),
         "mkfs 种的根还在"
     );
-    // 超级块：取号写世代 2 槽 0，暖机写 3 / 4，事务写 5 槽 1、tail = jsn 3；两盘同。
+    // 系统配置：取号写世代 2 槽 0，暖机写 3 / 4，事务写 5 槽 1、tail = jsn 3；两盘同。
     for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
         let slot_zero = read(device(&pool, identity), DeviceOffsetInBytes(0), 4096);
         let slot_one = read(device(&pool, identity), DeviceOffsetInBytes(4096), 4096);

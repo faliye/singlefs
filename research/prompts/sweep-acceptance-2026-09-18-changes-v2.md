@@ -1498,7 +1498,7 @@
 - 旧：针为零的读法）或 16641 字节（空树也要一个根节
   新：针为零的读法）或 16693 字节（空树也要一个根节
 
-### .claude/kb/experiments/147-超级块字段表按第一个事务字节表重算.md
+### .claude/kb/experiments/147-系统配置字段表按第一个事务字节表重算.md
 
 - 旧：把 [layout/01-first-txn.md](../firs
   新：01-first-txn.md](../layo

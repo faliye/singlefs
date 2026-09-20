@@ -64,12 +64,12 @@ F5（43 行）、F6（9 行）、F7（14 行），合计 240 行，全部逐行�
 | D13 | .claude/kb/decisions/22-单元原子性怎么合成.md:659 | 不相干 | decisions/22:659 的历史讨论是超级块字段范围之争，逐字写明「树表不在其中」，与树表条目宽无关 |
 | D13 | .claude/kb/experiments.md:118 | 不相干 | experiments.md:118 说的是超级块设备表条目宽度，不是树表条目 |
 | D13 | .claude/kb/experiments.md:150 | 要人看 | experiments.md:150（E132）报的「44 头/66 头」等livelist数字基于旧的树表第二层门槛假设算出；milestone/02-second-txn.md:344 已自行标注这批数按 200 重跑的结果尚未同步进决策正文，需要人拿到重跑结果后一并更新 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:1 | 不相干 | experiments/100 全部 6 处（1/18/25/42/44/74）说的是超级块设备表条目宽度候选（24/40/64），不是树表条目 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:18 | 不相干 | experiments/100:18 同上 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:25 | 不相干 | experiments/100:25 同上 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:42 | 不相干 | experiments/100:42 同上 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:44 | 不相干 | experiments/100:44 同上 |
-| D13 | .claude/kb/experiments/100-超级块的三段几何.md:74 | 不相干 | experiments/100:74 同上 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:1 | 不相干 | experiments/100 全部 6 处（1/18/25/42/44/74）说的是超级块设备表条目宽度候选（24/40/64），不是树表条目 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:18 | 不相干 | experiments/100:18 同上 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:25 | 不相干 | experiments/100:25 同上 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:42 | 不相干 | experiments/100:42 同上 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:44 | 不相干 | experiments/100:44 同上 |
+| D13 | .claude/kb/experiments/100-系统配置的三段几何.md:74 | 不相干 | experiments/100:74 同上 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:22 | 不相干 | experiments/101 全部 3 处（22/24/51）说的是「三棵已定条目宽的树」（inode/extent/记账），不是树表条目 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:24 | 不相干 | experiments/101:24 同上 |
 | D13 | .claude/kb/experiments/101-节点头留位的代价与表达力.md:51 | 不相干 | experiments/101:51 同上 |

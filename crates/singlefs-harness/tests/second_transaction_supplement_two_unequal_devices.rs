@@ -445,6 +445,6 @@ fn user_data_slots_that_differ_across_devices_are_refused_before_anything_is_wri
     assert_eq!(
         disk_snapshot(&pool.memory_pool(), &pool.stream),
         snapshot_before,
-        "盘上逐项不变：超级块槽、根环里的根、录制流步数"
+        "盘上逐项不变：系统配置槽、根环里的根、录制流步数"
     );
 }

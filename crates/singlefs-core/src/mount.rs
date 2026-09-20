@@ -79,14 +79,14 @@ pub enum MountError {
         root: RollbackTarget,
         failure: RecoveryFailure,
     },
-    /// 取号之前判定时算出的号与取号写之前重算的号不同（两次读超级块之间有瞬时读错）：判定作废，一个字节都没写。
+    /// 取号之前判定时算出的号与取号写之前重算的号不同（两次读系统配置之间有瞬时读错）：判定作废，一个字节都没写。
     InstanceGenerationChangedBeforeAcquisition {
         expected: InstanceGeneration,
         recomputed: InstanceGeneration,
     },
     /// 写行那次发布的准入（这次之后的分配记录条数、这次要写的记账行数）算不过：在**取号之前**拒绝，盘上一个字节都不动、
-    /// 两块盘超级块里的实例代号不动（增补 2 第 20a 行，代码三方第一轮打中）。改之前这两条只在发布路径里算，
-    /// 取号（两次超级块槽写 + 一道屏障）已经写完才报出来，而取号的回卷只管取号自己那几次写报错、管不到之后的发布失败 ⇒
+    /// 两块盘系统配置里的实例代号不动（增补 2 第 20a 行，代码三方第一轮打中）。改之前这两条只在发布路径里算，
+    /// 取号（两次系统配置槽写 + 一道屏障）已经写完才报出来，而取号的回卷只管取号自己那几次写报错、管不到之后的发布失败 ⇒
     /// 分配记录树满了的池此后每试一次可写挂载就再烧一个实例代号。
     RowPublishAdmissionRefusedBeforeAcquisition {
         instance_to_acquire: InstanceGeneration,
@@ -105,7 +105,7 @@ pub enum MountError {
     },
     /// 写行那次发布之后实例表一片装不下：这一版的行数 + 这次要写的行数 + 1（链指针记录恒为一片的最后一条）> 一片的记录数 370
     /// （D18（块里携带什么信息） 已定项 11）。装不下时该链到下一片、或先按回收条件删行，这两样第一版都不做（代码三方第二轮判决第二节第 2 行：
-    /// 第二片与删行不在这一轮）；在**取号之前**拒绝，盘上一个字节都不动、两块盘超级块里的实例代号不动。改之前没有这一项：
+    /// 第二片与删行不在这一轮）；在**取号之前**拒绝，盘上一个字节都不动、两块盘系统配置里的实例代号不动。改之前没有这一项：
     /// 取号写完才在装实例表单元时越界 panic，池此后每试一次可写挂载就再烧一个实例代号（代码三方第二轮 Z1-a）。
     InstanceTableRowsExceedOnePageSecondPageUnsupported {
         instance_to_acquire: InstanceGeneration,
@@ -824,7 +824,7 @@ fn refuse_instance_rows_on_version_without_file(
 
 /// 树表 0 条的一版上只放行与 mkfs 同一个进程里第一个事务同形的那一格：新实例的第一次发布 txg 1、jsn 1，零单元写行（txg 1）与暖机
 /// （txg 2）落在不同的盘上——之后的 `publish_first_file` 写死 txg 3 / jsn 3 才接得上。其余形状（环里有记录让新实例从更大的 txg 起、
-/// 区域归属让暖机要推不止一次）在取号之前拒绝（m2-emptypool-nonempty-r1 云端攻方腿 Z3-A：两盘超级块槽 0 各坏一字节 + 第一次挂载崩在
+/// 区域归属让暖机要推不止一次）在取号之前拒绝（m2-emptypool-nonempty-r1 云端攻方腿 Z3-A：两盘系统配置槽 0 各坏一字节 + 第一次挂载崩在
 /// txg 1 的记录之后，放行之后暖机推到 txg 4，第一个文件版本写死 txg 3 盖在暖机根上、冷恢复读不到）。
 fn refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(
     parameters: &MakeFilesystemParameters,

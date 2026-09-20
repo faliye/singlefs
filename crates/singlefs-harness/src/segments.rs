@@ -1,8 +1,8 @@
 //! 把录制流切成段（D13（验证路线） 已定项 4：屏障与 FUA 写切段，段内任意整写子集），并按
 //! `layout/01-first-txn.md` 八那张登记表的写法报出段序列与每段的步骤种类多重集（门禁 52 号比对的形态）。
 //!
-//! 步骤种类只有五种（D17（实现分层与第三方管道） 已定项 2）：写单元、写 journal 记录、根槽 FUA 写、超级块槽原地覆写、屏障。
-//! 一条写属于哪一种，由它的落点决定（第一版几何写死：超级块槽 / 根环区域 / journal 环 / 单元区）。
+//! 步骤种类只有五种（D17（实现分层与第三方管道） 已定项 2）：写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障。
+//! 一条写属于哪一种，由它的落点决定（第一版几何写死：系统配置槽 / 根环区域 / journal 环 / 单元区）。
 
 use std::collections::BTreeMap;
 
@@ -34,7 +34,7 @@ impl StepKind {
     }
 }
 
-/// 第一版的固定几何：超级块两槽从偏移 0 起按槽距排；根环从 1 MiB 起到 `ring_end`；journal 环从槽 1024 起；之后是单元区。
+/// 第一版的固定几何：系统配置两槽从偏移 0 起按槽距排；根环从 1 MiB 起到 `ring_end`；journal 环从槽 1024 起；之后是单元区。
 #[derive(Clone, Copy, Debug)]
 pub struct FixedGeometry {
     pub fixed_structure_slot_spacing: u32,
@@ -251,7 +251,7 @@ mod tests {
             "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2]"
         );
 
-        // 种类串按枚举声明序，不按出现序：超级块槽写先于单元写发出，串里仍是 unit_write 在前。
+        // 种类串按枚举声明序，不按出现序：系统配置槽写先于单元写发出，串里仍是 unit_write 在前。
         let mixed = vec![
             operation(RecordedOperationKind::Write, 0),
             operation(RecordedOperationKind::Write, 4096),

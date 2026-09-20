@@ -125,7 +125,7 @@ fn registry_rows() -> Vec<(&'static str, u32, u64, u64, HexadecimalExtent)> {
         // t9：jsn (1, 3) 那条记录，journal 环从槽 1024（16 MiB）起，环内偏移 8192（两次暖机各占一条 4096）
         ("journal_record",  0, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
         ("journal_record",  1, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
-        // t11：超级块槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
+        // t11：系统配置槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
         ("superblock",      0, 4096, 4096, WholeRegion),
         ("superblock",      1, 4096, 4096, WholeRegion),
     ]
@@ -147,7 +147,7 @@ fn the_region_table_lists_the_twenty_one_registered_regions_in_order() {
     assert_eq!(
         expected.len(),
         FIRST_TRANSACTION_REGION_COUNT,
-        "登记第一节第 3 条写死 21 行：8 个单元 × 2 盘 + 根槽 1 + journal 记录 × 2 盘 + 超级块槽 × 2 盘"
+        "登记第一节第 3 条写死 21 行：8 个单元 × 2 盘 + 根槽 1 + journal 记录 × 2 盘 + 系统配置槽 × 2 盘"
     );
     assert_eq!(
         FIRST_TRANSACTION_REGIONS.len(),
@@ -165,7 +165,7 @@ fn the_region_table_lists_the_twenty_one_registered_regions_in_order() {
         .count();
     assert_eq!(
         whole_region_rows, 5,
-        "整段十六进制照打的只有固定结构那 5 行：根槽 512、journal 记录 4096 两份、超级块槽 4096 两份"
+        "整段十六进制照打的只有固定结构那 5 行：根槽 512、journal 记录 4096 两份、系统配置槽 4096 两份"
     );
 }
 

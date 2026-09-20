@@ -1,4 +1,4 @@
-//! 超级块（D22（单元原子性怎么合成） 已定项 9 / 已定项 15 / 已定项 16）：481 字节住 4096 字节的槽，每盘两槽轮换，
+//! 系统配置（D22（单元原子性怎么合成） 已定项 9 / 已定项 15 / 已定项 16）：481 字节住 4096 字节的槽，每盘两槽轮换，
 //! 整槽校验和罩 4096 含补齐、自身按 0 参与。字段顺序照 `layout/01-first-txn.md` 一那一节的字段表。
 
 use singlefs_format::{
@@ -89,7 +89,7 @@ impl Superblock {
         writer.skip(95);
         writer.assert_position(
             u64::try_from(FSID_OFFSET).expect("fsid 偏移"),
-            "超级块 fsid",
+            "系统配置 fsid",
         );
         writer.put(&self.filesystem_identifier);
         let mut writer_identity = [0u8; 16];
@@ -102,10 +102,10 @@ impl Superblock {
         writer.put_u64(self.slot_generation);
         writer.assert_position(
             u64::try_from(SUPERBLOCK_CHECKSUM_OFFSET).expect("校验和偏移"),
-            "超级块整槽校验和",
+            "系统配置整槽校验和",
         );
         writer.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
-        writer.skip(16 + 12 + 4); // 超级块 MAC、nonce 水位、KDF 标识：第一版全 0
+        writer.skip(16 + 12 + 4); // 系统配置 MAC、nonce 水位、KDF 标识：第一版全 0
         writer.put_u8(0); // 加密类型：关
         writer.put_u8(16); // MAC 长度声明
         writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0
@@ -143,7 +143,7 @@ impl Superblock {
         writer.assert_position(TAIL_OFFSET, "journal tail");
         writer.put_u64(self.journal_tail);
         writer.put_u32(self.journal_instance.0);
-        writer.assert_position(SUPERBLOCK_BYTES, "超级块");
+        writer.assert_position(SUPERBLOCK_BYTES, "系统配置");
         let mut bytes = writer.into_bytes();
         let digest =
             wide_checksum_with_field_zeroed(&bytes, slot_bytes(), SUPERBLOCK_CHECKSUM_OFFSET);

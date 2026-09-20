@@ -1,5 +1,5 @@
 //! 里程碑「第二个事务」步 0 在发布 B 上的那一半：把「取号 → 暖机 → A → B」整条录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，
-//! 与第一个事务同一种切法（上一次发布的超级块槽写与下一次发布的单元写落在同一段，登记表八末尾那条 ⚠️），
+//! 与第一个事务同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段，登记表八末尾那条 ⚠️），
 //! 每个状态跑恢复 + 多版本 oracle（实际走的根是哪一代就得读出那一代的内容）、池级 checker、记录核对器。
 //! 平时 `cargo test` 跳过两个 18 写的段；全量那条标 ignored，54 号门禁在 release 下跑它。再加四组靶向的阳性对照。
 //! 另有两条只展开小段的流：基镜像里预置一条残留记录（步 0 预想的细节第三条的正例），与到 E 之后再复用一次、改坏 tail（步 6 必红「陈旧 tail + 已复用的块」）。
@@ -244,13 +244,13 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             assert_eq!(
                 sizes,
                 vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 2],
-                "A 的两个超级块槽写与 B 的 16 个单元写合成一段：整条流按屏障切，不按发布切"
+                "A 的两个系统配置槽写与 B 的 16 个单元写合成一段：整条流按屏障切，不按发布切"
             );
             assert_eq!(writes.len(), 54, "取号 2 + 暖机 10 + A 21 + B 21 次写");
         }
         Script::ThirdVersion => {
-            // B 的两个超级块槽写与取号的两个合成一段（4）；写行发布 10 个单元写（实例表 + 四个固定点单元，各两盘）；
-            // 每次暖机 8 个单元写与上一次发布的两个超级块槽写合成一段（10）；C 的 16 个单元写与 txg 7 的超级块槽写合成 18。
+            // B 的两个系统配置槽写与取号的两个合成一段（4）；写行发布 10 个单元写（实例表 + 四个固定点单元，各两盘）；
+            // 每次暖机 8 个单元写与上一次发布的两个系统配置槽写合成一段（10）；C 的 16 个单元写与 txg 7 的系统配置槽写合成 18。
             assert_eq!(
                 sizes,
                 vec![
@@ -266,8 +266,8 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
         }
         Script::RollbackToFirstVersion => {
-            // C 的两个超级块槽写与回退取号的两个合成一段（4）；D 是写回退行的发布：10 个单元写（实例表 + 四个固定点单元，各两盘）；
-            // 暖机一次 8 个单元写与 D 的两个超级块槽写合成一段（10）。
+            // C 的两个系统配置槽写与回退取号的两个合成一段（4）；D 是写回退行的发布：10 个单元写（实例表 + 四个固定点单元，各两盘）；
+            // 暖机一次 8 个单元写与 D 的两个系统配置槽写合成一段（10）。
             assert_eq!(
                 sizes,
                 vec![
@@ -283,7 +283,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
         }
         Script::ReuseAfterRaisingFloor => {
-            // 四次覆盖写各 16 个单元写并上一次的两个超级块槽写（18）；抬 F 的两次空发布各 8 个单元写并上两个超级块槽写（10）；E 同覆盖写。
+            // 四次覆盖写各 16 个单元写并上一次的两个系统配置槽写（18）；抬 F 的两次空发布各 8 个单元写并上两个系统配置槽写（10）；E 同覆盖写。
             assert_eq!(
                 sizes,
                 vec![
@@ -300,7 +300,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
         }
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
-            // 到 E 的段序列末尾那段（E 的两个超级块槽写）并进 txg 18 的 16 个单元写（18），再接记录、根槽、超级块槽。
+            // 到 E 的段序列末尾那段（E 的两个系统配置槽写）并进 txg 18 的 16 个单元写（18），再接记录、根槽、系统配置槽。
             assert_eq!(
                 sizes,
                 vec![
@@ -702,7 +702,7 @@ const RESIDUAL_RECORD_ROOT: (InstanceGeneration, CheckpointTxg) =
     (InstanceGeneration(1), CheckpointTxg(5));
 
 /// 造那条残留记录与它点名的单元：另开一个池走同一段历史（mkfs → 取号 → 暖机 → A → B，字节确定），在实例 1 里再覆盖写一次，
-/// 只留下这次发布的单元写与 journal 记录写（根槽与超级块槽的写丢掉 = 根槽没落盘）。返回种子与种子之前那段历史的录制流。
+/// 只留下这次发布的单元写与 journal 记录写（根槽与系统配置槽的写丢掉 = 根槽没落盘）。返回种子与种子之前那段历史的录制流。
 fn residual_record_and_its_named_units(
     tag: &str,
 ) -> (Vec<RetainedOperation>, Vec<RetainedOperation>) {
@@ -900,7 +900,7 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     assert_eq!(second_publish_record_indexes.len(), 2, "B 的记录两份");
     let second_instance_root_indexes = &root_indexes[4..];
     // 只展开 B 的根槽段之后的段：种子是 B 之后才写下的，B 的根槽没持久而种子已在环里的状态走不到——
-    // 取号的超级块槽都没持久时环里就有实例 1 的记录，checker 的 I-7.7（超级块实例代号不低于根环）① 正确地判红（先前全部展开时 3 个状态）。
+    // 取号的系统配置槽都没持久时环里就有实例 1 的记录，checker 的 I-7.7（系统配置实例代号不低于根环）① 正确地判红（先前全部展开时 3 个状态）。
     let second_publish_root_segment_index = prepared
         .segments
         .iter()
@@ -971,7 +971,7 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     assert_eq!(
         (tally.states, states_whose_chain_reaches_the_residual_record),
         (31, 19),
-        "跑到的：B 与取号的超级块槽段 15 + 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 12 个是实例 2 的某条根已持久"
+        "跑到的：B 与取号的系统配置槽段 15 + 写行发布的记录段 3 + 写行发布的根槽段 1；跑不到的 12 个是实例 2 的某条根已持久"
     );
     assert_eq!(
         tally.violations, 0,
@@ -994,7 +994,7 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
 /// 改坏 tail 的 tail 值：窗口 [3, 18] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 18 被合法复用。
 const STALE_JOURNAL_TAIL: u64 = 2;
 
-/// 改坏 tail：录制流里每一次超级块槽写都换成 tail = `stale_tail` 的那一份（按字段重写、校验和重算，其余字段原样）。
+/// 改坏 tail：录制流里每一次系统配置槽写都换成 tail = `stale_tail` 的那一份（按字段重写、校验和重算，其余字段原样）。
 fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> Vec<RetainedWrite> {
     writes
         .iter()
@@ -1056,7 +1056,7 @@ fn records_after_tail_naming_a_mismatched_unit(
 }
 
 /// 步 6 必红「陈旧 tail + 已复用的块」（verification-build.md 崩溃点重放第一版必红用例表；C77（重放起点未定义）；D23（journal 的角色与格式） 已定项 3
-/// 那条 ⚠️ 与已定项 14）：固定脚本到 E 之后再覆盖写一次（txg 18 的数据单元落回 50180，A 那条记录点名的单元被合法复用），录制流里每次超级块槽写的
+/// 那条 ⚠️ 与已定项 14）：固定脚本到 E 之后再覆盖写一次（txg 18 的数据单元落回 50180，A 那条记录点名的单元被合法复用），录制流里每次系统配置槽写的
 /// tail 都改成 2。txg 18 的 16 个单元写全持久之后的每个崩溃状态：恢复必须完成、终态与 tail 没改坏的同一个状态逐项相等、施加前验证一次都不失败；
 /// 从陈旧 tail 起逐条验证、失配即中止的恢复在这些状态上中止，红在逐项相等那条。再注入一次真撕裂：施加前验证恰判失败一次（陈旧失配不进这个计数器）。
 #[test]
@@ -1079,7 +1079,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         .segments
         .iter()
         .position(|segment| segment.contains(&(publish_after_raising_floor_root_index + 1)))
-        .expect("E 的超级块槽写与 txg 18 的单元写同段");
+        .expect("E 的系统配置槽写与 txg 18 的单元写同段");
     assert_eq!(prepared.segments[reuse_units_segment_index].len(), 18);
     let expand = |segment_index: usize, segment: &[usize]| {
         segment_index > reuse_units_segment_index && segment.len() < 10
@@ -1097,10 +1097,10 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         &mut |stale_tail_image, stale_tail_report| {
             assert_eq!(
                 choose_superblock(stale_tail_image)
-                    .expect("超级块")
+                    .expect("系统配置")
                     .journal_tail,
                 STALE_JOURNAL_TAIL,
-                "展开的状态里择到的超级块都带陈旧的 tail"
+                "展开的状态里择到的系统配置都带陈旧的 tail"
             );
             let mismatched =
                 records_after_tail_naming_a_mismatched_unit(stale_tail_image, STALE_JOURNAL_TAIL);
@@ -1140,7 +1140,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     );
     assert_eq!(
         tally.states, 8,
-        "txg 18 的记录段 3 + 根槽段 1 + 超级块槽段 3 + 全部持久 1"
+        "txg 18 的记录段 3 + 根槽段 1 + 系统配置槽段 3 + 全部持久 1"
     );
     assert_eq!(
         (
@@ -1165,7 +1165,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     // 这条判据写成时流里没有复用，它不认「被流里更晚、已持久的写盖掉」——口径未定（2026-09-17 写这条用例时发现），这里钉的是现状，不是认下来的行为。
     assert_checker_and_record_checker_counts(&tally, &[], 8);
 
-    // 撕裂注入：txg 18 的记录已持久、根槽与超级块槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
+    // 撕裂注入：txg 18 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
     // 验证失败恰为 1 次：陈旧 tail 之后那条点名块已被复用的记录（jsn 3）不进这个计数器，真撕裂与陈旧失配分得开。
     let mut torn_writes = stale_writes.clone();
     let reused_data_unit_offset = SlotNumber(50180).to_device_offset();

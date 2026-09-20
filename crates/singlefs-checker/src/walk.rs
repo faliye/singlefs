@@ -148,7 +148,7 @@ impl Walk<'_> {
         let fsid = read_u64(unit, fsid_offset);
         self.judgements
             .judge("I-1.4", fsid == self.filesystem_identifier_low, || {
-                format!("{what}：头里的 fsid {fsid:#x} 与超级块的低 8 字节不符")
+                format!("{what}：头里的 fsid {fsid:#x} 与系统配置的低 8 字节不符")
             });
         true
     }
@@ -596,7 +596,7 @@ fn unit_write_order_instance(bytes: &[u8], filesystem_identifier_low: u64) -> Op
 }
 
 /// 盘上带实例代号的东西：根环里自证过的根、journal 环里 fsid 相同的记录、单元区里头校验和过且 fsid 相同的单元写序。
-/// 任何一个该读的槽读不出 ⇒ None（I-7.7（超级块实例代号不低于根环） 读不全报不适用）。
+/// 任何一个该读的槽读不出 ⇒ None（I-7.7（系统配置实例代号不低于根环） 读不全报不适用）。
 fn instance_carriers(
     reader: &dyn ImageReader,
     geometry: &PoolGeometry,
@@ -641,7 +641,7 @@ fn instance_carriers(
     Some(carriers)
 }
 
-/// I-7.7（超级块实例代号不低于根环） 的 ① ②（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）：
+/// I-7.7（系统配置实例代号不低于根环） 的 ① ②（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）：
 /// 每盘的实例代号取它两槽里全部自证过（fsid 与本池相同）的槽中最大的；① 本池的每个根记录、journal 记录、单元写序的实例代号
 /// 不超过各盘的最大者，② 各盘不等时较大者不出现在它们里——两句合起来就是「每一个带号的东西都不超过各盘最大号里最小的那个」。
 fn judge_instance_carriers(
@@ -664,7 +664,7 @@ fn judge_instance_carriers(
     else {
         judgements.not_applicable(
             "I-7.7",
-            "有一块盘没有本池 fsid 的超级块槽：那块盘归不归这个池由 I-1.4 判",
+            "有一块盘没有本池 fsid 的系统配置槽：那块盘归不归这个池由 I-1.4 判",
         );
         return;
     };
@@ -688,7 +688,7 @@ fn judge_instance_carriers(
         .find(|(_, instance)| *instance > pool_highest);
     judgements.judge("I-7.7", above_every_disk.is_none(), || {
         let (what, instance) = above_every_disk.expect("判红时有");
-        format!("{what}带实例代号 {instance}，高于各盘超级块的最大者 {pool_highest}（①）")
+        format!("{what}带实例代号 {instance}，高于各盘系统配置的最大者 {pool_highest}（①）")
     });
     let witnessed_by_one_disk = carriers
         .iter()
@@ -1305,20 +1305,20 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         for invariant in crate::image::IMPLEMENTED_INVARIANTS {
             root_ring_judgements.not_applicable(
                 invariant,
-                "有一块盘两个超级块槽都无效：这不是一个挂得上的镜像",
+                "有一块盘两个系统配置槽都无效：这不是一个挂得上的镜像",
             );
         }
         return root_ring_judgements.into_report();
     }
     let geometry = chosen[0].2;
-    // 各盘择到的超级块要属于同一个池：fsid 逐盘相同（一块别的池的旧盘插进来，实例代号可以恰好也是 1，I-7.7 看不出来）。
+    // 各盘择到的系统配置要属于同一个池：fsid 逐盘相同（一块别的池的旧盘插进来，实例代号可以恰好也是 1，I-7.7 看不出来）。
     for (device, view, _) in &chosen {
         root_ring_judgements.judge(
             "I-1.4",
             view.filesystem_identifier == geometry.filesystem_identifier,
             || {
                 format!(
-                    "盘 {device} 择到的超级块 fsid 与盘 {} 的不同：这块盘不属于这个池",
+                    "盘 {device} 择到的系统配置 fsid 与盘 {} 的不同：这块盘不属于这个池",
                     chosen[0].0
                 )
             },

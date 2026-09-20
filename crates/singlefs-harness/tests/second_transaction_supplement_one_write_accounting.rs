@@ -1,7 +1,7 @@
 //! 里程碑「第二个事务」增补 1 第 1 件的验收：发布路径按结构种类报每次发布的写调用数与写字节。
 //! 两条对照：一，每段窗口里按种类的合计与录制器在设备一层记下的写（写调用 = 一条写记录，字节 = 它的长度）逐项相等——录制器不知道写的是什么，
 //! 漏计一种、多计一种都对不上；二，每次发布的合计与每一种都钉成字节表算好的绝对值（`.claude/kb/layout/01-first-txn.md`「零」的写清单：
-//! 单元两盘各一份、journal 记录 4096 两盘各一份、根槽 512 一次 FUA、超级块槽 4096 两盘各一次），种类归错了合计不变、这一条红。
+//! 单元两盘各一份、journal 记录 4096 两盘各一份、根槽 512 一次 FUA、系统配置槽 4096 两盘各一次），种类归错了合计不变、这一条红。
 //! 两块内存盘（与宿主重跑虚机那条路同一种设备），不落文件。
 
 use std::cell::Cell;
@@ -120,7 +120,7 @@ fn every_kind_matches(
     }
 }
 
-/// 固定结构三样：journal 记录两盘各一份 4096、根槽一次 FUA 512、超级块槽两盘各一次 4096（字节表零 t9..t11 / w1..w3）。
+/// 固定结构三样：journal 记录两盘各一份 4096、根槽一次 FUA 512、系统配置槽两盘各一次 4096（字节表零 t9..t11 / w1..w3）。
 const JOURNAL_RECORD_ROOT_SLOT_SUPERBLOCK_SLOTS: [(WrittenStructureKind, WriteCallsAndBytes); 3] = [
     (
         WrittenStructureKind::JournalRecord,
@@ -355,14 +355,14 @@ fn first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_
         assert_eq!(
             warm_up_writes.total(),
             calls_and_bytes(5, 16_896),
-            "第 {} 次暖机：记录 2 + 根槽 1 + 超级块槽 2",
+            "第 {} 次暖机：记录 2 + 根槽 1 + 系统配置槽 2",
             warm_up_index + 1
         );
     }
     assert_eq!(
         published.first_transaction.writes.total(),
         calls_and_bytes(21, 344_576),
-        "第一个事务：单元 8 × 2 盘 = 16 次 327 680 字节 + 记录 2 次 8192 + 根槽 1 次 512 + 超级块槽 2 次 8192"
+        "第一个事务：单元 8 × 2 盘 = 16 次 327 680 字节 + 记录 2 次 8192 + 根槽 1 次 512 + 系统配置槽 2 次 8192"
     );
     assert_eq!(
         published.overwrite.writes.total(),
@@ -389,7 +389,7 @@ fn first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_
     );
 }
 
-/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 2 次超级块槽写不属于任何一次发布；写行那次发布 15 次、
+/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 2 次系统配置槽写不属于任何一次发布；写行那次发布 15 次、
 /// 213 504 字节；之后两次暖机空发布各 13 次、147 968 字节；整段录制器记下的写 == 取号 + 三次发布的合计。
 #[test]
 fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_writes() {
@@ -421,7 +421,7 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
             |sum, warm_up_publish| sum.plus(warm_up_publish.writes.total())
         ),
         recorded_writes(&operations[mount_start..]),
-        "取号两盘各一次超级块槽 + 写行发布 + 各次暖机按种类的合计 == 录制器在挂载这段里记下的写"
+        "取号两盘各一次系统配置槽 + 写行发布 + 各次暖机按种类的合计 == 录制器在挂载这段里记下的写"
     );
 
     assert_eq!(
@@ -432,7 +432,7 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
     assert_eq!(
         row_publish.writes.total(),
         calls_and_bytes(15, 213_504),
-        "写行：实例表单元 + 四个固定点单元 × 2 盘 = 10 次 196 608 字节 + 记录、根槽、超级块槽 5 次 16 896"
+        "写行：实例表单元 + 四个固定点单元 × 2 盘 = 10 次 196 608 字节 + 记录、根槽、系统配置槽 5 次 16 896"
     );
     for (warm_up_index, warm_up_publish) in warm_up_publishes.iter().enumerate() {
         assert_eq!(

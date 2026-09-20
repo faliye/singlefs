@@ -1,4 +1,4 @@
-//! 池级 checker 的输入与第一层判定：读盘的口子、每条不变量的三态、超级块与根环（I-7 类）、指针与位置条目。
+//! 池级 checker 的输入与第一层判定：读盘的口子、每条不变量的三态、系统配置与根环（I-7 类）、指针与位置条目。
 //! 与实现只共享 `singlefs-format` 这一个常量模块（D13（验证路线） 已定项 5）：偏移在这里按字段表各写一份。
 
 use std::collections::BTreeMap;
@@ -98,7 +98,7 @@ impl Judgements {
     }
 }
 
-/// 超级块里 checker 要用的几何（偏移按超级块字段表各写一份：物理块 317、journal 环起点 325 与长度 333、R 361、S 362、P 363、
+/// 系统配置里 checker 要用的几何（偏移按系统配置字段表各写一份：物理块 317、journal 环起点 325 与长度 333、R 361、S 362、P 363、
 /// chunk 367、根环基址 371、逐区域设备 379、单元区起点 417、io_min 425、槽距 429）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PoolGeometry {
@@ -145,8 +145,8 @@ fn parse_superblock_slot(bytes: &[u8]) -> Option<(SuperblockView, PoolGeometry)>
     })
 }
 
-/// 每盘两槽里自证过的超级块：槽 0 在偏移 0；槽 1 的偏移按槽 0 记的槽距，槽 0 无效时按最小槽距 4096（2026-09-14 用户收尾弹窗定甲）。
-/// I-7.7（超级块实例代号不低于根环） 按这个读法取每盘的实例代号（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
+/// 每盘两槽里自证过的系统配置：槽 0 在偏移 0；槽 1 的偏移按槽 0 记的槽距，槽 0 无效时按最小槽距 4096（2026-09-14 用户收尾弹窗定甲）。
+/// I-7.7（系统配置实例代号不低于根环） 按这个读法取每盘的实例代号（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
 #[must_use]
 pub fn verified_superblock_slots(
     reader: &dyn ImageReader,
@@ -173,7 +173,7 @@ pub fn verified_superblock_slots(
         .collect()
 }
 
-/// 每盘择一个超级块：两槽里世代号大的那一份（相等取槽 0）。
+/// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。
 #[must_use]
 pub fn chosen_superblocks(
     reader: &dyn ImageReader,
@@ -195,7 +195,7 @@ pub fn chosen_superblocks(
         .collect()
 }
 
-/// 根环全部槽：(区域, 槽, 盘, 偏移)，择根与 I-7.7（超级块实例代号不低于根环） 的「读不全」判定共用这一个算式。
+/// 根环全部槽：(区域, 槽, 盘, 偏移)，择根与 I-7.7（系统配置实例代号不低于根环） 的「读不全」判定共用这一个算式。
 #[must_use]
 pub fn root_slot_positions(geometry: &PoolGeometry) -> Vec<(u64, u64, u32, u64)> {
     let mut positions = Vec::new();

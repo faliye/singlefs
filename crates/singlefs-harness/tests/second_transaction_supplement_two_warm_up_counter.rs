@@ -1,4 +1,4 @@
-//! 里程碑「第二个事务」增补 2 第 21 行（C366（暖机路径把 txg 写进计数器与 tail））：暖机的空记录按记录号接着数 jsn，超级块的 tail 存的是
+//! 里程碑「第二个事务」增补 2 第 21 行（C366（暖机路径把 txg 写进计数器与 tail））：暖机的空记录按记录号接着数 jsn，系统配置的 tail 存的是
 //! jsn 计数器（D23（journal 的角色与格式） 已定项 18），checkpoint_txg 照格式常量走 1、2，两个量各走各的。
 //!
 //! 今天只有 mkfs 之后第一次可写挂载走暖机，环是空的，txg 与 jsn 按构造相等（1、2），在这条路上分不出「计数器写成 txg」；
@@ -67,7 +67,7 @@ fn warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_whi
     let superblock = choose_superblock(&devices).expect("暖机之后超级块自证得过");
     assert_eq!(
         superblock.journal_tail, 42,
-        "超级块的 tail 存 jsn 计数器（最后一条空记录的 42），不是 txg 2"
+        "系统配置的 tail 存 jsn 计数器（最后一条空记录的 42），不是 txg 2"
     );
 
     let filesystem_identifier = unit_filesystem_identifier(&parameters.filesystem_identifier);

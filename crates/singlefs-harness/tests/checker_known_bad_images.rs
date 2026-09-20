@@ -226,7 +226,7 @@ fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
         .1
 }
 
-/// 超级块槽重封：自证校验和在 155，罩整槽 4096。
+/// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
 fn mutate_superblock_slot(
     pool: &mut MemoryPool,
     device: u32,
@@ -380,7 +380,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 mutate_unit(image, INODE_LEAF, |bytes| set_u64(bytes, 81, 0xDEAD), true)
             }),
         ),
-        // 盘 1 被择的那个超级块槽里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
+        // 盘 1 被择的那个系统配置槽里 fsid 改成别的池的（一块外来的旧盘）；单元头照旧。
         (
             "I-1.4",
             Box::new(|image: &mut MemoryPool| {
@@ -501,7 +501,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
                 }
             }),
         ),
-        // 盘 0 被择的那个超级块槽（槽 1，世代 5）里逐区域设备改成 [0, 0, 0]。
+        // 盘 0 被择的那个系统配置槽（槽 1，世代 5）里逐区域设备改成 [0, 0, 0]。
         (
             "I-7.6",
             Box::new(|image: &mut MemoryPool| {
@@ -511,7 +511,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
             }),
         ),
         // C322（取号那一步的屏障怎么放没有条款） 的撞号镜像：没人引用的槽 50302 上放一份写序实例代号 2 的数据单元（头与载荷
-        // 校验和都过），两盘超级块都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
+        // 校验和都过），两盘系统配置都还是实例 1 ⇒ ① 红（旧的「各盘相等且 ≥ 根环」在这里判成立）。
         (
             "I-7.7",
             Box::new(move |image: &mut MemoryPool| {

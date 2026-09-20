@@ -94,7 +94,7 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     assert_eq!(
         output.instance,
         InstanceGeneration(2),
-        "取号 = max(超级块 1, 根环 1) + 1"
+        "取号 = max(系统配置 1, 根环 1) + 1"
     );
     assert_eq!(
         (

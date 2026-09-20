@@ -1,6 +1,6 @@
 //! 每次发布按结构种类计的写（里程碑「第二个事务」增补 1 第 1 件）：写调用数与写字节。
 //!
-//! 种类由发布路径在构造提交步骤时给出：单元写带着它的角色，journal 记录、根槽、超级块槽由步骤成员本身定。写入口把一次写交给设备、
+//! 种类由发布路径在构造提交步骤时给出：单元写带着它的角色，journal 记录、根槽、系统配置槽由步骤成员本身定。写入口把一次写交给设备、
 //! 设备报成功之后记一笔。记账不发写、不改写的次序、屏障与段序列，也不加提交步骤成员或块设备动作（D17（实现分层与第三方管道）
 //! 已定项 2 / 已定项 5）。一次写调用 = 交给一块盘的一次 `write_at`：镜像的两份各算一次，与设备一层数的口径相同，
 //! 所以一次发布按种类的合计要与设备一层数的逐次相等。
@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 
 use crate::transaction::TransactionUnit;
 
-/// 一次写调用写的是哪一种盘上结构：单元按角色分到每棵树各自的节点、树表单元、实例表单元，固定结构分 journal 记录、根槽、超级块槽。
+/// 一次写调用写的是哪一种盘上结构：单元按角色分到每棵树各自的节点、树表单元、实例表单元，固定结构分 journal 记录、根槽、系统配置槽。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WrittenStructureKind {
     DataUnit,
@@ -195,7 +195,7 @@ mod tests {
                 write_calls: 1,
                 written_bytes: 4096
             },
-            "发布之前的两次超级块槽写不算进这次发布"
+            "发布之前的两次系统配置槽写不算进这次发布"
         );
         assert_eq!(
             publish.of(WrittenStructureKind::DataUnit),

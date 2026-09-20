@@ -3,7 +3,7 @@
 //! 这张表是 E142（第一个事务的干跑） 第十一次跑的跑前登记（`research/prompts/e142-r11-prereg.md` 第一节第 3 条）
 //! 写死的那份区域清单，逐行抄自 `.claude/kb/layout/01-first-txn.md` 零那一节的写清单：
 //! 第一个事务写到的 8 个单元的落点（t1..t8，两盘各一份 = 16 行）、jsn (1, 3) 那条 journal 记录的两个落点（t9）、
-//! 这次发布的根槽（t10，区域 0 槽 1，只落在根环区域 0 那块盘）、这次发布写的超级块槽（t11，两盘各一份）
+//! 这次发布的根槽（t10，区域 0 槽 1，只落在根环区域 0 那块盘）、这次发布写的系统配置槽（t11，两盘各一份）
 //! ⇒ 16 + 2 + 1 + 2 = **21**，与那一节「⇒ 写请求数 … 21 条」逐项对得上。
 //!
 //! 这张表只对 E142 那套几何成立（两盘、`physical_block_size` = 512、io_min = 512 ⇒ 固定结构槽距 4096、根槽宽 512），
@@ -36,7 +36,7 @@ pub const HEAD_AND_TAIL_BYTES: usize = 32;
 const E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES: u64 = 4096;
 /// E142 几何的根槽宽 = 探到的 `physical_block_size` = 512（字节表零那一节的 m3「371 / 512 槽」）。
 const E142_ROOT_SLOT_BYTES: u64 = 512;
-/// 这次发布写的超级块槽是槽 1（t11：世代号 5、tail = 3，根槽之后再更新）。
+/// 这次发布写的系统配置槽是槽 1（t11：世代号 5、tail = 3，根槽之后再更新）。
 const FIRST_TRANSACTION_SUPERBLOCK_SLOT_INDEX: u64 = 1;
 /// 这次发布的根槽：区域 `3 mod 3` = 0 的槽 `(3 div 3) mod 8` = 1（t10）。
 const FIRST_TRANSACTION_ROOT_RING_REGION: u64 = 0;
@@ -59,7 +59,7 @@ const TREE_TABLE_SLOT: u64 = 50248;
 /// 十六进制打多少：整段照打，还是只打前后各 [`HEAD_AND_TAIL_BYTES`] 字节。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HexadecimalExtent {
-    /// 整段十六进制照打（固定结构那 5 行：根槽 512、journal 记录 4096 两份、超级块槽 4096 两份）。
+    /// 整段十六进制照打（固定结构那 5 行：根槽 512、journal 记录 4096 两份、系统配置槽 4096 两份）。
     WholeRegion,
     /// 只打 sha256 与前后各 32 字节（16 KiB / 32 KiB 的单元那 16 行）。
     HeadAndTail,
@@ -127,8 +127,8 @@ const FIRST_TRANSACTION_JOURNAL_RECORD_OFFSET: u64 =
 const FIRST_TRANSACTION_SUPERBLOCK_SLOT_OFFSET: u64 =
     FIRST_TRANSACTION_SUPERBLOCK_SLOT_INDEX * E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES;
 
-/// 登记里那 21 行，顺序就是结果行的顺序：8 个单元各两盘（t1..t8）、根记录（t10）、journal 记录两盘（t9）、超级块槽两盘（t11）。
-/// 前 16 行是 16 KiB / 32 KiB 的单元，只打 sha256 与前后 32 字节；后 5 行（根槽、journal 记录两份、超级块槽两份）整段十六进制照打。
+/// 登记里那 21 行，顺序就是结果行的顺序：8 个单元各两盘（t1..t8）、根记录（t10）、journal 记录两盘（t9）、系统配置槽两盘（t11）。
+/// 前 16 行是 16 KiB / 32 KiB 的单元，只打 sha256 与前后 32 字节；后 5 行（根槽、journal 记录两份、系统配置槽两份）整段十六进制照打。
 pub const FIRST_TRANSACTION_REGIONS: [FirstTransactionRegion; FIRST_TRANSACTION_REGION_COUNT] = [
     unit_region("data_unit", 0, DATA_UNIT_SLOT, 2),
     unit_region("data_unit", 1, DATA_UNIT_SLOT, 2),

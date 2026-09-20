@@ -286,7 +286,7 @@ pub fn memory_pool_of_sparse_devices(
     }
 }
 
-/// 盘上可比的一份快照：两盘各两个超级块槽的原样字节、根环里全部自证过的根、录制流里已有几步。挂载或抬 F 被拒之后与拒之前逐项相等，
+/// 盘上可比的一份快照：两盘各两个系统配置槽的原样字节、根环里全部自证过的根、录制流里已有几步。挂载或抬 F 被拒之后与拒之前逐项相等，
 /// 才算「在任何写之前拒绝」（录制流不多一步 = 一个写、一道屏障都没发）。
 #[derive(Debug, PartialEq, Eq)]
 pub struct DiskSnapshot {
@@ -309,7 +309,7 @@ pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot 
                     singlefs_core::address::DeviceOffsetInBytes(offset),
                     slot_bytes,
                 )
-                .expect("超级块槽读得到"),
+                .expect("系统配置槽读得到"),
             );
         }
     }

@@ -84,7 +84,7 @@ fn build_through_third_publish(tag: &str) -> BuiltPool {
 
 /// 回退到树表 0 条的根（第一个事务里 txg 2 的暖机根），第一版不支持（设计没定），在任何写之前拒绝：第一个事务之后进程退出、重开回退到 (1, 2)
 /// ⇒ 返回 `RollbackToVersionWithoutFileUnsupported`（它在回退候选集里，不报候选排除；增补 3 第 2 件代码三方第二轮判决第三节第 1 条）；
-/// 两盘超级块槽逐字节不变、根环没有新根、录制流一步都没多。
+/// 两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多。
 #[test]
 fn rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write() {
     let mut pool = build_pool("step-four-rollback-to-warm-up-root");

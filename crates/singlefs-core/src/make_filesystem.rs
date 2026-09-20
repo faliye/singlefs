@@ -1,7 +1,7 @@
 //! mkfs（里程碑「第一个事务」步 1）：吃 N 块设备，写出一个能被挂载、但一个文件都没有的池。
 //!
 //! 写序（字节表零 m1..m4；段序列 `4+1+1+1+4`）：实例表单元第 0 片与树表单元第 0 版（两盘各一份）→ 屏障 →
-//! 第 0 代根记录种进三个区域各自槽 0（各一道 FUA 写）→ 每盘两个超级块槽都写世代号 1 → 屏障。
+//! 第 0 代根记录种进三个区域各自槽 0（各一道 FUA 写）→ 每盘两个系统配置槽都写世代号 1 → 屏障。
 //! journal 环与根环区域「整段写 0」是镜像准备，不进录制流：这里要求设备是新建的全零镜像。
 
 use singlefs_format::{
@@ -27,7 +27,7 @@ use crate::unit::{
 
 /// mkfs 写实例代号 0（D23（journal 的角色与格式） 已定项 16）。
 pub const MKFS_INSTANCE_GENERATION: InstanceGeneration = InstanceGeneration(0);
-/// 超级块槽世代号从 1 起，mkfs 把两个槽都种上 1（D22（单元原子性怎么合成） 已定项 16）。
+/// 系统配置槽世代号从 1 起，mkfs 把两个槽都种上 1（D22（单元原子性怎么合成） 已定项 16）。
 pub const SUPERBLOCK_GENERATION_AT_MKFS: u64 = 1;
 /// 实例表单元第 0 片落槽 50176（占两槽），树表单元第 0 版落槽 50178（D3（空间分配） 已定项 10 ④）。
 pub const INSTANCE_TABLE_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT);

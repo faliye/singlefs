@@ -744,7 +744,7 @@ fn image_of(
 }
 
 /// 按 checker 的读法在镜像上数一条根下的分配记录（`singlefs_checker::walk::allocation_record_count_under_root`，与实现的分配器
-/// 不共用代码）：根环里 (txg, 实例) 等于 `root` 的那条自证过的根。超级块或那条根找不到、那棵树读不出都是 None。
+/// 不共用代码）：根环里 (txg, 实例) 等于 `root` 的那条自证过的根。系统配置或那条根找不到、那棵树读不出都是 None。
 #[must_use]
 pub fn allocation_records_on_the_image_under(
     image: &MemoryPool,
@@ -1186,7 +1186,7 @@ pub struct FailureObservation {
     pub panic: Option<CapturedPanic>,
     /// 按 checker 的读法从盘上读：根环里最新那条根的 txg；读不到时 None。
     pub newest_ring_root_txg: Option<u64>,
-    /// 根环一圈的槽数 R × S（按 checker 从超级块读出的几何）；读不到时 None。
+    /// 根环一圈的槽数 R × S（按 checker 从系统配置读出的几何）；读不到时 None。
     pub root_ring_slot_count: Option<u64>,
     /// 执行器自己判出的失败（分配代、冷启动读回）。
     pub harness_judgement: Option<HarnessJudgement>,
@@ -2850,7 +2850,7 @@ fn failure_observation(
 
 /// 抬 F 之前的镜像上，txg = `new_floor` 的根是不是全属于被抛弃的实例（F 落在回退留下的空档里）：按最新根指着的实例表，
 /// 有行 (i, T) 且根的 txg > T 的 i 就是被抛弃的（与 `mount::mount_rollback` 判候选集同一句）。那个 txg 上一条根都没有、
-/// 超级块或最新根或它的实例表读不出，都是 None（不算落在空档里）。
+/// 系统配置或最新根或它的实例表读不出，都是 None（不算落在空档里）。
 /// 读法用的是实现的 `recovery::readable_roots` / `choose_root` / `instance_table_of_root`（代码三方第一轮攻方的 P1 就这么读）：
 /// checker 判候选集时解实例表的那一段不对外（`singlefs-checker` 的 `walk.rs` 里 `Walk::instance_table_rows`），这里没另写一份解析。
 #[must_use]

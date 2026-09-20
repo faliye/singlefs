@@ -165,8 +165,8 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 
 ```rust
 // ✗ 一套布局 + 参数：拿错假设是一次静默误读
-struct SuperBlock { node_size: u32, /* ... */ }
-// 读者按 sb.node_size 算偏移。若某个版本改了「node_size 含不含块头」的口径，
+struct SystemConfiguration { node_size: u32, /* ... */ }
+// 读者按 system_configuration.node_size 算偏移。若某个版本改了「node_size 含不含块头」的口径，
 // 旧读者照样算得出一个偏移、照样读出「看起来合法」的字节 —— 不报错，而数据是错的。
 ```
 
@@ -179,8 +179,8 @@ const INCOMPAT_LAYOUT_ZONED:      u64 = 1 << 2;
 const SUPPORTED_INCOMPAT: u64 =
     INCOMPAT_LAYOUT_ROTATIONAL | INCOMPAT_LAYOUT_SSD | INCOMPAT_LAYOUT_ZONED;
 
-fn mount(sb: &SuperBlock) -> Result<Fs, MountError> {
-    let unknown = sb.incompat & !SUPPORTED_INCOMPAT;
+fn mount(system_configuration: &SystemConfiguration) -> Result<Fs, MountError> {
+    let unknown = system_configuration.incompat & !SUPPORTED_INCOMPAT;
     if unknown != 0 {
         // 拒绝挂载，而不是「尽力而为地猜」
         return Err(MountError::UnknownIncompat(unknown));

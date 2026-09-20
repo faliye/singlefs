@@ -7,3 +7,8 @@
 .claude/kb/second-txn-layout.md	.claude/kb/layout/02-second-txn.md	2026-09-17	同上
 .claude/agents/agent-common.md	.claude/agent-common.md	2026-09-18	用户定案：搬进 .claude/agents/ 之后退回原位置（doc-lint 要求那里每个文件都是带 frontmatter 的 agent 定义），同日搬进又搬回，那一次搬进没有提交
 .claude/agents/main-agent.md	.claude/main-agent.md	2026-09-18	同上
+.claude/kb/experiments/100-超级块的三段几何.md	.claude/kb/experiments/100-系统配置的三段几何.md	2026-09-20	「超级块」改名「系统配置」，实验页文件名随正文一起改（用户 2026-09-20 定案）
+.claude/kb/experiments/115-超级块字段表的完备性与字节预算.md	.claude/kb/experiments/115-系统配置字段表的完备性与字节预算.md	2026-09-20	「超级块」改名「系统配置」，实验页文件名随正文一起改（用户 2026-09-20 定案）
+.claude/kb/experiments/124-超级块字段表按已定项14重算.md	.claude/kb/experiments/124-系统配置字段表按已定项14重算.md	2026-09-20	「超级块」改名「系统配置」，实验页文件名随正文一起改（用户 2026-09-20 定案）
+.claude/kb/experiments/126-超级块槽宽四条候选的代价.md	.claude/kb/experiments/126-系统配置槽宽四条候选的代价.md	2026-09-20	「超级块」改名「系统配置」，实验页文件名随正文一起改（用户 2026-09-20 定案）
+.claude/kb/experiments/147-超级块字段表按第一个事务字节表重算.md	.claude/kb/experiments/147-系统配置字段表按第一个事务字节表重算.md	2026-09-20	「超级块」改名「系统配置」，实验页文件名随正文一起改（用户 2026-09-20 定案）

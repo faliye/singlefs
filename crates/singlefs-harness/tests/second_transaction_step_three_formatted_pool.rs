@@ -32,7 +32,7 @@ use singlefs_harness::crash::writes_and_segments;
 use singlefs_harness::SharedStream;
 use std::cell::Cell;
 
-/// 读超级块槽 0（偏移 0）时按「这块盘第几次读槽 0」注入一次瞬时读错的盘，别的读写原样交给内层（m2-emptypool-nonempty-r1 云端攻方腿
+/// 读系统配置槽 0（偏移 0）时按「这块盘第几次读槽 0」注入一次瞬时读错的盘，别的读写原样交给内层（m2-emptypool-nonempty-r1 云端攻方腿
 /// 模型 `opus_attack_emptypool.rs` 第 294 行起的做法）。
 struct TransientSuperblockReadErrorDevice<Inner: BlockDevice> {
     inner: Inner,
@@ -77,7 +77,7 @@ impl<Inner: BlockDevice> BlockDevice for TransientSuperblockReadErrorDevice<Inne
 }
 
 /// 取号之前判定算出的号与取号写之前重算的号不同，取号不写、报错（m2-emptypool-nonempty-r1 云端攻方腿 Z2）：mkfs 之后第一次可写挂载崩在
-/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘超级块槽 0 已是号 1），重开时两块盘第 2 次读超级块槽 0 各报一次瞬时读错——
+/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘第 2 次读系统配置槽 0 各报一次瞬时读错——
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
 #[test]
@@ -169,12 +169,12 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_is_refused_bef
     assert_eq!(
         disk_snapshot(&formatted.memory_pool(), &formatted.stream),
         before,
-        "两盘超级块槽逐字节不变、根环没有新根、一个写都没发"
+        "两盘系统配置槽逐字节不变、根环没有新根、一个写都没发"
     );
 }
 
 /// 空池挂载的形状不是第一个事务那一种，在取号之前拒绝（m2-emptypool-nonempty-r1 云端攻方腿 Z3-A）：mkfs 之后第一次可写挂载崩在
-/// 取号两写与 txg 1 的记录两写都持久、txg 1 的根槽没持久；两块盘超级块槽 0（取号写进号 1 的那一槽）各坏一个字节——择超级块只剩 mkfs 的槽 1、
+/// 取号两写与 txg 1 的记录两写都持久、txg 1 的根槽没持久；两块盘系统配置槽 0（取号写进号 1 的那一槽）各坏一个字节——择系统配置只剩 mkfs 的槽 1、
 /// 根环只有第 0 代根，要取的号 1、要写的行为空；而环里那条 txg 1 的记录让新实例从 txg 2、jsn 2 起 ⇒ 返回
 /// `FormattedPoolMountNotShapedLikeTheFirstTransaction`，整份镜像与录制流都不变。
 #[test]
@@ -202,7 +202,7 @@ fn formatted_pool_mount_starting_after_a_leftover_record_is_refused_before_acqui
         device
             .inner()
             .read_at(DeviceOffsetInBytes(0), &mut sector)
-            .expect("读超级块槽 0");
+            .expect("读系统配置槽 0");
         sector[100] ^= 0xff;
         device
             .inner_mut()
@@ -357,7 +357,7 @@ fn assert_checker_verdicts(pool: &FormattedPool, step: &str, not_applicable: &[&
 
 /// 没有文件版本的一版上要写实例表行，第一版不支持（设计没定），在取号之前拒绝：第一个事务取号、暖机两次之后、第一个文件版本之前崩溃
 /// （同一个进程里做到暖机就停、镜像关掉），重开可写挂载——所选根 (1, 2)、树表 0 条，要取的号 2，要写的行区间 [1, 2) 不为空 ⇒
-/// 返回 `InstanceRowsOnVersionWithoutFileUnsupported`；两盘超级块四个槽逐字节不变（实例代号仍是 1）、根环没有新根、录制流一步都没多。
+/// 返回 `InstanceRowsOnVersionWithoutFileUnsupported`；两盘系统配置四个槽逐字节不变（实例代号仍是 1）、根环没有新根、录制流一步都没多。
 #[test]
 fn writable_mount_after_a_crash_between_warm_up_and_the_first_file_is_refused_before_acquiring_an_instance(
 ) {
@@ -401,7 +401,7 @@ fn writable_mount_after_a_crash_between_warm_up_and_the_first_file_is_refused_be
     let after = disk_snapshot(&formatted.memory_pool(), &formatted.stream);
     assert_eq!(
         after.superblock_slots, before.superblock_slots,
-        "两盘超级块槽逐字节不变：没有取号"
+        "两盘系统配置槽逐字节不变：没有取号"
     );
     assert_eq!(after.readable_roots, before.readable_roots, "根环没有新根");
     assert_eq!(
@@ -428,7 +428,7 @@ fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit
     assert_eq!(
         output.instance,
         InstanceGeneration(1),
-        "取号 = max(超级块 0, 根环 0) + 1"
+        "取号 = max(系统配置 0, 根环 0) + 1"
     );
     assert_eq!(
         (

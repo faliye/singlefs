@@ -35,7 +35,7 @@
 
 
 
-### 小节清单：`.claude/kb/experiments/126-超级块槽宽四条候选的代价.md`（kb-sections.py 全量生成，未经任何过滤）
+### 小节清单：`.claude/kb/experiments/126-系统配置槽宽四条候选的代价.md`（kb-sections.py 全量生成，未经任何过滤）
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|

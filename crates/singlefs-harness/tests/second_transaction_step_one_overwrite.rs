@@ -162,7 +162,7 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     assert_eq!(second.key_order_mismatches, 0);
     assert_eq!(pool.allocator.policy_mismatches, 0);
 
-    // 根槽落区域 4 mod 3 = 1 的槽 (4 div 3) mod 8 = 1，区域 1 归盘 1；超级块世代号 6、tail = 4。
+    // 根槽落区域 4 mod 3 = 1 的槽 (4 div 3) mod 8 = 1，区域 1 归盘 1；系统配置世代号 6、tail = 4。
     let image = pool.memory_pool();
     let target = target_for_publish(CheckpointTxg(4));
     let region_device =

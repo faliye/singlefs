@@ -1,7 +1,7 @@
-//! 冷启动恢复（里程碑步 6）：择超级块 → 择根 → 全环扫描 journal → 按前缀口径施加记录的新根段 → 沿树走到数据单元。
+//! 冷启动恢复（里程碑步 6）：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加记录的新根段 → 沿树走到数据单元。
 //! 只通过 [`PoolReader`] 读盘，不沿进程内的指针热读；崩溃点重放（步 7）拿同一条路径去判每一个崩溃状态。
 //!
-//! 口径：择超级块 = 校验和过且世代号大的那个槽、各盘 fsid 与设备数要对得上（D22（单元原子性怎么合成） 已定项 16）；
+//! 口径：择系统配置 = 校验和过且世代号大的那个槽、各盘 fsid 与设备数要对得上（D22（单元原子性怎么合成） 已定项 16）；
 //! 择根 = 三个区域全部槽里自证过、`(checkpoint_txg, 实例代号)` 最大的（D22（单元原子性怎么合成） 已定项 7）；
 //! journal 全环扫描、不先信 tail（D23（journal 的角色与格式） 已定项 3），两份镜像任一份自证过即算在（D23（journal 的角色与格式） 已定项 14）；
 //! 前缀 = `(实例代号, checkpoint_txg)` 严格大于所选根、jsn 严格连续、提交标记齐全、在飞上限之内、点名单元逐项验过，
@@ -115,9 +115,9 @@ impl<Device: BlockDevice> PoolReader for Vec<(DeviceIdentity, Device)> {
 /// 恢复走不下去的原因，按调用方能据以行动的粒度分。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecoveryFailure {
-    /// 某块盘两个超级块槽都无效。
+    /// 某块盘两个系统配置槽都无效。
     NoValidSuperblock { device: DeviceIdentity },
-    /// 各盘的超级块 fsid 或设备数对不上。
+    /// 各盘的系统配置 fsid 或设备数对不上。
     SuperblocksDisagree,
     /// 根环里一条自证过的根都没有。
     NoValidRoot,
@@ -763,7 +763,7 @@ pub fn highest_root_instance<Reader: PoolReader + ?Sized>(
     highest
 }
 
-/// 一块盘两槽里自证过、fsid 与本池相同的超级块。取号的 max（D18（块里携带什么信息） 已定项 11）与超级块槽写的世代号
+/// 一块盘两槽里自证过、fsid 与本池相同的系统配置。取号的 max（D18（块里携带什么信息） 已定项 11）与系统配置槽写的世代号
 /// （D22（单元原子性怎么合成） 已定项 16，逐盘计）都按这个读法（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
 #[must_use]
 pub fn verified_superblock_slots<Reader: PoolReader + ?Sized>(

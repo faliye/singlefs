@@ -5,7 +5,7 @@
 //! 「写行装得下、暖机第 N 次装不下」的池仍是取号写完、写行也发完，暖机才报错，实例代号照烧。
 //! 本文件三条用例：写行那次装不下（`..._cannot_publish_the_rows_...`）、暖机第 1 次装不下、暖机第 2 次装不下。
 //!
-//! 改之前这两条只在发布路径里算：取号（两次超级块槽写 + 一道屏障）已经写完才报出来，而取号的回卷只管取号自己那几次写报错、
+//! 改之前这两条只在发布路径里算：取号（两次系统配置槽写 + 一道屏障）已经写完才报出来，而取号的回卷只管取号自己那几次写报错、
 //! 管不到取号之后的发布失败（`write_acquired_instance`）⇒ 分配记录树满了的池此后每试一次可写挂载就再烧一个实例代号、
 //! 录制流多 3 步，而这个池本来就再也发布不出东西。
 //!
@@ -94,7 +94,7 @@ fn try_empty_publish_in_process(pool: &mut BuiltPool) -> Result<TransactionOutpu
     Ok(output)
 }
 
-/// 两块盘四个超级块槽里自证过的那些槽写着的实例代号，按盘排。
+/// 两块盘四个系统配置槽里自证过的那些槽写着的实例代号，按盘排。
 fn superblock_instances(pool: &BuiltPool) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
     let image = pool.memory_pool();
     let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
@@ -157,8 +157,8 @@ fn publish_until_the_allocation_record_node_holds(
 }
 
 /// 验收：分配记录树满了的池上可写挂载——在取号之前返回 `RowPublishAdmissionRefusedBeforeAcquisition`，
-/// 盘上逐字节不变（`DiskSnapshot`：两盘四个超级块槽的原样字节、根环里全部自证过的根、录制流步数）、
-/// 两块盘超级块里的实例代号没动。
+/// 盘上逐字节不变（`DiskSnapshot`：两盘四个系统配置槽的原样字节、根环里全部自证过的根、录制流步数）、
+/// 两块盘系统配置里的实例代号没动。
 #[test]
 fn writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is_acquired() {
     assert_eq!(allocation_node_capacity(), 812);
@@ -214,17 +214,17 @@ fn writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is
     assert_eq!(
         disk_snapshot(&pool.memory_pool(), &pool.stream),
         before,
-        "盘上逐字节不变：超级块槽、根环里的根、录制流步数都没动"
+        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数都没动"
     );
     assert_eq!(
         superblock_instances(&pool),
         instances_before,
-        "两块盘超级块里的实例代号没动：取号一次都没发生"
+        "两块盘系统配置里的实例代号没动：取号一次都没发生"
     );
 }
 
 /// 「写行装得下、暖机第 `refused_warm_up_index` 次装不下」的池上可写挂载：在取号之前返回
-/// `WarmUpAdmissionRefusedBeforeAcquisition`，盘上逐字节不变、四个超级块槽里的实例代号不变、录制流一步没多。
+/// `WarmUpAdmissionRefusedBeforeAcquisition`，盘上逐字节不变、四个系统配置槽里的实例代号不变、录制流一步没多。
 ///
 /// 两块盘、区域归属 0 / 1 / 0：这两个池最后一次发布都落在 txg 52，新实例的第一次发布（写行）是 txg 53 = 区域 2 = 盘 0，
 /// 暖机 txg 54 = 区域 0 = 盘 0（还没覆盖盘 1）、txg 55 = 区域 1 = 盘 1 ⇒ 这次挂载计划推 2 次暖机空发布。
@@ -314,7 +314,7 @@ fn writable_mount_is_refused_before_acquisition_at_warm_up_publish(
     assert_eq!(
         disk_snapshot(&pool.memory_pool(), &pool.stream),
         before,
-        "盘上逐字节不变：超级块槽、根环里的根、录制流步数都没动"
+        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数都没动"
     );
     assert_eq!(
         pool.stream.operations().len() - steps_before,
@@ -324,7 +324,7 @@ fn writable_mount_is_refused_before_acquisition_at_warm_up_publish(
     assert_eq!(
         superblock_instances(&pool),
         instances_before,
-        "两块盘超级块里的实例代号没动：取号一次都没发生"
+        "两块盘系统配置里的实例代号没动：取号一次都没发生"
     );
 }
 

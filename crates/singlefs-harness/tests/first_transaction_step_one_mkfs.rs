@@ -276,7 +276,7 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
 
 /// 第一版两块盘时根环区域归属写死盘 0 / 盘 1 / 盘 0（D2（RAID 条带策略） 已定项 7：不是 mkfs 参数），参数给别的归属就在任何写之前拒绝
 /// （m2-emptypool-nonempty-r1 云端攻方腿 Z3-B）：[0, 1, 1] 与 [1, 0, 0] 各一次 ⇒ 返回 `RegionDevicesNotTheFirstVersionLayout`，
-/// 录制流一步没有、两块盘的超级块槽 0 与三个区域的根槽 0 全是 0。
+/// 录制流一步没有、两块盘的系统配置槽 0 与三个区域的根槽 0 全是 0。
 #[test]
 fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
     for (tag, layout) in [
@@ -333,7 +333,7 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
                 )
                 .iter()
                 .all(|byte| *byte == 0),
-                "盘 {identity:?} 的超级块槽 0 全零"
+                "盘 {identity:?} 的系统配置槽 0 全零"
             );
             for region in 0..3 {
                 let offset = slot_offset(RootRingSlot { region, slot: 0 }, spacing);

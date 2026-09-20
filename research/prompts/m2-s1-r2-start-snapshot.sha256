@@ -1,0 +1,13 @@
+f824a8a3929645e8b2368f66a8493e3d50e5970cd72f06cd85a02b0f8ddbce86  research/prompts/_m2-s1-r2-body.md
+74f51c774cfcea22752525f651f0b7318ad5c0c91ff263f7f5aa7f409ed7944a  .claude/kb/decisions/23-journal的角色与格式.md
+472e9d8d9558e0e6c72404c36ab1b65437d6f84e9274d51a7ddc452109a8817e  .claude/kb/decisions/16-发布语义.md
+5d30efd2e0c09db399f1342e27d5a2eba8e826de333b66dd67b8643448160ab4  .claude/kb/decisions/03-空间分配.md
+ae6f1db1b1471badf4f21e29c839e3cacab1ba4d7c463f9b6d7020cd8701c621  .claude/kb/decisions/13-验证路线.md
+404befeb0d35546256a4215ef2bb934ee4a10d851e429a6ba243080def98eaa9  .claude/kb/decisions/25-目标负载优先级.md
+e1e1734c8aedd5ba13766082bc06b8bb550fdd4ef2f819dc1770126ee7cc35ca  .claude/kb/decisions/28-挂载期承诺量.md
+cf910cf6cf3370756f5b1ae919529cf0a1026ad52d8fa085829ed2087bee83de  .claude/kb/invariants.md
+d0492c87cea003e0dfa21478229269bce10b9f192956cb381828247dfa3ea824  .claude/kb/checks-owed.md
+6e762731a0af3a36318d1c77600f6f8d5b57dc4310795ac8553a899389cf6576  .claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md
+fd5dfd08c92532a265c8b069298f6b0fff65a0695c0236b907f63c1bbd1ab53b  .claude/kb/experiments/16-journal的角色WALvs意图日志.md
+4d690c7a122b7c6cd1d644f0238131397455b26fe8f27723d5782b86ebec044d  research/prompts/m2-s1-r1-main-verification.md
+828c12cd09f0f9f6dbc99fee802b8a9c17672642c60b3132e8d367ba13f9b682  research/prompts/m2-s1-forks.md
