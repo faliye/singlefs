@@ -98,7 +98,11 @@ def index_status():
 
 
 def cell(text):
-    return text.replace('|', '\\|').replace('\n', ' ')
+    # 快查行是从 decisions-history/<月>.md 里搬到 decisions-history.md 的，两者差一层目录：
+    # 源文件里的 ](../prior-art.md) 指 kb/prior-art.md，原样搬过来就变成指 .claude/prior-art.md（门禁 23 号判红）。
+    # 每个以 ../ 开头的链接目标去掉一层：../prior-art.md → prior-art.md、../../rules/x.md → ../rules/x.md。
+    one_level_up = text.replace('](../', '](')
+    return one_level_up.replace('|', '\\|').replace('\n', ' ')
 
 
 # 每节只列最近这么多次：decisions-history.md 的大小只随决策条数涨，不随变更次数涨（变更次数几年下来会是上万）。

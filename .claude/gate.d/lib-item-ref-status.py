@@ -57,8 +57,18 @@ def self_decisions():
 
 def references(path, item_map, self_map):
     """逐处给出一个分项引用：(行号, 行, 匹配, 写的状态, 归属或 None, 指名却没有第 k 条的那条决策或 None, 紧挨着指名的决策或 None)。"""
-    self_d = self_map.get(path); last = None; hist = None
+    self_d = self_map.get(path); last = None; hist = None; in_fence = False
     for ln, line in enumerate(open(path, encoding='utf-8').read().split('\n'), 1):
+        # 代码围栏里是逐字照抄的东西——变更史的「改前」原行、实验的产物行、源码片段。
+        # 按今天的状态判它们，等于要求「原样保存的证据」跟着现状改
+        # （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
+        # 实测（2026-09-20）：第三批瘦身把 D17（实现分层与第三方管道） 的旧正文抄进变更史围栏之后，
+        # 围栏里两处「未定项 6」当场判红——那两行说的是抄下来那天的状态，而立项让第 6 条变成了已定。
+        if line.lstrip().startswith('```'):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
         if (path.endswith('decisions-history.md') or '/decisions-history/' in path) and line.startswith('### '):
             mm = re.search(r'D(\d+)', line); hist = 'D' + mm.group(1) if mm else None
         for m in re.finditer(r'(已定项|未定项)\s*(\d+)', line):

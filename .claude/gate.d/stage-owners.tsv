@@ -64,4 +64,6 @@
 71-agent-def-flow-only.sh	gate-triage	定义与共用约束只由主 agent 改（共用约束「不做」一节不许子 agent 改 .claude/agents/），没有哪个子 agent 写完会先跑它；提交前核
 72-agent-def-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名（形态照 56 号）
 73-research-gate-lint.sh	gate-triage	研究脚本与 hook 由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核
+75-decision-experiment-links.sh	kb-scribe,experiment-runner	决策与实验双向登记、实验变了之后的回看（两边都写这张表）
+74-model-differential.sh	implementation-writer,crash-verifier	模型对拍：改 crates/ 的实现员改完先跑（release 下单跑一个测试二进制，几秒）；崩溃验证员跑重阶段时一起跑
 76-second-txn-hooks.sh	kb-scribe	第二个事务的 layout/02 登记表、里程碑各步「写出的字节」、layout/01 段序列登记表三处互相挂钩
