@@ -1,0 +1,7 @@
+05:08 UTC 开工（限额重置后续做）；ps 空闲
+05:10 UTC 基线快档（主工作区，改动前）：cargo test --test second_transaction_supplement_three_random_history -- --test-threads 8 墙钟 36.6 s（快档 campaign 自报 36.6 s、取样点 27.2 s），日志 baseline-fast.log
+05:15 UTC 开始写 crates/singlefs-harness/src/model.rs（只 use singlefs_format）与胶水
+05:52 UTC 起变异证明（后台）：run-mutants.sh
+（更正：变异证明实际 05:33 UTC 起，上一行的 05:52 是估的）
+05:4x UTC 起 gate 59 只跑新加的 10 行（副本 gate59-new-rows）
+05:48 UTC 起 check.sh（后台）

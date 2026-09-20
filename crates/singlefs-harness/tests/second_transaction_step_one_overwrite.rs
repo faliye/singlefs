@@ -14,7 +14,7 @@ use common::{
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
-use singlefs_core::allocator::UnitFootprint;
+use singlefs_core::allocator::{PlacementRefusal, UnitFootprint};
 use singlefs_core::journal::{back_chain_of, record_offset};
 use singlefs_core::records::{
     build_mapping_entry, parse_mapping_entry, STATISTIC_ALLOCATED_BYTES,
@@ -576,6 +576,57 @@ fn repeated_overwrites_report_a_full_allocation_node_instead_of_panicking() {
     );
 }
 
+/// 分配记录过 600 条时记账的「已分配」照样等于分配记录的跨度之和（增补 3 第 2 件代码三方第二轮判决第三节第 3 条：攻方变异 m4b——
+/// 分配记录过 600 条之后「已分配」少记一槽——整个 workspace 没有一条测试会红）。同一个进程同一个实例里从第一个文件起连着覆盖写，
+/// 直到一个节点装不下（49 次，最后一版 804 条）：没有挂载、没有抬 F，一个落点都不回收，已释放的都还在 defer 窗口里、仍算已分配
+/// （I-3.1 读法甲），所以每一版每盘的「已分配」= 这一版交回的分配记录里那块盘的跨度之和 × 16 KiB——拿分配记录现算，不看分配器的计数。
+/// 逐版核；过 600 条的版本 13 个（第 37–49 次覆盖写：612、628 … 804 条）。每一次覆盖写接着上一版，次序本身就是被测对象，不切片并行。
+#[test]
+fn allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records() {
+    let mut pool = build_pool("allocated-statistic-past-six-hundred-records");
+    let mut versions_past_six_hundred_records = 0;
+    let mut overwrites = 0;
+    loop {
+        let previous = pool.output.clone();
+        let Ok(output) = try_overwrite(&mut pool, &previous) else {
+            break;
+        };
+        overwrites += 1;
+        for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let span_sum_in_slots: u64 = output
+                .allocation_records
+                .iter()
+                .filter(|record| record.device == device)
+                .map(|record| u64::from(record.span_slots))
+                .sum();
+            let allocated_bytes = output
+                .accounting_entries
+                .iter()
+                .find(|entry| {
+                    entry.statistic == STATISTIC_ALLOCATED_BYTES && entry.device == device
+                })
+                .map(|entry| entry.value)
+                .expect("带设备维的行每盘一行");
+            assert_eq!(
+                allocated_bytes,
+                span_sum_in_slots * SLOT_BYTES,
+                "第 {overwrites} 次覆盖写（{} 条分配记录）盘 {}：「已分配」要等于这一版分配记录的跨度之和",
+                output.allocation_records.len(),
+                device.0
+            );
+        }
+        if output.allocation_records.len() > 600 {
+            versions_past_six_hundred_records += 1;
+        }
+        pool.output = output;
+    }
+    assert_eq!(overwrites, 49, "20 + 16 × 49 = 804 ≤ 812，第 50 次装不下");
+    assert_eq!(
+        versions_past_six_hundred_records, 13,
+        "第 37 次（612 条）到第 49 次（804 条）"
+    );
+}
+
 /// 可再分配谓词（D16（发布语义） 已定项 1「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）：F 不抬（恒 0）时一个已释放的落点都回不来——
 /// 这条用例把 F = 0 的形态钉住：释放过的落点一个都不再发出去、defer 只增不减、空闲随分配单调减。它是 C22（刚释放的块立即重分配）的弱形态：
 /// 把 `mark_released` 改成清位图（立即复用）它红；抬 F 之后的回收与复用在步 5 的用例里（`second_transaction_step_five_reuse.rs`）。
@@ -710,7 +761,7 @@ fn release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_in
 }
 
 /// 准入之后失败的发布不留半新的池：把 A 开的那个提交内生段用到头、单元区里别的空槽全标成已分配、只留 50182–50183 给 B 的数据单元，
-/// B 释放了 A、分配到了数据单元、第一个提交内生块拿不到 ⇒ `NoSpaceFor`；返回之后分配器要和进去之前一模一样。
+/// B 释放了 A、分配到了数据单元、第一个提交内生块拿不到 ⇒ 落点被拒（`PlacementRefused`，每块盘上都没有）；返回之后分配器要和进去之前一模一样。
 #[test]
 fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
     let mut pool = build_pool("no-space-midway");
@@ -750,11 +801,12 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
     assert!(
         matches!(
             result,
-            Err(PublishError::NoSpaceFor {
-                unit: TransactionUnit::ExtentRoot
+            Err(PublishError::PlacementRefused {
+                unit: TransactionUnit::ExtentRoot,
+                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
             })
         ),
-        "数据单元拿到了 50182，第一个提交内生块拿不到：{result:?}"
+        "数据单元拿到了 50182，第一个提交内生块拿不到（每块盘上都没有：容量不够那一种）：{result:?}"
     );
     assert_eq!(
         pool.allocator.records(),

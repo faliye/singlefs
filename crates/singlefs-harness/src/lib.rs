@@ -18,6 +18,8 @@ pub mod device_log;
 pub mod first_transaction_regions;
 pub mod hexadecimal;
 pub mod history;
+pub mod model;
+pub mod model_comparison;
 pub mod scenario;
 pub mod segments;
 pub mod sha256;

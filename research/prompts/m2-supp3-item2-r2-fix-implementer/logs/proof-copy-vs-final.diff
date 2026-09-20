@@ -1,0 +1,56 @@
+diff -r -x target -x '*.pristine' /tmp/claude-1000/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/mutations.tsv crates/mutations.tsv
+164a165,177
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根（在候选集里、第一版不支持）报成候选排除「低于 F」	crates/singlefs-core/src/mount.rs	        return Err(MountError::RollbackToVersionWithoutFileUnsupported(target));	        return Err(MountError::RollbackTargetNotACandidate {\n            target,\n            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n        });	-p singlefs-harness --test second_transaction_supplement_three_random_history -- random_histories_fast_tier	random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根报成候选排除「低于 F」；步 4 那条写死的用例判出	crates/singlefs-core/src/mount.rs	        return Err(MountError::RollbackToVersionWithoutFileUnsupported(target));	        return Err(MountError::RollbackTargetNotACandidate {\n            target,\n            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n        });	-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_a_warm_up_root	rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：候选排除「低于 F」报成「树表 0 条、第一版不支持」	crates/singlefs-core/src/mount.rs	        return Err(MountError::RollbackTargetNotACandidate {\n            target,\n            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n        });	        return Err(MountError::RollbackToVersionWithoutFileUnsupported(target));	-p singlefs-harness --test second_transaction_supplement_three_random_history -- random_histories_fast_tier	random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条的改法）：胶水把「树表 0 条、第一版不支持」映射成「低于 F」	crates/singlefs-harness/src/model_comparison.rs	        MountError::RollbackToVersionWithoutFileUnsupported(_) => {\n            explained(ModelRefusalReason::RollbackToVersionWithoutFileUnsupported)\n        }	        MountError::RollbackToVersionWithoutFileUnsupported(_) => {\n            explained(ModelRefusalReason::RollbackTargetBelowEffectiveFloor)\n        }	-p singlefs-harness --lib -- model_comparison::tests::each_rollback_candidate_exclusion	each_rollback_candidate_exclusion_and_the_version_without_file_map_to_their_own_reasons
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2h）：分配器用户数据那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出	crates/singlefs-core/src/allocator.rs	            DeviceAgreement::Agreed(slot) => slot,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);	            DeviceAgreement::Agreed(slot) => slot,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices: Vec::new() });	-p singlefs-harness --test second_transaction_supplement_three_random_history -- unit_area_wall_sampling	unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2i）：分配器用户数据那一处把「小盘写满」报成「每块盘上都没有」；等大的小盘走不到，不等盘那条用例判出	crates/singlefs-core/src/allocator.rs	            DeviceAgreement::SomeDevicesWithoutAnswer(full_devices) => {\n                return Err(\n                    PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices },\n                );\n            }\n            DeviceAgreement::AnswersDiffer(slot_per_device) => {	            DeviceAgreement::SomeDevicesWithoutAnswer(_full_devices) => {\n                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);\n            }\n            DeviceAgreement::AnswersDiffer(slot_per_device) => {	-p singlefs-harness --test second_transaction_supplement_two_unequal_devices -- filling_the_smaller_device	filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2j）：分配器提交内生块那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出	crates/singlefs-core/src/allocator.rs	            DeviceAgreement::Agreed(answer) => answer,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);	            DeviceAgreement::Agreed(answer) => answer,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices: Vec::new() });	-p singlefs-harness --test second_transaction_supplement_three_random_history -- unit_area_wall_sampling	unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4a）：根环转过之后回收门槛取「环里最旧有效根 + 1」；逼近分配记录墙那一段照跑 checker 判出	crates/singlefs-core/src/mount.rs	    oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.max(oldest))	    oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.max(if oldest.0 > 0 { CheckpointTxg(oldest.0 + 1) } else { oldest }))	-p singlefs-harness --test second_transaction_supplement_three_random_history -- allocation_record_wall_sampling	allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4b）：分配记录过 600 条之后记账「已分配」少记一槽；逼近分配记录墙那一段照跑 checker 判出	crates/singlefs-core/src/transaction.rs	            device_map.allocated_slots() * SLOT_BYTES,	            (device_map.allocated_slots() - u64::from(allocator.records().len() > 600)) * SLOT_BYTES,	-p singlefs-harness --test second_transaction_supplement_three_random_history -- allocation_record_wall_sampling	allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4b 同一处）：分配记录过 600 条之后记账「已分配」少记一槽；直接钉已分配统计的那条用例判出	crates/singlefs-core/src/transaction.rs	            device_map.allocated_slots() * SLOT_BYTES,	            (device_map.allocated_slots() - u64::from(allocator.records().len() > 600)) * SLOT_BYTES,	-p singlefs-harness --test second_transaction_step_one_overwrite -- allocated_statistic_equals	allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条的改法）：「已知红第 0 条那一形只记不停」退回成判红就停；逼近分配记录墙那一段走不到墙	crates/singlefs-harness/src/history.rs	                if !continues_past_the_ring_turn_form {\n                    return Some(observation);\n                }	                if true || !continues_past_the_ring_turn_form {\n                    return Some(observation);\n                }	-p singlefs-harness --test second_transaction_supplement_three_random_history -- allocation_record_wall_sampling	allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1c；要带调试符号的构建，函数改名会悄悄失效）：只在抬 F 路径的准入里多算一个角色；抬 F 逼近墙的写死用例判出	crates/singlefs-core/src/transaction.rs	        records_before_this_publish + rewritten.len() * allocator.devices.len();	        records_before_this_publish + (rewritten.len() + usize::from(std::backtrace::Backtrace::force_capture().to_string().contains("raise_rollback_floor"))) * allocator.devices.len();	-p singlefs-harness --test second_transaction_supplement_three_random_history -- raising_the_floor_with_a_second_empty_publish	raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds
+> 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1d；要带调试符号的构建，函数改名会悄悄失效）：只在回退路径的准入里多算一个角色；回退逼近墙的写死用例判出	crates/singlefs-core/src/transaction.rs	        records_before_this_publish + rewritten.len() * allocator.devices.len();	        records_before_this_publish + (rewritten.len() + usize::from(std::backtrace::Backtrace::force_capture().to_string().contains("mount_rollback"))) * allocator.devices.len();	-p singlefs-harness --test second_transaction_supplement_three_random_history -- rolling_back_to_a_root_whose_warm_up	rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds
+diff -r -x target -x '*.pristine' /tmp/claude-1000/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness/src/history.rs crates/singlefs-harness/src/history.rs
+467c467,468
+<     /// 让逼近 812 条时的条数落在不同的余数上——墙的「差一」只在某次准入之后正好 812 条时分得出。配 `PerStepChecker::Skipped` 跑。
+---
+>     /// 让逼近 812 条时的条数落在不同的余数上——墙的「差一」只在某次准入之后正好 812 条时分得出。配
+>     /// `PerStepChecker::RunContinuingPastTheRingTurnForm` 跑（第二轮判决第三节第 3 条；第一轮配的是 `Skipped`）。
+3104,3106c3105,3111
+<     let outcomes =
+<         execute_history_with(&shrunk_history, execution, &SharedStream::new(), &mut |_| {})
+<             .outcomes;
+---
+>     let outcomes = execute_history_with(
+>         &shrunk_history,
+>         execution,
+>         &SharedStream::new(),
+>         &mut |_| {},
+>     )
+>     .outcomes;
+diff -r -x target -x '*.pristine' /tmp/claude-1000/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
+583c583
+< /// 逐版核；过 600 条的版本 13 个（第 37–49 次覆盖写：612、628 … 804 条）。
+---
+> /// 逐版核；过 600 条的版本 13 个（第 37–49 次覆盖写：612、628 … 804 条）。每一次覆盖写接着上一版，次序本身就是被测对象，不切片并行。
+diff -r -x target -x '*.pristine' /tmp/claude-1000/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+300,301c300,301
+< fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count(
+< ) {
+---
+> fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count()
+> {
+546a547
+> /// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
+597c598
+< /// 那一版的真条数（794 + 10 + 8）判「模型说该成、实现拒了」。
+---
+> /// 那一版的真条数（794 + 10 + 8）判「模型说该成、实现拒了」。一段历史每一步接着上一步的盘面，不切片并行。
+599c600,601
+< fn rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds() {
+---
+> fn rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds()
+> {

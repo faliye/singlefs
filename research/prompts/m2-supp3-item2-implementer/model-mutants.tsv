@@ -1,0 +1,7 @@
+# 模型自己的变异：名字、文件、原文、替换文（\n 表示换行）；跑 harness 的 lib 测试二进制
+M1-capacity	crates/singlefs-harness/src/model.rs	    DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET	    DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET - 1
+M2-fourth-non-empty	crates/singlefs-harness/src/model.rs	match non_empty_txgs.get(3) {	match non_empty_txgs.get(2) {
+M3-floor-candidate	crates/singlefs-harness/src/model.rs	if target.checkpoint_txg < self.effective_rollback_floor() {	if target.checkpoint_txg <= self.effective_rollback_floor() {
+M4-effective-floor-max	crates/singlefs-harness/src/model.rs	        highest_floor_per_device\n            .values()\n            .copied()\n            .min()	        highest_floor_per_device\n            .values()\n            .copied()\n            .max()
+M5-generation	crates/singlefs-harness/src/model.rs	&& record.generation == *written_at	&& record.generation >= *written_at
+M6-import-core	crates/singlefs-harness/src/model.rs	use std::rc::Rc;	use std::rc::Rc;\nuse singlefs_core as _;

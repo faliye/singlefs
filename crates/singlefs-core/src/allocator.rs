@@ -713,7 +713,8 @@ impl PoolAllocator {
         }
     }
 
-    /// 用户数据：见 `try_allocate_user_data`；拒绝的原因在这里丢掉，发布路径把 `None` 报成装不下。
+    /// 用户数据：见 `try_allocate_user_data`；拒绝的原因在这里丢掉，只给不看原因的调用方（测试里「一定分得到」的那几处）。
+    /// 发布路径调 `try_allocate_user_data`，按原因报（`PublishError::PlacementRefused`）。
     pub fn allocate_user_data(&mut self, generation: CheckpointTxg) -> Option<Placement> {
         self.try_allocate_user_data(generation).ok()
     }
@@ -760,7 +761,8 @@ impl PoolAllocator {
         Ok(placement)
     }
 
-    /// 提交内生块：见 `try_allocate_commit_generated`；拒绝的原因在这里丢掉，发布路径把 `None` 报成装不下。
+    /// 提交内生块：见 `try_allocate_commit_generated`；拒绝的原因在这里丢掉，只给不看原因的调用方（测试里「一定分得到」的那几处）。
+    /// 发布路径调 `try_allocate_commit_generated`，按原因报（`PublishError::PlacementRefused`）。
     pub fn allocate_commit_generated(
         &mut self,
         footprint: UnitFootprint,

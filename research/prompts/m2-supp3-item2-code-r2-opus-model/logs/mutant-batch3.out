@@ -1,0 +1,20 @@
+Sat Sep 19 04:44:17 PM UTC 2026
+## m4a-reclaim-one-past-oldest-after-ring-turn
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.09s
+GATE74-BINARY-EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=224 steps=150 observe=true: new_findings=0 probe_checker_red=120
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 65.60s
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=0 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 81.92s
+EXTRA-EXIT 0
+## m4b-allocated-stat-short-above-600-records
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.11s
+GATE74-BINARY-EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=224 steps=150 observe=true: new_findings=0 probe_checker_red=224
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.89s
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=0 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 74.95s
+EXTRA-EXIT 0
+Sat Sep 19 04:49:11 PM UTC 2026

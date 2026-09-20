@@ -1,0 +1,11 @@
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B1）：内容正好装满载荷容量也报装不下：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B2）：回退到 txg = F_生效 的根也拒：rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_that_version 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B3）：抬 F 上限不取第 4 新的非空根（只取每盘最新有效根）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B5）：非空判定恒真（空发布也算非空）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：载荷容量少算一字节：content_of_exactly_the_payload_capacity_is_accepted_and_one_byte_more_is_refused 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：抬 F 上限取第 3 新的非空根：the_ceiling_is_the_fourth_newest_non_empty_root_capped_by_the_newest_root_on_every_device 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：txg = F_生效 的回退目标判成低于 F：rollback_to_the_effective_floor_is_accepted_and_abandons_the_newer_roots_of_that_instance 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：F_生效取各盘最大 F 的最大（只一块盘带新 F 也生效）：a_raised_floor_carried_by_one_device_only_does_not_take_effect 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：分配代只要不小于写它的那次发布就算对：a_carried_unit_keeps_the_generation_of_the_publish_that_wrote_it 红了
+  ✓ 增补 3 第 2 件（理想模型自身，D13 已定项 5）：模型模块 use 了 singlefs_core：the_model_module_uses_only_the_standard_library_and_the_format_constants 红了
+  ✓ crates 变异表复跑：10 条变异各自红在点名的测试上（原文都恰好命中一次）

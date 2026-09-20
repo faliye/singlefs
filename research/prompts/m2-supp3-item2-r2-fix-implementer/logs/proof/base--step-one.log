@@ -1,0 +1,19 @@
+   Compiling singlefs-harness v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running tests/second_transaction_step_one_overwrite.rs (target/debug/deps/second_transaction_step_one_overwrite-1ec8abe29c834558)
+
+running 11 tests
+test content_larger_than_a_data_unit_payload_is_refused_before_anything_is_touched ... ok
+test release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_instead_of_panicking ... ok
+test overwrite_publishes_the_second_version_through_the_same_commit_shape ... ok
+test release_rewrites_the_first_versions_records_and_accounting_moves_them_into_the_defer_queue ... ok
+test publish_running_out_of_space_midway_leaves_the_allocator_as_it_was ... ok
+test released_placements_are_not_handed_out_again_before_reclaim_exists ... ok
+test damage_probes_after_the_overwrite_tell_the_new_unit_from_the_released_one ... ok
+test release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not_released ... ok
+test cold_start_reads_the_second_content_and_the_pool_checker_stays_green ... ok
+test allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records ... ok
+test repeated_overwrites_report_a_full_allocation_node_instead_of_panicking ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+

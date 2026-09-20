@@ -1,7 +1,8 @@
 //! 里程碑「第二个事务」增补 2 收进来的 C368（分配器落点只看盘 0，盘不等大时断言失败）：D2（RAID 条带策略） 已定项 2「各盘不必等大」，
 //! D3（空间分配） 已定项 8 第 1 条「在每一块被选中的设备上各自取该设备内」。
 //! 两块不等大的盘（盘 0 4 GiB、盘 1 3 GiB 加 33 槽）：mkfs、第一个事务、可写挂载今天都接受；填到小盘单元区末尾之后，
-//! 分配按设备取落点，小盘答不出就在动任何状态之前拒绝、发布报 `NoSpaceFor`，不 panic、一个写都不发。
+//! 分配按设备取落点，小盘答不出就在动任何状态之前拒绝、发布报 `PlacementRefused` 并带着分配器的原因（不再一律报装不下），
+//! 不 panic、一个写都不发。
 //! 另钉两个第一版不支持、没有条款的分支（拒绝成员的名字说哪条没定）：各盘给提交内生块的去处不同（一块开段一块回落，D3 已定项 8 待办 ①）；
 //! 各盘的用户数据落点不同（`Placement` 两盘同槽）。
 //!
@@ -229,7 +230,7 @@ fn try_overwrite(pool: &mut UnequalPool) -> Result<TransactionOutput, PublishErr
 
 /// C368 的验收：小盘单元区末尾那一对偶数槽在两块盘上都空时，用户数据按设备取、两块盘都落在那里；之后小盘一个空槽都没有、
 /// 大盘在小盘末尾之后还有 1 万多个槽——用户数据、一槽节点、两槽容器都拒成「小盘满了、设备集合怎么选没有条款」，分配器一样没动；
-/// 走发布路径报 `NoSpaceFor`（数据单元先分配），录制流一步都不多、分配器退回。只看盘 0 的写法在这里 panic（小盘越界）。
+/// 走发布路径报 `PlacementRefused`（数据单元先分配），原因照样是小盘满了，录制流一步都不多、分配器退回。只看盘 0 的写法在这里 panic（小盘越界）。
 #[test]
 fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking(
 ) {
@@ -296,16 +297,19 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
 
     let operations_before = pool.stream.operations().len();
     let refused = try_overwrite(&mut pool);
-    assert!(
-        matches!(
-            refused,
-            Err(PublishError::NoSpaceFor {
-                unit: TransactionUnit::Data
-            })
+    match &refused {
+        Err(PublishError::PlacementRefused {
+            unit: TransactionUnit::Data,
+            refusal,
+        }) => assert_eq!(
+            *refusal,
+            PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined {
+                full_devices: vec![DeviceIdentity(1)],
+            },
+            "发布层报的是分配器的原因（小盘满了），不是一律报装不下"
         ),
-        "{:?}",
-        refused.as_ref().err()
-    );
+        other => panic!("数据单元的落点该被拒：{:?}", other.as_ref().err()),
+    }
     assert_eq!(
         pool.stream.operations().len(),
         operations_before,
@@ -316,7 +320,7 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
 
 /// 各盘给提交内生块的去处不同：小盘单元区里只剩末尾三个槽、一个全空段都没有 ⇒ 小盘回落到 196638；大盘在小盘末尾之后还有全空段 ⇒
 /// 开段 196672。各盘上的聚簇段要不要对齐没有条款（D3（空间分配） 已定项 8 待办 ①），拒成那个成员、分配器不动；发布里数据单元两块盘
-/// 同落 196638，extent 树根在这里被拒 ⇒ `NoSpaceFor`，录制流一步都不多。
+/// 同落 196638，extent 树根在这里被拒 ⇒ `PlacementRefused`、原因是各盘去处不同，录制流一步都不多。
 #[test]
 fn devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written(
 ) {
@@ -358,16 +362,19 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
 
     let operations_before = pool.stream.operations().len();
     let refused = try_overwrite(&mut pool);
-    assert!(
-        matches!(
-            refused,
-            Err(PublishError::NoSpaceFor {
-                unit: TransactionUnit::ExtentRoot
-            })
+    match &refused {
+        Err(PublishError::PlacementRefused {
+            unit: TransactionUnit::ExtentRoot,
+            refusal,
+        }) => assert!(
+            matches!(
+                refusal,
+                PlacementRefusal::CommitGeneratedPlacementsDifferAcrossDevicesSegmentAlignmentUndefined { .. }
+            ),
+            "发布层报的是分配器的原因（各盘去处不同），不是一律报装不下：{refusal:?}"
         ),
-        "{:?}",
-        refused.as_ref().err()
-    );
+        other => panic!("extent 树根的落点该被拒：{:?}", other.as_ref().err()),
+    }
     assert_eq!(
         pool.stream.operations().len(),
         operations_before,
@@ -377,7 +384,8 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
 }
 
 /// 各盘的用户数据落点不同（等大的池，只在盘 0 上隔离 50182–50183：只有拼出来的、两盘分配记录不对称的镜像走得到）：
-/// 盘 0 答 50184、盘 1 答 50182，`Placement` 两盘同槽装不下，拒成那个成员、分配器不动；覆盖写报 `NoSpaceFor`，盘上逐项不变。
+/// 盘 0 答 50184、盘 1 答 50182，`Placement` 两盘同槽装不下，拒成那个成员、分配器不动；覆盖写报 `PlacementRefused`、原因是各盘落点不同，
+/// 盘上逐项不变。
 #[test]
 fn user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written() {
     let mut pool = common::build_pool("supplement-two-user-data-disagree");
@@ -417,16 +425,22 @@ fn user_data_slots_that_differ_across_devices_are_refused_before_anything_is_wri
         },
         InstanceGeneration(1),
     );
-    assert!(
-        matches!(
-            refused,
-            Err(PublishError::NoSpaceFor {
-                unit: TransactionUnit::Data
-            })
+    match &refused {
+        Err(PublishError::PlacementRefused {
+            unit: TransactionUnit::Data,
+            refusal,
+        }) => assert_eq!(
+            *refusal,
+            PlacementRefusal::UserDataSlotsDifferAcrossDevicesPerDeviceSlotsUnsupported {
+                slot_per_device: vec![
+                    (DeviceIdentity(0), SlotNumber(50_184)),
+                    (DeviceIdentity(1), SlotNumber(50_182)),
+                ],
+            },
+            "发布层报的是分配器的原因（各盘落点不同），不是一律报装不下"
         ),
-        "{:?}",
-        refused.as_ref().err()
-    );
+        other => panic!("数据单元的落点该被拒：{:?}", other.as_ref().err()),
+    }
     assert_eq!(fingerprint(&pool.allocator), before, "失败的发布退回分配器");
     assert_eq!(
         disk_snapshot(&pool.memory_pool(), &pool.stream),

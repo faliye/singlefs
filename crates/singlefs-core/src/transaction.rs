@@ -24,7 +24,9 @@ use crate::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
     TreeIdentifier,
 };
-use crate::allocator::{AllocationRecord, Placement, PoolAllocator, UnitFootprint};
+use crate::allocator::{
+    AllocationRecord, Placement, PlacementRefusal, PoolAllocator, UnitFootprint,
+};
 use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
 use crate::journal::{back_chain_of, record_offset, JournalRecord, NamedUnit};
 use crate::make_filesystem::{
@@ -918,11 +920,16 @@ pub fn mapping_locations_for_key(
         .map(|(_, locations)| locations)
 }
 
-/// 发布能出的错：单元区放不下（哪一个单元没拿到落点），或底层块设备错。
+/// 发布能出的错：分配器给不出落点（哪一个单元、为什么）、两棵单节点树装不下、内容装不下、释放判定路径对不上，或底层块设备错。
 #[derive(Debug)]
 pub enum PublishError {
-    NoSpaceFor {
+    /// 分配器拒了这个单元的落点，`refusal` 原样带着分配器的原因：每块盘上都没有合政策的落点（容量不够）是 `NoFreeSlotOnAnyDevice`；
+    /// 小盘写满、各盘的落点不一致是第一版不支持的池形状（D2（RAID 条带策略） 已定项 2 ⚠️、已定项 10；D3（空间分配） 已定项 8），
+    /// 不是容量不够。此前这四种一律报成 `NoSpaceFor`（C368（分配器落点只看盘 0，盘不等大时断言失败） 仍欠的那一半；
+    /// 增补 3 第 2 件代码三方第一轮判决第三节第 2 条：胶水把它们都当成单元区墙）。
+    PlacementRefused {
         unit: TransactionUnit,
+        refusal: PlacementRefusal,
     },
     /// 分配记录树第一版只有一个节点，这次发布之后的记录数装不下（每次发布每盘加 8 条、释放只改写不删）。
     AllocationRecordsExceedOneNode {
@@ -1186,7 +1193,8 @@ pub fn publish_first_file<Device: BlockDevice>(
 /// 对象出生代与容器身份不改，改动计数取这次的 txg；上一版的八个落点经映射释放（进 defer 队列）。
 ///
 /// # Errors
-/// 释放判定路径查不到上一版的某个单元（`ReleaseNotInMapping` 一族）、空间不够、装不下、块设备报错，都原样交回。
+/// 释放判定路径查不到上一版的某个单元（`ReleaseNotInMapping` 一族）、落点被拒（`PlacementRefused`，带分配器的原因）、装不下、
+/// 块设备报错，都原样交回。
 pub fn publish_overwrite<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
@@ -1221,11 +1229,11 @@ pub fn publish_overwrite<Device: BlockDevice>(
 
 /// 发布一版：先做准入（内容装得进一个数据单元，再加 `publish_admission` 的两条），再释放上一版被换下的角色的落点、分配、装单元、
 /// 按 D16（发布语义） 已定项 7 的持久顺序落盘。准入之后任何一步失败，分配器退回到进来时的样子——这次发布没有成立，
-/// 释放与分配都不算数（第二轮攻方腿：`NoSpaceFor` 在释放之后、分配到一半返回，留下半新的池，拿同一个上一版重试撞断言）；
+/// 释放与分配都不算数（第二轮攻方腿：落点被拒（当时叫 `NoSpaceFor`）在释放之后、分配到一半返回，留下半新的池，拿同一个上一版重试撞断言）；
 /// 落盘那几步里失败的，这次已记的写进写入口的失败账（增补 2 第 20b 行，`PoolWriter::writes_of_failed_publishes`）。
 ///
 /// # Errors
-/// `ContentExceedsDataUnit`、`AllocationRecordsExceedOneNode`、`AccountingEntriesExceedOneNode`、释放判定路径的四种错、`NoSpaceFor`、块设备错。
+/// `ContentExceedsDataUnit`、`AllocationRecordsExceedOneNode`、`AccountingEntriesExceedOneNode`、释放判定路径的四种错、`PlacementRefused`、块设备错。
 pub fn publish_version<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     allocator: &mut PoolAllocator,
@@ -1587,12 +1595,15 @@ fn publish_admitted<Device: BlockDevice>(
     let mut slots: BTreeMap<TransactionUnit, SlotNumber> = BTreeMap::new();
     for identity in rewritten {
         let placement = match identity.placement() {
-            PlacementRule::UserData => allocator.allocate_user_data(txg),
+            PlacementRule::UserData => allocator.try_allocate_user_data(txg),
             PlacementRule::CommitGenerated(footprint) => {
-                allocator.allocate_commit_generated(footprint, txg)
+                allocator.try_allocate_commit_generated(footprint, txg)
             }
         };
-        let placement = placement.ok_or(PublishError::NoSpaceFor { unit: *identity })?;
+        let placement = placement.map_err(|refusal| PublishError::PlacementRefused {
+            unit: *identity,
+            refusal,
+        })?;
         slots.insert(*identity, placement.slot);
     }
     let slot_of = |identity: TransactionUnit| slots[&identity];

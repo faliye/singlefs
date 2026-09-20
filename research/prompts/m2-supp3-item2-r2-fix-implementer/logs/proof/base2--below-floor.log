@@ -1,0 +1,9 @@
+   Compiling singlefs-harness v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+
+running 1 test
+test rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.83s
+

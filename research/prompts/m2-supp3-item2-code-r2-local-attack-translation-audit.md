@@ -1,0 +1,34 @@
+# 翻译核对表：m2-supp3-item2-code-r2 本地攻方提示
+
+每行：英文项（提示里的编号）/ 原文文件:行 / 首稿缺的或错的（已补/已改） / 定稿怎么写。行号现查（`grep -n`），不从背景材料数。
+
+| 英文项 | 原文文件:行 | 首稿缺的/错的 | 定稿 |
+|---|---|---|---|
+| L1 | `crates/singlefs-core/src/transaction.rs:1326-1327` | 略去了括注「（三方代码第一轮攻方腿：第 50 次覆盖写 panic）」——这是这条检查为什么存在的历史出处，不是规则本身的限定词，删掉不改变「装不下就报错、不许走到断言」这句规则的取值；已在本行注明，未回补（本轮问题不问「这条检查的历史由来」） | "The allocation record tree's first version has only one node: if it does not fit after this publish, return an error here; this must not be allowed to reach the assertion inside the function that builds an index node. Release only overwrites a record, it does not add a new one; this publish adds one record per rewritten role per device." |
+| L2 | `crates/singlefs-harness/src/model.rs:1285-1289` | 首稿只译到 1287 行「数不出基数也不放行」为止，略去 1287-1289 括注（增补 3 第 2 件代码三方第一轮判决出处、攻方把墙的 `>` 改成 `>=` 那段历史证据）与 1289 整句「必须拒那一头（真条数装不下而实现做成了）不判：装不下还去写会 panic，由第 1 件判」。后一句是射程边界（这条真条数判据只管「该拒被判成该拒」这个方向，不管反方向），本轮 8 行事实表（T1-T8）与 6 个问题（a-f）没有一行问反方向（实现该拒却成功的情形），删掉不影响可答的问题；已在本行注明，未译入提示 | "The true-count side: the executor counts, on the mirror, using the checker's own parsing, the admission base, meaning the version named by the function root_whose_allocation_records_the_wall_counts, plus the count of records added per the admission rule for each publish in the plan up to that point, meaning one record per rewritten role per device, kept as the upper-bound admission by user decision on 2026-09-18; only once this exceeds 812 does it count as not fitting. If the true count is less than or equal to 812 and the implementation refused, that is a mismatch; if the base count cannot be determined, a refusal is not permitted either." |
+| F1 | `crates/singlefs-harness/src/model.rs:2004`（`assert_eq!(IdealModel::allocation_record_node_capacity(), 812);`） | 无缺漏；直接引用断言里的常量 812 | "the allocation record node capacity is asserted to equal 812" |
+| L3 | `crates/singlefs-core/src/mount.rs:123` | 无缺漏 | "There is no readable root slot for that (instance, txg) pair in the root ring: the candidate set is the roots that are in the root ring (decision D23, settled item 14)." |
+| L4 | `crates/singlefs-core/src/mount.rs:125` | 无缺漏 | "The txg is below the effective rollback floor F (decision D16, settled item 1, table row rollback candidate set: txg is greater than or equal to F effective)." |
+| L5 | `crates/singlefs-core/src/mount.rs:127-128` | 无缺漏；跨两行的一句话完整拼回 | "The instance table pointed to by the newest root has a row (i, Ti, Wi) for that instance, and the target's txg is greater than Ti: a root on an abandoned timeline (decision D23, settled item 14, table row judged still valid according to the instance table)." |
+| L6 | `crates/singlefs-core/src/mount.rs:130-131` | 无缺漏；D16 已定项 9 的括注从原文中段挪到「没有条款」之后，语序调整但三个分句（可以在候选集里/回退行要重写实例表/落点没有条款）与 D16 引用全部保留，未删字 | "That target version's tree table has 0 entries, meaning no file version has been published yet: by the first three rules it can be in the candidate set, but the rollback row has to rewrite the instance table, and there is no clause for where its placement is recorded on a version with no file version, since decision D16 settled item 9 only defines that an empty publish on a version with 0 tree table entries writes zero units; the first version does not support this." |
+| L7 | `crates/singlefs-harness/src/model.rs:243` | 无缺漏 | "The rollback target is not in the root ring (decision D23, settled item 14: the candidate set is the roots in the root ring)." |
+| L8 | `crates/singlefs-harness/src/model.rs:245` | 无缺漏 | "The rollback target's txg is below F effective (decision D16, settled item 1, table row rollback candidate set)." |
+| L9 | `crates/singlefs-harness/src/model.rs:247` | 无缺漏 | "The rollback target is on an abandoned timeline (decision D23, settled item 14: there is a row (i, Ti, Wi) with T greater than Ti)." |
+| L10 | `crates/singlefs-harness/src/model.rs:249` | 无缺漏 | "Rolling back to a root whose tree table has 0 entries: the rollback row has to rewrite the instance table, there is no clause for where its placement is recorded, the first version does not support this, per today's reading of the code." |
+| L11 | `crates/singlefs-core/src/allocator.rs:122` | 无缺漏 | "There is no placement that satisfies policy on any device." |
+| L12 | `crates/singlefs-core/src/allocator.rs:124-125` | 原文 ⚠️ 符号译成了词 "warning"，是转写符号本身、不是新增限定词（见下节「多出来的」表） | "Some devices have no placement that satisfies policy while other devices still do, meaning when devices are not equal in size the smaller device fills up first: the first version's device set is simply every device in the pool; warning, how to choose the currently writable device set once a smaller device is full is the undefined half of decision D2 settled item 2, there is no clause; the first version does not support this." |
+| L13 | `crates/singlefs-core/src/allocator.rs:127-128` | 无缺漏；「`Placement` 两盘同槽」译成「the placement structure uses the same slot number on both devices」，`Placement` 是代码里的结构体名，按规则 5 不写 Rust 路径分隔符，此处本来就不含双冒号，直接译名不加代码语法 | "The user-data placement each device works out from its own free-space map differs across devices: decision D3 settled item 8 requires each device to take its own placement, decision D2 settled item 10 requires one placement entry per replica, while the placement structure uses the same slot number on both devices and the publish path's placement entry carries only one slot number; the first version does not support this." |
+| L14 | `crates/singlefs-core/src/allocator.rs:132-133` | 无缺漏 | "After the open segment cannot hold it, the devices are given different destinations, meaning one device opens a new segment while another falls back, or they open different segments: whether the cluster segments on each device need to stay aligned is decision D3 settled item 8's open item number 1, there is no clause; the placement structure uses the same slot number on both devices; the first version does not support this." |
+| L15 | `crates/singlefs-harness/src/model.rs:235-236` | 无缺漏 | "The unit area cannot hold it (the admission check in decision D28 settled item 1; the model answers with an interval in which a refusal is permitted)." |
+
+## 提示里多出来的限定词（原文没有，本提示自己加的）
+
+| 位置 | 多出来的 | 为什么加 |
+|---|---|---|
+| L12 | 词 "warning" | 转写原文的 ⚠️ 符号本身，不添加新的限定含义；不转写会让「那一半没有条款」这句的强调记号消失 |
+| 背景段、术语表、Rule R1/R2、Note N1 全段 | 整段白话解释（publish/rewritten role/device/root/instance/rollback/placement 的定义；R1、R2 两条算术复述规则；N1 关于「可能没有匹配项」的提醒） | 原文条款本身不是为这道练习写的操作化算法或英文术语表；这些是本轮为了让题目「能落成数、能逐格判」而做的操作化改写与英文释义，提示第 2 节已明写「这些是为这次练习写的白话复述，不是逐字引用，与第 1 节分开看」，不冒充决策原文 |
+| Table T 全部数据（T1-T8 的具体数字与 reused_a_recycled_record 字段） | 全部为本轮攻方按 Rule R1 构造的合成取样点（T5、T6 除外，那两行数字取自仓里已有测试） | 任务要求造能落成数的取样点，覆盖恰好 811/812/813 与「复用已回收记录」两种取值；每行已标出数字来源（合成或某条已有测试） |
+
+## 没有走三方独立核实、本表只核「译得准不准」
+
+本核对表只核英文译文与原文逐字对不对得上，不核 L1-L15 与事实表本身该不该这样出题——出题设计是否覆盖了 M1、M2 该测的角度，由主 agent 与另外两条推论腿判。

@@ -1,0 +1,346 @@
+Sat Sep 19 11:19:16 PM UTC 2026
+  ✓ 逐盘核退回只核总数：placement_recorded_on_one_device_only_is_rejected_even_when_the_total_is_even 红了
+  ✓ 同盘槽号不核唯一：two_records_for_the_same_slot_on_the_same_device_are_rejected 红了
+  ✓ 步 3：I-3.8 判定恒真：checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_root 红了
+  ✓ 步 3：重建分配器时不把已释放的放进 defer 队列：remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version 红了
+  ✓ 步 4：回退行不带回退位：rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content 红了
+  ✓ 步 4：只写被退回的实例那一行、不写中间实例行：rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content 红了
+  ✓ 步 4：回退之后 jsn 接 R_old 那条之后（C340 的 P1，盖掉被抛弃发布的记录槽）：rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation 红了
+  ✓ 步 4：影子账一个槽都不隔离：without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_data_slots_and_a_recovery_onto_the_abandoned_root_reads_a_torn_unit 红了
+  ✓ 步 4：回退候选集不按实例表判（被抛弃时间线的根也能退到）：rolling_back_onto_an_abandoned_timeline_or_a_missing_root_is_refused 红了
+  ✓ 步 4：前缀第五条不判（回退行的 W 不封顶）：the_rollback_row_caps_the_prefix_of_the_chosen_roots_instance_at_its_high_water 红了
+  ✓ 步 4：checker 的 I-3.1 并集不按实例表排除被抛弃的根：rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content 红了
+  ✓ 步 5：回收不看释放代（复用窗口置 0）：remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version 红了
+  ✓ 步 5：抬 F 的上限不看第 4 新的非空根：raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused 红了
+  ✓ 步 5：抬 F 的空发布只推一次（F 只落在一块盘上）：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：复用时追加记录而不改写（同盘同槽两条）：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：checker 的候选集不按 F 收（F 之下的根照走）：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：F_生效 取各盘 F 最大值的最大值而不是最小值：one_device_carrying_the_floor_alone_does_not_take_effect_on_remount 红了
+  ✓ 步 3 三方第一轮：链首没锚点时不看 txg、无条件接上水位之上最小的一条：torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg 红了
+  ✓ 步 4：普通重开不隔离被抛弃根引用的槽（影子账只在回退那一次算）：rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keeps_the_isolation 红了
+  ✓ 步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效：roots_below_a_floor_carried_by_only_one_device_remain_rollback_candidates 红了
+  ✓ 步 5：回收门槛不看环里最旧有效根：reclaim_floor_takes_the_larger_of_the_effective_floor_and_the_oldest_valid_ring_root 红了
+  ✓ 步 4：影子账把被抛弃根账里已释放的落点也隔离：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：重建分配器时不认第 0 版树表单元（另一个进程里的第一个文件版本漏释放它）：rebuild_from_records_remembers_the_genesis_tree_table_until_it_is_released 红了
+  ✓ 步 4：影子账不豁免候选根引用的槽（保守读法）：rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content 红了
+  ✓ 步 4：被抛弃根的树表读不出时不计数：torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount 红了
+  ✓ 步 5：抬 F 之后不按新候选集重算影子账：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：影子账的豁免不看候选根的 txg 是否 ≥ F：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：抬 F 回收的槽不扣住、生效之前就能发出去：slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect 红了
+  ✓ 步 5：抬 F 生效之后不放开扣住的槽：raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it 红了
+  ✓ 步 5：没做过可写挂载的进程抬 F 时 panic 而不是报错：raising_the_floor_on_a_current_version_without_a_rewritten_instance_table_unit_is_refused_instead_of_panicking 红了
+  ✓ 步 5：抬 F 重算影子账时读不出账的被抛弃根不计数：raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable 红了
+  ✓ 步 5：提交内生块的 bump 游标不绕开开段之后才隔离或扣住的槽：commit_generated_bump_skips_a_slot_isolated_after_the_segment_was_opened 红了
+  ✓ 步 6：I-7.4 不判候选根引用的单元被复用或抹头：the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target 红了
+  ✓ 步 6：I-4.8 只看最新根、不看别的候选根：the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target 红了
+  ✓ 步 6：I-7.4 不在最新根上判、只看更早的候选根：reused_unit_referenced_only_by_the_newest_root_makes_the_reuse_invariant_red 红了
+  ✓ 步 5：「非空」退回按环里记录的事务号认（txg 14 的记录两份都坏了它就算空根，上限掉到 3）：torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling 红了
+  ✓ 步 5：「非空」的前一条取任意可读根（不排除被抛弃的根与 F 之下的根）：the_rollback_publish_is_compared_with_the_previous_valid_root_and_not_with_the_abandoned_root_before_it 红了
+  ✓ 步 5：「非空」只比 inode 树的根指针、不比 extent 树的：root_is_non_empty_when_either_user_visible_tree_pointer_differs_from_the_previous_valid_root 红了
+  ✓ 步 3：只做过 mkfs 的池重开后分配器不认 mkfs 写在单元区里的两个单元：writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold 红了
+  ✓ 步 3：只做过 mkfs 的池上零单元暖机的反向链写 0：writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold 红了
+  ✓ 步 3：零单元发布在记录与根之间少一道屏障：the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence 红了
+  ✓ 步 3：只做过 mkfs 的池重开后把 mkfs 实例表按 1 槽记：every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims 红了
+  ✓ 步 3：树表 0 条的一版上要写行时，拒绝挪到取号之后（超级块已写进新号才返回）：writable_mount_after_a_crash_right_after_acquiring_an_instance_is_refused_before_acquiring_again 红了
+  ✓ 步 4：回退到树表 0 条的根不在写之前拒绝：rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write 红了
+  ✓ 步 5：算抬 F 上限时有效根的树表读不出，按「树表里没有这两棵树」猜而不是拒绝：raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable 红了
+  ✓ 步 3：取号不核判定时算出的号（瞬时读错让判定与取号算出不同号，写进新号之后才发现）：transient_superblock_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write 红了
+  ✓ 第一个事务 步 1：mkfs 不核根环区域归属是不是第一版写死的 0 / 1 / 0：region_layout_other_than_zero_one_zero_is_refused_before_any_write 红了
+  ✓ 步 3：空池挂载不核形状是不是第一个事务那一种（新实例从 txg 1、jsn 1 起，写行与暖机落两块盘）：formatted_pool_mount_starting_after_a_leftover_record_is_refused_before_acquiring_an_instance 红了
+  ✓ 步 3：publish_first_file 不核上一版的记录是 txg 2、jsn 2：first_file_version_after_a_third_zero_unit_publish_is_refused_before_any_write 红了
+  ✓ 步 3：空池挂载的零单元暖机把回退下界写成 1（流与第一个事务那条不再逐项相同）：formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_first_transaction_stream 红了
+  ✓ 增补 1：发布路径漏计数据单元的写（第一个事务按种类的合计对不上录制器在设备一层记下的写）：first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table 红了
+  ✓ 增补 1：发布路径漏计实例表单元的写（写行发布按种类的合计对不上录制器）：writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_writes 红了
+  ✓ 增补 1：写入口漏计超级块槽的写（暖机按种类的合计对不上录制器）：first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table 红了
+  ✓ 增补 1：树表单元的写记到中央映射树名下（合计不变，按种类钉的字节表红）：first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table 红了
+  ✓ 增补 1：一次发布的账不减发布之前的写调用（发布前的取号写算进这次发布）：since_keeps_only_the_later_writes_and_total_adds_every_counted_kind 红了
+  ✓ 增补 1：真设备二进制的设备一层比对恒判相等：device_window_check_matches_only_when_both_write_calls_and_bytes_are_equal 红了
+  ✓ 增补 1：报数清单把根槽换成重复的 journal 记录（报出的各种之和对不上合计）：report_order_lists_every_kind_once_so_the_reported_kinds_add_up_to_the_total 红了
+  ✓ 增补 1：报数清单把根槽换成重复的 journal 记录（真设备二进制的结果行跟着错）：publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros 红了
+  ✓ 增补 1：真设备二进制的窗口计数取后一次快照的字节、不减前一次：pool_writes_between_adds_the_differences_of_every_device 红了
+  ✓ 增补 2：用户数据落点只取盘 0 的答案（C368：小盘写满之后越界 panic）：filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking 红了
+  ✓ 增补 2：提交内生块开段与回落只取盘 0 的答案（C368：小盘越界 panic）：filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking 红了
+  ✓ 增补 2：各盘给提交内生块的去处不同也不拒（D3 已定项 8 待办 ① 没条款的分支被定成取盘 0）：devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written 红了
+  ✓ 增补 2：各盘的用户数据落点不同也不拒（Placement 两盘同槽装不下）：user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written 红了
+  ✓ 增补 2：提交内生块拒绝之前先关开放段（拒绝动了分配器）：devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written 红了
+  ✓ 增补 2：提交内生块段耗尽不回落（C369）：publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_on_every_device 红了
+  ✓ 增补 2：提交内生块段耗尽不回落（抬 F 的空发布在唯一全空段被扣住时又报 NoSpaceFor）：raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_outside_the_hold 红了
+  ✓ 增补 2：回落只看已分配位（发出影子账隔离的槽）：fallback_skips_a_slot_isolated_by_the_shadow_ledger 红了
+  ✓ 增补 2：回落只看已分配位（抬 F 的空发布发出扣住的槽）：raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold_stays_in_the_process 红了
+  ✓ 步 0：崩溃镜像的记录提示漏掉基镜像里的记录（种进基镜像的残留记录恢复扫不到）：residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it 红了
+  ✓ 步 0：恢复把没有回退行的所选根也按 W = 0 封顶（前缀第五条误判，种进基镜像的残留记录不施加）：residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it 红了
+  ✓ 步 6：恢复从超级块 tail 起逐条验证记录的点名单元、失配即中止（E78 的自我中止形态）：stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state 红了
+  ✓ 步 6：I-3.8 的判定没跑到（层 0 报「不适用」，阴性结果与没跑到混在一起）：every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims 红了
+  ✓ 步 6：I-2.1 的判定没跑到（层 0 报「不适用」，阴性结果与没跑到混在一起）：every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims 红了
+  ✓ 步 6：层 0 计数不记「不适用」（评估过 + 不适用 ≠ 状态数）：every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims 红了
+  ✓ 增补 2 第 21 行：暖机把 jsn 计数器写成 txg（C366；接在 jsn 40 之后时记录落进 jsn 1、2 那两格、tail 写 2）：warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two 红了
+  ✓ 增补 2 第 19 行：出生序号发号器挪回每装一个文件对象重建一次（同一个 checkpoint 的第二个对象从 0 重数）：second_file_object_in_the_same_checkpoint_continues_birth_sequences_instead_of_restarting_at_zero 红了
+  ✓ 增补 2 第 28 行：记账树装不下不判（80 块盘走到装节点的断言 panic）：eightieth_device_overflows_the_accounting_node_and_the_publish_is_refused_before_anything_is_written 红了
+  ✓ 增补 2 第 28 行：记账树正好装满 477 行也判装不下（79 块盘发布被拒）：seventy_nine_devices_fill_the_accounting_node_exactly_and_still_publish 红了
+  ✓ 增补 2 第 30 行：真设备二进制的挂载窗口从重开那一刻算起（取号的两次超级块槽写进了设备一层的数、不在按种类的账里）：second_instance_mode_mounts_writes_the_row_warms_up_publishes_the_third_version_and_every_window_matches 红了
+  ✓ 增补 2 第 30 行：真设备二进制每道屏障都覆盖「第一道屏障」那份计数（挂载窗口从最后一道屏障算起）：second_instance_mode_mounts_writes_the_row_warms_up_publishes_the_third_version_and_every_window_matches 红了
+  ✓ 增补 2 第 20a 行：写行那次发布的准入不在取号之前算（取号之后发布才被拒，实例代号已经烧掉）：writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is_acquired 红了
+  ✓ 增补 2 第 20b 行：中途失败的发布不把这次已记的写交出去（与设备一层记的合计对不上）：publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_adds_up 红了
+  ✓ 增补 2 第 20c 行：用户数据只排除当前那一个开放段（回落把开放段置空之后，那一段对用户数据开放）：user_data_does_not_land_in_a_cluster_segment_that_the_fallback_closed 红了
+  ✓ 收口表第 22 行 C22（刚释放的块立即重分配）：候选根那一格不判 I-4.8（复用窗口置 0 之后 I-4.8 不红）：reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red 红了
+  ✓ 增补 2 第 20a 行：取号之前只算写行那一次，暖机那几次空发布不算（写行发完、暖机才被拒，实例代号已经烧掉）：writable_mount_whose_first_warm_up_publish_does_not_fit_is_refused_before_the_instance_is_acquired 红了
+  ✓ 增补 2 第 20a 行：取号之前只把第一次暖机算进去（写行装得下、暖机第 2 次装不下的池照样放行）：writable_mount_whose_second_warm_up_publish_does_not_fit_is_refused_before_the_instance_is_acquired 红了
+  ✓ 增补 2 第 11 行：第一个事务的改动计数写回 1（字段表定义是最后一次改动所在发布的 checkpoint_txg = 3）：inode_and_extent_lookups_from_the_root_read_the_first_file_back 红了
+  ✓ C374 I-3.9：释放代的区间判据整条拿掉（判定恒真）：each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了
+  ✓ C374 I-9.14：树表条目诞生 txg 跨根相等的判定恒真：each_c374_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了
+  ✓ E142 量 5：sha256 轮常量改一位：sha256_matches_the_published_test_vectors 红了
+  ✓ E142 量 5：区域清单换行序：the_region_table_lists_the_twenty_one_registered_regions_in_order 红了
+  ✓ E142 量 5：数据单元那一行少算一槽：the_region_table_matches_the_writes_the_first_transaction_really_issues 红了
+  ✓ E142 量 5：写入时刻改取系统时钟：running_the_same_pipeline_twice_gives_byte_identical_result_lines 红了
+  ✓ E142 量 5：区域摘要不罩内容：flipping_one_bit_of_the_change_count_moves_only_that_regions_digest 红了
+  ✓ Z1-d：复用时新记录罩住的已回收记录不删（I-5.4 要红）：reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds 红了
+  ✓ Z1-d：新落点罩住没回收的记录不断言：placement_over_record_that_was_not_reclaimed_is_asserted_on_the_records 红了
+  ✓ I-5.4：checker 判不出分配记录重叠：an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant 红了
+  ✓ I-5.4：只判最新根那棵账：an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant 红了
+  ✓ Z1-a：取号之前不算实例表：writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition 红了
+  ✓ Z1-a：实例表准入漏算链指针：writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_before_acquisition 红了
+  ✓ Z1-a：实例表准入把正好写满一片也拒掉：mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it 红了
+  ✓ Z1-a：实例表准入按每次挂载只写一行算：mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflow_it 红了
+  ✓ 增补 3 第 1 件：随机历史快档判出「复用时追加记录而不改写」（第 41 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 1 件：随机历史偏向抬 F 之后复用的取样点判出「复用时新记录罩住的已回收记录不删」（第 121 行同一处）：reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms 红了
+  ✓ 增补 2 第 41 行 层 0 并行：丢掉第一片（状态数等于闭式的断言要红）：every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims 红了
+  ✓ 增补 2 第 41 行 层 0 并行：相邻两片重叠（状态数等于闭式的断言要红）：every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims 红了
+  ✓ 增补 2 第 41 行 层 0 并行：相邻两片重叠（切片单测）：state_slices_cover_every_state_exactly_once_in_ordinal_order 红了
+  ✓ 增补 2 第 41 行 层 0 并行：按序号取状态时段内子集掩码取反：the_state_plan_hands_out_the_same_persisted_sets_in_the_same_order_as_walking_segment_by_segment 红了
+  ✓ 增补 2 第 41 行 层 0 并行：并片时第一处违例取后面那一片的：one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread 红了
+  ✓ 增补 2 第 41 行 层 0 并行：并片时 checker 每条不变量的第一处违例取后面那一片的：absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation 红了
+  ✓ 增补 2 第 41 行 层 0 并行：不读 SINGLEFS_LAYER0_THREADS：worker_threads_come_from_the_environment_variable_before_available_parallelism 红了
+  ✓ 增补 2 第 41 行 层 0 并行：SINGLEFS_LAYER0_THREADS=0 悄悄退回 1 个线程：zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back 红了
+  ✓ 增补 3 第 1 件（代码三方第一轮第 1 条）：已知红第 1 条不看 F 是否落在回退留下的空档里：an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding 红了
+  ✓ 增补 3 第 1 件（代码三方第一轮第 3 条）：随机历史快档判出「复用改写已回收记录时不改分配代」（N2）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 1 件（代码三方第一轮第 4 条）：随机历史快档判出「checker 判绿的镜像上冷启动读回报错」（B6：补齐字节从最后一个载荷字节算起）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 2 第 41 行 层 0 并行（代码三方第一轮 Y5m2）：并片时「不看 journal 那一遍的第一处」取后面那一片的：absorbing_a_following_slice_keeps_the_earlier_first_ignored_violation_when_both_slices_have_one 红了
+  ✓ 增补 3 第 1 件（代码三方第二轮第 1 条，形态 a）：只在挂载写出的写行与暖机里复用改写已回收记录时不改分配代：row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked 红了
+  ✓ 增补 3 第 1 件（代码三方第二轮第 1 条，形态 b）：挂载写出的写行与暖机里每次分配的分配代记成 txg − 1：row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked 红了
+  ✓ 增补 3 第 1 件（代码三方第二轮第 2 条，几何补取样点）：随机历史快档也判出「复用时新记录罩住的已回收记录不删」（第 121、130 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B1）：内容正好装满载荷容量也报装不下：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B2）：回退到 txg = F_生效 的根也拒：rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_that_version 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B3）：抬 F 上限不取第 4 新的非空根（只取每盘最新有效根）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型，r1 攻方变异 B5）：非空判定恒真（空发布也算非空）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：载荷容量少算一字节：content_of_exactly_the_payload_capacity_is_accepted_and_one_byte_more_is_refused 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：抬 F 上限取第 3 新的非空根：the_ceiling_is_the_fourth_newest_non_empty_root_capped_by_the_newest_root_on_every_device 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：txg = F_生效 的回退目标判成低于 F：rollback_to_the_effective_floor_is_accepted_and_abandons_the_newer_roots_of_that_instance 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：F_生效取各盘最大 F 的最大（只一块盘带新 F 也生效）：raised_floor_carried_by_one_device_only_does_not_take_effect 红了
+  ✓ 增补 3 第 2 件（理想模型自身）：分配代只要不小于写它的那次发布就算对：carried_unit_keeps_the_generation_of_the_publish_that_wrote_it 红了
+  ✓ 增补 3 第 2 件（理想模型自身，D13 已定项 5）：模型模块 use 了 singlefs_core：the_model_module_uses_only_the_standard_library_and_the_format_constants 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条，攻方变异 W1）：分配记录墙差一，812 条正好装满也拒（> 写成 >=）；逼近墙的取样点判出：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条，攻方变异 W1 同一处）：分配记录墙差一；812 条那一格的边沿用例判出：an_overwrite_that_fills_the_allocation_node_to_exactly_812_records_succeeds_and_the_next_is_refused 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条的改法）：模型的分配记录墙只看沿来路的上界、不看镜像上的真条数：the_allocation_record_wall_is_permitted_only_when_the_counted_records_plus_this_publish_exceed_812 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条的改法）：抬 F 做完几次之后被墙拒，基数仍数这一步起点那一版：mount_and_raise_count_the_wall_from_the_version_their_admission_starts_from 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条的改法）：checker 数一条根下的分配记录只数一半：allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_without_a_file 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条，攻方变异 R1）：被抛弃时间线的根报成低于 F（只换判别字段）：rolling_back_onto_an_abandoned_root_above_the_floor_is_refused_for_being_abandoned 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条的改法）：胶水把回退目标「被抛弃」映射成「低于 F」：rolling_back_onto_an_abandoned_root_above_the_floor_is_refused_for_being_abandoned 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条，C368 仍欠的那一半）：发布层把分配器的落点拒绝一律报成「每块盘上都没有」：filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking 红了
+  ✓ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条的改法）：胶水把小盘写满、各盘落点不一致也映射成单元区墙：only_a_placement_refused_on_every_device_passes_as_the_unit_area_wall 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根（在候选集里、第一版不支持）报成候选排除「低于 F」：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根报成候选排除「低于 F」；步 4 那条写死的用例判出：rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：候选排除「低于 F」报成「树表 0 条、第一版不支持」：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条的改法）：胶水把「树表 0 条、第一版不支持」映射成「低于 F」：each_rollback_candidate_exclusion_and_the_version_without_file_map_to_their_own_reasons 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2h）：分配器用户数据那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出：unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2i）：分配器用户数据那一处把「小盘写满」报成「每块盘上都没有」；等大的小盘走不到，不等盘那条用例判出：filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2j）：分配器提交内生块那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出：unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4a）：根环转过之后回收门槛取「环里最旧有效根 + 1」；逼近分配记录墙那一段照跑 checker 判出：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4b）：分配记录过 600 条之后记账「已分配」少记一槽；逼近分配记录墙那一段照跑 checker 判出：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4b 同一处）：分配记录过 600 条之后记账「已分配」少记一槽；直接钉已分配统计的那条用例判出：allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条的改法）：「已知红第 0 条那一形只记不停」退回成判红就停；逼近分配记录墙那一段走不到墙：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1c；要带调试符号的构建，函数改名会悄悄失效）：只在抬 F 路径的准入里多算一个角色；抬 F 逼近墙的写死用例判出：raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1d；要带调试符号的构建，函数改名会悄悄失效）：只在回退路径的准入里多算一个角色；回退逼近墙的写死用例判出：rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds 红了
+  ✓ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：候选排除「低于 F」报成「树表 0 条、第一版不支持」；回退到 F 之下的写死用例判出（门禁五段各只红 1 段）：rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor 红了
+  ✗ 有变异没红：
+      crates/mutations.tsv:8 空闲不随分配减（I-5.2 要红）：点名的测试 cold_start_reads_the_second_content_and_the_pool_checker_stays_green 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:9 释放时清位图（立即复用）：点名的测试 released_placements_are_not_handed_out_again_before_reclaim_exists 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:10 分配记录树装不下不判：点名的测试 repeated_overwrites_report_a_full_allocation_node_instead_of_panicking 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:11 释放退回按提示：点名的测试 release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not_released 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:12 映射查到 key 就算（落点指错不核记录）：点名的测试 release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_instead_of_panicking 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:13 失败的发布不退回分配器：点名的测试 publish_running_out_of_space_midway_leaves_the_allocator_as_it_was 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:14 内容超长不判：点名的测试 content_larger_than_a_data_unit_payload_is_refused_before_anything_is_touched 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:15 oracle 只比 txg 不比实例：点名的测试 landing_on_the_lower_instance_of_the_same_txg_is_a_violation 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib test) due to 1 previous error
+      crates/mutations.tsv:16 oracle 只按 txg 找版本：点名的测试 the_same_txg_from_two_instances_are_two_versions 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib test) due to 1 previous error
+      crates/mutations.tsv:17 oracle 放过没版本的更新根：点名的测试 newer_root_without_any_version_reporting_no_file_is_violation 没跑到（退出码 101）
+685 |             .find(|candidate_version| {
+    |                    ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_candidate_version`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `singlefs-harness` (lib test) generated 1 warning
+error: could not compile `singlefs-harness` (lib test) due to 1 previous error; 1 warning emitted
+      crates/mutations.tsv:18 Ignore 那一遍恢复不过 oracle：点名的测试 targeted_controls_on_the_second_publish_go_red_where_they_should 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:19 步 1 变异：不释放旧落点：点名的测试 release_rewrites_the_first_versions_records_and_accounting_moves_them_into_the_defer_queue 没跑到（退出码 101）
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:20 步 1 变异：defer 行写 0：点名的测试 release_rewrites_the_first_versions_records_and_accounting_moves_them_into_the_defer_queue 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:21 步 1 变异：事务号不加一：点名的测试 overwrite_publishes_the_second_version_through_the_same_commit_shape 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:22 步 1 变异：改动计数留 1：点名的测试 overwrite_publishes_the_second_version_through_the_same_commit_shape 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:23 步 2 变异：已分配行不随分配更新（I-3.1 要红）：点名的测试 cold_start_reads_the_second_content_and_the_pool_checker_stays_green 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:24 步 2 变异：忘了改写分配记录：点名的测试 release_rewrites_the_first_versions_records_and_accounting_moves_them_into_the_defer_queue 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:25 步 3：不写行（实例表照抄）：点名的测试 remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:26 步 3：暖机只推一次：点名的测试 damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_other_device 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:27 步 3：前缀跨实例边界（把别的实例的记录也接上）：点名的测试 layer0_partial_enumeration_skipping_the_eighteen_write_segment_matches_the_full_tally_shape 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+      crates/mutations.tsv:28 步 3：链首锚点错一位（接在所选根自己那条记录之后第二条）：点名的测试 stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row 没跑到（退出码 101）
+error[E0432]: unresolved import `singlefs_checker::walk::allocation_record_count_under_root`
+  --> crates/singlefs-harness/src/history.rs:22:30
+   |
+22 | use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `allocation_record_count_under_root` in `walk`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `singlefs-harness` (lib) due to 1 previous error
+     → 怎么办：没红 = 那处改法没有任何测试守着：先造一条会红的用例再改代码（show-me-test.md）；「没跑到」多半是 cargo test 参数或测试名写错，或者副本里缺它要读的文件。
+exit=1
+Sat Sep 19 11:33:12 PM UTC 2026

@@ -1,0 +1,45 @@
+cargo test -p singlefs-harness --test second_transaction_supplement_two_unequal_devices
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-supp3-item2-fix-implementer/copies/core-placement/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-supp3-item2-fix-implementer/copies/core-placement/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-supp3-item2-fix-implementer/copies/core-placement/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item2-fix-implementer/copies/core-placement/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.21s
+     Running tests/second_transaction_supplement_two_unequal_devices.rs (target/debug/deps/second_transaction_supplement_two_unequal_devices-927c7e16a1fb9102)
+
+running 3 tests
+test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... FAILED
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... FAILED
+test filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking ... FAILED
+
+failures:
+
+---- user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written stdout ----
+
+thread 'user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written' (3826766) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_unequal_devices.rs:432:15:
+assertion `left == right` failed: 发布层报的是分配器的原因（各盘落点不同），不是一律报装不下
+  left: NoFreeSlotOnAnyDevice
+ right: UserDataSlotsDifferAcrossDevicesPerDeviceSlotsUnsupported { slot_per_device: [(DeviceIdentity(0), SlotNumber(50184)), (DeviceIdentity(1), SlotNumber(50182))] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written stdout ----
+
+thread 'devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written' (3826764) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_unequal_devices.rs:369:15:
+发布层报的是分配器的原因（各盘去处不同），不是一律报装不下：NoFreeSlotOnAnyDevice
+
+---- filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking stdout ----
+
+thread 'filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking' (3826765) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_unequal_devices.rs:304:15:
+assertion `left == right` failed: 发布层报的是分配器的原因（小盘满了），不是一律报装不下
+  left: NoFreeSlotOnAnyDevice
+ right: SomeDevicesFullDeviceSetSelectionUndefined { full_devices: [DeviceIdentity(1)] }
+
+
+failures:
+    devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written
+    filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking
+    user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_unequal_devices`
+exit 101

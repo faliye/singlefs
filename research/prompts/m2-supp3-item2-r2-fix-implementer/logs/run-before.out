@@ -1,0 +1,15 @@
+Sat Sep 19 05:34:28 PM UTC 2026
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item2-r2-fix-implementer/copies/before/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.04s
+  Executable tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+exit 0
+── 随机历史：偏向抬 F 之后回退的取样点 ──
+用时 32.4 秒
+── 随机历史：偏向抬 F 之后复用的取样点 ──
+用时 43.2 秒
+── 随机历史：逼近分配记录墙的取样点 ──
+用时 45.6 秒
+── 随机历史快档 ──
+用时 51.2 秒
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 51.18s
+Sat Sep 19 05:35:21 PM UTC 2026

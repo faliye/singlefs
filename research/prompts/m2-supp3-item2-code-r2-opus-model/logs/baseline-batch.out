@@ -1,0 +1,20 @@
+Sat Sep 19 03:48:03 PM UTC 2026
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=0 seeds=32 steps=150 observe=true: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=480 steps=150 observe=true: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=0 seeds=2000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=2000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=1000 steps=300 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、只覆盖写与可写挂载 first=0 seeds=1000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=各类操作都抽（快档、大档） first=0 seeds=1000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=偏向抬 F 之后回退（B2 那一格的取样点） first=0 seeds=1000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+PROBE SUMMARY weights=偏向抬 F 之后的复用（第 121 行那一类的取样点） first=0 seeds=1000 steps=150 observe=false: new_findings=0 probe_checker_red=0
+EXIT 0
+Sat Sep 19 04:35:31 PM UTC 2026

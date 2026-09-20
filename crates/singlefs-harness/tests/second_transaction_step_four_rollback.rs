@@ -12,7 +12,8 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, InstanceRow, MountError, Mounted, RollbackTarget, ShadowLedger,
+    mount_rollback, mount_writable, InstanceRow, MountError, Mounted, RollbackCandidateExclusion,
+    RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
     choose_root, choose_superblock, recover, replay_journal, scan_journal, JournalPolicy,
@@ -82,7 +83,8 @@ fn build_through_third_publish(tag: &str) -> BuiltPool {
 }
 
 /// 回退到树表 0 条的根（第一个事务里 txg 2 的暖机根），第一版不支持（设计没定），在任何写之前拒绝：第一个事务之后进程退出、重开回退到 (1, 2)
-/// ⇒ 返回 `RollbackToVersionWithoutFileUnsupported`；两盘超级块槽逐字节不变、根环没有新根、录制流一步都没多。
+/// ⇒ 返回 `RollbackToVersionWithoutFileUnsupported`（它在回退候选集里，不报候选排除；增补 3 第 2 件代码三方第二轮判决第三节第 1 条）；
+/// 两盘超级块槽逐字节不变、根环没有新根、录制流一步都没多。
 #[test]
 fn rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write() {
     let mut pool = build_pool("step-four-rollback-to-warm-up-root");
@@ -286,27 +288,32 @@ fn rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_r
     }
 }
 
-/// 回退候选集（D23 已定项 14）：实例表里有行 (i, Ti, Wi) 的实例，只有 T ≤ Ti 的根可选——B 的根 (1, 4) 与 C 的根 (2, 8) 都是被抛弃时间线的；
-/// 根环里没有的 (1, 42) 另报。
+/// 回退候选集（D23 已定项 14）：实例表里有行 (i, Ti, Wi) 的实例，只有 T ≤ Ti 的根可选——B 的根 (1, 4) 与 C 的根 (2, 8) 都是被抛弃时间线的
+/// （F 还是 0，不低于 F），报 `OnAbandonedTimeline`；根环里没有的 (1, 42) 报 `NotInRing`。调用方按这个字段分流，不看文字。
 #[test]
 fn rolling_back_onto_an_abandoned_timeline_or_a_missing_root_is_refused() {
     let mut pool = build_through_third_publish("step-four-refused");
     rollback_to_first_root(&mut pool, ShadowLedger::On);
+    let missing = RollbackTarget {
+        instance: InstanceGeneration(1),
+        checkpoint_txg: CheckpointTxg(42),
+    };
     for (target, expected) in [
         (
             RollbackTarget {
                 instance: InstanceGeneration(1),
                 checkpoint_txg: CheckpointTxg(4),
             },
-            "实例表里那个实例的行 T 更小：这是被抛弃时间线的根",
+            RollbackCandidateExclusion::OnAbandonedTimeline,
         ),
         (
             RollbackTarget {
                 instance: InstanceGeneration(2),
                 checkpoint_txg: CheckpointTxg(8),
             },
-            "实例表里那个实例的行 T 更小：这是被抛弃时间线的根",
+            RollbackCandidateExclusion::OnAbandonedTimeline,
         ),
+        (missing, RollbackCandidateExclusion::NotInRing),
     ] {
         let mut devices = pool.reopen_recorded();
         let refused = mount_rollback(&parameters(), &mut devices, target, ShadowLedger::On);
@@ -314,25 +321,14 @@ fn rolling_back_onto_an_abandoned_timeline_or_a_missing_root_is_refused() {
         match refused {
             Err(MountError::RollbackTargetNotACandidate {
                 target: reported,
-                reason,
-            }) => assert_eq!((reported, reason), (target, expected)),
+                exclusion,
+            }) => assert_eq!((reported, exclusion), (target, expected)),
             other => panic!(
                 "{target:?} 该被拒：{:?}",
                 other.map(|mounted| mounted.output.instance)
             ),
         }
     }
-    let mut devices = pool.reopen_recorded();
-    let missing = RollbackTarget {
-        instance: InstanceGeneration(1),
-        checkpoint_txg: CheckpointTxg(42),
-    };
-    let refused = mount_rollback(&parameters(), &mut devices, missing, ShadowLedger::On);
-    pool.devices = Some(devices);
-    assert!(
-        matches!(refused, Err(MountError::RollbackTargetNotInRing(reported)) if reported == missing),
-        "根环里没有 (1, 42)"
-    );
 }
 
 /// C314（回退可以复用被抛弃的根引用的单元） 那一格的必红，影子账开关强制进入：关掉影子账，回退之后再发两版文件，

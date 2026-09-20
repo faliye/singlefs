@@ -1,0 +1,23 @@
+--- ../repo/crates/singlefs-harness/src/history.rs	2026-09-19 11:49:11.928125586 +0000
++++ crates/singlefs-harness/src/history.rs	2026-09-19 16:46:47.220620148 +0000
+@@ -60,7 +60,7 @@
+ use crate::{RecordingBlockDevice, SharedStream};
+ 
+ /// 每块内存盘的字节数：与 `tests/common` 的文件镜像同宽。
+-pub const HISTORY_DEVICE_BYTES: u64 = 4 << 30;
++pub const HISTORY_DEVICE_BYTES: u64 = (50_176 + 384) * 16_384; // opus-r2 副本：单元区 384 槽的小盘（两块等大）
+ 
+ /// 历史里的一块盘：内存盘外面包录制器，写与屏障进调用方给的那条流。
+ pub type HistoryDevice = RecordingBlockDevice<SparseBlockDevice>;
+@@ -68,7 +68,10 @@
+ /// mkfs 与发布的参数：E142 装置那一份（物理块 512、io_min 512），与各步用例相同。
+ #[must_use]
+ pub fn history_parameters() -> MakeFilesystemParameters {
+-    e142_parameters(512, 512)
++    // opus-r2 副本：小盘上 journal 环缩到 128 MiB，不然 mkfs 要求盘 ≥ 4 × 768 MiB。
++    let mut parameters = e142_parameters(512, 512);
++    parameters.geometry.journal_ring_bytes = 128 << 20;
++    parameters
+ }
+ 
+ /// 一段历史的种子。

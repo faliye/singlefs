@@ -1,0 +1,63 @@
+B1 G1 40/96 MD { aspect: "模型说该成、实现拒了" }:40
+B1 G2 37/96 MD { aspect: "模型说该成、实现拒了" }:37
+B1 G3 48/96 MD { aspect: "模型说该成、实现拒了" }:48
+B1 G4 68/96 MD { aspect: "模型说该成、实现拒了" }:68
+B1 G5 38/96 MD { aspect: "模型说该成、实现拒了" }:38
+B1 G6 16/48 MD { aspect: "模型说该成、实现拒了" }:16
+B1 G7 16/48 MD { aspect: "模型说该成、实现拒了" }:16
+B1 G8 32/48 MD { aspect: "模型说该成、实现拒了" }:32
+B1 G9 25/96 MD { aspect: "模型说该成、实现拒了" }:25
+B2 G1 30/96 MD { aspect: "拒绝的理由" }:29; MD { aspect: "模型说该成、实现拒了" }:1
+B2 G2 25/96 MD { aspect: "拒绝的理由" }:25
+B2 G3 31/96 MD { aspect: "拒绝的理由" }:30; MD { aspect: "模型说该成、实现拒了" }:1
+B2 G4 2/96 MD { aspect: "拒绝的理由" }:2
+B2 G5 94/96 MD { aspect: "拒绝的理由" }:92; MD { aspect: "模型说该成、实现拒了" }:2
+B2 G6 46/48 MD { aspect: "拒绝的理由" }:46
+B2 G7 47/48 MD { aspect: "拒绝的理由" }:45; MD { aspect: "模型说该成、实现拒了" }:2
+B2 G8 2/48 MD { aspect: "拒绝的理由" }:2
+B2 G9 24/96 MD { aspect: "拒绝的理由" }:24
+B2s G1 1/96 MD { aspect: "模型说该成、实现拒了" }:1
+B2s G2 0/96 
+B2s G3 1/96 MD { aspect: "模型说该成、实现拒了" }:1
+B2s G4 0/96 
+B2s G5 11/96 MD { aspect: "模型说该成、实现拒了" }:6; MD { aspect: "拒绝的理由" }:5
+B2s G6 2/48 MD { aspect: "模型说该成、实现拒了" }:1; MD { aspect: "拒绝的理由" }:1
+B2s G7 6/48 MD { aspect: "模型说该成、实现拒了" }:3; MD { aspect: "拒绝的理由" }:3
+B2s G8 0/48 
+B2s G9 0/96 
+B3 G1 60/96 MD { aspect: "抬 F 的上限" }:30; MD { aspect: "模型说该拒、实现做成了" }:30
+B3 G2 60/96 MD { aspect: "模型说该拒、实现做成了" }:36; MD { aspect: "抬 F 的上限" }:24
+B3 G3 65/96 MD { aspect: "模型说该拒、实现做成了" }:37; MD { aspect: "抬 F 的上限" }:28
+B3 G4 89/96 MD { aspect: "抬 F 的上限" }:46; MD { aspect: "模型说该拒、实现做成了" }:43
+B3 G5 75/96 MD { aspect: "模型说该拒、实现做成了" }:37; MD { aspect: "抬 F 的上限" }:38
+B3 G6 37/48 MD { aspect: "模型说该拒、实现做成了" }:19; MD { aspect: "抬 F 的上限" }:18
+B3 G7 30/48 MD { aspect: "模型说该拒、实现做成了" }:16; MD { aspect: "抬 F 的上限" }:14
+B3 G8 46/48 MD { aspect: "抬 F 的上限" }:22; MD { aspect: "模型说该拒、实现做成了" }:24
+B3 G9 44/96 MD { aspect: "模型说该拒、实现做成了" }:27; MD { aspect: "抬 F 的上限" }:17
+B5 G1 59/96 MD { aspect: "抬 F 的上限" }:38; MD { aspect: "模型说该拒、实现做成了" }:21
+B5 G2 59/96 MD { aspect: "抬 F 的上限" }:34; MD { aspect: "模型说该拒、实现做成了" }:25
+B5 G3 63/96 MD { aspect: "抬 F 的上限" }:38; MD { aspect: "模型说该拒、实现做成了" }:25
+B5 G4 88/96 MD { aspect: "抬 F 的上限" }:62; MD { aspect: "模型说该拒、实现做成了" }:26
+B5 G5 75/96 MD { aspect: "抬 F 的上限" }:50; MD { aspect: "模型说该拒、实现做成了" }:25
+B5 G6 37/48 MD { aspect: "模型说该拒、实现做成了" }:13; MD { aspect: "抬 F 的上限" }:24
+B5 G7 30/48 MD { aspect: "抬 F 的上限" }:20; MD { aspect: "模型说该拒、实现做成了" }:10
+B5 G8 45/48 MD { aspect: "抬 F 的上限" }:30; MD { aspect: "模型说该拒、实现做成了" }:15
+B5 G9 44/96 MD { aspect: "模型说该拒、实现做成了" }:19; MD { aspect: "抬 F 的上限" }:25
+B6 G1 34/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:34
+B6 G2 40/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:40
+B6 G3 46/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:46
+B6 G4 12/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:12
+B6 G5 25/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:25
+B6 G6 11/48 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:11
+B6 G7 10/48 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:10
+B6 G8 4/48 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:4
+B6 G9 30/96 HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }:30
+N2 G1 26/96 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:26
+N2 G2 12/96 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:12
+N2 G3 18/96 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:18
+N2 G4 50/96 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:50
+N2 G5 12/96 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:12
+N2 G6 5/48 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:5
+N2 G7 4/48 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:4
+N2 G8 19/48 HarnessJudgement { judgement: "改写或新增的分配记录的代不是这次发布的 txg" }:19
+N2 G9 0/96 

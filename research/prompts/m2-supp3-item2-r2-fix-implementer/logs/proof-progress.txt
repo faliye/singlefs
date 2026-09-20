@@ -1,0 +1,48 @@
+17:52:57 开跑
+17:56:11 base random-history exit 0（194 秒）；红：
+17:56:12 base step-four exit 0（1 秒）；红：
+17:56:13 base step-one exit 0（1 秒）；红：
+17:56:14 base unequal-devices exit 0（1 秒）；红：
+17:56:15 base lib exit 0（1 秒）；红：
+施加：crates/singlefs-harness/src/history.rs 第 1 处（共 1 处）
+17:57:12 continuation-stops-on-ring-turn-form random-history exit 101（57 秒）；红：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+还原：crates/singlefs-harness/src/history.rs
+施加：crates/singlefs-harness/src/model_comparison.rs 第 1 处（共 1 处）
+17:57:12 glue-tt0-as-below-floor lib exit 101（0 秒）；红：model_comparison::tests::each_rollback_candidate_exclusion_and_the_version_without_file_map_to_their_own_reasons 
+18:00:11 glue-tt0-as-below-floor random-history exit 101（179 秒）；红：rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+还原：crates/singlefs-harness/src/model_comparison.rs
+施加：crates/singlefs-core/src/transaction.rs 第 1 处（共 1 处）
+18:03:24 m1c random-history exit 101（193 秒）；红：raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 
+还原：crates/singlefs-core/src/transaction.rs
+施加：crates/singlefs-core/src/transaction.rs 第 1 处（共 1 处）
+18:06:37 m1d random-history exit 101（193 秒）；红：rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 
+还原：crates/singlefs-core/src/transaction.rs
+施加：crates/singlefs-core/src/allocator.rs 第 1 处（共 1 处）
+18:09:51 m2h random-history exit 101（194 秒）；红：unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+还原：crates/singlefs-core/src/allocator.rs
+施加：crates/singlefs-core/src/allocator.rs 第 1 处（共 1 处）
+18:09:52 m2i unequal-devices exit 101（1 秒）；红：filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking 
+18:13:01 m2i random-history exit 0（189 秒）；红：
+还原：crates/singlefs-core/src/allocator.rs
+施加：crates/singlefs-core/src/allocator.rs 第 1 处（共 1 处）
+18:16:00 m2j random-history exit 101（179 秒）；红：unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+还原：crates/singlefs-core/src/allocator.rs
+施加：crates/singlefs-core/src/mount.rs 第 1 处（共 1 处）
+18:18:56 m4a random-history exit 101（176 秒）；红：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+还原：crates/singlefs-core/src/mount.rs
+施加：crates/singlefs-core/src/transaction.rs 第 1 处（共 1 处）
+18:20:51 m4b random-history exit 101（115 秒）；红：allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+18:20:52 m4b step-one exit 101（1 秒）；红：allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records 
+还原：crates/singlefs-core/src/transaction.rs
+施加：crates/singlefs-core/src/mount.rs 第 1 处（共 1 处）
+18:23:49 tt0-A-reported-as-below-floor random-history exit 101（177 秒）；红：rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+18:23:50 tt0-A-reported-as-below-floor step-four exit 101（1 秒）；红：rolling_back_to_a_warm_up_root_without_a_file_version_is_refused_before_any_write 
+还原：crates/singlefs-core/src/mount.rs
+施加：crates/singlefs-core/src/mount.rs 第 1 处（共 1 处）
+18:27:04 tt0-B-below-floor-reported-as-tt0 random-history exit 101（194 秒）；红：rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device 
+18:27:06 tt0-B-below-floor-reported-as-tt0 step-four exit 0（2 秒）；红：
+还原：crates/singlefs-core/src/mount.rs
+施加：crates/singlefs-core/src/transaction.rs 第 1 处（共 1 处）
+18:30:20 w1-row156 random-history exit 101（194 秒）；红：rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds an_overwrite_that_fills_the_allocation_node_to_exactly_812_records_succeeds_and_the_next_is_refused allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count 
+还原：crates/singlefs-core/src/transaction.rs
+18:30:20 全部跑完

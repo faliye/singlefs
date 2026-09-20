@@ -1,0 +1,13 @@
+cargo test -p singlefs-harness --test second_transaction_supplement_two_unequal_devices
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-supp3-item2-fix-implementer/copies/base/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/second_transaction_supplement_two_unequal_devices.rs (target/debug/deps/second_transaction_supplement_two_unequal_devices-927c7e16a1fb9102)
+
+running 3 tests
+test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... ok
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... ok
+test filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+exit 0

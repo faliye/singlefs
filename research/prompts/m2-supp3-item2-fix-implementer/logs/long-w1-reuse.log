@@ -1,0 +1,167 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/release/deps/second_transaction_supplement_three_random_history-febc0246c8ac82b5)
+
+running 1 test
+── 随机历史大档 ──
+种子 [0, 96)，每段 200 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）；不跑池级 checker（只由模型、执行器的判定与 panic 判）
+历史 96 段：跑完 63、以已知红收尾 {}、新发现 33；根环转过一圈的 94 段；最高 txg 268
+  操作 PublishFirstFile：Ok 8、Err 134、前提不满足没调 51
+  操作 PublishOverwrite：Ok 6267、Err 1250、前提不满足没调 1906
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 164
+  操作 CloseAndMountWritable：Ok 2591、Err 691、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 262、Err 131、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 1497、Err 1607、前提不满足没调 753
+  操作 ColdStartRecover：Ok 180、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 764 次、发成 727 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 4520 次、发成 4333 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 559 次、发成 0 次
+  内容长度 载荷容量：入口被调 652 次、发成 624 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 553 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 611 次、发成 591 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：75 次
+  Err 成员 MountError::Publish(PublishError::AllocationRecordsExceedOneNode)：46 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：92 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：1469 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：16 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：67 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：10 次
+  Err 成员 MountError::RollbackTargetNotACandidate(TargetVersionWithoutFileUnsupported)：12 次
+  Err 成员 MountError::RowPublishAdmissionRefusedBeforeAcquisition(PublishError::AllocationRecordsExceedOneNode)：326 次
+  Err 成员 MountError::WarmUpAdmissionRefusedBeforeAcquisition(PublishError::AllocationRecordsExceedOneNode)：316 次
+  Err 成员 PublishError::AllocationRecordsExceedOneNode：157 次
+  Err 成员 PublishError::ContentExceedsDataUnit：1094 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：133 次
+  前提不满足（没有可写会话）：2740 次
+  前提不满足（现行版本带文件）：129 次
+  前提不满足（现行版本树表 0 条）：5 次
+  冷启动结局 FileRead：175 次
+  冷启动结局 NoFile：5 次
+  一次挂载里最多写出 42 条根；一段历史里最多挂载成功 54 次、最多试挂载 55 次
+  抬 F 回收到落点 1355 次、共回收 52840 个落点；复用已释放的记录 99482 条（其中跨度变了 8924 条）；已释放的记录被罩住起点 4396 条、被删 4396 条
+  挂载写出的发布比过分配记录 6959 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 0 次；一个写都没发、沿用上一次结论的 6854 步
+  模型对拍 14704 步：该拒而拒 2876、区间里拒 904、该成而成 10891；比过根 16936 条、分配记录 303876 条、冷启动内容 175 次、抬 F 上限 2966 次；回退到 txg = F_生效 > 0 的根做成 3 次；分配记录墙按镜像上的真条数放行 812 次
+  I-1.1：判绿 0 次、不适用 0 次
+  I-1.3：判绿 0 次、不适用 0 次
+  I-1.4：判绿 0 次、不适用 0 次
+  I-1.6：判绿 0 次、不适用 0 次
+  I-1.7：判绿 0 次、不适用 0 次
+  I-2.1：判绿 0 次、不适用 0 次
+  I-2.3：判绿 0 次、不适用 0 次
+  I-2.4：判绿 0 次、不适用 0 次
+  I-2.5：判绿 0 次、不适用 0 次
+  I-3.1：判绿 0 次、不适用 0 次
+  I-3.8：判绿 0 次、不适用 0 次
+  I-3.9：判绿 0 次、不适用 0 次
+  I-4.8：判绿 0 次、不适用 0 次
+  I-5.1：判绿 0 次、不适用 0 次
+  I-5.2：判绿 0 次、不适用 0 次
+  I-5.4：判绿 0 次、不适用 0 次
+  I-7.1：判绿 0 次、不适用 0 次
+  I-7.2：判绿 0 次、不适用 0 次
+  I-7.4：判绿 0 次、不适用 0 次
+  I-7.6：判绿 0 次、不适用 0 次
+  I-7.7：判绿 0 次、不适用 0 次
+  I-7.8：判绿 0 次、不适用 0 次
+  I-9.1：判绿 0 次、不适用 0 次
+  I-9.2：判绿 0 次、不适用 0 次
+  I-9.4：判绿 0 次、不适用 0 次
+  I-9.7：判绿 0 次、不适用 0 次
+  I-9.10：判绿 0 次、不适用 0 次
+  I-9.13：判绿 0 次、不适用 0 次
+  I-9.14：判绿 0 次、不适用 0 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 段；前几个种子 []
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }：第一个种子 0（同签名的种子 [0, 3, 4, 6, 7, 8, 9, 16, 18, 20, 22, 27, 32, 36, 37, 41, 42, 47, 54, 58, 61, 66, 67, 69, 74, 77, 81, 83, 87, 89, 91, 92, 95]），在 Operation(151)（Some(RaiseRollbackFloor)）之后
+  模型对不上（模型说该成、实现拒了）：模型答 RaiseRollbackFloor 该成（写出 [(192, 36), (193, 36)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::Publish(PublishError::AllocationRecordsExceedOneNode)（镜像上数的准入基数 804 条）
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=0 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+每个新发现的种子：[(0, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (3, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (4, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (6, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (7, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (8, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (9, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (16, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (18, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (20, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (22, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (27, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (32, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (36, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (37, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (41, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (42, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (47, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (54, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (58, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (61, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (66, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (67, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (69, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (74, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (77, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (81, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (83, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (87, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (89, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (91, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (92, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (95, ModelDisagreement { aspect: "模型说该成、实现拒了" })]
+用时 21.8 秒
+
+thread 'random_histories_large_tier_seeds_and_length_from_the_environment' (327409) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs:889:5:
+「已知红」清单外的失败：
+种子 [0, 96)，每段 200 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）；不跑池级 checker（只由模型、执行器的判定与 panic 判）
+历史 96 段：跑完 63、以已知红收尾 {}、新发现 33；根环转过一圈的 94 段；最高 txg 268
+  操作 PublishFirstFile：Ok 8、Err 134、前提不满足没调 51
+  操作 PublishOverwrite：Ok 6267、Err 1250、前提不满足没调 1906
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 164
+  操作 CloseAndMountWritable：Ok 2591、Err 691、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 262、Err 131、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 1497、Err 1607、前提不满足没调 753
+  操作 ColdStartRecover：Ok 180、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 764 次、发成 727 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 4520 次、发成 4333 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 559 次、发成 0 次
+  内容长度 载荷容量：入口被调 652 次、发成 624 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 553 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 611 次、发成 591 次
+  Err 成员 MountError::InstanceRowsOnVersionWithoutFileUnsupported：75 次
+  Err 成员 MountError::Publish(PublishError::AllocationRecordsExceedOneNode)：46 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：92 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：1469 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：16 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：67 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：10 次
+  Err 成员 MountError::RollbackTargetNotACandidate(TargetVersionWithoutFileUnsupported)：12 次
+  Err 成员 MountError::RowPublishAdmissionRefusedBeforeAcquisition(PublishError::AllocationRecordsExceedOneNode)：326 次
+  Err 成员 MountError::WarmUpAdmissionRefusedBeforeAcquisition(PublishError::AllocationRecordsExceedOneNode)：316 次
+  Err 成员 PublishError::AllocationRecordsExceedOneNode：157 次
+  Err 成员 PublishError::ContentExceedsDataUnit：1094 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：133 次
+  前提不满足（没有可写会话）：2740 次
+  前提不满足（现行版本带文件）：129 次
+  前提不满足（现行版本树表 0 条）：5 次
+  冷启动结局 FileRead：175 次
+  冷启动结局 NoFile：5 次
+  一次挂载里最多写出 42 条根；一段历史里最多挂载成功 54 次、最多试挂载 55 次
+  抬 F 回收到落点 1355 次、共回收 52840 个落点；复用已释放的记录 99482 条（其中跨度变了 8924 条）；已释放的记录被罩住起点 4396 条、被删 4396 条
+  挂载写出的发布比过分配记录 6959 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 0 次；一个写都没发、沿用上一次结论的 6854 步
+  模型对拍 14704 步：该拒而拒 2876、区间里拒 904、该成而成 10891；比过根 16936 条、分配记录 303876 条、冷启动内容 175 次、抬 F 上限 2966 次；回退到 txg = F_生效 > 0 的根做成 3 次；分配记录墙按镜像上的真条数放行 812 次
+  I-1.1：判绿 0 次、不适用 0 次
+  I-1.3：判绿 0 次、不适用 0 次
+  I-1.4：判绿 0 次、不适用 0 次
+  I-1.6：判绿 0 次、不适用 0 次
+  I-1.7：判绿 0 次、不适用 0 次
+  I-2.1：判绿 0 次、不适用 0 次
+  I-2.3：判绿 0 次、不适用 0 次
+  I-2.4：判绿 0 次、不适用 0 次
+  I-2.5：判绿 0 次、不适用 0 次
+  I-3.1：判绿 0 次、不适用 0 次
+  I-3.8：判绿 0 次、不适用 0 次
+  I-3.9：判绿 0 次、不适用 0 次
+  I-4.8：判绿 0 次、不适用 0 次
+  I-5.1：判绿 0 次、不适用 0 次
+  I-5.2：判绿 0 次、不适用 0 次
+  I-5.4：判绿 0 次、不适用 0 次
+  I-7.1：判绿 0 次、不适用 0 次
+  I-7.2：判绿 0 次、不适用 0 次
+  I-7.4：判绿 0 次、不适用 0 次
+  I-7.6：判绿 0 次、不适用 0 次
+  I-7.7：判绿 0 次、不适用 0 次
+  I-7.8：判绿 0 次、不适用 0 次
+  I-9.1：判绿 0 次、不适用 0 次
+  I-9.2：判绿 0 次、不适用 0 次
+  I-9.4：判绿 0 次、不适用 0 次
+  I-9.7：判绿 0 次、不适用 0 次
+  I-9.10：判绿 0 次、不适用 0 次
+  I-9.13：判绿 0 次、不适用 0 次
+  I-9.14：判绿 0 次、不适用 0 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 段；前几个种子 []
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }：第一个种子 0（同签名的种子 [0, 3, 4, 6, 7, 8, 9, 16, 18, 20, 22, 27, 32, 36, 37, 41, 42, 47, 54, 58, 61, 66, 67, 69, 74, 77, 81, 83, 87, 89, 91, 92, 95]），在 Operation(151)（Some(RaiseRollbackFloor)）之后
+  模型对不上（模型说该成、实现拒了）：模型答 RaiseRollbackFloor 该成（写出 [(192, 36), (193, 36)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::Publish(PublishError::AllocationRecordsExceedOneNode)（镜像上数的准入基数 804 条）
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=0 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 21.87s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_random_history`
+exit 101

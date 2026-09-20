@@ -1,0 +1,74 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_random_history.rs (target/debug/deps/second_transaction_supplement_three_random_history-031d214e73b47b79)
+
+running 1 test
+test unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device has been running for over 60 seconds
+── 随机历史：小盘上逼近单元区墙的取样点 ──
+种子 [0, 32)，每段 150 步，比重：逼近单元区墙（小盘上落点拒绝那一格的取样点）；每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 32 段：跑完 32、以已知红收尾 {}、新发现 0；根环转过一圈的 32 段；最高 txg 174
+  操作 PublishFirstFile：Ok 0、Err 0、前提不满足没调 0
+  操作 PublishOverwrite：Ok 3201、Err 901、前提不满足没调 83
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 0
+  操作 CloseAndMountWritable：Ok 319、Err 0、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 46、Err 12、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 125、Err 61、前提不满足没调 0
+  操作 ColdStartRecover：Ok 52、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 397 次、发成 364 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 2418 次、发成 2210 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 327 次、发成 0 次
+  内容长度 载荷容量：入口被调 348 次、发成 319 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 270 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 342 次、发成 308 次
+  Err 成员 MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))：8 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：13 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：40 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：1 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：8 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：2 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：1 次
+  Err 成员 PublishError::ContentExceedsDataUnit：597 次
+  Err 成员 PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)：304 次
+  前提不满足（没有可写会话）：83 次
+  冷启动结局 FileRead：52 次
+  一次挂载里最多写出 51 条根；一段历史里最多挂载成功 22 次、最多试挂载 23 次
+  抬 F 回收到落点 120 次、共回收 9264 个落点；复用已释放的记录 34886 条（其中跨度变了 10024 条）；已释放的记录被罩住起点 4976 条、被删 4988 条
+  挂载写出的发布比过分配记录 873 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 3725 次；一个写都没发、沿用上一次结论的 1107 步；已知红第 0 条那一形只记不停 2542 步（32 段历史）
+  模型对拍 4749 步：该拒而拒 649、区间里拒 325、该成而成 3775；比过根 4400 条、分配记录 78450 条、冷启动内容 52 次、抬 F 上限 165 次；回退到 txg = F_生效 > 0 的根做成 0 次；分配记录墙按镜像上的真条数放行 0 次；单元区墙按区间放行 312 次
+  I-1.1：判绿 3725 次、不适用 0 次
+  I-1.3：判绿 3725 次、不适用 0 次
+  I-1.4：判绿 3725 次、不适用 0 次
+  I-1.6：判绿 3725 次、不适用 0 次
+  I-1.7：判绿 3725 次、不适用 0 次
+  I-2.1：判绿 3725 次、不适用 0 次
+  I-2.3：判绿 3725 次、不适用 0 次
+  I-2.4：判绿 3725 次、不适用 0 次
+  I-2.5：判绿 3725 次、不适用 0 次
+  I-3.1：判绿 1183 次、不适用 0 次
+  I-3.8：判绿 3725 次、不适用 0 次
+  I-3.9：判绿 3725 次、不适用 0 次
+  I-4.8：判绿 3725 次、不适用 0 次
+  I-5.1：判绿 3725 次、不适用 0 次
+  I-5.2：判绿 3725 次、不适用 0 次
+  I-5.4：判绿 3725 次、不适用 0 次
+  I-7.1：判绿 3725 次、不适用 0 次
+  I-7.2：判绿 3725 次、不适用 0 次
+  I-7.4：判绿 3725 次、不适用 0 次
+  I-7.6：判绿 3725 次、不适用 0 次
+  I-7.7：判绿 3725 次、不适用 0 次
+  I-7.8：判绿 3725 次、不适用 0 次
+  I-9.1：判绿 3725 次、不适用 0 次
+  I-9.2：判绿 3725 次、不适用 0 次
+  I-9.4：判绿 3725 次、不适用 0 次
+  I-9.7：判绿 3725 次、不适用 0 次
+  I-9.10：判绿 3725 次、不适用 0 次
+  I-9.13：判绿 3725 次、不适用 0 次
+  I-9.14：判绿 3693 次、不适用 32 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 段；前几个种子 []
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+用时 118.5 秒
+test unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 118.47s
+
+wall 118.48 s, user 1616.46 s, sys 0.42 s

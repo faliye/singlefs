@@ -1,0 +1,76 @@
+   Compiling singlefs-format v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/probe/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/probe/crates/singlefs-checker)
+   Compiling singlefs-core v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/probe/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/probe/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 4.22s
+     Running tests/probe_unit_area_wall.rs (target/release/deps/probe_unit_area_wall-44b6bc8f6407b6fd)
+
+running 1 test
+种子 [0, 128)，每段 150 步，比重：逼近单元区墙（小盘上落点拒绝那一格的取样点）；每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 128 段：跑完 128、以已知红收尾 {}、新发现 0；根环转过一圈的 128 段；最高 txg 174
+  操作 PublishFirstFile：Ok 0、Err 0、前提不满足没调 0
+  操作 PublishOverwrite：Ok 12655、Err 3601、前提不满足没调 453
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 0
+  操作 CloseAndMountWritable：Ok 1311、Err 0、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 157、Err 52、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 506、Err 248、前提不满足没调 20
+  操作 ColdStartRecover：Ok 197、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 1607 次、发成 1470 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 9624 次、发成 8726 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 1178 次、发成 0 次
+  内容长度 载荷容量：入口被调 1347 次、发成 1214 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 1136 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 1364 次、发成 1245 次
+  Err 成员 MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))：51 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：63 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：134 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：4 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：34 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：5 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：9 次
+  Err 成员 PublishError::ContentExceedsDataUnit：2314 次
+  Err 成员 PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)：1287 次
+  前提不满足（没有可写会话）：473 次
+  冷启动结局 FileRead：197 次
+  一次挂载里最多写出 60 条根；一段历史里最多挂载成功 22 次、最多试挂载 23 次
+  抬 F 回收到落点 480 次、共回收 32853 个落点；复用已释放的记录 138154 条（其中跨度变了 39662 条）；已释放的记录被罩住起点 19538 条、被删 19570 条
+  挂载写出的发布比过分配记录 3500 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 14783 次；一个写都没发、沿用上一次结论的 4545 步；已知红第 0 条那一形只记不停 10285 步（128 段历史）
+  模型对拍 18855 步：该拒而拒 2500、区间里拒 1401、该成而成 14954；比过根 17484 条、分配记录 311940 条、冷启动内容 197 次、抬 F 上限 640 次；回退到 txg = F_生效 > 0 的根做成 0 次；分配记录墙按镜像上的真条数放行 0 次；单元区墙按区间放行 1338 次
+  I-1.1：判绿 14783 次、不适用 0 次
+  I-1.3：判绿 14783 次、不适用 0 次
+  I-1.4：判绿 14783 次、不适用 0 次
+  I-1.6：判绿 14783 次、不适用 0 次
+  I-1.7：判绿 14783 次、不适用 0 次
+  I-2.1：判绿 14783 次、不适用 0 次
+  I-2.3：判绿 14783 次、不适用 0 次
+  I-2.4：判绿 14783 次、不适用 0 次
+  I-2.5：判绿 14783 次、不适用 0 次
+  I-3.1：判绿 4498 次、不适用 0 次
+  I-3.8：判绿 14783 次、不适用 0 次
+  I-3.9：判绿 14783 次、不适用 0 次
+  I-4.8：判绿 14783 次、不适用 0 次
+  I-5.1：判绿 14783 次、不适用 0 次
+  I-5.2：判绿 14783 次、不适用 0 次
+  I-5.4：判绿 14783 次、不适用 0 次
+  I-7.1：判绿 14783 次、不适用 0 次
+  I-7.2：判绿 14783 次、不适用 0 次
+  I-7.4：判绿 14783 次、不适用 0 次
+  I-7.6：判绿 14783 次、不适用 0 次
+  I-7.7：判绿 14783 次、不适用 0 次
+  I-7.8：判绿 14783 次、不适用 0 次
+  I-9.1：判绿 14783 次、不适用 0 次
+  I-9.2：判绿 14783 次、不适用 0 次
+  I-9.4：判绿 14783 次、不适用 0 次
+  I-9.7：判绿 14783 次、不适用 0 次
+  I-9.10：判绿 14783 次、不适用 0 次
+  I-9.13：判绿 14783 次、不适用 0 次
+  I-9.14：判绿 14655 次、不适用 128 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 段；前几个种子 []
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+
+PROBE SUMMARY weights=逼近单元区墙（小盘上落点拒绝那一格的取样点） width=UnitAreaOf384Slots checker=RunContinuingPastTheRingTurnForm first=0 seeds=128 steps=150: red_segments=0 red_seeds=[] seconds=32.9
+test probe_unit_area_wall ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.92s
+

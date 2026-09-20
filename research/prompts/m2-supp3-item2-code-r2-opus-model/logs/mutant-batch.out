@@ -1,0 +1,152 @@
+Sat Sep 19 03:49:28 PM UTC 2026
+## m2a-belowf-as-abandoned
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 13.51s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2b-tt0-as-belowf
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 19.16s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2c-tt0-as-abandoned
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 17.86s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2d-notinring-as-belowf
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 13.70s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2e-belowf-as-tt0
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.37s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2f-abandoned-as-tt0
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 15.74s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2g-notinring-as-tt0
+test result: FAILED. 9 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; finished in 13.65s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+EXTRA-EXIT 101
+## m2h-alloc-nofree-as-somefull-userdata
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.69s
+GATE74-BINARY-EXIT 0
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s
+EXTRA-EXIT 0
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+EXTRA-EXIT 0
+## m2i-alloc-somefull-as-nofree-userdata
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.87s
+GATE74-BINARY-EXIT 0
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.85s
+EXTRA-EXIT 101
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+EXTRA-EXIT 0
+## m2j-alloc-nofree-as-somefull-commit
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.62s
+GATE74-BINARY-EXIT 0
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s
+EXTRA-EXIT 0
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+EXTRA-EXIT 0
+## m1a-sequence-overcount-one
+test result: FAILED. 12 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.49s
+GATE74-BINARY-EXIT 101
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=480 steps=150 observe=false: new_findings=33 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 138.60s
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=16 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 159.79s
+EXTRA-EXIT 0
+## m1b-nonfile-publish-extra-role
+test result: FAILED. 12 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 14.01s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=21 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 152.48s
+EXTRA-EXIT 0
+## m1c-raise-only-extra-role
+test result: FAILED. 12 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 15.34s
+GATE74-BINARY-EXIT 101
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=480 steps=150 observe=false: new_findings=15 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 134.75s
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=8 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 147.69s
+EXTRA-EXIT 0
+## m1d-rollback-only-extra-role
+test result: FAILED. 12 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; finished in 14.44s
+GATE74-BINARY-EXIT 101
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=32 seeds=480 steps=150 observe=false: new_findings=9 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 135.90s
+EXTRA-EXIT 0
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=6 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 182.76s
+EXTRA-EXIT 0
+## m1e-margin-two
+test result: FAILED. 11 passed; 2 failed; 2 ignored; 0 measured; 0 filtered out; finished in 16.23s
+GATE74-BINARY-EXIT 101
+EXTRA-EXIT 101
+PROBE SUMMARY weights=opus-r2：逼近墙、回退与抬 F 多 first=0 seeds=512 steps=150 observe=false: new_findings=36 probe_checker_red=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 72.38s
+EXTRA-EXIT 0
+## m4a-reclaim-one-past-oldest-after-ring-turn
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.13s
+GATE74-BINARY-EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=0 seeds=32 steps=150 observe=true: new_findings=0 probe_checker_red=15
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.82s
+EXTRA-EXIT 0
+EXTRA-EXIT 101
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 45 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+EXTRA-EXIT 101
+## m4b-allocated-stat-short-above-600-records
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.07s
+GATE74-BINARY-EXIT 0
+PROBE SUMMARY weights=逼近分配记录墙（812 条那一格的取样点） first=0 seeds=32 steps=150 observe=true: new_findings=0 probe_checker_red=32
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.56s
+EXTRA-EXIT 0
+EXTRA-EXIT 101
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.41s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+test result: ok. 13 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 8.06s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+EXTRA-EXIT 0
+Sat Sep 19 04:40:35 PM UTC 2026

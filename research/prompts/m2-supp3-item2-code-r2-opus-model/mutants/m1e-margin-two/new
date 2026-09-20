@@ -1,0 +1,1 @@
+    if records_after_this_publish + 2 > allocation_node_capacity {

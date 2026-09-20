@@ -1,0 +1,27 @@
+   Compiling singlefs-core v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (research/prompts/m2-supp3-item2-r2-fix-implementer/copies/proof/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running tests/second_transaction_supplement_two_unequal_devices.rs (target/debug/deps/second_transaction_supplement_two_unequal_devices-927c7e16a1fb9102)
+
+running 3 tests
+test user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written ... ok
+test devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written ... ok
+test filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking ... FAILED
+
+failures:
+
+---- filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking stdout ----
+
+thread 'filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking' (3180237) panicked at crates/singlefs-harness/tests/second_transaction_supplement_two_unequal_devices.rs:275:5:
+assertion `left == right` failed: 用户数据
+  left: Err(NoFreeSlotOnAnyDevice)
+ right: Err(SomeDevicesFullDeviceSetSelectionUndefined { full_devices: [DeviceIdentity(1)] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_two_unequal_devices`

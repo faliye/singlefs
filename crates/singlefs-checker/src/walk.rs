@@ -1250,6 +1250,44 @@ fn judge_allocation_record_ranges_of_one_node(
     }
 }
 
+/// 一条根的分配记录树里有几条记录：按 checker 自己的字段表读这条根的树表，找种类 3（分配记录）的条目，数它根节点叶里的条目
+/// （第一版分配记录树只有一个节点；一条记录记一个单元，D3（空间分配） 已定项 7）。只读不判——给理想模型的对拍数分配记录墙的真条数
+/// （增补 3 第 2 件代码三方第一轮判决第三节第 1 条：从镜像上现数，不用分配器的状态）。
+/// 树表里没有分配记录树的条目、或那一条的根指针全零时是 0 条：树表 0 条的一版上没有分配记录树，mkfs 写的两个单元的记录要到
+/// 第一个文件版本才落盘。树表指针全零、树表或分配记录树的节点读不出或条目比字段表窄、分配记录树有内部节点（内部条目格式没有条款，
+/// 总审核 D8-D11 发现 16）时数不出，交回 None。
+#[must_use]
+pub fn allocation_record_count_under_root(
+    reader: &dyn ImageReader,
+    root: &crate::RootView,
+) -> Option<usize> {
+    let mut cache = IndexNodeCache::new();
+    let tree_table_pointer = parse_node_pointer(&root.record_bytes[36..122]);
+    if tree_table_pointer.all_zero {
+        return None;
+    }
+    let tree_table = read_index_node_without_judging(reader, &tree_table_pointer, &mut cache)?;
+    let mut records = 0;
+    for entry in &tree_table.entries {
+        if entry.len() < tree_table_entry_bytes() {
+            return None;
+        }
+        if read_u16(entry, 10) != TREE_KIND_ALLOCATION {
+            continue;
+        }
+        let allocation_root = parse_node_pointer(&entry[14..100]);
+        if allocation_root.all_zero {
+            continue;
+        }
+        let node = read_index_node_without_judging(reader, &allocation_root, &mut cache)?;
+        if node.level > 0 || node.entry_width < allocation_record_bytes() {
+            return None;
+        }
+        records += node.entries.len();
+    }
+    Some(records)
+}
+
 /// 池级 checker 的入口：每条第一版不变量都报，没评估到的报「不适用」并带理由。
 #[must_use]
 pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, InvariantVerdict)> {

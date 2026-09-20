@@ -43,13 +43,17 @@ pub enum MountError {
     RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion,
     Acquisition(AcquisitionFailed),
     Publish(PublishError),
-    /// 回退的目标根不在根环里（没有那个 (实例, txg) 的可读根槽）。
-    RollbackTargetNotInRing(RollbackTarget),
-    /// 回退的目标根在根环里，却不在回退候选集里：被抛弃时间线的根，或 txg 低于回退下界 F。
+    /// 回退的目标根不在回退候选集里，`exclusion` 说是哪一条（管理员要做的决定都是换一条目标；调用方按这个字段分流，不看给人看的文字——
+    /// 增补 3 第 2 件代码三方第一轮判决第三节第 2 条：此前只带一句理由文字，胶水分不出是哪一条）。在任何写之前拒绝。
     RollbackTargetNotACandidate {
         target: RollbackTarget,
-        reason: &'static str,
+        exclusion: RollbackCandidateExclusion,
     },
+    /// 回退的目标根在回退候选集里（D16（发布语义） 已定项 1「回退候选集」只有「按实例表判仍然有效」「txg ≥ F_生效」两条，
+    /// D23（journal 的角色与格式） 已定项 14 同一句），而它那一版树表 0 条（还没发布过文件版本）：回退行要重写实例表，没有文件版本的一版上
+    /// 它的落点记在哪没有条款（D16（发布语义） 已定项 9 只定了树表 0 条时空发布写零个单元），第一版不支持。在任何写之前拒绝。
+    /// 不是候选排除，所以不进 `RollbackCandidateExclusion`（增补 3 第 2 件代码三方第二轮判决第三节第 1 条：第一轮把它并进去，名实不符）。
+    RollbackToVersionWithoutFileUnsupported(RollbackTarget),
     /// 要抬的 F 超过上限 min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根)（D16（发布语义） 已定项 1）。
     RollbackFloorAboveCeiling {
         requested: CheckpointTxg,
@@ -62,9 +66,6 @@ pub enum MountError {
         first_row_instance: InstanceGeneration,
         instance_to_acquire: InstanceGeneration,
     },
-    /// 回退的目标根的树表 0 条（还没发布过文件版本）：回退行要重写实例表，没有文件版本的一版上它的落点记在哪没有条款，
-    /// 第一版不支持。在任何写之前拒绝。
-    RollbackToVersionWithoutFileUnsupported(RollbackTarget),
     /// 树表 0 条、而根记录指着的实例表或树表不是 mkfs 写的那一版（指针的诞生 txg 不是 0）：这样一版的分配记录在哪没有条款，
     /// 这个实现自己写不出这样的根（坏盘或别的写者才有），拒绝挂载。
     VersionWithoutFileNotWrittenByMakeFilesystem {
@@ -119,6 +120,19 @@ pub enum MountError {
         first_txg: CheckpointTxg,
         first_counter: u64,
     },
+}
+
+/// 回退目标不在回退候选集里的是哪一条。`mount_rollback` 按成员的次序判，一条目标同时中几条时只报最先判到的那一条；三条都不中、
+/// 目标那一版却树表 0 条的，报的是 `MountError::RollbackToVersionWithoutFileUnsupported`（在候选集里、第一版不支持），不在这里。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RollbackCandidateExclusion {
+    /// 根环里没有那个 (实例, txg) 的可读根槽：候选集是根环里的根（D23（journal 的角色与格式） 已定项 14）。
+    NotInRing,
+    /// txg 低于生效的回退下界 F（D16（发布语义） 已定项 1「回退候选集」：txg ≥ F_生效）。
+    BelowEffectiveFloor,
+    /// 最新根指着的实例表里有那个实例的行 (i, Ti, Wi) 且目标的 txg > Ti：被抛弃时间线上的根（D23（journal 的角色与格式） 已定项 14
+    /// 「按实例表判仍然有效」）。
+    OnAbandonedTimeline,
 }
 
 /// 回退的目标：管理员带外从回退候选集里选的那条根（D23（journal 的角色与格式） 已定项 14 的显式例外）。
@@ -1189,7 +1203,10 @@ pub fn mount_rollback<Device: BlockDevice>(
             root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg
         })
         .copied()
-        .ok_or(MountError::RollbackTargetNotInRing(target))?;
+        .ok_or(MountError::RollbackTargetNotACandidate {
+            target,
+            exclusion: RollbackCandidateExclusion::NotInRing,
+        })?;
     // 候选集：按最新根指着的实例表判仍然有效——(i, T) 可选 ⟺ 无 i 的行，或有行 (i, Ti, Wi) 且 T ≤ Ti；且 txg ≥ F_生效。
     let newest_table = instance_table_of_root(&*devices, &newest_root)
         .ok_or(MountError::InstanceTableMalformed)?;
@@ -1203,7 +1220,7 @@ pub fn mount_rollback<Device: BlockDevice>(
     if target.checkpoint_txg < effective_floor {
         return Err(MountError::RollbackTargetNotACandidate {
             target,
-            reason: "txg 低于生效的回退下界 F",
+            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
         });
     }
     if newest_table
@@ -1213,11 +1230,12 @@ pub fn mount_rollback<Device: BlockDevice>(
     {
         return Err(MountError::RollbackTargetNotACandidate {
             target,
-            reason: "实例表里那个实例的行 T 更小：这是被抛弃时间线的根",
+            exclusion: RollbackCandidateExclusion::OnAbandonedTimeline,
         });
     }
-    // 回退到树表 0 条的根（例如第一个事务里 txg 1、2 的暖机根）：回退行要重写实例表，没有文件版本的一版上它的落点记在哪、换下的 mkfs 实例表
-    // 与候选根引用的单元谁护着都没有条款（D16（发布语义） 已定项 9 只定了树表 0 条时空发布写零个单元）——在任何写之前拒绝。
+    // 回退到树表 0 条的根（例如第一个事务里 txg 1、2 的暖机根）：走到这里它已经在回退候选集里，但回退行要重写实例表，没有文件版本的一版上
+    // 它的落点记在哪、换下的 mkfs 实例表与候选根引用的单元谁护着都没有条款（D16（发布语义） 已定项 9 只定了树表 0 条时空发布写零个单元）——
+    // 在任何写之前拒绝，报「第一版不支持」，不报候选排除。
     if tree_table_has_no_entries(&*devices, &target_root)? {
         return Err(MountError::RollbackToVersionWithoutFileUnsupported(target));
     }

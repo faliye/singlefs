@@ -3,7 +3,7 @@
 //! 池里没有全空的 64 槽聚簇段、开放段也用满，每块盘上却还有大片空槽：一次发布要成功，提交内生块落在回落政策函数给的槽上。
 //! 回落与 bump 游标绕开同一套位（已分配、影子账隔离、抬 F 扣住），不是绕开影子账或回收扣住的第二条路。
 //! 另钉增补 2 第 ② 行里「抬 F 的空发布分配不到固定点（开放段满、唯一全空段正是扣住的那一段）」补了回落之后的行为：
-//! 扣住的段外面还有不被挡的空槽时抬 F 成功、落点一个都不在扣住的槽上；连一个都没有时照旧报 `NoSpaceFor`、扣住位留在这个进程里。
+//! 扣住的段外面还有不被挡的空槽时抬 F 成功、落点一个都不在扣住的槽上；连一个都没有时照旧落点被拒（`PlacementRefused`，每块盘上都没有）、扣住位留在这个进程里。
 //!
 //! 「没有全空段」的形态直接改空闲图造（开放段剩下的槽占满、每个全空段占掉段首一槽），不写分配记录：
 //! 第一版分配记录树只有一个节点（812 条），用真发布占满 3312 个段装不下。所以这些池上记账与记录对不上，这里不跑池级 checker。
@@ -291,7 +291,8 @@ fn raising_the_floor_when_the_only_empty_segment_is_held_falls_back_to_slots_out
     }
 }
 
-/// 同一格，扣住的槽之外一个空槽都没有：抬 F 之前把每块盘上的空槽全占掉，回收出来的全是扣住的槽 ⇒ 第一次空发布照旧报 `NoSpaceFor`、
+/// 同一格，扣住的槽之外一个空槽都没有：抬 F 之前把每块盘上的空槽全占掉，回收出来的全是扣住的槽 ⇒ 第一次空发布照旧落点被拒（`PlacementRefused`、
+/// 每块盘上都没有）、
 /// 一个写都没发；扣住位留在这个进程里：记账算它们空闲，分配器却一个都发不出去。
 #[test]
 fn raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold_stays_in_the_process(
@@ -309,11 +310,12 @@ fn raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold
     assert!(
         matches!(
             refused,
-            Err(MountError::Publish(PublishError::NoSpaceFor {
-                unit: TransactionUnit::AllocationTree
+            Err(MountError::Publish(PublishError::PlacementRefused {
+                unit: TransactionUnit::AllocationTree,
+                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
             }))
         ),
-        "回收出来的全是扣住的槽，第一个固定点就拿不到：{:?}",
+        "回收出来的全是扣住的槽，第一个固定点就拿不到（每块盘上都没有：容量不够那一种）：{:?}",
         refused.as_ref().err()
     );
     assert_eq!(

@@ -1,0 +1,82 @@
+
+running 1 test
+── 随机历史大档 ──
+种子 [288, 336)，每段 30 步，比重：偏向抬 F 之后回退（B2 那一格的取样点）
+历史 48 段：跑完 0、以已知红收尾 {0: 3}、新发现 45；根环转过一圈的 5 段；最高 txg 29
+  操作 PublishFirstFile：Ok 3、Err 3、前提不满足没调 2
+  操作 PublishOverwrite：Ok 108、Err 20、前提不满足没调 19
+  操作 PublishWithoutUnits：Ok 0、Err 0、前提不满足没调 7
+  操作 CloseAndMountWritable：Ok 36、Err 0、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 30、Err 62、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 12、Err 85、前提不满足没调 7
+  操作 ColdStartRecover：Ok 3、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 6 次、发成 6 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 87 次、发成 85 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 10 次、发成 0 次
+  内容长度 载荷容量：入口被调 12 次、发成 12 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 11 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 8 次、发成 8 次
+  Err 成员 MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion：46 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：39 次
+  Err 成员 MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）：46 次
+  Err 成员 MountError::RollbackTargetNotInRing：10 次
+  Err 成员 MountError::RollbackToVersionWithoutFileUnsupported：6 次
+  Err 成员 PublishError::ContentExceedsDataUnit：20 次
+  Err 成员 PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp：3 次
+  前提不满足（没有可写会话）：30 次
+  前提不满足（现行版本带文件）：5 次
+  冷启动结局 FileRead：1 次
+  冷启动结局 NoFile：2 次
+  一次挂载里最多写出 15 条根；一段历史里最多挂载成功 8 次、最多试挂载 9 次
+  抬 F 回收到落点 6 次、共回收 157 个落点；复用已释放的记录 74 条（其中跨度变了 22 条）；已释放的记录被罩住起点 4 条、被删 4 条
+  挂载写出的发布比过分配记录 154 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 237 次；一个写都没发、沿用上一次结论的 208 步
+  模型对拍 403 步：该拒而拒 79、区间里拒 46、该成而成 233；比过根 341 条、分配记录 5882 条、冷启动内容 1 次、抬 F 上限 51 次；回退到 txg = F_生效 > 0 的根做成 0 次
+  I-1.1：判绿 237 次、不适用 0 次
+  I-1.3：判绿 237 次、不适用 0 次
+  I-1.4：判绿 237 次、不适用 0 次
+  I-1.6：判绿 237 次、不适用 0 次
+  I-1.7：判绿 237 次、不适用 0 次
+  I-2.1：判绿 237 次、不适用 0 次
+  I-2.3：判绿 237 次、不适用 0 次
+  I-2.4：判绿 237 次、不适用 0 次
+  I-2.5：判绿 237 次、不适用 0 次
+  I-3.1：判绿 224 次、不适用 10 次
+  I-3.8：判绿 237 次、不适用 0 次
+  I-3.9：判绿 227 次、不适用 10 次
+  I-4.8：判绿 237 次、不适用 0 次
+  I-5.1：判绿 237 次、不适用 0 次
+  I-5.2：判绿 227 次、不适用 10 次
+  I-5.4：判绿 227 次、不适用 10 次
+  I-7.1：判绿 237 次、不适用 0 次
+  I-7.2：判绿 237 次、不适用 0 次
+  I-7.4：判绿 237 次、不适用 0 次
+  I-7.6：判绿 237 次、不适用 0 次
+  I-7.7：判绿 237 次、不适用 0 次
+  I-7.8：判绿 237 次、不适用 0 次
+  I-9.1：判绿 227 次、不适用 10 次
+  I-9.2：判绿 227 次、不适用 10 次
+  I-9.4：判绿 227 次、不适用 10 次
+  I-9.7：判绿 227 次、不适用 10 次
+  I-9.10：判绿 227 次、不适用 10 次
+  I-9.13：判绿 227 次、不适用 10 次
+  I-9.14：判绿 183 次、不适用 54 次
+已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：3 段；前几个种子 [(296, Operation(24)), (310, Operation(17)), (314, Operation(15))]
+已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
+新发现 ModelDisagreement { aspect: "拒绝的理由" }：第一个种子 288（同签名的种子 [288, 289, 290, 291, 293, 294, 295, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 308, 309, 311, 312, 313, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 332, 333, 334, 335]），在 Operation(2)（Some(CloseAndMountRollback)）之后
+  模型对不上（拒绝的理由）：模型答 MountRollback 该拒：["回退到树表 0 条的根（第一版不支持）"]；实现 拒了：MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=288 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }：第一个种子 292（同签名的种子 [292, 307, 331]），在 Operation(22)（Some(CloseAndMountRollback)）之后
+  模型对不上（模型说该成、实现拒了）：模型答 MountRollback 该成（写出 [(21, 4), (22, 4)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::RollbackTargetNotACandidate（txg 低于生效的回退下界 F）
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=292 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+每个新发现的种子：[(288, ModelDisagreement { aspect: "拒绝的理由" }), (289, ModelDisagreement { aspect: "拒绝的理由" }), (290, ModelDisagreement { aspect: "拒绝的理由" }), (291, ModelDisagreement { aspect: "拒绝的理由" }), (293, ModelDisagreement { aspect: "拒绝的理由" }), (294, ModelDisagreement { aspect: "拒绝的理由" }), (295, ModelDisagreement { aspect: "拒绝的理由" }), (297, ModelDisagreement { aspect: "拒绝的理由" }), (298, ModelDisagreement { aspect: "拒绝的理由" }), (299, ModelDisagreement { aspect: "拒绝的理由" }), (300, ModelDisagreement { aspect: "拒绝的理由" }), (301, ModelDisagreement { aspect: "拒绝的理由" }), (302, ModelDisagreement { aspect: "拒绝的理由" }), (303, ModelDisagreement { aspect: "拒绝的理由" }), (304, ModelDisagreement { aspect: "拒绝的理由" }), (305, ModelDisagreement { aspect: "拒绝的理由" }), (306, ModelDisagreement { aspect: "拒绝的理由" }), (308, ModelDisagreement { aspect: "拒绝的理由" }), (309, ModelDisagreement { aspect: "拒绝的理由" }), (311, ModelDisagreement { aspect: "拒绝的理由" }), (312, ModelDisagreement { aspect: "拒绝的理由" }), (313, ModelDisagreement { aspect: "拒绝的理由" }), (315, ModelDisagreement { aspect: "拒绝的理由" }), (316, ModelDisagreement { aspect: "拒绝的理由" }), (317, ModelDisagreement { aspect: "拒绝的理由" }), (318, ModelDisagreement { aspect: "拒绝的理由" }), (319, ModelDisagreement { aspect: "拒绝的理由" }), (320, ModelDisagreement { aspect: "拒绝的理由" }), (321, ModelDisagreement { aspect: "拒绝的理由" }), (322, ModelDisagreement { aspect: "拒绝的理由" }), (323, ModelDisagreement { aspect: "拒绝的理由" }), (324, ModelDisagreement { aspect: "拒绝的理由" }), (325, ModelDisagreement { aspect: "拒绝的理由" }), (326, ModelDisagreement { aspect: "拒绝的理由" }), (327, ModelDisagreement { aspect: "拒绝的理由" }), (328, ModelDisagreement { aspect: "拒绝的理由" }), (329, ModelDisagreement { aspect: "拒绝的理由" }), (330, ModelDisagreement { aspect: "拒绝的理由" }), (332, ModelDisagreement { aspect: "拒绝的理由" }), (333, ModelDisagreement { aspect: "拒绝的理由" }), (334, ModelDisagreement { aspect: "拒绝的理由" }), (335, ModelDisagreement { aspect: "拒绝的理由" }), (292, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (307, ModelDisagreement { aspect: "模型说该成、实现拒了" }), (331, ModelDisagreement { aspect: "模型说该成、实现拒了" })]
+用时 0.7 秒
+test random_histories_large_tier_seeds_and_length_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    random_histories_large_tier_seeds_and_length_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.75s
+
