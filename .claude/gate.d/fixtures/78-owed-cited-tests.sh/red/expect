@@ -1,0 +1,3 @@
+exit=1
+want=C902 引的 `the_sample_test_that_was_renamed_away` 在仓里的 .rs / .py / .sh 里一处都找不到
+want=已还清的行里有 1 个点名的标识符已经不在仓里了

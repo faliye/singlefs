@@ -1,0 +1,13 @@
+  ✓ 残留测试设备·loop：查了 3 个 loop 设备，没有挂在测试镜像上的
+  ✓ 残留测试设备·dm：查了 0 个 dm 设备
+  ✓ 残留测试设备·挂载：查了 24 条挂载，没有测试设备或临时目录下的
+  ✓ 残留测试设备·qemu 进程：查了 155 个进程的命令行，没有带 singlefs 的 qemu-system*
+  ✗ 临时目录残留：/tmp 下 34 项残留，实际占用 2.2 MiB（表观 136.0 GiB）；共查 37 项 singlefs-*
+       /tmp/singlefs-step1-layout-011-1288305-0-dev0.img  文件  实际 60.0 KiB（表观 4.0 GiB）
+     → 怎么办：跑 python3 research/scripts/test-environment-check.py clean 看计划，确认后加 --yes
+  ✓ 宿主盘·只读挂载：查了 3 个路径，罩着它们的挂载都可写
+  ✓ 宿主盘·剩余空间：查了 1 个文件系统，剩余都不低于 10% 且不低于 50 GiB
+  ✓ 宿主盘·ext4 错误计数：查了 1 个 ext4（nvme0n1p2），errors_count 都是 0
+  ✓ 宿主盘·内核日志：journalctl -k -b -p err 共 171 行，没有落在宿主盘栈上的块设备错误
+  - 宿主盘·SMART：没跑（没给 --smart）
+  汇总：查了 10 类；✓ 8 类，判红 1 类（临时目录残留），没查成 0 类，没跑 1 类（宿主盘·SMART（没给 --smart））

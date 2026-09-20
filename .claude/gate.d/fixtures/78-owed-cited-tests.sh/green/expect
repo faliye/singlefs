@@ -1,0 +1,4 @@
+exit=0
+want=查了 1 个标识符
+want=C902 the_sample_test_that_really_exists
+want=没查的 1 行
