@@ -101,11 +101,20 @@ INIT
     # 设备侧的独立录制（C6（块层语义假设写错））：每块盘前面套一层 QEMU 的 blklogwrites 过滤节点，
     # 把来宾发到这块盘上的每个写（带数据）与每个 FLUSH 按 dm-log-writes 格式记进宿主上的 log<d>.img。
     # 录制在来宾之外，与被测程序自己的录制器不共享一行代码。数据盘也放进这个目录，跑完宿主还能直接读。
+    # 镜像一律排他新建，撞名就停：`truncate` 对一个已经存在、大小相同的文件什么都不做，
+    # 字节原样留着，于是来宾读到的是上一轮的盘面——而这件事不报错。工作目录由调用方给，
+    # 复用目录就会撞上；每一轮要一个新环境（用户 2026-09-20 定案，门禁 77 号是同一条纪律的另一半）。
     drivearg=()
     for ((d=0; d<VM_DISKS; d++)); do
-      truncate -s "${VM_DISK_MB}M" "$VM_BLKLOGWRITES_DIR/disk$d.img"
-      rm -f "$VM_BLKLOGWRITES_DIR/log$d.img"
-      truncate -s "${VM_LOG_MB:-256}M" "$VM_BLKLOGWRITES_DIR/log$d.img"
+      for image in "disk$d.img:${VM_DISK_MB}M" "log$d.img:${VM_LOG_MB:-256}M"; do
+        if ! ( set -o noclobber; : > "$VM_BLKLOGWRITES_DIR/${image%%:*}" ) 2>/dev/null; then
+          echo "  ✗ 建不出 $VM_BLKLOGWRITES_DIR/${image%%:*}：它已经在了，或者这个目录写不进去" >&2
+          echo "     → 怎么办：harness 不复用镜像，每一轮要一个空目录。确认没有正在跑的活在用它之后，把这个目录整个删掉再跑，或者换一个新目录。" >&2
+          printf '%s\n' "$work" >> "$VM_WORKLIST"
+          return 1
+        fi
+        truncate -s "${image##*:}" "$VM_BLKLOGWRITES_DIR/${image%%:*}"
+      done
       drivearg+=( -blockdev "driver=file,node-name=data$d,filename=$VM_BLKLOGWRITES_DIR/disk$d.img,cache.direct=on,aio=native"
                   -blockdev "driver=file,node-name=logfile$d,filename=$VM_BLKLOGWRITES_DIR/log$d.img"
                   -blockdev "driver=blklogwrites,node-name=logwrites$d,file=data$d,log=logfile$d,log-sector-size=512,log-append=off"

@@ -1,0 +1,74 @@
+== 第一条流（今天的代码）
+   写数=33
+   甲 段序列=2+2+1+2+2+1+18+2+1+2 闭式=262165 向量数=262165
+   乙 段序列=2+2+1+2+2+1+18+2+1+2 闭式=262165 向量数=262165
+   丁 向量数=262165
+   乙⊆甲=True 甲⊆丁=True 甲==丁=True 甲==乙=True
+   丁\甲 = 0 个向量；甲\乙 = 0 个向量
+
+== 第一条流（施加变异表第 67 行）
+   写数=33
+   甲 段序列=2+3+2+3+18+2+1+2 闭式=262171 向量数=262171
+   乙 段序列=2+2+1+2+2+1+18+2+1+2 闭式=262165 向量数=262165
+   丁 向量数=1048609
+   乙⊆甲=True 甲⊆丁=True 甲==丁=False 甲==乙=False
+   丁\甲 = 786438 个向量；甲\乙 = 6 个向量
+     丁有甲无: sb#0|sb#1|root#4|sb#5
+     丁有甲无: sb#0|sb#1|jr#2|root#4|sb#5
+     丁有甲无: sb#0|sb#1|jr#3|root#4|sb#5
+     丁有甲无: sb#0|sb#1|root#4|sb#6
+     丁有甲无: sb#0|sb#1|jr#2|root#4|sb#6
+     丁有甲无: sb#0|sb#1|jr#3|root#4|sb#6
+     丁有甲无: sb#0|sb#1|root#4|sb#5|sb#6
+     丁有甲无: sb#0|sb#1|jr#2|root#4|sb#5|sb#6
+     丁有甲无: sb#0|sb#1|jr#3|root#4|sb#5|sb#6
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#10
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#10
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#10
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#10|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#10|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#10|sb#11
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#10|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#10|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#10|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|sb#10|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|sb#10|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#8|root#9|sb#10|sb#11|u#12
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|root#9|u#13
+     丁有甲无: sb#0|sb#1|jr#2|jr#3|root#4|sb#5|sb#6|jr#7|root#9|u#13
+     …… 还有 786406 个
+
+== mkfs 种根
+   写数=11
+   甲 段序列=4+1+1+1+4 闭式=34 向量数=34
+   乙 段序列=4+1+1+1+4 闭式=34 向量数=34
+   丁 向量数=34
+   乙⊆甲=True 甲⊆丁=True 甲==丁=True 甲==乙=True
+   丁\甲 = 0 个向量；甲\乙 = 0 个向量
+
+== 假想：记录与根同段、根后紧跟超级块槽写
+   写数=5
+   甲 段序列=3+2 闭式=11 向量数=11
+   乙 段序列=2+1+2 闭式=8 向量数=8
+   丁 向量数=20
+   乙⊆甲=True 甲⊆丁=True 甲==丁=False 甲==乙=False
+   丁\甲 = 9 个向量；甲\乙 = 3 个向量
+     丁有甲无: root#2|sb#3
+     丁有甲无: jr#0|root#2|sb#3
+     丁有甲无: jr#1|root#2|sb#3
+     丁有甲无: root#2|sb#4
+     丁有甲无: jr#0|root#2|sb#4
+     丁有甲无: jr#1|root#2|sb#4
+     丁有甲无: root#2|sb#3|sb#4
+     丁有甲无: jr#0|root#2|sb#3|sb#4
+     丁有甲无: jr#1|root#2|sb#3|sb#4
+
