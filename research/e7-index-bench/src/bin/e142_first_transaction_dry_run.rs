@@ -206,7 +206,7 @@ const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 
 /// D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11（2026-09-14 用户定案）：指针里压缩那两段的第一版取值。
-/// 登记表住 D9（加密） 硬要求 2 那一节：码 0 = 不压缩；码 0 时压后长度恒 0，非 0 判该指针损坏。
+/// 登记表住 D9（加密） 已定项 14：码 0 = 不压缩；码 0 时压后长度恒 0，非 0 判该指针损坏。
 const POINTER_COMPRESSION_CODE_NONE: u8 = 0;
 const POINTER_COMPRESSED_LENGTH_NONE: u16 = 0;
 
@@ -1589,7 +1589,7 @@ impl JournalRecord {
         writer.put_u64(self.new_tree_identifier_watermark);
         writer.put_u64(self.new_rollback_floor.0);
         assert_eq!(writer.position() - new_root_segment_start, JOURNAL_NEW_ROOT_SEGMENT_BYTES as usize, "新根段");
-        // 2026-09-14 用户定案：新根段之后是 fsid 8，再之后是 MAC 16（第一版全 0 留位，D9（加密） day-1 预留第 1 项）。
+        // 2026-09-14 用户定案：新根段之后是 fsid 8，再之后是 MAC 16（第一版全 0 留位，D9（加密） 已定项 12 第 1 项）。
         writer.put_u64(self.fsid);
         writer.skip(16);
         writer.assert_position(JOURNAL_HEADER_BYTES, "记录头");

@@ -475,7 +475,7 @@ fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
     publishes
 }
 
-/// 记录核对器（D13（验证路线） 故意不给编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像)）：崩溃前镜像是 `image.base`、
+/// 记录核对器（D13（验证路线） 已定项 7，故意不给它编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像)）：崩溃前镜像是 `image.base`、
 /// 记录流是 `image.writes`、崩溃后镜像是 `image` 本身。一处写「在盘上」= 崩溃后镜像那个位置上的字节与记录流里写下的逐字节相同；
 /// 不经恢复代码、不解析树。`effective_root` 取恢复报出来的实际走的那条根。
 #[must_use]
