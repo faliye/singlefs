@@ -1,0 +1,8 @@
+exit=1
+want=记账表里同一个位号登记了不止一行
+want=退役位被赋予新语义就是这个形状
+want=记账表的位号次序不对
+want=已分配的位跳号了，缺 [1]
+want=登记表把它列在未分配区间 1..255 里
+want=代码引用了记账表里不存在的 feature bit 位
+want=的 INCOMPAT_SAMPLE_THIRD_BIT 指 incompat 位 3

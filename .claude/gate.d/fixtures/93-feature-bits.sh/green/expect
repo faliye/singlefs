@@ -1,0 +1,4 @@
+exit=0
+want=feature bit 位号在记账表、D15（格式冻结政策） 已定项 4 与代码三处一致
+want=记账表 1 位、登记表分出去 1 位
+want=没判位号的 1 处：SUPPORTED_INCOMPAT_SAMPLE_BITS

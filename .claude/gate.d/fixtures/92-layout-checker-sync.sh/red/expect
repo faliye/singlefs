@@ -1,0 +1,4 @@
+exit=1
+want=格式常量在这次改动里变了
+want=改值 SAMPLE_UNIT_BYTES：16384 → 32768
+want=checker 判定路径一个都没被碰

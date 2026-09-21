@@ -1,0 +1,23 @@
+# C59（种子折叠成同一个状态）今天还没改的存量：门禁 96 号第 ① 条的出路二。
+# 四列用制表符分隔：实验源码路径、行号、欠账编号（checks-owed.md 欠着那张表里开着的一行）、为什么还没改。
+# 登记一条，等于承认「这一处的多轮实际只有几个访问模式」，并把它挂在一条有人排期的账上。
+# **这张表只缩不涨**：改好一处就删掉那一行，门禁 96 号会拿基准提交比每个文件的登记行数，涨了判红。
+# 新写的实验源码一律先乘法混淆再置位（`seed.wrapping_mul(0xD1B5_4A32_D192_ED03) | 1`），一处都不许加进来。
+# 空表是允许的：存量清完了就该一行都不剩。
+research/e7-index-bench/src/bin/e128_pointer_birth_cost.rs	114	C59	E128 有入库产物，replay.sh 判 timing；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e14_discrimination.rs	34	C59	E14 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e16_journal.rs	123	C59	E16 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e17_merge.rs	45	C59	E17 有入库产物，replay.sh 判 timing；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e18_branch.rs	74	C59	E18 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e19_defer.rs	117	C59	E19 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e20_fanout.rs	136	C59	E20 有入库产物，replay.sh 判 timing；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e26_accounting.rs	179	C59	E26 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e58_csum_grain.rs	208	C59	E58 有入库产物，replay.sh 判 timing；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e65_write_grain.rs	113	C59	没有入库产物在 replay.sh 的登记表里；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e66_small_files.rs	110	C59	没有入库产物在 replay.sh 的登记表里；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e66_small_files.rs	128	C59	没有入库产物在 replay.sh 的登记表里；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e89_interval_frontier.rs	76	C59	E89 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e89_interval_frontier.rs	77	C59	E89 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e8_split.rs	320	C59	E8 有入库产物，replay.sh 判 exact；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e9_keylayout.rs	53	C59	E9 有入库产物（replay.sh 用 @driver_e9 跑，判 exact）；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e9_keylayout.rs	74	C59	E9 有入库产物（replay.sh 用 @driver_e9 跑，判 exact）；改 PRNG 序列会换掉这个实验的全部读数，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮

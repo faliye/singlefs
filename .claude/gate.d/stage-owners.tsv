@@ -60,3 +60,10 @@
 78-owed-cited-tests.sh	kb-scribe,gate-triage	已还清的欠账行里点名的测试名还在不在：书记员改完欠账表、门禁分诊提交前各跑一次
 90-term-renames.sh	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
 91-archive-past-rounds.sh	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类
+92-layout-checker-sync.sh	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义两侧一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改），改完各自就跑
+94-checker-implementation-disjoint.sh	implementation-writer,crash-verifier	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一格归崩溃一致性验证员，改完各自就跑
+95-fixture-claims.sh	gate-triage	阶段头部声称的判别力样本与 fixtures 目录对不对得上：谁加门禁阶段都可能写下一句对不上的声称，收尾跑整轮门禁时一并判
+96-experiment-source-discipline.sh	experiment-runner,mutation-triage	实验源码的种子折叠（C59）与恒为字面量 0 的读数（C60）：research/e7-index-bench/src/bin/ 下的源码由实验执行员写，写完就跑；变异分诊读同一批源码判抓到 / 无效 / 没红，恒定读数会让那几条变异永远抓不到
+97-invariant-field-anchors.sh	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写，写完就跑
+98-kb-registry.sh	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员，建完就跑
+93-feature-bits.sh	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改，改完各自就跑

@@ -9,7 +9,7 @@
 `docs/` 下 7 份文献（RFC 8439、NIST SP 800-38B / 800-38D、DJB *Cryptography in NaCl*、
 OSTEP 第 45 章、BetrFS FAST 2017 / 2018、NetApp FAST'20；取回方式与 sha256 见
 `research/scripts/fetch-refs.sh`，抽取器 `research/scripts/pdf-text.py`）。
-**72 条**承重引用做成了可重跑的逐字断言（`research/scripts/verify-citations.sh`），
+**89 条**承重引用做成了可重跑的逐字断言（`research/scripts/verify-citations.sh`，这个数由它自己末行报出来：`bash research/scripts/verify-citations.sh` 的「结果：N 条命中」，别手数——源码里 `^(ck|ckn|ckdoc|ckdocn)` 的行还含 11 条只在 `--selftest` 里跑的合成断言）；其中 38 条核的是本机内核树、不是固定点树（C44（引用核到的不是固定点树）），
 挂在门禁阶段「外部引用还核得动吗」（`.claude/gate.d/70-citations.sh`）——**源码树不在也判红**，
 「跳过」正是让上一批文献无声蒸发的那个行为。
 ⚠️ **ZFS On-Disk Specification 没收**：它用 CID 双字节字体，`pdf-text.py` 抽出乱码 ⇒

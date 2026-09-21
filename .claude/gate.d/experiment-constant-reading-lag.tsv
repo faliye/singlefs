@@ -1,0 +1,20 @@
+# C60（恒定读数没有故障注入自证）今天还没改的存量：门禁 96 号第 ② 条的出路二。
+# 四列用制表符分隔：实验源码路径、`结构体.字段`、欠账编号（checks-owed.md 欠着那张表里开着的一行）、为什么还没改。
+# 登记一条，等于承认「这个字段的读数恒为字面量 0」，并把它挂在一条有人排期的账上。
+# **这张表只缩不涨**：改好一处就删掉那一行，门禁 96 号会拿基准提交比每个文件的登记行数，涨了判红。
+# 新写的实验源码里的读数要么真的被算出来、要么别留这个字段，一处都不许加进来。
+# 空表是允许的：存量清完了就该一行都不剩。
+research/e7-index-bench/src/bin/e102_unit_class_registry.rs	RecordTypeOutcome.records_applied	C60	E102 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e104_current_version.rs	World.frozen_container_counter	C60	E104 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e106_stripe_member_table.rs	LayoutParameters.prefilled_slots	C60	E106 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e139_tightened_floor.rs	CandidateLedger.maximum_publications_beyond_tolerance	C60	E139 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e139_tightened_floor.rs	CandidateLedger.maximum_publications_within_tolerance	C60	E139 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs	GateSnapshot.switch_reserve	C60	E154 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs	InstanceRow.applied_transaction_high_water	C60	E154 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs	RunSummary.admission_passed_but_allocation_failed_count	C60	E154 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e18_branch.rs	Block.single_value_death_latest	C60	E18 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e29_blast_radius.rs	BlastRadiusMeasurement.index_data_loss	C60	E29 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e31_aad_snapshot.rs	IndexKeyWithSnapshot.offset	C60	E31 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e59_message_recompute.rs	UnitHeader.anchor	C60	E59 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e69_backref_cost.rs	Authoritative.units_read_on_commit	C60	E69 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮
+research/e7-index-bench/src/bin/e99_writebuffer_sequence.rs	Update.index_within_window	C60	E99 有入库产物，replay.sh 判 exact；补上真实的写或删掉这个字段都会改动产物，要连同重跑与逐个回对正文引的数一起做，不在立闸这一轮

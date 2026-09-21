@@ -2,7 +2,7 @@
 # gate-stage: 三方论证那几个 research 脚本的自证还会红
 #
 # 判据：`research/scripts/ask-local-selftest.sh`、`checklist-specs.py --selftest`、`quote-kb.py --selftest`、
-# `insert-row.py --selftest`、`sweep-term.py --selftest`、`archive-past-rounds.py --selftest`、`kb-sections.py --selftest`、`check-segment-registry.py --selftest`、`replace-once.py --selftest`、`replace-batch.py --selftest`、`e152-tables.py --selftest`、`agent-watch.py --selftest`、`quote-rust-items.py --selftest`、`cache-keepalive.sh --selftest`、`stale-candidates.py --selftest` 与 `--benchmark`、`test-environment-check.py --selftest`、`change-touches-crates.sh --selftest` 十六份都通过。
+# `insert-row.py --selftest`、`sweep-term.py --selftest`、`archive-past-rounds.py --selftest`、`kb-sections.py --selftest`、`check-segment-registry.py --selftest`、`replace-once.py --selftest`、`replace-batch.py --selftest`、`e152-tables.py --selftest`、`agent-watch.py --selftest`、`quote-rust-items.py --selftest`、`cache-keepalive.sh --selftest`、`stale-candidates.py --selftest` 与 `--benchmark`、`test-environment-check.py --selftest`、`change-touches-crates.sh --selftest`、`verify-citations.sh --selftest`，上面列出的每一份都要通过（份数不在这里写死：加一份就要改两处，而这句注释没有任何东西盯着它；运行时那句报的数由下面的 runner 表现算，`stale-candidates` 占两条所以比脚本份数多一）。
 # 为什么：这几份自证此前都写着，却没有任何门禁阶段在跑（2026-09-12 现查 gate.d 与 .claude/scripts 零处调用）——自证只在写它的那天被跑过一次，
 # 之后脚本改坏了也没人知道。2026-09-12 实测的两个坑都住在这里：
 # ask-local.sh 判红时正文照样打到 stdout（一份作废输出顶着 -output-s1.md 落盘），
@@ -28,7 +28,8 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
               "bash research/scripts/cache-keepalive.sh --selftest" \
               "python3 research/scripts/stale-candidates.py --selftest" "python3 research/scripts/stale-candidates.py --benchmark" \
               "python3 research/scripts/test-environment-check.py --selftest" \
-              "bash research/scripts/change-touches-crates.sh --selftest"; do
+              "bash research/scripts/change-touches-crates.sh --selftest" \
+              "bash research/scripts/verify-citations.sh --selftest"; do
   checked=$((checked + 1))
   output="$($runner 2>&1)"; rc=$?
   if [[ $rc -ne 0 ]]; then
@@ -39,4 +40,4 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
   fi
 done
 ((failed)) && exit 1
-echo "  ✓ research 脚本的自证都通过（查了 $checked 份：ask-local 判红分支、清单生成取法、机械整抄、小节清单、段序列登记表比对、定点替换、批量定点替换、E152 出表、子 agent 监控、按项名抽 Rust 代码、读子进程输出的计时写法、子 agent 的缓存计时器、阶段同步的候选表与它的阳性对照、测试环境残留与宿主盘检查）"
+echo "  ✓ research 脚本的自证都通过（查了 $checked 份：ask-local 判红分支、清单生成取法、机械整抄、小节清单、段序列登记表比对、定点替换、批量定点替换、E152 出表、子 agent 监控、按项名抽 Rust 代码、读子进程输出的计时写法、子 agent 的缓存计时器、阶段同步的候选表与它的阳性对照、测试环境残留与宿主盘检查、引文核的是哪棵树）"

@@ -1,0 +1,5 @@
+exit=1
+want=除常量模块之外还共享 1 个依赖
+want=sample-shared-helper
+want=1 处引实现侧的 `singlefs_core`
+want=常量模块正文里有 1 处分支或循环

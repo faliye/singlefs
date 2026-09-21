@@ -64,7 +64,7 @@ ALLOWLIST = (
     (re.compile(r'^singlefs-e152-packages$'),
      'E152 六家文件系统的下载包缓存（research/scripts/e152-stage-root.sh 第 16 行）'),
     (re.compile(r'^singlefs-pdftext-[0-9]+$'),
-     '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（research/scripts/verify-citations.sh 第 134 行）'),
+     '引文核对的 PDF 抽文本缓存，名字里是 uid 不是 pid（research/scripts/verify-citations.sh 的 PDFTXT_CACHE）'),
     (re.compile(r'^singlefs-vmlinuz(-.+)?$'),
      '给 QEMU 用的可读内核副本（research/scripts/vm-kernel.sh 第 19、36 行）'),
 )

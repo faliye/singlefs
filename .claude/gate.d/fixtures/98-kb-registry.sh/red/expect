@@ -1,0 +1,5 @@
+exit=1
+want=1 份没有在 CLAUDE.md 的「## 项目本地事实」表里登记
+want=.claude/kb/sample-beta.md
+want=1 个路径指向不存在的东西
+want=.claude/kb/sample-gone.md

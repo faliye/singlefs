@@ -1,0 +1,7 @@
+exit=1
+want=1 个阶段的头部声称有判别力样本，而目录不存在
+want=50-claims-but-missing.sh
+want=1 个孤儿样本目录，没有对应的阶段
+want=99-orphan.sh
+want=1 个样本目录是空壳
+want=51-hollow.sh

@@ -1,0 +1,6 @@
+[package]
+name = "singlefs-checker"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }
+sample-shared-helper = "1"

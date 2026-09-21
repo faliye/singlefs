@@ -1,9 +1,0 @@
-1. literal text labels embedded in a free text sentence. facts 2 and 3. This would be refuted by evidence that the data is passed as a structured value without text labels.
-
-2. row Gamma: reading side. facts 6. row Delta: reading side. facts 7. row Epsilon: writing side. facts 8. row Zeta: writing side. facts 5.
-
-3. row Gamma: returns completed structure. affected shape: known red form zero. row Delta: returns completed structure. affected shape: known red form one. row Epsilon: returns nothing at all. affected shapes: both. row Zeta: returns nothing at all. affected shapes: both.
-
-4. row Gamma: over reporting. fact 6 removes the check for known red form zero so genuine instances are reported as new. This would be refuted by evidence that known red form zero is still recognized after the change. row Delta: over reporting. fact 7 removes the check for known red form one so genuine instances are reported as new. This would be refuted by evidence that known red form one is still recognized after the change. row Epsilon: over reporting. fact 8 removes rollback floor label causing parsing failure so genuine instances of both shapes are reported as new. This would be refuted by evidence that both shapes are still recognized despite the missing label. row Zeta: over reporting. fact 5 and 3 show changed label wording causes parsing failure so genuine instances of both shapes are reported as new. This would be refuted by evidence that both shapes are still recognized despite the label wording change.
-
-5. tends to fail in the safe direction of over reporting known issues as new. facts 2 3 4 5 6 7 8 show all changes cause known issues to be reported as new rather than silently accepted. This would be refuted by evidence that a change causes a new issue to be silently accepted as known.

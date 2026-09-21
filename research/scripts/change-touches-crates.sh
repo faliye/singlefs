@@ -2,7 +2,7 @@
 # 这次改动碰没碰 `crates/`：碰了退出 0，没碰退出 1，判不出来退出 0。
 #
 #   change-touches-crates.sh [项目根] [输入前缀…]   判一次，把判据与依据打到 stdout（前缀不给按 `crates/`）
-#   change-touches-crates.sh --selftest   自证 5 格：只改文档判「没碰」、改一行 crates 判「碰了」、判不出来时判「碰了」、强制全跑判「碰了」、漏进来的 GATE_BASE 不污染判定
+#   change-touches-crates.sh --selftest   自证 6 格：只改文档判「没碰」、改一行 crates 判「碰了」、判不出来时判「碰了」、强制全跑判「碰了」、漏进来的 GATE_BASE 不污染判定
 #
 # 谁在用：`.claude/gate.d/` 里那几道只判 `crates/` 里代码的重阶段（层 0 崩溃点重放、QEMU 真设备、
 # 崩溃点重放、模型对拍）。没碰 `crates/` 时它们退 77（本次未跑），不退 0——
@@ -24,22 +24,28 @@ set -uo pipefail
 # 基取哪一个：显式的 GATE_BASE > 与上游的 merge-base > HEAD。与 .claude/gate.d/75-decision-experiment-links.sh 同一套取法。
 base_of() {
   local repository="$1"
-  # GATE_BASE 是外层那个仓的基，只对那个仓有意义。它会顺着环境漏进里层：`gate.sh --staged` 设了它，
-  # 本脚本的 --selftest 在自己造的临时仓里判时就拿它当基，而那个 SHA 在临时仓里够不着
-  # ——两格都落进「拿不到 diff ⇒ 保守判碰了」，阴性那一格于是恒不成立，自证再也分不出差别。
-  # 所以取它之前先确认它在**这个仓**里够得着；够不着就退回 HEAD（`.claude/singlefs-ai-sop/rules/command-safety.md`
-  # 「握手用的环境变量漏给子进程」）。
-  if [[ -n "${GATE_BASE:-}" ]]; then
-    if git -C "$repository" rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
-      printf '%s' "$GATE_BASE"; return 0
-    fi
-    printf 'HEAD'; return 0
-  fi
-  local upstream_base
-  if upstream_base="$(git -C "$repository" merge-base HEAD '@{upstream}' 2>/dev/null)" && [[ -n "$upstream_base" ]]; then
-    printf '%s' "$upstream_base"; return 0
-  fi
+  # 基准恒取 HEAD，**不取 `GATE_BASE`**——两者回答的不是同一个问题，混用会让这道判定失效：
+  #
+  #   `GATE_BASE`（共享 gate.sh 算出来传进来的）问的是「**上次过闸以来有没有人改过**」。
+  #   它为 show-me-test 而设，要挡的是「第一次提交改代码不带测试、第二次只改文档」这种分两次绕过去的走法，
+  #   所以窗口要尽量宽：没有远端、也没有 `refs/sop/gate-ok` 时它退回 `HEAD~1`。
+  #
+  #   这个脚本问的是「**这份代码变没变**」。HEAD 那个提交的 `crates/` 在它被提交之前就验过了
+  #   （那一轮门禁验的正是「HEAD~1 + 暂存区」，也就是 HEAD 的内容），这一轮只需要验相对 HEAD 新增的部分。
+  #
+  # 拿前者当后者的基准，上一个提交已经验过的同一份 `crates/` 改动就会重新落进「这次改动」里。
+  # 实测 2026-09-21：暂存区零行 `crates/`，相对 `HEAD~1` 却有 5 个 `crates/` 路径（全是上一个提交改的），
+  # 层 0 重放、QEMU、模型对拍、replay 四道重阶段全跑，白等 40 分钟。
+  #
+  # ⚠️ **别为了「跟门禁基准统一」把这里改回 `GATE_BASE`。** 看着整齐，代价是这道判定恒判「碰了」：
+  # `gate.sh --staged` 必定给里层设 `GATE_BASE`，而写 `refs/sop/gate-ok` 的守卫要求它为空，
+  # 所以几个会话共写、一直用 `--staged` 提交的仓里那个 ref 永远不存在，基准永远是 `HEAD~1`，
+  # 也就永远把上一个提交算进来。
+  #
+  # 不用落盘记指纹也是这个道理：暂存之后 git 自己就答得出「相对 HEAD 变了什么」，
+  # 另记一份 hash 等于再造一个会腐化、新 clone 拿不到、几个会话抢着写的状态。
   printf 'HEAD'
+  : "$repository"   # 保留参数形状：调用点与自证都按 base_of <仓> 调
 }
 
 # 判一个项目根。碰了打印依据并回 0，没碰回 1。第二个参数起是这道阶段自己的输入前缀，不给就按 `crates/`。
@@ -142,6 +148,25 @@ selftest() {
     failures=$((failures + 1))
   fi
 
+  # 这一格判的是「基准取 HEAD 还是取 GATE_BASE」那个岔路，别的格都分不出它。
+  echo "上一个提交改了 crates/、这一轮只改文档 ⇒ 应当判「没碰」"
+  checked=$((checked + 1))
+  local two_commits_ago; two_commits_ago="$(git -C "$work" rev-parse HEAD)"
+  git -C "$work" add -A >/dev/null 2>&1
+  git -C "$work" commit -q -m "改了 crates（这一次提交之前已经过闸）" >/dev/null 2>&1
+  echo "又改一行" >> "$work/docs/note.md"
+  git -C "$work" add docs/note.md >/dev/null 2>&1
+  # GATE_BASE 指向**上上个**提交：没有 refs/sop/gate-ok 时共享 gate.sh 就是这么退的（退到 HEAD~1）。
+  # 拿它当基准，上一个提交那次已经过闸的 crates 改动会重新落进「这次改动」里。
+  if GATE_BASE="$two_commits_ago" judge "$work"; then
+    echo "  ✗ 上一个提交的 crates 改动被算进了这一轮——四道重阶段会把同一份代码再跑一遍"
+    echo "     → 怎么办：看 base_of，它必须恒返回 HEAD。把它改回取 GATE_BASE 就会踩这一格，"
+    echo "               那两个值回答的不是同一个问题，base_of 的注释里写了为什么。"
+    failures=$((failures + 1))
+  else
+    echo "  ✓ 判「没碰」"
+  fi
+
   echo "不是 git 工作树 ⇒ 应当保守判「碰了」"
   checked=$((checked + 1))
   local plain; plain="$(mktemp -d)"
@@ -188,7 +213,7 @@ selftest() {
     echo "     → 怎么办：上面每一项各自写了看哪一段。"
     return 1
   fi
-  echo "  ✓ 自证通过（查了 $checked 格）：只改文档判「没碰」、改一行 crates 判「碰了」、算不出范围与强制全跑都判「碰了」、外层漏进来而本仓够不着的 GATE_BASE 退回 HEAD 之后仍判「没碰」"
+  echo "  ✓ 自证通过（查了 $checked 格）：只改文档判「没碰」、改一行 crates 判「碰了」、算不出范围与强制全跑都判「碰了」、外层漏进来而本仓够不着的 GATE_BASE 退回 HEAD 之后仍判「没碰」、上一个提交的 crates 改动不算进这一轮"
   return 0
 }
 

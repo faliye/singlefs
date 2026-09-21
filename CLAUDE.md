@@ -19,7 +19,7 @@ agent治理与上游sop治理，是另外一个重要的任务。因此遇到问
 
 别的会话、别的贡献者、派出去的 subagent 可能撞上的坑与约定，写进项目：规则（`.claude/rules/`）、agent 定义与 `.claude/agent-common.md`、kb、`records/`。私有 memory 只放用户个人的偏好（提交时间窗、回复语言这类）：它只在本机，别的贡献者看不到，定义开了 `omitClaudeMd` 的 subagent 也读不到。往本文件加内容之前先问它属于哪个 agent，属于就写进那个定义或共用约束。
 
-subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身。定义、共用约束、三方流程与配套脚本用着发现问题就直接改，改完记进那份计划、跑相关门禁（26、47、62、63、89 与 doc-lint），不先问。
+subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身。定义、共用约束、三方流程与配套脚本用着发现问题就直接改，改完记进那份计划、跑相关门禁（47、62、63 与 doc-lint；本地阶段判别力与编号简称由共享 `gate.sh` 跑），不先问。
 
 ## 规则（始终生效）
 
@@ -74,6 +74,10 @@ subagent 与协作工具的欠账记在 `records/2026-09-16-subagent拆分提案
 | `.claude/kb/experiments/` | 每个实验一个文件（`NN-简称.md`），正文与口径都在这里 |
 | `.claude/kb/experiments-history.md` | 全部实验的变更史 |
 | `.claude/kb/invariants.md` | 不变量清单，checker 是它的可执行形式 |
+| `.claude/kb/feature-bits.md` | feature bit 的记账表（位号 / 类别 / 名称 / 引入版本 / 引入 commit / 状态 / 语义一句话），形态由 D15（格式冻结政策） 已定项 10 定。**位号的唯一登记位不在这里**，在 D15（格式冻结政策） 已定项 4 那张表；门禁 93 号判两处逐位一致 |
+| `.claude/kb/term-renames.md` | 全仓术语改名的登记表，一行一条（旧名 / 新名 / 匹配），门禁 90 号按它查全仓不再出现旧名；怎么改名见 `.claude/rules/path-moves.md`「改一个全仓术语」 |
+| `.claude/kb/tooling.md` | 本机工具与模型的事实（本地腿用哪个模型、网关怎么调、量化到几位、中文为什么会退化性复读） |
+| `.claude/kb/INDEX.md` | kb 的导航表，本身不放事实；它是唯一不留「## 历史版本」节的 kb 文件（`kb-discipline.md` 第 8 条显式豁免） |
 | `.claude/kb/prior-art.md` | 他家方案调研，含来源与口径 |
 | `.claude/kb/pitfalls.md` | 避坑清单，每做设计决定回来对一遍 |
 | `.claude/kb/checks-owed.md` | 欠的检查：知道要拦什么但还拦不了的，含前置 |

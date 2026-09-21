@@ -1,0 +1,2 @@
+# 样本：C902 的存量登记，四列用制表符分隔。这张表只缩不涨。
+research/e7-index-bench/src/bin/e1_sample.rs	Reading.units_read_on_commit	C902	样本：存量按豁免表放行，改它要重跑产物

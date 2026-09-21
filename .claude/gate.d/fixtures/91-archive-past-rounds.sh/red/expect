@@ -1,0 +1,3 @@
+exit=1
+want=工作区里还留着上一轮及更早的实验记录
+want=archive-past-rounds.py --apply
