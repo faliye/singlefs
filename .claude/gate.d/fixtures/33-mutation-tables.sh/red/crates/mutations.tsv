@@ -1,2 +1,3 @@
 # 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
 M_锚点腐化	crates/demo/src/lib.rs	    transaction_txg\n}	    transaction_txg - 1\n}	-p demo	published_generation_is_the_transaction_generation
+M_转义写进源码	crates/demo/src/lib.rs	    transaction_generation\n}	    published_generation(\&transaction_generation)\n}	-p demo	published_generation_is_the_transaction_generation

@@ -38,9 +38,12 @@ done
 # 都写着「N 条变异全抓」——那句话当时已经复跑不出来了。
 # ⚠️ 这里仍然**不跑变异**，只做子串计数，代价是毫秒级。
 anchor_report="$(BIN_DIR="$BIN_DIR" MUT_DIR="$MUT_DIR" python3 - <<'PY'
-import os, glob
+import os, glob, re
 bin_dir = os.environ["BIN_DIR"]; mut_dir = os.environ["MUT_DIR"]
-bad = []; checked = 0
+bad = []; stray = []; checked = 0
+def stray_escapes(segment_name, segment):
+    """mutate.sh 与 59 号只把 \\n 还原成换行，别的反斜杠按字面写进源码（C427）。"""
+    return [(segment_name, match.group(0)) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
 for tsv in sorted(glob.glob(os.path.join(mut_dir, "*.tsv"))):
     stem = os.path.basename(tsv)[:-4]
     src_path = os.path.join(bin_dir, stem + ".rs")
@@ -54,15 +57,20 @@ for tsv in sorted(glob.glob(os.path.join(mut_dir, "*.tsv"))):
         parts = line.rstrip("\n").split("\t")
         if len(parts) != 3:
             continue
-        name, frm, _ = parts
+        name, frm, to = parts
         checked += 1
         # 口径与 mutate.sh 一致：表里的 \n 先还原成换行，再数子串
         hits = src.count(frm.replace("\\n", "\n"))
         if hits != 1:
             bad.append((stem, name, lineno, hits))
+        for segment_name, segment in (("原文", frm), ("替换文", to)):
+            for found in stray_escapes(segment_name, segment):
+                stray.append((stem, name, lineno) + found)
 print("CHECKED", checked)
 for b in bad:
     print("BAD", *b, sep="\t")
+for s in stray:
+    print("STRAY", *s, sep="\t")
 PY
 )"
 # ── crates/mutations.tsv 的锚点（六段：变异名、文件、原文、替换文、cargo test 参数、必须红的测试名）──
@@ -70,7 +78,11 @@ PY
 crates_report=""
 if [[ -f crates/mutations.tsv ]]; then
   crates_report="$(python3 - <<'PY'
+import re
 checked = 0
+def stray_escapes(segment_name, segment):
+    """59 号只把 \\n 还原成换行，别的反斜杠按字面写进源码，那条变异编不过、等于没跑（C427）。"""
+    return [(segment_name, match.group(0)) for match in re.finditer(r"\\(.)", segment) if match.group(1) != "n"]
 for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"), 1):
     line = line.rstrip("\n")
     if not line or line.startswith("#"):
@@ -81,6 +93,9 @@ for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"
         continue
     checked += 1
     name, path, original = fields[0], fields[1], fields[2].replace("\\n", "\n")
+    for segment_name, segment in (("原文", fields[2]), ("替换文", fields[3])):
+        for found in stray_escapes(segment_name, segment):
+            print("CRATES_STRAY", line_number, name, *found, sep="\t")
     try:
         source = open(path, encoding="utf-8").read()
     except FileNotFoundError:
@@ -97,8 +112,10 @@ crates_checked="$(sed -n 's/^CRATES_CHECKED //p' <<<"$crates_report")"
 mapfile -t crates_bad < <(grep '^CRATES_BAD' <<<"$crates_report")
 anchor_checked="$(sed -n 's/^CHECKED //p' <<<"$anchor_report")"
 mapfile -t anchor_bad < <(grep '^BAD' <<<"$anchor_report")
+mapfile -t stray_rows < <(grep '^STRAY' <<<"$anchor_report")
+mapfile -t crates_stray < <(grep '^CRATES_STRAY' <<<"$crates_report")
 
-if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]})); then
+if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]} + ${#stray_rows[@]} + ${#crates_stray[@]})); then
   if ((${#missing[@]})); then
     echo "  ✗ 这些实验二进制没有同名变异表："   # gate-lint:detail
     printf '      %s\n' "${missing[@]}"
@@ -120,6 +137,22 @@ if ((${#missing[@]} + ${#malformed[@]} + ${#anchor_bad[@]} + ${#crates_bad[@]}))
     echo "    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，"
     echo "    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。"
   fi
+  if ((${#stray_rows[@]})); then
+    echo "  ✗ 这些变异条目的原文或替换文里有 \\n 以外的反斜杠转义（mutate.sh 只还原 \\n，别的按字面写进源码）："
+    while IFS=$'\t' read -r _ stem name lineno segment escape; do
+      printf '      %s 的 %s（表第 %s 行，%s 里的 %s）\n' "$stem" "$name" "$lineno" "$segment" "$escape"   # gate-lint:detail
+    done < <(printf '%s\n' "${stray_rows[@]}")
+    echo "    → 怎么办：去掉那个反斜杠。替换文按字面写进源码，\\& \\\" 这类会原样落进去、那份源码编不过，"
+    echo "      变异既不算被抓也不算没红（.claude/rules/mutation-sampling.md 第八类：无效变异），而跑变异的脚本报的是「点名的测试没跑到」。"
+  fi
+  if ((${#crates_stray[@]})); then
+    echo "  ✗ crates/mutations.tsv 这些行的原文或替换文里有 \\n 以外的反斜杠转义（门禁 59 号只还原 \\n）："
+    while IFS=$'\t' read -r _ lineno name segment escape; do
+      printf '      第 %s 行 %s（%s 里的 %s）\n' "$lineno" "$name" "$segment" "$escape"   # gate-lint:detail
+    done < <(printf '%s\n' "${crates_stray[@]}")
+    echo "    → 怎么办：去掉那个反斜杠，改完单跑那一行证明点名的测试红（2026-09-20 第 180 行踩过：替换文写 \\&report.outcome，"
+    echo "      写进源码是字面反斜杠、编不过，59 号把它报成「点名的测试没跑到」，出路指向「先造一条会红的用例」，方向是反的）。"
+  fi
   if ((${#crates_bad[@]})); then
     echo "  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 59 号预扫会整张表退出，一条都不跑）："
     while IFS=$'\t' read -r _ lineno name why; do
@@ -132,4 +165,4 @@ fi
 n=$(ls "$BIN_DIR"/*.rs | wc -l)
 crates_summary="；没有 crates/mutations.tsv"
 [[ -f crates/mutations.tsv ]] && crates_summary="；crates/mutations.tsv ${crates_checked} 条的原文各命中源码一次"
-echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上）"
+echo "  ✓ $n 个实验二进制都有成形的变异表，${anchor_checked} 条变异的原文各命中源码一次${crates_summary}（本阶段不跑变异，只验装置在、锚点对得上、两段里没有 \n 以外的反斜杠转义）"

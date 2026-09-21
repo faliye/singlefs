@@ -1,0 +1,442 @@
+
+running 8 tests
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 configured_worker_threads=32 worker_threads_source=available_parallelism images=/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 configured_worker_threads=32 worker_threads_source=available_parallelism images=/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113
+iCRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355121) slices=4 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355115) slices=2 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=1/2 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/2 finished_histories=1/2 elapsed_seconds=0.4
+CRASH_INJECTION_PROGRESS slice=2/2 seeds=[7463871032432355114,7463871032432355115) finished_slices=2/2 finished_histories=2/2 elapsed_seconds=1.0
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355115) slices=2 worker_threads=1 elapsed_seconds=1.0
+.CRASH_INJECTION_PROGRESS slice=20/24 seeds=[7463871032432355132,7463871032432355133) finished_slices=1/24 finished_histories=1/24 elapsed_seconds=1.2
+CRASH_INJECTION_PROGRESS slice=16/24 seeds=[7463871032432355128,7463871032432355129) finished_slices=2/24 finished_histories=2/24 elapsed_seconds=1.4
+CRASH_INJECTION_PROGRESS slice=8/24 seeds=[7463871032432355120,7463871032432355121) finished_slices=3/24 finished_histories=3/24 elapsed_seconds=1.5
+CRASH_INJECTION_PROGRESS slice=11/12 seeds=[7463871032432355123,7463871032432355124) finished_slices=1/12 finished_histories=1/12 elapsed_seconds=1.5
+CRASH_INJECTION_PROGRESS slice=6/12 seeds=[7463871032432355118,7463871032432355119) finished_slices=2/12 finished_histories=2/12 elapsed_seconds=1.6
+CRASH_INJECTION_PROGRESS slice=1/24 seeds=[7463871032432355113,7463871032432355114) finished_slices=4/24 finished_histories=4/24 elapsed_seconds=1.8
+CRASH_INJECTION_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355115) finished_slices=1/4 finished_histories=2/8 elapsed_seconds=1.8
+CRASH_INJECTION_PROGRESS slice=5/24 seeds=[7463871032432355117,7463871032432355118) finished_slices=5/24 finished_histories=5/24 elapsed_seconds=1.8
+CRASH_INJECTION_PROGRESS slice=2/12 seeds=[7463871032432355114,7463871032432355115) finished_slices=3/12 finished_histories=3/12 elapsed_seconds=2.1
+CRASH_INJECTION_PROGRESS slice=11/24 seeds=[7463871032432355123,7463871032432355124) finished_slices=6/24 finished_histories=6/24 elapsed_seconds=2.1
+CRASH_INJECTION_PROGRESS slice=1/12 seeds=[7463871032432355113,7463871032432355114) finished_slices=4/12 finished_histories=4/12 elapsed_seconds=2.1
+CRASH_INJECTION_PROGRESS slice=23/24 seeds=[7463871032432355135,7463871032432355136) finished_slices=7/24 finished_histories=7/24 elapsed_seconds=2.2
+CRASH_INJECTION_PROGRESS slice=3/12 seeds=[7463871032432355115,7463871032432355116) finished_slices=5/12 finished_histories=5/12 elapsed_seconds=2.2
+.CRASH_INJECTION_PROGRESS slice=5/12 seeds=[7463871032432355117,7463871032432355118) finished_slices=6/12 finished_histories=6/12 elapsed_seconds=2.4
+CRASH_INJECTION_PROGRESS slice=21/24 seeds=[7463871032432355133,7463871032432355134) finished_slices=8/24 finished_histories=8/24 elapsed_seconds=2.4
+CRASH_INJECTION_PROGRESS slice=22/24 seeds=[7463871032432355134,7463871032432355135) finished_slices=9/24 finished_histories=9/24 elapsed_seconds=2.5
+CRASH_INJECTION_PROGRESS slice=4/24 seeds=[7463871032432355116,7463871032432355117) finished_slices=10/24 finished_histories=10/24 elapsed_seconds=2.6
+CRASH_INJECTION_PROGRESS slice=10/12 seeds=[7463871032432355122,7463871032432355123) finished_slices=7/12 finished_histories=7/12 elapsed_seconds=2.7
+CRASH_INJECTION_PROGRESS slice=4/12 seeds=[7463871032432355116,7463871032432355117) finished_slices=8/12 finished_histories=8/12 elapsed_seconds=2.8
+CRASH_INJECTION_PROGRESS slice=2/24 seeds=[7463871032432355114,7463871032432355115) finished_slices=11/24 finished_histories=11/24 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=9/12 seeds=[7463871032432355121,7463871032432355122) finished_slices=9/12 finished_histories=9/12 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=13/24 seeds=[7463871032432355125,7463871032432355126) finished_slices=12/24 finished_histories=12/24 elapsed_seconds=3.0
+CRASH_INJECTION_PROGRESS slice=12/12 seeds=[7463871032432355124,7463871032432355125) finished_slices=10/12 finished_histories=10/12 elapsed_seconds=3.0
+CRASH_INJECTION_PROGRESS slice=24/24 seeds=[7463871032432355136,7463871032432355137) finished_slices=13/24 finished_histories=13/24 elapsed_seconds=3.0
+CRASH_INJECTION_PROGRESS slice=15/24 seeds=[7463871032432355127,7463871032432355128) finished_slices=14/24 finished_histories=14/24 elapsed_seconds=3.1
+CRASH_INJECTION_PROGRESS slice=14/24 seeds=[7463871032432355126,7463871032432355127) finished_slices=15/24 finished_histories=15/24 elapsed_seconds=3.3
+CRASH_INJECTION_PROGRESS slice=17/24 seeds=[7463871032432355129,7463871032432355130) finished_slices=16/24 finished_histories=16/24 elapsed_seconds=3.3
+CRASH_INJECTION_PROGRESS slice=3/24 seeds=[7463871032432355115,7463871032432355116) finished_slices=17/24 finished_histories=17/24 elapsed_seconds=3.4
+CRASH_INJECTION_PROGRESS slice=10/24 seeds=[7463871032432355122,7463871032432355123) finished_slices=18/24 finished_histories=18/24 elapsed_seconds=3.5
+CRASH_INJECTION_PROGRESS slice=19/24 seeds=[7463871032432355131,7463871032432355132) finished_slices=19/24 finished_histories=19/24 elapsed_seconds=3.5
+CRASH_INJECTION_PROGRESS slice=7/12 seeds=[7463871032432355119,7463871032432355120) finished_slices=11/12 finished_histories=11/12 elapsed_seconds=3.6
+CRASH_INJECTION_PROGRESS slice=18/24 seeds=[7463871032432355130,7463871032432355131) finished_slices=20/24 finished_histories=20/24 elapsed_seconds=3.6
+CRASH_INJECTION_PROGRESS slice=8/12 seeds=[7463871032432355120,7463871032432355121) finished_slices=12/12 finished_histories=12/12 elapsed_seconds=3.7
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 elapsed_seconds=3.7
+── 崩溃注入：偏向抬 F 之后回退的取样点 ──
+种子基 7463871032432355113（这个测试周期写死的；同一个构建加同一个种子基重放得出来），种子 [7463871032432355113, 7463871032432355125)，每段 20 步，崩溃状态怎么摆 Sampled { crash_points_per_history: 6 }，比重：偏向抬 F 之后回退（B2 那一格的取样点）；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+判红的崩溃镜像曾写在 /tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113，跑完已删
+历史 12 段：跑完 12、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 29 版
+崩溃状态 69 个：截在发布中间（根还没落盘）的 52 个、截回到最后一版之前的 65 个、段内有洞（后发的写先持久）的 33 个、落在起点那一段里的 18 个
+  段内扣下过 journal_record：24 个
+  段内扣下过 root_record_fua：22 个
+  段内扣下过 system_configuration_slot：17 个
+  段内扣下过 unit_write：16 个
+  落在 PublishFirstFile 里：0 个
+  落在 PublishOverwrite 里：17 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：14 个
+  落在 CloseAndMountRollback 里：19 个
+  落在 RaiseRollbackFloor 里：1 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 51 次、没有文件 18 次、失败 0 次；施加过 journal 记录前缀 27 次
+崩溃状态上 checker 跑了 69 次；记录核对器跑了 69 次：根在而记录一条都不在 1 次、恢复自称新态而单元缺席 0 次
+问模型 69 次：比过内容 51 次、树表 0 条对上 18 次
+崩溃状态：以已知红收尾 {}、新发现 1
+  I-1.1：判绿 69 次、不适用 0 次
+  I-1.3：判绿 69 次、不适用 0 次
+  I-1.4：判绿 69 次、不适用 0 次
+  I-1.6：判绿 69 次、不适用 0 次
+  I-1.7：判绿 69 次、不适用 0 次
+  I-2.1：判绿 69 次、不适用 0 次
+  I-2.3：判绿 69 次、不适用 0 次
+  I-2.4：判绿 69 次、不适用 0 次
+  I-2.5：判绿 69 次、不适用 0 次
+  I-3.1：判绿 46 次、不适用 23 次
+  I-3.8：判绿 69 次、不适用 0 次
+  I-3.9：判绿 46 次、不适用 23 次
+  I-4.8：判绿 69 次、不适用 0 次
+  I-5.1：判绿 69 次、不适用 0 次
+  I-5.2：判绿 46 次、不适用 23 次
+  I-5.4：判绿 46 次、不适用 23 次
+  I-7.1：判绿 69 次、不适用 0 次
+  I-7.2：判绿 69 次、不适用 0 次
+  I-7.4：判绿 69 次、不适用 0 次
+  I-7.6：判绿 69 次、不适用 0 次
+  I-7.7：判绿 69 次、不适用 0 次
+  I-7.8：判绿 69 次、不适用 0 次
+  I-9.1：判绿 46 次、不适用 23 次
+  I-9.2：判绿 46 次、不适用 23 次
+  I-9.4：判绿 46 次、不适用 23 次
+  I-9.7：判绿 46 次、不适用 23 次
+  I-9.10：判绿 46 次、不适用 23 次
+  I-9.13：判绿 46 次、不适用 23 次
+  I-9.14：判绿 42 次、不适用 27 次
+崩溃状态上的已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 个崩溃状态；前几个 (种子, 段号) []
+崩溃状态上的已知红第 1 条（增补 2 收口表第 43 行）：0 个崩溃状态；前几个 (种子, 段号) []
+崩溃状态上的新发现 RecordCheck { aspects: ["root_without_record"] }：种子 7463871032432355123，第 8 段（3 个写，持久 1 个，扣下段内第 [0, 1] 个），落在 Operation(16)／Some(CloseAndMountWritable)
+  恢复读回：NoFile { root: ModelRootKey { checkpoint_txg: ModelCheckpointTxg(2), instance: ModelInstanceGeneration(1) } }
+  记录核对器判红：root_without_record
+  崩溃镜像留在：/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113/seed-7463871032432355123-segment-8
+  复现：SINGLEFS_CRASH_INJECTION_FIRST_SEED=7463871032432355123 SINGLEFS_CRASH_INJECTION_SEEDS=1 跑大档那条 #[ignore] 用例
+
+thread 'crash_states_land_inside_rollbacks_and_floor_raises' (3581956) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs:461:5:
+崩溃状态上「已知红」清单外的失败；重放：SINGLEFS_CRASH_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_CRASH_INJECTION_SEEDS=12 SINGLEFS_CRASH_INJECTION_OPERATIONS=20 跑大档那条 #[ignore] 用例
+种子基 7463871032432355113（这个测试周期写死的；同一个构建加同一个种子基重放得出来），种子 [7463871032432355113, 7463871032432355125)，每段 20 步，崩溃状态怎么摆 Sampled { crash_points_per_history: 6 }，比重：偏向抬 F 之后回退（B2 那一格的取样点）；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+判红的崩溃镜像曾写在 /tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113，跑完已删
+历史 12 段：跑完 12、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 29 版
+崩溃状态 69 个：截在发布中间（根还没落盘）的 52 个、截回到最后一版之前的 65 个、段内有洞（后发的写先持久）的 33 个、落在起点那一段里的 18 个
+  段内扣下过 journal_record：24 个
+  段内扣下过 root_record_fua：22 个
+  段内扣下过 system_configuration_slot：17 个
+  段内扣下过 unit_write：16 个
+  落在 PublishFirstFile 里：0 个
+  落在 PublishOverwrite 里：17 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：14 个
+  落在 CloseAndMountRollback 里：19 个
+  落在 RaiseRollbackFloor 里：1 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 51 次、没有文件 18 次、失败 0 次；施加过 journal 记录前缀 27 次
+崩溃状态上 checker 跑了 69 次；记录核对器跑了 69 次：根在而记录一条都不在 1 次、恢复自称新态而单元缺席 0 次
+问模型 69 次：比过内容 51 次、树表 0 条对上 18 次
+崩溃状态：以已知红收尾 {}、新发现 1
+  I-1.1：判绿 69 次、不适用 0 次
+  I-1.3：判绿 69 次、不适用 0 次
+  I-1.4：判绿 69 次、不适用 0 次
+  I-1.6：判绿 69 次、不适用 0 次
+  I-1.7：判绿 69 次、不适用 0 次
+  I-2.1：判绿 69 次、不适用 0 次
+  I-2.3：判绿 69 次、不适用 0 次
+  I-2.4：判绿 69 次、不适用 0 次
+  I-2.5：判绿 69 次、不适用 0 次
+  I-3.1：判绿 46 次、不适用 23 次
+  I-3.8：判绿 69 次、不适用 0 次
+  I-3.9：判绿 46 次、不适用 23 次
+  I-4.8：判绿 69 次、不适用 0 次
+  I-5.1：判绿 69 次、不适用 0 次
+  I-5.2：判绿 46 次、不适用 23 次
+  I-5.4：判绿 46 次、不适用 23 次
+  I-7.1：判绿 69 次、不适用 0 次
+  I-7.2：判绿 69 次、不适用 0 次
+  I-7.4：判绿 69 次、不适用 0 次
+  I-7.6：判绿 69 次、不适用 0 次
+  I-7.7：判绿 69 次、不适用 0 次
+  I-7.8：判绿 69 次、不适用 0 次
+  I-9.1：判绿 46 次、不适用 23 次
+  I-9.2：判绿 46 次、不适用 23 次
+  I-9.4：判绿 46 次、不适用 23 次
+  I-9.7：判绿 46 次、不适用 23 次
+  I-9.10：判绿 46 次、不适用 23 次
+  I-9.13：判绿 46 次、不适用 23 次
+  I-9.14：判绿 42 次、不适用 27 次
+崩溃状态上的已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 个崩溃状态；前几个 (种子, 段号) []
+崩溃状态上的已知红第 1 条（增补 2 收口表第 43 行）：0 个崩溃状态；前几个 (种子, 段号) []
+崩溃状态上的新发现 RecordCheck { aspects: ["root_without_record"] }：种子 7463871032432355123，第 8 段（3 个写，持久 1 个，扣下段内第 [0, 1] 个），落在 Operation(16)／Some(CloseAndMountWritable)
+  恢复读回：NoFile { root: ModelRootKey { checkpoint_txg: ModelCheckpointTxg(2), instance: ModelInstanceGeneration(1) } }
+  记录核对器判红：root_without_record
+  崩溃镜像留在：/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113/seed-7463871032432355123-segment-8
+  复现：SINGLEFS_CRASH_INJECTION_FIRST_SEED=7463871032432355123 SINGLEFS_CRASH_INJECTION_SEEDS=1 跑大档那条 #[ignore] 用例
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ 3/8
+crash_states_land_inside_rollbacks_and_floor_raises --- FAILED
+CRASH_INJECTION_PROGRESS slice=9/24 seeds=[7463871032432355121,7463871032432355122) finished_slices=21/24 finished_histories=21/24 elapsed_seconds=3.8
+CRASH_INJECTION_PROGRESS slice=7/24 seeds=[7463871032432355119,7463871032432355120) finished_slices=22/24 finished_histories=22/24 elapsed_seconds=3.9
+CRASH_INJECTION_PROGRESS slice=6/24 seeds=[7463871032432355118,7463871032432355119) finished_slices=23/24 finished_histories=23/24 elapsed_seconds=3.9
+CRASH_INJECTION_PROGRESS slice=12/24 seeds=[7463871032432355124,7463871032432355125) finished_slices=24/24 finished_histories=24/24 elapsed_seconds=4.0
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 elapsed_seconds=4.0
+── 崩溃注入快档 ──
+种子基 7463871032432355113（这个测试周期写死的；同一个构建加同一个种子基重放得出来），种子 [7463871032432355113, 7463871032432355137)，每段 24 步，崩溃状态怎么摆 Sampled { crash_points_per_history: 4 }，比重：各类操作都抽（快档、大档）；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+历史 24 段：跑完 24、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 32 版
+崩溃状态 94 个：截在发布中间（根还没落盘）的 66 个、截回到最后一版之前的 89 个、段内有洞（后发的写先持久）的 43 个、落在起点那一段里的 2 个
+  段内扣下过 journal_record：36 个
+  段内扣下过 root_record_fua：24 个
+  段内扣下过 system_configuration_slot：34 个
+  段内扣下过 unit_write：18 个
+  落在 PublishFirstFile 里：2 个
+  落在 PublishOverwrite 里：26 个
+  落在 PublishWithoutUnits 里：2 个
+  落在 CloseAndMountWritable 里：50 个
+  落在 CloseAndMountRollback 里：9 个
+  落在 RaiseRollbackFloor 里：3 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 65 次、没有文件 29 次、失败 0 次；施加过 journal 记录前缀 35 次
+崩溃状态上 checker 跑了 94 次；记录核对器跑了 94 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次
+问模型 94 次：比过内容 65 次、树表 0 条对上 29 次
+崩溃状态：以已知红收尾 {0: 3, 1: 1}、新发现 0
+  I-1.1：判绿 94 次、不适用 0 次
+  I-1.3：判绿 94 次、不适用 0 次
+  I-1.4：判绿 94 次、不适用 0 次
+  I-1.6：判绿 94 次、不适用 0 次
+  I-1.7：判绿 94 次、不适用 0 次
+  I-2.1：判绿 94 次、不适用 0 次
+  I-2.3：判绿 94 次、不适用 0 次
+  I-2.4：判绿 94 次、不适用 0 次
+  I-2.5：判绿 94 次、不适用 0 次
+  I-3.1：判绿 59 次、不适用 31 次
+  I-3.8：判绿 94 次、不适用 0 次
+  I-3.9：判绿 63 次、不适用 31 次
+  I-4.8：判绿 94 次、不适用 0 次
+  I-5.1：判绿 94 次、不适用 0 次
+  I-5.2：判绿 63 次、不适用 31 次
+  I-5.4：判绿 63 次、不适用 31 次
+  I-7.1：判绿 94 次、不适用 0 次
+  I-7.2：判绿 94 次、不适用 0 次
+  I-7.4：判绿 94 次、不适用 0 次
+  I-7.6：判绿 94 次、不适用 0 次
+  I-7.7：判绿 94 次、不适用 0 次
+  I-7.8：判绿 94 次、不适用 0 次
+  I-9.1：判绿 63 次、不适用 31 次
+  I-9.2：判绿 63 次、不适用 31 次
+  I-9.4：判绿 63 次、不适用 31 次
+  I-9.7：判绿 63 次、不适用 31 次
+  I-9.10：判绿 63 次、不适用 31 次
+  I-9.13：判绿 63 次、不适用 31 次
+  I-9.14：判绿 60 次、不适用 34 次
+崩溃状态上的已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：3 个崩溃状态；前几个 (种子, 段号) [(7463871032432355118, 96), (7463871032432355118, 99), (7463871032432355121, 93)]
+崩溃状态上的已知红第 1 条（增补 2 收口表第 43 行）：1 个崩溃状态；前几个 (种子, 段号) [(7463871032432355129, 53)]
+用时 4.0 秒
+.CRASH_INJECTION_PROGRESS slice=2/4 seeds=[7463871032432355115,7463871032432355117) finished_slices=2/4 finished_histories=4/8 elapsed_seconds=4.4
+CRASH_INJECTION_PROGRESS slice=3/4 seeds=[7463871032432355117,7463871032432355119) finished_slices=3/4 finished_histories=6/8 elapsed_seconds=5.6
+── 崩溃注入：写死的一段历史，段内真子集全枚举 ──
+历史 1 段：跑完 1、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 9 版
+崩溃状态 110 个：截在发布中间（根还没落盘）的 78 个、截回到最后一版之前的 107 个、段内有洞（后发的写先持久）的 76 个、落在起点那一段里的 0 个
+  段内扣下过 journal_record：30 个
+  段内扣下过 root_record_fua：14 个
+  段内扣下过 system_configuration_slot：53 个
+  段内扣下过 unit_write：48 个
+  落在 PublishFirstFile 里：11 个
+  落在 PublishOverwrite 里：28 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：71 个
+  落在 CloseAndMountRollback 里：0 个
+  落在 RaiseRollbackFloor 里：0 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 81 次、没有文件 29 次、失败 0 次；施加过 journal 记录前缀 18 次
+崩溃状态上 checker 跑了 110 次；记录核对器跑了 110 次：根在而记录一条都不在 2 次、恢复自称新态而单元缺席 0 次
+问模型 110 次：比过内容 81 次、树表 0 条对上 29 次
+崩溃状态：以已知红收尾 {}、新发现 2
+  I-1.1：判绿 110 次、不适用 0 次
+  I-1.3：判绿 110 次、不适用 0 次
+  I-1.4：判绿 110 次、不适用 0 次
+  I-1.6：判绿 110 次、不适用 0 次
+  I-1.7：判绿 110 次、不适用 0 次
+  I-2.1：判绿 110 次、不适用 0 次
+  I-2.3：判绿 110 次、不适用 0 次
+  I-2.4：判绿 110 次、不适用 0 次
+  I-2.5：判绿 110 次、不适用 0 次
+  I-3.1：判绿 78 次、不适用 32 次
+  I-3.8：判绿 110 次、不适用 0 次
+  I-3.9：判绿 78 次、不适用 32 次
+  I-4.8：判绿 110 次、不适用 0 次
+  I-5.1：判绿 110 次、不适用 0 次
+  I-5.2：判绿 78 次、不适用 32 次
+  I-5.4：判绿 78 次、不适用 32 次
+  I-7.1：判绿 110 次、不适用 0 次
+  I-7.2：判绿 110 次、不适用 0 次
+  I-7.4：判绿 110 次、不适用 0 次
+  I-7.6：判绿 110 次、不适用 0 次
+  I-7.7：判绿 110 次、不适用 0 次
+  I-7.8：判绿 110 次、不适用 0 次
+  I-9.1：判绿 78 次、不适用 32 次
+  I-9.2：判绿 78 次、不适用 32 次
+  I-9.4：判绿 78 次、不适用 32 次
+  I-9.7：判绿 78 次、不适用 32 次
+  I-9.10：判绿 78 次、不适用 32 次
+  I-9.13：判绿 78 次、不适用 32 次
+  I-9.14：判绿 66 次、不适用 44 次
+
+thread 'every_crash_state_of_a_written_out_history_recovers_into_a_committed_version' (3581958) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs:314:5:
+写死的这段历史上崩溃状态判红：[
+    CrashPointFinding {
+        signature: RecordCheck {
+            aspects: [
+                "root_without_record",
+            ],
+        },
+        seed: HistorySeed(
+            0,
+        ),
+        crash_point: CrashPoint {
+            segment_index: 6,
+            persisted_within_the_segment: [
+                false,
+                false,
+                true,
+            ],
+            step: Operation(
+                0,
+            ),
+            operation_kind: Some(
+                CloseAndMountWritable,
+            ),
+        },
+        observation: FailureObservation {
+            position: Operation(
+                0,
+            ),
+            operation_kind: Some(
+                CloseAndMountWritable,
+            ),
+            violations: [],
+            panic: None,
+            newest_ring_root_txg: Some(
+                1,
+            ),
+            root_ring_slot_count: Some(
+                24,
+            ),
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: Some(
+                false,
+            ),
+            record_check: RecordCheck {
+                root_without_record: true,
+                claimed_state_missing_unit: false,
+            },
+        },
+        read_back: "NoFile { root: ModelRootKey { checkpoint_txg: ModelCheckpointTxg(1), instance: ModelInstanceGeneration(1) } }",
+        image_files: None,
+    },
+]
+ 5/8
+every_crash_state_of_a_written_out_history_recovers_into_a_committed_version --- FAILED
+CRASH_INJECTION_PROGRESS slice=4/4 seeds=[7463871032432355119,7463871032432355121) finished_slices=4/4 finished_histories=8/8 elapsed_seconds=7.4
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355121) slices=4 worker_threads=1 elapsed_seconds=7.4
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355121) slices=8 worker_threads=4 configured_worker_threads=4 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-3581953-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=1/8 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/8 finished_histories=1/8 elapsed_seconds=0.2
+CRASH_INJECTION_PROGRESS slice=2/8 seeds=[7463871032432355114,7463871032432355115) finished_slices=2/8 finished_histories=2/8 elapsed_seconds=0.7
+CRASH_INJECTION_PROGRESS slice=5/8 seeds=[7463871032432355117,7463871032432355118) finished_slices=3/8 finished_histories=3/8 elapsed_seconds=0.9
+CRASH_INJECTION_PROGRESS slice=4/8 seeds=[7463871032432355116,7463871032432355117) finished_slices=4/8 finished_histories=4/8 elapsed_seconds=0.9
+CRASH_INJECTION_PROGRESS slice=3/8 seeds=[7463871032432355115,7463871032432355116) finished_slices=5/8 finished_histories=5/8 elapsed_seconds=1.2
+CRASH_INJECTION_PROGRESS slice=6/8 seeds=[7463871032432355118,7463871032432355119) finished_slices=6/8 finished_histories=6/8 elapsed_seconds=1.3
+CRASH_INJECTION_PROGRESS slice=8/8 seeds=[7463871032432355120,7463871032432355121) finished_slices=7/8 finished_histories=7/8 elapsed_seconds=1.4
+CRASH_INJECTION_PROGRESS slice=7/8 seeds=[7463871032432355119,7463871032432355120) finished_slices=8/8 finished_histories=8/8 elapsed_seconds=2.2
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355121) slices=8 worker_threads=4 elapsed_seconds=2.2
+.── 崩溃注入：抬 F 落进回退空档那一段历史 ──
+历史 1 段：跑完 1、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 23 版
+崩溃状态 115 个：截在发布中间（根还没落盘）的 101 个、截回到最后一版之前的 112 个、段内有洞（后发的写先持久）的 48 个、落在起点那一段里的 14 个
+  段内扣下过 journal_record：62 个
+  段内扣下过 root_record_fua：21 个
+  段内扣下过 system_configuration_slot：26 个
+  段内扣下过 unit_write：20 个
+  落在 PublishFirstFile 里：0 个
+  落在 PublishOverwrite 里：32 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：21 个
+  落在 CloseAndMountRollback 里：31 个
+  落在 RaiseRollbackFloor 里：17 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 105 次、没有文件 10 次、失败 0 次；施加过 journal 记录前缀 48 次
+崩溃状态上 checker 跑了 115 次；记录核对器跑了 115 次：根在而记录一条都不在 1 次、恢复自称新态而单元缺席 0 次
+问模型 115 次：比过内容 105 次、树表 0 条对上 10 次
+崩溃状态：以已知红收尾 {1: 13}、新发现 1
+  I-1.1：判绿 115 次、不适用 0 次
+  I-1.3：判绿 115 次、不适用 0 次
+  I-1.4：判绿 115 次、不适用 0 次
+  I-1.6：判绿 115 次、不适用 0 次
+  I-1.7：判绿 115 次、不适用 0 次
+  I-2.1：判绿 115 次、不适用 0 次
+  I-2.3：判绿 115 次、不适用 0 次
+  I-2.4：判绿 115 次、不适用 0 次
+  I-2.5：判绿 115 次、不适用 0 次
+  I-3.1：判绿 89 次、不适用 13 次
+  I-3.8：判绿 115 次、不适用 0 次
+  I-3.9：判绿 102 次、不适用 13 次
+  I-4.8：判绿 115 次、不适用 0 次
+  I-5.1：判绿 115 次、不适用 0 次
+  I-5.2：判绿 102 次、不适用 13 次
+  I-5.4：判绿 102 次、不适用 13 次
+  I-7.1：判绿 115 次、不适用 0 次
+  I-7.2：判绿 115 次、不适用 0 次
+  I-7.4：判绿 115 次、不适用 0 次
+  I-7.6：判绿 115 次、不适用 0 次
+  I-7.7：判绿 115 次、不适用 0 次
+  I-7.8：判绿 115 次、不适用 0 次
+  I-9.1：判绿 102 次、不适用 13 次
+  I-9.2：判绿 102 次、不适用 13 次
+  I-9.4：判绿 102 次、不适用 13 次
+  I-9.7：判绿 102 次、不适用 13 次
+  I-9.10：判绿 102 次、不适用 13 次
+  I-9.13：判绿 102 次、不适用 13 次
+  I-9.14：判绿 96 次、不适用 19 次
+
+thread 'crash_states_after_raising_the_floor_into_the_gap_match_the_second_known_red_form' (3581955) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_crash_injection.rs:401:5:
+这一形要接进清单第 1 条，不许报成新发现：[
+    CrashPointFinding {
+        signature: RecordCheck {
+            aspects: [
+                "root_without_record",
+            ],
+        },
+        seed: HistorySeed(
+            80,
+        ),
+        crash_point: CrashPoint {
+            segment_index: 8,
+            persisted_within_the_segment: [
+                false,
+                false,
+                true,
+            ],
+            step: StartingPoint,
+            operation_kind: None,
+        },
+        observation: FailureObservation {
+            position: StartingPoint,
+            operation_kind: None,
+            violations: [],
+            panic: None,
+            newest_ring_root_txg: Some(
+                2,
+            ),
+            root_ring_slot_count: Some(
+                24,
+            ),
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: Some(
+                false,
+            ),
+            record_check: RecordCheck {
+                root_without_record: true,
+                claimed_state_missing_unit: false,
+            },
+        },
+        read_back: "NoFile { root: ModelRootKey { checkpoint_txg: ModelCheckpointTxg(2), instance: ModelInstanceGeneration(1) } }",
+        image_files: None,
+    },
+]
+ 7/8
+crash_states_after_raising_the_floor_into_the_gap_match_the_second_known_red_form --- FAILED
+
+failures:
+
+failures:
+    crash_states_after_raising_the_floor_into_the_gap_match_the_second_known_red_form
+    crash_states_land_inside_rollbacks_and_floor_raises
+    every_crash_state_of_a_written_out_history_recovers_into_a_committed_version
+
+test result: FAILED. 4 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.52s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_crash_injection`

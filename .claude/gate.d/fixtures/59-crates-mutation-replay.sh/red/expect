@@ -1,3 +1,5 @@
 exit=1
 want=没红
 want=comment-only
+want=无效
+want=compile-error

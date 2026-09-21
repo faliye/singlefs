@@ -56,8 +56,9 @@ PROCESS_IDENTIFIER_REUSE_SLACK_SECONDS = 2.0
 
 # 有意跨轮复用的缓存：不判残留、clean 不碰。每条写明谁在用它。
 ALLOWLIST = (
-    (re.compile(r'^singlefs-crates-mutation-target$'),
-     '门禁 59 号的 cargo 编译产物目录，跨轮复用（.claude/gate.d/59-crates-mutation-replay.sh 第 12、29 行）'),
+    (re.compile(r'^singlefs-crates-mutation-target(-w[0-9]+)?$'),
+     '门禁 59 号的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个'
+     '（.claude/gate.d/59-crates-mutation-replay.sh 的 prepare_shard）'),
     (re.compile(r'^singlefs-mutate-target$'),
      'mutate.sh 的 cargo 编译产物目录，跨轮复用（research/scripts/mutate.sh 第 54 行）'),
     (re.compile(r'^singlefs-e152-packages$'),
@@ -296,7 +297,7 @@ def describe_openers(openers):
     return '；'.join(shown) + more
 
 
-def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds):
+def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, produced_after=0.0):
     name = os.path.basename(path)
     kind, actual_bytes, apparent_bytes, latest_modification_epoch, unreadable_count = measure_entry(path)
 
@@ -316,6 +317,11 @@ def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds):
             return build('in_use', f'{owner_description}；名字形态出自 {source}')
         if openers:
             return build('in_use', f'{owner_description}，但 {describe_openers(openers)}')
+        if produced_after and latest_modification_epoch >= produced_after:
+            # 这一次跑自己产生的：门禁 59 号让每条变异点名的测试判红，那些测试红在断言上就 panic，
+            # 写在断言之后的清理走不到（C448）。它确实是垃圾，但不是「上一轮没清干净」，不该让整道红。
+            return build('produced_by_this_run', f'{owner_description}，也没有进程开着它'
+                         f'（名字形态出自 {source}）；这一次跑自己产生的，本次跑完再清')
         return build('residual', f'{owner_description}，也没有进程开着它（名字形态出自 {source}）')
     if openers:
         return build('in_use', describe_openers(openers))
@@ -326,7 +332,7 @@ def classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds):
                              f'最近一次修改在 {int(age_seconds // 60)} 分钟前')
 
 
-def scan_temporary_directories(temporary_directories, recent_seconds):
+def scan_temporary_directories(temporary_directories, recent_seconds, produced_after=0.0):
     """返回 (条目列表, 打开文件扫描结果, 读不了的临时目录列表)。"""
     open_path_scan = scan_open_paths(temporary_directories)
     now_epoch = time.time()
@@ -348,7 +354,7 @@ def scan_temporary_directories(temporary_directories, recent_seconds):
                 continue  # TMPDIR 与 /tmp 指向同一处时只算一次
             seen_real_paths.add(real_path)
             try:
-                entries.append(classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds))
+                entries.append(classify_temporary_entry(path, open_path_scan, now_epoch, recent_seconds, produced_after))
             except FileNotFoundError:
                 continue  # 扫描的过程中被别的进程删掉了
     return entries, open_path_scan, unreadable_directories
@@ -367,6 +373,8 @@ class Environment:
     minimum_free_gibibytes: float = 50.0
     kernel_log_since: str = ''
     smart_requested: bool = False
+    # 这个时刻之后才出现的临时条目单列成「这一次跑自己产生的」、不判红（C448）；0 表示不分界、照旧全判
+    produced_after: float = 0.0
     # 可注入的读取器；None 表示用真系统
     kernel_log_reader: object = None       # () -> (行列表 | None, 说明)
     host_device_resolver: object = None    # (mounts 行) -> (设备名集合, 主次设备号集合)
@@ -811,6 +819,7 @@ def judge_temporary_entries(entries, open_path_scan, unreadable_directories, tem
     residual = [entry for entry in entries if entry.verdict == 'residual']
     kept = [entry for entry in entries if entry.verdict != 'residual']
     kept_lines = [f'不判红：{describe_entry(entry)}' for entry in kept]
+    produced_by_this_run = [entry for entry in entries if entry.verdict == 'produced_by_this_run']
     if open_path_scan.unreadable_process_count:
         kept_lines.append(f'注意：{open_path_scan.unreadable_process_count} 个进程的打开文件读不了（别的用户的），'
                           '「没有进程开着」只对读得到的进程成立')
@@ -820,7 +829,7 @@ def judge_temporary_entries(entries, open_path_scan, unreadable_directories, tem
         apparent_total = sum(entry.apparent_bytes for entry in residual)
         return CategoryResult('临时目录残留', 'red',
                               f'{scope} 下 {len(residual)} 项残留，实际占用 {format_bytes(actual_total)}'
-                              f'（表观 {format_bytes(apparent_total)}）；共查 {len(entries)} 项 singlefs-*',
+                              f'（表观 {format_bytes(apparent_total)}）；共查 {len(entries)} 项 singlefs-*，其中这一次跑自己产生的 {len(produced_by_this_run)} 项不判红',
                               [describe_entry(entry) for entry in residual] + kept_lines,
                               f'跑 {CLEAN_COMMAND} 看计划，确认后加 --yes；某项其实是该留的缓存，'
                               '就把它连同用它的脚本与行号加进本脚本的 ALLOWLIST')
@@ -831,7 +840,7 @@ def judge_temporary_entries(entries, open_path_scan, unreadable_directories, tem
     in_use_count = sum(1 for entry in entries if entry.verdict == 'in_use')
     return CategoryResult('临时目录残留', 'green',
                           f'查了 {scope} 下 {len(entries)} 项 singlefs-*（白名单 {allowlisted_count} 项、'
-                          f'在用 {in_use_count} 项），没有残留', kept_lines)
+                          f'在用 {in_use_count} 项、这一次跑自己产生的 {len(produced_by_this_run)} 项），没有残留', kept_lines)
 
 
 def judge_readonly(covering_pairs):
@@ -1001,7 +1010,8 @@ def write_report(report_path, environment, results, entries, summary, exit_code)
         lines.append(f'| {result.title} | {status_words[result.status]} | {result.headline.replace("|", "／")} |')
     lines += ['', '## 临时目录下的 singlefs-*', '',
               '| 路径 | 类型 | 实际占用 | 表观大小 | 最后修改 | 判定 | 为什么 |', '|---|---|---|---|---|---|---|']
-    verdict_words = {'residual': '残留', 'in_use': '在用', 'allowlisted': '白名单'}
+    verdict_words = {'residual': '残留', 'in_use': '在用', 'allowlisted': '白名单',
+                     'produced_by_this_run': '这一次跑自己产生的'}
     for entry in entries:
         lines.append(f'| `{entry.path}` | {entry.kind} | {format_bytes(entry.actual_bytes)} | '
                      f'{format_bytes(entry.apparent_bytes)} | {format_time(entry.latest_modification_epoch)} | '
@@ -1022,7 +1032,7 @@ def run_check(environment, report_path=''):
     print(f'test-environment-check：check（临时目录 {"、".join(environment.temporary_directories)}）')
     device_scan = scan_devices(environment)
     entries, open_path_scan, unreadable_directories = scan_temporary_directories(
-        environment.temporary_directories, environment.recent_seconds)
+        environment.temporary_directories, environment.recent_seconds, environment.produced_after)
     results = judge_devices(device_scan)
     results.append(judge_temporary_entries(entries, open_path_scan, unreadable_directories,
                                            environment.temporary_directories))
@@ -1573,6 +1583,9 @@ def build_argument_parser():
                         help='要查的临时目录，可给多次；默认 /tmp，TMPDIR 设了且不同就再加上它')
     parser.add_argument('--report', default='', help='另写一份 Markdown 报告（排他新建，不盖掉已有文件）')
     parser.add_argument('--minimum-free-percent', type=float, default=10.0, help='剩余空间下限（百分比），默认 10')
+    parser.add_argument('--produced-after', type=float, default=0.0,
+                        help='这个时刻（epoch 秒）之后才出现的临时条目，单列成「这一次跑自己产生的」、不判红；'
+                             '门禁 77 号把本次门禁的开跑时刻传进来（C448）')
     parser.add_argument('--minimum-free-gibibytes', type=float, default=50.0, help='剩余空间下限（GiB），默认 50；两条取严')
     parser.add_argument('--recent-minutes', type=float, default=10.0,
                         help='名字里没有 pid 的条目这么多分钟内还在改就当可能正在跑，默认 10')
@@ -1604,7 +1617,8 @@ def main(argument_list):
                               recent_seconds=int(arguments.recent_minutes * 60),
                               minimum_free_percent=arguments.minimum_free_percent,
                               minimum_free_gibibytes=arguments.minimum_free_gibibytes,
-                              kernel_log_since=arguments.kernel_log_since, smart_requested=arguments.smart)
+                              kernel_log_since=arguments.kernel_log_since, smart_requested=arguments.smart,
+                              produced_after=arguments.produced_after)
     if arguments.action == 'clean':
         return run_clean(environment, arguments.yes)
     return run_check(environment, arguments.report)

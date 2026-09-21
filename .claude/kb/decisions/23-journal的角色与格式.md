@@ -387,7 +387,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - 三方：`research/prompts/c199-r1-main-verification.md`、`research/prompts/c199-r2-main-verification.md`（注 1–4）；`research/prompts/c322-r3-main-verification.md`（取号屏障与跳过的号）；`research/prompts/c329-c330-r3-main-verification.md`（切换的所选根与 W 那一行）；`research/prompts/c143-r3-main-verification.md`（第一个新根的 txg 取 CJ2）；`research/prompts/m2-r1-main-verification.md` 第三节与 `research/prompts/m2-step45-code-r3-main-verification.md` 第六节 5（影子账查谁的账、有效根）；C113（扫描重建时多版单元的现行版本判定无输入） 定案（`_c113-r9-final.md`）。
 - 用户定案（重放下界、回退、失败表、切换预留口径、两份镜像的口径各一次），原话在变更史。
 
-**欠**：C77（重放起点未定义）；C124（回退行与重放下界没有会红的检查）；C314（回退可以复用被抛弃的根引用的单元）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C340（回退之后记录链从哪条之后接没有定义）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）。
+**欠**：C77（重放起点未定义）；C124（回退行与重放下界没有会红的检查）；C314（回退可以复用被抛弃的根引用的单元）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C340（回退之后记录链从哪条之后接没有定义）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）；C381（根已落盘之后发布失败，分配器仍退回）——三方第二、三轮打中失败表那两支判别子（探针写在盘上没有落点、屏障类失败点连「失败的那个落点」都没有定义），用户已定「落点进地址空间表、射程逐个失败点列一张表」，改法与另三题待定（`research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）。
 
 #### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根
 

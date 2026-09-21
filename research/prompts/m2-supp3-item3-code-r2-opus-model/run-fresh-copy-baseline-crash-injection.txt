@@ -1,0 +1,260 @@
+
+running 8 tests
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 configured_worker_threads=32 worker_threads_source=available_parallelism images=/tmp/singlefs-crash-injection-2785259-seedbase-7463871032432355113
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 configured_worker_threads=32 worker_threads_source=available_parallelism images=/tmp/singlefs-crash-injection-2785259-seedbase-7463871032432355113
+iCRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355115) slices=2 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-2785259-seedbase-7463871032432355113
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355121) slices=4 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-2785259-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=1/2 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/2 finished_histories=1/2 elapsed_seconds=0.4
+CRASH_INJECTION_PROGRESS slice=1/24 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/24 finished_histories=1/24 elapsed_seconds=1.0
+CRASH_INJECTION_PROGRESS slice=2/2 seeds=[7463871032432355114,7463871032432355115) finished_slices=2/2 finished_histories=2/2 elapsed_seconds=1.0
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355115) slices=2 worker_threads=1 elapsed_seconds=1.0
+.CRASH_INJECTION_PROGRESS slice=20/24 seeds=[7463871032432355132,7463871032432355133) finished_slices=2/24 finished_histories=2/24 elapsed_seconds=1.1
+CRASH_INJECTION_PROGRESS slice=11/12 seeds=[7463871032432355123,7463871032432355124) finished_slices=1/12 finished_histories=1/12 elapsed_seconds=1.2
+CRASH_INJECTION_PROGRESS slice=16/24 seeds=[7463871032432355128,7463871032432355129) finished_slices=3/24 finished_histories=3/24 elapsed_seconds=1.4
+CRASH_INJECTION_PROGRESS slice=5/24 seeds=[7463871032432355117,7463871032432355118) finished_slices=4/24 finished_histories=4/24 elapsed_seconds=1.5
+CRASH_INJECTION_PROGRESS slice=5/12 seeds=[7463871032432355117,7463871032432355118) finished_slices=2/12 finished_histories=2/12 elapsed_seconds=1.5
+CRASH_INJECTION_PROGRESS slice=8/24 seeds=[7463871032432355120,7463871032432355121) finished_slices=5/24 finished_histories=5/24 elapsed_seconds=1.5
+CRASH_INJECTION_PROGRESS slice=2/12 seeds=[7463871032432355114,7463871032432355115) finished_slices=3/12 finished_histories=3/12 elapsed_seconds=1.7
+CRASH_INJECTION_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355115) finished_slices=1/4 finished_histories=2/8 elapsed_seconds=1.9
+CRASH_INJECTION_PROGRESS slice=1/12 seeds=[7463871032432355113,7463871032432355114) finished_slices=4/12 finished_histories=4/12 elapsed_seconds=1.9
+CRASH_INJECTION_PROGRESS slice=2/24 seeds=[7463871032432355114,7463871032432355115) finished_slices=6/24 finished_histories=6/24 elapsed_seconds=2.0
+CRASH_INJECTION_PROGRESS slice=6/12 seeds=[7463871032432355118,7463871032432355119) finished_slices=5/12 finished_histories=5/12 elapsed_seconds=2.1
+CRASH_INJECTION_PROGRESS slice=3/12 seeds=[7463871032432355115,7463871032432355116) finished_slices=6/12 finished_histories=6/12 elapsed_seconds=2.3
+.CRASH_INJECTION_PROGRESS slice=23/24 seeds=[7463871032432355135,7463871032432355136) finished_slices=7/24 finished_histories=7/24 elapsed_seconds=2.5
+CRASH_INJECTION_PROGRESS slice=12/12 seeds=[7463871032432355124,7463871032432355125) finished_slices=7/12 finished_histories=7/12 elapsed_seconds=2.5
+CRASH_INJECTION_PROGRESS slice=9/12 seeds=[7463871032432355121,7463871032432355122) finished_slices=8/12 finished_histories=8/12 elapsed_seconds=2.5
+CRASH_INJECTION_PROGRESS slice=21/24 seeds=[7463871032432355133,7463871032432355134) finished_slices=8/24 finished_histories=8/24 elapsed_seconds=2.5
+CRASH_INJECTION_PROGRESS slice=17/24 seeds=[7463871032432355129,7463871032432355130) finished_slices=9/24 finished_histories=9/24 elapsed_seconds=2.6
+CRASH_INJECTION_PROGRESS slice=10/12 seeds=[7463871032432355122,7463871032432355123) finished_slices=9/12 finished_histories=9/12 elapsed_seconds=2.6
+CRASH_INJECTION_PROGRESS slice=22/24 seeds=[7463871032432355134,7463871032432355135) finished_slices=10/24 finished_histories=10/24 elapsed_seconds=2.8
+CRASH_INJECTION_PROGRESS slice=4/12 seeds=[7463871032432355116,7463871032432355117) finished_slices=10/12 finished_histories=10/12 elapsed_seconds=2.8
+CRASH_INJECTION_PROGRESS slice=4/24 seeds=[7463871032432355116,7463871032432355117) finished_slices=11/24 finished_histories=11/24 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=8/12 seeds=[7463871032432355120,7463871032432355121) finished_slices=11/12 finished_histories=11/12 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=15/24 seeds=[7463871032432355127,7463871032432355128) finished_slices=12/24 finished_histories=12/24 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=11/24 seeds=[7463871032432355123,7463871032432355124) finished_slices=13/24 finished_histories=13/24 elapsed_seconds=2.9
+CRASH_INJECTION_PROGRESS slice=19/24 seeds=[7463871032432355131,7463871032432355132) finished_slices=14/24 finished_histories=14/24 elapsed_seconds=3.0
+CRASH_INJECTION_PROGRESS slice=6/24 seeds=[7463871032432355118,7463871032432355119) finished_slices=15/24 finished_histories=15/24 elapsed_seconds=3.1
+CRASH_INJECTION_PROGRESS slice=13/24 seeds=[7463871032432355125,7463871032432355126) finished_slices=16/24 finished_histories=16/24 elapsed_seconds=3.2
+CRASH_INJECTION_PROGRESS slice=24/24 seeds=[7463871032432355136,7463871032432355137) finished_slices=17/24 finished_histories=17/24 elapsed_seconds=3.4
+CRASH_INJECTION_PROGRESS slice=14/24 seeds=[7463871032432355126,7463871032432355127) finished_slices=18/24 finished_histories=18/24 elapsed_seconds=3.5
+CRASH_INJECTION_PROGRESS slice=3/24 seeds=[7463871032432355115,7463871032432355116) finished_slices=19/24 finished_histories=19/24 elapsed_seconds=3.5
+CRASH_INJECTION_PROGRESS slice=18/24 seeds=[7463871032432355130,7463871032432355131) finished_slices=20/24 finished_histories=20/24 elapsed_seconds=3.5
+CRASH_INJECTION_PROGRESS slice=7/24 seeds=[7463871032432355119,7463871032432355120) finished_slices=21/24 finished_histories=21/24 elapsed_seconds=3.6
+CRASH_INJECTION_PROGRESS slice=7/12 seeds=[7463871032432355119,7463871032432355120) finished_slices=12/12 finished_histories=12/12 elapsed_seconds=3.7
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 elapsed_seconds=3.7
+── 崩溃注入：偏向抬 F 之后回退的取样点 ──
+种子基 7463871032432355113（这个测试周期写死的；同一个构建加同一个种子基重放得出来），种子 [7463871032432355113, 7463871032432355125)，每段 20 步，崩溃状态怎么摆 Sampled { crash_points_per_history: 6 }，比重：偏向抬 F 之后回退（B2 那一格的取样点）；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+历史 12 段：跑完 12、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 29 版
+崩溃状态 68 个：截在发布中间（根还没落盘）的 49 个、截回到最后一版之前的 65 个、段内有洞（后发的写先持久）的 27 个、落在起点那一段里的 26 个
+  段内扣下过 journal_record：18 个
+  段内扣下过 root_record_fua：21 个
+  段内扣下过 system_configuration_slot：19 个
+  段内扣下过 unit_write：15 个
+  落在 PublishFirstFile 里：0 个
+  落在 PublishOverwrite 里：14 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：14 个
+  落在 CloseAndMountRollback 里：12 个
+  落在 RaiseRollbackFloor 里：2 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 44 次、没有文件 24 次、失败 0 次；施加过 journal 记录前缀 29 次
+崩溃状态上 checker 跑了 68 次；记录核对器跑了 68 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次
+问模型 68 次：比过内容 44 次、树表 0 条对上 24 次
+崩溃状态：以已知红收尾 {}、新发现 0
+  I-1.1：判绿 68 次、不适用 0 次
+  I-1.3：判绿 68 次、不适用 0 次
+  I-1.4：判绿 68 次、不适用 0 次
+  I-1.6：判绿 68 次、不适用 0 次
+  I-1.7：判绿 68 次、不适用 0 次
+  I-2.1：判绿 68 次、不适用 0 次
+  I-2.3：判绿 68 次、不适用 0 次
+  I-2.4：判绿 68 次、不适用 0 次
+  I-2.5：判绿 68 次、不适用 0 次
+  I-3.1：判绿 38 次、不适用 30 次
+  I-3.8：判绿 68 次、不适用 0 次
+  I-3.9：判绿 38 次、不适用 30 次
+  I-4.8：判绿 68 次、不适用 0 次
+  I-5.1：判绿 68 次、不适用 0 次
+  I-5.2：判绿 38 次、不适用 30 次
+  I-5.4：判绿 38 次、不适用 30 次
+  I-7.1：判绿 68 次、不适用 0 次
+  I-7.2：判绿 68 次、不适用 0 次
+  I-7.4：判绿 68 次、不适用 0 次
+  I-7.6：判绿 68 次、不适用 0 次
+  I-7.7：判绿 68 次、不适用 0 次
+  I-7.8：判绿 68 次、不适用 0 次
+  I-9.1：判绿 38 次、不适用 30 次
+  I-9.2：判绿 38 次、不适用 30 次
+  I-9.4：判绿 38 次、不适用 30 次
+  I-9.7：判绿 38 次、不适用 30 次
+  I-9.10：判绿 38 次、不适用 30 次
+  I-9.13：判绿 38 次、不适用 30 次
+  I-9.14：判绿 32 次、不适用 36 次
+崩溃状态上的已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 个崩溃状态；前几个 (种子, 段号) []
+崩溃状态上的已知红第 1 条（增补 2 收口表第 43 行）：0 个崩溃状态；前几个 (种子, 段号) []
+.CRASH_INJECTION_PROGRESS slice=10/24 seeds=[7463871032432355122,7463871032432355123) finished_slices=22/24 finished_histories=22/24 elapsed_seconds=3.7
+CRASH_INJECTION_PROGRESS slice=12/24 seeds=[7463871032432355124,7463871032432355125) finished_slices=23/24 finished_histories=23/24 elapsed_seconds=3.7
+CRASH_INJECTION_PROGRESS slice=9/24 seeds=[7463871032432355121,7463871032432355122) finished_slices=24/24 finished_histories=24/24 elapsed_seconds=3.8
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 elapsed_seconds=3.8
+── 崩溃注入快档 ──
+种子基 7463871032432355113（这个测试周期写死的；同一个构建加同一个种子基重放得出来），种子 [7463871032432355113, 7463871032432355137)，每段 24 步，崩溃状态怎么摆 Sampled { crash_points_per_history: 4 }，比重：各类操作都抽（快档、大档）；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+历史 24 段：跑完 24、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 32 版
+崩溃状态 93 个：截在发布中间（根还没落盘）的 75 个、截回到最后一版之前的 88 个、段内有洞（后发的写先持久）的 40 个、落在起点那一段里的 3 个
+  段内扣下过 journal_record：27 个
+  段内扣下过 root_record_fua：27 个
+  段内扣下过 system_configuration_slot：33 个
+  段内扣下过 unit_write：22 个
+  落在 PublishFirstFile 里：1 个
+  落在 PublishOverwrite 里：21 个
+  落在 PublishWithoutUnits 里：2 个
+  落在 CloseAndMountWritable 里：53 个
+  落在 CloseAndMountRollback 里：9 个
+  落在 RaiseRollbackFloor 里：4 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 59 次、没有文件 34 次、失败 0 次；施加过 journal 记录前缀 33 次
+崩溃状态上 checker 跑了 93 次；记录核对器跑了 93 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次
+问模型 93 次：比过内容 59 次、树表 0 条对上 34 次
+崩溃状态：以已知红收尾 {0: 1, 1: 1}、新发现 0
+  I-1.1：判绿 93 次、不适用 0 次
+  I-1.3：判绿 93 次、不适用 0 次
+  I-1.4：判绿 93 次、不适用 0 次
+  I-1.6：判绿 93 次、不适用 0 次
+  I-1.7：判绿 93 次、不适用 0 次
+  I-2.1：判绿 93 次、不适用 0 次
+  I-2.3：判绿 93 次、不适用 0 次
+  I-2.4：判绿 93 次、不适用 0 次
+  I-2.5：判绿 93 次、不适用 0 次
+  I-3.1：判绿 57 次、不适用 34 次
+  I-3.8：判绿 93 次、不适用 0 次
+  I-3.9：判绿 59 次、不适用 34 次
+  I-4.8：判绿 93 次、不适用 0 次
+  I-5.1：判绿 93 次、不适用 0 次
+  I-5.2：判绿 59 次、不适用 34 次
+  I-5.4：判绿 59 次、不适用 34 次
+  I-7.1：判绿 93 次、不适用 0 次
+  I-7.2：判绿 93 次、不适用 0 次
+  I-7.4：判绿 93 次、不适用 0 次
+  I-7.6：判绿 93 次、不适用 0 次
+  I-7.7：判绿 93 次、不适用 0 次
+  I-7.8：判绿 93 次、不适用 0 次
+  I-9.1：判绿 59 次、不适用 34 次
+  I-9.2：判绿 59 次、不适用 34 次
+  I-9.4：判绿 59 次、不适用 34 次
+  I-9.7：判绿 59 次、不适用 34 次
+  I-9.10：判绿 59 次、不适用 34 次
+  I-9.13：判绿 59 次、不适用 34 次
+  I-9.14：判绿 56 次、不适用 37 次
+崩溃状态上的已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：1 个崩溃状态；前几个 (种子, 段号) [(7463871032432355121, 96)]
+崩溃状态上的已知红第 1 条（增补 2 收口表第 43 行）：1 个崩溃状态；前几个 (种子, 段号) [(7463871032432355129, 60)]
+用时 3.8 秒
+.CRASH_INJECTION_PROGRESS slice=2/4 seeds=[7463871032432355115,7463871032432355117) finished_slices=2/4 finished_histories=4/8 elapsed_seconds=4.4
+CRASH_INJECTION_PROGRESS slice=3/4 seeds=[7463871032432355117,7463871032432355119) finished_slices=3/4 finished_histories=6/8 elapsed_seconds=5.7
+── 崩溃注入：写死的一段历史，段内真子集全枚举 ──
+历史 1 段：跑完 1、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 9 版
+崩溃状态 104 个：截在发布中间（根还没落盘）的 78 个、截回到最后一版之前的 101 个、段内有洞（后发的写先持久）的 70 个、落在起点那一段里的 0 个
+  段内扣下过 journal_record：24 个
+  段内扣下过 root_record_fua：8 个
+  段内扣下过 system_configuration_slot：53 个
+  段内扣下过 unit_write：48 个
+  落在 PublishFirstFile 里：11 个
+  落在 PublishOverwrite 里：28 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：65 个
+  落在 CloseAndMountRollback 里：0 个
+  落在 RaiseRollbackFloor 里：0 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 81 次、没有文件 23 次、失败 0 次；施加过 journal 记录前缀 18 次
+崩溃状态上 checker 跑了 104 次；记录核对器跑了 104 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次
+问模型 104 次：比过内容 81 次、树表 0 条对上 23 次
+崩溃状态：以已知红收尾 {}、新发现 0
+  I-1.1：判绿 104 次、不适用 0 次
+  I-1.3：判绿 104 次、不适用 0 次
+  I-1.4：判绿 104 次、不适用 0 次
+  I-1.6：判绿 104 次、不适用 0 次
+  I-1.7：判绿 104 次、不适用 0 次
+  I-2.1：判绿 104 次、不适用 0 次
+  I-2.3：判绿 104 次、不适用 0 次
+  I-2.4：判绿 104 次、不适用 0 次
+  I-2.5：判绿 104 次、不适用 0 次
+  I-3.1：判绿 78 次、不适用 26 次
+  I-3.8：判绿 104 次、不适用 0 次
+  I-3.9：判绿 78 次、不适用 26 次
+  I-4.8：判绿 104 次、不适用 0 次
+  I-5.1：判绿 104 次、不适用 0 次
+  I-5.2：判绿 78 次、不适用 26 次
+  I-5.4：判绿 78 次、不适用 26 次
+  I-7.1：判绿 104 次、不适用 0 次
+  I-7.2：判绿 104 次、不适用 0 次
+  I-7.4：判绿 104 次、不适用 0 次
+  I-7.6：判绿 104 次、不适用 0 次
+  I-7.7：判绿 104 次、不适用 0 次
+  I-7.8：判绿 104 次、不适用 0 次
+  I-9.1：判绿 78 次、不适用 26 次
+  I-9.2：判绿 78 次、不适用 26 次
+  I-9.4：判绿 78 次、不适用 26 次
+  I-9.7：判绿 78 次、不适用 26 次
+  I-9.10：判绿 78 次、不适用 26 次
+  I-9.13：判绿 78 次、不适用 26 次
+  I-9.14：判绿 66 次、不适用 38 次
+.CRASH_INJECTION_PROGRESS slice=4/4 seeds=[7463871032432355119,7463871032432355121) finished_slices=4/4 finished_histories=8/8 elapsed_seconds=7.4
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355121) slices=4 worker_threads=1 elapsed_seconds=7.4
+CRASH_INJECTION_START seeds=[7463871032432355113,7463871032432355121) slices=8 worker_threads=4 configured_worker_threads=4 worker_threads_source=given_by_caller images=/tmp/singlefs-crash-injection-2785259-seedbase-7463871032432355113
+CRASH_INJECTION_PROGRESS slice=1/8 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/8 finished_histories=1/8 elapsed_seconds=0.2
+CRASH_INJECTION_PROGRESS slice=2/8 seeds=[7463871032432355114,7463871032432355115) finished_slices=2/8 finished_histories=2/8 elapsed_seconds=0.7
+CRASH_INJECTION_PROGRESS slice=5/8 seeds=[7463871032432355117,7463871032432355118) finished_slices=3/8 finished_histories=3/8 elapsed_seconds=0.8
+CRASH_INJECTION_PROGRESS slice=4/8 seeds=[7463871032432355116,7463871032432355117) finished_slices=4/8 finished_histories=4/8 elapsed_seconds=0.9
+CRASH_INJECTION_PROGRESS slice=3/8 seeds=[7463871032432355115,7463871032432355116) finished_slices=5/8 finished_histories=5/8 elapsed_seconds=1.1
+CRASH_INJECTION_PROGRESS slice=8/8 seeds=[7463871032432355120,7463871032432355121) finished_slices=6/8 finished_histories=6/8 elapsed_seconds=1.3
+CRASH_INJECTION_PROGRESS slice=6/8 seeds=[7463871032432355118,7463871032432355119) finished_slices=7/8 finished_histories=7/8 elapsed_seconds=1.4
+CRASH_INJECTION_PROGRESS slice=7/8 seeds=[7463871032432355119,7463871032432355120) finished_slices=8/8 finished_histories=8/8 elapsed_seconds=2.1
+CRASH_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355121) slices=8 worker_threads=4 elapsed_seconds=2.1
+.── 崩溃注入：抬 F 落进回退空档那一段历史 ──
+历史 1 段：跑完 1、以已知红收尾 {}、新发现 0；一个崩溃状态都摆不出的 0 段；模型目录最多 23 版
+崩溃状态 121 个：截在发布中间（根还没落盘）的 106 个、截回到最后一版之前的 118 个、段内有洞（后发的写先持久）的 49 个、落在起点那一段里的 20 个
+  段内扣下过 journal_record：66 个
+  段内扣下过 root_record_fua：22 个
+  段内扣下过 system_configuration_slot：27 个
+  段内扣下过 unit_write：20 个
+  落在 PublishFirstFile 里：0 个
+  落在 PublishOverwrite 里：30 个
+  落在 PublishWithoutUnits 里：0 个
+  落在 CloseAndMountWritable 里：22 个
+  落在 CloseAndMountRollback 里：32 个
+  落在 RaiseRollbackFloor 里：17 个
+  落在 ColdStartRecover 里：0 个
+恢复：读回文件 105 次、没有文件 16 次、失败 0 次；施加过 journal 记录前缀 51 次
+崩溃状态上 checker 跑了 121 次；记录核对器跑了 121 次：根在而记录一条都不在 0 次、恢复自称新态而单元缺席 0 次
+问模型 121 次：比过内容 105 次、树表 0 条对上 16 次
+崩溃状态：以已知红收尾 {1: 13}、新发现 0
+  I-1.1：判绿 121 次、不适用 0 次
+  I-1.3：判绿 121 次、不适用 0 次
+  I-1.4：判绿 121 次、不适用 0 次
+  I-1.6：判绿 121 次、不适用 0 次
+  I-1.7：判绿 121 次、不适用 0 次
+  I-2.1：判绿 121 次、不适用 0 次
+  I-2.3：判绿 121 次、不适用 0 次
+  I-2.4：判绿 121 次、不适用 0 次
+  I-2.5：判绿 121 次、不适用 0 次
+  I-3.1：判绿 89 次、不适用 19 次
+  I-3.8：判绿 121 次、不适用 0 次
+  I-3.9：判绿 102 次、不适用 19 次
+  I-4.8：判绿 121 次、不适用 0 次
+  I-5.1：判绿 121 次、不适用 0 次
+  I-5.2：判绿 102 次、不适用 19 次
+  I-5.4：判绿 102 次、不适用 19 次
+  I-7.1：判绿 121 次、不适用 0 次
+  I-7.2：判绿 121 次、不适用 0 次
+  I-7.4：判绿 121 次、不适用 0 次
+  I-7.6：判绿 121 次、不适用 0 次
+  I-7.7：判绿 121 次、不适用 0 次
+  I-7.8：判绿 121 次、不适用 0 次
+  I-9.1：判绿 102 次、不适用 19 次
+  I-9.2：判绿 102 次、不适用 19 次
+  I-9.4：判绿 102 次、不适用 19 次
+  I-9.7：判绿 102 次、不适用 19 次
+  I-9.10：判绿 102 次、不适用 19 次
+  I-9.13：判绿 102 次、不适用 19 次
+  I-9.14：判绿 96 次、不适用 25 次
+.
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.70s
+

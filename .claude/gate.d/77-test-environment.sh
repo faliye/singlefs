@@ -26,8 +26,40 @@ cd "$ROOT" 2>/dev/null || exit 2
 
 SCRIPT="research/scripts/test-environment-check.py"
 log="$(mktemp)"
+
+# 本次门禁的开跑时刻（epoch 秒）：晚于它才出现的临时条目是这一次跑自己产生的，单列一档不判红（C448）。
+# 取法是往上找祖先里那个 gate.sh 进程、读它的启动时刻——门禁没有导出开跑时刻的环境变量，而这一阶段
+# 排在最后，用「本阶段开跑时刻」当分界会把前面每个阶段留下的都算进去，方向正好反了。
+# 单跑这一阶段（祖先里没有 gate.sh）时算不出来，就不给分界、照旧全判。
+gate_started_epoch() {
+  local boot_time clock_ticks pid parent start_ticks command_line
+  boot_time="$(awk "/^btime/{print \$2}" /proc/stat 2>/dev/null)"
+  clock_ticks="$(getconf CLK_TCK 2>/dev/null)"
+  [[ -n "$boot_time" && -n "$clock_ticks" && "$clock_ticks" -gt 0 ]] || return 1
+  pid=$$
+  while [[ "$pid" != 1 && -r "/proc/$pid/stat" ]]; do
+    # /proc/<pid>/stat 的第二个字段是可执行文件名、可能带空格，去掉「… ) 」之后 $2 才是父进程号、$20 是启动时刻
+    parent="$(sed "s/.*) //" "/proc/$pid/stat" 2>/dev/null | awk "{print \$2}")"
+    [[ -n "$parent" && "$parent" != 0 && -r "/proc/$parent/cmdline" ]] || return 1
+    # 先把命令行落到变量再判：pipefail 下管道以 grep -q 收尾，命中时前段吃 SIGPIPE、整体返回 141，会被读成没命中
+    command_line="$(tr "\\0" " " < "/proc/$parent/cmdline" 2>/dev/null)"
+    if [[ "$command_line" == *gate.sh* ]]; then
+      start_ticks="$(sed "s/.*) //" "/proc/$parent/stat" 2>/dev/null | awk "{print \$20}")"
+      [[ -n "$start_ticks" ]] || return 1
+      echo "$(( boot_time + start_ticks / clock_ticks ))"
+      return 0
+    fi
+    pid="$parent"
+  done
+  return 1
+}
+
 if [[ -f "$SCRIPT" ]]; then
-  python3 "$SCRIPT" check >"$log" 2>&1 || true
+  if started="$(gate_started_epoch)"; then
+    python3 "$SCRIPT" check --produced-after "$started" >"$log" 2>&1 || true
+  else
+    python3 "$SCRIPT" check >"$log" 2>&1 || true
+  fi
 elif [[ -f test-environment-check-output.log ]]; then
   cp test-environment-check-output.log "$log"
 else

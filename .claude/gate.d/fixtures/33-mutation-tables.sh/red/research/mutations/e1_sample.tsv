@@ -1,1 +1,2 @@
 M1_样本	foo	bar
+M2_转义写进源码	fn main() {}	fn main() { \&(); }

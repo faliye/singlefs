@@ -12,3 +12,5 @@ research/e7-index-bench/src/bin/e67_device_subset.rs  # 回扫跳过：还没回
 research/e7-index-bench/src/bin/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
 research/e7-index-bench/src/bin/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
 research/e7-index-bench/src/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3
+research/prompts/m2-supp3-item3-code-r2-opus-model/probe1-fast-tier-subset-coverage.rs  # 三方攻方腿 m2-supp3-item3-code-r2 交的量具：原样保存的证据，改名就断证据链（evidence-discipline「原样保存的证据不许事后改」，与 .claude/doc-lint-exclude 绕开 research/prompts/ 是同一条理由）。下一次提交按门禁 91 号归档删掉它时，这一行一起删
+research/prompts/m2-supp3-item3-code-r2-opus-model/probe2-deeper-enumeration.rs  # 同上
