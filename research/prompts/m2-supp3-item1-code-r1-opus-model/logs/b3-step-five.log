@@ -1,5 +1,0 @@
-test the_rollback_publish_is_compared_with_the_previous_valid_root_and_not_with_the_abandoned_root_before_it ... FAILED
-test torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling ... FAILED
-test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
-test raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused ... FAILED
-test result: FAILED. 7 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s

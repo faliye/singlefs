@@ -11,9 +11,9 @@ use singlefs_format::{
 };
 
 use crate::image::{
-    chosen_superblocks, judge_location_order, parse_data_pointer, parse_node_pointer,
-    read_referenced_unit, root_slot_positions, valid_roots, verified_superblock_slots, ImageReader,
-    InvariantVerdict, Judgements, PointerView, PoolGeometry,
+    chosen_system_configurations, judge_location_order, parse_data_pointer, parse_node_pointer,
+    read_referenced_unit, root_slot_positions, valid_roots, verified_system_configuration_slots,
+    ImageReader, InvariantVerdict, Judgements, PointerView, PoolGeometry,
 };
 use crate::{
     check_index_node_keys, check_journal_record, checksum_field_holds, crc32_castagnoli_table,
@@ -650,7 +650,7 @@ fn judge_instance_carriers(
     roots: &[(u64, u64, crate::RootView)],
     judgements: &mut Judgements,
 ) {
-    let highest_by_device: Vec<Option<u32>> = verified_superblock_slots(reader)
+    let highest_by_device: Vec<Option<u32>> = verified_system_configuration_slots(reader)
         .into_iter()
         .map(|(_, slots)| {
             slots
@@ -1291,9 +1291,9 @@ pub fn allocation_record_count_under_root(
 /// 池级 checker 的入口：每条第一版不变量都报，没评估到的报「不适用」并带理由。
 #[must_use]
 pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, InvariantVerdict)> {
-    let superblocks = chosen_superblocks(reader);
+    let system_configurations = chosen_system_configurations(reader);
     let mut root_ring_judgements = Judgements::default();
-    let chosen: Vec<_> = superblocks
+    let chosen: Vec<_> = system_configurations
         .iter()
         .filter_map(|(device, chosen)| {
             chosen
@@ -1301,7 +1301,7 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 .map(|(view, geometry)| (*device, view, geometry))
         })
         .collect();
-    if chosen.is_empty() || chosen.len() != superblocks.len() {
+    if chosen.is_empty() || chosen.len() != system_configurations.len() {
         for invariant in crate::image::IMPLEMENTED_INVARIANTS {
             root_ring_judgements.not_applicable(
                 invariant,
@@ -1404,6 +1404,9 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             .try_into()
             .expect("8 字节"),
     );
+    // 掉出遍历的根槽按理由各记一次（两样都占的两边都记）：I-3.1 判红时这几个数就是「遍历为什么少算」的机理标识。
+    let mut root_slots_dropped_as_abandoned = 0u64;
+    let mut root_slots_dropped_below_floor = 0u64;
     let candidate_indexes: Vec<usize> = roots
         .iter()
         .enumerate()
@@ -1412,7 +1415,16 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 *row_instance == root.instance && root.checkpoint_txg > *row_txg
             });
             let below_floor = root.checkpoint_txg < newest_rollback_floor;
-            *index == newest_index || (!abandoned && !below_floor)
+            let walked = *index == newest_index || (!abandoned && !below_floor);
+            if !walked {
+                if abandoned {
+                    root_slots_dropped_as_abandoned += 1;
+                }
+                if below_floor {
+                    root_slots_dropped_below_floor += 1;
+                }
+            }
+            walked
         })
         .map(|(index, _)| index)
         .collect();
@@ -1488,6 +1500,23 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             });
         }
     }
+    // I-3.1 判红时，说明文字里带一段机理标识：遍历覆盖了哪些根、剩下的按什么理由没覆盖。
+    // 判读的一方（`singlefs-harness` 的 `history::allocation_statistic_mechanism`）按它分辨「记账多算」是哪一种机理造成的：
+    // 环转过一圈把 F 之上的根挤出了环，还是回退下界把环里读得到的根挡在了外面——两者的签名（只有 I-3.1 红、记账多于遍历）
+    // 一模一样，不带这一段就只能按签名认，机理不同的新问题会被「已知红」清单接走（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半）。
+    let root_ring_slot_count = geometry.regions * geometry.slots_per_region;
+    let oldest_readable_root_txg = roots
+        .iter()
+        .map(|(_, _, root)| root.checkpoint_txg)
+        .min()
+        .unwrap_or(0);
+    let readable_root_slot_count = u64::try_from(roots.len()).expect("根槽数");
+    let walked_root_slot_count = u64::try_from(candidate_indexes.len()).expect("候选根槽数");
+    let mechanism = move || {
+        format!(
+            "；机理：根环槽数 {root_ring_slot_count}、最新根 txg {newest_txg}、环里自证过的根槽 {readable_root_slot_count} 个、最老的自证过的根 txg {oldest_readable_root_txg}、遍历的候选根槽 {walked_root_slot_count} 个、被实例表判抛弃的根槽 {root_slots_dropped_as_abandoned} 个、回退下界 F {newest_rollback_floor}、低于 F 的根槽 {root_slots_dropped_below_floor} 个"
+        )
+    };
     // I-3.1 / I-5.2：最新根下面记账树的「已分配」「空闲」逐盘对遍历得到的和与容量。
     if accounting_seen {
         for device in &devices {
@@ -1498,7 +1527,10 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 .get(&(STATISTIC_ALLOCATED_BYTES, *device))
                 .copied();
             judgements.judge("I-3.1", allocated == Some(walked), || {
-                format!("盘 {device}：记账的已分配 {allocated:?}，遍历全部有效根得到 {walked}")
+                format!(
+                    "盘 {device}：记账的已分配 {allocated:?}，遍历全部有效根得到 {walked}{}",
+                    mechanism()
+                )
             });
             let capacity = reader
                 .device_bytes(*device)

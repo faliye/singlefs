@@ -1,4 +1,0 @@
-H1F at-stop txg=29 inst=2 F_root=0 F_eff=0 floor_now=9 acct_alloc=206 acct_free=211762 acct_defer=194 mem_alloc=206 mem_defer=194 mem_free=211762 iso=50 held=0  | GREEN
-H1F wiped root slots of instance 2: txgs=[24, 27, 9, 12, 15, 18, 21, 25, 28, 10, 13, 16, 19, 22, 26, 29, 11, 14, 17, 20, 23] ; recovery now chooses (1,8) ; checker on the wiped image: I-2.1[实例表单元 在盘 0 槽 50176 的那一份与位置条目里的校验和对不上] ; I-3.1[盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 524288] ; I-4.8[最新根（txg 8）出发的遍历有单元对不上或读不出] ; I-7.2[最新的根走不完：实例表单元两份都读不到对得上的] ; I-7.4[最新根（txg 8）引用的单元已被复用或抹头（校验和对不上或头用不了）]
-H1F mount on the fallback root failed: Recovery(UnitUnreadable { slot: SlotNumber(50176) })
-PROBE-COMPLETE

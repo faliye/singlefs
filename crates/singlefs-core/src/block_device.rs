@@ -6,7 +6,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom};
 use std::os::unix::fs::{FileExt, OpenOptionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::address::DeviceOffsetInBytes;
 
@@ -42,6 +42,11 @@ pub enum BlockDeviceError {
     InputOutput(io::Error),
     /// 块设备的 queue 属性读不到（sysfs 没有这块盘，或内容不是数）：不许拿一个写死的值顶上（D20（承重面：单元的原子性与自包含） 推论三）。
     ProbeFailed { attribute: &'static str },
+    /// 要建的镜像文件已经在那儿了：不许接着用旧镜像（进程号会被系统复用、上一轮被杀留下的文件不会被清，
+    /// 接着用就是拿别人的盘面当自己的起点）。调用方自己挑一个没人用的路径，或先清掉。
+    ImageFileAlreadyExists { path: PathBuf },
+    /// 要重开的镜像文件不在：重开的语义是「接着用这块盘」，文件没了就不是重开，不许静默建一块空盘。
+    ImageFileMissing { path: PathBuf },
 }
 
 impl std::fmt::Display for BlockDeviceError {
@@ -72,6 +77,12 @@ impl std::fmt::Display for BlockDeviceError {
             BlockDeviceError::InputOutput(error) => write!(formatter, "块设备 I/O 错：{error}"),
             BlockDeviceError::ProbeFailed { attribute } => {
                 write!(formatter, "读不到块设备的 queue/{attribute}")
+            }
+            BlockDeviceError::ImageFileAlreadyExists { path } => {
+                write!(formatter, "要建的镜像文件已经在那儿了：{}", path.display())
+            }
+            BlockDeviceError::ImageFileMissing { path } => {
+                write!(formatter, "要重开的镜像文件不在：{}", path.display())
             }
         }
     }
@@ -106,8 +117,11 @@ pub struct FileBackedBlockDevice {
 }
 
 impl FileBackedBlockDevice {
-    /// 打开（或建出）一个镜像文件并把它撑到 `size_in_bytes`；稀疏文件，不真占盘。
-    pub fn open_or_create(
+    /// 排他地建出一个镜像文件并把它撑到 `size_in_bytes`；稀疏文件，不真占盘。
+    /// 同名文件已经在那儿了就报 [`BlockDeviceError::ImageFileAlreadyExists`]，不接着用旧镜像：
+    /// 测试的镜像名带进程号，而进程号会被系统复用、上一轮被杀留下的文件不会被清——接着用就是拿上一轮的盘面当这一轮的起点，
+    /// 而且是静默的（代码三方 m2-supp3-item3-code-r1 判决第四节第 9 题，用户定案）。
+    pub fn create_image_file_exclusively(
         path: &Path,
         size_in_bytes: u64,
         physical_block_size: PhysicalBlockSizeInBytes,
@@ -115,10 +129,48 @@ impl FileBackedBlockDevice {
         let file = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::AlreadyExists {
+                    BlockDeviceError::ImageFileAlreadyExists {
+                        path: path.to_path_buf(),
+                    }
+                } else {
+                    BlockDeviceError::InputOutput(error)
+                }
+            })?;
+        file.set_len(size_in_bytes)
+            .map_err(BlockDeviceError::InputOutput)?;
+        Ok(Self {
+            file,
+            size_in_bytes,
+            physical_block_size,
+        })
+    }
+
+    /// 重开一个已经在的镜像文件（关掉会话再挂回同一块盘、冷启动读回）：文件不在就报
+    /// [`BlockDeviceError::ImageFileMissing`]，不静默建一块空盘。
+    pub fn open_existing_image_file(
+        path: &Path,
+        size_in_bytes: u64,
+        physical_block_size: PhysicalBlockSizeInBytes,
+    ) -> Result<Self, BlockDeviceError> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(false)
             .truncate(false)
             .open(path)
-            .map_err(BlockDeviceError::InputOutput)?;
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::NotFound {
+                    BlockDeviceError::ImageFileMissing {
+                        path: path.to_path_buf(),
+                    }
+                } else {
+                    BlockDeviceError::InputOutput(error)
+                }
+            })?;
         file.set_len(size_in_bytes)
             .map_err(BlockDeviceError::InputOutput)?;
         Ok(Self {
@@ -432,9 +484,12 @@ mod tests {
     #[test]
     fn write_then_read_returns_the_same_bytes_and_zero_fill_elsewhere() {
         let path = temporary_image_path("roundtrip");
-        let mut device =
-            FileBackedBlockDevice::open_or_create(&path, 16384, PhysicalBlockSizeInBytes(512))
-                .expect("建镜像");
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            16384,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
         let payload = vec![0xA5u8; 1024];
         device
             .write_at(
@@ -459,12 +514,77 @@ mod tests {
         std::fs::remove_file(&path).expect("清理镜像");
     }
 
+    /// 撞上同名文件一律报错、盘上那一份字节一个都不动（进程号会被系统复用、上一轮被杀留下的镜像不会被清：
+    /// 接着用旧镜像就是拿上一轮的盘面当这一轮的起点）。重开走另一条入口，文件不在时也报错、不静默建空盘。
+    #[test]
+    fn creating_an_image_that_already_exists_is_refused_and_leaves_the_old_bytes_alone() {
+        let path = temporary_image_path("exclusive");
+        let mut first = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            8192,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("第一次建得出来");
+        first
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &[0x5Au8; 512],
+                WriteDurability::ForceUnitAccess,
+            )
+            .expect("写一扇区");
+        drop(first);
+        let again = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            8192,
+            PhysicalBlockSizeInBytes(512),
+        );
+        let refusal = again.err().map(|error| error.to_string());
+        assert!(
+            refusal
+                .as_deref()
+                .is_some_and(|text| text.contains("要建的镜像文件已经在那儿了")),
+            "撞上同名文件要报 ImageFileAlreadyExists，报的是 {refusal:?}"
+        );
+        let reopened = FileBackedBlockDevice::open_existing_image_file(
+            &path,
+            8192,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("重开得出来");
+        let mut first_sector = [0u8; 512];
+        reopened
+            .read_at(DeviceOffsetInBytes(0), &mut first_sector)
+            .expect("读回第一扇区");
+        assert!(
+            first_sector.iter().all(|byte| *byte == 0x5A),
+            "被拒之后旧镜像逐字节不变"
+        );
+        drop(reopened);
+        std::fs::remove_file(&path).expect("清理镜像");
+        let missing = FileBackedBlockDevice::open_existing_image_file(
+            &path,
+            8192,
+            PhysicalBlockSizeInBytes(512),
+        );
+        let absence = missing.err().map(|error| error.to_string());
+        assert!(
+            absence
+                .as_deref()
+                .is_some_and(|text| text.contains("要重开的镜像文件不在")),
+            "重开一个不在的镜像要报 ImageFileMissing，报的是 {absence:?}"
+        );
+        assert!(!path.exists(), "重开被拒之后没有建出文件来");
+    }
+
     #[test]
     fn unaligned_and_out_of_range_requests_are_rejected_before_touching_the_file() {
         let path = temporary_image_path("bounds");
-        let mut device =
-            FileBackedBlockDevice::open_or_create(&path, 8192, PhysicalBlockSizeInBytes(512))
-                .expect("建镜像");
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            8192,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
         let unaligned = device.write_at(
             DeviceOffsetInBytes(100),
             &[0u8; 512],

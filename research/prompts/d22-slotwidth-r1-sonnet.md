@@ -7,7 +7,7 @@
    - `.claude/kb/decisions/22-单元原子性怎么合成.md` 已定项 2 / 已定三 / 已定项 16 / 已定项 9 / 已定项 15 的原文
    - `.claude/kb/decisions/20-承重面单元的原子性与自包含.md` 推论三那一节
    - `.claude/kb/decisions/02-RAID条带策略.md` 硬要求 1 与已定项 19
-   - `.claude/kb/experiments/126-系统配置槽宽四条候选的代价.md` 与它的产物 `research/results/e126-*.out`、源码 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs`（尤其 honors 那一列的定义）
+   - `.claude/kb/experiments/126-系统配置槽宽四条候选的代价.md` 与它的产物 `research/results/e126-*.out`、源码 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs`（尤其 honors 那一列的定义）
    - `.claude/kb/layout/01-first-txn.md` 零、一两节（超级块落点与 481 字节字段表）
 
 ## 要做的

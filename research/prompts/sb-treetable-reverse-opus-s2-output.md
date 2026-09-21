@@ -39,8 +39,8 @@ grep -rn "tree_table\|treetable\|tree-table" .              →  见下表源码
 | `decisions/03/05/11/26` | 各 1 | 旁证 |
 
 **源码侧 4 处**（全部把 59 字节记在超级块名下或注释里）：
-`research/e7-index-bench/src/bin/e115_superblock_completeness.rs:66,97`、
-`e124_superblock_recompute.rs:72`、`e100_superblock_slot.rs:77`。
+`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:66,97`、
+`research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs:72`、`research/e7-index-bench/src/bin/e100_system_configuration_slot.rs:77`。
 
 ⚠️ **材料没列、而这一轮真用上的承重命中，至少 5 处**：D15（格式冻结政策） 已定项 2 那一节整节、
 D8（核心索引结构） 已定项 8、D21（权威态与派生态的分界） 第 10 行、D18（块里携带什么信息） 第 367 行、C196（中央映射树的根住哪全仓无条款）。

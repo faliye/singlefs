@@ -16,9 +16,9 @@
 | 记录头 307 字节，`header_csum` 罩整条 `[0, 4096)`，记录定长 4096 | `crates/singlefs-core/src/journal.rs:1-3` 文件头注释与 `JOURNAL_HEADER_CHECKSUM_OFFSET` |
 | 一条记录的载荷上限：4096 − 307 = 3789 字节，点名一个单元之后剩 3733 字节 | 由上两行算出 |
 | 提交步骤是封闭枚举 `CommitStep`，五个成员：写单元、写 journal 记录、根槽 FUA 写、超级块槽轮换、屏障 | `crates/singlefs-core/src/transaction.rs:68` |
-| 超级块里有 journal 环长、tail、实例代号；**没有 `T_time` 字段，也没有 `T_dirty` 字段** | `crates/singlefs-core/src/superblock.rs:49-75`；`grep -n "T_time\|T_dirty\|dirty" crates/singlefs-core/src/superblock.rs crates/singlefs-format/src/lib.rs` 零命中 |
+| 超级块里有 journal 环长、tail、实例代号；**没有 `T_time` 字段，也没有 `T_dirty` 字段** | `crates/singlefs-core/src/system_configuration.rs:49-75`；`grep -n "T_time\|T_dirty\|dirty" crates/singlefs-core/src/system_configuration.rs crates/singlefs-format/src/lib.rs` 零命中 |
 | 挂载路径里没有任何挂载选项结构 | `crates/singlefs-core/src/mount.rs`（1376 行）里 `mount option` / 选项解析零命中 |
-| 数据单元宽度是格式常量 `DATA_UNIT_BYTES` | `crates/singlefs-core/src/superblock.rs:5` 引入 |
+| 数据单元宽度是格式常量 `DATA_UNIT_BYTES` | `crates/singlefs-core/src/system_configuration.rs:5` 引入 |
 
 ⇒ **两条提议今天在 `crates/` 里都没有落点**：journal 记录没有装数据的字段，挂载路径没有选项入口。`T_time` / `T_dirty` 在 kb 的字节表（`.claude/kb/layout/01-first-txn.md` 第 145–146 行「可调值」两行）里有位置，实现还没写到那一步。所以两问的改法都写成「加在哪一处、要与已经实现的哪几样对得上」。
 

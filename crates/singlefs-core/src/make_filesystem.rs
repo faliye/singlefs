@@ -6,8 +6,8 @@
 
 use singlefs_format::{
     INSTANCE_ROW_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_POINTER_BYTES,
-    ROOT_RING_REGIONS, SLOT_BYTES, SUPERBLOCK_SLOTS_PER_DEVICE, TREE_IDENTIFIER_WATERMARK_AT_MKFS,
-    TREE_TABLE_ENTRY_BYTES, UNIT_AREA_START_SLOT,
+    ROOT_RING_REGIONS, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+    TREE_IDENTIFIER_WATERMARK_AT_MKFS, TREE_TABLE_ENTRY_BYTES, UNIT_AREA_START_SLOT,
 };
 
 use crate::address::{
@@ -20,7 +20,10 @@ use crate::checksum::crc32_castagnoli;
 use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
 use crate::root_record::RootRecord;
 use crate::root_ring::{ring_end, slot_offset, RootRingSlot};
-use crate::superblock::{FormatTimeGeometry, Superblock};
+use crate::system_configuration::{
+    SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
+    SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
+};
 use crate::unit::{
     build_index_node, build_packed_unit, PackedIdentity, WriteOrder, PACKED_TYPE_INSTANCE_TABLE,
 };
@@ -28,7 +31,7 @@ use crate::unit::{
 /// mkfs 写实例代号 0（D23（journal 的角色与格式） 已定项 16）。
 pub const MKFS_INSTANCE_GENERATION: InstanceGeneration = InstanceGeneration(0);
 /// 系统配置槽世代号从 1 起，mkfs 把两个槽都种上 1（D22（单元原子性怎么合成） 已定项 16）。
-pub const SUPERBLOCK_GENERATION_AT_MKFS: u64 = 1;
+pub const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 /// 实例表单元第 0 片落槽 50176（占两槽），树表单元第 0 版落槽 50178（D3（空间分配） 已定项 10 ④）。
 pub const INSTANCE_TABLE_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT);
 pub const TREE_TABLE_GENESIS_SLOT: SlotNumber = SlotNumber(UNIT_AREA_START_SLOT + 2);
@@ -39,11 +42,14 @@ pub const FIRST_VERSION_REGION_DEVICES: [DeviceIdentity; 3] =
     [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)];
 
 /// mkfs 的参数：fsid 与时间戳都是参数，同参数两次 mkfs 逐字节相同（里程碑步 1 验收）。
+///
+/// 三样都进系统不可变配置那一档（D22（单元原子性怎么合成） 已定项 26 第一档：改了要重建文件系统）；
+/// 那一档里剩下的本盘设备号与设备数不是参数——mkfs 逐盘现填、按池里的盘数现数。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MakeFilesystemParameters {
     pub filesystem_identifier: [u8; 16],
     pub region_devices: [DeviceIdentity; 3],
-    pub geometry: FormatTimeGeometry,
+    pub geometry: SystemImmutableSizes,
 }
 
 /// mkfs 能出的错：几何放不下，或底层块设备错。
@@ -285,18 +291,24 @@ pub fn make_filesystem<Device: BlockDevice>(
     }
 
     for (identity, device) in devices.iter_mut() {
-        let superblock = Superblock {
-            filesystem_identifier: parameters.filesystem_identifier,
-            this_device: *identity,
-            device_count: u32::try_from(identities.len()).expect("设备数"),
-            slot_generation: SUPERBLOCK_GENERATION_AT_MKFS,
-            region_devices: parameters.region_devices,
-            geometry: parameters.geometry,
-            journal_tail: 0,
-            journal_instance: instance,
+        let system_configuration = SystemConfiguration {
+            immutable: SystemImmutableConfiguration {
+                filesystem_identifier: parameters.filesystem_identifier,
+                this_device: *identity,
+                device_count: u32::try_from(identities.len()).expect("设备数"),
+                region_devices: parameters.region_devices,
+                sizes: parameters.geometry,
+            },
+            mutable: SystemMutableConfiguration,
+            runtime: SystemRuntimeConfiguration,
+            quantities: SystemRuntimeQuantities {
+                slot_generation: SYSTEM_CONFIGURATION_GENERATION_AT_MKFS,
+                journal_tail: 0,
+                journal_instance: instance,
+            },
         };
-        let slot = superblock.to_slot();
-        for slot_index in 0..SUPERBLOCK_SLOTS_PER_DEVICE {
+        let slot = system_configuration.to_slot();
+        for slot_index in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
             let offset = DeviceOffsetInBytes(
                 slot_index * u64::from(parameters.geometry.fixed_structure_slot_spacing),
             );

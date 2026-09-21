@@ -1,2 +1,0 @@
-thread 'main'  panicked at /tmp/claude-1000/c355-head/crates/singlefs-core/src/allocator.rs:155:9:
-thread 'main'  panicked at /tmp/claude-1000/c355-head/crates/singlefs-core/src/allocator.rs:155:9:

@@ -17,8 +17,8 @@ cd research && bash scripts/replay.sh E146
 cd research && cargo run --release --bin e146-livelist-entry-width
 ```
 
-代码 `research/e7-index-bench/src/bin/e146_livelist_entry_width.rs`，原始输出 `research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `research/results/e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=first_transaction`），再上一版 `research/results/e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `research/results/e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
-跑前登记 `research/prompts/e146-preregistration.md`，变异表 `research/mutations/e146_livelist_entry_width.tsv`（12 条全抓，
+代码 `research/e7-index-bench/src/bin/e146_livelist_entry_width.rs`，原始输出 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行，末行 `emitted=130`；树表条目按 200 算的那一版，上一版 `e146-livelist-entry-width-2026-09-14-round2.out` 按 148 算、与它只差 6 行（`name=config` 1 行与 5 行 `name=first_transaction`），再上一版 `e146-livelist-entry-width-2026-09-13.out` 按 145 算，两版都原样保留；变异复跑 `e146_livelist_entry_width-mutate-2026-09-16-tree-table-200.log`，12 条全抓），
+跑前登记 `e146-preregistration.md`，变异表 `research/mutations/e146_livelist_entry_width.tsv`（12 条全抓，
 `bash research/scripts/mutate.sh e146-livelist-entry-width research/e7-index-bench/src/bin/e146_livelist_entry_width.rs research/mutations/e146_livelist_entry_width.tsv`）。
 
 ### 这是计数模型，不是实现
@@ -125,11 +125,11 @@ E7RESULT name=verdict pad_entry_bytes=35 legacy_entry_bytes=24 pad_leaf_fanout=4
 ## 历史版本
 
 ### 2026-09-16
-- 树表条目 148 → 200（D8（核心索引结构） 已定项 8，2026-09-16 用户定案加宽），装置的 `TREE_TABLE_ENTRY_BYTES` 跟着改，产物从 `research/results/e146-livelist-entry-width-2026-09-14-round2.out` 换成 `research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out`；哪几行变了见 [experiments-history.md](../experiments-history.md) 2026-09-16（其一）。
+- 树表条目 148 → 200（D8（核心索引结构） 已定项 8，2026-09-16 用户定案加宽），装置的 `TREE_TABLE_ENTRY_BYTES` 跟着改，产物从 `e146-livelist-entry-width-2026-09-14-round2.out` 换成 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`；哪几行变了见 [experiments-history.md](../experiments-history.md) 2026-09-16（其一）。
 
 ### 2026-09-14
 - 树表条目 145 → 148（D8（核心索引结构） 已定项 8 的树表条目 2026-09-14 用户定案重排并加头 ID 8、根指针从 83 到 86，`format-const: TREE_TABLE_ENTRY_BYTES = 148`，门禁阶段「格式常量在 kb 与实验源码之间同步」当天判红）重跑：
-  产物换成 `research/results/e146-livelist-entry-width-2026-09-14-round2.out`，130 行里 **6 行**变——`name=config` 的 `tree_table_entry` 145→148，5 行 `name=first_transaction` 的 `day1_null_root_bytes` 145→148（两棵树那臂 290→296）与 `day1_root_required_bytes` 16638→16641（两棵树 33276→33282）；
+  产物换成 `e146-livelist-entry-width-2026-09-14-round2.out`，130 行里 **6 行**变——`name=config` 的 `tree_table_entry` 145→148，5 行 `name=first_transaction` 的 `day1_null_root_bytes` 145→148（两棵树那臂 290→296）与 `day1_root_required_bytes` 16638→16641（两棵树 33276→33282）；
   条目宽、预付字节、规模网格上的树高、判别取样点各行逐字未变。8 个单测全绿。
   ⚠️ 变异表 M12 的原文停在 `TREE_TABLE_FIRST_VERSION_ENTRIES = 5`，而装置 2026-09-13 已按定案改成 7 ⇒ 这一条从那天起就替换不上、整轮变异中断（退出码 3）。原文改成 7 之后 12 条全抓。
   曾经：树表条目 145，day-1 注册 145 / 16638 字节（两棵树 290 / 33276）。

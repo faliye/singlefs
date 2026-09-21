@@ -11,8 +11,8 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemError, MakeFilesystemOutput, MakeFilesystemParameters,
 };
 use singlefs_core::root_ring::{slot_offset, RootRingSlot};
-use singlefs_core::superblock::FormatTimeGeometry;
-use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SUPERBLOCK_SLOT_BYTES};
+use singlefs_core::system_configuration::SystemImmutableSizes;
+use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
 use singlefs_harness::segments::{
     segment_kinds_text, segment_sizes_text, split_into_segments, FixedGeometry,
 };
@@ -36,10 +36,10 @@ fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: *b"singlefs-step1-x",
         region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: FormatTimeGeometry {
+        geometry: SystemImmutableSizes {
             physical_block_size: 512,
             minimum_input_output_bytes: 512,
-            fixed_structure_slot_spacing: FormatTimeGeometry::slot_spacing_for(512),
+            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(512),
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
         },
     }
@@ -58,7 +58,7 @@ fn run_mkfs(tag: &str) -> Pool {
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
-        let file = FileBackedBlockDevice::open_or_create(
+        let file = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
             IMAGE_BYTES,
             PhysicalBlockSizeInBytes(512),
@@ -184,14 +184,16 @@ fn checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolat
 }
 
 #[test]
-fn both_superblock_slots_verify_with_the_same_generation_and_a_corrupt_slot_loses_the_choice() {
+fn both_system_configuration_slots_verify_with_the_same_generation_and_a_corrupt_slot_loses_the_choice(
+) {
     let mut pool = run_mkfs("superblock");
-    let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     for (device_number, (_, device)) in pool.devices.iter().enumerate() {
         let slot_zero = read(device, 0, slot_bytes);
         let slot_one = read(device, 4096, slot_bytes);
-        let view_zero = singlefs_checker::check_superblock_slot(&slot_zero).expect("槽 0");
-        let view_one = singlefs_checker::check_superblock_slot(&slot_one).expect("槽 1");
+        let view_zero =
+            singlefs_checker::check_system_configuration_slot(&slot_zero).expect("槽 0");
+        let view_one = singlefs_checker::check_system_configuration_slot(&slot_one).expect("槽 1");
         assert_eq!(view_zero.slot_generation, 1);
         assert_eq!(view_one.slot_generation, 1);
         assert_eq!(
@@ -212,8 +214,8 @@ fn both_superblock_slots_verify_with_the_same_generation_and_a_corrupt_slot_lose
         .expect("写坏槽 0");
     let slot_zero = read(&pool.devices[0].1, 0, slot_bytes);
     let slot_one = read(&pool.devices[0].1, 4096, slot_bytes);
-    let (chosen, _) =
-        singlefs_checker::choose_superblock(&[&slot_zero, &slot_one]).expect("还有一槽可择");
+    let (chosen, _) = singlefs_checker::choose_system_configuration(&[&slot_zero, &slot_one])
+        .expect("还有一槽可择");
     assert_eq!(chosen, 1, "挂载选没坏的那一槽");
     remove_images(&pool);
 }
@@ -294,7 +296,7 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
         let mut paths = Vec::new();
         for device_number in 0..2u32 {
             let path = image_path(tag, device_number);
-            let file = FileBackedBlockDevice::open_or_create(
+            let file = FileBackedBlockDevice::create_image_file_exclusively(
                 &path,
                 IMAGE_BYTES,
                 PhysicalBlockSizeInBytes(512),
@@ -323,13 +325,13 @@ fn region_layout_other_than_zero_one_zero_is_refused_before_any_write() {
             result.as_ref().err()
         );
         assert!(stream.operations().is_empty(), "拒绝之前一个字节都没写");
-        let spacing = FormatTimeGeometry::slot_spacing_for(512);
+        let spacing = SystemImmutableSizes::slot_spacing_for(512);
         for (identity, device) in &devices {
             assert!(
                 read(
                     device,
                     0,
-                    usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096")
+                    usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096")
                 )
                 .iter()
                 .all(|byte| *byte == 0),
@@ -357,9 +359,12 @@ fn ring_larger_than_a_quarter_of_the_device_is_refused_before_any_write() {
     let mut paths = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path("small", device_number);
-        let file =
-            FileBackedBlockDevice::open_or_create(&path, 1 << 30, PhysicalBlockSizeInBytes(512))
-                .expect("建镜像");
+        let file = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            1 << 30,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
         devices.push((
             DeviceIdentity(device_number),
             RecordingBlockDevice::with_shared_stream(

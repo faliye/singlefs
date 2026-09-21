@@ -19,7 +19,7 @@ use singlefs_core::instance_table::InstanceTableRecords;
 use singlefs_core::mount::{
     mount_rollback, mount_writable, MountError, Mounted, RollbackTarget, ShadowLedger,
 };
-use singlefs_core::recovery::verified_superblock_slots;
+use singlefs_core::recovery::verified_system_configuration_slots;
 use singlefs_core::transaction::{acquire_instance, PoolWriter, TransactionUnit};
 use singlefs_format::INSTANCE_TABLE_PAGE_RECORDS;
 use singlefs_harness::crash::SparseBlockDevice;
@@ -75,19 +75,21 @@ fn rows_in_the_row_publish(mounted: &Mounted) -> usize {
 }
 
 /// 两块盘四个系统配置槽里自证过的那些槽写着的实例代号，按盘排。
-fn superblock_instances(devices: &Devices) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
+fn system_configuration_instances(
+    devices: &Devices,
+) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
     let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
     DISKS
         .iter()
         .map(|device| {
-            let mut instances: Vec<InstanceGeneration> = verified_superblock_slots(
+            let mut instances: Vec<InstanceGeneration> = verified_system_configuration_slots(
                 devices,
                 *device,
                 spacing,
                 &parameters().filesystem_identifier,
             )
             .iter()
-            .map(|superblock| superblock.journal_instance)
+            .map(|system_configuration| system_configuration.quantities.journal_instance)
             .collect();
             instances.sort();
             (*device, instances)
@@ -137,7 +139,7 @@ fn assert_refused_before_acquisition(
         "盘上逐字节不变：系统配置槽、根环里的根、录制流步数（一个写、一道屏障都没发）"
     );
     assert_eq!(
-        superblock_instances(devices),
+        system_configuration_instances(devices),
         instances_before,
         "两块盘系统配置里的实例代号不变：号没烧"
     );
@@ -166,7 +168,7 @@ fn writable_mounts_fill_the_instance_table_page_and_the_next_one_is_refused_befo
         );
     }
     let before = snapshot(&devices, &stream);
-    let instances_before = superblock_instances(&devices);
+    let instances_before = system_configuration_instances(&devices);
     assert_eq!(
         instances_before,
         vec![
@@ -201,7 +203,7 @@ fn mount_after_crashes_right_after_acquisition_may_fill_the_page_but_not_overflo
     let (mut one_row_too_many, stream) = pool_after_the_first_transaction();
     crash_right_after_acquisition(&mut one_row_too_many, 369);
     let before = snapshot(&one_row_too_many, &stream);
-    let instances_before = superblock_instances(&one_row_too_many);
+    let instances_before = system_configuration_instances(&one_row_too_many);
     let refused = mount_writable(&parameters(), &mut one_row_too_many);
     assert_refused_before_acquisition(
         refused,
@@ -247,7 +249,7 @@ fn rollback_counts_the_rows_of_the_table_it_rolls_back_to() {
         mount_writable(&parameters(), &mut overflows).expect("369 行，可写挂载放行");
     assert_eq!(rows_in_the_row_publish(&mounted_full_page), ROWS_PER_PAGE);
     let before = snapshot(&overflows, &stream);
-    let instances_before = superblock_instances(&overflows);
+    let instances_before = system_configuration_instances(&overflows);
     let refused = mount_rollback(&parameters(), &mut overflows, target, ShadowLedger::On);
     assert_refused_before_acquisition(
         refused,

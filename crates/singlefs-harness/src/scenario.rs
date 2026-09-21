@@ -7,7 +7,7 @@ use singlefs_core::block_device::BlockDevice;
 use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::superblock::FormatTimeGeometry;
+use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
     WarmUpOutput,
@@ -41,10 +41,10 @@ pub fn e142_parameters(
     MakeFilesystemParameters {
         filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
         region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: FormatTimeGeometry {
+        geometry: SystemImmutableSizes {
             physical_block_size,
             minimum_input_output_bytes,
-            fixed_structure_slot_spacing: FormatTimeGeometry::slot_spacing_for(
+            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(
                 minimum_input_output_bytes,
             ),
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,

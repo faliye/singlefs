@@ -1,7 +1,0 @@
-# 改动范围：git -c core.quotepath=false diff HEAD --stat -- crates litmus（HEAD = 00c9d4f，2026-09-18 15:32 UTC 原样），另有未跟踪：
- crates/mutations.tsv                 |  2 ++
- crates/singlefs-harness/src/crash.rs | 25 ++++++++++++++++---------
- crates/singlefs-harness/src/lib.rs   |  6 ++++++
- 3 files changed, 24 insertions(+), 9 deletions(-)
-crates/singlefs-harness/src/history.rs
-crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs

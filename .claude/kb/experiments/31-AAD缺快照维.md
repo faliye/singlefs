@@ -98,7 +98,7 @@
 - **没有建模 nonce 重用**：`derived_nonce` 臂把逻辑身份折进 nonce，
   真实实现里那要与 I-6.1（nonce 不重用） 一起验，E31（AAD 缺快照维）对此一个字没说。
 - 代码 `research/e7-index-bench/src/bin/e31_aad_snapshot.rs`（`cargo run --release --bin e31-aad-snapshot`），
-  原始输出 `research/results/e31-aad-snapshot-2026-08-29.out`。
+  原始输出 `e31-aad-snapshot-2026-08-29.out`。
   5 个单测、**4 条变异全部被抓**（表在 `research/mutations/e31_aad_snapshot.tsv`）。
 
 ⚠️ **一条关于E31（AAD 缺快照维）来历的记录**：那条擅自写代码的攻方腿也跑出过一份结果，

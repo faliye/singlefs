@@ -1,4 +1,0 @@
-$ nice -n 19 bash .claude/gate.d/63-agent-write-scope.sh   # 开跑 2026-09-18 06:08:14 UTC
-  ✓ 写范围闸、Bash 检出 hook 与续派闸注册着、自证通过，表与定义一致（3 个有 Write 或 Edit 的定义、16 条路径模式）
-exit=0
-# 结束 2026-09-18 06:08:14 UTC

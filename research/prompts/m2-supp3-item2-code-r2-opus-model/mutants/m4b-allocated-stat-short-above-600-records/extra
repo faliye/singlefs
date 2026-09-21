@@ -1,2 +1,0 @@
-env PROBE_THREADS=24 PROBE_WEIGHTS=wall PROBE_FIRST=32 PROBE_SEEDS=224 PROBE_STEPS=150 PROBE_CHECKER=observe cargo test --release -p singlefs-harness --test opus_r2_probe -- --ignored --nocapture
-env PROBE_THREADS=24 PROBE_WEIGHTS=wall_rb PROBE_FIRST=0 PROBE_SEEDS=512 PROBE_STEPS=150 PROBE_CHECKER=skip cargo test --release -p singlefs-harness --test opus_r2_probe -- --ignored --nocapture

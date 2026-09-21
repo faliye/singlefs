@@ -1,9 +1,0 @@
-1. Could not construct one.
-
-2. For instance 2 starting at checkpoint 5, the rows publish is the first root (e.g., region 2 slot 1 on disk 0), and one empty publish is needed for disk 1 (e.g., region 1 slot 2). For instance 3 after rollback, the first new root is written (e.g., region 2 slot 2 on disk 0), and one empty publish is needed for disk 1 (e.g., region 1 slot 3). The plan's warm-up count of at most 3 holds as both cases use 1 empty publish.
-
-3. Deleting the mapping entry of a released unit is correct per F3 as the central mapping tree is the only entry for dereference. The free-bytes-unchanged claim in P4 is consistent with F2 because released slots are deferred and not immediately free. Could not construct a history where recovery after a crash during B leaves the released unit unreferenced and unrecorded, as F3 requires the allocation record to be rewritten with a released flag, not deleted.
-
-4. If B's record persisted but B's root did not, instance 2 writes for instance 1 the row (1, checkpoint of the chosen root after replay, largest transaction number of instance 1 applied by recovery). Since recovery rebuilds the root from the record, the chosen root is B's root, so the row is (1, 4, 0). No stale record of instance 1 can be applied under F6 because recovery stops at W, and F6 ensures records are applied only up to the largest transaction number applied during recovery.
-
-5. There is no rule among F1 to F9 that says a release checkpoint must not be below the allocation checkpoint. The only acceptance claim in P1 to P5 with no rule to make it red is P5's mutation rule regarding release checkpoint not being below allocation checkpoint. All other claims in P1 to P4 have supporting rules: P1's unit placement aligns with F9's slot allocation rules, P2's F-raising logic follows F2's candidate set rules, P3's instance table row is consistent with F5 and F6, and P4's accounting changes align with F2 and F3.

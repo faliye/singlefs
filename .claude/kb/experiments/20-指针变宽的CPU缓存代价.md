@@ -72,8 +72,8 @@
 条目变宽 ⇒ 工作集变大 ⇒ 被挤出缓存，这才是要问的。
 本机每核 L1d 48 KiB、L2 1 MiB、L3 32 MiB、缓存行 64 字节。
 代码 `research/e7-index-bench/src/bin/e20_fanout.rs`（`cargo run --release --bin e20-fanout`），
-原始输出 `research/results/e20-fanout-2026-08-28.out`（两档首版）与
-`research/results/e20-sweep-2026-08-29.out`（六档 × 三轮）。
+原始输出 `e20-fanout-2026-08-28.out`（两档首版）与
+`e20-sweep-2026-08-29.out`（六档 × 三轮）。
 
 ### ⚠️ 阳性对照此前只跑一个点，而产出结论的那组从没过闸（2026-08-29 对抗验证改）
 
@@ -90,7 +90,7 @@ E20（指针变宽的 CPU 缓存代价）的阳性对照此前硬编码在 **`en
 任一格比值 < 2 即整轮作废。
 
 **结果：18 个配置全部通过，比值 2.97–9.81**
-（原始输出 `research/results/e20-poscontrol-2026-08-29.out`）。
+（原始输出 `e20-poscontrol-2026-08-29.out`）。
 
 | 节点 | entry=16 | entry=40 | entry=111 |
 |---|---|---|---|

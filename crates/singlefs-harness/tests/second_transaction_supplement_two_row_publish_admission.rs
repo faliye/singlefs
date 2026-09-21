@@ -20,7 +20,7 @@ use common::{build_pool, disk_snapshot, parameters, BuiltPool, FIXED_WRITE_TIME_
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::mount::{mount_writable, MountError};
-use singlefs_core::recovery::verified_superblock_slots;
+use singlefs_core::recovery::verified_system_configuration_slots;
 use singlefs_core::transaction::{
     publish_overwrite, publish_version, FirstFile, InstanceTablePlan, PoolWriter, PublishError,
     PublishPlan, PublishShape, TransactionOutput,
@@ -95,20 +95,22 @@ fn try_empty_publish_in_process(pool: &mut BuiltPool) -> Result<TransactionOutpu
 }
 
 /// 两块盘四个系统配置槽里自证过的那些槽写着的实例代号，按盘排。
-fn superblock_instances(pool: &BuiltPool) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
+fn system_configuration_instances(
+    pool: &BuiltPool,
+) -> Vec<(DeviceIdentity, Vec<InstanceGeneration>)> {
     let image = pool.memory_pool();
     let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
     DISKS
         .iter()
         .map(|device| {
-            let mut instances: Vec<InstanceGeneration> = verified_superblock_slots(
+            let mut instances: Vec<InstanceGeneration> = verified_system_configuration_slots(
                 &image,
                 *device,
                 spacing,
                 &parameters().filesystem_identifier,
             )
             .iter()
-            .map(|superblock| superblock.journal_instance)
+            .map(|system_configuration| system_configuration.quantities.journal_instance)
             .collect();
             instances.sort();
             (*device, instances)
@@ -179,7 +181,7 @@ fn writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is
     );
 
     let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    let instances_before = superblock_instances(&pool);
+    let instances_before = system_configuration_instances(&pool);
     assert_eq!(
         instances_before,
         vec![
@@ -217,7 +219,7 @@ fn writable_mount_that_cannot_publish_the_rows_is_refused_before_the_instance_is
         "盘上逐字节不变：系统配置槽、根环里的根、录制流步数都没动"
     );
     assert_eq!(
-        superblock_instances(&pool),
+        system_configuration_instances(&pool),
         instances_before,
         "两块盘系统配置里的实例代号没动：取号一次都没发生"
     );
@@ -271,7 +273,7 @@ fn writable_mount_is_refused_before_acquisition_at_warm_up_publish(
     );
 
     let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    let instances_before = superblock_instances(&pool);
+    let instances_before = system_configuration_instances(&pool);
     assert_eq!(
         instances_before,
         vec![
@@ -322,7 +324,7 @@ fn writable_mount_is_refused_before_acquisition_at_warm_up_publish(
         "录制流 0 步：一个写、一道屏障都没发"
     );
     assert_eq!(
-        superblock_instances(&pool),
+        system_configuration_instances(&pool),
         instances_before,
         "两块盘系统配置里的实例代号没动：取号一次都没发生"
     );

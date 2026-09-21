@@ -12,7 +12,7 @@
 
 ### E126 判据 3（D2 已定硬要求 1 合规）的完整产物，现查坐实
 
-`research/results/e126-superblock-slot-width-2026-09-09.out`（`grep "^E7RESULT name=iomin"`，共 15 行，5 臂 × 3 设备）：
+`research/results/e126-system-configuration-slot-width-2026-09-09.out`（`grep "^E7RESULT name=iomin"`，共 15 行，5 臂 × 3 设备）：
 
 ```
 E7RESULT name=iomin dev=nvme_local arm=jia_probe_pbs       width=512   io_min=512   honors=1
@@ -53,7 +53,7 @@ E7RESULT name=iomin dev=md_raid5   arm=ding_min_unit       width=16384 io_min=65
 ### 乙：`= max(physical_block_size, io_min)`（探测）—— 推荐
 
 **不撞硬要求 1**：15 行产物里凡是 `arm=yi_probe_max_iomin` 的都是 `honors=1`。
-**它撞的是一条弱得多的张力，不是硬要求**：`E7RESULT name=hetero arm=yi_probe_max_iomin distinct_widths=2 is_format_const=0`（`research/results/e126-superblock-slot-width-2026-09-09.out`）——它不是格式常量，异构池上取到 2 个值；`512 → 65536` 是 128 倍的探测值驱动跳变；最坏单池占用 `E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin ... slots=16 per_disk_bytes=1048576 pool_bytes=2097152`（2 MiB）。这条张力与 D22（单元原子性怎么合成）已定项 2 给根槽宽已经背着的那条张力**同源、同一份证据**（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 260-266 行「槽宽这一格有一条已量出来、尚未处置的张力（E34（根环槽几何），2026-09-01）……换成 `max(physical_block_size, io_min)` 之后 48 格全部降到 1」），不是本轮新造出来的问题。
+**它撞的是一条弱得多的张力，不是硬要求**：`E7RESULT name=hetero arm=yi_probe_max_iomin distinct_widths=2 is_format_const=0`（`research/results/e126-system-configuration-slot-width-2026-09-09.out`）——它不是格式常量，异构池上取到 2 个值；`512 → 65536` 是 128 倍的探测值驱动跳变；最坏单池占用 `E7RESULT name=footprint dev=md_raid5 arm=yi_probe_max_iomin ... slots=16 per_disk_bytes=1048576 pool_bytes=2097152`（2 MiB）。这条张力与 D22（单元原子性怎么合成）已定项 2 给根槽宽已经背着的那条张力**同源、同一份证据**（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 260-266 行「槽宽这一格有一条已量出来、尚未处置的张力（E34（根环槽几何），2026-09-01）……换成 `max(physical_block_size, io_min)` 之后 48 格全部降到 1」），不是本轮新造出来的问题。
 **处置**：**接受代价**。按 `.claude/rules/fs-design.md` 第 87-88 行「比谁省不构成任何判据」，占用与是否格式常量都不能单独否掉一个满足硬要求的候选；C212（固定结构的写小于 io_min）自己列的候选①正是「抬固定结构的写宽到 `io_min`」（`.claude/kb/checks-owed.md` 第 207 行），乙就是这条候选在超级块槽上的实例化。
 **格式机制上不是新发明**：D22（单元原子性怎么合成）已定项 2 给根槽宽定的机制本来就是「挂载时探测值 + mkfs 按池内 max 划 + 挂载时逐设备复算比对，未达到拒绝挂载」（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 251 行），乙只是把探测公式从 `physical_block_size` 换成 `max(physical_block_size, io_min)`，机制骨架不变，是 D21（权威态与派生态的分界）「单元几何挂载时求值一次」的同一个实例，不需要新造一套流程。
 

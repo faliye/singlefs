@@ -1,2 +1,0 @@
-FOREIGN case=home_pool_untouched I-7.7=Some(Holds) violated=[] recovery=FileRead root=(InstanceGeneration(1), CheckpointTxg(3)) bytes=3000
-FOREIGN case=disk1_replaced_by_foreign_pool_disk1 I-7.7=Some(Holds) violated=[I-2.1: 实例表单元 在盘 1 槽 50176 的那一份与位置条目里的校验和对不上] recovery=Failed root=None failure=SuperblocksDisagree

@@ -78,7 +78,7 @@ E116|e116-pack-settle||e116-pack-settle-2026-09-14-round2.out|exact
 E119|e119-slot-tiers||e119-slot-tiers-2026-09-12.out|exact
 E120|e120-tier-ratio||e120-tier-ratio-2026-09-12.out|exact
 E121|e121-capacity-tiers||e121-cap-tiers-2026-09-12.out|exact
-E115|e115-superblock-completeness||e115-superblock-completeness-2026-09-07.out|exact
+E115|e115-system-configuration-completeness||e115-system-configuration-completeness-2026-09-07.out|exact
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
@@ -93,8 +93,8 @@ E90|e90-tree-aad||e90-tree-aad-2026-09-03.out|exact
 E91|e91-ring-admission||e91-ring-admission-2026-09-03.out|exact
 E92|e92-reuse-requirement||e92-reuse-requirement-2026-09-08.out|exact
 E123|e123-reuse-window-versus-rollback-depth||e123-k-fork-cost-2026-09-09.out|exact
-E124|e124-superblock-recompute||e124-superblock-recompute-2026-09-09.out|exact
-E126|e126-superblock-slot-width||e126-superblock-slot-width-2026-09-09.out|exact
+E124|e124-system-configuration-recompute||e124-system-configuration-recompute-2026-09-09.out|exact
+E126|e126-system-configuration-slot-width||e126-system-configuration-slot-width-2026-09-09.out|exact
 E127|e127-group-identity-under-split-merge||e127-group-identity-under-split-merge-2026-09-13-knobs.out|exact
 E93|e93-aging-placement||e93-aging-placement-2026-09-03.out|exact
 E95|e95-node-layout-arms||e95-node-layout-arms-2026-09-09.out|exact
@@ -103,7 +103,7 @@ E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact
 E98|e98-inode-record||e98-inode-record-2026-09-07.out|exact
 E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
-E100|e100-superblock-slot||e100-superblock-slot-2026-09-03.out|exact
+E100|e100-system-configuration-slot||e100-system-configuration-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
 E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-12.out|exact
 E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-14-round2.out|exact
@@ -158,7 +158,7 @@ E142|@driver_e142||e142-first-txn-dry-run-2026-09-18-change-count-three.out|exac
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
-E147|e147-superblock-recompute-from-layout||e147-superblock-recompute-from-layout-2026-09-13.out|exact
+E147|e147-system-configuration-recompute-from-layout||e147-system-configuration-recompute-from-layout-2026-09-13.out|exact
 E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
 E150|e150-rollback-reuse-of-abandoned-roots||e150-rollback-reuse-of-abandoned-roots-2026-09-13-admission.out|exact
 E151|e151-arrival-and-container-arms||e151-arrival-and-container-arms-2026-09-13-region.out|exact
@@ -170,6 +170,8 @@ E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rej
 E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out|exact
 E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-17-stage4.out|exact
 E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-19-stage2.out|exact
+E155R3|e155-third-run-release-cascade||e155-third-run-release-cascade-2026-09-20-stage1.out|exact
+E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-concurrency-2026-09-21.out|exact
 TSV
 )
 
@@ -389,10 +391,23 @@ for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
 done
 want() { [[ ${#ONLY[@]} -eq 0 ]] && return 0; local e; for e in "${ONLY[@]}"; do [[ "$e" == "$1" ]] && return 0; done; return 1; }
 
+# 产物列是 results/ 底下的纯文件名，不是仓库根起的路径：写成路径时下面拼出 results/research/results/… 指不到文件，
+# 而 diff 失败会被报成「对不上，N 行不同」——看着像产物变了，其实是登记表坏了。2026-09-21 被一次全仓路径回写
+# 的路径回写踩中一次（它把第 4 列升级成了仓库根路径）。
+bad_rows=$(printf "%s\n" "$TABLE" | awk -F"|" '/^E[0-9]+\|/ && $4 ~ /\// {print "      " $1 "：第 4 列 " $4}')
+if [[ -n "$bad_rows" ]]; then
+  echo "  ✗ 登记表第 4 列（留存产物）写成了带斜杠的路径，应当是 results/ 底下的纯文件名：" >&2
+  printf "%s\n" "$bad_rows" >&2   # gate-lint:detail
+  echo "     → 怎么办：把那几行第 4 列改回纯文件名（例 e100-system-configuration-slot-2026-09-03.out）；" >&2
+  echo "               产物搬过家就同时改文件名本身，别把目录写进这一列。" >&2
+  exit 2
+fi
+
 cargo build --release --manifest-path e7-index-bench/Cargo.toml >/dev/null 2>&1 || { echo "replay: 构建失败" >&2; exit 2; }
 
 pass=0; drift=0; timing_only=0; broken=0; claim_bad=0
 CLAIM_QUEUE=()
+
 printf '%-5s %-24s %-10s %s\n' 实验 二进制 判定 说明
 printf '%s\n' "-------------------------------------------------------------------------"
 while IFS='|' read -r exp bin args stored kind; do

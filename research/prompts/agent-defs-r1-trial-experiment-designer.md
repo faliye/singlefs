@@ -86,7 +86,7 @@ $ ls /home/fy5090/code/singlefs/research/prompts/ | grep -c '^e153'
 - `crates/singlefs-format/src/lib.rs`：全文
 - `crates/singlefs-core/src/unit.rs`：第 110–179 行
 - `crates/singlefs-core/src/make_filesystem.rs`：第 195–215 行；`transaction.rs`：第 915–930、1455–1480 行
-- 只有 grep 命中行：`crates/singlefs-core/src/records.rs`、`recovery.rs`、`superblock.rs`；`crates/singlefs-checker/src/lib.rs`、`walk.rs`；`crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs`、`checker_known_bad_images.rs`
+- 只有 grep 命中行：`crates/singlefs-core/src/records.rs`、`recovery.rs`、`crates/singlefs-core/src/system_configuration.rs`；`crates/singlefs-checker/src/lib.rs`、`walk.rs`；`crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs`、`checker_known_bad_images.rs`
 - `research/scripts/quote-kb.py`：第 1–40 行
 - `.claude/doc-lint-exclude`：grep `prompts` 命中第 3–4 行（`research/prompts/` 被 doc-lint 排除）
 

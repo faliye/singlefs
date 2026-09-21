@@ -16,7 +16,7 @@ use singlefs_core::mount::{
     RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
-    choose_root, choose_superblock, recover, replay_journal, scan_journal, JournalPolicy,
+    choose_root, choose_system_configuration, recover, replay_journal, scan_journal, JournalPolicy,
     RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
@@ -402,15 +402,15 @@ fn the_rollback_row_caps_the_prefix_of_the_chosen_roots_instance_at_its_high_wat
     let mut pool = build_pool("step-four-cap");
     overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
     let image = pool.memory_pool();
-    let superblock = choose_superblock(&image).expect("超级块");
-    let newest = choose_root(&image, &superblock).expect("B 的根");
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
+    let newest = choose_root(&image, &system_configuration).expect("B 的根");
     assert_eq!(newest.checkpoint_txg, CheckpointTxg(4));
-    let records = scan_journal(&image, &superblock);
+    let records = scan_journal(&image, &system_configuration);
     let roots = singlefs_core::recovery::readable_roots(
         &image,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
     let first = roots
         .iter()
@@ -426,7 +426,7 @@ fn the_rollback_row_caps_the_prefix_of_the_chosen_roots_instance_at_its_high_wat
         let (report, effective) = replay_journal(
             &image,
             &first,
-            superblock.geometry.journal_ring_bytes,
+            system_configuration.immutable.sizes.journal_ring_bytes,
             &records,
             true,
             high_water,
@@ -452,8 +452,8 @@ fn rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keep
         "D 的 jsn 接在 C 的 8 之后"
     );
     let image = pool.memory_pool();
-    let superblock = choose_superblock(&image).expect("超级块");
-    let records = scan_journal(&image, &superblock);
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
+    let records = scan_journal(&image, &system_configuration);
     for (instance, counter) in [(1u32, 4u64), (2, 5), (2, 8), (3, 9), (3, 10)] {
         assert!(
             records.contains_key(&(InstanceGeneration(instance), counter)),

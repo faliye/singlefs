@@ -4,12 +4,12 @@
 use std::collections::BTreeMap;
 
 use singlefs_format::{
-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, SLOT_BYTES, SUPERBLOCK_SLOT_BYTES,
+    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::{
-    check_root_slot, check_superblock_slot, read_six_byte_unsigned, read_u32, read_u64, RootView,
-    SuperblockView,
+    check_root_slot, check_system_configuration_slot, read_six_byte_unsigned, read_u32, read_u64,
+    RootView, SystemConfigurationView,
 };
 
 /// checker 读镜像的口子。它不依赖实现的块设备抽象：harness 的崩溃镜像、宿主上的盘镜像各自接一份。
@@ -117,7 +117,7 @@ pub struct PoolGeometry {
 }
 
 #[must_use]
-pub fn geometry_of(slot: &[u8], view: &SuperblockView) -> PoolGeometry {
+pub fn geometry_of(slot: &[u8], view: &SystemConfigurationView) -> PoolGeometry {
     PoolGeometry {
         filesystem_identifier: view.filesystem_identifier,
         physical_block_size: view.declared_physical_block_size,
@@ -138,8 +138,10 @@ pub fn geometry_of(slot: &[u8], view: &SuperblockView) -> PoolGeometry {
     }
 }
 
-fn parse_superblock_slot(bytes: &[u8]) -> Option<(SuperblockView, PoolGeometry)> {
-    check_superblock_slot(bytes).ok().map(|view| {
+fn parse_system_configuration_slot(
+    bytes: &[u8],
+) -> Option<(SystemConfigurationView, PoolGeometry)> {
+    check_system_configuration_slot(bytes).ok().map(|view| {
         let geometry = geometry_of(bytes, &view);
         (view, geometry)
     })
@@ -148,10 +150,10 @@ fn parse_superblock_slot(bytes: &[u8]) -> Option<(SuperblockView, PoolGeometry)>
 /// 每盘两槽里自证过的系统配置：槽 0 在偏移 0；槽 1 的偏移按槽 0 记的槽距，槽 0 无效时按最小槽距 4096（2026-09-14 用户收尾弹窗定甲）。
 /// I-7.7（系统配置实例代号不低于根环） 按这个读法取每盘的实例代号（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
 #[must_use]
-pub fn verified_superblock_slots(
+pub fn verified_system_configuration_slots(
     reader: &dyn ImageReader,
-) -> Vec<(u32, Vec<(SuperblockView, PoolGeometry)>)> {
-    let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
+) -> Vec<(u32, Vec<(SystemConfigurationView, PoolGeometry)>)> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     reader
         .devices()
         .into_iter()
@@ -159,7 +161,7 @@ pub fn verified_superblock_slots(
             let slot_zero = reader
                 .read(device, 0, slot_bytes)
                 .as_deref()
-                .and_then(parse_superblock_slot);
+                .and_then(parse_system_configuration_slot);
             let spacing = slot_zero.as_ref().map_or(
                 FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
                 |(_, geometry)| geometry.slot_spacing,
@@ -167,7 +169,7 @@ pub fn verified_superblock_slots(
             let slot_one = reader
                 .read(device, spacing, slot_bytes)
                 .as_deref()
-                .and_then(parse_superblock_slot);
+                .and_then(parse_system_configuration_slot);
             (device, slot_zero.into_iter().chain(slot_one).collect())
         })
         .collect()
@@ -175,15 +177,15 @@ pub fn verified_superblock_slots(
 
 /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。
 #[must_use]
-pub fn chosen_superblocks(
+pub fn chosen_system_configurations(
     reader: &dyn ImageReader,
-) -> Vec<(u32, Option<(SuperblockView, PoolGeometry)>)> {
-    verified_superblock_slots(reader)
+) -> Vec<(u32, Option<(SystemConfigurationView, PoolGeometry)>)> {
+    verified_system_configuration_slots(reader)
         .into_iter()
         .map(|(device, slots)| {
             let chosen = slots.into_iter().fold(
                 None,
-                |best: Option<(SuperblockView, PoolGeometry)>, candidate| match best {
+                |best: Option<(SystemConfigurationView, PoolGeometry)>, candidate| match best {
                     Some(current) if candidate.0.slot_generation <= current.0.slot_generation => {
                         Some(current)
                     }

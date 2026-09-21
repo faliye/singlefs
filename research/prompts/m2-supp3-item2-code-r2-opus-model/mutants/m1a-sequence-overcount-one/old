@@ -1,1 +1,0 @@
-        records_before_this_publish += rewritten.len() * allocator.devices.len();

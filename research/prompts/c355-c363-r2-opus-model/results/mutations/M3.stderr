@@ -1,6 +1,0 @@
-
-thread 'main' (573041) panicked at src/bin/v3_empty_publish.rs:555:5:
-assertion `left == right` failed
-  left: (3, 1, 1, 1, 0)
- right: (4, 1, 1, 1, 1)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

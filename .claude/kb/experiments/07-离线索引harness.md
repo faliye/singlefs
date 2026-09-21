@@ -169,7 +169,7 @@ E7（离线索引 harness）把「一次节点读」记为 1 次设备 I/O，**�
 ### 2026-08-29 复跑：数字复现了，但**校验路径没有复现**
 
 本轮把它在**本机的一个普通文件**上按 N=5、五个种子重跑了一遍，
-产物 `research/results/e7-index-2026-08-29-file.out`（这是E7（离线索引 harness）第一次有归档产物）。
+产物 `e7-index-2026-08-29-file.out`（这是E7（离线索引 harness）第一次有归档产物）。
 
 | 臂 | 本次中位 io/op | 正文记的 | 差 |
 |---|---|---|---|
@@ -185,7 +185,7 @@ E7（离线索引 harness）把「一次节点读」记为 1 次设备 I/O，**�
 
 ### 同日在虚机里复跑：那条校验路径也复现了
 
-产物 `research/results/e7-index-2026-08-29-vm.out`。
+产物 `e7-index-2026-08-29-vm.out`。
 跑法见 [vm-harness.md](../vm-harness.md)：musl 静态编译 + `scripts/vm-bench.sh` 送进
 QEMU/KVM，来宾里是一块真的 virtio 盘（`/dev/vda`），`blkstat=true`。
 

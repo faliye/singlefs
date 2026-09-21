@@ -59,9 +59,16 @@ impl Drop for UnequalPool {
     }
 }
 
+/// 这一轮是新建镜像还是接着用上一轮那两块盘：新建一律排他（撞上同名报错），重开要求文件已经在。
+enum ImageFileOpening {
+    CreateNew,
+    ReopenExisting,
+}
+
 fn open_recorded_devices(
     paths: &[PathBuf],
     stream: &SharedStream,
+    opening: &ImageFileOpening,
 ) -> Vec<(DeviceIdentity, Recorded)> {
     paths
         .iter()
@@ -69,11 +76,22 @@ fn open_recorded_devices(
         .enumerate()
         .map(|(index, (path, device_bytes))| {
             let identity = DeviceIdentity(u32::try_from(index).expect("设备号"));
-            let file = FileBackedBlockDevice::open_or_create(
-                path,
-                device_bytes,
-                PhysicalBlockSizeInBytes(512),
-            )
+            let file = match opening {
+                ImageFileOpening::CreateNew => {
+                    FileBackedBlockDevice::create_image_file_exclusively(
+                        path,
+                        device_bytes,
+                        PhysicalBlockSizeInBytes(512),
+                    )
+                }
+                ImageFileOpening::ReopenExisting => {
+                    FileBackedBlockDevice::open_existing_image_file(
+                        path,
+                        device_bytes,
+                        PhysicalBlockSizeInBytes(512),
+                    )
+                }
+            }
             .expect("开镜像");
             (
                 identity,
@@ -87,7 +105,8 @@ fn open_recorded_devices(
 fn build_unequal_pool(tag: &str) -> UnequalPool {
     let paths: Vec<PathBuf> = (0..2u32).map(|device| image_path(tag, device)).collect();
     let stream = SharedStream::new();
-    let mut formatting_process_devices = open_recorded_devices(&paths, &stream);
+    let mut formatting_process_devices =
+        open_recorded_devices(&paths, &stream, &ImageFileOpening::CreateNew);
     let genesis = make_filesystem(&parameters(), &mut formatting_process_devices)
         .expect("盘不等大的 mkfs 今天接受：几何检查按最小的那块盘算");
     let mut allocator = PoolAllocator::new(
@@ -136,7 +155,8 @@ fn build_unequal_pool(tag: &str) -> UnequalPool {
         "两块盘在低处的空闲图一样，落点与等大的池相同"
     );
     drop(formatting_process_devices);
-    let mut remounted_devices = open_recorded_devices(&paths, &stream);
+    let mut remounted_devices =
+        open_recorded_devices(&paths, &stream, &ImageFileOpening::ReopenExisting);
     assert_eq!(
         recover(&remounted_devices, JournalPolicy::Consult).outcome,
         RecoveryOutcome::FileRead {

@@ -1,0 +1,176 @@
+--- HEAD/crates/singlefs-core/src/transaction.rs
++++ 副本/crates/singlefs-core/src/transaction.rs
+@@ -9,6 +9,51 @@
+ 
+ use std::collections::BTreeMap;
+ 
++// ===== c381-r3 攻方副本：臂开关（只在副本里，thread_local，按线程） =====
++/// 0 甲（今天的代码，一律退回）、2 丙（失败即停）、5 戊（照失败表：退回 + 交给驱动做探针写与切换）。
++#[derive(Clone, Debug, Default)]
++pub struct C381Arm {
++    pub arm: u8,
++    /// 丙：这次挂载里写入口已作废；戊：等驱动做切换之前不许再发布。
++    pub stopped: bool,
++    /// 戊：探针写判持续失败之后转只读到下次挂载。
++    pub read_only: bool,
++    /// 上一次落盘失败停在哪一段：1 = 单元 / 第一道屏障，2 = 记录 / 第二道屏障，4 = 根槽 FUA，3 = 系统配置槽轮换；0 = 没失败过。
++    pub last_stage: u8,
++    /// 戊：有一次失败等着做切换。
++    pub switch_pending: bool,
++}
++thread_local! {
++    pub static C381: std::cell::RefCell<C381Arm> = std::cell::RefCell::new(C381Arm::default());
++}
++pub fn c381_with<T>(body: impl FnOnce(&mut C381Arm) -> T) -> T {
++    C381.with(|cell| body(&mut cell.borrow_mut()))
++}
++#[must_use]
++pub fn c381_get() -> C381Arm {
++    C381.with(|cell| cell.borrow().clone())
++}
++pub fn c381_set_arm(arm: u8) {
++    c381_with(|state| *state = C381Arm { arm, ..C381Arm::default() });
++}
++/// 驱动做完切换或重开之后清掉「停」与「等切换」（真正的实例切换在挂载内做，重开是它的近似）。
++pub fn c381_clear_stop() {
++    c381_with(|state| {
++        state.stopped = false;
++        state.switch_pending = false;
++    });
++}
++pub fn c381_set_read_only() {
++    c381_with(|state| {
++        state.read_only = true;
++        state.stopped = true;
++    });
++}
++thread_local! {
++    /// 落盘闭包当前停在哪一段（每次发布开头置 1）。
++    pub static C381_STAGE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
++}
++
+ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_BYTES,
+     ALLOCATION_RECORD_KEY_BYTES, EXTENT_KEY_BYTES, EXTENT_LEAF_RECORD_BYTES, FIRST_TRANSACTION_TXG,
+@@ -545,16 +590,19 @@
+     let writes_before_this_publish = pool.writes_by_structure_kind.clone();
+     // 中途失败时这次已记的写要交出去（增补 2 第 20b 行）：四步收在一个闭包里，失败在这里记账再把错原样交回。
+     let persist = |writer: &mut PoolWriter<'_, Device>| -> Result<(), BlockDeviceError> {
++        C381_STAGE.with(|stage| stage.set(2));
+         writer.perform(CommitStep::Barrier)?;
+         writer.perform(CommitStep::WriteJournalRecordToEveryDevice {
+             counter: plan.counter,
+             record: &record_bytes,
+         })?;
+         writer.perform(CommitStep::Barrier)?;
++        C381_STAGE.with(|stage| stage.set(4));
+         writer.perform(CommitStep::WriteRootRecordForceUnitAccess {
+             checkpoint_txg: plan.txg,
+             root_slot: &root_slot,
+         })?;
++        C381_STAGE.with(|stage| stage.set(3));
+         writer.perform(CommitStep::RotateSuperblockSlots {
+             journal_tail: plan.counter,
+             journal_instance: plan.instance,
+@@ -956,6 +1004,8 @@
+         slot: SlotNumber,
+     },
+     /// 分配记录里的跨度与这个单元种类该有的跨度不符（映射给槽、记录给跨度，两边对不上）。
++    /// c381-r3 攻方副本，丙 / 戊：写入口已作废（丙要重开；戊等切换，或已转只读）。
++    C381WriterStopped,
+     ReleaseSpanMismatch {
+         unit: TransactionUnit,
+         slot: SlotNumber,
+@@ -1240,6 +1290,13 @@
+     plan: PublishPlan<'_>,
+     previous: Option<&TransactionOutput>,
+ ) -> Result<TransactionOutput, PublishError> {
++    // c381-r2：丙的「写入口作废」、戊的「等切换 / 已转只读」都在这里拦，零次写。
++    {
++        let state = c381_get();
++        if (state.arm == 2 || state.arm >= 5) && (state.stopped || state.read_only) {
++            return Err(PublishError::C381WriterStopped);
++        }
++    }
+     let rewritten = plan.rewritten_roles();
+     // 释放判定路径先于准入：它只查不改（D19（块指针的结构与宽度预算） 已定项 5 第 1 条），查不到就整次发布不做。
+     let release = match previous {
+@@ -1263,9 +1320,31 @@
+     publish_admission(allocator, &rewritten)?;
+     // 整个分配器拷一份、失败就换回去：第一版每次发布约 450 KiB 的拷贝（两盘各一张 211968 位的位图），换来失败路径不留半新的池。
+     let allocator_before_this_publish = allocator.clone();
++    C381_STAGE.with(|stage| stage.set(0));
+     let outcome = publish_admitted(pool, allocator, &plan, previous, &rewritten, &release);
+     if outcome.is_err() {
++        // 三条臂在这一步都把分配器换回去：甲按今天的代码；丙换回是「重开由恢复定」的前一步；
++        // 戊换回是「切换 = 挂载内一次恢复，重建态里失败那次的分配不存在」（D28（挂载期承诺量） 已定项 3）。
+         *allocator = allocator_before_this_publish;
++        let stage = C381_STAGE.with(std::cell::Cell::get);
++        c381_with(|state| {
++            state.last_stage = stage;
++            match state.arm {
++                // 丙：记录发出之后（段 2 / 4）与根槽之后（段 3）写入口作废；单元那一段（段 1）照旧。
++                2 => {
++                    if matches!(stage, 2 | 3 | 4) {
++                        state.stopped = true;
++                    }
++                }
++                // 戊：任何一次写失败都进失败表（第一格也走表，按第四节「第一格是不是也走这张表，是第二问」取最强读法），
++                // 等驱动做探针写：瞬时走切换、持续转只读。
++                5 | 6 | 7 | 8 => {
++                    state.stopped = true;
++                    state.switch_pending = true;
++                }
++                _ => {}
++            }
++        });
+     }
+     outcome
+ }
+@@ -2108,6 +2187,7 @@
+     // 账是两次快照之差、只在成功路径上取，失败那次落盘的写不交出去就不属于任何一次发布，与设备一层的合计对不上。
+     let writes_before_this_publish = pool.writes_by_structure_kind.clone();
+     let persist = |writer: &mut PoolWriter<'_, Device>| -> Result<(), BlockDeviceError> {
++        C381_STAGE.with(|stage| stage.set(1));
+         for unit in &written_units {
+             writer.perform(CommitStep::WriteUnitToEveryDevice {
+                 slot: unit.slot,
+@@ -2116,15 +2196,18 @@
+             })?;
+         }
+         writer.perform(CommitStep::Barrier)?;
++        C381_STAGE.with(|stage| stage.set(2));
+         writer.perform(CommitStep::WriteJournalRecordToEveryDevice {
+             counter: plan.counter,
+             record: &record_bytes,
+         })?;
+         writer.perform(CommitStep::Barrier)?;
++        C381_STAGE.with(|stage| stage.set(4));
+         writer.perform(CommitStep::WriteRootRecordForceUnitAccess {
+             checkpoint_txg: txg,
+             root_slot: &root_slot,
+         })?;
++        C381_STAGE.with(|stage| stage.set(3));
+         writer.perform(CommitStep::RotateSuperblockSlots {
+             journal_tail: plan.counter,
+             journal_instance: instance,
+--- HEAD/crates/singlefs-harness/src/history.rs
++++ 副本/crates/singlefs-harness/src/history.rs
+@@ -1683,6 +1683,7 @@
+                 placement_refusal_member(refusal)
+             )
+         }
++        PublishError::C381WriterStopped => "C381WriterStopped",
+         PublishError::AllocationRecordsExceedOneNode { .. } => "AllocationRecordsExceedOneNode",
+         PublishError::AccountingEntriesExceedOneNode { .. } => "AccountingEntriesExceedOneNode",
+         PublishError::ReleaseNotInMapping { .. } => "ReleaseNotInMapping",
+--- HEAD/crates/singlefs-harness/src/model_comparison.rs
++++ 副本/crates/singlefs-harness/src/model_comparison.rs
+@@ -159,6 +159,7 @@
+         | PublishError::ReleaseTargetNotAllocated { .. }
+         | PublishError::ReleaseTargetAlreadyReleased { .. }
+         | PublishError::ReleaseSpanMismatch { .. }
++        | PublishError::C381WriterStopped
+         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
+     }
+ }

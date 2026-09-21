@@ -1,7 +1,0 @@
-74a768eaad8ef2badfe140282f7e81364d1220e140c685ea58684d34e38b2143  .claude/agents/sweep.md
-467df69c4591eabac20715c558528a1da17e5ff41635a85b817bb0252b66244d  .claude/main-agent.md
-fab9160376b6a7637a02be773869b64673e3d3f764090493fa2f17eef9166f0b  research/scripts/stale-candidates.py
-e9b9d09c5580bc52805827531b89a0b6fa2ee1fd3731a96339a10f9816d4e3f6  .claude/gate.d/73-research-gate-lint.sh
-29f71d6cd17c7148a53dbb78514492aea0da68ac90daf6882d24cb70ca6482e0  research/scripts/fixtures/stale-candidates-benchmark-facts.tsv
-f76bc31d4086a1c254a129940316226742d8acbd4587a6dc048ae2ffd8f7cded  .claude/gate.d/fixtures/73-research-gate-lint.sh/red/research/scripts/sample.sh
-d82d1b6f9091775dcb5f9f063a43431114f2cf5cd1b357a3300b85871f30b4dd  .claude/gate.d/fixtures/73-research-gate-lint.sh/green/research/scripts/sample.sh

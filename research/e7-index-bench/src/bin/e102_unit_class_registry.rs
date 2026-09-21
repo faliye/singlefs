@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(unmapped_name_count, 0, "名字都映得到码，缺的是登记位");
         assert_eq!(multi_code_name_count, 0);
         // 映到未登记码的名字：tombstone（3）、metadata_class（罩 3）、journal_record（17）、
-        // superblock_slot（18）、self_cert_unit（罩 17/18）= 5
+        // system_configuration_slot（18）、self_cert_unit（罩 17/18）= 5
         assert_eq!(unregistered_name_count, 5);
         // 单独钉墓碑这一条：它是 D18 已定项 8 在用的那个值
         let (_, _, tombstone_only_unregistered_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &[("D18-item8", "tombstone")]);

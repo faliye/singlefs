@@ -17,7 +17,8 @@ use singlefs_core::mount::{
     ShadowLedger,
 };
 use singlefs_core::recovery::{
-    choose_superblock, readable_roots, recover, scan_journal, JournalPolicy, RecoveryOutcome,
+    choose_system_configuration, readable_roots, recover, scan_journal, JournalPolicy,
+    RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
@@ -112,12 +113,12 @@ fn raise_floor(pool: &mut BuiltPool, new_floor: CheckpointTxg) -> Result<RaisedF
 
 fn newest_root_floor(pool: &BuiltPool) -> CheckpointTxg {
     let image = pool.memory_pool();
-    let superblock = choose_superblock(&image).expect("超级块");
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
     readable_roots(
         &image,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     )
     .into_iter()
     .max_by_key(|root| (root.checkpoint_txg, root.instance))
@@ -342,9 +343,9 @@ fn torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_c
         }
     }
     let image = pool.memory_pool();
-    let superblock = choose_superblock(&image).expect("超级块");
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
     assert!(
-        !scan_journal(&image, &superblock).contains_key(&(InstanceGeneration(3), 14)),
+        !scan_journal(&image, &system_configuration).contains_key(&(InstanceGeneration(3), 14)),
         "txg 14 那条记录两份都读不出"
     );
     let refused = raise_floor(&mut pool, CheckpointTxg(12));
@@ -632,12 +633,12 @@ fn raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable() {
     let mut pool = build_through_rollback("step-five-raise-counts-unreadable");
     four_overwrites_after_the_rollback(&mut pool);
     let image = pool.memory_pool();
-    let superblock = choose_superblock(&image).expect("超级块");
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
     let third = readable_roots(
         &image,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     )
     .into_iter()
     .find(|root| root.checkpoint_txg == CheckpointTxg(8))

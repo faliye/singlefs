@@ -45,7 +45,7 @@
 
 而 E115（超级块字段表的完备性与字节预算） 的必需项表把「树表单元指针」59 字节**记在超级块名下**，
 出处栏写的却是 D22（单元原子性怎么合成） 已定项 7——**那是根记录的字段表**
-（`research/e7-index-bench/src/bin/e115_superblock_completeness.rs` 第 97 行；
+（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs` 第 97 行；
 D22（单元原子性怎么合成） 已定项 7 那一节里「超级块」出现 **0 次**）⇒ 已立 C231（超级块必需项里混进了根记录的字段）。
 
 ## 2. 为什么这一问现在承重

@@ -18,9 +18,9 @@
 
 `research/prompts/_d22-slotwidth-r1-background.md` 二、问法逐字：「**乙**：= 超级块记录的『固定结构槽距』= max(4096, mkfs 时探测的 io_min）（本机 4096）；mkfs 时定、写进超级块、不随 live io_min 变」——**这是一个记录值，下限是硬编码的 4096**。
 
-而 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs` 第 46 行逐字定义候选乙：`/// 乙：= max(physical_block_size, io_min)（探测值）`，代码第 63 行 `Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize => physical_block_size.max(io_min)` ——**这是一个探测值，下限是探测到的 `physical_block_size`，不是硬编码的 4096**。
+而 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs` 第 46 行逐字定义候选乙：`/// 乙：= max(physical_block_size, io_min)（探测值）`，代码第 63 行 `Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize => physical_block_size.max(io_min)` ——**这是一个探测值，下限是探测到的 `physical_block_size`，不是硬编码的 4096**。
 
-两者在 `common_4k`（pbs=4096, io_min=4096）与 `md_raid5`（io_min=65536≫4096）上取到相同的数，因为下限项不起作用；但在 `nvme_local`（本机现查 pbs=512, io_min=512）上分叉：E126 的乙给 **512**（`research/results/e126-superblock-slot-width-2026-09-09.out` 第 6 行 `arm=yi_probe_max_iomin width=512`），本轮问法的乙给 **4096**（= max(4096,512)）。
+两者在 `common_4k`（pbs=4096, io_min=4096）与 `md_raid5`（io_min=65536≫4096）上取到相同的数，因为下限项不起作用；但在 `nvme_local`（本机现查 pbs=512, io_min=512）上分叉：E126 的乙给 **512**（`research/results/e126-system-configuration-slot-width-2026-09-09.out` 第 6 行 `arm=yi_probe_max_iomin width=512`），本轮问法的乙给 **4096**（= max(4096,512)）。
 
 ⇒ **E126 的『乙』产物不能直接照搬当作本轮『乙』在 nvme_local 上的数**，要用格式常量 4096 那一臂（E126 的丙_4096，`arm=bing_const_4096`）的数代替，因为丙_4096（固定 4096）与本轮乙（记录值，下限 4096）在 io_min ≤ 4096 的设备上取到的宽度、honors、tear_states 逐格相同，只在 io_min > 4096（md_raid5）时两者分叉——此时本轮乙会跟着抬到 65536（与 E126 的乙相同），丙_4096 仍钉死在 4096（不追）。下面 J1/J2/J4 的「乙」数据按这个拼接规则从 E126 产物里取，逐条标明取的是哪一臂。
 
@@ -48,7 +48,7 @@
 
 **判据原文**：「三档设备（nvme_local / common_4k / md_raid5）上每次超级块槽写是不是 ≥ io_min（P7 的 honors 列）」。
 
-`honors` 的定义现查 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs:97-99`：
+`honors` 的定义现查 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs:97-99`：
 
 ```rust
 fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
@@ -58,7 +58,7 @@ fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
 
 即「一次槽写的宽度 ≥ io_min」，直接对应 D2（RAID 条带策略） 已定硬要求 1 逐字（`.claude/kb/decisions/02-RAID条带策略.md:14`）：「**不发出小于 `io_min` 的写。** 在 Linux 上这个量是 `io_min`，不是 `physical_block_size`」。
 
-产物 `research/results/e126-superblock-slot-width-2026-09-09.out` 逐行（甲取 `arm=jia_probe_pbs`；乙按零节「对不上之二」的拼接规则，nvme_local/common_4k 取 `arm=bing_const_4096`，md_raid5 取 `arm=yi_probe_max_iomin`）：
+产物 `research/results/e126-system-configuration-slot-width-2026-09-09.out` 逐行（甲取 `arm=jia_probe_pbs`；乙按零节「对不上之二」的拼接规则，nvme_local/common_4k 取 `arm=bing_const_4096`，md_raid5 取 `arm=yi_probe_max_iomin`）：
 
 | 设备 | io_min | 甲 width / honors | 乙 width / honors |
 |---|---|---|---|
@@ -119,7 +119,7 @@ fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
 
 ### 甲臂同样构造一遍，确认不是乙独有的性质
 
-甲臂槽宽 512（= pbs），本身就等于设备的原子写单元，理论上这一档「不存在跨扇区撕裂」（1 个扇区，`tear_states=0`，`research/results/e126-superblock-slot-width-2026-09-09.out` 第 6 行 `sectors=1 tear_states=0`）。但即便如此，槽 1 与槽 0 之间仍然是靠依据 4（槽距 ≥ io_min）隔开的，同样构造不出「两槽同时不可择」。
+甲臂槽宽 512（= pbs），本身就等于设备的原子写单元，理论上这一档「不存在跨扇区撕裂」（1 个扇区，`tear_states=0`，`research/results/e126-system-configuration-slot-width-2026-09-09.out` 第 6 行 `sectors=1 tear_states=0`）。但即便如此，槽 1 与槽 0 之间仍然是靠依据 4（槽距 ≥ io_min）隔开的，同样构造不出「两槽同时不可择」。
 
 **J4 判：甲、乙两臂在这条判据上打平，都不触发「两槽同时不可择」——真正提供隔离保证的是 D2（RAID 条带策략） 已定项 19 的槽距公式（已单独定案，与本轮槽宽决策无关），不是槽宽本身。** 槽宽只决定「正在被写的那一个槽，内部撕裂之后校验和判定失配的概率与它自证的方式」，不影响「另一个槽是否被这次写波及」这件事。
 
@@ -149,7 +149,7 @@ fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
 
 **判据原文**：「io_min 在 mkfs 之后变（mdadm 改 chunk）时，乙的槽宽是『记录值』还是『探测值』；记录值下挂载闸 (a) 怎么判 | 乙若按 live 探测值定槽宽则槽几何随栈漂移即触发」。
 
-**本轮问法已经把乙定义成记录值**（零节已引），**这一点必须与 E126（超级块槽宽四条候选的代价） 测试过的『乙』分清楚**——E126 的乙注释里明写「探测值」（`e126_superblock_slot_width.rs:46`），2026-09-10 三方论证的反推腿正是针对**那个探测值版本**打中了「io_min 是栈属性，mdadm 可在线改 chunk-size」这条（`.claude/kb/decisions/22-单元原子性怎么合成.md:688` 追记：「反推腿打中……io_min 是栈属性不是盘属性，本机 man mdadm GROW MODE 明写可在线改 chunk-size ⇒ 乙的槽宽 mkfs 后会变，而槽几何是盘上既成事实」）。
+**本轮问法已经把乙定义成记录值**（零节已引），**这一点必须与 E126（超级块槽宽四条候选的代价） 测试过的『乙』分清楚**——E126 的乙注释里明写「探测值」（`research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs:46`），2026-09-10 三方论证的反推腿正是针对**那个探测值版本**打中了「io_min 是栈属性，mdadm 可在线改 chunk-size」这条（`.claude/kb/decisions/22-单元原子性怎么合成.md:688` 追记：「反推腿打中……io_min 是栈属性不是盘属性，本机 man mdadm GROW MODE 明写可在线改 chunk-size ⇒ 乙的槽宽 mkfs 后会变，而槽几何是盘上既成事实」）。
 
 **本轮的乙不是那个探测值版本**。它复用的是 D2（RAID 条带策略） 已定项 19 已经定案的机制：`.claude/kb/decisions/02-RAID条带策略.md:70` 逐字「槽距 = max(4096, mkfs 时探测的 io_min）；超级块几何段加两个 4 字节字段『mkfs 时的 io_min』与『固定结构槽距』……挂载闸是两条并列……**(a) 实际 io_min ≤ 记录的槽距**，不满足拒绝可写挂载」。这条闸**已经存在、已经定案（2026-09-13）**，专门处理「mkfs 之后 io_min 变了」这件事：mkfs 时把 io_min 探测值连同算出的槽距一起写进超级块（`.claude/kb/layout/01-first-txn.md:143-144`：「mkfs 时的 io_min | 4 | 512」「固定结构槽距 | 4 | 4096」），之后任何一次挂载都拿**当时现探测的** io_min 与**这个记录值**比较，只要抬高（比如 mdadm 在线改大 chunk-size），下次可写挂载就被闸 (a) 拒绝，不会静默地在错的几何上继续写。
 

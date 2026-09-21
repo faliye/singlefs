@@ -1,1 +1,0 @@
-applied 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条，C368 仍欠的那一半）：发布层把分配器的落点拒绝一律报成「每块盘上都没有」 to crates/singlefs-core/src/transaction.rs

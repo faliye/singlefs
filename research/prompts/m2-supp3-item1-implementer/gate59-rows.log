@@ -1,4 +1,0 @@
-  ✓ 锚点预扫：125 条变异，原文都恰好命中一次
-  ✓ 第 129 行 增补 3 第 1 件：随机历史快档判出「复用时追加记录而不改写」（第 41 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
-  ✓ 第 130 行 增补 3 第 1 件：随机历史快档判出「复用时新记录罩住的已回收记录不删」（第 121 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
-exit 0

@@ -1,1 +1,0 @@
-        records_before_this_publish + (rewritten.len() + usize::from(!rewritten.contains(&TransactionUnit::Data))) * allocator.devices.len();

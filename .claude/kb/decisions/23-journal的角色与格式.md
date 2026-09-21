@@ -77,7 +77,7 @@ D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃�
 **依据**：
 
 - E16（journal 的角色：WAL vs 意图日志）：延后祖先的臂只在 checkpoint 发根、从没在 fsync 时发过根；攒批吃不掉延后祖先的收益只在「批 ≤ 并发流数」时成立——它改的是「乙的收益形状」那条已降级依据的强度，不是结论。
-- 三方：2026-08-28 三方论证（材料 `research/prompts/_axis2-background.md`），正推腿给出「轴一 ⇒ 轴二」这条结构性依据，三条原依据怎么降级、腿况在变更史。
+- 三方：2026-08-28 三方论证（材料 `_axis2-background.md`），正推腿给出「轴一 ⇒ 轴二」这条结构性依据，三条原依据怎么降级、腿况在变更史。
 
 **欠**：C1（意图续做做成常规路径）；反向判据的 N 没有声明，记录核对器已接在层 0 上（`crates/singlefs-harness/src/crash.rs` 的 `check_records`），事件数没人计。
 
@@ -102,7 +102,7 @@ D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃�
 
 - E25（环与链各要多大保留池）：checkpoint 卡死恰好在预测的那一档归零——环在 reserve = ckpt_cost，链在 ckpt_cost 加一个窗口的 journal 块。
 - E23（journal 几何）：环与链只差一项——链式每个 journal 块都要向分配器要一次块，环 0 次；链式没有死锁 3、环要几何不变量。
-- 三方：2026-08-29 三条腿一致判「链式进入死锁 2」过强（材料 `research/prompts/_d23-background.md`）。
+- 三方：2026-08-29 三条腿一致判「链式进入死锁 2」过强（材料 `_d23-background.md`）。
 
 **欠**：C28（环几何不变量未实现）。
 
@@ -132,7 +132,7 @@ D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃�
 
 - E24（恢复算法：先信 tail 会不会丢记录）：先信 tail 漏掉的条数恰等于窗口内写入的条数；全环扫描不丢，但把陈旧 tail 以来的记录全部重放一遍（逼出幂等）；窗口撑爆环时两条臂一起丢（恢复救不了几何）。
 - E23（journal 几何）：jbd2 形态与 XFS 内联形态在稳态额外写与空闲崩溃后的重放量上方向相反——按的是 tail 每 checkpoint 推进一次的旧前提，见射程。
-- 三方：2026-08-29（材料 `research/prompts/_d23-background.md`）。
+- 三方：2026-08-29（材料 `_d23-background.md`）。
 
 **欠**：C245（系统配置槽的写频率，两条条款说反话）；C29（恢复先信 tail 会丢数据）；C28（环几何不变量未实现）；C77（重放起点未定义）。
 
@@ -172,7 +172,7 @@ D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃�
 
 **依据**：
 
-- 无实验：一元谓词不能变成二元关系，这是类型之争，没有可量的量；2026-08-29 三方论证（材料 `research/prompts/_o2-background.md`），逐条依据见 D13（验证路线） 已定项 7。
+- 无实验：一元谓词不能变成二元关系，这是类型之争，没有可量的量；2026-08-29 三方论证（材料 `_o2-background.md`），逐条依据见 D13（验证路线） 已定项 7。
 
 **欠**：无。
 
@@ -384,7 +384,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 - E104（扫描重建的现行版本判定）：不写回退行时被回退抛弃的单元在全规则臂上复活；新根取 T_old + 1 时压不过被抛弃的根。
 - E150（回退复用被抛弃的根引用的单元）：影子账在模型里两格零违例，多隔离的单元到被抛弃的最新根被轮转覆写为止——回退例外那句靠它成立。
 - E142（第一个事务的干跑）：干跑时装置取「两份镜像任一份合法即在」，改坏一份记录仍读到全部合法记录——「记录在」的口径由此收口。
-- 三方：`research/prompts/c199-r1-main-verification.md`、`research/prompts/c199-r2-main-verification.md`（注 1–4）；`research/prompts/c322-r3-main-verification.md`（取号屏障与跳过的号）；`research/prompts/c329-c330-r3-main-verification.md`（切换的所选根与 W 那一行）；`research/prompts/c143-r3-main-verification.md`（第一个新根的 txg 取 CJ2）；`research/prompts/m2-r1-main-verification.md` 第三节与 `research/prompts/m2-step45-code-r3-main-verification.md` 第六节 5（影子账查谁的账、有效根）；C113（扫描重建时多版单元的现行版本判定无输入） 定案（`research/prompts/_c113-r9-final.md`）。
+- 三方：`research/prompts/c199-r1-main-verification.md`、`research/prompts/c199-r2-main-verification.md`（注 1–4）；`research/prompts/c322-r3-main-verification.md`（取号屏障与跳过的号）；`research/prompts/c329-c330-r3-main-verification.md`（切换的所选根与 W 那一行）；`research/prompts/c143-r3-main-verification.md`（第一个新根的 txg 取 CJ2）；`research/prompts/m2-r1-main-verification.md` 第三节与 `research/prompts/m2-step45-code-r3-main-verification.md` 第六节 5（影子账查谁的账、有效根）；C113（扫描重建时多版单元的现行版本判定无输入） 定案（`_c113-r9-final.md`）。
 - 用户定案（重放下界、回退、失败表、切换预留口径、两份镜像的口径各一次），原话在变更史。
 
 **欠**：C77（重放起点未定义）；C124（回退行与重放下界没有会红的检查）；C314（回退可以复用被抛弃的根引用的单元）；C318（影子账隔离的单元没进准入不等式）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C340（回退之后记录链从哪条之后接没有定义）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）。

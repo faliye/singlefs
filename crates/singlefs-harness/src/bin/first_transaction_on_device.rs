@@ -1087,7 +1087,7 @@ mod tests {
     #[test]
     fn device_window_check_matches_only_when_both_write_calls_and_bytes_are_equal() {
         let mut first = WritesByStructureKind::NOTHING_WRITTEN;
-        first.count_write_call(WrittenStructureKind::SuperblockSlot, &[0u8; 4096]);
+        first.count_write_call(WrittenStructureKind::SystemConfigurationSlot, &[0u8; 4096]);
         let mut second = WritesByStructureKind::NOTHING_WRITTEN;
         second.count_write_call(WrittenStructureKind::RootSlot, &[0u8; 512]);
         let (line, matches) = publish_writes_against_device(

@@ -27,8 +27,8 @@ $ grep -rn "pub [a-z_]*: \(CheckpointTxg\|InstanceGeneration\|u64\|u32\)" crates
 
 | # | 对象（盘上落点） | ①有效不变量 | ②checker 实现 | ③验收断言（点名） | 判定 | 理由 |
 |---|---|---|---|---|---|---|
-| 1 | 超级块槽世代号 `Superblock.slot_generation`（`crates/singlefs-core/src/superblock.rs:71`；layout 01 第 91/95/113 行"槽世代号"） | 无 | 无 | 单测按往返断言，未见专门验收 | 分不清 | 它是"哪个槽更新"的择槽计数器，语义只要求严格递增、不要求取到某个具体值；`invariants.md` 全文 0 命中"槽世代号"。是否该算这类判据管的"代字段"存疑，列出交人看 |
-| 2 | 超级块 `journal_instance`（实例代号，`superblock.rs:75`） | I-7.7（超级块实例代号不低于根环） | 已实现，`walk::judge_instance_carriers`（`crates/singlefs-checker/src/walk.rs:647`） | — | 过 | `judge_instance_carriers` 直接读各盘超级块槽的 `journal_instance` 参与比对 |
+| 1 | 超级块槽世代号 `Superblock.slot_generation`（`crates/singlefs-core/src/system_configuration.rs:71`；layout 01 第 91/95/113 行"槽世代号"） | 无 | 无 | 单测按往返断言，未见专门验收 | 分不清 | 它是"哪个槽更新"的择槽计数器，语义只要求严格递增、不要求取到某个具体值；`invariants.md` 全文 0 命中"槽世代号"。是否该算这类判据管的"代字段"存疑，列出交人看 |
+| 2 | 超级块 `journal_instance`（实例代号，`crates/singlefs-core/src/system_configuration.rs:75`） | I-7.7（超级块实例代号不低于根环） | 已实现，`walk::judge_instance_carriers`（`crates/singlefs-checker/src/walk.rs:647`） | — | 过 | `judge_instance_carriers` 直接读各盘超级块槽的 `journal_instance` 参与比对 |
 | 3 | 根记录 `instance`（`crates/singlefs-core/src/root_record.rs:18`；layout 01 第 60/355 行） | I-7.7 | 已实现，`judge_instance_carriers`（`instance_carriers` 里 `roots.iter().map(... root.instance)`，`walk.rs:612`） | — | 过 | 同上，根记录的实例代号是 `instance_carriers` 扫描对象之一 |
 | 4 | 根记录 `checkpoint_txg`（自身的 txg，`root_record.rs:19`） | 无（它是别的判据的自变量，如 I-3.5 的 `R.txg`） | — | 大量脚本按具体 txg 断言（如各步 `_publish.rs`） | 分不清 | 没有一条不变量说"这条根自身的 checkpoint_txg 该取什么值"——它是被比较的坐标轴，不是被约束的对象；I-7.3（环健康性）只从"存不存在更早代号"侧面涉及、未实现，且不判具体值 |
 | 5 | 根记录 `rollback_floor` F（`root_record.rs:22`；layout 02 第 14 行） | 无（只被 I-3.1/I-7.4/I-4.8/I-5.4 当输入使用） | — | `crates/singlefs-harness/tests/second_transaction_step_five_reuse.rs`（`one_device_carrying_the_floor_alone_does_not_take_effect_on_remount` 等钉 F=11 一类具体值） | 不过 | `invariants.md` 全文没有一条约束 F 自身该取什么值（例如"非递减，除非新实例重开允许回落"这类）；只有验收断言盯着固定脚本上的具体 F 值，checker 一处未判 F 本身对不对 |

@@ -7,7 +7,7 @@
 三轮对抗第一轮的反推腿打中它两处建模错误，主 agent 现查坐实：它按「每头一棵数据树、没有池级树」数树表条目，
 并且对内部节点也用了叶扇出。E131（livelist 的两条载体，数值与代价） 的判据已写死、产物已入库，按本仓「判据已写死、产物已入库的实验不回头改，另起一号重跑」的先例另立新号。
 
-**跑前写死**：`research/prompts/e132-preregistration.md`（含一格触发结果是「`per_head` 输」的判据，
+**跑前写死**：`e132-preregistration.md`（含一格触发结果是「`per_head` 输」的判据，
 以及「结果反过来我接不接受」）。
 
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
@@ -19,7 +19,7 @@ cd research && cargo run --release --bin e132_livelist_carrier_recount
 ```
 
 代码 `research/e7-index-bench/src/bin/e132_livelist_carrier_recount.rs`，
-原始输出 `research/results/e132-livelist-carrier-recount-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
+原始输出 `e132-livelist-carrier-recount-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现
 
@@ -40,7 +40,7 @@ cd research && cargo run --release --bin e132_livelist_carrier_recount
 
 ### 结论：改正之后每头一棵树仍然一格没输
 
-产物逐行抄自 `research/results/e132-livelist-carrier-recount-2026-09-16.out`。
+产物逐行抄自 `e132-livelist-carrier-recount-2026-09-16.out`。
 
 | 跑前写死的判据 | 产物 | 判 |
 |---|---|---|

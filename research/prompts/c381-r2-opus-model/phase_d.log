@@ -1,0 +1,413 @@
+warning: unused import: `singlefs_harness::scenario::e142_parameters`
+ --> crates/singlefs-harness/tests/c381r2_sweep.rs:5:5
+  |
+5 | use singlefs_harness::scenario::e142_parameters;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `note` is never read
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:267:9
+    |
+260 | pub struct Snapshot {
+    |            -------- field in this struct
+...
+267 |     pub note: String,
+    |         ^^^^
+    |
+    = note: `Snapshot` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `Empty` and `Other` are never constructed
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:563:5
+    |
+559 | pub enum Action {
+    |          ------ variants in this enum
+...
+563 |     Empty,
+    |     ^^^^^
+564 |     /// 从现行版发一次内容不同的覆盖写。
+565 |     Other,
+    |     ^^^^^
+    |
+    = note: `Action` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: constant `ACTIONS` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:569:11
+    |
+569 | pub const ACTIONS: [Action; 4] = [Action::Retry, Action::Empty, Action::Other, Action::Remount];
+    |           ^^^^^^^
+
+warning: function `writes_of_c` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:981:8
+    |
+981 | pub fn writes_of_c(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<(u32, u64, usize)> {
+    |        ^^^^^^^^^^^
+
+warning: `singlefs-harness` (test "c381r2_sweep") generated 5 warnings (run `cargo fix --test "c381r2_sweep" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/c381r2_sweep.rs (target/release/deps/c381r2_sweep-b80c280302700ce7)
+
+running 1 test
+test phase_d_dead_device ... progress 25/4704 at 137.99674ms
+progress 50/4704 at 220.774462ms
+progress 75/4704 at 324.404079ms
+progress 100/4704 at 402.604754ms
+progress 125/4704 at 489.04246ms
+progress 150/4704 at 581.384633ms
+progress 175/4704 at 671.464513ms
+progress 200/4704 at 769.013323ms
+progress 225/4704 at 853.646407ms
+progress 250/4704 at 941.877874ms
+progress 275/4704 at 1.031987835s
+progress 300/4704 at 1.114485266s
+progress 325/4704 at 1.217232631s
+progress 350/4704 at 1.280514048s
+progress 375/4704 at 1.342712723s
+progress 400/4704 at 1.401413534s
+progress 425/4704 at 1.4967849s
+progress 450/4704 at 1.660148678s
+progress 475/4704 at 1.77699788s
+progress 500/4704 at 1.908170949s
+progress 525/4704 at 1.980252737s
+progress 550/4704 at 2.045180646s
+progress 575/4704 at 2.108966713s
+progress 600/4704 at 2.225825174s
+progress 625/4704 at 2.376418645s
+progress 650/4704 at 2.497904501s
+progress 675/4704 at 2.636665828s
+progress 700/4704 at 2.726967646s
+progress 725/4704 at 2.816610974s
+progress 750/4704 at 2.916008174s
+progress 775/4704 at 3.009902907s
+progress 800/4704 at 3.101266617s
+progress 825/4704 at 3.20437209s
+progress 850/4704 at 3.302867447s
+progress 875/4704 at 3.387719368s
+progress 900/4704 at 3.489161439s
+progress 925/4704 at 3.585443614s
+progress 950/4704 at 3.665417819s
+progress 975/4704 at 3.765521879s
+progress 1000/4704 at 3.861233583s
+progress 1025/4704 at 3.930853506s
+progress 1050/4704 at 3.999300877s
+progress 1075/4704 at 4.070318962s
+progress 1100/4704 at 4.16133546s
+progress 1125/4704 at 4.325931324s
+progress 1150/4704 at 4.478563905s
+progress 1175/4704 at 4.578787493s
+progress 1200/4704 at 4.672255683s
+progress 1225/4704 at 4.740930284s
+progress 1250/4704 at 4.809417545s
+progress 1275/4704 at 4.928633396s
+progress 1300/4704 at 5.080099095s
+progress 1325/4704 at 5.229946791s
+progress 1350/4704 at 5.360293603s
+progress 1375/4704 at 5.454563974s
+progress 1400/4704 at 5.549617605s
+progress 1425/4704 at 5.655401918s
+progress 1450/4704 at 5.75085134s
+progress 1475/4704 at 5.848221394s
+progress 1500/4704 at 5.958172763s
+progress 1525/4704 at 6.051611172s
+progress 1550/4704 at 6.155320953s
+progress 1575/4704 at 6.2559595s
+progress 1600/4704 at 6.347197186s
+progress 1625/4704 at 6.450809636s
+progress 1650/4704 at 6.547422498s
+progress 1675/4704 at 6.651172488s
+progress 1700/4704 at 6.723401731s
+progress 1725/4704 at 6.794127323s
+progress 1750/4704 at 6.864121445s
+progress 1775/4704 at 6.992334903s
+progress 1800/4704 at 7.134730768s
+progress 1825/4704 at 7.281699177s
+progress 1850/4704 at 7.403598017s
+progress 1875/4704 at 7.492728129s
+progress 1900/4704 at 7.568224146s
+progress 1925/4704 at 7.641856731s
+progress 1950/4704 at 7.782326242s
+progress 1975/4704 at 7.931763583s
+progress 2000/4704 at 8.090124765s
+progress 2025/4704 at 8.212384125s
+progress 2050/4704 at 8.307534163s
+progress 2075/4704 at 8.398487426s
+progress 2100/4704 at 8.487960878s
+progress 2125/4704 at 8.576101768s
+progress 2150/4704 at 8.672476118s
+progress 2175/4704 at 8.765760704s
+progress 2200/4704 at 8.862579014s
+progress 2225/4704 at 8.956533361s
+progress 2250/4704 at 9.04327793s
+progress 2275/4704 at 9.137202467s
+progress 2300/4704 at 9.233625805s
+progress 2325/4704 at 9.326063359s
+progress 2350/4704 at 9.41520052s
+progress 2375/4704 at 9.479698172s
+progress 2400/4704 at 9.554525397s
+progress 2425/4704 at 9.625410327s
+progress 2450/4704 at 9.732078437s
+progress 2475/4704 at 9.881700365s
+progress 2500/4704 at 10.025065067s
+progress 2525/4704 at 10.145246882s
+progress 2550/4704 at 10.235615653s
+progress 2575/4704 at 10.294514899s
+progress 2600/4704 at 10.362264584s
+progress 2625/4704 at 10.503904092s
+progress 2650/4704 at 10.656564933s
+progress 2675/4704 at 10.807437561s
+progress 2700/4704 at 10.943536133s
+progress 2725/4704 at 11.058766501s
+progress 2750/4704 at 11.172683318s
+progress 2775/4704 at 11.2918242s
+progress 2800/4704 at 11.405319605s
+progress 2825/4704 at 11.5272081s
+progress 2850/4704 at 11.658882985s
+progress 2875/4704 at 11.7718879s
+progress 2900/4704 at 11.883352333s
+progress 2925/4704 at 12.003694756s
+progress 2950/4704 at 12.120335335s
+progress 2975/4704 at 12.232268848s
+progress 3000/4704 at 12.355477603s
+progress 3025/4704 at 12.453909921s
+progress 3050/4704 at 12.556680153s
+progress 3075/4704 at 12.658320524s
+progress 3100/4704 at 12.74530862s
+progress 3125/4704 at 12.910970521s
+progress 3150/4704 at 13.068605833s
+progress 3175/4704 at 13.244046784s
+progress 3200/4704 at 13.365039025s
+progress 3225/4704 at 13.459510448s
+progress 3250/4704 at 13.557367424s
+progress 3275/4704 at 13.657507342s
+progress 3300/4704 at 13.84960528s
+progress 3325/4704 at 14.001509465s
+progress 3350/4704 at 14.166047063s
+progress 3375/4704 at 14.285613621s
+progress 3400/4704 at 14.381326534s
+progress 3425/4704 at 14.496946198s
+progress 3450/4704 at 14.600487339s
+progress 3475/4704 at 14.699375405s
+progress 3500/4704 at 14.801279685s
+progress 3525/4704 at 14.912128703s
+progress 3550/4704 at 15.010759849s
+progress 3575/4704 at 15.125127622s
+progress 3600/4704 at 15.218210591s
+progress 3625/4704 at 15.32067229s
+progress 3650/4704 at 15.425011381s
+progress 3675/4704 at 15.522343954s
+progress 3700/4704 at 15.617917386s
+progress 3725/4704 at 15.698927682s
+progress 3750/4704 at 15.780154628s
+progress 3775/4704 at 15.86672246s
+progress 3800/4704 at 16.014285176s
+progress 3825/4704 at 16.167152119s
+progress 3850/4704 at 16.324919465s
+progress 3875/4704 at 16.422327847s
+progress 3900/4704 at 16.501794731s
+progress 3925/4704 at 16.583892717s
+progress 3950/4704 at 16.676825615s
+progress 3975/4704 at 16.835324231s
+progress 4000/4704 at 16.990244854s
+progress 4025/4704 at 17.135158326s
+progress 4050/4704 at 17.23479542s
+progress 4075/4704 at 17.308194487s
+progress 4100/4704 at 17.414925078s
+progress 4125/4704 at 17.499175816s
+progress 4150/4704 at 17.587959998s
+progress 4175/4704 at 17.675952929s
+progress 4200/4704 at 17.769184687s
+progress 4225/4704 at 17.855840577s
+progress 4250/4704 at 17.944561579s
+progress 4275/4704 at 18.040053788s
+progress 4300/4704 at 18.121126073s
+progress 4325/4704 at 18.211578936s
+progress 4350/4704 at 18.305122713s
+progress 4375/4704 at 18.381845652s
+progress 4400/4704 at 18.450828113s
+progress 4425/4704 at 18.513881168s
+progress 4450/4704 at 18.579976956s
+progress 4475/4704 at 18.742415753s
+progress 4500/4704 at 18.859532684s
+progress 4525/4704 at 18.996083085s
+progress 4550/4704 at 19.087855139s
+progress 4575/4704 at 19.153763457s
+progress 4600/4704 at 19.222287677s
+progress 4625/4704 at 19.302918319s
+progress 4650/4704 at 19.474872374s
+progress 4675/4704 at 19.589687421s
+progress 4700/4704 at 19.758718324s
+progress 4704/4704 at 19.797487053s
+=== 四（整块盘持续失败） 汇总 ===
+[base 丙 干净] runs=136
+[base 丙 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 丙 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 戊-A 干净] runs=4
+[base 戊-A 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[base 戊-A 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[base 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 4) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[base 戊-B 干净] runs=4
+[base 戊-B 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[base 戊-B 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[base 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 4) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[base 甲 干净] runs=136
+[base 甲 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 甲 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[floor_raised 丙 干净] runs=136
+[floor_raised 丙 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 丙 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 戊-A 干净] runs=4
+[floor_raised 戊-A 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 戊-A 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 14) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 戊-B 干净] runs=4
+[floor_raised 戊-B 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 戊-B 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 14) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[floor_raised 甲 干净] runs=136
+[floor_raised 甲 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 甲 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 丙 干净] runs=136
+[many_overwrites 丙 没确认的那一版] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 丙 没确认的那一版+红] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 戊-A 干净] runs=4
+[many_overwrites 戊-A 没确认的那一版+红+转只读] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 1) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 戊-A 没确认的那一版+转只读] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 12) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 戊-B 干净] runs=4
+[many_overwrites 戊-B 没确认的那一版+红+转只读] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 1) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 戊-B 没确认的那一版+转只读] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 12) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[many_overwrites 甲 干净] runs=136
+[many_overwrites 甲 没确认的那一版] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 甲 没确认的那一版+红] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 丙 干净] runs=136
+[remounted 丙 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 丙 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 戊-A 干净] runs=4
+[remounted 戊-A 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[remounted 戊-A 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[remounted 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[remounted 戊-B 干净] runs=4
+[remounted 戊-B 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[remounted 戊-B 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=2 探针=1
+[remounted 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=2 探针=1
+[remounted 甲 干净] runs=136
+[remounted 甲 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 甲 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[rolled_back 丙 干净] runs=136
+[rolled_back 丙 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 丙 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 戊-A 干净] runs=4
+[rolled_back 戊-A 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 戊-A 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 10) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 戊-B 干净] runs=4
+[rolled_back 戊-B 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 戊-B 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 10) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=3 探针=1
+[rolled_back 甲 干净] runs=136
+[rolled_back 甲 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 甲 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[txg6 丙 干净] runs=136
+[txg6 丙 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 丙 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 戊-A 干净] runs=4
+[txg6 戊-A 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg6 戊-A 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg6 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[txg6 戊-B 干净] runs=4
+[txg6 戊-B 没确认的那一版+红+转只读] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg6 戊-B 没确认的那一版+转只读] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg6 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 5) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[txg6 甲 干净] runs=136
+[txg6 甲 没确认的那一版] runs=16
+    first: 盘0从19起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 甲 没确认的那一版+红] runs=16
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 丙 干净] runs=136
+[txg7 丙 没确认的那一版] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 丙 没确认的那一版+红] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 戊-A 干净] runs=4
+[txg7 戊-A 没确认的那一版+红+转只读] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 1) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg7 戊-A 没确认的那一版+转只读] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg7 戊-A 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[txg7 戊-B 干净] runs=4
+[txg7 戊-B 没确认的那一版+红+转只读] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 1) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg7 戊-B 没确认的那一版+转只读] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=true 实例=1 探针=1
+[txg7 戊-B 转只读] runs=132
+    first: 盘0从0起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)", "探针写(盘 0) 不过", "持续失败 → 转只读到下次挂载"] remount=ok(chosen 6) crash红=[] after红=[] 内容=同一份 切换=0 只读=true 实例=1 探针=1
+[txg7 甲 干净] runs=136
+[txg7 甲 没确认的那一版] runs=20
+    first: 盘0从17起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 甲 没确认的那一版+红] runs=12
+    first: 盘1从16起坏 探针打盘0=false 之后重开=false steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 19.93s
+

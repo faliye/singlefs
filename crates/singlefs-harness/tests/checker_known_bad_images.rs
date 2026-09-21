@@ -227,7 +227,7 @@ fn verdict(pool: &MemoryPool, invariant: &str) -> InvariantVerdict {
 }
 
 /// 系统配置槽重封：自证校验和在 155，罩整槽 4096。
-fn mutate_superblock_slot(
+fn mutate_system_configuration_slot(
     pool: &mut MemoryPool,
     device: u32,
     slot_offset: u64,
@@ -384,7 +384,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
         (
             "I-1.4",
             Box::new(|image: &mut MemoryPool| {
-                mutate_superblock_slot(image, 1, 4096, |bytes| bytes[102] ^= 0xFF)
+                mutate_system_configuration_slot(image, 1, 4096, |bytes| bytes[102] ^= 0xFF)
             }),
         ),
         // 码 3 容器类身份段的首字节改成 1。
@@ -505,7 +505,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
         (
             "I-7.6",
             Box::new(|image: &mut MemoryPool| {
-                mutate_superblock_slot(image, 0, 4096, |bytes| {
+                mutate_system_configuration_slot(image, 0, 4096, |bytes| {
                     bytes[379..391].copy_from_slice(&[0u8; 12])
                 })
             }),
@@ -538,7 +538,7 @@ fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {
         (
             "I-7.7",
             Box::new(move |image: &mut MemoryPool| {
-                mutate_superblock_slot(image, 0, 4096, |bytes| {
+                mutate_system_configuration_slot(image, 0, 4096, |bytes| {
                     bytes[477..481].copy_from_slice(&2u32.to_le_bytes())
                 });
                 write(image, 0, 50302 * SLOT, &orphan_for_second_sentence);

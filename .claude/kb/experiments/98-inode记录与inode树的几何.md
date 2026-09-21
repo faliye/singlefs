@@ -46,7 +46,7 @@
 
 - 代码 `research/e7-index-bench/src/bin/e98_inode_record.rs`
   （`cargo run --release --bin e98-inode-record`），
-  原始输出 `research/results/e98-inode-record-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e98-inode-record-2026-09-03.out，留在 results/ 里不动）`（74 行，收尾 `emitted=74`）。
+  原始输出 `e98-inode-record-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e98-inode-record-2026-09-03.out，留在 results/ 里不动）`（74 行，收尾 `emitted=74`）。
 - 变异表 `research/mutations/e98_inode_record.tsv`，9 条逐条命中、0 条判等价；单测 12 个。
 - 已挂进 `research/scripts/replay.sh`（exact 档）。
 - ⚠️ **头宽停在旧值，欠一次复跑**（C89（单元头收口的遗留重算） ④ ⑤）：源码 `DATA_UNIT_HEADER = 91`，

@@ -176,7 +176,7 @@ mkfs 34 三者相等。原因也很直白：今天每一个 FUA 写前面都紧�
 
 - `journal_tail`。`crates/singlefs-core/src/transaction.rs:559` 每次发布把 `journal_tail: plan.counter`
   写进超级块槽；D23（journal 的角色与格式） 已定项 3 的「tail 住超级块槽」就是它。
-  现查 `grep -rn "\.journal_tail" --include=*.rs crates/`：`crates/*/src/` 下除了 `superblock.rs` 的字段定义与
+  现查 `grep -rn "\.journal_tail" --include=*.rs crates/`：`crates/*/src/` 下除了 `crates/singlefs-core/src/system_configuration.rs` 的字段定义与
   `transaction.rs` 的写入侧，**一处读都没有**，命中的七处全在 `crates/singlefs-harness/tests/` 里。
   所以**今天这一格没有受害者**。等它有了消费者，甲 的枚举域里「tail 指着的那条记录不在介质上」一次都不会出现——
   那段新代码第一天就是零覆盖，而门禁全绿。

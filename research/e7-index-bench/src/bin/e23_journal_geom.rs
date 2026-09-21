@@ -45,7 +45,7 @@ enum Shape {
 enum Tail {
     /// jbd2 形态：住 journal 超级块，固定位置、原地覆盖、FUA。
     /// 可以脱离记录单独推进 —— 这正是它那次 FUA 买到的东西。
-    SuperBlock,
+    SystemConfiguration,
     /// XFS 形态：内联在每条记录头的 `tail_lsn` 里。零额外写，但只能搭便车推进。
     Inline,
 }
@@ -53,14 +53,14 @@ enum Tail {
 impl Tail {
     fn label(self) -> &'static str {
         match self {
-            Tail::SuperBlock => "tail_sb",
+            Tail::SystemConfiguration => "tail_sb",
             Tail::Inline => "tail_inline",
         }
     }
     /// 头部是否需要那 8 字节的 `tail_lsn`。
     fn header_bytes(self) -> u64 {
         match self {
-            Tail::SuperBlock => JOURNAL_RECORD_HEADER_BYTES - 8,
+            Tail::SystemConfiguration => JOURNAL_RECORD_HEADER_BYTES - 8,
             Tail::Inline => JOURNAL_RECORD_HEADER_BYTES,
         }
     }
@@ -116,7 +116,7 @@ fn simulate_journal_run(named: &[u64], shape: Shape, tail: Tail, physical_block_
                 live_journal_bytes = 0;
                 // checkpoint 之后 tail 该前进。谁能立刻兑现，取决于 tail 住哪。
                 match tail {
-                    Tail::SuperBlock => outcome.tail_blocks += 1, // 单独写一次，立刻兑现
+                    Tail::SystemConfiguration => outcome.tail_blocks += 1, // 单独写一次，立刻兑现
                     Tail::Inline => tail_lag += aligned_record_bytes,         // 只能等下一条记录捎带
                 }
             }
@@ -139,7 +139,7 @@ fn simulate_journal_run(named: &[u64], shape: Shape, tail: Tail, physical_block_
             outcome.checkpoint_count += 1;
             live_journal_bytes = 0;
             match tail {
-                Tail::SuperBlock => outcome.tail_blocks += 1,
+                Tail::SystemConfiguration => outcome.tail_blocks += 1,
                 Tail::Inline => tail_lag += aligned_record_bytes,
             }
         }
@@ -151,7 +151,7 @@ fn simulate_journal_run(named: &[u64], shape: Shape, tail: Tail, physical_block_
             .map(|&named_count| record_bytes(named_count, tail, physical_block_size)).sum();
         outcome.checkpoint_count += 1;
         match tail {
-            Tail::SuperBlock => {
+            Tail::SystemConfiguration => {
                 outcome.tail_blocks += 1;
                 outcome.replay_blocks = 0; // tail 单独推到最新 ⇒ 无需重放
             }
@@ -177,7 +177,7 @@ fn main() {
             ("grain10", vec![10u64; operation_count]), // 多流批 10：点名 10 项（E23 与 E16 口径一致）
         ] {
             for shape in [Shape::Ring { blocks: 4096 }, Shape::Chain] {
-                for tail in [Tail::SuperBlock, Tail::Inline] {
+                for tail in [Tail::SystemConfiguration, Tail::Inline] {
                     let cell_outcome = simulate_journal_run(&named, shape, tail, physical_block_size, 1000, Some(operation_count - 500));
                     let shape_label = match shape { Shape::Ring { .. } => "ring", Shape::Chain => "chain" };
                     println!("{}", emitter.emit_raw(&format!(
@@ -195,7 +195,7 @@ fn main() {
     for physical_block_size in [512u64, 4096] {
         let named = vec![1u64; operation_count];
         for ring_block_count in [4u64, 16, 64, 256, 1024, 4096] {
-            let sweep_outcome = simulate_journal_run(&named, Shape::Ring { blocks: ring_block_count }, Tail::SuperBlock, physical_block_size, 1000, None);
+            let sweep_outcome = simulate_journal_run(&named, Shape::Ring { blocks: ring_block_count }, Tail::SystemConfiguration, physical_block_size, 1000, None);
             println!("{}", emitter.emit_raw(&format!(
                 "name=ringsweep pbs={physical_block_size} ring_blocks={ring_block_count} forced={} ckpts={} tail_blocks={} peak={}",
                 sweep_outcome.forced_checkpoint_count, sweep_outcome.checkpoint_count, sweep_outcome.tail_blocks, sweep_outcome.peak_journal_blocks)));
@@ -243,10 +243,10 @@ mod tests {
 
     /// `tail_sb` 省掉头里那 8 字节，必须真的体现在算术里，否则两条臂只是换个名字。
     #[test]
-    fn superblock_tail_actually_shrinks_the_header() {
-        assert_eq!(Tail::SuperBlock.header_bytes(), JOURNAL_RECORD_HEADER_BYTES - 8);
+    fn system_configuration_tail_actually_shrinks_the_header() {
+        assert_eq!(Tail::SystemConfiguration.header_bytes(), JOURNAL_RECORD_HEADER_BYTES - 8);
         assert_eq!(Tail::Inline.header_bytes(), JOURNAL_RECORD_HEADER_BYTES);
-        assert_eq!(Tail::SuperBlock.header_bytes(), 76);
+        assert_eq!(Tail::SystemConfiguration.header_bytes(), 76);
     }
 
     /// **链式的分配次数必须恰好等于它写的块数。** 这条钉住 D23 死锁 2 的输入：
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn ring_never_allocates() {
         let named = vec![1u64; 5000];
-        for tail in [Tail::SuperBlock, Tail::Inline] {
+        for tail in [Tail::SystemConfiguration, Tail::Inline] {
             for physical_block_size in [512u64, 4096] {
                 let ring_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, tail, physical_block_size, 1000, None);
                 assert_eq!(ring_outcome.allocation_count, 0, "定长环不该向分配器要块（tail={tail:?} pbs={physical_block_size}）");
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn ring_forces_checkpoints_only_when_it_is_too_small() {
         let named = vec![1u64; 3000];
-        for tail in [Tail::SuperBlock, Tail::Inline] {
+        for tail in [Tail::SystemConfiguration, Tail::Inline] {
             for physical_block_size in [512u64, 4096] {
                 let tight = simulate_journal_run(&named, Shape::Ring { blocks: 4 }, tail, physical_block_size, 1000, None);
                 assert!(tight.forced_checkpoint_count > 0, "环只有 4 块却没强制过 checkpoint（tail={tail:?} pbs={physical_block_size}）");
@@ -297,21 +297,21 @@ mod tests {
     #[test]
     fn the_two_tail_arms_differ_exactly_at_an_idle_crash() {
         let named = vec![1u64; 2000];
-        let superblock_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::SuperBlock, 4096, 1000, Some(1500));
+        let system_configuration_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::SystemConfiguration, 4096, 1000, Some(1500));
         let inline_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::Inline, 4096, 1000, Some(1500));
-        assert_eq!(superblock_tail_outcome.replay_blocks, 0, "超级块 tail 能单独推进，空闲崩溃后不该有重放");
+        assert_eq!(system_configuration_tail_outcome.replay_blocks, 0, "超级块 tail 能单独推进，空闲崩溃后不该有重放");
         assert_eq!(inline_tail_outcome.replay_blocks, 500, "内联 tail 只能搭便车 ⇒ 崩溃前最后 500 条各占一块");
-        assert!(inline_tail_outcome.replay_blocks > superblock_tail_outcome.replay_blocks);
+        assert!(inline_tail_outcome.replay_blocks > system_configuration_tail_outcome.replay_blocks);
     }
 
     /// **而它买到那个是要付钱的**：超级块 tail 每次推进一次写，内联恒为零。
     #[test]
-    fn superblock_tail_costs_exactly_one_write_per_advance() {
+    fn system_configuration_tail_costs_exactly_one_write_per_advance() {
         let named = vec![1u64; 5000];
-        let superblock_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::SuperBlock, 4096, 1000, None);
+        let system_configuration_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::SystemConfiguration, 4096, 1000, None);
         let inline_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::Inline, 4096, 1000, None);
         assert_eq!(inline_tail_outcome.tail_blocks, 0, "内联 tail 不该有任何额外写");
-        assert_eq!(superblock_tail_outcome.checkpoint_count, 5, "5000 次操作、每 1000 次一个 checkpoint");
-        assert_eq!(superblock_tail_outcome.tail_blocks, superblock_tail_outcome.checkpoint_count, "超级块 tail 的写次数应恰好等于 checkpoint 次数");
+        assert_eq!(system_configuration_tail_outcome.checkpoint_count, 5, "5000 次操作、每 1000 次一个 checkpoint");
+        assert_eq!(system_configuration_tail_outcome.tail_blocks, system_configuration_tail_outcome.checkpoint_count, "超级块 tail 的写次数应恰好等于 checkpoint 次数");
     }
 }

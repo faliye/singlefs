@@ -5,7 +5,7 @@
 ## 〇、先说三件口径上的事
 
 **跑前写死的失败条款没有触发。** 材料第三节逐字「触发它的观测是：腿逐字抄出 E126 源码里 honors 的定义与本材料说的不一致」。
-现查 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs:96-100` 逐字：
+现查 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs:96-100` 逐字：
 
 ```rust
 /// 判据 3：D2 已定硬要求 1 合规——一次槽写是否 ≥ io_min。
@@ -18,7 +18,7 @@ fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
 
 **但材料把两条不同的臂当成了同一条。** E126 那条 `yi_probe_max_iomin` 是 `physical_block_size.max(io_min)`（源码第 76 行），
 材料那条乙是 `max(4096, mkfs 时探测的 io_min)`。两者在本机上给出的不是同一个数——
-产物 `research/results/e126-superblock-slot-width-2026-09-09.out` 逐行：
+产物 `research/results/e126-system-configuration-slot-width-2026-09-09.out` 逐行：
 
 ```
 E7RESULT name=iomin dev=nvme_local arm=yi_probe_max_iomin width=512 io_min=512 honors=1 sectors=1 tear_states=0
@@ -352,7 +352,7 @@ COPYRESULT name=journal dev=md_raid5 io_min=65536 record=4096 records_sharing_on
 ⇒ 乙用的是**记录值**，不会随栈漂移。J6 的触发条件逐字是「乙若按 live 探测值定槽宽则槽几何随栈漂移即触发」，
 ⇒ **对材料这条乙永不触发**。
 
-它触发的是 **E126 那条乙**（`e126_superblock_slot_width.rs:76` 逐字
+它触发的是 **E126 那条乙**（`research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs:76` 逐字
 `Arm::ProbeLargerOfPhysicalBlockSizeAndMinimumInputOutputSize => physical_block_size.max(io_min),`），
 那条是实时探测的。而 E126 2026-09-10 的三方判决里那条「待复核」正是冲它去的
 （`experiments/126-系统配置槽宽四条候选的代价.md:112` 逐字）：
@@ -649,7 +649,7 @@ D2 / E126 / D18 / D20 / D22 / D23 / E34 / layout/01-first-txn / checks-owed。**
 下面每个数要进 kb，得由主 agent 在 E126 的入库装置上重跑一次（跑前登记写明是核实哪一句）。
 
 **在哪**：`/tmp/claude-1000/-home-fy5090-code-singlefs/72d37caa-c52c-4f5d-81fd-138d4e9f00d1/scratchpad/q18/`
-- `slotwidth_copy.rs`：臂算术**逐字抄自** `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs`
+- `slotwidth_copy.rs`：臂算术**逐字抄自** `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs`
   （`width` / `honors_minimum_input_output_size` / `tear_states` / `footprint` 四个函数），新增四样见下。
 - `copy-2026-09-14.out`：产物，106 行（末行 `COPYRESULT name=done emitted=106`）。
 - **复跑**：`rustc -O slotwidth_copy.rs -o slotwidth_copy && ./slotwidth_copy`；
@@ -665,7 +665,7 @@ D2 / E126 / D18 / D20 / D22 / D23 / E34 / layout/01-first-txn / checks-owed。**
    按 `.claude/rules/mutation-sampling.md` 第六类补的几何取样点。
 
 **单测 7 个全过，其中一个是阳性对照**：`e126_committed_iomin_rows_reproduce_exactly` 把
-E126 已入库产物 `research/results/e126-superblock-slot-width-2026-09-09.out` 的 `name=iomin` 行逐格钉死
+E126 已入库产物 `research/results/e126-system-configuration-slot-width-2026-09-09.out` 的 `name=iomin` 行逐格钉死
 （512 / 4096 / 16384 三档的 `tear_states` = 0 / 254 / 4294967294，65536 档 `sectors` = 128 且第二项溢出报 None）
 ⇒ **复现不出就说明副本的算术与 E126 不是同一套，整份作废。** 它过了。
 

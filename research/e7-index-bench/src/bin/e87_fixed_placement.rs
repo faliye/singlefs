@@ -96,7 +96,7 @@ fn fallback_unseeded(generation: u64, dead_device: usize) -> u64 {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum SuperblockArm {
+enum SystemConfigurationArm {
     Single,
     PerDevice,
 }
@@ -114,10 +114,10 @@ struct Cell {
     journal_writes_per_record: u64,
 }
 
-fn judge(superblock_arm: SuperblockArm, journal_arm: JournalArm, dead_device: usize) -> Cell {
-    let superblock_survives = match superblock_arm {
-        SuperblockArm::Single => dead_device != 0,
-        SuperblockArm::PerDevice => true,
+fn judge(system_configuration_arm: SystemConfigurationArm, journal_arm: JournalArm, dead_device: usize) -> Cell {
+    let system_configuration_survives = match system_configuration_arm {
+        SystemConfigurationArm::Single => dead_device != 0,
+        SystemConfigurationArm::PerDevice => true,
     };
     // 根：R=3 轮转下任何单盘失效都至少剩一个区域 ⇒ 根总有幸存者
     let worst_fallback = (1..=12u64).map(|generation| fallback(generation, dead_device)).max().unwrap();
@@ -126,7 +126,7 @@ fn judge(superblock_arm: SuperblockArm, journal_arm: JournalArm, dead_device: us
         JournalArm::Mirror => false,
     };
     Cell {
-        mountable: superblock_survives, // 根恒有幸存者，成不成只看超级块
+        mountable: system_configuration_survives, // 根恒有幸存者，成不成只看超级块
         worst_fallback,
         window_lost,
         journal_writes_per_record: match journal_arm {
@@ -144,15 +144,15 @@ fn main() {
             "name=config devs={DEVICE_COUNT} ring_regions={RING_REGION_COUNT} region_dev_map=0:0,1:1,2:0 model=arithmetic file_ops=0"
         ))
     );
-    for superblock_arm in [SuperblockArm::Single, SuperblockArm::PerDevice] {
+    for system_configuration_arm in [SystemConfigurationArm::Single, SystemConfigurationArm::PerDevice] {
         for journal_arm in [JournalArm::Single, JournalArm::Mirror] {
             for dead_device in 0..DEVICE_COUNT {
-                let cell = judge(superblock_arm, journal_arm, dead_device);
+                let cell = judge(system_configuration_arm, journal_arm, dead_device);
                 println!(
                     "{}",
                     emitter.emit_raw(&format!(
                         "name=cell sb={} journal={} dead_dev={dead_device} mountable={} worst_root_fallback={} replay_window_lost={} journal_writes_per_record={}",
-                        match superblock_arm { SuperblockArm::Single => "single", SuperblockArm::PerDevice => "per_dev" },
+                        match system_configuration_arm { SystemConfigurationArm::Single => "single", SystemConfigurationArm::PerDevice => "per_dev" },
                         match journal_arm { JournalArm::Single => "single", JournalArm::Mirror => "mirror" },
                         u8::from(cell.mountable),
                         cell.worst_fallback,
@@ -173,12 +173,12 @@ mod tests {
     /// **判据 1**：超级块单份、掉盘 0 ⇒ 不可挂（数据、根、journal 健在也没用）；
     /// 每盘一份 ⇒ 全部 8 格可挂。
     #[test]
-    fn single_superblock_is_a_single_point_of_failure() {
+    fn single_system_configuration_is_a_single_point_of_failure() {
         for journal_arm in [JournalArm::Single, JournalArm::Mirror] {
-            assert!(!judge(SuperblockArm::Single, journal_arm, 0).mountable);
-            assert!(judge(SuperblockArm::Single, journal_arm, 1).mountable);
+            assert!(!judge(SystemConfigurationArm::Single, journal_arm, 0).mountable);
+            assert!(judge(SystemConfigurationArm::Single, journal_arm, 1).mountable);
             for dead_device in 0..DEVICE_COUNT {
-                assert!(judge(SuperblockArm::PerDevice, journal_arm, dead_device).mountable);
+                assert!(judge(SystemConfigurationArm::PerDevice, journal_arm, dead_device).mountable);
             }
         }
     }
@@ -232,14 +232,14 @@ mod tests {
     /// **判据 3**：journal 单份掉盘 0 丢重放窗口；镜像全格不丢；镜像代价恰每条 ×2。
     #[test]
     fn journal_mirroring_arithmetic() {
-        assert!(judge(SuperblockArm::PerDevice, JournalArm::Single, 0).window_lost);
-        assert!(!judge(SuperblockArm::PerDevice, JournalArm::Single, 1).window_lost);
+        assert!(judge(SystemConfigurationArm::PerDevice, JournalArm::Single, 0).window_lost);
+        assert!(!judge(SystemConfigurationArm::PerDevice, JournalArm::Single, 1).window_lost);
         for dead_device in 0..DEVICE_COUNT {
-            let cell = judge(SuperblockArm::PerDevice, JournalArm::Mirror, dead_device);
+            let cell = judge(SystemConfigurationArm::PerDevice, JournalArm::Mirror, dead_device);
             assert!(!cell.window_lost);
             assert_eq!(cell.journal_writes_per_record, 2);
         }
-        assert_eq!(judge(SuperblockArm::PerDevice, JournalArm::Single, 1).journal_writes_per_record, 1);
+        assert_eq!(judge(SystemConfigurationArm::PerDevice, JournalArm::Single, 1).journal_writes_per_record, 1);
     }
 
     /// 区域指派自检：逐区域存身份的映射恒为 {0:0, 1:1, 2:0}——两盘上 R=3 必有一盘背两个区域。

@@ -21,7 +21,7 @@ const UNIT_BYTES: u64 = 32768;
 /// journal 记录固定宽度。
 const RECORD_BYTES: u64 = 4096;
 /// 超级块槽宽度。
-const SUPERBLOCK_SLOT_BYTES: u64 = 4096;
+const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 记录头宽度（`journal_named_items_per_record` 用它反推容量）。
 const RECORD_HEADER_BYTES: u64 = 307;
 /// 一条点名项的宽度。
@@ -526,7 +526,7 @@ struct JiaPublishOutcome {
     tree_table_bytes: u64,
     record_bytes: u64,
     root_slot_bytes: u64,
-    superblock_bytes: u64,
+    system_configuration_bytes: u64,
     write_calls: u64,
     barriers: u64,
     fua_count: u64,
@@ -575,7 +575,7 @@ impl JiaPublishOutcome {
             + self.tree_table_bytes
             + self.record_bytes
             + self.root_slot_bytes
-            + self.superblock_bytes
+            + self.system_configuration_bytes
     }
 
     fn block_layer_write_requests(&self) -> u64 {
@@ -917,7 +917,7 @@ fn solve_jia_publish_with_suppressed_fixed_points_and_tree_count(shape: PoolShap
         tree_table_bytes: (core.tree_table_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         root_slot_bytes: pbs,
-        superblock_bytes: SUPERBLOCK_SLOT_BYTES * DEVICE_COUNT,
+        system_configuration_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES * DEVICE_COUNT,
         write_calls: total_calls,
         barriers: 2 * DEVICE_COUNT,
         fua_count: 1,
@@ -967,7 +967,7 @@ mod jia_anchor_tests {
             assert_eq!(outcome.tree_table_bytes, 16384 * 2, "policy={policy:?}");
             assert_eq!(outcome.record_bytes, 4096 * 2, "policy={policy:?}");
             assert_eq!(outcome.root_slot_bytes, 512, "policy={policy:?}");
-            assert_eq!(outcome.superblock_bytes, 4096 * 2, "policy={policy:?}");
+            assert_eq!(outcome.system_configuration_bytes, 4096 * 2, "policy={policy:?}");
         }
     }
 
@@ -975,7 +975,7 @@ mod jia_anchor_tests {
     /// 分子（Q1.6）＝ extent、inode 两树的**非叶**节点 + 分配记录、记账、映射、树表四棵的**全部**脏节点 + 根槽；
     /// P=1 时 extent 树高 1（根就是叶），非叶节点为 0——`inode_container_bytes`（叶）与 `extent_bytes`（此格恒为叶）都不算进去。
     #[test]
-    fn ancestor_and_fixed_point_share_at_the_anchor_matches_the_literal_and_with_superblock_readings() {
+    fn ancestor_and_fixed_point_share_at_the_anchor_matches_the_literal_and_with_system_configuration_readings() {
         let outcome = solve_jia_publish(shape_at(1, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced));
         assert_eq!(outcome.extent_layers.len(), 1, "P=1 时 extent 树高 1，根即叶，非叶节点为 0");
         let literal_numerator = outcome.ancestor_and_fixed_point_share_numerator_bytes();
@@ -983,8 +983,8 @@ mod jia_anchor_tests {
         assert_eq!(literal_numerator, 164_352);
         let share = literal_numerator as f64 / total as f64;
         assert!((share - 0.476_968_796).abs() < 1e-6, "share={share}");
-        let with_superblock = (literal_numerator + outcome.superblock_bytes) as f64 / total as f64;
-        assert!((with_superblock - 0.500_742_942).abs() < 1e-6, "with_superblock={with_superblock}");
+        let with_system_configuration = (literal_numerator + outcome.system_configuration_bytes) as f64 / total as f64;
+        assert!((with_system_configuration - 0.500_742_942).abs() < 1e-6, "with_superblock={with_system_configuration}");
     }
 
     /// B7（第七节 7.2）：甲，P=145、F1、seq、主几何 —— extent 树长到 2 层，其余树层数与 P=1 相同，
@@ -1147,7 +1147,7 @@ struct WriteAheadLogCheckpointOutcome {
     tree_table_bytes: u64,
     record_bytes: u64,
     root_slot_bytes: u64,
-    superblock_bytes: u64,
+    system_configuration_bytes: u64,
     write_calls: u64,
     barriers: u64,
     fua_count: u64,
@@ -1165,7 +1165,7 @@ impl WriteAheadLogCheckpointOutcome {
             + self.tree_table_bytes
             + self.record_bytes
             + self.root_slot_bytes
-            + self.superblock_bytes
+            + self.system_configuration_bytes
     }
 }
 
@@ -1239,7 +1239,7 @@ fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, int
         tree_table_bytes: (core.tree_table_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         root_slot_bytes: pbs,
-        superblock_bytes: SUPERBLOCK_SLOT_BYTES * DEVICE_COUNT,
+        system_configuration_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES * DEVICE_COUNT,
         write_calls: total_calls,
         barriers: 2 * DEVICE_COUNT,
         fua_count: 1,
@@ -1946,7 +1946,7 @@ fn main() {
     println!(
         "{}",
         emitter.emit_raw(&format!(
-            "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} superblock_slot_bytes={SUPERBLOCK_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} effective_dirty_data_budget_bytes={EFFECTIVE_DIRTY_DATA_BUDGET_BYTES} model=counting file_ops=0",
+            "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} superblock_slot_bytes={SYSTEM_CONFIGURATION_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} effective_dirty_data_budget_bytes={EFFECTIVE_DIRTY_DATA_BUDGET_BYTES} model=counting file_ops=0",
             default_ring_in_flight_limit()
         ))
     );

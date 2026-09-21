@@ -1,0 +1,143 @@
+warning: variants `Lying`, `TornError`, and `TornSilent` are never constructed
+  --> crates/singlefs-harness/tests/c381r2_probe_common.rs:55:5
+   |
+51 | pub enum Fault {
+   |          ----- variants in this enum
+...
+55 |     Lying,
+   |     ^^^^^
+56 |     /// 前半落盘、后半不落，然后报错（撕裂 + 报错）。
+57 |     TornError,
+   |     ^^^^^^^^^
+58 |     /// 前半落盘、后半不落，返回成功（撕裂而设备不说：写不做原子性承诺的那一形）。
+59 |     TornSilent,
+   |     ^^^^^^^^^^
+   |
+   = note: `Fault` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `plus_empty_publishes` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:352:8
+    |
+352 | pub fn plus_empty_publishes(base: &Snapshot, count: u64, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `remounted` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:422:8
+    |
+422 | pub fn remounted(base: &Snapshot, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^
+
+warning: function `rolled_back` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:449:8
+    |
+449 | pub fn rolled_back(base: &Snapshot, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^
+
+warning: function `floor_raised` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:503:8
+    |
+503 | pub fn floor_raised(base: &Snapshot, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^^
+
+warning: variants `Retry`, `Empty`, and `Other` are never constructed
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:561:5
+    |
+559 | pub enum Action {
+    |          ------ variants in this enum
+560 |     /// 原样重发上一次失败的内容（从调用方手里的现行版）。
+561 |     Retry,
+    |     ^^^^^
+562 |     /// 从现行版发一次空发布。
+563 |     Empty,
+    |     ^^^^^
+564 |     /// 从现行版发一次内容不同的覆盖写。
+565 |     Other,
+    |     ^^^^^
+    |
+    = note: `Action` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: constant `ACTIONS` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:569:11
+    |
+569 | pub const ACTIONS: [Action; 4] = [Action::Retry, Action::Empty, Action::Other, Action::Remount];
+    |           ^^^^^^^
+
+warning: function `writes_of_c` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:981:8
+    |
+981 | pub fn writes_of_c(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<(u32, u64, usize)> {
+    |        ^^^^^^^^^^^
+
+warning: function `sweep` is never used
+    --> crates/singlefs-harness/tests/c381r2_probe_common.rs:1051:8
+     |
+1051 | pub fn sweep<T: Send, F: Fn(&MakeFilesystemParameters, usize) -> T + Sync>(
+     |        ^^^^^
+
+warning: `singlefs-harness` (test "c381r2_fullpool") generated 9 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/c381r2_fullpool.rs (target/release/deps/c381r2_fullpool-2741b5bc1ab179d8)
+
+running 2 tests
+test arms_on_a_nearly_full_pool ... --- 44 次覆盖写：base + 44 次覆盖写；C 是 txg 49（根落区域 1）
+  [甲] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 48) after红=1
+  [甲] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 48) after红=1
+  [甲] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [丙] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 48) after红=1
+  [丙] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 48) after红=1
+  [丙] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [戊-A] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 48，新实例 2，现行 txg 50)", "重发在飞 checkpoint ok(txg 51)"] remount=ok(chosen 51) after红=1
+  [戊-A] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 1) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 48，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-A] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 48，新实例 2，现行 txg 50)", "重发在飞 checkpoint ok(txg 51)"] remount=ok(chosen 51) after红=1
+  [戊-B] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 1) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 48，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+--- 45 次覆盖写：base + 45 次覆盖写；C 是 txg 50（根落区域 2）
+  [甲] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [甲] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [甲] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [丙] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [丙] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 49) after红=1
+  [丙] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [戊-A] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-A] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-A] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 49，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+--- 46 次覆盖写：base + 46 次覆盖写；C 是 txg 51（根落区域 0）
+  [甲] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [甲] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [甲] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 51) after红=1
+  [丙] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [丙] C 第18次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 50) after红=1
+  [丙] C 第19次写瞬时错：分类=没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 51) after红=1
+  [戊-A] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-A] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+  [戊-A] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 51，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+  [戊-B] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 52)", "重发在飞 checkpoint ok(txg 53)"] remount=ok(chosen 53) after红=1
+  [戊-B] C 第18次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 50，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+  [戊-B] C 第19次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 51，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+--- 47 次覆盖写：base + 47 次覆盖写；C 是 txg 52（根落区域 1）
+  [甲] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 51) after红=1
+  [甲] C 第18次写瞬时错：分类=挂不上+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [甲] C 第19次写瞬时错：分类=挂不上+没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [丙] C 第16次写瞬时错：分类=红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=ok(chosen 51) after红=1
+  [丙] C 第18次写瞬时错：分类=挂不上+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [丙] C 第19次写瞬时错：分类=挂不上+没确认的那一版+红 切换=0 只读=false 实例=1 steps=["C err(BlockDevice)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [戊-A] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 51，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+  [戊-A] C 第18次写瞬时错：分类=挂不上+红+转只读 切换=3 只读=true 实例=1 steps=["C err(BlockDevice)", "探针写(盘 1) 过", "切换#1 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 1) 过", "切换#2 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 1) 过", "切换#3 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 1) 过", "连续切换越过 N_switch = 3 → 转只读"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [戊-A] C 第19次写瞬时错：分类=挂不上+没确认的那一版+红+转只读 切换=3 只读=true 实例=1 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 0) 过", "切换#2 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 0) 过", "切换#3 挂载失败(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)", "探针写(盘 0) 过", "连续切换越过 N_switch = 3 → 转只读"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [戊-B] C 第16次写瞬时错：分类=红 切换=1 只读=false 实例=2 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 51，新实例 2，现行 txg 53)", "重发在飞 checkpoint ok(txg 54)"] remount=ok(chosen 54) after红=1
+  [戊-B] C 第18次写瞬时错：分类=挂不上+红+转只读 切换=3 只读=true 实例=1 steps=["C err(BlockDevice)", "探针写(盘 1) 过", "切换#1 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 1) 过", "切换#2 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 1) 过", "切换#3 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 1) 过", "连续切换越过 N_switch = 3 → 转只读"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+  [戊-B] C 第19次写瞬时错：分类=挂不上+没确认的那一版+红+转只读 切换=3 只读=true 实例=1 steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 0) 过", "切换#2 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 0) 过", "切换#3 挂载失败(WarmUpAdmissionRefusedBeforeAcquisition { instance_to_acquir)", "探针写(盘 0) 过", "连续切换越过 N_switch = 3 → 转只读"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed after红=1
+ok
+test how_many_overwrites_until_the_mount_is_refused ... 45 次覆盖写之后：steps=["C ok(txg 50)", "重开 ok(所选根 50)"] remount=ok(chosen 52)
+46 次覆盖写之后：steps=["C ok(txg 51)", "重开 ok(所选根 51)"] remount=ok(chosen 53)
+47 次覆盖写之后：steps=["C ok(txg 52)", "重开 err(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed
+48 次覆盖写之后：steps=["C err(AllocationRecordsExceedOneNode)", "重开 err(RowPublishAdmissionRefusedBeforeAcquisition { instance_to_ac)"] remount=REFUSED RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(2), cause: AllocationRecordsExceed
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.74s
+

@@ -40,7 +40,7 @@
 ### 实测（2026-09-03，纯计数，N=5 轮逐字节一致，12 单测 / 10 条变异全抓 + 2 条等价变异留档）
 
 **口径与复跑**：代码 `research/e7-index-bench/src/bin/e99_writebuffer_sequence.rs`，
-产物 `research/results/e99-writebuffer-seq-2026-09-03.out`（37 行，收尾 `emitted=37`），
+产物 `e99-writebuffer-seq-2026-09-03.out`（37 行，收尾 `emitted=37`），
 变异表 `research/mutations/e99_writebuffer_sequence.tsv`，已挂 `research/scripts/replay.sh`。
 
 #### 判据 1 + 5：**8 字节装不下，12 字节才够**

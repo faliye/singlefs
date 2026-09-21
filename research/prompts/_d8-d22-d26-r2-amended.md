@@ -11,7 +11,7 @@
 |---|---|---|
 | E98（inode 记录与 inode 树的几何） | 11 / 8 全抓 | `research/results/e98-inode-record-2026-09-03.out` |
 | E99（write buffer 条目与 seq 的去重） | 9 / 6 全抓（另 1 条等价变异留档） | `research/results/e99-writebuffer-seq-2026-09-03.out` |
-| E100（超级块的三段几何） | 8 / 6 全抓 | `research/results/e100-superblock-slot-2026-09-03.out` |
+| E100（超级块的三段几何） | 8 / 6 全抓 | `research/results/e100-system-configuration-slot-2026-09-03.out` |
 | E101（节点头留位的代价与表达力） | 7 / 5 全抓 | `research/results/e101-node-tag-reserve-2026-09-03.out` |
 
 ---

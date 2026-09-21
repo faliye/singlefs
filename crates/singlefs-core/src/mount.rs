@@ -9,11 +9,11 @@ use crate::block_device::BlockDevice;
 use crate::journal::back_chain_of;
 use crate::make_filesystem::MakeFilesystemParameters;
 use crate::recovery::{
-    allocation_records_under_root, choose_root, choose_superblock, effective_rollback_floor,
-    highest_root_txg, instance_table_of_root, readable_roots, rebuild_version, replay_journal,
-    rollback_high_water_of_root, scan_journal, tree_table_has_no_entries,
-    user_visible_tree_root_pointers, JournalScanReport, RebuildVersionFailure, RebuiltVersion,
-    RecoveryFailure, UserVisibleTreeRootPointers,
+    allocation_records_under_root, choose_root, choose_system_configuration,
+    effective_rollback_floor, highest_root_txg, instance_table_of_root, readable_roots,
+    rebuild_version, replay_journal, rollback_high_water_of_root, scan_journal,
+    tree_table_has_no_entries, user_visible_tree_root_pointers, JournalScanReport,
+    RebuildVersionFailure, RebuiltVersion, RecoveryFailure, UserVisibleTreeRootPointers,
 };
 use crate::root_record::RootRecord;
 use crate::root_ring::target_for_publish;
@@ -264,7 +264,7 @@ struct InstanceStart {
 /// （D23（journal 的角色与格式） 已定项 14 第 3 条）。
 fn first_txg_of_new_instance<Device: BlockDevice>(
     devices: &[(DeviceIdentity, Device)],
-    superblock: &crate::superblock::Superblock,
+    system_configuration: &crate::system_configuration::SystemConfiguration,
     records: &std::collections::BTreeMap<(InstanceGeneration, u64), crate::journal::JournalRecord>,
 ) -> CheckpointTxg {
     let highest_record_txg = records
@@ -274,9 +274,9 @@ fn first_txg_of_new_instance<Device: BlockDevice>(
         .unwrap_or(CheckpointTxg(0));
     let highest_ring_txg = highest_root_txg(
         devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     )
     .unwrap_or(CheckpointTxg(0));
     CheckpointTxg(highest_ring_txg.max(highest_record_txg).0 + 1)
@@ -376,7 +376,7 @@ fn isolate_slots_referenced_only_by_abandoned_roots<Device: BlockDevice>(
 )]
 fn rebuilt_allocator<Device: BlockDevice>(
     devices: &Vec<(DeviceIdentity, Device)>,
-    superblock: &crate::superblock::Superblock,
+    system_configuration: &crate::system_configuration::SystemConfiguration,
     previous: &PreviousVersion,
     extra_abandoned: &dyn Fn(&RootRecord) -> bool,
     shadow_ledger: ShadowLedger,
@@ -394,17 +394,17 @@ fn rebuilt_allocator<Device: BlockDevice>(
     let current_records = allocator.records().to_vec();
     let effective_floor = effective_rollback_floor(
         devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
     let roots = readable_roots(
         devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
-    let newest_table = choose_root(devices, superblock)
+    let newest_table = choose_root(devices, system_configuration)
         .and_then(|newest| instance_table_of_root(devices, &newest));
     let is_abandoned = |root: &RootRecord| {
         extra_abandoned(root)
@@ -505,15 +505,15 @@ pub fn user_visible_trees_changed(
 )]
 pub fn rollback_floor_ceiling<Device: BlockDevice>(
     devices: &Vec<(DeviceIdentity, Device)>,
-    superblock: &crate::superblock::Superblock,
+    system_configuration: &crate::system_configuration::SystemConfiguration,
     current_floor: CheckpointTxg,
     table: &InstanceTableRecords,
 ) -> Result<CheckpointTxg, MountError> {
     let readable = readable_roots(
         devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
     let valid: Vec<RootRecord> = readable
         .iter()
@@ -524,7 +524,7 @@ pub fn rollback_floor_ceiling<Device: BlockDevice>(
     let mut newest_per_device: std::collections::BTreeMap<DeviceIdentity, CheckpointTxg> =
         std::collections::BTreeMap::new();
     for root in &valid {
-        let device = superblock.region_devices
+        let device = system_configuration.immutable.region_devices
             [usize::try_from(target_for_publish(root.checkpoint_txg).region).expect("区域号")];
         let newest = newest_per_device
             .entry(device)
@@ -614,7 +614,7 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
     new_floor: CheckpointTxg,
     shadow_ledger: ShadowLedger,
 ) -> Result<RaisedFloor, MountError> {
-    let superblock = choose_superblock(&*devices)?;
+    let system_configuration = choose_system_configuration(&*devices)?;
     let instance_table_unit = current
         .units
         .iter()
@@ -622,8 +622,12 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
         .ok_or(MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion)?;
     let table = InstanceTableRecords::parse(&instance_table_unit.bytes)
         .ok_or(MountError::InstanceTableMalformed)?;
-    let ceiling =
-        rollback_floor_ceiling(devices, &superblock, current.root.rollback_floor, &table)?;
+    let ceiling = rollback_floor_ceiling(
+        devices,
+        &system_configuration,
+        current.root.rollback_floor,
+        &table,
+    )?;
     if new_floor > ceiling {
         return Err(MountError::RollbackFloorAboveCeiling {
             requested: new_floor,
@@ -641,9 +645,9 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
     // 落满每块盘之后再放开。记账按写那条根的那一刻的 F 算还是按它持久之后的 F_生效 算，口径交 alloc-basis 那一轮（预想）。
     let oldest_valid_root = readable_roots(
         devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     )
     .into_iter()
     .filter(|root| !abandoned_by_table(root, &table))
@@ -654,9 +658,9 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
     let abandoned_roots_unreadable = if shadow_ledger == ShadowLedger::On {
         let roots = readable_roots(
             devices,
-            &superblock.region_devices,
-            &superblock.geometry,
-            &superblock.filesystem_identifier,
+            &system_configuration.immutable.region_devices,
+            &system_configuration.immutable.sizes,
+            &system_configuration.immutable.filesystem_identifier,
         );
         isolate_slots_referenced_only_by_abandoned_roots(
             devices,
@@ -1109,13 +1113,14 @@ pub fn mount_writable<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
     devices: &mut Vec<(DeviceIdentity, Device)>,
 ) -> Result<Mounted, MountError> {
-    let superblock = choose_superblock(&*devices)?;
-    let chosen_root = choose_root(&*devices, &superblock).ok_or(RecoveryFailure::NoValidRoot)?;
-    let records = scan_journal(&*devices, &superblock);
+    let system_configuration = choose_system_configuration(&*devices)?;
+    let chosen_root =
+        choose_root(&*devices, &system_configuration).ok_or(RecoveryFailure::NoValidRoot)?;
+    let records = scan_journal(&*devices, &system_configuration);
     let (journal, effective_root) = replay_journal(
         &*devices,
         &chosen_root,
-        superblock.geometry.journal_ring_bytes,
+        system_configuration.immutable.sizes.journal_ring_bytes,
         &records,
         true,
         rollback_high_water_of_root(&*devices, &chosen_root),
@@ -1138,10 +1143,10 @@ pub fn mount_writable<Device: BlockDevice>(
         .max()
         .unwrap_or(0)
         + 1;
-    let first_txg = first_txg_of_new_instance(devices, &superblock, &records);
+    let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
     let rebuilt = rebuilt_allocator(
         devices,
-        &superblock,
+        &system_configuration,
         &previous,
         &|_| false,
         ShadowLedger::On,
@@ -1188,14 +1193,15 @@ pub fn mount_rollback<Device: BlockDevice>(
     target: RollbackTarget,
     shadow_ledger: ShadowLedger,
 ) -> Result<Mounted, MountError> {
-    let superblock = choose_superblock(&*devices)?;
-    let newest_root = choose_root(&*devices, &superblock).ok_or(RecoveryFailure::NoValidRoot)?;
-    let records = scan_journal(&*devices, &superblock);
+    let system_configuration = choose_system_configuration(&*devices)?;
+    let newest_root =
+        choose_root(&*devices, &system_configuration).ok_or(RecoveryFailure::NoValidRoot)?;
+    let records = scan_journal(&*devices, &system_configuration);
     let roots = readable_roots(
         &*devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
     let target_root = roots
         .iter()
@@ -1213,9 +1219,9 @@ pub fn mount_rollback<Device: BlockDevice>(
     // txg ≥ F_生效（各幸存盘所带 F 最大值的最小值），不是最新根自己带的 F（步 4 / 步 5 代码三方第一轮正推腿判「窄化」）。
     let effective_floor = effective_rollback_floor(
         &*devices,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     );
     if target.checkpoint_txg < effective_floor {
         return Err(MountError::RollbackTargetNotACandidate {
@@ -1267,7 +1273,7 @@ pub fn mount_rollback<Device: BlockDevice>(
         verification_failed: 0,
         maximum_applied_transaction: 0,
     };
-    let first_txg = first_txg_of_new_instance(devices, &superblock, &records);
+    let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
     // 影子账：这次回退新抛弃的根 = 根环里 (txg, 实例) 大于 R_old 的每一条可读根；只被它们引用的槽隔离，
     // 连同按实例表早已被抛弃的根一起在重建里算。
     let newly_abandoned = |root: &RootRecord| {
@@ -1279,7 +1285,7 @@ pub fn mount_rollback<Device: BlockDevice>(
         abandoned_roots_unreadable,
     } = rebuilt_allocator(
         devices,
-        &superblock,
+        &system_configuration,
         &previous,
         &newly_abandoned,
         shadow_ledger,

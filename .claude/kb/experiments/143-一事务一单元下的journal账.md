@@ -14,8 +14,8 @@ cd research && bash scripts/replay.sh E143
 cd research && cargo run --release --bin e143-one-unit-per-txn-journal
 ```
 
-代码 `research/e7-index-bench/src/bin/e143_one_unit_per_transaction_journal.rs`，原始输出 `research/results/e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
-跑前登记 `research/prompts/e143-preregistration.md`，变异表 `research/mutations/e143_one_unit_per_transaction_journal.tsv`。
+代码 `research/e7-index-bench/src/bin/e143_one_unit_per_transaction_journal.rs`，原始输出 `e143-one-unit-per-txn-journal-2026-09-13.out`（34 行，末行 `emitted=34`），
+跑前登记 `e143-preregistration.md`，变异表 `research/mutations/e143_one_unit_per_transaction_journal.tsv`。
 
 ### 这是纯算术，不是测量
 

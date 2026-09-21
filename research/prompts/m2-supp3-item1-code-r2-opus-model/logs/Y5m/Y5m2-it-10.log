@@ -1,9 +1,0 @@
-    Finished `release` profile [optimized + debuginfo] target(s) in 0.01s
-     Running tests/second_transaction_step_zero_layer0.rs (target/release/deps/second_transaction_step_zero_layer0-e03819fd0ad18a91)
-
-running 2 tests
-test every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_root_claims ... ok
-test one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_order_as_one_slice_on_one_thread ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 3.97s
-

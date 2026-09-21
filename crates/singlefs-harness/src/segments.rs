@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use singlefs_format::{JOURNAL_RING_START_SLOT, SLOT_BYTES, SUPERBLOCK_SLOTS_PER_DEVICE};
+use singlefs_format::{JOURNAL_RING_START_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE};
 
 use crate::{RecordedOperation, RecordedOperationKind};
 use singlefs_core::root_ring::{region_start, ring_end};
@@ -17,7 +17,7 @@ pub enum StepKind {
     UnitWrite,
     JournalRecord,
     RootRecordFua,
-    SuperblockSlot,
+    SystemConfigurationSlot,
     Barrier,
 }
 
@@ -28,7 +28,7 @@ impl StepKind {
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
-            StepKind::SuperblockSlot => "superblock_slot",
+            StepKind::SystemConfigurationSlot => "superblock_slot",
             StepKind::Barrier => "barrier",
         }
     }
@@ -48,12 +48,12 @@ impl FixedGeometry {
             RecordedOperationKind::Barrier => StepKind::Barrier,
             RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
                 let offset = operation.offset.0;
-                let superblock_end =
-                    SUPERBLOCK_SLOTS_PER_DEVICE * u64::from(self.fixed_structure_slot_spacing);
+                let system_configuration_end = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+                    * u64::from(self.fixed_structure_slot_spacing);
                 let journal_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
                 let journal_end = journal_start + self.journal_ring_bytes;
-                if offset < superblock_end {
-                    StepKind::SuperblockSlot
+                if offset < system_configuration_end {
+                    StepKind::SystemConfigurationSlot
                 } else if offset >= region_start(0).0
                     && offset < ring_end(self.fixed_structure_slot_spacing)
                 {
@@ -186,7 +186,7 @@ mod tests {
         };
         assert_eq!(
             geometry.classify(&operation(RecordedOperationKind::Write, 4096)),
-            StepKind::SuperblockSlot
+            StepKind::SystemConfigurationSlot
         );
         assert_eq!(
             geometry.classify(&operation(

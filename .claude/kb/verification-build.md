@@ -238,8 +238,8 @@ C26（屏障数从没量过）（真机屏障计数）、C16（管道声明失�
 
 ### 三方对抗（2026-09-03）
 
-背景材料 `research/prompts/_verification-build-background.md`（16 条现查事实 + 6 条提案），三条腿立场各不相同，
-提示与输出在 `research/prompts/verification-build-*.md` 与 `research/results/verification-build-local.out`；
+背景材料 `_verification-build-background.md`（16 条现查事实 + 6 条提案），三条腿立场各不相同，
+提示与输出在 `research/prompts/verification-build-*.md` 与 `verification-build-local.out`；
 本地腿字词损坏闸判绿（退出码 0）。
 
 | 腿 | 判定性产出 |

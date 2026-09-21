@@ -1,9 +1,0 @@
-C161R2 name=A_u1 workload=generic arm=bing depth_limit=12 states=198109 stale=- undefined=- stale_after_tie=- u2_recovered_content=- g1_restructure_changed_read=- g2_buffer_key_out_of_range=- g3_second_writer=-
-C161R2 name=E_detector workload=generic arm=bing durable_images=851 with_duplicate_keys=0 seq:agree=0,tie=0,disagree=0 txg_seq:agree=0,tie=0,disagree=0 first_seq_tie=- first_seq_disagree=- first_txg_seq_tie=- first_txg_seq_disagree=-
-C161R2 name=A_u1 workload=generic arm=bing+N4 depth_limit=8 states=48965 stale=2:fe_put_b,direct_put_b|READ('b') undefined=- stale_after_tie=- u2_recovered_content=- g1_restructure_changed_read=- g2_buffer_key_out_of_range=- g3_second_writer=2:direct_put_b,publish
-C161R2 name=E_detector workload=generic arm=bing+N4 durable_images=644 with_duplicate_keys=0 seq:agree=0,tie=0,disagree=0 txg_seq:agree=0,tie=0,disagree=0 first_seq_tie=- first_seq_disagree=- first_txg_seq_tie=- first_txg_seq_disagree=-
-C161R2 name=A_u1 workload=accounting_K2 arm=bing depth_limit=15 states=174699 stale=- undefined=- stale_after_tie=- u2_recovered_content=- g1_restructure_changed_read=- g2_buffer_key_out_of_range=- g3_second_writer=-
-C161R2 name=E_detector workload=accounting_K2 arm=bing durable_images=6869 with_duplicate_keys=0 seq:agree=0,tie=0,disagree=0 txg_seq:agree=0,tie=0,disagree=0 first_seq_tie=- first_seq_disagree=- first_txg_seq_tie=- first_txg_seq_disagree=-
-C161R2 name=A_u1 workload=accounting_K3 arm=bing depth_limit=15 states=148303 stale=- undefined=- stale_after_tie=- u2_recovered_content=- g1_restructure_changed_read=- g2_buffer_key_out_of_range=- g3_second_writer=-
-C161R2 name=E_detector workload=accounting_K3 arm=bing durable_images=5949 with_duplicate_keys=0 seq:agree=0,tie=0,disagree=0 txg_seq:agree=0,tie=0,disagree=0 first_seq_tie=- first_seq_disagree=- first_txg_seq_tie=- first_txg_seq_disagree=-
-emitted=8

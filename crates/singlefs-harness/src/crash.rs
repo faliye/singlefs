@@ -166,6 +166,15 @@ impl MemoryPool {
             device_size_in_bytes,
         }
     }
+    /// 把写表里的若干次写按次序施加上去（崩溃注入建「更早的段整段持久」那份基线用；与 [`Self::apply`] 同一条落盘路）。
+    pub fn apply_writes(&mut self, writes: &[RetainedWrite]) {
+        for write in writes {
+            self.devices
+                .get_mut(&write.device)
+                .expect("写表里的写都落在池里的盘上")
+                .write(write.offset, &write.bytes);
+        }
+    }
     /// 把一段录制流按次序整个施加上去（屏障不改镜像）。
     pub fn apply(&mut self, operations: &[RetainedOperation]) {
         for retained in operations {
@@ -307,10 +316,23 @@ pub fn writes_and_segments(
     operations: &[RetainedOperation],
     geometry: &FixedGeometry,
 ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+    let (writes, segments, _stream_indexes) =
+        writes_and_segments_with_stream_indexes(operations, geometry);
+    (writes, segments)
+}
+
+/// 同上，再交回写表每一项在录制流里的下标：崩溃注入（增补 3 第 3 件）按它把一个崩溃状态落回历史的哪一步。
+/// 切段只有这一份实现，两个调用方不各切一遍。
+#[must_use]
+pub fn writes_and_segments_with_stream_indexes(
+    operations: &[RetainedOperation],
+    geometry: &FixedGeometry,
+) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, Vec<usize>) {
     let mut writes: Vec<RetainedWrite> = Vec::new();
+    let mut stream_indexes: Vec<usize> = Vec::new();
     let mut segments: Vec<Vec<usize>> = Vec::new();
     let mut current: Vec<usize> = Vec::new();
-    for retained in operations {
+    for (stream_index, retained) in operations.iter().enumerate() {
         match retained.operation.kind {
             RecordedOperationKind::Barrier => {
                 if !current.is_empty() {
@@ -329,6 +351,7 @@ pub fn writes_and_segments(
                         .clone()
                         .expect("崩溃点重放要开了内容保留的录制流"),
                 });
+                stream_indexes.push(stream_index);
                 current.push(writes.len() - 1);
                 if retained.operation.kind == RecordedOperationKind::WriteForceUnitAccess {
                     segments.push(std::mem::take(&mut current));
@@ -339,7 +362,7 @@ pub fn writes_and_segments(
     if !current.is_empty() {
         segments.push(current);
     }
-    (writes, segments)
+    (writes, segments, stream_indexes)
 }
 
 /// E77（发布的持久顺序） 的闭式：1 + Σ(2^|段| − 1)。
@@ -469,7 +492,7 @@ fn publishes_in(writes: &[RetainedWrite]) -> Vec<PublishWrites> {
                     checkpoint_txg: checkpoint_txg.0,
                 });
             }
-            StepKind::SuperblockSlot | StepKind::Barrier => {}
+            StepKind::SystemConfigurationSlot | StepKind::Barrier => {}
         }
     }
     publishes
@@ -483,27 +506,58 @@ pub fn check_records(
     image: &CrashImage<'_>,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
+    check_records_against(image, image.writes, effective_root)
+}
+
+/// 同一条判据，读盘的口子与被核的记录流分开给：崩溃注入（增补 3 第 3 件）读的是「更早的段整段持久 + 当前段一个子集」
+/// 那份镜像（`reader`），而要核的记录流是到当前段为止的整条前缀（`writes`）——两者的写表不是同一张，层 0 那一路两张是同一张。
+///
+/// 两处只在随机历史上才遇得到的限定（固定脚本上逐状态相同，层 0 的计数不变）：
+/// 一次发布一条 journal 记录都没写过时不判「根在而记录一条都不在」（记录流本来就是空的，不是有洞）；
+/// 一份单元副本在这条记录流后面又被别的写盖过时，它不在盘上算不得缺席（那是合法的复用：位置让给了后来的写，
+/// 旧字节本来就不该还在）——一次发布的某个单元要全部副本都「不在而且没被盖过」，才算「两份都不在」。
+#[must_use]
+pub fn check_records_against(
+    reader: &dyn PoolReader,
+    writes: &[RetainedWrite],
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+) -> RecordCheck {
     let in_place = |index: usize| {
-        let write = &image.writes[index];
-        PoolReader::read(image, write.device, write.offset, write.bytes.len())
+        let write = &writes[index];
+        reader
+            .read(write.device, write.offset, write.bytes.len())
             .is_some_and(|bytes| bytes == write.bytes)
     };
+    let written_over_later = |index: usize| {
+        let write = &writes[index];
+        let start = write.offset.0;
+        let end = start + u64::try_from(write.bytes.len()).expect("写长");
+        writes[index + 1..].iter().any(|later| {
+            let later_start = later.offset.0;
+            let later_end = later_start + u64::try_from(later.bytes.len()).expect("写长");
+            later.device == write.device && later_start < end && start < later_end
+        })
+    };
+    let copy_is_missing = |copy: usize| !in_place(copy) && !written_over_later(copy);
     let mut check = RecordCheck::default();
-    for publish in publishes_in(image.writes) {
-        if in_place(publish.root) && !publish.records.iter().any(|record| in_place(*record)) {
+    for publish in publishes_in(writes) {
+        if !publish.records.is_empty()
+            && in_place(publish.root)
+            && !publish.records.iter().any(|record| in_place(*record))
+        {
             check.root_without_record = true;
         }
         if effective_root.is_some_and(|(_, txg)| txg.0 >= publish.checkpoint_txg) {
             let mut copies_by_offset: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
             for unit in &publish.units {
                 copies_by_offset
-                    .entry(image.writes[*unit].offset.0)
+                    .entry(writes[*unit].offset.0)
                     .or_default()
                     .push(*unit);
             }
             if copies_by_offset
                 .values()
-                .any(|copies| !copies.iter().any(|copy| in_place(*copy)))
+                .any(|copies| copies.iter().all(|copy| copy_is_missing(*copy)))
             {
                 check.claimed_state_missing_unit = true;
             }
@@ -707,6 +761,22 @@ pub fn oracle_violation_for_versions(
     }
 }
 
+/// 这个持久集合把一次发布截在了它的根落盘之前：那次发布的单元写或记录写至少有一次已持久，而它的根槽写没持久。
+#[must_use]
+pub fn some_publish_persisted_without_its_root(
+    writes: &[RetainedWrite],
+    persisted: &[bool],
+) -> bool {
+    publishes_in(writes).iter().any(|publish| {
+        !persisted[publish.root]
+            && publish
+                .units
+                .iter()
+                .chain(publish.records.iter())
+                .any(|write| persisted[*write])
+    })
+}
+
 /// 这一状态里持久了的根槽写中最新的那一条，按 (txg, 实例) 字典序取（D22（单元原子性怎么合成） 已定项 7 的择新序）。
 #[must_use]
 pub fn newest_persisted_root(
@@ -732,14 +802,23 @@ fn root_identity_of_write(write: &RetainedWrite) -> (InstanceGeneration, Checkpo
         StepKind::RootRecordFua,
         "被判的那条写要是根槽 FUA 写"
     );
+    root_identity_written_by(&write.bytes)
+}
+
+/// 一次落在根环里的写写下的根身份：实例代号在偏移 24（4 字节）、checkpoint_txg 在偏移 28（8 字节）。
+/// 崩溃注入（增补 3 第 3 件）拿它从截断了的录制流里数「盘上已持久的最新根槽」，写表与层 0 那一份不共用
+/// （那一份要整条流的 `RetainedWrite`，这里只有录制流本身）。
+///
+/// # Panics
+/// 这次写短于 36 字节：落在根环里的写都是整条根记录，短了说明调用方分错了种类。
+#[must_use]
+pub fn root_identity_written_by(bytes: &[u8]) -> (InstanceGeneration, CheckpointTxg) {
     (
         InstanceGeneration(u32::from_le_bytes(
-            write.bytes[24..28]
-                .try_into()
-                .expect("根记录的实例代号在偏移 24"),
+            bytes[24..28].try_into().expect("根记录的实例代号在偏移 24"),
         )),
         CheckpointTxg(u64::from_le_bytes(
-            write.bytes[28..36]
+            bytes[28..36]
                 .try_into()
                 .expect("根记录的 checkpoint_txg 在偏移 28"),
         )),

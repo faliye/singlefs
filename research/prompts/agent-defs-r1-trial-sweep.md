@@ -45,7 +45,7 @@ grep -rn 'expect("148")' . 2>/dev/null | grep -v "/\.git/"
 grep -rn "skip(24)" . 2>/dev/null | grep -v "/\.git/"
 grep -rn "len() *- *24\b" . 2>/dev/null | grep -v "/\.git/"
 ```
-命中的 `skip(24)`（`crates/singlefs-core/src/superblock.rs:136/142`、`research/e7-index-bench/.../e142_first_transaction_dry_run.rs:1274/1281`）核实后**都是超级块的两个不同字段**（"映射来源"/"整理三条水位"），恰好也是 24 字节，与树表条目无关——**同一个数、不同的量，不改**。树表条目自己的预留读写在 `crates/singlefs-core/src/records.rs:277`（`writer.skip(76)`）与 `records.rs:288`（`bytes[bytes.len() - 76..]`），已经是 76 且用 `bytes.len()` 现算，不是硬编码。`len() - 24` 字面串 0 处出现在真实代码里（只在规则文件与冻结材料的举例里）。
+命中的 `skip(24)`（`crates/singlefs-core/src/system_configuration.rs:136/142`、`research/e7-index-bench/.../e142_first_transaction_dry_run.rs:1274/1281`）核实后**都是超级块的两个不同字段**（"映射来源"/"整理三条水位"），恰好也是 24 字节，与树表条目无关——**同一个数、不同的量，不改**。树表条目自己的预留读写在 `crates/singlefs-core/src/records.rs:277`（`writer.skip(76)`）与 `records.rs:288`（`bytes[bytes.len() - 76..]`），已经是 76 且用 `bytes.len()` 现算，不是硬编码。`len() - 24` 字面串 0 处出现在真实代码里（只在规则文件与冻结材料的举例里）。
 
 ### 4. 下标（值−1，即 `[147]`）
 ```

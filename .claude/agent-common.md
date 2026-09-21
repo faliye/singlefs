@@ -19,6 +19,13 @@
   给人看的文字照 `.claude/singlefs-ai-sop/rules/writing-discipline.md`「说人话」一节；说外部状态之前现查（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md` 开头一节）。
 - 本机时钟是 UTC，人在东京（JST，UTC+9）；报告里的时刻写清是哪个时区。
 - 派发提示里没给、定义里也没写的项目事实（某份 kb 在哪、某条决策的原文），去仓里现查，不凭印象补。
+- **找不到历史实验的数据、提示或产物，去 `git log` 里看。** 上一轮及更早的实验记录不留在工作区：
+  这一轮提交之后由下一次提交删掉上一次那批，本轮的留着（`.claude/gate.d/91-archive-past-rounds.sh` 判这一条）。
+  仓里因此有一批引用只写文件名、不写路径，那不是坏链接，是已经归档的东西。
+  查法：`git log --all --diff-filter=D --name-only -- "*<文件名>*"` 找到删它的那次提交，
+  `git show <提交>^:<路径>` 读当时的内容。**读到的是当时的数，不是今天的结论**——
+  拿它支撑新结论之前先重新跑一遍（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「所有旧数据都只是参考」）；
+  要推翻早先的结论，按 `.claude/rules/three-way-inference.md` 重走一轮，不是拿旧文件对质。
 
 ## 写
 

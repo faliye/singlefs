@@ -1,3 +1,0 @@
-S7 reclaimed=18 E data slot=50178
-S7 reuse-without-raising-F txg=15 inst=3 F_root=0 F_eff=0 acct_alloc=52 acct_free=211916 acct_defer=40 mem_alloc=52 mem_defer=40 mem_isolated=36 | I-2.1[树表单元 在盘 0 槽 50178 的那一份与位置条目里的校验和对不上] ; I-3.1[盘 0：记账的已分配 Some(851968)，遍历全部有效根得到 1196032] ; I-5.1[盘 0：树表单元（槽 50178 跨 1）与 数据单元（槽 50178）重叠]
-PROBE-COMPLETE

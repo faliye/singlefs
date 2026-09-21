@@ -81,7 +81,7 @@ const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 2 * NODE_POINTER_BYTES + 8 + 8;
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 /// 超级块字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——
 /// 自举头的写入者身份 20 与校验和算法标识 1、几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4，共 29。
-const SUPERBLOCK_BYTES: u64 = 481;
+const SYSTEM_CONFIGURATION_BYTES: u64 = 481;
 /// 头校验和 / 自证校验和的字段宽度（D18 已定项 7、D22 已定项 7、D23 已定项 4 同口径）。
 /// 算法由 D18（块里携带什么信息） 已定项 17 定（2026-09-13）：字段里放 CRC32C 4 字节 + 28 字节零。
 const WIDE_CHECKSUM_BYTES: u64 = 32;
@@ -96,12 +96,12 @@ const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
 const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;
 
 /// 字节表零：超级块槽 0 / 1 的设备内偏移。槽距 = 固定结构槽距 4096，与槽宽同值 ⇒ 两个槽首尾相接。
-const SUPERBLOCK_SLOT_OFFSETS: [u64; 2] = [0, 4096];
+const SYSTEM_CONFIGURATION_SLOT_OFFSETS: [u64; 2] = [0, 4096];
 /// D22（单元原子性怎么合成） 已定项 2 的槽宽那一格（2026-09-14 三方论证后按主 agent 推荐值写）：
 /// **超级块槽宽是格式常量 4096**，不再等于挂载时探测到的 `physical_block_size`。
 /// 整槽校验和罩这 4096 字节含补齐（D18（块里携带什么信息） 已定项 17），481 字节的字段表在槽里余 3615。
 /// ⚠️ 它只管超级块：根槽仍按判定宽度 512 写（字节表七）。
-const SUPERBLOCK_SLOT_BYTES: u64 = 4096;
+const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 字节表零：根环起点 1 MiB（槽 64）、P = 3、chunk = 1 MiB、每区 8 槽、槽距 4096（预想）。
 const RING_START_OFFSET: u64 = 1 << 20;
 const RING_PRIME_STEP: u64 = 3;
@@ -228,11 +228,11 @@ const EXTENSION_POINT_DECLARED_BYTES: u32 = 0;
 
 const UNIT_MAGIC: [u8; 4] = *b"SFSU";
 const ROOT_MAGIC: [u8; 4] = *b"SFSR";
-const SUPERBLOCK_MAGIC: [u8; 4] = *b"SFSB";
+const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
 /// D15 已定项 4：incompat 位 0 = 第一条纯 SSD 布局线，mkfs 起就置上；位图小端、位 0 是第一个字节的最低位。
 const INCOMPAT_FIRST_SSD_LINE_BIT: u8 = 0x01;
 /// 三张位图各 32 字节（256 位）紧跟 magic 4 + 版本 2，incompat 在前、compat_ro 居中、compat 在后（D15 已定项 1）。
-const SUPERBLOCK_FEATURE_BITS_OFFSET: usize = 4 + 2;
+const SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET: usize = 4 + 2;
 const FEATURE_BITMAP_BYTES: usize = 32;
 /// 读者认识的全部 incompat 位；多出任何一位就是「不认识不许挂」（fs-design 格式层判据）。
 const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_FIRST_SSD_LINE_BIT;
@@ -248,8 +248,8 @@ const FIRST_INODE_NUMBER: u64 = 1;
 const MKFS_INSTANCE_GENERATION: u32 = 0;
 const FIRST_INSTANCE_GENERATION: u32 = 1;
 /// D22（单元原子性怎么合成） 已定项 16：超级块槽世代号从 1 起、每写一次 +1，写世代号 g 的那一次落在槽 `g mod 2`。
-const SUPERBLOCK_GENERATION_AT_MKFS: u64 = 1;
-const SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION: u64 = 2;
+const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
+const SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION: u64 = 2;
 /// D16 已定项 8（暖机取甲′，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
 /// 第一版几何区域 1 / 2 分住两块盘 ⇒ 两次（txg 1、2），第一个事务从 txg 3 起。
 const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
@@ -640,7 +640,7 @@ enum StepKind {
     /// 根环槽的一次 FUA 写（D16（发布语义） 已定项 7：只有这一步等落盘才发下一条）。
     RootRecordFua,
     /// 超级块槽的一次写。
-    SuperblockSlot,
+    SystemConfigurationSlot,
 }
 
 impl StepKind {
@@ -650,14 +650,14 @@ impl StepKind {
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
-            StepKind::SuperblockSlot => "superblock_slot",
+            StepKind::SystemConfigurationSlot => "superblock_slot",
         }
     }
     /// FUA 由步骤种类决定，不再是调用点各传各的布尔：超级块槽写不可能是 FUA，这样它写不出来。
     fn is_fua(self) -> bool {
         match self {
             StepKind::RootRecordFua => true,
-            StepKind::UnitWrite | StepKind::JournalRecord | StepKind::SuperblockSlot => false,
+            StepKind::UnitWrite | StepKind::JournalRecord | StepKind::SystemConfigurationSlot => false,
         }
     }
 }
@@ -1332,7 +1332,7 @@ impl RootRecord {
 /// 2026-09-14 用户定案再加四个：自举头的写入者身份 20 与校验和算法标识 1、
 /// 几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4。
 #[derive(Clone, PartialEq, Eq, Debug)]
-struct Superblock {
+struct SystemConfiguration {
     fsid: [u8; 16],
     this_device: DeviceIdentity,
     device_count: u32,
@@ -1343,26 +1343,26 @@ struct Superblock {
 }
 
 /// magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 + 校验和算法标识 1 + 本盘设备号 4 + 设备数 4 + 槽世代号 8。
-const SUPERBLOCK_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
+const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
 /// fsid 住自举头里 magic 4 + 格式版本 2 + feature bits 96 之后。
-const SUPERBLOCK_FSID_OFFSET: usize = 4 + 2 + 96;
-const SUPERBLOCK_REGION_DEVICES_OFFSET: usize = 379;
-const SUPERBLOCK_TAIL_OFFSET: usize = 469;
+const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 4 + 2 + 96;
+const SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET: usize = 379;
+const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
 /// D2（RAID 条带策略） 已定项 19：固定结构槽距 = max(4096, mkfs 时探测的 io_min)，两个数各占超级块一个 4 字节字段。
 const FIXED_STRUCTURE_SLOT_SPACING: u32 = 4096;
 const MKFS_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
 /// D2（RAID 条带策略） 已定项 18：第一版超级块里 w_max 与 g 都写 4；g 挂载时按可写设备数夹取。
-const SUPERBLOCK_MAXIMUM_WIDTH: u8 = 4;
-const SUPERBLOCK_GROUP_SIZE: u8 = 4;
+const SYSTEM_CONFIGURATION_MAXIMUM_WIDTH: u8 = 4;
+const SYSTEM_CONFIGURATION_GROUP_SIZE: u8 = 4;
 
-impl Superblock {
+impl SystemConfiguration {
     fn to_slot(&self) -> Vec<u8> {
-        let mut writer = ByteWriter::new(SUPERBLOCK_SLOT_BYTES as usize);
-        writer.put(&SUPERBLOCK_MAGIC);
+        let mut writer = ByteWriter::new(SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+        writer.put(&SYSTEM_CONFIGURATION_MAGIC);
         writer.put_u16(FORMAT_VERSION);
         writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT); // feature bits：incompat 位 0 = 第一条纯 SSD 布局线（D15 已定项 4，2026-09-13 用户定案）
         writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
-        writer.assert_position(SUPERBLOCK_FSID_OFFSET as u64, "超级块 fsid");
+        writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "超级块 fsid");
         writer.put(&self.fsid);
         // 写入者身份（D22 已定项 9，2026-09-14 用户定案）：实现标识 16 字节 ASCII 零补齐 + 版本 4 字节。
         let mut writer_identity = [0u8; WRITER_IDENTITY_NAME_BYTES];
@@ -1373,7 +1373,7 @@ impl Superblock {
         writer.put_u32(self.this_device.0);
         writer.put_u32(self.device_count);
         writer.put_u64(self.slot_generation);
-        writer.assert_position(SUPERBLOCK_CHECKSUM_OFFSET as u64, "超级块整槽校验和");
+        writer.assert_position(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET as u64, "超级块整槽校验和");
         writer.skip(WIDE_CHECKSUM_BYTES as usize);
         writer.skip(16 + 12 + 4); // 超级块 MAC、nonce 水位、KDF 标识（4，D22 已定项 9）
         writer.put_u8(0); // 加密类型：关
@@ -1400,12 +1400,12 @@ impl Superblock {
         writer.put_u32(RING_PRIME_STEP as u32);
         writer.put_u32(RING_CHUNK_BYTES as u32);
         writer.put_u64(RING_START_OFFSET / SLOT_BYTES);
-        writer.assert_position(SUPERBLOCK_REGION_DEVICES_OFFSET as u64, "根环逐区域设备身份");
+        writer.assert_position(SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET as u64, "根环逐区域设备身份");
         for region_device in &self.region_devices {
             writer.put_u32(region_device.0);
         }
-        writer.put_u8(SUPERBLOCK_MAXIMUM_WIDTH);
-        writer.put_u8(SUPERBLOCK_GROUP_SIZE);
+        writer.put_u8(SYSTEM_CONFIGURATION_MAXIMUM_WIDTH);
+        writer.put_u8(SYSTEM_CONFIGURATION_GROUP_SIZE);
         writer.skip(24); // 映射来源
         // D22 已定项 15 加的三个几何字段，排在「映射来源」之后。
         writer.put_u64(UNIT_AREA_START_SLOT);
@@ -1414,28 +1414,28 @@ impl Superblock {
         writer.put_u32(5); // T_time 秒
         writer.put_u64(2 << 30); // T_dirty
         writer.skip(24); // 整理三条水位：第一版恒 0 = 内置默认（D22 已定项 15）
-        writer.assert_position(SUPERBLOCK_TAIL_OFFSET as u64, "journal tail");
+        writer.assert_position(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64, "journal tail");
         writer.put_u64(self.journal_tail);
         writer.put_u32(self.journal_instance.0);
-        writer.assert_position(SUPERBLOCK_BYTES, "超级块");
+        writer.assert_position(SYSTEM_CONFIGURATION_BYTES, "超级块");
         let mut bytes = writer.bytes;
         // 「整槽校验和」：覆盖整个 4096 槽含补齐、自身按 0 参与（D18 已定项 17）。
-        let digest = wide_checksum_with_field_zeroed(&bytes, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);
-        bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+        let digest = wide_checksum_with_field_zeroed(&bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
+        bytes[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
         bytes
     }
 
     fn parse_slot(bytes: &[u8]) -> Option<Self> {
-        if bytes[..4] != SUPERBLOCK_MAGIC {
+        if bytes[..4] != SYSTEM_CONFIGURATION_MAGIC {
             return None;
         }
-        if wide_checksum_with_field_zeroed(bytes, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET) != bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32] {
+        if wide_checksum_with_field_zeroed(bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET) != bytes[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32] {
             return None;
         }
         if !incompat_bits_are_mountable(bytes) {
             return None;
         }
-        let mut reader = ByteReader::at(bytes, SUPERBLOCK_FSID_OFFSET);
+        let mut reader = ByteReader::at(bytes, SYSTEM_CONFIGURATION_FSID_OFFSET);
         let fsid: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节");
         reader.skip(WRITER_IDENTITY_NAME_BYTES + 4); // 写入者身份：读者不判它，只要在
         if reader.get_u8() != CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI {
@@ -1444,9 +1444,9 @@ impl Superblock {
         let this_device = DeviceIdentity(reader.get_u32());
         let device_count = reader.get_u32();
         let slot_generation = reader.get_u64();
-        let mut region_reader = ByteReader::at(bytes, SUPERBLOCK_REGION_DEVICES_OFFSET);
+        let mut region_reader = ByteReader::at(bytes, SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET);
         let region_devices = [DeviceIdentity(region_reader.get_u32()), DeviceIdentity(region_reader.get_u32()), DeviceIdentity(region_reader.get_u32())];
-        let mut tail_reader = ByteReader::at(bytes, SUPERBLOCK_TAIL_OFFSET);
+        let mut tail_reader = ByteReader::at(bytes, SYSTEM_CONFIGURATION_TAIL_OFFSET);
         let journal_tail = tail_reader.get_u64();
         let journal_instance = InstanceGeneration(tail_reader.get_u32());
         Some(Self { fsid, this_device, device_count, slot_generation, region_devices, journal_tail, journal_instance })
@@ -1456,7 +1456,7 @@ impl Superblock {
 /// D15 已定项 4 与 fs-design「格式层的让非法状态无法表示」：incompat 位图里有读者不认识的位、
 /// 或第一条 SSD 线那一位没置（没有布局身份），都拒绝挂载；compat_ro / compat 两张位图不认识随便，读者不看。
 fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
-    let incompat = &slot[SUPERBLOCK_FEATURE_BITS_OFFSET..SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
+    let incompat = &slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
     let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
     let unknown_in_rest = incompat[1..].iter().any(|byte| *byte != 0);
     let has_layout_identity = incompat[0] & INCOMPAT_FIRST_SSD_LINE_BIT != 0;
@@ -2091,17 +2091,17 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     }
     // D22（单元原子性怎么合成） 已定项 16：每盘恒 2 个槽，世代号从 1 起；mkfs 把两个槽都种上世代号 1。
     for device in parameters.devices() {
-        let superblock = Superblock {
+        let system_configuration = SystemConfiguration {
             fsid: parameters.fsid,
             this_device: device,
             device_count: u32::try_from(parameters.device_count).expect("设备数"),
-            slot_generation: SUPERBLOCK_GENERATION_AT_MKFS,
+            slot_generation: SYSTEM_CONFIGURATION_GENERATION_AT_MKFS,
             region_devices: parameters.region_devices,
             journal_tail: 0,
             journal_instance: instance,
         };
-        for slot_offset in SUPERBLOCK_SLOT_OFFSETS {
-            pool.write(device, DeviceOffset(slot_offset), &superblock.to_slot(), StepKind::SuperblockSlot);
+        for slot_offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
+            pool.write(device, DeviceOffset(slot_offset), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
         }
     }
     pool.barrier();
@@ -2113,18 +2113,18 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
 /// 段的收尾靠暖机第一次空发布开头那道屏障（D16 已定项 7 的形态，不另加屏障：这是最少屏障的写法）。
 fn acquire_instance(pool: &mut RecordingPool, parameters: &PoolParameters) -> InstanceGeneration {
     let instance = InstanceGeneration(FIRST_INSTANCE_GENERATION);
-    let slot_index = (SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION % 2) as usize;
+    let slot_index = (SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION % 2) as usize;
     for device in parameters.devices() {
-        let superblock = Superblock {
+        let system_configuration = SystemConfiguration {
             fsid: parameters.fsid,
             this_device: device,
             device_count: u32::try_from(parameters.device_count).expect("设备数"),
-            slot_generation: SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION,
+            slot_generation: SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION,
             region_devices: parameters.region_devices,
             journal_tail: 0,
             journal_instance: instance,
         };
-        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[slot_index]), &superblock.to_slot(), StepKind::SuperblockSlot);
+        pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
     }
     instance
 }
@@ -2261,8 +2261,8 @@ fn journal_record_offset(counter: JournalCounter) -> DeviceOffset {
 }
 
 /// 发布之后那次超级块槽写的世代号与落点（D22 已定项 16）：取号那次是 2，之后每次发布 +1，槽 = 世代号 mod 2。
-fn superblock_write_for_publish(checkpoint_txg: CheckpointTxg) -> (u64, usize) {
-    let generation = checkpoint_txg.0 + SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION;
+fn system_configuration_write_for_publish(checkpoint_txg: CheckpointTxg) -> (u64, usize) {
+    let generation = checkpoint_txg.0 + SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION;
     (generation, (generation % 2) as usize)
 }
 
@@ -2312,9 +2312,9 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
         };
         let (region, ring_slot) = ring_target_for_publish(txg);
         pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
-        let (slot_generation, slot_index) = superblock_write_for_publish(txg);
+        let (slot_generation, slot_index) = system_configuration_write_for_publish(txg);
         for device in parameters.devices() {
-            let superblock = Superblock {
+            let system_configuration = SystemConfiguration {
                 fsid: parameters.fsid,
                 this_device: device,
                 device_count: u32::try_from(parameters.device_count).expect("设备数"),
@@ -2323,7 +2323,7 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
                 journal_tail: txg_number,
                 journal_instance: instance,
             };
-            pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[slot_index]), &superblock.to_slot(), StepKind::SuperblockSlot);
+            pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
         }
         roots.push(root);
     }
@@ -2635,9 +2635,9 @@ fn publish_first_file(
     pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
 
     // 根槽之后：超级块槽轮换，世代号 5、落槽 1（D22 已定项 16），tail 前移到 jsn 3（D16 已定项 7 的超级块注）。
-    let (slot_generation, slot_index) = superblock_write_for_publish(txg);
+    let (slot_generation, slot_index) = system_configuration_write_for_publish(txg);
     for device in parameters.devices() {
-        let superblock = Superblock {
+        let system_configuration = SystemConfiguration {
             fsid: parameters.fsid,
             this_device: device,
             device_count: u32::try_from(parameters.device_count).expect("设备数"),
@@ -2646,7 +2646,7 @@ fn publish_first_file(
             journal_tail: FIRST_TRANSACTION_TXG,
             journal_instance: instance,
         };
-        pool.write(device, DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[slot_index]), &superblock.to_slot(), StepKind::SuperblockSlot);
+        pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
     }
 
     TransactionOutput {
@@ -2712,14 +2712,14 @@ fn read_unit_via_locations(reader: &dyn BlockReader, locations: &[LocationEntry;
     Err(format!("槽 {} 的两条位置条目都读不到校验和相符的单元", locations[0].slot.0))
 }
 
-fn choose_superblock(reader: &dyn BlockReader) -> Result<Superblock, String> {
-    let mut chosen: Option<Superblock> = None;
+fn choose_system_configuration(reader: &dyn BlockReader) -> Result<SystemConfiguration, String> {
+    let mut chosen: Option<SystemConfiguration> = None;
     for device_index in 0..reader.device_count() {
         let device = DeviceIdentity(u32::try_from(device_index).expect("设备数"));
-        let mut best_on_device: Option<Superblock> = None;
-        for slot_offset in SUPERBLOCK_SLOT_OFFSETS {
-            let bytes = reader.read(device, DeviceOffset(slot_offset), SUPERBLOCK_SLOT_BYTES as usize);
-            if let Some(candidate) = Superblock::parse_slot(&bytes) {
+        let mut best_on_device: Option<SystemConfiguration> = None;
+        for slot_offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
+            let bytes = reader.read(device, DeviceOffset(slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+            if let Some(candidate) = SystemConfiguration::parse_slot(&bytes) {
                 if best_on_device.as_ref().is_none_or(|best| candidate.slot_generation > best.slot_generation) {
                     best_on_device = Some(candidate);
                 }
@@ -2740,16 +2740,16 @@ fn choose_superblock(reader: &dyn BlockReader) -> Result<Superblock, String> {
     chosen.ok_or_else(|| "池里没有设备".to_string())
 }
 
-fn choose_root(reader: &dyn BlockReader, superblock: &Superblock) -> Option<RootRecord> {
+fn choose_root(reader: &dyn BlockReader, system_configuration: &SystemConfiguration) -> Option<RootRecord> {
     let mut best: Option<RootRecord> = None;
     for region in 0..RING_REGIONS {
-        let device = superblock.region_devices[region as usize];
+        let device = system_configuration.region_devices[region as usize];
         if device.0 as usize >= reader.device_count() {
             continue;
         }
         for slot in 0..RING_SLOTS_PER_REGION {
             let bytes = reader.read(device, ring_slot_offset(region, slot), PHYSICAL_BLOCK_BYTES as usize);
-            if let Some(candidate) = RootRecord::parse_slot(&bytes, &superblock.fsid) {
+            if let Some(candidate) = RootRecord::parse_slot(&bytes, &system_configuration.fsid) {
                 let candidate_key = (candidate.checkpoint_txg, candidate.instance);
                 if best.is_none_or(|current| candidate_key > (current.checkpoint_txg, current.instance)) {
                     best = Some(candidate);
@@ -3037,20 +3037,20 @@ fn walk_to_file(reader: &dyn BlockReader, root: &RootRecord, fsid: &[u8; 16], ma
 #[allow(clippy::needless_pass_by_value, reason = "参数是 Copy 的策略枚举，按值取更贴调用点")]
 fn recover(reader: &dyn BlockReader, policy: JournalPolicy) -> RecoveryReport {
     let mut mapping_fallbacks = 0;
-    let superblock = match choose_superblock(reader) {
-        Ok(superblock) => superblock,
+    let system_configuration = match choose_system_configuration(reader) {
+        Ok(system_configuration) => system_configuration,
         Err(reason) => return RecoveryReport { outcome: RecoveryOutcome::Failed { root: None, reason }, journal: JournalScanReport::default(), mapping_fallbacks },
     };
-    let Some(root) = choose_root(reader, &superblock) else {
+    let Some(root) = choose_root(reader, &system_configuration) else {
         return RecoveryReport { outcome: RecoveryOutcome::Failed { root: None, reason: "根环里一条合法根都没有".to_string() }, journal: JournalScanReport::default(), mapping_fallbacks };
     };
     // 报出去的 `root=` 恒是**所选**的那条根；施加记录之后走的是重建出来的根（D23 已定项 15）。
     let root_key = (root.instance, root.checkpoint_txg);
     let (journal, effective_root) = match policy {
-        JournalPolicy::Consult => replay_journal(reader, &root, &scan_journal(reader, unit_fsid(&superblock.fsid))),
+        JournalPolicy::Consult => replay_journal(reader, &root, &scan_journal(reader, unit_fsid(&system_configuration.fsid))),
         JournalPolicy::Ignore => (JournalScanReport::default(), root),
     };
-    let outcome = match walk_to_file(reader, &effective_root, &superblock.fsid, &mut mapping_fallbacks) {
+    let outcome = match walk_to_file(reader, &effective_root, &system_configuration.fsid, &mut mapping_fallbacks) {
         Ok(Some(content)) => RecoveryOutcome::FileRead { root: root_key, content },
         Ok(None) => RecoveryOutcome::NoFile { root: root_key },
         Err(reason) => RecoveryOutcome::Failed { root: Some(root_key), reason },
@@ -3276,7 +3276,7 @@ fn probes(parameters: &PoolParameters) -> Vec<Probe> {
         Probe { name: "data_payload_both_copies", flips: both(data_offset, 200) },
         Probe { name: "data_header_last_byte_both_copies", flips: both(data_offset, DATA_UNIT_HEADER_BYTES - 1) },
         Probe { name: "tree_table_both_copies", flips: both(tree_table_offset, 300) },
-        Probe { name: "superblock_slot_one_both_devices", flips: both(DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[1]), 50) },
+        Probe { name: "superblock_slot_one_both_devices", flips: both(DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), 50) },
     ]
 }
 
@@ -3753,8 +3753,8 @@ fn main() {
         ("mapping_key", 27, MAPPING_KEY_BYTES),
         ("mapping_entry", 55, MAPPING_ENTRY_BYTES),
         ("location_entry", 14, LOC_ENTRY),
-        ("superblock", 481, SUPERBLOCK_BYTES),
-        ("superblock_slot", 4096, SUPERBLOCK_SLOT_BYTES),
+        ("superblock", 481, SYSTEM_CONFIGURATION_BYTES),
+        ("superblock_slot", 4096, SYSTEM_CONFIGURATION_SLOT_BYTES),
     ];
     let mut width_mismatches = 0u64;
     for (structure, expected, actual) in width_rows {
@@ -3889,8 +3889,8 @@ fn main() {
     // （`name=impl_region_bytes region=… device=… offset=… length=… sha256=…`，≤4096 字节整段十六进制、其余头尾各 32 字节，
     // `region=` 与这里的 `descriptive_tag()` 同名同序）。这个二进制的第一个命令行参数给它那份输出的文件路径就做真比对；
     // 不给参数（旧调用方式）退回 `equal=unknown`，不炸。
-    let (_, superblock_slot_index) = superblock_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
-    let superblock_offset = SUPERBLOCK_SLOT_OFFSETS[superblock_slot_index];
+    let (_, system_configuration_slot_index) = system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let system_configuration_offset = SYSTEM_CONFIGURATION_SLOT_OFFSETS[system_configuration_slot_index];
     let mut region_geometry: Vec<(&'static str, u32, u64, u64)> = Vec::new();
     for (slot, unit, bytes) in catalog.units {
         for device_index in 0..parameters.device_count {
@@ -3902,7 +3902,7 @@ fn main() {
         region_geometry.push(("journal_record", u32::try_from(device_index).expect("设备数"), catalog.journal_offset, catalog.journal_length));
     }
     for device_index in 0..parameters.device_count {
-        region_geometry.push(("superblock", u32::try_from(device_index).expect("设备数"), superblock_offset, SUPERBLOCK_SLOT_BYTES));
+        region_geometry.push(("superblock", u32::try_from(device_index).expect("设备数"), system_configuration_offset, SYSTEM_CONFIGURATION_SLOT_BYTES));
     }
 
     let impl_snapshot_path = std::env::args().nth(1);
@@ -4075,9 +4075,9 @@ fn main() {
         output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(0)).count()
     ));
     emit(&mut emitter, &format!(
-        "name=instances mkfs_instance={MKFS_INSTANCE_GENERATION} first_writable_mount_instance={FIRST_INSTANCE_GENERATION} mkfs_superblock_generation={SUPERBLOCK_GENERATION_AT_MKFS} acquisition_superblock_generation={SUPERBLOCK_GENERATION_AT_INSTANCE_ACQUISITION} transaction_superblock_generation={} transaction_superblock_slot={}",
-        superblock_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).0,
-        superblock_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).1
+        "name=instances mkfs_instance={MKFS_INSTANCE_GENERATION} first_writable_mount_instance={FIRST_INSTANCE_GENERATION} mkfs_superblock_generation={SYSTEM_CONFIGURATION_GENERATION_AT_MKFS} acquisition_superblock_generation={SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION} transaction_superblock_generation={} transaction_superblock_slot={}",
+        system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).0,
+        system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).1
     ));
     // 反向链（D23 已定项 19 ②）：环上计数器为 1 的那条恒 0，其余罩前一条的整个头。
     let records_on_disk = scan_journal(&full, unit_fsid(&FIXED_FSID));
@@ -4091,12 +4091,12 @@ fn main() {
     emit(&mut emitter, &format!("name=gaps count={}", GAPS.len()));
 
     // 判据 9（2026-09-13 加，D15 已定项 4）：feature bits 的实际字节与「不认识不许挂」。
-    let superblock_slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), SUPERBLOCK_SLOT_BYTES as usize);
-    let feature_bits = &superblock_slot[SUPERBLOCK_FEATURE_BITS_OFFSET..SUPERBLOCK_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES];
-    let mut unknown_incompat_slot = superblock_slot.clone();
-    unknown_incompat_slot[SUPERBLOCK_FEATURE_BITS_OFFSET] = 0x03;
-    let mut no_layout_slot = superblock_slot.clone();
-    no_layout_slot[SUPERBLOCK_FEATURE_BITS_OFFSET] = 0x00;
+    let system_configuration_slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+    let feature_bits = &system_configuration_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES];
+    let mut unknown_incompat_slot = system_configuration_slot.clone();
+    unknown_incompat_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = 0x03;
+    let mut no_layout_slot = system_configuration_slot.clone();
+    no_layout_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = 0x00;
     emit(&mut emitter, &format!(
         "name=feature_bits incompat_byte0={:#04x} incompat_rest_zero={} compat_ro_zero={} compat_zero={} refuses_unknown_incompat={} refuses_missing_layout_bit={}",
         feature_bits[0],
@@ -4191,13 +4191,13 @@ mod tests {
         assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 188);
         assert_eq!(JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES, 3789, "4096 − 307");
         assert_eq!((JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES, 67, "4096 的记录装 67 个点名项");
-        assert_eq!(SUPERBLOCK_CHECKSUM_OFFSET, 155);
-        assert_eq!(SUPERBLOCK_FSID_OFFSET, 102);
-        assert_eq!(SUPERBLOCK_BYTES, 481);
-        assert_eq!(SUPERBLOCK_SLOT_BYTES, 4096, "超级块槽宽是格式常量（D22 已定项 2，2026-09-14 三方论证后按主 agent 推荐值）");
-        assert_eq!(SUPERBLOCK_SLOT_BYTES - SUPERBLOCK_BYTES, 3615, "481 的超级块在 4096 槽里余 3615");
-        assert_eq!(SUPERBLOCK_SLOT_OFFSETS[1] - SUPERBLOCK_SLOT_OFFSETS[0], SUPERBLOCK_SLOT_BYTES, "槽距与槽宽同值 ⇒ 两个槽首尾相接、不重叠");
-        assert_eq!(SUPERBLOCK_TAIL_OFFSET as u64 + 8 + 4, SUPERBLOCK_BYTES);
+        assert_eq!(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET, 155);
+        assert_eq!(SYSTEM_CONFIGURATION_FSID_OFFSET, 102);
+        assert_eq!(SYSTEM_CONFIGURATION_BYTES, 481);
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES, 4096, "超级块槽宽是格式常量（D22 已定项 2，2026-09-14 三方论证后按主 agent 推荐值）");
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES - SYSTEM_CONFIGURATION_BYTES, 3615, "481 的超级块在 4096 槽里余 3615");
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1] - SYSTEM_CONFIGURATION_SLOT_OFFSETS[0], SYSTEM_CONFIGURATION_SLOT_BYTES, "槽距与槽宽同值 ⇒ 两个槽首尾相接、不重叠");
+        assert_eq!(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64 + 8 + 4, SYSTEM_CONFIGURATION_BYTES);
         assert_eq!(MAPPING_KEY_BYTES, 27);
         assert_eq!(MAPPING_KEY_BYTES + 2 * LOC_ENTRY, MAPPING_ENTRY_BYTES);
         assert_eq!(MAPPING_ENTRY_BYTES, 55, "映射条目一律 55（D19 已定项 10，2026-09-14 用户定案）");
@@ -4303,10 +4303,10 @@ mod tests {
     fn mkfs_seeds_three_generation_zero_roots_readable_from_all_regions() {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, genesis) = mkfs(&parameters);
-        let superblock = choose_superblock(&recording.pool).expect("超级块");
+        let system_configuration = choose_system_configuration(&recording.pool).expect("超级块");
         let mut readable = 0;
         for region in 0..RING_REGIONS {
-            let bytes = recording.pool.read(superblock.region_devices[region as usize], ring_slot_offset(region, 0), 512);
+            let bytes = recording.pool.read(system_configuration.region_devices[region as usize], ring_slot_offset(region, 0), 512);
             if RootRecord::parse_slot(&bytes, &FIXED_FSID) == Some(genesis.root) {
                 readable += 1;
             }
@@ -4320,11 +4320,11 @@ mod tests {
         assert_eq!(parse_packed_unit(&genesis.instance_table_unit).expect("实例表").write_order, WriteOrder { instance: InstanceGeneration(0), transaction: TransactionNumber(0) });
         // D22 已定项 16：mkfs 把每盘两个槽都种上世代号 1。
         for device_index in 0..2u32 {
-            for slot_offset in SUPERBLOCK_SLOT_OFFSETS {
-                let slot = recording.pool.read(DeviceIdentity(device_index), DeviceOffset(slot_offset), SUPERBLOCK_SLOT_BYTES as usize);
-                let superblock = Superblock::parse_slot(&slot).expect("mkfs 的超级块槽");
-                assert_eq!(superblock.slot_generation, 1);
-                assert_eq!(superblock.journal_instance, InstanceGeneration(0));
+            for slot_offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
+                let slot = recording.pool.read(DeviceIdentity(device_index), DeviceOffset(slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+                let system_configuration = SystemConfiguration::parse_slot(&slot).expect("mkfs 的超级块槽");
+                assert_eq!(system_configuration.slot_generation, 1);
+                assert_eq!(system_configuration.journal_instance, InstanceGeneration(0));
             }
         }
     }
@@ -4332,11 +4332,11 @@ mod tests {
     /// 超级块 481（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段）：每个字段按**绝对偏移**读一遍，
     /// 以及「整槽校验和罩整个 4096 槽」——改 481 之后那 3615 字节补齐里的任何一个字节，解析都要拒绝。
     #[test]
-    fn superblock_is_481_bytes_and_the_slot_checksum_covers_all_4096() {
+    fn system_configuration_is_481_bytes_and_the_slot_checksum_covers_all_4096() {
         let BuiltPool { recording, .. } = built_pool();
-        let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[1]), SUPERBLOCK_SLOT_BYTES as usize);
+        let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
         assert_eq!(slot.len(), 4096, "超级块槽宽是格式常量 4096（D22 已定项 2，2026-09-14 三方论证后）");
-        assert!(Superblock::parse_slot(&slot).is_some());
+        assert!(SystemConfiguration::parse_slot(&slot).is_some());
         let read_u64 = |offset: usize| u64::from_le_bytes(slot[offset..offset + 8].try_into().expect("切了 8 字节"));
         let read_u32 = |offset: usize| u32::from_le_bytes(slot[offset..offset + 4].try_into().expect("切了 4 字节"));
         // 自举头 2026-09-14 加的两个字段：写入者身份 20（偏移 118）与校验和算法标识 1（偏移 138）。
@@ -4357,38 +4357,38 @@ mod tests {
         assert_eq!(read_u32(425), 512, "mkfs 时的 io_min（D2 已定项 19）");
         assert_eq!(read_u32(429), 4096, "固定结构槽距（D2 已定项 19）");
         assert!(slot[445..469].iter().all(|byte| *byte == 0), "整理三条水位 24 字节恒 0（D22 已定项 15）");
-        assert!(slot[SUPERBLOCK_BYTES as usize..].iter().all(|byte| *byte == 0), "481 之后的 3615 字节补齐恒 0");
+        assert!(slot[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0), "481 之后的 3615 字节补齐恒 0");
         let mut padded = slot.clone();
-        padded[SUPERBLOCK_BYTES as usize] ^= 0x01;
-        assert!(Superblock::parse_slot(&padded).is_none(), "整槽校验和罩到补齐区（D18 已定项 17）");
+        padded[SYSTEM_CONFIGURATION_BYTES as usize] ^= 0x01;
+        assert!(SystemConfiguration::parse_slot(&padded).is_none(), "整槽校验和罩到补齐区（D18 已定项 17）");
         // 算法标识写成未登记的码：这个槽不认（I-2.2）。
         let mut wrong_algorithm = slot.clone();
         wrong_algorithm[138] = 2;
-        let digest = wide_checksum_with_field_zeroed(&wrong_algorithm, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);
-        wrong_algorithm[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
-        assert!(Superblock::parse_slot(&wrong_algorithm).is_none(), "校验和算法标识不是 1 就不认这个槽");
+        let digest = wide_checksum_with_field_zeroed(&wrong_algorithm, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
+        wrong_algorithm[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+        assert!(SystemConfiguration::parse_slot(&wrong_algorithm).is_none(), "校验和算法标识不是 1 就不认这个槽");
     }
 
     #[test]
     fn unknown_incompat_bit_or_missing_ssd_line_bit_refuses_to_mount_but_compat_bits_do_not() {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, _) = mkfs(&parameters);
-        let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SUPERBLOCK_SLOT_OFFSETS[0]), SUPERBLOCK_SLOT_BYTES as usize);
-        assert_eq!(slot[SUPERBLOCK_FEATURE_BITS_OFFSET], INCOMPAT_FIRST_SSD_LINE_BIT, "mkfs 起 incompat 位 0 置 1（D15 已定项 4）");
-        assert!(slot[SUPERBLOCK_FEATURE_BITS_OFFSET + 1..SUPERBLOCK_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
-        assert!(Superblock::parse_slot(&slot).is_some(), "原样可挂");
+        let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+        assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], INCOMPAT_FIRST_SSD_LINE_BIT, "mkfs 起 incompat 位 0 置 1（D15 已定项 4）");
+        assert!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
+        assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样可挂");
         let reseal = |mut bytes: Vec<u8>, offset: usize, value: u8| {
             bytes[offset] = value;
-            let digest = wide_checksum_with_field_zeroed(&bytes, SUPERBLOCK_SLOT_BYTES as usize, SUPERBLOCK_CHECKSUM_OFFSET);
-            bytes[SUPERBLOCK_CHECKSUM_OFFSET..SUPERBLOCK_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+            let digest = wide_checksum_with_field_zeroed(&bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
+            bytes[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
             bytes
         };
-        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET, 0x03)).is_none(), "incompat 位 1 没登记：不认识不许挂");
-        assert_eq!(SUPERBLOCK_FEATURE_BITS_OFFSET, 6);
-        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
-        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET, 0x00)).is_none(), "没有布局身份：拒绝");
-        assert!(Superblock::parse_slot(&reseal(slot.clone(), SUPERBLOCK_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat_ro 位不认识只读挂，读者照样解析");
-        assert!(Superblock::parse_slot(&reseal(slot, SUPERBLOCK_FEATURE_BITS_OFFSET + 2 * FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat 位不认识随便");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x03)).is_none(), "incompat 位 1 没登记：不认识不许挂");
+        assert_eq!(SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 6);
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x00)).is_none(), "没有布局身份：拒绝");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat_ro 位不认识只读挂，读者照样解析");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot, SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 2 * FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat 位不认识随便");
     }
 
     #[test]
@@ -4525,9 +4525,9 @@ mod tests {
         assert_eq!(FIRST_TRANSACTION_TXG, WARM_UP_EMPTY_PUBLISHES + 1, "第一个事务紧跟暖机之后");
         assert_eq!(output.record.instance, InstanceGeneration(1), "第一次可写挂载取的实例代号是 1（D23 已定项 16）");
         // D22 已定项 16：世代号 mkfs 1（两槽同写）、取号 2（槽 0）、w3 3（槽 1）、w6 4（槽 0）、t11 5（槽 1）。
-        assert_eq!(superblock_write_for_publish(CheckpointTxg(1)), (3, 1));
-        assert_eq!(superblock_write_for_publish(CheckpointTxg(2)), (4, 0));
-        assert_eq!(superblock_write_for_publish(CheckpointTxg(3)), (5, 1));
+        assert_eq!(system_configuration_write_for_publish(CheckpointTxg(1)), (3, 1));
+        assert_eq!(system_configuration_write_for_publish(CheckpointTxg(2)), (4, 0));
+        assert_eq!(system_configuration_write_for_publish(CheckpointTxg(3)), (5, 1));
         // D23 已定项 19 ②：环上计数器为 1 的那条反向链恒 0，之后每条罩前一条的整个头。
         let records = scan_journal(&recording.pool, unit_fsid(&FIXED_FSID));
         let chains: Vec<u32> = records.values().map(|record| record.back_chain).collect();

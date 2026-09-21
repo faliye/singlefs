@@ -13,11 +13,11 @@ use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_BYTES,
     ALLOCATION_RECORD_KEY_BYTES, EXTENT_KEY_BYTES, EXTENT_LEAF_RECORD_BYTES, FIRST_TRANSACTION_TXG,
     INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES, INSTANCE_ROW_BYTES, MAPPING_ENTRY_BYTES,
-    MAPPING_KEY_BYTES, SLOT_BYTES, SUPERBLOCK_SLOTS_PER_DEVICE, TREE_IDENTIFIER_ACCOUNTING,
-    TREE_IDENTIFIER_ALLOCATION_RECORDS, TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST,
-    TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE, TREE_IDENTIFIER_LIVELIST,
-    TREE_IDENTIFIER_SPARSE_SIDE_TABLE, TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
-    TREE_TABLE_ENTRY_BYTES, WARM_UP_EMPTY_PUBLISHES,
+    MAPPING_KEY_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+    TREE_IDENTIFIER_ACCOUNTING, TREE_IDENTIFIER_ALLOCATION_RECORDS,
+    TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST, TREE_IDENTIFIER_EXTENT,
+    TREE_IDENTIFIER_INODE, TREE_IDENTIFIER_LIVELIST, TREE_IDENTIFIER_SPARSE_SIDE_TABLE,
+    TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_TABLE_ENTRY_BYTES, WARM_UP_EMPTY_PUBLISHES,
 };
 
 use crate::address::{
@@ -44,10 +44,13 @@ use crate::records::{
     STATISTIC_UNRECLAIMABLE_BYTES, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST,
     TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
 };
-use crate::recovery::{highest_root_instance, verified_superblock_slots};
+use crate::recovery::{highest_root_instance, verified_system_configuration_slots};
 use crate::root_record::RootRecord;
 use crate::root_ring::{slot_offset, target_for_publish};
-use crate::superblock::Superblock;
+use crate::system_configuration::{
+    SystemConfiguration, SystemImmutableConfiguration, SystemMutableConfiguration,
+    SystemRuntimeConfiguration, SystemRuntimeQuantities,
+};
 use crate::unit::{
     build_data_unit, build_index_node, build_packed_unit, data_unit_payload_capacity,
     index_node_entry_capacity, parse_index_node, unit_filesystem_identifier, DataUnitIdentity,
@@ -82,7 +85,7 @@ pub enum CommitStep<'publish> {
         root_slot: &'publish [u8],
     },
     /// 每盘一次系统配置槽原地覆写：世代号 = 这块盘两槽里自证过的最大世代号 + 1，槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16，逐盘计）。
-    RotateSuperblockSlots {
+    RotateSystemConfigurationSlots {
         journal_tail: u64,
         journal_instance: InstanceGeneration,
     },
@@ -167,12 +170,12 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
                 self.writes_by_structure_kind
                     .count_write_call(WrittenStructureKind::RootSlot, root_slot);
             }
-            CommitStep::RotateSuperblockSlots {
+            CommitStep::RotateSystemConfigurationSlots {
                 journal_tail,
                 journal_instance,
             } => {
                 for index in 0..self.devices.len() {
-                    self.write_superblock_slot(index, journal_tail, journal_instance)?;
+                    self.write_system_configuration_slot(index, journal_tail, journal_instance)?;
                 }
             }
             CommitStep::Barrier => {
@@ -188,7 +191,7 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
     }
 
     /// 一块盘写一次系统配置槽：世代号 = 这块盘两槽里自证过的最大世代号 + 1（两槽都读不出时从 1 起），槽 = 世代号 mod 2。
-    fn write_superblock_slot(
+    fn write_system_configuration_slot(
         &mut self,
         index: usize,
         journal_tail: u64,
@@ -196,36 +199,44 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
     ) -> Result<(), BlockDeviceError> {
         let spacing = u64::from(self.parameters.geometry.fixed_structure_slot_spacing);
         let identity = self.devices[index].0;
-        let slot_generation = verified_superblock_slots(
+        let slot_generation = verified_system_configuration_slots(
             &*self.devices,
             identity,
             spacing,
             &self.parameters.filesystem_identifier,
         )
         .iter()
-        .map(|superblock| superblock.slot_generation)
+        .map(|system_configuration| system_configuration.quantities.slot_generation)
         .max()
         .unwrap_or(0)
             + 1;
-        let superblock = Superblock {
-            filesystem_identifier: self.parameters.filesystem_identifier,
-            this_device: identity,
-            device_count: u32::try_from(self.devices.len()).expect("设备数"),
-            slot_generation,
-            region_devices: self.parameters.region_devices,
-            geometry: self.parameters.geometry,
-            journal_tail,
-            journal_instance,
+        let system_configuration = SystemConfiguration {
+            immutable: SystemImmutableConfiguration {
+                filesystem_identifier: self.parameters.filesystem_identifier,
+                this_device: identity,
+                device_count: u32::try_from(self.devices.len()).expect("设备数"),
+                region_devices: self.parameters.region_devices,
+                sizes: self.parameters.geometry,
+            },
+            mutable: SystemMutableConfiguration,
+            runtime: SystemRuntimeConfiguration,
+            quantities: SystemRuntimeQuantities {
+                slot_generation,
+                journal_tail,
+                journal_instance,
+            },
         };
         self.has_writes_since_barrier = true;
-        let slot_bytes = superblock.to_slot();
+        let slot_bytes = system_configuration.to_slot();
         self.devices[index].1.write_at(
-            DeviceOffsetInBytes((slot_generation % SUPERBLOCK_SLOTS_PER_DEVICE) * spacing),
+            DeviceOffsetInBytes(
+                (slot_generation % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE) * spacing,
+            ),
             &slot_bytes,
             WriteDurability::Plain,
         )?;
         self.writes_by_structure_kind
-            .count_write_call(WrittenStructureKind::SuperblockSlot, &slot_bytes);
+            .count_write_call(WrittenStructureKind::SystemConfigurationSlot, &slot_bytes);
         Ok(())
     }
 
@@ -261,7 +272,9 @@ impl<Device: BlockDevice> PoolWriter<'_, Device> {
             };
         }
         for &index in written {
-            if let Err(rollback_error) = self.write_superblock_slot(index, 0, previous_instance) {
+            if let Err(rollback_error) =
+                self.write_system_configuration_slot(index, 0, previous_instance)
+            {
                 return AcquisitionFailed {
                     cause,
                     rollback: AcquisitionRollback::RollbackFailed(rollback_error),
@@ -310,7 +323,7 @@ pub struct AcquisitionFailed {
 }
 
 /// 每块盘两槽里全部自证过（fsid 与本池相同）的系统配置中最大的实例代号；一份都没有时是 mkfs 的 0。取号回卷时写回的旧号也是它。
-fn highest_superblock_instance<Device: BlockDevice>(
+fn highest_system_configuration_instance<Device: BlockDevice>(
     pool: &PoolWriter<'_, Device>,
 ) -> InstanceGeneration {
     let spacing = u64::from(pool.parameters.geometry.fixed_structure_slot_spacing);
@@ -318,9 +331,14 @@ fn highest_superblock_instance<Device: BlockDevice>(
     pool.devices
         .iter()
         .flat_map(|(identity, _)| {
-            verified_superblock_slots(&*pool.devices, *identity, spacing, &filesystem_identifier)
+            verified_system_configuration_slots(
+                &*pool.devices,
+                *identity,
+                spacing,
+                &filesystem_identifier,
+            )
         })
-        .map(|superblock| superblock.journal_instance)
+        .map(|system_configuration| system_configuration.quantities.journal_instance)
         .max()
         .unwrap_or(MKFS_INSTANCE_GENERATION)
 }
@@ -338,7 +356,12 @@ pub fn instance_generation_to_acquire<Device: BlockDevice>(
         &pool.parameters.filesystem_identifier,
     )
     .unwrap_or(MKFS_INSTANCE_GENERATION);
-    InstanceGeneration(highest_superblock_instance(pool).max(highest_root).0 + 1)
+    InstanceGeneration(
+        highest_system_configuration_instance(pool)
+            .max(highest_root)
+            .0
+            + 1,
+    )
 }
 
 /// 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；2026-09-14 用户定案，
@@ -394,10 +417,10 @@ fn write_acquired_instance<Device: BlockDevice>(
     pool: &mut PoolWriter<'_, Device>,
     instance: InstanceGeneration,
 ) -> Result<InstanceGeneration, AcquisitionFailed> {
-    let previous_instance = highest_superblock_instance(pool);
+    let previous_instance = highest_system_configuration_instance(pool);
     let mut written = Vec::new();
     for index in 0..pool.devices.len() {
-        if let Err(cause) = pool.write_superblock_slot(index, 0, instance) {
+        if let Err(cause) = pool.write_system_configuration_slot(index, 0, instance) {
             return Err(pool.roll_back_acquisition(&written, previous_instance, cause));
         }
         written.push(index);
@@ -555,7 +578,7 @@ pub fn publish_without_units<Device: BlockDevice>(
             checkpoint_txg: plan.txg,
             root_slot: &root_slot,
         })?;
-        writer.perform(CommitStep::RotateSuperblockSlots {
+        writer.perform(CommitStep::RotateSystemConfigurationSlots {
             journal_tail: plan.counter,
             journal_instance: plan.instance,
         })
@@ -2125,7 +2148,7 @@ fn publish_admitted<Device: BlockDevice>(
             checkpoint_txg: txg,
             root_slot: &root_slot,
         })?;
-        writer.perform(CommitStep::RotateSuperblockSlots {
+        writer.perform(CommitStep::RotateSystemConfigurationSlots {
             journal_tail: plan.counter,
             journal_instance: instance,
         })

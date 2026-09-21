@@ -30,7 +30,7 @@
 | 本该看到 | 去看了什么 | 结果 |
 |---|---|---|
 | 仓里已有条款对超级块槽宽说过话，只是材料没找到 | `grep -rn "自证单元" .claude/kb/ --include=*.md \| grep 超级块` | **出现了**，四处，其中一处在 2026-09-02 用户定案的已定项里 ⇒ 打中 1 |
-| 乙的 `honors` 优势建立在一个已被实测无害的取样点上 | 读 D22 已定项 2「真设备把这条张力收窄了」整节；读 `e126_superblock_slot_width.rs` 的 `devices` 数组 | **出现了** ⇒ 打中 2 |
+| 乙的 `honors` 优势建立在一个已被实测无害的取样点上 | 读 D22 已定项 2「真设备把这条张力收窄了」整节；读 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs` 的 `devices` 数组 | **出现了** ⇒ 打中 2 |
 | E126 的取样点让乙看起来不比甲差，而换个取样点就分开 | 逐字复制 E126 的 `width()` 与 `distinct_widths()` 重算另一个池 | **出现了** ⇒ 打中 3 |
 | `io_min` 在同一份盘上真的会变，而槽几何改不了 | Linux 稳定 ABI 逐字（仓内 E34 源码 2026-08-29 现查）+ 本机 `man mdadm` 现查 GROW MODE | **出现了** ⇒ 打中 4 |
 
@@ -107,7 +107,7 @@ D20 那一行第三列写的类判据是「核心层合成（整单元校验和 
 ## 打中 2（致命）：乙唯一的优势格，正是真设备实测「损失面 = 0」的那一格
 
 **乙的全部优势来自一格**：`md_raid5`（pbs 512 / io_min 65536）上只有它 `honors=1`。
-现查产物 `research/results/e126-superblock-slot-width-2026-09-09.out`，15 行 `name=iomin` 全抄：
+现查产物 `research/results/e126-system-configuration-slot-width-2026-09-09.out`，15 行 `name=iomin` 全抄：
 
 ```
 6:  name=iomin dev=nvme_local arm=jia_probe_pbs      width=512   io_min=512   honors=1 sectors=1   tear_states=0
@@ -141,7 +141,7 @@ D20 那一行第三列写的类判据是「核心层合成（整单元校验和 
 
 ⇒ **在乙唯一赢的那台设备上，硬要求 1 要防的那个损害被真设备实测为零**（邻槽 10/10 完好，带阳性 + 阴性对照）。
 
-**而机制仍然活着的那类设备，E126 的设备集里一台都没有。** 现查 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs` 第 145–150 行逐字：
+**而机制仍然活着的那类设备，E126 的设备集里一台都没有。** 现查 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs` 第 145–150 行逐字：
 
 ```rust
     // 判据 3 的设备档：512 是本机 nvme0n1 现查值，65536 是 E34 真 md/raid5 量到的值。
@@ -191,7 +191,7 @@ E126 正确地标了「暴露面 ≠ 损失面」，但那句话罩得住甲（s
 
 ## 打中 3：判据 5 的取样点对乙零判别力，换一格结论就反过来
 
-现查 `research/e7-index-bench/src/bin/e126_superblock_slot_width.rs` 第 200–201 行逐字：
+现查 `research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs` 第 200–201 行逐字：
 
 ```rust
     // ── 判据 5：异构池（pbs 512 与 4096 混合）上取到几个不同值 ──

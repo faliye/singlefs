@@ -18,7 +18,7 @@ use std::collections::BTreeMap;
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, SlotNumber};
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, ROOT_RING_BASE_SLOT, ROOT_RING_CHUNK_BYTES,
-    ROOT_RING_PRIME_STEP, SLOT_BYTES, SUPERBLOCK_SLOT_BYTES,
+    ROOT_RING_PRIME_STEP, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::crash::MemoryPool;
@@ -37,7 +37,7 @@ const E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES: u64 = 4096;
 /// E142 几何的根槽宽 = 探到的 `physical_block_size` = 512（字节表零那一节的 m3「371 / 512 槽」）。
 const E142_ROOT_SLOT_BYTES: u64 = 512;
 /// 这次发布写的系统配置槽是槽 1（t11：世代号 5、tail = 3，根槽之后再更新）。
-const FIRST_TRANSACTION_SUPERBLOCK_SLOT_INDEX: u64 = 1;
+const FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_INDEX: u64 = 1;
 /// 这次发布的根槽：区域 `3 mod 3` = 0 的槽 `(3 div 3) mod 8` = 1（t10）。
 const FIRST_TRANSACTION_ROOT_RING_REGION: u64 = 0;
 const FIRST_TRANSACTION_ROOT_RING_SLOT_INDEX: u64 = 1;
@@ -124,8 +124,8 @@ const FIRST_TRANSACTION_JOURNAL_RECORD_OFFSET: u64 =
     SlotNumber(JOURNAL_RING_START_SLOT).to_device_offset().0
         + FIRST_TRANSACTION_JOURNAL_RECORD_RING_OFFSET;
 
-const FIRST_TRANSACTION_SUPERBLOCK_SLOT_OFFSET: u64 =
-    FIRST_TRANSACTION_SUPERBLOCK_SLOT_INDEX * E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES;
+const FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET: u64 =
+    FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_INDEX * E142_FIXED_STRUCTURE_SLOT_SPACING_BYTES;
 
 /// 登记里那 21 行，顺序就是结果行的顺序：8 个单元各两盘（t1..t8）、根记录（t10）、journal 记录两盘（t9）、系统配置槽两盘（t11）。
 /// 前 16 行是 16 KiB / 32 KiB 的单元，只打 sha256 与前后 32 字节；后 5 行（根槽、journal 记录两份、系统配置槽两份）整段十六进制照打。
@@ -167,14 +167,14 @@ pub const FIRST_TRANSACTION_REGIONS: [FirstTransactionRegion; FIRST_TRANSACTION_
     fixed_structure_region(
         "superblock",
         0,
-        FIRST_TRANSACTION_SUPERBLOCK_SLOT_OFFSET,
-        SUPERBLOCK_SLOT_BYTES,
+        FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET,
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
     ),
     fixed_structure_region(
         "superblock",
         1,
-        FIRST_TRANSACTION_SUPERBLOCK_SLOT_OFFSET,
-        SUPERBLOCK_SLOT_BYTES,
+        FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET,
+        SYSTEM_CONFIGURATION_SLOT_BYTES,
     ),
 ];
 

@@ -1,8 +1,0 @@
-{"section": "bfs-big", "arm": "BING_R", "cfg": {}, "found": false, "explored": 1946485, "depth_reached": 11, "truncated": false, "states": 880628}
-{"section": "bfs-big", "arm": "BING_R", "cfg": {"order": "any"}, "found": false, "explored": 2500000, "depth_reached": 10, "truncated": true}
-{"section": "bfs-big", "arm": "YI", "cfg": {}, "found": false, "explored": 1502899, "depth_reached": 11, "truncated": false, "states": 686441}
-{"section": "bfs-big", "arm": "BING_T", "cfg": {}, "found": false, "explored": 1661979, "depth_reached": 11, "truncated": false, "states": 789933}
-{"section": "bfs-clone-big", "arm": "BING_R", "cfg": {}, "found": false, "explored": 698038, "depth_reached": 8, "truncated": false, "states": 397161}
-{"section": "bfs-clone-big", "arm": "YI", "cfg": {}, "found": false, "explored": 571498, "depth_reached": 8, "truncated": false, "states": 312190}
-{"section": "bfs-clone-big", "arm": "BING_T", "cfg": {}, "found": false, "explored": 579607, "depth_reached": 8, "truncated": false, "states": 318477}
-{"section": "END", "rows": 7}

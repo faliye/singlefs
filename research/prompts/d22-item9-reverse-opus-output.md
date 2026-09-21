@@ -28,7 +28,7 @@
 **反推的具体形态**：W 说「不合并臂在 512 档上没有活路」。若这是错的，
 **W 自己引的那份留存产物里就应该躺着一条「不合并、512、装得下」的行**。
 
-**去看了一眼**（`research/results/e124-superblock-recompute-2026-09-09.out` 第 3 行，逐字）：
+**去看了一眼**（`research/results/e124-system-configuration-recompute-2026-09-09.out` 第 3 行，逐字）：
 
 ```
 E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=0 total=503 was=499 slot=512 fits=1 over_by=0 torn_states=0
@@ -68,7 +68,7 @@ E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=0 total=5
 
 清单逐字是「根槽、journal 记录**头**」，**没有超级块槽**。
 
-**E115 的源码自己承认这一点**，`research/e7-index-bench/src/bin/e115_superblock_completeness.rs:23` 与 `:34`（逐字）：
+**E115 的源码自己承认这一点**，`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:23` 与 `:34`（逐字）：
 
 ```
 //! - D20 推论三：自证单元清单逐字只有「**根槽、journal 记录头**」两类，**未列超级块槽**
@@ -131,13 +131,13 @@ mkfs 划的是 **4096**，不是 512。512 只在**池内每一台都报 512** �
 
 ### H3：树表单元指针 59 字节，出处指的是**根记录**不是超级块
 
-`research/e7-index-bench/src/bin/e100_superblock_slot.rs:77`（逐字，含注释）：
+`research/e7-index-bench/src/bin/e100_system_configuration_slot.rs:77`（逐字，含注释）：
 
 ```rust
     ("tree_table_ptr", 59),  // D22 已定项 7 的树表单元指针（间接层）
 ```
 
-它被 E115 原样继承进 `CANDIDATE`（`e115_superblock_completeness.rs:66`），
+它被 E115 原样继承进 `CANDIDATE`（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:66`），
 并在 `REQUIRED` 里登记出处为「D22 已定项 7」（`:97` 逐字 `("树表单元指针", "D22 已定项 7", Some("tree_table_ptr")),`）。
 
 **而 D22 已定项 7 这条已定项，一个字都不是在说超级块。**
@@ -201,7 +201,7 @@ C217 给的处置逐字含这一条：
   （`.claude/kb/experiments/62-根环归属存身份vs算公式.md:36` 逐字「**代价是 4 字节**：4 个区域 × 1 字节设备身份」），
   而 D22 已定项 2 的 R = 3、D19 已定项 4 的 dev id 是 4 字节 ⇒ 12。E115 自陈「没有替仓里选一个」。
   **这一项我判不了哪边对**，只能说它是 `wide` 这个旋钮的一半，而 `wide` 把它和「主密钥槽内联 80」
-  **绑成了一个开关**（`e115_superblock_completeness.rs:159` 逐字 `let key_slot_indirect = !wide; // 宽口径那一档是内联 80，不占指针`）——
+  **绑成了一个开关**（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:159` 逐字 `let key_slot_indirect = !wide; // 宽口径那一档是内联 80，不占指针`）——
   两件互不相干的事共用一个旋钮，四格里的 `wide=1` 两格因此**同时**背着两个未定量。这是口径缺陷，不是反例。
 
 ---
@@ -245,7 +245,7 @@ W 的形态逐字（背景材料第 8 节 / E115 结论句）：
 
 ⇒ **W 的形态骑在一个还没做的用户定案上，而材料一个字没提。**
 
-**算术后果**：`e115_superblock_completeness.rs:159` 逐字 `let key_slot_indirect = !wide; // 宽口径那一档是内联 80，不占指针`
+**算术后果**：`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:159` 逐字 `let key_slot_indirect = !wide; // 宽口径那一档是内联 80，不占指针`
 ⇒ 「省 177（3 × 59）」那个数**只在 `wide=0` 出现**，而 `wide=0` 正是主密钥槽走指针那一档。
 主密钥槽必须内联（80）之后，能合并的只剩设备表 + 树表两个指针 ⇒ **省 59，不是省 177**，
 落在 `473 / 477` 那两格，**385 / 389 这两个数不可达**。
@@ -266,7 +266,7 @@ W 的形态逐字（背景材料第 8 节 / E115 结论句）：
 合并之后：**设备表、树表、主密钥槽、中央映射四个入口的可达性压到同一个单元上**，
 那个单元丢一次，四样一起没。而**那个单元放几份、放哪、要不要跨盘，仓里一个字都没有**——
 E115 判据 4 只算了「新增那一级间接要付的单元头 68 / 77 / 86」，
-`e115_superblock_completeness.rs` 里没有任何一行涉及它的冗余。
+`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs` 里没有任何一行涉及它的冗余。
 
 叠加 H1 之后更糟：主密钥槽从「每盘一份、住在唯一的明文豁免结构里」
 变成「全池一个单元、且按 D9 方向必须加密」。**这是两个维度同时降级，而 W 的代价栏里只写了 86 字节。**
@@ -394,7 +394,7 @@ C47 逐字还写着按较小那个划的后果（`.claude/kb/checks-owed.md:57`�
 > | 0 | 0 | 否 | 503 | **507** | 装得下（余 5，原为余 9）|
 
 **产物里 `name=budget` 每一行都带第三个旋钮 `dev_unit`，而材料那张表没有这一列。**
-`research/results/e124-superblock-recompute-2026-09-09.out` 第 3 行与第 19 行逐字：
+`research/results/e124-system-configuration-recompute-2026-09-09.out` 第 3 行与第 19 行逐字：
 
 ```
 E7RESULT name=budget dev_unit=code3_packed wide=0 map_sep=0 merge_ptrs=0 total=503 was=499 slot=512 fits=1 over_by=0 torn_states=0
@@ -452,7 +452,7 @@ E7RESULT name=budget dev_unit=code2_index  wide=0 map_sep=0 merge_ptrs=0 total=5
 | feature bits 96 字节可以压窄 | D15 已定项 2 与冻结政策全文 | **构造不出**，D15 逐字「三个 bitmap 各 256 位」 |
 | 已定项 8 里另有一句定了超级块槽宽 | `.claude/kb/decisions/22-单元原子性怎么合成.md:505-530` 全节 | **没有**。只有「每盘至少 2 个槽」 |
 | 别处（invariants / layout/01-first-txn / verification-build）定过超级块槽宽 | `grep -rn "超级块" .claude/kb/ \| grep -E "槽宽\|512\|physical_block_size"` | **零命中**。唯一一处是 C212 那句「跟着根槽走」 |
-| 中央映射必须单占一个指针（`map_sep=1` 是否强制） | D19 已定项 5 正文、D19 未定项 6 | **判不了**。D19 已定项 5 定了它是唯一入口，没定它的根挂哪；`e115_superblock_completeness.rs:154` 的注释逐字「否则它借树表的一行，槽里 0 字节」，两种都没被排除 ⇒ 这不是反例，是又一个未定量在撑着 W 的「三格已经爆」 |
+| 中央映射必须单占一个指针（`map_sep=1` 是否强制） | D19 已定项 5 正文、D19 未定项 6 | **判不了**。D19 已定项 5 定了它是唯一入口，没定它的根挂哪；`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:154` 的注释逐字「否则它借树表的一行，槽里 0 字节」，两种都没被排除 ⇒ 这不是反例，是又一个未定量在撑着 W 的「三格已经爆」 |
 
 ---
 

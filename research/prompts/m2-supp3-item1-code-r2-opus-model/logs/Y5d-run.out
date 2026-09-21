@@ -1,4 +1,0 @@
-Y5m1 diff exit 101 first_unequal: OPUS_Y5 trial=4 segments=115 expanded=28 states=243 threads=3 slice=StatesPerSlice(2) observer=true violations=65 ignored=65 checker_violated=805 equal_tally=true equal_observed=false | note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-Y5m2 diff exit 101 first_unequal: OPUS_Y5 trial=1 segments=131 expanded=36 states=251 threads=5 slice=StatesPerSlice(1) observer=false violations=30 ignored=30 checker_violated=810 equal_tally=false equal_observed=true |   left: Layer0Tally { states: 251, violations: 30, root_persisted_states: 2, no_file_states: 15, file_read_states: 206, failed_states: 30, journal_differing_states: 2, verification_ran_states: 55, ver
-
-[exited with code 0]

@@ -1,8 +1,0 @@
-# crates/mutations.tsv 里 59 号判锚点腐化的 6 行：原文在实现员开工前的副本（/tmp/claude-1000/impl-m2-wave2-fixes/baseline）与今天的工作区里各命中几次
-# 原文按 59 号的读法把 \n 换成换行；生成于 2026-09-18，命令见 research/prompts/m2-wave2-crash-verifier/anchor-origin.py
-第 32 行	crates/singlefs-core/src/mount.rs	开工前副本 1 次	今天 0 次	步 4：只写被退回的实例那一行、不写中间实例行
-第 37 行	crates/singlefs-checker/src/walk.rs	开工前副本 0 次	今天 0 次	步 4：checker 的 I-3.1 并集不按实例表排除被抛弃的根
-第 41 行	crates/singlefs-core/src/allocator.rs	开工前副本 1 次	今天 0 次	步 5：复用时追加记录而不改写（同盘同槽两条）
-第 42 行	crates/singlefs-checker/src/walk.rs	开工前副本 0 次	今天 0 次	步 5：checker 的候选集不按 F 收（F 之下的根照走）
-第 69 行	crates/singlefs-core/src/mount.rs	开工前副本 1 次	今天 0 次	步 3：树表 0 条的一版上要写行时，拒绝挪到取号之后（超级块已写进新号才返回）
-第 107 行	crates/singlefs-core/src/mount.rs	开工前副本 1 次	今天 0 次	增补 2 第 20a 行：写行那次发布的准入不在取号之前算（取号之后发布才被拒，实例代号已经烧掉）

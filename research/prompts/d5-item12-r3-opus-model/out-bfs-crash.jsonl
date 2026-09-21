@@ -1,5 +1,0 @@
-{"section": "bfs-crash", "arm": "BING_R", "cfg": {}, "found": false, "explored": 564537, "states": 331502, "depth_reached": 8, "truncated": false}
-{"section": "bfs-crash", "arm": "YI", "cfg": {}, "found": false, "explored": 545583, "states": 318751, "depth_reached": 8, "truncated": false}
-{"section": "bfs-crash", "arm": "BING_T", "cfg": {}, "found": false, "explored": 547777, "states": 320425, "depth_reached": 8, "truncated": false}
-{"section": "bfs-crash", "arm": "BING_R", "cfg": {"hi": "pub"}, "found": true, "path": [["W", 11, 1], ["PS", 11], ["K", 11, 0], ["D", 12], ["B", 0]], "over": [], "double": 0, "leak": [0], "explored": 2308, "states": 1788}
-{"section": "END", "rows": 4}

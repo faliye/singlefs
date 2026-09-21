@@ -1,0 +1,479 @@
+warning: unused import: `singlefs_harness::scenario::e142_parameters`
+ --> crates/singlefs-harness/tests/c381r2_sweep.rs:5:5
+  |
+5 | use singlefs_harness::scenario::e142_parameters;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `note` is never read
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:267:9
+    |
+260 | pub struct Snapshot {
+    |            -------- field in this struct
+...
+267 |     pub note: String,
+    |         ^^^^
+    |
+    = note: `Snapshot` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `Empty` and `Other` are never constructed
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:563:5
+    |
+559 | pub enum Action {
+    |          ------ variants in this enum
+...
+563 |     Empty,
+    |     ^^^^^
+564 |     /// 从现行版发一次内容不同的覆盖写。
+565 |     Other,
+    |     ^^^^^
+    |
+    = note: `Action` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: constant `ACTIONS` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:569:11
+    |
+569 | pub const ACTIONS: [Action; 4] = [Action::Retry, Action::Empty, Action::Other, Action::Remount];
+    |           ^^^^^^^
+
+warning: function `writes_of_c` is never used
+   --> crates/singlefs-harness/tests/c381r2_probe_common.rs:981:8
+    |
+981 | pub fn writes_of_c(parameters: &MakeFilesystemParameters, snapshot: &Snapshot) -> Vec<(u32, u64, usize)> {
+    |        ^^^^^^^^^^^
+
+warning: `singlefs-harness` (test "c381r2_sweep") generated 5 warnings (run `cargo fix --test "c381r2_sweep" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/c381r2_sweep.rs (target/release/deps/c381r2_sweep-b80c280302700ce7)
+
+running 1 test
+test phase_f_fault_kinds ... progress 25/7056 at 169.954431ms
+progress 50/7056 at 291.048289ms
+progress 75/7056 at 409.293215ms
+progress 100/7056 at 537.285063ms
+progress 125/7056 at 664.165046ms
+progress 150/7056 at 794.824536ms
+progress 175/7056 at 894.226029ms
+progress 200/7056 at 1.0138484s
+progress 225/7056 at 1.148366135s
+progress 250/7056 at 1.250299707s
+progress 275/7056 at 1.375859693s
+progress 300/7056 at 1.500729735s
+progress 325/7056 at 1.63531034s
+progress 350/7056 at 1.762453362s
+progress 375/7056 at 1.865462109s
+progress 400/7056 at 1.996568838s
+progress 425/7056 at 2.104461365s
+progress 450/7056 at 2.23734196s
+progress 475/7056 at 2.356220734s
+progress 500/7056 at 2.503839493s
+progress 525/7056 at 2.691887136s
+progress 550/7056 at 2.864131022s
+progress 575/7056 at 3.056473762s
+progress 600/7056 at 3.22997888s
+progress 625/7056 at 3.400392434s
+progress 650/7056 at 3.584101636s
+progress 675/7056 at 3.785340553s
+progress 700/7056 at 3.96337648s
+progress 725/7056 at 4.148640686s
+progress 750/7056 at 4.351125905s
+progress 775/7056 at 4.522827612s
+progress 800/7056 at 4.711920583s
+progress 825/7056 at 4.871087216s
+progress 850/7056 at 5.060388127s
+progress 875/7056 at 5.274004881s
+progress 900/7056 at 5.421708122s
+progress 925/7056 at 5.608820822s
+progress 950/7056 at 5.7836971s
+progress 975/7056 at 5.970184757s
+progress 1000/7056 at 6.148397346s
+progress 1025/7056 at 6.274415573s
+progress 1050/7056 at 6.415952955s
+progress 1075/7056 at 6.527639521s
+progress 1100/7056 at 6.663045378s
+progress 1125/7056 at 6.768064765s
+progress 1150/7056 at 6.916541047s
+progress 1175/7056 at 7.041477348s
+progress 1200/7056 at 7.174658793s
+progress 1225/7056 at 7.318576583s
+progress 1250/7056 at 7.431393412s
+progress 1275/7056 at 7.561558704s
+progress 1300/7056 at 7.687688449s
+progress 1325/7056 at 7.797088753s
+progress 1350/7056 at 7.943895905s
+progress 1375/7056 at 8.076610267s
+progress 1400/7056 at 8.198530172s
+progress 1425/7056 at 8.316935002s
+progress 1450/7056 at 8.439279259s
+progress 1475/7056 at 8.570069731s
+progress 1500/7056 at 8.699712419s
+progress 1525/7056 at 8.89172605s
+progress 1550/7056 at 9.058961935s
+progress 1575/7056 at 9.231681202s
+progress 1600/7056 at 9.418778349s
+progress 1625/7056 at 9.589560178s
+progress 1650/7056 at 9.78958887s
+progress 1675/7056 at 9.960214927s
+progress 1700/7056 at 10.146478078s
+progress 1725/7056 at 10.326612053s
+progress 1750/7056 at 10.518856359s
+progress 1775/7056 at 10.689784685s
+progress 1800/7056 at 10.881053997s
+progress 1825/7056 at 11.06102315s
+progress 1850/7056 at 11.238863862s
+progress 1875/7056 at 11.408187899s
+progress 1900/7056 at 11.60000332s
+progress 1925/7056 at 11.762531268s
+progress 1950/7056 at 11.945769933s
+progress 1975/7056 at 12.125714851s
+progress 2000/7056 at 12.300230027s
+progress 2025/7056 at 12.421456851s
+progress 2050/7056 at 12.546706672s
+progress 2075/7056 at 12.662910785s
+progress 2100/7056 at 12.777456751s
+progress 2125/7056 at 12.896719827s
+progress 2150/7056 at 13.009145354s
+progress 2175/7056 at 13.127386423s
+progress 2200/7056 at 13.24503238s
+progress 2225/7056 at 13.379990979s
+progress 2250/7056 at 13.488312888s
+progress 2275/7056 at 13.607052889s
+progress 2300/7056 at 13.736411835s
+progress 2325/7056 at 13.85839306s
+progress 2350/7056 at 13.964835231s
+progress 2375/7056 at 14.088750462s
+progress 2400/7056 at 14.210781306s
+progress 2425/7056 at 14.325641799s
+progress 2450/7056 at 14.442660732s
+progress 2475/7056 at 14.566397882s
+progress 2500/7056 at 14.686403907s
+progress 2525/7056 at 14.8495241s
+progress 2550/7056 at 15.032125712s
+progress 2575/7056 at 15.207273861s
+progress 2600/7056 at 15.376097425s
+progress 2625/7056 at 15.557367329s
+progress 2650/7056 at 15.735809282s
+progress 2675/7056 at 15.905345759s
+progress 2700/7056 at 16.077179073s
+progress 2725/7056 at 16.237061837s
+progress 2750/7056 at 16.398664568s
+progress 2775/7056 at 16.561191203s
+progress 2800/7056 at 16.731371819s
+progress 2825/7056 at 16.897672319s
+progress 2850/7056 at 17.083210687s
+progress 2875/7056 at 17.234476673s
+progress 2900/7056 at 17.399935457s
+progress 2925/7056 at 17.576003934s
+progress 2950/7056 at 17.740208183s
+progress 2975/7056 at 17.895419006s
+progress 3000/7056 at 18.059861314s
+progress 3025/7056 at 18.178370325s
+progress 3050/7056 at 18.288513852s
+progress 3075/7056 at 18.383714678s
+progress 3100/7056 at 18.492975092s
+progress 3125/7056 at 18.594663244s
+progress 3150/7056 at 18.703761537s
+progress 3175/7056 at 18.807771359s
+progress 3200/7056 at 18.90907955s
+progress 3225/7056 at 19.008121912s
+progress 3250/7056 at 19.113681278s
+progress 3275/7056 at 19.214949267s
+progress 3300/7056 at 19.311467767s
+progress 3325/7056 at 19.422843518s
+progress 3350/7056 at 19.519751889s
+progress 3375/7056 at 19.624232991s
+progress 3400/7056 at 19.727970721s
+progress 3425/7056 at 19.828680248s
+progress 3450/7056 at 19.921158341s
+progress 3475/7056 at 20.031909968s
+progress 3500/7056 at 20.130261704s
+progress 3525/7056 at 20.249233633s
+progress 3550/7056 at 20.411106544s
+progress 3575/7056 at 20.570289935s
+progress 3600/7056 at 20.716040591s
+progress 3625/7056 at 20.863756606s
+progress 3650/7056 at 21.014267231s
+progress 3675/7056 at 21.164817785s
+progress 3700/7056 at 21.31345345s
+progress 3725/7056 at 21.460698741s
+progress 3750/7056 at 21.619095306s
+progress 3775/7056 at 21.764526618s
+progress 3800/7056 at 21.904209648s
+progress 3825/7056 at 22.065926655s
+progress 3850/7056 at 22.223575835s
+progress 3875/7056 at 22.376596276s
+progress 3900/7056 at 22.512417268s
+progress 3925/7056 at 22.671710243s
+progress 3950/7056 at 22.817327955s
+progress 3975/7056 at 22.962774135s
+progress 4000/7056 at 23.105132052s
+progress 4025/7056 at 23.264323884s
+progress 4050/7056 at 23.395250065s
+progress 4075/7056 at 23.520027011s
+progress 4100/7056 at 23.651068342s
+progress 4125/7056 at 23.772172843s
+progress 4150/7056 at 23.898386435s
+progress 4175/7056 at 24.020113949s
+progress 4200/7056 at 24.150693056s
+progress 4225/7056 at 24.276055602s
+progress 4250/7056 at 24.416766269s
+progress 4275/7056 at 24.539990077s
+progress 4300/7056 at 24.665274263s
+progress 4325/7056 at 24.802155395s
+progress 4350/7056 at 24.923901197s
+progress 4375/7056 at 25.051939733s
+progress 4400/7056 at 25.174516326s
+progress 4425/7056 at 25.300026411s
+progress 4450/7056 at 25.432236352s
+progress 4475/7056 at 25.547792318s
+progress 4500/7056 at 25.682562809s
+progress 4525/7056 at 25.803173655s
+progress 4550/7056 at 25.995106331s
+progress 4575/7056 at 26.166132013s
+progress 4600/7056 at 26.340845909s
+progress 4625/7056 at 26.510750516s
+progress 4650/7056 at 26.684245717s
+progress 4675/7056 at 26.86075501s
+progress 4700/7056 at 27.054192819s
+progress 4725/7056 at 27.228771911s
+progress 4750/7056 at 27.421535745s
+progress 4775/7056 at 27.599984643s
+progress 4800/7056 at 27.773848393s
+progress 4825/7056 at 27.94961521s
+progress 4850/7056 at 28.13181211s
+progress 4875/7056 at 28.32948042s
+progress 4900/7056 at 28.529485359s
+progress 4925/7056 at 28.913973366s
+progress 4950/7056 at 29.341495435s
+progress 4975/7056 at 29.818485915s
+progress 5000/7056 at 30.314471013s
+progress 5025/7056 at 30.724347976s
+progress 5050/7056 at 31.034993454s
+progress 5075/7056 at 31.342200986s
+progress 5100/7056 at 31.645648763s
+progress 5125/7056 at 31.978801134s
+progress 5150/7056 at 32.255236203s
+progress 5175/7056 at 32.537396533s
+progress 5200/7056 at 32.804894468s
+progress 5225/7056 at 33.134688188s
+progress 5250/7056 at 33.404847489s
+progress 5275/7056 at 33.6858573s
+progress 5300/7056 at 33.994653697s
+progress 5325/7056 at 34.280807454s
+progress 5350/7056 at 34.578297404s
+progress 5375/7056 at 34.839812047s
+progress 5400/7056 at 35.149742691s
+progress 5425/7056 at 35.447177326s
+progress 5450/7056 at 35.736153429s
+progress 5475/7056 at 36.036752225s
+progress 5500/7056 at 36.285899963s
+progress 5525/7056 at 36.552263836s
+progress 5550/7056 at 36.961547527s
+progress 5575/7056 at 37.352048952s
+progress 5600/7056 at 37.733755683s
+progress 5625/7056 at 38.194742608s
+progress 5650/7056 at 38.554571142s
+progress 5675/7056 at 38.978493835s
+progress 5700/7056 at 39.349820785s
+progress 5725/7056 at 39.833855115s
+progress 5750/7056 at 40.217506618s
+progress 5775/7056 at 40.637843644s
+progress 5800/7056 at 41.049507227s
+progress 5825/7056 at 41.453600676s
+progress 5850/7056 at 41.884911926s
+progress 5875/7056 at 42.292699365s
+progress 5900/7056 at 42.677357226s
+progress 5925/7056 at 43.078965609s
+progress 5950/7056 at 43.523236513s
+progress 5975/7056 at 44.021479873s
+progress 6000/7056 at 44.381797384s
+progress 6025/7056 at 44.801521872s
+progress 6050/7056 at 45.063619174s
+progress 6075/7056 at 45.347245952s
+progress 6100/7056 at 45.583531068s
+progress 6125/7056 at 45.842010575s
+progress 6150/7056 at 46.091246946s
+progress 6175/7056 at 46.321585117s
+progress 6200/7056 at 46.529695758s
+progress 6225/7056 at 46.799387471s
+progress 6250/7056 at 47.050583306s
+progress 6275/7056 at 47.2688231s
+progress 6300/7056 at 47.544142899s
+progress 6325/7056 at 47.775281429s
+progress 6350/7056 at 48.0037632s
+progress 6375/7056 at 48.250759293s
+progress 6400/7056 at 48.492715408s
+progress 6425/7056 at 48.735398156s
+progress 6450/7056 at 48.949688683s
+progress 6475/7056 at 49.21274028s
+progress 6500/7056 at 49.426966423s
+progress 6525/7056 at 49.688885255s
+progress 6550/7056 at 49.985806263s
+progress 6575/7056 at 50.391006549s
+progress 6600/7056 at 50.758508632s
+progress 6625/7056 at 51.112779776s
+progress 6650/7056 at 51.475185095s
+progress 6675/7056 at 51.880794607s
+progress 6700/7056 at 52.234354651s
+progress 6725/7056 at 52.594314986s
+progress 6750/7056 at 52.96811814s
+progress 6775/7056 at 53.263473284s
+progress 6800/7056 at 53.663908815s
+progress 6825/7056 at 54.049437843s
+progress 6850/7056 at 54.465944574s
+progress 6875/7056 at 54.779652697s
+progress 6900/7056 at 55.200058228s
+progress 6925/7056 at 55.547275782s
+progress 6950/7056 at 55.925954395s
+progress 6975/7056 at 56.265403578s
+progress 7000/7056 at 56.573512372s
+progress 7025/7056 at 56.937934691s
+progress 7050/7056 at 57.214852603s
+progress 7056/7056 at 57.342407932s
+=== 一（故障型 × 下标，不断电） 汇总 ===
+[base 丙 干净] runs=207
+[base 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 5)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[base 戊-A 干净] runs=228
+[base 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 4，新实例 2，现行 txg 7)", "重发在飞 checkpoint ok(txg 8)"] remount=ok(chosen 8) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(868352)，遍历全部有效根得到 802816；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=2 探针=1
+[base 戊-B 干净] runs=249
+[base 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 5)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[base 甲 干净] runs=221
+[base 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[base 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 5)"] remount=ok(chosen 4) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[floor_raised 丙 干净] runs=207
+[floor_raised 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 15)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 戊-A 干净] runs=228
+[floor_raised 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 14，新实例 3，现行 txg 17)", "重发在飞 checkpoint ok(txg 18)"] remount=ok(chosen 18) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1310720)，遍历全部有效根得到 1245184；机理：根环槽数 24、最新根 txg 18、环里自证过的根槽 18 个、最老的自证过的根 txg 0、遍历的候选根槽 9 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1474560)，遍历全部有效根得到 1409024；机理：根环槽数 24、最新根 txg 20、环里自证过的根槽 20 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=同一份 切换=1 只读=false 实例=3 探针=1
+[floor_raised 戊-B 干净] runs=249
+[floor_raised 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 15)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 甲 干净] runs=221
+[floor_raised 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 15) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[floor_raised 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 15)"] remount=ok(chosen 14) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1081344；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 9、低于 F 的根槽 9 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 丙 干净] runs=207
+[many_overwrites 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 13)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 戊-A 干净] runs=228
+[many_overwrites 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 12，新实例 3，现行 txg 16)", "重发在飞 checkpoint ok(txg 17)"] remount=ok(chosen 17) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1982464)，遍历全部有效根得到 1916928；机理：根环槽数 24、最新根 txg 17、环里自证过的根槽 17 个、最老的自证过的根 txg 0、遍历的候选根槽 17 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2146304)，遍历全部有效根得到 2080768；机理：根环槽数 24、最新根 txg 19、环里自证过的根槽 19 个、最老的自证过的根 txg 0、遍历的候选根槽 19 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=3 探针=1
+[many_overwrites 戊-B 干净] runs=249
+[many_overwrites 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 13)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 甲 干净] runs=221
+[many_overwrites 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 13) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[many_overwrites 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 13)"] remount=ok(chosen 12) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1818624)，遍历全部有效根得到 1753088；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 16 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[remounted 丙 干净] runs=207
+[remounted 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 8)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[remounted 戊-A 干净] runs=228
+[remounted 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 7，新实例 3，现行 txg 10)", "重发在飞 checkpoint ok(txg 11)"] remount=ok(chosen 11) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 1032192；机理：根环槽数 24、最新根 txg 11、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 13 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=3 探针=1
+[remounted 戊-B 干净] runs=249
+[remounted 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 8)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[remounted 甲 干净] runs=221
+[remounted 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 8) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=2 探针=0
+[remounted 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 8)"] remount=ok(chosen 7) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=2 探针=0
+[rolled_back 丙 干净] runs=207
+[rolled_back 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 11)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 戊-A 干净] runs=228
+[rolled_back 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 10，新实例 4，现行 txg 13)", "重发在飞 checkpoint ok(txg 14)"] remount=ok(chosen 14) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(868352)，遍历全部有效根得到 802816；机理：根环槽数 24、最新根 txg 14、环里自证过的根槽 14 个、最老的自证过的根 txg 0、遍历的候选根槽 9 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656；机理：根环槽数 24、最新根 txg 16、环里自证过的根槽 16 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=4 探针=1
+[rolled_back 戊-B 干净] runs=249
+[rolled_back 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 11)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 甲 干净] runs=221
+[rolled_back 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 11) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=3 探针=0
+[rolled_back 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 11)"] remount=ok(chosen 10) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(704512)，遍历全部有效根得到 638976；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 5 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=3 探针=0
+[txg6 丙 干净] runs=207
+[txg6 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 6)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[txg6 戊-A 干净] runs=228
+[txg6 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 5，新实例 2，现行 txg 8)", "重发在飞 checkpoint ok(txg 9)"] remount=ok(chosen 9) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(933888)，遍历全部有效根得到 868352；机理：根环槽数 24、最新根 txg 9、环里自证过的根槽 9 个、最老的自证过的根 txg 0、遍历的候选根槽 9 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1097728)，遍历全部有效根得到 1032192；机理：根环槽数 24、最新根 txg 11、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=2 探针=1
+[txg6 戊-B 干净] runs=249
+[txg6 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 6)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[txg6 甲 干净] runs=221
+[txg6 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg6 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 6)"] remount=ok(chosen 5) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(770048)，遍历全部有效根得到 704512；机理：根环槽数 24、最新根 txg 8、环里自证过的根槽 8 个、最老的自证过的根 txg 0、遍历的候选根槽 8 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[txg7 丙 干净] runs=207
+[txg7 丙 没确认的那一版] runs=21
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 丙 没确认的那一版+红] runs=21
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 丙 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 7)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[txg7 戊-A 干净] runs=228
+[txg7 戊-A 红] runs=24
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)", "探针写(盘 0) 过", "切换#1（近似：进程内可写重开）ok(所选根 txg 6，新实例 2，现行 txg 10)", "重发在飞 checkpoint ok(txg 11)"] remount=ok(chosen 11) crash红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1064960)，遍历全部有效根得到 999424；机理：根环槽数 24、最新根 txg 11、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 11 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1228800)，遍历全部有效根得到 1163264；机理：根环槽数 24、最新根 txg 13、环里自证过的根槽 13 个、最老的自证过的根 txg 0、遍历的候选根槽 13 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=1 只读=false 实例=2 探针=1
+[txg7 戊-B 干净] runs=249
+[txg7 戊-B 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 7)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+[txg7 甲 干净] runs=221
+[txg7 甲 没确认的那一版] runs=14
+    first: k=18 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 7) crash红=[] after红=[] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 甲 没确认的那一版+红] runs=14
+    first: k=16 已落盘但报错 actions=[] steps=["C err(BlockDevice)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=没确认的 C 那一份 切换=0 只读=false 实例=1 探针=0
+[txg7 甲 红] runs=3
+    first: k=18 撕裂而不报错 actions=[] steps=["C ok(txg 7)"] remount=ok(chosen 6) crash红=[] after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(901120)，遍历全部有效根得到 835584；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 10 个、最老的自证过的根 txg 0、遍历的候选根槽 10 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个\")"] 内容=同一份 切换=0 只读=false 实例=1 探针=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 57.49s
+

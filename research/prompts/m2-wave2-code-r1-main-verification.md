@@ -53,7 +53,7 @@
 | `crates/singlefs-harness/src/scenario.rs`、`crates/singlefs-harness/src/crash.rs` | 攻了：Z5（量 5 的实装一侧）；文件内容与装置不同由诊断查出，改的是装置 |
 | `crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs` | 没攻：只是跟着 `run_first_transaction` 回调多一个参数改的调用点（3 行） |
 | `crates/singlefs-harness/src/bin/first_transaction_on_device.rs` | 没攻：增补 1、增补 2 第 30 行加的 `publish_writes` 行与挂载窗口这一轮的腿没碰；同一文件里 E152（按里程碑对比六家文件系统的文件性能） 加的几种模式是别的会话的改动，不在本轮 |
-| `crates/singlefs-core/src/superblock.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-harness/src/segments.rs` | 没攻：只改了 `//!` 注释里的路径（`.claude/rules/path-moves.md`） |
+| `crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-harness/src/segments.rs` | 没攻：只改了 `//!` 注释里的路径（`.claude/rules/path-moves.md`） |
 
 ## 四、核查员查出的引用错
 

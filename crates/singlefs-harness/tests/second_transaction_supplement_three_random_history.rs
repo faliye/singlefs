@@ -1,11 +1,15 @@
 //! 里程碑「第二个事务」增补 3 第 1 件：随机历史。生成器、执行器、「已知红」清单与收缩在 `singlefs_harness::history`；
 //! 这里是快档（普通 `cargo test`）、大档（`#[ignore]`，种子数与步数从环境变量取）与清单每一条的复现。
+//!
+//! 五段取样的种子基都是 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`：这个测试周期开头抽一次、之后写死
+//! （用户 2026-09-20 定案第 7 条），崩溃注入那个二进制用的是同一个；种子数照旧写死，里程碑的验收说的是「写死的种子数之内判红」。
 
 use std::io::Write as _;
 
-use singlefs_checker::image::{chosen_superblocks, valid_roots};
+use singlefs_checker::image::{chosen_system_configurations, valid_roots};
 use singlefs_core::address::CheckpointTxg;
-use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::crash::{MemoryPool, RecordCheck};
+use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     allocated_and_walked_bytes, allocation_records_on_the_image_under, classify_failure,
     execute_history, execute_history_observing, execute_history_with, generate_history,
@@ -19,30 +23,59 @@ use singlefs_harness::history::{
 use singlefs_harness::model::{ModelCheckpointTxg, ModelInstanceGeneration, ModelRootKey};
 use singlefs_harness::SharedStream;
 
-/// 快档的种子区间与每段步数：写死，门禁每次跑同一批。
-const FAST_TIER_FIRST_SEED: u64 = 0;
+// 下面五段的种子基都是同一个：这个测试周期开头抽一次、抽完在这个周期之内写死的那个数
+// （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-20 定案第 7 条）。
+// 种子**数**（96 / 48 / 48 / 32 / 32）与每段步数照旧写死：里程碑的验收说的是「写死的种子数之内判红」，管的是数不是基。
+// 下一个测试周期重抽种子基之后，这五段跑的就是另一批历史，那时量过的判出率要重量。
+
+/// 快档的种子区间与每段步数：门禁每次跑同一批。
+const FAST_TIER_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const FAST_TIER_SEEDS: u64 = 96;
 const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 第 121 行那一类的专门取样点：种子区间与每段步数，写死（判出率与窗口大小见那条用例的注释）。
-const REUSE_SAMPLING_FIRST_SEED: u64 = 0;
+const REUSE_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const REUSE_SAMPLING_SEEDS: u64 = 48;
 const REUSE_SAMPLING_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 理想模型 B2 那一格的专门取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
-const ROLLBACK_SAMPLING_FIRST_SEED: u64 = 0;
+const ROLLBACK_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const ROLLBACK_SAMPLING_SEEDS: u64 = 48;
 const ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY: usize = 30;
 
 /// 分配记录墙那一格的取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
-const WALL_SAMPLING_FIRST_SEED: u64 = 0;
+const WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const WALL_SAMPLING_SEEDS: u64 = 32;
 const WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
 
 /// 单元区墙那一格的取样点（两块小盘）：种子区间与每段步数，写死（判出率见那条用例的注释）。
-const UNIT_AREA_WALL_SAMPLING_FIRST_SEED: u64 = 0;
+const UNIT_AREA_WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const UNIT_AREA_WALL_SAMPLING_SEEDS: u64 = 32;
 const UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
+
+/// 五段的种子基都是这个测试周期的常量：两个二进制（随机历史与崩溃注入）同基，
+/// `crates/mutations.tsv` 第 146–178 行那些「这条变异必须红」与里程碑的验收才是可判的命题——
+/// 哪一段被改回写死的别的数，那一段跑的就是另一批历史，那些判红不再是同一个命题。
+/// 常量本身是不是这个周期 2026-09-20 抽出来的那个数，由崩溃注入那个二进制的
+/// `the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle` 钉。
+#[test]
+fn the_five_sampling_tiers_start_from_the_test_cycle_seed_base() {
+    for (tier, first_seed) in [
+        ("快档", FAST_TIER_FIRST_SEED),
+        ("偏向抬 F 之后复用的取样点", REUSE_SAMPLING_FIRST_SEED),
+        ("偏向抬 F 之后回退的取样点", ROLLBACK_SAMPLING_FIRST_SEED),
+        ("逼近分配记录墙的取样点", WALL_SAMPLING_FIRST_SEED),
+        (
+            "小盘上逼近单元区墙的取样点",
+            UNIT_AREA_WALL_SAMPLING_FIRST_SEED,
+        ),
+    ] {
+        assert_eq!(
+            first_seed, SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+            "{tier}的种子基是 {first_seed}，不是这个测试周期的种子基：这一段跑的是另一批历史，变异表与验收在它上面量过的判红都不算数"
+        );
+    }
+}
 
 /// 只看准入与模型的写死用例怎么跑：不跑池级 checker（它们要在根环转过之后接着连发，checker 在已知红第 0 条那一形上会先停下），
 /// 两块 4 GiB 的盘。
@@ -390,7 +423,7 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
 
 /// 镜像上最新那条根（按 checker 的读法，(txg, 实例) 最大）的身份。
 fn newest_root_on_the_image(image: &MemoryPool) -> ModelRootKey {
-    let geometry = chosen_superblocks(image)
+    let geometry = chosen_system_configurations(image)
         .into_iter()
         .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))
         .expect("历史里的盘上至少一块系统配置自证过");
@@ -972,7 +1005,9 @@ fn an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_
         operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
         violations: vec![(
             "I-3.1",
-            "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040".to_string(),
+            // checker 在 I-3.1 的说明文字里带的机理标识：这里是「F 把 4 条读得到的根挡在了遍历之外」那一种
+            // （`singlefs-checker` 的 `walk.rs`）——机理对得上而 F 没落在空档里，所以照样是新发现。
+            "盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 983040；机理：根环槽数 24、最新根 txg 10、环里自证过的根槽 11 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 3、低于 F 的根槽 4 个".to_string(),
         )],
         panic: None,
         newest_ring_root_txg: Some(10),
@@ -980,6 +1015,7 @@ fn an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_
         harness_judgement: None,
         model_disagreement: None,
         raised_floor_lands_only_on_abandoned_roots: lands_only_on_abandoned,
+        record_check: RecordCheck::default(),
     };
     let ending = classify_failure(observation);
     assert!(
@@ -1107,11 +1143,15 @@ fn execution_from_the_environment() -> HistoryExecution {
 }
 
 /// 大档：种子数、每段步数、第一个种子、线程数、比重（`broad` / `reuse` / `rollback` / `wall` / `unit-area-wall`）、跑法
-/// （`execution_from_the_environment`）、收不收缩（`every` / `none`）从环境变量取。
+/// （`execution_from_the_environment`）、收不收缩（`every` / `none`）从环境变量取；
+/// 种子基没给就用这个测试周期写死的那一个，跟上面五段同基（给了什么就跑什么）。
 #[test]
-#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起，SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，checker SINGLEFS_RANDOM_HISTORY_CHECKER，盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
+#[ignore = "大档：SINGLEFS_RANDOM_HISTORY_SEEDS 段、每段 SINGLEFS_RANDOM_HISTORY_OPERATIONS 步，从 SINGLEFS_RANDOM_HISTORY_FIRST_SEED 起（没给就用这个测试周期写死的种子基），SINGLEFS_RANDOM_HISTORY_THREADS 个线程，比重 SINGLEFS_RANDOM_HISTORY_WEIGHTS，checker SINGLEFS_RANDOM_HISTORY_CHECKER，盘宽 SINGLEFS_RANDOM_HISTORY_DEVICES，收缩 SINGLEFS_RANDOM_HISTORY_SHRINK；release 下后台跑"]
 fn random_histories_large_tier_seeds_and_length_from_the_environment() {
-    let first_seed = number_from_environment("SINGLEFS_RANDOM_HISTORY_FIRST_SEED", 0);
+    let first_seed = number_from_environment(
+        "SINGLEFS_RANDOM_HISTORY_FIRST_SEED",
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+    );
     let seed_count = number_from_environment("SINGLEFS_RANDOM_HISTORY_SEEDS", 1000);
     let operations_per_history = usize::try_from(number_from_environment(
         "SINGLEFS_RANDOM_HISTORY_OPERATIONS",

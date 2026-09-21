@@ -23,7 +23,7 @@ pub enum WrittenStructureKind {
     InstanceTableUnit,
     JournalRecord,
     RootSlot,
-    SuperblockSlot,
+    SystemConfigurationSlot,
 }
 
 impl WrittenStructureKind {
@@ -41,7 +41,7 @@ impl WrittenStructureKind {
         WrittenStructureKind::InstanceTableUnit,
         WrittenStructureKind::JournalRecord,
         WrittenStructureKind::RootSlot,
-        WrittenStructureKind::SuperblockSlot,
+        WrittenStructureKind::SystemConfigurationSlot,
     ];
 
     /// 一个单元角色的写归哪一种。
@@ -75,7 +75,7 @@ impl WrittenStructureKind {
             WrittenStructureKind::InstanceTableUnit => "instance_table_unit",
             WrittenStructureKind::JournalRecord => "journal_record",
             WrittenStructureKind::RootSlot => "root_slot",
-            WrittenStructureKind::SuperblockSlot => "superblock_slot",
+            WrittenStructureKind::SystemConfigurationSlot => "superblock_slot",
         }
     }
 }
@@ -182,15 +182,15 @@ mod tests {
     #[test]
     fn since_keeps_only_the_later_writes_and_total_adds_every_counted_kind() {
         let mut cumulative = WritesByStructureKind::NOTHING_WRITTEN;
-        cumulative.count_write_call(WrittenStructureKind::SuperblockSlot, &[0u8; 4096]);
-        cumulative.count_write_call(WrittenStructureKind::SuperblockSlot, &[0u8; 4096]);
+        cumulative.count_write_call(WrittenStructureKind::SystemConfigurationSlot, &[0u8; 4096]);
+        cumulative.count_write_call(WrittenStructureKind::SystemConfigurationSlot, &[0u8; 4096]);
         let before_publish = cumulative.clone();
         cumulative.count_write_call(WrittenStructureKind::DataUnit, &[0u8; 32768]);
         cumulative.count_write_call(WrittenStructureKind::RootSlot, &[0u8; 512]);
-        cumulative.count_write_call(WrittenStructureKind::SuperblockSlot, &[0u8; 4096]);
+        cumulative.count_write_call(WrittenStructureKind::SystemConfigurationSlot, &[0u8; 4096]);
         let publish = cumulative.since(&before_publish);
         assert_eq!(
-            publish.of(WrittenStructureKind::SuperblockSlot),
+            publish.of(WrittenStructureKind::SystemConfigurationSlot),
             WriteCallsAndBytes {
                 write_calls: 1,
                 written_bytes: 4096
@@ -254,7 +254,7 @@ mod tests {
         for fixed_structure in [
             WrittenStructureKind::JournalRecord,
             WrittenStructureKind::RootSlot,
-            WrittenStructureKind::SuperblockSlot,
+            WrittenStructureKind::SystemConfigurationSlot,
         ] {
             every_kind_once.count_write_call(fixed_structure, &vec![0u8; next_length_in_bytes]);
             next_length_in_bytes *= 2;

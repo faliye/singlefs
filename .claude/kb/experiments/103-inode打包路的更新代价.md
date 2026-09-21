@@ -33,10 +33,10 @@
 ### 实测（2026-09-04，纯算术，N=5 轮逐字节一致，13 单测 / 11 条变异全抓）
 
 **口径与复跑**：代码 `research/e7-index-bench/src/bin/e103_inode_update_cost.rs`（`cargo run --release --bin e103-inode-update-cost`），
-产物 `research/results/e103-inode-update-cost-2026-09-14-round2.out`（131 行，收尾 `emitted=131`；子指针 86、内部条目 120 的那一版。与上一版 `e103-inode-update-cost-2026-09-12-ptr83.out`（子指针 83、条目 117）差 **49 行**：`name=config` 1 行、`name=geom` 12 行（层数向量）、`name=write` 36 行；`name=stat`、`name=write_clustered`、爆炸半径各行**逐字未变**。再上一版 `e103-inode-update-cost-2026-09-12.out` 是子指针 59、打包头 107；更早的 `e103-inode-update-cost-2026-09-07.out` 与 `e103-inode-update-cost-2026-09-05.out` 也留着不动；变异复跑 `research/results/e103_inode_update_cost-mutate-2026-09-14-round2.log` 11 条全抓，上一次是 `research/results/e103-mutate-2026-09-12-ptr83.log`），
+产物 `e103-inode-update-cost-2026-09-14-round2.out`（131 行，收尾 `emitted=131`；子指针 86、内部条目 120 的那一版。与上一版 `e103-inode-update-cost-2026-09-12-ptr83.out`（子指针 83、条目 117）差 **49 行**：`name=config` 1 行、`name=geom` 12 行（层数向量）、`name=write` 36 行；`name=stat`、`name=write_clustered`、爆炸半径各行**逐字未变**。再上一版 `e103-inode-update-cost-2026-09-12.out` 是子指针 59、打包头 107；更早的 `e103-inode-update-cost-2026-09-07.out` 与 `e103-inode-update-cost-2026-09-05.out` 也留着不动；变异复跑 `e103_inode_update_cost-mutate-2026-09-14-round2.log` 11 条全抓，上一次是 `e103-mutate-2026-09-12-ptr83.log`），
 变异表 `research/mutations/e103_inode_update_cost.tsv`
 （`bash research/scripts/mutate.sh e103-inode-update-cost research/e7-index-bench/src/bin/e103_inode_update_cost.rs research/mutations/e103_inode_update_cost.tsv`，
-记录 `research/results/e103-mutate-2026-09-05.log`），已挂 `research/scripts/replay.sh`。
+记录 `e103-mutate-2026-09-05.log`），已挂 `research/scripts/replay.sh`。
 
 **几何（头 58，1e6 个 inode）**：住索引叶 8621 叶 → 50 → 1（高 3）；打包 4292 个容器，容器索引 30 叶 → 1（高 2；条目 26 + 86 = 112，扇出 145），
 inode 树按身份引用时叶扇出 466（条目 8 + 27）、高 3。

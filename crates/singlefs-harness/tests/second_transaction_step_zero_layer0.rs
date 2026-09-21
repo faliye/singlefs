@@ -16,10 +16,10 @@ use singlefs_core::mount::{
     mount_rollback, mount_writable, raise_rollback_floor, InstanceRow, RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
-    choose_superblock, recover, scan_journal, JournalPolicy, PoolReader, RecoveryOutcome,
+    choose_system_configuration, recover, scan_journal, JournalPolicy, PoolReader, RecoveryOutcome,
     RecoveryReport,
 };
-use singlefs_core::superblock::Superblock;
+use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_core::unit::{UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
 use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES};
@@ -338,23 +338,22 @@ fn prepare(tag: &str, script: Script) -> Prepared {
 }
 
 fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
-    assert_checker_and_record_checker_counts(tally, &[], 0);
+    assert_checker_and_record_checker_counts(tally, &[]);
 }
 
-/// `known_checker_violations` 与 `known_record_claimed_state_missing_unit` 只给两条只展开小段的流用：它们钉的是两处口径未定的分歧的现状
-/// （见各自用例的注释），不是认下来的行为；其余不变量判违例的状态数必须是 0。
+/// `known_checker_violations` 只给一条只展开小段的流用：它钉的是一处口径未定的分歧的现状（见那条用例的注释），
+/// 不是认下来的行为；其余不变量判违例的状态数必须是 0。
 fn assert_checker_and_record_checker_counts(
     tally: &Layer0Tally,
     known_checker_violations: &[(&str, u64)],
-    known_record_claimed_state_missing_unit: u64,
 ) {
     assert_eq!(
         (
             tally.record_root_without_record,
             tally.record_claimed_state_missing_unit
         ),
-        (0, known_record_claimed_state_missing_unit),
-        "记录核对器两条判据在已定的持久顺序下恒 0（第二条在合法复用上的已知分歧除外）"
+        (0, 0),
+        "记录核对器两条判据在已定的持久顺序下恒 0"
     );
     for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
         let expected_violated_states = known_checker_violations
@@ -726,7 +725,9 @@ fn residual_record_and_its_named_units(
         .iter()
         .filter(|retained| match geometry().classify(&retained.operation) {
             StepKind::UnitWrite | StepKind::JournalRecord => true,
-            StepKind::RootRecordFua | StepKind::SuperblockSlot | StepKind::Barrier => false,
+            StepKind::RootRecordFua | StepKind::SystemConfigurationSlot | StepKind::Barrier => {
+                false
+            }
         })
         .cloned()
         .collect();
@@ -988,7 +989,7 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
     // 正是残留记录那一版（(1, 5)，根槽从没落盘、只由记录施加出来）自己的四个固定点单元 50261–50264——写行发布 txg 6 把它们释放进 defer，
     // 环里没有一条根引用它们。checker 的「已分配 = 候选根引用的并集」与分配器「defer 里的仍算已分配」在「由记录施加出来的那一版」上分歧，
     // 改哪一边是 I-3.1 口径的设计问题；这里钉的是现状，不是认下来的行为。
-    assert_checker_and_record_checker_counts(&tally, &[("I-3.1", 12)], 0);
+    assert_checker_and_record_checker_counts(&tally, &[("I-3.1", 12)]);
 }
 
 /// 改坏 tail 的 tail 值：窗口 [3, 18] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 18 被合法复用。
@@ -999,21 +1000,21 @@ fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> 
     writes
         .iter()
         .map(|write| match write.kind {
-            StepKind::SuperblockSlot => {
-                let mut superblock =
-                    Superblock::parse_slot(&write.bytes).expect("录到的超级块槽写都自证得过");
+            StepKind::SystemConfigurationSlot => {
+                let mut system_configuration = SystemConfiguration::parse_slot(&write.bytes)
+                    .expect("录到的系统配置槽写都自证得过");
                 assert_eq!(
-                    superblock.to_slot(),
+                    system_configuration.to_slot(),
                     write.bytes,
                     "按字段重写一遍与录到的逐字节相同：改坏的只有 tail"
                 );
-                superblock.journal_tail = stale_tail;
+                system_configuration.quantities.journal_tail = stale_tail;
                 RetainedWrite {
                     device: write.device,
                     kind: write.kind,
                     is_force_unit_access: write.is_force_unit_access,
                     offset: write.offset,
-                    bytes: superblock.to_slot(),
+                    bytes: system_configuration.to_slot(),
                 }
             }
             StepKind::UnitWrite
@@ -1029,8 +1030,8 @@ fn records_after_tail_naming_a_mismatched_unit(
     crash_image: &CrashImage<'_>,
     tail: u64,
 ) -> Vec<u64> {
-    let superblock = choose_superblock(crash_image).expect("超级块");
-    scan_journal(crash_image, &superblock)
+    let system_configuration = choose_system_configuration(crash_image).expect("系统配置");
+    scan_journal(crash_image, &system_configuration)
         .values()
         .filter(|record| record.counter > tail)
         .filter(|record| {
@@ -1096,8 +1097,9 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         &expand,
         &mut |stale_tail_image, stale_tail_report| {
             assert_eq!(
-                choose_superblock(stale_tail_image)
+                choose_system_configuration(stale_tail_image)
                     .expect("系统配置")
+                    .quantities
                     .journal_tail,
                 STALE_JOURNAL_TAIL,
                 "展开的状态里择到的系统配置都带陈旧的 tail"
@@ -1161,9 +1163,11 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         "陈旧失配不进施加前验证的计数器：水位之下的记录不验"
     );
     assert_eq!(tally.ignored_violations, 0);
-    // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在 8 个状态上都判：A（txg 3）的数据单元两份被 txg 18 合法复用了。
-    // 这条判据写成时流里没有复用，它不认「被流里更晚、已持久的写盖掉」——口径未定（2026-09-17 写这条用例时发现），这里钉的是现状，不是认下来的行为。
-    assert_checker_and_record_checker_counts(&tally, &[], 8);
+    // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在这 8 个状态上判绿：
+    // A（txg 3）的数据单元两份被 txg 18 合法复用了，而「被流里更晚的写盖过的那一份不算缺席」——
+    // 2026-09-17 写这条用例时这一格口径未定、钉的是当时的 8，2026-09-20 按崩溃注入（增补 3 第 3 件）落地时定成前一种：
+    // 位置让给了后来的写，旧字节本来就不该还在，那不是崩溃摆出来的洞。改回去这条用例就红（`crates/mutations.tsv`）。
+    assert_checker_and_record_checker_counts(&tally, &[]);
 
     // 撕裂注入：txg 18 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
     // 验证失败恰为 1 次：陈旧 tail 之后那条点名块已被复用的记录（jsn 3）不进这个计数器，真撕裂与陈旧失配分得开。

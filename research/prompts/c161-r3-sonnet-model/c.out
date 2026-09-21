@@ -1,5 +1,0 @@
-{'placement': 'root', 'r_old_txg': 0, 'restored_counter': 3, 'reachable_max_seq_before_new_writes': 3, 'new_msgs': [4, 5, 6], 'collision': False}
-{'placement': 'superblock', 'r_old_txg': 0, 'restored_counter': 9, 'reachable_max_seq_before_new_writes': 3, 'new_msgs': [10, 11, 12], 'collision': False}
-root placement collision: False (counter correctly reverts to 3 together with the chosen root; new seq 4,5,6 do not collide with anything reachable from R_old)
-superblock placement collision: False (counter stayed at 9 from the abandoned g2, new seq 10,11,12 are *larger* than anything reachable -- no collision either, but the counter now silently skips 4..9 forever, a live seq range that was never actually consumed by anything reachable from R_old)
-emitted=2

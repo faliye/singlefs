@@ -6,7 +6,7 @@
 **为什么要跑**：用户 2026-09-10 对「每头一棵自己的树」逐字判「**这个有点狂暴了吧。你看看数值和性能呢。
 好的话也不是不能接受**」。形态照 D3（空间分配） 已定项 7 的先例（用户定案 + E97（记账与分配记录的条目编码））。
 
-**跑前写死**：`research/prompts/e131-preregistration.md`（含一格触发结果是「`per_head` 输」的判据，
+**跑前写死**：`e131-preregistration.md`（含一格触发结果是「`per_head` 输」的判据，
 也含「结果反过来我接不接受」）。
 
 **复跑命令**（`exact` 模式，与留存产物逐字节比对）：
@@ -18,7 +18,7 @@ cd research && cargo run --release --bin e131_livelist_carrier
 ```
 
 代码 `research/e7-index-bench/src/bin/e131_livelist_carrier.rs`，
-原始输出 `research/results/e131-livelist-carrier-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
+原始输出 `e131-livelist-carrier-2026-09-10.out`（一次运行，扫的格写在「臂与口径」那一节）。
 
 ### 这是计数模型，不是实现——它证明不了什么
 
@@ -41,7 +41,7 @@ cd research && cargo run --release --bin e131_livelist_carrier
 
 ### 结论：`per_head` 在跑前写死的五格上一格都没输
 
-产物逐行抄自 `research/results/e131-livelist-carrier-2026-09-16.out`。
+产物逐行抄自 `e131-livelist-carrier-2026-09-16.out`。
 
 | 跑前写死的判据 | 产物 | 判 |
 |---|---|---|

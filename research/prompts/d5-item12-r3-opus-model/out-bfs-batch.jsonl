@@ -1,8 +1,0 @@
-{"section": "bfs-snap", "arm": "BING_R", "cfg": {}, "found": true, "path": [["PS", 11], ["W", 11, 1], ["PS", 11], ["K", 11, 0], ["D", 13], ["D", 12], ["BS", 9]], "over": [], "double": 1, "leak": [], "explored": 27687, "states": 15799}
-{"section": "bfs-snap", "arm": "YI", "cfg": {}, "found": false, "explored": 74766, "states": 34264, "depth_reached": 8, "truncated": false}
-{"section": "bfs-snap", "arm": "BING_T", "cfg": {}, "found": false, "explored": 77479, "states": 36155, "depth_reached": 8, "truncated": false}
-{"section": "bfs-snap", "arm": "BING_R", "cfg": {"order": "lineage"}, "found": false, "explored": 104223, "states": 49686, "depth_reached": 8, "truncated": false}
-{"section": "bfs-safe", "arm": "BING_R", "cfg": {}, "found": false, "explored": 151403, "states": 60959, "depth_reached": 8, "truncated": false}
-{"section": "bfs-safe", "arm": "YI", "cfg": {}, "found": false, "explored": 87727, "states": 35961, "depth_reached": 8, "truncated": false}
-{"section": "bfs-safe", "arm": "BING_T", "cfg": {}, "found": false, "explored": 90898, "states": 37854, "depth_reached": 8, "truncated": false}
-{"section": "END", "rows": 7}

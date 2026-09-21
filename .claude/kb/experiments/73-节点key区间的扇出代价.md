@@ -110,7 +110,7 @@ COW 下改一条 key 要重写的节点数 = 树高，两条臂**逐格相同**�
 
 - 代码 `research/e7-index-bench/src/bin/e73_key_range.rs`
   （`cargo run --release --bin e73-key-range`），
-  原始输出 `research/results/e73-key-range-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e73-key-range-2026-09-01.out，留在 results/ 里不动）`（26 行，收尾行 `emitted=26`）。
+  原始输出 `e73-key-range-2026-09-07.out`（2026-09-07 按今天成立的头宽重跑；补账前那份是 `e73-key-range-2026-09-01.out，留在 results/ 里不动）`（26 行，收尾行 `emitted=26`）。
 - **N=5 轮逐字节一致**（同一个 md5）。**8 个单测，8 条变异逐条命中、0 个盲区**，
   变异表 `research/mutations/e73_key_range.tsv`
   （`bash research/scripts/mutate.sh e73-key-range research/e7-index-bench/src/bin/e73_key_range.rs research/mutations/e73_key_range.tsv`）。

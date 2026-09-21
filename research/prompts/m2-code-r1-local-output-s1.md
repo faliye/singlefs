@@ -1,9 +1,0 @@
-1. Could not construct such a history. The code marks released slots as occupied during the defer window, preventing the allocator from handing them out while the checkpoint 3 root is still in the ring. The slots remain occupied until the defer window expires, ensuring no reuse while referenced.
-
-2. Yes. After checkpoint 4's allocation records are written (releasing checkpoint 3's units with slots marked occupied) but before checkpoint 4's root is written, a crash occurs. The root ring still contains only checkpoint 3's root. The accounting rows show allocated bytes for 23 slots (mkfs 3 + checkpoint 3 10 + checkpoint 4 new 10), but the union of slots referenced by the valid root (checkpoint 3) is only 13 slots (mkfs 3 + checkpoint 3's 10). This violates the allocated-bytes rule (23 ≠ 13).
-
-3. Yes. An allocation tree with 18 records (a multiple of 2 but less than 20, the minimum 10 × disk count for 2 disks). Recovery should reject it due to record count below 20, but the current code accepts it as a multiple of the disk count without checking the lower bound.
-
-4. Could not construct such a state. If checkpoint 4's journal record persists but one unit fails verification, journal replay does not apply it. The effective root is checkpoint 3, and the file read matches checkpoint 3's content. The oracle correctly reports no violation since the effective root has a known content version (3) and the read matches.
-
-5. Wrong release checkpoint (e.g., allocation records for checkpoint 3 released during checkpoint 4 with checkpoint field set to 3 instead of 4), tree table birth checkpoint changed (e.g., checkpoint 4 tree entries keep birth checkpoint 3 instead of 4), superblock change counter not advanced (e.g., change counter remains 3 after checkpoint 4), and allocation records for released units lacking the released flag set in the span field (though this may be caught by accounting, it is not explicitly checked).

@@ -13,7 +13,7 @@ use singlefs_format::{
     index_node_header_bytes, DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, JOURNAL_HEADER_BYTES,
     JOURNAL_NAMED_ENTRY_BYTES, JOURNAL_RECORD_BYTES, NODE_BYTES,
     NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES, ROOT_RECORD_BYTES,
-    SUPERBLOCK_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
 /// checker 自己解析出来的判定宽度：探测到的，或系统配置声明的（探不到时报「声明值，未探测」，不许当成探到的）。
@@ -116,7 +116,7 @@ pub enum Verdict {
 
 /// 系统配置槽解出来的几个要紧字段。
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SuperblockView {
+pub struct SystemConfigurationView {
     pub filesystem_identifier: [u8; 16],
     pub this_device: u32,
     pub device_count: u32,
@@ -126,14 +126,15 @@ pub struct SuperblockView {
     pub journal_instance: u32,
 }
 
-const SUPERBLOCK_MAGIC: &[u8; 4] = b"SFSB";
+const SYSTEM_CONFIGURATION_MAGIC: &[u8; 4] = b"SFSB";
 const ROOT_MAGIC: &[u8; 4] = b"SFSR";
 const UNIT_MAGIC: &[u8; 4] = b"SFSU";
-const SUPERBLOCK_FEATURE_BITS_OFFSET: usize = 6;
-const SUPERBLOCK_FSID_OFFSET: usize = 102;
-const SUPERBLOCK_CHECKSUM_OFFSET: usize = 155;
-const SUPERBLOCK_PHYSICAL_BLOCK_SIZE_OFFSET: usize = 155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
-const SUPERBLOCK_TAIL_OFFSET: usize = 469;
+const SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET: usize = 6;
+const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 102;
+const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 155;
+const SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET: usize =
+    155 + 32 + 16 + 12 + 4 + 1 + 1 + 80 + 16;
+const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
 const ROOT_CHECKSUM_OFFSET: usize = 138;
 const UNIT_HEADER_CHECKSUM_OFFSET: usize = 10;
 
@@ -153,44 +154,53 @@ pub(crate) fn read_u64(bytes: &[u8], offset: usize) -> u64 {
 }
 
 /// 判一个系统配置槽（4096 字节）。
-pub fn check_superblock_slot(slot: &[u8]) -> Result<SuperblockView, Verdict> {
-    let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
+pub fn check_system_configuration_slot(slot: &[u8]) -> Result<SystemConfigurationView, Verdict> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     if slot.len() < slot_bytes {
         return Err(Verdict::TooShort);
     }
-    if &slot[..4] != SUPERBLOCK_MAGIC {
+    if &slot[..4] != SYSTEM_CONFIGURATION_MAGIC {
         return Err(Verdict::BadMagic);
     }
-    if !checksum_field_holds(slot, slot_bytes, SUPERBLOCK_CHECKSUM_OFFSET) {
+    if !checksum_field_holds(slot, slot_bytes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET) {
         return Err(Verdict::ChecksumMismatch);
     }
-    let incompat = &slot[SUPERBLOCK_FEATURE_BITS_OFFSET..SUPERBLOCK_FEATURE_BITS_OFFSET + 32];
+    let incompat = &slot
+        [SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 32];
     if incompat[0] & !0x01 != 0
         || incompat[1..].iter().any(|byte| *byte != 0)
         || incompat[0] & 0x01 == 0
     {
         return Err(Verdict::UnknownIncompatBit);
     }
-    Ok(SuperblockView {
-        filesystem_identifier: slot[SUPERBLOCK_FSID_OFFSET..SUPERBLOCK_FSID_OFFSET + 16]
+    Ok(SystemConfigurationView {
+        filesystem_identifier: slot
+            [SYSTEM_CONFIGURATION_FSID_OFFSET..SYSTEM_CONFIGURATION_FSID_OFFSET + 16]
             .try_into()
             .expect("16 字节"),
-        this_device: read_u32(slot, SUPERBLOCK_FSID_OFFSET + 16 + 20 + 1),
-        device_count: read_u32(slot, SUPERBLOCK_FSID_OFFSET + 16 + 20 + 1 + 4),
-        slot_generation: read_u64(slot, SUPERBLOCK_FSID_OFFSET + 16 + 20 + 1 + 8),
-        declared_physical_block_size: read_u32(slot, SUPERBLOCK_PHYSICAL_BLOCK_SIZE_OFFSET),
-        journal_tail: read_u64(slot, SUPERBLOCK_TAIL_OFFSET),
-        journal_instance: read_u32(slot, SUPERBLOCK_TAIL_OFFSET + 8),
+        this_device: read_u32(slot, SYSTEM_CONFIGURATION_FSID_OFFSET + 16 + 20 + 1),
+        device_count: read_u32(slot, SYSTEM_CONFIGURATION_FSID_OFFSET + 16 + 20 + 1 + 4),
+        slot_generation: read_u64(slot, SYSTEM_CONFIGURATION_FSID_OFFSET + 16 + 20 + 1 + 8),
+        declared_physical_block_size: read_u32(
+            slot,
+            SYSTEM_CONFIGURATION_PHYSICAL_BLOCK_SIZE_OFFSET,
+        ),
+        journal_tail: read_u64(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET),
+        journal_instance: read_u32(slot, SYSTEM_CONFIGURATION_TAIL_OFFSET + 8),
     })
 }
 
 /// 择槽（D22（单元原子性怎么合成） 已定项 16）：校验和过且世代号最大的那个。
 #[must_use]
-pub fn choose_superblock(slots: &[&[u8]]) -> Option<(usize, SuperblockView)> {
+pub fn choose_system_configuration(slots: &[&[u8]]) -> Option<(usize, SystemConfigurationView)> {
     slots
         .iter()
         .enumerate()
-        .filter_map(|(index, slot)| check_superblock_slot(slot).ok().map(|view| (index, view)))
+        .filter_map(|(index, slot)| {
+            check_system_configuration_slot(slot)
+                .ok()
+                .map(|view| (index, view))
+        })
         .max_by_key(|(_, view)| view.slot_generation)
 }
 
@@ -623,11 +633,11 @@ mod tests {
     #[test]
     fn garbage_slots_are_rejected_with_the_right_reason() {
         assert_eq!(
-            check_superblock_slot(&[0u8; 4096]).unwrap_err(),
+            check_system_configuration_slot(&[0u8; 4096]).unwrap_err(),
             Verdict::BadMagic
         );
         assert_eq!(
-            check_superblock_slot(&[0u8; 10]).unwrap_err(),
+            check_system_configuration_slot(&[0u8; 10]).unwrap_err(),
             Verdict::TooShort
         );
         assert_eq!(
@@ -635,6 +645,6 @@ mod tests {
             Verdict::BadMagic
         );
         assert_eq!(check_unit(&[0u8; 16384]).unwrap_err(), Verdict::BadMagic);
-        assert_eq!(choose_superblock(&[&[0u8; 4096][..]]), None);
+        assert_eq!(choose_system_configuration(&[&[0u8; 4096][..]]), None);
     }
 }

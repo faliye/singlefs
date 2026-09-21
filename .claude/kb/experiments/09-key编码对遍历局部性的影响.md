@@ -64,7 +64,7 @@ depth-first 创建（解压 tar 的形态）时 `Inode` 与 `Locality` **逐位�
 5 个种子（3/7/11/13/17）取中位数。
 代码 `research/e7-index-bench/src/bin/e9_keylayout.rs`，
 调用 `cargo run --release --bin e9-keylayout -- <镜像> <种子> interleave <cache_leaves> <改名次数>`；
-输出 `research/results/e9-keylayout-2026-08-28.out`（25 轮，完成标记 25 个）。
+输出 `e9-keylayout-2026-08-28.out`（25 轮，完成标记 25 个）。
 
 ⚠️ **那 25 轮是一个循环拼出来的，而这个循环 2026-08-29 之前没写进本文**——
 复跑的人只能从产物的 config 行反推参数。逐字补上（`cache_leaves` 恒为 8）：

@@ -11,7 +11,7 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemOutput, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
     TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::superblock::FormatTimeGeometry;
+use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
     PublishError, TransactionOutput, WarmUpOutput,
@@ -46,7 +46,7 @@ pub fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
         region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: FormatTimeGeometry {
+        geometry: SystemImmutableSizes {
             physical_block_size: 512,
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
@@ -104,7 +104,7 @@ fn reopen_recorded_images(
         .iter()
         .enumerate()
         .map(|(index, path)| {
-            let file = FileBackedBlockDevice::open_or_create(
+            let file = FileBackedBlockDevice::open_existing_image_file(
                 path,
                 IMAGE_BYTES,
                 PhysicalBlockSizeInBytes(512),
@@ -125,7 +125,7 @@ fn reopen_cold_images(paths: &[PathBuf]) -> Vec<(DeviceIdentity, FileBackedBlock
         .iter()
         .enumerate()
         .map(|(index, path)| {
-            let device = FileBackedBlockDevice::open_or_create(
+            let device = FileBackedBlockDevice::open_existing_image_file(
                 path,
                 IMAGE_BYTES,
                 PhysicalBlockSizeInBytes(512),
@@ -154,7 +154,7 @@ fn formatted_recorded_images(
     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
-        let file = FileBackedBlockDevice::open_or_create(
+        let file = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
             IMAGE_BYTES,
             PhysicalBlockSizeInBytes(512),
@@ -290,7 +290,7 @@ pub fn memory_pool_of_sparse_devices(
 /// 才算「在任何写之前拒绝」（录制流不多一步 = 一个写、一道屏障都没发）。
 #[derive(Debug, PartialEq, Eq)]
 pub struct DiskSnapshot {
-    pub superblock_slots: Vec<Vec<u8>>,
+    pub system_configuration_slots: Vec<Vec<u8>>,
     pub readable_roots: Vec<singlefs_core::root_record::RootRecord>,
     pub recorded_operations: usize,
 }
@@ -298,11 +298,12 @@ pub struct DiskSnapshot {
 pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot {
     use singlefs_core::recovery::PoolReader;
     let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
-    let slot_bytes = usize::try_from(singlefs_format::SUPERBLOCK_SLOT_BYTES).expect("4096");
-    let mut superblock_slots = Vec::new();
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut system_configuration_slots = Vec::new();
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
         for offset in [0, spacing] {
-            superblock_slots.push(
+            system_configuration_slots.push(
                 PoolReader::read(
                     image,
                     device,
@@ -313,14 +314,15 @@ pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot 
             );
         }
     }
-    let superblock = singlefs_core::recovery::choose_superblock(image).expect("超级块");
+    let system_configuration =
+        singlefs_core::recovery::choose_system_configuration(image).expect("系统配置");
     DiskSnapshot {
-        superblock_slots,
+        system_configuration_slots,
         readable_roots: singlefs_core::recovery::readable_roots(
             image,
-            &superblock.region_devices,
-            &superblock.geometry,
-            &superblock.filesystem_identifier,
+            &system_configuration.immutable.region_devices,
+            &system_configuration.immutable.sizes,
+            &system_configuration.immutable.filesystem_identifier,
         ),
         recorded_operations: stream.operations().len(),
     }

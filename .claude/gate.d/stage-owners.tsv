@@ -55,7 +55,6 @@
 88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
 89-stage-selftest.sh	gate-triage	项目本地阶段自己会不会红
 63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表
-64-moved-paths.sh	sweep	搬过的文件与目录全仓不再指向旧路径；搬迁的回扫归回扫员
 65-relay-timing.sh	experiment-runner	装置里读子进程输出的循环不许一边打时间戳一边转打；写装置的是执行员
 66-abandoned-rounds.sh	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，材料员与腿跑它只会红，提交前核
 67-milestone-closeout-owed.sh	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行，都在它手上变红
@@ -69,3 +68,5 @@
 76-second-txn-hooks.sh	kb-scribe	第二个事务的 layout/02 登记表、里程碑各步「写出的字节」、layout/01 段序列登记表三处互相挂钩
 77-test-environment.sh	crash-verifier,gate-triage	跑完测试之后机器还干不干净：崩溃验证员跑完重阶段、门禁分诊提交前各跑一次
 78-owed-cited-tests.sh	kb-scribe,gate-triage	已还清的欠账行里点名的测试名还在不在：书记员改完欠账表、门禁分诊提交前各跑一次
+90-term-renames.sh	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
+91-archive-past-rounds.sh	sweep	上一轮实验记录的归档属于回扫：与「撤回一个数之后全仓找还在引它的地方」同类

@@ -1,4 +1,0 @@
-{"section": "bfs-crash-deep", "arm": "BING_R", "cfg": {}, "found": false, "explored": 6000000, "states": 3253334, "depth_reached": 9, "truncated": true}
-{"section": "bfs-crash-deep", "arm": "YI", "cfg": {}, "found": false, "explored": 6000000, "states": 3212701, "depth_reached": 9, "truncated": true}
-{"section": "bfs-crash-deep", "arm": "BING_T", "cfg": {}, "found": false, "explored": 6000000, "states": 3217554, "depth_reached": 9, "truncated": true}
-{"section": "END", "rows": 3}

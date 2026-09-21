@@ -20,7 +20,7 @@ pub mod records;
 pub mod recovery;
 pub mod root_record;
 pub mod root_ring;
-pub mod superblock;
+pub mod system_configuration;
 pub mod transaction;
 pub mod unit;
 pub mod write_accounting;

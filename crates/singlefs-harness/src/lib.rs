@@ -14,6 +14,7 @@ use singlefs_core::block_device::{
 };
 
 pub mod crash;
+pub mod crash_injection;
 pub mod device_log;
 pub mod first_transaction_regions;
 pub mod hexadecimal;

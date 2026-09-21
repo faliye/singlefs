@@ -1,7 +1,0 @@
-  ✓ 锚点预扫：136 条变异，原文都恰好命中一次
-  ✓ 第 129 行 增补 3 第 1 件：随机历史快档判出「复用时追加记录而不改写」（第 41 行同一处）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
-  ✓ 第 130 行 增补 3 第 1 件：随机历史偏向抬 F 之后复用的取样点判出「复用时新记录罩住的已回收记录不删」（第 121 行同一处）：reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms 红了
-  ✓ 第 139 行 增补 3 第 1 件（代码三方第一轮第 1 条）：已知红第 1 条不看 F 是否落在回退留下的空档里：an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_is_a_new_finding 红了
-  ✓ 第 140 行 增补 3 第 1 件（代码三方第一轮第 3 条）：随机历史快档判出「复用改写已回收记录时不改分配代」（N2）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
-  ✓ 第 141 行 增补 3 第 1 件（代码三方第一轮第 4 条）：随机历史快档判出「checker 判绿的镜像上冷启动读回报错」（B6：补齐字节从最后一个载荷字节算起）：random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation 红了
-exit 0

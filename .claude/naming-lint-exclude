@@ -2,7 +2,7 @@
 # 一行一条：<相对路径>  # 为什么。按文件列的那些是 0.0.41 命名纪律的回扫账：改完一个文件就删它那一行，只删不加；新文件照查。按目录列的 research/prompts 是原样保存的证据，不回收（evidence-discipline.md「原样保存的证据不许事后改」：门禁也得绕开这批目录）。
 research/e7-index-bench/src/bin/e114_pack_ledger.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M6/M7 的原文当日现查已各命中 1 次，改名时要连表一起改
 research/e7-index-bench/src/bin/e116_pack_settle.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处。M16 的原文当日现查已命中 1 次，改名时要连表一起改
-research/e7-index-bench/src/bin/e126_superblock_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
+research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs  # 回扫已改完，剩 5 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 5
 research/e7-index-bench/src/bin/e17_merge.rs  # 回扫跳过：还没回扫，2026-09-16 现查 55 处（多为单字母循环变量与闭包参数）。溢出那条已修（阳性对照不再 panic、replay 跑得出产物），改名时要连变异表 M4 的锚点一起改
 research/e7-index-bench/src/bin/e34_ring_iomin.rs  # 回扫已改完，剩 8 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 8
 research/e7-index-bench/src/bin/e41_root_ring_geom.rs  # 回扫已改完，剩 7 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 7

@@ -22,8 +22,8 @@ use singlefs_core::records::{
     STATISTIC_FREE_BYTES, STATISTIC_INODE_WATERMARK,
 };
 use singlefs_core::recovery::{
-    choose_superblock, recover, JournalPolicy, JournalScanReport, PoolReader, RecoveryFailure,
-    RecoveryOutcome,
+    choose_system_configuration, recover, JournalPolicy, JournalScanReport, PoolReader,
+    RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
@@ -173,10 +173,10 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     let root = RootRecord::parse_slot(&root_bytes, &parameters().filesystem_identifier)
         .expect("根槽自证过");
     assert_eq!(root, second.root);
-    let superblock = choose_superblock(&image).expect("超级块");
-    assert_eq!(superblock.journal_tail, 4);
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
+    assert_eq!(system_configuration.quantities.journal_tail, 4);
     assert_eq!(
-        superblock.slot_generation, 6,
+        system_configuration.quantities.slot_generation, 6,
         "mkfs 1、取号 2、暖机 3 / 4、A 5、B 6"
     );
 }

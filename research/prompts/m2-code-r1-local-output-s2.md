@@ -1,9 +1,0 @@
-1. Yes. After checkpoint 4 is written, checkpoint 3's units are marked as released with checkpoint 4. Checkpoint 3's root remains in the root ring. During checkpoint 5, the allocator reuses slot 50180 (previously checkpoint 3's data unit) for new data. When reading the checkpoint 3 data, the system reads slot 50180 and retrieves checkpoint 5's data instead, corrupting the historical data.
-
-2. Yes. After checkpoint 4, checkpoint 3's units are released. The root ring size is 5, so checkpoint 3's root is removed by checkpoint 8. From checkpoint 9 to 14 (defer window of 10 checkpoints), allocated bytes count includes checkpoint 3's released slots. At checkpoint 10, the union of slots referenced by roots in the ring (checkpoints 5-10) does not include checkpoint 3's slots, but allocated bytes still counts them. The checker rule fails because allocated bytes > union of referenced slots.
-
-3. Yes. Create an allocation tree with 20 records (10 per disk) where two entries reference slot 50180 on both disks. Recovery accepts it because the record count is a multiple of the disk count (2) and >=20, but the duplicate slot violates uniqueness constraints.
-
-4. No. If checkpoint 4's journal record persisted but one unit failed verification, the journal replay does not apply it. The effective root is checkpoint 3 (if valid), and file read matches checkpoint 3's content. The oracle correctly reports no violation. If checkpoint 3's root is invalid, recovery reports no file (as checkpoints 1-2 have no version), which is correct.
-
-5. Wrong release checkpoint (e.g., setting allocation record checkpoint to 2 instead of 4), mapping tree entries for released units remaining, tree table birth checkpoint changed to 4 instead of 3, superblock generation not advanced from 3 to 4, back chain CRC pointing to checkpoint 4's header instead of checkpoint 3's, allocation records rewritten for incorrect slots, journal record commit flag not verified during replay.

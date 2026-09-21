@@ -69,11 +69,11 @@ eebca3173de917629c12ba8a6a81b4deeba1d27fa8f88ffcbb5baadda1d2ac0f  selftest_disti
 $ grep -rn "\.journal_tail" --include=*.rs crates/ | wc -l
 8
 $ grep -rn "\.journal_tail" --include=*.rs crates/*/src/
-crates/singlefs-core/src/superblock.rs:144:        writer.put_u64(self.journal_tail);
+crates/singlefs-core/src/system_configuration.rs:144:        writer.put_u64(self.journal_tail);
 ```
 
-命中 8 处，`crates/*/src/` 下只有 1 处（`superblock.rs:144`，写入侧 `self.journal_tail` 序列化），其余 7 处全在 `tests/`——
-这一半与报告数字（「命中的七处全在 tests/」）对得上。但报告原句「除了 `superblock.rs` 的字段定义**与 `transaction.rs` 的写入侧**，一处读都没有」
+命中 8 处，`crates/*/src/` 下只有 1 处（`crates/singlefs-core/src/system_configuration.rs:144`，写入侧 `self.journal_tail` 序列化），其余 7 处全在 `tests/`——
+这一半与报告数字（「命中的七处全在 tests/」）对得上。但报告原句「除了 `crates/singlefs-core/src/system_configuration.rs` 的字段定义**与 `transaction.rs` 的写入侧**，一处读都没有」
 **这半句不准**：`\.journal_tail` 这个模式在 `transaction.rs` 里零命中（该文件写侧用的是不带点的字段初始化 `journal_tail: plan.counter,`，不是 `self.journal_tail`），
 不存在报告所说的「transaction.rs 的写入侧」这个命中。
 
@@ -88,7 +88,7 @@ $ grep -n "journal_tail" crates/singlefs-checker/src/lib.rs
 ```
 
 `crates/singlefs-checker/src/lib.rs:182` 确实是一处「读」（从字节解析出字段），与主 agent 指出的一致；`src/` 下用宽口径命中 15 处，不是 10 处
-（差异未查明，留给主 agent）。**实质核实**：用 `\.journal_tail`（真正的字段访问）在全仓 `.rs` 搜，除 `superblock.rs:144` 写入侧外零命中，
+（差异未查明，留给主 agent）。**实质核实**：用 `\.journal_tail`（真正的字段访问）在全仓 `.rs` 搜，除 `crates/singlefs-core/src/system_configuration.rs:144` 写入侧外零命中，
 `checker::SuperblockView.journal_tail` 解析出来之后没有任何 `.journal_tail` 访问消费它（`choose_superblock` 按 `slot_generation` 择槽，不看 `journal_tail`）。
 **判定**：Opus 报告「一处读都没有」按字面（含 checker 的解析）**不准**（✗，应为「除写入侧的字段序列化外，唯一一次字节解析在 `checker/lib.rs:182`，但解析出的字段没有下游消费者」）；
 但它据以推出的实质结论——**这个字段今天没有消费者**——现查成立（✓）。

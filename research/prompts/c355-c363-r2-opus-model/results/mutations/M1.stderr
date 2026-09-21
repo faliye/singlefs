@@ -1,4 +1,0 @@
-
-thread 'main' (572928) panicked at src/bin/v2_per_device.rs:271:5:
-assertion failed: !two_device_truth([7, 7], 4, 1, 1)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

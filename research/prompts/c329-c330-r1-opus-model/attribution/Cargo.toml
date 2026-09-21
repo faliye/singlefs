@@ -1,7 +1,0 @@
-[package]
-name = "c329_c330_attribution"
-version = "0.1.0"
-edition = "2021"
-build = "build.rs"
-
-[dependencies]

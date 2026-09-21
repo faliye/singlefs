@@ -10,17 +10,17 @@ use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGenera
 use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
-use singlefs_core::recovery::{choose_superblock, verified_superblock_slots};
+use singlefs_core::recovery::{choose_system_configuration, verified_system_configuration_slots};
 use singlefs_core::transaction::{acquire_instance, AcquisitionRollback, CommitStep, PoolWriter};
 
 /// 系统配置两槽住在偏移 0 与 4096，都在这个界之下。
-const SUPERBLOCK_SLOTS_END_OFFSET: u64 = 8192;
+const SYSTEM_CONFIGURATION_SLOTS_END_OFFSET: u64 = 8192;
 
 /// 包在录制盘外面：按开关让屏障或系统配置槽写报错，并数真正交给设备的屏障。
 struct FaultInjectingDevice {
     inner: Recorded,
     fail_barriers: bool,
-    fail_superblock_writes: bool,
+    fail_system_configuration_writes: bool,
     barrier_calls: u64,
 }
 
@@ -42,7 +42,8 @@ impl BlockDevice for FaultInjectingDevice {
         bytes: &[u8],
         durability: WriteDurability,
     ) -> Result<(), BlockDeviceError> {
-        if self.fail_superblock_writes && offset.0 < SUPERBLOCK_SLOTS_END_OFFSET {
+        if self.fail_system_configuration_writes && offset.0 < SYSTEM_CONFIGURATION_SLOTS_END_OFFSET
+        {
             return Err(injected("系统配置槽写"));
         }
         self.inner.write_at(offset, bytes, durability)
@@ -74,7 +75,7 @@ fn wrap(built: &mut BuiltPool) -> Vec<(DeviceIdentity, FaultInjectingDevice)> {
                 FaultInjectingDevice {
                     inner,
                     fail_barriers: false,
-                    fail_superblock_writes: false,
+                    fail_system_configuration_writes: false,
                     barrier_calls: 0,
                 },
             )
@@ -89,11 +90,20 @@ fn slots_of(
 ) -> Vec<(u64, InstanceGeneration)> {
     let parameters = parameters();
     let spacing = u64::from(parameters.geometry.fixed_structure_slot_spacing);
-    let mut slots: Vec<(u64, InstanceGeneration)> =
-        verified_superblock_slots(devices, device, spacing, &parameters.filesystem_identifier)
-            .iter()
-            .map(|superblock| (superblock.slot_generation, superblock.journal_instance))
-            .collect();
+    let mut slots: Vec<(u64, InstanceGeneration)> = verified_system_configuration_slots(
+        devices,
+        device,
+        spacing,
+        &parameters.filesystem_identifier,
+    )
+    .iter()
+    .map(|system_configuration| {
+        (
+            system_configuration.quantities.slot_generation,
+            system_configuration.quantities.journal_instance,
+        )
+    })
+    .collect();
     slots.sort();
     slots
 }
@@ -124,8 +134,9 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
         );
     }
     assert_eq!(
-        choose_superblock(&devices)
+        choose_system_configuration(&devices)
             .expect("择系统配置")
+            .quantities
             .journal_instance,
         InstanceGeneration(2),
         "择到的那一份带新号：取号的世代号若恒为 2，会被世代 5 的旧槽藏住、这里读回 1"
@@ -168,7 +179,7 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
 }
 
 #[test]
-fn failed_superblock_write_on_the_second_disk_rolls_the_first_disk_back_and_leaves_the_second_untouched(
+fn failed_system_configuration_write_on_the_second_disk_rolls_the_first_disk_back_and_leaves_the_second_untouched(
 ) {
     let mut built = build_pool("acquire-write-error");
     let mut devices = wrap(&mut built);
@@ -177,7 +188,7 @@ fn failed_superblock_write_on_the_second_disk_rolls_the_first_disk_back_and_leav
         .find(|(identity, _)| *identity == DeviceIdentity(1))
         .expect("盘 1")
         .1
-        .fail_superblock_writes = true;
+        .fail_system_configuration_writes = true;
     let failure = acquire(&mut devices).expect_err("盘 1 的取号写报错，取号必须失败");
     assert!(
         matches!(failure.rollback, AcquisitionRollback::RolledBack),

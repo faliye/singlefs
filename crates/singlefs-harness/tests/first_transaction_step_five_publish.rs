@@ -8,9 +8,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use singlefs_checker::{
     back_chain_of_record_header, check_index_node_keys, check_journal_record, check_root_slot,
-    check_superblock_slot, check_unit, choose_superblock, crc32_castagnoli_bitwise,
-    index_node_view, key_schema_for_tree_kind, packed_unit_view, Verdict, KEY_SCHEMA_MAPPING,
-    KEY_SCHEMA_TREE_TABLE,
+    check_system_configuration_slot, check_unit, choose_system_configuration,
+    crc32_castagnoli_bitwise, index_node_view, key_schema_for_tree_kind, packed_unit_view, Verdict,
+    KEY_SCHEMA_MAPPING, KEY_SCHEMA_TREE_TABLE,
 };
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -33,7 +33,7 @@ use singlefs_core::records::{
     STATISTIC_UNRECLAIMABLE_BYTES,
 };
 use singlefs_core::root_ring::{slot_offset, RootRingSlot};
-use singlefs_core::superblock::FormatTimeGeometry;
+use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
     TransactionUnit, WarmUpOutput, FIRST_INODE_NUMBER,
@@ -74,7 +74,7 @@ fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: E142_FILESYSTEM_IDENTIFIER,
         region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: FormatTimeGeometry {
+        geometry: SystemImmutableSizes {
             physical_block_size: 512,
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
@@ -127,7 +127,7 @@ fn build_pool(tag: &str) -> BuiltPool {
     let mut devices: Vec<(DeviceIdentity, Recorded)> = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
-        let file = FileBackedBlockDevice::open_or_create(
+        let file = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
             IMAGE_BYTES,
             PhysicalBlockSizeInBytes(512),
@@ -384,7 +384,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
 }
 
 #[test]
-fn root_slots_superblocks_and_journal_ring_hold_the_published_state() {
+fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() {
     let pool = build_pool("roots");
     let filesystem_identifier = unit_filesystem_identifier(&E142_FILESYSTEM_IDENTIFIER);
     // 根槽：第一个事务 txg 3 落区域 0 槽 1；暖机 txg 1 / 2 落区域 1 / 2 的槽 0，分住两块盘（D22（单元原子性怎么合成） 已定项 16）。
@@ -432,7 +432,8 @@ fn root_slots_superblocks_and_journal_ring_hold_the_published_state() {
     for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
         let slot_zero = read(device(&pool, identity), DeviceOffsetInBytes(0), 4096);
         let slot_one = read(device(&pool, identity), DeviceOffsetInBytes(4096), 4096);
-        let (chosen_index, chosen) = choose_superblock(&[&slot_zero, &slot_one]).expect("可择");
+        let (chosen_index, chosen) =
+            choose_system_configuration(&[&slot_zero, &slot_one]).expect("可择");
         assert_eq!(chosen_index, 1);
         assert_eq!(
             (
@@ -443,7 +444,7 @@ fn root_slots_superblocks_and_journal_ring_hold_the_published_state() {
             ),
             (5, 3, 1, identity.0)
         );
-        let older = check_superblock_slot(&slot_zero).expect("槽 0");
+        let older = check_system_configuration_slot(&slot_zero).expect("槽 0");
         assert_eq!(
             (
                 older.slot_generation,

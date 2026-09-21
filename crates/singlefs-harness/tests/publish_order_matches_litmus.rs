@@ -48,7 +48,7 @@ fn litmus_writer_threads_follow_the_recorded_publish_order() {
     let mut collapsed: Vec<StepKind> = Vec::new();
     for operation in transaction {
         let kind = geometry().classify(operation);
-        if kind == StepKind::SuperblockSlot || collapsed.last() == Some(&kind) {
+        if kind == StepKind::SystemConfigurationSlot || collapsed.last() == Some(&kind) {
             continue;
         }
         collapsed.push(kind);

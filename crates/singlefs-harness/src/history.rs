@@ -18,7 +18,9 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, Once};
 
-use singlefs_checker::image::{chosen_superblocks, valid_roots, InvariantVerdict};
+use singlefs_checker::image::{
+    chosen_system_configurations, valid_roots, ImageReader, InvariantVerdict,
+};
 use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::allocator::{
@@ -33,8 +35,9 @@ use singlefs_core::mount::{
     mount_rollback, mount_writable, raise_rollback_floor, MountError, RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
-    allocation_records_under_root, choose_root, choose_superblock, instance_table_of_root,
-    readable_roots, recover, JournalPolicy, RecoveryFailure, RecoveryOutcome,
+    allocation_records_under_root, choose_root, choose_system_configuration,
+    instance_table_of_root, readable_roots, recover, JournalPolicy, PoolReader, RecoveryFailure,
+    RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{
@@ -44,7 +47,7 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
 
-use crate::crash::{MemoryPool, SparseBlockDevice};
+use crate::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
     ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRootKey, ObservedEffect,
@@ -681,6 +684,8 @@ struct HistoryPool {
     mount_attempts: usize,
     model: IdealModel,
     stream: SharedStream,
+    /// mkfs 写完时录制流里有几步（崩溃注入的基线从这里起）。
+    operations_written_by_make_filesystem: usize,
 }
 
 /// 模型对一步的判定：对不上的那一格（没有就是 None）与这一步比了多少格。
@@ -750,7 +755,7 @@ pub fn allocation_records_on_the_image_under(
     image: &MemoryPool,
     root: ModelRootKey,
 ) -> Option<u64> {
-    let geometry = chosen_superblocks(image)
+    let geometry = chosen_system_configurations(image)
         .into_iter()
         .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))?;
     let (_, _, view) = valid_roots(image, &geometry)
@@ -806,6 +811,7 @@ impl HistoryPool {
         let genesis = make_filesystem(&parameters, &mut devices).expect(
             "两块全零、等大的内存盘上按 E142 参数 mkfs：两种宽度的几何都放得下（环不超过容量的四分之一），内存盘的写不报错",
         );
+        let operations_written_by_make_filesystem = stream.operation_count();
         let mut model = IdealModel::after_make_filesystem(ModelPoolGeometry {
             devices: devices
                 .iter()
@@ -876,6 +882,7 @@ impl HistoryPool {
                 mount_attempts: 0,
                 model,
                 stream: stream.clone(),
+                operations_written_by_make_filesystem,
             },
             verdict,
         )
@@ -1194,7 +1201,11 @@ pub struct FailureObservation {
     pub model_disagreement: Option<ModelDisagreement>,
     /// 抬 F 那一步（入口返回 Ok）之后判红时：抬之前的镜像上，新 F 那个 txg 上的根是不是全属于被抛弃的实例
     /// （`raised_floor_lands_only_on_abandoned_roots`）；别的步、读不出、那个 txg 上没有根，都是 None。
+    /// 崩溃状态上算的是同一个谓词、读的是这个崩溃镜像自己：F 取镜像里最新那条根带的回退下界
+    /// （`crash_injection::raised_floor_of_the_newest_root_lands_only_on_abandoned_roots`）。
     pub raised_floor_lands_only_on_abandoned_roots: Option<bool>,
+    /// 记录核对器（`crash::check_records_against`）在这个盘面上判出的两类：活盘面那一路不跑它，恒是默认值（两项都 false）。
+    pub record_check: RecordCheck,
 }
 
 impl FailureObservation {
@@ -1205,16 +1216,93 @@ impl FailureObservation {
     }
 }
 
-/// I-3.1 的违例文字 `盘 N：记账的已分配 Some(A)，遍历全部有效根得到 B`（`singlefs-checker` 的 `walk.rs`）里的 A 与 B；读不出就 None。
+/// I-3.1 的违例文字 `盘 N：记账的已分配 Some(A)，遍历全部有效根得到 B；机理：…`（`singlefs-checker` 的 `walk.rs`）里的 A 与 B；
+/// 读不出就 None。B 后面跟着机理标识那一段，所以只取紧跟着的那串数字，不把整段尾巴拿去 parse。
 #[must_use]
 pub fn allocated_and_walked_bytes(detail: &str) -> Option<(u64, u64)> {
     let after_allocated = detail.split_once("记账的已分配 Some(")?.1;
     let (allocated_text, rest) = after_allocated.split_once(')')?;
-    let walked_text = rest.split_once("遍历全部有效根得到 ")?.1;
     Some((
         allocated_text.parse().ok()?,
-        walked_text.trim().parse().ok()?,
+        leading_number_after(rest, "遍历全部有效根得到 ")?,
     ))
+}
+
+/// `label` 之后紧跟着的那串十进制数字；`label` 不在、或它后面不是数字，都是 None。
+fn leading_number_after(text: &str, label: &str) -> Option<u64> {
+    text.split_once(label)?
+        .1
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect::<String>()
+        .parse()
+        .ok()
+}
+
+/// I-3.1 判红时 checker 在说明文字里带的机理标识（`singlefs-checker` 的 `walk.rs` 写的那一段）：遍历覆盖了哪些根槽、
+/// 剩下的按什么理由没覆盖。「已知红」清单按它分辨机理，不按签名（只有 I-3.1 红、记账多于遍历）认人。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AllocationStatisticMechanism {
+    /// 根环一圈的槽数 R × S。
+    pub root_ring_slot_count: u64,
+    /// 环里最新那条根的 txg。
+    pub newest_root_txg: u64,
+    /// 环里自证过的根槽个数。
+    pub readable_root_slot_count: u64,
+    /// 环里最老的那条自证过的根的 txg。
+    pub oldest_readable_root_txg: u64,
+    /// 遍历真走过的候选根槽个数。
+    pub walked_root_slot_count: u64,
+    /// 被最新根的实例表判成「被抛弃的时间线」而没走的根槽个数。
+    pub root_slots_dropped_as_abandoned: u64,
+    /// 最新根带的回退下界 F。
+    pub rollback_floor: u64,
+    /// 低于 F 而没走的根槽个数。
+    pub root_slots_dropped_below_floor: u64,
+}
+
+impl AllocationStatisticMechanism {
+    /// 环转过一圈把 F 之上的根挤出了环：环里最老的自证过的根已经高过 F，[F, 最老) 那一段的根读不到了，
+    /// 而它们引用的单元还在当前账里。
+    #[must_use]
+    pub fn the_ring_turn_dropped_roots_above_the_floor(&self) -> bool {
+        self.newest_root_txg >= self.root_ring_slot_count
+            && self.oldest_readable_root_txg > self.rollback_floor
+    }
+
+    /// 回退下界把环里读得到的根挡在了遍历之外。
+    #[must_use]
+    pub fn the_floor_dropped_readable_roots(&self) -> bool {
+        self.root_slots_dropped_below_floor >= 1
+    }
+}
+
+/// 从 I-3.1 的说明文字里读机理标识；少一项就 None（说明这条违例不是那一段格式写出来的）。
+#[must_use]
+pub fn allocation_statistic_mechanism(detail: &str) -> Option<AllocationStatisticMechanism> {
+    Some(AllocationStatisticMechanism {
+        root_ring_slot_count: leading_number_after(detail, "根环槽数 ")?,
+        newest_root_txg: leading_number_after(detail, "最新根 txg ")?,
+        readable_root_slot_count: leading_number_after(detail, "环里自证过的根槽 ")?,
+        oldest_readable_root_txg: leading_number_after(detail, "最老的自证过的根 txg ")?,
+        walked_root_slot_count: leading_number_after(detail, "遍历的候选根槽 ")?,
+        root_slots_dropped_as_abandoned: leading_number_after(detail, "被实例表判抛弃的根槽 ")?,
+        rollback_floor: leading_number_after(detail, "回退下界 F ")?,
+        root_slots_dropped_below_floor: leading_number_after(detail, "低于 F 的根槽 ")?,
+    })
+}
+
+/// 这次失败里 I-3.1 那几条（逐盘各一条）带的机理标识：取第一条读得出来的。
+/// 一条 I-3.1 都没有、或那几条文字里都没有机理标识，都是 None——机理读不出来时「已知红」一条都不接。
+#[must_use]
+fn allocation_statistic_mechanism_of(
+    observation: &FailureObservation,
+) -> Option<AllocationStatisticMechanism> {
+    observation
+        .violations
+        .iter()
+        .filter(|(invariant, _)| *invariant == "I-3.1")
+        .find_map(|(_, detail)| allocation_statistic_mechanism(detail))
 }
 
 /// 「已知红」清单的一条：形态与它在增补 2 收口表里的那一行。
@@ -1226,11 +1314,13 @@ pub struct KnownRedForm {
     pub matches: fn(&FailureObservation) -> bool,
 }
 
-/// 没有 panic、执行器没判出失败、模型没对不上、判红的只有 I-3.1、而且是记账的已分配大于遍历全部有效根得到的（记账多算，不是少算）。
+/// 没有 panic、执行器没判出失败、模型没对不上、记录核对器也没判出、判红的只有 I-3.1、而且是记账的已分配大于遍历全部有效根得到的
+/// （记账多算，不是少算）。
 fn only_allocated_statistic_above_walked(observation: &FailureObservation) -> bool {
     observation.panic.is_none()
         && observation.harness_judgement.is_none()
         && observation.model_disagreement.is_none()
+        && observation.record_check == RecordCheck::default()
         && !observation.violations.is_empty()
         && observation.violations.iter().all(|(invariant, detail)| {
             *invariant == "I-3.1"
@@ -1239,19 +1329,33 @@ fn only_allocated_statistic_above_walked(observation: &FailureObservation) -> bo
         })
 }
 
+/// 第 0 条那一形：只有 I-3.1 红、记账多于遍历，而且 checker 自己报的机理是「环转过一圈把 F 之上的根挤出了环」
+/// ——签名相同而机理不同（比如根一条都没掉出环、缺口出在别处）的，不接进这一条，照新发现报
+/// （代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半，用户 2026-09-20 定案第 6 条）。
+/// 执行器那一路自己从盘上读的「根环转过一圈」照样要成立：两份独立的读法都说转过了，才算这一形。
 fn ring_turn_leaves_allocated_statistic_above_walked(observation: &FailureObservation) -> bool {
-    observation.root_ring_has_turned() && only_allocated_statistic_above_walked(observation)
+    observation.root_ring_has_turned()
+        && only_allocated_statistic_above_walked(observation)
+        && allocation_statistic_mechanism_of(observation)
+            .is_some_and(|mechanism| mechanism.the_ring_turn_dropped_roots_above_the_floor())
 }
 
-/// 抬 F 那一步之后、抬之前的镜像上新 F 那个 txg 上的根全属于被抛弃的实例（F 落在回退留下的空档里）、根环没转圈、只有 I-3.1 红且
-/// 记账多于遍历（代码三方第一轮判决第二节第 1 条收窄：此前不看空档，不经回退的抬 F 之后记账多算也被接走）。
+/// F 落在回退留下的空档里（F 那个 txg 上的根全属于被抛弃的实例）、只有 I-3.1 红且记账多于遍历，
+/// 而且 checker 报的机理是「回退下界把环里读得到的根挡在了遍历之外」
+/// （代码三方第一轮判决第二节第 1 条收窄：此前不看空档，不经回退的抬 F 之后记账多算也被接走）。
+///
+/// 两条不再要求，都因为机理标识把它们替代掉了（用户 2026-09-20 定案第 6 条）：
+/// 「这一步是抬 F」——活盘面那一路上 `raised_floor_lands_only_on_abandoned_roots` 只有抬 F 那一步算得出来（别的步恒 None），
+/// 卡着操作种类只会把崩溃状态上同一机理的盘面判成新发现；
+/// 「根环没转圈」——环转没转圈与这条机理正交。缺口是不是环转出来的，由第 0 条的机理（环里最老的自证过的根已经高过 F）判，
+/// 不由「转没转过」判：F 之下的根本来就不走，它们掉出环一个字节都不差。两条机理同时成立时按清单次序落在第 0 条上。
 fn raise_after_rollback_leaves_allocated_statistic_above_walked(
     observation: &FailureObservation,
 ) -> bool {
-    observation.operation_kind == Some(HistoryOperationKind::RaiseRollbackFloor)
-        && observation.raised_floor_lands_only_on_abandoned_roots == Some(true)
-        && !observation.root_ring_has_turned()
+    observation.raised_floor_lands_only_on_abandoned_roots == Some(true)
         && only_allocated_statistic_above_walked(observation)
+        && allocation_statistic_mechanism_of(observation)
+            .is_some_and(|mechanism| mechanism.the_floor_dropped_readable_roots())
 }
 
 /// 「已知红」清单。修好一条就删一条，删掉之后那条的复现（`tests/second_transaction_supplement_three_random_history.rs` 里钉着）要转绿。
@@ -1272,15 +1376,44 @@ pub const KNOWN_RED_FORMS: [KnownRedForm; 2] = [
 /// 新发现的「同一个」：panic 按位置、违例按判红的不变量集合。收缩只留签名不变的删法。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FailureSignature {
-    Panic { location: String },
-    HarnessJudgement { judgement: &'static str },
-    ModelDisagreement { aspect: &'static str },
-    CheckerViolations { invariants: Vec<&'static str> },
+    Panic {
+        location: String,
+    },
+    HarnessJudgement {
+        judgement: &'static str,
+    },
+    ModelDisagreement {
+        aspect: &'static str,
+    },
+    /// 记录核对器判红的那几类（`crash::RecordCheck`，只有崩溃状态上跑得到）。
+    RecordCheck {
+        aspects: Vec<&'static str>,
+    },
+    CheckerViolations {
+        invariants: Vec<&'static str>,
+    },
+}
+
+/// 记录核对器判红的那几类的名字，按 `RecordCheck` 的字段序；两项都 false 时是空的。
+#[must_use]
+pub fn record_check_aspects(check: &RecordCheck) -> Vec<&'static str> {
+    let RecordCheck {
+        root_without_record,
+        claimed_state_missing_unit,
+    } = check;
+    let mut aspects = Vec::new();
+    if *root_without_record {
+        aspects.push("root_without_record");
+    }
+    if *claimed_state_missing_unit {
+        aspects.push("claimed_state_missing_unit");
+    }
+    aspects
 }
 
 impl FailureSignature {
-    /// panic 先于执行器判的失败，执行器判的失败先于模型对不上，模型对不上先于 checker 的违例（同一步里都有时签名取前一种，
-    /// 别的照样在观察里）。
+    /// panic 先于执行器判的失败，执行器判的失败先于模型对不上，模型对不上先于记录核对器，记录核对器先于 checker 的违例
+    /// （同一步里都有时签名取前一种，别的照样在观察里）。
     fn of(observation: &FailureObservation) -> Self {
         match (
             &observation.panic,
@@ -1296,13 +1429,20 @@ impl FailureSignature {
             (None, None, Some(disagreement)) => FailureSignature::ModelDisagreement {
                 aspect: disagreement.aspect.name(),
             },
-            (None, None, None) => FailureSignature::CheckerViolations {
-                invariants: observation
-                    .violations
-                    .iter()
-                    .map(|(invariant, _)| *invariant)
-                    .collect(),
-            },
+            (None, None, None) => {
+                let aspects = record_check_aspects(&observation.record_check);
+                if aspects.is_empty() {
+                    FailureSignature::CheckerViolations {
+                        invariants: observation
+                            .violations
+                            .iter()
+                            .map(|(invariant, _)| *invariant)
+                            .collect(),
+                    }
+                } else {
+                    FailureSignature::RecordCheck { aspects }
+                }
+            }
         }
     }
 }
@@ -1650,14 +1790,21 @@ pub struct HistoryRun {
     /// 每一步操作的结局，按次序；失败在第几步就到第几步为止（panic 的那一步没有结局）。
     pub outcomes: Vec<StepOutcome>,
     pub tally: HistoryTally,
+    /// mkfs 占了录制流开头的几步：崩溃注入（增补 3 第 3 件）的基线与层 0 一样取「mkfs 之后」——
+    /// mkfs 不是事务，它写到一半的盘面上没有池，恢复报不出根是对的，不该拿事务的 oracle 去判
+    /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `tests/first_transaction_step_seven_layer0.rs`）。
+    pub operations_written_by_make_filesystem: usize,
 }
 
-/// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像。
+/// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
+/// 只在这一步没判出失败时调（判出失败的那一步直接停下，观察者看不到），所以模型与镜像都是判过的状态。
 pub struct StepObservation<'run> {
     pub position: StepPosition,
     pub operation: Option<&'run HistoryOperation>,
     pub outcome: Option<&'run StepOutcome>,
     pub image: &'run MemoryPool,
+    /// 崩溃注入（增补 3 第 3 件）每一步之后从它取一次 `committed_versions`，攒成「模型提交过的每一版」。
+    pub model: &'run IdealModel,
 }
 
 fn placement_refusal_member(refusal: &PlacementRefusal) -> &'static str {
@@ -1709,15 +1856,21 @@ fn block_device_error_member(error: &BlockDeviceError) -> &'static str {
         BlockDeviceError::Unaligned { .. } => "BlockDeviceError::Unaligned",
         BlockDeviceError::InputOutput(_) => "BlockDeviceError::InputOutput",
         BlockDeviceError::ProbeFailed { .. } => "BlockDeviceError::ProbeFailed",
+        BlockDeviceError::ImageFileAlreadyExists { .. } => {
+            "BlockDeviceError::ImageFileAlreadyExists"
+        }
+        BlockDeviceError::ImageFileMissing { .. } => "BlockDeviceError::ImageFileMissing",
     }
 }
 
 fn recovery_failure_member(failure: &RecoveryFailure) -> String {
     match failure {
-        RecoveryFailure::NoValidSuperblock { .. } => {
-            "RecoveryFailure::NoValidSuperblock".to_string()
+        RecoveryFailure::NoValidSystemConfiguration { .. } => {
+            "RecoveryFailure::NoValidSystemConfiguration".to_string()
         }
-        RecoveryFailure::SuperblocksDisagree => "RecoveryFailure::SuperblocksDisagree".to_string(),
+        RecoveryFailure::SystemConfigurationsDisagree => {
+            "RecoveryFailure::SystemConfigurationsDisagree".to_string()
+        }
         RecoveryFailure::NoValidRoot => "RecoveryFailure::NoValidRoot".to_string(),
         RecoveryFailure::UnitUnreadable { .. } => "RecoveryFailure::UnitUnreadable".to_string(),
         RecoveryFailure::UnitMalformed { what } => {
@@ -1808,7 +1961,12 @@ fn recovery_outcome_member(outcome: &RecoveryOutcome) -> String {
 
 /// 按 checker 的读法（`singlefs_checker::image`，与实现的择根不共用代码）读根环：(txg, 实例) 从新到旧、去重，连同一圈的槽数 R × S。
 fn ring_roots_newest_first(image: &MemoryPool) -> (Vec<(u64, u32)>, Option<u64>) {
-    let Some(geometry) = chosen_superblocks(image)
+    ring_roots_newest_first_of(image)
+}
+
+/// 同上，读的盘面由调用方给（崩溃镜像也走这一条）。
+fn ring_roots_newest_first_of(image: &dyn ImageReader) -> (Vec<(u64, u32)>, Option<u64>) {
+    let Some(geometry) = chosen_system_configurations(image)
         .into_iter()
         .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))
     else {
@@ -1825,7 +1983,7 @@ fn ring_roots_newest_first(image: &MemoryPool) -> (Vec<(u64, u32)>, Option<u64>)
 
 /// 按 checker 的读法：根环里最新那条根（(txg, 实例) 最大）带的 F；读不到时 None。
 fn newest_ring_root_floor(image: &MemoryPool) -> Option<u64> {
-    let geometry = chosen_superblocks(image)
+    let geometry = chosen_system_configurations(image)
         .into_iter()
         .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))?;
     valid_roots(image, &geometry)
@@ -2673,6 +2831,7 @@ pub fn execute_history_with(
             operation: None,
             outcome: None,
             image: &image,
+            model: &pool.model,
         });
         for (step_index, operation) in history.operations.iter().enumerate() {
             let step_position = StepPosition::Operation(step_index);
@@ -2754,6 +2913,7 @@ pub fn execute_history_with(
                 operation: Some(operation),
                 outcome: outcomes.last(),
                 image: &image,
+                model: &pool.model,
             });
         }
         let (newest_ring_root_txg, root_ring_slot_count) = newest_ring_root_and_slot_count(&image);
@@ -2789,6 +2949,7 @@ pub fn execute_history_with(
                 harness_judgement: None,
                 model_disagreement: None,
                 raised_floor_lands_only_on_abandoned_roots: None,
+                record_check: RecordCheck::default(),
             })
         }
     };
@@ -2824,6 +2985,10 @@ pub fn execute_history_with(
         ending,
         outcomes,
         tally,
+        // mkfs 在 `HistoryPool::start` 里跑，它自己 panic 时（`pool_slot` 还没填）流里还没有别的东西，报 0。
+        operations_written_by_make_filesystem: pool_slot
+            .as_ref()
+            .map_or(0, |pool| pool.operations_written_by_make_filesystem),
     }
 }
 
@@ -2845,6 +3010,7 @@ fn failure_observation(
         harness_judgement: None,
         model_disagreement: None,
         raised_floor_lands_only_on_abandoned_roots: None,
+        record_check: RecordCheck::default(),
     }
 }
 
@@ -2855,15 +3021,15 @@ fn failure_observation(
 /// checker 判候选集时解实例表的那一段不对外（`singlefs-checker` 的 `walk.rs` 里 `Walk::instance_table_rows`），这里没另写一份解析。
 #[must_use]
 pub fn raised_floor_lands_only_on_abandoned_roots(
-    image_before_raising: &MemoryPool,
+    image_before_raising: &dyn PoolReader,
     new_floor: CheckpointTxg,
 ) -> Option<bool> {
-    let superblock = choose_superblock(image_before_raising).ok()?;
+    let system_configuration = choose_system_configuration(image_before_raising).ok()?;
     let roots_at_floor: Vec<RootRecord> = readable_roots(
         image_before_raising,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
     )
     .into_iter()
     .filter(|root| root.checkpoint_txg == new_floor)
@@ -2871,7 +3037,7 @@ pub fn raised_floor_lands_only_on_abandoned_roots(
     if roots_at_floor.is_empty() {
         return None;
     }
-    let newest_root = choose_root(image_before_raising, &superblock)?;
+    let newest_root = choose_root(image_before_raising, &system_configuration)?;
     let newest_table = instance_table_of_root(image_before_raising, &newest_root)?;
     Some(roots_at_floor.iter().all(|root| {
         newest_table
@@ -2882,8 +3048,16 @@ pub fn raised_floor_lands_only_on_abandoned_roots(
 }
 
 /// 按 checker 的读法：根环里最新那条根的 txg 与一圈的槽数 R × S。
-fn newest_ring_root_and_slot_count(image: &MemoryPool) -> (Option<u64>, Option<u64>) {
-    let (roots, root_ring_slot_count) = ring_roots_newest_first(image);
+#[must_use]
+pub fn newest_ring_root_and_slot_count(image: &MemoryPool) -> (Option<u64>, Option<u64>) {
+    newest_ring_root_and_slot_count_of(image)
+}
+
+/// 同上，读的盘面由调用方给：崩溃注入（增补 3 第 3 件）要在崩溃镜像（`crash::CrashImage`）上也拿到这两个事实，
+/// 才判得出「已知红」第 0 条那一形（根环转过一圈）。
+#[must_use]
+pub fn newest_ring_root_and_slot_count_of(image: &dyn ImageReader) -> (Option<u64>, Option<u64>) {
+    let (roots, root_ring_slot_count) = ring_roots_newest_first_of(image);
     (roots.first().map(|(txg, _)| *txg), root_ring_slot_count)
 }
 
@@ -3547,16 +3721,25 @@ mod tests {
         );
     }
 
+    /// checker 在 I-3.1 的说明文字里带的那一段机理标识（`singlefs-checker` 的 `walk.rs` 写的格式）。
+    fn allocation_statistic_detail(
+        newest_root_txg: u64,
+        oldest_readable_root_txg: u64,
+        rollback_floor: u64,
+        root_slots_dropped_below_floor: u64,
+    ) -> String {
+        format!(
+            "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088；机理：根环槽数 24、最新根 txg {newest_root_txg}、环里自证过的根槽 24 个、最老的自证过的根 txg {oldest_readable_root_txg}、遍历的候选根槽 20 个、被实例表判抛弃的根槽 0 个、回退下界 F {rollback_floor}、低于 F 的根槽 {root_slots_dropped_below_floor} 个"
+        )
+    }
+
     /// 执行器判出的失败不进「已知红」：哪怕同一步 checker 也只判了 I-3.1 多算、根环也转过了，签名取执行器判的那一种。
     #[test]
     fn harness_judgement_is_never_classified_as_a_known_red_form() {
         let observation = FailureObservation {
             position: StepPosition::Operation(21),
             operation_kind: Some(HistoryOperationKind::PublishOverwrite),
-            violations: vec![(
-                "I-3.1",
-                "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088".to_string(),
-            )],
+            violations: vec![("I-3.1", allocation_statistic_detail(26, 3, 0, 0))],
             panic: None,
             newest_ring_root_txg: Some(26),
             root_ring_slot_count: Some(24),
@@ -3567,6 +3750,7 @@ mod tests {
             }),
             model_disagreement: None,
             raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
         };
         let HistoryEnding::NewFinding { signature, .. } = classify_failure(observation.clone())
         else {
@@ -3586,6 +3770,128 @@ mod tests {
                 HistoryEnding::KnownRed { form: 0, .. }
             ),
             "去掉执行器判的那一条，同一个观察是已知红第 0 条"
+        );
+    }
+
+    /// 「已知红」按机理认，不按签名认（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半）：
+    /// 同一个签名（只有 I-3.1 红、记账多于遍历、根环转过一圈）下，机理对得上才接进第 0 条；
+    /// 机理说环转过一圈并没把 F 之上的根挤出去（环里最老的根就在 F 上）、或者说明文字里根本没有机理标识的，照新发现报。
+    #[test]
+    fn known_red_forms_are_matched_by_mechanism_not_by_signature() {
+        let with_detail = |detail: String| FailureObservation {
+            position: StepPosition::Operation(21),
+            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            violations: vec![("I-3.1", detail)],
+            panic: None,
+            newest_ring_root_txg: Some(26),
+            root_ring_slot_count: Some(24),
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck::default(),
+        };
+        assert!(
+            matches!(
+                classify_failure(with_detail(allocation_statistic_detail(26, 3, 0, 0))),
+                HistoryEnding::KnownRed { form: 0, .. }
+            ),
+            "机理是「环转过一圈把 F 之上的根挤出了环」：接进第 0 条"
+        );
+        assert!(
+            matches!(
+                classify_failure(with_detail(allocation_statistic_detail(26, 7, 7, 0))),
+                HistoryEnding::NewFinding { .. }
+            ),
+            "环里最老的根正好就在 F 上（F 之上一条根都没掉出环）：签名一样，机理不同，照新发现报"
+        );
+        assert!(
+            matches!(
+                classify_failure(with_detail(
+                    "盘 0：记账的已分配 Some(3817472)，遍历全部有效根得到 3801088".to_string()
+                )),
+                HistoryEnding::NewFinding { .. }
+            ),
+            "说明文字里没有机理标识：认不出机理就不接，照新发现报"
+        );
+        // 第 1 条那一形（收口表第 43 行）：F 落在回退留下的空档里、环没转圈、机理是「F 把环里读得到的根挡在了遍历之外」。
+        let mut raised_into_the_gap = with_detail(allocation_statistic_detail(9, 0, 5, 4));
+        raised_into_the_gap.newest_ring_root_txg = Some(9);
+        raised_into_the_gap.raised_floor_lands_only_on_abandoned_roots = Some(true);
+        // 环转没转圈与这条机理正交：环转过了、而 F 之上一条根都没掉出环（最老的自证过的根就在 F 之下），照样是第 1 条。
+        let mut the_ring_also_turned = with_detail(allocation_statistic_detail(27, 4, 8, 4));
+        the_ring_also_turned.newest_ring_root_txg = Some(27);
+        the_ring_also_turned.raised_floor_lands_only_on_abandoned_roots = Some(true);
+        assert!(
+            matches!(
+                classify_failure(the_ring_also_turned),
+                HistoryEnding::KnownRed { form: 1, .. }
+            ),
+            "环也转过一圈、但缺口出在 F 上：还是第 1 条，不是新发现"
+        );
+        assert!(
+            matches!(
+                classify_failure(raised_into_the_gap.clone()),
+                HistoryEnding::KnownRed { form: 1, .. }
+            ),
+            "F 落在空档里、环没转圈、机理对得上：接进第 1 条"
+        );
+        let mut nothing_dropped_by_the_floor = raised_into_the_gap.clone();
+        nothing_dropped_by_the_floor.violations =
+            vec![("I-3.1", allocation_statistic_detail(9, 0, 5, 0))];
+        assert!(
+            matches!(
+                classify_failure(nothing_dropped_by_the_floor),
+                HistoryEnding::NewFinding { .. }
+            ),
+            "F 一条读得到的根都没挡掉：缺口不出在这条机理上，照新发现报"
+        );
+        // 这一形不再卡「这一步是抬 F」：崩溃状态摆在抬 F 之后的别的步上，同一机理照样接得进第 1 条。
+        let mut later_step = raised_into_the_gap;
+        later_step.operation_kind = Some(HistoryOperationKind::PublishOverwrite);
+        assert!(
+            matches!(
+                classify_failure(later_step),
+                HistoryEnding::KnownRed { form: 1, .. }
+            ),
+            "抬 F 之后的别的步上同一机理照样是第 1 条"
+        );
+    }
+
+    /// 记录核对器判红的不接进「已知红」：签名是 `RecordCheck`，照新发现报。
+    #[test]
+    fn record_check_violations_are_never_absorbed_into_known_red_forms() {
+        let mut observation = FailureObservation {
+            position: StepPosition::Operation(21),
+            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            violations: vec![("I-3.1", allocation_statistic_detail(26, 3, 0, 0))],
+            panic: None,
+            newest_ring_root_txg: Some(26),
+            root_ring_slot_count: Some(24),
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: None,
+            record_check: RecordCheck {
+                root_without_record: true,
+                claimed_state_missing_unit: false,
+            },
+        };
+        let HistoryEnding::NewFinding { signature, .. } = classify_failure(observation.clone())
+        else {
+            panic!("记录核对器判红了，要是新发现");
+        };
+        assert_eq!(
+            signature,
+            FailureSignature::RecordCheck {
+                aspects: vec!["root_without_record"]
+            }
+        );
+        observation.record_check = RecordCheck::default();
+        assert!(
+            matches!(
+                classify_failure(observation),
+                HistoryEnding::KnownRed { form: 0, .. }
+            ),
+            "去掉记录核对器那一条，同一个观察是已知红第 0 条"
         );
     }
 }

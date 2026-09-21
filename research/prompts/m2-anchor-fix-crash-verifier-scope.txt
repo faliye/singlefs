@@ -9,7 +9,7 @@
  crates/singlefs-core/src/mount.rs                  | 1358 ++++++++++++++++++
  crates/singlefs-core/src/records.rs                |   21 +-
  crates/singlefs-core/src/recovery.rs               |  488 ++++++-
- crates/singlefs-core/src/superblock.rs             |    2 +-
+ crates/singlefs-core/src/system_configuration.rs             |    2 +-
  crates/singlefs-core/src/transaction.rs            | 1470 +++++++++++++++-----
  crates/singlefs-core/src/write_accounting.rs       |  295 ++++
  crates/singlefs-format/src/lib.rs                  |    2 +-

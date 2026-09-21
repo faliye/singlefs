@@ -67,7 +67,7 @@ D25（目标负载优先级） 已定主负载是 seq（一次 fsync 带 8 叶�
 
 - 代码 `research/e7-index-bench/src/bin/e70_ckpt_thresholds.rs`
   （`cargo run --release --bin e70-ckpt-thresholds`），
-  原始输出 `research/results/e70-ckpt-thresholds-2026-08-31.out`（18 行，收尾行 `emitted=18`）。
+  原始输出 `e70-ckpt-thresholds-2026-08-31.out`（18 行，收尾行 `emitted=18`）。
 - 变异表 `research/mutations/e70_ckpt_thresholds.tsv`（2026-09-03，6 条全抓）。
   补的单测钉住小环下溢护栏——环装不下一个记录头时上界必须是 0，此前没有测试走过那条分支。
 

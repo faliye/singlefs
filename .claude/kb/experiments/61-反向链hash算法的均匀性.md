@@ -134,7 +134,7 @@ CRC 把它线性地映到 GF(2)³²。**碰撞数恰好为 0 ⟺ 该线性映射
 
 - 代码 `research/e7-index-bench/src/bin/e61_chain_hash.rs`
   （`cargo run --release --bin e61-chain-hash`）。
-- 产物 `research/results/e61-chain-hash-2026-08-31.out`（24 行，收尾行 `emitted=24`）。
+- 产物 `e61-chain-hash-2026-08-31.out`（24 行，收尾行 `emitted=24`）。
 - ⚠️ **三轮逐字节一致，但那只证明「没有隐藏状态」，不是统计稳定性**：
   E61（反向链 hash 算法的均匀性）是确定性模型（无 I/O、无并发、无时钟输入），同一个二进制跑三遍必然相同
   ⇒ N=1 与 N=3 信息量相同。**不许拿它冒充真实压测那一级的证据强度。**

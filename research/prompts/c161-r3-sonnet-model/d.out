@@ -1,4 +1,0 @@
-drain_scope=node_only: rebuild reads k=None (truth=('put', 42)) -> STALE/MISSING
-drain_scope=both:      rebuild reads k=('put', 42) (truth=('put', 42)) -> correct
-bug_demonstrated=True fix_confirmed=True
-emitted=2

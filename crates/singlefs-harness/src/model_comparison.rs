@@ -10,7 +10,7 @@ use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::BlockDeviceError;
 use singlefs_core::mount::{InstanceRow, MountError, Mounted, RollbackCandidateExclusion};
-use singlefs_core::recovery::RecoveryOutcome;
+use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
 use singlefs_core::transaction::{
     PoolVersion, PublishError, TransactionOutput, TransactionUnit, ZeroUnitPublishOutput,
 };
@@ -282,6 +282,31 @@ pub fn observed_read_back(outcome: &RecoveryOutcome) -> ObservedReadBack {
         },
         RecoveryOutcome::Failed { failure, root } => ObservedReadBack::Failed {
             what: format!("{failure:?}（所选根 {root:?}）"),
+        },
+    }
+}
+
+/// 崩溃之后的冷启动读回（增补 3 第 3 件）：根取施加 journal 记录前缀之后**实际走的**那条根（`RecoveryReport::effective_root`），
+/// 不取 `RecoveryOutcome` 里带的那条。两者的差别只在崩溃状态上看得见：`crates/singlefs-core/src/recovery.rs` 的 `recover` 里
+/// `root_key` 取的是 `choose_root`（施加之前所选的根），`walk_to_file` 走的却是 `effective_root`（施加之后的根）——
+/// 不建崩溃时记录都在水位之下、两者相等，崩溃状态上记录前缀一施加就不等了，读回的内容属于后者。
+/// 层 0 的 oracle（`crash::oracle_violation_for_versions`）判该读出哪一版拿的也是 `effective_root`。
+#[must_use]
+pub fn observed_read_back_after_a_crash(report: &RecoveryReport) -> ObservedReadBack {
+    let Some((instance, checkpoint_txg)) = report.effective_root else {
+        return ObservedReadBack::Failed {
+            what: format!("没择到根（{:?}）", report.outcome),
+        };
+    };
+    let root = model_root_key(instance, checkpoint_txg);
+    match &report.outcome {
+        RecoveryOutcome::NoFile { .. } => ObservedReadBack::NoFile { root },
+        RecoveryOutcome::FileRead { content, .. } => ObservedReadBack::FileRead {
+            root,
+            content: content.clone(),
+        },
+        RecoveryOutcome::Failed { failure, .. } => ObservedReadBack::Failed {
+            what: format!("{failure:?}（实际走的根 {root:?}）"),
         },
     }
 }

@@ -1,6 +1,0 @@
-debug allocation_record_wall_sampling exit 0: 用时 103.1 秒 wall 103.10 s, user 1399.61 s, sys 0.49 s
-debug unit_area_wall_sampling exit 0: 用时 118.5 秒 wall 118.48 s, user 1616.46 s, sys 0.42 s
-debug random_histories_fast_tier exit 0: 用时 24.7 秒 wall 24.67 s, user 334.28 s, sys 0.14 s
-release allocation_record_wall_sampling exit 0: 用时 11.1 秒 wall 11.17 s, user 154.73 s, sys 0.55 s
-release unit_area_wall_sampling exit 0: 用时 11.6 秒 wall 11.66 s, user 158.97 s, sys 0.50 s
-release random_histories_fast_tier exit 0: 用时 3.2 秒 wall 3.16 s, user 44.28 s, sys 0.16 s

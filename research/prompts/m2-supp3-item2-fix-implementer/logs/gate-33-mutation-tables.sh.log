@@ -1,8 +1,0 @@
-  ✗ 这些变异条目的「原文」在源码里不是恰好命中一次（mutate.sh 会退出码 3，后面的条目一条都不跑）：
-      e155_second_run_fsync_write_volume 的 M7_乙在fsync写全部祖先（表第 7 行，命中 2 次）
-      e155_second_run_fsync_write_volume 的 R2_M8_中间版漏掉数据单元（表第 23 行，命中 2 次）
-      e155_second_run_fsync_write_volume 的 R2_M15_乙M在一批里写全部祖先（表第 25 行，命中 2 次）
-    命中 0 次：源码改过而表没跟；命中多次：原文要多带一行上下文才唯一。
-  → 怎么办：缺表的写 research/mutations/<bin名>.tsv（每行：变异名<TAB>原文<TAB>替换文）；
-    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，
-    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。

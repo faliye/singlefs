@@ -12,7 +12,7 @@ use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::journal::{record_offset, JournalRecord};
 use singlefs_core::make_filesystem::make_filesystem;
-use singlefs_core::recovery::{choose_superblock, PoolReader};
+use singlefs_core::recovery::{choose_system_configuration, PoolReader};
 use singlefs_core::transaction::{acquire_instance, warm_up_after_journal_counter, PoolWriter};
 use singlefs_core::unit::unit_filesystem_identifier;
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
@@ -64,9 +64,10 @@ fn warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_whi
         .collect();
     assert_eq!(root_txgs, vec![CheckpointTxg(1), CheckpointTxg(2)]);
 
-    let superblock = choose_superblock(&devices).expect("暖机之后超级块自证得过");
+    let system_configuration =
+        choose_system_configuration(&devices).expect("暖机之后系统配置自证得过");
     assert_eq!(
-        superblock.journal_tail, 42,
+        system_configuration.quantities.journal_tail, 42,
         "系统配置的 tail 存 jsn 计数器（最后一条空记录的 42），不是 txg 2"
     );
 

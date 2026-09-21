@@ -8,7 +8,7 @@ D6（快照实现模型） 九条判据第 5 条「**有界销毁**：可分批�
 而反推腿自己明写「我的结论只到『乙过不了』，**不到『甲过得了』**」——
 甲有条目数，可「每批最坏空间需求」的算式与「可 condense」的代价仓里一个数都没有。
 
-**跑前写死**：`research/prompts/e130-preregistration.md`（判据、阈值、作废条款、
+**跑前写死**：`e130-preregistration.md`（判据、阈值、作废条款、
 以及「结果反过来我接不接受」都写在测量代码之前）。
 
 **复跑命令**（登记成 `exact` 模式，与留存产物逐字节比对）：
@@ -19,7 +19,7 @@ cd research && bash scripts/replay.sh E130
 cd research && cargo run --release --bin e130_livelist_bounded_destroy
 ```
 
-代码 `research/e7-index-bench/src/bin/e130_livelist_bounded_destroy.rs`，原始输出 `research/results/e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
+代码 `research/e7-index-bench/src/bin/e130_livelist_bounded_destroy.rs`，原始输出 `e130-livelist-bounded-destroy-2026-09-10.out`（一次运行，无参数扫描）。
 
 ### 这是计数模型，不是实现——它证明不了什么
 
@@ -49,7 +49,7 @@ cd research && cargo run --release --bin e130_livelist_bounded_destroy
 
 ### 结论：甲过判据 5，代价两笔
 
-产物逐行抄自 `research/results/e130-livelist-bounded-destroy-2026-09-10.out`。
+产物逐行抄自 `e130-livelist-bounded-destroy-2026-09-10.out`。
 
 | 跑前写死的判据 | 产物 | 判 |
 |---|---|---|

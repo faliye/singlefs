@@ -1,1 +1,0 @@
-applied 增补 3 第 2 件（代码三方第一轮判决第三节第 1 条，攻方变异 W1）：分配记录墙差一，812 条正好装满也拒（> 写成 >=）；逼近墙的取样点判出 to crates/singlefs-core/src/transaction.rs

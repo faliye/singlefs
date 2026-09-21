@@ -1,8 +1,0 @@
-
-running 1 test
-test writable_mount_after_a_crash_right_after_acquiring_an_instance_is_refused_before_acquiring_again ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
-
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
-     Running tests/second_transaction_step_three_formatted_pool.rs (/tmp/claude-1000/m2-anchor-fix/copy-target/debug/deps/second_transaction_step_three_formatted_pool-4b0b81f1ccf4faad)

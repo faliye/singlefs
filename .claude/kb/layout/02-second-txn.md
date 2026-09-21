@@ -18,7 +18,7 @@
 
 ## E152（按里程碑对比六家文件系统的文件性能） 第三次跑量到的（2026-09-17）
 
-发布 B 在真设备（两块 16 GiB virtio 盘）上 5 轮逐字相同：两盘合计 21 次写调用（来宾块层记 26 次写请求：每道屏障与每次 FUA 各多记一次）、344 576 字节（2 × 172 032 + 根槽 512）、4 次屏障、1 次 FUA，段序列 16+2+1+2，与第一个事务的 `path=transaction` 同型——产物 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out` 的 `name=summary` 行，表在 `research/perf-by-milestone.md` 第三·二节。回退、抬 F、复用那几次发布的字节只有层 0 与用例钉着，真设备上没量。
+发布 B 在真设备（两块 16 GiB virtio 盘）上 5 轮逐字相同：两盘合计 21 次写调用（来宾块层记 26 次写请求：每道屏障与每次 FUA 各多记一次）、344 576 字节（2 × 172 032 + 根槽 512）、4 次屏障、1 次 FUA，段序列 16+2+1+2，与第一个事务的 `path=transaction` 同型——产物 `e152-file-system-benchmark-second-transaction-2026-09-17.out` 的 `name=summary` 行，表在 `research/perf-by-milestone.md` 第三·二节。回退、抬 F、复用那几次发布的字节只有层 0 与用例钉着，真设备上没量。
 
 ## 历史版本
 

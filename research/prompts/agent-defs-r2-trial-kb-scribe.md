@@ -104,10 +104,10 @@ $ python3 research/scripts/relabel-item.py D22 7
 ### 改到的 16 个 research/**/*.rs 实验源码（列给主 agent；入库产物里印着旧标签的，复跑会对不上）
 
 ```
-research/e7-index-bench/src/bin/e100_superblock_slot.rs
-research/e7-index-bench/src/bin/e115_superblock_completeness.rs
-research/e7-index-bench/src/bin/e124_superblock_recompute.rs
-research/e7-index-bench/src/bin/e126_superblock_slot_width.rs
+research/e7-index-bench/src/bin/e100_system_configuration_slot.rs
+research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs
+research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs
+research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs
 research/e7-index-bench/src/bin/e132_livelist_carrier_recount.rs
 research/e7-index-bench/src/bin/e133_map_key_format_cost.rs
 research/e7-index-bench/src/bin/e134_map_key_slot_baselines.rs
@@ -130,8 +130,8 @@ $ bash .claude/gate.d/33-mutation-tables.sh
       e100_superblock_slot 的 M3_间接层没省（表第 3 行，命中 0 次）
 ```
 
-根因：`research/mutations/e100_superblock_slot.tsv` 第 3 行的「原文」列还写着
-`… 同 D22 已定项 7 的树表单元指针宽度`，而 relabel-item.py 把源码 `research/e7-index-bench/src/bin/e100_superblock_slot.rs`
+根因：`research/mutations/e100_system_configuration_slot.tsv` 第 3 行的「原文」列还写着
+`… 同 D22 已定项 7 的树表单元指针宽度`，而 relabel-item.py 把源码 `research/e7-index-bench/src/bin/e100_system_configuration_slot.rs`
 第 28、111 行的同一句改成了「同 D22 未定项 7 …」，表里的旧串在源码里现在命中 0 次。
 `research/mutations/**` 不在书记员写范围（只许 experiment-runner 改），此处只报告、不修。
 
@@ -217,8 +217,8 @@ $ bash .claude/gate.d/21-decision-items-sync.sh --write
 
 ### 33-mutation-tables.sh
 
-见上「6. relabel-item.py」，根因是 relabel-item.py 改写了 `e100_superblock_slot.rs` 里的注释文本，
-变异表 `research/mutations/e100_superblock_slot.tsv` 的锚点因此腐化。这是这一轮写出来的（relabel-item.py
+见上「6. relabel-item.py」，根因是 relabel-item.py 改写了 `research/e7-index-bench/src/bin/e100_system_configuration_slot.rs` 里的注释文本，
+变异表 `research/mutations/e100_system_configuration_slot.tsv` 的锚点因此腐化。这是这一轮写出来的（relabel-item.py
 是我在这一轮触发的），但 `research/mutations/**` 不在书记员写范围，只报告不修。
 
 **三条共同点**：都是「翻状态」这个动作在 kb corpus 里连锁出的下游校验缺口，缺口的填法都需要新的判断或新的句子，
@@ -284,10 +284,10 @@ e0d1487e8cd3cb8857a2ff8ae68ce7c2d5d5f6ea42a33013aee7bdfaef77d9f8  records/2026-0
 4626e03a1383afe5c81ddfdac3ee8cea2c04c4f7b3f3508a31f62fdd1cb2a83d  records/2026-09-06-树ID水位臂比较重做.md
 aa6200983eaf64c0f146f4021e8e76df87ad29e157a7fe2a67e3b3cf05713fb0  records/2026-09-10-D26项4项5定案推演.md
 601d9b876a8fec6dccaff9f87437ddb456fcb99394f0ff1ea321680facb15625  records/2026-09-13-总审核.md
-82d6e54c81f9c0e9327d7c6dfd55309ad2a9bb821c123a28b14ca9caf27b1d8b  research/e7-index-bench/src/bin/e100_superblock_slot.rs
-00068cccebd6977da091e0082ff074270a54684bbc05bfbaa12dc1708337c65e  research/e7-index-bench/src/bin/e115_superblock_completeness.rs
-4307d8280eb5edd6ac1d74e3e842029be52c0f5f1e1591902a69ce49e9ecc259  research/e7-index-bench/src/bin/e124_superblock_recompute.rs
-6c3b9ec6f8ae9a325d75be01a11e0d5c3aa2d93267da043645a740ca14d18375  research/e7-index-bench/src/bin/e126_superblock_slot_width.rs
+82d6e54c81f9c0e9327d7c6dfd55309ad2a9bb821c123a28b14ca9caf27b1d8b  research/e7-index-bench/src/bin/e100_system_configuration_slot.rs
+00068cccebd6977da091e0082ff074270a54684bbc05bfbaa12dc1708337c65e  research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs
+4307d8280eb5edd6ac1d74e3e842029be52c0f5f1e1591902a69ce49e9ecc259  research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs
+6c3b9ec6f8ae9a325d75be01a11e0d5c3aa2d93267da043645a740ca14d18375  research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs
 5f8889822906fa2abe92d9d071e24178cacd14c18118ef049578771a125e3eb9  research/e7-index-bench/src/bin/e132_livelist_carrier_recount.rs
 120a07782c647d502711768dd1c8242de78b6c59d057b0ab6d913d755b266c79  research/e7-index-bench/src/bin/e133_map_key_format_cost.rs
 944ce8b22ccaf53a76ef56bdf51d9fa22c9276bf97ea52c1e5e3a648939fc920  research/e7-index-bench/src/bin/e134_map_key_slot_baselines.rs

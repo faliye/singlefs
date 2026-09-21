@@ -1,9 +1,0 @@
-1. For candidate A: Yes. History: Publish root R1 with watermark watermark 100. Publish R2 with watermark 200 (inodes 0-199 published). R2's slot becomes unreadable. Rollback to R1: max of readable roots (only R1) is 100. New objects start at 100, reusing published inode 100. For candidate B: Same history as A. For candidate C: No. New root txg is ring max +1 (e than any abandoned txg), so birth generation is always newer. Published pairs (inode, birth generation) are unique.
-
-2. Extent key (F7): Breaks. Sequence: Object A (inode 100, birth gen 20) has extent at offset 0. After rollback, object B (inode 100, birth gen 21) writes extent at same offset. Extent key (locality_id, 100, 0) collides, overwriting data. NFS file handles: Breaks. Sequence: Client has file handle for inode 100 pre-rollback. After rollback, new object with inode 100 is created. Client accesses handle and gets new data. Inode tree inserts: Breaks. Sequence: Inode tree stores entries by inode number. Object A (100) exists. New object B (100) inserted overwrites A's entry, causing incorrect lookups.
-
-3. Yes. If a root's generation is older than K, its accounting row is deleted per F9. During rollback, B cannot read the watermark from the deleted row, so the max may be lower than actual, leading to reuse.
-
-4. Moving watermark to tree table entry (F5 reserved bytes) removes need for accounting row to store watermark. Journal records swapping tree table pointer during replay would reference the new location, but tree table entry is part of root record so replay logic adapts. Accounting row for watermark is no longer needed.
-
-5. Pick candidate A. Single observation changing pick: If extent key can include birth generation, candidate C would be better.

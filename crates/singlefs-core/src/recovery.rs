@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use singlefs_format::{
     journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
     INODE_RECORD_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, NODE_BYTES,
-    ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION, SLOT_BYTES, SUPERBLOCK_SLOT_BYTES,
+    ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
     TREE_IDENTIFIER_CENTRAL_MAPPING,
 };
 
@@ -36,7 +36,7 @@ use crate::records::{
 use crate::root_record::RootRecord;
 use crate::root_ring::target_for_publish;
 use crate::root_ring::{slot_offset, RootRingSlot};
-use crate::superblock::{FormatTimeGeometry, Superblock};
+use crate::system_configuration::{SystemConfiguration, SystemImmutableSizes};
 use crate::transaction::{PublishedUnit, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER};
 use crate::unit::{
     data_unit_payload, parse_data_unit, parse_index_node, parse_packed_unit,
@@ -116,9 +116,9 @@ impl<Device: BlockDevice> PoolReader for Vec<(DeviceIdentity, Device)> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RecoveryFailure {
     /// 某块盘两个系统配置槽都无效。
-    NoValidSuperblock { device: DeviceIdentity },
+    NoValidSystemConfiguration { device: DeviceIdentity },
     /// 各盘的系统配置 fsid 或设备数对不上。
-    SuperblocksDisagree,
+    SystemConfigurationsDisagree,
     /// 根环里一条自证过的根都没有。
     NoValidRoot,
     /// 一个单元两条位置条目都读不到校验和相符的那份。
@@ -217,26 +217,34 @@ fn read_unit_via_locations(
 }
 
 /// 每盘两槽：槽 0 在偏移 0；槽 1 的偏移按槽 0 里记的槽距，槽 0 无效时按最小槽距 4096 试。
-pub fn choose_superblock(reader: &dyn PoolReader) -> Result<Superblock, RecoveryFailure> {
-    let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
-    let mut chosen: Option<Superblock> = None;
+pub fn choose_system_configuration(
+    reader: &dyn PoolReader,
+) -> Result<SystemConfiguration, RecoveryFailure> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut chosen: Option<SystemConfiguration> = None;
     for device in reader.device_identities() {
         let slot_zero = reader
             .read(device, DeviceOffsetInBytes(0), slot_bytes)
-            .and_then(|bytes| Superblock::parse_slot(&bytes));
-        let spacing = slot_zero
-            .as_ref()
-            .map_or(FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, |superblock| {
-                u64::from(superblock.geometry.fixed_structure_slot_spacing)
-            });
+            .and_then(|bytes| SystemConfiguration::parse_slot(&bytes));
+        let spacing = slot_zero.as_ref().map_or(
+            FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+            |system_configuration| {
+                u64::from(
+                    system_configuration
+                        .immutable
+                        .sizes
+                        .fixed_structure_slot_spacing,
+                )
+            },
+        );
         let slot_one = reader
             .read(device, DeviceOffsetInBytes(spacing), slot_bytes)
-            .and_then(|bytes| Superblock::parse_slot(&bytes));
+            .and_then(|bytes| SystemConfiguration::parse_slot(&bytes));
         let best_on_device = match (slot_zero, slot_one) {
-            (None, None) => return Err(RecoveryFailure::NoValidSuperblock { device }),
+            (None, None) => return Err(RecoveryFailure::NoValidSystemConfiguration { device }),
             (Some(only), None) | (None, Some(only)) => only,
             (Some(zero), Some(one)) => {
-                if one.slot_generation > zero.slot_generation {
+                if one.quantities.slot_generation > zero.quantities.slot_generation {
                     one
                 } else {
                     zero
@@ -246,32 +254,33 @@ pub fn choose_superblock(reader: &dyn PoolReader) -> Result<Superblock, Recovery
         match &chosen {
             None => chosen = Some(best_on_device),
             Some(previous) => {
-                if previous.filesystem_identifier != best_on_device.filesystem_identifier
-                    || previous.device_count != best_on_device.device_count
+                if previous.immutable.filesystem_identifier
+                    != best_on_device.immutable.filesystem_identifier
+                    || previous.immutable.device_count != best_on_device.immutable.device_count
                 {
-                    return Err(RecoveryFailure::SuperblocksDisagree);
+                    return Err(RecoveryFailure::SystemConfigurationsDisagree);
                 }
             }
         }
     }
-    chosen.ok_or(RecoveryFailure::SuperblocksDisagree)
+    chosen.ok_or(RecoveryFailure::SystemConfigurationsDisagree)
 }
 
 /// 根环三个区域全部槽里自证过的根，逐个交给 `visit`（择根与取号共用这一段遍历）。
 fn visit_valid_roots<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
-    geometry: &FormatTimeGeometry,
+    immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
     mut visit: impl FnMut(RootRecord),
 ) {
-    let root_slot_bytes = usize::try_from(geometry.physical_block_size).expect("根槽宽");
+    let root_slot_bytes = usize::try_from(immutable_sizes.physical_block_size).expect("根槽宽");
     for region in 0..ROOT_RING_REGIONS {
         let device = region_devices[usize::try_from(region).expect("区域号")];
         for slot in 0..ROOT_RING_SLOTS_PER_REGION {
             let offset = slot_offset(
                 RootRingSlot { region, slot },
-                geometry.fixed_structure_slot_spacing,
+                immutable_sizes.fixed_structure_slot_spacing,
             );
             let Some(bytes) = reader.read(device, offset, root_slot_bytes) else {
                 continue;
@@ -285,13 +294,16 @@ fn visit_valid_roots<Reader: PoolReader + ?Sized>(
 
 /// 三个区域全部槽逐个验自证校验和，取 `(checkpoint_txg, 实例代号)` 最大的。
 #[must_use]
-pub fn choose_root(reader: &dyn PoolReader, superblock: &Superblock) -> Option<RootRecord> {
+pub fn choose_root(
+    reader: &dyn PoolReader,
+    system_configuration: &SystemConfiguration,
+) -> Option<RootRecord> {
     let mut best: Option<RootRecord> = None;
     visit_valid_roots(
         reader,
-        &superblock.region_devices,
-        &superblock.geometry,
-        &superblock.filesystem_identifier,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
         |candidate| {
             let candidate_key = (candidate.checkpoint_txg, candidate.instance);
             if best.is_none_or(|current| candidate_key > (current.checkpoint_txg, current.instance))
@@ -309,14 +321,14 @@ pub fn choose_root(reader: &dyn PoolReader, superblock: &Superblock) -> Option<R
 pub fn highest_root_txg<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
-    geometry: &FormatTimeGeometry,
+    immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> Option<CheckpointTxg> {
     let mut highest: Option<CheckpointTxg> = None;
     visit_valid_roots(
         reader,
         region_devices,
-        geometry,
+        immutable_sizes,
         filesystem_identifier,
         |root| {
             highest = Some(highest.map_or(root.checkpoint_txg, |current| {
@@ -332,14 +344,14 @@ pub fn highest_root_txg<Reader: PoolReader + ?Sized>(
 pub fn readable_roots<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
-    geometry: &FormatTimeGeometry,
+    immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> Vec<RootRecord> {
     let mut roots = Vec::new();
     visit_valid_roots(
         reader,
         region_devices,
-        geometry,
+        immutable_sizes,
         filesystem_identifier,
         |root| roots.push(root),
     );
@@ -352,11 +364,16 @@ pub fn readable_roots<Reader: PoolReader + ?Sized>(
 pub fn effective_rollback_floor<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
-    geometry: &FormatTimeGeometry,
+    immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> CheckpointTxg {
     let mut highest_per_device: BTreeMap<DeviceIdentity, CheckpointTxg> = BTreeMap::new();
-    for root in readable_roots(reader, region_devices, geometry, filesystem_identifier) {
+    for root in readable_roots(
+        reader,
+        region_devices,
+        immutable_sizes,
+        filesystem_identifier,
+    ) {
         let device = region_devices
             [usize::try_from(target_for_publish(root.checkpoint_txg).region).expect("区域号")];
         let highest = highest_per_device
@@ -747,14 +764,14 @@ pub fn user_visible_tree_root_pointers(
 pub fn highest_root_instance<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     region_devices: &[DeviceIdentity; 3],
-    geometry: &FormatTimeGeometry,
+    immutable_sizes: &SystemImmutableSizes,
     filesystem_identifier: &[u8; 16],
 ) -> Option<InstanceGeneration> {
     let mut highest: Option<InstanceGeneration> = None;
     visit_valid_roots(
         reader,
         region_devices,
-        geometry,
+        immutable_sizes,
         filesystem_identifier,
         |root| {
             highest = Some(highest.map_or(root.instance, |current| current.max(root.instance)));
@@ -766,18 +783,20 @@ pub fn highest_root_instance<Reader: PoolReader + ?Sized>(
 /// 一块盘两槽里自证过、fsid 与本池相同的系统配置。取号的 max（D18（块里携带什么信息） 已定项 11）与系统配置槽写的世代号
 /// （D22（单元原子性怎么合成） 已定项 16，逐盘计）都按这个读法（2026-09-14 用户定案，C322（取号那一步的屏障怎么放没有条款） 三轮三方）。
 #[must_use]
-pub fn verified_superblock_slots<Reader: PoolReader + ?Sized>(
+pub fn verified_system_configuration_slots<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     device: DeviceIdentity,
     slot_spacing_in_bytes: u64,
     filesystem_identifier: &[u8; 16],
-) -> Vec<Superblock> {
-    let slot_bytes = usize::try_from(SUPERBLOCK_SLOT_BYTES).expect("4096");
+) -> Vec<SystemConfiguration> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     [0, slot_spacing_in_bytes]
         .into_iter()
         .filter_map(|offset| reader.read(device, DeviceOffsetInBytes(offset), slot_bytes))
-        .filter_map(|bytes| Superblock::parse_slot(&bytes))
-        .filter(|superblock| superblock.filesystem_identifier == *filesystem_identifier)
+        .filter_map(|bytes| SystemConfiguration::parse_slot(&bytes))
+        .filter(|system_configuration| {
+            system_configuration.immutable.filesystem_identifier == *filesystem_identifier
+        })
         .collect()
 }
 
@@ -785,12 +804,12 @@ pub fn verified_superblock_slots<Reader: PoolReader + ?Sized>(
 #[must_use]
 pub fn scan_journal(
     reader: &dyn PoolReader,
-    superblock: &Superblock,
+    system_configuration: &SystemConfiguration,
 ) -> BTreeMap<(InstanceGeneration, u64), JournalRecord> {
     let expected_filesystem_identifier =
-        unit_filesystem_identifier(&superblock.filesystem_identifier);
+        unit_filesystem_identifier(&system_configuration.immutable.filesystem_identifier);
     let ring_start = DeviceOffsetInBytes(JOURNAL_RING_START_SLOT * SLOT_BYTES);
-    let ring_bytes = superblock.geometry.journal_ring_bytes;
+    let ring_bytes = system_configuration.immutable.sizes.journal_ring_bytes;
     let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
     let mut records = BTreeMap::new();
     for device in reader.device_identities() {
@@ -1335,8 +1354,8 @@ pub fn walk_to_file(
 #[must_use]
 pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport {
     let mut mapping_fallbacks = 0;
-    let superblock = match choose_superblock(reader) {
-        Ok(superblock) => superblock,
+    let system_configuration = match choose_system_configuration(reader) {
+        Ok(system_configuration) => system_configuration,
         Err(failure) => {
             return RecoveryReport {
                 outcome: RecoveryOutcome::Failed {
@@ -1349,7 +1368,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
             }
         }
     };
-    let Some(root) = choose_root(reader, &superblock) else {
+    let Some(root) = choose_root(reader, &system_configuration) else {
         return RecoveryReport {
             outcome: RecoveryOutcome::Failed {
                 root: None,
@@ -1363,11 +1382,11 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
     let root_key = (root.instance, root.checkpoint_txg);
     let (journal, effective_root) = match policy {
         JournalPolicy::Consult | JournalPolicy::ConsultWithoutNamedVerification => {
-            let records = scan_journal(reader, &superblock);
+            let records = scan_journal(reader, &system_configuration);
             replay_journal(
                 reader,
                 &root,
-                superblock.geometry.journal_ring_bytes,
+                system_configuration.immutable.sizes.journal_ring_bytes,
                 &records,
                 policy == JournalPolicy::Consult,
                 rollback_high_water_of_root(reader, &root),

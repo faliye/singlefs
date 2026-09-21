@@ -239,9 +239,9 @@ metaheavy 的 5.937 是按概率算出来的，不是反解：热区 = 叶子总
 - 两轮运行**逐字节相同**；完整性闸 `emitted=60` == 抓到 60 行。
 
 代码 `research/e7-index-bench/src/bin/e16_journal.rs`，`cargo run --release --bin e16-journal`；
-输出 `research/results/e16-journal-2026-08-31.out`（含 2026-08-31 新增的祖先块计数器；
+输出 `e16-journal-2026-08-31.out`（含 2026-08-31 新增的祖先块计数器；
 去掉该字段后与 `e16-journal-2026-08-28.out` 逐字节相同）
-与 `research/results/e16-sweep-2026-08-28.out`（56 格扫描）。
+与 `e16-sweep-2026-08-28.out`（56 格扫描）。
 复跑：把E16（journal 的角色：WAL vs 意图日志）的编号作为参数传给 `research/scripts/replay.sh`。
 
 ### 字节口径（2026-09-03 补测，C27（块数口径定格式参数）的前置）
@@ -279,7 +279,7 @@ D11（索引节点要不要留消息缓冲区）方向可能是反的——节�
 **两种口径对节点大小的排序相反** ⇒ 引用 E16（journal 的角色：WAL vs 意图日志）任何块数结论去定
 扇出、节点大小、D11（索引节点要不要留消息缓冲区）这类格式参数时，必须同时给出字节口径。
 复跑：`cargo run --release --bin e16-journal bytes`，产物
-`research/results/e16-bytes-2026-09-03.out`（7 行，收尾 `emitted=7`），replay 表第二条 E16（journal 的角色：WAL vs 意图日志）行字节比对。
+`e16-bytes-2026-09-03.out`（7 行，收尾 `emitted=7`），replay 表第二条 E16（journal 的角色：WAL vs 意图日志）行字节比对。
 一处顺手留档：第一版的 config 行绕过了 Emitter，收尾行说 6 实收 7，
 replay 完整性闸当场判红——闸在工作的直接证据。
 

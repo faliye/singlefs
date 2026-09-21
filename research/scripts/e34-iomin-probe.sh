@@ -157,7 +157,7 @@ run_scenario() { # $1=轮号 $2=场景名 $3=受害偏移 $4=注入撕裂(0/1) $
   put_mark $OFF_C_R1 "~C1_${round}_$$~"
   put_mark $OFF_C_R2 "~C2_${round}_$$~"
   S sync
-  # 掉电序列：先停干净（superblock 落盘），再在停机状态注入，再少一条腿拉起
+  # 掉电序列：先停干净（系统配置落盘），再在停机状态注入，再少一条腿拉起
   S mdadm --stop "$MD_DEV" 2>/dev/null
   local legA legV
   legA="$(leg_of "$MA")" || { emit "name=skip scen=$scen round=$round reason=legA_ambiguous"; return; }

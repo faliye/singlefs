@@ -1,1 +1,0 @@
-    oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.max(oldest))

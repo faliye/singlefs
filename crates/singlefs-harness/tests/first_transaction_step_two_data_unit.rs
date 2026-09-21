@@ -15,7 +15,7 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::pointer::{DataPointer, LocationEntry, PointerHead};
-use singlefs_core::superblock::FormatTimeGeometry;
+use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::unit::{build_data_unit, declared_length, DataUnitIdentity, WriteOrder};
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, TREE_IDENTIFIER_EXTENT};
 use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
@@ -37,7 +37,7 @@ fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
         filesystem_identifier: *b"singlefs-step2-x",
         region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
-        geometry: FormatTimeGeometry {
+        geometry: SystemImmutableSizes {
             physical_block_size: 512,
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
@@ -65,7 +65,7 @@ fn mkfs_pool(tag: &str) -> Pool {
     let mut devices = Vec::new();
     for device_number in 0..2u32 {
         let path = image_path(tag, device_number);
-        let file = FileBackedBlockDevice::open_or_create(
+        let file = FileBackedBlockDevice::create_image_file_exclusively(
             &path,
             IMAGE_BYTES,
             PhysicalBlockSizeInBytes(512),

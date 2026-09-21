@@ -34,13 +34,13 @@ use std::cell::Cell;
 
 /// 读系统配置槽 0（偏移 0）时按「这块盘第几次读槽 0」注入一次瞬时读错的盘，别的读写原样交给内层（m2-emptypool-nonempty-r1 云端攻方腿
 /// 模型 `opus_attack_emptypool.rs` 第 294 行起的做法）。
-struct TransientSuperblockReadErrorDevice<Inner: BlockDevice> {
+struct TransientSystemConfigurationReadErrorDevice<Inner: BlockDevice> {
     inner: Inner,
     slot_zero_reads: Cell<u32>,
     failing_slot_zero_read_ordinal: u32,
 }
 
-impl<Inner: BlockDevice> BlockDevice for TransientSuperblockReadErrorDevice<Inner> {
+impl<Inner: BlockDevice> BlockDevice for TransientSystemConfigurationReadErrorDevice<Inner> {
     fn read_at(
         &self,
         offset: DeviceOffsetInBytes,
@@ -81,7 +81,7 @@ impl<Inner: BlockDevice> BlockDevice for TransientSuperblockReadErrorDevice<Inne
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
 #[test]
-fn transient_superblock_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write(
+fn transient_system_configuration_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write(
 ) {
     let mut formatted = format_pool("step-three-formatted-transient-read-error");
     {
@@ -94,13 +94,16 @@ fn transient_superblock_read_errors_between_the_refusal_and_the_acquisition_refu
         );
     }
     let before = disk_snapshot(&formatted.memory_pool(), &formatted.stream);
-    let mut devices: Vec<(DeviceIdentity, TransientSuperblockReadErrorDevice<_>)> = formatted
+    let mut devices: Vec<(
+        DeviceIdentity,
+        TransientSystemConfigurationReadErrorDevice<_>,
+    )> = formatted
         .reopen_recorded()
         .into_iter()
         .map(|(identity, recorded)| {
             (
                 identity,
-                TransientSuperblockReadErrorDevice {
+                TransientSystemConfigurationReadErrorDevice {
                     inner: recorded,
                     slot_zero_reads: Cell::new(0),
                     failing_slot_zero_read_ordinal: 2,
@@ -400,7 +403,7 @@ fn writable_mount_after_a_crash_between_warm_up_and_the_first_file_is_refused_be
     );
     let after = disk_snapshot(&formatted.memory_pool(), &formatted.stream);
     assert_eq!(
-        after.superblock_slots, before.superblock_slots,
+        after.system_configuration_slots, before.system_configuration_slots,
         "两盘系统配置槽逐字节不变：没有取号"
     );
     assert_eq!(after.readable_roots, before.readable_roots, "根环没有新根");

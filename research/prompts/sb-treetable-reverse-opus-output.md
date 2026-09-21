@@ -299,7 +299,7 @@ D19（块指针的结构与宽度预算） 已定项 5（**2026-09-06 用户定�
 
 材料里的编号（D22 已定项 2 / 7 / 8、D15 已定项 2、D2 已定项 9、D6 已定项 1、D18 已定项 7、D19 已定项 4、D25、E79、E115、E124、E73、C231）逐条现查，**指向都对**。
 材料引 C231（超级块必需项里混进了根记录的字段） 时给的源码位置
-`research/e7-index-bench/src/bin/e115_superblock_completeness.rs` 第 97 行也对，现查逐字：
+`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs` 第 97 行也对，现查逐字：
 
 ```rust
     ("树表单元指针", "D22 已定项 7", Some("tree_table_ptr")),
@@ -403,7 +403,7 @@ D22（单元原子性怎么合成） 未定项 9 的「改第一个事务的字�
 `.claude/kb/decisions/` 下 01 / 02 / 03 / 05 / 06 / 08 / 09 / 12 / 13 / 15 / 16 / 18 / 19 / 21 / 22 / 23 / 26 / 27，
 `invariants.md` 全表（I-1 到 I-9），`checks-owed.md` 全表，`layout/01-first-txn.md` 全文，
 `verification-build.md` 全文，`decisions-history.md` 中「树 ID 水位」「开放列表」两族命中，
-`research/e7-index-bench/src/bin/e115_superblock_completeness.rs`。
+`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs`。
 关键词：树表 / tree_table / 中央映射 / 扫描重建 / fsck / 超级块 + 加密 / 根环 / 自举。
 
 **没搜的**：`records/`（建设过程记录，不是条款），`research/prompts/` 下别轮的原样输出

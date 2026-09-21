@@ -169,17 +169,17 @@ pub const fn journal_in_flight_record_limit(ring_bytes: u64) -> u64 {
     ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR
 }
 
-/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；2026-09-14 用户定案加四个字段）。format-const: SUPERBLOCK_BYTES
-pub const SUPERBLOCK_BYTES: u64 = 481;
+/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 / 已定项 15；2026-09-14 用户定案加四个字段）。format-const: SYSTEM_CONFIGURATION_BYTES
+pub const SYSTEM_CONFIGURATION_BYTES: u64 = 481;
 
 /// 系统配置每盘恒 2 个槽、槽 = 世代号 mod 2（D22（单元原子性怎么合成） 已定项 16）。
-pub const SUPERBLOCK_SLOTS_PER_DEVICE: u64 = 2;
+pub const SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE: u64 = 2;
 
 /// 固定结构槽距的下限；槽距 = max(4096, mkfs 时探测的 io_min)（D2（RAID 条带策略） 已定项 19）。
 pub const FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES: u64 = 4096;
 
-/// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮 + 用户定案；此前是探测到的 physical_block_size）。format-const: SUPERBLOCK_SLOT_BYTES
-pub const SUPERBLOCK_SLOT_BYTES: u64 = 4096;
+/// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮 + 用户定案；此前是探测到的 physical_block_size）。format-const: SYSTEM_CONFIGURATION_SLOT_BYTES
+pub const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 
 /// 根环参数：R 个区域、每区 S 槽、素数步长 P、chunk、基址（D22（单元原子性怎么合成） 已定项 2 / 已定项 16）。
 pub const ROOT_RING_REGIONS: u64 = 3;
@@ -304,12 +304,16 @@ mod tests {
 
     /// 系统配置的 481 与它所在的槽：槽宽预想 4096 时余 3615，装得下下一条 86 字节指针；按此前的 512 槽算只余 31、塞不进（D22 已定项 2 重开的理由之一）。
     #[test]
-    fn superblock_fits_in_the_slot_with_room_for_one_more_pointer() {
-        let slot_bytes = std::hint::black_box(SUPERBLOCK_SLOT_BYTES);
-        assert!(SUPERBLOCK_BYTES <= slot_bytes);
-        assert_eq!(slot_bytes, SUPERBLOCK_BYTES + 3615, "4096 槽余 3615");
+    fn system_configuration_fits_in_the_slot_with_room_for_one_more_pointer() {
+        let slot_bytes = std::hint::black_box(SYSTEM_CONFIGURATION_SLOT_BYTES);
+        assert!(SYSTEM_CONFIGURATION_BYTES <= slot_bytes);
+        assert_eq!(
+            slot_bytes,
+            SYSTEM_CONFIGURATION_BYTES + 3615,
+            "4096 槽余 3615"
+        );
         assert!(
-            SUPERBLOCK_BYTES + NODE_POINTER_BYTES <= slot_bytes,
+            SYSTEM_CONFIGURATION_BYTES + NODE_POINTER_BYTES <= slot_bytes,
             "下一条 86 字节指针装得下"
         );
         assert!(

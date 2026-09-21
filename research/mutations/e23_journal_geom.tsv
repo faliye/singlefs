@@ -1,7 +1,7 @@
 M1_头常量漂移	const JOURNAL_RECORD_HEADER_BYTES: u64 = 84;	const JOURNAL_RECORD_HEADER_BYTES: u64 = 76;
 M2_条目常量漂移	const ENTRY_BYTES: u64 = 56;	const ENTRY_BYTES: u64 = 48;
 M3_对齐删掉	bytes.div_ceil(physical_block_size) * physical_block_size	bytes
-M4_sb头不省8字节	Tail::SuperBlock => JOURNAL_RECORD_HEADER_BYTES - 8,	Tail::SuperBlock => JOURNAL_RECORD_HEADER_BYTES,
+M4_sb头不省8字节	Tail::SystemConfiguration => JOURNAL_RECORD_HEADER_BYTES - 8,	Tail::SystemConfiguration => JOURNAL_RECORD_HEADER_BYTES,
 M5_链按记录分配	outcome.allocation_count += (total_record_bytes + aligned_record_bytes).div_ceil(BLOCK) - total_record_bytes.div_ceil(BLOCK);	outcome.allocation_count += 1;
 M6_环也分配	if shape == Shape::Chain {\n            outcome.allocation_count	if shape != Shape::Chain {\n            outcome.allocation_count
 M7_重放漏掉搭不上车的	outcome.replay_blocks = tailing_record_bytes.max(tail_lag).div_ceil(BLOCK);	outcome.replay_blocks = tail_lag.div_ceil(BLOCK);

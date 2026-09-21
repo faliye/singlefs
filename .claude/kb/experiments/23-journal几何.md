@@ -99,7 +99,7 @@ D23（journal 的角色与格式）已定项 9（2026-08-30）把 `jsn` 定成 1
 - **重放量只按块算，没算重放时的随机读**。链式重放要沿指针逐块跳，
   环式可以顺序预读——这一层E23（journal 几何）够不着。
 - 代码 `research/e7-index-bench/src/bin/e23_journal_geom.rs`（`cargo run --release --bin e23_journal_geom`），
-  原始输出 `research/results/e23-journal-geom-2026-08-29.out`。三轮字节一致。
+  原始输出 `e23-journal-geom-2026-08-29.out`。三轮字节一致。
 
 ### 08-29 那一轮踩的两个坑，都由变异测试抓出来
 

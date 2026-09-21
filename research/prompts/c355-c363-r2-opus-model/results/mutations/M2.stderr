@@ -1,4 +1,0 @@
-
-thread 'main' (572981) panicked at src/bin/v2_per_device.rs:277:5:
-assertion failed: three_device_admits(ThreeDeviceVariant::SelectedDevices, [6, 6, 0], 1, 0, 1)
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

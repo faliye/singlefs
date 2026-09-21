@@ -1,7 +1,0 @@
-S4L before-raise txg=13 inst=2 F_root=0 F_eff=0 acct_alloc=97 acct_free=211871 acct_defer=85 mem_alloc=97 mem_defer=85 mem_isolated=0 | GREEN
-S4L ceiling=10 reclaimed_count=30
-S4L publish txg=14 F=8 wrote=[(AllocationTree, 50367, 1), (AccountingTree, 50240, 1), (MappingTree, 50241, 1), (TreeTable, 50242, 1)]
-S4L crash-state txg=14 inst=2 F_root=8 F_eff=0 acct_alloc=66 acct_free=211902 acct_defer=54 mem_alloc=66 mem_defer=54 mem_isolated=0 | GREEN
-S4L crash->rollback(victim) failed: Recovery(UnitUnreadable { slot: SlotNumber(50240) })
-S4L crash->remount txg=16 inst=3 F_root=0 F_eff=0 acct_alloc=108 acct_free=211860 acct_defer=96 mem_alloc=108 mem_defer=96 mem_isolated=0 | I-2.1[树 11（种类 1）的根 在盘 0 槽 50240 的那一份与位置条目里的校验和对不上] ; I-5.1[盘 0：树表单元（槽 50242 跨 1）与 inode 树的孩子（槽 50242）重叠]
-PROBE-COMPLETE

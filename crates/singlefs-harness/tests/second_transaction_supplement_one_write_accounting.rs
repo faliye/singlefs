@@ -121,7 +121,10 @@ fn every_kind_matches(
 }
 
 /// 固定结构三样：journal 记录两盘各一份 4096、根槽一次 FUA 512、系统配置槽两盘各一次 4096（字节表零 t9..t11 / w1..w3）。
-const JOURNAL_RECORD_ROOT_SLOT_SUPERBLOCK_SLOTS: [(WrittenStructureKind, WriteCallsAndBytes); 3] = [
+const JOURNAL_RECORD_ROOT_SLOT_SYSTEM_CONFIGURATION_SLOTS: [(
+    WrittenStructureKind,
+    WriteCallsAndBytes,
+); 3] = [
     (
         WrittenStructureKind::JournalRecord,
         WriteCallsAndBytes {
@@ -137,7 +140,7 @@ const JOURNAL_RECORD_ROOT_SLOT_SUPERBLOCK_SLOTS: [(WrittenStructureKind, WriteCa
         },
     ),
     (
-        WrittenStructureKind::SuperblockSlot,
+        WrittenStructureKind::SystemConfigurationSlot,
         WriteCallsAndBytes {
             write_calls: 2,
             written_bytes: 8192,
@@ -172,7 +175,7 @@ fn expected_by_kind(
             (*kind, writes)
         })
         .collect();
-    expected.extend(JOURNAL_RECORD_ROOT_SLOT_SUPERBLOCK_SLOTS);
+    expected.extend(JOURNAL_RECORD_ROOT_SLOT_SYSTEM_CONFIGURATION_SLOTS);
     expected
 }
 
@@ -496,7 +499,7 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
         ),
         (WrittenStructureKind::RootSlot, WriteCallsAndBytes::NONE),
         (
-            WrittenStructureKind::SuperblockSlot,
+            WrittenStructureKind::SystemConfigurationSlot,
             WriteCallsAndBytes::NONE,
         ),
     ]

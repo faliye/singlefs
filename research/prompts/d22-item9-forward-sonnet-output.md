@@ -18,7 +18,7 @@
 
 ## 问 1：E115 的 31 项必需项逐项列出来
 
-源码 `research/e7-index-bench/src/bin/e115_superblock_completeness.rs:81-111`（`REQUIRED` 数组，
+源码 `research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:81-111`（`REQUIRED` 数组，
 逐字抄自源码，第三列是候选表覆盖状态）：
 
 | # | 项 | 出处（逐字） | 候选表里的宽度 / E115 假设宽度 | 是最小可用吗 |
@@ -62,13 +62,13 @@
 
 **这是本问最重的一条，也是三条腿里我推得最硬的一条。**
 
-E100 源码里这一行的注释逐字（`research/e7-index-bench/src/bin/e100_superblock_slot.rs:77`）：
+E100 源码里这一行的注释逐字（`research/e7-index-bench/src/bin/e100_system_configuration_slot.rs:77`）：
 
 ```
 ("tree_table_ptr", 59),  // D22 已定项 7 的树表单元指针（间接层）
 ```
 
-E115 的 REQUIRED 表同一项（`e115_superblock_completeness.rs:97`）：
+E115 的 REQUIRED 表同一项（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:97`）：
 
 ```
 ("树表单元指针", "D22 已定项 7", Some("tree_table_ptr")),
@@ -81,7 +81,7 @@ E115 的 REQUIRED 表同一项（`e115_superblock_completeness.rs:97`）：
 住根环槽，194 字节）的字段表，**我把这一节（461–503 行）整段读完，逐字搜过一遍，
 「超级块」三个字一次都没出现过**。
 
-E100 源码头部自己给的类比理由逐字（`e100_superblock_slot.rs:19-20`）：
+E100 源码头部自己给的类比理由逐字（`research/e7-index-bench/src/bin/e100_system_configuration_slot.rs:19-20`）：
 
 ```
 //! - **C78 / E79 的先例**：512 字节槽带 jsn 水位只装 **6 棵树**，7 棵常识树集恰好 **513 字节爆 1 字节**
@@ -168,7 +168,7 @@ E124 判据 2 已经把这一条讲清楚，我现查坐实：D18（块里携带
 背景材料第 8 节写「那 11 个未定字段的宽度只会涨不会缩」。**我先把这 11 项找出来**
 （背景材料本身没有列出是哪 11 项，我按 E115 + E124 的数据逐一核对复原）：
 
-E115 的 9 个"缺项"（`e115_superblock_completeness.rs:96-108`，`MISSING_WIDTHS` 数组）：
+E115 的 9 个"缺项"（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs:96-108`，`MISSING_WIDTHS` 数组）：
 journal 最坏占用与 F、根环逐区域设备身份、条带宽度上界 `w_max`、组大小 `g`、
 KDF 标识、加密类型、MAC 长度声明、设备数 `devs`、主密钥槽——**9 项**。
 
@@ -301,8 +301,8 @@ D22 已定项 2 的这一节自己已经指出这个冲突（`decisions/22-单�
   是**物理约束**——512 字节槽本来就装不下这些必需字段，这不是能不能省字节的取舍，
   是 D20（承重面：单元的原子性与自包含）推论三「撕裂判定宽度 = `physical_block_size`
   ⇒ 一个槽就是一个扇区」（背景材料第 7 节转述，我未在本轮重新逐字核对 D20 原文，
-  但该句在 E115/E124 两处源码注释里都被引用，`e115_superblock_completeness.rs` 头部注释、
-  `e124_superblock_recompute.rs:22`）钉死的原子性边界：**超过一个扇区就不是一次原子写**，
+  但该句在 E115/E124 两处源码注释里都被引用，`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs` 头部注释、
+  `research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs:22`）钉死的原子性边界：**超过一个扇区就不是一次原子写**，
   这不是可选的效率取舍。
 
 ⇒ **建议的措辞方向**（不是最终条款，见问 5）：
@@ -442,9 +442,9 @@ D22 已定项 2 的这一节自己已经指出这个冲突（`decisions/22-单�
 - `.claude/kb/decisions/18-块里携带什么信息.md`：495-527（已定项 5，map_provenance）
 - `.claude/kb/invariants.md`：72（I-8.1）
 - `.claude/rules/fs-design.md`：74-81（自描述不省）、227（格式分支判据）
-- `research/e7-index-bench/src/bin/e100_superblock_slot.rs`：1-113（全文，含 `tree_table_ptr` 注释）
-- `research/e7-index-bench/src/bin/e115_superblock_completeness.rs`：1-330（全文，含 `REQUIRED`/`MISSING_WIDTHS`）
-- `research/e7-index-bench/src/bin/e124_superblock_recompute.rs`（未直接读源码，正文数字取自
+- `research/e7-index-bench/src/bin/e100_system_configuration_slot.rs`：1-113（全文，含 `tree_table_ptr` 注释）
+- `research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs`：1-330（全文，含 `REQUIRED`/`MISSING_WIDTHS`）
+- `research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs`（未直接读源码，正文数字取自
   `.claude/kb/experiments/124-系统配置字段表按已定项14重算.md` 的逐字产物引用）
 - `.claude/kb/experiments/115-系统配置字段表的完备性与字节预算.md`：全文
 - `.claude/kb/experiments/124-系统配置字段表按已定项14重算.md`：全文

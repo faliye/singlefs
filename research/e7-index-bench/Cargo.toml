@@ -250,8 +250,8 @@ name = "e99-writebuffer-sequence"
 path = "src/bin/e99_writebuffer_sequence.rs"
 
 [[bin]]
-name = "e100-superblock-slot"
-path = "src/bin/e100_superblock_slot.rs"
+name = "e100-system-configuration-slot"
+path = "src/bin/e100_system_configuration_slot.rs"
 
 [[bin]]
 name = "e101-node-tag-reserve"
@@ -310,8 +310,8 @@ name = "e114-pack-ledger"
 path = "src/bin/e114_pack_ledger.rs"
 
 [[bin]]
-name = "e115-superblock-completeness"
-path = "src/bin/e115_superblock_completeness.rs"
+name = "e115-system-configuration-completeness"
+path = "src/bin/e115_system_configuration_completeness.rs"
 
 [[bin]]
 name = "e116-pack-settle"
@@ -342,8 +342,8 @@ name = "e122-directory-locality"
 path = "src/bin/e122_directory_locality.rs"
 
 [[bin]]
-name = "e124-superblock-recompute"
-path = "src/bin/e124_superblock_recompute.rs"
+name = "e124-system-configuration-recompute"
+path = "src/bin/e124_system_configuration_recompute.rs"
 
 [[bin]]
 name = "e95-node-layout-arms"
@@ -362,8 +362,8 @@ name = "e151-arrival-and-container-arms"
 path = "src/bin/e151_arrival_and_container_arms.rs"
 
 [[bin]]
-name = "e126-superblock-slot-width"
-path = "src/bin/e126_superblock_slot_width.rs"
+name = "e126-system-configuration-slot-width"
+path = "src/bin/e126_system_configuration_slot_width.rs"
 
 [[bin]]
 name = "e128-pointer-birth-cost"
@@ -394,8 +394,8 @@ name = "e146-livelist-entry-width"
 path = "src/bin/e146_livelist_entry_width.rs"
 
 [[bin]]
-name = "e147-superblock-recompute-from-layout"
-path = "src/bin/e147_superblock_recompute_from_layout.rs"
+name = "e147-system-configuration-recompute-from-layout"
+path = "src/bin/e147_system_configuration_recompute_from_layout.rs"
 
 [[bin]]
 name = "e149-pack-container-repair-options"
@@ -424,3 +424,11 @@ path = "src/bin/e155_fsync_write_volume.rs"
 [[bin]]
 name = "e155-second-run-fsync-write-volume"
 path = "src/bin/e155_second_run_fsync_write_volume.rs"
+
+[[bin]]
+name = "e155-third-run-release-cascade"
+path = "src/bin/e155_third_run_release_cascade.rs"
+
+[[bin]]
+name = "e155-fourth-run-group-commit-concurrency"
+path = "src/bin/e155_fourth_run_group_commit_concurrency.rs"

@@ -1,0 +1,536 @@
+warning: variants `TornError` and `TornSilent` are never constructed
+  --> crates/singlefs-harness/tests/c381r3_probe_common.rs:60:5
+   |
+54 | pub enum Fault {
+   |          ----- variants in this enum
+...
+60 |     TornError,
+   |     ^^^^^^^^^
+61 |     /// 前半落盘、后半不落，返回成功（撕裂而设备不说：写不做原子性承诺的那一形）。
+62 |     TornSilent,
+   |     ^^^^^^^^^^
+   |
+   = note: `Fault` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `plus_overwrites` is never used
+   --> crates/singlefs-harness/tests/c381r3_probe_common.rs:409:8
+    |
+409 | pub fn plus_overwrites(base: &Snapshot, count: u64, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^^^^^
+
+warning: function `rolled_back` is never used
+   --> crates/singlefs-harness/tests/c381r3_probe_common.rs:474:8
+    |
+474 | pub fn rolled_back(base: &Snapshot, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^
+
+warning: function `floor_raised` is never used
+   --> crates/singlefs-harness/tests/c381r3_probe_common.rs:528:8
+    |
+528 | pub fn floor_raised(base: &Snapshot, label: &'static str) -> Snapshot {
+    |        ^^^^^^^^^^^^
+
+warning: variants `Retry`, `Empty`, `Other`, and `Remount` are never constructed
+   --> crates/singlefs-harness/tests/c381r3_probe_common.rs:586:5
+    |
+584 | pub enum Action {
+    |          ------ variants in this enum
+585 |     /// 原样重发上一次失败的内容（从调用方手里的现行版）。
+586 |     Retry,
+    |     ^^^^^
+587 |     /// 从现行版发一次空发布。
+588 |     Empty,
+    |     ^^^^^
+589 |     /// 从现行版发一次内容不同的覆盖写。
+590 |     Other,
+    |     ^^^^^
+591 |     /// 放下写入口、进程内可写重开。
+592 |     Remount,
+    |     ^^^^^^^
+    |
+    = note: `Action` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: constant `ACTIONS` is never used
+   --> crates/singlefs-harness/tests/c381r3_probe_common.rs:594:11
+    |
+594 | pub const ACTIONS: [Action; 4] = [Action::Retry, Action::Empty, Action::Other, Action::Remount];
+    |           ^^^^^^^
+
+warning: function `sweep` is never used
+    --> crates/singlefs-harness/tests/c381r3_probe_common.rs:1243:8
+     |
+1243 | pub fn sweep<T: Send, F: Fn(&MakeFilesystemParameters, usize) -> T + Sync>(
+     |        ^^^^^
+
+warning: `singlefs-harness` (test "c381r3_landing") generated 7 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/c381r3_landing.rs (target/release/deps/c381r3_landing-63b65f062d50318e)
+
+running 1 test
+=== 前缀 base：A(txg3) → B(txg4)，实例 1；C 是 txg 5（根落区域 2）（C 共 21 次写）
+  C 的第 0 次写：盘0 偏移822214656 长32768（单元区）
+  C 的第 1 次写：盘1 偏移822214656 长32768（单元区）
+  C 的第 2 次写：盘0 偏移823410688 长16384（单元区）
+  C 的第 3 次写：盘1 偏移823410688 长16384（单元区）
+  C 的第 4 次写：盘0 偏移823427072 长32768（单元区）
+  C 的第 5 次写：盘1 偏移823427072 长32768（单元区）
+  C 的第 6 次写：盘0 偏移823459840 长16384（单元区）
+  C 的第 7 次写：盘1 偏移823459840 长16384（单元区）
+  C 的第 8 次写：盘0 偏移823476224 长16384（单元区）
+  C 的第 9 次写：盘1 偏移823476224 长16384（单元区）
+  C 的第 10 次写：盘0 偏移823492608 长16384（单元区）
+  C 的第 11 次写：盘1 偏移823492608 长16384（单元区）
+  C 的第 12 次写：盘0 偏移823508992 长16384（单元区）
+  C 的第 13 次写：盘1 偏移823508992 长16384（单元区）
+  C 的第 14 次写：盘0 偏移823525376 长16384（单元区）
+  C 的第 15 次写：盘1 偏移823525376 长16384（单元区）
+  C 的第 16 次写：盘0 偏移16793600 长4096（journal 环）
+  C 的第 17 次写：盘1 偏移16793600 长4096（journal 环）
+  C 的第 18 次写：盘0 偏移7344128 长512（根环区域）
+  C 的第 19 次写：盘0 偏移4096 长4096（系统配置槽）
+  C 的第 20 次写：盘1 偏移4096 长4096（系统配置槽）
+base	写#0(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#0(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#0(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#0(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#0(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#0(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#1(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823410688 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823410688 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823410688 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#2(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823410688 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823410688 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823410688 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823410688 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#3(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823410688 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823427072 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823427072 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823427072 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#4(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823427072 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823427072 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823427072 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823427072 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#5(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823427072 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823459840 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823459840 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823459840 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#6(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823459840 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823459840 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823459840 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823459840 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#7(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823459840 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823476224 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823476224 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823476224 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#8(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823476224 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823476224 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823476224 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823476224 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#9(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823476224 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823492608 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823492608 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823492608 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#10(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823492608 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823492608 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823492608 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823492608 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#11(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823492608 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823508992 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823508992 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823508992 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#12(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823508992 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823508992 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823508992 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823508992 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#13(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823508992 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823525376 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823525376 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823525376 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#14(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移823525376 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823525376 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823525376 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823525376 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#15(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移823525376 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Transient,journal 环)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16793600 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16793600 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16793600 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#16(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16793600 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Transient,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16793600 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16793600 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16793600 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#17(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16793600 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Transient,根环区域)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Transient,根环区域)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7344128 长512（根环区域，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Transient,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7344128 长512（根环区域，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Lying,根环区域)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Lying,根环区域)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 根记录(实例 1, txg 5)"]	落点=["探针落点 盘0 偏移7344128 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1032192)，遍历全部有效根得到 966656\")"]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#18(Lying,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7344128 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Transient,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 5)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 5)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Lying,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 7)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#19(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Transient,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 5)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 5)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Lying,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 7)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	写#20(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#0	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#0	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#0	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#1	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#1	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+base	屏障#1	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 8)	after红=[]	内容=同一份	回退=ok(回退到 txg 8，新实例 3)
+=== 前缀 wrapped：base + 22 次空发布；C 是 txg 27（根落区域 0）（C 共 21 次写）
+  C 的第 0 次写：盘0 偏移822214656 长32768（单元区）
+  C 的第 1 次写：盘1 偏移822214656 长32768（单元区）
+  C 的第 2 次写：盘0 偏移824852480 长16384（单元区）
+  C 的第 3 次写：盘1 偏移824852480 长16384（单元区）
+  C 的第 4 次写：盘0 偏移824868864 长32768（单元区）
+  C 的第 5 次写：盘1 偏移824868864 长32768（单元区）
+  C 的第 6 次写：盘0 偏移824901632 长16384（单元区）
+  C 的第 7 次写：盘1 偏移824901632 长16384（单元区）
+  C 的第 8 次写：盘0 偏移824918016 长16384（单元区）
+  C 的第 9 次写：盘1 偏移824918016 长16384（单元区）
+  C 的第 10 次写：盘0 偏移824934400 长16384（单元区）
+  C 的第 11 次写：盘1 偏移824934400 长16384（单元区）
+  C 的第 12 次写：盘0 偏移824950784 长16384（单元区）
+  C 的第 13 次写：盘1 偏移824950784 长16384（单元区）
+  C 的第 14 次写：盘0 偏移824967168 长16384（单元区）
+  C 的第 15 次写：盘1 偏移824967168 长16384（单元区）
+  C 的第 16 次写：盘0 偏移16883712 长4096（journal 环）
+  C 的第 17 次写：盘1 偏移16883712 长4096（journal 环）
+  C 的第 18 次写：盘0 偏移1052672 长512（根环区域）
+  C 的第 19 次写：盘0 偏移4096 长4096（系统配置槽）
+  C 的第 20 次写：盘1 偏移4096 长4096（系统配置槽）
+wrapped	写#0(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#0(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#0(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#0(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#0(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#0(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#1(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824852480 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824852480 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824852480 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#2(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824852480 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824852480 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824852480 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824852480 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#3(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824852480 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824868864 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824868864 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824868864 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#4(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824868864 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824868864 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824868864 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824868864 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#5(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824868864 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824901632 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824901632 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824901632 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#6(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824901632 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824901632 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824901632 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824901632 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#7(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824901632 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824918016 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824918016 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824918016 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#8(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824918016 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824918016 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824918016 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824918016 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#9(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824918016 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824934400 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824934400 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824934400 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#10(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824934400 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824934400 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824934400 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824934400 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#11(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824934400 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824950784 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824950784 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824950784 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#12(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824950784 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824950784 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824950784 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824950784 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#13(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824950784 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824967168 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824967168 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824967168 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#14(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824967168 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Transient,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824967168 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824967168 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Lying,单元区)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824967168 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#15(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824967168 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#16(Transient,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#16(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16883712 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#16(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16883712 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#16(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#16(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16883712 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#16(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16883712 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Transient,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16883712 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16883712 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16883712 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#17(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16883712 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#18(Transient,根环区域)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2457600)，遍历全部有效根得到 2064384\")"]	内容=同一份	回退=ok(回退到 txg 30，新实例 3)
+wrapped	写#18(Transient,根环区域)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 根记录(实例 1, txg 3)"]	落点=["探针落点 盘0 偏移1052672 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1900544\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#18(Transient,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 根记录(实例 1, txg 3)"]	落点=["探针落点 盘0 偏移1052672 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#18(Lying,根环区域)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#18(Lying,根环区域)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 根记录(实例 1, txg 27)"]	落点=["探针落点 盘0 偏移1052672 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1900544\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#18(Lying,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移1052672 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Transient,系统配置槽)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 27)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 27)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Lying,系统配置槽)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 29)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#19(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Transient,系统配置槽)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 27)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 27)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Lying,系统配置槽)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 29)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	写#20(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 30)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(2097152)，遍历全部有效根得到 1966080\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#0	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#0	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#0	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#1	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#1	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+wrapped	屏障#1	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 29)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1998848)，遍历全部有效根得到 1867776\")"]	内容=同一份	回退=REFUSED RollbackTargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_t
+=== 前缀 remounted：base + 进程内可写重开（实例 2，写行 + 暖机）；C 是 txg 8（根落区域 2）（C 共 21 次写）
+  C 的第 0 次写：盘0 偏移822214656 长32768（单元区）
+  C 的第 1 次写：盘1 偏移822214656 长32768（单元区）
+  C 的第 2 次写：盘0 偏移824410112 长16384（单元区）
+  C 的第 3 次写：盘1 偏移824410112 长16384（单元区）
+  C 的第 4 次写：盘0 偏移824442880 长32768（单元区）
+  C 的第 5 次写：盘1 偏移824442880 长32768（单元区）
+  C 的第 6 次写：盘0 偏移824475648 长16384（单元区）
+  C 的第 7 次写：盘1 偏移824475648 长16384（单元区）
+  C 的第 8 次写：盘0 偏移824492032 长16384（单元区）
+  C 的第 9 次写：盘1 偏移824492032 长16384（单元区）
+  C 的第 10 次写：盘0 偏移824508416 长16384（单元区）
+  C 的第 11 次写：盘1 偏移824508416 长16384（单元区）
+  C 的第 12 次写：盘0 偏移824524800 长16384（单元区）
+  C 的第 13 次写：盘1 偏移824524800 长16384（单元区）
+  C 的第 14 次写：盘0 偏移824541184 长16384（单元区）
+  C 的第 15 次写：盘1 偏移824541184 长16384（单元区）
+  C 的第 16 次写：盘0 偏移16805888 长4096（journal 环）
+  C 的第 17 次写：盘1 偏移16805888 长4096（journal 环）
+  C 的第 18 次写：盘0 偏移7348224 长512（根环区域）
+  C 的第 19 次写：盘0 偏移4096 长4096（系统配置槽）
+  C 的第 20 次写：盘1 偏移4096 长4096（系统配置槽）
+remounted	写#0(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#0(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#0(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#0(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#0(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#0(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#1(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移822214656 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824410112 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824410112 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824410112 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#2(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824410112 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824410112 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824410112 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824410112 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#3(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824410112 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824442880 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824442880 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824442880 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#4(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824442880 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824442880 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824442880 长32768（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824442880 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#5(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824442880 长32768（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824475648 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824475648 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824475648 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#6(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824475648 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824475648 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824475648 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824475648 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#7(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824475648 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824492032 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824492032 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824492032 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#8(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824492032 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824492032 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824492032 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824492032 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#9(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824492032 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824508416 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824508416 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824508416 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#10(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824508416 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824508416 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824508416 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824508416 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#11(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824508416 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824524800 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824524800 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824524800 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#12(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824524800 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824524800 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824524800 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824524800 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#13(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824524800 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824541184 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824541184 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824541184 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#14(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移824541184 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Transient,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Transient,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824541184 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Transient,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824541184 长16384（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Lying,单元区)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Lying,单元区)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824541184 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#15(Lying,单元区)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移824541184 长16384（单元区，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Transient,journal 环)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16805888 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16805888 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16805888 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#16(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移16805888 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Transient,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Transient,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16805888 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Transient,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16805888 长4096（journal 环，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Lying,journal 环)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Lying,journal 环)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16805888 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#17(Lying,journal 环)	戊-乙b（把那次写的原样字节再写一遍）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移16805888 长4096（journal 环，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Transient,根环区域)	戊-A	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Transient,根环区域)	戊-乙a（探针写这次失败的那个落点）	红	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7348224 长512（根环区域，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Transient,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7348224 长512（根环区域，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Lying,根环区域)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Lying,根环区域)	戊-乙a（探针写这次失败的那个落点）	红+探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 根记录(实例 2, txg 8)"]	落点=["探针落点 盘0 偏移7348224 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=["I-3.1: Violated(\"盘 0：记账的已分配 Some(1261568)，遍历全部有效根得到 1196032\")"]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#18(Lying,根环区域)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移7348224 长512（根环区域，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Transient,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 9)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 9)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Lying,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 0, 世代 11)"]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#19(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘0 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Transient,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Transient,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 9)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Transient,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 9)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Lying,系统配置槽)	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Lying,系统配置槽)	戊-乙a（探针写这次失败的那个落点）	探针写抹掉权威结构	切换=1 只读=false 探针=1 没定义=0	抹掉=["探针写抹掉了 系统配置(盘 1, 世代 11)"]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	写#20(Lying,系统配置槽)	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=["探针落点 盘1 偏移4096 长4096（系统配置槽，盖掉之前那一段非零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#0	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#0	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#0	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘0 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#1	戊-A	干净	切换=1 只读=false 探针=1 没定义=0	抹掉=[]	落点=[]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#1	戊-乙a（探针写这次失败的那个落点）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+remounted	屏障#1	戊-乙b（把那次写的原样字节再写一遍）	干净	切换=1 只读=false 探针=1 没定义=1	抹掉=[]	落点=["落点没有定义（失败发生在屏障上，barrier() 不带偏移）→ 装置按最宽松的读法退回固定落点", "探针落点 盘1 偏移4294963200 长512（单元区，盖掉之前那一段全零）"]	remount=ok(chosen 11)	after红=[]	内容=同一份	回退=ok(回退到 txg 11，新实例 4)
+test landing_point_of_the_failed_write ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 50.56s
+

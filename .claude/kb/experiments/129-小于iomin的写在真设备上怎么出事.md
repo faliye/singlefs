@@ -1,6 +1,6 @@
 ## E129 小于 io_min 的写在真设备上怎么出事 —— 已跑（2026-09-10，三段真设备，5 轮逐格一致，9 条变异全抓）
 
-**它答两件事**，判据、阈值、作废条款写在 `research/prompts/e129-preregistration.md`，先于任何一行 harness 代码：
+**它答两件事**，判据、阈值、作废条款写在 `e129-preregistration.md`，先于任何一行 harness 代码：
 
 1. D2（RAID 条带策略）「写的粒度」那一节末尾逐字「⚠️ 本机无法用故障注入证伪（`dm-flakey` 造不出撕裂），
    按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md` 记为**机制推导**，证伪等崩溃点重放 harness。」
@@ -96,9 +96,9 @@ bash research/scripts/e129-thin-neighbour.sh     # 结论三
 ```
 
 三份原始输出：
-`research/results/e129-tear-injector-2026-09-10.out`、
-`research/results/e129-thin-rmw-2026-09-10.out`、
-`research/results/e129-thin-neighbour-2026-09-10.out`。
+`e129-tear-injector-2026-09-10.out`、
+`e129-thin-rmw-2026-09-10.out`、
+`e129-thin-neighbour-2026-09-10.out`。
 
 ⚠️ **复跑不是逐字节比对**：设备名（`/dev/loopN`）与工作目录每次不同。
 钉住结论的是三份产物里的 `name=verdict` 行，以及各自的作废条款——

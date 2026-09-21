@@ -943,7 +943,7 @@ H4a / H4b / H5 在这次准入里根本没有推空（或没有第二次推空�
 | `crates/singlefs-core/src/transaction.rs` | grep 大纲命中 98、111、234、275、321、387、415、531、540、550、560、603、666、731、746、812、838、876、914、992、999、1001；380–559、780–1029；`fn warm_up` 之后 60 行里的 grep 命中（329）；核行号 812、834 | grep、Read、awk |
 | `crates/singlefs-core/src/recovery.rs` | 351–391；grep 命中 15、270 | grep -A 40 |
 | `crates/singlefs-core/src/root_ring.rs` | 20–50、30–39；grep 命中 6、36、44 | awk、grep |
-| `crates/singlefs-core/src/superblock.rs` | grep 命中 8、31、126 | grep |
+| `crates/singlefs-core/src/system_configuration.rs` | grep 命中 8、31、126 | grep |
 | `crates/singlefs-core/src/make_filesystem.rs` | grep 命中 42、147、261、279 | grep |
 | `crates/singlefs-core/src/unit.rs` | grep 命中 33、104、186、220、260、383、450、503、518 | grep |
 | `crates/singlefs-checker/src/image.rs` | grep 命中 114、131 | grep |

@@ -1,1 +1,0 @@
-            (device_map.allocated_slots() - u64::from(allocator.records().len() > 600)) * SLOT_BYTES,

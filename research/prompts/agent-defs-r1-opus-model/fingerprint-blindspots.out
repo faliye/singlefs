@@ -1,9 +1,0 @@
-name=case case=S1_untracked_content_edit step6=same content=changed verdict=漏报：源码变了，第6步指纹不变
-name=case case=S2_clean_file_edit_then_add step6=same content=changed verdict=漏报：源码变了，第6步指纹不变
-name=case case=S3_clean_file_edit_add_commit step6=same content=changed verdict=漏报：源码变了，第6步指纹不变
-name=case case=S4_modified_file_edit_add_control step6=changed content=changed verdict=两边都报
-name=case case=C1_unstaged_edit_control step6=changed content=changed verdict=两边都报
-name=case case=C2_new_untracked_file_control step6=changed content=changed verdict=两边都报
-name=case case=C3_stage_only_no_content_change step6=changed content=same verdict=误报：源码没变，第6步指纹变了
-name=case case=C4_nothing_happens step6=same content=same verdict=两边都不报
-name=done cases=8

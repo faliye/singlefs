@@ -1,7 +1,0 @@
-IMPLRESULT name=equal_devices_no_empty_segment free_before=61/61 empty_segments_before=0 data_unit_placed=true commit_generated_placed=0/7 free_after=59/59
-IMPLRESULT name=unequal_commit_generated_step placed=0 free=253/189 summed=442 empty_segments_device0=3
-IMPLRESULT name=unequal_commit_generated_step placed=64 free=189/125 summed=314 empty_segments_device0=2
-IMPLRESULT name=unequal_commit_generated_step placed=128 free=125/61 summed=186 empty_segments_device0=1
-IMPLRESULT name=unequal_commit_generated outcome=panicked placed=128 free_at_stop=124/61
-IMPLRESULT name=unequal_user_data outcome=panicked placed_units=94 free_at_stop=63/1
-IMPLRESULT name=done
