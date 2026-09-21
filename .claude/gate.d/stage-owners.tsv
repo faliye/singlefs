@@ -11,7 +11,7 @@
 28-cross-decision-status.sh	kb-scribe	跨决策的未定说法
 29-settled-item-self-open.sh	kb-scribe	已定分项自称没定
 30-decision-history.sh	kb-scribe	决策变更留痕
-31-blocking-verdict.sh	kb-scribe	未定项判没判过挡不挡第一个事务
+31-blocking-verdict.sh	kb-scribe	未定项两把尺判没判过：挡不挡第一个事务、动不动格式
 32-first-txn-fields.sh	kb-scribe	字节表字段指向真实分项
 33-mutation-tables.sh	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员改完就跑（59 号要几个钟头，实现员不跑）
 34-experiment-index-sync.sh	experiment-runner	实验索引行与正文标题
@@ -67,3 +67,4 @@
 97-invariant-field-anchors.sh	kb-scribe	新写的不变量要点名字段落点：不变量清单归书记员写，写完就跑
 98-kb-registry.sh	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员，建完就跑
 93-feature-bits.sh	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改，改完各自就跑
+

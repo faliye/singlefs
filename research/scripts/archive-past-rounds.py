@@ -11,7 +11,8 @@
   archive-past-rounds.py --selftest
 
 判据（机械，不靠人记）：
-  删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且工作区没改过**的文件。
+  删 —— `research/results/` 与 `research/prompts/` 下，**在 HEAD 里有、且这一轮没碰过**的文件；
+        「这一轮」的起点取 `GATE_BASE`（与门禁 68 号同一个基准，见 base_of 的说明），没给就取 HEAD。
         没改过 = 它是上一次提交固化下来的，属于上一轮及更早。
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
         `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）。
@@ -38,9 +39,29 @@ def git(*args, root="."):
                           capture_output=True, text=True, check=True).stdout
 
 
+def base_of(root="."):
+    """「这一轮」的起点。与门禁 68 号（改了规则、agent、hook、门禁、脚本或实现之后有没有写阶段同步记录）
+    取同一个基准——两道对同一批文件判相反的事，基准必须是同一个。
+
+    ⚠️ **基准不一致会让两道直接打架**（C450 实测 2026-09-21，同一天撞了两次）：
+    68 号的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`，`refs/sop/gate-ok` 不存在时退回 `HEAD~1`），
+    这一处原先写死 `HEAD`。差这一格的后果是**每次提交之后，上一轮的同步记录必然同时满足
+    「这一道说该删」（它已进仓、相对 HEAD 没再改）与「68 号说要留」（它点名的触发文件相对 `HEAD~1` 还在范围里）**，
+    不是偶发。实测那天两份 sync 记录点名的触发文件相对 `HEAD~1` 分别还有 14 个和 7 个在范围里。
+    取同一个基准之后，上一轮的记录能正常退场。
+    """
+    base = os.environ.get("GATE_BASE", "")
+    if base:
+        r = subprocess.run(['git', '-C', root, 'rev-parse', '--verify', '-q', base + '^{commit}'],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            return base
+    return "HEAD"
+
+
 def past_round_files(root="."):
     tracked = [p for p in git("ls-files", *DIRS, root=root).splitlines() if p]
-    dirty = set(p for p in git("diff", "--name-only", "HEAD", "--", *DIRS, root=root).splitlines() if p)
+    dirty = set(p for p in git("diff", "--name-only", base_of(root), "--", *DIRS, root=root).splitlines() if p)
     return sorted(p for p in tracked if p not in dirty and not KEEP.search(p))
 
 
@@ -305,6 +326,25 @@ def selftest():
             print("  ✗ 自检失败：删完 --check 仍判红")
             print("     → 怎么办：看 past_round_files() 删除之后还认出了什么。")
             return 1
+        # ── 基准对齐：上一轮的记录已进仓，而它点名的触发文件相对 HEAD~1 还在改动范围里 ──
+        # 这一格分的是「这一轮」取哪个起点。取 HEAD（旧行为）时那份记录被判成「上一轮的、该删」，
+        # 而门禁 68 号按 GATE_BASE（= HEAD~1）判它「还要着」，两道打架（C450 实测撞过两次）。
+        # 取同一个 GATE_BASE 之后它落进「这一轮碰过的」，不再被判该删。
+        open(os.path.join(work, "research/prompts/r1-sync.md"), "w").write("<!-- knowledge-sync -->\n同步记录\n")
+        git("add", "-A", root=work)
+        subprocess.run(["git", "commit", "-qm", "上一轮：写记录并提交"], cwd=work, check=True)
+        one_commit_ago = git("rev-parse", "HEAD~1", root=work).strip()
+        os.environ["GATE_BASE"] = one_commit_ago
+        try:
+            still_past = past_round_files(work)
+        finally:
+            os.environ.pop("GATE_BASE", None)
+        if any(name.endswith("r1-sync.md") for name in still_past):
+            print("  ✗ 自检失败：给了 GATE_BASE 之后，这一轮碰过的记录仍被判成上一轮的")
+            print("     → 怎么办：看 base_of —— 它要取 GATE_BASE（与门禁 68 号同一个基准），")
+            print("               写死 HEAD 会让两道对同一份记录判相反的事。")
+            return 1
+
     print("  ✓ 自检：有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
           "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报")
     return 0

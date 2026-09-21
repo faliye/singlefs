@@ -58,7 +58,7 @@ fi
 changed="$( { git -c core.quotepath=false diff --name-only "$base" -- ; git -c core.quotepath=false diff --name-only --cached -- ; git -c core.quotepath=false ls-files --others --exclude-standard -- ; } | sort -u )"
 # 改动清单经进程替换当文件传：当成一个命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
 python3 - "$base" <(printf '%s\n' "$changed") <<'PY'
-import os, re, sys
+import os, re, subprocess, sys
 
 base = sys.argv[1]
 with open(sys.argv[2], encoding="utf-8", errors="replace") as handle:
@@ -85,6 +85,7 @@ if not trigger_files:
 marker_line = "<!-- knowledge-sync -->"
 record_name = re.compile(r"^research/prompts/[^/]+-sync\.md$")
 records = []
+fresh_records = set()
 unmarked_candidates = []
 for path in changed_files:
     if not record_name.search(path) or not os.path.isfile(path):
@@ -93,6 +94,19 @@ for path in changed_files:
         text = handle.read()
     if any(line.strip() == marker_line for line in text.split("\n")):
         records.append((path, text))
+        # 这一轮**新写**的那几份：处置行的「改了 / 补了」只对它们判。
+        # ⚠️ 跨轮留存的旧记录点名的载体是更早一轮改的，相对今天的基准当然不在范围里，
+        # 而那些行说的都是真话——改写它们才是假的（C450 实测 2026-09-21）。
+        # 判据用同一个基准：相对基准是新增（A）的才算这一轮写的；只是被改过（M，例如
+        # 按 C450 追加一句「为什么这一轮还留着」）的不算。
+        # 判据是「基准那一版里有没有这个文件」，不是 `git diff --name-status`：
+        # 后者看不见**未跟踪**的新文件，而这一轮刚写出来还没 add 的记录正是那一种
+        # （门禁自己的红样本就这么造的，用 diff 判会把它当成旧记录放行）。
+        exists_at_base = subprocess.run(
+            ["git", "cat-file", "-e", f"{base}:{path}"],
+            capture_output=True, text=True).returncode == 0
+        if not exists_at_base:
+            fresh_records.add(path)
     else:
         unmarked_candidates.append(path)
 
@@ -207,7 +221,8 @@ for record_path, text in records:
                 carrier_path = candidate_path
         if disposition.startswith("改了") or disposition.startswith("补了"):
             disposition_counts[disposition[:2]] += 1
-            if carrier_path is not None and carrier_path not in changed_set:
+            if (record_path in fresh_records
+                    and carrier_path is not None and carrier_path not in changed_set):
                 out_of_range_problems.append(f"{location}：处置写「{disposition[:2]}」，载体 {carrier_path} 不在改动范围里")
         elif disposition.startswith("不改："):
             disposition_counts["不改"] += 1

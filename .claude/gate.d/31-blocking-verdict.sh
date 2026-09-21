@@ -88,9 +88,20 @@ for line in r.stdout.splitlines():
     if m and cur and '未定' in m.group(2):
         want.add((cur, m.group(1)))
 
-VERDICT = re.compile(r'改第一个事务的字节：\*{0,2}(是|否|无对象)\*{0,2}[（(](\d{4}-\d{2}-\d{2})')
+# 两把尺，同一批登记行上各判各的。**不许互相代替，也不许拿一把的结论去填另一格**：
+# 一条未定项可以在「改第一个事务的字节」上判「否」而在「动不动格式」上判「动」——
+# D2（RAID 条带策略） 未定项 21 就是：第一版两盘恒 w=2 不写第二种字节，
+# 而它的答案会改 `w_max` 那个字节将来的取值。
+RULERS = [
+    ("改第一个事务的字节",
+     re.compile(r'改第一个事务的字节：\*{0,2}(是|否|无对象)\*{0,2}[（(](\d{4}-\d{2}-\d{2})'),
+     "判过改不改第一个事务的字节"),
+    ("动不动格式",
+     re.compile(r'动不动格式：\*{0,2}(动|不动|界不定)\*{0,2}[（(](\d{4}-\d{2}-\d{2})'),
+     "写了「动不动格式」的判定"),
+]
 
-seen, bad = set(), []
+seen, bad = set(), {}
 for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
     s = open(f, encoding='utf-8').read()
     mm = re.match(r'## (D\d+) ', s.split('\n', 1)[0])
@@ -116,9 +127,10 @@ for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
         if (dnum, num) not in want:
             continue          # 已定项不在这一节，理论上不会到这里；到了就是解析漂了
         seen.add((dnum, num))
-        if not VERDICT.search(block):
-            first = block.strip().splitlines()[0]
-            bad.append((os.path.basename(f), dnum, num, first[:70]))
+        for name, pattern, _ in RULERS:
+            if not pattern.search(block):
+                first = block.strip().splitlines()[0]
+                bad.setdefault(name, []).append((os.path.basename(f), dnum, num, first[:70]))
 
 missed = want - seen
 extra = seen - want
@@ -132,16 +144,27 @@ if missed or extra:
     sys.exit(1)
 
 if bad:
-    print(f"  ✗ {len(bad)} 条未定项没有判过改不改第一个事务的字节：")
-    for fn, d, n, first in bad:
-        print(f"     {fn}  {d} 未定项 {n}：{first}")
-    print("     → 怎么办：按「改不改变第一个事务写出的字节」这把尺判一次，")
-    print("               在该分项的登记行里写上规范形态：")
-    print("               改第一个事务的字节：否（YYYY-MM-DD，依据：…）")
-    print("               三个合法取值：是 / 否 / 无对象。**两侧要用同一把尺**——")
-    print("               判「不阻塞」用这把尺、判「阻塞」换一把，量出来的集合不是包含关系")
-    print("               （decisions-history.md 2026-08-29 其十八 实测）。")
+    total = sum(len(v) for v in bad.values())
+    print(f"  ✗ {total} 条未定项缺判定（两把尺分开数）：")          # gate-lint:summary
+    for name, rows in bad.items():
+        print(f"     ── 缺「{name}」：{len(rows)} 条")               # gate-lint:detail
+        for fn, d, n, first in rows:
+            print(f"        {fn}  {d} 未定项 {n}：{first}")          # gate-lint:detail
+    if "改第一个事务的字节" in bad:
+        print("     → 缺「改第一个事务的字节」怎么办：按「改不改变第一个事务写出的字节」这把尺判一次，")
+        print("               在该分项的登记行里写：改第一个事务的字节：否（YYYY-MM-DD，依据：…）")
+        print("               三个合法取值：是 / 否 / 无对象。**两侧要用同一把尺**——")
+        print("               判「不阻塞」用这把尺、判「阻塞」换一把，量出来的集合不是包含关系")
+        print("               （decisions-history.md 2026-08-29 其十八 实测）。")
+    if "动不动格式" in bad:
+        print("     → 缺「动不动格式」怎么办：按 D15（格式冻结政策） 已定项 1 的尺判一次——它的答案")
+        print("               会不会改动任何盘上字节，或改动已有字节的解释口径（宽度不变而含义变了）；")
+        print("               在该分项的登记行里写：动不动格式：动（YYYY-MM-DD，依据：…）")
+        print("               三个合法取值：动 / 不动 / 界不定（视同动）。⚠️ 别拿上面那把尺的结论来填：")
+        print("               那把量「这一版写不写出不同字节」，这把量「将来动不动格式」，")
+        print("               两把量的不是一个集合。")
     sys.exit(1)
 
-print(f"  ✓ {len(seen)} 条未定项都判过改不改第一个事务的字节")
+print(f"  ✓ {len(seen)} 条未定项两把尺都判过："
+      + "、".join(f"{name}" for name, _, _ in RULERS))
 PY

@@ -234,10 +234,14 @@ for decision, info in sorted(decisions.items()):
                 bad('没有实验', f'{where}：D{decision} 已定项 {item_number} 的依据一个实验都没引——有实验才有决策；实在没有可量的，写「无实验：理由」')
     for kind, item_number, cell in info['index_cells']:
         # 「**状态：已定。**」是 20 号要的规范标记（检索端出来的是这一行），不算在一句话的字数里；
-        # 「改第一个事务的字节：否（日期，依据：…）」是 31 号要写在未定项登记行里的规范标记，同理不算——
+        # 31 号要写在未定项登记行里的两句规范标记（「改第一个事务的字节：…」与「动不动格式：…」）同理不算——
         # 31 号明写它要在登记行里（写在表下那一段里它定位不到），而它必须带日期，与这一条的「不带日期、
         # 不超过 100 字」直接相撞：2026-09-20 给 D2 未定项 21 与 D26 未定项 8 / 9 / 10 补上字节判决之后四行一起红。
-        without_marks = re.sub(r'改第一个事务的字节：[^（(]*[（(][^）)]*[）)]', '', cell)
+        # 两句都剥：31 号是两把尺，一句量「这一版写不写出不同字节」、一句量「将来动不动格式」，
+        # 缺哪一句它都判红，而两句都必须带日期 ⇒ 两句都不算进这一条的「不带日期、不超过 100 字」。
+        without_marks = cell
+        for mark in ('改第一个事务的字节', '动不动格式'):
+            without_marks = re.sub(mark + r'：[^（(]*[（(][^）)]*[）)]', '', without_marks)
         plain = re.sub(r'\*\*|`', '', re.sub(r'\*\*状态：[^*]*\*\*', '', without_marks)).strip()
         if DATE.search(plain) or len(plain) > 100:
             bad('瘦身形态', f'{where}：D{decision} {kind}索引表第 {item_number} 行的定案格要一句话、不带日期、不超过 100 字（现在 {len(plain)} 字）')
