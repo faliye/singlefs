@@ -68,3 +68,4 @@
 98-kb-registry.sh	kb-scribe	kb 目录与 CLAUDE.md 那张职责表逐项一致：建 kb 文件的是书记员，建完就跑
 93-feature-bits.sh	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改，改完各自就跑
 
+99-multipath-registry.sh	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写，写完就跑

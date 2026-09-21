@@ -1,0 +1,13 @@
+# 还没写「### 路径与结论登记」那一节的实验页，一份一行，第二列写普查判定的依据。
+# 这张表只缩不涨：补齐一份删一行；新写的实验页不许往里加。
+# 名单来自 research/prompts/c48-c49-multipath-survey.md 的普查（2026-09-21）：
+# 15 份命中里 10 份是真的多条路径互证，E45 当天补了登记节，其余 9 份在这里。
+.claude/kb/experiments/07-离线索引harness.md	档 A 差一条：`logstruct_wb` 闭式估算（≈1.56）全仓搜不到对应函数，只活在正文散文里
+.claude/kb/experiments/12-攒批的顺序追加vs不攒批的随机页读.md	档 A 差一条：「推算」那条首性原理公式没有对应函数
+.claude/kb/experiments/14-I-3.1的判别力幂等完整值vs增量Δ.md	档 B：两条路径与跨路径比对断言都在源码里，等着补登记节
+.claude/kb/experiments/56-消息缓冲的收益vsε.md	档 A：两条路径各自算得出，没有一处断言把两边直接连起来比
+.claude/kb/experiments/58-校验和粒度的端到端代价.md	档 A：同 E56，缺跨路径比对断言
+.claude/kb/experiments/86-第三方管道的字节可比性.md	档 B
+.claude/kb/experiments/93-老化下的放置与碎片度.md	档 B
+.claude/kb/experiments/110-条带表在连续发布下的期望写放大.md	档 B
+.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md	档 B
