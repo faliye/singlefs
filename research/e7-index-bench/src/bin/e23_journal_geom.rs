@@ -14,7 +14,7 @@
 //! ## 建模的要害：tail 推进与记录写是两件事
 //!
 //! `tail_inline`（XFS 形态）下 tail 只能**搭记录的便车**——不写记录就推不了 tail。
-//! `tail_sb`（jbd2 形态）下 tail 可以在 checkpoint 完成时**单独写一次**推进。
+//! `tail_system_configuration`（jbd2 形态）下 tail 可以在 checkpoint 完成时**单独写一次**推进。
 //! ⇒ 空闲期崩溃时两者的重放量不同，而这正是 jbd2 那次 FUA 买到的东西。
 //! 若把 tail 推进建模成「checkpoint 一完成就免费生效」，两条臂当场相等，实验归零。
 //!
@@ -43,7 +43,7 @@ enum Shape {
 /// 已定项 3 的两条臂。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Tail {
-    /// jbd2 形态：住 journal 超级块，固定位置、原地覆盖、FUA。
+    /// jbd2 形态：住 journal 系统配置，固定位置、原地覆盖、FUA。
     /// 可以脱离记录单独推进 —— 这正是它那次 FUA 买到的东西。
     SystemConfiguration,
     /// XFS 形态：内联在每条记录头的 `tail_lsn` 里。零额外写，但只能搭便车推进。
@@ -53,7 +53,7 @@ enum Tail {
 impl Tail {
     fn label(self) -> &'static str {
         match self {
-            Tail::SystemConfiguration => "tail_sb",
+            Tail::SystemConfiguration => "tail_system_configuration",
             Tail::Inline => "tail_inline",
         }
     }
@@ -241,7 +241,7 @@ mod tests {
         assert!(large_sector_ten_item_record_bytes / small_sector_ten_item_record_bytes < large_sector_one_item_record_bytes / small_sector_one_item_record_bytes, "粒度变粗时 pbs 的影响该变小");
     }
 
-    /// `tail_sb` 省掉头里那 8 字节，必须真的体现在算术里，否则两条臂只是换个名字。
+    /// `tail_system_configuration` 省掉头里那 8 字节，必须真的体现在算术里，否则两条臂只是换个名字。
     #[test]
     fn system_configuration_tail_actually_shrinks_the_header() {
         assert_eq!(Tail::SystemConfiguration.header_bytes(), JOURNAL_RECORD_HEADER_BYTES - 8);
@@ -299,12 +299,12 @@ mod tests {
         let named = vec![1u64; 2000];
         let system_configuration_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::SystemConfiguration, 4096, 1000, Some(1500));
         let inline_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::Inline, 4096, 1000, Some(1500));
-        assert_eq!(system_configuration_tail_outcome.replay_blocks, 0, "超级块 tail 能单独推进，空闲崩溃后不该有重放");
+        assert_eq!(system_configuration_tail_outcome.replay_blocks, 0, "系统配置 tail 能单独推进，空闲崩溃后不该有重放");
         assert_eq!(inline_tail_outcome.replay_blocks, 500, "内联 tail 只能搭便车 ⇒ 崩溃前最后 500 条各占一块");
         assert!(inline_tail_outcome.replay_blocks > system_configuration_tail_outcome.replay_blocks);
     }
 
-    /// **而它买到那个是要付钱的**：超级块 tail 每次推进一次写，内联恒为零。
+    /// **而它买到那个是要付钱的**：系统配置 tail 每次推进一次写，内联恒为零。
     #[test]
     fn system_configuration_tail_costs_exactly_one_write_per_advance() {
         let named = vec![1u64; 5000];
@@ -312,6 +312,6 @@ mod tests {
         let inline_tail_outcome = simulate_journal_run(&named, Shape::Ring { blocks: 4096 }, Tail::Inline, 4096, 1000, None);
         assert_eq!(inline_tail_outcome.tail_blocks, 0, "内联 tail 不该有任何额外写");
         assert_eq!(system_configuration_tail_outcome.checkpoint_count, 5, "5000 次操作、每 1000 次一个 checkpoint");
-        assert_eq!(system_configuration_tail_outcome.tail_blocks, system_configuration_tail_outcome.checkpoint_count, "超级块 tail 的写次数应恰好等于 checkpoint 次数");
+        assert_eq!(system_configuration_tail_outcome.tail_blocks, system_configuration_tail_outcome.checkpoint_count, "系统配置 tail 的写次数应恰好等于 checkpoint 次数");
     }
 }

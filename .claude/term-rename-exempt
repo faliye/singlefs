@@ -8,3 +8,10 @@
 research/scripts/sweep-term.py  # 清扫工具自己：替换表与检测正则里必须写得出旧名，扫了它就再也换不动东西
 .claude/term-rename-exempt  # 这张表自己：豁免理由里要写得出旧名才说得清豁免的是什么
 .claude/kb/term-renames.md  # 新旧对照的唯一权威记录：写「X 改名成 Y」必须写得出 X，旧名要有一处查得到，历史产物与旧提交的字段才对得上
+research/prompts/  # 冻结证据：发给模型的提示、腿的产出、拼好的背景材料与 diff 附录。evidence-discipline「原样保存的证据不许事后改」——改一个字，产物就不再对应它的输入；而这一轮的材料正文讨论的就是这次改名，词换掉整份材料失去意义
+.claude/kb/decisions-history/2026-09.md  # 两处 F2FS 的原题引文（「F2FS 用 superblock 里的后缀表」，D14 已定项 2 的来历）：别家术语，与 prior-art.md 同一条理由。这份变更史别处的旧名已随本次改名一起换掉，所以只豁免这一份、不豁免整个目录
+records/2026-09-07-D14项2第一轮.md  # 同一句 F2FS 原题的引文（「原题逐字」那一行）：别家术语。records/ 别处的旧名已随本次改名一起换掉，不豁免整个目录
+.claude/kb/experiments/23-journal几何.md  # jbd2 自己的 journal superblock：别家术语，与 prior-art.md 同一条理由
+.claude/kb/checks-owed.md  # C65 那一行引的是 D14 已定项 2 的原题「F2FS 用 superblock 里的后缀表」：别家术语的引文
+.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md  # 整行抄自留存产物的引文块：产物已归档进版本库，字节改不了，正文换名那句「整行抄自」就成假的（门禁 88 号会红）
+.claude/gate.d/fixtures/90-term-renames.sh/  # 这道门禁自己的判别力样本：red 那一份必须留着旧名才红得出来，green 的登记表旧名列也要写得出旧名。扫了它，红绿两份会被改成一模一样，判别力当场归零（2026-09-21 实测过一次）

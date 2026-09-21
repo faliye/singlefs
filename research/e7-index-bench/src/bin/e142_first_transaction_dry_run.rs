@@ -79,7 +79,7 @@ const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 2 * NODE_POINTER_BYTES + 8 + 8;
 /// D23（journal 的角色与格式） 已定项 4 口径的点名项宽度；构成无落点，装置按字节表六的预想构成写。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
-/// 超级块字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——
+/// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——
 /// 自举头的写入者身份 20 与校验和算法标识 1、几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4，共 29。
 const SYSTEM_CONFIGURATION_BYTES: u64 = 481;
 /// 头校验和 / 自证校验和的字段宽度（D18 已定项 7、D22 已定项 7、D23 已定项 4 同口径）。
@@ -95,12 +95,12 @@ const INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE: u64 = 86;
 /// 码 2 头里 key 宽那一格的偏移（D18 已定项 18）：共同前缀 42 + 树 ID 8 + 层级 1 = 51。
 const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;
 
-/// 字节表零：超级块槽 0 / 1 的设备内偏移。槽距 = 固定结构槽距 4096，与槽宽同值 ⇒ 两个槽首尾相接。
+/// 字节表零：系统配置槽 0 / 1 的设备内偏移。槽距 = 固定结构槽距 4096，与槽宽同值 ⇒ 两个槽首尾相接。
 const SYSTEM_CONFIGURATION_SLOT_OFFSETS: [u64; 2] = [0, 4096];
 /// D22（单元原子性怎么合成） 已定项 2 的槽宽那一格（2026-09-14 三方论证后按主 agent 推荐值写）：
-/// **超级块槽宽是格式常量 4096**，不再等于挂载时探测到的 `physical_block_size`。
+/// **系统配置槽宽是格式常量 4096**，不再等于挂载时探测到的 `physical_block_size`。
 /// 整槽校验和罩这 4096 字节含补齐（D18（块里携带什么信息） 已定项 17），481 字节的字段表在槽里余 3615。
-/// ⚠️ 它只管超级块：根槽仍按判定宽度 512 写（字节表七）。
+/// ⚠️ 它只管系统配置：根槽仍按判定宽度 512 写（字节表七）。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 字节表零：根环起点 1 MiB（槽 64）、P = 3、chunk = 1 MiB、每区 8 槽、槽距 4096（预想）。
 const RING_START_OFFSET: u64 = 1 << 20;
@@ -120,10 +120,10 @@ const JOURNAL_RING_BYTES: u64 = 768 << 20;
 const JOURNAL_RING_SLOTS: u64 = JOURNAL_RING_BYTES / JOURNAL_RECORD_BYTES;
 const JOURNAL_SAFETY_FACTOR: u64 = 3;
 const JOURNAL_IN_FLIGHT_RECORD_LIMIT: u64 = JOURNAL_RING_SLOTS / JOURNAL_SAFETY_FACTOR;
-/// 超级块几何段的「journal 最坏占用」：在飞记录数上限 × 一条记录的字节数（I-8.1（环几何够大））。
+/// 系统配置几何段的「journal 最坏占用」：在飞记录数上限 × 一条记录的字节数（I-8.1（环几何够大））。
 const JOURNAL_WORST_CASE_BYTES: u64 = JOURNAL_IN_FLIGHT_RECORD_LIMIT * JOURNAL_RECORD_BYTES;
 
-/// D3（空间分配） 已定项 10 ④：单元区起始槽号进超级块，第一版 = journal 环末尾的下一个槽（16 MiB + 768 MiB = 784 MiB）。
+/// D3（空间分配） 已定项 10 ④：单元区起始槽号进系统配置，第一版 = journal 环末尾的下一个槽（16 MiB + 768 MiB = 784 MiB）。
 const UNIT_AREA_START_SLOT: u64 = JOURNAL_START_SLOT + JOURNAL_RING_BYTES / SLOT_BYTES;
 /// 镜像大小是 mkfs 参数（跟 fsid、写入时刻同一类），装置取 4 GiB 并在 `name=config` 里报出来。
 /// 下界由 D23（journal 的角色与格式） 已定项 19 ③ 的「环 ≤ 设备容量 ÷ 4」逼出：默认 768 MiB 的环要 3 GiB 以上的盘。
@@ -214,8 +214,8 @@ const POINTER_COMPRESSED_LENGTH_NONE: u16 = 0;
 /// inode 树条目写自己（12）、extent 树条目写它服务的那个头（12），分配记录 / 记账 / livelist / 旁表 / deadlist 写 0。
 const TREE_TABLE_HEAD_IDENTIFIER_NONE: u64 = 0;
 
-/// D22（单元原子性怎么合成） 已定项 9（2026-09-14 用户定案）：超级块自举头的「写入者身份」=
-/// 实现标识 16 字节 ASCII 零补齐 + 版本 4 字节；第一版写 `singlefs-rs` 与 1（I-1.5（超级块记管道身份）、D17（实现分层与第三方管道） 债 3）。
+/// D22（单元原子性怎么合成） 已定项 9（2026-09-14 用户定案）：系统配置自举头的「写入者身份」=
+/// 实现标识 16 字节 ASCII 零补齐 + 版本 4 字节；第一版写 `singlefs-rs` 与 1（I-1.5（系统配置记管道身份）、D17（实现分层与第三方管道） 债 3）。
 const WRITER_IDENTITY_NAME: &[u8] = b"singlefs-rs";
 const WRITER_IDENTITY_NAME_BYTES: usize = 16;
 const WRITER_IDENTITY_VERSION: u32 = 1;
@@ -244,10 +244,10 @@ const FIXED_FSID: [u8; 16] = [0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
 const FIRST_INODE_NUMBER: u64 = 1;
 /// D23（journal 的角色与格式） 已定项 16：mkfs 写实例代号 0（「mkfs、尚无实例」，不是有效实例），
-/// 第一次可写挂载取 max(超级块, 根环) + 1 = 1，并先写进每一份超级块之后才动单元。
+/// 第一次可写挂载取 max(系统配置, 根环) + 1 = 1，并先写进每一份系统配置之后才动单元。
 const MKFS_INSTANCE_GENERATION: u32 = 0;
 const FIRST_INSTANCE_GENERATION: u32 = 1;
-/// D22（单元原子性怎么合成） 已定项 16：超级块槽世代号从 1 起、每写一次 +1，写世代号 g 的那一次落在槽 `g mod 2`。
+/// D22（单元原子性怎么合成） 已定项 16：系统配置槽世代号从 1 起、每写一次 +1，写世代号 g 的那一次落在槽 `g mod 2`。
 const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 const SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION: u64 = 2;
 /// D16 已定项 8（暖机取甲′，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
@@ -421,7 +421,7 @@ fn castagnoli_crc32(bytes: &[u8]) -> u32 {
 
 /// 「校验和字段自身按 0 参与」（I-2.4）：把 `[field_offset, field_offset + 32)` 清零后对 `[0, cover_end)` 求校验和。
 /// D18（块里携带什么信息） 已定项 17（2026-09-13 用户定案）：32 字节的校验和字段里放 CRC32C 4 字节 + 28 字节零，
-/// 根记录自证校验和、超级块整槽校验和、journal `header_csum` 同口径——此前装置取 SHA-256，那是 gap G5，已收口。
+/// 根记录自证校验和、系统配置整槽校验和、journal `header_csum` 同口径——此前装置取 SHA-256，那是 gap G5，已收口。
 fn wide_checksum_with_field_zeroed(bytes: &[u8], cover_end: usize, field_offset: usize) -> [u8; 32] {
     let mut covered = bytes[..cover_end].to_vec();
     covered[field_offset..field_offset + WIDE_CHECKSUM_BYTES as usize].fill(0);
@@ -639,7 +639,7 @@ enum StepKind {
     JournalRecord,
     /// 根环槽的一次 FUA 写（D16（发布语义） 已定项 7：只有这一步等落盘才发下一条）。
     RootRecordFua,
-    /// 超级块槽的一次写。
+    /// 系统配置槽的一次写。
     SystemConfigurationSlot,
 }
 
@@ -650,10 +650,10 @@ impl StepKind {
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
-            StepKind::SystemConfigurationSlot => "superblock_slot",
+            StepKind::SystemConfigurationSlot => "system_configuration_slot",
         }
     }
-    /// FUA 由步骤种类决定，不再是调用点各传各的布尔：超级块槽写不可能是 FUA，这样它写不出来。
+    /// FUA 由步骤种类决定，不再是调用点各传各的布尔：系统配置槽写不可能是 FUA，这样它写不出来。
     fn is_fua(self) -> bool {
         match self {
             StepKind::RootRecordFua => true,
@@ -924,7 +924,7 @@ fn header_checksum_holds(bytes: &[u8], header_end: usize) -> bool {
     wide_checksum_with_field_zeroed(bytes, header_end, HEADER_CHECKSUM_OFFSET) == bytes[HEADER_CHECKSUM_OFFSET..HEADER_CHECKSUM_OFFSET + 32]
 }
 
-/// fsid 在单元头里是 8 字节（D18 已定项 7）；字节表二预想取超级块 fsid 的低 8 字节。
+/// fsid 在单元头里是 8 字节（D18 已定项 7）；字节表二预想取系统配置 fsid 的低 8 字节。
 fn unit_fsid(fsid: &[u8; 16]) -> u64 {
     u64::from_le_bytes(fsid[..8].try_into().expect("切了 8 字节"))
 }
@@ -1256,7 +1256,7 @@ fn data_unit_payload(bytes: &[u8], declared_length: u16) -> &[u8] {
     &bytes[start..start + declared_length as usize]
 }
 
-// ───────────────────────── 根记录、超级块、journal 记录 ─────────────────────────
+// ───────────────────────── 根记录、系统配置、journal 记录 ─────────────────────────
 
 /// D22（单元原子性怎么合成） 已定项 7 的字段表，371 字节，字段序照那张表（gap G4：字节表七的行序与它不同，两处都没写偏移）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1326,7 +1326,7 @@ impl RootRecord {
     }
 }
 
-/// 超级块字段表（D22 已定项 9 + 已定项 15）：**481 字节**，512 槽内余 31。
+/// 系统配置字段表（D22 已定项 9 + 已定项 15）：**481 字节**，512 槽内余 31。
 /// 2026-09-13 用户定案去掉「间接目录单元指针 59」（第一版显式留白，不是留位），几何段加三个字段：
 /// 单元区起始槽号 8（D3 已定项 10 ④）、mkfs 时的 io_min 4 与固定结构槽距 4（D2 已定项 19）；
 /// 2026-09-14 用户定案再加四个：自举头的写入者身份 20 与校验和算法标识 1、
@@ -1348,10 +1348,10 @@ const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4
 const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 4 + 2 + 96;
 const SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET: usize = 379;
 const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
-/// D2（RAID 条带策略） 已定项 19：固定结构槽距 = max(4096, mkfs 时探测的 io_min)，两个数各占超级块一个 4 字节字段。
+/// D2（RAID 条带策略） 已定项 19：固定结构槽距 = max(4096, mkfs 时探测的 io_min)，两个数各占系统配置一个 4 字节字段。
 const FIXED_STRUCTURE_SLOT_SPACING: u32 = 4096;
 const MKFS_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
-/// D2（RAID 条带策略） 已定项 18：第一版超级块里 w_max 与 g 都写 4；g 挂载时按可写设备数夹取。
+/// D2（RAID 条带策略） 已定项 18：第一版系统配置里 w_max 与 g 都写 4；g 挂载时按可写设备数夹取。
 const SYSTEM_CONFIGURATION_MAXIMUM_WIDTH: u8 = 4;
 const SYSTEM_CONFIGURATION_GROUP_SIZE: u8 = 4;
 
@@ -1362,7 +1362,7 @@ impl SystemConfiguration {
         writer.put_u16(FORMAT_VERSION);
         writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT); // feature bits：incompat 位 0 = 第一条纯 SSD 布局线（D15 已定项 4，2026-09-13 用户定案）
         writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
-        writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "超级块 fsid");
+        writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "系统配置 fsid");
         writer.put(&self.fsid);
         // 写入者身份（D22 已定项 9，2026-09-14 用户定案）：实现标识 16 字节 ASCII 零补齐 + 版本 4 字节。
         let mut writer_identity = [0u8; WRITER_IDENTITY_NAME_BYTES];
@@ -1373,9 +1373,9 @@ impl SystemConfiguration {
         writer.put_u32(self.this_device.0);
         writer.put_u32(self.device_count);
         writer.put_u64(self.slot_generation);
-        writer.assert_position(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET as u64, "超级块整槽校验和");
+        writer.assert_position(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET as u64, "系统配置整槽校验和");
         writer.skip(WIDE_CHECKSUM_BYTES as usize);
-        writer.skip(16 + 12 + 4); // 超级块 MAC、nonce 水位、KDF 标识（4，D22 已定项 9）
+        writer.skip(16 + 12 + 4); // 系统配置 MAC、nonce 水位、KDF 标识（4，D22 已定项 9）
         writer.put_u8(0); // 加密类型：关
         writer.put_u8(16); // MAC 长度声明
         writer.skip(80); // 主密钥槽：内联进槽，加密关时全 0（D22 已定项 9，2026-09-13 用户定案）
@@ -1417,7 +1417,7 @@ impl SystemConfiguration {
         writer.assert_position(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64, "journal tail");
         writer.put_u64(self.journal_tail);
         writer.put_u32(self.journal_instance.0);
-        writer.assert_position(SYSTEM_CONFIGURATION_BYTES, "超级块");
+        writer.assert_position(SYSTEM_CONFIGURATION_BYTES, "系统配置");
         let mut bytes = writer.bytes;
         // 「整槽校验和」：覆盖整个 4096 槽含补齐、自身按 0 参与（D18 已定项 17）。
         let digest = wide_checksum_with_field_zeroed(&bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
@@ -1543,7 +1543,7 @@ struct JournalRecord {
     transaction: TransactionNumber,
     is_commit: bool,
     back_chain: u32,
-    /// D23（journal 的角色与格式） 已定项 4（2026-09-14 用户定案）：超级块 fsid 的低 8 字节，与单元头同口径（I-1.4（块头 fsid 一致））。
+    /// D23（journal 的角色与格式） 已定项 4（2026-09-14 用户定案）：系统配置 fsid 的低 8 字节，与单元头同口径（I-1.4（块头 fsid 一致））。
     fsid: u64,
     /// D23（journal 的角色与格式） 已定项 15 的新根段：崩在记录持久之后、根槽持久之前时由它重建那次发布的根。
     new_tree_table: NodePointer,
@@ -2108,8 +2108,8 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     (pool, MkfsOutput { root, instance_table_unit, tree_table_genesis_unit })
 }
 
-/// D23（journal 的角色与格式） 已定项 16：第一次可写挂载取 max(超级块, 根环) + 1 = 1，
-/// **并写进每一份超级块（一次超级块槽写，世代号 +1）之后才动单元**——所以它自成一段，排在暖机之前。
+/// D23（journal 的角色与格式） 已定项 16：第一次可写挂载取 max(系统配置, 根环) + 1 = 1，
+/// **并写进每一份系统配置（一次系统配置槽写，世代号 +1）之后才动单元**——所以它自成一段，排在暖机之前。
 /// 段的收尾靠暖机第一次空发布开头那道屏障（D16 已定项 7 的形态，不另加屏障：这是最少屏障的写法）。
 fn acquire_instance(pool: &mut RecordingPool, parameters: &PoolParameters) -> InstanceGeneration {
     let instance = InstanceGeneration(FIRST_INSTANCE_GENERATION);
@@ -2260,13 +2260,13 @@ fn journal_record_offset(counter: JournalCounter) -> DeviceOffset {
     DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES + ((counter.0 - 1) % JOURNAL_RING_SLOTS) * JOURNAL_RECORD_BYTES)
 }
 
-/// 发布之后那次超级块槽写的世代号与落点（D22 已定项 16）：取号那次是 2，之后每次发布 +1，槽 = 世代号 mod 2。
+/// 发布之后那次系统配置槽写的世代号与落点（D22 已定项 16）：取号那次是 2，之后每次发布 +1，槽 = 世代号 mod 2。
 fn system_configuration_write_for_publish(checkpoint_txg: CheckpointTxg) -> (u64, usize) {
     let generation = checkpoint_txg.0 + SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION;
     (generation, (generation % 2) as usize)
 }
 
-/// 暖机（D16 已定项 8）：每次空发布照 D16 已定项 7 的顺序——屏障 → 空记录 → 屏障 → 根槽 FUA → 超级块槽轮换；
+/// 暖机（D16 已定项 8）：每次空发布照 D16 已定项 7 的顺序——屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
 /// 空记录不点名任何单元、事务号 0（D23 已定项 19 ①：0 保留给不承载事务的记录）、提交标记 1，
 /// 新根段照 mkfs 的根，根记录只改 checkpoint_txg。返回最后一条记录的字节，下一条记录的反向链要用它。
 fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &MkfsOutput, instance: InstanceGeneration) -> (Vec<RootRecord>, Option<Vec<u8>>) {
@@ -2634,7 +2634,7 @@ fn publish_first_file(
     let (region, ring_slot) = ring_target_for_publish(txg);
     pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
 
-    // 根槽之后：超级块槽轮换，世代号 5、落槽 1（D22 已定项 16），tail 前移到 jsn 3（D16 已定项 7 的超级块注）。
+    // 根槽之后：系统配置槽轮换，世代号 5、落槽 1（D22 已定项 16），tail 前移到 jsn 3（D16 已定项 7 的系统配置注）。
     let (slot_generation, slot_index) = system_configuration_write_for_publish(txg);
     for device in parameters.devices() {
         let system_configuration = SystemConfiguration {
@@ -2726,13 +2726,13 @@ fn choose_system_configuration(reader: &dyn BlockReader) -> Result<SystemConfigu
             }
         }
         let Some(best_on_device) = best_on_device else {
-            return Err(format!("盘 {device_index} 两个超级块槽都无效"));
+            return Err(format!("盘 {device_index} 两个系统配置槽都无效"));
         };
         match &chosen {
             None => chosen = Some(best_on_device),
             Some(previous) => {
                 if previous.fsid != best_on_device.fsid || previous.device_count != best_on_device.device_count {
-                    return Err("两盘的超级块 fsid 或设备数对不上".to_string());
+                    return Err("两盘的系统配置 fsid 或设备数对不上".to_string());
                 }
             }
         }
@@ -3276,7 +3276,7 @@ fn probes(parameters: &PoolParameters) -> Vec<Probe> {
         Probe { name: "data_payload_both_copies", flips: both(data_offset, 200) },
         Probe { name: "data_header_last_byte_both_copies", flips: both(data_offset, DATA_UNIT_HEADER_BYTES - 1) },
         Probe { name: "tree_table_both_copies", flips: both(tree_table_offset, 300) },
-        Probe { name: "superblock_slot_one_both_devices", flips: both(DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), 50) },
+        Probe { name: "system_configuration_slot_one_both_devices", flips: both(DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), 50) },
     ]
 }
 
@@ -3350,8 +3350,8 @@ fn hex_bytes(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join("")
 }
 
-/// 量 1/3/4 的「所属结构」候选表：第一个事务写到的 8 个单元、根记录、journal 记录（第一节第 3 条的区域清单，去掉超级块——
-/// 超级块与改动计数无关，按第三节推导；它若意外出现在差异里，classify_offset 找不到候选、归到「未登记」而不是被这张表悄悄吃掉）。
+/// 量 1/3/4 的「所属结构」候选表：第一个事务写到的 8 个单元、根记录、journal 记录（第一节第 3 条的区域清单，去掉系统配置——
+/// 系统配置与改动计数无关，按第三节推导；它若意外出现在差异里，classify_offset 找不到候选、归到「未登记」而不是被这张表悄悄吃掉）。
 struct StructureCatalog<'output> {
     units: &'output [(SlotNumber, TransactionUnit, Vec<u8>)],
     root_device: u32,
@@ -3668,11 +3668,11 @@ const GAPS: &[(&str, &str)] = &[
     ("G18", "D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同"),
     ("G19", "mkfs种根的13次操作（11写+2屏障，段序列4+1+1+1+4、34个崩溃状态）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住"),
     ("G20", "已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错"),
-    ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份超级块之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[superblock_slot×2]"),
+    ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份系统配置之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[system_configuration_slot×2]"),
     ("G22", "**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节3472670720、全空聚簇段数3310、runs4三个数都随它变"),
     ("G23", "已收口（2026-09-14用户定案，C324还清）：码3打包容器按「数据单元」那一档取落点（起点32768对齐、两槽都空）；连同D3已定项10⑤的bump次序（树ID升序、树内先叶后根、映射树倒数第二、树表最末）⇒t2 extent根拿50240、游标停在50241而t3要对齐⇒t3拿50242–50243，**槽50241空着**、runs因此从3变4"),
     ("G24", "树表条目的「头ID」（D5已定项9，2026-09-14用户定案）只说了inode树写自己、extent树写12、其余写0，没说**这个数从哪来**：第一版只有一个可写头，装置按「inode树的树ID就是头ID」写；多头之后头ID与树ID还是不是一回事，条款没答"),
-    ("G25", "journal记录头2026-09-14加的fsid8与MAC16，条款只说fsid「与单元头同口径」（超级块fsid的低8字节）、MAC第一版全0；**读者拿fsid做什么没写**——装置按I-1.4把fsid不符的记录整条丢掉（不进重放前缀），而「丢掉」与「判损坏断链」在条款里分不出来"),
+    ("G25", "journal记录头2026-09-14加的fsid8与MAC16，条款只说fsid「与单元头同口径」（系统配置fsid的低8字节）、MAC第一版全0；**读者拿fsid做什么没写**——装置按I-1.4把fsid不符的记录整条丢掉（不进重放前缀），而「丢掉」与「判损坏断链」在条款里分不出来"),
 ];
 
 /// 整条路（mkfs → 取号 → 暖机两次 → 第一个事务）跑一遍，返回落盘后的整份镜像与这次发布的产出。
@@ -3753,8 +3753,8 @@ fn main() {
         ("mapping_key", 27, MAPPING_KEY_BYTES),
         ("mapping_entry", 55, MAPPING_ENTRY_BYTES),
         ("location_entry", 14, LOC_ENTRY),
-        ("superblock", 481, SYSTEM_CONFIGURATION_BYTES),
-        ("superblock_slot", 4096, SYSTEM_CONFIGURATION_SLOT_BYTES),
+        ("system_configuration", 481, SYSTEM_CONFIGURATION_BYTES),
+        ("system_configuration_slot", 4096, SYSTEM_CONFIGURATION_SLOT_BYTES),
     ];
     let mut width_mismatches = 0u64;
     for (structure, expected, actual) in width_rows {
@@ -3902,7 +3902,7 @@ fn main() {
         region_geometry.push(("journal_record", u32::try_from(device_index).expect("设备数"), catalog.journal_offset, catalog.journal_length));
     }
     for device_index in 0..parameters.device_count {
-        region_geometry.push(("superblock", u32::try_from(device_index).expect("设备数"), system_configuration_offset, SYSTEM_CONFIGURATION_SLOT_BYTES));
+        region_geometry.push(("system_configuration", u32::try_from(device_index).expect("设备数"), system_configuration_offset, SYSTEM_CONFIGURATION_SLOT_BYTES));
     }
 
     let impl_snapshot_path = std::env::args().nth(1);
@@ -4075,7 +4075,7 @@ fn main() {
         output.allocation_records.iter().filter(|record| record.generation == CheckpointTxg(0)).count()
     ));
     emit(&mut emitter, &format!(
-        "name=instances mkfs_instance={MKFS_INSTANCE_GENERATION} first_writable_mount_instance={FIRST_INSTANCE_GENERATION} mkfs_superblock_generation={SYSTEM_CONFIGURATION_GENERATION_AT_MKFS} acquisition_superblock_generation={SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION} transaction_superblock_generation={} transaction_superblock_slot={}",
+        "name=instances mkfs_instance={MKFS_INSTANCE_GENERATION} first_writable_mount_instance={FIRST_INSTANCE_GENERATION} mkfs_system_configuration_generation={SYSTEM_CONFIGURATION_GENERATION_AT_MKFS} acquisition_system_configuration_generation={SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION} transaction_system_configuration_generation={} transaction_system_configuration_slot={}",
         system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).0,
         system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG)).1
     ));
@@ -4194,8 +4194,8 @@ mod tests {
         assert_eq!(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET, 155);
         assert_eq!(SYSTEM_CONFIGURATION_FSID_OFFSET, 102);
         assert_eq!(SYSTEM_CONFIGURATION_BYTES, 481);
-        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES, 4096, "超级块槽宽是格式常量（D22 已定项 2，2026-09-14 三方论证后按主 agent 推荐值）");
-        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES - SYSTEM_CONFIGURATION_BYTES, 3615, "481 的超级块在 4096 槽里余 3615");
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES, 4096, "系统配置槽宽是格式常量（D22 已定项 2，2026-09-14 三方论证后按主 agent 推荐值）");
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES - SYSTEM_CONFIGURATION_BYTES, 3615, "481 的系统配置在 4096 槽里余 3615");
         assert_eq!(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1] - SYSTEM_CONFIGURATION_SLOT_OFFSETS[0], SYSTEM_CONFIGURATION_SLOT_BYTES, "槽距与槽宽同值 ⇒ 两个槽首尾相接、不重叠");
         assert_eq!(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64 + 8 + 4, SYSTEM_CONFIGURATION_BYTES);
         assert_eq!(MAPPING_KEY_BYTES, 27);
@@ -4303,7 +4303,7 @@ mod tests {
     fn mkfs_seeds_three_generation_zero_roots_readable_from_all_regions() {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, genesis) = mkfs(&parameters);
-        let system_configuration = choose_system_configuration(&recording.pool).expect("超级块");
+        let system_configuration = choose_system_configuration(&recording.pool).expect("系统配置");
         let mut readable = 0;
         for region in 0..RING_REGIONS {
             let bytes = recording.pool.read(system_configuration.region_devices[region as usize], ring_slot_offset(region, 0), 512);
@@ -4322,20 +4322,20 @@ mod tests {
         for device_index in 0..2u32 {
             for slot_offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
                 let slot = recording.pool.read(DeviceIdentity(device_index), DeviceOffset(slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-                let system_configuration = SystemConfiguration::parse_slot(&slot).expect("mkfs 的超级块槽");
+                let system_configuration = SystemConfiguration::parse_slot(&slot).expect("mkfs 的系统配置槽");
                 assert_eq!(system_configuration.slot_generation, 1);
                 assert_eq!(system_configuration.journal_instance, InstanceGeneration(0));
             }
         }
     }
 
-    /// 超级块 481（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段）：每个字段按**绝对偏移**读一遍，
+    /// 系统配置 481（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段）：每个字段按**绝对偏移**读一遍，
     /// 以及「整槽校验和罩整个 4096 槽」——改 481 之后那 3615 字节补齐里的任何一个字节，解析都要拒绝。
     #[test]
     fn system_configuration_is_481_bytes_and_the_slot_checksum_covers_all_4096() {
         let BuiltPool { recording, .. } = built_pool();
         let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        assert_eq!(slot.len(), 4096, "超级块槽宽是格式常量 4096（D22 已定项 2，2026-09-14 三方论证后）");
+        assert_eq!(slot.len(), 4096, "系统配置槽宽是格式常量 4096（D22 已定项 2，2026-09-14 三方论证后）");
         assert!(SystemConfiguration::parse_slot(&slot).is_some());
         let read_u64 = |offset: usize| u64::from_le_bytes(slot[offset..offset + 8].try_into().expect("切了 8 字节"));
         let read_u32 = |offset: usize| u32::from_le_bytes(slot[offset..offset + 4].try_into().expect("切了 4 字节"));
@@ -4417,9 +4417,9 @@ mod tests {
     }
 
     #[test]
-    /// 取号 [2 个超级块槽]（3 个状态）、暖机第一次 [2 条空记录][根 FUA][2 个超级块槽]（7 个）、第二次 [2][1]（4 个）；
-    /// 第二次的超级块槽写与事务的 16 个单元写之间没有屏障、同一段 18 个（2¹⁸ − 1）；
-    /// 再 [2 条记录][根 FUA][2 个超级块槽]（7 个）⇒ 1 + 3 + 7 + 4 + 262143 + 7 = 262165。
+    /// 取号 [2 个系统配置槽]（3 个状态）、暖机第一次 [2 条空记录][根 FUA][2 个系统配置槽]（7 个）、第二次 [2][1]（4 个）；
+    /// 第二次的系统配置槽写与事务的 16 个单元写之间没有屏障、同一段 18 个（2¹⁸ − 1）；
+    /// 再 [2 条记录][根 FUA][2 个系统配置槽]（7 个）⇒ 1 + 3 + 7 + 4 + 262143 + 7 = 262165。
     fn layer0_state_count_is_262165_with_zero_violations() {
         let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
         let (base, _) = mkfs(&PoolParameters::settled_two_devices());
@@ -4429,7 +4429,7 @@ mod tests {
         let tally = enumerate_layer0(&base.pool, &writes, &segments, &sample_file());
         assert_eq!(tally.states, 262165);
         assert_eq!(tally.violations, 0, "{:?}", tally.first_violation);
-        assert_eq!(tally.root_persisted_states, 4, "事务根槽持久的状态照旧 4 个：根槽那一段与之后超级块段的子集");
+        assert_eq!(tally.root_persisted_states, 4, "事务根槽持久的状态照旧 4 个：根槽那一段与之后系统配置段的子集");
         // 施加记录会重建那次发布的根（D23 已定项 15）⇒ 事务记录两份都持久、8 个单元都验得过的那 3 个状态也读得到文件。
         assert_eq!(tally.file_read_states, 7);
         assert_eq!(tally.no_file_states, 262158);
@@ -4455,7 +4455,7 @@ mod tests {
     ///
     /// D17（实现分层与第三方管道） 已定项 2 的结构等价类要的是「段边界位置 + 每段步骤种类集合」，
     /// 所以这里连每段的步骤种类多重集一起钉死，四条路径各钉一个**绝对值**（不是拿几条路径互相比）：
-    /// 把某一步录成别的种类——例如超级块槽写录成单元写——段边界与状态数一个都不变，只有这几行会红（C316 ②）。
+    /// 把某一步录成别的种类——例如系统配置槽写录成单元写——段边界与状态数一个都不变，只有这几行会红（C316 ②）。
     #[test]
     fn registered_segment_sequences_match_every_recorded_path() {
         let BuiltPool { recording, mkfs_operation_count, acquisition_operation_count, warm_up_operation_count, .. } = built_pool();
@@ -4466,10 +4466,10 @@ mod tests {
         let warm_up_operations = &recording.operations[acquisition_operation_count..warm_up_operation_count];
         let transaction_operations = &recording.operations[warm_up_operation_count..];
         let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
-        assert_eq!(mkfs_operations.len(), 13, "mkfs：11 次写（m1/m2 各两盘、三个第 0 代根、两盘各两个超级块槽）+ 2 道屏障");
+        assert_eq!(mkfs_operations.len(), 13, "mkfs：11 次写（m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道屏障");
         assert_eq!(sizes(mkfs_operations), vec![4, 1, 1, 1, 4]);
         assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 34);
-        assert_eq!(acquisition_operations.len(), 2, "取号：两盘各写一次超级块槽，不另加屏障");
+        assert_eq!(acquisition_operations.len(), 2, "取号：两盘各写一次系统配置槽，不另加屏障");
         assert_eq!(sizes(acquisition_operations), vec![2]);
         assert_eq!(sizes(warm_up_operations), vec![2, 1, 2, 2, 1, 2]);
         assert_eq!(sizes(transaction_operations), vec![16, 2, 1, 2]);
@@ -4477,24 +4477,24 @@ mod tests {
 
         assert_eq!(
             kinds(mkfs_operations),
-            "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[superblock_slot×4,barrier]",
-            "mkfs：m1/m2 两个单元各两盘一段、三个第 0 代根各自 FUA 一段、两盘各两个超级块槽收尾"
+            "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]",
+            "mkfs：m1/m2 两个单元各两盘一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
         );
-        assert_eq!(kinds(acquisition_operations), "[superblock_slot×2]", "取号那一段只有两次超级块槽写");
+        assert_eq!(kinds(acquisition_operations), "[system_configuration_slot×2]", "取号那一段只有两次系统配置槽写");
         assert_eq!(
             kinds(warm_up_operations),
-            "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
-            "暖机两次空发布：每次「空记录两盘 → 根 FUA → 超级块槽两盘」，第一段前面还有那道开场屏障"
+            "[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+            "暖机两次空发布：每次「空记录两盘 → 根 FUA → 系统配置槽两盘」，第一段前面还有那道开场屏障"
         );
         assert_eq!(
             kinds(transaction_operations),
-            "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
-            "第一个事务：8 个单元各两盘 → journal 记录两盘 → 根 FUA → 超级块槽两盘"
+            "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+            "第一个事务：8 个单元各两盘 → journal 记录两盘 → 根 FUA → 系统配置槽两盘"
         );
         assert_eq!(
             kinds(post_mkfs_operations),
-            "[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]",
-            "整条流：取号那两次超级块槽写自成一段（收段的是暖机第一次开头那道屏障），暖机第二次的两个超级块槽与事务的 16 个单元写同一段 18 个写"
+            "[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]",
+            "整条流：取号那两次系统配置槽写自成一段（收段的是暖机第一次开头那道屏障），暖机第二次的两个系统配置槽与事务的 16 个单元写同一段 18 个写"
         );
 
         // 每一步都恰好落在一个段里：各段的步骤数加起来等于录到的操作数。
@@ -4503,7 +4503,7 @@ mod tests {
         }
         // 种类的字母表就这五个，别处不许冒出第六个。
         let alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(post_mkfs_operations, true).concat().iter().map(|kind| kind.tag()).collect();
-        assert_eq!(alphabet.into_iter().collect::<Vec<_>>(), vec!["barrier", "journal_record", "root_record_fua", "superblock_slot", "unit_write"]);
+        assert_eq!(alphabet.into_iter().collect::<Vec<_>>(), vec!["barrier", "journal_record", "root_record_fua", "system_configuration_slot", "unit_write"]);
     }
 
     /// 暖机（D16 已定项 8）：两次空发布，根落区域 1 与区域 2（分住两块盘），jsn 1、2 不点名任何单元，第一个事务从 txg 3 起。
@@ -4513,7 +4513,7 @@ mod tests {
         let operations = &recording.operations[acquisition_operation_count..warm_up_operation_count];
         let writes = operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
         let fua_writes: Vec<&WriteRequest> = operations.iter().filter_map(|operation| match operation { RecordedOperation::Write(write) if write.is_fua() => Some(write), RecordedOperation::Write(_) | RecordedOperation::Barrier => None }).collect();
-        assert_eq!(writes, 10, "每次空发布 2 条记录 + 1 个根 + 2 个超级块槽");
+        assert_eq!(writes, 10, "每次空发布 2 条记录 + 1 个根 + 2 个系统配置槽");
         assert_eq!(operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier)).count(), 4);
         assert_eq!(fua_writes.len(), 2);
         let parameters = PoolParameters::settled_two_devices();
@@ -4612,7 +4612,7 @@ mod tests {
         assert_eq!(by_name["data_payload_both_copies"].mapping_fallbacks, 1);
         assert!(matches!(by_name["data_header_last_byte_both_copies"].outcome, RecoveryOutcome::Failed { .. }));
         assert!(matches!(by_name["tree_table_both_copies"].outcome, RecoveryOutcome::Failed { .. }));
-        assert!(matches!(by_name["superblock_slot_one_both_devices"].outcome, RecoveryOutcome::FileRead { .. }));
+        assert!(matches!(by_name["system_configuration_slot_one_both_devices"].outcome, RecoveryOutcome::FileRead { .. }));
     }
 
     /// 根记录 371（D22 已定项 7 的字段表，2026-09-14 用户定案在中央映射树根指针之后加算法类型 1 + nonce 12 + MAC 16）：

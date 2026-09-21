@@ -35,7 +35,7 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 python3 - <<'PY'
-import os, re, sys
+import os, re, subprocess, sys
 
 prompts_dir = "research/prompts"
 registry_path = "research/prompts/abandoned-rounds.tsv"
@@ -56,7 +56,21 @@ dispatch_forms = (
 legacy_body_form = re.compile(r"^_(?P<prefix>.+)-body\.md$")
 legacy_leg_form = re.compile(r"^(?P<prefix>[^_].*?)(?:(?:-(?:forward|reverse|attack|defense|admission|ledger))?-(?:opus|sonnet)|-local|-local-attack|-local-defense)\.md$")
 
-prompt_files = sorted(name for name in os.listdir(prompts_dir) if os.path.isfile(os.path.join(prompts_dir, name)))
+# 树上现有的，加上按「每一次提交删上一次的实验记录」归档进版本库的那些。
+# 少了后一半，一轮的腿文件一被归档，撂下登记表里那一行就报「认不出它发过腿」——
+# 而登记表本身是归档规则明令保留的（门禁 66 号的输入），两边对不上不是登记错了，是这道检查只看了树。
+archived_names = set()
+try:
+    log = subprocess.run(["git", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
+                          "--", prompts_dir], capture_output=True, text=True, check=True).stdout
+    for entry in log.split("\n"):
+        entry = entry.strip()
+        if entry.startswith(prompts_dir + "/"):
+            archived_names.add(os.path.basename(entry))
+except (subprocess.CalledProcessError, OSError):
+    pass                                     # 不在版本库里跑（样本目录）时退回只看树，判据不变宽
+prompt_files = sorted(set(name for name in os.listdir(prompts_dir)
+                          if os.path.isfile(os.path.join(prompts_dir, name))) | archived_names)
 dispatch_files_by_round = {}
 unrecognized_files = []
 for name in prompt_files:
@@ -123,6 +137,7 @@ for name in sorted(dispatch_files_by_round):
         rounds_without_any_verdict.append(name)
 
 registered_line_numbers = {}
+registered_reasons = {}                      # 轮名 → 第三列「为什么撂下」，判「腿一条没派」那一格要读它
 malformed_registry_rows = []
 if os.path.isfile(registry_path):
     for line_number, line in enumerate(open(registry_path, encoding="utf-8"), 1):
@@ -137,9 +152,17 @@ if os.path.isfile(registry_path):
             malformed_registry_rows.append(f"第 {line_number} 行日期不是 YYYY-MM-DD：{fields[1]}")
             continue
         registered_line_numbers.setdefault(fields[0].strip(), []).append(line_number)
+        if len(fields) >= 3:
+            registered_reasons[fields[0].strip()] = fields[2]
 
 duplicated_registrations = [f"{name}（第 {', '.join(map(str, numbers))} 行）" for name, numbers in sorted(registered_line_numbers.items()) if len(numbers) > 1]
-registered_unknown_rounds = [name for name in sorted(registered_line_numbers) if name not in dispatch_files_by_round]
+# 「腿一条没派」也是合法的撂下理由（正文写完之后现查发现题没了、题面并进别处），
+# 这种轮次本来就没有腿文件。它的正文一被归档，这条判据就永远认不出它——而登记表自己那一行
+# 写着为什么撂下，比文件名更权威。⇒ 理由里明写没派腿的，不要求认出腿文件。
+no_leg_form = re.compile(r"腿一条没派|没有派腿|一条腿都没派")
+registered_unknown_rounds = [name for name in sorted(registered_line_numbers)
+                             if name not in dispatch_files_by_round
+                             and not no_leg_form.search(registered_reasons.get(name, ""))]
 registered_rounds_with_verdict = [name for name in sorted(registered_line_numbers) if name in verdict_file_rounds or name in kb_verdict_rounds]
 unjudged_unregistered_rounds = [name for name in rounds_without_any_verdict if name not in registered_line_numbers]
 abandoned_rounds = [name for name in rounds_without_any_verdict if name in registered_line_numbers]

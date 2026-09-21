@@ -1,4 +1,4 @@
-M1_单份超级块掉盘0也算可挂	SystemConfigurationArm::Single => dead_device != 0,	SystemConfigurationArm::Single => true,
+M1_单份系统配置掉盘0也算可挂	SystemConfigurationArm::Single => dead_device != 0,	SystemConfigurationArm::Single => true,
 M2_种子退化成只有区域0	if candidate_generation == 0 {\n            return generations_back; // 第 0 代在全部区域都有种子 ⇒ 任何盘上都找得到\n        }	if candidate_generation == 0 {\n            return if dead_device == 0 { u64::MAX } else { generations_back };\n        }
 M3_区域指派全落一盘	region % DEVICE_COUNT	0
 M4_镜像journal也丢窗口	JournalArm::Mirror => false,	JournalArm::Mirror => dead_device == 0,

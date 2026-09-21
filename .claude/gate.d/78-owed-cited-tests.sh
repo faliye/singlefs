@@ -85,8 +85,8 @@ def is_in_the_repository(name):
 missing = [(number, name) for number, name in cited if not is_in_the_repository(name)]
 
 if missing:
-    for number, name in missing:  # gate-lint:detail
-        print(f"  ✗ {number} 引的 `{name}` 在仓里的 .rs / .py / .sh 里一处都找不到")
+    for number, name in missing:
+        print(f"  ✗ {number} 引的 `{name}` 在仓里的 .rs / .py / .sh 里一处都找不到")  # gate-lint:detail
     print(f"  ✗ 已还清的行里有 {len(missing)} 个点名的标识符已经不在仓里了")  # gate-lint:summary
     print("     → 怎么办：那条欠账是靠这个测试还清的。先 grep 它今天叫什么（多半是改了名），")
     print("               用 research/scripts/replace-once.py 把行里的旧名字定点换成现在的名字；")

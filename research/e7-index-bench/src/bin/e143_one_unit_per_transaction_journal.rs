@@ -25,7 +25,7 @@ const NODE_BYTES: u64 = 16384;
 const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
 /// 字节表零的预想环长。
 const RING_BYTES: u64 = 64 << 20;
-/// I-8.1（环几何够大） 的安全系数，超级块预想 3。
+/// I-8.1（环几何够大） 的安全系数，系统配置预想 3。
 const SAFETY_FACTOR: u64 = 3;
 /// E44（序号位宽的本机实测与代价）。
 const FSYNC_PER_SECOND: u64 = 2785;

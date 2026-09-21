@@ -27,6 +27,10 @@ DIRS = ("research/results", "research/prompts")
 KEEP = re.compile(r"-main-verification\.md$|abandoned-rounds\.tsv$")
 LINK = re.compile(r"research/(?:results|prompts)/[^\s`)（）\]\n，。、；]+")
 SCAN = (".claude/kb", "records", ".claude/rules", "briefs")
+# 会把留存产物当**输入**的地方：门禁阶段按名字读它去比对、装置源码 include_str! 在编译期读它。
+# 这些不是「记录」，删了不是「去 git 历史里查」，是**这道检查没得比 / 这个 crate 编不过**。
+INPUT_TREES = (".claude/gate.d", ".claude/scripts", "research", "crates")
+INPUT_SUFFIX = (".sh", ".py", ".rs", ".toml")
 
 
 def git(*args, root="."):
@@ -38,6 +42,44 @@ def past_round_files(root="."):
     tracked = [p for p in git("ls-files", *DIRS, root=root).splitlines() if p]
     dirty = set(p for p in git("diff", "--name-only", "HEAD", "--", *DIRS, root=root).splitlines() if p)
     return sorted(p for p in tracked if p not in dirty and not KEEP.search(p))
+
+
+def still_an_input(root, candidates):
+    """候选里还被代码当输入的那些：门禁阶段按名字读它去比对、装置源码 include_str! 在编译期读它。
+    返回 {相对路径: [点名它的源文件]}。这些**不删**——它们不是上一轮的记录，是这一轮还在跑的东西的输入。
+
+    2026-09-21 实测两次，都是删完才发现：① 门禁 52 号（段序列登记表与 E142 产物逐字比对）连同它的自证一起塌；
+    ② 归档删掉四份跨实验断言读的产物之后，research 整个编不过（e134 读 e133、e136 读 e134 与 e109、e137 读 e136），
+    而 HEAD 上就是这个状态。第一次只把射程补到门禁脚本与 research/scripts，漏掉装置源码，于是第二次照样发生——
+    所以这里按「哪些后缀是代码」扫，不按「我记得哪些目录会引」扫。"""
+    by_name = {}
+    for relative in candidates:
+        by_name.setdefault(os.path.basename(relative), []).append(relative)
+    found = {}
+    for tree in INPUT_TREES:
+        for directory, _, names in os.walk(os.path.join(root, tree)):
+            if "fixtures" in directory.split(os.sep):
+                continue                        # 样本目录里的路径是造给检查自证用的，不是真引用
+            for name in names:
+                if not name.endswith(INPUT_SUFFIX) or name == os.path.basename(__file__):
+                    continue
+                source = os.path.join(directory, name)
+                if os.path.relpath(source, root) in candidates:
+                    continue                    # 自己点名自己不算被谁当输入
+                try:
+                    text = open(source, encoding="utf-8", errors="ignore").read()
+                except OSError:
+                    continue
+                # 只看非注释行：代码注释里写「依据见 research/prompts/xxx」是**记录引用**，
+                # 归档要做的正是把它改成不带路径的说法；非注释行点名才是把它当数据读。
+                # 不收这一刀，几乎每份产物都会被某处注释保下来，归档规则整个失效。
+                text = "\n".join(line for line in text.splitlines()
+                                 if not line.lstrip().startswith(("#", "//", "//!", "/*", "*")))
+                for base, relatives in by_name.items():
+                    if base in text:
+                        for relative in relatives:
+                            found.setdefault(relative, []).append(os.path.relpath(source, root))
+    return found
 
 
 def text_files(root="."):
@@ -79,8 +121,67 @@ def rewrite_links(root, doomed):
     return changed, touched
 
 
+def missing_code_inputs(root):
+    """装置源码 include_str! 点名、而磁盘上不在的留存产物：那个 crate 编不过。
+    不限于这一轮删的——上一轮删错了，这一轮照样红。
+
+    2026-09-21 实测：上一次提交归档时删掉了四份跨实验断言用 include_str! 读的产物
+    （e134 读 e133、e136 读 e134 与 e109、e137 读 e136），于是 HEAD 上 research 整个编不过，
+    而当时的检查只在**删的那一刻**看、只扫门禁脚本，一个字都没说。
+
+    ⚠️ 只认 include 这一族。别的形态（shell 把产物 cat 出来比、python 读它）**这里不判**：
+    实测按「非注释行出现过这个名字」扫，49 处命中里只有 0 处是真的——样本目录 fixtures/ 造的假路径、
+    模板占位串 `eNN-xxx-YYYY-MM-DD.out`、println! 里写的那句复跑说明，全会中。
+    宁可射程窄而准：那些形态的脚本读不到文件时自己会失败，编译期输入不会，它只在 build 时塌。"""
+    missing = []
+    include = re.compile(r"include(?:_str|_bytes)?!\s*\(\s*\"([^\"]+)\"")
+    for tree in INPUT_TREES:
+        for directory, _, names in os.walk(os.path.join(root, tree)):
+            if "fixtures" in directory.split(os.sep):
+                continue
+            for name in names:
+                if not name.endswith(".rs"):
+                    continue
+                source = os.path.join(directory, name)
+                try:
+                    lines = open(source, encoding="utf-8", errors="ignore").read().splitlines()
+                except OSError:
+                    continue
+                for number, line in enumerate(lines, 1):
+                    if line.lstrip().startswith(("//", "/*", "*")):
+                        continue
+                    for target in include.findall(line):
+                        if os.path.exists(os.path.normpath(os.path.join(directory, target))):
+                            continue
+                        missing.append("%s:%d  ← %s" % (os.path.relpath(source, root), number, target))
+    return sorted(set(missing))
+
+
+def stale_exclusions(root):
+    """删完之后指不到东西的排除项：排除表指向不存在的路径时，那道检查自己会判红
+    （`.claude/singlefs-ai-sop/rules/show-me-test.md`「排除的每一份都要登记」）。
+    2026-09-21 实测：归档删掉 research/results/e153-s1-probe-tests/ 之后，naming-lint 整道红。"""
+    import glob as _glob
+    stale = []
+    for table in sorted(_glob.glob(os.path.join(root, ".claude", "*-exclude"))):
+        for number, line in enumerate(open(table, encoding="utf-8"), 1):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            target = line.split("#")[0].strip()
+            if target and not os.path.exists(os.path.join(root, target)):
+                stale.append("%s:%d  %s" % (os.path.relpath(table, root), number, target))
+    return stale
+
+
 def run(root, apply_changes):
     doomed = past_round_files(root)
+    inputs = still_an_input(root, doomed)
+    doomed = [p for p in doomed if p not in inputs]
+    if inputs:
+        print("      留下 %d 份还被代码当输入的产物（门禁按名字读它比对、装置 include_str! 编译期读它）：" % len(inputs))
+        for relative in sorted(inputs):                              # gate-lint:detail
+            print("        %s  ← %s" % (relative, "、".join(sorted(set(inputs[relative])))))
     if not doomed:
         # 数磁盘上真有的，不数 git 索引：删过还没提交时索引里仍跟踪着那些文件，
         # 拿索引数报「现有多少份」会报出一个磁盘上不成立的数。
@@ -102,7 +203,21 @@ def run(root, apply_changes):
     changed, touched = rewrite_links(root, doomed)
     for relative in doomed:
         os.remove(os.path.join(root, relative))
+    stale = stale_exclusions(root)
+    losing = missing_code_inputs(root)
     print("  ✓ 删了 %d 份上一轮及更早的实验记录；%d 份文件里 %d 处引用去掉了路径、只留文件名" % (len(doomed), touched, changed))
+    if losing:
+        print("  ✗ 代码非注释行点名了这些产物，而磁盘上没有——那道检查没得比、那个 crate 编不过：")
+        for entry in losing:                                       # gate-lint:detail
+            print("      %s" % entry)
+        print("     → 怎么办：把它从 git 取回（git log --all --diff-filter=D --name-only 找删它的提交，")
+        print("               再 git show <提交>^:<路径> 取出来）；确实不该再读它，就改那一行代码。")
+        return 1
+    if stale:
+        print("  ! 删完之后这几条排除项指不到东西了，各自那道检查会判红：")
+        for entry in stale:                                        # gate-lint:detail
+            print("      %s" % entry)
+        print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
     print("     → 下一步：跑门禁 23 号（文档指向）确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 0
 
@@ -118,8 +233,15 @@ def selftest():
         subprocess.run(["git", "config", "user.name", "t"], cwd=work, check=True)
         open(os.path.join(work, "research/results/e1-old.out"), "w").write("old\n")
         open(os.path.join(work, "research/prompts/r1-main-verification.md"), "w").write("判决\n")
+        # 上一轮的产物，但装置源码在编译期读它：它不是记录，删了那个 crate 编不过
+        open(os.path.join(work, "research/results/e3-input.out"), "w").write("input\n")
+        os.makedirs(os.path.join(work, "research/bench/src"))
+        open(os.path.join(work, "research/bench/src/probe.rs"), "w").write(
+            '//! 依据见 research/results/e1-old.out\n'
+            'const P: &str = include_str!("../../results/e3-input.out");\n')
         open(os.path.join(work, ".claude/kb/page.md"), "w").write(
-            "产物 `research/results/e1-old.out`，判决 `research/prompts/r1-main-verification.md`\n")
+            "产物 `research/results/e1-old.out`，判决 `research/prompts/r1-main-verification.md`，"
+            "输入 `research/results/e3-input.out`\n")
         git("add", "-A", root=work)
         subprocess.run(["git", "commit", "-qm", "round one"], cwd=work, check=True)
         open(os.path.join(work, "research/results/e2-new.out"), "w").write("new\n")
@@ -140,6 +262,36 @@ def selftest():
             print("  ✗ 自检失败：本轮新产生的被删了")
             print("     → 怎么办：未跟踪的文件不在 ls-files 里，看 past_round_files() 为什么把它算进去了。")
             return 1
+        if not os.path.exists(os.path.join(work, "research/results/e3-input.out")):
+            print("  ✗ 自检失败：装置源码 include_str! 读的产物被当成上一轮的记录删了")
+            print("     → 怎么办：看 still_an_input() 扫的树与后缀，它该在删之前把这一份挑走。")
+            return 1
+        page = open(os.path.join(work, ".claude/kb/page.md"), encoding="utf-8").read()
+        if "research/results/e3-input.out" not in page:
+            print("  ✗ 自检失败：没删的产物，指向它的路径却被改掉了")
+            print("     → 怎么办：rewrite_links() 只改真删掉的那些，看 doomed 是不是没减去输入集。")
+            return 1
+        # 「代码点名了磁盘上没有的产物」这条自己也要证明会红：造一处非注释行的引用
+        gate_dir = os.path.join(work, ".claude", "gate.d")
+        os.makedirs(gate_dir, exist_ok=True)
+        sample = os.path.join(work, "research/bench/src/gone.rs")
+        open(sample, "w").write('const G: &str = include_str!("../../results/e9-gone.out");\n')
+        if not missing_code_inputs(work):
+            print("  ✗ 自检失败：装置源码 include_str! 点名了磁盘上没有的产物，missing_code_inputs 却一条都没报")
+            print("     → 怎么办：看 include 那条正则与它按 directory 解相对路径那一步。")
+            return 1
+        # 同一行挪进注释就该不报：注释里的引用是记录，归档改的正是它
+        open(sample, "w").write('// const G: &str = include_str!("../../results/e9-gone.out");\n')
+        if missing_code_inputs(work):
+            print("  ✗ 自检失败：注释行里的 include 被当成了输入")
+            print("     → 怎么办：看 missing_code_inputs 跳注释那一步。")
+            return 1
+        os.remove(sample)
+        # 产物在的时候不许报：只证明会红不够，还要证明它分得出差别
+        if missing_code_inputs(work):
+            print("  ✗ 自检失败：include 指的产物都在，missing_code_inputs 还是报了")
+            print("     → 怎么办：看它解出来的路径与磁盘上的实际位置差在哪。")
+            return 1
         page = open(os.path.join(work, ".claude/kb/page.md"), encoding="utf-8").read()
         if "research/results/e1-old.out" in page:
             print("  ✗ 自检失败：指向被删文件的引用还留着指空的路径")
@@ -153,7 +305,8 @@ def selftest():
             print("  ✗ 自检失败：删完 --check 仍判红")
             print("     → 怎么办：看 past_round_files() 删除之后还认出了什么。")
             return 1
-    print("  ✓ 自检：有旧记录判红、删完判绿、判决与本轮新产物不被删、指向被删文件的引用改成不带路径的说法")
+    print("  ✓ 自检：有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
+          "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报")
     return 0
 
 

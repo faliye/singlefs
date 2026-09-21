@@ -1,11 +1,11 @@
-//! E87：固定结构的放置 —— 超级块与 journal 环在第一版的 2 盘池上怎么摆，掉一盘各是什么结局。
+//! E87：固定结构的放置 —— 系统配置与 journal 环在第一版的 2 盘池上怎么摆，掉一盘各是什么结局。
 //!
 //! ## 为什么要有这个实验
 //!
-//! C79（超级块与 journal 环的放置没人定）：超级块（设备表、树表、tail 槽、根环参数、阈值
+//! C79（系统配置与 journal 环的放置没人定）：系统配置（设备表、树表、tail 槽、根环参数、阈值
 //! 全住在它里）自己的副本数与放置、journal 环放哪块盘、掉那块盘还挂不挂得上——零覆盖，
 //! 而 2 盘第一版里它们是仅有的单点候选。根环那半已定（D22（单元原子性怎么合成）已定项 2：
-//! R=3 区域、逐区域存设备身份、跨区轮转），E87（固定结构的放置）把它与超级块 / journal
+//! R=3 区域、逐区域存设备身份、跨区轮转），E87（固定结构的放置）把它与系统配置 / journal
 //! 的放置组合起来穷举单盘失效。
 //!
 //! ⚠️ 一条早已有、但从没对准 journal 的规则：D2（RAID 条带策略）已定项 6 的硬下界
@@ -17,33 +17,33 @@
 //! 2 盘；根环 R=3 区域按 mkfs 轮转指派（区域 0、2 → 盘 0，区域 1 → 盘 1；
 //! 逐区域存身份，D2（RAID 条带策略）已定项 7）；发布 g 落区域 `g mod 3`
 //! （D16（发布语义）已定项 6：逐发布计数）。放置臂 2 × 2：
-//! 超级块 {sb_single：只在盘 0 / sb_per_dev：每盘一份}；
+//! 系统配置 {system_configuration_single：只在盘 0 / system_configuration_per_dev：每盘一份}；
 //! journal 环 {j_single：只在盘 0 / j_mirror：两盘各一份，每条记录写两遍}。
 //! 失效：掉盘 0 / 掉盘 1，逐发布代 g = 1..=12 穷举。
 //!
-//! 判定（每格）：挂得上吗（≥1 超级块副本 且 ≥1 幸存根）；根回退几代（幸存区域里
+//! 判定（每格）：挂得上吗（≥1 系统配置副本 且 ≥1 幸存根）；根回退几代（幸存区域里
 //! 最新的代与 g 的差，取 g 全档最坏）；journal 重放窗口丢不丢（环副本全灭 = 丢，
 //! 上界一个 T_time 窗口，D16（发布语义）已定项 5）；稳态代价（镜像 journal 每条记录 +1 写）。
 //!
 //! ⚠️ **试跑时发现并修订的一处（2026-09-02，任何正式轮入库之前）**：初版没建 mkfs 的
 //! 初始根，g=1 掉盘 1 直接全灭（第一次发布恰落在盘 1）。⇒ 模型改成
 //! **mkfs 把第 0 代根种进全部区域**，并保留未种臂把这个洞钉成单测——
-//! 它是要写进 C79（超级块与 journal 环的放置没人定）收口决策的一条硬要求。
+//! 它是要写进 C79（系统配置与 journal 环的放置没人定）收口决策的一条硬要求。
 //!
 //! ## 判据（跑前写死，跑完不许改）
 //!
-//! 1. sb_single 掉盘 0 必不可挂（哪怕数据、根、journal 全健在）——单点的机检形态；
-//!    sb_per_dev 全部 8 格可挂。
+//! 1. system_configuration_single 掉盘 0 必不可挂（哪怕数据、根、journal 全健在）——单点的机检形态；
+//!    system_configuration_per_dev 全部 8 格可挂。
 //! 2. 根回退最坏值按轮转算术钉死：掉盘 1（只有区域 1）最坏 1 代；
 //!    掉盘 0（区域 0、2 全灭、只剩区域 1）最坏 **2** 代——g ≡ 1 (mod 3) 时区域 1 里
 //!    最新的是 g−3？不对：区域 1 存代 ≡ 1 (mod 3)，g ≡ 1 时它自己就在盘 1……
 //!    穷举给答案，判据只钉「与逐代穷举一致的闭式」（见单测手算）。
 //! 3. j_single 掉盘 0 丢重放窗口，j_mirror 全格不丢；镜像的稳态代价恰为每条记录 ×2。
-//! 4. 不判「选哪格」——那是 C79（超级块与 journal 环的放置没人定）的收口决策，交表。
+//! 4. 不判「选哪格」——那是 C79（系统配置与 journal 环的放置没人定）的收口决策，交表。
 //!
 //! ## 它答不了的
 //!
-//! 纯算术穷举，文件操作 0 处。不建模超级块的更新协议（≥2 槽轮换那套语义归
+//! 纯算术穷举，文件操作 0 处。不建模系统配置的更新协议（≥2 槽轮换那套语义归
 //! D23（journal 的角色与格式）已定项 3 的同型纪律，收口时一起定）；不建模盘失而复得
 //! （那是 C88（根环的时间线判别未实现）的射程）；S（每区槽数）取 1 简化——
 //! 槽多只加深同区回退，不改跨区结局。
@@ -126,7 +126,7 @@ fn judge(system_configuration_arm: SystemConfigurationArm, journal_arm: JournalA
         JournalArm::Mirror => false,
     };
     Cell {
-        mountable: system_configuration_survives, // 根恒有幸存者，成不成只看超级块
+        mountable: system_configuration_survives, // 根恒有幸存者，成不成只看系统配置
         worst_fallback,
         window_lost,
         journal_writes_per_record: match journal_arm {
@@ -151,7 +151,7 @@ fn main() {
                 println!(
                     "{}",
                     emitter.emit_raw(&format!(
-                        "name=cell sb={} journal={} dead_dev={dead_device} mountable={} worst_root_fallback={} replay_window_lost={} journal_writes_per_record={}",
+                        "name=cell system_configuration={} journal={} dead_dev={dead_device} mountable={} worst_root_fallback={} replay_window_lost={} journal_writes_per_record={}",
                         match system_configuration_arm { SystemConfigurationArm::Single => "single", SystemConfigurationArm::PerDevice => "per_dev" },
                         match journal_arm { JournalArm::Single => "single", JournalArm::Mirror => "mirror" },
                         u8::from(cell.mountable),
@@ -170,7 +170,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    /// **判据 1**：超级块单份、掉盘 0 ⇒ 不可挂（数据、根、journal 健在也没用）；
+    /// **判据 1**：系统配置单份、掉盘 0 ⇒ 不可挂（数据、根、journal 健在也没用）；
     /// 每盘一份 ⇒ 全部 8 格可挂。
     #[test]
     fn single_system_configuration_is_a_single_point_of_failure() {
@@ -200,7 +200,7 @@ mod tests {
     }
 
     /// 根恒有幸存者（**前提：mkfs 把第 0 代根种进全部区域**）：任何单盘失效、
-    /// 任何代都找得到根。这是「挂得上只看超级块」那半句的前提。
+    /// 任何代都找得到根。这是「挂得上只看系统配置」那半句的前提。
     #[test]
     fn roots_always_survive_single_disk_loss() {
         for dead_device in 0..DEVICE_COUNT {

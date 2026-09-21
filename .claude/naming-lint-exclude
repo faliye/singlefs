@@ -12,5 +12,3 @@ research/e7-index-bench/src/bin/e67_device_subset.rs  # 回扫跳过：还没回
 research/e7-index-bench/src/bin/e79_root_record.rs  # 回扫跳过：变异表 M1 的原文自 04b4f3e 起就不在源码里，要先修表
 research/e7-index-bench/src/bin/e7_index.rs  # 回扫已改完，剩 1 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 1
 research/e7-index-bench/src/lib.rs  # 回扫已改完，剩 3 处待定：含 io 段的名字（io 登不登记成领域缩写待定） 3
-research/results/e153-s1-probe-tests  # E153（账本形态与环上有洞的代价） 停机条款 S1 在 crates 副本里跑的探针测试源码，原样拷贝，与对拍产物 research/results/e153-s1-crates-alignment-2026-09-17.out 一一对应，改名就不再是跑出那份证据的源码（evidence-discipline.md「原样保存的证据不许事后改」）
-research/prompts  # 三方论证发给模型的提示、原始输出与云端腿写的模型源码，与判决一一对应，改一个字就不再对应（evidence-discipline.md「原样保存的证据不许事后改」）；doc-lint 同样绕开它，见 .claude/doc-lint-exclude

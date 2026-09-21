@@ -27,15 +27,21 @@ cd "$ROOT" 2>/dev/null || exit 2
 
 BASE="${GATE_BASE:-}"
 if [[ -z "$BASE" ]]; then
-  BASE="$(git rev-parse --verify --quiet refs/singlefs/gate-ok || git rev-parse --verify --quiet '@{upstream}' || true)"
+  BASE="$(git rev-parse --verify --quiet refs/sop/gate-ok || git rev-parse --verify --quiet refs/singlefs/gate-ok || git rev-parse --verify --quiet '@{upstream}' || true)"
 fi
 export GATE_BASE_RESOLVED="$BASE"
 
 python3 - <<'PY'
 import glob, os, subprocess, sys
 
+# 射程不止 kb：research/ 下也有正文整行抄产物（research/perf-by-milestone.md 就是），
+# 而它原先一份门禁都罩不到——2026-09-21 术语改名把那里一行引文改成了假话，没有任何检查会说。
+# 冻结证据目录（research/prompts/ 的提示与腿的产出、research/results/ 的产物本身）不判：
+# 前者按 evidence-discipline 不许事后改，后者就是被比对的那一方。
 kb = sorted(f for f in glob.glob('.claude/kb/**/*.md', recursive=True)
-            if not f.endswith('-history.md') and '/decisions-history/' not in f)
+                 + glob.glob('research/**/*.md', recursive=True)
+            if not f.endswith('-history.md') and '/decisions-history/' not in f
+            and not f.startswith('research/prompts/') and not f.startswith('research/results/'))
 quoted = []
 for path in kb:
     text = open(path, encoding='utf-8').read()
@@ -79,7 +85,38 @@ for product in products:
         for line in handle:
             product_lines.add(line.strip().replace('\r', ''))
 
+# 树里找不到就去版本库历史里找：产物按「每次提交删上一次的实验记录」归档进 git，
+# 树里没有不等于对照物没有。少了这一段，归档之后每一行历史引文都会被报成「找不到」，
+# 而它们当时逐字是对的——那样这道检查会由「抓抄错的数」退化成「抓归档过的产物」。
+# 反过来它也更硬：引文与**归档那一刻的产物字节**不符，照样红（2026-09-21 术语改名
+# 把 research/perf-by-milestone.md 里一行引文改成了假话，就是这一格抓出来的）。
+archived_count = 0
+def archived_product_lines():
+    global archived_count
+    lines = set()
+    log = subprocess.run(['git', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
+                          '--', 'research/results'], capture_output=True, text=True).stdout
+    commit = None
+    for entry in log.split('\n'):
+        entry = entry.strip()
+        if not entry:
+            continue
+        if len(entry) == 40 and all(character in '0123456789abcdef' for character in entry):
+            commit = entry
+            continue
+        if commit and entry.endswith('.out'):
+            blob = subprocess.run(['git', 'show', '%s^:%s' % (commit, entry)],
+                                  capture_output=True, text=True)
+            if blob.returncode == 0:
+                archived_count += 1
+                for one in blob.stdout.split('\n'):
+                    lines.add(one.strip().replace('\r', ''))
+    return lines
+
 missing = [(path, number, stripped) for path, number, stripped in quoted if stripped not in product_lines]
+if missing:
+    product_lines |= archived_product_lines()
+    missing = [item for item in missing if item[2] not in product_lines]
 if missing:
     print(f'  ✗ {scope} kb 正文里有 {len(missing)} 行整行抄的产物行，在 research/results/ 的 {len(products)} 份产物里一份都找不到：')
     for path, number, stripped in missing:

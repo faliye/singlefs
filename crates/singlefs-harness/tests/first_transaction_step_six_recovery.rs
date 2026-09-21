@@ -103,7 +103,7 @@ fn probes() -> Vec<Probe> {
             flips: both(tree_table_offset, 300),
         },
         Probe {
-            name: "superblock_slot_one_both_devices",
+            name: "system_configuration_slot_one_both_devices",
             flips: both(DeviceOffsetInBytes(4096), 50),
         },
     ]
@@ -185,7 +185,7 @@ fn probes_behave_as_milestone_step_six_expects() {
         ),
         // 陈旧的 tail（槽 1 坏了就择回槽 0：tail 2）：全环扫描不信 tail，结果与 tail 正确时相同。
         (
-            "superblock_slot_one_both_devices",
+            "system_configuration_slot_one_both_devices",
             file_read(ROOT_ONE_THREE),
             3,
             0,

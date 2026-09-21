@@ -165,13 +165,13 @@ pub const FIRST_TRANSACTION_REGIONS: [FirstTransactionRegion; FIRST_TRANSACTION_
         JOURNAL_RECORD_BYTES,
     ),
     fixed_structure_region(
-        "superblock",
+        "system_configuration",
         0,
         FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET,
         SYSTEM_CONFIGURATION_SLOT_BYTES,
     ),
     fixed_structure_region(
-        "superblock",
+        "system_configuration",
         1,
         FIRST_TRANSACTION_SYSTEM_CONFIGURATION_SLOT_OFFSET,
         SYSTEM_CONFIGURATION_SLOT_BYTES,

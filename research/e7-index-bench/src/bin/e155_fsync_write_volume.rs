@@ -20,7 +20,7 @@ const NODE_BYTES: u64 = 16384;
 const UNIT_BYTES: u64 = 32768;
 /// journal 记录固定宽度。
 const RECORD_BYTES: u64 = 4096;
-/// 超级块槽宽度。
+/// 系统配置槽宽度。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 记录头宽度（`journal_named_items_per_record` 用它反推容量）。
 const RECORD_HEADER_BYTES: u64 = 307;
@@ -971,7 +971,7 @@ mod jia_anchor_tests {
         }
     }
 
-    /// B3（值断言，Q1.6 门槛已撤，第十二节修订②）：G23.1 在锚点的份额，字面口径 47.70%、加超级块 50.07%。
+    /// B3（值断言，Q1.6 门槛已撤，第十二节修订②）：G23.1 在锚点的份额，字面口径 47.70%、加系统配置 50.07%。
     /// 分子（Q1.6）＝ extent、inode 两树的**非叶**节点 + 分配记录、记账、映射、树表四棵的**全部**脏节点 + 根槽；
     /// P=1 时 extent 树高 1（根就是叶），非叶节点为 0——`inode_container_bytes`（叶）与 `extent_bytes`（此格恒为叶）都不算进去。
     #[test]
@@ -984,7 +984,7 @@ mod jia_anchor_tests {
         let share = literal_numerator as f64 / total as f64;
         assert!((share - 0.476_968_796).abs() < 1e-6, "share={share}");
         let with_system_configuration = (literal_numerator + outcome.system_configuration_bytes) as f64 / total as f64;
-        assert!((with_system_configuration - 0.500_742_942).abs() < 1e-6, "with_superblock={with_system_configuration}");
+        assert!((with_system_configuration - 0.500_742_942).abs() < 1e-6, "with_system_configuration={with_system_configuration}");
     }
 
     /// B7（第七节 7.2）：甲，P=145、F1、seq、主几何 —— extent 树长到 2 层，其余树层数与 P=1 相同，
@@ -1326,7 +1326,7 @@ mod write_ahead_log_anchor_tests {
         let jia_fsync = solve_jia_publish(shape_at_file_count_1).total_bytes();
         let write_ahead_log_full_fsync = solve_write_ahead_log_fsync(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogFull).total_bytes();
         let write_ahead_log_leaf_fsync = solve_write_ahead_log_fsync(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogLeaf).total_bytes();
-        assert_eq!(jia_fsync - write_ahead_log_full_fsync, 139_776, "甲：四样固定点 × 2 盘 + 根槽 + 超级块槽 × 2");
+        assert_eq!(jia_fsync - write_ahead_log_full_fsync, 139_776, "甲：四样固定点 × 2 盘 + 根槽 + 系统配置槽 × 2");
         assert_eq!(write_ahead_log_full_fsync - write_ahead_log_leaf_fsync, 32_768, "write_ahead_log_full：inode 根 × 2 盘");
 
         let jia_root_slots_in_16 = 16u64; // 甲每次 fsync 都写根槽。
@@ -1658,7 +1658,7 @@ fn one_path_bytes(height: usize, leaf_is_inode_container: bool) -> u64 {
     }
 }
 
-/// Q5.1：甲这一格的 `A(P)`（`total_bytes`）与 `A_tree(P)`（六棵树的字节之和，不含数据单元 / 记录 / 根槽 / 超级块）。
+/// Q5.1：甲这一格的 `A(P)`（`total_bytes`）与 `A_tree(P)`（六棵树的字节之和，不含数据单元 / 记录 / 根槽 / 系统配置）。
 fn total_bytes_and_tree_bytes(shape: PoolShape) -> (u64, u64) {
     let outcome = solve_jia_publish(shape);
     let tree_bytes = outcome.extent_bytes
@@ -1946,7 +1946,7 @@ fn main() {
     println!(
         "{}",
         emitter.emit_raw(&format!(
-            "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} superblock_slot_bytes={SYSTEM_CONFIGURATION_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} effective_dirty_data_budget_bytes={EFFECTIVE_DIRTY_DATA_BUDGET_BYTES} model=counting file_ops=0",
+            "name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} system_configuration_slot_bytes={SYSTEM_CONFIGURATION_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} effective_dirty_data_budget_bytes={EFFECTIVE_DIRTY_DATA_BUDGET_BYTES} model=counting file_ops=0",
             default_ring_in_flight_limit()
         ))
     );

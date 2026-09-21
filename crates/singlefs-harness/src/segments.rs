@@ -28,7 +28,7 @@ impl StepKind {
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
-            StepKind::SystemConfigurationSlot => "superblock_slot",
+            StepKind::SystemConfigurationSlot => "system_configuration_slot",
             StepKind::Barrier => "barrier",
         }
     }
@@ -230,7 +230,7 @@ mod tests {
         assert_eq!(segment_sizes_text(&segments), "2+1+2");
         assert_eq!(
             segment_kinds_text(&segments),
-            "[unit_write×2,barrier]|[root_record_fua]|[superblock_slot×2,barrier]"
+            "[unit_write×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]"
         );
         assert_eq!(closed_form_state_count(&segments), 1 + 3 + 1 + 3);
 
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(segment_sizes_text(&warm_up_segments), "2+1+2");
         assert_eq!(
             segment_kinds_text(&warm_up_segments),
-            "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2]"
+            "[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]"
         );
 
         // 种类串按枚举声明序，不按出现序：系统配置槽写先于单元写发出，串里仍是 unit_write 在前。
@@ -260,7 +260,7 @@ mod tests {
         ];
         assert_eq!(
             segment_kinds_text(&split_into_segments(&mixed, &geometry)),
-            "[unit_write,superblock_slot×2,barrier]"
+            "[unit_write,system_configuration_slot×2,barrier]"
         );
 
         // FUA 不替它前面的普通写做持久：普通写与 FUA 同段。

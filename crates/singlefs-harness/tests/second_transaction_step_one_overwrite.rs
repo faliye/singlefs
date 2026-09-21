@@ -88,7 +88,7 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]"
+        "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
     );
 
     assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));

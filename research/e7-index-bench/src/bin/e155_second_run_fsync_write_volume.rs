@@ -37,7 +37,7 @@ const NODE_BYTES: u64 = 16384;
 const UNIT_BYTES: u64 = 32768;
 /// journal 记录固定宽度。
 const RECORD_BYTES: u64 = 4096;
-/// 超级块槽宽度。
+/// 系统配置槽宽度。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 记录头宽度（`journal_named_items_per_record` 用它反推容量）。
 const RECORD_HEADER_BYTES: u64 = 307;
@@ -1122,7 +1122,7 @@ fn solve_jia_batch_publish(shape: PoolShape, concurrent_fsync_count: u64, shared
         extent_bytes: (extent_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
         inode_container_bytes: (inode_container_dirty * UNIT_BYTES as f64).round() as u64 * DEVICE_COUNT,
         inode_root_bytes: (inode_root_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        // R8 一批只写一份固定点、一条记录组、一个根槽、一份超级块（M9 的反例：每个 fsync 各写一份）。
+        // R8 一批只写一份固定点、一条记录组、一个根槽、一份系统配置（M9 的反例：每个 fsync 各写一份）。
         allocation_bytes: (allocation_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
         accounting_bytes: (core.accounting_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
         mapping_bytes: (mapping_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
@@ -2200,7 +2200,7 @@ mod write_ahead_log_anchor_tests {
         let jia_fsync = solve_jia_publish(shape_at_file_count_1).total_bytes();
         let write_ahead_log_full_fsync = solve_write_ahead_log_fsync(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogFull).total_bytes();
         let write_ahead_log_leaf_fsync = solve_write_ahead_log_fsync(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogLeaf).total_bytes();
-        assert_eq!(jia_fsync - write_ahead_log_full_fsync, 139_776, "甲：四样固定点 × 2 盘 + 根槽 + 超级块槽 × 2");
+        assert_eq!(jia_fsync - write_ahead_log_full_fsync, 139_776, "甲：四样固定点 × 2 盘 + 根槽 + 系统配置槽 × 2");
         assert_eq!(write_ahead_log_full_fsync - write_ahead_log_leaf_fsync, 32_768, "wal_full：inode 根 × 2 盘");
 
         let shape_at_file_count_145 = shape_at(145, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced);
@@ -2422,7 +2422,7 @@ mod row7_group_commit_tests {
     }
 
     /// 阳性对照（5.5，第 7 行）：共享 / 不共享在 B13 那一格上必须给出登记原文的差；
-    /// 甲组提交（concurrent_fsync_count=2 对 concurrent_fsync_count=1）必须省下固定点/记录/根槽/超级块那一份重复开销。
+    /// 甲组提交（concurrent_fsync_count=2 对 concurrent_fsync_count=1）必须省下固定点/记录/根槽/系统配置那一份重复开销。
     #[test]
     fn positive_controls_for_row_7_show_the_prescribed_difference() {
         let shape = shape_at(10_000, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced);
@@ -2773,7 +2773,7 @@ mod row_2_to_4_counterfactual_tests {
         let share = literal_numerator as f64 / total as f64;
         assert!((share - 0.476_968_796).abs() < 1e-6, "share={share}");
         let with_system_configuration = (literal_numerator + outcome.system_configuration_bytes) as f64 / total as f64;
-        assert!((with_system_configuration - 0.500_742_942).abs() < 1e-6, "with_superblock={with_system_configuration}");
+        assert!((with_system_configuration - 0.500_742_942).abs() < 1e-6, "with_system_configuration={with_system_configuration}");
     }
 }
 
@@ -2843,7 +2843,7 @@ mod row_5_growth_tests {
 
 fn main() {
     let mut emitter = Emitter::new();
-    println!("{}", emitter.emit_raw(&format!("name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} superblock_slot_bytes={SYSTEM_CONFIGURATION_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} model=counting", default_ring_in_flight_limit())));
+    println!("{}", emitter.emit_raw(&format!("name=config node_bytes={NODE_BYTES} unit_bytes={UNIT_BYTES} record_bytes={RECORD_BYTES} system_configuration_slot_bytes={SYSTEM_CONFIGURATION_SLOT_BYTES} device_count={DEVICE_COUNT} named_items_per_record={NAMED_ITEMS_PER_RECORD_MAIN} ring_default_bytes={RING_DEFAULT_BYTES} ring_default_in_flight_limit={} model=counting", default_ring_in_flight_limit())));
     println!(
         "{}",
         emitter.emit_raw(

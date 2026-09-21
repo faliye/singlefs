@@ -1080,7 +1080,7 @@ mod tests {
              instance_table_unit_write_calls=0 instance_table_unit_written_bytes=0 \
              journal_record_write_calls=2 journal_record_written_bytes=8192 \
              root_slot_write_calls=1 root_slot_written_bytes=512 \
-             superblock_slot_write_calls=0 superblock_slot_written_bytes=0"
+             system_configuration_slot_write_calls=0 system_configuration_slot_written_bytes=0"
         );
     }
 

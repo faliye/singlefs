@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # gate-stage: 内存序（herd7 + litmus/，本工程自己的阶段）
 #
-# 上游 singlefs-ai-sop 2026-09-16 起不再跑 LKMM（移交记录在 .claude/handover/qemu-herd7/README.md），
+# 上游 singlefs-ai-sop 2026-09-16 起不再跑 LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
 # 从此 litmus/ 下每条 Never 有没有对照组、绑没绑到代码、herd7 判定与声明符不符，只有这一道阶段在判。
 # 逻辑全在 .claude/scripts/lkmm.sh（本工程接管的那份），这里只负责把它接进门禁并给出路。
 #

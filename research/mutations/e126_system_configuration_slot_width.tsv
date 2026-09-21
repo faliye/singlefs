@@ -1,4 +1,4 @@
-# E126 超级块槽宽四条候选的代价 —— 变异表
+# E126 系统配置槽宽四条候选的代价 —— 变异表
 # 每行三段：变异名<TAB>原文<TAB>替换文
 min_unit_bytes	const MINIMUM_UNIT_BYTES: u64 = 16384;	const MINIMUM_UNIT_BYTES: u64 = 4096;
 first_version_disks	const FIRST_VERSION_DISKS: u64 = 2;	const FIRST_VERSION_DISKS: u64 = 3;

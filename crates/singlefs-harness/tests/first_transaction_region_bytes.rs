@@ -126,8 +126,8 @@ fn registry_rows() -> Vec<(&'static str, u32, u64, u64, HexadecimalExtent)> {
         ("journal_record",  0, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
         ("journal_record",  1, 16 * 1024 * 1024 + 8192, 4096, WholeRegion),
         // t11：系统配置槽 1（世代号 5、tail = 3），槽距 4096、槽宽 4096
-        ("superblock",      0, 4096, 4096, WholeRegion),
-        ("superblock",      1, 4096, 4096, WholeRegion),
+        ("system_configuration",      0, 4096, 4096, WholeRegion),
+        ("system_configuration",      1, 4096, 4096, WholeRegion),
     ]
 }
 

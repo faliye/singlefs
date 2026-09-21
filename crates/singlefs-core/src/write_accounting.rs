@@ -75,7 +75,7 @@ impl WrittenStructureKind {
             WrittenStructureKind::InstanceTableUnit => "instance_table_unit",
             WrittenStructureKind::JournalRecord => "journal_record",
             WrittenStructureKind::RootSlot => "root_slot",
-            WrittenStructureKind::SystemConfigurationSlot => "superblock_slot",
+            WrittenStructureKind::SystemConfigurationSlot => "system_configuration_slot",
         }
     }
 }

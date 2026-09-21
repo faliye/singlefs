@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: research/scripts/ 与 .claude/hooks/ 里每一条拒绝都带出路、守 shell 纪律
+# gate-stage: research/scripts/ 与 .claude/hooks/ 里每一条拒绝都带出路、守 shell 纪律、执行位不丢
 #
 # 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint（.claude/singlefs-ai-sop/scripts/gate.sh 第 211–212 行），
 # 研究脚本与 hook 不在射程里。2026-09-18 单跑整仓 gate-lint 红 90 处，84 处在这两个目录，没有任何一笔账记着（C382（研究脚本与 hook 的拒绝不在门禁自检的射程里））。
@@ -26,6 +26,18 @@ if ! GATE_LINT_DIR="${TARGETS[0]}" bash "$LINT" "${TARGETS[@]:1}"; then
   echo "  ✗ research/scripts/ 或 .claude/hooks/ 里有不带出路的拒绝（上面逐处列出）"
   echo "     → 怎么办：照 .claude/singlefs-ai-sop/rules/sop-first.md「每一条拒绝都必须给出下一步」补出路：die 加第二个参数，bad 后五行内写 howto，直接打印的拒绝之后跟一行以箭头开头的出路"
   failed=1
+fi
+# 执行位也一起：共享门禁的「脚本执行位」阶段只扫 .claude/gate.d 与 .claude/scripts，
+# research/scripts 与 .claude/hooks 不在它的射程里（同 gate-lint / shell-lint 那两条的理由）。
+MODES="$(dirname "$LINT")/script-modes.sh"
+if [[ -f "$MODES" ]]; then
+  modes_rc=0
+  bash "$MODES" "${TARGETS[@]}" || modes_rc=$?
+  if (( modes_rc != 0 && modes_rc != 77 )); then
+    echo "  ✗ research/scripts/ 或 .claude/hooks/ 里的脚本执行位在暂存区里不对（上面逐处列出）"
+    echo "     → 怎么办：用 git update-index --chmod=+x <路径>（或 -x）改暂存区里的模式，让它与工作区一致"
+    failed=1
+  fi
 fi
 # shell-lint 一次只扫一个目录（SHELL_LINT_DIR），逐个目录跑
 for directory in "${TARGETS[@]}"; do

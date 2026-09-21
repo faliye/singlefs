@@ -405,7 +405,7 @@ fi
 
 cargo build --release --manifest-path e7-index-bench/Cargo.toml >/dev/null 2>&1 || { echo "replay: 构建失败" >&2; exit 2; }
 
-pass=0; drift=0; timing_only=0; broken=0; claim_bad=0
+pass=0; drift=0; timing_only=0; broken=0; claim_bad=0; archived=0
 CLAIM_QUEUE=()
 
 printf '%-5s %-24s %-10s %s\n' 实验 二进制 判定 说明
@@ -442,6 +442,13 @@ while IFS='|' read -r exp bin args stored kind; do
   if [[ -n "$gate2" ]]; then
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "$gate2"; broken=$((broken+1)); continue
   fi
+  # 留存产物已按「每次提交删上一次的实验记录」归档进版本库时，这一档不比对。
+  # 不报成「对不上」：那与「装置真的改坏了、复跑出不同字节」长得一模一样，读的人会以为实验坏了
+  # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+  if [[ ! -f "results/$stored" ]]; then
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 产物已归档 "$stored 不在树里；本次跑得出来，逐字节这一档不比对"
+    archived=$((archived+1)); CLAIM_QUEUE+=("$exp|$fresh"); continue
+  fi
   if diff -q "$fresh" "results/$stored" >/dev/null 2>&1; then
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 字节一致 "$stored"; pass=$((pass+1))
     CLAIM_QUEUE+=("$exp|$fresh"); continue
@@ -466,8 +473,15 @@ for q in "${CLAIM_QUEUE[@]}"; do
   check_claims "${q%%|*}" "${q#*|}" || claim_bad=$((claim_bad+1))
 done
 printf '%s\n' "-------------------------------------------------------------------------"
-echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift ／ 跑不了 $broken ／ 结论断言不中 $claim_bad"
+echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift ／ 跑不了 $broken ／ 结论断言不中 $claim_bad ／ 产物已归档 $archived"
 echo "本轮输出：$OUT_DIR"
+if [[ $archived -ne 0 ]]; then
+  echo "  ! 「产物已归档」$archived 行：留存产物按「每次提交删上一次的实验记录」归档进了版本库，逐字节这一档没有对照物。"
+  echo "     这不是判红——这几行本次都跑得出来，结论区间断言照常判。要看当时的产物："
+  echo "         git log --all --diff-filter=D --name-only -- \"*<产物文件名>\"     # 找到删它的那次提交"
+  echo "         git show <提交>^:research/results/<产物文件名>                      # 读回当时的内容"
+  echo "     读到的是当时的数、不是今天的结论；要拿它支撑新结论就重新跑一遍（evidence-discipline.md）。"
+fi
 if [[ $drift -ne 0 || $broken -ne 0 || $claim_bad -ne 0 ]]; then
   echo "  → 怎么办：「跑不了」看上面那一行给的 $OUT_DIR/<实验号>.err；「对不上」按上面给的 diff 命令看差在哪，" \
        "结构性差异是代码改动带来的就更新入库产物，不是就说明代码退化了；" \

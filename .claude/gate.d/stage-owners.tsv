@@ -6,17 +6,13 @@
 20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
 21-decision-items-sync.sh	kb-scribe	决策分项清单与正文
 22-item-ref-status.sh	kb-scribe	分项引用写的状态
-23-link-targets.sh	kb-scribe	文档里的链接与「第 N 节」指向
 24-status-redundancy.sh	kb-scribe	分项状态重复标注
-25-kb-deictic.sh	kb-scribe	kb 里的「本轮」锚
-26-number-name-sync.sh	kb-scribe	编号与简称
 27-format-constants.sh	kb-scribe,experiment-runner	kb 登记的格式常量与实验源码两边
 28-cross-decision-status.sh	kb-scribe	跨决策的未定说法
 29-settled-item-self-open.sh	kb-scribe	已定分项自称没定
 30-decision-history.sh	kb-scribe	决策变更留痕
 31-blocking-verdict.sh	kb-scribe	未定项判没判过挡不挡第一个事务
 32-first-txn-fields.sh	kb-scribe	字节表字段指向真实分项
-32-history-ordinal.sh	kb-scribe	新增历史条目撞号
 33-mutation-tables.sh	experiment-runner,kb-scribe,implementation-writer	实验二进制有同名变异表；relabel-item.py 改写实验源码之后锚点会腐化，书记员也跑；crates/mutations.tsv 的锚点也归它数，改 crates/ 的实现员改完就跑（59 号要几个钟头，实现员不跑）
 34-experiment-index-sync.sh	experiment-runner	实验索引行与正文标题
 35-user-verdict-owed.sh	kb-scribe	动了用户定案要记欠账
@@ -25,12 +21,9 @@
 38-field-table-projection.sh	kb-scribe	决策里定的字段投影进字节表
 39-field-table-sum.sh	kb-scribe	字段表合计
 40-results-cited.sh	experiment-runner	实验产物写回
-41-pipefail-grepq.sh	gate-triage	脚本纪律；没有 agent 负责写门禁脚本
 42-first-txn-trio.sh	kb-scribe	字节表、里程碑、决策索引三份互相挂钩
 43-owed-table-shape.sh	kb-scribe	欠账表行形状
 44-settled-ref-says-open.sh	kb-scribe	已定项引用紧跟着说没定
-45-script-modes.sh	gate-triage	看暂存区里的执行位，暂存之后才有对象
-46-write-hook.sh	gate-triage	看项目 settings 里的 hook
 47-research-script-selftests.sh	three-way-materials	材料员用的抽取脚本与本地腿脚本的自证
 48-history-month-file.sh	kb-scribe	变更史条目住在所在月
 49-history-brief.sh	kb-scribe	变更史快查与原文
@@ -53,14 +46,11 @@
 86-experiment-orphans.sh	experiment-runner	实验号在 kb 里有正文
 87-replay.sh	gate-triage	入库实验复现（全部实验复跑十几分钟，2026-09-17 从 experiment-runner 挪到收尾，理由同 15 号；执行员只跑自己那一个实验的 replay.sh）
 88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
-89-stage-selftest.sh	gate-triage	项目本地阶段自己会不会红
 63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表
-65-relay-timing.sh	experiment-runner	装置里读子进程输出的循环不许一边打时间戳一边转打；写装置的是执行员
 66-abandoned-rounds.sh	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，材料员与腿跑它只会红，提交前核
 67-milestone-closeout-owed.sh	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行，都在它手上变红
 68-knowledge-sync.sh	gate-triage	同步记录由主 agent 在阶段收尾时写；提交前核
 69-evidence-in-repo.sh	experiment-runner,kb-scribe,gate-triage	两半各归一个：装置与变异表改了要有产物，是执行员跑完自己那一个实验就该核的（与 40、85、88 同一批）；kb 里把依据写成 /tmp 路径，是书记员写回时该核的；research/prompts/ 那一半（提示、报告与判决）由主 agent 写，提交前核
-71-agent-def-flow-only.sh	gate-triage	定义与共用约束只由主 agent 改（共用约束「不做」一节不许子 agent 改 .claude/agents/），没有哪个子 agent 写完会先跑它；提交前核
 72-agent-def-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名（形态照 56 号）
 73-research-gate-lint.sh	gate-triage	研究脚本与 hook 由主 agent 与各执行员改，没有哪个 agent 专管它们；提交前核
 75-decision-experiment-links.sh	kb-scribe,experiment-runner	决策与实验双向登记、实验变了之后的回看（两边都写这张表）

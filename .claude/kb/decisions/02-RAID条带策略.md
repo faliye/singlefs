@@ -316,7 +316,7 @@ D2（RAID 条带策略） 管条带这一格：一条条带有多宽、用哪几
 **依据**：
 
 - E129（小于 io_min 的写在真设备上怎么出事）：真设备上确实存在 `io_min` 远大于 `physical_block_size` 的块设备（`dm-thin` 块 64 KiB、`io_min` 65536 而 `physical_block_size` 512），且在那种设备上一次小写会诱发设备侧多写 ⇒ 槽距必须按探测到的 `io_min` 取整，只按 `physical_block_size` 划会让两槽落进同一个映射单元。
-- 三方论证（系统配置槽宽那一轮）第一轮反推腿在 `io_min` = 3072 的几何上构造出两槽共享一个映射单元，材料与输出在 `sb-slot-width-reverse-opus.md`、`sb-slot-width-reverse 那一轮的腿报告（产物在 git 里）`。
+- 三方论证（系统配置槽宽那一轮）第一轮反推腿在 `io_min` = 3072 的几何上构造出两槽共享一个映射单元，材料与输出在 `system_configuration-slot-width-reverse-opus.md`、`system_configuration-slot-width-reverse 那一轮的腿报告（产物在 git 里）`。
 - 用户定案（写代码前的总审核加次日收尾弹窗），原话在变更史。
 
 **欠**：C82（io_min 不在挂载比对清单）、C212（固定结构的写小于 io_min）、C414（挂载时不比对 io_min 与记录的槽距）。

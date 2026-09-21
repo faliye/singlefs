@@ -9,18 +9,18 @@
 //!   可不可能逐指针不同』定，不能按『它今天是什么值』定」。
 //! - **D18 已定项 7**：共同前缀 42 = magic 4 + 版本 2 + flags 2（含单元类标签位）+ 声明长度 2 +
 //!   头校验和 32；数据单元类身份段 = 五元组 33（标签 1 + 树 8 + 对象 8 + 出生代 8 + 锚点 8）+
-//!   诞生代号 8 + fsid 8 ⇒ 头 91；「自证单元（journal 记录 / 根槽 / 超级块槽）不用这张表」。
+//!   诞生代号 8 + fsid 8 ⇒ 头 91；「自证单元（journal 记录 / 根槽 / 系统配置槽）不用这张表」。
 //! - **D18 已定项 8**：「单元类型标签取『墓碑』」。**D18 已定项 10**：墓碑打包共享单元、
 //!   按代际装载、回收粒度 = 单元；E83：(32768 − 91) / 56 = 583。E98：(32768 − 91) / 140 = 233。
 //! - **D21 已定项 4**：扩展点归属三类（数据单元 / 索引节点 / 自证单元）。
 //! - **I-6.2**：两张白名单（数据单元类 / 元数据类）。
 //! - **D15 判定表**：新增记录类型 ⇒ compat_ro；改变已有字段含义 ⇒ incompat。
-//! - **D23 已定项 1 下属「记录头的类型字段」小节 A 条**：「未知类型 ⇒ 拒绝挂载，由超级块 incompat 位承载」。
+//! - **D23 已定项 1 下属「记录头的类型字段」小节 A 条**：「未知类型 ⇒ 拒绝挂载，由系统配置 incompat 位承载」。
 //!
 //! ## 提案（`research/prompts/_d18-item11-unit-class-registry.md`）里被模型化的部分
 //!
 //! 登记表码 0 无效 / 1 数据单元 / 2 索引节点 / 3 打包记录单元 / 16 根记录 / 17 journal 记录 /
-//! 18 超级块槽，其余保留；标签 1 字节住共同前缀偏移 6、是 AAD 首字节；打包记录单元类身份段 51 字节
+//! 18 系统配置槽，其余保留；标签 1 字节住共同前缀偏移 6、是 AAD 首字节；打包记录单元类身份段 51 字节
 //! （含 4 字节自包含载荷校验和；2026-09-05 C113 定案再加 10 字节写序；2026-09-12 C288 ① 再加 4 字节出生序号）⇒ 头 107；一个单元只装一种记录类型 / 一个代际 / 一棵树，记录定宽；未登记单元类 ⇒ 拒收 + incompat，
 //! 未登记记录类型 ⇒ 容器可验、内容跳过、只读（compat_ro）。
 //!
@@ -92,7 +92,7 @@ const REGISTRY: [(u8, &str, Kind); 7] = [
     (3, "packed_record_unit", Kind::Content),
     (16, "root_record", Kind::SelfCertifying),
     (17, "journal_record", Kind::SelfCertifying),
-    (18, "superblock_slot", Kind::SelfCertifying),
+    (18, "system_configuration_slot", Kind::SelfCertifying),
 ];
 
 /// 仓里四处清单 + D18 已定项 8 用到的类名（来源, 名字）。
@@ -105,7 +105,7 @@ const USED_NAMES: [(&str, &str); 15] = [
     ("D18-item7", "index_node"),
     ("D18-item7", "journal_record"),
     ("D18-item7", "root_slot"),
-    ("D18-item7", "superblock_slot"),
+    ("D18-item7", "system_configuration_slot"),
     ("D21-item4", "data_unit"),
     ("D21-item4", "index_node"),
     ("D21-item4", "self_cert_unit"),
@@ -124,7 +124,7 @@ fn codes_for(name: &str) -> Vec<u8> {
         "metadata_class" => vec![2, 3],
         "root_record" | "root_slot" => vec![16],
         "journal_record" => vec![17],
-        "superblock_slot" => vec![18],
+        "system_configuration_slot" => vec![18],
         // D21 已定项 4 的「自证单元」罩三个自证码
         "self_cert_unit" => vec![16, 17, 18],
         _ => vec![],

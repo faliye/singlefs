@@ -308,7 +308,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     );
     assert_eq!(
         kinds(mkfs_operations),
-        "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[superblock_slot×4,barrier]"
+        "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
     );
     assert_eq!(
         (
@@ -318,7 +318,10 @@ fn recorded_paths_match_the_registered_segment_sequences() {
         ),
         (2, "2".to_string(), 4)
     );
-    assert_eq!(kinds(acquisition_operations), "[superblock_slot×2]");
+    assert_eq!(
+        kinds(acquisition_operations),
+        "[system_configuration_slot×2]"
+    );
     assert_eq!(
         (
             warm_up_operations.len(),
@@ -329,7 +332,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     );
     assert_eq!(
         kinds(warm_up_operations),
-        "[journal_record×2,barrier×2]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]"
+        "[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
     );
     assert_eq!(
         (
@@ -341,7 +344,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     );
     assert_eq!(
         kinds(transaction_operations),
-        "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]"
+        "[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
     );
     assert_eq!(
         (
@@ -353,7 +356,7 @@ fn recorded_paths_match_the_registered_segment_sequences() {
     );
     assert_eq!(
         kinds(post_mkfs_operations),
-        "[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,superblock_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[superblock_slot×2]"
+        "[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]"
     );
     // 每一步恰好落在一个段里。
     for slice in [

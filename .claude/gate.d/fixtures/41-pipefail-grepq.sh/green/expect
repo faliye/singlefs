@@ -1,2 +1,0 @@
-exit=0
-want=没有 pipefail 下以 grep -q 收尾的管道

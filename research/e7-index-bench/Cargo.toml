@@ -424,11 +424,3 @@ path = "src/bin/e155_fsync_write_volume.rs"
 [[bin]]
 name = "e155-second-run-fsync-write-volume"
 path = "src/bin/e155_second_run_fsync_write_volume.rs"
-
-[[bin]]
-name = "e155-third-run-release-cascade"
-path = "src/bin/e155_third_run_release_cascade.rs"
-
-[[bin]]
-name = "e155-fourth-run-group-commit-concurrency"
-path = "src/bin/e155_fourth_run_group_commit_concurrency.rs"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 用 LKMM 判内存序结论：herd7 给模型判定。
 #
-# 这是本工程自己的一份：上游 singlefs-ai-sop 2026-09-16 起不再管 herd7 / LKMM（`.claude/handover/qemu-herd7/README.md`），
+# 这是本工程自己的一份：上游 singlefs-ai-sop 2026-09-16 起不再管 herd7 / LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
 # 原文取自那里的 `sop-0.0.50-snapshot/scripts/lkmm.sh`，只改了 lib.sh 的路径、`litmus/` 改指本仓 `litmus/`。
 # 门禁阶段 `.claude/gate.d/57-lkmm.sh` 调它；提交前必跑（`.claude/rules/implementation-workflow.md`）。
 #

@@ -2,7 +2,7 @@
 //!
 //! ## 它答什么
 //!
-//! D21 已定「扩展点大小按线在超级块里声明，上限取固定字节数」，
+//! D21 已定「扩展点大小按线在系统配置里声明，上限取固定字节数」，
 //! 但**上限取多少未定案**——正文那个 128 是举例。
 //!
 //! 本实验不问「128 好不好」（那样只可能产出支持性证据），而是**三段夹一个区间**：
@@ -188,7 +188,7 @@ fn slots_per_atomic(slot: u64, atomic: u64) -> u64 {
 
 /// 挂载时求值一次的几何判定。**返回「挂得上 / 挂不上」，不返回「慢一点」**——
 /// 这是 `.claude/rules/fs-design.md`「能不能把『用错了』变成『挂不上』」在本项上的形态。
-/// 输入全部是**操作期间不会变的量**：超级块里声明的 N、格式里的单元与节点大小、
+/// 输入全部是**操作期间不会变的量**：系统配置里声明的 N、格式里的单元与节点大小、
 /// 运行时探测到的 `physical_block_size`。⇒ 挂载时算一次，运行时只查不算。
 fn mount_verdict(extension_point_bytes: u64, unit: u64, node: u64, slot: u64, atomic: u64) -> &'static str {
     if extension_point_bytes > maximum_extension_point_bytes_keeping_payload_positive(unit) {

@@ -186,7 +186,7 @@ fn checker_reads_the_same_generation_zero_root_from_all_three_regions_and_isolat
 #[test]
 fn both_system_configuration_slots_verify_with_the_same_generation_and_a_corrupt_slot_loses_the_choice(
 ) {
-    let mut pool = run_mkfs("superblock");
+    let mut pool = run_mkfs("system_configuration");
     let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
     for (device_number, (_, device)) in pool.devices.iter().enumerate() {
         let slot_zero = read(device, 0, slot_bytes);
@@ -266,7 +266,7 @@ fn recorded_stream_matches_the_registered_mkfs_segment_sequence() {
     );
     assert_eq!(
         segment_kinds_text(&segments),
-        "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[superblock_slot×4,barrier]"
+        "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
     );
     assert_eq!(operations.len(), 13, "mkfs 13 次操作（含两道池屏障）");
     assert_eq!(

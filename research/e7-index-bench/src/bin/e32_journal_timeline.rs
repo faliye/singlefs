@@ -232,7 +232,7 @@ fn setup(slots: usize, settled: u64, stale: u64) -> (Ring, u64, u64, u64) {
         let record = JournalRecord { jsn, timeline: TIMELINE_PREVIOUS_LAP, previous_record_hash: 0, is_checksum_valid: true };
         ring.put(record);
     }
-    let tail = slots as u64 + 1; // 本圈第一条；tail 的权威副本住超级块槽（D23 已定项 3 已定）
+    let tail = slots as u64 + 1; // 本圈第一条；tail 的权威副本住系统配置槽（D23 已定项 3 已定）
 
     // ── 时间线 A：安定段 ──
     let mut chain_hash = anchor;
@@ -270,10 +270,10 @@ fn run(arm: Arm, slots: usize, settled: u64, stale: u64, new_after: u64) -> ArmO
     let resume_jsn = match arm {
         // 没有 `_ =>`
         Arm::ResumeAtPrefix | Arm::BackChain => first_recovery_records.last().map(|record| record.jsn + 1).unwrap_or(tail),
-        // 需要一个「全环见过的最大合法 jsn」水位——本仓的记录头与超级块里都没有这个字段
+        // 需要一个「全环见过的最大合法 jsn」水位——本仓的记录头与系统配置里都没有这个字段
         Arm::SkipHole => {
             // 扫全环取「见过的最大合法 jsn」。⚠️ 这需要一个水位概念，
-            // 而 E23（journal 几何）逐字列出的 11 个记录头字段与超级块槽里都没有它。
+            // 而 E23（journal 几何）逐字列出的 11 个记录头字段与系统配置槽里都没有它。
             let mut highest_valid_jsn = tail;
             for slot in ring.slot.iter().flatten() {
                 if slot.is_checksum_valid && slot.jsn > highest_valid_jsn {

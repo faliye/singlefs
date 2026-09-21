@@ -58,7 +58,7 @@ const CONTAINER_INDEX_HEADER_BYTES: u64 = 76;
 const CONTAINER_INDEX_ENTRY_BYTES: u64 = 85;
 /// 全池容器总数，用来钉容器索引的高（E106 口径：16 TiB / 90% 填充）。
 const TOTAL_CONTAINERS: u64 = 828_789;
-/// `w` 的上界，超级块声明的常量（D2 已定项 6）。
+/// `w` 的上界，系统配置声明的常量（D2 已定项 6）。
 const STRIPE_WIDTH_MAXIMUM: u64 = 4;
 /// `w` 的硬下界（D2 已定项 6：零冗余的条带不许发出）。
 const STRIPE_WIDTH_MINIMUM: u64 = 2;
