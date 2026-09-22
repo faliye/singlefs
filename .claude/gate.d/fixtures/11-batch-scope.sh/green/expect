@@ -1,0 +1,2 @@
+exit=0
+want=这一批的 3 个触发文件都登记进了 .claude/batch-scope，登记的 3 个都在这一批里（相对 HEAD 共 6 个改动路径，另外 3 个不是触发文件、不用登记；触发文件的判据是 .claude/gate.d/knowledge-sync-triggers.tsv 的 3 条正则）

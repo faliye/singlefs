@@ -9,9 +9,10 @@
 # （取法与 56-crates-adversarial-review.sh 相同，只多一个 core.quotepath=false：不加的话中文路径被 git 转成带引号的八进制，载体对不上）。
 #
 # 判据：
-#   ① 触发文件：改动范围里匹配下面任一条的——^\.claude/agents/、^\.claude/agent-common\.md$、^\.claude/hooks/、
-#      ^\.claude/settings\.json$、^\.claude/gate\.d/[^/]+\.(sh|py|tsv)$、^\.claude/rules/、^research/scripts/、
-#      ^crates/[^/]+/src/、^CLAUDE\.md$。一个都没有 ⇒ 无对象可判，退 77（不记通过）。
+#   ① 触发文件：改动范围里命中 `.claude/gate.d/knowledge-sync-triggers.tsv` 里任一条正则的路径。
+#      那份表是触发文件的**唯一登记位**，门禁 11 号（这一批的触发文件有没有登记进范围）读同一份；
+#      两道各存一份清单就会判得不一样，一道说要回扫、另一道说不用登记。表读不到或一条正则都没有 ⇒ 红。
+#      一个触发文件都没有 ⇒ 无对象可判，退 77（不记通过）。
 #   ② 同步记录：改动范围里的 research/prompts/<阶段>-sync.md（prompts 顶层），且文件里有一行只写 <!-- knowledge-sync -->。
 #      每个触发文件都要在某份同步记录里按路径逐字出现（等同 grep -F）；漏的逐个列出 ⇒ 红。
 #   ③ 每份同步记录有「## 搜索」小节且不空 ⇒ 否则红。
@@ -81,17 +82,24 @@ with open(sys.argv[2], encoding="utf-8", errors="replace") as handle:
     changed_files = sorted({path for path in handle.read().split("\n") if path})
 changed_set = set(changed_files)
 
-trigger_patterns = [re.compile(pattern) for pattern in (
-    r"^\.claude/agents/",
-    r"^\.claude/agent-common\.md$",
-    r"^\.claude/hooks/",
-    r"^\.claude/settings\.json$",
-    r"^\.claude/gate\.d/[^/]+\.(sh|py|tsv)$",
-    r"^\.claude/rules/",
-    r"^research/scripts/",
-    r"^crates/[^/]+/src/",
-    r"^CLAUDE\.md$",
-)]
+# 触发文件的清单读 .claude/gate.d/knowledge-sync-triggers.tsv，不在这里再存一份：
+# 门禁 11 号（这一批的触发文件有没有登记进范围）拿同一份清单算它那个范围，两道判得不一样谁都说不清该信哪个
+# （`show-me-test.md`「两套装置算同一个量，就要有一条检查逼它们落到同一个数」）。
+TRIGGER_TABLE = ".claude/gate.d/knowledge-sync-triggers.tsv"
+if not os.path.isfile(TRIGGER_TABLE):
+    print(f"  ✗ 读不到触发文件清单 {TRIGGER_TABLE}")
+    print("     → 怎么办：那份表是触发文件的唯一登记位，68 号与 11 号都读它；恢复它，别在脚本里再存一份清单。")
+    sys.exit(1)
+trigger_patterns = []
+for raw in open(TRIGGER_TABLE, encoding="utf-8").read().split("\n"):
+    body = raw.split("\t")[0].strip()
+    if not body or body.startswith("#"):
+        continue
+    trigger_patterns.append(re.compile(body))
+if not trigger_patterns:
+    print(f"  ✗ 触发文件清单 {TRIGGER_TABLE} 里一条正则都没有")
+    print("     → 怎么办：一行一条「<python 正则><制表符>#<这一类是什么>」，空表等于这道检查整个关掉。")
+    sys.exit(1)
 trigger_files = [path for path in changed_files if any(pattern.search(path) for pattern in trigger_patterns)]
 outside_trigger_count = len(changed_files) - len(trigger_files)
 if not trigger_files:

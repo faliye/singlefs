@@ -5,12 +5,26 @@
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
-mkdir -p .claude/agents .claude/hooks crates/demo/src records research/prompts
+mkdir -p .claude/agents .claude/gate.d .claude/hooks crates/demo/src records research/prompts
 printf '# demo\n\n还没用过。\n' > .claude/agents/demo.md
 printf '#!/usr/bin/env bash\nexit 0\n' > .claude/hooks/demo.sh
 printf 'pub fn publish() -> u32 { 1 }\n' > crates/demo/src/lib.rs
 printf '# 记录\n\n第二行\n第三行\n' > records/notes.md
 printf '# 没动的记录\n' > records/untouched.md
+# 触发文件清单挪进数据文件之后，夹具仓里也要有一份（68 号读它、11 号读它）。
+# 放在 base 提交里：它自己也是触发文件，留在改动范围里会把触发文件数多算一个。
+cat > .claude/gate.d/knowledge-sync-triggers.tsv <<'TRIGGERS'
+# 夹具用的清单，与真表同形
+^\.claude/agents/	# agent 定义
+^\.claude/agent-common\.md$	# agent 的共用约束
+^\.claude/hooks/	# 钩子
+^\.claude/settings\.json$	# 钩子的注册处
+^\.claude/gate\.d/[^/]+\.(sh|py|tsv)$	# 门禁阶段与它们读的数据表
+^\.claude/rules/	# 项目本地规则
+^research/scripts/	# 研究与协作脚本
+^crates/[^/]+/src/	# 实现
+^CLAUDE\.md$	# 项目说明
+TRIGGERS
 git add -A && git commit -qm base
 printf '# demo\n\n用过了。\n' > .claude/agents/demo.md
 printf '#!/usr/bin/env bash\nexit 1\n' > .claude/hooks/demo.sh

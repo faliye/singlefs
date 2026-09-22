@@ -2,6 +2,7 @@
 # 三列用制表符分隔：阶段文件名、agent 名（逗号分隔，每个名字要有 .claude/agents/<名字>.md）、为什么归它。
 # 表与目录、定义逐项一致由 62-stage-owners.sh 判；各 agent 怎么从表里取自己的阶段，见 .claude/agent-common.md「门禁」。
 10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
+11-batch-scope.sh	gate-triage	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，跑整轮门禁的分诊先替它看一眼
 15-research-build.sh	gate-triage	research 构建与单测（全工作区十几分钟，2026-09-17 从 experiment-runner 挪到收尾：执行员前台等它会让缓存过期、整份上下文重写）
 20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
 21-decision-items-sync.sh	kb-scribe	决策分项清单与正文

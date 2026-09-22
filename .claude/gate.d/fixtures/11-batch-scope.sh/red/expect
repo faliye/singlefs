@@ -1,0 +1,10 @@
+exit=1
+want=1 个触发文件没登记进这一批的范围
+want=      research/scripts/sneak.py
+want=2 个登记的路径不是这一批的触发文件
+want=.claude/batch-scope:4：.claude/agents/gone.md
+want=1 行登记没写理由
+want=.claude/batch-scope:5：research/scripts/kept.py 后面没写为什么这一批要碰它
+want=1 行登记的路径不是从仓库根起写的
+want=.claude/batch-scope:6：./research/scripts/kept.py 不是从仓库根起写的
+want=.claude/gate.d/68-knowledge-sync.sh 里找不到 knowledge-sync-triggers.tsv：它不再读这份清单了
