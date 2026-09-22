@@ -19,6 +19,12 @@
 #      载体格是「路径:行号」，路径从仓库根起（可包一层反引号），在仓里存在或在改动范围里；
 #      处置格以「改了」「补了」「不改：」之一开头，「不改：」后面要写理由；
 #      处置是「改了」「补了」的，载体路径要在改动范围里（记录说改了而文件没动）。任一不合 ⇒ 红。表可以 0 行。
+#   ⑤ 这一次提交要带上的每份同步记录（**还没进 HEAD** 的那几份，基准与 ①–④ 的 GATE_BASE 不同，理由写在 uncommitted_records 那一段）有「## 原始证据」小节，小节里恰好一张表，表头 | 材料 | 路径 | 行数 |，**至少一行**。
+#      逐行：材料格非空；路径格是仓库根起的路径、在仓里现存；行数格是十进制整数，与那份文件的 `wc -l` 逐字相等。任一不合 ⇒ 红。
+#      拦的是 C468（判错的原始证据不落盘）：阶段同步判错一行之后，事实表、候选表与逐行判定报告都留在 /tmp，
+#      想复盘「当时看得出来吗」一个字节都拿不到，只能由当时判错的人事后重建。⑤ 只对还没进 HEAD 的记录判——
+#      已经提交的记录是冻结证据、改不得，它点名的材料也早晚归档进版本库（archive-past-rounds.py 会删掉工作区里的那一份），
+#      再判就是判一个不存在的对照。
 #
 # 同步记录的格式（research/prompts/<阶段>-sync.md）：
 #   <!-- knowledge-sync -->
@@ -35,14 +41,24 @@
 #   | .claude/agent-common.md:120 | <那一行的原句> | 改了：<改成了什么> |
 #   | .claude/kb/pitfalls.md:40 | （新增） | 补了：<补了什么> |
 #   | records/2026-09-16-subagent拆分提案.md:88 | <那一行的原句> | 不改：<理由，例：说的是那一次发生的事> |
-#   两个小节标题逐字写，后面不加字；原句里的 | 写成 \|；代码围栏里的 # 行不算标题。
+#
+#   ## 原始证据
+#   | 材料 | 路径 | 行数 |
+#   |---|---|---|
+#   | 事实表 | research/prompts/<阶段>-facts.tsv | 137 |
+#   | 候选表 | research/prompts/<阶段>-candidates.tsv | 138 |
+#   | 逐行判定报告（第一段 f1-f11） | research/prompts/<阶段>-judge-f1-f11.md | 420 |
+#   三个小节标题逐字写，后面不加字；原句里的 | 写成 \|；代码围栏里的 # 行不算标题。
 #
 # 管不到的：记录写得对不对（原句是不是那一行、「不改」的理由站不站得住）、回扫搜没搜全、
 # 只用过而没改动的东西（用过之后该改的句子，只要没碰触发范围就不触发）——这些靠阶段收尾的任务点与人。
 # 「改了」「补了」只核载体文件在改动范围里，不核那一行真的动了；行号不核是否越界；路径里带制表符、换行或引号的，git 仍会转义，认不出。
+# ⑤ 只核「点名的那几份在不在、行数对不对得上」：材料的内容对不对、候选表召回全没全、判定报告里那几行判得对不对，一个字都判不了。
 # 判别力：fixtures/68-knowledge-sync.sh/red 放一个没被点名的触发文件、一个只在不带标记的文件里点名的触发文件、
 # 说改了而载体没动、开头不合法、不改没理由、载体没行号、载体不存在、缺「## 搜索」、表头写错，必须判红；
-# green 放三个触发文件分在两份记录里点名、三种处置各一行、中文文件名的载体、原句里的 \|、表后围栏里的竖线行、一份 0 行的表，必须判绿并报对数。
+# 另放四种「## 原始证据」的坏形态：整节缺掉、表头写错、表一行都没有、点名的候选表不在仓里、行数与 wc -l 对不上；
+# green 放三个触发文件分在两份记录里点名、三种处置各一行、中文文件名的载体、原句里的 \|、表后围栏里的竖线行、一份 0 行的表，
+# 两份记录各带一张对得上的「## 原始证据」表（含一个反引号包着的路径、一份不以换行结尾的材料），必须判绿并报对数。
 #
 #   bash .claude/gate.d/68-knowledge-sync.sh [项目根]
 set -uo pipefail
@@ -86,6 +102,7 @@ marker_line = "<!-- knowledge-sync -->"
 record_name = re.compile(r"^research/prompts/[^/]+-sync\.md$")
 records = []
 fresh_records = set()
+uncommitted_records = set()
 unmarked_candidates = []
 for path in changed_files:
     if not record_name.search(path) or not os.path.isfile(path):
@@ -107,6 +124,16 @@ for path in changed_files:
             capture_output=True, text=True).returncode == 0
         if not exists_at_base:
             fresh_records.add(path)
+        # ⑤ 用的是另一个基准：HEAD，不是 GATE_BASE。两个基准回答的不是同一个问题——
+        # 「改了 / 补了」问的是「这一轮的改动范围里有没有这个载体」，范围由 GATE_BASE 定，两边必须同一个基准（C450）；
+        # ⑤ 问的是「这一次提交要带上的记录，它的原始材料带了没有」，那就只能是还没进 HEAD 的那几份。
+        # 拿 GATE_BASE 判 ⑤ 会连**上一个提交里已经写好的记录**一起判（gate-ok 不存在时基准退回 HEAD~1，
+        # 上一个提交新增的记录相对它就是「新写的」），而那份记录是冻结证据、改不得，它的材料也归档了。
+        exists_at_head = subprocess.run(
+            ["git", "cat-file", "-e", f"HEAD:{path}"],
+            capture_output=True, text=True).returncode == 0
+        if not exists_at_head:
+            uncommitted_records.add(path)
     else:
         unmarked_candidates.append(path)
 
@@ -165,6 +192,30 @@ disposition_start_problems = []
 empty_reason_problems = []
 out_of_range_problems = []
 disposition_counts = {"改了": 0, "补了": 0, "不改": 0}
+evidence_problems = []
+evidence_rows_total = 0
+evidence_record_count = 0
+
+
+def tables_in(section_body):
+    """小节体里的几张表：连着的表格行算一张，代码围栏里的行不算。返回 [[(行号, 整行), …], …]。"""
+    runs = []
+    previous_was_table_line = False
+    for line_number, line, fenced in section_body:
+        is_table_line = (not fenced) and line.lstrip().startswith("|")
+        if is_table_line and not previous_was_table_line:
+            runs.append([])
+        if is_table_line:
+            runs[-1].append((line_number, line))
+        previous_was_table_line = is_table_line
+    return runs
+
+
+def newline_count(path):
+    """`wc -l` 报的数：数换行符，不补末尾。不以换行结尾的文件两者差 1，取一个口径，别让写记录的人猜。"""
+    with open(path, "rb") as handle:
+        return handle.read().count(b"\n")
+
 
 for record_path, text in records:
     sections = second_level_sections(text)
@@ -172,6 +223,50 @@ for record_path, text in records:
         search_problems.append(f"{record_path}：没有「## 搜索」小节")
     elif not any(line.strip() for _number, line, _fenced in sections["## 搜索"]):
         search_problems.append(f"{record_path}：「## 搜索」小节是空的")
+    # ⑤ 原始证据只对还没进 HEAD 的记录判：已提交的记录改不得，它点名的材料也归档了（C468）。
+    if record_path in uncommitted_records:
+        evidence_record_count += 1
+        if "## 原始证据" not in sections:
+            evidence_problems.append(f"{record_path}：没有「## 原始证据」小节")
+        else:
+            evidence_tables = tables_in(sections["## 原始证据"])
+            if not evidence_tables:
+                evidence_problems.append(f"{record_path}：「## 原始证据」小节里没有表")
+            elif len(evidence_tables) > 1:
+                evidence_problems.append(f"{record_path}：「## 原始证据」小节里有 {len(evidence_tables)} 张表，只许一张（第二张从第 {evidence_tables[1][0][0]} 行起）")
+            else:
+                evidence_rows = evidence_tables[0]
+                evidence_header_number, evidence_header_line = evidence_rows[0]
+                if table_cells(evidence_header_line) != ["材料", "路径", "行数"]:
+                    evidence_problems.append(f"{record_path}:{evidence_header_number}：「## 原始证据」的表头不是 | 材料 | 路径 | 行数 |，实际是 {evidence_header_line.strip()}")
+                elif (len(evidence_rows) < 2 or len(table_cells(evidence_rows[1][1])) != 3
+                      or not all(separator_cell.match(cell) for cell in table_cells(evidence_rows[1][1]))):
+                    evidence_problems.append(f"{record_path}:{evidence_header_number + 1}：「## 原始证据」表头下面一行不是三格的分隔行 |---|---|---|")
+                elif len(evidence_rows) < 3:
+                    evidence_problems.append(f"{record_path}:{evidence_header_number}：「## 原始证据」的表一行都没有——判错一行之后拿不出任何原始材料，正是这一条要拦的")
+                else:
+                    for row_number, row_line in evidence_rows[2:]:
+                        cells = table_cells(row_line)
+                        location = f"{record_path}:{row_number}"
+                        evidence_rows_total += 1
+                        if len(cells) != 3:
+                            evidence_problems.append(f"{location}：这一行拆出 {len(cells)} 格，要三格")
+                            continue
+                        material, evidence_path, declared_lines = cells
+                        if len(evidence_path) >= 2 and evidence_path.startswith("`") and evidence_path.endswith("`"):
+                            evidence_path = evidence_path[1:-1].strip()
+                        if not material:
+                            evidence_problems.append(f"{location}：材料格是空的，要写这份材料是什么（事实表 / 候选表 / 逐行判定报告）")
+                        if evidence_path.startswith(("/", "./", "../")) or "/../" in evidence_path:
+                            evidence_problems.append(f"{location}：路径不是从仓库根起写的：{evidence_path}")
+                        elif not os.path.isfile(evidence_path):
+                            evidence_problems.append(f"{location}：{evidence_path} 不在仓里——原始材料没入库，判错之后无从复盘")
+                        elif not re.fullmatch(r"[0-9]+", declared_lines):
+                            evidence_problems.append(f"{location}：行数格不是十进制整数：{declared_lines or '（空）'}")
+                        else:
+                            actual_lines = newline_count(evidence_path)
+                            if actual_lines != int(declared_lines):
+                                evidence_problems.append(f"{location}：行数写 {declared_lines}，{evidence_path} 实际 {actual_lines}（wc -l）")
     if "## 命中处置" not in sections:
         table_problems.append(f"{record_path}：没有「## 命中处置」小节")
         continue
@@ -274,6 +369,13 @@ if empty_reason_problems:
     for entry in empty_reason_problems:
         print(f"      {entry}")
     print("     → 怎么办：「不改：」后面写不改的理由，例：冻结证据 / 说的是那一次发生的事 / 同一个词、不同的事。")
+if evidence_problems:
+    failed = True
+    print(f"  ✗ {len(evidence_problems)} 处「## 原始证据」写坏了，或点名的材料不在仓里、行数对不上：")
+    for entry in evidence_problems:
+        print(f"      {entry}")
+    print("     → 怎么办：这一轮新写的同步记录要有「## 原始证据」小节，小节里恰好一张表，表头逐字 | 材料 | 路径 | 行数 |，至少一行；")
+    print("               把这一阶段的事实表、候选表与每份逐行判定报告从 /tmp 挪进 research/prompts/ 跟着记录一起提交，行数写 wc -l 报的数。")
 if out_of_range_problems:
     failed = True
     print(f"  ✗ {len(out_of_range_problems)} 行处置写「改了」「补了」而载体不在改动范围里（记录说改了，文件没动）：")
@@ -286,5 +388,6 @@ if failed:
 hit_rows = sum(disposition_counts.values())
 print(f"  ✓ 触发文件 {len(trigger_files)} 个都在同步记录里点名（同步记录 {len(records)} 份；命中 {hit_rows} 行："
       f"改了 {disposition_counts['改了']} / 补了 {disposition_counts['补了']} / 不改 {disposition_counts['不改']}；基准 {base}）；"
+      f"这一次提交新带的同步记录 {evidence_record_count} 份，点名的 {evidence_rows_total} 份原始材料都在仓里、行数对得上；"
       f"改动范围里另有 {outside_trigger_count} 个文件不在触发范围")
 PY

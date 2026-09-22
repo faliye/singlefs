@@ -19,6 +19,6 @@ if python3 "$SCRIPT" --check "$ROOT"; then
   exit 0
 fi
 echo "  ✗ 工作区里还留着上一轮及更早的实验记录（上面按目录列出份数）"
-echo "     → 怎么办：python3 research/scripts/archive-past-rounds.py --apply 删掉，它同时把别处指向这些文件的引用"
-echo "               改成「<名字>（已归档，见 git 历史）」，不留指空的路径；删完跑门禁 23 号确认链接都还到得了。"
+echo "     → 怎么办：照上面那一行打出来的基准跑 --apply 删掉（不带基准它会按 HEAD 算、把这一次提交要带的记录也删掉），"
+echo "               它同时把别处指向这些文件的引用改成「<名字>（已归档，见 git 历史）」，不留指空的路径；删完跑门禁 23 号确认链接都还到得了。"
 exit 1

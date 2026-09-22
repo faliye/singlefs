@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本该判红，一份样本同时放九种坏法：crates 源码没被任何记录点名；hook 只在不带标记的 *-sync.md 里点名；
+# 本该判红，一份样本同时放十四种坏法：crates 源码没被任何记录点名；hook 只在不带标记的 *-sync.md 里点名；
 # 处置写「改了」而载体没动；处置开头不合法；「不改：」没理由；载体没行号；载体指不到文件；
 # 一份记录缺「## 搜索」且命中处置的表头写错。agent 定义被点名了，不该出现在漏点名清单里。
 set -e
@@ -50,5 +50,92 @@ cat > research/prompts/nosearch-sync.md <<'EOF'
 ## 命中处置
 
 | 位置 | 原句 | 处置 |
+|---|---|---|
+EOF
+
+# ⑤ 原始证据的四种坏法，各一份记录：表头写错、表一行都没有、点名的材料不在仓里、行数与 wc -l 对不上。
+# （bad-sync.md 与 nosearch-sync.md 整节都没有，那是第五种。）
+printf '甲\n乙\n丙\n' > research/prompts/demo-candidates.tsv
+cat > research/prompts/evidence-header-sync.md <<'EOF'
+<!-- knowledge-sync -->
+# 表头写错的阶段同步
+
+触发文件：.claude/agents/demo.md
+
+## 搜索
+
+grep -rn "没用过" . → 5
+
+## 原始证据
+
+| 材料 | 文件 | 行数 |
+|---|---|---|
+| 候选表 | research/prompts/demo-candidates.tsv | 3 |
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
+|---|---|---|
+EOF
+cat > research/prompts/evidence-empty-sync.md <<'EOF'
+<!-- knowledge-sync -->
+# 表一行都没有的阶段同步
+
+触发文件：.claude/agents/demo.md
+
+## 搜索
+
+grep -rn "没用过" . → 5
+
+## 原始证据
+
+| 材料 | 路径 | 行数 |
+|---|---|---|
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
+|---|---|---|
+EOF
+cat > research/prompts/evidence-missing-sync.md <<'EOF'
+<!-- knowledge-sync -->
+# 材料不在仓里的阶段同步
+
+触发文件：.claude/agents/demo.md
+
+## 搜索
+
+grep -rn "没用过" . → 5
+
+## 原始证据
+
+| 材料 | 路径 | 行数 |
+|---|---|---|
+| 候选表 | research/prompts/demo-gone-candidates.tsv | 3 |
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
+|---|---|---|
+EOF
+cat > research/prompts/evidence-count-sync.md <<'EOF'
+<!-- knowledge-sync -->
+# 行数对不上的阶段同步
+
+触发文件：.claude/agents/demo.md
+
+## 搜索
+
+grep -rn "没用过" . → 5
+
+## 原始证据
+
+| 材料 | 路径 | 行数 |
+|---|---|---|
+| 候选表 | research/prompts/demo-candidates.tsv | 138 |
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
 |---|---|---|
 EOF

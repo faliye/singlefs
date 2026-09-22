@@ -1181,8 +1181,16 @@ def run_clean(environment, confirmed):
         print(f'    · 不碰：{entry.path}（{entry.reason}）')
     for directory_text in unreadable_directories:
         print(f'    · 没扫到：{directory_text}')
+    # 不碰的那几项要在最后一行也报出来。逐条列在上面了，而读的人常常只看末尾那一行——
+    # 「太新」这一档尤其要点名：它不是白名单，是这一次清不掉、下一次门禁开跑前又已经存在，
+    # 于是 77 号必然判它红（清完紧接着跑门禁时撞过一次，白跑一轮全量）。
+    too_recent = [entry for entry in kept if '可能正在跑' in entry.reason]
+    kept_summary = (f'；不碰 {len(kept)} 项'
+                    + (f'，其中 {len(too_recent)} 项只是太新（不到 {environment.recent_seconds // 60} 分钟没改），'
+                       f'这一次清不掉、下一次门禁会判它们红：{"、".join(os.path.basename(entry.path) for entry in too_recent)}'
+                       if too_recent else ''))
     if not confirmed:
-        print('  没动任何东西；看过上面这份清单、确认没有正在跑的活在用它们之后，加 --yes 再跑一次')
+        print(f'  没动任何东西{kept_summary}；看过上面这份清单、确认没有正在跑的活在用它们之后，加 --yes 再跑一次')
         return 0
     failures = execute_clean(environment, actions)
     print('  清完复查：')
@@ -1195,7 +1203,8 @@ def run_clean(environment, confirmed):
         print_category_result(result)
     still_red = [result.title for result in recheck_results if result.status == 'red']
     print(f'  clean 汇总：做了 {len(actions) - failures} / {len(actions)} 步，没做成 {failures} 步；'
-          f'复查仍判红 {len(still_red)} 类{"（" + "、".join(still_red) + "）" if still_red else ""}')
+          f'复查仍判红 {len(still_red)} 类{"（" + "、".join(still_red) + "）" if still_red else ""}'
+          f'{kept_summary}')
     return 1 if failures or still_red else 0
 
 
@@ -1420,11 +1429,20 @@ def check_devices_and_clean(recorder, environment, holders, fake_temporary, outs
 
     recorded_commands = []
     environment.command_runner = make_fake_command_runner(environment, recorded_commands)
-    with contextlib.redirect_stdout(io.StringIO()):
+    dry_run_output = io.StringIO()
+    with contextlib.redirect_stdout(dry_run_output):
         dry_run_exit = run_clean(environment, confirmed=False)
     all_present = all(os.path.lexists(os.path.join(fake_temporary, name)) for name in expectations)
     recorder.expect(dry_run_exit == 0 and not recorded_commands and all_present,
                     f'不带 --yes 的 clean 不许动任何东西：退出码 {dry_run_exit}，命令 {recorded_commands}')
+    # 汇总那一行自己要报出「不碰几项、其中几项只是太新」：读的人常常只看末尾一行，而「太新」这一档
+    # 这一次清不掉、下一次门禁开跑前又已经存在，77 号必然判它红（实测因此白跑一轮全量门禁）。
+    dry_run_summary = next((line for line in dry_run_output.getvalue().split('\n') if '没动任何东西' in line), '')
+    kept_count = sum(1 for verdict in expectations.values() if verdict != 'residual')
+    recorder.expect(f'不碰 {kept_count} 项' in dry_run_summary,
+                    f'clean 预演的汇总行要报不碰几项，实际：{dry_run_summary}')
+    recorder.expect('只是太新' in dry_run_summary and 'singlefs-e34.Rec123' in dry_run_summary,
+                    f'clean 预演的汇总行要把太新的那几项逐个点名，实际：{dry_run_summary}')
     clean_output = io.StringIO()
     with contextlib.redirect_stdout(clean_output):
         clean_exit = run_clean(environment, confirmed=True)

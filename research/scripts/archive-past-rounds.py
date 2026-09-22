@@ -196,6 +196,19 @@ def stale_exclusions(root):
 
 
 def run(root, apply_changes):
+    # `--apply` 不给基准就拒绝跑，不是提醒、是拒绝。
+    # 为什么非拒绝不可：门禁跑的时候 GATE_BASE 是设好的，人照着出路抄到自己的 shell 里就没了，
+    # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 68 号
+    # 当场红（触发文件没人点名），而删掉的文件没进过任何提交就找不回来。
+    # 2026-09-22 实测：这么删掉两份，白跑一趟 20 分钟的全量门禁。
+    # 文件头写着 base_of 取 GATE_BASE 拦不住这件事：写下来的提醒不会在动手那一刻拦人（sop-first.md）。
+    # `--check` 不拦：它只读不写，而门禁就是不带 GATE_BASE 单跑它也要能报出现状。
+    if apply_changes and not os.environ.get("GATE_BASE", ""):
+        print("  ✗ --apply 不许在没给 GATE_BASE 的时候跑：不给基准它按 HEAD 算，会把这一次提交要带的同步记录也当上一轮的删掉")
+        print("     → 怎么办：跑 GATE_BASE=<门禁那一行「diff 基准 <sha>」报的那个提交> python3 research/scripts/archive-past-rounds.py --apply；")
+        print("               基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）。")
+        print("               真要按 HEAD 算（只有手里一个提交都没暂存时才成立），显式写 GATE_BASE=HEAD。")
+        return 2
     doomed = past_round_files(root)
     inputs = still_an_input(root, doomed)
     doomed = [p for p in doomed if p not in inputs]
@@ -217,7 +230,14 @@ def run(root, apply_changes):
         for name, count in sorted(by_dir.items(), key=lambda item: -item[1]):
             print("      research/%s/  %d 份" % (name, count))       # gate-lint:detail
         print("  ✗ 还留着上一轮及更早的实验记录 %d 份（本轮的与判决不算）" % len(doomed))
-        print("     → 怎么办：跑 python3 research/scripts/archive-past-rounds.py --apply 删掉，")
+        # 出路里把基准一起打出来：门禁跑的时候 GATE_BASE 是设好的，人照着抄到自己的 shell 里就没了，
+        # 于是它按 HEAD 算「这一轮」，把**这一次提交要带的**同步记录也当上一轮的删掉——删完门禁 68 号
+        # 当场红（触发文件没人点名），实测 2026-09-22 多删两份、白跑一轮全量门禁。
+        given_base = os.environ.get("GATE_BASE", "")
+        shown_base = given_base if given_base else "<门禁那一行「diff 基准 <sha>」报的那个提交>"
+        print("     → 怎么办：跑 GATE_BASE=%s python3 research/scripts/archive-past-rounds.py --apply 删掉，" % shown_base)
+        print("               这个基准要与门禁跑的时候一样（`gate.sh` 开头打的那一行「diff 基准 <sha>」就是它）；")
+        print("               不给基准它会按 HEAD 算，把这一次提交要带的同步记录也当上一轮的删掉，删完门禁 68 号当场红；")
         print("               它同时把别处指向这些文件的引用改成只留文件名、不留路径；")
         print("               要查删掉的内容去 git 历史里找，有疑问就重新验证、不翻旧证据。")
         return 1
@@ -245,6 +265,20 @@ def run(root, apply_changes):
 
 def selftest():
     import tempfile
+    # 自检自己控制 GATE_BASE，先清掉外面传进来的那一个。
+    # 门禁跑这一条自证时 GATE_BASE 是 export 好的（门禁 47 号在 gate.sh 底下跑），
+    # 不清掉，「不给基准的 --apply 必须被拒绝」那一格在门禁里永远不触发、当场判红，
+    # 而单独手敲它又是绿的——`command-safety.md`「握手用的环境变量漏给子进程」那一格。
+    inherited_base = os.environ.pop("GATE_BASE", None)
+    try:
+        return selftest_in_temporary_directory()
+    finally:
+        if inherited_base is not None:
+            os.environ["GATE_BASE"] = inherited_base
+
+
+def selftest_in_temporary_directory():
+    import tempfile
     with tempfile.TemporaryDirectory() as work:
         os.makedirs(os.path.join(work, "research/results"))
         os.makedirs(os.path.join(work, "research/prompts"))
@@ -270,7 +304,16 @@ def selftest():
             print("  ✗ 自检失败：有上一轮记录时 --check 没判红")
             print("     → 怎么办：看 past_round_files() 的 ls-files 与 diff 组合。")
             return 1
-        run(work, True)
+        # 不给基准的 --apply 必须当场拒绝（退出码 2），而且一个文件都不许删
+        if run(work, True) != 2 or not os.path.exists(os.path.join(work, "research/results/e1-old.out")):
+            print("  ✗ 自检失败：没给 GATE_BASE 的 --apply 没被拒绝，或者它已经动手删了")
+            print("     → 怎么办：看 run() 开头那道 GATE_BASE 闸，它要在 past_round_files() 之前 return 2。")
+            return 1
+        os.environ["GATE_BASE"] = "HEAD"
+        try:
+            run(work, True)
+        finally:
+            os.environ.pop("GATE_BASE", None)
         if os.path.exists(os.path.join(work, "research/results/e1-old.out")):
             print("  ✗ 自检失败：上一轮的产物没删掉")
             print("     → 怎么办：看 run() 的 os.remove 那一段。")
@@ -345,7 +388,7 @@ def selftest():
             print("               写死 HEAD 会让两道对同一份记录判相反的事。")
             return 1
 
-    print("  ✓ 自检：有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
+    print("  ✓ 自检：不给 GATE_BASE 的 --apply 当场拒绝且一个文件没删、有旧记录判红、删完判绿、判决与本轮新产物不被删、装置 include_str! 读的产物不被删且链接不被改、"
           "指向被删文件的引用改成不带路径的说法、include 指空的产物报得出来、注释里的 include 与产物都在时不误报")
     return 0
 
