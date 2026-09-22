@@ -26,6 +26,17 @@
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
+# 先问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
+# 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
+# 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
+# 这一道原先没有任何范围判定，每趟跑满：2026-09-22 实测，一批 27 个路径里 crates/ 零个，它照跑不误。
+reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
+reuse_rc=$?
+if [[ "$reuse_rc" != 0 ]]; then
+  echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
+  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
+  exit 77
+fi
 TABLE="crates/mutations.tsv"
 if [[ ! -f "$TABLE" ]]; then
   echo "  ✗ 没有 $TABLE"

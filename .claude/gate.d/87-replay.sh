@@ -19,6 +19,16 @@ set -uo pipefail
 # 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
 # 它判的是入库实验数今天还复现不复现得出来，输入是实验二进制、replay.sh 的表与留存产物；
 # research/prompts/ 是冻结证据，改它不可能改变任何实验的输出，所以不在前缀里。C8（范围判定）的粗粒度前身。
+# 先问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
+# 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
+# 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
+reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
+reuse_rc=$?
+if [[ "$reuse_rc" != 0 ]]; then
+  echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
+  echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
+  exit 77
+fi
 scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$(cd "$(dirname "$0")/../.." && pwd)" crates/ research/e7-index-bench/ research/scripts/ research/results/)"
 scope_rc=$?
 if [[ "$scope_rc" != 0 ]]; then
