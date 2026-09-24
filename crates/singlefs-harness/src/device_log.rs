@@ -8,7 +8,7 @@
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 
-use crate::{fnv1a_64, RecordedOperationKind, RetainedOperation};
+use crate::{fnv1a_64, fnv1a_64_of_zeros, RecordedOperationKind, RetainedOperation};
 
 pub const WRITE_LOG_MAGIC: u64 = 0x006a_7366_7773_6872;
 pub const WRITE_LOG_VERSION: u64 = 1;
@@ -156,6 +156,19 @@ pub fn expected_device_events(
         let operation = &retained.operation;
         match operation.kind {
             RecordedOperationKind::Barrier => events.push(DeviceEvent::Flush),
+            // 整段清零：程序发的是一个动作，期望侧就摆一件事——整段一次写，内容是那么多个 0。
+            // 盘上收到几条由块层怎么拆决定（后端按 `ZERO_FILL_CHUNK_BYTES` 拆，来宾内核还会按
+            // `max_sectors_kb` 再拆），所以比之前先把盘上那一段折回一件事（[`fold_declared_zero_fills`]）。
+            RecordedOperationKind::WriteZeroes => {
+                if operation.device != device {
+                    continue;
+                }
+                events.push(DeviceEvent::Write {
+                    offset: operation.offset,
+                    length: operation.length,
+                    content_hash: operation.content_hash,
+                });
+            }
             RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
                 if operation.device != device {
                     continue;
@@ -172,6 +185,94 @@ pub fn expected_device_events(
         }
     }
     events
+}
+
+/// 程序在这块盘上声明清零的那几段（起点与长度），按发出次序。
+#[must_use]
+pub fn declared_zero_fills(
+    operations: &[RetainedOperation],
+    device: DeviceIdentity,
+) -> Vec<(DeviceOffsetInBytes, u64)> {
+    operations
+        .iter()
+        .filter(|retained| {
+            retained.operation.kind == RecordedOperationKind::WriteZeroes
+                && retained.operation.device == device
+        })
+        .map(|retained| (retained.operation.offset, retained.operation.length))
+        .collect()
+}
+
+/// 把盘上那几段清零折回一件事：程序声明清了 `[offset, offset + length)` 的地方，
+/// 日志里连着的若干个写只要**恰好铺满这一段**（按序、首尾相接、每一条都是全 0），就换成一个整段的写事件。
+///
+/// 为什么要折：一次 `write_zeroes_at` 在程序那一侧是一个动作，落到盘上却是好几条写——
+/// 后端按 [`singlefs_core::block_device::ZERO_FILL_CHUNK_BYTES`] 拆过一次，来宾内核还会按
+/// `max_sectors_kb` 再拆一次，拆成几条是块层的事，程序管不着、也不该由它决定比对过不过。
+///
+/// 为什么折了还判得动：折的条件是**铺满**——少一块、多一块、顺序反了、中间夹一条不是全 0 的写，
+/// 都折不起来，那一段就原样留着、逐项比对照样判红（「漏写环的最后 1 MiB」正是少一块）。
+/// 折只在程序声明过的那几段里做，别处一个字节都不碰：页缓存那一档的回写合并落在普通写上，判别力不受影响。
+///
+/// 「这一条是不是全 0」按内容哈希判：`fnv1a_64` 对 `length` 个 0 有唯一取值（[`crate::fnv1a_64_of_zeros`]），
+/// 日志里存着的是真字节、哈希是解析时从真字节算的。
+#[must_use]
+pub fn fold_declared_zero_fills(
+    observed: &[DeviceEvent],
+    declared: &[(DeviceOffsetInBytes, u64)],
+) -> Vec<DeviceEvent> {
+    let mut folded: Vec<DeviceEvent> = Vec::new();
+    let mut index = 0usize;
+    while index < observed.len() {
+        match tile_of_zeros_starting_at(observed, index, declared) {
+            Some((offset, length, consumed)) => {
+                folded.push(DeviceEvent::Write {
+                    offset,
+                    length,
+                    content_hash: fnv1a_64_of_zeros(length),
+                });
+                index += consumed;
+            }
+            None => {
+                folded.push(observed[index].clone());
+                index += 1;
+            }
+        }
+    }
+    folded
+}
+
+/// 从 `index` 起的连续几条写，是不是恰好铺满 `declared` 里的某一段；是就交回那一段与用掉的条数。
+fn tile_of_zeros_starting_at(
+    observed: &[DeviceEvent],
+    index: usize,
+    declared: &[(DeviceOffsetInBytes, u64)],
+) -> Option<(DeviceOffsetInBytes, u64, usize)> {
+    let DeviceEvent::Write { offset: start, .. } = &observed[index] else {
+        return None;
+    };
+    let (declared_offset, declared_length) = declared
+        .iter()
+        .find(|(declared_offset, _)| declared_offset == start)?;
+    let end = declared_offset.0 + declared_length;
+    let mut cursor = declared_offset.0;
+    let mut consumed = 0usize;
+    while cursor < end {
+        let Some(DeviceEvent::Write {
+            offset,
+            length,
+            content_hash,
+        }) = observed.get(index + consumed)
+        else {
+            return None;
+        };
+        if offset.0 != cursor || *content_hash != fnv1a_64_of_zeros(*length) {
+            return None;
+        }
+        cursor += *length;
+        consumed += 1;
+    }
+    (cursor == end).then_some((*declared_offset, *declared_length, consumed))
 }
 
 /// 逐项比，报第一处不一致（下标、程序以为的、盘上收到的）。
@@ -361,5 +462,112 @@ mod tests {
             Some(5),
             "尾部出现写就不是收尾的 FLUSH，判不一致"
         );
+    }
+
+    /// 整段清零：程序那一侧一件事，盘上那一侧拆成几条都算对得上——只要恰好铺满、每条全 0。
+    /// 拆法换了（4 MiB → 512 KiB）判定不变，这正是块层怎么拆不该影响比对的那一条。
+    /// 少一块、中间夹一条不是全 0 的写、越过段尾，都折不起来 ⇒ 逐项比对判红。
+    #[test]
+    fn a_zero_fill_folds_back_into_one_event_however_the_block_layer_split_it() {
+        let ring_start = 1024 * 16384u64;
+        let ring_bytes = 32 * 1024 * 1024u64;
+        let zero_fill = RetainedOperation {
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind: RecordedOperationKind::WriteZeroes,
+                offset: DeviceOffsetInBytes(ring_start),
+                length: ring_bytes,
+                content_hash: fnv1a_64_of_zeros(ring_bytes),
+            },
+            contents: None,
+        };
+        let stream = vec![zero_fill];
+        let expected = expected_device_events(&stream, DeviceIdentity(0));
+        assert_eq!(
+            expected,
+            vec![DeviceEvent::Write {
+                offset: DeviceOffsetInBytes(ring_start),
+                length: ring_bytes,
+                content_hash: fnv1a_64_of_zeros(ring_bytes),
+            }],
+            "程序那一侧：一次调用一件事"
+        );
+        let declared = declared_zero_fills(&stream, DeviceIdentity(0));
+        assert_eq!(
+            declared,
+            vec![(DeviceOffsetInBytes(ring_start), ring_bytes)]
+        );
+        assert_eq!(
+            declared_zero_fills(&stream, DeviceIdentity(1)),
+            vec![],
+            "另一块盘上没有这一段"
+        );
+
+        let split_into = |chunk: u64| -> Vec<DeviceEvent> {
+            (0..ring_bytes / chunk)
+                .map(|index| DeviceEvent::Write {
+                    offset: DeviceOffsetInBytes(ring_start + index * chunk),
+                    length: chunk,
+                    content_hash: fnv1a_64_of_zeros(chunk),
+                })
+                .collect()
+        };
+        for chunk in [4 * 1024 * 1024u64, 512 * 1024, ring_bytes] {
+            let observed = split_into(chunk);
+            assert_eq!(
+                fold_declared_zero_fills(&observed, &declared),
+                expected,
+                "盘上拆成 {} 条，折回来还是那一件事",
+                observed.len()
+            );
+            assert_eq!(
+                compare_allowing_trailing_flushes(
+                    &expected,
+                    &fold_declared_zero_fills(&observed, &declared)
+                )
+                .divergence,
+                None
+            );
+        }
+
+        // 少最后一块（「漏写环的最后 1 MiB」那一类）：铺不满 ⇒ 折不起来 ⇒ 判红。
+        let mut missing_last = split_into(4 * 1024 * 1024);
+        missing_last.pop();
+        assert_eq!(
+            fold_declared_zero_fills(&missing_last, &declared),
+            missing_last,
+            "铺不满就一条都不折"
+        );
+        assert_eq!(
+            compare_allowing_trailing_flushes(
+                &expected,
+                &fold_declared_zero_fills(&missing_last, &declared)
+            )
+            .divergence
+            .map(|(index, _, _)| index),
+            Some(0),
+            "盘上没把这一段清满：第一处就对不上"
+        );
+
+        // 段里夹了一条不是全 0 的写：折不起来 ⇒ 判红。
+        let mut not_all_zero = split_into(4 * 1024 * 1024);
+        not_all_zero[3] = DeviceEvent::Write {
+            offset: DeviceOffsetInBytes(ring_start + 3 * 4 * 1024 * 1024),
+            length: 4 * 1024 * 1024,
+            content_hash: fnv1a_64_of_zeros(4 * 1024 * 1024) ^ 1,
+        };
+        assert_eq!(
+            fold_declared_zero_fills(&not_all_zero, &declared),
+            not_all_zero,
+            "段里有一条不是全 0：一条都不折"
+        );
+
+        // 声明之外的写不碰：普通写照样逐项比（页缓存那一档的判别力从这里来）。
+        let plain = vec![DeviceEvent::Write {
+            offset: DeviceOffsetInBytes(0),
+            length: 4096,
+            content_hash: 0x1234,
+        }];
+        assert_eq!(fold_declared_zero_fills(&plain, &declared), plain);
     }
 }

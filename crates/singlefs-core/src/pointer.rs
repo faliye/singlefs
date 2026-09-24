@@ -38,6 +38,34 @@ impl LocationEntry {
     }
 }
 
+/// 一条盘上指针里两条位置条目的槽号不等。**这是一份坏镜像，不是我们的不变量被破坏**：位置条目里的槽号是盘上的
+/// 6 字节，可以是任何值；D2（RAID 条带策略） 已定项 10 要的是「每个副本一条位置条目」，而「两条都落在同一个槽」
+/// 是第一版的布局约定（一个单元整个落在一列上、两盘各一份）——盘上写着两个不同的槽，说明这一版不是这个实现写出来的。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LocationEntriesOnDifferentSlots {
+    pub devices: [DeviceIdentity; 2],
+    pub slots: [SlotNumber; 2],
+}
+
+/// 一条盘上指针的两条位置条目共用的那个槽号（第一版两盘同槽）：不等就交回错误，由调用方在动任何状态之前拒绝。
+/// 读路径上每一处「拿盘上指针当落点用」都走这一处判，不各写各的（`code-discipline.md`「重复要生成，不许手抄」）。
+///
+/// # Errors
+/// 两条位置条目的槽号不等 ⇒ [`LocationEntriesOnDifferentSlots`]。改之前这一判是 `mount.rs` 与 `transaction.rs` 里
+/// 各一句 `assert_eq!`：一份两条位置条目不同槽的镜像把可写挂载打 panic（panic 面普查 R5）。
+pub fn slot_shared_by_both_location_entries(
+    locations: &[LocationEntry; 2],
+) -> Result<SlotNumber, LocationEntriesOnDifferentSlots> {
+    if locations[0].slot == locations[1].slot {
+        Ok(locations[0].slot)
+    } else {
+        Err(LocationEntriesOnDifferentSlots {
+            devices: [locations[0].device, locations[1].device],
+            slots: [locations[0].slot, locations[1].slot],
+        })
+    }
+}
+
 /// 出生序号：同一棵树在同一个 checkpoint 里每写出一个码 2 / 码 3 单元加 1（D19（块指针的结构与宽度预算） 已定项 9）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BirthSequence(pub u32);

@@ -8,8 +8,10 @@
 //! 删掉前面几步之后，后面的操作照样有意义，收缩靠的就是这一条。
 //!
 //! 第 3 至 5 件在这里生成的历史上做：录制流由调用方给（`execute_history_observing`；崩溃注入给开了内容保留的流，截断点从流里取），
-//! 每一步之后的镜像经观察者交出去（坏盘输入拿它当合法镜像）；故障注入要在录制器与内存盘之间再包一层，届时把 `HistoryDevice`
-//! 换成泛型——今天只有一种盘，按编码纪律「只有一个实现的 trait 不抽」不先抽。
+//! 每一步之后的镜像经观察者交出去（坏盘输入拿它当合法镜像）；故障注入（第 4 件）在**录制器外面**包了一层
+//! `crate::fault_injection::FaultInjectingBlockDevice`，注入计划由调用方给（`execute_history_with_faults`），
+//! 不注入时它只数调用、每一次都原样交给录制器——报错的写、被吞掉的写与被吞掉的屏障都不进录制流，
+//! 录制流因此恒等于真正落到盘上的那一串。
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
@@ -23,13 +25,11 @@ use singlefs_checker::image::{
 };
 use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
-use singlefs_core::allocator::{
-    AllocationRecord, DeviceFreeMap, Placement, PlacementRefusal, PoolAllocator,
-};
+use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator};
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::{
-    make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+    allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
     mount_rollback, mount_writable, raise_rollback_floor, MountError, RollbackTarget, ShadowLedger,
@@ -42,12 +42,13 @@ use singlefs_core::recovery::{
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, publish_without_units, warm_up,
-    FirstFile, PoolVersion, PoolWriter, PublishError, ZeroUnitPublishPlan,
+    FirstFile, PoolVersion, PoolWriter, PublishError, TransactionOutput, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
 
 use crate::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
+use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
     ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRootKey, ObservedEffect,
@@ -60,6 +61,7 @@ use crate::model_comparison::{
     reported_ceiling_of_mount_error,
 };
 use crate::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
+use crate::segments::FixedGeometry;
 use crate::{RecordingBlockDevice, SharedStream};
 
 /// 历史里两块内存盘多宽（取样点的参数；两块恒等大：模型的几何只有一个盘大小，`ModelPoolGeometry::device_size_in_bytes`）。
@@ -72,10 +74,17 @@ pub enum HistoryDeviceWidth {
     /// 4 GiB 的盘上四段历史里落点拒绝一次都没有，映射把它报成什么都没人看得见）。journal 环缩到 128 MiB：mkfs 要求环不超过设备容量的
     /// 四分之一（`make_filesystem::check_geometry`），默认 768 MiB 的环放不进这块盘。
     UnitAreaOf384Slots,
+    /// 单元区 256 槽的小盘（journal 环同 384 槽那一档）：单元区墙那一格的取样点用它。mkfs 同一个进程那条会话也装上根环表之后
+    /// （`make_filesystem::allocator_after_make_filesystem`），每条会话在根环转过之后都按谓词回收，稳态占用约是根环里那 24 版的账
+    /// （每版每盘约 10 槽），384 槽那一档一次落点拒绝都走不到了；256 槽走得到用户数据那一处的拒绝。
+    UnitAreaOf256Slots,
 }
 
 /// 小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf384Slots`）：六个 64 槽的聚簇段。
 const SMALL_DEVICE_UNIT_AREA_SLOTS: u64 = 384;
+
+/// 更小一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf256Slots`）：四个 64 槽的聚簇段。
+const SMALLER_DEVICE_UNIT_AREA_SLOTS: u64 = 256;
 
 /// 小盘上的 journal 环字节数：不超过设备容量的四分之一（设备约 790 MiB）。
 const SMALL_DEVICE_JOURNAL_RING_BYTES: u64 = 128 << 20;
@@ -89,6 +98,9 @@ impl HistoryDeviceWidth {
             HistoryDeviceWidth::UnitAreaOf384Slots => {
                 (UNIT_AREA_START_SLOT + SMALL_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
             }
+            HistoryDeviceWidth::UnitAreaOf256Slots => {
+                (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+            }
         }
     }
 
@@ -98,11 +110,22 @@ impl HistoryDeviceWidth {
         let mut parameters = e142_parameters(512, 512);
         match self {
             HistoryDeviceWidth::FourGibibytes => {}
-            HistoryDeviceWidth::UnitAreaOf384Slots => {
+            HistoryDeviceWidth::UnitAreaOf384Slots | HistoryDeviceWidth::UnitAreaOf256Slots => {
                 parameters.geometry.journal_ring_bytes = SMALL_DEVICE_JOURNAL_RING_BYTES;
             }
         }
         parameters
+    }
+
+    /// 按落点分写的种类要的那份几何（`crate::segments::FixedGeometry`）：故障注入拿它报「注入落在哪一类结构上」。
+    #[must_use]
+    pub fn fixed_geometry(self) -> FixedGeometry {
+        let parameters = self.parameters();
+        FixedGeometry {
+            fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+            journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+            root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+        }
     }
 
     /// 报告里的名字。
@@ -113,12 +136,17 @@ impl HistoryDeviceWidth {
             HistoryDeviceWidth::UnitAreaOf384Slots => {
                 "两块单元区 384 槽的小盘（journal 环 128 MiB）"
             }
+            HistoryDeviceWidth::UnitAreaOf256Slots => {
+                "两块单元区 256 槽的小盘（journal 环 128 MiB）"
+            }
         }
     }
 }
 
-/// 历史里的一块盘：内存盘外面包录制器，写与屏障进调用方给的那条流。
-pub type HistoryDevice = RecordingBlockDevice<SparseBlockDevice>;
+/// 历史里的一块盘：内存盘外面包录制器（写与屏障进调用方给的那条流），录制器外面再包故障注入
+/// （`crate::fault_injection::FaultInjectingBlockDevice`；不注入时只数调用）。
+/// 注入层在最外面：报错的写、被吞掉的写与被吞掉的屏障都不进录制流。
+pub type HistoryDevice = FaultInjectingBlockDevice<RecordingBlockDevice<SparseBlockDevice>>;
 
 /// 一段历史的种子。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -467,8 +495,8 @@ impl GenerationWeights {
 
     /// 分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：一律从第一个文件起，带文件的版本上多半覆盖写
     /// （每次每盘加 8 条），夹着可写挂载（写行与暖机每次加 18 或 26 条）、抬 F（回收之后复用改写记录，条数涨得慢）与少量回退，
-    /// 让逼近 812 条时的条数落在不同的余数上——墙的「差一」只在某次准入之后正好 812 条时分得出。配
-    /// `PerStepChecker::RunContinuingPastTheRingTurnForm` 跑（第二轮判决第三节第 3 条；第一轮配的是 `Skipped`）。
+    /// 让逼近 812 条时的条数落在不同的余数上——墙的「差一」只在某次准入之后正好 812 条时分得出。配 `PerStepChecker::Run` 跑
+    /// （第二轮判决第三节第 3 条：第一轮配的是 `Skipped`，攻方两条只有 checker 看得见的变异在它上面一段都不红）。
     pub const TOWARD_THE_ALLOCATION_RECORD_WALL: GenerationWeights = GenerationWeights {
         name: "逼近分配记录墙（812 条那一格的取样点）",
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
@@ -490,10 +518,10 @@ impl GenerationWeights {
         rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
     };
 
-    /// 单元区墙那一格（增补 3 第 2 件代码三方第二轮判决第三节第 2 条）的取样点，配 `HistoryDeviceWidth::UnitAreaOf384Slots` 跑：
-    /// 一律从第一个文件起，带文件的版本上绝大多数是覆盖写（每次每盘占 10 槽，回收之前三十几次写满单元区），夹着少量可写挂载与抬 F
-    /// （回收之后腾出落点，写满、拒、再写满）与回退——落点拒绝落在用户数据那一处（覆盖写的数据单元）与提交内生块那一处（挂载、抬 F 的
-    /// 固定点单元）都走得到。
+    /// 单元区墙那一格（增补 3 第 2 件代码三方第二轮判决第三节第 2 条）的取样点，配 `HistoryDeviceWidth::UnitAreaOf256Slots` 跑：
+    /// 一律从第一个文件起，带文件的版本上绝大多数是覆盖写（每次每盘占 10 槽），夹着少量可写挂载与抬 F 与回退。
+    /// 这组比重在 256 槽的小盘上只走得到用户数据那一处（覆盖写的数据单元）的落点拒绝：提交内生块能回落到任一空槽，
+    /// 每块盘上一个空槽都不剩才拒，那一处由写死的用例钉（`second_transaction_supplement_two_commit_generated_fallback.rs`）。
     pub const TOWARD_THE_UNIT_AREA_WALL: GenerationWeights = GenerationWeights {
         name: "逼近单元区墙（小盘上落点拒绝那一格的取样点）",
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
@@ -742,7 +770,7 @@ fn image_of(
     MemoryPool {
         devices: devices
             .iter()
-            .map(|(identity, device)| (*identity, device.inner().image.clone()))
+            .map(|(identity, device)| (*identity, device.inner().inner().image.clone()))
             .collect(),
         device_size_in_bytes: device_width.device_bytes(),
     }
@@ -785,13 +813,46 @@ fn allocation_records_counted_for_the_wall(
     allocation_records_on_the_image_under(&image_of(devices, device_width), root)
 }
 
+/// 起点段里 mkfs 之后那三步：取号、暖机、第一个文件。任一步返回错误就交回是哪一步、报的什么。
+/// 写入口借着 `devices`，交回的错里因此不带镜像——镜像由调用方在写入口放手之后自己取。
+fn acquire_warm_up_and_publish_the_first_file(
+    parameters: &MakeFilesystemParameters,
+    devices: &mut [(DeviceIdentity, HistoryDevice)],
+    allocator: &mut PoolAllocator,
+    genesis_root: &RootRecord,
+    content: &[u8],
+) -> Result<(InstanceGeneration, TransactionOutput), (StartingPointStep, String)> {
+    let mut writer = PoolWriter::new(parameters, devices);
+    let instance = acquire_instance(&mut writer)
+        .map_err(|error| (StartingPointStep::AcquireInstance, format!("{error:?}")))?;
+    let warmed = warm_up(&mut writer, genesis_root, instance)
+        .map_err(|error| (StartingPointStep::WarmUp, format!("{error:?}")))?;
+    let output = publish_first_file(
+        &mut writer,
+        allocator,
+        warmed.roots.last().expect("暖机两代根"),
+        FirstFile {
+            content,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+        },
+        instance,
+        &warmed.last_record_bytes,
+    )
+    .map_err(|error| (StartingPointStep::PublishFirstFile, format!("{error:?}")))?;
+    Ok((instance, output))
+}
+
 impl HistoryPool {
     /// 起点：mkfs（加上同一个进程里的取号、暖机、第一个文件）。模型跟着走一遍，第一个文件那次发布拿实现的输出与模型比，判定一并交回。
+    ///
+    /// 这四个入口都可能返回块设备错：不注入故障时走不到（两块内存盘的读写不报错），故障注入把注入点摆进起点段之后走得到。
+    /// 走到时交回 [`StartingPointFailure`]，不 panic——判决第二节改法二（判定五坐实起点段今天只会撞出执行器自己的 `expect`）。
     fn start(
         starting_point: HistoryStartingPoint,
         device_width: HistoryDeviceWidth,
         stream: &SharedStream,
-    ) -> (Self, Option<ModelVerdict>) {
+        fault_plan: &SharedFaultPlan,
+    ) -> Result<(Self, Option<ModelVerdict>), StartingPointFailure> {
         let parameters = device_width.parameters();
         let device_bytes = device_width.device_bytes();
         let mut devices: Vec<(DeviceIdentity, HistoryDevice)> =
@@ -800,17 +861,28 @@ impl HistoryPool {
                 .map(|identity| {
                     (
                         identity,
-                        RecordingBlockDevice::with_shared_stream(
+                        FaultInjectingBlockDevice::new(
                             identity,
-                            SparseBlockDevice::new(device_bytes, PhysicalBlockSizeInBytes(512)),
-                            stream.clone(),
+                            RecordingBlockDevice::with_shared_stream(
+                                identity,
+                                SparseBlockDevice::new(device_bytes, PhysicalBlockSizeInBytes(512)),
+                                stream.clone(),
+                            ),
+                            fault_plan.clone(),
                         ),
                     )
                 })
                 .collect();
-        let genesis = make_filesystem(&parameters, &mut devices).expect(
-            "两块全零、等大的内存盘上按 E142 参数 mkfs：两种宽度的几何都放得下（环不超过容量的四分之一），内存盘的写不报错",
-        );
+        let genesis = match make_filesystem(&parameters, &mut devices) {
+            Ok(genesis) => genesis,
+            Err(error) => {
+                return Err(StartingPointFailure {
+                    step: StartingPointStep::MakeFilesystem,
+                    error: format!("{error:?}"),
+                    image: image_of(&devices, device_width),
+                })
+            }
+        };
         let operations_written_by_make_filesystem = stream.operation_count();
         let mut model = IdealModel::after_make_filesystem(ModelPoolGeometry {
             devices: devices
@@ -823,38 +895,28 @@ impl HistoryPool {
         let session = match starting_point {
             HistoryStartingPoint::AfterMakeFilesystem => None,
             HistoryStartingPoint::AfterFirstFile => {
-                let mut allocator = PoolAllocator::new(vec![
-                    DeviceFreeMap::new(DeviceIdentity(0), device_bytes),
-                    DeviceFreeMap::new(DeviceIdentity(1), device_bytes),
-                ]);
-                allocator.mark_format_time_units(
-                    Placement {
-                        slot: INSTANCE_TABLE_SLOT,
-                        span: 2,
-                    },
-                    Placement {
-                        slot: TREE_TABLE_GENESIS_SLOT,
-                        span: 1,
-                    },
-                );
-                let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
-                let instance = acquire_instance(&mut writer)
-                    .expect("刚 mkfs 的池取号：内存盘的写与屏障不报错");
-                let warmed = warm_up(&mut writer, &genesis.root, instance)
-                    .expect("刚取号的池暖机：内存盘的写不报错");
+                // mkfs 同一个进程那条会话也装根环表（`allocator_after_make_filesystem`）：根环转过一圈之后照样按谓词回收，
+                // 与做过挂载的会话同一条路（增补 2 收口表第 ② 行）。
+                let mut allocator =
+                    allocator_after_make_filesystem(&parameters, &devices, &genesis);
                 let content = first_file_content();
-                let output = publish_first_file(
-                    &mut writer,
+                let started = acquire_warm_up_and_publish_the_first_file(
+                    &parameters,
+                    devices.as_mut_slice(),
                     &mut allocator,
                     &genesis.root,
-                    FirstFile {
-                        content: &content,
-                        write_time_seconds: FIXED_WRITE_TIME_SECONDS,
-                    },
-                    instance,
-                    &warmed.last_record_bytes,
-                )
-                .expect("暖机之后的第一个文件：与 build_pool 同一条路，各步用例都走过");
+                    &content,
+                );
+                let (instance, output) = match started {
+                    Ok(started) => started,
+                    Err((step, error)) => {
+                        return Err(StartingPointFailure {
+                            step,
+                            error,
+                            image: image_of(&devices, device_width),
+                        })
+                    }
+                };
                 model.acquire_and_warm_up_in_the_make_filesystem_process();
                 let answer = model.answer_publish_first_file(&content);
                 verdict = Some(judge_by_model(
@@ -873,7 +935,7 @@ impl HistoryPool {
                 })
             }
         };
-        (
+        Ok((
             Self {
                 device_width,
                 devices,
@@ -885,7 +947,7 @@ impl HistoryPool {
                 operations_written_by_make_filesystem,
             },
             verdict,
-        )
+        ))
     }
 
     /// 两块盘此刻的整份镜像（拷一份，checker 与观察者读它）。
@@ -1000,7 +1062,7 @@ impl RecordReuse {
 /// 一次发布改写或新增的分配记录（发布之后有、发布之前没有一模一样的一条）里，代不在 [`first_publish_txg`, `last_publish_txg`] 里的那些。
 /// 一次发布改写的记录只有三种，代都是这次发布的 txg：新分配的（分配代）、复用改写已回收的（分配代改成这次的，D3（空间分配） 的
 /// 「value = 分配代」）、这次释放的（释放代，`crates/singlefs-core/src/transaction.rs` 的 `allocator.release(*placement, txg);`）。
-/// 盘上 checker 判不出分配代没改（29 条不变量里只有 I-3.9 看代，只看已释放的；增补 2 收口表第 44 行），这里在执行器里判。
+/// 盘上 checker 判不出分配代没改（33 条不变量里只有 I-3.9 看代，只看已释放的；增补 2 收口表第 44 行），这里在执行器里判。
 #[must_use]
 pub fn records_changed_with_a_generation_outside_the_publish_txgs(
     before: &[AllocationRecord],
@@ -1030,6 +1092,12 @@ pub enum HarnessJudgement {
     },
     /// 冷启动恢复报错，而这一步之前的镜像 checker 判过绿（判红的话历史已经停了；冷启动不写盘，镜像没变）。
     ColdStartRecoveryFailedOnCheckerGreenImage { outcome: String },
+    /// 起点段（mkfs、取号、暖机、第一个文件）里有一个入口返回了错误。不注入故障时走不到：两块内存盘的读写不报错。
+    /// 故障注入（增补 3 第 4 件）把注入点摆进起点段之后走得到，判定归那一路（`fault_injection::the_fault_surfaced_as_an_error`）。
+    TheStartingPointReturnedAnError {
+        step: StartingPointStep,
+        error: String,
+    },
 }
 
 impl HarnessJudgement {
@@ -1043,8 +1111,51 @@ impl HarnessJudgement {
             HarnessJudgement::ColdStartRecoveryFailedOnCheckerGreenImage { .. } => {
                 "checker 判绿的镜像上冷启动恢复报错"
             }
+            HarnessJudgement::TheStartingPointReturnedAnError { .. } => "起点段的入口返回了错误",
         }
     }
+}
+
+/// 起点段是哪一步：mkfs、取号、暖机、第一个文件。故障注入把注入点摆进起点段之后这四步都可能返回块设备错，
+/// 执行器把错交回判定而不是 panic（增补 3 第 4 件代码三方第一轮判决改法二）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StartingPointStep {
+    MakeFilesystem,
+    AcquireInstance,
+    WarmUp,
+    PublishFirstFile,
+}
+
+impl StartingPointStep {
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            StartingPointStep::MakeFilesystem => "mkfs",
+            StartingPointStep::AcquireInstance => "取号",
+            StartingPointStep::WarmUp => "暖机",
+            StartingPointStep::PublishFirstFile => "第一个文件",
+        }
+    }
+
+    /// 这一步报错时，盘上有没有一个 mkfs 做完了的池。mkfs 自己就报错的那一格没有：那份盘面上没有文件系统，
+    /// 模型一版都没提交过，池级 checker 与「重开要恢复到模型允许的版本」都没有可判的对象。
+    #[must_use]
+    pub const fn a_finished_filesystem_is_on_the_devices(self) -> bool {
+        match self {
+            StartingPointStep::MakeFilesystem => false,
+            StartingPointStep::AcquireInstance
+            | StartingPointStep::WarmUp
+            | StartingPointStep::PublishFirstFile => true,
+        }
+    }
+}
+
+/// 起点段停在哪一步、报的什么错，加上那一刻两块盘的整份镜像（起点段失败时池还没建起来，调用方拿不到 `HistoryPool`）。
+pub struct StartingPointFailure {
+    pub step: StartingPointStep,
+    /// 那一步交回的错误成员，`{:?}` 出来的一行。
+    pub error: String,
+    pub image: MemoryPool,
 }
 
 /// 一步操作的结局本身判不判失败：冷启动读回报错就算（不看读回的内容对不对，那是第 2 件模型的事）。
@@ -1168,7 +1279,8 @@ fn install_panic_capture_hook() {
 }
 
 /// 跑 `body`，panic 就接住、交回钩子记下的位置与消息。
-fn with_panic_capture<Output>(body: impl FnOnce() -> Output) -> Result<Output, CapturedPanic> {
+/// 坏盘输入（增补 3 第 5 件）拿它兜着恢复、可写挂载与池级 checker：panic 是被测代码的缺口，要接住记下来，不是让用例崩。
+pub fn with_panic_capture<Output>(body: impl FnOnce() -> Output) -> Result<Output, CapturedPanic> {
     install_panic_capture_hook();
     let was_capturing = IS_CAPTURING_PANICS.with(|flag| flag.replace(true));
     let result = catch_unwind(AssertUnwindSafe(body));
@@ -1262,14 +1374,6 @@ pub struct AllocationStatisticMechanism {
 }
 
 impl AllocationStatisticMechanism {
-    /// 环转过一圈把 F 之上的根挤出了环：环里最老的自证过的根已经高过 F，[F, 最老) 那一段的根读不到了，
-    /// 而它们引用的单元还在当前账里。
-    #[must_use]
-    pub fn the_ring_turn_dropped_roots_above_the_floor(&self) -> bool {
-        self.newest_root_txg >= self.root_ring_slot_count
-            && self.oldest_readable_root_txg > self.rollback_floor
-    }
-
     /// 回退下界把环里读得到的根挡在了遍历之外。
     #[must_use]
     pub fn the_floor_dropped_readable_roots(&self) -> bool {
@@ -1329,17 +1433,6 @@ fn only_allocated_statistic_above_walked(observation: &FailureObservation) -> bo
         })
 }
 
-/// 第 0 条那一形：只有 I-3.1 红、记账多于遍历，而且 checker 自己报的机理是「环转过一圈把 F 之上的根挤出了环」
-/// ——签名相同而机理不同（比如根一条都没掉出环、缺口出在别处）的，不接进这一条，照新发现报
-/// （代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半，用户 2026-09-20 定案第 6 条）。
-/// 执行器那一路自己从盘上读的「根环转过一圈」照样要成立：两份独立的读法都说转过了，才算这一形。
-fn ring_turn_leaves_allocated_statistic_above_walked(observation: &FailureObservation) -> bool {
-    observation.root_ring_has_turned()
-        && only_allocated_statistic_above_walked(observation)
-        && allocation_statistic_mechanism_of(observation)
-            .is_some_and(|mechanism| mechanism.the_ring_turn_dropped_roots_above_the_floor())
-}
-
 /// F 落在回退留下的空档里（F 那个 txg 上的根全属于被抛弃的实例）、只有 I-3.1 红且记账多于遍历，
 /// 而且 checker 报的机理是「回退下界把环里读得到的根挡在了遍历之外」
 /// （代码三方第一轮判决第二节第 1 条收窄：此前不看空档，不经回退的抬 F 之后记账多算也被接走）。
@@ -1347,8 +1440,7 @@ fn ring_turn_leaves_allocated_statistic_above_walked(observation: &FailureObserv
 /// 两条不再要求，都因为机理标识把它们替代掉了（用户 2026-09-20 定案第 6 条）：
 /// 「这一步是抬 F」——活盘面那一路上 `raised_floor_lands_only_on_abandoned_roots` 只有抬 F 那一步算得出来（别的步恒 None），
 /// 卡着操作种类只会把崩溃状态上同一机理的盘面判成新发现；
-/// 「根环没转圈」——环转没转圈与这条机理正交。缺口是不是环转出来的，由第 0 条的机理（环里最老的自证过的根已经高过 F）判，
-/// 不由「转没转过」判：F 之下的根本来就不走，它们掉出环一个字节都不差。两条机理同时成立时按清单次序落在第 0 条上。
+/// 「根环没转圈」——环转没转圈与这条机理正交：F 之下的根本来就不走，它们掉出环一个字节都不差。
 fn raise_after_rollback_leaves_allocated_statistic_above_walked(
     observation: &FailureObservation,
 ) -> bool {
@@ -1359,13 +1451,7 @@ fn raise_after_rollback_leaves_allocated_statistic_above_walked(
 }
 
 /// 「已知红」清单。修好一条就删一条，删掉之后那条的复现（`tests/second_transaction_supplement_three_random_history.rs` 里钉着）要转绿。
-/// 第 0 条的宽度（转圈跨几次挂载也算）2026-09-18 主 agent 定案保留，记在收口表第 ② 行。
-pub const KNOWN_RED_FORMS: [KnownRedForm; 2] = [
-    KnownRedForm {
-        closeout_table_row: "增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红）",
-        shape: "根环转过一圈之后（按 checker 的读法，盘上最新根的 txg ≥ R × S = 24）I-3.1（已分配统计对得上） 红、记账的已分配大于遍历全部有效根得到的、别的不变量都不红、没有 panic；不限哪一步操作之后（转圈可以跨几次挂载）",
-        matches: ring_turn_leaves_allocated_statistic_above_walked,
-    },
+pub const KNOWN_RED_FORMS: [KnownRedForm; 1] = [
     KnownRedForm {
         closeout_table_row: "增补 2 收口表第 43 行",
         shape: "回退之后把 F 抬进回退目标根与新实例第一次发布之间（抬之前的镜像上，F 那个 txg 上的根全属于被抛弃的实例）：抬 F 那一步之后 I-3.1（已分配统计对得上） 红、记账的已分配大于遍历全部有效根得到的、别的不变量都不红、没有 panic、根环没转圈",
@@ -1506,9 +1592,6 @@ pub struct HistoryTally {
     pub checker_runs: u64,
     /// 这一步一个写都没发（录制流一步没多）：镜像逐字节不变，checker 的结论沿用上一次，不重跑。
     pub checker_runs_skipped_because_nothing_was_written: u64,
-    /// `PerStepChecker::RunContinuingPastTheRingTurnForm` 下 checker 判出「已知红」清单第 0 条那一形、只记不停的步数，与出现过它的历史段数。
-    pub ring_turn_form_steps_noted: u64,
-    pub histories_with_the_ring_turn_form_noted: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
     /// 理想模型判过的步数（起点那次第一个文件也算一步；前提不满足、入口没调的不算）与各格计数。
@@ -1574,9 +1657,6 @@ impl HistoryTally {
         self.checker_runs += other.checker_runs;
         self.checker_runs_skipped_because_nothing_was_written +=
             other.checker_runs_skipped_because_nothing_was_written;
-        self.ring_turn_form_steps_noted += other.ring_turn_form_steps_noted;
-        self.histories_with_the_ring_turn_form_noted +=
-            other.histories_with_the_ring_turn_form_noted;
         for (invariant, count) in &other.invariant_holds {
             *self.invariant_holds.entry(invariant).or_insert(0) += count;
         }
@@ -1746,11 +1826,8 @@ impl HistoryTally {
         );
         let _ = writeln!(
             text,
-            "  checker 跑了 {} 次；一个写都没发、沿用上一次结论的 {} 步；已知红第 0 条那一形只记不停 {} 步（{} 段历史）",
-            self.checker_runs,
-            self.checker_runs_skipped_because_nothing_was_written,
-            self.ring_turn_form_steps_noted,
-            self.histories_with_the_ring_turn_form_noted
+            "  checker 跑了 {} 次；一个写都没发、沿用上一次结论的 {} 步",
+            self.checker_runs, self.checker_runs_skipped_because_nothing_was_written
         );
         let counts = &self.model_counts;
         let _ = writeln!(
@@ -1794,6 +1871,11 @@ pub struct HistoryRun {
     /// mkfs 不是事务，它写到一半的盘面上没有池，恢复报不出根是对的，不该拿事务的 oracle 去判
     /// （层 0 那一路同样从 `mkfs_operation_count` 之后起枚举，见 `tests/first_transaction_step_seven_layer0.rs`）。
     pub operations_written_by_make_filesystem: usize,
+    /// 这段历史停下时模型根环里的每一条根（`IdealModel::committed_versions`）：故障注入（增补 3 第 4 件）拿它当
+    /// 「模型认下来的每一版」判重开走到的那一版——失败那一步的根，模型认了就在里面，没认（判定对不上、模型没往前走）就不在。
+    /// 观察者那一路看不到这一份：判出失败的那一步不调观察者，而失败常常出在模型已经认下那一版之后（checker 在那一步判红）。
+    /// 内容拷成 `Vec<u8>` 不留 `Rc`：`HistoryRun` 要跨线程送（`run_history_campaign` 的那张表），`Rc` 不是 `Send`。
+    pub committed_versions_at_the_end: Vec<(ModelRootKey, Option<Vec<u8>>)>,
 }
 
 /// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
@@ -1832,13 +1914,39 @@ fn publish_error_member(error: &PublishError) -> String {
         }
         PublishError::AllocationRecordsExceedOneNode { .. } => "AllocationRecordsExceedOneNode",
         PublishError::AccountingEntriesExceedOneNode { .. } => "AccountingEntriesExceedOneNode",
+        PublishError::MappingEntriesExceedOneNode { .. } => "MappingEntriesExceedOneNode",
         PublishError::ReleaseNotInMapping { .. } => "ReleaseNotInMapping",
         PublishError::ReleaseTargetNotAllocated { .. } => "ReleaseTargetNotAllocated",
         PublishError::ReleaseTargetAlreadyReleased { .. } => "ReleaseTargetAlreadyReleased",
+        PublishError::ReleaseTargetLocationsOnDifferentSlots { .. } => {
+            "ReleaseTargetLocationsOnDifferentSlots"
+        }
         PublishError::ReleaseSpanMismatch { .. } => "ReleaseSpanMismatch",
+        PublishError::MappingEntryNarrowerThanItsFieldTable { .. } => {
+            "MappingEntryNarrowerThanItsFieldTable"
+        }
+        PublishError::ReleaseChecksumReadFailedWhoseHandlingIsUndecided { .. } => {
+            "ReleaseChecksumReadFailedWhoseHandlingIsUndecided"
+        }
         PublishError::ContentExceedsDataUnit { .. } => "ContentExceedsDataUnit",
-        PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp { .. } => {
-            "FirstFileVersionNotRightAfterTheSecondWarmUp"
+        PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided { .. } => {
+            "ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided"
+        }
+        PublishError::InodeTreeWriteRefused(_) => "InodeTreeWriteRefused",
+        PublishError::MoreNamedUnitsThanOneJournalRecordHolds { .. } => {
+            "MoreNamedUnitsThanOneJournalRecordHolds"
+        }
+        PublishError::FirstFileVersionDoesNotFollowTheVersionItBuildsOn { .. } => {
+            "FirstFileVersionDoesNotFollowTheVersionItBuildsOn"
+        }
+        PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile { .. } => {
+            "FirstFileVersionOnAVersionThatAlreadyHasAFile"
+        }
+        PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. } => {
+            "TreeTableOfTheVersionToBuildOnUnreadable"
+        }
+        PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_) => {
+            "TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees"
         }
         PublishError::BlockDevice(cause) => {
             return format!(
@@ -1871,6 +1979,12 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
         RecoveryFailure::SystemConfigurationsDisagree => {
             "RecoveryFailure::SystemConfigurationsDisagree".to_string()
         }
+        RecoveryFailure::RootRingSlotsPerRegionOutOfRange { out_of_range, .. } => {
+            format!(
+                "RecoveryFailure::RootRingSlotsPerRegionOutOfRange（S = {}）",
+                out_of_range.declared_slots_per_region
+            )
+        }
         RecoveryFailure::NoValidRoot => "RecoveryFailure::NoValidRoot".to_string(),
         RecoveryFailure::UnitUnreadable { .. } => "RecoveryFailure::UnitUnreadable".to_string(),
         RecoveryFailure::UnitMalformed { what } => {
@@ -1878,6 +1992,15 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
         }
         RecoveryFailure::InvariantViolated { invariant, .. } => {
             format!("RecoveryFailure::InvariantViolated（{invariant}）")
+        }
+        RecoveryFailure::EntryNarrowerThanItsFieldTable { what, .. } => {
+            format!("RecoveryFailure::EntryNarrowerThanItsFieldTable（{what}）")
+        }
+        RecoveryFailure::AllocationRecordOutsideThePoolGeometry { what } => {
+            format!("RecoveryFailure::AllocationRecordOutsideThePoolGeometry（{what}）")
+        }
+        RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree => {
+            "RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree".to_string()
         }
         RecoveryFailure::MappingMiss { .. } => "RecoveryFailure::MappingMiss".to_string(),
         RecoveryFailure::MappingStillUnreadable { .. } => {
@@ -1893,30 +2016,36 @@ fn mount_error_member(error: &MountError) -> String {
         }
         MountError::FileVersionWithoutAnyJournalRecord => "FileVersionWithoutAnyJournalRecord",
         MountError::InstanceTableMalformed => "InstanceTableMalformed",
-        MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion => {
-            "RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion"
-        }
         MountError::Acquisition(acquisition) => {
             return format!(
                 "MountError::Acquisition({})",
                 block_device_error_member(&acquisition.cause)
             )
         }
-        MountError::Publish(cause) => {
-            return format!("MountError::Publish({})", publish_error_member(cause))
+        MountError::Publish(failed) => {
+            return format!(
+                "MountError::Publish({})",
+                publish_error_member(&failed.cause)
+            )
+        }
+        MountError::RaiseFloorSequencePublishFailed {
+            publishes_persisted,
+            cause,
+        } => {
+            return format!(
+                "MountError::RaiseFloorSequencePublishFailed(publishes_persisted = {publishes_persisted}, {})",
+                publish_error_member(cause)
+            )
         }
         MountError::RollbackTargetNotACandidate { exclusion, .. } => {
             return format!("MountError::RollbackTargetNotACandidate({exclusion:?})")
         }
-        MountError::RollbackToVersionWithoutFileUnsupported(_) => {
-            "RollbackToVersionWithoutFileUnsupported"
-        }
         MountError::RollbackFloorAboveCeiling { .. } => "RollbackFloorAboveCeiling",
-        MountError::InstanceRowsOnVersionWithoutFileUnsupported { .. } => {
-            "InstanceRowsOnVersionWithoutFileUnsupported"
-        }
         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
             "VersionWithoutFileNotWrittenByMakeFilesystem"
+        }
+        MountError::FormatTimeUnitLocationsOnDifferentSlots { .. } => {
+            "FormatTimeUnitLocationsOnDifferentSlots"
         }
         MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { failure, .. } => {
             return format!(
@@ -1939,11 +2068,8 @@ fn mount_error_member(error: &MountError) -> String {
                 publish_error_member(cause)
             )
         }
-        MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported { .. } => {
-            "InstanceTableRowsExceedOnePageSecondPageUnsupported"
-        }
-        MountError::FormattedPoolMountNotShapedLikeTheFirstTransaction { .. } => {
-            "FormattedPoolMountNotShapedLikeTheFirstTransaction"
+        MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => {
+            "InstanceTableChainLongerThanOnePageUndecided"
         }
     };
     format!("MountError::{member}")
@@ -2232,6 +2358,8 @@ fn apply_publish_without_units(
         instance: session.instance,
         back_chain: back_chain_of(&previous.record_bytes),
         rollback_floor: previous.root.rollback_floor,
+        // 会话里接着现行那一版：它的水位已经是根环里的 max（挂载时本实例第一次发布取过，之后只照抄或推高）。
+        tree_identifier_watermark: previous.root.tree_identifier_watermark,
     };
     let previous_root = previous.root;
     let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
@@ -2701,15 +2829,9 @@ pub fn classify_failure(observation: FailureObservation) -> HistoryEnding {
 /// 每一步之后跑不跑池级 checker、判红了停不停。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PerStepChecker {
-    /// 起点之后与每一步写过盘之后都跑，判红就停（第 1 件的执行器；快档、前两个取样点与大档都是这一种）。
+    /// 起点之后与每一步写过盘之后都跑，判红就停（第 1 件的执行器；快档、各取样点与大档都是这一种）。
     Run,
-    /// 起点之后与每一步写过盘之后都跑；判红时只要是「已知红」清单第 0 条那一形（根环转过一圈之后只有 I-3.1 红、记账多算，
-    /// 增补 2 收口表第 ② 行）就只记一笔、历史接着走，别的判红照样停、照样分类（增补 3 第 2 件代码三方第二轮判决第三节第 3 条：
-    /// 逼近分配记录墙那一段要在根环转过之后接着连发几十次，第一轮给它 `Skipped`，攻方两条只有 checker 看得见的变异——根环转过之后
-    /// 回收门槛多一代、分配记录过 600 条之后「已分配」少记一槽——在门禁里没有一段红）。
-    RunContinuingPastTheRingTurnForm,
-    /// 不跑：只由理想模型、执行器自己的判定与 panic 让历史停下。给只看准入与模型的写死用例（分配记录墙的边沿、抬 F 与回退逼近墙）：
-    /// 走到 812 条要连发五十次左右，根环转过一圈之后 checker 在合法状态上判 I-3.1 红（已知红第 0 条）。
+    /// 不跑：只由理想模型、执行器自己的判定与 panic 让历史停下（崩溃注入、坏盘输入这些在历史之外另有判据的装置用它，省下每一步的 checker）。
     Skipped,
 }
 
@@ -2718,16 +2840,13 @@ impl PerStepChecker {
     pub fn name(self) -> &'static str {
         match self {
             PerStepChecker::Run => "每一步之后跑池级 checker",
-            PerStepChecker::RunContinuingPastTheRingTurnForm => {
-                "每一步之后跑池级 checker，已知红第 0 条那一形只记不停"
-            }
             PerStepChecker::Skipped => "不跑池级 checker（只由模型、执行器的判定与 panic 判）",
         }
     }
 
     fn runs_the_checker(self) -> bool {
         match self {
-            PerStepChecker::Run | PerStepChecker::RunContinuingPastTheRingTurnForm => true,
+            PerStepChecker::Run => true,
             PerStepChecker::Skipped => false,
         }
     }
@@ -2784,13 +2903,30 @@ pub fn execute_history_observing(
 }
 
 /// 跑一段历史：在 `execution.device_width` 那么宽的两块盘上，起点之后与每一步写过盘之后按 `execution.per_step_checker` 对镜像跑池级
-/// checker，再把那一刻的镜像交给观察者。第一次失败（违例、执行器判出的、模型对不上、panic）就停——`RunContinuingPastTheRingTurnForm`
-/// 下只有「已知红」清单第 0 条那一形的违例不停，记进 `HistoryTally::ring_turn_form_steps_noted` 之后接着走。盘上的写与屏障录进 `stream`
+/// checker，再把那一刻的镜像交给观察者。第一次失败（违例、执行器判出的、模型对不上、panic）就停。盘上的写与屏障录进 `stream`
 /// （崩溃注入给开了内容保留的流）。
 pub fn execute_history_with(
     history: &GeneratedHistory,
     execution: HistoryExecution,
     stream: &SharedStream,
+    observer: &mut dyn FnMut(&StepObservation<'_>),
+) -> HistoryRun {
+    execute_history_with_faults(
+        history,
+        execution,
+        stream,
+        &SharedFaultPlan::unarmed(execution.device_width.fixed_geometry()),
+        observer,
+    )
+}
+
+/// 同 [`execute_history_with`]，再按调用方给的注入计划在读 / 写 / 刷盘上注入故障（增补 3 第 4 件）。
+/// 计划不开时与 [`execute_history_with`] 逐字节相同：注入层只数调用，每一次都原样交给录制器。
+pub fn execute_history_with_faults(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    stream: &SharedStream,
+    fault_plan: &SharedFaultPlan,
     observer: &mut dyn FnMut(&StepObservation<'_>),
 ) -> HistoryRun {
     let per_step_checker = execution.per_step_checker;
@@ -2800,8 +2936,39 @@ pub fn execute_history_with(
     let position = Cell::new(StepPosition::StartingPoint);
     let mut completed_after_the_root_ring_turned = false;
     let body_result = with_panic_capture(|| -> Option<FailureObservation> {
-        let (started_pool, starting_verdict) =
-            HistoryPool::start(history.starting_point, execution.device_width, stream);
+        let started = HistoryPool::start(
+            history.starting_point,
+            execution.device_width,
+            stream,
+            fault_plan,
+        );
+        let (started_pool, starting_verdict) = match started {
+            Ok(started) => started,
+            Err(failure) => {
+                // 起点段有一个入口返回了错误（只有故障注入把注入点摆进起点段时走得到）。mkfs 自己就报错的那一格不跑池级
+                // checker：盘上没有一个做完了的文件系统，checker 判的每一条都没有对象。
+                let violations = if per_step_checker.runs_the_checker()
+                    && failure.step.a_finished_filesystem_is_on_the_devices()
+                {
+                    violations_on(&failure.image, &mut tally)
+                } else {
+                    Vec::new()
+                };
+                let mut observation = failure_observation(
+                    &failure.image,
+                    StepPosition::StartingPoint,
+                    None,
+                    violations,
+                    None,
+                );
+                observation.harness_judgement =
+                    Some(HarnessJudgement::TheStartingPointReturnedAnError {
+                        step: failure.step,
+                        error: failure.error,
+                    });
+                return Some(observation);
+            }
+        };
         let pool = pool_slot.insert(started_pool);
         let mut image = pool.image();
         let mut checked_stream_length = stream.operation_count();
@@ -2814,7 +2981,7 @@ pub fn execute_history_with(
             tally.note_model_verdict(verdict);
         }
         let starting_disagreement = starting_verdict.and_then(|verdict| verdict.disagreement);
-        // 起点（txg 至多 3）的根环没转过，第 0 条那一形在这里不会出现：判红一律停。
+        // 起点判红一律停。
         if !violations_after_the_starting_point.is_empty() || starting_disagreement.is_some() {
             let mut observation = failure_observation(
                 &image,
@@ -2897,16 +3064,7 @@ pub fn execute_history_with(
                 observation.model_disagreement = model_disagreement;
                 observation.raised_floor_lands_only_on_abandoned_roots =
                     raised_floor_lands_only_on_abandoned;
-                // 第 0 条那一形的判定（`ring_turn_leaves_allocated_statistic_above_walked`）自己要求没有 panic、执行器没判出、模型没对不上、
-                // 只有 I-3.1 记账多算、根环转过：别的失败混在同一步里就不算这一形，照样停。
-                let continues_past_the_ring_turn_form = per_step_checker
-                    == PerStepChecker::RunContinuingPastTheRingTurnForm
-                    && ring_turn_leaves_allocated_statistic_above_walked(&observation);
-                if !continues_past_the_ring_turn_form {
-                    return Some(observation);
-                }
-                tally.ring_turn_form_steps_noted += 1;
-                tally.histories_with_the_ring_turn_form_noted = 1;
+                return Some(observation);
             }
             observer(&StepObservation {
                 position: step_position,
@@ -2989,6 +3147,13 @@ pub fn execute_history_with(
         operations_written_by_make_filesystem: pool_slot
             .as_ref()
             .map_or(0, |pool| pool.operations_written_by_make_filesystem),
+        committed_versions_at_the_end: pool_slot.as_ref().map_or_else(Vec::new, |pool| {
+            pool.model
+                .committed_versions()
+                .into_iter()
+                .map(|(key, content)| (key, content.map(|content| content.to_vec())))
+                .collect()
+        }),
     }
 }
 
@@ -3053,8 +3218,8 @@ pub fn newest_ring_root_and_slot_count(image: &MemoryPool) -> (Option<u64>, Opti
     newest_ring_root_and_slot_count_of(image)
 }
 
-/// 同上，读的盘面由调用方给：崩溃注入（增补 3 第 3 件）要在崩溃镜像（`crash::CrashImage`）上也拿到这两个事实，
-/// 才判得出「已知红」第 0 条那一形（根环转过一圈）。
+/// 同上，读的盘面由调用方给：崩溃注入（增补 3 第 3 件）要在崩溃镜像（`crash::CrashImage`）上也拿到这两个事实
+/// （失败观察里的「根环转过一圈」照样报出来）。
 #[must_use]
 pub fn newest_ring_root_and_slot_count_of(image: &dyn ImageReader) -> (Option<u64>, Option<u64>) {
     let (roots, root_ring_slot_count) = ring_roots_newest_first_of(image);
@@ -3733,25 +3898,33 @@ mod tests {
         )
     }
 
-    /// 执行器判出的失败不进「已知红」：哪怕同一步 checker 也只判了 I-3.1 多算、根环也转过了，签名取执行器判的那一种。
+    /// 收口表第 43 行那一形的失败观察：抬 F 那一步之后只有 I-3.1 红、记账多算，F 落在回退留下的空档里、环没转圈，
+    /// checker 报的机理是「F 把环里读得到的根挡在了遍历之外」（`KNOWN_RED_FORMS` 那一条要的全都有）。
+    fn raised_into_the_gap_observation() -> FailureObservation {
+        FailureObservation {
+            position: StepPosition::Operation(10),
+            operation_kind: Some(HistoryOperationKind::RaiseRollbackFloor),
+            violations: vec![("I-3.1", allocation_statistic_detail(9, 0, 5, 4))],
+            panic: None,
+            newest_ring_root_txg: Some(9),
+            root_ring_slot_count: Some(24),
+            harness_judgement: None,
+            model_disagreement: None,
+            raised_floor_lands_only_on_abandoned_roots: Some(true),
+            record_check: RecordCheck::default(),
+        }
+    }
+
+    /// 执行器判出的失败不进「已知红」：哪怕同一步 checker 判的正是清单那一形，签名取执行器判的那一种。
     #[test]
     fn harness_judgement_is_never_classified_as_a_known_red_form() {
-        let observation = FailureObservation {
-            position: StepPosition::Operation(21),
-            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
-            violations: vec![("I-3.1", allocation_statistic_detail(26, 3, 0, 0))],
-            panic: None,
-            newest_ring_root_txg: Some(26),
-            root_ring_slot_count: Some(24),
-            harness_judgement: Some(HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
+        let mut observation = raised_into_the_gap_observation();
+        observation.harness_judgement =
+            Some(HarnessJudgement::AllocationGenerationIsNotThePublishTxg {
                 records: vec![record(50178, 1, 5, false)],
-                first_publish_txg: CheckpointTxg(26),
-                last_publish_txg: CheckpointTxg(26),
-            }),
-            model_disagreement: None,
-            raised_floor_lands_only_on_abandoned_roots: None,
-            record_check: RecordCheck::default(),
-        };
+                first_publish_txg: CheckpointTxg(10),
+                last_publish_txg: CheckpointTxg(10),
+            });
         let HistoryEnding::NewFinding { signature, .. } = classify_failure(observation.clone())
         else {
             panic!("要是新发现");
@@ -3769,13 +3942,13 @@ mod tests {
                 classify_failure(without_the_judgement),
                 HistoryEnding::KnownRed { form: 0, .. }
             ),
-            "去掉执行器判的那一条，同一个观察是已知红第 0 条"
+            "去掉执行器判的那一条，同一个观察是清单那一形（收口表第 43 行）"
         );
     }
 
     /// 「已知红」按机理认，不按签名认（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阴那一半）：
-    /// 同一个签名（只有 I-3.1 红、记账多于遍历、根环转过一圈）下，机理对得上才接进第 0 条；
-    /// 机理说环转过一圈并没把 F 之上的根挤出去（环里最老的根就在 F 上）、或者说明文字里根本没有机理标识的，照新发现报。
+    /// 同一个签名（只有 I-3.1 红、记账多于遍历）下，机理对得上才接进清单那一形（收口表第 43 行）。
+    /// 根环转过一圈把 F 之上的根挤出了环那一形（收口表第 ② 行）已经修好、从清单里删了：同一个观察现在是新发现。
     #[test]
     fn known_red_forms_are_matched_by_mechanism_not_by_signature() {
         let with_detail = |detail: String| FailureObservation {
@@ -3793,16 +3966,9 @@ mod tests {
         assert!(
             matches!(
                 classify_failure(with_detail(allocation_statistic_detail(26, 3, 0, 0))),
-                HistoryEnding::KnownRed { form: 0, .. }
-            ),
-            "机理是「环转过一圈把 F 之上的根挤出了环」：接进第 0 条"
-        );
-        assert!(
-            matches!(
-                classify_failure(with_detail(allocation_statistic_detail(26, 7, 7, 0))),
                 HistoryEnding::NewFinding { .. }
             ),
-            "环里最老的根正好就在 F 上（F 之上一条根都没掉出环）：签名一样，机理不同，照新发现报"
+            "环转过一圈把 F 之上的根挤出了环、记账多算：收口表第 ② 行修好了，清单里没有这一形，照新发现报"
         );
         assert!(
             matches!(
@@ -3813,27 +3979,24 @@ mod tests {
             ),
             "说明文字里没有机理标识：认不出机理就不接，照新发现报"
         );
-        // 第 1 条那一形（收口表第 43 行）：F 落在回退留下的空档里、环没转圈、机理是「F 把环里读得到的根挡在了遍历之外」。
-        let mut raised_into_the_gap = with_detail(allocation_statistic_detail(9, 0, 5, 4));
-        raised_into_the_gap.newest_ring_root_txg = Some(9);
-        raised_into_the_gap.raised_floor_lands_only_on_abandoned_roots = Some(true);
-        // 环转没转圈与这条机理正交：环转过了、而 F 之上一条根都没掉出环（最老的自证过的根就在 F 之下），照样是第 1 条。
+        let raised_into_the_gap = raised_into_the_gap_observation();
+        // 环转没转圈与这条机理正交：环转过了、而 F 之上一条根都没掉出环（最老的自证过的根就在 F 之下），照样是这一形。
         let mut the_ring_also_turned = with_detail(allocation_statistic_detail(27, 4, 8, 4));
         the_ring_also_turned.newest_ring_root_txg = Some(27);
         the_ring_also_turned.raised_floor_lands_only_on_abandoned_roots = Some(true);
         assert!(
             matches!(
                 classify_failure(the_ring_also_turned),
-                HistoryEnding::KnownRed { form: 1, .. }
+                HistoryEnding::KnownRed { form: 0, .. }
             ),
-            "环也转过一圈、但缺口出在 F 上：还是第 1 条，不是新发现"
+            "环也转过一圈、但缺口出在 F 上：还是清单那一形，不是新发现"
         );
         assert!(
             matches!(
                 classify_failure(raised_into_the_gap.clone()),
-                HistoryEnding::KnownRed { form: 1, .. }
+                HistoryEnding::KnownRed { form: 0, .. }
             ),
-            "F 落在空档里、环没转圈、机理对得上：接进第 1 条"
+            "F 落在空档里、环没转圈、机理对得上：接进清单那一形"
         );
         let mut nothing_dropped_by_the_floor = raised_into_the_gap.clone();
         nothing_dropped_by_the_floor.violations =
@@ -3845,35 +4008,34 @@ mod tests {
             ),
             "F 一条读得到的根都没挡掉：缺口不出在这条机理上，照新发现报"
         );
-        // 这一形不再卡「这一步是抬 F」：崩溃状态摆在抬 F 之后的别的步上，同一机理照样接得进第 1 条。
+        let mut floor_not_in_a_gap = raised_into_the_gap.clone();
+        floor_not_in_a_gap.raised_floor_lands_only_on_abandoned_roots = Some(false);
+        assert!(
+            matches!(
+                classify_failure(floor_not_in_a_gap),
+                HistoryEnding::NewFinding { .. }
+            ),
+            "F 那个 txg 上的根不全属于被抛弃的实例：不经回退的抬 F 之后记账多算，照新发现报"
+        );
+        // 这一形不再卡「这一步是抬 F」：崩溃状态摆在抬 F 之后的别的步上，同一机理照样接得进清单那一形。
         let mut later_step = raised_into_the_gap;
         later_step.operation_kind = Some(HistoryOperationKind::PublishOverwrite);
         assert!(
             matches!(
                 classify_failure(later_step),
-                HistoryEnding::KnownRed { form: 1, .. }
+                HistoryEnding::KnownRed { form: 0, .. }
             ),
-            "抬 F 之后的别的步上同一机理照样是第 1 条"
+            "抬 F 之后的别的步上同一机理照样是清单那一形"
         );
     }
 
     /// 记录核对器判红的不接进「已知红」：签名是 `RecordCheck`，照新发现报。
     #[test]
     fn record_check_violations_are_never_absorbed_into_known_red_forms() {
-        let mut observation = FailureObservation {
-            position: StepPosition::Operation(21),
-            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
-            violations: vec![("I-3.1", allocation_statistic_detail(26, 3, 0, 0))],
-            panic: None,
-            newest_ring_root_txg: Some(26),
-            root_ring_slot_count: Some(24),
-            harness_judgement: None,
-            model_disagreement: None,
-            raised_floor_lands_only_on_abandoned_roots: None,
-            record_check: RecordCheck {
-                root_without_record: true,
-                claimed_state_missing_unit: false,
-            },
+        let mut observation = raised_into_the_gap_observation();
+        observation.record_check = RecordCheck {
+            root_without_record: true,
+            claimed_state_missing_unit: false,
         };
         let HistoryEnding::NewFinding { signature, .. } = classify_failure(observation.clone())
         else {
@@ -3891,7 +4053,7 @@ mod tests {
                 classify_failure(observation),
                 HistoryEnding::KnownRed { form: 0, .. }
             ),
-            "去掉记录核对器那一条，同一个观察是已知红第 0 条"
+            "去掉记录核对器那一条，同一个观察是清单那一形（收口表第 43 行）"
         );
     }
 }

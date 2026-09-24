@@ -48,9 +48,9 @@ impl WrittenStructureKind {
     #[must_use]
     pub const fn of_unit(identity: TransactionUnit) -> WrittenStructureKind {
         match identity {
-            TransactionUnit::Data => WrittenStructureKind::DataUnit,
+            TransactionUnit::Data(_) => WrittenStructureKind::DataUnit,
             TransactionUnit::ExtentRoot => WrittenStructureKind::ExtentTreeNode,
-            TransactionUnit::InodeLeaf => WrittenStructureKind::InodeTreeLeafContainer,
+            TransactionUnit::InodeLeafContainer(_) => WrittenStructureKind::InodeTreeLeafContainer,
             TransactionUnit::InodeRoot => WrittenStructureKind::InodeTreeRoot,
             TransactionUnit::AllocationTree => WrittenStructureKind::AllocationRecordTreeNode,
             TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
@@ -178,6 +178,8 @@ impl WritesByStructureKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::address::DataUnitIndexInFile;
+    use crate::inode_tree::InodeLeafContainerIndexInTree;
 
     #[test]
     fn since_keeps_only_the_later_writes_and_total_adds_every_counted_kind() {
@@ -235,9 +237,9 @@ mod tests {
         let mut every_kind_once = WritesByStructureKind::NOTHING_WRITTEN;
         let mut next_length_in_bytes = 1usize;
         for identity in [
-            TransactionUnit::Data,
+            TransactionUnit::Data(DataUnitIndexInFile::FIRST),
             TransactionUnit::ExtentRoot,
-            TransactionUnit::InodeLeaf,
+            TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST),
             TransactionUnit::InodeRoot,
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,

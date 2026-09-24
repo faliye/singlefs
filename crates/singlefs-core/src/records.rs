@@ -2,9 +2,8 @@
 //! key 的全序按逐字段无符号整数、字段自左向右比较（D8（核心索引结构） 已定项 11）——小端存储不构成 memcmp 序，所以各给 sort key。
 
 use singlefs_format::{
-    ACCOUNTING_ENTRY_BYTES, DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY,
-    INODE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES,
-    TREE_TABLE_ENTRY_BYTES,
+    ACCOUNTING_ENTRY_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
+    MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES, TREE_TABLE_ENTRY_BYTES,
 };
 
 use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, TreeIdentifier};
@@ -27,7 +26,14 @@ pub const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// 第一版直落叶，seq 一律 1（D8（核心索引结构） 已定项 10）。
 pub const ACCOUNTING_SEQUENCE_DIRECT_TO_LEAF: u32 = 1;
 
+/// inode 记录偏移 48 那个 `blocks` 字段的计量单位：512 字节一块（D8（核心索引结构） 已定项 6）。
+pub const INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES: u64 = 512;
+
 /// inode 记录 140（D8（核心索引结构） 已定项 6 的偏移表）；时间是发布参数，不取系统时钟（可复现）。
+///
+/// 偏移 48 的 `blocks` **不是字段**：条款定它 = ⌈`size` ÷ 512⌉（逻辑长度的块数，不表示分到的空间），
+/// 写的时候由 `size` 现算，于是「`blocks` 与 `size` 对不上」的记录从写路径造不出来；读的时候不交出它——
+/// 盘上那 8 字节与 `size` 一不一致归 checker 判（C480（inode 记录的 blocks 怎么算全仓没有条款））。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InodeRecord {
     pub inode: u64,
@@ -50,7 +56,7 @@ impl InodeRecord {
         writer.put_u32(1); // nlink
         writer.assert_position(40, "size");
         writer.put_u64(self.size);
-        writer.put_u64(DATA_UNIT_BYTES / 512); // blocks 按 512 字节块计
+        writer.put_u64(self.size.div_ceil(INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES)); // blocks = ⌈size ÷ 512⌉
         writer.put_u64(0); // rdev
         writer.assert_position(64, "时间秒");
         for _clock in 0..3 {
@@ -78,7 +84,7 @@ impl InodeRecord {
         let object_birth = CheckpointTxg(reader.get_u64());
         reader.skip(8 + 16);
         let size = reader.get_u64();
-        reader.skip(16);
+        reader.skip(8 + 8); // blocks（由 size 定，不交出）、rdev
         let write_time_seconds = reader.get_u64();
         reader.skip(16);
         let change_count = reader.get_u64();
@@ -159,17 +165,22 @@ impl AccountingEntry {
             self.generation.0,
         )
     }
+    /// 记账条目 34 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 22），
+    /// 窄于 34 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 34 信它。
     #[must_use]
-    pub fn parse(bytes: &[u8]) -> Self {
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() < usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34") {
+            return None;
+        }
         let mut reader = ByteReader::at(bytes, 0);
-        Self {
+        Some(Self {
             statistic: reader.get_u16(),
             tree: TreeIdentifier(reader.get_u64()),
             device: DeviceIdentity(reader.get_u32()),
             generation: CheckpointTxg(reader.get_u64()),
             value: reader.get_u64(),
             sequence: reader.get_u32(),
-        }
+        })
     }
 }
 
@@ -328,9 +339,13 @@ impl TreeTableEntry {
     }
 }
 
-/// inode 内部条目 120 的读者。
+/// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
+/// 窄于字段表时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
 #[must_use]
-pub fn parse_inode_internal_entry(bytes: &[u8]) -> (u64, PackedIdentity, NodePointer) {
+pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
+    if bytes.len() < usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
+        return None;
+    }
     let mut reader = ByteReader::at(bytes, 0);
     let separator_key = reader.get_u64();
     let child_identity = PackedIdentity {
@@ -340,29 +355,42 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> (u64, PackedIdentity, NodePoi
         container_birth: CheckpointTxg(reader.get_u64()),
     };
     let child = NodePointer::read_from(&mut reader);
-    (separator_key, child_identity, child)
+    Some((separator_key, child_identity, child))
 }
 
-/// extent 叶记录 112 的读者：key 24 + 指针 88。
+/// extent 叶记录 112 的读者：key 24 + 指针 88。条目宽窄于 112 时返回 `None`（同 [`parse_inode_internal_entry`]：
+/// `parse_index_node` 只判了条目宽 ≥ key 宽 24，切到偏移 112 之前要在这里判一次）。
 #[must_use]
-pub fn parse_extent_record(bytes: &[u8]) -> ([u8; 24], DataPointer) {
+pub fn parse_extent_record(bytes: &[u8]) -> Option<([u8; 24], DataPointer)> {
+    if bytes.len() < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
+        return None;
+    }
     let key: [u8; 24] = bytes[..24].try_into().expect("24");
     let pointer = DataPointer::read_from(&mut ByteReader::at(bytes, 24));
-    (key, pointer)
+    Some((key, pointer))
 }
 
-/// 映射条目 55 的读者：key 27 + 位置条目 14 × 2。
+/// 映射条目 55 的读者：key 27 + 位置条目 14 × 2。条目宽窄于 55 时返回 `None`
+/// （同 [`parse_inode_internal_entry`] 与 [`parse_extent_record`]：`parse_index_node` 只判了条目宽 ≥ key 宽，
+/// 切到偏移 27 与 55 之前要在这里判一次；panic 面普查 R2）。
+///
+/// **判的是「今天这个解析器要几个字节」，不是「映射条目该有多宽」**：后者归 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树），
+/// 那一条还开着（码 1 给 27、码 2 / 码 3 给 25，补不补零没定）。C307 定案改的是 [`MAPPING_KEY_BYTES`] 与
+/// [`MAPPING_ENTRY_BYTES`]，这一判跟着那两个常量走，不自己写死一个宽度。
 #[must_use]
-pub fn parse_mapping_entry(bytes: &[u8]) -> (Vec<u8>, [LocationEntry; 2]) {
+pub fn parse_mapping_entry(bytes: &[u8]) -> Option<(Vec<u8>, [LocationEntry; 2])> {
+    if bytes.len() < usize::try_from(MAPPING_ENTRY_BYTES).expect("55") {
+        return None;
+    }
     let key = bytes[..usize::try_from(MAPPING_KEY_BYTES).expect("27")].to_vec();
     let mut reader = ByteReader::at(bytes, key.len());
-    (
+    Some((
         key,
         [
             LocationEntry::read_from(&mut reader),
             LocationEntry::read_from(&mut reader),
         ],
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -391,6 +419,11 @@ mod tests {
             u64::from_le_bytes(bytes[40..48].try_into().expect("8")),
             3000,
             "size 在偏移 40"
+        );
+        assert_eq!(
+            u64::from_le_bytes(bytes[48..56].try_into().expect("8")),
+            6,
+            "blocks 在偏移 48：3000 字节 ⇒ ⌈3000 ÷ 512⌉ = 6（D8（核心索引结构） 已定项 6）"
         );
         assert_eq!(InodeRecord::parse(&bytes), Some(record));
         let mut tampered = bytes.clone();
@@ -428,12 +461,14 @@ mod tests {
         };
         assert_eq!(build_extent_record(1, 0, data_pointer).len(), 112);
         assert_eq!(
-            parse_extent_record(&build_extent_record(1, 0, data_pointer)).1,
+            parse_extent_record(&build_extent_record(1, 0, data_pointer))
+                .expect("满宽的 112 字节记录解得开")
+                .1,
             data_pointer
         );
         assert_eq!(
             parse_inode_internal_entry(&build_inode_internal_entry(1, identity, pointer)),
-            (1, identity, pointer)
+            Some((1, identity, pointer))
         );
         let entry = AccountingEntry {
             statistic: 1,
@@ -444,13 +479,13 @@ mod tests {
             sequence: 1,
         };
         assert_eq!(entry.to_bytes().len(), 34);
-        assert_eq!(AccountingEntry::parse(&entry.to_bytes()), entry);
+        assert_eq!(AccountingEntry::parse(&entry.to_bytes()), Some(entry));
         let key = mapping_key_for_data(data_pointer.head, data_pointer.write_order);
         assert_eq!(key.len(), 27);
         assert_eq!(build_mapping_entry(&key, data_pointer.locations).len(), 55);
         assert_eq!(
             parse_mapping_entry(&build_mapping_entry(&key, data_pointer.locations)),
-            (key.clone(), data_pointer.locations)
+            Some((key.clone(), data_pointer.locations))
         );
         assert_eq!(
             &key[17..27],
@@ -470,6 +505,88 @@ mod tests {
         assert_eq!(
             TreeTableEntry::parse(&table_entry.to_bytes()),
             Some(table_entry)
+        );
+    }
+
+    /// C480（inode 记录的 blocks 怎么算全仓没有条款） 定案（D8（核心索引结构） 已定项 6）：`blocks` = ⌈size ÷ 512⌉，
+    /// 逻辑长度的块数，不表示分到的空间。期望值按条款手算，不从被测代码反推。
+    /// 每个取样点旁边写着另外两种读法会给的数：「按分到几个 32 KiB 数据单元 × 64 填」（净荷 32634 一个单元）
+    /// 与「向下取整」——除了 0 之外，每个点至少把其中一种分开。
+    #[test]
+    fn blocks_is_the_logical_length_in_512_byte_blocks_rounded_up_not_the_allocated_units() {
+        let blocks_written_for_size = |size: u64| {
+            let bytes = InodeRecord {
+                inode: 1,
+                object_birth: CheckpointTxg(3),
+                size,
+                change_count: 3,
+                write_time_seconds: 1_788_000_000,
+            }
+            .to_bytes();
+            u64::from_le_bytes(bytes[48..56].try_into().expect("偏移 48 起 8 字节"))
+        };
+        // (size, 条款给的 blocks, 按分到的单元填, 向下取整)
+        let expected: [(u64, u64, u64, u64); 7] = [
+            (0, 0, 0, 0),
+            (1, 1, 64, 0),
+            (512, 1, 64, 1),
+            (513, 2, 64, 1),
+            (3000, 6, 64, 5),
+            (32_635, 64, 128, 63),
+            (40_000, 79, 128, 78),
+        ];
+        for (size, blocks, by_allocated_units, rounded_down) in expected {
+            assert_eq!(
+                blocks_written_for_size(size),
+                blocks,
+                "size {size} 字节 ⇒ blocks = ⌈{size} ÷ 512⌉ = {blocks}（按分到的单元填是 {by_allocated_units}，向下取整是 {rounded_down}）"
+            );
+        }
+    }
+
+    /// 条目宽是索引节点头里的一个**盘上字段**（`parse_index_node` 只判了它 ≥ key 宽）：
+    /// 窄到刚好等于 key 宽的条目，四个读者都要交回 `None`，不许按字段表的固定偏移切下去。
+    /// key 宽：extent 24、inode 8、记账 22、映射 27（panic 面普查 R1 / R3 / R4 / R2 的坏法就是把条目宽缩到这四个数）。
+    #[test]
+    fn entry_readers_refuse_an_entry_narrower_than_its_field_table() {
+        let entry_narrowed_to_the_key_width = |key_width: usize| vec![0u8; key_width];
+        assert_eq!(
+            parse_extent_record(&entry_narrowed_to_the_key_width(24)),
+            None,
+            "extent 叶记录该有 112 字节，条目宽缩到 key 宽 24 时不解"
+        );
+        assert_eq!(parse_extent_record(&[0u8; 111]), None, "差一个字节也不解");
+        assert!(
+            parse_extent_record(&[0u8; 112]).is_some(),
+            "刚好 112 要解得开"
+        );
+        assert_eq!(
+            parse_inode_internal_entry(&entry_narrowed_to_the_key_width(8)),
+            None,
+            "inode 内部条目该有 120 字节，条目宽缩到 key 宽 8 时不解"
+        );
+        assert!(
+            parse_inode_internal_entry(&[0u8; 120]).is_some(),
+            "刚好 120 要解得开"
+        );
+        assert_eq!(
+            AccountingEntry::parse(&entry_narrowed_to_the_key_width(22)),
+            None,
+            "记账条目该有 34 字节，条目宽缩到 key 宽 22 时不解"
+        );
+        assert!(
+            AccountingEntry::parse(&[0u8; 34]).is_some(),
+            "刚好 34 要解得开"
+        );
+        assert_eq!(
+            parse_mapping_entry(&entry_narrowed_to_the_key_width(27)),
+            None,
+            "映射条目该有 55 字节，条目宽缩到 key 宽 27 时不解（普查 R2）"
+        );
+        assert_eq!(parse_mapping_entry(&[0u8; 54]), None, "差一个字节也不解");
+        assert!(
+            parse_mapping_entry(&[0u8; 55]).is_some(),
+            "刚好 55 要解得开"
         );
     }
 

@@ -4,7 +4,9 @@
 //! `ByteWriter`），每试一次再烧一个实例代号（攻方探针 `research/prompts/m2-wave2-code-r1-opus-model/opus_probe_pristine.rs` 的
 //! `pristine_instance_table_rows_overflow_after_acquisition`，日志 `pristine-run.log`）。
 //! 改法（最小）：取号之前的准入加一项——这一版的行数 + 这次要写的行数 + 1（链指针）≤ 一片的记录数，不够返回
-//! `InstanceTableRowsExceedOnePageSecondPageUnsupported`，一个写都不发；实例表第二片、删行不在这一轮。
+//! `InstanceTableChainLongerThanOnePageUndecided`，一个写都不发。用户 2026-09-19 定第二片进里程碑二（增补 2 收口表第 38 行）；
+//! 实做时查出第二片在 bump 次序里排第几、行怎么分片两处没有条款（D3（空间分配） 已定项 10 ⑤ 只写「实例表单元最前」），
+//! 定之前照样在取号之前拒（成员名改成说清是哪两处没定），读路径已沿链读（`second_transaction_supplement_two_instance_table_chain.rs`）。
 //! 回退走同一个 `establish_instance`，行数按 R_old 那一版表与 [max(r_old, 1), 新实例) 自己算。
 //!
 //! 「取号之后崩溃」（取号写完、写行那次发布之前掉电）是今天就走得到的历史：下一次挂载要给中间那些实例各补一行 (i, 0, 0)，
@@ -101,7 +103,8 @@ fn snapshot(devices: &Devices, stream: &SharedStream) -> DiskSnapshot {
     disk_snapshot(&memory_pool_of_sparse_devices(devices), stream)
 }
 
-/// 拒绝的那一次：错误成员与三个数对得上，盘上逐字节不变（系统配置槽原样字节、根环里的根、录制流步数）、四个系统配置槽的实例代号不变。
+/// 拒绝的那一次：错误成员与几个数对得上（这一版一片、这次之后两片），盘上逐字节不变（系统配置槽原样字节、根环里的根、录制流步数）、
+/// 四个系统配置槽的实例代号不变。
 fn assert_refused_before_acquisition(
     refused: Result<Mounted, MountError>,
     expected: (InstanceGeneration, usize, usize),
@@ -111,11 +114,12 @@ fn assert_refused_before_acquisition(
     instances_before: &[(DeviceIdentity, Vec<InstanceGeneration>)],
 ) {
     match refused {
-        Err(MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported {
+        Err(MountError::InstanceTableChainLongerThanOnePageUndecided {
             instance_to_acquire,
             rows_in_version,
+            pages_in_version,
             rows_to_write,
-            records_per_page,
+            pages_after_this_publish,
         }) => {
             assert_eq!(
                 (instance_to_acquire, rows_in_version, rows_to_write),
@@ -123,9 +127,11 @@ fn assert_refused_before_acquisition(
                 "要取的号、这一版的行数、这次要写的行数"
             );
             assert_eq!(
-                records_per_page,
-                usize::try_from(INSTANCE_TABLE_PAGE_RECORDS).expect("370")
+                (pages_in_version, pages_after_this_publish),
+                (1, 2),
+                "这一版一片、这次之后要两片"
             );
+            let records_per_page = usize::try_from(INSTANCE_TABLE_PAGE_RECORDS).expect("370");
             assert!(rows_in_version + rows_to_write + 1 > records_per_page);
         }
         other => panic!(

@@ -28,7 +28,7 @@ use singlefs_harness::crash::{
     enumerate_layer0_selecting_versions_observing_each_state, enumerate_layer0_versions,
     evaluate_state_for_versions, writes_and_segments, CrashImage, Layer0Parallelism,
     Layer0SliceLength, Layer0Tally, Layer0WorkerThreadsSource, MemoryPool, PublishedVersion,
-    RetainedWrite,
+    RetainedWrite, WrittenContents,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::RetainedOperation;
@@ -207,7 +207,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
                 }
                 let reuse = overwrite(&mut pool, &later_content(31), InstanceGeneration(3));
                 assert_eq!(
-                    reuse.data_pointer.locations[0].slot.0,
+                    reuse.data_pointers[0].locations[0].slot.0,
                     50178,
                     "E 的数据单元落回最低的可再分配偶数槽对（mkfs 树表那 1 槽回收了、50179 从没分配过）"
                 );
@@ -221,7 +221,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
                     let first_data_unit_slot_reused =
                         overwrite(&mut pool, &later_content(37), InstanceGeneration(3));
                     assert_eq!(
-                        first_data_unit_slot_reused.data_pointer.locations[0].slot.0,
+                        first_data_unit_slot_reused.data_pointers[0].locations[0].slot.0,
                         50180,
                         "txg 18 的数据单元落回 A 的数据单元那一对槽（抬 F 回收了、E 用掉的是更低的 50178）"
                     );
@@ -353,7 +353,12 @@ fn assert_checker_and_record_checker_counts(
             tally.record_claimed_state_missing_unit
         ),
         (0, 0),
-        "记录核对器两条判据在已定的持久顺序下恒 0"
+        "记录核对器两条判据在层 0 这条负载上**结构上**到不了、不是语义上保证恒 0：段按屏障切，\
+         一次发布的单元写、journal 记录写与根槽写两两不同段（这几条流上同时含两类的段现查都是 0 个），\
+         「根在案而记录一条都不在」与「恢复自称的 txg ≥ 某次发布而它的单元两份都不在」这两个状态，层 0 枚举摆不出来。\
+         这两条判据的判别力在手搭状态那一路（同一份文件里 \
+         a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker）\
+         与崩溃注入那一路（增补 3 第 3 件）"
     );
     for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
         let expected_violated_states = known_checker_violations
@@ -373,11 +378,14 @@ fn assert_checker_and_record_checker_counts(
     }
     // 里程碑「第二个事务」步 6 新接的三条（I-3.8、I-7.4、I-4.8）、改按回退候选集判的两条（I-3.1、I-2.1），
     // 与 C374（释放代与树表诞生 txg 只有验收断言盯着） 定案接的两条（I-3.9、I-9.14——这条流上发布 B 起每次发布都重写树表，
-    // 跨根比得出来）、代码三方第二轮 Z1-d 之后接的 I-5.4（分配记录罩住的槽互不相交）：阴性结果要与「代码没跑到」分开，
-    // 每条至少在一个状态上真被评估过；评估过的与报「不适用」的加起来恰是状态数，一个状态都不漏记。
+    // 跨根比得出来）、代码三方第二轮 Z1-d 之后接的 I-5.4（分配记录罩住的槽互不相交）、代码轮第一轮判定四之后接的
+    // I-8.7（实例内事务号不重号——这条流上同一实例发布 A、B 两个承载事务的版本，事务号 1 与 2 比得出来）、
+    // 增补 2 收口第 44 行接的 I-3.10 与岔路 7（G27）立的 I-3.11（已分配减 defer 等于最新根走读——发布 A 起记账树在最新根下面）：
+    // 阴性结果要与「代码没跑到」分开，每条至少在一个状态上真被评估过；评估过的与报「不适用」的加起来恰是状态数，
+    // 一个状态都不漏记。
     for must_evaluate in [
         "I-3.1", "I-5.2", "I-5.1", "I-7.2", "I-2.1", "I-3.8", "I-7.4", "I-4.8", "I-3.9", "I-9.14",
-        "I-5.4",
+        "I-5.4", "I-8.7", "I-3.10", "I-3.11",
     ] {
         assert!(
             tally
@@ -453,9 +461,28 @@ fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_r
         "1 + 二十个 2 写段各 3 + 两个 4 写段各 15 + 十七个 1 写段各 1"
     );
     println!(
-        "LAYER0B_FAST states={} checker_by_invariant(evaluated/violated/not_applicable) {}",
+        "LAYER0B_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
         tally.states,
+        tally.states_by_publish_text(),
         tally.checker_counts_by_invariant()
+    );
+    // 步 6 验收第 1 条「每次发布各多少」：按段归到后面最近的那次根槽写（`crash::Layer0PublishOfState`）。
+    // 每次发布记录段 2 写（3）+ 根槽段 1 写（1）= 4；暖机 txg 1、2 各多一段 2 写（取号那段、上一次的系统配置槽轮换）= 7；
+    // 写行 txg 5 与回退 txg 9 各多一段 4 写（上一次的轮换并上取号，15）= 19；18 写与 10 写的段不展开；
+    // 最后一次根槽写之后是 E 的轮换那一段 2 写（3），再加全部持久那一个。
+    assert_eq!(
+        tally.states_by_publish_text(),
+        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=4 instance1_txg4=4 \
+         instance2_txg5=19 instance2_txg6=4 instance2_txg7=4 instance2_txg8=4 \
+         instance3_txg9=19 instance3_txg10=4 instance3_txg11=4 instance3_txg12=4 instance3_txg13=4 \
+         instance3_txg14=4 instance3_txg15=4 instance3_txg16=4 instance3_txg17=4 \
+         after_the_last_root=3 every_write_persisted=1",
+        "平时跑的那 108 个状态按发布分"
+    );
+    assert_eq!(
+        tally.states_by_publish.values().sum::<u64>(),
+        tally.states,
+        "按发布分的各格加起来就是状态数：一个状态不漏、不重"
     );
     assert_eq!(
         tally.violations, 0,
@@ -549,9 +576,10 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
     );
     let checker_violations: u64 = tally.checker_violated_states.values().sum();
     // 每条不变量报成 `I-x.y=评估过/判违例/不适用` 夹在 checker_violations 与 first_violation 之间（步 6 验收第 3 条：阴性结果与「代码没跑到」分开）；
-    // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。
+    // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
+    // checker 那一段与 first_violation 之间，随整行一起进门禁的成功句。
     println!(
-        "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} first_violation={}",
+        "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} states_by_publish=[{}] first_violation={}",
         tally.states,
         tally.states == closed_form,
         tally.violations,
@@ -565,9 +593,22 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         tally.record_root_without_record,
         tally.record_claimed_state_missing_unit,
         tally.checker_counts_by_invariant(),
+        tally.states_by_publish_text(),
         tally.first_violation.as_deref().unwrap_or("none")
     );
     assert_eq!(tally.states, closed_form, "枚举到的状态数要等于闭式");
+    // 每次发布：18 写段 262143 或 10 写段 1023，加记录段 3、根槽段 1；写行 txg 5 与回退 txg 9 多一段 4 写（15）；
+    // 暖机 txg 1、2 是 2 写段 + 记录段 + 根槽段（7）。
+    assert_eq!(
+        tally.states_by_publish_text(),
+        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=262147 instance1_txg4=262147 \
+         instance2_txg5=1042 instance2_txg6=1027 instance2_txg7=1027 instance2_txg8=262147 \
+         instance3_txg9=1042 instance3_txg10=1027 instance3_txg11=262147 instance3_txg12=262147 \
+         instance3_txg13=262147 instance3_txg14=262147 instance3_txg15=1027 instance3_txg16=1027 \
+         instance3_txg17=262147 after_the_last_root=3 every_write_persisted=1",
+        "全量 2104413 个状态按发布分"
+    );
+    assert_eq!(tally.states_by_publish.values().sum::<u64>(), tally.states);
     assert_eq!(
         tally.violations, 0,
         "第一处违例：{:?}",
@@ -725,9 +766,10 @@ fn residual_record_and_its_named_units(
         .iter()
         .filter(|retained| match geometry().classify(&retained.operation) {
             StepKind::UnitWrite | StepKind::JournalRecord => true,
-            StepKind::RootRecordFua | StepKind::SystemConfigurationSlot | StepKind::Barrier => {
-                false
-            }
+            StepKind::ZeroFill
+            | StepKind::RootRecordFua
+            | StepKind::SystemConfigurationSlot
+            | StepKind::Barrier => false,
         })
         .cloned()
         .collect();
@@ -985,11 +1027,12 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
         tally.first_ignored_violation
     );
     assert_eq!(tally.failed_states, 0);
-    // I-3.1（已分配统计对得上）在实例 2 的根为最新的 12 个状态上判红（口径未定，2026-09-17 写这条用例时发现）：记账的已分配逐盘比遍历候选根多 65536 字节，
-    // 正是残留记录那一版（(1, 5)，根槽从没落盘、只由记录施加出来）自己的四个固定点单元 50261–50264——写行发布 txg 6 把它们释放进 defer，
-    // 环里没有一条根引用它们。checker 的「已分配 = 候选根引用的并集」与分配器「defer 里的仍算已分配」在「由记录施加出来的那一版」上分歧，
-    // 改哪一边是 I-3.1 口径的设计问题；这里钉的是现状，不是认下来的行为。
-    assert_checker_and_record_checker_counts(&tally, &[("I-3.1", 12)]);
+    // 实例 2 的根为最新的那 12 个状态：残留记录那一版（(1, 5)，根槽从没落盘、只由记录施加出来）自己的四个固定点单元
+    // 50261–50264 被写行发布 txg 6 释放进 defer、仍算已分配，环里没有一条根引用它们。2026-09-17 写这条用例时它们在
+    // I-3.1（已分配统计对得上） 上判红、差 65536 字节；2026-09-23 用户定候选 b（增补 2 收口表第 54 行）：checker 的候选集
+    // 补上「由记录施加出来、根槽从没落盘的那一版」（`singlefs_checker::walk` 的 `versions_applied_only_by_records`），
+    // 那 12 个状态从此一条都不红。把那一版从候选集里拿掉，这一行在 I-3.1 上当场红回 12。
+    assert_checker_and_record_checker_counts(&tally, &[]);
 }
 
 /// 改坏 tail 的 tail 值：窗口 [3, 18] 里有 A 那条记录（jsn 3），它点名的 50180 在 txg 18 被合法复用。
@@ -1001,11 +1044,12 @@ fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> 
         .iter()
         .map(|write| match write.kind {
             StepKind::SystemConfigurationSlot => {
-                let mut system_configuration = SystemConfiguration::parse_slot(&write.bytes)
-                    .expect("录到的系统配置槽写都自证得过");
+                let slot = write.bytes().expect("系统配置槽写是普通写，带着字节");
+                let mut system_configuration =
+                    SystemConfiguration::parse_slot(slot).expect("录到的系统配置槽写都自证得过");
                 assert_eq!(
                     system_configuration.to_slot(),
-                    write.bytes,
+                    slot,
                     "按字段重写一遍与录到的逐字节相同：改坏的只有 tail"
                 );
                 system_configuration.quantities.journal_tail = stale_tail;
@@ -1014,10 +1058,11 @@ fn writes_with_stale_journal_tail(writes: &[RetainedWrite], stale_tail: u64) -> 
                     kind: write.kind,
                     is_force_unit_access: write.is_force_unit_access,
                     offset: write.offset,
-                    bytes: system_configuration.to_slot(),
+                    contents: WrittenContents::Bytes(system_configuration.to_slot()),
                 }
             }
-            StepKind::UnitWrite
+            StepKind::ZeroFill
+            | StepKind::UnitWrite
             | StepKind::JournalRecord
             | StepKind::RootRecordFua
             | StepKind::Barrier => write.clone(),
@@ -1164,9 +1209,12 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     );
     assert_eq!(tally.ignored_violations, 0);
     // 记录核对器第二条判据（恢复自称的 txg ≥ 某次发布、那次发布的某个单元两份都不在）在这 8 个状态上判绿：
-    // A（txg 3）的数据单元两份被 txg 18 合法复用了，而「被流里更晚的写盖过的那一份不算缺席」——
+    // A（txg 3）的数据单元两份被 txg 18 合法复用了，而「被流里更晚的、**已经持久**的写盖过的那一份不算缺席」——
     // 2026-09-17 写这条用例时这一格口径未定、钉的是当时的 8，2026-09-20 按崩溃注入（增补 3 第 3 件）落地时定成前一种：
-    // 位置让给了后来的写，旧字节本来就不该还在，那不是崩溃摆出来的洞。改回去这条用例就红（`crates/mutations.tsv`）。
+    // 位置让给了后来的写，旧字节本来就不该还在，那不是崩溃摆出来的洞。
+    // 这 8 个状态里 txg 18 的单元写都已持久（上面那条断言钉着），所以 C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）
+    // 把豁免收严成「更晚那次写也已持久」之后，这 8 个仍然判绿。豁免整个撤回、或者把那个持久判定取反，这条用例就红
+    //（`crates/mutations.tsv`）。
     assert_checker_and_record_checker_counts(&tally, &[]);
 
     // 撕裂注入：txg 18 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
@@ -1179,7 +1227,10 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
             && write.kind == StepKind::UnitWrite
             && write.offset == reused_data_unit_offset
         {
-            write.bytes[4000] ^= 0xff;
+            let WrittenContents::Bytes(bytes) = &mut write.contents else {
+                panic!("单元写是普通写，带着字节");
+            };
+            bytes[4000] ^= 0xff;
             torn_copies += 1;
         }
     }
@@ -1210,5 +1261,136 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
         torn_tally.violations, 0,
         "停在 E、读出 E 的内容：{:?}",
         torn_tally.first_violation
+    );
+}
+
+/// C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 收严之后要买到的那一半：**更晚那次同槽的写没落盘**的崩溃状态里，
+/// 早先那个单元是真的缺席。手搭的状态（层 0 段枚举产生不出它：段是按屏障切的，一次发布的单元写与它的根槽写永远不同段）：
+/// 固定脚本到 txg 18 为止，txg 18 那次复用 50180 的写连同它的记录、根槽一个字节没落盘；它之前的写全部持久，
+/// 只把 A（txg 3）那两份落在 50180 的数据单元写摘成不持久——A 的记录与根槽照样在盘上。
+/// 恢复走 E (3, 17)，oracle 看不出问题（E 自己完好、读得出它的内容）；而 A 的数据单元两份都不在盘上、
+/// 唯一盖住它的那次写又没落盘，记录核对器第二条判据必须报 1。
+/// 只看「流里有没有更晚的写」、不看那次写持没持久的那一版在这里报 0（`crates/mutations.tsv` 里那条把 `in_place` 摘掉的变异）。
+#[test]
+fn a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker(
+) {
+    let prepared = prepare(
+        "layer0-reuse-that-never-landed",
+        Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish,
+    );
+    let first_data_unit_offset = SlotNumber(50180).to_device_offset();
+    let writes_to_the_first_data_unit_slot: Vec<usize> = prepared
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| {
+            write.kind == StepKind::UnitWrite && write.offset == first_data_unit_offset
+        })
+        .map(|(index, _)| index)
+        .collect();
+    assert_eq!(
+        writes_to_the_first_data_unit_slot.len(),
+        4,
+        "这条流上 50180 只被写过两次：A（txg 3）的数据单元与 txg 18 复用它的那次，各两盘一份"
+    );
+    let (first_publish_copies, reusing_publish_copies) =
+        writes_to_the_first_data_unit_slot.split_at(2);
+    let root_indexes: Vec<usize> = prepared
+        .writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
+        .map(|(index, _)| index)
+        .collect();
+    let publish_after_raising_floor_root_index = root_indexes[16];
+    let first_write_of_the_reusing_publish = prepared
+        .writes
+        .iter()
+        .enumerate()
+        .find(|(index, write)| {
+            *index > publish_after_raising_floor_root_index && write.kind == StepKind::UnitWrite
+        })
+        .map(|(index, _)| index)
+        .expect("E 的根槽写之后还有 txg 18 那次覆盖写的单元写");
+    let mut persisted: Vec<bool> = (0..prepared.writes.len())
+        .map(|write_index| write_index < first_write_of_the_reusing_publish)
+        .collect();
+    for copy in first_publish_copies {
+        persisted[*copy] = false;
+    }
+    assert!(
+        reusing_publish_copies
+            .iter()
+            .all(|copy| !persisted[*copy] && *copy >= first_write_of_the_reusing_publish),
+        "txg 18 复用 50180 的那两份写一个字节都没落盘"
+    );
+    assert!(
+        first_publish_copies
+            .iter()
+            .all(|copy| *copy < publish_after_raising_floor_root_index),
+        "A 的那两份写在 E 的根槽写之前"
+    );
+    assert!(
+        persisted[prepared.first_root_index],
+        "A 的根槽写已持久：记录核对器要判的正是「恢复自称的 txg ≥ A，而 A 的单元两份都不在」"
+    );
+    let image = CrashImage {
+        base: &prepared.base,
+        writes: &prepared.writes,
+        persisted: persisted.clone(),
+    };
+    for copy in &writes_to_the_first_data_unit_slot {
+        let write = &prepared.writes[*copy];
+        let length = usize::try_from(write.length_in_bytes()).expect("单元写的长度装得进 usize");
+        let on_disk = PoolReader::read(&image, write.device, write.offset, length)
+            .expect("50180 这一槽在两盘上都读得回来");
+        assert!(
+            !write.contents.still_on_disk(&on_disk),
+            "50180 上这四份写一份都不在盘上（写表下标 {copy}）：盘上是 mkfs 之后、这条流之前的字节"
+        );
+    }
+    let mut tally = Layer0Tally::default();
+    let report = evaluate_state_for_versions(
+        &prepared.base,
+        &prepared.writes,
+        persisted,
+        prepared.judged_root_index,
+        &prepared.versions,
+        &mut tally,
+    );
+    println!(
+        "REUSE_THAT_NEVER_LANDED effective_root={:?} file_read={} violations={} ignored_violations={} record=({}, {})",
+        report.effective_root,
+        matches!(report.outcome, RecoveryOutcome::FileRead { .. }),
+        tally.violations,
+        tally.ignored_violations,
+        tally.record_root_without_record,
+        tally.record_claimed_state_missing_unit
+    );
+    assert_eq!(
+        report.effective_root,
+        Some((InstanceGeneration(3), CheckpointTxg(17))),
+        "txg 18 一个字节都没落盘，恢复走 E"
+    );
+    assert_eq!(
+        report.outcome,
+        RecoveryOutcome::FileRead {
+            root: (InstanceGeneration(3), CheckpointTxg(17)),
+            content: later_content(31)
+        },
+        "E 自己完好：读得出它的内容"
+    );
+    assert_eq!(
+        tally.violations, 0,
+        "oracle 看不出这个洞（它只问走到的那一版读不读得对）：{:?}",
+        tally.first_violation
+    );
+    assert_eq!(
+        (
+            tally.record_root_without_record,
+            tally.record_claimed_state_missing_unit
+        ),
+        (0, 1),
+        "记录核对器第二条判据报这个洞：恢复自称到了 (3, 17) ≥ A 的 txg 3，而 A 的数据单元两份都不在盘上"
     );
 }

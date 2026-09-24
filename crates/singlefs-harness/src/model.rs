@@ -22,8 +22,8 @@ use std::rc::Rc;
 use singlefs_format::{
     index_node_header_bytes, ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_BYTES,
     ALLOCATION_RECORD_KEY_BYTES, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, DATA_UNIT_PAYLOAD_OFFSET,
-    FIRST_TRANSACTION_TXG, INSTANCE_TABLE_PAGE_RECORDS, NODE_BYTES, ROOT_RING_REGIONS,
-    ROOT_RING_REGION_DEVICES, ROOT_RING_SLOTS_PER_REGION, SLOT_BYTES, UNIT_AREA_START_SLOT,
+    INSTANCE_TABLE_PAGE_RECORDS, NODE_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
+    ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 
 /// 模型里的 checkpoint 号（D16（发布语义） 已定项 6：每次发布 + 1）。与实现的 `CheckpointTxg` 各自声明（D13（验证路线） 已定项 5）。
@@ -94,21 +94,42 @@ impl ModelUnitRole {
 /// 一次发布重写哪些角色。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ModelPublishKind {
-    /// 第一个文件版本、覆盖写：四个文件角色，加四个固定点单元（D16（发布语义） 已定项 9：记账行每发布重写，连带记账树节点、分配记录、
-    /// 映射条目与树表单元）。
-    FileVersion,
+    /// 第一个文件版本：四个文件角色，加四个固定点单元（D16（发布语义） 已定项 9：记账行每发布重写，连带记账树节点、分配记录、
+    /// 映射条目与树表单元）。与覆盖写重写的角色相同，分开只为一件事——它走 `previous: None`，这一版的内存态从头建。
+    FirstFileVersion,
+    /// 覆盖写：与第一个文件版本重写的角色相同，接在上一版的内存态后面。
+    OverwriteFileVersion,
     /// 写行：实例表单元（D18（块里携带什么信息） 已定项 11：每次可写挂载都写行）加四个固定点单元（D16（发布语义） 已定项 9）。
     RowsOnFileVersion,
     /// 树表不是 0 条时的空发布（暖机、抬 F）：四个固定点单元（D16（发布语义） 已定项 9）。
     EmptyOnFileVersion,
-    /// 树表 0 条：零单元（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）。
+    /// 树表 0 条的一版上写行：只重写实例表这一个单元（D18（块里携带什么信息） 已定项 11 要求每次可写挂载都写行；
+    /// 这一版没有记账树，D16（发布语义） 已定项 9 的那五样——记账行、记账树节点、分配记录、映射条目、树表单元——一样都不写）。
+    RowsOnVersionWithoutFile,
+    /// 树表 0 条上的空发布：零单元（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）。
     ZeroUnit,
 }
 
 impl ModelPublishKind {
+    /// 这次发布往分配记录树里加几条（每块盘一条）：重写的每个角色各一条。
+    /// 零单元发布一个字节都不写，一条不加；树表 0 条的一版上写行那次**建起这一版自己的分配记录树**
+    /// （C512（树表 0 条的一版上被换下的单元记在哪），2026-09-23 用户定案），实例表与那片节点各一条。
+    fn allocation_records_added_per_device(self) -> u64 {
+        match self {
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile => {
+                u64::try_from(self.rewritten_roles().len()).expect("至多九个角色")
+            }
+            ModelPublishKind::ZeroUnit => 0,
+        }
+    }
+
     fn rewritten_roles(self) -> &'static [ModelUnitRole] {
         match self {
-            ModelPublishKind::FileVersion => &[
+            ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => &[
                 ModelUnitRole::Data,
                 ModelUnitRole::ExtentRoot,
                 ModelUnitRole::InodeLeaf,
@@ -131,6 +152,11 @@ impl ModelPublishKind {
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
+            // 树表 0 条的一版上写行：实例表，加这一版自己那片分配记录树
+            // （C512（树表 0 条的一版上被换下的单元记在哪），2026-09-23 用户定案：根指针住根记录、不进树表）。
+            ModelPublishKind::RowsOnVersionWithoutFile => {
+                &[ModelUnitRole::InstanceTable, ModelUnitRole::AllocationTree]
+            }
             ModelPublishKind::ZeroUnit => &[],
         }
     }
@@ -196,10 +222,17 @@ struct ModelRingPosition {
     slot_in_region: u64,
 }
 
+/// S 取 mkfs 那一档：模型只建 mkfs 默认参数的池，从不改 S（改 S 的池由
+/// `crates/singlefs-harness/tests/system_configuration_slots_per_region.rs` 直接在实现上跑）。
+/// 写成「mkfs 写的那个值」而不是「每区槽数 S」，是为了让「模型假定 S 不变」这件事在名字里就看得见。
+const MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 =
+    ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM;
+
 fn ring_position_of(checkpoint_txg: ModelCheckpointTxg) -> ModelRingPosition {
     ModelRingPosition {
         region: checkpoint_txg.0 % ROOT_RING_REGIONS,
-        slot_in_region: (checkpoint_txg.0 / ROOT_RING_REGIONS) % ROOT_RING_SLOTS_PER_REGION,
+        slot_in_region: (checkpoint_txg.0 / ROOT_RING_REGIONS)
+            % MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM,
     }
 }
 
@@ -226,32 +259,33 @@ pub fn data_unit_payload_capacity_in_bytes() -> u64 {
 pub enum ModelRefusalReason {
     /// 内容装不进一个数据单元（D4（校验和位置） 已定项 5）。
     ContentExceedsDataUnitPayload,
-    /// 第一个文件版本写死 txg 3（`FIRST_TRANSACTION_TXG`，D16（发布语义） 已定项 8 的格式常量），只接得上 txg 2 那一版。
-    FirstFileNotRightAfterTheWarmUp,
+    /// 第一个文件版本要建在上面的那一版的根，与交给它的上一条记录说的不是同一版：新根的 txg 从那条根接着算、jsn 从那条记录接着算，
+    /// 两者对不上时接上去会盖在别的发布上。健康的历史里走不到（执行器恒拿现行那一版的根与记录）。
+    FirstFileVersionDoesNotFollowTheVersionItBuildsOn,
+    /// 第一个文件版本要建在上面的那一版已经有过文件版本：那条路径按「树还没建起来」写，树表条目的诞生 txg 与
+    /// inode 1 的对象出生代都会取这次的 txg，与环里那些旧根记的对不上（I-9.14、I-9.10）。再写一版走覆盖写。
+    FirstFileVersionOnAVersionThatAlreadyHasAFile,
     /// 分配记录树第一版只有一个节点（容量墙，收口表第 39 行：模型答允许拒绝的区间）。
     AllocationRecordNodeWall,
     /// 记账树第一版只有一个节点。
     AccountingNodeWall,
     /// 单元区装不下（D28（挂载期承诺量） 已定项 1 的准入；模型答允许拒绝的区间）。
     UnitAreaWall,
-    /// 实例表第一版只有一片（D18（块里携带什么信息） 已定项 11：一片 370 条含链指针；第二片第一版不做）。
-    InstanceTableOnePageWall,
-    /// 树表 0 条的一版上要写行：落点记在哪没有条款，第一版不支持（条款没写，照代码今天的读法）。
-    RowsOnVersionWithoutFileUnsupported,
-    /// 空池挂载的形状接不上写死 txg 3 的第一个文件版本（第一版不支持，照代码今天的读法）。
-    FormattedPoolMountNotShapedLikeTheFirstTransaction,
+    /// 实例表这次之后要多于一片（D18（块里携带什么信息） 已定项 11：一片 370 条含链指针）：第二片在 bump 次序里怎么排、
+    /// 行怎么分片没有条款（D3（空间分配） 已定项 10 ⑤ 只写「实例表单元最前」），第一版不写第二片。
+    InstanceTableChainLongerThanOnePageUndecided,
     /// 回退目标不在根环里（D23（journal 的角色与格式） 已定项 14：候选集是根环里的根）。
     RollbackTargetNotInRing,
     /// 回退目标的 txg 低于 F_生效（D16（发布语义） 已定项 1「回退候选集」）。
     RollbackTargetBelowEffectiveFloor,
     /// 回退目标在被抛弃的时间线上（D23（journal 的角色与格式） 已定项 14：有行 (i, Ti, Wi) 且 T > Ti）。
     RollbackTargetOnAbandonedTimeline,
-    /// 回退到树表 0 条的根：回退行要重写实例表，落点记在哪没有条款，第一版不支持（照代码今天的读法）。
-    RollbackToVersionWithoutFileUnsupported,
+    /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）：
+    /// 被换下的那一片记在哪没有条款——树表 0 条 ⇒ 这一版没有分配记录树，那次释放只住内存，重开之后账取不回来，
+    /// 而根环里更旧的候选根还指着它。第一版不支持（设计空白，交主 agent）。
+    VersionWithoutFileNotWrittenByMakeFilesystem,
     /// 要抬的 F 超过上限（D16（发布语义） 已定项 1「抬 F 的上限」）。
     FloorAboveCeiling,
-    /// 现行版本的实例表还是 mkfs 写的那一片时抬 F：条款没写这个拒绝（设计问题，交主 agent）；照代码今天的读法当作第一版不支持的区间。
-    RaiseWithFormatTimeInstanceTableUnsupported,
 }
 
 impl ModelRefusalReason {
@@ -259,29 +293,25 @@ impl ModelRefusalReason {
     pub fn name(self) -> &'static str {
         match self {
             ModelRefusalReason::ContentExceedsDataUnitPayload => "内容装不进一个数据单元",
-            ModelRefusalReason::FirstFileNotRightAfterTheWarmUp => {
-                "第一个文件版本只接得上第二次暖机那一版"
+            ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn => {
+                "第一个文件版本接不上它要建在上面的那一版"
+            }
+            ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile => {
+                "要建在上面的那一版已经有过文件版本（再写一版走覆盖写）"
             }
             ModelRefusalReason::AllocationRecordNodeWall => "分配记录树一个节点装不下",
             ModelRefusalReason::AccountingNodeWall => "记账树一个节点装不下",
             ModelRefusalReason::UnitAreaWall => "单元区装不下",
-            ModelRefusalReason::InstanceTableOnePageWall => "实例表一片装不下",
-            ModelRefusalReason::RowsOnVersionWithoutFileUnsupported => {
-                "树表 0 条的一版上要写行（第一版不支持）"
-            }
-            ModelRefusalReason::FormattedPoolMountNotShapedLikeTheFirstTransaction => {
-                "空池挂载的形状接不上第一个文件版本（第一版不支持）"
+            ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided => {
+                "实例表要多于一片（第二片怎么写没有条款）"
             }
             ModelRefusalReason::RollbackTargetNotInRing => "回退目标不在根环里",
             ModelRefusalReason::RollbackTargetBelowEffectiveFloor => "回退目标低于 F_生效",
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline => "回退目标在被抛弃的时间线上",
-            ModelRefusalReason::RollbackToVersionWithoutFileUnsupported => {
-                "回退到树表 0 条的根（第一版不支持）"
+            ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem => {
+                "树表 0 条、而实例表已经不是 mkfs 那一片（条款没写被换下的那一片记在哪）"
             }
             ModelRefusalReason::FloorAboveCeiling => "要抬的 F 超过上限",
-            ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported => {
-                "实例表还是 mkfs 那一片时抬 F（条款没写，照代码今天的读法）"
-            }
         }
     }
 
@@ -290,17 +320,15 @@ impl ModelRefusalReason {
         match self {
             ModelRefusalReason::AllocationRecordNodeWall | ModelRefusalReason::UnitAreaWall => true,
             ModelRefusalReason::ContentExceedsDataUnitPayload
-            | ModelRefusalReason::FirstFileNotRightAfterTheWarmUp
+            | ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn
+            | ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile
             | ModelRefusalReason::AccountingNodeWall
-            | ModelRefusalReason::InstanceTableOnePageWall
-            | ModelRefusalReason::RowsOnVersionWithoutFileUnsupported
-            | ModelRefusalReason::FormattedPoolMountNotShapedLikeTheFirstTransaction
+            | ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-            | ModelRefusalReason::RollbackToVersionWithoutFileUnsupported
-            | ModelRefusalReason::FloorAboveCeiling
-            | ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported => false,
+            | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
+            | ModelRefusalReason::FloorAboveCeiling => false,
         }
     }
 }
@@ -806,8 +834,7 @@ impl IdealModel {
             role_written_at.insert(*role, checkpoint_txg);
             slots_written += role.span_in_slots();
         }
-        let allocation_records_added =
-            u64::try_from(rewritten.len()).expect("至多九个角色") * device_count;
+        let allocation_records_added = kind.allocation_records_added_per_device() * device_count;
         let file = match new_file_content {
             Some(content) => Some(ModelFileVersion {
                 written_by: key,
@@ -863,11 +890,14 @@ impl IdealModel {
         let session = self.open_session()?;
         let current = &session.current;
         let mut required_refusals = BTreeSet::new();
-        // 第一个文件版本写死 txg 3 与 jsn 3（FIRST_TRANSACTION_TXG；第一个事务 jsn 与 txg 同号），只接得上 txg 2、jsn 2 的那一版。
-        let follows_the_warm_up = current.key.checkpoint_txg.0 + 1 == FIRST_TRANSACTION_TXG
-            && current.journal_counter.0 + 1 == FIRST_TRANSACTION_TXG;
-        if !follows_the_warm_up {
-            required_refusals.insert(ModelRefusalReason::FirstFileNotRightAfterTheWarmUp);
+        // 第一个文件版本接在现行那一版后面：txg 与 jsn 各加一，不取 `FIRST_TRANSACTION_TXG`——那个常量只管 mkfs
+        // 同一个进程里那条流（2026-09-23 用户定案）。执行器恒拿现行那一版的根与记录，所以
+        // `FirstFileVersionDoesNotFollowTheVersionItBuildsOn` 在随机历史里走不到、模型一次都不要求它。
+        // 现行那一版已经有过文件版本：这条路径按「树还没建起来」写，再走一次会重新建树、重新发对象出生代，
+        // 与环里那些旧根记的对不上（I-9.14、I-9.10）——再写一版走覆盖写。
+        if current.file.is_some() {
+            required_refusals
+                .insert(ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile);
         }
         if u64::try_from(content.len()).expect("内容长度") > data_unit_payload_capacity_in_bytes()
         {
@@ -876,9 +906,9 @@ impl IdealModel {
         let root = self.next_root(
             current,
             session.instance,
-            ModelCheckpointTxg(FIRST_TRANSACTION_TXG),
-            ModelJournalCounter(FIRST_TRANSACTION_TXG),
-            ModelPublishKind::FileVersion,
+            ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+            ModelJournalCounter(current.journal_counter.0 + 1),
+            ModelPublishKind::FirstFileVersion,
             current.rollback_floor,
             Some(content),
             Rc::clone(&current.instance_table_rows),
@@ -919,7 +949,7 @@ impl IdealModel {
             session.instance,
             ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
             ModelJournalCounter(self.highest_journal_counter.0 + 1),
-            ModelPublishKind::FileVersion,
+            ModelPublishKind::OverwriteFileVersion,
             current.rollback_floor,
             Some(content),
             Rc::clone(&current.instance_table_rows),
@@ -1043,9 +1073,9 @@ impl IdealModel {
         if Self::is_abandoned_by(target_root, &self.newest_root().instance_table_rows) {
             reasons.insert(ModelRefusalReason::RollbackTargetOnAbandonedTimeline);
         }
-        if target_root.file.is_none() {
-            reasons.insert(ModelRefusalReason::RollbackToVersionWithoutFileUnsupported);
-        }
+        // 候选集只有上面那三条（D23（journal 的角色与格式） 已定项 14）：目标那一版树表 0 条不是排除项，
+        // 环里还留着带文件版本的根时也照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：回退那一版带环里的树 ID 水位 max，
+        // 再发第一个文件版本从它往上发号；I-9.14 只比同一条时间线上的根）。
         if !reasons.is_empty() {
             return refused(reasons);
         }
@@ -1062,7 +1092,7 @@ impl IdealModel {
         )
     }
 
-    /// 可写挂载与回退共用的后半段：取号、写行那次发布、暖机到本实例的根覆盖每块盘（D16（发布语义） 已定项 8 甲′，至多 R 次）。
+    /// 可写挂载与回退共用的后半段：取号、写行那次发布、暖机到本实例的根覆盖每块盘（D16（发布语义） 已定项 8 戊，至多 R 次）。
     /// `previous_row` 为 None 只在 mkfs 同一个进程里（不写行）。
     fn answer_establishing_an_instance(
         &self,
@@ -1098,41 +1128,38 @@ impl IdealModel {
         let rollback_floor = self.effective_rollback_floor();
         let mut required_refusals = BTreeSet::new();
         let has_file = base.file.is_some();
-        if !has_file && !rows_to_write.is_empty() {
-            required_refusals.insert(ModelRefusalReason::RowsOnVersionWithoutFileUnsupported);
+        // 树表 0 条、而这一版的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）**此前是必拒的一格**：
+        // 重建账时只剩根记录那两条指针，被换下的那一片成了空闲槽。C512（树表 0 条的一版上被换下的单元记在哪）
+        // 2026-09-23 定案之后，写行那次发布建起这一版自己的分配记录树、根指针住根记录 ⇒ 账取得回来，这一格不再拒。
+        // 模型因此**一条都不列**：实现要是还在这一格上拒，对拍当场报「模型说该成、实现拒了」——
+        // 那正是这条定案要盯住的回退面。`MountError::VersionWithoutFileNotWrittenByMakeFilesystem` 今天只剩
+        // 「树表或实例表不是 mkfs 写的那一版、而这一版又没有自己的分配记录树」那种手造镜像走得到，随机历史里造不出来。
+        let rows_after =
+            u64::try_from(base.instance_table_rows.len() + rows_to_write.len()).expect("行数");
+        // 一片 370 条，链指针记录恒为一片的最后一条（D18（块里携带什么信息） 已定项 11）；这次之后要多于一片时，第二片怎么写没有条款，
+        // 第一版不写第二片。两臂都判：树表 0 条的一版上写行同样重写整张实例表。
+        if rows_after + 1 > INSTANCE_TABLE_PAGE_RECORDS {
+            required_refusals
+                .insert(ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided);
         }
-        if !has_file && rows_to_write.is_empty() {
-            let shaped_like_the_first_transaction = first_txg.0 == 1
-                && first_journal_counter.0 == 1
-                && device_holding_the_root_of(ModelCheckpointTxg(1))
-                    != device_holding_the_root_of(ModelCheckpointTxg(2));
-            if !shaped_like_the_first_transaction {
-                required_refusals
-                    .insert(ModelRefusalReason::FormattedPoolMountNotShapedLikeTheFirstTransaction);
-            }
-        }
-        if has_file {
-            let rows_after =
-                u64::try_from(base.instance_table_rows.len() + rows_to_write.len()).expect("行数");
-            // 一片 370 条，链指针记录恒为一片的最后一条（D18（块里携带什么信息） 已定项 11）；第二片第一版不做。
-            if rows_after + 1 > INSTANCE_TABLE_PAGE_RECORDS {
-                required_refusals.insert(ModelRefusalReason::InstanceTableOnePageWall);
-            }
-        }
-        let table_after: Rc<Vec<ModelInstanceRow>> = if has_file {
+        let table_after: Rc<Vec<ModelInstanceRow>> = if rows_to_write.is_empty() {
+            Rc::clone(&base.instance_table_rows)
+        } else {
             let mut rows = base.instance_table_rows.as_ref().clone();
             rows.extend_from_slice(&rows_to_write);
             Rc::new(rows)
-        } else {
-            Rc::clone(&base.instance_table_rows)
         };
-        let (row_kind, warm_up_kind) = if has_file {
-            (
+        let (row_kind, warm_up_kind) = match (has_file, rows_to_write.is_empty()) {
+            (true, _) => (
                 ModelPublishKind::RowsOnFileVersion,
                 ModelPublishKind::EmptyOnFileVersion,
-            )
-        } else {
-            (ModelPublishKind::ZeroUnit, ModelPublishKind::ZeroUnit)
+            ),
+            // 树表 0 条、要写的行不为空：只重写实例表那一个单元；之后的暖机仍是零单元。
+            (false, false) => (
+                ModelPublishKind::RowsOnVersionWithoutFile,
+                ModelPublishKind::ZeroUnit,
+            ),
+            (false, true) => (ModelPublishKind::ZeroUnit, ModelPublishKind::ZeroUnit),
         };
         let mut roots = vec![self.next_root(
             base,
@@ -1213,7 +1240,7 @@ impl IdealModel {
         }
         let ceiling = self.rollback_floor_ceiling();
         let mut required_refusals = BTreeSet::new();
-        let mut permitted_refusals = BTreeSet::new();
+        let permitted_refusals = BTreeSet::new();
         match ceiling {
             Some(ceiling) if new_floor > ceiling => {
                 required_refusals.insert(ModelRefusalReason::FloorAboveCeiling);
@@ -1226,13 +1253,6 @@ impl IdealModel {
                     "实现调了抬 F".to_string(),
                 ))
             }
-        }
-        // 现行版本的实例表还是 mkfs 那一片（这一路来路上还没有写行过）：实现拒（它从现行版本的单元里读表，没有这一单元），条款没写
-        // 这个拒绝——mkfs 的表没有行、候选集照样判得出。设计问题交主 agent；照代码今天的读法划进允许拒绝。
-        if current.role_written_at.get(&ModelUnitRole::InstanceTable) == Some(&MAKE_FILESYSTEM_TXG)
-        {
-            permitted_refusals
-                .insert(ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported);
         }
         let mut roots: Vec<ModelRoot> = Vec::new();
         let mut covered: BTreeSet<ModelDeviceIdentity> = BTreeSet::new();
@@ -1351,17 +1371,15 @@ impl IdealModel {
                     > self.unit_area_slots_per_device()
             }),
             ModelRefusalReason::ContentExceedsDataUnitPayload
-            | ModelRefusalReason::FirstFileNotRightAfterTheWarmUp
+            | ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn
+            | ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile
             | ModelRefusalReason::AccountingNodeWall
-            | ModelRefusalReason::InstanceTableOnePageWall
-            | ModelRefusalReason::RowsOnVersionWithoutFileUnsupported
-            | ModelRefusalReason::FormattedPoolMountNotShapedLikeTheFirstTransaction
+            | ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-            | ModelRefusalReason::RollbackToVersionWithoutFileUnsupported
-            | ModelRefusalReason::FloorAboveCeiling
-            | ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported => false,
+            | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
+            | ModelRefusalReason::FloorAboveCeiling => false,
         }
     }
 

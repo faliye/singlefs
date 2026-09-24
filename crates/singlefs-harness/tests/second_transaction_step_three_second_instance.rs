@@ -7,8 +7,11 @@ mod common;
 use common::{build_pool, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS};
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::journal::record_offset;
 use singlefs_core::mount::{mount_writable, InstanceRow, InstanceTableRecords, Mounted};
@@ -70,7 +73,10 @@ fn build_publish_second_version_and_remount(tag: &str) -> (BuiltPool, Transactio
 }
 
 fn region_device(txg: u64) -> DeviceIdentity {
-    let target = target_for_publish(CheckpointTxg(txg));
+    let target = target_for_publish(
+        CheckpointTxg(txg),
+        parameters().geometry.root_ring_slots_per_region,
+    );
     parameters().region_devices[usize::try_from(target.region).expect("区域号")]
 }
 
@@ -141,12 +147,15 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         "写行发布重写实例表 + 四个固定点单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9）"
     );
     assert_eq!(row.record.named.len(), 5, "点名的只有重写的五个");
-    assert_eq!(row.data_pointer, second.data_pointer, "文件角色照抄 B 的");
+    assert_eq!(
+        row.data_pointers[0], second.data_pointers[0],
+        "文件角色照抄 B 的"
+    );
     assert_eq!(row.inode_record, second.inode_record);
     for identity in [
-        TransactionUnit::Data,
+        TransactionUnit::Data(DataUnitIndexInFile::FIRST),
         TransactionUnit::ExtentRoot,
-        TransactionUnit::InodeLeaf,
+        TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST),
         TransactionUnit::InodeRoot,
     ] {
         assert_eq!(
@@ -278,7 +287,9 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         );
     }
     assert_eq!(
-        third_publish.unit(TransactionUnit::Data).slot,
+        third_publish
+            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+            .slot,
         SlotNumber(50184),
         "C 的数据单元落在 B 之后的下一对偶数空槽（A、B 的都占着）"
     );
@@ -328,7 +339,10 @@ fn damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_oth
         build_publish_second_version_and_remount("step-three-one-device-damaged");
     let mut image = pool.memory_pool();
     for txg in [5u64, 6] {
-        let target = target_for_publish(CheckpointTxg(txg));
+        let target = target_for_publish(
+            CheckpointTxg(txg),
+            parameters().geometry.root_ring_slots_per_region,
+        );
         image.flip_byte(region_device(txg), slot_offset(target, 4096), 100);
     }
     let report = recover(&image, JournalPolicy::Consult);
@@ -366,7 +380,10 @@ fn stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transacti
     );
     let mut devices: Vec<(DeviceIdentity, Recorded)> = pool.reopen_recorded();
     // 把 txg 5 的根槽改坏：只留记录与单元，模拟「根槽没持久」。
-    let target = target_for_publish(CheckpointTxg(5));
+    let target = target_for_publish(
+        CheckpointTxg(5),
+        parameters().geometry.root_ring_slots_per_region,
+    );
     let device = region_device(5);
     let offset = slot_offset(target, 4096);
     let (_, damaged_device) = devices
@@ -451,9 +468,13 @@ fn checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_r
             txg: CheckpointTxg(current.root.checkpoint_txg.0 + 1),
             counter: current.record.counter + 1,
             transaction: 0,
+            // 新实例（2）自己的第一条记录，事务号按实例各算各的。
+            highest_transaction_number_before_this_publish: 0,
             instance: InstanceGeneration(2),
             back_chain: back_chain_of(&current.record_bytes),
             file: None,
+            // 写行那次发布不碰 inode 树。
+            new_inode_records: &[],
             instance_table: InstanceTablePlan::Rewrite(bad_table.to_records()),
             tree_birth_txg: current.tree_birth_txg(),
             tree_identifier_watermark: current.root.tree_identifier_watermark,
@@ -489,7 +510,10 @@ fn one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_lat
     );
     let mut image = pool.memory_pool();
     for txg in [5u64, 6] {
-        let target = target_for_publish(CheckpointTxg(txg));
+        let target = target_for_publish(
+            CheckpointTxg(txg),
+            parameters().geometry.root_ring_slots_per_region,
+        );
         image.flip_byte(region_device(txg), slot_offset(target, 4096), 100);
     }
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
@@ -543,7 +567,10 @@ fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg() {
         assert_eq!(fourth.record.counter, 6);
         let mut image = pool.memory_pool();
         for txg in [5u64, 6] {
-            let target = target_for_publish(CheckpointTxg(txg));
+            let target = target_for_publish(
+                CheckpointTxg(txg),
+                parameters().geometry.root_ring_slots_per_region,
+            );
             image.flip_byte(region_device(txg), slot_offset(target, 4096), 100);
         }
         let torn: Vec<u64> = if tear_jsn_five { vec![4, 5] } else { vec![4] };
@@ -569,7 +596,10 @@ fn torn_anchor_record_lets_the_chain_start_only_at_the_next_checkpoint_txg() {
         // 同一段历史做可写挂载：写出的行 W 只罩住真被施加的前缀。
         let mut devices = pool.reopen_recorded();
         for txg in [5u64, 6] {
-            let target = target_for_publish(CheckpointTxg(txg));
+            let target = target_for_publish(
+                CheckpointTxg(txg),
+                parameters().geometry.root_ring_slots_per_region,
+            );
             let device = region_device(txg);
             let offset = slot_offset(target, 4096);
             let (_, recorded) = devices

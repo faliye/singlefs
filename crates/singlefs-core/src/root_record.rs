@@ -1,4 +1,4 @@
-//! 根记录（D22（单元原子性怎么合成） 已定项 7）：371 字节住一个判定宽度（physical_block_size）的根槽，
+//! 根记录（D22（单元原子性怎么合成） 已定项 7）：457 字节住一个判定宽度（physical_block_size）的根槽，
 //! 自证校验和罩整槽含补齐、自身按 0 参与。行序即盘上顺序，偏移按行累加。
 
 use singlefs_format::{NODE_POINTER_BYTES, ROOT_RECORD_BYTES, WIDE_CHECKSUM_BYTES};
@@ -23,14 +23,21 @@ pub struct RootRecord {
     pub instance_table: NodePointer,
     /// 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）。
     pub mapping_root: NodePointer,
+    /// 树表 0 条的那一版的分配记录树的根（2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。
+    ///
+    /// **只有树表 0 条的那一版用这一项**：它没有树表条目可放（往树表里写一条，`tree_table_has_no_entries` 当场翻面，
+    /// 按 `PreviousVersion::WithoutFile` / `WithFile` 分流的每一处跟着变）。带文件的一版恒 [`NodePointer::empty_root`]
+    /// ——那一版的分配记录树住树表条目（D8（核心索引结构） 已定项 8），两处都写就成了同一个量的两份手抄。
+    /// mkfs 的第 0 代也恒全零：那一版的账由 `mount::format_time_allocator` 从实例表与树表两条指针直接算。
+    pub allocation_record_tree_root: NodePointer,
 }
 
 impl RootRecord {
-    /// 写成一个 `slot_bytes` 宽的槽；记录 371 字节，其余补 0。
+    /// 写成一个 `slot_bytes` 宽的槽；记录 457 字节，其余补 0。
     #[must_use]
     pub fn to_slot(&self, slot_bytes: usize) -> Vec<u8> {
         assert!(
-            slot_bytes >= usize::try_from(ROOT_RECORD_BYTES).expect("371"),
+            slot_bytes >= usize::try_from(ROOT_RECORD_BYTES).expect("457"),
             "根槽装不下根记录"
         );
         let mut writer = ByteWriter::new(slot_bytes);
@@ -49,6 +56,7 @@ impl RootRecord {
         writer.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
         self.instance_table.write_to(&mut writer);
         self.mapping_root.write_to(&mut writer);
+        self.allocation_record_tree_root.write_to(&mut writer);
         writer.put_u8(0); // 算法类型：未加密
         writer.skip(12 + 16); // nonce、MAC：第一版留位全 0
         writer.assert_position(ROOT_RECORD_BYTES, "根记录");
@@ -61,7 +69,7 @@ impl RootRecord {
     /// 读者：magic、整槽校验和、fsid、flags 四关。
     #[must_use]
     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> Option<Self> {
-        if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("371")
+        if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("457")
             || bytes[..4] != ROOT_MAGIC
         {
             return None;
@@ -85,9 +93,10 @@ impl RootRecord {
         reader.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
         let instance_table = NodePointer::read_from(&mut reader);
         let mapping_root = NodePointer::read_from(&mut reader);
+        let allocation_record_tree_root = NodePointer::read_from(&mut reader);
         assert_eq!(
             reader.position(),
-            ROOT_CHECKSUM_OFFSET + 32 + 2 * usize::try_from(NODE_POINTER_BYTES).expect("86")
+            ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86")
         );
         Some(Self {
             filesystem_identifier,
@@ -98,6 +107,7 @@ impl RootRecord {
             rollback_floor,
             instance_table,
             mapping_root,
+            allocation_record_tree_root,
         })
     }
 }
@@ -116,14 +126,15 @@ mod tests {
             rollback_floor: CheckpointTxg(0),
             instance_table: NodePointer::empty_root(),
             mapping_root: NodePointer::empty_root(),
+            allocation_record_tree_root: NodePointer::empty_root(),
         }
     }
 
     #[test]
-    fn root_record_is_371_bytes_with_the_checksum_at_138_and_round_trips() {
+    fn root_record_is_457_bytes_with_the_checksum_at_138_and_round_trips() {
         let slot = sample().to_slot(512);
         assert_eq!(slot.len(), 512);
-        assert!(slot[371..].iter().all(|byte| *byte == 0));
+        assert!(slot[457..].iter().all(|byte| *byte == 0));
         assert_eq!(&slot[..4], b"SFSR");
         assert_eq!(RootRecord::parse_slot(&slot, &[5u8; 16]), Some(sample()));
         assert_eq!(

@@ -53,6 +53,24 @@ pub const fn index_node_header_bytes(key_width_in_bytes: u64) -> u64 {
         + NONCE_MAC_ALGORITHM_RESERVED_BYTES
 }
 
+/// inode 树根（码 2）的节点头：`86 + 2 × 8 + 29`，key 宽 8，条目区从这里起（D8（核心索引结构） 已定项 6 / 已定项 11；D18（块里携带什么信息） 已定项 16 / 已定项 18）。format-const: INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES
+pub const INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES: u64 = 131;
+
+/// 树表单元自己的码 2 头：`86 + 2 × 8 + 29`，key 是树 ID、key 宽 8（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 7 / 已定项 16）。format-const: TREE_TABLE_UNIT_INDEX_NODE_HEADER_BYTES
+pub const TREE_TABLE_UNIT_INDEX_NODE_HEADER_BYTES: u64 = 131;
+
+/// extent 树节点（码 2）的头：`86 + 2 × 24 + 29`，key 宽 24（D18（块里携带什么信息） 已定项 2 / 已定项 16；D8（核心索引结构） 已定项 11）。format-const: EXTENT_TREE_INDEX_NODE_HEADER_BYTES
+pub const EXTENT_TREE_INDEX_NODE_HEADER_BYTES: u64 = 163;
+
+/// 分配记录树节点（码 2）的头：`86 + 2 × 10 + 29`，key 宽 10（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16）。format-const: ALLOCATION_RECORDS_TREE_INDEX_NODE_HEADER_BYTES
+pub const ALLOCATION_RECORDS_TREE_INDEX_NODE_HEADER_BYTES: u64 = 135;
+
+/// 记账树节点（码 2）的头：`86 + 2 × 22 + 29`，key 宽 22（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16）。format-const: ACCOUNTING_TREE_INDEX_NODE_HEADER_BYTES
+pub const ACCOUNTING_TREE_INDEX_NODE_HEADER_BYTES: u64 = 159;
+
+/// 中央映射树节点（码 2）的头：`86 + 2 × 27 + 29`，key 宽 27，条目区从这里起（D8（核心索引结构） 已定项 11；D18（块里携带什么信息） 已定项 16）。format-const: CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES
+pub const CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES: u64 = 169;
+
 /// 位置条目：设备身份 4 + 16 KiB 槽号 6 + 密文校验和 4（D19（块指针的结构与宽度预算） 已定项 4）。format-const: LOC_ENTRY
 pub const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-const 登记位定（D19 已定项 4），门禁 27 号按这个名字绑值
 
@@ -62,25 +80,23 @@ pub const LOCATION_ENTRIES_PER_POINTER: u64 = 2;
 /// 指针头部：MAC 16 + nonce 12 + 算法类型 1 + 压缩算法码 1 + 压后长度 2 + extent 偏移 2 + 出生树 8 + 出生 txg 8（D19（块指针的结构与宽度预算） 已定项 11；压缩两段 2026-09-14 用户定案）。
 pub const POINTER_HEAD_BYTES: u64 = 50;
 
-/// 指向码 1 的指针：头部 50 + 位置条目 14 × 2 + 写序 10（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。
-pub const DATA_POINTER_BYTES: u64 =
-    POINTER_HEAD_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 10;
+/// 指向码 1 的指针：头部 50 + 位置条目 14 × 2 + 写序 10（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。format-const: DATA_POINTER_BYTES
+pub const DATA_POINTER_BYTES: u64 = 88;
 
-/// 指向码 2 / 码 3 的指针：头部 50 + 位置条目 14 × 2 + 实例代号 4 + 出生序号 4（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。
-pub const NODE_POINTER_BYTES: u64 =
-    POINTER_HEAD_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 8;
+/// 指向码 2 / 码 3 的指针：头部 50 + 位置条目 14 × 2 + 实例代号 4 + 出生序号 4（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 8）。format-const: NODE_POINTER_BYTES
+pub const NODE_POINTER_BYTES: u64 = 86;
 
 /// 中央映射 key：类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10，码 2 / 码 3 的 8 字节尾段补零到同宽（D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10，2026-09-14 用户定案一宽）。
 pub const MAPPING_KEY_BYTES: u64 = 27;
 
-/// 中央映射条目：key 27 + 位置条目 14 × 2（D19（块指针的结构与宽度预算） 已定项 6）。
-pub const MAPPING_ENTRY_BYTES: u64 = MAPPING_KEY_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER;
+/// 中央映射条目：key 27 + 位置条目 14 × 2（D19（块指针的结构与宽度预算） 已定项 6）。format-const: MAPPING_ENTRY_BYTES
+pub const MAPPING_ENTRY_BYTES: u64 = 55;
 
 /// extent 树叶记录 key：locality_id 8 + inode 8 + offset 8（D8（核心索引结构） 已定项 3）。
 pub const EXTENT_KEY_BYTES: u64 = 24;
 
-/// extent 树叶记录：key 24 + 数据指针 88（D19（块指针的结构与宽度预算） 已定项 7）。
-pub const EXTENT_LEAF_RECORD_BYTES: u64 = EXTENT_KEY_BYTES + DATA_POINTER_BYTES;
+/// extent 树叶记录：key 24 + 数据指针 88（D19（块指针的结构与宽度预算） 已定项 7）。format-const: EXTENT_LEAF_RECORD_BYTES
+pub const EXTENT_LEAF_RECORD_BYTES: u64 = 112;
 
 /// inode 记录定长 140（D8（核心索引结构） 已定项 6）。format-const: INODE_RECORD_BYTES
 pub const INODE_RECORD_BYTES: u64 = 140;
@@ -103,12 +119,13 @@ pub const INSTANCE_TABLE_PAGE_RECORDS: u64 = 370;
 /// 分配记录：key (设备 4, 槽号 6) + value (跨度 2, 代 8)（D3（空间分配） 已定项 7 / 已定项 11）。
 pub const ALLOCATION_RECORD_KEY_BYTES: u64 = 10;
 pub const ALLOCATION_RECORD_VALUE_BYTES: u64 = 10;
-pub const ALLOCATION_RECORD_BYTES: u64 =
-    ALLOCATION_RECORD_KEY_BYTES + ALLOCATION_RECORD_VALUE_BYTES;
+/// 分配记录一条：key 10 + value 10（D3（空间分配） 已定项 7 / 已定项 11）。format-const: ALLOCATION_RECORD_BYTES
+pub const ALLOCATION_RECORD_BYTES: u64 = 20;
 
 /// 记账条目：key (标签 2, 树 ID 8, 设备 4, 代 8) + value 8 + seq 4（D5（快照 / 空间记账机制） 已定项 5；D8（核心索引结构） 已定项 7）。
 pub const ACCOUNTING_KEY_BYTES: u64 = 22;
-pub const ACCOUNTING_ENTRY_BYTES: u64 = ACCOUNTING_KEY_BYTES + 8 + 4;
+/// 记账条目一条：key 22 + value 8 + seq 4（D5（快照 / 空间记账机制） 已定项 5；D8（核心索引结构） 已定项 7）。format-const: ACCOUNTING_ENTRY_BYTES
+pub const ACCOUNTING_ENTRY_BYTES: u64 = 34;
 
 /// 第一个事务这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
 pub const FIRST_TRANSACTION_ACCOUNTING_ROWS: u64 = 15;
@@ -132,8 +149,8 @@ pub const TREE_IDENTIFIER_DEADLIST: u64 = 18;
 pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 11;
 pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 19;
 
-/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案）。format-const: ROOT_RECORD_BYTES
-pub const ROOT_RECORD_BYTES: u64 = 371;
+/// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。format-const: ROOT_RECORD_BYTES
+pub const ROOT_RECORD_BYTES: u64 = 457;
 
 /// journal 记录定长 4 KiB（D23（journal 的角色与格式） 已定项 12）。
 pub const JOURNAL_RECORD_BYTES: u64 = 4096;
@@ -144,8 +161,8 @@ pub const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 /// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8（D23（journal 的角色与格式） 已定项 15）。
 pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8;
 
-/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 反向链 4 + 载荷校验和 4 + 新根段 188 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案）。format-const: JOURNAL_HEADER_BYTES
-pub const JOURNAL_HEADER_BYTES: u64 = 307;
+/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 188 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
+pub const JOURNAL_HEADER_BYTES: u64 = 311;
 
 /// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。
 pub const JOURNAL_NAMED_ENTRY_BYTES: u64 =
@@ -181,9 +198,28 @@ pub const FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES: u64 = 4096;
 /// 系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮 + 用户定案；此前是探测到的 physical_block_size）。format-const: SYSTEM_CONFIGURATION_SLOT_BYTES
 pub const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 
-/// 根环参数：R 个区域、每区 S 槽、素数步长 P、chunk、基址（D22（单元原子性怎么合成） 已定项 2 / 已定项 16）。
+/// 根环参数：R 个区域、素数步长 P、chunk、基址（D22（单元原子性怎么合成） 已定项 2 / 已定项 16）。
+/// 每区槽数 S **不在这里**：它是系统配置字段，见下面那三个常量。
 pub const ROOT_RING_REGIONS: u64 = 3;
-pub const ROOT_RING_SLOTS_PER_REGION: u64 = 8;
+
+/// 每区槽数 S 的下界 = k_tol + 2（D22（单元原子性怎么合成） 已定项 1 的字段表逐字：S 要装得下
+/// 4 个状态加一次带 k_tol 次根槽写失败的处置）。
+///
+/// ⚠️ **S 自己不是格式常量**：字段表逐字写「具体取多少不是格式决策——格式承诺的是『S 是系统配置字段 +
+/// 挂载时判区间』」。它住系统配置槽偏移 362 那一字节，mkfs 写进去、挂载时读回来判这两条边
+/// （`singlefs_core::root_ring::RootRingSlotsPerRegion`）。格式承诺的、因而登记成格式常量的，只有区间的两条边。
+/// format-const: ROOT_RING_SLOTS_PER_REGION_MINIMUM
+pub const ROOT_RING_SLOTS_PER_REGION_MINIMUM: u64 = 4;
+
+// placeholder: C506（每区槽数 S 写成编译期常量，条文说它住系统配置） —— 字段表给的上界是「由 I-7.4（近 K 代块未被复用）
+// 扣住的块数挂载时算」，那个数今天算不出来：I-7.4 的「K 代」2026-09-13 起就指回退候选集本身（按实例表判仍有效 ∧ txg ≥ F_生效），
+// 候选集又按 F 与实例表现算，仓里没有一条式子从池的参数给得出 S 的上界。在它算得出来之前按 16 收着，区间判用的是这个收着的数。
+pub const ROOT_RING_SLOTS_PER_REGION_MAXIMUM: u64 = 16;
+
+// placeholder: D22（单元原子性怎么合成） 已定项 1 —— S 取多少不是格式决策，是 mkfs 参数（字段表逐字「取值由第一版实现按
+// D25（目标负载优先级） 的负载形态定」）；第一版 mkfs 写 8，与 `.claude/kb/layout/01-first-txn.md` 一字段表「每区槽数 S」那一行的值相同。
+pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
+
 pub const ROOT_RING_PRIME_STEP: u64 = 3;
 pub const ROOT_RING_CHUNK_BYTES: u64 = 1024 * 1024;
 /// 根环起点是 16 KiB 槽号（1 MiB）。
@@ -198,6 +234,10 @@ pub const UNIT_AREA_START_SLOT: u64 = 50176;
 pub const CLUSTER_SEGMENT_SLOTS: u64 = 64;
 
 /// 第一个事务的 checkpoint_txg 是 3：两次暖机空发布之后（D16（发布语义） 已定项 6 / 已定项 8）。format-const: FIRST_TRANSACTION_TXG
+///
+/// ⚠️ **射程只有 mkfs 同一个进程里那条流**（mkfs → 取号 → 暖机两次 → 第一个事务），**不管任何池的第一个文件版本**
+/// （2026-09-23 用户定案）：池重开过一次可写挂载之后再写第一个文件时，那一版已经推到别的 txg，
+/// `transaction::publish_first_file` 从它接着算，不取这个常量。
 pub const FIRST_TRANSACTION_TXG: u64 = 3;
 
 /// 第一次可写挂载先推两次空发布（D16（发布语义） 已定项 8）。format-const: WARM_UP_EMPTY_PUBLISHES
@@ -218,15 +258,6 @@ mod tests {
             "码 1 载荷起点（D18 已定项 16 + 2026-09-14 算法类型）"
         );
         assert_eq!(PACKED_UNIT_RECORDS_OFFSET, 136, "码 3 记录区起点");
-        assert_eq!(
-            index_node_header_bytes(8),
-            131,
-            "inode 树根 / 树表单元的码 2 头"
-        );
-        assert_eq!(index_node_header_bytes(24), 163, "extent 树的码 2 头");
-        assert_eq!(index_node_header_bytes(10), 135, "分配记录树的码 2 头");
-        assert_eq!(index_node_header_bytes(22), 159, "记账树的码 2 头");
-        assert_eq!(index_node_header_bytes(27), 169, "中央映射树的码 2 头");
         assert_eq!(DATA_POINTER_BYTES, 88, "指向码 1 的指针");
         assert_eq!(NODE_POINTER_BYTES, 86, "指向码 2 / 码 3 的指针");
         assert_eq!(MAPPING_ENTRY_BYTES, 55, "映射条目一宽");
@@ -263,10 +294,11 @@ mod tests {
                 + WIDE_CHECKSUM_BYTES
                 + NODE_POINTER_BYTES
                 + NODE_POINTER_BYTES
+                + NODE_POINTER_BYTES
                 + 1
                 + 12
                 + 16,
-            "根记录十四段"
+            "根记录十五段"
         );
         assert_eq!(
             JOURNAL_HEADER_BYTES,
@@ -275,19 +307,20 @@ mod tests {
                 + 1
                 + 4
                 + 4
+                + 4
                 + JOURNAL_NEW_ROOT_SEGMENT_BYTES
                 + 8
                 + 16,
-            "journal 记录头七段"
+            "journal 记录头 = 十个字段 + 事务号 + 提交标记 + 本次发布内序号 + 反向链 + 载荷校验和 + 新根段 + fsid + MAC"
         );
         assert_eq!(INODE_LEAF_RECORDS, 233, "一个容器装几条 inode 记录");
         assert_eq!(INSTANCE_TABLE_PAGE_RECORDS, 370, "实例表一片装几条");
         assert_eq!(ALLOCATION_RECORD_BYTES, 20, "分配记录");
         assert_eq!(ACCOUNTING_ENTRY_BYTES, 34, "记账条目");
         assert_eq!(TREE_TABLE_ENTRY_BYTES, 200, "树表条目");
-        assert_eq!(ROOT_RECORD_BYTES, 371, "根记录");
+        assert_eq!(ROOT_RECORD_BYTES, 457, "根记录");
         assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 188, "journal 新根段");
-        assert_eq!(JOURNAL_HEADER_BYTES, 307, "journal 记录头");
+        assert_eq!(JOURNAL_HEADER_BYTES, 311, "journal 记录头");
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56, "journal 点名项");
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67, "一条记录装几个点名项");
         assert_eq!(
@@ -299,6 +332,78 @@ mod tests {
             UNIT_AREA_START_SLOT,
             JOURNAL_RING_START_SLOT + JOURNAL_RING_DEFAULT_BYTES / SLOT_BYTES,
             "单元区紧接 journal 环之后"
+        );
+    }
+
+    /// 这六个宽写成整数字面量，门禁 27 号才核得了它们与 kb 的登记值（C94（登记的格式常量与后来的定案对不上））；
+    /// 原来定义它们的算式留在这里，要一个数不差。写成加法、不写减法（减法在变异下会编译期溢出）。
+    #[test]
+    fn pointer_record_and_entry_width_literals_equal_the_field_sums_they_stand_for() {
+        assert_eq!(
+            DATA_POINTER_BYTES,
+            POINTER_HEAD_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 10,
+            "指向码 1 的指针 = 头部 + 位置条目 × 2 + 写序 10"
+        );
+        assert_eq!(
+            NODE_POINTER_BYTES,
+            POINTER_HEAD_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER + 8,
+            "指向码 2 / 码 3 的指针 = 头部 + 位置条目 × 2 + 实例代号 4 + 出生序号 4"
+        );
+        assert_eq!(
+            MAPPING_ENTRY_BYTES,
+            MAPPING_KEY_BYTES + LOC_ENTRY * LOCATION_ENTRIES_PER_POINTER,
+            "映射条目 = key + 位置条目 × 2"
+        );
+        assert_eq!(
+            EXTENT_LEAF_RECORD_BYTES,
+            EXTENT_KEY_BYTES + DATA_POINTER_BYTES,
+            "extent 叶记录 = key + 指向码 1 的指针"
+        );
+        assert_eq!(
+            ALLOCATION_RECORD_BYTES,
+            ALLOCATION_RECORD_KEY_BYTES + ALLOCATION_RECORD_VALUE_BYTES,
+            "分配记录 = key + value"
+        );
+        assert_eq!(
+            ACCOUNTING_ENTRY_BYTES,
+            ACCOUNTING_KEY_BYTES + 8 + 4,
+            "记账条目 = key + value 8 + seq 4"
+        );
+    }
+
+    /// 每棵树的码 2 节点头宽写成整数字面量（门禁 27 号要核），与 `index_node_header_bytes` 在那棵树的 key 宽上算出来的一个数不差；
+    /// 哪棵树取哪个 key 宽照 `.claude/kb/layout/01-first-txn.md` 那几行：inode 树根与树表单元都是 8，两者各有各的名字。
+    #[test]
+    fn tree_index_node_header_literals_equal_the_header_formula_at_each_tree_key_width() {
+        assert_eq!(
+            INODE_TREE_ROOT_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(8),
+            "inode 树根：key 宽 8"
+        );
+        assert_eq!(
+            TREE_TABLE_UNIT_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(8),
+            "树表单元：key 是树 ID、key 宽 8"
+        );
+        assert_eq!(
+            EXTENT_TREE_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(EXTENT_KEY_BYTES),
+            "extent 树：key 宽 24"
+        );
+        assert_eq!(
+            ALLOCATION_RECORDS_TREE_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(ALLOCATION_RECORD_KEY_BYTES),
+            "分配记录树：key 宽 10"
+        );
+        assert_eq!(
+            ACCOUNTING_TREE_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(ACCOUNTING_KEY_BYTES),
+            "记账树：key 宽 22"
+        );
+        assert_eq!(
+            CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES,
+            index_node_header_bytes(MAPPING_KEY_BYTES),
+            "中央映射树：key 宽 27"
         );
     }
 

@@ -10,13 +10,14 @@ use singlefs_format::{
     journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY, NODE_BYTES,
     ROOT_RING_BASE_SLOT, ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS,
-    ROOT_RING_SLOTS_PER_REGION, SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES,
-    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT, WIDE_CHECKSUM_BYTES,
+    SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+    WIDE_CHECKSUM_BYTES,
 };
 
 use crate::address::{DeviceIdentity, InstanceGeneration};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{wide_checksum_field_holds, wide_checksum_with_field_zeroed};
+use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange};
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
 pub const FORMAT_VERSION: u16 = 1;
@@ -33,6 +34,10 @@ pub const CHECKSUM_ALGORITHM_CRC32_CASTAGNOLI: u8 = 1;
 /// 自举头：magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 + 校验和算法标识 1 + 本盘设备号 4 + 设备数 4 + 槽世代号 8。
 pub const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4 + 4 + 8;
 const FSID_OFFSET: usize = 4 + 2 + 96;
+/// 几何段里「每区槽数 S」那一字节（字段表 `layout/01-first-txn.md` 一：R 在 361、S 在 362）。
+/// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切，
+/// 一个偏移只有这一处定义。
+const ROOT_RING_SLOTS_PER_REGION_OFFSET: u64 = 362;
 const REGION_DEVICES_OFFSET: u64 = 379;
 const TAIL_OFFSET: u64 = 469;
 /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
@@ -60,11 +65,11 @@ pub enum SlotFieldMutability {
     RuntimeQuantity,
 }
 
-/// 系统不可变配置里那四个 mkfs 探测或取参定下的尺寸。
+/// 系统不可变配置里那五个 mkfs 探测或取参定下的尺寸。
 ///
-/// 单拎成一个类型，是因为 mkfs 的参数只给得出这四个：本盘设备号由 mkfs 逐盘现填，设备数由池里的盘数现数
+/// 单拎成一个类型，是因为 mkfs 的参数只给得出这五个：本盘设备号由 mkfs 逐盘现填，设备数由池里的盘数现数
 /// （[`crate::make_filesystem::MakeFilesystemParameters`] 拿它当 `geometry` 字段）。
-/// 四个都在字段表「几何」段里，都属于系统不可变配置——改它们要重建文件系统。
+/// 五个都在字段表「几何」段里，都属于系统不可变配置——改它们要重建文件系统。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemImmutableSizes {
     /// mkfs 时探测到的 physical_block_size（2026-09-14 用户定案的字段，给挂载与 checker 比对用）。
@@ -75,6 +80,10 @@ pub struct SystemImmutableSizes {
     pub fixed_structure_slot_spacing: u32,
     /// journal 环长（mkfs 参数，默认 768 MiB，环 ≤ 容量 / 4，D23（journal 的角色与格式） 已定项 19）。
     pub journal_ring_bytes: u64,
+    /// 每区槽数 S（mkfs 参数，第一版写 [`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM`] = 8，
+    /// 挂载时判 4..16 区间，D22（单元原子性怎么合成） 已定项 1 的字段表）。环几何的每一处都读它，
+    /// 不读编译期常量（C506（每区槽数 S 写成编译期常量，条文说它住系统配置））。
+    pub root_ring_slots_per_region: RootRingSlotsPerRegion,
 }
 
 impl SystemImmutableSizes {
@@ -346,7 +355,13 @@ impl SystemConfiguration {
             writer.put_u64(in_flight_limit * JOURNAL_RECORD_BYTES);
             writer.put_u32(u32::try_from(JOURNAL_SAFETY_FACTOR).expect("安全系数"));
             writer.put_u8(u8::try_from(ROOT_RING_REGIONS).expect("R"));
-            writer.put_u8(u8::try_from(ROOT_RING_SLOTS_PER_REGION).expect("S"));
+            writer.assert_position(ROOT_RING_SLOTS_PER_REGION_OFFSET, "每区槽数 S");
+            writer.put_u8(
+                self.immutable
+                    .sizes
+                    .root_ring_slots_per_region
+                    .to_system_configuration_field(),
+            );
             writer.put_u32(u32::try_from(ROOT_RING_PRIME_STEP).expect("P"));
             writer.put_u32(u32::try_from(ROOT_RING_CHUNK_BYTES).expect("chunk"));
             writer.put_u64(ROOT_RING_BASE_SLOT);
@@ -384,18 +399,27 @@ impl SystemConfiguration {
         (bytes, accounting)
     }
 
-    /// 读者：magic、整槽校验和、incompat 位三关都过才解；任一关不过返回 None（这一槽不可择）。
-    #[must_use]
-    pub fn parse_slot(bytes: &[u8]) -> Option<Self> {
+    /// 读者：magic、整槽校验和、incompat 位三关都过才解，三关任一不过是
+    /// [`SystemConfigurationSlotRefusal::NotSelfDescribing`]（这一槽不可择）；解开之后按 D22 已定项 1
+    /// 的字段表判每区槽数 S 的区间，越界是
+    /// [`SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange`]（整池拒绝挂载）。
+    ///
+    /// # Errors
+    /// 见两个成员各自的说明。
+    pub fn parse_slot(bytes: &[u8]) -> Result<Self, SystemConfigurationSlotRefusal> {
         if bytes.len() < slot_bytes() || bytes[..4] != SYSTEM_CONFIGURATION_MAGIC {
-            return None;
+            return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
         }
         if !wide_checksum_field_holds(bytes, slot_bytes(), SYSTEM_CONFIGURATION_CHECKSUM_OFFSET) {
-            return None;
+            return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
         }
         if !incompat_bits_are_mountable(bytes) {
-            return None;
+            return Err(SystemConfigurationSlotRefusal::NotSelfDescribing);
         }
+        let root_ring_slots_per_region = RootRingSlotsPerRegion::from_system_configuration_field(
+            u64::from(bytes[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")]),
+        )
+        .map_err(SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange)?;
         let mut reader = ByteReader::at(bytes, FSID_OFFSET);
         let filesystem_identifier: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节");
         reader.skip(16 + 4 + 1);
@@ -419,7 +443,7 @@ impl SystemConfiguration {
         let mut tail_reader = ByteReader::at(bytes, usize::try_from(TAIL_OFFSET).expect("469"));
         let journal_tail = tail_reader.get_u64();
         let journal_instance = InstanceGeneration(tail_reader.get_u32());
-        Some(Self {
+        Ok(Self {
             immutable: SystemImmutableConfiguration {
                 filesystem_identifier,
                 this_device,
@@ -430,6 +454,7 @@ impl SystemConfiguration {
                     minimum_input_output_bytes,
                     fixed_structure_slot_spacing,
                     journal_ring_bytes,
+                    root_ring_slots_per_region,
                 },
             },
             // 节点大小那 4 字节不读回来：它今天只可能是格式常量 `NODE_BYTES`，读回来会多出一个
@@ -445,6 +470,19 @@ impl SystemConfiguration {
             },
         })
     }
+}
+
+/// 一个系统配置槽读不成的原因，按调用方能据以行动的粒度分（`code-discipline.md`：
+/// 错误成员按调用方要做的决定分）。封闭集合，`match` 不写通配臂。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SystemConfigurationSlotRefusal {
+    /// magic、整槽校验和、incompat 位三关里有一关不过 ⇒ **这一槽不可择**：换一槽、换一盘还可以试，
+    /// 系统配置每盘两槽、池里每盘一份买的就是这份冗余（D22（单元原子性怎么合成） 已定项 8 第 1 条）。
+    NotSelfDescribing,
+    /// 自述的每区槽数 S 落在格式承诺的区间之外 ⇒ **整池拒绝挂载**，不换一槽再试：S 是池级字段，
+    /// 两盘四槽写的是同一个值，换一槽读到的还是它（D22（单元原子性怎么合成） 已定项 9 的射程：
+    /// 字段表里只有本盘设备号是盘级的）。
+    RootRingSlotsPerRegionOutOfRange(RootRingSlotsPerRegionOutOfRange),
 }
 
 /// incompat 位图里不认识的位 ⇒ 挂不上（`.claude/rules/fs-design.md`）；且必须带布局身份位。
@@ -474,6 +512,7 @@ mod tests {
                     minimum_input_output_bytes: 512,
                     fixed_structure_slot_spacing: 4096,
                     journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                    root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
                 },
             },
             mutable: SystemMutableConfiguration,
@@ -499,7 +538,12 @@ mod tests {
             &slot[FSID_OFFSET + 16..FSID_OFFSET + 16 + 11],
             b"singlefs-rs"
         );
-        assert_eq!(SystemConfiguration::parse_slot(&slot), Some(sample()));
+        assert_eq!(SystemConfiguration::parse_slot(&slot), Ok(sample()));
+        assert_eq!(
+            slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")],
+            8,
+            "每区槽数 S 写在偏移 362 那一字节，mkfs 第一版写 8"
+        );
         assert!(wide_checksum_field_holds(
             &slot,
             4096,
@@ -513,12 +557,64 @@ mod tests {
         slot[4000] ^= 1;
         assert_eq!(
             SystemConfiguration::parse_slot(&slot),
-            None,
+            Err(SystemConfigurationSlotRefusal::NotSelfDescribing),
             "补齐区改一字节也失配：整槽校验和罩 4096"
         );
         let mut unknown = sample().to_slot();
         unknown[6] |= 0x02;
         assert!(!incompat_bits_are_mountable(&unknown));
+    }
+
+    /// 把槽里那一字节的 S 改成区间外的值（校验和重算，三关照样过），读者必须报得出拒的是什么：
+    /// 不是「这一槽不可择」，而是点名的越界成员，带着盘上读到的值与两条边。
+    #[test]
+    fn a_self_describing_slot_declaring_an_out_of_range_slots_per_region_is_refused_by_name() {
+        for (declared, expected) in [(3u64, 3u64), (17, 17), (0, 0), (255, 255)] {
+            let mut slot = sample().to_slot();
+            slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")] =
+                u8::try_from(declared).expect("采样点都装得进一字节");
+            let digest = wide_checksum_with_field_zeroed(
+                &slot,
+                slot_bytes(),
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            );
+            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+                .copy_from_slice(&digest);
+            assert!(
+                wide_checksum_field_holds(&slot, 4096, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET),
+                "这一槽自证得过，拒它的只能是区间判"
+            );
+            assert_eq!(
+                SystemConfiguration::parse_slot(&slot),
+                Err(
+                    SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange(
+                        RootRingSlotsPerRegionOutOfRange {
+                            declared_slots_per_region: expected,
+                            minimum: 4,
+                            maximum: 16,
+                        }
+                    )
+                ),
+                "S = {declared} 越界"
+            );
+        }
+        for declared in [4u8, 8, 16] {
+            let mut slot = sample().to_slot();
+            slot[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")] = declared;
+            let digest = wide_checksum_with_field_zeroed(
+                &slot,
+                slot_bytes(),
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            );
+            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+                .copy_from_slice(&digest);
+            let parsed = SystemConfiguration::parse_slot(&slot).expect("区间里的值收");
+            assert_eq!(
+                parsed.immutable.sizes.root_ring_slots_per_region.count(),
+                u64::from(declared),
+                "读回来的 S 就是盘上那一字节，不是编译期常量"
+            );
+        }
     }
 
     #[test]

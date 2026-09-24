@@ -11,6 +11,7 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemOutput, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
     TREE_TABLE_GENESIS_SLOT,
 };
+use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
@@ -51,6 +52,7 @@ pub fn parameters() -> MakeFilesystemParameters {
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         },
     }
 }
@@ -59,6 +61,7 @@ pub fn geometry() -> FixedGeometry {
     FixedGeometry {
         fixed_structure_slot_spacing: 4096,
         journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+        root_ring_slots_per_region: parameters().geometry.root_ring_slots_per_region,
     }
 }
 
@@ -259,7 +262,7 @@ pub fn crash_state_devices(
             device.image = sparse.clone();
             for (write, is_persisted) in writes.iter().zip(persisted) {
                 if *is_persisted && write.device == *identity {
-                    device.image.write(write.offset, &write.bytes);
+                    write.contents.apply_to(&mut device.image, write.offset);
                 }
             }
             (
@@ -390,7 +393,7 @@ pub fn build_pool(tag: &str) -> BuiltPool {
         let output = publish_first_file(
             &mut pool,
             &mut allocator,
-            &genesis.root,
+            warm_up.roots.last().expect("暖机两代根"),
             FirstFile {
                 content: &content,
                 write_time_seconds: FIXED_WRITE_TIME_SECONDS,

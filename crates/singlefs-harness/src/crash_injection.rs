@@ -98,33 +98,43 @@ impl CrashInjectionWorkerThreads {
     /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）：配错了就停，不悄悄退回单线程。
     #[must_use]
     pub fn from_the_environment() -> Self {
+        Self::from_the_environment_variable_named(
+            CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+        )
+    }
+
+    /// 线程数取 `variable_name` 这个环境变量，没设就取 `available_parallelism`。
+    /// 坏盘输入（增补 3 第 5 件）拿它配自己那个变量名：判定只有「环境变量 → 正整数」这一件事，
+    /// 抄一份出来两边会分叉（`code-discipline.md`「重复要生成，不许手抄」）。
+    ///
+    /// # Panics
+    /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）：配错了就停，不悄悄退回单线程。
+    #[must_use]
+    pub fn from_the_environment_variable_named(variable_name: &str) -> Self {
         Self::from_the_environment_value(
-            std::env::var(CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE),
+            variable_name,
+            std::env::var(variable_name),
             std::thread::available_parallelism,
         )
     }
 
-    /// [`Self::from_the_environment`] 的判定本身：环境变量读到什么、`available_parallelism` 报什么都由调用方给
-    /// （用例不改进程的环境变量）。
+    /// [`Self::from_the_environment_variable_named`] 的判定本身：环境变量读到什么、`available_parallelism` 报什么
+    /// 都由调用方给（用例不改进程的环境变量）。
     ///
     /// # Panics
     /// 环境变量设了却不是正整数。
     #[must_use]
     fn from_the_environment_value(
+        variable_name: &str,
         variable: Result<String, std::env::VarError>,
         available_parallelism: impl Fn() -> std::io::Result<std::num::NonZeroUsize>,
     ) -> Self {
         match variable {
             Ok(text) => {
                 let count: usize = text.trim().parse().unwrap_or_else(|error| {
-                    panic!(
-                        "{CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE}={text} 不是十进制正整数：{error}"
-                    )
+                    panic!("{variable_name}={text} 不是十进制正整数：{error}")
                 });
-                assert!(
-                    count > 0,
-                    "{CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE}={text}：至少要 1 个线程"
-                );
+                assert!(count > 0, "{variable_name}={text}：至少要 1 个线程");
                 Self::FromTheEnvironmentVariable(count)
             }
             Err(std::env::VarError::NotPresent) => match available_parallelism() {
@@ -132,7 +142,7 @@ impl CrashInjectionWorkerThreads {
                 Err(_) => Self::AvailableParallelismUnknown,
             },
             Err(std::env::VarError::NotUnicode(raw)) => {
-                panic!("{CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE} 不是 UTF-8：{raw:?}")
+                panic!("{variable_name} 不是 UTF-8：{raw:?}")
             }
         }
     }
@@ -589,6 +599,7 @@ pub fn inject_crashes_into_history(
     let geometry = FixedGeometry {
         fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
         journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
     };
     let (writes, segments, stream_indexes) =
         writes_and_segments_with_stream_indexes(&operations, &geometry);
@@ -967,7 +978,7 @@ fn write_crash_image_files(
                 continue;
             }
             let first_sector = write.offset.0 / SECTOR_BYTES;
-            let sector_count = u64::try_from(write.bytes.len()).expect("写长") / SECTOR_BYTES;
+            let sector_count = write.length_in_bytes() / SECTOR_BYTES;
             sectors.extend(first_sector..first_sector + sector_count);
         }
         for sector in sectors {
@@ -1207,7 +1218,9 @@ pub fn run_crash_injection_campaign(campaign: &CrashInjectionCampaign) -> CrashI
 }
 
 /// 把 [0, `seed_count`) 切成首尾相接的种子区间：片数取 min(种子数, 4 × 线程数)，各片长度相差至多 1。
-fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u64>> {
+/// 坏盘输入（增补 3 第 5 件）共用这一份：切法抄一份出来两边会分叉（`code-discipline.md`「重复要生成，不许手抄」）。
+#[must_use]
+pub fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Range<u64>> {
     if seed_count == 0 {
         return Vec::new();
     }
@@ -1236,11 +1249,16 @@ mod tests {
     fn worker_thread_count_comes_from_the_environment_variable_or_available_parallelism() {
         let four = || Ok(std::num::NonZeroUsize::new(4).expect("4"));
         assert_eq!(
-            CrashInjectionWorkerThreads::from_the_environment_value(Ok("3".to_string()), four),
+            CrashInjectionWorkerThreads::from_the_environment_value(
+                CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+                Ok("3".to_string()),
+                four,
+            ),
             CrashInjectionWorkerThreads::FromTheEnvironmentVariable(3)
         );
         assert_eq!(
             CrashInjectionWorkerThreads::from_the_environment_value(
+                CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
                 Err(std::env::VarError::NotPresent),
                 four
             ),
@@ -1248,6 +1266,7 @@ mod tests {
         );
         assert_eq!(
             CrashInjectionWorkerThreads::from_the_environment_value(
+                CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE,
                 Err(std::env::VarError::NotPresent),
                 || Err(std::io::Error::other("说不出几个核"))
             ),

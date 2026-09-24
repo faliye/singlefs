@@ -13,9 +13,13 @@ use common::{
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::allocator::{PlacementRefusal, UnitFootprint};
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::{back_chain_of, record_offset};
+use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::records::{
     build_mapping_entry, parse_mapping_entry, STATISTIC_ALLOCATED_BYTES,
     STATISTIC_DEFER_QUEUE_BYTES, STATISTIC_EMPTY_CLUSTER_SEGMENTS, STATISTIC_FRAGMENTATION_RUNS,
@@ -29,7 +33,8 @@ use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
     mapping_locations_for_key, placements_to_release_via_mapping, publish_overwrite, FirstFile,
-    PoolWriter, PublishError, TransactionOutput, TransactionUnit,
+    MappingLookup, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
+    FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{
     build_index_node, data_unit_payload_capacity, index_node_entry_capacity, parse_index_node,
@@ -120,9 +125,12 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     assert_eq!(second.record.named.len(), 8, "点名项 = 这次新写的单元数");
 
     let expected_slots = [
-        (TransactionUnit::Data, 50182),
+        (TransactionUnit::Data(DataUnitIndexInFile::FIRST), 50182),
         (TransactionUnit::ExtentRoot, 50249),
-        (TransactionUnit::InodeLeaf, 50250),
+        (
+            TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST),
+            50250,
+        ),
         (TransactionUnit::InodeRoot, 50252),
         (TransactionUnit::AllocationTree, 50253),
         (TransactionUnit::AccountingTree, 50254),
@@ -164,7 +172,10 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
 
     // 根槽落区域 4 mod 3 = 1 的槽 (4 div 3) mod 8 = 1，区域 1 归盘 1；系统配置世代号 6、tail = 4。
     let image = pool.memory_pool();
-    let target = target_for_publish(CheckpointTxg(4));
+    let target = target_for_publish(
+        CheckpointTxg(4),
+        parameters().geometry.root_ring_slots_per_region,
+    );
     let region_device =
         parameters().region_devices[usize::try_from(target.region).expect("区域号")];
     assert_eq!(region_device, DeviceIdentity(1));
@@ -342,6 +353,20 @@ fn cold_start_reads_the_second_content_and_the_pool_checker_stays_green() {
         },
         "第一次的内容从最新根出发读不到"
     );
+    // 步 1 验收第 4 条「inode 记录的写入时间留成 A 的 ⇒ 判红」：从盘上读回 inode 记录，不看发布交回的内存结构——
+    // 只读挂载走的是挂载态那一条读路径（`mounted_read`），与发布路径不共用代码。
+    let mounted_read_only = mount_read_only(&reopened).expect("B 之后只读挂载");
+    let first_file_inode_record = mounted_read_only
+        .mounted
+        .inode_records()
+        .iter()
+        .find(|record| record.inode == FIRST_INODE_NUMBER)
+        .expect("第一个文件那条 inode 记录在挂载态里");
+    assert_eq!(
+        first_file_inode_record.write_time_seconds,
+        FIXED_WRITE_TIME_SECONDS + 60,
+        "盘上 inode 记录的写入时间是 B 那一次写入的时间，不是 A 的 {FIXED_WRITE_TIME_SECONDS}"
+    );
 
     let verdicts = check_pool_image(&image);
     for (invariant, verdict) in &verdicts {
@@ -368,10 +393,11 @@ fn damage_probes_after_the_overwrite_tell_the_new_unit_from_the_released_one() {
     let mut pool = build_pool("overwrite-probes");
     let (second, _) = overwrite(&mut pool);
     let full = pool.memory_pool();
-    let second_data = slot_of(&second, TransactionUnit::Data).to_device_offset();
+    let second_data =
+        slot_of(&second, TransactionUnit::Data(DataUnitIndexInFile::FIRST)).to_device_offset();
     let first_data = pool
         .output
-        .unit(TransactionUnit::Data)
+        .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
         .slot
         .to_device_offset();
     let both = |image: &MemoryPool, offset, byte| {
@@ -414,7 +440,10 @@ fn damage_probes_after_the_overwrite_tell_the_new_unit_from_the_released_one() {
     );
     assert_eq!(record_damaged_report.journal.valid_records, 3);
 
-    let target = target_for_publish(CheckpointTxg(4));
+    let target = target_for_publish(
+        CheckpointTxg(4),
+        parameters().geometry.root_ring_slots_per_region,
+    );
     let region_device =
         parameters().region_devices[usize::try_from(target.region).expect("区域号")];
     let mut root_damaged = full.clone();
@@ -462,27 +491,31 @@ fn release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not
     let first_data_key = &first
         .mapped_units
         .iter()
-        .find(|(unit, _)| *unit == TransactionUnit::Data)
+        .find(|(unit, _)| *unit == TransactionUnit::Data(DataUnitIndexInFile::FIRST))
         .expect("码 1 一把 key")
         .1;
     let (second, _) = overwrite(&mut pool);
     let second_mapping = &second.unit(TransactionUnit::MappingTree).bytes;
     assert_eq!(
         mapping_locations_for_key(second_mapping, first_data_key),
-        None,
+        MappingLookup::NodeMalformedOrNoEntryWithThisKey,
         "释放判定路径对已换下的单元报「不在映射」"
     );
     let second_data_key = &second
         .mapped_units
         .iter()
-        .find(|(unit, _)| *unit == TransactionUnit::Data)
+        .find(|(unit, _)| *unit == TransactionUnit::Data(DataUnitIndexInFile::FIRST))
         .expect("码 1 一把 key")
         .1;
-    assert_eq!(
+    let MappingLookup::Found(second_data_locations) =
         mapping_locations_for_key(second_mapping, second_data_key)
-            .map(|locations| locations[0].slot),
-        Some(SlotNumber(50182)),
-        "B 自己的数据单元经映射查得到、落点 50182"
+    else {
+        panic!("B 自己的数据单元在 B 的映射里查得到");
+    };
+    assert_eq!(
+        second_data_locations.map(|location| location.slot),
+        [SlotNumber(50182); 2],
+        "B 自己的数据单元经映射查得到、两盘都落在 50182"
     );
 
     let mut fresh_pool = build_pool("release-missing-entry");
@@ -521,7 +554,7 @@ fn release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not
         matches!(
             result,
             Err(PublishError::ReleaseNotInMapping {
-                unit: TransactionUnit::Data
+                unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST)
             })
         ),
         "删掉映射条目 ⇒ 报「不在映射」而不是按提示释放：{result:?}"
@@ -661,7 +694,7 @@ fn released_placements_are_not_handed_out_again_before_reclaim_exists() {
         assert!(!device_map.is_free(released.slot), "已释放的槽仍占着");
     }
     assert_eq!(
-        slot_of(&third, TransactionUnit::Data),
+        slot_of(&third, TransactionUnit::Data(DataUnitIndexInFile::FIRST)),
         SlotNumber(50184),
         "C 的数据单元落在 B 之后的下一对偶数空槽"
     );
@@ -676,7 +709,7 @@ fn previous_with_data_mapping_entry_pointing_at(
     let data_key = &output
         .mapped_units
         .iter()
-        .find(|(unit, _)| *unit == TransactionUnit::Data)
+        .find(|(unit, _)| *unit == TransactionUnit::Data(DataUnitIndexInFile::FIRST))
         .expect("码 1 一把 key")
         .1;
     let mapping_node = parse_index_node(&damaged.unit(TransactionUnit::MappingTree).bytes)
@@ -685,7 +718,7 @@ fn previous_with_data_mapping_entry_pointing_at(
         .entries
         .iter()
         .map(|entry| {
-            let (key, mut locations) = parse_mapping_entry(entry);
+            let (key, mut locations) = parse_mapping_entry(entry).expect("上一版的映射条目宽 55");
             if key == *data_key {
                 for location in &mut locations {
                     location.slot = slot;
@@ -718,6 +751,69 @@ fn previous_with_data_mapping_entry_pointing_at(
     damaged
 }
 
+/// 把上一版的映射节点重装成「自述的条目宽 = key 宽 27，条目跟着截短」的形态：节点自己仍然自洽
+/// （条目数 × 27 = 声明长度、两道校验和都对得上），`parse_index_node` 也只判了条目宽 ≥ key 宽。
+fn previous_with_mapping_entries_narrowed_to_the_key_width(
+    output: &TransactionOutput,
+) -> TransactionOutput {
+    let mut damaged = output.clone();
+    let mapping_node = parse_index_node(&damaged.unit(TransactionUnit::MappingTree).bytes)
+        .expect("上一版的映射节点解得开");
+    let entries: Vec<Vec<u8>> = mapping_node
+        .entries
+        .iter()
+        .map(|entry| entry[..mapping_node.key_width].to_vec())
+        .collect();
+    let rebuilt = build_index_node(
+        mapping_node.tree,
+        mapping_node.level,
+        mapping_node.key_width,
+        &entries[0][..mapping_node.key_width],
+        &entries[entries.len() - 1][..mapping_node.key_width],
+        mapping_node.birth_txg,
+        &parameters().filesystem_identifier,
+        mapping_node.instance,
+        mapping_node.birth_sequence,
+        u16::try_from(mapping_node.key_width).expect("key 宽 27"),
+        &entries,
+    );
+    let mapping_index = damaged
+        .units
+        .iter()
+        .position(|unit| unit.identity == TransactionUnit::MappingTree)
+        .expect("八个单元每种一个");
+    damaged.units[mapping_index].bytes = rebuilt;
+    damaged
+}
+
+/// 上一版的映射节点自述的条目宽缩到 key 宽 27（panic 面普查 R2 在释放判定路径上的那一处）⇒ 报
+/// `MappingEntryNarrowerThanItsFieldTable`，不按字段表切到偏移 55、也不报成「不在映射」：
+/// 「节点里的条目切不动」与「节点好、里面没有这把 key」是调用方要分开看的两件事。
+/// 在动分配器之前报错——一条记录都没改写。
+#[test]
+fn release_reports_a_mapping_entry_narrower_than_its_field_table_instead_of_slicing_past_it() {
+    let mut pool = build_pool("mapping-entry-narrower-than-the-field-table");
+    let records_before = pool.allocator.records().to_vec();
+    let narrowed = previous_with_mapping_entries_narrowed_to_the_key_width(&pool.output);
+    let result = try_overwrite(&mut pool, &narrowed);
+    assert!(
+        matches!(
+            result,
+            Err(PublishError::MappingEntryNarrowerThanItsFieldTable {
+                unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
+                entry_bytes: 27,
+                field_table_bytes: 55
+            })
+        ),
+        "{result:?}"
+    );
+    assert_eq!(
+        pool.allocator.records(),
+        &records_before[..],
+        "在动分配器之前报错：一条记录都没改写"
+    );
+}
+
 /// 映射条目在、落点指错：指向一个没有分配记录的槽 ⇒ `ReleaseTargetNotAllocated`；指向 A 的 extent 根（1 槽的单元）⇒ 记录的跨度 1
 /// 与码 1 该有的 2 不符 ⇒ `ReleaseSpanMismatch`。两次都在动分配器之前报错——查得到 key 就直接交给 `release` 的写法会在断言上 panic。
 #[test]
@@ -731,7 +827,8 @@ fn release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_in
         matches!(
             unallocated_result,
             Err(PublishError::ReleaseTargetNotAllocated {
-                unit: TransactionUnit::Data,
+                unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
+                device: DeviceIdentity(0),
                 slot: SlotNumber(60000)
             })
         ),
@@ -745,7 +842,8 @@ fn release_reports_a_mapping_entry_whose_slot_has_no_record_or_the_wrong_span_in
         matches!(
             one_slot_result,
             Err(PublishError::ReleaseSpanMismatch {
-                unit: TransactionUnit::Data,
+                unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
+                device: DeviceIdentity(0),
                 slot,
                 recorded_span: 1,
                 expected_span: 2

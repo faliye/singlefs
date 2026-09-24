@@ -104,7 +104,9 @@ fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
             tally.checker_first_violation.get(invariant)
         );
     }
-    for must_evaluate in ["I-3.1", "I-5.2", "I-5.1", "I-5.4", "I-7.2", "I-7.7"] {
+    for must_evaluate in [
+        "I-3.1", "I-3.11", "I-5.2", "I-5.1", "I-5.4", "I-7.2", "I-7.7",
+    ] {
         assert!(
             tally
                 .checker_evaluated_states

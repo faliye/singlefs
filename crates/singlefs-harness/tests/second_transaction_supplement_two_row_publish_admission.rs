@@ -1,7 +1,7 @@
 //! 里程碑「第二个事务」增补 2 第 20a 行（代码三方第一轮打中，判决 `research/prompts/m2-wave1-code-r1-main-verification.md` 第二节第 1 行）：
 //! 写行那次发布要用的准入（这次之后的分配记录条数、这次要写的记账行数）在**取号之前**算，算不过在任何写之前返回。
 //! 2026-09-18 用户定案再把**暖机那几次空发布**的准入一起挪到取号之前（收口表第 20a 行）：写行之后要推 1–3 次空发布
-//! （D16（发布语义） 已定项 8 甲′），每次重写四个固定点单元、每盘各加一条分配记录，改之前它们没进取号之前那一遍 ⇒
+//! （D16（发布语义） 已定项 8 戊），每次重写四个固定点单元、每盘各加一条分配记录，改之前它们没进取号之前那一遍 ⇒
 //! 「写行装得下、暖机第 N 次装不下」的池仍是取号写完、写行也发完，暖机才报错，实例代号照烧。
 //! 本文件三条用例：写行那次装不下（`..._cannot_publish_the_rows_...`）、暖机第 1 次装不下、暖机第 2 次装不下。
 //!
@@ -80,9 +80,13 @@ fn try_empty_publish_in_process(pool: &mut BuiltPool) -> Result<TransactionOutpu
             txg: CheckpointTxg(previous.root.checkpoint_txg.0 + 1),
             counter: previous.record.counter + 1,
             transaction: 0,
+            highest_transaction_number_before_this_publish: previous
+                .highest_transaction_number_in_this_instance,
             instance: InstanceGeneration(1),
             back_chain: back_chain_of(&previous.record_bytes),
             file: None,
+            // 这次空发布不碰 inode 树。
+            new_inode_records: &[],
             instance_table: InstanceTablePlan::Carry(previous.root.instance_table),
             tree_birth_txg: previous.tree_birth_txg(),
             tree_identifier_watermark: previous.root.tree_identifier_watermark,

@@ -1,19 +1,26 @@
 //! 把录制流切成段（D13（验证路线） 已定项 4：屏障与 FUA 写切段，段内任意整写子集），并按
 //! `layout/01-first-txn.md` 八那张登记表的写法报出段序列与每段的步骤种类多重集（门禁 52 号比对的形态）。
 //!
-//! 步骤种类只有五种（D17（实现分层与第三方管道） 已定项 2）：写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障。
-//! 一条写属于哪一种，由它的落点决定（第一版几何写死：系统配置槽 / 根环区域 / journal 环 / 单元区）。
+//! 步骤种类六种（D17（实现分层与第三方管道） 已定项 2；第六种 2026-09-22 加，用户 2026-09-19 定案
+//! 「环清零写录制流登记成一种新步骤、层 0 认它」，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行）：
+//! 整段清零、写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障。
+//! 一次**普通写**属于哪一种由它的落点决定（第一版几何写死：系统配置槽 / 根环区域 / journal 环 / 单元区）；
+//! 整段清零按**动作**归类、不看落点：它在块层就是另一个命令（真设备上映射成 WRITE ZEROES），
+//! 不是「写在某处」的一次写。今天唯一的清零是 mkfs 清 journal 环。
 
 use std::collections::BTreeMap;
 
 use singlefs_format::{JOURNAL_RING_START_SLOT, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE};
 
 use crate::{RecordedOperation, RecordedOperationKind};
-use singlefs_core::root_ring::{region_start, ring_end};
+use singlefs_core::root_ring::{region_start, ring_end, RootRingSlotsPerRegion};
 
 /// 提交步骤的封闭枚举，`match` 不写通配臂；声明序就是种类串的规范序。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum StepKind {
+    /// 整段清零一次调用算一步（mkfs 清 journal 环）。声明序排在最前，种类串里它就写在最前面——
+    /// mkfs 那一段里它本来也发在最前。
+    ZeroFill,
     UnitWrite,
     JournalRecord,
     RootRecordFua,
@@ -25,6 +32,7 @@ impl StepKind {
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
+            StepKind::ZeroFill => "zero_fill",
             StepKind::UnitWrite => "unit_write",
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
@@ -35,10 +43,15 @@ impl StepKind {
 }
 
 /// 第一版的固定几何：系统配置两槽从偏移 0 起按槽距排；根环从 1 MiB 起到 `ring_end`；journal 环从槽 1024 起；之后是单元区。
+///
+/// 根环末端要 S 才算得出来，而 S 是这个池的系统配置字段（C506（每区槽数 S 写成编译期常量，条文说它住系统配置））：
+/// 切段的人拿的是哪个池的录制流，就给哪个池的 S。给错了，落在 `ring_end(S_真)` 与 `ring_end(S_给)` 之间的
+/// 根槽写会被分成别的一类。
 #[derive(Clone, Copy, Debug)]
 pub struct FixedGeometry {
     pub fixed_structure_slot_spacing: u32,
     pub journal_ring_bytes: u64,
+    pub root_ring_slots_per_region: RootRingSlotsPerRegion,
 }
 
 impl FixedGeometry {
@@ -46,6 +59,7 @@ impl FixedGeometry {
     pub fn classify(&self, operation: &RecordedOperation) -> StepKind {
         match operation.kind {
             RecordedOperationKind::Barrier => StepKind::Barrier,
+            RecordedOperationKind::WriteZeroes => StepKind::ZeroFill,
             RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
                 let offset = operation.offset.0;
                 let system_configuration_end = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
@@ -55,7 +69,11 @@ impl FixedGeometry {
                 if offset < system_configuration_end {
                     StepKind::SystemConfigurationSlot
                 } else if offset >= region_start(0).0
-                    && offset < ring_end(self.fixed_structure_slot_spacing)
+                    && offset
+                        < ring_end(
+                            self.fixed_structure_slot_spacing,
+                            self.root_ring_slots_per_region,
+                        )
                 {
                     StepKind::RootRecordFua
                 } else if offset >= journal_start && offset < journal_end {
@@ -93,7 +111,10 @@ pub fn split_into_segments(
                 segments.push(std::mem::take(&mut current));
                 writes_in_current = 0;
             }
-            RecordedOperationKind::Write => writes_in_current += 1,
+            // 清零是普通写那一档：不做持久、不关段，段里多算一个写。
+            RecordedOperationKind::Write | RecordedOperationKind::WriteZeroes => {
+                writes_in_current += 1;
+            }
         }
     }
     if !current.is_empty() {
@@ -183,6 +204,7 @@ mod tests {
         let geometry = FixedGeometry {
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: 768 << 20,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         };
         assert_eq!(
             geometry.classify(&operation(RecordedOperationKind::Write, 4096)),
@@ -209,11 +231,52 @@ mod tests {
         );
     }
 
+    /// 整段清零按动作归类，不按落点：同一个落点（journal 环里）普通写是 `journal_record`、清零是 `zero_fill`；
+    /// 清零是普通写那一档，不关段、段里算一个写。
+    #[test]
+    fn a_zero_fill_is_its_own_kind_and_counts_as_one_plain_write_in_its_segment() {
+        let geometry = FixedGeometry {
+            fixed_structure_slot_spacing: 4096,
+            journal_ring_bytes: 768 << 20,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+        };
+        let journal = 1024 * 16384;
+        let unit = 50176 * 16384;
+        assert_eq!(
+            geometry.classify(&operation(RecordedOperationKind::Write, journal)),
+            StepKind::JournalRecord
+        );
+        assert_eq!(
+            geometry.classify(&operation(RecordedOperationKind::WriteZeroes, journal)),
+            StepKind::ZeroFill,
+            "同一个落点，清零不是写 journal 记录"
+        );
+        // 清零与单元写混在一段里的形：两次清零，再四个单元写，屏障关段（mkfs 第一段是这个形，
+        // 它今天每块盘发四次清零、整段 12 个写，这里只验分类与切段，不抄 mkfs 的条数）。
+        let mkfs_first_segment = vec![
+            operation(RecordedOperationKind::WriteZeroes, journal),
+            operation(RecordedOperationKind::WriteZeroes, journal),
+            operation(RecordedOperationKind::Write, unit),
+            operation(RecordedOperationKind::Write, unit + 32768),
+            operation(RecordedOperationKind::Write, unit),
+            operation(RecordedOperationKind::Write, unit + 32768),
+            operation(RecordedOperationKind::Barrier, 0),
+        ];
+        let segments = split_into_segments(&mkfs_first_segment, &geometry);
+        assert_eq!(segment_sizes_text(&segments), "6");
+        assert_eq!(
+            segment_kinds_text(&segments),
+            "[zero_fill×2,unit_write×4,barrier]"
+        );
+        assert_eq!(closed_form_state_count(&segments), 1 + ((1 << 6) - 1));
+    }
+
     #[test]
     fn barriers_close_segments_a_leading_barrier_folds_forward_and_fua_closes_its_own_segment() {
         let geometry = FixedGeometry {
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: 768 << 20,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         };
         let unit = 50176 * 16384;
         let journal = 1024 * 16384;

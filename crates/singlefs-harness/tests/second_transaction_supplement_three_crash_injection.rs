@@ -29,8 +29,7 @@ const FAST_TIER_DRAW: CrashPointDraw = CrashPointDraw::Sampled {
 };
 
 /// 崩溃注入这一段历史本身怎么跑：不跑每一步的池级 checker，两块 4 GiB 的盘。
-/// 活盘面上每一步的 checker 由随机历史那五段（门禁 74 号）罩着，这一段的预算全给崩溃状态；
-/// 而且不跑它，历史就不会在「已知红」第 0 条那一形那里停下，根环转过之后的那几段照样摆得出崩溃状态。
+/// 活盘面上每一步的 checker 由随机历史那五段（门禁 74 号）罩着，这一段的预算全给崩溃状态。
 const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     per_step_checker: PerStepChecker::Skipped,
     device_width: HistoryDeviceWidth::FourGibibytes,
@@ -351,13 +350,13 @@ fn every_crash_state_of_a_written_out_history_recovers_into_a_committed_version(
     );
 }
 
-/// 「已知红」第 1 条（增补 2 收口表第 43 行）在崩溃状态上也认得出来：历史与随机历史那一段钉住的那条复现逐项相同
+/// 「已知红」清单那一条（增补 2 收口表第 43 行）在崩溃状态上也认得出来：历史与随机历史那一段钉住的那条复现逐项相同
 /// （`second_transaction_supplement_three_random_history.rs` 的 `raising_the_floor_into_the_gap_left_by_a_rollback_…`），
 /// 抬 F 到 8 落在回退留下的空档里。抬 F 那几步之后的崩溃状态上 I-3.1 照样记账多算，机理与活盘面上那一次相同，
-/// 所以要接进清单第 1 条、不许报成新发现（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阳那一半：
+/// 所以要接进清单那一条、不许报成新发现（代码三方 m2-supp3-item3-code-r1 判决 K6 的假阳那一半：
 /// 此前 `crash_state_observation` 把「F 落在空档里」写死成 None，这一形在崩溃状态上恒不匹配，攻方大档 200 段把 3 条已知缺陷报成新发现）。
 #[test]
-fn crash_states_after_raising_the_floor_into_the_gap_match_the_second_known_red_form() {
+fn crash_states_after_raising_the_floor_into_the_gap_match_the_known_red_form_of_closeout_row_43() {
     let empty = ContentChoice {
         length: ContentLength::Empty,
         fill_seed: 0,
@@ -400,18 +399,18 @@ fn crash_states_after_raising_the_floor_into_the_gap_match_the_second_known_red_
     ));
     assert!(
         injection.new_findings.is_empty(),
-        "这一形要接进清单第 1 条，不许报成新发现：{:#?}",
+        "这一形要接进清单那一条，不许报成新发现：{:#?}",
         injection.new_findings
     );
     assert!(
         injection
             .tally
             .crash_states_ending_known_red
-            .get(&1)
+            .get(&0)
             .copied()
             .unwrap_or(0)
             >= 1,
-        "抬 F 之后的崩溃状态上一次都没认出清单第 1 条：{:?}",
+        "抬 F 之后的崩溃状态上一次都没认出清单那一条（收口表第 43 行）：{:?}",
         injection.tally.crash_states_ending_known_red
     );
     // 「回退与抬 F 的写上也摆得到崩溃状态」这一条钉在这里，不钉在随机种子那一段上：

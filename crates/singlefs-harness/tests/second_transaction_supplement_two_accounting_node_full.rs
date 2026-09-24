@@ -73,6 +73,7 @@ fn publish_first_file_version(
             txg,
             counter: FIRST_TRANSACTION_TXG,
             transaction: FIRST_TRANSACTION_NUMBER,
+            highest_transaction_number_before_this_publish: 0,
             instance: InstanceGeneration(1),
             back_chain: 0,
             file: Some(FileVersionPlan {
@@ -82,6 +83,8 @@ fn publish_first_file_version(
                 // 改动计数 = 这次发布的 checkpoint_txg（增补 2 第 11 行）：第一个文件版本形态就是 txg 3。
                 change_count: txg.0,
             }),
+            // 这条路径只建第一个文件那一个 inode。
+            new_inode_records: &[],
             instance_table: InstanceTablePlan::Carry(NodePointer::empty_root()),
             tree_birth_txg: txg,
             tree_identifier_watermark: TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,

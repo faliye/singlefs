@@ -2,16 +2,17 @@
 //! 虚机里的真设备、宿主上的内存盘都跑这一份，同参数同字节（mkfs 与发布都不取系统时钟与随机数）。
 
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
-use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::BlockDevice;
 use singlefs_core::make_filesystem::{
-    make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+    allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
+use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
     WarmUpOutput,
 };
+use singlefs_core::write_accounting::WritesByStructureKind;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 
 use crate::SharedStream;
@@ -48,6 +49,7 @@ pub fn e142_parameters(
                 minimum_input_output_bytes,
             ),
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         },
     }
 }
@@ -59,15 +61,73 @@ pub struct FirstTransactionRun {
     pub policy_mismatches: u64,
 }
 
-/// 整条路上调用方被叫到的两处。
+/// 整条路上调用方被叫到的三处。
 pub enum ScenarioPoint {
+    /// mkfs 写完（含末尾那道屏障），取号还没开始。虚机档在这里切出 mkfs 那一段的挂钟。
+    AfterMakeFilesystem,
     /// 取号写完、那道屏障做完，暖机还没开始（同一个写入口接着暖机，这里不另发屏障）。
     AfterInstanceAcquisition,
     /// 暖机之后、第一个事务之前（虚机档在这里给某块盘装上「漏一道屏障」）。
     BeforeFirstTransaction,
 }
 
-/// 整条路。`at_point` 在 `ScenarioPoint` 的两处各被叫一次：虚机档在两处给设备一层的计数拍快照，暖机与第一个事务各自的写就是快照之差。
+/// 整条路上的四步，按次序。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FirstTransactionPathStep {
+    MakeFilesystem,
+    InstanceAcquisition,
+    WarmUp,
+    FirstTransaction,
+}
+
+impl FirstTransactionPathStep {
+    /// 结果行里的名字，与虚机档分段时间的段名相同。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            FirstTransactionPathStep::MakeFilesystem => "mkfs",
+            FirstTransactionPathStep::InstanceAcquisition => "instance_acquisition",
+            FirstTransactionPathStep::WarmUp => "warm_up",
+            FirstTransactionPathStep::FirstTransaction => "first_transaction",
+        }
+    }
+}
+
+/// 整条路没走完：停在哪一步、为什么，以及那一步的写入口交得出的账——落盘阶段失败的发布各自已记的写
+/// （`PoolWriter::writes_of_failed_publishes`），与同一步里失败之前已经落盘的发布各自的写（暖机两次空发布里第二次失败时，第一次的账由
+/// `transaction::WarmUpFailed` 交回）。里程碑「第二个事务」增补 2 收口表第 58 行：失败那次落盘的写不属于任何一次成功发布的账，
+/// 同一步里已经落盘的那几次的账又随错一起丢，不交出来，设备一层数到的写就对不上。两样相加就是那一步的写入口记下的全部发布写。
+/// mkfs 与取号不是发布，停在这两步时两样恒空；第一个事务那一步只有一次发布，第二样恒空。
+#[derive(Debug)]
+pub struct FirstTransactionPathFailure {
+    pub failed_step: FirstTransactionPathStep,
+    pub cause: String,
+    pub writes_of_failed_publishes: Vec<WritesByStructureKind>,
+    pub writes_of_persisted_publishes: Vec<WritesByStructureKind>,
+}
+
+impl FirstTransactionPathFailure {
+    fn before_any_publish(failed_step: FirstTransactionPathStep, cause: String) -> Self {
+        Self {
+            failed_step,
+            cause,
+            writes_of_failed_publishes: Vec::new(),
+            writes_of_persisted_publishes: Vec::new(),
+        }
+    }
+
+    /// 给人看的一句：哪一步、什么错。
+    #[must_use]
+    pub fn render(&self) -> String {
+        format!("{}：{}", self.failed_step.name(), self.cause)
+    }
+}
+
+/// 整条路。`at_point` 在 `ScenarioPoint` 的三处各被叫一次：虚机档在这三处给设备一层的计数与单调时钟拍快照，
+/// 每一段的写与挂钟就是相邻两处之差。
+///
+/// # Errors
+/// 哪一步没做成，连同那一步的写入口交出来的失败账（[`FirstTransactionPathFailure`]）。
 pub fn run_first_transaction<
     Device: BlockDevice,
     AtPoint: FnMut(ScenarioPoint, &mut [(DeviceIdentity, Device)]),
@@ -76,33 +136,34 @@ pub fn run_first_transaction<
     devices: &mut [(DeviceIdentity, Device)],
     stream: &SharedStream,
     mut at_point: AtPoint,
-) -> Result<FirstTransactionRun, String> {
-    let genesis =
-        make_filesystem(parameters, devices).map_err(|error| format!("mkfs：{error:?}"))?;
+) -> Result<FirstTransactionRun, FirstTransactionPathFailure> {
+    let genesis = make_filesystem(parameters, devices).map_err(|error| {
+        FirstTransactionPathFailure::before_any_publish(
+            FirstTransactionPathStep::MakeFilesystem,
+            format!("{error:?}"),
+        )
+    })?;
     let mkfs_operation_count = stream.operations().len();
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: INSTANCE_TABLE_SLOT,
-            span: 2,
-        },
-        Placement {
-            slot: TREE_TABLE_GENESIS_SLOT,
-            span: 1,
-        },
-    );
+    at_point(ScenarioPoint::AfterMakeFilesystem, devices);
+    let mut allocator = allocator_after_make_filesystem(parameters, devices, &genesis);
     let content = first_file_content();
     let (instance, warm_up_output) = {
         let mut pool = PoolWriter::new(parameters, &mut *devices);
-        let instance = acquire_instance(&mut pool).map_err(|error| format!("取号：{error:?}"))?;
+        let instance = acquire_instance(&mut pool).map_err(|error| {
+            FirstTransactionPathFailure::before_any_publish(
+                FirstTransactionPathStep::InstanceAcquisition,
+                format!("{error:?}"),
+            )
+        })?;
         at_point(ScenarioPoint::AfterInstanceAcquisition, &mut *pool.devices);
-        let warm = warm_up(&mut pool, &genesis.root, instance)
-            .map_err(|error| format!("暖机：{error:?}"))?;
+        let warm = warm_up(&mut pool, &genesis.root, instance).map_err(|failed| {
+            FirstTransactionPathFailure {
+                failed_step: FirstTransactionPathStep::WarmUp,
+                cause: format!("{:?}", failed.cause),
+                writes_of_failed_publishes: pool.writes_of_failed_publishes().to_vec(),
+                writes_of_persisted_publishes: failed.writes_of_persisted_publishes,
+            }
+        })?;
         (instance, warm)
     };
     assert_eq!(instance, InstanceGeneration(1));
@@ -111,7 +172,7 @@ pub fn run_first_transaction<
     let output = publish_first_file(
         &mut pool,
         &mut allocator,
-        &genesis.root,
+        warm_up_output.roots.last().expect("暖机两代根"),
         FirstFile {
             content: &content,
             write_time_seconds: FIXED_WRITE_TIME_SECONDS,
@@ -119,7 +180,12 @@ pub fn run_first_transaction<
         instance,
         &warm_up_output.last_record_bytes,
     )
-    .map_err(|error| format!("第一个事务：{error:?}"))?;
+    .map_err(|error| FirstTransactionPathFailure {
+        failed_step: FirstTransactionPathStep::FirstTransaction,
+        cause: format!("{error:?}"),
+        writes_of_failed_publishes: pool.writes_of_failed_publishes().to_vec(),
+        writes_of_persisted_publishes: Vec::new(),
+    })?;
     Ok(FirstTransactionRun {
         mkfs_operation_count,
         warm_up: warm_up_output,

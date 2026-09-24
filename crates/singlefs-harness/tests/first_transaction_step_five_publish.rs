@@ -13,12 +13,13 @@ use singlefs_checker::{
     KEY_SCHEMA_MAPPING, KEY_SCHEMA_TREE_TABLE,
 };
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
-    TreeIdentifier,
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    SlotNumber, TreeIdentifier,
 };
 use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, FileBackedBlockDevice, PhysicalBlockSizeInBytes};
 use singlefs_core::bytes::ByteReader;
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::record_offset;
 use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemOutput, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
@@ -32,7 +33,7 @@ use singlefs_core::records::{
     STATISTIC_INODE_WATERMARK, STATISTIC_NO_DEVICE_DIMENSION, STATISTIC_PENDING_DELETE_BYTES,
     STATISTIC_UNRECLAIMABLE_BYTES,
 };
-use singlefs_core::root_ring::{slot_offset, RootRingSlot};
+use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::transaction::{
     acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
@@ -53,14 +54,17 @@ static IMAGE_COUNTER: AtomicU64 = AtomicU64::new(0);
 const IMAGE_BYTES: u64 = 4 << 30;
 /// E142 的第一个文件 3000 字节（`name=config file_bytes=3000`）。
 const FILE_BYTES: usize = 3000;
-/// E142 装置里的固定 fsid（`FIXED_FSID`）：用同一个 fsid，暖机第二条记录头的 CRC 才能与产物 `name=root_record … back_chain=628216162` 逐字对上。
+/// E142 装置里的固定 fsid（`FIXED_FSID`）：用同一个 fsid，暖机第二条记录头的 CRC 才能与产物 `name=root_record … back_chain=…` 那一行逐字对上。
 const E142_FILESYSTEM_IDENTIFIER: [u8; 16] = [
     0x5f, 0x53, 0x46, 0x53, 0x2d, 0x45, 0x31, 0x34, 0x32, 0x2d, 0x30, 0x30, 0x30, 0x31, 0x2d, 0x00,
 ];
 /// E142 装置里的固定写入时间（`FIXED_WRITE_TIME_SECONDS`）。
 const FIXED_WRITE_TIME_SECONDS: u64 = 1_788_000_000;
-/// 产物第 37 行逐字：`name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 record_bytes=4096 back_chain=628216162`。
-const E142_BACK_CHAIN_OF_FIRST_TRANSACTION: u32 = 628_216_162;
+/// 第一个事务那条记录的反向链 = CRC32C(暖机第二条记录的 311 字节头)。E142 产物第 37 行（`back_chain=628216162`）是 307 字节头下的值；
+/// 记录头加本次发布内序号（D23（journal 的角色与格式） 已定项 4）之后，这个值由一段独立的换算得出：拿 307 字节头下写出的三条记录，
+/// 在提交标记之后插 4 字节序号 1、重算暖机第二条的反向链，再算它的头的 CRC32C（先复现出 628216162 当阳性对照），得 1057457588。
+/// E142 装置按 311 重跑之后，产物里那一行应当逐字是这个数。
+const E142_BACK_CHAIN_OF_FIRST_TRANSACTION: u32 = 1_057_457_588;
 
 fn image_path(tag: &str, device: u32) -> PathBuf {
     let sequence = IMAGE_COUNTER.fetch_add(1, Ordering::SeqCst);
@@ -79,6 +83,7 @@ fn parameters() -> MakeFilesystemParameters {
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         },
     }
 }
@@ -87,6 +92,7 @@ fn geometry() -> FixedGeometry {
     FixedGeometry {
         fixed_structure_slot_spacing: 4096,
         journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+        root_ring_slots_per_region: parameters().geometry.root_ring_slots_per_region,
     }
 }
 
@@ -174,7 +180,7 @@ fn build_pool(tag: &str) -> BuiltPool {
         let output = publish_first_file(
             &mut pool,
             &mut allocator,
-            &genesis.root,
+            warm_up.roots.last().expect("暖机两代根"),
             FirstFile {
                 content: &content,
                 write_time_seconds: FIXED_WRITE_TIME_SECONDS,
@@ -243,9 +249,9 @@ fn read_journal_record(pool: &BuiltPool, identity: DeviceIdentity, counter: u64)
 
 fn unit_length(identity: TransactionUnit) -> usize {
     match identity {
-        TransactionUnit::Data | TransactionUnit::InodeLeaf | TransactionUnit::InstanceTable => {
-            32768
-        }
+        TransactionUnit::Data(_)
+        | TransactionUnit::InodeLeafContainer(_)
+        | TransactionUnit::InstanceTable => 32768,
         TransactionUnit::ExtentRoot
         | TransactionUnit::InodeRoot
         | TransactionUnit::AllocationTree
@@ -297,18 +303,19 @@ fn recorded_paths_match_the_registered_segment_sequences() {
         &operations[pool.acquisition_operation_count..pool.warm_up_operation_count];
     let transaction_operations = &operations[pool.warm_up_operation_count..];
     let post_mkfs_operations = &operations[pool.mkfs_operation_count..];
-    // 产物第 31–35 行逐字（operations= / segments= / closed_form= / kinds=）。
+    // 产物第 31–35 行逐字（operations= / segments= / closed_form= / kinds=）；mkfs 那一行 2026-09-22 起
+    // 与产物**不同**：清 journal 环与清根环都是这之后加的，E142 干跑的产物还没重跑（重跑之前门禁 55 号红着）。
     assert_eq!(
         (
             mkfs_operations.len(),
             sizes(mkfs_operations),
             closed_form(mkfs_operations)
         ),
-        (13, "4+1+1+1+4".to_string(), 34)
+        (21, "12+1+1+1+4".to_string(), 4114)
     );
     assert_eq!(
         kinds(mkfs_operations),
-        "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
+        "[zero_fill×8,unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]"
     );
     assert_eq!(
         (
@@ -402,7 +409,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         ),
         (3, 1, TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, 0)
     );
-    assert_eq!(newest.record_bytes, pool.output.root.to_slot(512)[..371]);
+    assert_eq!(newest.record_bytes, pool.output.root.to_slot(512)[..457]);
     for (region, expected_txg) in [(1u64, 1u64), (2, 2)] {
         let warm = check_root_slot(
             &read_root_slot(&pool, region, 0),
@@ -421,7 +428,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         assert_eq!(
             warm.record_bytes,
             pool.warm_up.roots[usize::try_from(expected_txg - 1).expect("下标")].to_slot(512)
-                [..371]
+                [..457]
         );
     }
     let genesis = check_root_slot(&read_root_slot(&pool, 0, 0), &E142_FILESYSTEM_IDENTIFIER)
@@ -480,7 +487,11 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
             .map_or(0, back_chain_of_record_header);
         assert_eq!(
             view.back_chain, expected_back_chain,
-            "反向链 = 本实例内逻辑前一条记录的 307 字节头的 CRC-32C"
+            "反向链 = 本实例内逻辑前一条记录的 311 字节头的 CRC-32C"
+        );
+        assert_eq!(
+            view.ordinal_within_publish, 1,
+            "三次发布各只有一条记录：本次发布内序号都是 1（D23（journal 的角色与格式） 已定项 4，空发布记录也写 1）"
         );
         if counter < 3 {
             assert_eq!((view.transaction, view.named.len()), (0, 0), "空发布的记录");
@@ -501,7 +512,7 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
             );
             assert_eq!(
                 view.back_chain, E142_BACK_CHAIN_OF_FIRST_TRANSACTION,
-                "与 E142 第八次跑产物第 37 行的 back_chain 逐字相同"
+                "与 311 字节头下独立换算出的 back_chain 逐字相同（E142 第八次跑产物第 37 行是 307 字节头下的值）"
             );
             assert_eq!(
                 &view.new_root_segment[..86],
@@ -539,7 +550,10 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
             continue;
         }
         let view = index_node_view(&unit.bytes).expect("码 2 节点");
-        assert_eq!(view.tree_identifier, unit.identity.tree().0);
+        assert_eq!(
+            view.tree_identifier,
+            unit.identity.tree(&pool.output.tree_identifiers).0
+        );
         let schema = match unit.identity {
             TransactionUnit::MappingTree => KEY_SCHEMA_MAPPING,
             TransactionUnit::TreeTable => KEY_SCHEMA_TREE_TABLE,
@@ -549,12 +563,16 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
             | TransactionUnit::AccountingTree => {
                 let kind = tree_table_entries
                     .iter()
-                    .find(|entry| entry.tree.0 == unit.identity.tree().0)
+                    .find(|entry| {
+                        entry.tree.0 == unit.identity.tree(&pool.output.tree_identifiers).0
+                    })
                     .expect("在树表里")
                     .kind;
                 key_schema_for_tree_kind(kind).expect("有节点的树都有 key 形态")
             }
-            TransactionUnit::Data | TransactionUnit::InodeLeaf | TransactionUnit::InstanceTable => {
+            TransactionUnit::Data(_)
+            | TransactionUnit::InodeLeafContainer(_)
+            | TransactionUnit::InstanceTable => {
                 unreachable!("上面按类跳过了")
             }
         };
@@ -607,15 +625,17 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
         }
     }
     assert_eq!(
-        pool.output.data_pointer.locations[0].unit_checksum,
-        checksum_of(TransactionUnit::Data)
+        pool.output.data_pointers[0].locations[0].unit_checksum,
+        checksum_of(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
     );
     let inode_root =
         index_node_view(&pool.output.unit(TransactionUnit::InodeRoot).bytes).expect("inode 根");
     let child_pointer = NodePointer::read_from(&mut ByteReader::at(&inode_root.entries[0], 8 + 26));
     assert_eq!(
         child_pointer.locations[0].unit_checksum,
-        checksum_of(TransactionUnit::InodeLeaf),
+        checksum_of(TransactionUnit::InodeLeafContainer(
+            InodeLeafContainerIndexInTree::LEFTMOST
+        )),
         "inode 内部条目的子指针"
     );
     // 位置条目按设备身份升序（I-2.5）。
@@ -684,6 +704,15 @@ fn inode_and_extent_lookups_from_the_root_read_the_first_file_back() {
         (12, 2, 1, 3, 140)
     );
     assert_eq!(leaf.records.len(), 1);
+    assert_eq!(
+        u64::from_le_bytes(
+            leaf.records[0][48..56]
+                .try_into()
+                .expect("记录偏移 48 起 8 字节")
+        ),
+        6,
+        "blocks = ⌈3000 ÷ 512⌉ = 6：逻辑长度的块数，不是分到的一个 32 KiB 单元的 64（D8（核心索引结构） 已定项 6，C480）"
+    );
     let inode_record = InodeRecord::parse(&leaf.records[0]).expect("inode 记录");
     assert_eq!(
         inode_record,
@@ -729,7 +758,7 @@ fn inode_and_extent_lookups_from_the_root_read_the_first_file_back() {
         "extent key"
     );
     let pointer = DataPointer::read_from(&mut extent_reader);
-    assert_eq!(pointer, pool.output.data_pointer);
+    assert_eq!(pointer, pool.output.data_pointers[0]);
     assert_eq!(
         (
             pointer.head.birth_tree.0,
@@ -769,8 +798,8 @@ fn central_mapping_holds_six_entries_rebuilt_from_the_named_entries_and_excludes
     );
     // 按步 2 那个单元的逻辑身份查映射，位置等于 extent 树指针里的位置提示；key 三段与数据单元头同值。
     let data_key = mapping_key_for_data(
-        pool.output.data_pointer.head,
-        pool.output.data_pointer.write_order,
+        pool.output.data_pointers[0].head,
+        pool.output.data_pointers[0].write_order,
     );
     let data_entry = mapping
         .entries
@@ -782,8 +811,11 @@ fn central_mapping_holds_six_entries_rebuilt_from_the_named_entries_and_excludes
         singlefs_core::pointer::LocationEntry::read_from(&mut reader),
         singlefs_core::pointer::LocationEntry::read_from(&mut reader),
     ];
-    assert_eq!(locations, pool.output.data_pointer.locations);
-    let data_unit = &pool.output.unit(TransactionUnit::Data).bytes;
+    assert_eq!(locations, pool.output.data_pointers[0].locations);
+    let data_unit = &pool
+        .output
+        .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+        .bytes;
     assert_eq!(
         &data_key[1..9],
         &data_unit[43..51],
@@ -864,7 +896,10 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
     let records: Vec<AllocationRecord> = allocation
         .entries
         .iter()
-        .map(|bytes| AllocationRecord::parse(bytes))
+        .map(|bytes| {
+            AllocationRecord::parse(bytes)
+                .expect("上一句刚把这个节点的条目宽钉成 20（I-1.10：码 2 条目宽等于字段表宽）")
+        })
         .collect();
     let device_zero_slots: Vec<u64> = records
         .iter()
@@ -923,7 +958,10 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
     let rows: Vec<AccountingEntry> = accounting
         .entries
         .iter()
-        .map(|bytes| AccountingEntry::parse(bytes))
+        .map(|bytes| {
+            AccountingEntry::parse(bytes)
+                .expect("上一句刚把这个节点的条目宽钉成 34（I-1.10：码 2 条目宽等于字段表宽）")
+        })
         .collect();
     assert_eq!(rows, pool.output.accounting_entries);
     assert!(rows
@@ -1060,14 +1098,26 @@ fn tree_table_holds_seven_entries_keyed_by_tree_identifier() {
 fn mutations_are_caught_by_the_check_that_owns_them() {
     let pool = build_pool("mutations");
     // 叶容器头里记录宽改成 139：头校验和判红（头合法性）。
-    let mut narrow_leaf = pool.output.unit(TransactionUnit::InodeLeaf).bytes.clone();
+    let mut narrow_leaf = pool
+        .output
+        .unit(TransactionUnit::InodeLeafContainer(
+            InodeLeafContainerIndexInTree::LEFTMOST,
+        ))
+        .bytes
+        .clone();
     narrow_leaf[71..73].copy_from_slice(&139u16.to_le_bytes());
     assert_eq!(
         packed_unit_view(&narrow_leaf),
         Err(Verdict::ChecksumMismatch)
     );
     // 子节点改坏一字节：父指针里的校验和判红。
-    let mut damaged_leaf = pool.output.unit(TransactionUnit::InodeLeaf).bytes.clone();
+    let mut damaged_leaf = pool
+        .output
+        .unit(TransactionUnit::InodeLeafContainer(
+            InodeLeafContainerIndexInTree::LEFTMOST,
+        ))
+        .bytes
+        .clone();
     damaged_leaf[20000] ^= 1;
     let inode_root =
         index_node_view(&pool.output.unit(TransactionUnit::InodeRoot).bytes).expect("inode 根");

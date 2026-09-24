@@ -16,7 +16,9 @@ use common::{
     disk_snapshot, file_content, image_path, parameters, Recorded, FIXED_WRITE_TIME_SECONDS,
     IMAGE_BYTES,
 };
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::allocator::{
     AllocationRecord, CommitGeneratedDeviceAnswer, DeviceFreeMap, Placement, PlacementRefusal,
     PoolAllocator, UnitFootprint,
@@ -139,7 +141,7 @@ fn build_unequal_pool(tag: &str) -> UnequalPool {
         publish_first_file(
             &mut writer,
             &mut allocator,
-            &genesis.root,
+            warmed.roots.last().expect("暖机两代根"),
             FirstFile {
                 content: &content,
                 write_time_seconds: FIXED_WRITE_TIME_SECONDS,
@@ -150,7 +152,9 @@ fn build_unequal_pool(tag: &str) -> UnequalPool {
         .expect("盘不等大的第一个事务今天接受")
     };
     assert_eq!(
-        first.unit(TransactionUnit::Data).slot,
+        first
+            .unit(TransactionUnit::Data(DataUnitIndexInFile::FIRST))
+            .slot,
         SlotNumber(50180),
         "两块盘在低处的空闲图一样，落点与等大的池相同"
     );
@@ -319,7 +323,7 @@ fn filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placem
     let refused = try_overwrite(&mut pool);
     match &refused {
         Err(PublishError::PlacementRefused {
-            unit: TransactionUnit::Data,
+            unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
             refusal,
         }) => assert_eq!(
             *refusal,
@@ -447,7 +451,7 @@ fn user_data_slots_that_differ_across_devices_are_refused_before_anything_is_wri
     );
     match &refused {
         Err(PublishError::PlacementRefused {
-            unit: TransactionUnit::Data,
+            unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
             refusal,
         }) => assert_eq!(
             *refusal,

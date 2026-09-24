@@ -1,7 +1,11 @@
-//! 块设备抽象：读、写、屏障、FUA 写、探测 `physical_block_size`。
+//! 块设备抽象：读、写、屏障、FUA 写、探测 `physical_block_size`、写零。
 //!
 //! 第一版两个后端（D17（实现分层与第三方管道） 已定项 5）：文件后端（测试镜像）与 `O_DIRECT` 后端（虚机里的真块设备）。
 //! 两个后端的持久语义相同：屏障 = `sync_data`（块设备上是一次 FLUSH），FUA 写 = 写完立刻 `sync_data`。
+//!
+//! 「写零」是第六个动作（用户 2026-09-19 定案，`records/2026-09-19-里程碑二遗留收拢.md` 第五之二节第 4 行：
+//! 问「块设备抽象加不加写零」答「加」）：一次调用覆盖 `[offset, offset + length)` 一整段，真设备上对应 WRITE ZEROES。
+//! **一次调用就是一个动作**——底下拆成几次 I/O 由后端自己定（[`ZERO_FILL_CHUNK_BYTES`]），上层（录制流、段序列）看到的是一步。
 
 use std::fs::{File, OpenOptions};
 use std::io::{self, Seek, SeekFrom};
@@ -90,7 +94,15 @@ impl std::fmt::Display for BlockDeviceError {
 
 impl std::error::Error for BlockDeviceError {}
 
-/// 五个动作，只有这五个。介质是什么这里看不见。
+/// 后端把一段写零拆成多大的块交给底层：4 MiB。
+///
+/// 实测（2026-09-22 本机 NVMe，`/tmp` 的 ext4，对 4 GiB 稀疏文件的 768 MiB 段写零，各 3 轮）：
+/// `O_DIRECT` 下 256 KiB 要 233–240 ms、1 MiB 要 146–152 ms、4 MiB 要 135–138 ms、16 MiB 要 133–137 ms、64 MiB 要 134–135 ms；
+/// 走页缓存那一侧 1 MiB 到 16 MiB 都是 43–49 ms。**拐点在 4 MiB**：比它小明显变慢（256 KiB 慢 75%），
+/// 比它大只再快 1–2 ms 而暂存区从 4 MiB 长到 64 MiB（`O_DIRECT` 那条路每次调用要一块对齐暂存区）。
+pub const ZERO_FILL_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+
+/// 六个动作，只有这六个。介质是什么这里看不见。
 pub trait BlockDevice {
     fn read_at(
         &self,
@@ -102,6 +114,20 @@ pub trait BlockDevice {
         offset: DeviceOffsetInBytes,
         bytes: &[u8],
         durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError>;
+    /// 写零：把 `[offset, offset + length)` 整段变成 0。偏移与长度同样要按物理块对齐、不越过设备末尾。
+    ///
+    /// 与「拿一个全 0 缓冲反复调 [`BlockDevice::write_at`]」的区别在**它是一个动作**：
+    /// mkfs 把 768 MiB 的 journal 环整环清零时，上层只发一次调用、录制流只记一步，
+    /// 底下拆成几次 I/O 是后端自己的事（[`ZERO_FILL_CHUNK_BYTES`]）。
+    ///
+    /// 没有 [`WriteDurability`] 参数，与 [`BlockDevice::write_at`] 不同：清零永远是普通写，
+    /// 持久由后面的屏障保证。唯一的调用方是 mkfs 的整环清零，它末尾有屏障；而「返回时已持久」这条语义
+    /// 第一版只给根槽（D16（发布语义） 已定项 7），给清零留一个走不到的 FUA 分支，等于留一条没人测的路。
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
     ) -> Result<(), BlockDeviceError>;
     /// 屏障：之前发出的写全部持久之后才返回。
     fn barrier(&mut self) -> Result<(), BlockDeviceError>;
@@ -218,6 +244,36 @@ fn length_of(buffer: &[u8]) -> u64 {
     u64::try_from(buffer.len()).expect("缓冲区长度装得进 u64")
 }
 
+/// 一次写零要准备多大的全 0 暂存区：整段与 [`ZERO_FILL_CHUNK_BYTES`] 取小的那个。
+/// 清一段短于一个块的范围时不白白分配 4 MiB。
+fn zero_fill_chunk_length(length: u64) -> usize {
+    usize::try_from(length.min(ZERO_FILL_CHUNK_BYTES)).expect("块长不超过 4 MiB，装得进 usize")
+}
+
+/// 两个后端共用的拆块循环：`zeros` 是后端备好的全 0 暂存区（它的长度就是块大小），
+/// 从 `offset` 起按块顺序交给 `write_chunk`，最后一块按剩余长度截短。
+///
+/// 长度按物理块对齐由调用方先核过（[`check_aligned_and_in_range`]），而块大小 4 MiB 是 512 与 4096 的整数倍，
+/// 所以每一块都还是对齐的。
+fn write_zeroes_in_chunks<WriteChunk>(
+    offset: DeviceOffsetInBytes,
+    length: u64,
+    zeros: &[u8],
+    mut write_chunk: WriteChunk,
+) -> Result<(), BlockDeviceError>
+where
+    WriteChunk: FnMut(DeviceOffsetInBytes, &[u8]) -> Result<(), BlockDeviceError>,
+{
+    let mut written: u64 = 0;
+    while written < length {
+        let this_chunk = (length - written).min(length_of(zeros));
+        let end = usize::try_from(this_chunk).expect("块长装得进 usize");
+        write_chunk(DeviceOffsetInBytes(offset.0 + written), &zeros[..end])?;
+        written += this_chunk;
+    }
+    Ok(())
+}
+
 impl BlockDevice for FileBackedBlockDevice {
     fn read_at(
         &self,
@@ -246,6 +302,20 @@ impl BlockDevice for FileBackedBlockDevice {
                 self.file.sync_data().map_err(BlockDeviceError::InputOutput)
             }
         }
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, length)?;
+        let zeros = vec![0u8; zero_fill_chunk_length(length)];
+        write_zeroes_in_chunks(offset, length, &zeros, |chunk_offset, chunk| {
+            self.file
+                .write_all_at(chunk, chunk_offset.0)
+                .map_err(BlockDeviceError::InputOutput)
+        })
     }
 
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
@@ -452,6 +522,22 @@ impl BlockDevice for DirectInputOutputBlockDevice {
         }
     }
 
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        check_aligned_and_in_range(offset, length, self.physical_block_size, self.size_in_bytes)?;
+        // `O_DIRECT` 要求用户缓冲对齐，所以全 0 暂存区走 `AlignedScratch`（它自己就是全 0 的）；
+        // 走页缓存那一臂不需要对齐，但用同一块暂存区，两臂发出的 pwrite 完全一样。
+        let scratch = AlignedScratch::new(zero_fill_chunk_length(length));
+        write_zeroes_in_chunks(offset, length, scratch.as_slice(), |chunk_offset, chunk| {
+            self.file
+                .write_all_at(chunk, chunk_offset.0)
+                .map_err(BlockDeviceError::InputOutput)
+        })
+    }
+
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
         self.file.sync_data().map_err(BlockDeviceError::InputOutput)
     }
@@ -511,6 +597,106 @@ mod tests {
             untouched.iter().all(|byte| *byte == 0),
             "稀疏镜像没写过的地方读回全 0"
         );
+        std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 写零把整段变成 0、段外一个字节不动；长度大于一个块时底下拆成几次写，拆的边界上不许留下没清的洞。
+    /// 段长取 `ZERO_FILL_CHUNK_BYTES` 的 2.5 倍：两个整块加一个半块，最后一块要按剩余长度截短。
+    #[test]
+    fn writing_zeroes_clears_the_whole_range_across_chunk_boundaries_and_nothing_outside_it() {
+        let path = temporary_image_path("zeroes");
+        let chunk = ZERO_FILL_CHUNK_BYTES;
+        let zero_start = chunk;
+        let zero_length = chunk * 2 + chunk / 2;
+        let image_bytes = zero_start + zero_length + chunk;
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            image_bytes,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
+        // 整个镜像先填成非 0：稀疏镜像本来就读回全 0，不先弄脏就分不出「清过」与「从来没写过」
+        // （`test-discipline.md`「读不到 ≠ 读到 0」）。
+        let dirt = vec![0xC3u8; usize::try_from(chunk).expect("块长")];
+        let mut filled: u64 = 0;
+        while filled < image_bytes {
+            let this_piece = usize::try_from((image_bytes - filled).min(chunk)).expect("片长");
+            device
+                .write_at(
+                    DeviceOffsetInBytes(filled),
+                    &dirt[..this_piece],
+                    WriteDurability::Plain,
+                )
+                .expect("填脏");
+            filled += u64::try_from(this_piece).expect("片长装得进 u64");
+        }
+        device
+            .write_zeroes_at(DeviceOffsetInBytes(zero_start), zero_length)
+            .expect("写零");
+        // 抽样读：段内取每一块的首尾与两个块边界的两侧，段外取紧挨着的前后各一扇区。
+        let mut sample = vec![0xFFu8; 512];
+        for offset in [
+            zero_start,
+            zero_start + chunk - 512,
+            zero_start + chunk,
+            zero_start + 2 * chunk - 512,
+            zero_start + 2 * chunk,
+            zero_start + zero_length - 512,
+        ] {
+            device
+                .read_at(DeviceOffsetInBytes(offset), &mut sample)
+                .expect("读段内");
+            assert!(
+                sample.iter().all(|byte| *byte == 0),
+                "偏移 {offset} 那一扇区没被清干净"
+            );
+        }
+        for offset in [zero_start - 512, zero_start + zero_length] {
+            device
+                .read_at(DeviceOffsetInBytes(offset), &mut sample)
+                .expect("读段外");
+            assert!(
+                sample.iter().all(|byte| *byte == 0xC3),
+                "偏移 {offset} 在清零段外，不该被动"
+            );
+        }
+        std::fs::remove_file(&path).expect("清理镜像");
+    }
+
+    /// 写零与写走同一条前置判定：偏移或长度不按物理块对齐、或者越过设备末尾，都在动盘之前拒绝。
+    #[test]
+    fn writing_zeroes_rejects_unaligned_and_out_of_range_ranges_before_touching_the_file() {
+        let path = temporary_image_path("zeroes-refused");
+        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
+            &path,
+            16384,
+            PhysicalBlockSizeInBytes(512),
+        )
+        .expect("建镜像");
+        device
+            .write_at(
+                DeviceOffsetInBytes(0),
+                &[0x7Eu8; 512],
+                WriteDurability::Plain,
+            )
+            .expect("先写一扇区");
+        assert!(matches!(
+            device.write_zeroes_at(DeviceOffsetInBytes(1), 512),
+            Err(BlockDeviceError::Unaligned { .. })
+        ));
+        assert!(matches!(
+            device.write_zeroes_at(DeviceOffsetInBytes(0), 513),
+            Err(BlockDeviceError::Unaligned { .. })
+        ));
+        assert!(matches!(
+            device.write_zeroes_at(DeviceOffsetInBytes(16384), 512),
+            Err(BlockDeviceError::OutOfRange { .. })
+        ));
+        let mut read_back = vec![0u8; 512];
+        device
+            .read_at(DeviceOffsetInBytes(0), &mut read_back)
+            .expect("读");
+        assert_eq!(read_back, vec![0x7Eu8; 512], "被拒的写零一个字节都没落盘");
         std::fs::remove_file(&path).expect("清理镜像");
     }
 

@@ -90,7 +90,7 @@ fn main() {
             &mut devices,
             &stream,
             |point, _devices| match point {
-                ScenarioPoint::AfterInstanceAcquisition => {}
+                ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
                 ScenarioPoint::BeforeFirstTransaction => {
                     steps_before_first_transaction = Some(stream.operations().len());
                 }

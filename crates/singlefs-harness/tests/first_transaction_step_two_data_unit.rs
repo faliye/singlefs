@@ -15,6 +15,7 @@ use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::pointer::{DataPointer, LocationEntry, PointerHead};
+use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_core::unit::{build_data_unit, declared_length, DataUnitIdentity, WriteOrder};
 use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, TREE_IDENTIFIER_EXTENT};
@@ -42,6 +43,7 @@ fn parameters() -> MakeFilesystemParameters {
             minimum_input_output_bytes: 512,
             fixed_structure_slot_spacing: 4096,
             journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
         },
     }
 }

@@ -178,7 +178,7 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
         );
         assert!(device.is_free(SlotNumber(50180)) && device.is_free(SlotNumber(50181)));
         for later in &overwrites[..3] {
-            let slot = later.data_pointer.locations[0].slot;
+            let slot = later.data_pointers[0].locations[0].slot;
             assert!(
                 !device.is_free(slot),
                 "释放代 > F 的数据单元 {slot:?} 仍占着"
@@ -188,7 +188,7 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
     let reuse = overwrite_in_process(&mut pool, &content_of(2000, 31), InstanceGeneration(3));
     assert_eq!(reuse.root.checkpoint_txg, CheckpointTxg(17));
     assert_eq!(
-        reuse.data_pointer.locations[0].slot,
+        reuse.data_pointers[0].locations[0].slot,
         SlotNumber(50178),
         "E 的数据单元落回最低的可再分配偶数槽对 50178–50179：mkfs 树表那 1 槽（A 换下、释放代 3）回收了、50179 从没分配过；mkfs 实例表那片 50176 虽被 D 放掉、也回收了，但 B 的根还引用它、被影子账隔离；A 的数据单元 50180 排在后面"
     );
@@ -231,6 +231,15 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
     );
     let verdicts = check_pool_image(&image);
     for (invariant, verdict) in &verdicts {
+        if *invariant == "I-8.8" {
+            // 一事务一条、每条都带提交标记：I-8.8（前缀里的事务不被切开） 的 ③ ④ 没有对象，报不适用
+            // （判别力在 `checker_known_bad_images.rs`）。
+            assert!(
+                matches!(verdict, InvariantVerdict::NotApplicable(_)),
+                "{invariant} 在 E 之后的镜像上报不适用：{verdict:?}"
+            );
+            continue;
+        }
         assert_eq!(
             *verdict,
             InvariantVerdict::Holds,
@@ -259,7 +268,10 @@ fn one_device_carrying_the_floor_alone_does_not_take_effect_on_remount() {
         assert_eq!(second_carrier, CheckpointTxg(16));
         let mut devices = pool.reopen_recorded();
         if damage_second_carrier {
-            let target = target_for_publish(second_carrier);
+            let target = target_for_publish(
+                second_carrier,
+                parameters().geometry.root_ring_slots_per_region,
+            );
             let device =
                 parameters().region_devices[usize::try_from(target.region).expect("区域号")];
             let offset = slot_offset(target, 4096);
@@ -494,7 +506,7 @@ fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_ref
     assert_eq!(reclaimed.len(), 18);
     let reuse = overwrite_in_process(&mut pool, &content_of(2000, 31), InstanceGeneration(3));
     assert_eq!(
-        reuse.data_pointer.locations[0].slot,
+        reuse.data_pointers[0].locations[0].slot,
         SlotNumber(50176),
         "A 的数据落点被拿走：A（F = 0 时仍是候选）还引用它，窄读法没隔离它"
     );
@@ -527,7 +539,10 @@ fn roots_below_a_floor_carried_by_only_one_device_remain_rollback_candidates() {
     let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬 F");
     let second_carrier = raised.publishes[1].root.checkpoint_txg;
     let mut devices = pool.reopen_recorded();
-    let target = target_for_publish(second_carrier);
+    let target = target_for_publish(
+        second_carrier,
+        parameters().geometry.root_ring_slots_per_region,
+    );
     let device = parameters().region_devices[usize::try_from(target.region).expect("区域号")];
     let offset = slot_offset(target, 4096);
     let (_, recorded) = devices
@@ -609,20 +624,97 @@ fn slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_take
     assert_eq!(newest_root_floor(&pool), CheckpointTxg(8));
 }
 
-/// 现行版本里没有重写过的实例表单元时抬 F（mkfs 加第一个事务的进程，现行版本是 `publish_first_file` 的输出）：报错而不是 panic
-/// （alloc-basis 第二轮云端攻方腿第七节第 1 条）。
+/// C502（抬 F 时现行版本里没有实例表单元）：mkfs 同一个进程里第一个事务之后再覆盖写三次（txg 4、5、6），抬 F 做成。
+/// 这个进程的现行版本是 `publish_first_file` 那一版往下接的，`TransactionOutput::units` 里一个实例表单元都没有；
+/// 候选集按现行那一版的根指针上读出来的实例表判（mkfs 那片 0 行的表），不看那个内存数组。
+/// 上限 = min(每块盘上最新的有效根 min(6, 4), 第 4 新的非空有效根 3) = 3（D16（发布语义） 已定项 1）；两次空发布 txg 7（盘 1）、8（盘 0）
+/// 让两块盘各有一条带 F = 3 的根；释放代 ≤ 3 的只有第一个文件版本换下的 mkfs 那片第 0 版树表（1 槽）。
 #[test]
-fn raising_the_floor_on_a_current_version_without_a_rewritten_instance_table_unit_is_refused_instead_of_panicking(
+fn raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root(
 ) {
-    let mut pool = build_pool("step-five-raise-without-mount");
-    let refused = raise_floor(&mut pool, CheckpointTxg(1));
+    let mut pool = build_pool("step-five-raise-in-the-make-filesystem-process");
+    for seed in [3usize, 5, 7] {
+        overwrite_in_process(
+            &mut pool,
+            &content_of(3000 + seed, seed),
+            InstanceGeneration(1),
+        );
+    }
+    assert_eq!(pool.output.root.checkpoint_txg, CheckpointTxg(6));
     assert!(
-        matches!(
-            refused,
-            Err(MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion)
-        ),
-        "第一个事务之后直接抬 F：现行版本里没有重写过的实例表单元：{:?}",
+        pool.output
+            .units
+            .iter()
+            .all(|unit| unit.identity != singlefs_core::transaction::TransactionUnit::InstanceTable),
+        "这个进程内存里的现行版本不带实例表单元：抬 F 要的那张表只在根指针后面"
+    );
+    let raised = raise_floor(&mut pool, CheckpointTxg(3)).expect("抬 F 到 3");
+    assert_eq!(raised.ceiling, CheckpointTxg(3), "上限 min(4, 3)");
+    assert_eq!(
+        raised
+            .publishes
+            .iter()
+            .map(|publish| publish.root.checkpoint_txg)
+            .collect::<Vec<_>>(),
+        vec![CheckpointTxg(7), CheckpointTxg(8)],
+        "两次空发布让两块盘各有一条带新 F 的根"
+    );
+    assert_eq!(
+        raised.reclaimed,
+        vec![Placement {
+            slot: singlefs_core::make_filesystem::TREE_TABLE_GENESIS_SLOT,
+            span: 1
+        }],
+        "释放代 ≤ 3 的只有 mkfs 那片第 0 版树表"
+    );
+    assert_eq!(newest_root_floor(&pool), CheckpointTxg(3));
+    let verdicts = check_pool_image(&pool.memory_pool());
+    let violated: Vec<&str> = verdicts
+        .iter()
+        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+        .map(|(invariant, _)| *invariant)
+        .collect();
+    assert!(
+        violated.is_empty(),
+        "抬 F 之后 checker 一条都不红：{verdicts:?}"
+    );
+}
+
+/// C502 那一格改成从根指针读表之后，读不出的那一格：现行那一版的根指着的实例表两份都读不出，抬 F 在任何写之前拒绝
+/// （`InstanceTableMalformed`：判不了候选集），盘上逐字节不变（系统配置槽、根环、录制流步数）。
+#[test]
+fn raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refused_before_any_write(
+) {
+    let mut pool = build_pool("step-five-raise-with-an-unreadable-instance-table");
+    overwrite_in_process(&mut pool, &content_of(3100, 13), InstanceGeneration(1));
+    {
+        let instance_table_locations = pool.output.root.instance_table.locations;
+        let devices = pool.devices.as_mut().expect("镜像还开着");
+        for location in &instance_table_locations {
+            let (_, recorded) = devices
+                .iter_mut()
+                .find(|(identity, _)| *identity == location.device)
+                .expect("实例表所在的盘");
+            let offset = location.slot.to_device_offset();
+            let mut bytes = vec![0u8; 512];
+            recorded.read_at(offset, &mut bytes).expect("读实例表");
+            bytes[200] ^= 0xff;
+            recorded
+                .write_at(offset, &bytes, WriteDurability::Plain)
+                .expect("改坏实例表");
+        }
+    }
+    let before = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let refused = raise_floor(&mut pool, CheckpointTxg(3));
+    assert!(
+        matches!(refused, Err(MountError::InstanceTableMalformed)),
+        "现行那一版的实例表两份都读不出：{:?}",
         refused.as_ref().err()
+    );
+    assert_eq!(
+        common::disk_snapshot(&pool.memory_pool(), &pool.stream),
+        before,
+        "拒绝在任何写之前"
     );
 }
 
@@ -661,4 +753,75 @@ fn raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable() {
     }
     let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬到 11");
     assert_eq!(raised.abandoned_roots_unreadable, 1, "C 的账读不出");
+}
+
+/// 事务号按实例计数、从 1 起（D23（journal 的角色与格式） 已定项 7），**不承载事务的空发布写 0 也不许把计数拉回去**。
+///
+/// 抬 F 推的两次空发布在记录上写事务号 0；发布 E 若取「上一条记录的事务号 + 1」就拿到 0 + 1 = 1，
+/// 与实例 3 第一次覆盖写用过的 1 重号。重号之后同一实例的两个版本写序逐字节相同（写序存事务号低 48 位），
+/// I-1.8（归并后版本全序） 判不开它们，而实例表行的 W 能当精确前缀也正是靠「记录按事务号顺序追加」这条纪律。
+#[test]
+fn the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor(
+) {
+    let mut pool = build_through_rollback("txn-number-per-instance");
+    let four = four_overwrites_after_the_rollback(&mut pool);
+    let before_raising: Vec<u64> = four
+        .iter()
+        .map(|output| output.record.transaction)
+        .collect();
+    assert_eq!(
+        before_raising,
+        vec![1, 2, 3, 4],
+        "实例 3 的四次覆盖写按实例计数、从 1 起"
+    );
+
+    raise_floor(&mut pool, CheckpointTxg(11)).expect("抬到 11");
+    assert_eq!(
+        pool.output.record.transaction, 0,
+        "抬 F 推的空发布不承载事务，记录上写 0（D23 已定项 19 ①）"
+    );
+
+    let after_raising =
+        overwrite_in_process(&mut pool, &content_of(3100, 31), InstanceGeneration(3));
+    assert_eq!(
+        after_raising.record.transaction, 5,
+        "空发布不推进计数，也不许把它拉回去：E 接在 4 之后是 5，不是 0 + 1"
+    );
+
+    let mut used: Vec<u64> = before_raising;
+    used.push(after_raising.record.transaction);
+    let mut deduplicated = used.clone();
+    deduplicated.sort_unstable();
+    deduplicated.dedup();
+    assert_eq!(
+        deduplicated.len(),
+        used.len(),
+        "同一个实例里非 0 的事务号互不重复：{used:?}"
+    );
+
+    // 盘上的样子，兼 I-8.7（实例内事务号不重号） 那条射程「事务号 0 不进序列」的阳性对照：抬 F 推出来的两条空发布记录
+    // （事务号 0）**夹在**实例 3 的 4 与 5 中间，而池级 checker 在这份镜像上判 I-8.7 绿且真被评估过。
+    // 把 0 也算进序列的写法在这里就红了（4 → 0 不是严格递增），它红不了才说明 0 真被排除掉。
+    let image = pool.memory_pool();
+    let system_configuration = choose_system_configuration(&image).expect("系统配置");
+    let transactions_of_the_third_instance: Vec<u64> = scan_journal(&image, &system_configuration)
+        .into_iter()
+        .filter(|((instance, _), _)| *instance == InstanceGeneration(3))
+        .map(|(_, record)| record.transaction)
+        .collect();
+    assert_eq!(
+        transactions_of_the_third_instance,
+        vec![0, 0, 1, 2, 3, 4, 0, 0, 5],
+        "实例 3 按 jsn 排下来的事务号：回退那次建实例推的写行与暖机空发布 0，之后四次覆盖写 1–4，抬 F 两次空发布 0，E 是 5"
+    );
+    let verdicts = check_pool_image(&image);
+    assert_eq!(
+        verdicts
+            .iter()
+            .find(|(invariant, _)| *invariant == "I-8.7")
+            .expect("清单里有 I-8.7")
+            .1,
+        InvariantVerdict::Holds,
+        "I-8.7 要真被评估过且成立：中间夹着的空发布记录不进那个序列：{verdicts:?}"
+    );
 }

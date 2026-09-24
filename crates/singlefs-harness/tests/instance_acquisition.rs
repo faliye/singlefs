@@ -3,68 +3,47 @@
 
 mod common;
 
-use std::io;
-
-use common::{build_pool, parameters, BuiltPool, Recorded};
-use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
-use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
-};
+use common::{build_pool, geometry, parameters, BuiltPool, Recorded};
+use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
 use singlefs_core::recovery::{choose_system_configuration, verified_system_configuration_slots};
 use singlefs_core::transaction::{acquire_instance, AcquisitionRollback, CommitStep, PoolWriter};
+use singlefs_harness::fault_injection::{
+    FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
+    FaultSchedule, InjectedFault, SharedFaultPlan,
+};
 
 /// 系统配置两槽住在偏移 0 与 4096，都在这个界之下。
 const SYSTEM_CONFIGURATION_SLOTS_END_OFFSET: u64 = 8192;
 
-/// 包在录制盘外面：按开关让屏障或系统配置槽写报错，并数真正交给设备的屏障。
-struct FaultInjectingDevice {
-    inner: Recorded,
-    fail_barriers: bool,
-    fail_system_configuration_writes: bool,
-    barrier_calls: u64,
+/// 包在录制盘外面的通用故障注入（增补 3 第 4 件，`singlefs_harness::fault_injection`；这里原先手写的 `FaultInjectingDevice`
+/// 2026-09-21 并进了它）：按开关让屏障或系统配置槽写报错，并数真正交给设备的屏障（`FaultDeviceCounts::barriers_forwarded`）。
+type FaultInjectingDevice = FaultInjectingBlockDevice<Recorded>;
+
+/// 两块盘共用的注入计划连同它们。
+struct WrappedDevices {
+    plan: SharedFaultPlan,
+    devices: Vec<(DeviceIdentity, FaultInjectingDevice)>,
 }
 
-fn injected(what: &str) -> BlockDeviceError {
-    BlockDeviceError::InputOutput(io::Error::other(format!("注入的{what}错")))
+/// 每一道屏障都报错。
+fn fail_every_barrier() -> FaultSchedule {
+    FaultSchedule::every_call_across_the_pool(InjectedFault::BarrierFails)
 }
 
-impl BlockDevice for FaultInjectingDevice {
-    fn read_at(
-        &self,
-        offset: DeviceOffsetInBytes,
-        buffer: &mut [u8],
-    ) -> Result<(), BlockDeviceError> {
-        self.inner.read_at(offset, buffer)
-    }
-    fn write_at(
-        &mut self,
-        offset: DeviceOffsetInBytes,
-        bytes: &[u8],
-        durability: WriteDurability,
-    ) -> Result<(), BlockDeviceError> {
-        if self.fail_system_configuration_writes && offset.0 < SYSTEM_CONFIGURATION_SLOTS_END_OFFSET
-        {
-            return Err(injected("系统配置槽写"));
-        }
-        self.inner.write_at(offset, bytes, durability)
-    }
-    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
-        if self.fail_barriers {
-            return Err(injected("屏障"));
-        }
-        self.barrier_calls += 1;
-        self.inner.barrier()
-    }
-    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
-        self.inner.probe_physical_block_size()
-    }
-    fn size_in_bytes(&self) -> u64 {
-        self.inner.size_in_bytes()
+/// 这块盘上每一次系统配置槽写都报错（两槽住在偏移 0 起的 `SYSTEM_CONFIGURATION_SLOTS_END_OFFSET` 之内）。
+fn fail_every_system_configuration_write_on(device: DeviceIdentity) -> FaultSchedule {
+    FaultSchedule {
+        fault: InjectedFault::WriteFails,
+        device: FaultDeviceSelector::OnlyDevice(device),
+        placement: FaultPlacement::OffsetBelow(SYSTEM_CONFIGURATION_SLOTS_END_OFFSET),
+        counting: FaultCounting::AcrossThePool,
+        occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
     }
 }
 
-fn wrap(built: &mut BuiltPool) -> Vec<(DeviceIdentity, FaultInjectingDevice)> {
-    built
+fn wrap(built: &mut BuiltPool) -> WrappedDevices {
+    let plan = SharedFaultPlan::unarmed(geometry());
+    let devices = built
         .devices
         .take()
         .expect("第一个事务写完，盘还开着")
@@ -72,15 +51,11 @@ fn wrap(built: &mut BuiltPool) -> Vec<(DeviceIdentity, FaultInjectingDevice)> {
         .map(|(identity, inner)| {
             (
                 identity,
-                FaultInjectingDevice {
-                    inner,
-                    fail_barriers: false,
-                    fail_system_configuration_writes: false,
-                    barrier_calls: 0,
-                },
+                FaultInjectingBlockDevice::new(identity, inner, plan.clone()),
             )
         })
-        .collect()
+        .collect();
+    WrappedDevices { plan, devices }
 }
 
 /// 一块盘两槽里自证过的系统配置：(世代号, 实例代号)，按世代号排好。
@@ -121,7 +96,10 @@ const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
 #[test]
 fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisition_gets_three() {
     let mut built = build_pool("acquire-second");
-    let mut devices = wrap(&mut built);
+    let WrappedDevices {
+        plan: _,
+        mut devices,
+    } = wrap(&mut built);
     assert_eq!(
         acquire(&mut devices).expect("第二次取号"),
         InstanceGeneration(2)
@@ -151,10 +129,8 @@ fn second_acquisition_writes_generation_six_on_both_disks_and_the_next_acquisiti
 fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number_is_never_handed_out_again(
 ) {
     let mut built = build_pool("acquire-barrier-error");
-    let mut devices = wrap(&mut built);
-    for (_, device) in &mut devices {
-        device.fail_barriers = true;
-    }
+    let WrappedDevices { plan, mut devices } = wrap(&mut built);
+    plan.arm(fail_every_barrier());
     let failure =
         acquire(&mut devices).expect_err("取号之后那道屏障报错，取号必须失败、不交出新号");
     assert!(
@@ -168,9 +144,7 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
             "{disk:?}：取号写世代 6 带新号 2，回卷写世代 7 带取号之前全部自证过的槽中最大的号 1"
         );
     }
-    for (_, device) in &mut devices {
-        device.fail_barriers = false;
-    }
+    plan.disarm();
     assert_eq!(
         acquire(&mut devices).expect("屏障好了再取号"),
         InstanceGeneration(3),
@@ -182,13 +156,8 @@ fn failed_barrier_after_acquisition_rolls_both_disks_back_and_the_skipped_number
 fn failed_system_configuration_write_on_the_second_disk_rolls_the_first_disk_back_and_leaves_the_second_untouched(
 ) {
     let mut built = build_pool("acquire-write-error");
-    let mut devices = wrap(&mut built);
-    devices
-        .iter_mut()
-        .find(|(identity, _)| *identity == DeviceIdentity(1))
-        .expect("盘 1")
-        .1
-        .fail_system_configuration_writes = true;
+    let WrappedDevices { plan, mut devices } = wrap(&mut built);
+    plan.arm(fail_every_system_configuration_write_on(DeviceIdentity(1)));
     let failure = acquire(&mut devices).expect_err("盘 1 的取号写报错，取号必须失败");
     assert!(
         matches!(failure.rollback, AcquisitionRollback::RolledBack),
@@ -208,16 +177,17 @@ fn failed_system_configuration_write_on_the_second_disk_rolls_the_first_disk_bac
 #[test]
 fn barrier_right_after_the_acquisition_barrier_is_not_sent_to_the_devices() {
     let mut built = build_pool("acquire-barrier-skip");
-    let mut devices = wrap(&mut built);
+    let WrappedDevices { plan, mut devices } = wrap(&mut built);
     {
         let parameters = parameters();
         let mut pool = PoolWriter::new(&parameters, &mut devices);
         acquire_instance(&mut pool).expect("取号");
         pool.perform(CommitStep::Barrier).expect("紧跟着的一道屏障");
     }
-    for (identity, device) in &devices {
+    for (identity, _) in &devices {
         assert_eq!(
-            device.barrier_calls, 1,
+            plan.counts_of_device(*identity).barriers_forwarded,
+            1,
             "{identity:?}：取号之后那道屏障发一次；紧跟着的那道前面没有写，不再发——首次挂载路径上暖机开场那道就这样并掉，设备收到的 FLUSH 数不变"
         );
     }

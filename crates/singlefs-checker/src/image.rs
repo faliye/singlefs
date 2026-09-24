@@ -4,7 +4,8 @@
 use std::collections::BTreeMap;
 
 use singlefs_format::{
-    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+    FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, ROOT_RING_SLOTS_PER_REGION_MAXIMUM,
+    ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
 };
 
 use crate::{
@@ -33,10 +34,12 @@ pub enum InvariantVerdict {
 }
 
 /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
-pub const IMPLEMENTED_INVARIANTS: [&str; 29] = [
-    "I-1.1", "I-1.3", "I-1.4", "I-1.6", "I-1.7", "I-2.1", "I-2.3", "I-2.4", "I-2.5", "I-3.1",
-    "I-3.8", "I-3.9", "I-4.8", "I-5.1", "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.4", "I-7.6",
-    "I-7.7", "I-7.8", "I-9.1", "I-9.2", "I-9.4", "I-9.7", "I-9.10", "I-9.13", "I-9.14",
+pub const IMPLEMENTED_INVARIANTS: [&str; 41] = [
+    "I-1.1", "I-1.2", "I-1.3", "I-1.4", "I-1.6", "I-1.7", "I-1.8", "I-1.10", "I-2.1", "I-2.3",
+    "I-2.4", "I-2.5", "I-3.1", "I-3.8", "I-3.9", "I-3.10", "I-3.11", "I-4.2", "I-4.8", "I-5.1",
+    "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.3", "I-7.4", "I-7.6", "I-7.7", "I-7.8", "I-8.6",
+    "I-8.7", "I-8.8", "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13",
+    "I-9.14",
 ];
 
 /// 判定累加器：每条不变量记评估了几次、第一处违例、以及整条不适用的理由。
@@ -116,15 +119,44 @@ pub struct PoolGeometry {
     pub slot_spacing: u64,
 }
 
-#[must_use]
-pub fn geometry_of(slot: &[u8], view: &SystemConfigurationView) -> PoolGeometry {
-    PoolGeometry {
+/// 系统配置字段表给逐区域设备身份留了几个字段：偏移 379 / 383 / 387，一共三个。
+/// R（偏移 361 那一字节）是**盘上读来的值**，可以是 0..255 里的任何一个；它大于这个数时，
+/// 第 3 个及以后的区域在字段表里根本没有设备身份可读——这份系统配置这个格式版本读不了。
+pub const REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION: usize = 3;
+
+/// 从一个自证过的系统配置槽里取几何。
+///
+/// # Errors
+/// R 大于 [`REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION`] ⇒
+/// [`crate::Verdict::RegionCountPastTheRegionDeviceFields`]：不夹成 3 往下走（那是静默跳过几个区域，
+/// 根环少读几个槽而没人说），也不 panic（panic 面普查 R12：`root_slot_positions` 拿它下标一个长 3 的数组）。
+///
+/// S（偏移 362 那一字节）不在格式承诺的区间里 ⇒
+/// [`crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval`]，同一条理由：
+/// 夹一下往下走就是按一个不存在的几何走读。两条判据都在盘上那一字节进 [`PoolGeometry`] 的唯一入口上。
+pub fn geometry_of(
+    slot: &[u8],
+    view: &SystemConfigurationView,
+) -> Result<PoolGeometry, crate::Verdict> {
+    let regions = u64::from(slot[361]);
+    if regions
+        > u64::try_from(REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION).expect("三个区域字段")
+    {
+        return Err(crate::Verdict::RegionCountPastTheRegionDeviceFields);
+    }
+    let slots_per_region = u64::from(slot[362]);
+    if !(ROOT_RING_SLOTS_PER_REGION_MINIMUM..=ROOT_RING_SLOTS_PER_REGION_MAXIMUM)
+        .contains(&slots_per_region)
+    {
+        return Err(crate::Verdict::RootRingSlotsPerRegionOutsideTheFormatInterval);
+    }
+    Ok(PoolGeometry {
         filesystem_identifier: view.filesystem_identifier,
         physical_block_size: view.declared_physical_block_size,
         journal_ring_start_slot: read_u64(slot, 325),
         journal_ring_bytes: read_u64(slot, 333),
-        regions: u64::from(slot[361]),
-        slots_per_region: u64::from(slot[362]),
+        regions,
+        slots_per_region,
         prime_step: u64::from(read_u32(slot, 363)),
         chunk_bytes: u64::from(read_u32(slot, 367)),
         base_slot: read_u64(slot, 371),
@@ -135,16 +167,15 @@ pub fn geometry_of(slot: &[u8], view: &SystemConfigurationView) -> PoolGeometry 
         ],
         unit_area_start_slot: read_u64(slot, 417),
         slot_spacing: u64::from(read_u32(slot, 429)),
-    }
+    })
 }
 
 fn parse_system_configuration_slot(
     bytes: &[u8],
 ) -> Option<(SystemConfigurationView, PoolGeometry)> {
-    check_system_configuration_slot(bytes).ok().map(|view| {
-        let geometry = geometry_of(bytes, &view);
-        (view, geometry)
-    })
+    let view = check_system_configuration_slot(bytes).ok()?;
+    let geometry = geometry_of(bytes, &view).ok()?;
+    Some((view, geometry))
 }
 
 /// 每盘两槽里自证过的系统配置：槽 0 在偏移 0；槽 1 的偏移按槽 0 记的槽距，槽 0 无效时按最小槽距 4096（2026-09-14 用户收尾弹窗定甲）。
@@ -202,7 +233,11 @@ pub fn chosen_system_configurations(
 pub fn root_slot_positions(geometry: &PoolGeometry) -> Vec<(u64, u64, u32, u64)> {
     let mut positions = Vec::new();
     for region in 0..geometry.regions {
-        let device = geometry.region_devices[usize::try_from(region).expect("区域号")];
+        // 下标在范围内不是这里判的：`geometry_of` 是盘上那一字节进 `PoolGeometry` 的唯一入口，
+        // 它已经把 R > 3 的槽拒成 `Verdict::RegionCountPastTheRegionDeviceFields`、不交出 `PoolGeometry`。
+        let device = geometry.region_devices[usize::try_from(region).expect(
+            "区域号：geometry_of 判过 R ≤ REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION",
+        )];
         for slot in 0..geometry.slots_per_region {
             let offset = geometry.base_slot * SLOT_BYTES
                 + region * geometry.prime_step * geometry.chunk_bytes

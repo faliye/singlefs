@@ -1,0 +1,42 @@
+# 广谱变异（里程碑「第二个事务」增补 3 第 7 件）的 cargo-mutants 配置草案。
+# 主 agent 2026-09-22 采纳并入库；这一轮先只跑 `singlefs-checker`（用户当天定：2697 条全跑按实测
+# 基线要 5.7–11.5 天，先把 checker 那 911 条的三个数出全，core 那 1786 条另立一笔账）。
+# ⚠️ 跑的时候在独立 worktree 上跑，不在共享工作区：干扰不是别的用户，是主 agent 自己并发
+# 派出去的实现线（2026-09-22 实测：相隔 51 秒两次 cargo check 报不同的错，第三次才编过）。
+#
+# examine_globs：只生成这两个 crate 的变异——增补 3 第 7 件设想实现原话
+# 「对 crates/singlefs-core 与 crates/singlefs-checker 全量生成变异」点名的正是这两个 crate，
+# 不含 singlefs-format（纯常量/布局定义，第 1–5 件的历史生成器与故障注入不改它）、
+# 不含 singlefs-harness（那是测试装置本身，变异测试装置没有意义）。
+examine_globs = [
+    "crates/singlefs-core/src/*.rs",
+    "crates/singlefs-checker/src/*.rs",
+]
+
+# test_workspace = true：第 1–5 件的断言绝大多数住在 crates/singlefs-harness/tests/ 里
+# （随机历史、崩溃注入、故障注入、坏盘输入、模型对拍），不是 singlefs-core / singlefs-checker
+# 自己的单元测试。cargo-mutants 的默认行为（test_workspace 留空）在只有一个包时等价于
+# 「只跑被变异包自己的测试」，那样第 1–5 件接上的断言全部照不到——这正是这一件要问的问题
+# 本身要求的判据，缺了它，整个「有没有变异没被抓」的问题就问错了对象。
+test_workspace = true
+
+# baseline：用工具默认的 "run"（开跑前先在未变异的树上跑一遍，确认基线全绿）。
+# 不设成 "skip"：基线要是本来就不绿，"skip" 会把所有超时或失败
+# 都错记成「变异被抓到」。
+
+# minimum_test_timeout：这台机器上主 agent 会并发派实现线（本轮开工前 ps 已确认没有
+# qemu-system / vm-bench / fio 在跑，但不保证跑变异期间不会有别的会话起 cargo），
+# 给一个高于单次基线测试墙钟（本轮量到 366.99 秒，见报告）的地板，避免偶发的资源抢占
+# 把「没抓到」错记成「超时→无效」。地板定 900 秒（约 2.5 倍基线），不设更高：
+# 再高会让真正卡死的变异（写死的死循环）拖满整批的墙钟预算。
+minimum_test_timeout = 900.0
+
+# timeout_multiplier：工具默认按基线测试时长的倍数做每个变异的超时上限，默认倍数已经
+# 覆盖了正常的构建抖动；这里不覆盖默认值（未显式给出，让工具用自己的默认——
+# 显式抄一个数字进来只会制造出一个「为什么是这个数」答不出来的常量）。
+
+# jobs 不写进配置：并行度按开跑那天的机器负载现定（`ps` 现查），写进命令行不写进配置文件，
+# 配置要能在负载不同的日子复用。
+
+# 不设 copy_target / copy_vcs / gitignore：跟工具默认（按目录大小与是否有 VCS 自动判断），
+# 这三项目前没有第一手证据说明默认值不适用于这个仓；有证据再钉。

@@ -4,14 +4,9 @@
 //! 单元两盘各一份、journal 记录 4096 两盘各一份、根槽 512 一次 FUA、系统配置槽 4096 两盘各一次），种类归错了合计不变、这一条红。
 //! 两块内存盘（与宿主重跑虚机那条路同一种设备），不落文件。
 
-use std::cell::Cell;
-use std::rc::Rc;
-
-use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
+use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
-use singlefs_core::block_device::{
-    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
-};
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemOutput, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
@@ -24,61 +19,36 @@ use singlefs_core::write_accounting::{
     WriteCallsAndBytes, WritesByStructureKind, WrittenStructureKind,
 };
 use singlefs_harness::crash::SparseBlockDevice;
+use singlefs_harness::fault_injection::{
+    FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
+    FaultSchedule, InjectedFault, SharedFaultPlan,
+};
 use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
+use singlefs_harness::segments::FixedGeometry;
 use singlefs_harness::{
     RecordedOperation, RecordedOperationKind, RecordingBlockDevice, SharedStream,
 };
 
 const IMAGE_BYTES: u64 = 4 << 30;
 
-/// 还许成功几次写：`None` = 不注入（一直放行），`Some(n)` = 再放行 n 次写，之后每次写都报错。
-/// 装的是 `Rc<Cell<..>>`，测试拿着同一个句柄，写入口正拿着设备时也开得了、关得掉。
-type RemainingSuccessfulWrites = Rc<Cell<Option<u64>>>;
+/// 内存盘外面包录制器，录制器外面包通用的故障注入（增补 3 第 4 件，`singlefs_harness::fault_injection`；
+/// 这里原先手写的 `WriteFailingDevice` 2026-09-21 并进了它）。注入层在录制器**外面**：报错的那次写既不进录制流、
+/// 也不进按种类的账（录制器只记它报成功的写），两边口径仍相同。
+type MemoryDevice = FaultInjectingBlockDevice<RecordingBlockDevice<SparseBlockDevice>>;
 
-/// 包在内存盘外面、录制器里面：按开关让写报错。放在录制器**里面**，失败的那次写就既不进录制流、也不进按种类的账
-/// （录制器只记内层报成功的写，`RecordingBlockDevice::write_at`），两边口径仍相同。
-struct WriteFailingDevice<Inner: BlockDevice> {
-    inner: Inner,
-    remaining_successful_writes: RemainingSuccessfulWrites,
-}
-
-impl<Inner: BlockDevice> BlockDevice for WriteFailingDevice<Inner> {
-    fn read_at(
-        &self,
-        offset: DeviceOffsetInBytes,
-        buffer: &mut [u8],
-    ) -> Result<(), BlockDeviceError> {
-        self.inner.read_at(offset, buffer)
-    }
-    fn write_at(
-        &mut self,
-        offset: DeviceOffsetInBytes,
-        bytes: &[u8],
-        durability: WriteDurability,
-    ) -> Result<(), BlockDeviceError> {
-        match self.remaining_successful_writes.get() {
-            None => {}
-            Some(0) => {
-                return Err(BlockDeviceError::InputOutput(std::io::Error::other(
-                    "注入的设备写错",
-                )));
-            }
-            Some(remaining) => self.remaining_successful_writes.set(Some(remaining - 1)),
-        }
-        self.inner.write_at(offset, bytes, durability)
-    }
-    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
-        self.inner.barrier()
-    }
-    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
-        self.inner.probe_physical_block_size()
-    }
-    fn size_in_bytes(&self) -> u64 {
-        self.inner.size_in_bytes()
+/// 让盘 `device` 再放行 `successful_writes` 次写、之后每次写都报错（原先那个 `Rc<Cell<Option<u64>>>` 开关的同义写法）。
+fn fail_every_write_on_one_device_after(
+    device: DeviceIdentity,
+    successful_writes: u64,
+) -> FaultSchedule {
+    FaultSchedule {
+        fault: InjectedFault::WriteFails,
+        device: FaultDeviceSelector::OnlyDevice(device),
+        placement: FaultPlacement::AnyOffset,
+        counting: FaultCounting::PerDevice,
+        occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(successful_writes + 1),
     }
 }
-
-type MemoryDevice = RecordingBlockDevice<WriteFailingDevice<SparseBlockDevice>>;
 
 fn calls_and_bytes(write_calls: u64, written_bytes: u64) -> WriteCallsAndBytes {
     WriteCallsAndBytes {
@@ -87,13 +57,16 @@ fn calls_and_bytes(write_calls: u64, written_bytes: u64) -> WriteCallsAndBytes {
     }
 }
 
-/// 录制器记下的一段操作里的写：每条写记录算一次写调用（普通写与 FUA 写都算），字节是记录的长度；屏障不算。
+/// 录制器记下的一段操作里的写：每条写记录算一次写调用（普通写、FUA 写、整段清零都算一次调用，
+/// 清零就是一次调用——底下拆成几次 I/O 是后端的事），字节是记录的长度；屏障不算。
 fn recorded_writes(operations: &[RecordedOperation]) -> WriteCallsAndBytes {
     operations
         .iter()
         .fold(WriteCallsAndBytes::NONE, |sum, operation| {
             match operation.kind {
-                RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
+                RecordedOperationKind::Write
+                | RecordedOperationKind::WriteForceUnitAccess
+                | RecordedOperationKind::WriteZeroes => {
                     sum.plus(calls_and_bytes(1, operation.length))
                 }
                 RecordedOperationKind::Barrier => sum,
@@ -229,8 +202,8 @@ fn second_file_content() -> Vec<u8> {
 /// mkfs → 取号 → 暖机 → 第一个事务 → 发布 B，同一个写入口；记下每一步开始时录制流有几条。
 struct PublishedThroughOverwrite {
     devices: Vec<(DeviceIdentity, MemoryDevice)>,
-    /// 与 `devices` 同序：每块盘的注入开关。
-    write_faults: Vec<RemainingSuccessfulWrites>,
+    /// 几块盘共用的故障注入计划：开关一条计划就注入，收起来就一直放行。
+    fault_plan: SharedFaultPlan,
     stream: SharedStream,
     allocator: PoolAllocator,
     warm_up: WarmUpOutput,
@@ -245,22 +218,24 @@ struct PublishedThroughOverwrite {
 fn publish_through_overwrite() -> PublishedThroughOverwrite {
     let parameters = e142_parameters(512, 512);
     let stream = SharedStream::new();
-    let write_faults: Vec<RemainingSuccessfulWrites> =
-        (0..2).map(|_| Rc::new(Cell::new(None))).collect();
+    let fault_plan = SharedFaultPlan::unarmed(FixedGeometry {
+        fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
+        journal_ring_bytes: parameters.geometry.journal_ring_bytes,
+        root_ring_slots_per_region: parameters.geometry.root_ring_slots_per_region,
+    });
     let mut devices: Vec<(DeviceIdentity, MemoryDevice)> = (0..2u32)
         .map(|device_number| {
             let identity = DeviceIdentity(device_number);
             (
                 identity,
-                RecordingBlockDevice::with_shared_stream(
+                FaultInjectingBlockDevice::new(
                     identity,
-                    WriteFailingDevice {
-                        inner: SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
-                        remaining_successful_writes: write_faults
-                            [usize::try_from(device_number).expect("设备号")]
-                        .clone(),
-                    },
-                    stream.clone(),
+                    RecordingBlockDevice::with_shared_stream(
+                        identity,
+                        SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
+                        stream.clone(),
+                    ),
+                    fault_plan.clone(),
                 ),
             )
         })
@@ -289,7 +264,7 @@ fn publish_through_overwrite() -> PublishedThroughOverwrite {
     let first_transaction = publish_first_file(
         &mut writer,
         &mut allocator,
-        &genesis.root,
+        warmed.roots.last().expect("暖机两代根"),
         FirstFile {
             content: &first_file_content(),
             write_time_seconds: FIXED_WRITE_TIME_SECONDS,
@@ -314,7 +289,7 @@ fn publish_through_overwrite() -> PublishedThroughOverwrite {
     drop(writer);
     PublishedThroughOverwrite {
         devices,
-        write_faults,
+        fault_plan,
         stream,
         allocator,
         warm_up: warmed,
@@ -526,7 +501,9 @@ fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_
     let window_start = published.stream.operations().len();
     let content = third_file_content();
     // 盘 1 再放行 5 次写：发布 C 的第六个单元写到盘 1 时报错（单元按 bump 次序写，每个单元两盘各一次）。
-    published.write_faults[1].set(Some(5));
+    published
+        .fault_plan
+        .arm(fail_every_write_on_one_device_after(DeviceIdentity(1), 5));
     let (failed_publishes, retry) = {
         let mut writer = PoolWriter::new(&parameters, published.devices.as_mut_slice());
         let failure = publish_overwrite(
@@ -547,7 +524,7 @@ fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_
             ),
             "中途失败的是设备写：{failure:?}"
         );
-        published.write_faults[1].set(None);
+        published.fault_plan.disarm();
         let retry = publish_overwrite(
             &mut writer,
             &mut published.allocator,

@@ -7,14 +7,17 @@
 #![forbid(unsafe_code)]
 
 pub mod address;
+pub mod admission;
 pub mod allocator;
 pub mod block_device;
 pub mod bytes;
 pub mod checksum;
+pub mod inode_tree;
 pub mod instance_table;
 pub mod journal;
 pub mod make_filesystem;
 pub mod mount;
+pub mod mounted_read;
 pub mod pointer;
 pub mod records;
 pub mod recovery;
@@ -24,3 +27,4 @@ pub mod system_configuration;
 pub mod transaction;
 pub mod unit;
 pub mod write_accounting;
+pub mod write_request_split;

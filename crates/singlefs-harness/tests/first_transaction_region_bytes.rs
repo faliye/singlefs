@@ -52,7 +52,7 @@ fn run_on_memory_devices() -> FirstTransactionImage {
         &mut devices,
         &stream,
         |point, _devices| match point {
-            ScenarioPoint::AfterInstanceAcquisition => {}
+            ScenarioPoint::AfterMakeFilesystem | ScenarioPoint::AfterInstanceAcquisition => {}
             ScenarioPoint::BeforeFirstTransaction => {
                 steps_before_first_transaction = Some(stream.operations().len());
             }
@@ -190,7 +190,12 @@ fn the_region_table_matches_the_writes_the_first_transaction_really_issues() {
     assert!(against_writes.matches());
 
     // 根槽那一行不靠表自己说了算：区域与槽号由 root_ring 按 txg 算，落哪块盘由 mkfs 的 region_devices 定。
-    let root_target = target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let root_target = target_for_publish(
+        CheckpointTxg(FIRST_TRANSACTION_TXG),
+        e142_parameters(512, 512)
+            .geometry
+            .root_ring_slots_per_region,
+    );
     let root_row = FIRST_TRANSACTION_REGIONS
         .iter()
         .find(|region| region.name == "root_record")

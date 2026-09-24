@@ -44,6 +44,39 @@ pub struct TreeIdentifier(pub u64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct InodeNumber(pub u64);
 
+/// 文件内的字节偏移，从文件第 0 个字节起算。与设备内字节偏移、16 KiB 槽号是三个地址空间
+/// （`.claude/rules/fs-design.md`「不同地址空间必须是不同的 Rust 类型」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct FileOffsetInBytes(pub u64);
+
+/// 一个文件里第几个数据单元，从 0 起：文件字节偏移除以数据单元的净荷容量取商
+/// （D4（校验和位置） 已定项 5：净荷不是 2 的幂，文件偏移到单元做除法而不是移位）。
+///
+/// ⚠️ 它**不是** extent 叶记录 key 里那个 offset 段：那一段是文件字节偏移（D8（核心索引结构） 已定项 3，
+/// 2026-09-23 定），第 n 个单元是 n × 净荷容量，由 [`DataUnitIndexInFile::first_file_byte`] 换算。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DataUnitIndexInFile(pub u64);
+
+impl DataUnitIndexInFile {
+    /// 文件的第一个数据单元。只有一个单元的文件（第一个事务那一档）就是它。
+    pub const FIRST: Self = Self(0);
+
+    /// 这个单元载荷的第一个字节在文件里的偏移：单元序号乘净荷容量（D4（校验和位置） 已定项 5 的除法倒过来）。
+    /// extent 叶记录 key 的 offset 段与数据单元头的锚点偏移写的都是它（D8（核心索引结构） 已定项 3；
+    /// D9（加密） 已定项 6「锚点偏移 = `key.offset − ptr.extent_off`」，第一版 extent 距起点偏移恒 0）。
+    ///
+    /// # Panics
+    /// 乘出来越过 `u64`：单元序号由一段内存里的内容长度除净荷容量得出，乘回去不超过内容长度加一个净荷。
+    #[must_use]
+    pub fn first_file_byte(self, payload_capacity_in_bytes: u64) -> FileOffsetInBytes {
+        FileOffsetInBytes(
+            self.0
+                .checked_mul(payload_capacity_in_bytes)
+                .expect("单元序号由内容长度除净荷容量得出，乘回去不越过 u64"),
+        )
+    }
+}
+
 impl SlotNumber {
     /// 槽号乘落点粒度就是设备内字节偏移；这是两个地址空间之间唯一的换算。
     #[must_use]

@@ -10,6 +10,7 @@
 //! sha256 是 FIPS 180-4 给这个算法起的名字，不是我们的缩写；值与仓外 `sha256sum` 打出来的逐字相同。
 
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
+use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::{
     SlotBytesByMutability, SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
     SystemMutableConfiguration, SystemRuntimeConfiguration, SystemRuntimeQuantities,
@@ -30,6 +31,7 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
                 minimum_input_output_bytes: 512,
                 fixed_structure_slot_spacing: 4096,
                 journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
             },
         },
         mutable: SystemMutableConfiguration,
@@ -59,6 +61,7 @@ fn system_configuration_after_the_first_transaction() -> SystemConfiguration {
                 minimum_input_output_bytes: 4096,
                 fixed_structure_slot_spacing: 4096,
                 journal_ring_bytes: 805_306_368,
+                root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
             },
         },
         mutable: SystemMutableConfiguration,

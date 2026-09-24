@@ -13,14 +13,18 @@ use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
 
+pub mod bad_disk_input;
 pub mod crash;
 pub mod crash_injection;
 pub mod device_log;
+pub mod fault_injection;
 pub mod first_transaction_regions;
 pub mod hexadecimal;
 pub mod history;
 pub mod model;
 pub mod model_comparison;
+pub mod on_device_modes;
+pub mod read_tally;
 pub mod scenario;
 pub mod segments;
 pub mod sha256;
@@ -30,6 +34,9 @@ pub mod sha256;
 pub enum RecordedOperationKind {
     Write,
     WriteForceUnitAccess,
+    /// 整段清零：一次 [`BlockDevice::write_zeroes_at`] 记成**一步**，不是底下拆出来的那几次写
+    /// （用户 2026-09-19 定案「录制流登记成一种新步骤、层 0 认它」）。内容由 `offset` 与 `length` 全定：整段全 0。
+    WriteZeroes,
     Barrier,
 }
 
@@ -52,6 +59,7 @@ impl RecordedOperation {
         let kind = match self.kind {
             RecordedOperationKind::Write => "write",
             RecordedOperationKind::WriteForceUnitAccess => "write_fua",
+            RecordedOperationKind::WriteZeroes => "write_zeroes",
             RecordedOperationKind::Barrier => "barrier",
         };
         format!(
@@ -64,12 +72,35 @@ impl RecordedOperation {
 /// FNV-1a 64 位；本地实现，步 0 不引第三方 crate。
 #[must_use]
 pub fn fnv1a_64(bytes: &[u8]) -> u64 {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut hash: u64 = FNV1A_64_OFFSET_BASIS;
     for byte in bytes {
         hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        hash = hash.wrapping_mul(FNV1A_64_PRIME);
     }
     hash
+}
+
+const FNV1A_64_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV1A_64_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+/// `length` 个 0 字节的 FNV-1a 64 位哈希，不把那几百 MiB 全 0 真的摆出来。
+///
+/// 每吃一个 0 字节，`hash ^= 0` 什么都不做，只剩 `hash *= prime`，所以整串的哈希是
+/// `offset_basis * prime^length`（模 2^64）。用平方乘算 `prime^length`，与
+/// [`fnv1a_64`] 对同一串全 0 的结果逐位相同（本模块用例 `zero_hash_shortcut_agrees_with_hashing_real_zeros` 钉住）。
+#[must_use]
+pub fn fnv1a_64_of_zeros(length: u64) -> u64 {
+    let mut result: u64 = FNV1A_64_OFFSET_BASIS;
+    let mut factor: u64 = FNV1A_64_PRIME;
+    let mut remaining = length;
+    while remaining > 0 {
+        if remaining % 2 == 1 {
+            result = result.wrapping_mul(factor);
+        }
+        factor = factor.wrapping_mul(factor);
+        remaining /= 2;
+    }
+    result
 }
 
 /// 一条录制流里的一步，带上写的内容（只在开了内容保留的流里有；屏障没有内容）。
@@ -280,6 +311,30 @@ impl<Inner: BlockDevice> BlockDevice for RecordingBlockDevice<Inner> {
         Ok(())
     }
 
+    /// 整段清零记成**一步**（`RecordedOperationKind::WriteZeroes`）：底下拆成几次 I/O 是后端的事，上层看到的是一个动作。
+    ///
+    /// 内容不留（`contents: None`），即使这条流开了内容保留：整段全 0 由 `offset` 与 `length` 全定，
+    /// 而 mkfs 一次清 768 MiB，留下来就是每条流多背 768 MiB 的 0。要重放它的人按长度铺 0
+    /// （[`crash::SparseDevice::zero_fill`]），不从 `contents` 里拿。
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.write_zeroes_at(offset, length)?;
+        self.stream.push(
+            RecordedOperation {
+                device: self.device,
+                kind: RecordedOperationKind::WriteZeroes,
+                offset,
+                length,
+                content_hash: fnv1a_64_of_zeros(length),
+            },
+            None,
+        );
+        Ok(())
+    }
+
     fn barrier(&mut self) -> Result<(), BlockDeviceError> {
         self.inner.barrier()?;
         self.stream.push(
@@ -331,6 +386,16 @@ mod tests {
         ) -> Result<(), BlockDeviceError> {
             let start = usize::try_from(offset.0).expect("测试偏移装得进 usize");
             self.bytes[start..start + bytes.len()].copy_from_slice(bytes);
+            Ok(())
+        }
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            let start = usize::try_from(offset.0).expect("测试偏移装得进 usize");
+            let end = start + usize::try_from(length).expect("测试长度装得进 usize");
+            self.bytes[start..end].fill(0);
             Ok(())
         }
         fn barrier(&mut self) -> Result<(), BlockDeviceError> {
@@ -446,5 +511,77 @@ mod tests {
             "device=1 kind=write_fua offset=4096 length=512 hash=0000000000001234"
         );
         assert_eq!(fnv1a_64(b""), 0xcbf2_9ce4_8422_2325, "FNV-1a 64 的空串值");
+    }
+
+    /// 整段清零记一步：录制流多的是一条 `write_zeroes`，不是底下拆出来的那几次写；
+    /// 内层设备真的被清了；开了内容保留的流也不为它留字节（768 MiB 的 0 不进内存）。
+    #[test]
+    fn a_zero_fill_is_recorded_as_one_step_and_keeps_no_contents() {
+        let stream = SharedStream::retaining_contents();
+        let mut recorder = RecordingBlockDevice::with_shared_stream(
+            DeviceIdentity(0),
+            MemoryDevice {
+                bytes: vec![0xD7; 4096],
+            },
+            stream.clone(),
+        );
+        recorder
+            .write_at(DeviceOffsetInBytes(0), &[1u8; 512], WriteDurability::Plain)
+            .expect("先写一扇区");
+        recorder
+            .write_zeroes_at(DeviceOffsetInBytes(512), 2048)
+            .expect("写零");
+        let operations = recorder.recorded_operations();
+        assert_eq!(
+            operations.len(),
+            2,
+            "一次写 + 一次清零 = 两步，清零不按块拆成多条"
+        );
+        assert_eq!(operations[1].kind, RecordedOperationKind::WriteZeroes);
+        assert_eq!(operations[1].offset, DeviceOffsetInBytes(512));
+        assert_eq!(operations[1].length, 2048);
+        assert_eq!(operations[1].content_hash, fnv1a_64(&[0u8; 2048]));
+        assert_eq!(
+            operations[1].to_stream_line(),
+            format!(
+                "device=0 kind=write_zeroes offset=512 length=2048 hash={:016x}",
+                fnv1a_64(&[0u8; 2048])
+            )
+        );
+        let retained = stream.retained_operations();
+        assert!(
+            retained[1].contents.is_none(),
+            "清零不留内容：整段全 0 由偏移与长度全定"
+        );
+        assert!(
+            retained[0].contents.is_some(),
+            "普通写照样留内容（这条流开了内容保留）"
+        );
+        let mut read_back = [0xFFu8; 2048];
+        recorder
+            .read_at(DeviceOffsetInBytes(512), &mut read_back)
+            .expect("读");
+        assert!(
+            read_back.iter().all(|byte| *byte == 0),
+            "内层设备那一段真的清了"
+        );
+        let mut before = [0u8; 512];
+        recorder
+            .read_at(DeviceOffsetInBytes(0), &mut before)
+            .expect("读清零段之前");
+        assert_eq!(before, [1u8; 512], "清零段之外一个字节不动");
+    }
+
+    /// 全 0 串的哈希走的是平方乘的捷径，必须与真的把那一串 0 喂给 [`fnv1a_64`] 逐位相同。
+    /// 长度取 0、1、2、3、512、4096 与一个不是 2 的幂的奇数长（平方乘的两条臂都要走到）。
+    #[test]
+    fn zero_hash_shortcut_agrees_with_hashing_real_zeros() {
+        for length in [0u64, 1, 2, 3, 512, 4096, 5001] {
+            assert_eq!(
+                fnv1a_64_of_zeros(length),
+                fnv1a_64(&vec![0u8; usize::try_from(length).expect("测试长度")]),
+                "长度 {length} 的全 0 串"
+            );
+        }
     }
 }

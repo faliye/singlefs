@@ -285,7 +285,12 @@ pub fn region_table_against_writes(
     for operation in first_transaction_operations {
         match operation.kind {
             RecordedOperationKind::Barrier => continue,
-            RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
+            // 整段清零也是一次写调用，落点与长度同样拿去比表：这张表登记的是第一个事务写了哪几段，
+            // 表里没有「清一段」这一项，真在第一个事务里清了一段就该落进 `writes_outside_the_table` 报出来
+            //（今天唯一的清零是 mkfs 清 journal 环，不在第一个事务的录制流里）。
+            RecordedOperationKind::Write
+            | RecordedOperationKind::WriteForceUnitAccess
+            | RecordedOperationKind::WriteZeroes => {
                 write_calls += 1;
             }
         }

@@ -13,8 +13,11 @@ mod common;
 use std::collections::BTreeSet;
 
 use common::{build_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
+};
 use singlefs_core::allocator::{PlacementRefusal, PoolAllocator, UnitFootprint};
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, MountError, RaisedFloor, ShadowLedger,
 };
@@ -102,9 +105,12 @@ fn publish_on_pool_without_empty_cluster_segment_falls_back_to_lowest_free_slot_
     let second = try_overwrite_in_process(&mut pool, &second_content, InstanceGeneration(1))
         .expect("没有全空段、每块盘仍有空槽：发布必须成功（C369）");
     let expected_slots = [
-        (TransactionUnit::Data, 50182),
+        (TransactionUnit::Data(DataUnitIndexInFile::FIRST), 50182),
         (TransactionUnit::ExtentRoot, 50179),
-        (TransactionUnit::InodeLeaf, 50184),
+        (
+            TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST),
+            50184,
+        ),
         (TransactionUnit::InodeRoot, 50186),
         (TransactionUnit::AllocationTree, 50187),
         (TransactionUnit::AccountingTree, 50188),
@@ -310,12 +316,15 @@ fn raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold
     assert!(
         matches!(
             refused,
-            Err(MountError::Publish(PublishError::PlacementRefused {
-                unit: TransactionUnit::AllocationTree,
-                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
-            }))
+            Err(MountError::RaiseFloorSequencePublishFailed {
+                publishes_persisted: 0,
+                cause: PublishError::PlacementRefused {
+                    unit: TransactionUnit::AllocationTree,
+                    refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+                },
+            })
         ),
-        "回收出来的全是扣住的槽，第一个固定点就拿不到（每块盘上都没有：容量不够那一种）：{:?}",
+        "回收出来的全是扣住的槽，第一次空发布的第一个固定点就拿不到（每块盘上都没有：容量不够那一种），这一串一次都没落盘：{:?}",
         refused.as_ref().err()
     );
     assert_eq!(
@@ -335,5 +344,85 @@ fn raising_the_floor_with_no_free_slot_outside_the_hold_still_fails_and_the_hold
             .try_allocate_commit_generated(UnitFootprint::OneSlot, CheckpointTxg(14)),
         Err(PlacementRefusal::NoFreeSlotOnAnyDevice),
         "扣住位没放开：之后的发布照样分配不到固定点"
+    );
+}
+
+/// C516（抬 F 那一串发布被拒时前面几次已落盘）：抬 F 是一串空发布（推到每块盘上都有一条带新 F 的根，D16（发布语义） 已定项 1），
+/// 固定点分配被拒（`PlacementRefused`）说的「在任何写之前」只对出错的那一次成立。造一段历史让第二次空发布拿不到固定点：
+/// 抬 F 之前每块盘上只留四个空槽（一次空发布重写四个固定点，D16（发布语义） 已定项 9），其余空槽全占掉；抬 F 回收出来的槽扣到生效为止，
+/// 于是第一次空发布（txg 14，落盘 1）拿走那四个槽、落盘，第二次（txg 15）一个都拿不到。
+/// 被拒的结果要报出这一串已经落盘了 1 次；盘上比抬 F 之前正好多一条根——txg 14、带新 F = 8 的那一条——txg 15 一条都没有。
+#[test]
+fn a_raise_whose_second_empty_publish_is_refused_reports_that_one_publish_of_the_sequence_persisted(
+) {
+    let mut pool =
+        build_six_overwrites_after_a_writable_remount("supplement-two-raise-refused-part-way");
+    let lowest_free_slots: Vec<u64> = (UNIT_AREA_START_SLOT
+        ..UNIT_AREA_START_SLOT + pool.allocator.devices[0].unit_area_slots())
+        .filter(|slot| {
+            pool.allocator
+                .devices
+                .iter()
+                .all(|device_map| device_map.is_free(SlotNumber(*slot)))
+        })
+        .take(4)
+        .collect();
+    assert_eq!(lowest_free_slots.len(), 4, "两块盘上共同的空槽至少四个");
+    for device_map in &mut pool.allocator.devices {
+        for slot in UNIT_AREA_START_SLOT..UNIT_AREA_START_SLOT + device_map.unit_area_slots() {
+            if device_map.is_free(SlotNumber(slot)) && !lowest_free_slots.contains(&slot) {
+                device_map.mark_allocated(SlotNumber(slot), 1);
+            }
+        }
+    }
+    let before = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let refused = raise_floor(&mut pool, CheckpointTxg(8));
+    let Err(MountError::RaiseFloorSequencePublishFailed {
+        publishes_persisted,
+        cause,
+    }) = refused
+    else {
+        panic!(
+            "第二次空发布拿不到固定点，报的应是这一串走到哪一步：{:?}",
+            refused.as_ref().err()
+        );
+    };
+    assert!(
+        matches!(
+            cause,
+            PublishError::PlacementRefused {
+                unit: TransactionUnit::AllocationTree,
+                refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+            }
+        ),
+        "第二次空发布的第一个固定点拿不到：{cause:?}"
+    );
+    assert_eq!(
+        publishes_persisted, 1,
+        "这一串在被拒之前已经落盘了一次（txg 14）"
+    );
+    assert_eq!(
+        pool.output.root.checkpoint_txg,
+        CheckpointTxg(14),
+        "调用方的现行版本已经是落盘的那一次"
+    );
+    let after = common::disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let roots_added: Vec<(InstanceGeneration, CheckpointTxg, CheckpointTxg)> = after
+        .readable_roots
+        .iter()
+        .filter(|root| !before.readable_roots.contains(root))
+        .map(|root| (root.instance, root.checkpoint_txg, root.rollback_floor))
+        .collect();
+    assert_eq!(
+        roots_added,
+        vec![(InstanceGeneration(2), CheckpointTxg(14), CheckpointTxg(8))],
+        "盘上正好多出落盘的那一次：txg 14、带新 F"
+    );
+    assert!(
+        before
+            .readable_roots
+            .iter()
+            .all(|root| after.readable_roots.contains(root)),
+        "txg 14 落在一个空的根环槽上，抬 F 之前的根一条都没被盖掉"
     );
 }

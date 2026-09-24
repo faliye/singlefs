@@ -112,6 +112,18 @@ pub enum Verdict {
     KeyOutsideDeclaredRange,
     /// journal 记录类型不在登记表里。
     UnknownRecordType,
+    /// 系统配置自述的区域数 R 大于字段表给逐区域设备身份留的字段数
+    /// （[`crate::image::REGION_DEVICE_FIELDS_IN_THE_SYSTEM_CONFIGURATION`]）：
+    /// 第 3 个及以后的区域没有设备身份可读，这份系统配置这个格式版本读不了，这一槽不可择。
+    RegionCountPastTheRegionDeviceFields,
+    /// 系统配置自述的每区槽数 S（偏移 362 那一字节）落在格式承诺的区间之外
+    /// （`singlefs_format::ROOT_RING_SLOTS_PER_REGION_MINIMUM`..`_MAXIMUM`，D22（单元原子性怎么合成） 已定项 1 的字段表）：
+    /// S 是**盘上读来的一字节**，可以是 0..255 里的任何一个，而根环的每一处走读都按它算
+    /// （`image::root_slot_positions` 枚举 R × S 个槽、`walk` 按 R × S 算环长）。
+    /// 不夹到区间里往下走（那是按一个池里根本不存在的几何走读，少读或多读几个槽而没人说），
+    /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
+    /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`。
+    RootRingSlotsPerRegionOutsideTheFormatInterval,
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -211,7 +223,7 @@ pub struct RootView {
     pub checkpoint_txg: u64,
     pub tree_identifier_watermark: u64,
     pub rollback_floor: u64,
-    /// 371 字节记录本身（含校验和字段），三个区域比对用。
+    /// 457 字节记录本身（含校验和字段），三个区域比对用。
     pub record_bytes: Vec<u8>,
 }
 
@@ -220,7 +232,7 @@ pub fn check_root_slot(
     slot: &[u8],
     expected_filesystem_identifier: &[u8; 16],
 ) -> Result<RootView, Verdict> {
-    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("371");
+    let record_bytes = usize::try_from(ROOT_RECORD_BYTES).expect("457");
     if slot.len() < record_bytes {
         return Err(Verdict::TooShort);
     }
@@ -485,12 +497,17 @@ pub fn packed_unit_view(unit: &[u8]) -> Result<PackedUnitView, Verdict> {
     })
 }
 
-/// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）。
+/// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，
+/// 再是反向链 4、载荷校验和 4、新根段 188、fsid 8、MAC 16，头到 311 为止。
 const JOURNAL_MAGIC: &[u8; 4] = b"SFSJ";
 const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 46;
 const JOURNAL_TRANSACTION_OFFSET: usize = 78;
-const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: usize = 95;
-const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 283;
+const JOURNAL_COMMIT_MARKER_OFFSET: usize = 86;
+const JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET: usize = 87;
+const JOURNAL_BACK_CHAIN_OFFSET: usize = 91;
+const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
+const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: usize = 99;
+const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 287;
 
 /// 点名项解出来的样子（D23（journal 的角色与格式） 已定项 17）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -522,7 +539,13 @@ pub struct JournalRecordView {
     pub counter: u64,
     pub checkpoint_txg: u64,
     pub transaction: u64,
+    /// 提交标记那 1 字节等于 1。
     pub is_commit: bool,
+    /// 提交标记那 1 字节原样（D23（journal 的角色与格式） 已定项 7）：只许 0 或 1，别的值 I-8.8（前缀里的事务不被切开） 判红，
+    /// 所以不能只留 `is_commit`——那一步把 2..=255 静默读成「不带」。
+    pub commit_marker_byte: u8,
+    /// 本次发布内序号（D23（journal 的角色与格式） 已定项 4）：一次发布 N 条记录依次是 1..N，只有一条时是 1。
+    pub ordinal_within_publish: u32,
     pub back_chain: u32,
     /// 新根段 188 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8）。
     pub new_root_segment: Vec<u8>,
@@ -531,10 +554,10 @@ pub struct JournalRecordView {
     pub named: Vec<NamedEntryView>,
 }
 
-/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 307 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
+/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 311 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
 #[must_use]
 pub fn back_chain_of_record_header(record: &[u8]) -> u32 {
-    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("307")].to_vec();
+    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("311")].to_vec();
     header[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].fill(0);
     crc32_castagnoli_bitwise(&header)
 }
@@ -564,13 +587,13 @@ pub fn check_journal_record(
         return Err(Verdict::FilesystemIdentifierMismatch);
     }
     let named_count = usize::try_from(read_u32(record, 12)).expect("点名项数");
-    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("307");
+    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("311");
     let entry_bytes = usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56");
     let payload_end = header_bytes + named_count * entry_bytes;
     if payload_end > record_bytes {
         return Err(Verdict::DeclaredLengthMismatch);
     }
-    if read_u32(record, JOURNAL_TRANSACTION_OFFSET + 8 + 1 + 4)
+    if read_u32(record, JOURNAL_PAYLOAD_CHECKSUM_OFFSET)
         != crc32_castagnoli_bitwise(&record[header_bytes..payload_end])
     {
         return Err(Verdict::ChecksumMismatch);
@@ -604,8 +627,10 @@ pub fn check_journal_record(
         counter: read_six_byte_unsigned(record, 20),
         checkpoint_txg: read_u64(record, 26),
         transaction: read_u64(record, JOURNAL_TRANSACTION_OFFSET),
-        is_commit: record[JOURNAL_TRANSACTION_OFFSET + 8] == 1,
-        back_chain: read_u32(record, JOURNAL_TRANSACTION_OFFSET + 9),
+        is_commit: record[JOURNAL_COMMIT_MARKER_OFFSET] == 1,
+        commit_marker_byte: record[JOURNAL_COMMIT_MARKER_OFFSET],
+        ordinal_within_publish: read_u32(record, JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET),
+        back_chain: read_u32(record, JOURNAL_BACK_CHAIN_OFFSET),
         new_tree_identifier_watermark: read_u64(record, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86 + 86),
         new_rollback_floor: read_u64(record, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86 + 86 + 8),
         new_root_segment,

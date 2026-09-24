@@ -6,13 +6,16 @@
 //! I/O、盘坏、走读失败、第一版不支持的池形状（小盘写满、各盘落点不一致）这类模型里没有的一律 `Unexplained`（不建崩溃与设备错、
 //! 两块等大盘的历史里它们都不该出现）。
 
-use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
 use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::BlockDeviceError;
-use singlefs_core::mount::{InstanceRow, MountError, Mounted, RollbackCandidateExclusion};
+use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
+use singlefs_core::mount::{
+    InstanceRow, MountError, Mounted, PublishAfterAcquisitionFailed, RollbackCandidateExclusion,
+};
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
 use singlefs_core::transaction::{
-    PoolVersion, PublishError, TransactionOutput, TransactionUnit, ZeroUnitPublishOutput,
+    PoolVersion, PublishError, TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
 };
 
 use crate::model::{
@@ -42,9 +45,28 @@ pub fn model_root_key(instance: InstanceGeneration, checkpoint_txg: CheckpointTx
 #[must_use]
 pub fn model_unit_role(unit: TransactionUnit) -> ModelUnitRole {
     match unit {
-        TransactionUnit::Data => ModelUnitRole::Data,
+        // 模型罩的发布（第一个文件版本 / 覆盖写、写行、暖机空发布）写的文件恒只有一个数据单元：多单元只会从
+        // `publish_sequential_write` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它。
+        TransactionUnit::Data(index) => {
+            assert_eq!(
+                index,
+                DataUnitIndexInFile::FIRST,
+                "模型今天只罩一个数据单元的文件"
+            );
+            ModelUnitRole::Data
+        }
         TransactionUnit::ExtentRoot => ModelUnitRole::ExtentRoot,
-        TransactionUnit::InodeLeaf => ModelUnitRole::InodeLeaf,
+        // 模型罩的三种发布（第一个文件版本 / 覆盖写、写行、暖机空发布）里 inode 树恒只有最左那一片叶容器：
+        // 第二片只会从 `publish_new_inodes` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它
+        // （`history.rs` 的操作集合里没有「建 inode」，`ModelPublishKind` 也只有那三种）。
+        TransactionUnit::InodeLeafContainer(index) => {
+            assert_eq!(
+                index,
+                InodeLeafContainerIndexInTree::LEFTMOST,
+                "模型今天只罩一片叶容器的那几种发布"
+            );
+            ModelUnitRole::InodeLeaf
+        }
         TransactionUnit::InodeRoot => ModelUnitRole::InodeRoot,
         TransactionUnit::AllocationTree => ModelUnitRole::AllocationTree,
         TransactionUnit::AccountingTree => ModelUnitRole::AccountingTree,
@@ -95,7 +117,9 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
 
 /// 树表 0 条的一版（零单元发布）：没有单元、没有分配记录。
 #[must_use]
-pub fn observed_root_of_version_without_file(output: &ZeroUnitPublishOutput) -> ObservedRoot {
+pub fn observed_root_of_version_without_file(
+    output: &VersionWithoutFilePublishOutput,
+) -> ObservedRoot {
     ObservedRoot {
         key: model_root_key(output.root.instance, output.root.checkpoint_txg),
         journal_counter: ModelJournalCounter(output.record.counter),
@@ -151,14 +175,33 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         PublishError::ContentExceedsDataUnit { .. } => {
             explained(ModelRefusalReason::ContentExceedsDataUnitPayload)
         }
-        PublishError::FirstFileVersionNotRightAfterTheSecondWarmUp { .. } => {
-            explained(ModelRefusalReason::FirstFileNotRightAfterTheWarmUp)
+        PublishError::FirstFileVersionDoesNotFollowTheVersionItBuildsOn { .. } => {
+            explained(ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn)
         }
-        // 释放判定路径的四种：上一版的映射或分配记录与上一版对不上，健康的历史里不该出现。
-        PublishError::ReleaseNotInMapping { .. }
+        PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile { .. } => {
+            explained(ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile)
+        }
+        // 释放判定路径的五种：上一版的映射或分配记录与上一版对不上、盘上那条指针的两条位置条目不同槽，健康的历史里不该出现。
+        // extent 树要长内部节点那一条同理：随机历史一次都不调 `publish_sequential_write`，写的文件恒一个数据单元，它出现就是对不上。
+        // inode 树写入被拒与点名项装不下那两条同样：随机历史一次都不调 `publish_new_inodes`，
+        // 而它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
+        // 映射节点装不下那一条同理：条目数 = 五个固定角色 + 叶容器数，随机历史里恒是 1 片叶 ⇒ 恒 6 条，
+        // 离一个节点的 294 条差得远；它出现就是模型与实现对不上。
+        PublishError::MappingEntriesExceedOneNode { .. }
+        | PublishError::InodeTreeWriteRefused(_)
+        | PublishError::MoreNamedUnitsThanOneJournalRecordHolds { .. }
+        | PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided { .. }
+        | PublishError::ReleaseNotInMapping { .. }
         | PublishError::ReleaseTargetNotAllocated { .. }
         | PublishError::ReleaseTargetAlreadyReleased { .. }
+        | PublishError::ReleaseTargetLocationsOnDifferentSlots { .. }
         | PublishError::ReleaseSpanMismatch { .. }
+        | PublishError::MappingEntryNarrowerThanItsFieldTable { .. }
+        // 释放之前读盘核校验和那一读没读到：健康的内存盘上读不会失败，出现就是对不上（读失败怎么办条款没定，模型里没有它的理由）。
+        | PublishError::ReleaseChecksumReadFailedWhoseHandlingIsUndecided { .. }
+        // 第一个文件版本读不出那一版的树表、水位离 u64::MAX 不到八个号：健康的内存盘上都不该出现。
+        | PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. }
+        | PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_)
         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
     }
 }
@@ -179,7 +222,8 @@ pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> Observ
 }
 
 /// 回退目标不在候选集里的那一条说的是哪条理由：按字段一对一映射，不看给人看的文字（增补 3 第 2 件代码三方第一轮判决第三节第 2 条）。
-/// 「树表 0 条」不在这里：它在候选集里、第一版不支持，是 `MountError` 单独一个成员（第二轮判决第三节第 1 条）。
+/// 「树表 0 条」不在这里：候选集只有这三条（D23（journal 的角色与格式） 已定项 14），目标那一版树表 0 条不是排除项
+/// （C493（回退候选集条文与实现说反话） 还清）；环里还留着带文件版本的根时照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
 #[must_use]
 pub fn refusal_reason_of_rollback_candidate_exclusion(
     exclusion: RollbackCandidateExclusion,
@@ -205,39 +249,31 @@ pub fn refusal_reason_of_block_device_error(_error: &BlockDeviceError) -> Observ
 #[must_use]
 pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReason {
     match error {
-        MountError::Publish(cause)
+        MountError::Publish(PublishAfterAcquisitionFailed { cause, .. })
+        | MountError::RaiseFloorSequencePublishFailed { cause, .. }
         | MountError::RowPublishAdmissionRefusedBeforeAcquisition { cause, .. }
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { cause, .. } => {
             refusal_reason_of_publish_error(cause)
         }
-        MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion => {
-            explained(ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported)
-        }
         MountError::RollbackTargetNotACandidate { exclusion, .. } => {
             refusal_reason_of_rollback_candidate_exclusion(*exclusion)
-        }
-        // 在候选集里、第一版不支持：映射到模型「第一版不支持」那一类里回退那一条（模型照代码今天的读法划进必须拒）。
-        MountError::RollbackToVersionWithoutFileUnsupported(_) => {
-            explained(ModelRefusalReason::RollbackToVersionWithoutFileUnsupported)
         }
         MountError::RollbackFloorAboveCeiling { .. } => {
             explained(ModelRefusalReason::FloorAboveCeiling)
         }
-        MountError::InstanceRowsOnVersionWithoutFileUnsupported { .. } => {
-            explained(ModelRefusalReason::RowsOnVersionWithoutFileUnsupported)
+        MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => {
+            explained(ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided)
         }
-        MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported { .. } => {
-            explained(ModelRefusalReason::InstanceTableOnePageWall)
-        }
-        MountError::FormattedPoolMountNotShapedLikeTheFirstTransaction { .. } => {
-            explained(ModelRefusalReason::FormattedPoolMountNotShapedLikeTheFirstTransaction)
+        // 树表 0 条、而实例表已经不是 mkfs 那一片：零故障走得到（写过行的那一版上再挂载一次），模型照代码今天的读法划进必须拒。
+        MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
+            explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
         }
         // 恢复失败、记录读不出、表解不开、取号失败、坏盘上才有的根、判定与取号之间号变了：健康的内存盘上都不该出现。
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
         | MountError::Acquisition(_)
-        | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
+        | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
         | MountError::InstanceGenerationChangedBeforeAcquisition { .. } => {
             ObservedRefusalReason::Unexplained
@@ -253,19 +289,17 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
-        | MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion
         | MountError::Acquisition(_)
         | MountError::Publish(_)
+        | MountError::RaiseFloorSequencePublishFailed { .. }
         | MountError::RollbackTargetNotACandidate { .. }
-        | MountError::RollbackToVersionWithoutFileUnsupported(_)
-        | MountError::InstanceRowsOnVersionWithoutFileUnsupported { .. }
         | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
+        | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
         | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
         | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
-        | MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported { .. }
-        | MountError::FormattedPoolMountNotShapedLikeTheFirstTransaction { .. } => None,
+        | MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => None,
     }
 }
 
@@ -371,7 +405,7 @@ mod tests {
         for refusal in every_placement_refusal() {
             let is_capacity = refusal == PlacementRefusal::NoFreeSlotOnAnyDevice;
             let error = PublishError::PlacementRefused {
-                unit: TransactionUnit::Data,
+                unit: TransactionUnit::Data(DataUnitIndexInFile::FIRST),
                 refusal,
             };
             let observed = ObservedOutcome::Refused {
@@ -399,10 +433,10 @@ mod tests {
         }
     }
 
-    /// 回退目标被挡下的四种各映射到自己那一条理由、互不相同：候选排除的三条按字段映射（此前「不在候选集里」映射成「低于 F、被抛弃」
-    /// 两条之一），树表 0 条是 `MountError` 单独的成员、映射到「第一版不支持」那一类（第二轮判决第三节第 1 条）。
+    /// 回退候选集的三条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
+    /// 「目标那一版树表 0 条」**不在**这三条里——它不是候选排除，回退到它照常做（C493（回退候选集条文与实现说反话） 还清）。
     #[test]
-    fn each_rollback_candidate_exclusion_and_the_version_without_file_map_to_their_own_reasons() {
+    fn each_rollback_candidate_exclusion_maps_to_its_own_reason() {
         let target = RollbackTarget {
             instance: InstanceGeneration(2),
             checkpoint_txg: CheckpointTxg(7),
@@ -414,9 +448,6 @@ mod tests {
         ]
         .into_iter()
         .map(|exclusion| MountError::RollbackTargetNotACandidate { target, exclusion })
-        .chain(std::iter::once(
-            MountError::RollbackToVersionWithoutFileUnsupported(target),
-        ))
         .map(|error| refusal_reason_of_mount_error(&error))
         .collect();
         assert_eq!(
@@ -428,9 +459,6 @@ mod tests {
                 ),
                 ObservedRefusalReason::Explained(
                     ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-                ),
-                ObservedRefusalReason::Explained(
-                    ModelRefusalReason::RollbackToVersionWithoutFileUnsupported
                 ),
             ]
         );
