@@ -15,7 +15,8 @@ const PAYLOAD_INTERNAL_COUNT_BYTES: u64 = 4;
 const SELF_DESCRIBING_EXTRA_BYTES: u64 = 5;
 /// C 臂：key 区间定宽 32 × 2。
 const FIXED_KEY_RANGE_KEY_BYTES: u64 = 32;
-const NODE_POINTER_BYTES: u64 = 83;
+// 这个实验跑的时候指针宽是 83；今天的宽登记在 format-const NODE_POINTER_BYTES（86）。这里留当时的值，改名是为了不与现行常量同名。
+const NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN: u64 = 83;
 const LOCATION_ENTRY_PAIR_BYTES: u64 = 28;
 const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// 10 TB ÷ 32 KiB。
@@ -251,7 +252,7 @@ fn mapping_figures(arm: MappingArm) -> MappingFigures {
     let data_units = DATA_UNITS_IN_POOL;
     let node_units = DATA_UNITS_IN_POOL / NODES_PER_DATA_UNITS;
     let payload_27 = HeaderArm::SelfDescribing.payload_bytes(MAPPING_KEY_DATA);
-    let internal_27 = fanout(payload_27, MAPPING_KEY_DATA + NODE_POINTER_BYTES);
+    let internal_27 = fanout(payload_27, MAPPING_KEY_DATA + NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN);
     match arm {
         MappingArm::PadTo27 | MappingArm::SelfDescribingEntries => {
             let mixed_entry_bytes = if arm == MappingArm::PadTo27 { data_entry_bytes } else { (data_entry_bytes * data_units + node_entry_bytes * node_units) / (data_units + node_units) };
@@ -270,7 +271,7 @@ fn mapping_figures(arm: MappingArm) -> MappingFigures {
         }
         MappingArm::TwoTrees => {
             let payload_25 = HeaderArm::SelfDescribing.payload_bytes(MAPPING_KEY_NODE);
-            let internal_25 = fanout(payload_25, MAPPING_KEY_NODE + NODE_POINTER_BYTES);
+            let internal_25 = fanout(payload_25, MAPPING_KEY_NODE + NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN);
             let data_leaf_fanout = fanout(payload_27, data_entry_bytes);
             let node_leaf_fanout = fanout(payload_25, node_entry_bytes);
             let data_height = tree_height(data_units, data_leaf_fanout, internal_27);
@@ -294,7 +295,7 @@ fn main() {
             let header_bytes = arm.header_bytes(tree.key_width);
             let payload = arm.payload_bytes(tree.key_width);
             let leaf_fanout = fanout(payload, tree.leaf_entry_bytes);
-            let internal_fanout = fanout(payload, tree.key_width + NODE_POINTER_BYTES);
+            let internal_fanout = fanout(payload, tree.key_width + NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN);
             let height = tree_height(tree.leaf_entries_in_pool, leaf_fanout, internal_fanout);
             heights.push(height);
             emit(&mut emitter, &format!("name=header tree={} arm={} key_width={} header_bytes={header_bytes} with_reserved={}", tree.name, arm.name(), tree.key_width, header_bytes + NONCE_MAC_RESERVED_BYTES));

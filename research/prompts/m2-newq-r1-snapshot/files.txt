@@ -1,0 +1,15 @@
+.claude/kb/decisions/19-块指针的结构与宽度预算.md
+.claude/kb/decisions/23-journal的角色与格式.md
+.claude/kb/decisions/18-块里携带什么信息.md
+.claude/kb/decisions/28-挂载期承诺量.md
+.claude/kb/decisions/03-空间分配.md
+.claude/kb/decisions/16-发布语义.md
+.claude/kb/checks-owed.md
+.claude/kb/verification-build.md
+.claude/kb/milestone/02-second-txn.md
+research/prompts/c381-r3-main-verification.md
+research/prompts/m2-placement-falsepositive-r1-main-verification.md
+crates/singlefs-core/src/transaction.rs
+crates/singlefs-core/src/recovery.rs
+crates/singlefs-core/src/allocator.rs
+crates/singlefs-core/src/mount.rs

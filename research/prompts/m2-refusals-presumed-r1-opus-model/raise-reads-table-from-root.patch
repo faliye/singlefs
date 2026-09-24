@@ -1,0 +1,25 @@
+--- /tmp/claude-1000/m2-refusals-opus/mount.rs.orig	2026-09-22 13:55:44.314265694 +0000
++++ crates/singlefs-core/src/mount.rs	2026-09-22 13:56:33.375513148 +0000
+@@ -653,13 +653,18 @@
+     shadow_ledger: ShadowLedger,
+ ) -> Result<RaisedFloor, MountError> {
+     let system_configuration = choose_system_configuration(&*devices)?;
+-    let instance_table_unit = current
++    // 攻方腿副本补丁：现行版本的内存表示里没有重写过的实例表单元时，从现行根的实例表指针上读盘（`instance_table_of_root`，
++    // 可写挂载与回退两条路本来就用它），而不是拒绝。
++    let table = match current
+         .units
+         .iter()
+         .find(|unit| unit.identity == TransactionUnit::InstanceTable)
+-        .ok_or(MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion)?;
+-    let table = InstanceTableRecords::parse(&instance_table_unit.bytes)
+-        .ok_or(MountError::InstanceTableMalformed)?;
++    {
++        Some(instance_table_unit) => InstanceTableRecords::parse(&instance_table_unit.bytes)
++            .ok_or(MountError::InstanceTableMalformed)?,
++        None => instance_table_of_root(&*devices, &current.root)
++            .ok_or(MountError::InstanceTableMalformed)?,
++    };
+     let ceiling = rollback_floor_ceiling(
+         devices,
+         &system_configuration,

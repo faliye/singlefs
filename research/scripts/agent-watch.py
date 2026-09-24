@@ -9,17 +9,21 @@
     agent-watch.py report --agents ID[,ID…]          # 看一眼：每个子 agent 的状态、最后一条命令、告警
     agent-watch.py report --session-dir DIR           # 看这个会话里最近活动过的全部子 agent
     agent-watch.py watch  --agents ID[,ID…]          # 看门狗：每隔一段时间查一次，有告警或全部结束就退出
+    agent-watch.py watch  --processes-only            # 不看子 agent，只盯这个 Claude 实例底下的进程：主 agent 自己放后台的长命令用它盯
     agent-watch.py cost   --agents ID[,ID…]          # 用量：调用次数、起步与平均上下文、新输入、读缓存、输出、整份重写、工具结果被什么撑大
     agent-watch.py --selftest                         # 造假的会话记录与进程走一遍各种告警；AGENT_WATCH_BREAK=<项> 时必须判红
 
 主 agent 派发之后用 Bash 的 run_in_background 起 watch：它一退出，harness 就会叫醒主 agent。
 它只看、只报，不停任何子 agent、不杀任何进程：子 agent 与脚本不强制结束，结束不结束由主 agent 看了报告定（用户 2026-09-17）。
 退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
+带 --processes-only 时 0 是看门狗起的时候就在跑的那些进程都退出了（起的时候一个都没有也退 0，报告里写明是哪一种）。
 「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务，不算结束。
+交回之后只有新指令撤销它（续做消息，认法见 is_new_instruction）；交回之后被自己后台任务的完成通知叫醒、又调了工具再结束本轮的，仍算交回。
 「被停」认两处：子 agent 会话记录里的 `[Request interrupted`（停在工具调用中途）；主会话记录（<会话 id>.jsonl）里 TaskStop 对它的成功结果，
 时刻不早于它自己最后一条记录减 30 秒（停在结束本轮、等后台任务的时候，子 agent 的会话记录里一个字都不写；停了之后又被续做的不算）。
 主会话记录不在那个位置时，报告里写明「被停只按打断判」，不悄悄退回。
-「结束本轮却不会醒」：子 agent 结束本轮、没交回，而它起过的后台任务（工具结果「Command running in background with ID: …」）都已收到完成通知
+「结束本轮却不会醒」：子 agent 结束本轮、没交回，而它起过的后台任务（工具结果「Command running in background with ID: …」，
+或前台命令跑满超时被挪进后台的「… was moved to the background (ID: …)」）都已收到完成通知
 （会话记录里 origin 为 task-notification 的消息，或忙时排进队的 queued_command 附件），结束本轮之后也没有新的通知进来——没有任何东西会叫醒它，
 过 60 秒就报，不等 10 分钟的「无动静」。
 
@@ -28,6 +32,20 @@ watch 每 15 秒读一次，读到被看子 agent 所在会话的检出就退出
 
 会话记录的位置：~/.claude/projects/<项目>/<会话 id>/subagents/agent-<id>.jsonl，同名 .meta.json 里有 agentType 与 description。
 进程这一半只看运行这个脚本的那个 Claude 实例的后代进程（主 agent 与它派出的子 agent 起的命令都在里面），不看别的会话。
+
+`--processes-only`：不给子 agent，只看进程这一半——主 agent 自己放后台的长命令没有会话记录可看，只有进程。
+盯的是看门狗起的时候这个实例底下已经在跑的进程（整棵子树，不只叶子：gate.sh 这类长命令一段一段起叶子，叶子换了，命令本身还在跑；
+看门狗自己那一支与 COMMAND_MARKERS_NOT_WATCHED 不算），它们都退出了（剩下没人收尸的僵尸也算退出）就退 0。
+告警与进程一节同一套：写着的文件 --process-stale-minutes 没动、CPU 也不涨，stdin 若是管道、上游写端连同子孙也既不算也不写，报「进程无输出」，跑过 --process-max-minutes 报「进程过长」，
+报了就退 3；--ack 进程:PID 与定时回报照旧。它不读 hook 的检出记录：认不出是哪个会话的。
+给了 --session-dir（watch.sh --processes 从 CLAUDE_CODE_SESSION_ID 找）就同时查「交回之后后台还在跑」；没给就在报告里写明这一类没查。
+
+「交回之后后台还在跑」：扫会话目录里全部子 agent（不只被看的那几个）。已交回、被停、或主会话记录里最近一次任务通知是
+failed / killed / stopped（stopped：上一个 Claude 进程退出时它还没跑完）的子 agent，它用 run_in_background 起过的后台任务的输出文件
+还有进程开着、而且它结束已过 --leftover-background-grace-minutes（交回那一刻最后一条完成通知可能还在路上），每个最上层的进程报一条，
+--ack 进程:PID 确认。2026-09-24 查到两条交回之后丢下的 `until … do sleep` 跑了 5 个多小时，看门狗只盯没交回的，没人报。
+被看的子 agent 全部交回时照旧退出，但退出前查一遍这一类；只剩宽限里的，等宽限过了再查一次才退。
+只认会话记录里写着输出文件路径的后台任务：命令里自己用 `&`、`nohup` 放出去又改了输出去向的进程，与子 agent 之间没有可认的联系，这里认不出。
 """
 import argparse
 import glob
@@ -70,12 +88,52 @@ TURN_END_STOP_REASONS = ("end_turn", "stop_sequence")   # 会话记录里结束�
 TEXT_SETTLE_SECONDS = 120            # 最后一条是纯文字、stop_reason 为空：流式写入时后面可能还接工具调用，过了这么久没接就是结束本轮
 CPU_SAMPLE_SECONDS = 2               # 写着的文件不动的进程，隔这么久再取一次 CPU 时间，分「在算」与「不动」
 BACKGROUND_STARTED = re.compile(r"^Command running in background with ID: (\w+)")
+# 前台命令跑满超时被 harness 挪进后台，工具结果是另一种写法，之后同样会来完成通知。不认它，在等这种任务的子 agent 会被报「结束本轮却不会醒」
+# （2026-09-23 门禁审计会话的 ac26abd494cda0968：doc-lint 超时转后台，看门狗报「起过的 0 个后台任务」；本机这个项目的子 agent 会话记录里 79 份有这种写法）。
+BACKGROUND_MOVED = re.compile(r"^Command did not complete within its \d+s timeout and was moved to the background \(ID: (\w+)\)")
+NEW_INSTRUCTION_ORIGINS = ("coordinator", "peer")   # 续做消息与别的会话发来的消息；task-notification 是自己后台任务的完成通知，不算
 BACKGROUND_OUTPUT_PATH = re.compile(r"Output is being written to: (\S+?\.output)")
 TASK_NOTIFICATION_ID = re.compile(r"<task-id>(\w+)</task-id>")
+# 进程一节不看的命令：claude 本体、IDE、node（常驻的 MCP 一类）、别的看门狗。进程告警与 --processes-only 盯哪些进程读的是这同一份。
+COMMAND_MARKERS_NOT_WATCHED = ("native-binary/claude", "vscode-server", "/node ", "agent-watch.py")
+EXITED_PROCESS_STATES = ("Z", "X")   # /proc/<pid>/stat 的状态：僵尸（退出了、等父进程收尸）与已死，都算退出了
+LEFTOVER_BACKGROUND_ALERT = "交回之后后台还在跑"
+# 主会话记录里任务通知的这几种状态说明子 agent 已经不在跑了：failed 撞限额或报错、killed 被停、stopped 上一个 Claude 进程退出时它还没跑完
+ENDED_NOTIFICATION_STATUSES = ("failed", "killed", "stopped")
+TASK_NOTIFICATION_BLOCK = re.compile(r"<task-notification>(.*?)</task-notification>", re.S)
+TASK_NOTIFICATION_STATUS = re.compile(r"<status>([a-z_]+)</status>")
+# 会话记录按字节扫后台输出文件路径：几百兆的会话记录不逐行解 JSON，先看它提没提到有进程开着的那几个文件
+BACKGROUND_OUTPUT_PATH_BYTES = re.compile(rb"Output is being written to: (\S+?\.output)")
+PROCESS_STOP_COMMAND = "python3 .claude/singlefs-ai-sop/scripts/proc.py stop"
 
 
 def parse_timestamp(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def is_new_instruction(record):
+    """会话记录里这一条是不是给子 agent 的新指令：交回之后来一条就撤销交回。
+    认：续做消息（user 记录，origin 为 coordinator；别的会话发来的为 peer）；它忙时排进队的续做消息（queued_command 附件，附件自己带
+    origin coordinator，没有对应的 user 记录）；不带 origin、不是 harness 自己插的一句 user 文字。
+    不认：后台任务的完成通知（origin 为 task-notification，或不带 origin 的 queued_command 附件）、工具结果、harness 插的提示（isMeta：
+    system-reminder、「Output token limit hit」「[handback-send-enforce]」这类）、打断、压缩摘要（isCompactSummary）。"""
+    attachment = record.get("attachment")
+    if isinstance(attachment, dict):
+        return attachment.get("type") == "queued_command" and (attachment.get("origin") or {}).get("kind") in NEW_INSTRUCTION_ORIGINS
+    origin_kind = (record.get("origin") or {}).get("kind")
+    if origin_kind is not None:
+        return origin_kind in NEW_INSTRUCTION_ORIGINS
+    message = record.get("message")
+    if record.get("isMeta") or record.get("isCompactSummary") or not isinstance(message, dict) or message.get("role") != "user":
+        return False
+    content = message.get("content")
+    if isinstance(content, str):
+        texts = [content]
+    elif isinstance(content, list) and not any(isinstance(block, dict) and block.get("type") == "tool_result" for block in content):
+        texts = [block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text"]
+    else:
+        return False
+    return any(text.strip() for text in texts) and not any("[Request interrupted" in text for text in texts)
 
 
 def parent_session_transcript(transcript_path):
@@ -83,25 +141,58 @@ def parent_session_transcript(transcript_path):
     return os.path.dirname(os.path.dirname(transcript_path)) + ".jsonl"
 
 
-def task_stop_time(agent_id, session_transcript_path):
-    """主会话记录里 TaskStop 停掉这个子 agent 的最晚一次成功结果的时刻；没有就 None。"""
-    if not os.path.isfile(session_transcript_path):
-        return None
-    stopped_at = None
+SESSION_TASK_EVENTS_CACHE = {}   # 主会话记录路径 → ((大小, 修改时刻), 读出来的两张表)
+
+
+def is_task_notification_record(record):
+    """真正的任务通知：origin 为 task-notification 的消息、排队的附件、队列操作；主 agent 自己的命令与回复里写着的 <status> 不算。"""
+    attachment = record.get("attachment")
+    return ((record.get("origin") or {}).get("kind") == "task-notification" or record.get("type") == "queue-operation"
+            or (isinstance(attachment, dict) and attachment.get("type") == "queued_command"))
+
+
+def session_task_events(session_transcript_path):
+    """主会话记录一遍读完，返回两张表：{子 agent id: TaskStop 对它成功结果的最晚时刻}、{任务 id: (最近一次任务通知的状态, 时刻)}。
+    按文件大小与修改时刻缓存：主会话记录能有上百兆，逐个子 agent 各读一遍太慢。"""
+    try:
+        status = os.stat(session_transcript_path)
+    except OSError:
+        return {}, {}
+    key = (status.st_size, status.st_mtime_ns)
+    cached = SESSION_TASK_EVENTS_CACHE.get(session_transcript_path)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    stops, notifications = {}, {}
     for line in open(session_transcript_path, encoding="utf-8", errors="replace"):
-        if agent_id not in line or "Successfully stopped task" not in line:
+        mentions_stop = "Successfully stopped task" in line
+        mentions_status = "<status>" in line
+        if not (mentions_stop or mentions_status):
             continue
         try:
             record = json.loads(line)
         except ValueError:
             continue
-        result = record.get("toolUseResult")
-        if not isinstance(result, dict) or result.get("task_id") != agent_id or "Successfully stopped task" not in str(result.get("message", "")):
+        if not record.get("timestamp"):
             continue
-        if record.get("timestamp"):
-            timestamp = parse_timestamp(record["timestamp"])
-            stopped_at = timestamp if stopped_at is None else max(stopped_at, timestamp)
-    return stopped_at
+        timestamp = parse_timestamp(record["timestamp"])
+        result = record.get("toolUseResult")
+        if mentions_stop and isinstance(result, dict) and "Successfully stopped task" in str(result.get("message", "")):
+            agent_id = result.get("task_id")
+            stops[agent_id] = timestamp if agent_id not in stops else max(stops[agent_id], timestamp)
+        if mentions_status and is_task_notification_record(record):
+            # 一条通知可以列好几个任务 id、共用一个状态（上一个 Claude 进程退出时没跑完的那一批）
+            for block in TASK_NOTIFICATION_BLOCK.findall(json.dumps(record, ensure_ascii=False)):
+                found_status = TASK_NOTIFICATION_STATUS.search(block)
+                if found_status:
+                    for task_id in TASK_NOTIFICATION_ID.findall(block):
+                        notifications[task_id] = (found_status.group(1), timestamp)
+    SESSION_TASK_EVENTS_CACHE[session_transcript_path] = (key, (stops, notifications))
+    return stops, notifications
+
+
+def task_stop_time(agent_id, session_transcript_path):
+    """主会话记录里 TaskStop 停掉这个子 agent 的最晚一次成功结果的时刻；没有就 None。"""
+    return session_task_events(session_transcript_path)[0].get(agent_id)
 
 
 def format_duration(seconds):
@@ -149,6 +240,9 @@ class AgentTranscript:
         self.background_finished = set() # 收到过完成通知的后台任务 id
         self.last_turn_end_timestamp = None
         self.last_notification_timestamp = None
+        self.handed_back_timestamp = None    # 算交回的那一次交回工具成功返回的时刻
+        self.interrupted_timestamp = None    # 最后一次被打断（[Request interrupted）的时刻
+        self.task_stopped_timestamp = None   # 按主会话记录里的 TaskStop 判成被停时，那次停的时刻
         self.state = "思考中"
         self._read()
         parent_path = parent_session_transcript(transcript_path)
@@ -158,13 +252,15 @@ class AgentTranscript:
         if (stopped_at is not None and BROKEN_DETECTION != "taskstop" and self.state != "已交回"
                 and (self.last_timestamp is None or (self.last_timestamp - stopped_at).total_seconds() <= STOP_AFTER_LAST_RECORD_SECONDS)):
             self.state = "被停"
+            self.task_stopped_timestamp = stopped_at
 
     def _read(self):
         seen_message_ids = set()
         pending_by_id = {}
         tool_inputs_by_id = {}
         handback_tool_ids = set()
-        is_handed_back = False  # 最近一次交回成功之后没有再调别的工具（续做之后又调工具就回到没交回）
+        is_handed_back = False  # 最近一次交回成功之后没有来过新指令（is_new_instruction）；交回之后它自己再调工具不撤销
+        handback_timestamp = None
         previous_call_time = None
         last_kind = None
         last_text_timestamp = None
@@ -185,6 +281,11 @@ class AgentTranscript:
             if is_notification:
                 self.background_finished.update(TASK_NOTIFICATION_ID.findall(json.dumps(record.get("message") or attachment, ensure_ascii=False)))
                 self.last_notification_timestamp = timestamp
+            # 交回之后来的新指令撤销交回（认法见 is_new_instruction）：还没调工具也已经不算交回——续做的头几秒它在想，看门狗不能当场报「全部交回」退出。
+            # 它忙时排进队的续做消息只落成 queued_command 附件、没有 user 记录，所以在这里判，不放进下面按 message 分的那几支。
+            # 后台任务的完成通知不算，它叫醒之后又调工具也不算：交回之后调工具不撤销（见 tool_use 那一支的注释）。
+            if is_new_instruction(record) and BROKEN_DETECTION != "resume":
+                is_handed_back = False
             message = record.get("message")
             if not isinstance(message, dict):
                 continue
@@ -218,9 +319,12 @@ class AgentTranscript:
                             tool_inputs_by_id[block.get("id")] = (block.get("name"), tool_input)
                             if block.get("name") == "Bash":
                                 self.bash_commands.append([timestamp, tool_input.get("command", ""), None, block.get("id")])
+                            # 交回之后它自己再调工具不撤销交回，撤销只认新指令：交回之后被自己后台任务的完成通知叫醒、看一眼输出再结束本轮的，
+                            # 按调工具撤销会被判成没交回、报「结束本轮却不会醒」（2026-09-23 门禁审计会话的 ac26abd494cda0968：交回、结束本轮、
+                            # 超时转后台的 doc-lint 的完成通知进来、grep 一次输出、结束本轮）。
                             if block.get("name") == "SubagentHandback":
                                 handback_tool_ids.add(block.get("id"))
-                            else:
+                            elif BROKEN_DETECTION == "toolrevoke":
                                 is_handed_back = False
                             last_kind = "tool_use"
                         elif block.get("type") == "text":
@@ -233,7 +337,9 @@ class AgentTranscript:
                     for block in content:
                         if block.get("type") == "tool_result":
                             pending_by_id.pop(block.get("tool_use_id"), None)
-                            started = BACKGROUND_STARTED.match(block.get("content")) if isinstance(block.get("content"), str) else None
+                            plain_result_text = block.get("content") if isinstance(block.get("content"), str) else ""
+                            started = BACKGROUND_STARTED.match(plain_result_text) or (
+                                BACKGROUND_MOVED.match(plain_result_text) if BROKEN_DETECTION != "movedbackground" else None)
                             if started:
                                 self.background_started.append(started.group(1))
                                 output_path = BACKGROUND_OUTPUT_PATH.search(block.get("content"))
@@ -243,6 +349,7 @@ class AgentTranscript:
                                 result_text = json.dumps(block.get("content"), ensure_ascii=False).replace("\\", "").replace(" ", "")
                                 if '"success":true' in result_text:
                                     is_handed_back = True
+                                    handback_timestamp = timestamp
                             if block.get("tool_use_id") in tool_inputs_by_id:
                                 self._count_tool_result(*tool_inputs_by_id[block.get("tool_use_id")], block.get("content"))
                             for entry in self.bash_commands[-20:]:
@@ -252,16 +359,21 @@ class AgentTranscript:
                             last_kind = "tool_result"
                         elif block.get("type") == "text" and "[Request interrupted" in block.get("text", ""):
                             last_kind = "interrupted"
+                            self.interrupted_timestamp = timestamp
                 elif isinstance(content, str) and "[Request interrupted" in content:
                     last_kind = "interrupted"
-                # 交回之后来的续做消息（origin 是 coordinator）：还没调工具也已经不算交回——续做的头几秒它在想，看门狗不能当场报「全部交回」退出。
-                # 后台任务的完成通知（origin 是 task-notification）不算：它叫醒之后要是又调工具，上面按调工具撤销。
-                if (record.get("origin") or {}).get("kind") == "coordinator" and BROKEN_DETECTION != "resume":
-                    is_handed_back = False
+                    self.interrupted_timestamp = timestamp
                 # 结束本轮之后来的续做消息：它被叫醒了，在想下一步，不再是「结束本轮」——不改的话续做头几秒它还没落下新记录，
                 # 看门狗照上一轮的结束时刻报「结束本轮却不会醒」（2026-09-19 E155 执行员续派第二段，最后动作 4 秒前就被报了）。
                 if (record.get("origin") or {}).get("kind") == "coordinator" and BROKEN_DETECTION != "resumeturn":
                     last_kind = "resumed"
+        # 一次工具调用只有在「它之后再没有别的记录」时才算还在跑。断网 / 被停时砍掉的那一次调用
+        # 只落了发起、永远等不到结果，旧写法会一直把它当成在跑，于是「工具调用过长」每一轮都假报一次
+        # （2026-09-22 实测：三条腿被断网停掉、续做之后又调了 5 次，看门狗照旧报那条已死的 Bash 跑了 10 分 55 秒）。
+        if BROKEN_DETECTION != "stalepending" and self.last_timestamp is not None:
+            pending_by_id = {
+                key: item for key, item in pending_by_id.items() if item[0] >= self.last_timestamp
+            }
         self.pending_tool = max(pending_by_id.values(), key=lambda item: item[0]) if pending_by_id else None
         # 最后一条是纯文字、stop_reason 为空：流式写入时同一条消息后面还会接工具调用，几秒之内就会落下来；
         # 过了 TEXT_SETTLE_SECONDS 还没接任何记录，就是结束本轮了（2026-09-19 c381-r1 攻方腿 10:57 写一句「等 phase B」就等后台任务，
@@ -274,6 +386,7 @@ class AgentTranscript:
             self.state = "被停"
         elif is_handed_back and not pending_by_id and BROKEN_DETECTION != "finished":
             self.state = "已交回"
+            self.handed_back_timestamp = handback_timestamp
         elif self.pending_tool is not None:
             self.state = "执行工具中"
         elif last_kind == "end_turn" and BROKEN_DETECTION == "handback":
@@ -333,6 +446,20 @@ class AgentTranscript:
             return False
         return (now - self.last_turn_end_timestamp).total_seconds() >= NO_WAKE_GRACE_SECONDS
 
+    def ended(self, notifications):
+        """它还在不在跑：交回、被停或失败了返回 (怎么结束的, 那一刻)，还在跑返回 None。notifications 是 session_task_events 的第二张表。
+        失败认它最近一次任务通知的状态在 ENDED_NOTIFICATION_STATUSES 里，且那条通知不早于它自己最后一条记录减
+        STOP_AFTER_LAST_RECORD_SECONDS（失败之后又被续做、还在跑的不算，与 TaskStop 同一个判法）。"""
+        if self.state == "已交回":
+            return "已交回", self.handed_back_timestamp or self.last_timestamp
+        if self.state == "被停":
+            return "被停", self.task_stopped_timestamp or self.interrupted_timestamp or self.last_timestamp
+        status, notified_at = notifications.get(self.agent_id, (None, None))
+        if (status in ENDED_NOTIFICATION_STATUSES and BROKEN_DETECTION != "leftovernotified"
+                and (self.last_timestamp is None or (self.last_timestamp - notified_at).total_seconds() <= STOP_AFTER_LAST_RECORD_SECONDS)):
+            return f"任务通知 {status}", notified_at
+        return None
+
 
 def files_held_open_by_any_process():
     """本机全部进程开着的文件（按真实路径）：判一个后台任务的输出文件还有没有进程在写。"""
@@ -350,6 +477,98 @@ def files_held_open_by_any_process():
             except OSError:
                 continue
     return held
+
+
+def output_files_held_open():
+    """本机进程开着的后台任务输出文件（.output，按真实路径）→ 开着它的进程号集合。"""
+    holders_by_file = {}
+    if BROKEN_DETECTION == "leftover":
+        return holders_by_file
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        try:
+            descriptors = os.listdir(f"/proc/{entry}/fd")
+        except OSError:
+            continue
+        for descriptor in descriptors:
+            try:
+                target = os.readlink(f"/proc/{entry}/fd/{descriptor}")
+            except OSError:
+                continue
+            if target.endswith(".output"):
+                holders_by_file.setdefault(os.path.realpath(target), set()).add(int(entry))
+    return holders_by_file
+
+
+TRANSCRIPT_OUTPUT_PATHS_CACHE = {}   # 子 agent 会话记录路径 → ((大小, 修改时刻), 它提到的后台输出文件的真实路径)
+
+
+def output_paths_mentioned(transcript_path):
+    """会话记录里提到过的后台输出文件（真实路径）：只用来挑出值得逐条解析的那几份，归属由 AgentTranscript 按工具结果认。"""
+    try:
+        status = os.stat(transcript_path)
+    except OSError:
+        return set()
+    key = (status.st_size, status.st_mtime_ns)
+    cached = TRANSCRIPT_OUTPUT_PATHS_CACHE.get(transcript_path)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    with open(transcript_path, "rb") as handle:
+        mentioned = {os.path.realpath(match.decode(errors="replace")) for match in BACKGROUND_OUTPUT_PATH_BYTES.findall(handle.read())}
+    TRANSCRIPT_OUTPUT_PATHS_CACHE[transcript_path] = (key, mentioned)
+    return mentioned
+
+
+def leftover_background_report(session_dirs, now, thresholds):
+    """交回、被停或失败的子 agent 起过的后台任务，它结束过了宽限还有进程开着输出文件：返回 (报告行, 告警, 宽限最早到期的时刻或 None)。
+    扫这些会话目录里全部子 agent，不只被看的那几个；只检出、只报，不停进程（检出与处置分开）。"""
+    holders_by_file = output_files_held_open()
+    grace_seconds = thresholds.leftover_background_grace_minutes * 60
+    detail_lines, alerts, pending_until = [], [], None
+    scanned, agents_within_grace, table = 0, 0, None
+    for session_dir in sorted(session_dirs):
+        transcript_paths = sorted(glob.glob(os.path.join(session_dir, "subagents", "agent-*.jsonl")))
+        scanned += len(transcript_paths)
+        notifications = None
+        for transcript_path in transcript_paths:
+            if not holders_by_file or not (output_paths_mentioned(transcript_path) & holders_by_file.keys()):
+                continue
+            agent_id = os.path.basename(transcript_path)[len("agent-"):-len(".jsonl")]
+            transcript = AgentTranscript(agent_id, transcript_path)
+            if notifications is None:
+                notifications = session_task_events(parent_session_transcript(transcript_path))[1]
+            ended = transcript.ended(notifications)
+            if ended is None:
+                continue   # 还在跑的归别的告警管
+            how_it_ended, ended_at = ended
+            held_tasks = sorted(task_id for task_id, path in transcript.background_output_paths.items()
+                                if os.path.realpath(path) in holders_by_file)
+            if not held_tasks:
+                continue
+            since_ended = (now - ended_at).total_seconds()
+            if since_ended < grace_seconds and BROKEN_DETECTION != "leftovergrace":
+                grace_ends_at = datetime.fromtimestamp(ended_at.timestamp() + grace_seconds, timezone.utc)
+                pending_until = grace_ends_at if pending_until is None else min(pending_until, grace_ends_at)
+                agents_within_grace += 1
+                detail_lines.append(f"  子 agent {agent_id} {how_it_ended}，距今 {format_duration(since_ended)}，它起的后台任务 {', '.join(held_tasks)} "
+                                    f"的输出文件还有进程开着：还在 {format_duration(grace_seconds)} 宽限里，过了再查")
+                continue
+            holder_pids = set().union(*(holders_by_file[os.path.realpath(transcript.background_output_paths[task_id])] for task_id in held_tasks))
+            table = table if table is not None else process_table()
+            topmost = sorted(pid for pid in holder_pids if pid in table and table[pid]["parent"] not in holder_pids)
+            detail_lines.append(f"  子 agent {agent_id} {transcript.agent_type}「{transcript.description}」{how_it_ended}，距今 {format_duration(since_ended)}，"
+                                f"它起的后台任务 {', '.join(held_tasks)} 的输出文件还有 {len(holder_pids)} 个进程开着，最上层的 {len(topmost)} 个各报一条")
+            ticks_per_second = os.sysconf("SC_CLK_TCK")
+            uptime_seconds = float(open("/proc/uptime").read().split()[0])
+            for pid in topmost:
+                running_seconds = uptime_seconds - table[pid]["start_ticks"] / ticks_per_second
+                alerts.append((agent_id, LEFTOVER_BACKGROUND_ALERT,
+                               f"进程 {pid} 已跑 {format_duration(running_seconds)}，{command_for_display(table[pid]['command'])[:140]}",
+                               f"看它在等什么；确认没用就按进程号停：`{PROCESS_STOP_COMMAND} {pid}`；要留着它接着跑就 --ack 进程:{pid}"))
+    summary = (f"交回、被停或失败之后后台还在跑：查了 {scanned} 个子 agent 的会话记录，本机有进程开着的后台输出文件 {len(holders_by_file)} 个，"
+               f"报 {len(alerts)} 条，宽限里的 {agents_within_grace} 个子 agent")
+    return [summary, *detail_lines], alerts, pending_until
 
 
 def tool_result_category(tool_name, tool_input):
@@ -567,8 +786,10 @@ def process_table():
         except OSError:
             continue
         after_name = stat_text[stat_text.rfind(")") + 2:].split()
-        table[int(entry)] = {"parent": int(after_name[1]), "start_ticks": int(after_name[19]),
-                             "cpu_ticks": int(after_name[11]) + int(after_name[12]), "command": command_line}
+        table[int(entry)] = {"parent": int(after_name[1]), "start_ticks": int(after_name[19]), "state": after_name[0],
+                             "cpu_ticks": int(after_name[11]) + int(after_name[12]),
+                             "cpu_ticks_with_reaped": sum(int(field) for field in after_name[11:15]),   # 连同已回收子进程的用户态、内核态
+                             "command": command_line}
     return table
 
 
@@ -599,6 +820,85 @@ def written_files(pid):
     return sorted(set(files))
 
 
+def stdin_pipe_writers(reader_pid, table):
+    """这个进程的 stdin 是管道（/proc/<pid>/fd/0 指向 pipe:[inode]）时，本机别的活进程里把同一个管道开在写端的那些进程号。
+    它自己与它的祖先不算：管道的上游是兄弟一类，不是祖先；祖先的子孙里就有这个进程自己那一支和不相干的兄弟，拿它的整棵子树判「在动」会把告警整个关掉。
+    stdin 不是管道、读不到，或写端进程的 /proc 读不了（别的用户的进程），都当作看不到写端。"""
+    try:
+        stdin_target = os.readlink(f"/proc/{reader_pid}/fd/0")
+    except OSError:
+        return []
+    if not stdin_target.startswith("pipe:["):
+        return []
+    ancestors, pid = set(), reader_pid
+    while pid in table and pid > 1 and BROKEN_DETECTION != "pipeancestor":
+        pid = table[pid]["parent"]
+        ancestors.add(pid)
+    writers = []
+    for other in table:
+        if other == reader_pid or other in ancestors or table[other]["state"] in EXITED_PROCESS_STATES:
+            continue
+        try:
+            descriptors = os.listdir(f"/proc/{other}/fd")
+        except OSError:
+            continue
+        for descriptor in descriptors:
+            try:
+                if os.readlink(f"/proc/{other}/fd/{descriptor}") != stdin_target:
+                    continue
+                flags_line = [line for line in open(f"/proc/{other}/fdinfo/{descriptor}") if line.startswith("flags:")][0]
+            except (OSError, IndexError):
+                continue
+            if (int(flags_line.split()[1], 8) & 0o3) in (1, 2):   # 开在写端（只写或读写）
+                writers.append(other)
+                break
+    return writers
+
+
+def pipe_upstream_activity(reader_pid, earlier, later, thresholds):
+    """写着的文件不动、CPU 也不涨的进程，stdin 是管道而上游在动：返回一句说明；看不到写端、或写端连同子孙既不算也不写，返回 None。
+    窗口与「进程无输出」同一套：CPU 比 process_alerts 里 earlier、later 那两次采样（隔 CPU_SAMPLE_SECONDS），已回收的子进程与采样之间新起的子孙也算；
+    写着的文件看 --process-stale-minutes 以内变没变过。"""
+    if BROKEN_DETECTION == "pipeupstreamalways":
+        return "（AGENT_WATCH_BREAK=pipeupstreamalways：这条判据恒真）"
+    if BROKEN_DETECTION == "pipeupstream":
+        return None
+    writers = [pid for pid in stdin_pipe_writers(reader_pid, earlier)
+               if pid in later and later[pid]["start_ticks"] == earlier[pid]["start_ticks"]]
+    if not writers:
+        return None
+    children = {}
+    for pid, info in later.items():
+        children.setdefault(info["parent"], []).append(pid)
+    subtree, frontier = set(), list(writers)
+    while frontier:
+        pid = frontier.pop()
+        if pid in subtree or pid == reader_pid or later[pid]["state"] in EXITED_PROCESS_STATES:
+            continue
+        subtree.add(pid)
+        frontier.extend(children.get(pid, []))
+    cpu_ticks = 0
+    for pid in subtree:
+        before = earlier.get(pid)
+        started_before_window = before is not None and before["start_ticks"] == later[pid]["start_ticks"]
+        cpu_ticks += later[pid]["cpu_ticks_with_reaped"] - (before["cpu_ticks_with_reaped"] if started_before_window else 0)
+    cpu_seconds = cpu_ticks / os.sysconf("SC_CLK_TCK")
+    file_ages = []
+    for pid in subtree:
+        for path in written_files(pid):
+            try:
+                file_ages.append(time.time() - os.path.getmtime(path))
+            except OSError:
+                continue
+    newest_age = min(file_ages, default=None)
+    writers_text = f"写端进程 {', '.join(str(pid) for pid in sorted(writers))}（连同子孙 {len(subtree)} 个进程）"
+    if cpu_seconds > 0:
+        return f"stdin 是管道，{writers_text}{CPU_SAMPLE_SECONDS} 秒里用了 {cpu_seconds:.1f} 核秒 CPU"
+    if newest_age is not None and newest_age < thresholds.process_stale_minutes * 60:
+        return f"stdin 是管道，{writers_text}写着的文件最近一次变动在 {format_duration(newest_age)} 以前"
+    return None
+
+
 def process_alerts(root_pid, excluded_pids, thresholds):
     """这个 Claude 实例底下跑得久的叶子进程：报跑了多久、写的文件多久没动；过期的告警。"""
     table = process_table()
@@ -618,7 +918,7 @@ def process_alerts(root_pid, excluded_pids, thresholds):
         if pid in excluded_pids or children.get(pid):
             continue
         info = table[pid]
-        if any(marker in info["command"] for marker in ("native-binary/claude", "vscode-server", "/node ", "agent-watch.py")):
+        if any(marker in info["command"] for marker in COMMAND_MARKERS_NOT_WATCHED):
             continue
         elapsed = uptime_seconds - info["start_ticks"] / ticks_per_second
         if elapsed < thresholds.process_report_minutes * 60:
@@ -649,11 +949,115 @@ def process_alerts(root_pid, excluded_pids, thresholds):
                 alerts.append(("进程过长", f"进程 {pid} 已跑 {format_duration(elapsed)}、一直在算却不写：{info['command'][:140]}",
                                "超过预期时长；主 agent 确认它是谁起的、还要多久，再决定接着盯还是处理"))
             continue
+        # 管道尾（`cargo test … | tail -30`、`… | ugrep`）在等上游、不写也不算：上游连同子孙在算或在写就不是卡住，报一行、不告警。
+        # 2026-09-24 实测这两种形态各被报过「进程无输出」，上游的测试二进制一直占满一个核。
+        upstream = pipe_upstream_activity(pid, table, later, thresholds)
+        if upstream is not None:
+            lines.append(f"  进程 {pid} 在等上游：{upstream}，它自己写着的文件 {format_duration(newest_age)} 没动（不告警；"
+                         f"跑到 {thresholds.process_max_minutes:.0f} 分钟报「进程过长」）")
+            if elapsed >= thresholds.process_max_minutes * 60:
+                alerts.append(("进程过长", f"进程 {pid} 已跑 {format_duration(elapsed)}、一直在等还在动的上游：{info['command'][:140]}",
+                               "超过预期时长；主 agent 确认它是谁起的、还要多久，再决定接着盯还是处理"))
+            continue
         alerts.append(("进程无输出", f"进程 {pid} 已跑 {format_duration(elapsed)}，写着的文件 {format_duration(newest_age)} 没变，"
                                      f"{CPU_SAMPLE_SECONDS} 秒里 CPU 也没涨：{info['command'][:140]}",
                        "既不写也不算，可能卡在等什么（锁、管道、网络、另一个进程）；主 agent 看它在等什么（/proc/<pid>/wchan、它的父进程与输入），"
                        "再决定接着盯、查、还是报给用户"))
     return lines, alerts
+
+
+BASH_TOOL_WRAPPER_COMMAND = re.compile(r"&& eval '(.*)'(?: < /dev/null)? && pwd -P >\| \S+\s*$", re.S)
+
+
+def command_for_display(command):
+    """Claude 的 Bash 工具把命令包在「source 快照 && … && eval '<命令>' [< /dev/null] && pwd -P >| …」里：报告里只列 eval 里那一段
+    （还原 eval 里转义过的单引号、换行并成空格），不然最上层每一行都是同一串包装。"""
+    if BROKEN_DETECTION == "display":
+        return command
+    wrapped = BASH_TOOL_WRAPPER_COMMAND.search(command)
+    shown = wrapped.group(1).replace("'\"'\"'", "'") if wrapped else command
+    return " ".join(shown.split())
+
+
+def processes_to_watch(root_pid, excluded_pids):
+    """--processes-only 盯的进程：{进程号: 起始时刻}。这个实例底下整棵子树，不只叶子；
+    看门狗自己那一支、COMMAND_MARKERS_NOT_WATCHED、已经退出的（僵尸）不算，它们的子孙照样往下找。"""
+    table = process_table()
+    children = {}
+    for pid, info in table.items():
+        children.setdefault(info["parent"], []).append(pid)
+    watched, frontier = {}, [root_pid]
+    while frontier:
+        for child in children.get(frontier.pop(), []):
+            frontier.append(child)
+            info = table[child]
+            if (child in excluded_pids or info["state"] in EXITED_PROCESS_STATES
+                    or any(marker in info["command"] for marker in COMMAND_MARKERS_NOT_WATCHED)):
+                continue
+            watched[child] = info["start_ticks"]
+    return watched
+
+
+def still_running(watched):
+    """盯着的进程里还没退出的：{进程号: 进程表那一行}。进程号被别的进程接走（起始时刻对不上）算退出了，僵尸也算。"""
+    table = process_table()
+    running = {}
+    for pid, start_ticks in watched.items():
+        info = table.get(pid)
+        if info is None or info["start_ticks"] != start_ticks:
+            continue
+        if info["state"] in EXITED_PROCESS_STATES and BROKEN_DETECTION != "zombie":
+            continue
+        running[pid] = info
+    return running
+
+
+def run_processes_only(arguments, process_root_pid, excluded_pids):
+    """--processes-only：起的时候在跑的那些都退出了退 0，进程一节报了告警退 3，到定时回报退 4；report 只看一眼，有告警退 3、没有退 0。"""
+    watched = processes_to_watch(process_root_pid, excluded_pids)
+    report_deadline = time.time() + arguments.max_minutes * 60
+    while True:
+        running = still_running(watched)
+        topmost_running_pids = sorted(pid for pid, info in running.items() if info["parent"] not in running)
+        lines = [f"只盯进程：进程 {process_root_pid} 底下看门狗起的时候就在跑的 {len(watched)} 个进程，还没退出的 {len(running)} 个"
+                 + ("，最上层的：" if topmost_running_pids else "")]
+        lines += [f"  进程 {pid}：{command_for_display(running[pid]['command'])[:140]}" for pid in topmost_running_pids]
+        process_lines, found = process_alerts(process_root_pid, excluded_pids, arguments)
+        if process_lines:
+            lines.append("这个 Claude 实例底下跑得久的进程：")
+            lines.extend(process_lines)
+        if arguments.session_dir:
+            leftover_lines, leftover_alerts, leftover_pending_until = leftover_background_report(
+                {os.path.normpath(arguments.session_dir)}, datetime.now(timezone.utc), arguments)
+        else:
+            leftover_lines, leftover_alerts, leftover_pending_until = (
+                ["交回、被停或失败之后后台还在跑：没给 --session-dir，这一类没查（watch.sh --processes 从 CLAUDE_CODE_SESSION_ID 找会话目录传进来）"], [], None)
+        lines.extend(leftover_lines)
+        alerts, acknowledged = split_acknowledged([("进程", name, explanation, next_step) for name, explanation, next_step in found]
+                                                  + leftover_alerts, set(arguments.ack or []))
+        for subject, name, explanation, _ in acknowledged:
+            lines.append(f"已确认接着盯（--ack {subject}:{name}）：{explanation}")
+        if arguments.mode == "report" or alerts:
+            print_report(lines, alerts)
+            return 3 if alerts else 0
+        # 只剩交回之后宽限里的后台进程时不退：宽限一过再查一次，免得它们刚好在退出之后才够格报
+        if not running and BROKEN_DETECTION != "processexit" and (leftover_pending_until is None or BROKEN_DETECTION == "leftoverexit"):
+            print_report(lines, alerts)
+            if watched:
+                print(f"看门狗起的时候就在跑的 {len(watched)} 个进程都退出了。")
+            else:
+                print("看门狗起的时候这个 Claude 实例底下就没有要盯的进程（看门狗自己那一支、claude 本体、IDE、node 与别的看门狗不算）："
+                      "长命令是已经跑完了，还是还没起？")
+            return 0
+        if time.time() >= report_deadline:
+            print_report(lines, alerts)
+            print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警，盯着的进程还有 {len(running)} 个没退出。")
+            print("   → 接着盯就再起一个看门狗 --processes-only")
+            return 4
+        next_check_in = min(arguments.interval_seconds, report_deadline - time.time())
+        if leftover_pending_until is not None:
+            next_check_in = min(next_check_in, leftover_pending_until.timestamp() + 1 - time.time())
+        time.sleep(max(0.0, next_check_in))
 
 
 def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pids, process_root_pid):
@@ -703,7 +1107,17 @@ def build_report(agent_ids, session_dir, thresholds, watch_started, excluded_pid
             lines.extend(process_lines)
         for name, explanation, next_step in found:
             alerts.append(("进程", name, explanation, next_step))
-    return lines, alerts, bool(done_flags) and all(done_flags), (active_ids, unstarted_ids)
+    # 交回之后丢下的后台进程：被看的子 agent 所在会话里全部子 agent 都查，不只被看的这几个
+    session_dirs = {os.path.normpath(session_dir)} if session_dir else set()
+    session_dirs |= {os.path.dirname(os.path.dirname(path)) for _, path in targets if path}
+    leftover_pending_until = None
+    if session_dirs:
+        leftover_lines, leftover_alerts, leftover_pending_until = leftover_background_report(session_dirs, now, thresholds)
+        lines.extend(leftover_lines)
+        alerts.extend(leftover_alerts)
+    else:
+        lines.append("交回、被停或失败之后后台还在跑：被看的子 agent 都还没有会话记录，不知道是哪个会话，这一类没查")
+    return lines, alerts, bool(done_flags) and all(done_flags), (active_ids, unstarted_ids), leftover_pending_until
 
 
 def session_id_of(transcript_path):
@@ -782,7 +1196,7 @@ def split_acknowledged(alerts, acknowledgements):
     for alert in alerts:
         subject, name, explanation, _ = alert
         keys = {f"{subject}:{name}"}
-        if subject == "进程":
+        if subject == "进程" or (name == LEFTOVER_BACKGROUND_ALERT and BROKEN_DETECTION != "leftoverack"):
             process_id = re.match(r"进程 (\d+) ", explanation)
             if process_id:
                 keys.add(f"进程:{process_id.group(1)}")
@@ -791,8 +1205,15 @@ def split_acknowledged(alerts, acknowledgements):
 
 
 def run(arguments):
-    if not arguments.agents and not arguments.session_dir:
-        print("✗ 要给 --agents 或 --session-dir\n→ 怎么办：派发返回的 agent id 用逗号连起来传 --agents", file=sys.stderr)
+    if arguments.processes_only and (arguments.agents or arguments.mode == "cost" or arguments.process_root_pid == 0):
+        print("✗ --processes-only 只盯进程，不和 --agents、cost、--process-root-pid 0 一起用\n"
+              "→ 怎么办：盯子 agent 就去掉 --processes-only（子 agent 起的进程照样在进程一节里）；只盯主 agent 自己放后台的长命令就只给 --processes-only"
+              "（可带 --session-dir，同时查交回之后后台还在跑）",
+              file=sys.stderr)
+        return 2
+    if not arguments.agents and not arguments.session_dir and not arguments.processes_only:
+        print("✗ 要给 --agents 或 --session-dir\n→ 怎么办：派发返回的 agent id 用逗号连起来传 --agents；只盯主 agent 自己放后台的长命令用 --processes-only",
+              file=sys.stderr)
         return 2
     agent_ids = [item for item in (arguments.agents or "").split(",") if item]
     table = process_table()
@@ -803,6 +1224,12 @@ def run(arguments):
     else:
         process_root_pid = claude_instance_pid(table, os.getpid())
     excluded_pids = own_process_chain(table, os.getpid())
+    if arguments.processes_only:
+        if process_root_pid is None:
+            print("✗ 往上找不到跑这个看门狗的 Claude 实例，--processes-only 没有进程可盯\n"
+                  "→ 怎么办：在 Claude 的 Bash 工具里起它，或者用 --process-root-pid 指定从哪个进程往下看", file=sys.stderr)
+            return 2
+        return run_processes_only(arguments, process_root_pid, excluded_pids)
     if arguments.mode == "cost":
         lines, _ = cost_report(agent_ids, arguments.session_dir, arguments)
         print("\n".join(lines))
@@ -813,7 +1240,8 @@ def run(arguments):
     report_deadline = watch_started + arguments.max_minutes * 60
     detection_notes = []
     while True:
-        lines, alerts, all_done, active_lists = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
+        lines, alerts, all_done, active_lists, leftover_pending_until = build_report(
+            agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
         session_ids = {session_id_of(path) for path in (find_transcript(agent_id, arguments.session_dir) for agent_id in agent_ids) if path}
         if arguments.session_dir:
             session_ids.add(os.path.basename(os.path.normpath(arguments.session_dir)))
@@ -831,7 +1259,8 @@ def run(arguments):
             print_report(lines, alerts)
             print_active_list(*active_lists)
             return 3
-        if all_done:
+        # 全部交回照旧退出，这一次 build_report 已经把「交回之后后台还在跑」查过了；只剩宽限里的，等宽限过了再查一次才退
+        if all_done and (leftover_pending_until is None or BROKEN_DETECTION == "leftoverexit"):
             print_report(lines, alerts)
             print("被看的子 agent 全部交回或被停。")
             return 0
@@ -843,12 +1272,14 @@ def run(arguments):
         next_full_check = time.time() + arguments.interval_seconds
         if BROKEN_DETECTION != "deadline":
             next_full_check = min(next_full_check, report_deadline)
+        if all_done:
+            next_full_check = min(next_full_check, leftover_pending_until.timestamp() + 1)
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(next_full_check - time.time(), 0)))
             detections_offset, detection_alerts, new_notes = read_detections(detections_path, detections_offset, session_ids, set(agent_ids))
             detection_notes += new_notes
             if detection_alerts:
-                lines, alerts, _, active_lists = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
+                lines, alerts, _, active_lists, _ = build_report(agent_ids, arguments.session_dir, arguments, watch_started, excluded_pids, process_root_pid)
                 print_report(lines + detection_notes, alerts + detection_alerts)
                 print_active_list(*active_lists)
                 return 3
@@ -914,11 +1345,172 @@ def handback_records(minutes_ago, tool_id, message_id):
                                                    "content": [{"type": "text", "text": '{"success":true,"message":"Report delivered to your caller."}'}]}])]
 
 
+def selftest_leftover_background(work, thresholds, failures, watch_runs, probed_processes):
+    """「交回之后后台还在跑」的自检：另起会话目录，免得这些开着输出文件的进程搅到别的看门狗自检。返回查了几个合成子 agent。
+    每个要看的子 agent 起过一个后台任务，自检起一个 sleep 把它的输出文件开成标准输出（harness 起的后台命令就是这个形状）。"""
+    leftover_session = os.path.join(work, "leftover-session")
+    holders = {}
+
+    def write_leftover_agent(session_directory, agent_id, started_minutes_ago, tail_records, description, keep_output_open=True):
+        output_path = os.path.join(work, f"{agent_id}.output")
+        with open(output_path, "a") as output_handle:
+            if keep_output_open:
+                holders[agent_id] = subprocess.Popen(["sleep", "300"], stdout=output_handle)
+                probed_processes.append(holders[agent_id])
+        started_record = record_at(started_minutes_ago - 0.05, "user", [{"type": "tool_result", "tool_use_id": "t1",
+                                   "content": f"Command running in background with ID: bg{agent_id}. Output is being written to: {output_path}. "
+                                              "You will be notified when it completes."}])
+        write_transcript(session_directory, agent_id, [bash_use(started_minutes_ago, "t1", "until [ -f /nonexistent ]; do sleep 5; done", "m1"),
+                                                       started_record, *tail_records],
+                         {"agentType": "three-way-verifier", "description": description})
+
+    def stop_holder(agent_id):
+        holders[agent_id].kill()
+        holders[agent_id].wait()
+
+    def alerting_pids(found):
+        """{子 agent id: 告警里报的进程号}；说明不是「进程 <pid> 已跑 …」开头的，原样放说明，比对时照样对不上。"""
+        pids = {}
+        for owner, name, explanation, _ in found:
+            if name == LEFTOVER_BACKGROUND_ALERT:
+                reported_pid = re.match(r"进程 (\d+) 已跑 ", explanation)
+                pids[owner] = int(reported_pid.group(1)) if reported_pid else explanation
+        return pids
+
+    try:
+        write_leftover_agent(leftover_session, "leftoverhandedback", 12, [*handback_records(10, "h1", "m2"),
+                             record_at(9.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m3")],
+                             "交回 10 分钟、它起的等待循环还在跑")
+        write_leftover_agent(leftover_session, "leftovergrace", 1, [*handback_records(0.6, "h1", "m2"),
+                             record_at(0.4, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m3")],
+                             "交回 30 秒、还在宽限里")
+        write_leftover_agent(leftover_session, "leftoverstopped", 12, [
+                             record_at(9.8, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2")],
+                             "结束本轮等后台任务时被 TaskStop 停掉")
+        write_leftover_agent(leftover_session, "leftoverfailed", 12, [
+                             record_at(9.7, "assistant", [{"type": "text", "text": "接着跑"}], message_id="m2")],
+                             "撞限额失败（最近一次任务通知是 failed）")
+        write_leftover_agent(leftover_session, "leftoverrunning", 12, [
+                             record_at(9.8, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2")],
+                             "没交回、结束本轮在等自己的后台任务")
+        write_leftover_agent(leftover_session, "leftoverresumed", 30, [
+                             record_at(20, "assistant", [{"type": "text", "text": "等后台任务"}], stop_reason="end_turn", message_id="m2"),
+                             record_at(3, "user", "续做：接着跑", origin_kind="coordinator"), bash_use(2, "t2", "cargo build", "m3")],
+                             "上一个 Claude 进程退出时没跑完（stopped）、之后又被续做、正在跑")
+        write_session_stops(leftover_session, {"leftoverstopped": 9})
+        with open(leftover_session + ".jsonl", "a", encoding="utf-8") as handle:
+            failed_notification = record_at(9.5, "user", "<task-notification>\n<task-id>leftoverfailed</task-id>\n<status>failed</status>\n"
+                                                         "<summary>Agent failed: API error</summary>\n</task-notification>", origin_kind="task-notification")
+            stopped_notification = {"type": "queue-operation", "operation": "enqueue", "timestamp": record_at(15, "user", "")["timestamp"],
+                                    "content": "<task-notification>\n<task-id>leftoverresumed</task-id>\n<task-id>aother</task-id>\n<status>stopped</status>\n"
+                                               "<summary>2 background agents didn't finish before the previous session ended</summary>\n</task-notification>"}
+            handle.write(json.dumps(failed_notification, ensure_ascii=False) + "\n")
+            handle.write(json.dumps(stopped_notification, ensure_ascii=False) + "\n")
+        wanted_alerting = {agent_id: holders[agent_id].pid for agent_id in ("leftoverhandedback", "leftoverstopped", "leftoverfailed")}
+        lines, found, pending_until = leftover_background_report({leftover_session}, datetime.now(timezone.utc), thresholds)
+        if alerting_pids(found) != wanted_alerting:
+            failures.append(f"「{LEFTOVER_BACKGROUND_ALERT}」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个、各报开着输出文件的那个进程 {wanted_alerting}"
+                            f"（交回不到宽限、没交回在等、stopped 之后又被续做的不报），实际 {alerting_pids(found) or '无'}")
+        if pending_until is None or not any("宽限里" in line and "leftovergrace" in line for line in lines):
+            failures.append(f"交回 30 秒、宽限 2 分钟的 leftovergrace 应当记成宽限里、给出宽限到期的时刻，实际到期时刻 {pending_until}，报告：{lines}")
+        stop_holder("leftovergrace")
+
+        def run_leftover_watch(agent_ids, session_directory, extra_arguments, timeout=60):
+            watch_runs.append(["leftover", agent_ids, *extra_arguments])
+            return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", agent_ids, "--session-dir", session_directory,
+                                   "--process-root-pid", "0", "--interval-seconds", "1", "--max-minutes", "1", *extra_arguments],
+                                  capture_output=True, text=True, timeout=timeout)
+
+        handed_back_pid = wanted_alerting["leftoverhandedback"]
+        wanted_alert_line = f"⚠️ {LEFTOVER_BACKGROUND_ALERT}（leftoverhandedback）：进程 {handed_back_pid} 已跑 "
+        all_done_run = run_leftover_watch("leftoverhandedback", leftover_session, [])
+        if (all_done_run.returncode != 3 or wanted_alert_line not in all_done_run.stdout
+                or f"{PROCESS_STOP_COMMAND} {handed_back_pid}" not in all_done_run.stdout):
+            failures.append(f"被看的子 agent 全部交回、它丢下的后台进程还在时，看门狗退出前应当报「{wanted_alert_line}…」、下一步给按进程号停的命令、退出码 3，"
+                            f"实际退出码 {all_done_run.returncode}，输出：{all_done_run.stdout[-400:]}")
+        acknowledged_run = run_leftover_watch("leftoverhandedback", leftover_session,
+                                              [argument for pid in wanted_alerting.values() for argument in ("--ack", f"进程:{pid}")])
+        if acknowledged_run.returncode != 0 or "已确认接着盯" not in acknowledged_run.stdout or "全部交回或被停" not in acknowledged_run.stdout:
+            failures.append(f"「{LEFTOVER_BACKGROUND_ALERT}」的进程都用 --ack 进程:<pid> 确认过时不该叫醒：应当退出码 0、写「已确认接着盯」，"
+                            f"实际退出码 {acknowledged_run.returncode}，输出：{acknowledged_run.stdout[-400:]}")
+        watch_runs.append(["--processes-only", "--session-dir", "leftover"])
+        processes_run = subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--processes-only", "--process-root-pid", str(os.getpid()),
+                                        "--session-dir", leftover_session, "--interval-seconds", "1", "--max-minutes", "0.5"],
+                                       capture_output=True, text=True, timeout=120)
+        if processes_run.returncode != 3 or wanted_alert_line not in processes_run.stdout:
+            failures.append(f"--processes-only 带 --session-dir 时也应当报「{wanted_alert_line}…」并退出码 3，"
+                            f"实际退出码 {processes_run.returncode}，输出：{processes_run.stdout[-400:]}")
+        # 被看的子 agent 刚交回、它的后台进程还在宽限里：看门狗不许当场退 0 放过，要等宽限过了再查一次、报出来
+        wait_session = os.path.join(work, "leftover-wait-session")
+        write_leftover_agent(wait_session, "leftoverjustnow", 0.3, [*handback_records(0.15, "h1", "m2"),
+                             record_at(0.04, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m3")],
+                             "刚交回、后台进程还开着输出文件")
+        wait_run = run_leftover_watch("leftoverjustnow", wait_session, ["--leftover-background-grace-minutes", "0.15", "--interval-seconds", "30"])
+        wanted_wait_line = f"⚠️ {LEFTOVER_BACKGROUND_ALERT}（leftoverjustnow）：进程 {holders['leftoverjustnow'].pid} 已跑 "
+        if wait_run.returncode != 3 or wanted_wait_line not in wait_run.stdout:
+            failures.append(f"被看的子 agent 刚交回、后台进程还在宽限里时看门狗应当等宽限过了再查、报「{wanted_wait_line}…」退出码 3，"
+                            f"实际退出码 {wait_run.returncode}，输出：{wait_run.stdout[-400:]}")
+        stop_holder("leftoverhandedback")
+        _, found_after_exit, _ = leftover_background_report({leftover_session}, datetime.now(timezone.utc), thresholds)
+        if "leftoverhandedback" in alerting_pids(found_after_exit):
+            failures.append(f"leftoverhandedback 丢下的进程 {handed_back_pid} 已经没了，不该再报「{LEFTOVER_BACKGROUND_ALERT}」，实际 {alerting_pids(found_after_exit)}")
+    finally:
+        for process in holders.values():
+            process.kill()
+            process.wait()
+    return len(holders)
+
+
+def selftest_pipe_upstream(work, thresholds, failures, probed_processes):
+    """管道尾在等上游：上游在算（只涨 CPU、不写管道）的不报「进程无输出」、报一行「在等上游」；上游睡着的、写端只在自己祖先手里的照报。
+    管道尾的输出文件一小时没动，形状照 2026-09-24 被误报的 `cargo test … 2>&1 | tail -30`。返回查了几个管道。"""
+    pipelines = {}
+    for label, upstream_command in (("busy", [sys.executable, "-c", "import time\ndeadline = time.time() + 60\nwhile time.time() < deadline:\n    pass\n"]),
+                                    ("sleeping", ["sleep", "60"])):
+        tail_output = os.path.join(work, f"pipe-{label}-tail.log")
+        with open(tail_output, "a") as tail_handle:
+            os.utime(tail_output, (time.time() - 3600, time.time() - 3600))
+            # stderr 不继承自检进程的：继承来的若是一份正被写着的日志，会被算成上游或管道尾「写着的文件在涨」
+            upstream = subprocess.Popen(upstream_command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            reader = subprocess.Popen(["tail", "-1"], stdin=upstream.stdout, stdout=tail_handle, stderr=subprocess.DEVNULL)
+        upstream.stdout.close()   # 自检进程不留管道的读端：管道两端只在上游与管道尾手里，同 shell 起的管道
+        pipelines[label] = (upstream, reader)
+        probed_processes += [upstream, reader]
+    # 写端是自己的祖先（自检进程拿着它 stdin 的写端，而自检进程的子孙里就有上面那个在算的上游）：祖先不算上游，照报
+    ancestor_fed_output = os.path.join(work, "pipe-ancestor-fed-tail.log")
+    with open(ancestor_fed_output, "a") as tail_handle:
+        os.utime(ancestor_fed_output, (time.time() - 3600, time.time() - 3600))
+        ancestor_fed = subprocess.Popen(["tail", "-1"], stdin=subprocess.PIPE, stdout=tail_handle, stderr=subprocess.DEVNULL)
+    probed_processes.append(ancestor_fed)
+    try:
+        time.sleep(4)
+        process_lines, found = process_alerts(os.getpid(), set(), thresholds)
+        busy_upstream, busy_reader = pipelines["busy"]
+        sleeping_upstream, sleeping_reader = pipelines["sleeping"]
+        if any(f"进程 {busy_reader.pid} " in explanation for _, explanation, _ in found):
+            failures.append(f"stdin 是管道、上游 {busy_upstream.pid} 一直在算的管道尾 {busy_reader.pid} 被当成告警（它在等上游）："
+                            f"{[explanation for _, explanation, _ in found]}")
+        if not any(f"进程 {busy_reader.pid} 在等上游" in line and f"写端进程 {busy_upstream.pid}" in line for line in process_lines):
+            failures.append(f"上游 {busy_upstream.pid} 在算的管道尾 {busy_reader.pid} 在报告里没有「在等上游」那一行并点名写端，实际 {process_lines}")
+        if not any(name == "进程无输出" and f"进程 {sleeping_reader.pid} " in explanation for name, explanation, _ in found):
+            failures.append(f"stdin 是管道、上游 {sleeping_upstream.pid} 睡着（不算也不写）的管道尾 {sleeping_reader.pid} 没报「进程无输出」："
+                            f"{[explanation for _, explanation, _ in found] or '一条告警都没有'}")
+        if not any(name == "进程无输出" and f"进程 {ancestor_fed.pid} " in explanation for name, explanation, _ in found):
+            failures.append(f"stdin 管道的写端只在自己的祖先（自检进程 {os.getpid()}）手里的 {ancestor_fed.pid} 没报「进程无输出」："
+                            f"祖先的子孙里有不相干的在算的进程，不能拿来当上游")
+    finally:
+        for process in [process for pair in pipelines.values() for process in pair] + [ancestor_fed]:
+            process.kill()
+            process.wait()
+        ancestor_fed.stdin.close()
+    return len(pipelines) + 1
+
+
 def selftest():
     work = tempfile.mkdtemp(prefix="agent-watch-selftest-")
     thresholds = argparse.Namespace(tool_minutes=8, wait_loop_minutes=3, idle_minutes=10, repeat_count=3, interval_seconds=240,
                                     process_report_minutes=0.02, process_stale_minutes=0.05, process_max_minutes=600,
-                                    not_started_minutes=5, active_minutes=600, context_tokens=600_000)
+                                    not_started_minutes=5, active_minutes=600, context_tokens=600_000, leftover_background_grace_minutes=2)
     session = os.path.join(work, "session")
     failures = []
     write_transcript(session, "finished", [bash_use(20, "t1", "ls", "m1"), bash_result(19, "t1"), *handback_records(18.5, "h1", "m2"),
@@ -948,8 +1540,40 @@ def selftest():
                                                         record_at(2.8, "assistant", [{"type": "text", "text": "交回了"}], stop_reason="end_turn", message_id="m2"),
                                                         record_at(0.2, "user", "[SYSTEM NOTIFICATION - NOT USER INPUT] 后台任务跑完了", origin_kind="task-notification")],
                      {"agentType": "implementation-writer", "description": "交回之后收到后台任务的完成通知"})
+    # 交回之后被自己后台任务的完成通知叫醒、看一眼输出再结束本轮：仍算交回，不许判成没交回、报「结束本轮却不会醒」
+    # （2026-09-23 门禁审计会话 ac26abd494cda0968 实测误报，次序照它的会话记录：前台 doc-lint 超时转后台、交回、结束本轮、完成通知、grep 一次、结束本轮）。
+    moved_task_started = record_at(4, "user", [{"type": "tool_result", "tool_use_id": "t1",
+                                                "content": "Command did not complete within its 120s timeout and was moved to the background (ID: bl1). "
+                                                           f"Output is being written to: {os.path.join(work, 'bl1.output')}. You will be notified when it completes."}])
+    moved_task_finished = record_at(2.7, "user", "[SYSTEM NOTIFICATION - NOT USER INPUT]\n<task-notification>\n<task-id>bl1</task-id>\n<status>completed</status>\n</task-notification>",
+                                    origin_kind="task-notification")
+    write_transcript(session, "toolafterhandback", [bash_use(6, "t1", 'bash .claude/singlefs-ai-sop/scripts/doc-lint.sh "$PWD"', "m1"), moved_task_started,
+                                                    *handback_records(3, "h1", "m2"),
+                                                    record_at(2.8, "assistant", [{"type": "text", "text": "报告已交回主 agent。"}], stop_reason="end_turn", message_id="m3"),
+                                                    moved_task_finished, bash_use(2.6, "t2", "grep -n '✗' bl1.output", "m4"), bash_result(2.5, "t2"),
+                                                    record_at(2.4, "assistant", [{"type": "text", "text": "后台那次 doc-lint 跑完了，和交回里写的一致"}],
+                                                              stop_reason="end_turn", message_id="m5")],
+                     {"agentType": "general-purpose", "description": "交回之后被自己后台任务的完成通知叫醒、调了工具再结束本轮"})
+    # 前台命令跑满超时被挪进后台之后结束本轮去等它：算在等自己的后台任务，不许报「结束本轮却不会醒」（同一份会话记录里的 doc-lint 就是这样转进后台的）。
+    write_transcript(session, "movedbackground", [bash_use(4, "t1", "bash .claude/scripts/gate.sh --staged", "m1"),
+                                                  record_at(2, "user", [{"type": "tool_result", "tool_use_id": "t1",
+                                                                         "content": "Command did not complete within its 120s timeout and was moved to the background (ID: bm1). "
+                                                                                    f"Output is being written to: {os.path.join(work, 'bm1.output')}. You will be notified when it completes."}]),
+                                                  record_at(1.8, "assistant", [{"type": "text", "text": "等超时转进后台的那条跑完"}], stop_reason="end_turn", message_id="m2")],
+                     {"agentType": "gate-triage", "description": "前台命令超时转进后台、结束本轮等它"})
+    # 交回之后、它还在忙的时候来的续做消息只落成 queued_command 附件（附件自己带 origin coordinator），同样撤销交回；
+    # 续做之后干完活、没再交回就结束本轮的，要报「结束本轮却不会醒」。
+    queued_resume = {"timestamp": record_at(3.8, "user", "")["timestamp"], "type": "attachment",
+                     "attachment": {"type": "queued_command", "prompt": "再补一格", "origin": {"kind": "coordinator"}, "isMeta": True}}
+    write_transcript(session, "queuedresume", [*handback_records(4, "h1", "m1"), queued_resume, bash_use(3.7, "t2", "ls", "m2"), bash_result(3.6, "t2"),
+                                               record_at(3.5, "assistant", [{"type": "text", "text": "补完了"}], stop_reason="end_turn", message_id="m3")],
+                     {"agentType": "experiment-runner", "description": "交回之后忙时收到续做消息、干完没再交回就结束本轮"})
     write_transcript(session, "waitloop", [bash_use(5, "t1", 'until grep -q "^exit=" log; do sleep 10; done', "m1")])
     write_transcript(session, "longtool", [bash_use(20, "t1", "cargo test --release", "m1")])
+    # 断网 / 被停砍掉的那一次调用：只有发起、永远没有结果，而它之后 agent 又接着动了。
+    # 那条调用已经死了，不许再按「工具调用过长」报（2026-09-22 三条腿续做后实测假报）。
+    write_transcript(session, "stalepending", [bash_use(20, "t1", "cargo test --release", "m1"),
+                                              bash_use(0.5, "t2", "cargo build", "m2")])
     write_transcript(session, "healthy", [bash_use(0.5, "t1", "cargo build", "m1")])
     write_transcript(session, "hugecontext", [record_at(0.5, "assistant", [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "cargo build"}}],
                                                         stop_reason="tool_use", message_id="m1", usage={"input_tokens": 10, "cache_read_input_tokens": 700_000})],
@@ -1055,7 +1679,8 @@ def selftest():
     expectations = {
         "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
         "stoppedidle": set(), "stoppedcontinued": set(), "stoppedtwice": set(), "wokenup": set(), "resumedafterturnend": set(), "nowake": {"结束本轮却不会醒"}, "waitinglong": set(), "orphantask": {"结束本轮却不会醒"}, "heldtask": set(), "textsettled": set(), "stopsequence": set(), "textstreaming": set(),
-        "hugecontext": {"上下文过大"}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
+        "toolafterhandback": set(), "movedbackground": set(), "queuedresume": {"结束本轮却不会醒"},
+        "hugecontext": {"上下文过大"}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "stalepending": set(), "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
     }
     now = datetime.now(timezone.utc)
     for agent_id, wanted in expectations.items():
@@ -1070,7 +1695,7 @@ def selftest():
     holder.wait()
     wanted_done = {"finished": True, "interrupted": True, "stoppedidle": True, "waiting": False, "continued": False, "healthy": False,
                    "stoppedcontinued": False, "stoppedtwice": True, "nowake": False, "wokenup": False, "resumedthinking": False, "notifiedafterhandback": True,
-                   "waitinglong": False}
+                   "waitinglong": False, "toolafterhandback": True, "movedbackground": False, "queuedresume": False}
     for agent_id, wanted_state in (("textsettled", "本轮结束、没交回"), ("stopsequence", "本轮结束、没交回"), ("textstreaming", "思考中"),
                                    ("resumedafterturnend", "思考中")):
         got_state = AgentTranscript(agent_id, find_transcript(agent_id, session)).state
@@ -1080,6 +1705,10 @@ def selftest():
         transcript = AgentTranscript(agent_id, find_transcript(agent_id, session))
         if transcript.is_done() != wanted:
             failures.append(f"子 agent {agent_id} 应当{'算' if wanted else '不算'}交回或被停，实际状态「{transcript.state}」")
+    moved_background_transcript = AgentTranscript("movedbackground", find_transcript("movedbackground", session))
+    if moved_background_transcript.background_started != ["bm1"] or not moved_background_transcript.waiting_on_its_own_background_tasks():
+        failures.append(f"前台命令超时被挪进后台（ID bm1）之后结束本轮的，应当算在等自己的后台任务，实际数到起过的后台任务 "
+                        f"{moved_background_transcript.background_started}、在不在等：{moved_background_transcript.waiting_on_its_own_background_tasks()}")
     stale_file = os.path.join(work, "stale-output.log")
     open(stale_file, "w").close()
     old = time.time() - 3600
@@ -1091,6 +1720,7 @@ def selftest():
     busy = subprocess.Popen([sys.executable, "-c", "import os, time\n"
                              f"handle = open({busy_file!r}, 'a')\nos.utime({busy_file!r}, (time.time() - 3600, time.time() - 3600))\n"
                              "deadline = time.time() + 30\nwhile time.time() < deadline:\n    pass\n"])
+    probed_processes = [sleeper, busy]
     try:
         time.sleep(4)
         process_lines, found = process_alerts(os.getpid(), set(), thresholds)
@@ -1104,6 +1734,7 @@ def selftest():
         for process in (sleeper, busy):
             process.kill()
             process.wait()
+    pipelines_checked = selftest_pipe_upstream(work, thresholds, failures, probed_processes)
     watch_runs = []
 
     def run_watch(watch_arguments, timeout=None):
@@ -1159,6 +1790,61 @@ def selftest():
                 or (wanted_note is not None and wanted_note not in output):
             failures.append(f"检出记录属于「{session_label}」「{agent_type} {agent_id}」、检出「{finding_text}」时看门狗应当退出码 {wanted_exit}"
                             f"{f'并在报告里记一行「{wanted_note}」' if wanted_note else ''}，实际 {watcher.returncode}")
+    # --processes-only：拿自检进程自己当那个 Claude 实例。一个一直在写文件的、一个写着的文件一小时没动而且不占 CPU 的，
+    # 只许后一个报「进程无输出」；一个两秒就退出、退出之后没人收尸（僵尸）的，盯到它退出就退 0；一个都没有也退 0 并写明。
+    def run_process_watch(watch_arguments, timeout=120):
+        watch_runs.append(["--processes-only", *watch_arguments])
+        return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--processes-only", "--process-root-pid", str(os.getpid()),
+                               "--interval-seconds", "1", *watch_arguments], capture_output=True, text=True, timeout=timeout)
+
+    writing_file = os.path.join(work, "writing-output.log")
+    writer = subprocess.Popen([sys.executable, "-c", "import time\n"
+                               f"handle = open({writing_file!r}, 'a')\n"
+                               "deadline = time.time() + 60\nwhile time.time() < deadline:\n"
+                               "    handle.write('一行\\n')\n    handle.flush()\n    time.sleep(0.3)\n"])
+    silent_file = os.path.join(work, "silent-output.log")
+    open(silent_file, "w").close()
+    silent = subprocess.Popen(["bash", "-c", f"exec 3>>'{silent_file}'; touch -d '1 hour ago' '{silent_file}'; exec sleep 60"])
+    probed_processes += [writer, silent]
+    try:
+        writer_and_silent_run = run_process_watch(["--max-minutes", "0.5", "--process-report-minutes", "0.02", "--process-stale-minutes", "0.05",
+                                     "--process-max-minutes", "600"])
+        alert_lines = [line for line in writer_and_silent_run.stdout.splitlines() if line.startswith("⚠️")]
+        if writer_and_silent_run.returncode != 3 or not any("进程无输出" in line and f"进程 {silent.pid} " in line for line in alert_lines):
+            failures.append(f"--processes-only 时写着的文件一小时没动、CPU 也不涨的进程 {silent.pid} 应当报「进程无输出」并退出码 3，"
+                            f"实际退出码 {writer_and_silent_run.returncode}，告警：{alert_lines or '无'}")
+        if any(f"进程 {writer.pid} " in line for line in alert_lines):
+            failures.append(f"--processes-only 时一直在写文件的进程 {writer.pid} 被当成告警：{alert_lines}")
+    finally:
+        for process in (writer, silent):
+            process.kill()
+            process.wait()
+    short = subprocess.Popen(["sleep", "2"])   # 自检在 subprocess.run 里等看门狗，这两秒退出的进程没人收尸，就是个僵尸
+    probed_processes.append(short)
+    try:
+        finished = run_process_watch(["--max-minutes", "0.25"])
+        if finished.returncode != 0 or "都退出了" not in finished.stdout:
+            failures.append(f"--processes-only 盯着的进程退出了（僵尸没人收尸也算）应当退出码 0 并写「都退出了」，"
+                            f"实际退出码 {finished.returncode}，输出：{finished.stdout[-300:]}")
+    finally:
+        short.kill()
+        short.wait()
+    nothing = run_process_watch(["--max-minutes", "0.25"])
+    if nothing.returncode != 0 or "就没有要盯的进程" not in nothing.stdout:
+        failures.append(f"--processes-only 起的时候一个要盯的进程都没有，应当退出码 0 并写明，实际退出码 {nothing.returncode}，输出：{nothing.stdout[-300:]}")
+    if "这一类没查" not in nothing.stdout:
+        failures.append(f"--processes-only 没给 --session-dir 时报告里应当写明「交回之后后台还在跑」这一类没查，实际输出：{nothing.stdout[-300:]}")
+    leftover_cases_checked = selftest_leftover_background(work, thresholds, failures, watch_runs, probed_processes)
+    for mixed in (["watch", "--processes-only", "--agents", "healthy"], ["cost", "--processes-only"]):
+        mixed_run = subprocess.run([sys.executable, os.path.abspath(__file__), *mixed], capture_output=True, text=True, timeout=30)
+        if mixed_run.returncode != 2:
+            failures.append(f"{' '.join(mixed)} 应当退出码 2（--processes-only 不和子 agent、用量混用），实际 {mixed_run.returncode}")
+    for wrapped_command, wanted_display in (
+            ("/bin/bash -c source s.sh 2>/dev/null || true && eval 'cargo test\n  --release' < /dev/null && pwd -P >| /tmp/claude-1-cwd", "cargo test --release"),
+            ("/bin/bash -c source s.sh 2>/dev/null || true && eval 'grep '\"'\"'x'\"'\"' f' && pwd -P >| /tmp/claude-2-cwd", "grep 'x' f"),
+            ("sleep 60", "sleep 60")):
+        if command_for_display(wrapped_command) != wanted_display:
+            failures.append(f"Bash 工具包着的命令在报告里应当显示成「{wanted_display}」，实际「{command_for_display(wrapped_command)}」")
     subprocess.run(["rm", "-rf", work])
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
@@ -1166,9 +1852,14 @@ def selftest():
         print("    → 看 agent_alerts() / process_alerts() / run() 的判法；AGENT_WATCH_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ agent-watch 自检通过：等待循环、工具过长、同一命令反复且输出不变、禁用命令、无动静、进程无输出六种告警都报得出，"
-          f"交回、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，交回按交回工具成功判（只结束本轮、交回后又被续做的都不算），"
+          f"交回、被停、带超时的循环、输出在变的复检与健康的子 agent 不误报，交回按交回工具成功判（只结束本轮、交回后又被续做的都不算，忙时排进队的续做消息也算续做；"
+          f"交回之后被自己后台任务的完成通知叫醒、又调了工具再结束本轮的仍算交回），前台命令超时转进后台的也算它起过的后台任务，"
           f"被停认会话记录里的打断与主会话记录里的 TaskStop（停在等后台任务时的算、停了又被续做的不算、续做之后又停的算，主会话记录不在的标出来），"
-          f"结束本轮而起过的后台任务都已完成、没有通知在路上的报「结束本轮却不会醒」（通知刚到正要醒的不报），看门狗三种退出码对、定时回报不被复检间隔拖后并列出还没交回的子 agent，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对；结束本轮认 end_turn 与 stop_sequence、纯文字记录两分钟没接下文也认，结束本轮之后收到续做消息就算在想，用 --ack 确认过的告警只进报告不叫醒，主 agent 自己被拒的写只进报告不叫醒、入口已拒的命令不再按禁用命令报、别的子 agent 的检出不叫醒这一个看门狗，等自己的后台任务时列出开着输出文件的进程，结束本轮等自己的后台任务的不报无动静（输出文件已没有进程开着、又没收到通知的后台任务不算在等，报「结束本轮却不会醒」），写着的文件不动而 CPU 在涨的进程只报「在算」不告警（查了 {len(expectations) + 1} 个子 agent、2 个进程、{len(watch_runs)} 次看门狗）")
+          f"结束本轮而起过的后台任务都已完成、没有通知在路上的报「结束本轮却不会醒」（通知刚到正要醒的不报），看门狗三种退出码对、定时回报不被复检间隔拖后并列出还没交回的子 agent，本会话的 hook 检出会叫醒主 agent、别的会话的与只检出等待循环的不立刻叫醒，用量与工具结果分类对；结束本轮认 end_turn 与 stop_sequence、纯文字记录两分钟没接下文也认，结束本轮之后收到续做消息就算在想，用 --ack 确认过的告警只进报告不叫醒，主 agent 自己被拒的写只进报告不叫醒、入口已拒的命令不再按禁用命令报、别的子 agent 的检出不叫醒这一个看门狗，等自己的后台任务时列出开着输出文件的进程，结束本轮等自己的后台任务的不报无动静（输出文件已没有进程开着、又没收到通知的后台任务不算在等，报「结束本轮却不会醒」），写着的文件不动而 CPU 在涨的进程只报「在算」不告警，stdin 是管道的管道尾上游在算只报「在等上游」、上游睡着或写端只在自己祖先手里照报「进程无输出」（{pipelines_checked} 个管道）；--processes-only 只盯进程：一直在写文件的不报、写着的文件不动且 CPU 不涨的报「进程无输出」，"
+          f"盯着的进程都退出了（退出之后没人收尸的僵尸也算）退 0、起的时候一个都没有也退 0 并写明，和 --agents、cost 混用退 2，Bash 工具包着的命令在报告里只列 eval 里那一段；"
+          f"交回、被 TaskStop 停掉、最近一次任务通知是 failed 的子 agent 过了宽限还有进程开着它后台任务的输出文件报「交回之后后台还在跑」（交回不到宽限、没交回还在等、"
+          f"stopped 之后又被续做的不报，进程没了不报，--ack 进程:<pid> 不叫醒），被看的全部交回时退出前也报、只剩宽限里的等宽限过了再查，--processes-only 带 --session-dir 也报、不带就写明没查"
+          f"（查了 {len(expectations) + 1 + leftover_cases_checked} 个子 agent、{len(probed_processes)} 个进程、{len(watch_runs)} 次看门狗）")
     return 0
 
 
@@ -1190,12 +1881,17 @@ def main():
     parser.add_argument("--process-stale-minutes", type=float, default=20, help="进程写着的文件这么久没动告警，默认 20 分钟")
     parser.add_argument("--process-max-minutes", type=float, default=120, help="进程跑过这么久告警，默认 120 分钟")
     parser.add_argument("--not-started-minutes", type=float, default=5, help="派发之后这么久还没有会话记录告警，默认 5 分钟")
+    parser.add_argument("--leftover-background-grace-minutes", type=float, default=2,
+                        help="子 agent 交回、被停或失败之后过了这么久，它起的后台任务还有进程开着输出文件就报「交回之后后台还在跑」，默认 2 分钟")
     parser.add_argument("--active-minutes", type=float, default=180, help="只给 --session-dir 时，只看这么久以内动过的子 agent")
     parser.add_argument("--detections-file", default=DEFAULT_DETECTIONS, help="hook 的检出记录，默认 /tmp/claude-1000/agent-hook-detections.jsonl")
     parser.add_argument("--detection-poll-seconds", type=float, default=15, help="watch 两次读检出记录的间隔，默认 15 秒")
     parser.add_argument("--ack", action="append", default=[],
                         help="主 agent 看过、判定只是慢接着盯的告警：子agent id:告警名，进程告警写 进程:PID；可给多次，只在这一次看门狗里有效")
     parser.add_argument("--process-root-pid", type=int, help="进程一半从哪个 pid 往下看；默认是跑这个脚本的 Claude 实例，0 表示不看进程")
+    parser.add_argument("--processes-only", action="store_true",
+                        help="不看子 agent，只盯这个 Claude 实例底下起的时候就在跑的进程，它们都退出了就退 0；主 agent 自己放后台的长命令用它盯；"
+                             "带 --session-dir 时同时查那个会话里交回之后后台还在跑")
     arguments = parser.parse_args()
     return run(arguments)
 

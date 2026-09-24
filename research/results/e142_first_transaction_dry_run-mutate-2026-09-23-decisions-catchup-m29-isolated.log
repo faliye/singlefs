@@ -1,0 +1,3 @@
+基线：全绿
+✅ [29:M29_journal_ring_64_mebibytes] 红：tests::widths_equal_the_byte_table_and_the_root_record_is_457,tests::allocation_and_accounting_trees_carry_the_byte_table_numbers,tests::system_configuration_is_481_bytes_and_the_slot_checksum_covers_all_4096
+已还原，基线仍全绿

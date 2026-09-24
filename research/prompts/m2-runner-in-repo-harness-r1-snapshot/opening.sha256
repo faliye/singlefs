@@ -1,0 +1,4 @@
+f74538a9c518ce974c223a0e45642f1a335033f6baf1921250b4496b86641fdf  .claude/agents/experiment-runner.md
+19199ce4f50a8105298cc32aae658abadb30a740ffbb8c2375fb5432af69a710  .claude/hooks/agent-write-scope.tsv
+436c3b912e444c6edebad545987ab2f0c6b89b1af27433112f23f3ad866f2337  .claude/rules/implementation-first.md
+b4e20da1b35bd4a6a48c00e0b0d78913f620d5b77835115c7a4625b15e7d6c66  crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs

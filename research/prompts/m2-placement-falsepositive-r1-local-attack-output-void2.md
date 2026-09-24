@@ -1,0 +1,16 @@
+Z1.1: yes, placements_to_release_via_mapping; facts F1, F5; this would be falsified by: if placements_to_release_via_mapping is not called during release operations under fault-free conditions.
+Z1.2: no; facts F4; this would be falsified by: if a test exists that asserts the absence of checksum checking during release and fails when checksum checking is added.
+Z1.3: 1; the candidate fix is to add a checksum verification step in placements_to_release_via_mapping; facts F5; this would be falsified by: if multiple distinct candidate fixes are described or implied by the facts.
+Z1.4: no; facts F18; this would be falsified by: if the fix for Z1 touches a file, function, structure, or invariant that is also touched by another item's fix.
+Z2.1: no, allocation function in allocator.rs; facts F7; this would be falsified by: if the code path for placement disagreements disagreements completes without refusal under fault-free operation.
+Z2.2: yes, filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking; facts F8; this would be falsified by: if this test does not fail when the refusal behavior for device disagreements is altered.
+Z2.3: 1; the candidate fix is to remove the unused policy_mismatches counter; facts F9, F10; this would be falsified by: if multiple distinct candidate fixes are described or implied by the facts.
+Z2.4: yes, crates/singlefs-core/src/allocator.rs shared with Z3; facts F19, F20; this would be falsified by: if the fix for Z2 or Z3 does not touch crates/singlefs-core/src/allocator.rs.
+Z3.1: yes, check_pool_image; facts F11, F12; this would be falsified by: if check_pool_image is not called during invariant checks under fault-free operation.
+Z3.2: yes, residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_whose_chain_reaches_it; facts F13; this would be falsified by: if this test does not assert the current violation count or passes for incorrect reasons.
+Z3.3: 2; adjust the allocator to exclude deferred-release units from allocated count or adjust the walk to include deferred-release units; facts F13; this would be falsified by: if only one candidate fix is described or no fix is needed.
+Z3.4: yes, crates/singlefs-core/src/allocator.rs shared with Z2; facts F19, F20; this would be falsified by: if the fix for Z2 or Z3 does not touch crates/singlefs-core/src/allocator.rs.
+Z4.1: yes, check_records_against; facts F15; this would be falsified by: if check_records_against is not executed during record checking under fault-free operation.
+Z4.2: yes, stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state; facts F16; this would be falsified by: if this test no longer passes when the current behavior is maintained.
+Z4.3: 1; modify the written-over-later check to verify persisted status; facts F15, F17; this would be falsified by: if multiple distinct candidate fixes are described or implied by the facts.
+Z4.4: no; facts F21; this would be falsified by: if the fix for Z4 touches a file, function, structure, or invariant that is also touched by another item's fix.

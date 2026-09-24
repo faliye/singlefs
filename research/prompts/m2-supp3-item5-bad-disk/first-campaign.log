@@ -1,0 +1,205 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_bad_disk_input.rs (/tmp/claude-1000/supp3-item5-bad-disk/target-main/debug/deps/second_transaction_supplement_three_bad_disk_input-bdf1d308d2eaa394)
+
+running 1 test
+BAD_DISK_INPUT_START seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 configured_worker_threads=32 worker_threads_source=available_parallelism
+BAD_DISK_INPUT_PROGRESS slice=1/12 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/12 finished_histories=1/12 elapsed_seconds=0.9
+BAD_DISK_INPUT_PROGRESS slice=8/12 seeds=[7463871032432355120,7463871032432355121) finished_slices=2/12 finished_histories=2/12 elapsed_seconds=1.1
+BAD_DISK_INPUT_PROGRESS slice=11/12 seeds=[7463871032432355123,7463871032432355124) finished_slices=3/12 finished_histories=3/12 elapsed_seconds=1.4
+BAD_DISK_INPUT_PROGRESS slice=2/12 seeds=[7463871032432355114,7463871032432355115) finished_slices=4/12 finished_histories=4/12 elapsed_seconds=1.5
+BAD_DISK_INPUT_PROGRESS slice=5/12 seeds=[7463871032432355117,7463871032432355118) finished_slices=5/12 finished_histories=5/12 elapsed_seconds=2.7
+BAD_DISK_INPUT_PROGRESS slice=6/12 seeds=[7463871032432355118,7463871032432355119) finished_slices=6/12 finished_histories=6/12 elapsed_seconds=2.7
+BAD_DISK_INPUT_PROGRESS slice=10/12 seeds=[7463871032432355122,7463871032432355123) finished_slices=7/12 finished_histories=7/12 elapsed_seconds=3.6
+BAD_DISK_INPUT_PROGRESS slice=4/12 seeds=[7463871032432355116,7463871032432355117) finished_slices=8/12 finished_histories=8/12 elapsed_seconds=3.8
+BAD_DISK_INPUT_PROGRESS slice=3/12 seeds=[7463871032432355115,7463871032432355116) finished_slices=9/12 finished_histories=9/12 elapsed_seconds=4.1
+BAD_DISK_INPUT_PROGRESS slice=9/12 seeds=[7463871032432355121,7463871032432355122) finished_slices=10/12 finished_histories=10/12 elapsed_seconds=4.3
+BAD_DISK_INPUT_PROGRESS slice=7/12 seeds=[7463871032432355119,7463871032432355120) finished_slices=11/12 finished_histories=11/12 elapsed_seconds=4.6
+BAD_DISK_INPUT_PROGRESS slice=12/12 seeds=[7463871032432355124,7463871032432355125) finished_slices=12/12 finished_histories=12/12 elapsed_seconds=5.1
+BAD_DISK_INPUT_FINISHED seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 elapsed_seconds=5.1
+坏盘输入：种子 [7463871032432355113, 7463871032432355125) × 每段 16 步；比重「各类操作都抽（快档、大档）」；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+  历史 12 段（起点就失败、交不出合法镜像的 0 段）
+  三个读者：恢复 116 次（读回文件 31、没有文件 16、报错 65）、可写挂载 116 次（成 23、拒 33）、池级 checker 116 次
+  读回判定：模型提交过的某一版 47、报错 65、**从没提交过的内容 0**
+  逐坏法（造出 / 不适用 / 被读者看见）：
+    翻位：写过的扇区里翻 4 位 | 12 / 0 / 12 | 盲坏法（不指着普查里的某一族）
+    清零：一个写过的扇区整个清零 | 12 / 0 / 9 | 盲坏法（不指着普查里的某一族）
+    截尾：切点之后写过的扇区全丢掉 | 12 / 0 / 12 | 盲坏法（不指着普查里的某一族）
+    条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算） | 8 / 4 / 8 | 普查第一族：条目宽度没有下界判（R1–R4、R13）
+    分配器：一条分配记录的槽号落在单元区之外 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：一条分配记录的跨度越过单元区末尾 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：两条分配记录罩住同一个槽 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：一条分配记录的设备身份不在池里 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：记账树里 inode 号水位那一行被改挂到别的标签上 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    写侧断言：系统配置里的区域数越过那个长 3 的数组 | 12 / 0 / 12 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）
+    写侧断言：一条指针的两条位置条目槽号不等 | 12 / 0 / 12 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）
+    判别力：数据单元整个重写、只重算它自己的两道校验和 | 8 / 4 / 8 | 不指 panic：指着恢复里那一道整单元校验和比对
+  清单里的 panic：{}；清单外的 panic 82 次
+  池级 checker 在坏镜像上判红：{"I-1.1": 34, "I-2.1": 90, "I-2.3": 2, "I-3.1": 8, "I-3.9": 6, "I-4.8": 90, "I-5.1": 12, "I-5.4": 16, "I-7.2": 63, "I-7.4": 90}
+  新发现 21 条：
+    种子 7463871032432355113 坏法「写侧断言：系统配置里的区域数越过那个长 3 的数组」：池级 checker panic 在 crates/singlefs-checker/src/image.rs:206：index out of bounds: the len is 3 but the index is 3（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：区域数改到数组之外——盘 0 偏移 0（3 → 4）、盘 0 偏移 4096（3 → 4）、盘 1 偏移 0（3 → 4）、盘 1 偏移 4096（3 → 4）
+    观察：恢复 Finished { how: "NoFile（实例 1 第 3 代根）" }；可写挂载 Finished { how: "Err(InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) })" }；checker 判红 []
+    种子 7463871032432355113 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/mount.rs:467：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50176)
+ right: SlotNumber(50177)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 1052672 的根记录里实例表指针，第二条位置条目的槽号 50176 → 50177（第一条还是 50176）
+    观察：恢复 Finished { how: "NoFile（实例 1 第 3 代根）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/mount.rs:467", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50176)\n right: SlotNumber(50177)" })；checker 判红 ["I-2.1", "I-4.8", "I-5.1", "I-7.4"]
+    种子 7463871032432355115 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 12 out of range for slice of length 10（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 3 的根（盘 [0, 1] 槽 50323）条目宽 20 → 10（= key 宽）、条目数 78 → 1、声明长度 → 10；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 12 out of range for slice of length 10" })；checker 判红 ["I-1.1", "I-2.1", "I-2.3", "I-4.8", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「分配器：一条分配记录的槽号落在单元区之外」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:236：attempt to subtract with overflow（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的槽号 50176 → 1024（单元区起点是 50176）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:236", message: "attempt to subtract with overflow" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「分配器：一条分配记录的跨度越过单元区末尾」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:376：跨度里有已分配的槽（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的跨度字段 0x8002 → 0x7fff（跨度 2 → 32767 槽，已释放位清掉）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于 10 个落点\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:376", message: "跨度里有已分配的槽" })；checker 判红 ["I-2.1", "I-4.8", "I-5.4", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「分配器：两条分配记录罩住同一个槽」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:376：跨度里有已分配的槽（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的 key 换成第二条的（盘 0、槽 50178），两条罩住同一个槽
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:376", message: "跨度里有已分配的槽" })；checker 判红 ["I-1.1", "I-2.1", "I-3.9", "I-4.8", "I-5.4", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「分配器：一条分配记录的设备身份不在池里」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:611：分配记录的盘在池里：走读逐盘核过（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的设备身份 0 → 7（池里只有 0 与 1）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:611", message: "分配记录的盘在池里：走读逐盘核过" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「分配器：记账树里 inode 号水位那一行被改挂到别的标签上」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:846：每次发布都写 inode 号水位那一行（D5 已定项 8 的池级三行之一）（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：记账树第 14 条的统计量标签 12（inode 号水位）→ 60000
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:846", message: "每次发布都写 inode 号水位那一行（D5 已定项 8 的池级三行之一）" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+    种子 7463871032432355115 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50304)
+ right: SlotNumber(50305)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 7348224 的根记录里实例表指针，第二条位置条目的槽号 50304 → 50305（第一条还是 50304）
+    观察：恢复 Finished { how: "FileRead（实例 2 第 8 代根，1912 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50304)\n right: SlotNumber(50305)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+    种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：恢复 panic 在 crates/singlefs-core/src/bytes.rs:72：range start index 58 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+    种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range start index 58 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+    种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/walk.rs:563：range end index 112 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+    种子 7463871032432355116 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50368)
+ right: SlotNumber(50369)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4206592 的根记录里实例表指针，第二条位置条目的槽号 50368 → 50369（第一条还是 50368）
+    观察：恢复 Finished { how: "FileRead（实例 3 第 10 代根，32633 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50368)\n right: SlotNumber(50369)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+    种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：恢复 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+    种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+    种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/lib.rs:142：range start index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+    种子 7463871032432355117 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50176)
+ right: SlotNumber(50177)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4198400 的根记录里实例表指针，第二条位置条目的槽号 50176 → 50177（第一条还是 50176）
+    观察：恢复 Finished { how: "FileRead（实例 1 第 4 代根，14374 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50176)\n right: SlotNumber(50177)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+    种子 7463871032432355118 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 30 out of range for slice of length 22（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 4 的根（盘 [0, 1] 槽 50262）条目宽 34 → 22（= key 宽）、条目数 15 → 1、声明长度 → 22；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(1), CheckpointTxg(5)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 30 out of range for slice of length 22" })；checker 判红 []
+    种子 7463871032432355118 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/lib.rs:153：range end index 30 out of range for slice of length 22（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 4 的根（盘 [0, 1] 槽 50262）条目宽 34 → 22（= key 宽）、条目数 15 → 1、声明长度 → 22；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(1), CheckpointTxg(5)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 30 out of range for slice of length 22" })；checker 判红 []
+    种子 7463871032432355122 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50432)
+ right: SlotNumber(50433)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4210688 的根记录里实例表指针，第二条位置条目的槽号 50432 → 50433（第一条还是 50432）
+    观察：恢复 Finished { how: "FileRead（实例 4 第 13 代根，14913 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50432)\n right: SlotNumber(50433)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+    种子 7463871032432355124 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50496)
+ right: SlotNumber(50497)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 7360512 的根记录里实例表指针，第二条位置条目的槽号 50496 → 50497（第一条还是 50496）
+    观察：恢复 Finished { how: "FileRead（实例 5 第 17 代根，31954 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50496)\n right: SlotNumber(50497)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+
+thread 'bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites' (563905) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:153:5:
+assertion `left == right` failed: 撞到 KNOWN_PANIC_SITES 之外的 panic：
+种子 7463871032432355113 坏法「写侧断言：系统配置里的区域数越过那个长 3 的数组」：池级 checker panic 在 crates/singlefs-checker/src/image.rs:206：index out of bounds: the len is 3 but the index is 3（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：区域数改到数组之外——盘 0 偏移 0（3 → 4）、盘 0 偏移 4096（3 → 4）、盘 1 偏移 0（3 → 4）、盘 1 偏移 4096（3 → 4）
+    观察：恢复 Finished { how: "NoFile（实例 1 第 3 代根）" }；可写挂载 Finished { how: "Err(InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) })" }；checker 判红 []
+种子 7463871032432355113 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/mount.rs:467：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50176)
+ right: SlotNumber(50177)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 1052672 的根记录里实例表指针，第二条位置条目的槽号 50176 → 50177（第一条还是 50176）
+    观察：恢复 Finished { how: "NoFile（实例 1 第 3 代根）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/mount.rs:467", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50176)\n right: SlotNumber(50177)" })；checker 判红 ["I-2.1", "I-4.8", "I-5.1", "I-7.4"]
+种子 7463871032432355115 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 12 out of range for slice of length 10（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 3 的根（盘 [0, 1] 槽 50323）条目宽 20 → 10（= key 宽）、条目数 78 → 1、声明长度 → 10；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 12 out of range for slice of length 10" })；checker 判红 ["I-1.1", "I-2.1", "I-2.3", "I-4.8", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「分配器：一条分配记录的槽号落在单元区之外」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:236：attempt to subtract with overflow（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的槽号 50176 → 1024（单元区起点是 50176）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:236", message: "attempt to subtract with overflow" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「分配器：一条分配记录的跨度越过单元区末尾」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:376：跨度里有已分配的槽（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的跨度字段 0x8002 → 0x7fff（跨度 2 → 32767 槽，已释放位清掉）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条：各盘的（槽, 跨度, 代, 已释放）集合不同，或少于 10 个落点\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:376", message: "跨度里有已分配的槽" })；checker 判红 ["I-2.1", "I-4.8", "I-5.4", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「分配器：两条分配记录罩住同一个槽」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:376：跨度里有已分配的槽（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的 key 换成第二条的（盘 0、槽 50178），两条罩住同一个槽
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:376", message: "跨度里有已分配的槽" })；checker 判红 ["I-1.1", "I-2.1", "I-3.9", "I-4.8", "I-5.4", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「分配器：一条分配记录的设备身份不在池里」：可写挂载 panic 在 crates/singlefs-core/src/allocator.rs:611：分配记录的盘在池里：走读逐盘核过（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：第一条分配记录的设备身份 0 → 7（池里只有 0 与 1）
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/allocator.rs:611", message: "分配记录的盘在池里：走读逐盘核过" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「分配器：记账树里 inode 号水位那一行被改挂到别的标签上」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:846：每次发布都写 inode 号水位那一行（D5 已定项 8 的池级三行之一）（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：分配器：记账树第 14 条的统计量标签 12（inode 号水位）→ 60000
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(2), CheckpointTxg(8)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:846", message: "每次发布都写 inode 号水位那一行（D5 已定项 8 的池级三行之一）" })；checker 判红 ["I-1.1", "I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+种子 7463871032432355115 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50304)
+ right: SlotNumber(50305)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 7348224 的根记录里实例表指针，第二条位置条目的槽号 50304 → 50305（第一条还是 50304）
+    观察：恢复 Finished { how: "FileRead（实例 2 第 8 代根，1912 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50304)\n right: SlotNumber(50305)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：恢复 panic 在 crates/singlefs-core/src/bytes.rs:72：range start index 58 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range start index 58 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+种子 7463871032432355116 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/walk.rs:563：range end index 112 out of range for slice of length 24（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 1 的根（盘 [0, 1] 槽 50257）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range start index 58 out of range for slice of length 24" })；checker 判红 []
+种子 7463871032432355116 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50368)
+ right: SlotNumber(50369)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4206592 的根记录里实例表指针，第二条位置条目的槽号 50368 → 50369（第一条还是 50368）
+    观察：恢复 Finished { how: "FileRead（实例 3 第 10 代根，32633 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50368)\n right: SlotNumber(50369)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：恢复 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+种子 7463871032432355117 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/lib.rs:142：range start index 16 out of range for slice of length 8（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 2 的根（盘 [0, 1] 槽 50252）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+    观察：恢复 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 16 out of range for slice of length 8" })；checker 判红 []
+种子 7463871032432355117 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50176)
+ right: SlotNumber(50177)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4198400 的根记录里实例表指针，第二条位置条目的槽号 50176 → 50177（第一条还是 50176）
+    观察：恢复 Finished { how: "FileRead（实例 1 第 4 代根，14374 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50176)\n right: SlotNumber(50177)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+种子 7463871032432355118 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：可写挂载 panic 在 crates/singlefs-core/src/bytes.rs:72：range end index 30 out of range for slice of length 22（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 4 的根（盘 [0, 1] 槽 50262）条目宽 34 → 22（= key 宽）、条目数 15 → 1、声明长度 → 22；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(1), CheckpointTxg(5)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 30 out of range for slice of length 22" })；checker 判红 []
+种子 7463871032432355118 坏法「条目宽：一棵树根自述的条目宽缩到 key 宽（链上校验和重算）」：池级 checker panic 在 crates/singlefs-checker/src/lib.rs:153：range end index 30 out of range for slice of length 22（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：条目宽：树种类 4 的根（盘 [0, 1] 槽 50262）条目宽 34 → 22（= key 宽）、条目数 15 → 1、声明长度 → 22；链上三道校验和重算
+    观察：恢复 Finished { how: "Failed（InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }（所选根 Some((InstanceGeneration(1), CheckpointTxg(5)))））" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/bytes.rs:72", message: "range end index 30 out of range for slice of length 22" })；checker 判红 []
+种子 7463871032432355122 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50432)
+ right: SlotNumber(50433)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 1 偏移 4210688 的根记录里实例表指针，第二条位置条目的槽号 50432 → 50433（第一条还是 50432）
+    观察：恢复 Finished { how: "FileRead（实例 4 第 13 代根，14913 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50432)\n right: SlotNumber(50433)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+种子 7463871032432355124 坏法「写侧断言：一条指针的两条位置条目槽号不等」：可写挂载 panic 在 crates/singlefs-core/src/transaction.rs:957：assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）
+  left: SlotNumber(50496)
+ right: SlotNumber(50497)（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：盘 0 偏移 7360512 的根记录里实例表指针，第二条位置条目的槽号 50496 → 50497（第一条还是 50496）
+    观察：恢复 Finished { how: "FileRead（实例 5 第 17 代根，31954 字节）" }；可写挂载 Panicked(CapturedPanic { location: "crates/singlefs-core/src/transaction.rs:957", message: "assertion `left == right` failed: 两盘同槽（D2（RAID 条带策略） 已定项 10）\n  left: SlotNumber(50496)\n right: SlotNumber(50497)" })；checker 判红 ["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+重放：SINGLEFS_BAD_DISK_FIRST_SEED=7463871032432355113 SINGLEFS_BAD_DISK_SEEDS=12 SINGLEFS_BAD_DISK_OPERATIONS=16 跑大档那条 #[ignore] 用例
+  left: 82
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites ... FAILED
+
+failures:
+
+failures:
+    bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 5.06s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_bad_disk_input`

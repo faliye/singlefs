@@ -1,0 +1,60 @@
+
+/// 云端攻方腿 m2-checker-supp-code-r1 的探针（副本上加的，不入库）：跑完步 5 的固定脚本（回退之后四次覆盖写、抬 F、发布 E）
+/// 之后，把单元区头 256 槽上解得开的码 1 数据单元全列出来，看同一个实例里有没有两个写序相同的。
+#[test]
+fn opus_probe_data_unit_write_orders_after_the_step_five_script() {
+    use singlefs_core::address::DeviceOffsetInBytes;
+    use singlefs_core::unit::parse_data_unit;
+    use singlefs_format::{DATA_UNIT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
+
+    let mut pool = build_through_rollback("opus-probe-write-order");
+    let four = four_overwrites_after_the_rollback(&mut pool);
+    let before: Vec<u64> = four.iter().map(|o| o.record.transaction).collect();
+    raise_floor(&mut pool, CheckpointTxg(11)).expect("抬到 11");
+    let e = overwrite_in_process(&mut pool, &content_of(3100, 31), InstanceGeneration(3));
+    eprintln!("回退之后四次覆盖写的事务号 {before:?}，E 的事务号 {}", e.record.transaction);
+
+    let devices = pool.devices.as_ref().expect("镜像还开着");
+    let unit_bytes = usize::try_from(DATA_UNIT_BYTES).expect("32768");
+    let mut found: Vec<(u32, u64, u32, u64, u64)> = Vec::new();
+    for (identity, device) in devices {
+        for step in 0..256u64 {
+            let offset = DeviceOffsetInBytes((UNIT_AREA_START_SLOT + step) * SLOT_BYTES);
+            let mut bytes = vec![0u8; unit_bytes];
+            if device.read_at(offset, &mut bytes).is_err() {
+                continue;
+            }
+            if let Ok(header) = parse_data_unit(&bytes) {
+                found.push((
+                    identity.0,
+                    UNIT_AREA_START_SLOT + step,
+                    header.write_order.instance.0,
+                    header.write_order.transaction,
+                    header.birth_txg.0,
+                ));
+            }
+        }
+    }
+    eprintln!("盘 / 槽 / 实例 / 事务号 / 诞生代号：");
+    for row in &found {
+        eprintln!("  {row:?}");
+    }
+    let mut orders_on_device_zero: Vec<(u32, u64)> = found
+        .iter()
+        .filter(|(device, _, _, _, _)| *device == 0)
+        .map(|(_, _, instance, transaction, _)| (*instance, *transaction))
+        .collect();
+    let total = orders_on_device_zero.len();
+    orders_on_device_zero.sort_unstable();
+    let mut deduplicated = orders_on_device_zero.clone();
+    deduplicated.dedup();
+    eprintln!(
+        "盘 0 上码 1 单元 {total} 个，写序去重之后 {} 个：{orders_on_device_zero:?}",
+        deduplicated.len()
+    );
+    assert_eq!(
+        deduplicated.len(),
+        total,
+        "同一块盘上没有两个码 1 单元写序相同"
+    );
+}

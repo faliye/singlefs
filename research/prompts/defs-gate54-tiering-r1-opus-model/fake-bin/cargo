@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# 假 cargo（攻方腿用）：只认 `cargo test --release -p singlefs-harness --test <名字> -- [--include-ignored] --nocapture`。
+# 「编译」＝在调用那一刻读 cwd 下 crates/ 的内容：内容的 sha256 记进 $FAKE_CARGO_COMPILE_LOG（证明跑的是哪一版）。
+# 内容里的记号决定结果（模拟真代码的性质）：
+#   STREAM1_BUG  第一条流的全量用例判红（快档不红）      STREAM2_BUG  第二条流的全量用例判红（快档不红）
+#   QUICK_BUG    两条流的快档都判红                      NONEXHAUSTIVE 第一条流的 LAYER0 行打 exhaustive=false（用例本身不红）
+# 钩子（模拟别的会话在这一刻动工作区）：FAKE_CARGO_HOOK_BEFORE_SECOND / FAKE_CARGO_HOOK_AFTER_SECOND 各是一条 bash 命令，
+#   在第二条流「编译」之前 / 跑完之后执行；FAKE_CARGO_SLEEP_FULL=秒数：第一条流全量跑这么久（给并发留窗口）。
+test_name=""; include_ignored=0; previous=""
+for argument in "$@"; do
+  [[ "$previous" == "--test" ]] && test_name="$argument"
+  [[ "$argument" == "--include-ignored" ]] && include_ignored=1
+  previous="$argument"
+done
+if [[ "$test_name" == second_transaction_step_zero_layer0 && -n "${FAKE_CARGO_HOOK_BEFORE_SECOND:-}" ]]; then
+  bash -c "$FAKE_CARGO_HOOK_BEFORE_SECOND"
+fi
+content_hash="$(find crates -type f -print0 2>/dev/null | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16)"
+has() { grep -rqF -- "$1" crates/ 2>/dev/null; }
+[[ -n "${FAKE_CARGO_COMPILE_LOG:-}" ]] && echo "compiled test=$test_name include_ignored=$include_ignored root=$PWD crates_content=$content_hash" >> "$FAKE_CARGO_COMPILE_LOG"
+echo "running 6 tests (fake cargo, test=$test_name, include_ignored=$include_ignored, crates_content=$content_hash)"
+finish() {
+  if [[ "$test_name" == second_transaction_step_zero_layer0 && -n "${FAKE_CARGO_HOOK_AFTER_SECOND:-}" ]]; then
+    bash -c "$FAKE_CARGO_HOOK_AFTER_SECOND"
+  fi
+  exit "$1"
+}
+if has QUICK_BUG; then echo "test quick_case ... FAILED"; echo "test result: FAILED. 4 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s"; finish 101; fi
+if [[ "$include_ignored" == 1 ]]; then
+  case "$test_name" in
+    first_transaction_step_seven_layer0)
+      [[ -n "${FAKE_CARGO_SLEEP_FULL:-}" ]] && sleep "$FAKE_CARGO_SLEEP_FULL"
+      if has STREAM1_BUG; then echo "test full_enumeration ... FAILED"; echo "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"; finish 101; fi
+      exhaustive=true; has NONEXHAUSTIVE && exhaustive=false
+      echo "LAYER0_PARALLEL_FINISHED states=262165 slices=2 worker_threads=32 configured_worker_threads=32 worker_threads_source=environment elapsed_seconds=2.0"
+      echo "LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=$exhaustive"
+      echo "CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0"
+      ;;
+    second_transaction_step_zero_layer0)
+      if has STREAM2_BUG; then echo "test full_enumeration_b ... FAILED"; echo "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"; finish 101; fi
+      echo "LAYER0_PARALLEL_FINISHED states=2104413 slices=64 worker_threads=32 configured_worker_threads=32 worker_threads_source=environment elapsed_seconds=3.0"
+      echo "LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none"
+      ;;
+  esac
+  echo "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+else
+  echo "test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+fi
+finish 0

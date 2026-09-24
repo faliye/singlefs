@@ -1,0 +1,48 @@
+E7RESULT name=local_constant_check item="根环区域数 ROOT_RING_REGIONS" verdict=pass local_value=3 crates_value=3
+E7RESULT name=local_constant_check item="每区槽数 mkfs 默认 ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM" verdict=pass local_value=8 crates_value=8
+E7RESULT name=local_constant_check item="每区槽数下界 ROOT_RING_SLOTS_PER_REGION_MINIMUM" verdict=pass local_value=4 crates_value=4
+E7RESULT name=local_constant_check item="每区槽数上界 ROOT_RING_SLOTS_PER_REGION_MAXIMUM" verdict=pass local_value=16 crates_value=16
+E7RESULT name=local_constant_check item="journal 默认环长 JOURNAL_RING_DEFAULT_BYTES" verdict=pass local_value=805306368 crates_value=805306368
+E7RESULT name=local_constant_check item="journal 记录宽 JOURNAL_RECORD_BYTES" verdict=pass local_value=4096 crates_value=4096
+E7RESULT name=local_constant_check item="journal 环起点槽 JOURNAL_RING_START_SLOT" verdict=pass local_value=1024 crates_value=1024
+E7RESULT name=local_constant_check item="落点粒度 SLOT_BYTES" verdict=pass local_value=16384 crates_value=16384
+E7RESULT name=local_constant_check item="节点宽 NODE_BYTES" verdict=pass local_value=16384 crates_value=16384
+E7RESULT name=local_constant_check item="数据单元宽 DATA_UNIT_BYTES" verdict=pass local_value=32768 crates_value=32768
+E7RESULT name=local_constant_check item="系统配置字段表合计 SYSTEM_CONFIGURATION_BYTES" verdict=pass local_value=481 crates_value=481
+E7RESULT name=local_constant_check item="系统配置槽宽 SYSTEM_CONFIGURATION_SLOT_BYTES" verdict=pass local_value=4096 crates_value=4096
+E7RESULT name=local_constant_check item="系统配置每盘槽数 SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE" verdict=pass local_value=2 crates_value=2
+E7RESULT name=local_constant_check item="根记录宽 ROOT_RECORD_BYTES" verdict=pass local_value=457 crates_value=457
+E7RESULT name=local_constant_check item="实例表行宽 INSTANCE_ROW_BYTES" verdict=pass local_value=88 crates_value=88
+E7RESULT name=local_constant_check item="实例表一片记录数 INSTANCE_TABLE_PAGE_RECORDS" verdict=pass local_value=370 crates_value=370
+E7RESULT name=local_constant_check item="系统配置整槽校验和偏移（装置自己的算术 4+2+96+16+20+1+4+4+8，与 core 的私有算法比）" verdict=pass local_value=155 crates_value=155
+E7RESULT name=local_constant_check item=region_devices verdict=pass local_value=[0, 1, 0] crates_value=[0, 1, 0]
+E7RESULT name=section_seven_two_arithmetic item="系统配置槽余量 4096-481" verdict=pass computed=3615 registered=3615
+E7RESULT name=section_seven_two_arithmetic item="512-481" verdict=pass computed=31 registered=31
+E7RESULT name=section_seven_two_arithmetic item="乙族字段表 481+8" verdict=pass computed=489 registered=489
+E7RESULT name=section_seven_two_arithmetic item="512-489" verdict=pass computed=23 registered=23
+E7RESULT name=section_seven_two_arithmetic item="4096-489" verdict=pass computed=3607 registered=3607
+E7RESULT name=section_seven_two_arithmetic item="字段表四档 389+4+36+52" verdict=pass computed=481 registered=481
+E7RESULT name=section_seven_two_arithmetic item="journal tail 与实例代号 469+8+4" verdict=pass computed=481 registered=481
+E7RESULT name=section_seven_two_arithmetic item="系统配置整槽校验和偏移 4+2+96+16+20+1+4+4+8" verdict=pass computed=155 registered=155
+E7RESULT name=section_seven_two_arithmetic item="实例表行宽 1+4+8+8+1+66" verdict=pass computed=88 registered=88
+E7RESULT name=section_seven_two_arithmetic item="实例表一片行数 370-1" verdict=pass computed=369 registered=369
+E7RESULT name=section_seven_two_arithmetic item="今天那一臂系统配置那一类写字节 4096*2*1" verdict=pass computed=8192 registered=8192
+E7RESULT name=root_ring_slot_total slots_per_region=4 verdict=pass computed=12 registered=12
+E7RESULT name=phi_three_fault_set_count slots_per_region=4 root_slots_with_a_root=12 verdict=pass computed=79 registered=79
+E7RESULT name=root_ring_slot_total slots_per_region=8 verdict=pass computed=24 registered=24
+E7RESULT name=phi_three_fault_set_count slots_per_region=8 root_slots_with_a_root=24 verdict=pass computed=301 registered=301
+E7RESULT name=root_ring_slot_total slots_per_region=16 verdict=pass computed=48 registered=48
+E7RESULT name=phi_three_fault_set_count slots_per_region=16 root_slots_with_a_root=48 verdict=pass computed=1177 registered=1177
+E7RESULT name=journal_ring_records_and_in_flight_limit label=768MiB verdict=pass computed_records=196608 computed_in_flight=65536 registered_records=196608 registered_in_flight=65536
+E7RESULT name=journal_ring_records_and_in_flight_limit label=3MiB verdict=pass computed_records=768 computed_in_flight=256 registered_records=768 registered_in_flight=256
+E7RESULT name=journal_ring_records_and_in_flight_limit label=48KiB verdict=pass computed_records=12 computed_in_flight=4 registered_records=12 registered_in_flight=4
+E7RESULT name=section_seven_one_anchor item="D22 已定项 9：系统配置字段表合计 481 字节、槽内余 3615、今天没跨 512" verdict=pass checked_in_this_segment=true
+E7RESULT name=section_seven_one_anchor item="C332 正文：2 个故障" verdict=deferred checked_in_this_segment=false deferred_to=Q3-1_第二段
+E7RESULT name=section_seven_one_anchor item="C393 正文：被抛弃根的账读不出时今天只计数、不拒绝挂载" verdict=deferred checked_in_this_segment=false deferred_to=Q1-1c_第四段
+E7RESULT name=section_seven_one_anchor item="D23 已定项 14：N_switch=3" verdict=deferred checked_in_this_segment=false deferred_to=第五段_前置未满足
+E7RESULT name=section_seven_one_anchor item="C334 判别力自证：3/3/各1" verdict=deferred checked_in_this_segment=false deferred_to=第五段_前置未满足
+E7RESULT name=section_seven_three_row item="PC2/PC1-a/PC1-b/Q1-3" verdict=deferred checked_in_this_segment=false deferred_to=第三_第四段
+E7RESULT name=s5_independent_decode_cross_check verdict=pass readable_root_count=6 readable_roots={(0, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5)}
+E7RESULT name=q2_1_pc2_root_ring_txg_only geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) candidate=root_ring_txg_only overwrites_before_the_rootback_probe=4 overwrites_after_the_rootback_probe=1 topmost_four={(1, 4), (1, 5), (1, 6), (1, 7)} fault_target_count=4 expected_by_k2_table_fault_count=4 hit=false expected_by_k2_table_hit=true first_check="ok" second_check="ok"
+E7RESULT name=q2_1_pc2_configuration_published_txg geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) candidate=configuration_published_txg overwrites_before_the_crash=2 acquired_instance_before_the_crash=2 injected_faults=0 crash_points=1 hit=false expected_by_k2_table=true first_check="ok" second_check="ok"
+E7RESULT name=done emitted=48

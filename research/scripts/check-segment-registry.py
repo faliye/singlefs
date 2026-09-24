@@ -74,6 +74,7 @@ class RegistryEntry:
     operation_count: int | None
     crash_state_count: int | None
     step_kinds_text: str | None  # 「种类 `[...]|[...]`」那一串：每段的步骤种类多重集，与产物 kinds= 字段逐字比
+    source_cell: str = ''  # 「出处」栏原文：出处指到一条钉住活代码的用例时按它比（C485）
 
 
 def default_repository_root():
@@ -171,6 +172,7 @@ def row_to_entry(row_cells):
         is_anticipated=is_anticipated,
         is_device_pinned=is_device_pinned,
         product_path_name=product_path_name,
+        source_cell=source_cell,
         segment_sequence_text=segment_sequence_text,
         operation_count=operation_count,
         crash_state_count=crash_state_count,
@@ -240,6 +242,44 @@ def build_registry_entries(section_text):
     table_entries = [row_to_entry(row_cells) for row_cells in parse_registry_table_rows(section_text)]
     merged_stream_entry = build_merged_stream_entry(section_text, table_entries)
     return table_entries + [merged_stream_entry]
+
+
+
+def compare_against_pinning_test(entry, repository_root):
+    """出处指到一条钉住活代码的用例时，把登记表那一行与用例里写死的串比。
+
+    返回 None 表示「出处里没有这种引用」，让调用方照旧报缺 `path=`；
+    返回一张（可能为空的）不符清单表示比过了。
+
+    判据只有一条：用例里那个函数体内，要逐字出现登记表这一行的段序列串与种类串。
+    用例自己由 `cargo test` 钉在活代码上——串对不上活代码，那条用例先红。
+    """
+    source_cell = entry.source_cell
+    file_match = re.search(r'`([^`]+\.rs)`', source_cell)
+    function_match = re.search(r'`([a-z_][a-z0-9_]*)`', source_cell)
+    if not file_match or not function_match:
+        return None
+    test_path = repository_root / file_match.group(1)
+    if not test_path.exists():
+        return [f'{entry.row_label}：出处指的用例文件 {file_match.group(1)} 不存在']
+    text = test_path.read_text(encoding='utf-8')
+    marker = f'fn {function_match.group(1)}('
+    start = text.find(marker)
+    if start < 0:
+        return [f'{entry.row_label}：出处指的用例文件里找不到 `fn {function_match.group(1)}`']
+    body = text[start:]
+    problems = []
+    if entry.segment_sequence_text and f'"{entry.segment_sequence_text}"' not in body:
+        problems.append(
+            f'{entry.row_label}（钉住活代码的用例 {function_match.group(1)}）：'
+            f'kb 写的段序列是 `{entry.segment_sequence_text}`，用例里找不到这个串'
+        )
+    if entry.step_kinds_text and f'"{entry.step_kinds_text}"' not in body:
+        problems.append(
+            f'{entry.row_label}（钉住活代码的用例 {function_match.group(1)}）：'
+            f'kb 写的种类串与用例里写死的对不上'
+        )
+    return problems
 
 
 def parse_product_segment_lines(product_text):
@@ -421,6 +461,7 @@ def perform_check(repository_root):
     compared_note_count = 0
     skipped_count = 0
     device_pinned_row_count = 0
+    live_pinned_row_count = 0
     for entry in entries:
         if entry.is_anticipated:
             skipped_count += 1
@@ -429,7 +470,16 @@ def perform_check(repository_root):
             device_pinned_row_count += 1
             continue
         if entry.product_path_name is None:
-            mismatches.append(f'{entry.row_label}：这一行不是预想，「出处」栏里却没有 `path=...` 引用，登记表这一行本身要修')
+            # 出处指到一条钉住活代码的用例（`<文件>.rs` 加一个测试函数名）时，按那条用例里写死的串比，
+            # 不按 E142 产物比：mkfs 那一行 2026-09-22 起就是这一种——E142 的装置是 research/ 下一份
+            # 独立手写模型、不读 crates/ 的 mkfs 实现，清零那八步它没有，拿它当基准两边会一起过时
+            # （C485（门禁 52 号不读活代码，段序列变了它照样绿））。
+            pinned = compare_against_pinning_test(entry, repository_root)
+            if pinned is None:
+                mismatches.append(f'{entry.row_label}：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修')
+            else:
+                mismatches.extend(pinned)
+                live_pinned_row_count += 1
             continue
         if entry.segment_sequence_text is None:
             mismatches.append(f'{entry.row_label}：这一行不是预想，却没有可比对的段序列数字串')
@@ -499,6 +549,7 @@ def perform_check(repository_root):
         f'  ✓ 比对了 {compared_total_count} 处登记（表格 {compared_table_row_count} 行 + '
         f'整条流提示 {compared_note_count} 处，段序列与每段步骤种类多重集都与 {product_path.name} 的 name=segments 行逐字一致），'
         f'跳过 {skipped_count} 条标预想的表格行；'
+        f'{live_pinned_row_count} 条的出处指到钉住活代码的用例、按那条用例里写死的串比（不按产物比）；'
         f'{device_pinned_row_count} 条标「装置钉住」的表格行不与产物比（形状从第二条流推得），'
         f'第二条流的登记 {len(device_pinned_descriptions)} 处与钉它的用例相符：' + '；'.join(device_pinned_descriptions)
     ]
@@ -535,10 +586,20 @@ def run_self_test():
          original_kind_text, mutated_kind_text) = mutate_one_step_kind(layout_text)
         (pinned_mutated_layout_text, original_pinned_text,
          mutated_pinned_text, pinned_test_relative_path) = mutate_device_pinned_note(layout_text)
+        section_text = extract_section_eight(layout_text)
         pinned_test_files = {
             match.group(4): (real_repository_root / match.group(4)).read_text(encoding='utf-8')
-            for match in DEVICE_PINNED_NOTE_PATTERN.finditer(extract_section_eight(layout_text))
+            for match in DEVICE_PINNED_NOTE_PATTERN.finditer(section_text)
         }
+        # 出处指到钉住活代码的用例那一种（2026-09-22 起 mkfs 那一行就是），
+        # 用例文件也要摆进临时目录——不摆的话自检里那一支找不到文件、整道自检红，
+        # 而红的理由与它要证明的事无关（`sop-first.md`：改了脚本要造一个该被拦的输入，
+        # 不是造一个因为备料不全而红的输入）。
+        for match in re.finditer(r'`([^`]+\.rs)`', section_text):
+            relative_path = match.group(1)
+            candidate = real_repository_root / relative_path
+            if relative_path not in pinned_test_files and candidate.exists():
+                pinned_test_files[relative_path] = candidate.read_text(encoding='utf-8')
     except CheckError as error:
         print(f'  ✗ --selftest 备料就失败了：{error}')
         print('     → 怎么办：先跑一次不带 --selftest 的检查，确认真实仓库能正常读出登记表与产物。')

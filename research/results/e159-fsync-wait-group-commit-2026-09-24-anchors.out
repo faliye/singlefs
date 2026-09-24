@@ -1,0 +1,6 @@
+E7RESULT name=anchor label=jia_p1_f1_k1_single_device_bytes value=172544
+E7RESULT name=anchor label=write_ahead_log_full_k10_p1_f1_k1_single_device_bytes value=102400
+E7RESULT name=anchor label=yi_m_k10_p1_f1_k1_single_device_bytes value=86016
+E7RESULT name=anchor label=write_ahead_log_full_k10_f8a_p10000_k1_single_device_expected_bytes value=365346.000
+E7RESULT name=anchor label=write_ahead_log_full_k10_f8a_p10000_k16_single_device_expected_bytes value=4313362.000
+E7RESULT name=done emitted=6

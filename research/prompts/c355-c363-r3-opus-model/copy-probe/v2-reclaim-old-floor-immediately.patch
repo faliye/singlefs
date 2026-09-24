@@ -1,0 +1,23 @@
+diff --git a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+index fded170..17fb9e3 100644
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -824,10 +824,16 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
+     } else {
+         0
+     };
+-    let reclaimed = allocator.reclaim_released_up_to(
++    // c355-r3 攻方副本变异 V2（零轮形态）：按旧 F 本来就可再分配的（释放代 ≤ max(旧 F, 环里最旧有效根)）当场放开，
++    // 只把 (旧门槛, 新门槛] 那一段扣住到生效。
++    let mut reclaimed = allocator.reclaim_released_up_to(
++        reclaim_floor(current.root.rollback_floor, oldest_valid_root),
++        ReclaimedReuse::Immediately,
++    );
++    reclaimed.extend(allocator.reclaim_released_up_to(
+         reclaim_floor(new_floor, oldest_valid_root),
+         ReclaimedReuse::HeldUntilFloorTakesEffect,
+-    );
++    ));
+     let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
+     let mut covered: Vec<DeviceIdentity> = Vec::new();
+     let mut publishes = Vec::new();

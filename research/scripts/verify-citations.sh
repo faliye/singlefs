@@ -150,11 +150,17 @@ ckn() { # ckn <决策> <树名> <说的是什么> <期望数> <实测命令，�
 PDFTXT_CACHE="${TMPDIR:-/tmp}/singlefs-pdftext-$(id -u)"
 mkdir -p "$PDFTXT_CACHE"
 pdftxt() { # pdftxt <树名> <文献名> —— 抽一次缓存一次，打印缓存路径；抽不出就打印空
-  local tree="$1" name="$2" pdf="" out=""
+  local tree="$1" name="$2" pdf="" out="" partial=""
   pdf="${TREE_ROOT[$tree]}/$name"; out="$PDFTXT_CACHE/${name%.pdf}.txt"
   [[ -f "$pdf" ]] || return 1
   if [[ ! -s "$out" || "$pdf" -nt "$out" ]]; then
-    python3 "$(dirname "$SELF")/pdf-text.py" "$pdf" >"$out" 2>/dev/null || return 1
+    # 先写临时文件，抽完才挪成缓存：抽到一半失败时留下的半截文本非空、又比 PDF 新，
+    # 下一次会被上面那句判成有效缓存，拿半截文本当原文去匹配。
+    partial="$(mktemp "$out.partial.XXXXXX")" || return 1
+    if ! python3 "$(dirname "$SELF")/pdf-text.py" "$pdf" >"$partial" 2>/dev/null; then
+      rm -f "$partial"; return 1
+    fi
+    mv -f "$partial" "$out" || { rm -f "$partial"; return 1; }
   fi
   printf '%s' "$out"
 }
@@ -329,7 +335,7 @@ st_run() { # st_run <合成树目录> <断言表文件> [额外的环境赋值�
   env FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$assertions" "$@" bash "$SELF" 2>&1
 }
 selftest() {
-  local work="" out="" rc=0
+  local work="" out="" rc=0 leftovers=0
   work="$(mktemp -d "${TMPDIR:-/tmp}/verify-citations-selftest-XXXXXX")"
   mkdir -p "$work/refs/linux-6.17/fs/bcachefs" "$work/refs/zfs/include/sys" "$work/refs/docs" "$work/kern/fs/xfs"
   printf '#define BUCKET_GC_GEN_MAX\t96U\n' >"$work/refs/linux-6.17/fs/bcachefs/alloc_background.h"
@@ -388,6 +394,27 @@ NOROOT_EOF
   st_case "命令读了别的树判红" 红 "$rc" "$out" '命令里却读了 host-kernel'
   out="$(st_run "$work" "$work/no-root.sh")"; rc=$?
   st_case "命令一棵树都没读判红" 红 "$rc" "$out" '命令没读标着的那棵树'
+  # ⑫ ⑬ ⑭ 抽取到一半失败：这一次判红，下一次也不许拿留下的半截文本当原文匹配，缓存目录里不许留半截文件。
+  # 抽取器换成一个假的：先吐出半截（要找的那句正好在里面），再退 1。抽取器按本脚本所在的目录找，
+  # 所以把本脚本拷一份、旁边放假抽取器，跑那一份；TMPDIR 指进临时目录，碰不到本机真的文本缓存。
+  mkdir -p "$work/bin" "$work/tmp"
+  cp "$SELF" "$work/bin/verify-citations.sh"
+  cat >"$work/bin/pdf-text.py" <<'HALF_EXTRACTOR_EOF'
+import sys
+sys.stdout.write('half of the text: 合成的半截原文\n')
+sys.stdout.flush()
+sys.exit(1)
+HALF_EXTRACTOR_EOF
+  printf '%%PDF-1.4 synthetic\n' >"$work/refs/docs/half.pdf"
+  cat >"$work/half-extraction.sh" <<'HALF_EOF'
+ckdoc D9 refs-docs "合成：抽取到一半失败的文献" half.pdf '合成的半截原文'
+HALF_EOF
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  st_case "抽取到一半失败判红" 红 "$rc" "$out" '抽取失败'
+  out="$(env TMPDIR="$work/tmp" FS_REFS="$work/refs" KERNEL_TREE="$work/kern" VERIFY_CITATIONS_ASSERTIONS="$work/half-extraction.sh" bash "$work/bin/verify-citations.sh" 2>&1)"; rc=$?
+  st_case "抽取失败之后再跑，不拿半截文本当原文" 红 "$rc" "$out" '抽取失败'
+  leftovers="$(find "$work/tmp" -name 'half.txt*' -type f | wc -l)"
+  st_case "抽取失败不在缓存目录里留半截文件" 绿 "$(( leftovers == 0 ? 0 : 1 ))" "缓存目录里留下的半截文件：$leftovers 个" '半截文件：0 个'
 
   rm -rf "${work:?}"
   if (( st_failed )); then
@@ -395,7 +422,7 @@ NOROOT_EOF
     echo "      「分组报数与被扫集合对不上」；树来源那几格看 mark_tree 与 cmd_in_tree。"
     exit 1
   fi
-  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树）"
+  echo "  ✓ 引文复核自证通过（查了 $st_checked 格：分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树、抽取到一半失败三格）"
   exit 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then selftest; fi

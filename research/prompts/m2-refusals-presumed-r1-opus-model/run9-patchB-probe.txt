@@ -1,0 +1,10 @@
+
+running 1 test
+test probe_q1_raising_the_floor_in_the_pool_creating_process ... probe Q1 现行 txg=CheckpointTxg(9)，根指着的实例表诞生 txg=CheckpointTxg(0)
+probe Q1 抬 F 前后盘上快照相等: false（录制流步数 198 → 228）
+probe Q1 抬 F 到 4: Ok(ceiling=CheckpointTxg(6), publishes=2, reclaimed=9)
+probe Q1 checker 违例: []
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.69s
+

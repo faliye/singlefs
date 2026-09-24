@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.02s
+     Running tests/opus_m2_refusals_r1.rs (target/debug/deps/opus_m2_refusals_r1-d5800afe1ef4426e)
+
+running 1 test
+test probe_what_actually_blocks_the_second_mount_of_a_formatted_pool ... probe 第一次挂载 Ok: instance=InstanceGeneration(1) row_publish_txg=CheckpointTxg(1) warm_ups=1
+probe 第二次挂载 Ok: instance=InstanceGeneration(2) row_publish_txg=CheckpointTxg(3) warm_ups=1 rows=[]
+probe 第二次挂载之后发第一个文件版本: FirstFileVersionNotRightAfterTheSecondWarmUp { previous_record: Some((CheckpointTxg(4), 4)) }
+probe checker 违例: []
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.81s
+

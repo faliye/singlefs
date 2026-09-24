@@ -1,0 +1,108 @@
+════ S1 [B 的东西：untracked｜出路 worktree：after-staging]
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-core/src/b_wip.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-untracked-after-staging/.git/singlefs-layer0-full-green（输入哈希 78ed81ff9c0765dc…，10 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=78ed81ff9c0765dc… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-untracked-after-staging；exhaustive=true]
+──── ③ 暂存这一批之后、出路之前：gate.sh --staged
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（78ed81ff9c0765dc3011061c778e573fb02ff3b22af34959308f3c33edfb4229）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         只在标记里：crates/singlefs-core/src/b_wip.rs
+[gate --staged 里 54 号的退出码 1]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-untracked-after-staging/.git/singlefs-layer0-full-green（输入哈希 6b52c81a754dde09…，9 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=6b52c81a754dde09… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-untracked-after-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 全绿标记与这批输入的内容哈希相同（6b52c81a754dde09…，9 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:45Z，标记里的计数行原样：
+[gate --staged 里 54 号的退出码 0]
+
+════ S1 [B 的东西：untracked｜出路 worktree：before-staging]
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-core/src/b_wip.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-untracked-before-staging/.git/singlefs-layer0-full-green（输入哈希 78ed81ff9c0765dc…，10 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=78ed81ff9c0765dc… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-untracked-before-staging；exhaustive=true]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-untracked-before-staging/.git/singlefs-layer0-full-green（输入哈希 c07850adb431b3cb…，8 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-untracked-before-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         内容不同：crates/singlefs-harness/src/lib.rs
+         只在这一次里：crates/singlefs-harness/src/batch_a.rs
+[gate --staged 里 54 号的退出码 1]
+
+════ S1 [B 的东西：modified｜出路 worktree：after-staging]
+ M crates/singlefs-core/src/lib.rs
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-modified-after-staging/.git/singlefs-layer0-full-green（输入哈希 be5bf80855e4dec5…，9 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=be5bf80855e4dec5… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-modified-after-staging；exhaustive=true]
+──── ③ 暂存这一批之后、出路之前：gate.sh --staged
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（be5bf80855e4dec5a02a144c21669ccbbce74b968360a78ad901175ff26ddaf6）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         内容不同：crates/singlefs-core/src/lib.rs
+[gate --staged 里 54 号的退出码 1]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-modified-after-staging/.git/singlefs-layer0-full-green（输入哈希 6b52c81a754dde09…，9 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=6b52c81a754dde09… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-modified-after-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 全绿标记与这批输入的内容哈希相同（6b52c81a754dde09…，9 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:45Z，标记里的计数行原样：
+[gate --staged 里 54 号的退出码 0]
+
+════ S1 [B 的东西：modified｜出路 worktree：before-staging]
+ M crates/singlefs-core/src/lib.rs
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-modified-before-staging/.git/singlefs-layer0-full-green（输入哈希 be5bf80855e4dec5…，9 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=be5bf80855e4dec5… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-modified-before-staging；exhaustive=true]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-modified-before-staging/.git/singlefs-layer0-full-green（输入哈希 c07850adb431b3cb…，8 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-modified-before-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         内容不同：crates/singlefs-harness/src/lib.rs
+         只在这一次里：crates/singlefs-harness/src/batch_a.rs
+[gate --staged 里 54 号的退出码 1]
+
+════ S1 [B 的东西：both｜出路 worktree：after-staging]
+ M crates/singlefs-core/src/lib.rs
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-core/src/b_wip.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-both-after-staging/.git/singlefs-layer0-full-green（输入哈希 a75d8368e7e8fca8…，10 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=a75d8368e7e8fca8… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-both-after-staging；exhaustive=true]
+──── ③ 暂存这一批之后、出路之前：gate.sh --staged
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（a75d8368e7e8fca8d22dd6662527486976c1942c8bdf587ecbe26f2b8cdaf23f）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         内容不同：crates/singlefs-core/src/lib.rs
+         只在标记里：crates/singlefs-core/src/b_wip.rs
+[gate --staged 里 54 号的退出码 1]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-both-after-staging/.git/singlefs-layer0-full-green（输入哈希 6b52c81a754dde09…，9 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=6b52c81a754dde09… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-both-after-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 全绿标记与这批输入的内容哈希相同（6b52c81a754dde09…，9 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:45Z，标记里的计数行原样：
+[gate --staged 里 54 号的退出码 0]
+
+════ S1 [B 的东西：both｜出路 worktree：before-staging]
+ M crates/singlefs-core/src/lib.rs
+ M crates/singlefs-harness/src/lib.rs
+?? crates/singlefs-core/src/b_wip.rs
+?? crates/singlefs-harness/src/batch_a.rs
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-both-before-staging/.git/singlefs-layer0-full-green（输入哈希 a75d8368e7e8fca8…，10 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=a75d8368e7e8fca8… judged_root=/tmp/claude-1000/defs54-attack/s1/repo-both-before-staging；exhaustive=true]
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s1/repo-both-before-staging/.git/singlefs-layer0-full-green（输入哈希 c07850adb431b3cb…，8 个文件；开跑 2026-09-23T23:27:45Z，跑完 2026-09-23T23:27:45Z）
+[退出码 0]
+[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s1/outlet-both-before-staging；exhaustive=true]
+──── ④ gate.sh --staged（HEAD + 暂存区）
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（6b52c81a754dde0914b46c38c3a3b9a115555967b84a99c5e90852a271847209，9 个文件）不同
+         内容不同：crates/singlefs-harness/src/lib.rs
+         只在这一次里：crates/singlefs-harness/src/batch_a.rs
+[gate --staged 里 54 号的退出码 1]
+

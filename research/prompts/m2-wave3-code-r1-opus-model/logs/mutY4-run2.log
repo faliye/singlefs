@@ -1,0 +1,108 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo-mutY4/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo-mutY4/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 54s
+     Running tests/opus_attack_y3.rs (/tmp/claude-1000/m2-wave3-opus/target-mutY4/debug/deps/opus_attack_y3-ea4ea815743599c4)
+
+running 1 test
+test y4_residual_record_version_then_mount ... === Y4 overwrite B ops [60, 83) ===
+k=60 last=- crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=60 step=mount root=(2,5) red=[] I-3.10=Holds
+k=60 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=60 step=remount ok=true red=[] I-3.10=Holds
+k=61 last=write@dev0+822181888 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=61 step=mount root=(2,5) red=[] I-3.10=Holds
+k=61 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=61 step=remount ok=true red=[] I-3.10=Holds
+k=62 last=write@dev1+822181888 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=62 step=mount root=(2,5) red=[] I-3.10=Holds
+k=62 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=62 step=remount ok=true red=[] I-3.10=Holds
+k=63 last=write@dev0+823279616 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=63 step=mount root=(2,5) red=[] I-3.10=Holds
+k=63 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=63 step=remount ok=true red=[] I-3.10=Holds
+k=64 last=write@dev1+823279616 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=64 step=mount root=(2,5) red=[] I-3.10=Holds
+k=64 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=64 step=remount ok=true red=[] I-3.10=Holds
+k=65 last=write@dev0+823296000 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=65 step=mount root=(2,5) red=[] I-3.10=Holds
+k=65 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=65 step=remount ok=true red=[] I-3.10=Holds
+k=66 last=write@dev1+823296000 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=66 step=mount root=(2,5) red=[] I-3.10=Holds
+k=66 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=66 step=remount ok=true red=[] I-3.10=Holds
+k=67 last=write@dev0+823328768 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=67 step=mount root=(2,5) red=[] I-3.10=Holds
+k=67 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=67 step=remount ok=true red=[] I-3.10=Holds
+k=68 last=write@dev1+823328768 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=68 step=mount root=(2,5) red=[] I-3.10=Holds
+k=68 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=68 step=remount ok=true red=[] I-3.10=Holds
+k=69 last=write@dev0+823345152 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=69 step=mount root=(2,5) red=[] I-3.10=Holds
+k=69 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=69 step=remount ok=true red=[] I-3.10=Holds
+k=70 last=write@dev1+823345152 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=70 step=mount root=(2,5) red=[] I-3.10=Holds
+k=70 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=70 step=remount ok=true red=[] I-3.10=Holds
+k=71 last=write@dev0+823361536 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=71 step=mount root=(2,5) red=[] I-3.10=Holds
+k=71 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=71 step=remount ok=true red=[] I-3.10=Holds
+k=72 last=write@dev1+823361536 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=72 step=mount root=(2,5) red=[] I-3.10=Holds
+k=72 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=72 step=remount ok=true red=[] I-3.10=Holds
+k=73 last=write@dev0+823377920 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=73 step=mount root=(2,5) red=[] I-3.10=Holds
+k=73 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=73 step=remount ok=true red=[] I-3.10=Holds
+k=74 last=write@dev1+823377920 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=74 step=mount root=(2,5) red=[] I-3.10=Holds
+k=74 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=74 step=remount ok=true red=[] I-3.10=Holds
+k=75 last=write@dev0+823394304 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=75 step=mount root=(2,5) red=[] I-3.10=Holds
+k=75 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=75 step=remount ok=true red=[] I-3.10=Holds
+k=76 last=write@dev1+823394304 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=76 step=mount root=(2,5) red=[] I-3.10=Holds
+k=76 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=76 step=remount ok=true red=[] I-3.10=Holds
+k=77 last=barrier@dev0+0 crash-image: recovery prefix_applied=0 red=[] I-3.10=Holds
+k=77 step=mount root=(2,5) red=[] I-3.10=Holds
+k=77 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=77 step=remount ok=true red=[] I-3.10=Holds
+k=78 last=write@dev0+16789504 crash-image: recovery prefix_applied=1 red=[] I-3.10=Holds
+k=78 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=78 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=78 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=79 last=write@dev1+16789504 crash-image: recovery prefix_applied=1 red=[] I-3.10=Holds
+k=79 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=79 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=79 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=80 last=barrier@dev0+0 crash-image: recovery prefix_applied=1 red=[] I-3.10=Holds
+k=80 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=80 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=80 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=81 last=fua@dev1+4198400 crash-image: recovery prefix_applied=0 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=81 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=81 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=81 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=82 last=write@dev0+0 crash-image: recovery prefix_applied=0 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=82 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=82 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=82 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=83 last=write@dev1+0 crash-image: recovery prefix_applied=0 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=83 step=mount root=(2,7) red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=83 step=overwrite1 txg=8 red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+k=83 step=remount ok=true red=["I-3.10: \"盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4\""] I-3.10=Violated("盘 0 槽 50182 的分配记录（未释放、跨 2 槽）分配代 5，它罩住的单元头里的诞生代号是 4
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 42.99s
+
+exit=0

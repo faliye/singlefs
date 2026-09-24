@@ -1,0 +1,80 @@
+════ S5a [post]
+  ── 收尾 --full（根：/tmp/claude-1000/defs54-attack/s5/repo-a-post；B 在第二条流编译前改主工作区的 crash.rs、跑完改回）
+      · --full 开跑（2026-09-23T23:28:09Z）：旧的全绿标记已删；这一道的输入哈希 e54134bdac4527be…（8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s5/repo-a-post/.git/singlefs-layer0-full-green（输入哈希 e54134bdac4527be…，8 个文件；开跑 2026-09-23T23:28:09Z，跑完 2026-09-23T23:28:09Z）
+    [标记：input_hash=e54134bdac4527be… judged_root=/tmp/claude-1000/defs54-attack/s5/repo-a-post；exhaustive=true]
+  ── gate.sh --staged
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（e54134bdac4527be…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-a-post crates_content=0380147310f385b4
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-a-post crates_content=93f8d9b332633f60
+    主工作区此刻 crash.rs 与开跑前逐字相同：是
+════ S5a [pre]
+  ── gate.sh --staged（门禁自己跑全量；B 在同一时刻改主工作区）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✗ 两次发布那条流的层 0 用例判红（上面是 cargo test 的尾部）
+    [gate --staged 里 54 号的退出码 1]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/staged.X7R6/tree crates_content=0380147310f385b4
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/staged.X7R6/tree crates_content=0380147310f385b4
+    主工作区此刻 crash.rs 与开跑前逐字相同：是
+════ S5a [f5]
+  ── 收尾 --full（根：/tmp/claude-1000/defs54-attack/s5/wt-a；B 在第二条流编译前改主工作区的 crash.rs、跑完改回）
+      · --full 开跑（2026-09-23T23:28:09Z）：旧的全绿标记已删；这一道的输入哈希 e54134bdac4527be…（8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✗ 两次发布那条流的层 0 用例判红（上面是 cargo test 的尾部）
+    [标记不在]
+  ── gate.sh --staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s5/repo-a-f5/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/wt-a crates_content=0380147310f385b4
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/wt-a crates_content=0380147310f385b4
+    主工作区此刻 crash.rs 与开跑前逐字相同：是
+════ S5b [post]
+  ── 收尾 --full（根：/tmp/claude-1000/defs54-attack/s5/repo-b-post；B 在第二条流编译前改主工作区的 crash.rs、跑完改回）
+      · --full 开跑（2026-09-23T23:28:09Z）：旧的全绿标记已删；这一道的输入哈希 6e96847e71225a83…（8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✗ 两次发布那条流的层 0 用例判红（上面是 cargo test 的尾部）
+    [标记不在]
+  ── gate.sh --staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s5/repo-b-post/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-b-post crates_content=5264a85783640559
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/repo-b-post crates_content=91405291e1fad197
+    主工作区此刻 crash.rs 与开跑前逐字相同：是
+════ S5b [pre]
+  ── gate.sh --staged（门禁自己跑全量；B 在同一时刻改主工作区）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/staged.bxNK/tree crates_content=5264a85783640559
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/staged.bxNK/tree crates_content=5264a85783640559
+    主工作区此刻 crash.rs 与开跑前逐字相同：是
+════ S5b [f5]
+  ── 收尾 --full（根：/tmp/claude-1000/defs54-attack/s5/wt-b；B 在第二条流编译前改主工作区的 crash.rs、跑完改回）
+      · --full 开跑（2026-09-23T23:28:09Z）：旧的全绿标记已删；这一道的输入哈希 6e96847e71225a83…（8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s5/repo-b-f5/.git/singlefs-layer0-full-green（输入哈希 6e96847e71225a83…，8 个文件；开跑 2026-09-23T23:28:09Z，跑完 2026-09-23T23:28:09Z）
+    [标记：input_hash=6e96847e71225a83… judged_root=/tmp/claude-1000/defs54-attack/s5/wt-b；exhaustive=true]
+  ── gate.sh --staged
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（6e96847e71225a83…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  ── 两条流编译时 crates/ 的内容指纹（假 cargo 记的）与主工作区此刻的：
+    compiled test=first_transaction_step_seven_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/wt-b crates_content=5264a85783640559
+    compiled test=second_transaction_step_zero_layer0 include_ignored=1 root=/tmp/claude-1000/defs54-attack/s5/wt-b crates_content=5264a85783640559
+    主工作区此刻 crash.rs 与开跑前逐字相同：是

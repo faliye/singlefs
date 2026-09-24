@@ -1,0 +1,35 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-refusals-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.46s
+     Running tests/opus_attack_refusals_r1r2r3q1.rs (target/debug/deps/opus_attack_refusals_r1r2r3q1-41ddba66a80a222d)
+
+running 5 tests
+test opus_q1_raising_the_floor_is_refused_after_in_process_overwrites_though_the_table_is_on_disk ... [Q1] 现行版本 txg 6，units 里的角色：["Data", "ExtentRoot", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))", "InodeRoot", "AllocationTree", "AccountingTree", "MappingTree", "TreeTable"]
+[Q1] 同一版的根指针指着的实例表读得出、解得开 = true，行数 Some(0)
+[Q1] 抬 F 到 3：Some(RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion)
+ok
+test opus_r1_second_writable_mount_of_a_formatted_pool_is_refused_and_no_rollback_target_is_an_exit ... [R1] 第一次可写挂载成功：实例 1，写行那次 txg 1，暖机 1 次
+[R1] 第二次可写挂载：Some(InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) })
+[R2] 环里可读根 3 条
+[R2] 回退到 (0, 0)：Some(RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }))
+[R2] 回退到 (1, 1)：Some(RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }))
+[R2] 回退到 (1, 2)：Some(RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }))
+[R1] 砖住之后的只读挂载：ok = false，err = Some(Open(Walk(UnitUnreadable { slot: SlotNumber(0) })))
+[R1] 对照：刚 mkfs、没挂载过的池只读挂载：ok = false，err = Some(Open(Walk(UnitUnreadable { slot: SlotNumber(0) })))
+ok
+test opus_r2_rollback_to_a_warm_up_root_is_refused_though_it_is_inside_the_candidate_set ... [R2] 第二次挂载写的行：[(1, 3, 0)]
+[R2] 回退到 (1, 1)：Some(RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }))
+[R2] 回退到 (1, 2)：Some(RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }))
+[R2] 对照：回退到 (1, 3) 成功 = true
+ok
+test opus_r3_wiping_every_record_refuses_the_writable_mount_while_the_file_is_still_readable ... [R3] 抹掉的记录槽：32 个（两块盘各 16）
+[R3] 环里自证过的记录：0 条
+[R3] 冷启动仍读回 (1, 3) 的内容 3000 字节，与写进去的一致 = true
+[R3] 可写挂载：Some(FileVersionWithoutAnyJournalRecord)
+ok
+test opus_r4_second_mkfs_with_the_same_fsid_on_the_same_images_is_refused_on_the_very_first_mount ... [R4] 第二次 mkfs 做完：第 0 代根 txg 0，实例 0
+[R4] 新池环里仍自证得过的旧记录：0 条，(实例, jsn) = []
+[R4] 新池第一次可写挂载做成了：实例 1，写行那次 txg 1——这条形状没打中
+ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.91s
+

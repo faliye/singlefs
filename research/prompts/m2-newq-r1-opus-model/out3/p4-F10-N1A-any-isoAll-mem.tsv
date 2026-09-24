@@ -1,0 +1,121 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFFO	F:ok(F=6,reclaimed=18) F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	10	196608	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFFF	F:ok(F=6,reclaimed=18) F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFFM	F:ok(F=6,reclaimed=18) F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFOF	F:ok(F=6,reclaimed=18) F:noop O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFMF	F:ok(F=6,reclaimed=18) F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFMM	F:ok(F=6,reclaimed=18) F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFOM	F:ok(F=6,reclaimed=18) F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFMO	F:ok(F=6,reclaimed=18) F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMFO	F:ok(F=6,reclaimed=18) M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMMF	F:ok(F=6,reclaimed=18) M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFOO	F:ok(F=6,reclaimed=18) F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMFM	F:ok(F=6,reclaimed=18) M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMFF	F:ok(F=6,reclaimed=18) M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMOF	F:ok(F=6,reclaimed=18) M:ok O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMMO	F:ok(F=6,reclaimed=18) M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	360448	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMOM	F:ok(F=6,reclaimed=18) M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMMM	F:ok(F=6,reclaimed=18) M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMOO	F:ok(F=6,reclaimed=18) M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOFF	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOFO	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOFM	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOMF	F:ok(F=6,reclaimed=18) O:ok M:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOOF	F:ok(F=6,reclaimed=18) O:ok O:ok F:ok(F=8,reclaimed=14)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOMO	F:ok(F=6,reclaimed=18) O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOOO	F:ok(F=6,reclaimed=18) O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	458752	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOMM	F:ok(F=6,reclaimed=18) O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOOM	F:ok(F=6,reclaimed=18) O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFFO	M:ok F:ok(F=6,reclaimed=18) F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFFF	M:ok F:ok(F=6,reclaimed=18) F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFMF	M:ok F:ok(F=6,reclaimed=18) M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFMM	M:ok F:ok(F=6,reclaimed=18) M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFFM	M:ok F:ok(F=6,reclaimed=18) F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFOF	M:ok F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFOM	M:ok F:ok(F=6,reclaimed=18) O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMFF	M:ok M:ok F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFOO	M:ok F:ok(F=6,reclaimed=18) O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMFO	M:ok M:ok F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	360448	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFMO	M:ok F:ok(F=6,reclaimed=18) M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	360448	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMOF	M:ok M:ok O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMOO	M:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMMF	M:ok M:ok M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMFM	M:ok M:ok F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMMO	M:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	360448	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMOM	M:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOFF	M:ok O:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOFO	M:ok O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMMM	M:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOFM	M:ok O:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOMF	M:ok O:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOMO	M:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	393216	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOOO	M:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	458752	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFFF	O:ok F:ok(F=7,reclaimed=24) F:noop F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	262144	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFFO	O:ok F:ok(F=7,reclaimed=24) F:noop O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	393216	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFMF	O:ok F:ok(F=7,reclaimed=24) M:ok F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOOF	M:ok O:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOMM	M:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFFM	O:ok F:ok(F=7,reclaimed=24) F:noop M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFMM	O:ok F:ok(F=7,reclaimed=24) M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOOM	M:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFOM	O:ok F:ok(F=7,reclaimed=24) O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFOF	O:ok F:ok(F=7,reclaimed=24) O:ok F:ok(F=8,reclaimed=8)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFOO	O:ok F:ok(F=7,reclaimed=24) O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	25	524288	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFMO	O:ok F:ok(F=7,reclaimed=24) M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMFF	O:ok M:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMFO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMMF	O:ok M:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMMM	O:ok M:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMFM	O:ok M:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMMO	O:ok M:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMOF	O:ok M:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOFF	O:ok O:ok F:ok(F=8,reclaimed=32) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMOM	O:ok M:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOFO	O:ok O:ok F:ok(F=8,reclaimed=32) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMOO	O:ok M:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	524288	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOFM	O:ok O:ok F:ok(F=8,reclaimed=32) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOMF	O:ok O:ok M:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOOF	O:ok O:ok O:ok F:ok(F=9,reclaimed=40)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOOO	O:ok O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	25	557056	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOOM	O:ok O:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFF	F:ok(F=6,reclaimed=18) F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOMO	O:ok O:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	491520	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOMM	O:ok O:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFO	F:ok(F=6,reclaimed=18) F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	10	196608	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FFM	F:ok(F=6,reclaimed=18) F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOF	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMO	F:ok(F=6,reclaimed=18) M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOO	F:ok(F=6,reclaimed=18) O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	327680	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMF	F:ok(F=6,reclaimed=18) M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FMM	F:ok(F=6,reclaimed=18) M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FOM	F:ok(F=6,reclaimed=18) O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFF	M:ok F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFM	M:ok F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOM	M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOF	M:ok O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMO	M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MFO	M:ok F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	262144	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMF	M:ok M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MOO	M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	327680	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MMM	M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFF	O:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	262144	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFO	O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	393216	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOF	O:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOO	O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFM	O:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMF	O:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMM	O:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OOM	O:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	17	360448	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FO	F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	10	196608	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FM	F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	FF	F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MF	M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMO	O:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	393216	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MM	M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OF	O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	262144	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	MO	M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	10	196608	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	F	F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OO	O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OM	O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	O	O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50326:released-and-isolated	[]	0	0

@@ -1,0 +1,35 @@
+E7RESULT name=k1_after_first_transaction txg=3 allocated_slots=13 free_slots=211955 deferred_slots=1 registered_item1_slots=13 registered_item5_slots=1 matches_registered=true
+E7RESULT name=k1_placements txg=3 units=50180:2,50240:1,50242:2,50244:1,50245:1,50246:1,50247:1,50248:1
+E7RESULT name=beta0_k1_end txg=3 allocated0=13 free0=211955 deferred0=1 referenced=12 g8_holds=true
+E7RESULT name=beta0_today_checker i31_red=false i52_red=false
+E7RESULT name=q7a basis=beta0_k1 defer_delta=1 base_check_holds=true base_allocated_statistic_is_red=false base_free_statistic_is_red=false corrupted_check_holds=true corrupted_allocated_statistic_is_red=false corrupted_free_statistic_is_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta0_k1 k=1 real_g8_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=geometry ring_length=24 baseline_workload_length=144 hr_prefix_length=72 hr_tail_length=72
+E7RESULT name=baseline_workload_truncated_by_write_failure requested_length=144 actual_length=49 failed_at_step=50 failure=AllocationRecordsExceedOneNode { records: 820, capacity: 812 }
+E7RESULT name=beta1_h0_end txg=52 allocated0=503 free0=211465 deferred0=491 allocated1=503 free1=211465 deferred1=491 referenced=12 g8_holds=true row0_eq_row1=true
+E7RESULT name=beta1_today_checker i31_red=true i52_red=false
+E7RESULT name=hr_prefix_truncated_by_write_failure requested_length=72 actual_length=49 failed_at_step=50 failure=AllocationRecordsExceedOneNode { records: 820, capacity: 812 }
+E7RESULT name=hr_rollback_target instance=1 txg=29 candidate_count=24
+E7RESULT name=hr_tail_truncated_by_write_failure requested_length=72 actual_length=47 failed_at_step=48 failure=AllocationRecordsExceedOneNode { records: 816, capacity: 812 }
+E7RESULT name=hr_lengths requested_prefix=72 actual_prefix=49 requested_tail=72 actual_tail=47
+E7RESULT name=beta2_hr_end txg=102 instance=2 allocated0=496 free0=211472 deferred0=484 allocated1=496 free1=211472 deferred1=484 referenced=12 g8_holds=true row0_eq_row1=true
+E7RESULT name=beta2_today_checker i31_red=true i52_red=false
+E7RESULT name=q7b red_l1=0 total_l1=96 first_red=
+E7RESULT name=q7a basis=beta1_h0 defer_delta=1 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta1_h0 k=1 real_g8_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=pc_check_bk1 basis=beta1_h0 g8_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta1_h0 g8_red=false i31_red=true i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta1_h0 g8_red=true i31_red=true i52_red=false
+E7RESULT name=q7a basis=beta1_h0 defer_delta=-1 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7c2_threshold_at_least basis=beta1_h0 k=-1 real_g8_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=q7a basis=beta1_h0 defer_delta=8 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7a basis=beta2_hr defer_delta=1 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta2_hr k=1 real_g8_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=pc_check_bk1 basis=beta2_hr g8_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta2_hr g8_red=false i31_red=true i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta2_hr g8_red=true i31_red=true i52_red=false
+E7RESULT name=q7a basis=beta2_hr defer_delta=-1 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7c2_threshold_at_least basis=beta2_hr k=-1 real_g8_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=q7a basis=beta2_hr defer_delta=8 base_check_holds=true base_allocated_statistic_is_red=true base_free_statistic_is_red=false corrupted_check_holds=false corrupted_allocated_statistic_is_red=true corrupted_free_statistic_is_red=false
+E7RESULT name=q7a_summary all_red_count=0 q7c1_flip_seen=false q7c2_flip_seen=true
+E7RESULT name=done emitted=35

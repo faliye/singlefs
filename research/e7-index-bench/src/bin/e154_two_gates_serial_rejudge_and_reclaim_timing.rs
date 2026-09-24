@@ -58,7 +58,7 @@ enum GateReading {
     Serial,
     SerialRejudge,
     Union,
-    UnionPrime,
+    UnionFullDeduction,
 }
 
 impl GateReading {
@@ -67,7 +67,7 @@ impl GateReading {
             GateReading::Serial => "串",
             GateReading::SerialRejudge => "串重判",
             GateReading::Union => "合",
-            GateReading::UnionPrime => "合撇",
+            GateReading::UnionFullDeduction => "合-全扣",
         }
     }
     /// 第一道闸不过时，这个读法会不会推空重判第一道闸。
@@ -80,7 +80,7 @@ impl GateReading {
 enum ReclaimTiming {
     AfterEffectiveFloor,
     HoldUntilCovered,
-    HoldUntilCoveredPrime,
+    HoldUntilCoveredDouble,
 }
 
 impl ReclaimTiming {
@@ -88,18 +88,18 @@ impl ReclaimTiming {
         match self {
             ReclaimTiming::AfterEffectiveFloor => "G7",
             ReclaimTiming::HoldUntilCovered => "F扣",
-            ReclaimTiming::HoldUntilCoveredPrime => "F扣撇",
+            ReclaimTiming::HoldUntilCoveredDouble => "F-双扣",
         }
     }
     fn holds_before_release(self) -> bool {
         matches!(
             self,
-            ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredPrime
+            ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredDouble
         )
     }
     /// F-扣撇 在第一道闸再减一次扣住槽数；F-扣 不减。
     fn first_gate_excludes_held(self) -> bool {
-        matches!(self, ReclaimTiming::HoldUntilCoveredPrime)
+        matches!(self, ReclaimTiming::HoldUntilCoveredDouble)
     }
 }
 
@@ -145,12 +145,12 @@ fn all_arms() -> Vec<Arm> {
         GateReading::Serial,
         GateReading::SerialRejudge,
         GateReading::Union,
-        GateReading::UnionPrime,
+        GateReading::UnionFullDeduction,
     ] {
         for reclaim in [
             ReclaimTiming::AfterEffectiveFloor,
             ReclaimTiming::HoldUntilCovered,
-            ReclaimTiming::HoldUntilCoveredPrime,
+            ReclaimTiming::HoldUntilCoveredDouble,
         ] {
             for stop in [StopPolicy::StopAtTarget, StopPolicy::FillBudget] {
                 arms.push(Arm { gate, reclaim, stop });
@@ -572,7 +572,7 @@ fn gate_serial(snapshot: &GateSnapshot, pool: &Pool, arm: Arm) -> u64 {
 }
 
 /// 可用_合 = 可用_串 + 已释放且 g ≤ 抬 F 上限的槽数（登记「五、5.2」）。
-/// `serial` 已经按 F-扣′ 扣过一次扣住槽数（`gate_serial` 对 `arm.reclaim` 独立判断，
+/// `serial` 已经按 F-双扣 扣过一次扣住槽数（`gate_serial` 对 `arm.reclaim` 独立判断，
 /// 与 `arm.gate` 是哪一种读法无关），这里不重复扣。
 fn gate_union(pool: &Pool, serial: u64) -> u64 {
     let ceiling = pool.rollback_floor_ceiling().unwrap_or(0);
@@ -592,7 +592,7 @@ fn compute_gate1(pool: &Pool, arm: Arm, in_flight: u64) -> (u64, GateSnapshot) {
     let serial = gate_serial(&snapshot, pool, arm);
     let value = match arm.gate {
         GateReading::Serial | GateReading::SerialRejudge => serial,
-        GateReading::Union | GateReading::UnionPrime => gate_union(pool, serial),
+        GateReading::Union | GateReading::UnionFullDeduction => gate_union(pool, serial),
     };
     (value, snapshot)
 }
@@ -609,7 +609,7 @@ fn compute_gate2(snapshot: &GateSnapshot) -> u64 {
 }
 
 /// `df`（字节，按臂）：串族取可用_串，合族取 D16（发布语义） 那条 `df` 式子算出的槽数；
-/// 合撇 在这个基础上再减一次切换预留、被抛弃根独占量与在飞已批准（见「五、5.3」闸的读法表）。
+/// 合-全扣 在这个基础上再减一次切换预留、被抛弃根独占量与在飞已批准（见「五、5.3」闸的读法表）。
 /// PC2（阳性对照）：改坏时一律报 U_all + Rel，不管闸读法是哪一种。
 fn df_bytes(pool: &Pool, arm: Arm, snapshot: &GateSnapshot, serial: u64) -> u64 {
     if pool.damage.raw_df {
@@ -618,7 +618,7 @@ fn df_bytes(pool: &Pool, arm: Arm, snapshot: &GateSnapshot, serial: u64) -> u64 
     let slots = match arm.gate {
         GateReading::Serial | GateReading::SerialRejudge => serial,
         GateReading::Union => snapshot.defined_free_space_formula_slots,
-        GateReading::UnionPrime => snapshot
+        GateReading::UnionFullDeduction => snapshot
             .defined_free_space_formula_slots
             .saturating_sub(snapshot.switch_reserve)
             .saturating_sub(snapshot.abandoned_root_exclusive_slots)
@@ -980,7 +980,7 @@ mod tests {
         assert_eq!(summary.unsafe_candidate_reuse_count_field, 0, "真实基线（串-重判 × G7）不该发出候选根还引用的槽");
     }
 
-    // ===== H5′（2026-09-17 第四段）：`LazyFailureInjector` =====
+    // ===== H8（2026-09-17 第四段）：`LazyFailureInjector` =====
 
     /// 位=首：`window_start` 恒为 1，与 `next` 的参数无关——传任意 `last_txg` 都不改变这一点，
     /// 与 `FailureInjector::new(1, k)` 逐次读数相同。
@@ -1050,7 +1050,7 @@ mod tests {
         assert_eq!(recovery_publishes_after_reopen, 0);
     }
 
-    // ===== H5′（2026-09-17 第四段）：注入点改到填满阶段 =====
+    // ===== H8（2026-09-17 第四段）：注入点改到填满阶段 =====
 
     /// 真实基线在这个几何点上，填满阶段自己确实自推了空发布——`run_fill_phase_injected_history` 的注入
     /// 打在填满阶段（`fill_phase_self_pushes` > 0），不是退回 H5 的注入点。数字是这个几何 + k=1
@@ -1067,8 +1067,8 @@ mod tests {
     }
 
     /// 头部结论：真实基线（串重判 × G7 × 止）在 H5 上因为「填满阶段自己把 F 抬走」而退化的那个
-    /// 具体几何点（登记「十二、修订」第三段诊断第 2 类原文实测），H5′ 上不再退化——这是
-    /// `run_fill_phase_injected_history` 整个改动要解决的那个问题，钉成一条对照断言（H5 与 H5′ 用同一个
+    /// 具体几何点（登记「十二、修订」第三段诊断第 2 类原文实测），H8 上不再退化——这是
+    /// `run_fill_phase_injected_history` 整个改动要解决的那个问题，钉成一条对照断言（H5 与 H8 用同一个
     /// k=1、位=首，唯一变量是注入点）。
     #[test]
     fn fill_phase_injection_eliminates_degeneration_that_original_injection_point_could_not_reach() {
@@ -1077,7 +1077,7 @@ mod tests {
         let (original_injection_point_summary, ..) = run_root_write_failure_history(arm, geometry, 1, FailurePosition::First, Damage::default());
         let (fill_phase_injected_summary, ..) = run_fill_phase_injected_history(arm, geometry, 1, FailurePosition::First, Damage::default());
         assert_eq!(original_injection_point_summary.delete_then_rewrite_outcome_label, "退化", "H5 在这一格上退化（注入点从没被这次准入的推空碰到）");
-        assert_eq!(fill_phase_injected_summary.delete_then_rewrite_outcome_label, "达标", "H5′ 把注入点挪到填满阶段之后，这一格不再退化");
+        assert_eq!(fill_phase_injected_summary.delete_then_rewrite_outcome_label, "达标", "H8 把注入点挪到填满阶段之后，这一格不再退化");
     }
 }
 
@@ -1131,7 +1131,7 @@ fn release_slots(pool: &mut Pool, slots: &[usize], released_at_txg: u64, from_em
 }
 
 /// 一次发布持久之后的回收（5.3「回收时点」）：ring-rotation 那一半（g ≤ 环里最旧有效根）
-/// 两种回收时点都直接生效；G7 再按 max(F_生效, 环里最旧有效根) 回收；F-扣／F-扣′ 只在
+/// 两种回收时点都直接生效；G7 再按 max(F_生效, 环里最旧有效根) 回收；F-扣／F-双扣 只在
 /// 扣住到期（`pending_hold_floor` 达到 F_生效）时把扣住的槽放开。
 fn reclaim_after_publish(pool: &mut Pool, reclaim: ReclaimTiming) {
     let oldest = pool.oldest_valid_root_txg();
@@ -1153,7 +1153,7 @@ fn reclaim_after_publish(pool: &mut Pool, reclaim: ReclaimTiming) {
                 }
             }
         }
-        ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredPrime => {
+        ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredDouble => {
             for state in pool.slots.iter_mut() {
                 if let SlotState::Released { released_at_txg, .. } = state {
                     if *released_at_txg <= oldest {
@@ -1175,7 +1175,7 @@ fn reclaim_after_publish(pool: &mut Pool, reclaim: ReclaimTiming) {
     }
 }
 
-/// F-扣／F-扣′：这次发布要带的 F 大于 F_顶 时，先把 g ≤ 新 F 的已释放槽扣住（登记「五、5.3」）。
+/// F-扣／F-双扣：这次发布要带的 F 大于 F_顶 时，先把 g ≤ 新 F 的已释放槽扣住（登记「五、5.3」）。
 /// PC4（F-扣 一族）：改坏时跳过扣住，直接把这批槽变空闲——复现 `mount.rs` 注释里
 /// 「不扣住时抬 F 自己的空发布落在刚回收的槽上」那个曾经打中过的缺陷。
 fn maybe_hold_before_publish(pool: &mut Pool, reclaim: ReclaimTiming, new_floor: u64) {
@@ -1367,7 +1367,7 @@ fn attempt_publish(
     // ④ 持久之后：先算这条根的记账行，再登记进环，再回收（回收依赖环里已经有这条根）。
     let ledger_floor = match reclaim {
         ReclaimTiming::AfterEffectiveFloor => pool.effective_rollback_floor(),
-        ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredPrime => floor,
+        ReclaimTiming::HoldUntilCovered | ReclaimTiming::HoldUntilCoveredDouble => floor,
     };
     let oldest_before_this_root = pool.oldest_valid_root_txg();
     let ledger_threshold = ledger_floor.max(oldest_before_this_root);
@@ -1802,7 +1802,7 @@ fn retry_outcome_label(outcome: RetryOutcome) -> (String, i64) {
 
 /// 填满阶段：写对象 X（`geometry.object_units` 个单元），再一个接一个写 1 单元填充对象，
 /// 直到某次填充写报 ENOSPC。返回 X 的对象号与填充对象队列（先进先出即最先写、槽号最低）。
-/// `failures`（2026-09-17 第四段加，H5′ 用）：填满阶段每一次自推空发布之前被问一次，参数是
+/// `failures`（2026-09-17 第四段加，H8 用）：填满阶段每一次自推空发布之前被问一次，参数是
 /// `last_persisted_txg`——H1／H5／H6 一律传 `&mut |_last_txg| false`（不注入，行为与加这个参数
 /// 之前逐字节相同），只有 `run_fill_phase_injected_history` 传一个真的 `LazyFailureInjector`。内部两处
 /// `admit_request` 调用都要 `&mut *failures` 重新借用——`failures` 是个 `&mut dyn FnMut(u64) -> bool`，
@@ -1955,7 +1955,7 @@ impl FailurePosition {
 /// 覆盖两块盘所需的根槽写次数（与「四」I1 锚点同一个公式：`last_txg mod 3 = 1` 时 3 次，否则 2 次），
 /// 只是这里要的是"从哪次开始失败"的窗口起点，不是覆盖次数本身——两者数值相同（覆盖需要几次，
 /// 让 F_生效 真正变成新值的正是最后那一次，也就是第几次）。拆成一个只吃 `last_txg` 标量的版本
-/// （`cover_push_index_from_last_txg`），是因为 H5′（2026-09-17 第四段）要在 `push_one_empty_publish`
+/// （`cover_push_index_from_last_txg`），是因为 H8（2026-09-17 第四段）要在 `push_one_empty_publish`
 /// 内部、`pool` 已经借给函数参数的那一刻现算这个值——传一个 `&Pool` 进闭包会撞借用检查，传一个
 /// 提前读好的 `u64` 不会。
 fn cover_push_index_from_last_txg(last_txg: u64) -> u64 {
@@ -2004,7 +2004,7 @@ impl FailureInjector {
     }
 }
 
-/// H5′ 专用（2026-09-17 第四段，主 agent 定，依据「十二、修订」第三段第 7 条第 2 类诊断：
+/// H8 专用（2026-09-17 第四段，主 agent 定，依据「十二、修订」第三段第 7 条第 2 类诊断：
 /// P-止 在「填满」阶段自己把 F 抬到位，H5 的失败注入窗口从没落在这几次自推空发布上）：与
 /// `FailureInjector` 同一套「连续 k 次」语义，区别是 `window_start` 不在构造时算好，而是在
 /// 第一次被问到（也就是这次运行里第一次真的发生自推空发布，不管是在填满阶段还是在「删后写回」
@@ -2147,10 +2147,10 @@ fn run_root_write_failure_history(
     (summary, injector.injected, pool.switches_so_far - switches_before, recovery_publishes_until_covered)
 }
 
-// ===== H5′：注入点改成填满阶段自推的空发布（登记「十二、修订」第三段第 7 条第 2 类诊断，
+// ===== H8：注入点改成填满阶段自推的空发布（登记「十二、修订」第三段第 7 条第 2 类诊断，
 // 主 agent 2026-09-17 第四段指定；不是登记「五」原文的一种历史，是原 H5 的一个变体） =====
 
-/// H5′：与 H5 相同的 k ∈ {1,2,3} × 位 ∈ {首,覆}，区别只在注入点——不等「删后写回」那次准入里
+/// H8：与 H5 相同的 k ∈ {1,2,3} × 位 ∈ {首,覆}，区别只在注入点——不等「删后写回」那次准入里
 /// 的推空，而是打在**填满阶段为抬 F 自己推的那几次空发布**上（第三段诊断：P-止 在「填满」阶段
 /// 自身推了 2 次空发布把 F 从 0 抬到 1949 那一类，串重判-G7-止 在 H5 上因此有 73% 的格从没被
 /// H5 的注入点碰到，退化）。用同一个 `LazyFailureInjector`，`window_start` 在第一次真的发生
@@ -2172,7 +2172,7 @@ fn run_fill_phase_injected_history(
     position: FailurePosition,
     damage: Damage,
 ) -> (RunSummary, u64, u64, u64, u64) {
-    let history_label = format!("H5'-{consecutive_root_write_failure_count}-{}", position.label());
+    let history_label = format!("H8-{consecutive_root_write_failure_count}-{}", position.label());
     let mut pool = Pool::seed(geometry);
     pool.damage = damage;
     let mut injector = LazyFailureInjector::new(position, consecutive_root_write_failure_count);
@@ -2261,7 +2261,7 @@ fn run_fill_phase_injected_history(
 /// ⚠️ **简化，不是登记的全部**：`pool.object_slots`（对象号 → 槽号）不按 `rollback_target` 重新对齐——
 /// 本模型只追踪"当前还有哪些填充对象未删"这一件事（`fillers` 队列），回退之后可能删除的对象
 /// 已经从队列与 `object_slots` 里一起弹出，之后的 `retry_loop` 只会碰未删过的对象，不会再引用
-/// 已经不存在的对象号，所以这处简化不影响 Q1′／Q6／Q7 的计算；但它意味着本函数不模拟"对象在
+/// 已经不存在的对象号，所以这处简化不影响 Q9／Q6／Q7 的计算；但它意味着本函数不模拟"对象在
 /// 回退之后重新出现"这件事（H6 的问法也没有问这个）。
 fn perform_rollback(pool: &mut Pool, reclaim: ReclaimTiming, rollback_target: &RootRecord) -> Option<u64> {
     let effective_floor = pool.effective_rollback_floor();
@@ -2346,7 +2346,7 @@ fn perform_rollback(pool: &mut Pool, reclaim: ReclaimTiming, rollback_target: &R
 /// H6（登记「五、5.4」）：H1 跑到 Y 成功（没成功记「退化」）；再触动 2 次；管理员回退到
 /// `R_old` = Y 被封进的那次发布之前最新的持久有效根（要求 `R_old` 在候选集里，不在记「回退够不着」，
 /// 这一格同样退化）；回退与暖机之后尝试写 Y2，进重试循环——这里的 Q1（`RunSummary` 里那一栏）
-/// 就是登记「六」的 Q1′（回退之后再写要几次非空发布）。
+/// 就是登记「六」的 Q9（回退之后再写要几次非空发布）。
 ///
 /// 返回 `(RunSummary, isolated_slots_after_rollback)`：后者是回退之后 `pool.isolated` 里
 /// 置位的槽数，对应登记「H6：回退之后隔离了一批槽再写」那句话本身——它是不是 > 0，是这一格
@@ -2639,7 +2639,7 @@ fn main() {
         }
     }
 
-    // H5′（2026-09-17 第四段，主 agent 定）：同一套 k × 位，注入点改成填满阶段的自推空发布，
+    // H8（2026-09-17 第四段，主 agent 定）：同一套 k × 位，注入点改成填满阶段的自推空发布，
     // 填满阶段不自推时原样落回 H5 的注入点；24 臂 × 48 格。
     for consecutive_root_write_failure_count in [1u64, 2, 3] {
         for position in [FailurePosition::First, FailurePosition::Cover] {
@@ -2651,7 +2651,7 @@ fn main() {
                     println!(
                         "{}",
                         emitter.emit_raw(&format!(
-                            "H5PRIMEDETAIL gate={} reclaim={} stop={} k={} position={} c={} n={} c_max={} s={} pad={} injected_failures={} switches_triggered={} recovery_publishes_until_covered={} fill_phase_self_pushes={}",
+                            "H8DETAIL gate={} reclaim={} stop={} k={} position={} c={} n={} c_max={} s={} pad={} injected_failures={} switches_triggered={} recovery_publishes_until_covered={} fill_phase_self_pushes={}",
                             summary.arm,
                             summary.reclaim_label,
                             summary.stop_label,
@@ -2849,9 +2849,9 @@ fn main() {
     let mut pc2_rollback_hit_any = false;
     let mut pc4_rollback_hit_any = false;
     let mut pc5_rollback_hit_any = false;
-    // H4（`CrashPoint::AfterFirstPush`）与 H5′（k=1、位=首，与其它历史的阳性对照同一个理由：
-    // 最简单、最容易命中的组合）也要跑（2026-09-17 第四段，主 agent 指示「阳性对照对 H4、H5′
-    // 也跑」）。H5′ 的 PC5 复用 H5 探针探出来的 k=3／位=覆——`pc5_geometry` 不落在诊断报的
+    // H4（`CrashPoint::AfterFirstPush`）与 H8（k=1、位=首，与其它历史的阳性对照同一个理由：
+    // 最简单、最容易命中的组合）也要跑（2026-09-17 第四段，主 agent 指示「阳性对照对 H4、H8
+    // 也跑」）。H8 的 PC5 复用 H5 探针探出来的 k=3／位=覆——`pc5_geometry` 不落在诊断报的
     // 「n=16×S=4」自推区间里，`LazyFailureInjector` 大概率在填满阶段问零次、原样落回 H5 的
     // 注入点，理由与判定同 H5 的 PC5。
     let mut pc1_crash_mid_push_hit_any = false;
@@ -2968,13 +2968,13 @@ fn main() {
         {
             pc1_fill_phase_injected_hit_any = true;
         }
-        println!("{}", emitter.emit_raw(&format!("PC name=pc1-h5prime arm={} baseline_q1={}/{} damaged_q1={}/{}", arm.label(), fill_phase_injected_baseline.delete_then_rewrite_outcome_label, fill_phase_injected_baseline.delete_then_rewrite_publish_count, fill_phase_injected_pc1.delete_then_rewrite_outcome_label, fill_phase_injected_pc1.delete_then_rewrite_publish_count)));
+        println!("{}", emitter.emit_raw(&format!("PC name=pc1-h8 arm={} baseline_q1={}/{} damaged_q1={}/{}", arm.label(), fill_phase_injected_baseline.delete_then_rewrite_outcome_label, fill_phase_injected_baseline.delete_then_rewrite_publish_count, fill_phase_injected_pc1.delete_then_rewrite_outcome_label, fill_phase_injected_pc1.delete_then_rewrite_publish_count)));
 
         let (fill_phase_injected_pc2, ..) = run_fill_phase_injected_history(arm, pc_geometry, 1, FailurePosition::First, Damage { raw_df: true, ..Damage::default() });
         if fill_phase_injected_pc2.df_reported_enough_but_write_failed_count >= 1 {
             pc2_fill_phase_injected_hit_any = true;
         }
-        println!("{}", emitter.emit_raw(&format!("PC name=pc2-h5prime arm={} df_reported_enough_but_write_failed_count={}", arm.label(), fill_phase_injected_pc2.df_reported_enough_but_write_failed_count)));
+        println!("{}", emitter.emit_raw(&format!("PC name=pc2-h8 arm={} df_reported_enough_but_write_failed_count={}", arm.label(), fill_phase_injected_pc2.df_reported_enough_but_write_failed_count)));
 
         let pc4_fill_phase_injected_damage = if arm.reclaim == ReclaimTiming::AfterEffectiveFloor {
             Damage { reclaim_on_first_new_floor_root: true, ..Damage::default() }
@@ -2985,13 +2985,13 @@ fn main() {
         if fill_phase_injected_pc4.unsafe_candidate_reuse_count_field >= 1 {
             pc4_fill_phase_injected_hit_any = true;
         }
-        println!("{}", emitter.emit_raw(&format!("PC name=pc4-h5prime arm={} unsafe_candidate_reuse_count_field={}", arm.label(), fill_phase_injected_pc4.unsafe_candidate_reuse_count_field)));
+        println!("{}", emitter.emit_raw(&format!("PC name=pc4-h8 arm={} unsafe_candidate_reuse_count_field={}", arm.label(), fill_phase_injected_pc4.unsafe_candidate_reuse_count_field)));
 
         let (fill_phase_injected_pc5, ..) = run_fill_phase_injected_history(arm, pc5_geometry, 3, FailurePosition::Cover, Damage { zero_reserves: true, ..Damage::default() });
         if fill_phase_injected_pc5.wedged {
             pc5_fill_phase_injected_hit_any = true;
         }
-        println!("{}", emitter.emit_raw(&format!("PC name=pc5-h5prime arm={} wedged={}", arm.label(), fill_phase_injected_pc5.wedged)));
+        println!("{}", emitter.emit_raw(&format!("PC name=pc5-h8 arm={} wedged={}", arm.label(), fill_phase_injected_pc5.wedged)));
 
         run_count += 16;
     }

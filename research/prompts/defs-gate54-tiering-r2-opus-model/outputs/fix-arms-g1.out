@@ -1,0 +1,241 @@
+######## 改法 g1（191f90430b39a773…）
+════ H-A [post] Y 在 T1 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-a-post-T1-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.3b769298cdd735f574a1309b67d237
+      [格] 3b769298cdd7 worker_threads=1 judged_root=…/tmp.1XvFHcmwRK/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 5fb8339ef4e455b4…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [post] Y 在 T2 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-a-post-T2-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.3b769298cdd735f574a1309b67d237
+      [格] 3b769298cdd7 worker_threads=1 judged_root=…/tmp.Bxg9qJtjHj/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 5fb8339ef4e455b4…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [post] Y 在 T3 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-a-post-T3-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.3b769298cdd735f574a1309b67d237
+      [格] 3b769298cdd7 worker_threads=1 judged_root=…/tmp.DTB9okDOm5/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（3b769298cdd735f5…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:05Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+  ── Y 起门禁；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 5fb8339ef4e455b4…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（Y 门禁那一刻）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════════ 对照：X 的内容本来就是多线程（new 54 --full 也该绿）
+════ H-A [post] Y 在 T1 暂存 54；X 的 crash.rs 记号=多线程
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-a-post-T1-multi-54/.git/singlefs-layer0-full-green.172a2c9d48f12154aed493b57971253a8535c724
+      [格] 172a2c9d48f1 worker_threads=32 judged_root=…/tmp.ETbaoLkrGy/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 9266a5e4e2671e34…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════════ 对照：Y 放进来的是登记的输入（crates/）
+════ H-B [post] 漂移=54 用户动作=during
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（cf55107a0081f2ba…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:11Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:19Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.79KwKqFWVB/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.6A19zgsvz7/tree
+  ── --full 还在跑（54 号 pid 2221055），起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 92205b6565a44927…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.79KwKqFWVB/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.6A19zgsvz7/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=kill9
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（cf55107a0081f2ba…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:28Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:29Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.WTDTaV4uhb/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.wHe1RC2z03/tree
+  ── 54 号 pid 2222229 被 SIGKILL 之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 92205b6565a44927…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.WTDTaV4uhb/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.wHe1RC2z03/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=finish
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（cf55107a0081f2ba…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:36Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:37Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.yU8PFTtcAs/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.O9hjIRZn4a/tree
+  ── --full 跑完之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 92205b6565a44927…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.yU8PFTtcAs/tree
+      [格] cf55107a0081 worker_threads=1 judged_root=…/tmp.O9hjIRZn4a/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=during
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:46Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:47Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] a4d6d7c42b7b worker_threads=32 judged_root=…/tmp.qWfG8xFUp1/tree
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.SYAo5F5XBy/tree
+  ── --full 还在跑（54 号 pid 2224264），起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:46Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.SYAo5F5XBy/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=kill9
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:49Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:50Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] a4d6d7c42b7b worker_threads=32 judged_root=…/tmp.NuXuCmzEPD/tree
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.9RqcH9EFhI/tree
+  ── 54 号 pid 2225436 被 SIGKILL 之后起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:49Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] a4d6d7c42b7b worker_threads=32 judged_root=…/tmp.NuXuCmzEPD/tree
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.9RqcH9EFhI/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B2 [post] 工具链 1 下提交 A → 工具链升到 2 → SINGLEFS_GATE_FULL=1 重新验 HEAD
+  ── 提交 A 之前的门禁（工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:55Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 工具链升到 2；工作树干净：0 行 status
+      [格] a4d6d7c42b7b worker_threads=32 judged_root=…/tmp.kHg2400yu3/tree
+  ── SINGLEFS_GATE_FULL=1，带 --staged 的建法
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:55Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── SINGLEFS_GATE_FULL=1，主工作区直接跑 54 号
+    [退出码 0]
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（a4d6d7c42b7bacac…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:55Z，标记里的计数行原样
+  ── 真值（工具链 2 下这份 HEAD 用它自己的 54 号跑全量）
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-C [post] Z=wip 先后=Zlast
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── X 那一趟（worktree，入库的 54 号）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-c-post-wip-Zlast/.git/singlefs-layer0-full-green.b6bb375bddb2b012b9379545bbbb7b13021c3b23aa
+  ── Z 那一趟（主工作区）：
+  ✗ （别的会话改到一半的 54 号）LAYER0 行 journal_differing 不是 0
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.Fvt9ewlZwg/tree
+  ── X 起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:39:57Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ H-C [post] Z=wip 先后=overlapZlast
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── X 那一趟（worktree，入库的 54 号）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-c-post-wip-overlapZlast/.git/singlefs-layer0-full-green.b6bb375bddb2b012b9379545bbbb7b13021
+  ── Z 那一趟（主工作区）：
+  ✗ （别的会话改到一半的 54 号）LAYER0 行 journal_differing 不是 0
+      [格] b6bb375bddb2 worker_threads=32 judged_root=…/tmp.CbLxp8zgRw/tree
+  ── X 起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b6bb375bddb2b012…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:40:04Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ H-C [post] Z=edit 先后=Zlast
+  ── 主工作区相对暂存区（Z 开跑前）：
+  ── X 那一趟（worktree，入库的 54 号）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-c-post-edit-Zlast/.git/singlefs-layer0-full-green.b6bb375bddb2b012b9379545bbbb7b13021c3b23a
+  ── Z 那一趟（主工作区）：
+  ✗ 全量跑的过程中这一道的输入变了（开跑 b6bb375bddb2b012…，跑完 0689a8276ae5cbe8…）：两条流读到的不一定是同一版，不写全绿标记
+      [格] 一格都没有
+  ── X 起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 b6bb375bddb2b012…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ H-C [post] Z=edit 先后=overlapZlast
+  ── 主工作区相对暂存区（Z 开跑前）：
+  ── X 那一趟（worktree，入库的 54 号）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g1/h-c-post-edit-overlapZlast/.git/singlefs-layer0-full-green.b6bb375bddb2b012b9379545bbbb7b1302
+  ── Z 那一趟（主工作区）：
+  ✗ 全量跑的过程中这一道的输入变了（开跑 b6bb375bddb2b012…，跑完 0689a8276ae5cbe8…）：两条流读到的不一定是同一版，不写全绿标记
+      [格] 一格都没有
+  ── X 起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 b6bb375bddb2b012…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
+    [gate --staged 里 54 号退出码 1]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+

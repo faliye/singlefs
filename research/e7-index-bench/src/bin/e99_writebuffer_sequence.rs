@@ -58,7 +58,8 @@ const TXG_BITS: u32 = 64;
 const PUBLISHES_PER_SECOND: u64 = 2785;
 /// D16 已定项 5：`T_dirty` = 2 GiB。D5 已定项 5：记账条目 30 字节。
 const DIRTY_THRESHOLD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-const ACCOUNTING_ENTRY_BYTES: u64 = 30;
+// 这个实验跑的时候记账条目宽是 30；今天的宽登记在 format-const ACCOUNTING_ENTRY_BYTES（34）。这里留当时的值，改名是为了不与现行常量同名。
+const ACCOUNTING_ENTRY_BYTES_WHEN_THIS_EXPERIMENT_RAN: u64 = 30;
 
 /// **判据 1**：`seq` 取 `w` 字节时，装完 `txg_bits` 位的 txg 之后还剩几位给窗口序号。
 /// 装不下时返回 `None`——**读不到 ≠ 读到 0**，不许退化成 0 位。
@@ -257,7 +258,7 @@ fn make_updates(key_count: u32, updates_per_key: u64, remount_at: Option<u64>) -
 /// **判据 5**：一次发布窗口内同一个 key 最多写几次的上界——
 /// `T_dirty` 全用来装记账条目时的条目数。
 fn maximum_updates_per_window() -> u64 {
-    DIRTY_THRESHOLD_BYTES / ACCOUNTING_ENTRY_BYTES
+    DIRTY_THRESHOLD_BYTES / ACCOUNTING_ENTRY_BYTES_WHEN_THIS_EXPERIMENT_RAN
 }
 
 fn bits_needed(value_to_represent: u64) -> u32 {
@@ -270,7 +271,7 @@ fn main() {
 
     output_lines.push(emitter.emit_raw(&format!(
         "name=config txg_bits={TXG_BITS} publish_per_sec={PUBLISHES_PER_SECOND} \
-         t_dirty={DIRTY_THRESHOLD_BYTES} acct_entry={ACCOUNTING_ENTRY_BYTES}"
+         t_dirty={DIRTY_THRESHOLD_BYTES} acct_entry={ACCOUNTING_ENTRY_BYTES_WHEN_THIS_EXPERIMENT_RAN}"
     )));
 
     // 判据 1：位宽账
@@ -344,7 +345,7 @@ mod tests {
     fn format_constants_match_knowledge_base() {
         assert_eq!(TXG_BITS, 64, "D22 已定项 7：checkpoint_txg 8 字节");
         assert_eq!(PUBLISHES_PER_SECOND, 2785, "E44 本机实测");
-        assert_eq!(ACCOUNTING_ENTRY_BYTES, 30, "D5 已定项 5");
+        assert_eq!(ACCOUNTING_ENTRY_BYTES_WHEN_THIS_EXPERIMENT_RAN, 30, "D5 已定项 5");
     }
 
     /// **判据 1 的绝对值**：8 字节一个位都不剩给窗口序号。

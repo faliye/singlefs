@@ -1,0 +1,20 @@
+编号	旧事实	新事实	检索词	出处
+F1	新立：checks-owed.md 没有 C520–C532 这 13 笔门禁修复三轮三方新立的欠账	checks-owed.md 新增 C520（75 号只认状态段恰好是已跑）到 C532（归档产物只剩区间断言）共 13 笔欠账	C520	H1
+F2	C46（门禁阶段自己不会红） 仍欠 8 个阶段的样本（15-research-build、21-decision-items-sync、70-citations、87-replay 前置是真的；47、52、54、55 号在各自脚本头部写明为什么装不进沙箱）	C46（门禁阶段自己不会红） 仍欠 4 个阶段的样本（15-research-build、87-replay 前置是真的；47、54 号在各自脚本头部写明为什么装不进沙箱），名单以上游样本自检每轮列出的「仍未自检」为准，不在这里抄	仍欠.*个阶段的样本	H1
+F3	新立：仓里没有统一禁止撇号角标（U+2032、U+2033、U+2034、U+02B9、U+02BA）当变体命名的门禁，`.claude/rules/path-moves.md` 没有「变体起新名字，不用角标」一节	门禁 12 号扫全仓（含冻结证据）零撇号角标；`.claude/rules/path-moves.md` 新增「变体起新名字，不用角标」一节；全仓 117 份文件里带撇号的变体名（如乙、甲、K9、命题 4 后面加撇号的那几个）改成不带撇号的新名字（如庚、丁、戊、K10、命题 5），受影响的决策变更史条目与实验页回看行只动了措辞	角标	H2;H3;H4;H5;H6;H7
+F4	新立：门禁阶段各自算改动范围，没有共用脚本	`research/scripts/changed-paths.sh` 是门禁阶段取改动范围的唯一一份代码（`gate_diff_base`、`gate_changed_paths`、`gate_added_lines`），11、40、56、61、68、69、75、88、92、97 号改用它	changed-paths\.sh	工作区（done.md 项 1）
+F5	新立：没有门禁判「改动范围只许一份取法」	门禁 64 号新立，判三条：① 基准不许自己算 ② git 列路径要带 quotepath=false ③ 调共用脚本要查退出码	改动范围只许一份取法	工作区（done.md 项 2）
+F6	新立：门禁 10 号的「已跑实验要有决策引用」判据与 75 号第 ⑨ 条各自独立，没有并入的记录	门禁 10 号撤掉第 3 节（剩三节），「已跑实验要有决策引用」并进 75 号第 ⑨ 条	10 号并进 ⑨	H1
+F7	新立：门禁 75 号不认粗体、反引号、空格、半角括号写法的实验引用，作废 / 退役写法没有放宽	门禁 75 号认粗体、反引号、空格、半角括号写法的实验引用；搬家的实验页按实验号找基准里的标题；作废 / 退役的写法放宽；新增行的取法带 --no-renames --no-color --no-ext-diff	认粗体、反引号、空格、半角括号写法的实验引用	工作区（done.md 项 5）
+F8	新立：门禁 61 号不认未跟踪的决策文件，40、88 号找新增行没有用共用脚本	门禁 61 号改用共用脚本（未跟踪的决策文件也算，git diff 带 --no-color --no-ext-diff）；40、88 号改用共用脚本取新增行，认 HEAD 树里的归档产物	61 号改用共用脚本	工作区（done.md 项 6）
+F9	新立：`.claude/gate.d/` 阶段在 cd 到项目根之后才找共用脚本或生成器，找不到时不报错；多道阶段「无对象可判」退出码是 0	门禁 31、52 号在 cd 之前取仓库根，找不到生成器 / 转发脚本退 1；门禁 77 号脚本不在不判红；15、28、32、35、48、60 等阶段「无对象可判」从退 0 改成退 77	阶段在 cd 之后找自己旁边的文件	H1
+F10	新立：门禁 80 号（绝对断言）不扫 `crates/*/src/bin/` 与 `research/*/src/bin/` 下的 `e<数字>_*.rs`	门禁 80 号射程加 `crates/*/src/bin/` 与 `research/*/src/bin/` 下的 `e<数字>_*.rs`	80 号射程加	工作区（done.md 项 8）
+F11	新立：`.claude/scripts/gen-decision-items.py` 截断分项摘要时会切断被截断的半个 ASCII 词，也会剥掉 not-numbers 里登记过的编号词尾	生成器截断时整词退让，不切断半个 ASCII 词；not-numbers 里登记过的编号词尾不剥	生成器截断	工作区（done.md 项 9）
+F12	`.claude/agent-common.md` 第 4 行写「门禁 71 号判这一条（规则：」	`.claude/agent-common.md` 第 4 行改写「上游门禁的『规则纪律（项目本地）』阶段判这一条（规则：」	判这一条（规则：	工作区（done.md 项 10；`.claude/rules/implementation-workflow.md` 那一半不在这一批文件清单内，不写事实）
+F13	新立：没有 hook 在书记员写入之后核相关记录跟没跟上；kb-scribe-followup.sh 还没有被真派发用过	新立 hook `.claude/hooks/kb-scribe-followup.sh`（登记表 `.claude/hooks/kb-scribe-followups.tsv`），注册在 `.claude/settings.json`，门禁 63 号第 ⑪ 条判它注册了、自证过了；两次真派发的书记员用过它，抓出一次「只读命令误认成写 kb 的修正」	kb-scribe-followup	工作区（done.md 项 11 与第一次用上的一段）
+F14	新立：`.claude/batch-scope` 没有一次性插入 71 行的记录	`research/scripts/insert-row.py` 往 `.claude/batch-scope` 一次插了 71 行	batch-scope.*71 行	工作区（done.md 第一次用上的一段）
+F15	新立：门禁 12 号还没有被真扫过全仓	门禁 12 号第一次真扫过全仓：查了 1991 份文本文件，0 处角标	门禁 12 号.*全仓	工作区（done.md 第一次用上的一段）
+F16	新立：`changed-paths.sh` 还没有被门禁阶段真调用过	共用脚本 `changed-paths.sh` 第一次真派发里被十道门禁阶段调用	changed-paths\.sh	工作区（done.md 第一次用上的一段）
+F17	新立：这一批要碰的触发文件、样本目录没有登记进 `stage-owners.tsv`、`doc-lint-exclude`、`batch-scope`	`.claude/gate.d/stage-owners.tsv` 登记 12、64 号；`.claude/doc-lint-exclude` 登记 40、52、12 号的样本目录；`.claude/batch-scope` 登记这一批的触发文件	登记 12、64 号	工作区（done.md 项 13）
+F18	新立：门禁修复三方（gate-fix-forks）还没有判完	三方论证 gate-fix-forks 三轮判完，T2、T7（kb 目录与 git 两类）、T11 交用户定	gate-fix-forks	工作区（done.md 项 14）
+F19	新立：上游样本自检 `stage-selftest.sh` 跑样本时不清 `GATE_DIFF_BASE`	上游样本自检 `stage-selftest.sh` 跑样本时一并清掉 `GATE_DIFF_BASE`，已填进上游三语仓工作区，等发版（不在本仓）	样本自检.*GATE_DIFF_BASE	工作区（done.md 项 15）

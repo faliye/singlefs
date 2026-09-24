@@ -3,7 +3,7 @@ M2_码1映射key宽改25	const MAPPING_KEY_DATA_BYTES: u64 = 27;	const MAPPING_K
 M3_头宽漏乘2	HEADER_WITHOUT_KEY_RANGE + 2 * self.key_bytes + NONCE_MAC_RESERVED_BYTES	HEADER_WITHOUT_KEY_RANGE + self.key_bytes + NONCE_MAC_RESERVED_BYTES
 M4_预留位改0	const NONCE_MAC_RESERVED_BYTES: u64 = 28;	const NONCE_MAC_RESERVED_BYTES: u64 = 0;
 M5_叶扇出向上取整	self.payload_bytes() / self.entry_bytes()	self.payload_bytes().div_ceil(self.entry_bytes())
-M6_内部条目漏加指针	self.payload_bytes() / (self.key_bytes + NODE_POINTER_BYTES)	self.payload_bytes() / self.key_bytes
+M6_内部条目漏加指针	self.payload_bytes() / (self.key_bytes + NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN)	self.payload_bytes() / self.key_bytes
 M7_树高每层加2	        height += 1;	        height += 2;
 M8_两棵树不分条目	let node_entries = total_entries / (DATA_UNITS_PER_NODE + 1);	let node_entries = 0;
 M9_预付按节点大小算万分点	prepaid_bytes * BASIS_POINTS / UNIT_BYTES	prepaid_bytes * BASIS_POINTS / NODE_BYTES

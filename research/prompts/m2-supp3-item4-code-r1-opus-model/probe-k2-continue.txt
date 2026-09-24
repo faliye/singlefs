@@ -1,0 +1,171 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_fault_injection.rs (target/release/deps/second_transaction_supplement_three_fault_injection-3200eca44feecba4)
+
+running 1 test
+FAULT_INJECTION_START seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 configured_worker_threads=32 worker_threads_source=available_parallelism
+FAULT_INJECTION_PROGRESS slice=1/24 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/24 finished_histories=1/24 elapsed_seconds=0.7
+FAULT_INJECTION_PROGRESS slice=5/24 seeds=[7463871032432355117,7463871032432355118) finished_slices=2/24 finished_histories=2/24 elapsed_seconds=1.0
+FAULT_INJECTION_PROGRESS slice=21/24 seeds=[7463871032432355133,7463871032432355134) finished_slices=3/24 finished_histories=3/24 elapsed_seconds=1.1
+FAULT_INJECTION_PROGRESS slice=15/24 seeds=[7463871032432355127,7463871032432355128) finished_slices=4/24 finished_histories=4/24 elapsed_seconds=1.2
+FAULT_INJECTION_PROGRESS slice=8/24 seeds=[7463871032432355120,7463871032432355121) finished_slices=5/24 finished_histories=5/24 elapsed_seconds=1.2
+FAULT_INJECTION_PROGRESS slice=16/24 seeds=[7463871032432355128,7463871032432355129) finished_slices=6/24 finished_histories=6/24 elapsed_seconds=1.2
+FAULT_INJECTION_PROGRESS slice=20/24 seeds=[7463871032432355132,7463871032432355133) finished_slices=7/24 finished_histories=7/24 elapsed_seconds=1.3
+FAULT_INJECTION_PROGRESS slice=11/24 seeds=[7463871032432355123,7463871032432355124) finished_slices=8/24 finished_histories=8/24 elapsed_seconds=1.4
+FAULT_INJECTION_PROGRESS slice=7/24 seeds=[7463871032432355119,7463871032432355120) finished_slices=9/24 finished_histories=9/24 elapsed_seconds=1.5
+FAULT_INJECTION_PROGRESS slice=18/24 seeds=[7463871032432355130,7463871032432355131) finished_slices=10/24 finished_histories=10/24 elapsed_seconds=1.6
+FAULT_INJECTION_PROGRESS slice=4/24 seeds=[7463871032432355116,7463871032432355117) finished_slices=11/24 finished_histories=11/24 elapsed_seconds=1.6
+FAULT_INJECTION_PROGRESS slice=13/24 seeds=[7463871032432355125,7463871032432355126) finished_slices=12/24 finished_histories=12/24 elapsed_seconds=1.7
+FAULT_INJECTION_PROGRESS slice=2/24 seeds=[7463871032432355114,7463871032432355115) finished_slices=13/24 finished_histories=13/24 elapsed_seconds=1.7
+FAULT_INJECTION_PROGRESS slice=17/24 seeds=[7463871032432355129,7463871032432355130) finished_slices=14/24 finished_histories=14/24 elapsed_seconds=1.7
+FAULT_INJECTION_PROGRESS slice=22/24 seeds=[7463871032432355134,7463871032432355135) finished_slices=15/24 finished_histories=15/24 elapsed_seconds=1.9
+FAULT_INJECTION_PROGRESS slice=14/24 seeds=[7463871032432355126,7463871032432355127) finished_slices=16/24 finished_histories=16/24 elapsed_seconds=1.9
+FAULT_INJECTION_PROGRESS slice=9/24 seeds=[7463871032432355121,7463871032432355122) finished_slices=17/24 finished_histories=17/24 elapsed_seconds=1.9
+FAULT_INJECTION_PROGRESS slice=23/24 seeds=[7463871032432355135,7463871032432355136) finished_slices=18/24 finished_histories=18/24 elapsed_seconds=1.9
+FAULT_INJECTION_PROGRESS slice=24/24 seeds=[7463871032432355136,7463871032432355137) finished_slices=19/24 finished_histories=19/24 elapsed_seconds=2.0
+FAULT_INJECTION_PROGRESS slice=10/24 seeds=[7463871032432355122,7463871032432355123) finished_slices=20/24 finished_histories=20/24 elapsed_seconds=2.0
+FAULT_INJECTION_PROGRESS slice=3/24 seeds=[7463871032432355115,7463871032432355116) finished_slices=21/24 finished_histories=21/24 elapsed_seconds=2.1
+FAULT_INJECTION_PROGRESS slice=6/24 seeds=[7463871032432355118,7463871032432355119) finished_slices=22/24 finished_histories=22/24 elapsed_seconds=2.2
+FAULT_INJECTION_PROGRESS slice=19/24 seeds=[7463871032432355131,7463871032432355132) finished_slices=23/24 finished_histories=23/24 elapsed_seconds=2.2
+FAULT_INJECTION_PROGRESS slice=12/24 seeds=[7463871032432355124,7463871032432355125) finished_slices=24/24 finished_histories=24/24 elapsed_seconds=2.4
+FAULT_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355137) slices=24 worker_threads=24 elapsed_seconds=2.4
+── 故障注入快档 ──
+故障注入：种子 [7463871032432355113, 7463871032432355137)（种子基是这个测试周期写死的那一个）、每段 20 步、每段注入 4 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
+历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 95 次
+  注入 barrier_fails：23 次
+  注入 read_fails：28 次
+  注入 read_returns_corrupted_bytes：18 次
+  注入 write_fails：26 次
+  收尾「历史停在别的东西上」：23 次
+  收尾「没走到」：1 次
+  收尾「被容错、历史跑完」：71 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 28 次
+  PublishWithoutUnits 上注入 3 次
+  CloseAndMountWritable 上注入 33 次
+  CloseAndMountRollback 上注入 18 次
+  RaiseRollbackFloor 上注入 8 次
+  ColdStartRecover 上注入 3 次
+    注入点 CloseAndMountRollback/barrier：3 次
+    注入点 CloseAndMountRollback/read：10 次
+    注入点 CloseAndMountRollback/root_record_fua：2 次
+    注入点 CloseAndMountRollback/unit_write：3 次
+    注入点 CloseAndMountWritable/barrier：8 次
+    注入点 CloseAndMountWritable/journal_record：3 次
+    注入点 CloseAndMountWritable/read：18 次
+    注入点 CloseAndMountWritable/root_record_fua：1 次
+    注入点 CloseAndMountWritable/system_configuration_slot：2 次
+    注入点 CloseAndMountWritable/unit_write：1 次
+    注入点 ColdStartRecover/read：3 次
+    注入点 PublishFirstFile/unit_write：1 次
+    注入点 PublishOverwrite/barrier：10 次
+    注入点 PublishOverwrite/journal_record：1 次
+    注入点 PublishOverwrite/read：7 次
+    注入点 PublishOverwrite/system_configuration_slot：1 次
+    注入点 PublishOverwrite/unit_write：9 次
+    注入点 PublishWithoutUnits/barrier：2 次
+    注入点 PublishWithoutUnits/journal_record：1 次
+    注入点 RaiseRollbackFloor/read：8 次
+  没命中的注入点 22 个：PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishFirstFile/barrier、PublishOverwrite/root_record_fua、PublishWithoutUnits/unit_write、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、CloseAndMountRollback/journal_record、CloseAndMountRollback/system_configuration_slot、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/barrier
+重开 95 次：读回文件 65、没有文件 30、走读失败 0
+  走到模型认下的某一版 74 次、走到失败那一步正在写的那一版 7 次（收口表第 40 行那一格，只记不判）、模型都不允许的 14 次
+注入之后的镜像上跑池级 checker 95 次：判绿 2411 条次、不适用 330 条次
+以「已知红」收尾 {0: 5, 1: 4}、新发现 38
+「已知红」第 0 条：5 次，第一次在种子 7463871032432355119（write_fails：整池第 111 次write，落在第 4 步（PublishOverwrite））
+「已知红」第 1 条：4 次，第一次在种子 7463871032432355129（write_fails：整池第 320 次write，落在第 18 步（PublishOverwrite））
+种子 7463871032432355114 barrier_fails：整池第 7 次barrier，落在第 12 步（CloseAndMountWritable）：ModelDisagreement { aspect: "模型说该成、实现拒了" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（模型说该成、实现拒了）：模型 MountWritable 该成（写出 [(1, 1), (2, 1)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::InstanceRowsOnVersionWithoutFileUnsupported
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "写的实例表行" }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32633 字节）
+  模型对不上（写的实例表行）：模型 写行 [ModelInstanceRow { instance: ModelInstanceGeneration(1), selected_root_txg: ModelCheckpointTxg(4), applied_transaction_high_water: 0, is_rollback: false }]；实现 写行 [ModelInstanceRow { instance: ModelInstanceGeneration(1), selected_root_txg: ModelCheckpointTxg(5), applied_transaction_high_water: 0, is_rollback: false }]
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "冷启动读回" }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32633 字节）
+  模型对不上（冷启动读回）：模型 择到的根要是模型提交过的某一版；实现 走到实例 2 第 7 代根，模型从没提交过这一版（所选根 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(7), instance: ModelInstanceGeneration(2) }，读回 32633 字节（末字节 Some(74)））
+种子 7463871032432355116 write_fails：整池第 327 次write，落在第 17 步（CloseAndMountRollback）：ModelDisagreement { aspect: "取到的实例代号" }
+  重开：OutsideEverythingTheModelAllows（走到实例 6 第 22 代根、读回 0 字节）
+  模型对不上（取到的实例代号）：模型 取号 5；实现 取号 6
+种子 7463871032432355122 barrier_fails：整池第 31 次barrier，落在第 2 步（CloseAndMountRollback）：ModelDisagreement { aspect: "模型说该拒、实现做成了" }
+  重开：OutsideEverythingTheModelAllows（走到实例 3 第 8 代根、读回 14913 字节）
+  模型对不上（模型说该拒、实现做成了）：模型 MountRollback 该拒：["回退目标不在根环里"]；实现 做成了
+种子 7463871032432355133 write_fails：整池第 35 次write，落在第 2 步（PublishFirstFile）：CheckerViolations { invariants: ["I-7.8"] }
+  重开：CommittedByTheModel（走到实例 1 第 3 代根、没有文件）
+  I-7.8：根环水位最大 11，盘上出现过的最大树 ID 14
+用时 2.5 秒
+
+thread 'fault_injection_fast_tier_returns_errors_instead_of_panicking' (2680630) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs:110:5:
+注入之后「已知红」清单外的失败；重放：SINGLEFS_FAULT_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_FAULT_INJECTION_SEEDS=24 SINGLEFS_FAULT_INJECTION_OPERATIONS=20 SINGLEFS_FAULT_INJECTION_FAULTS=4 跑大档那条 #[ignore] 用例
+故障注入：种子 [7463871032432355113, 7463871032432355137)（种子基是这个测试周期写死的那一个）、每段 20 步、每段注入 4 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
+历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 95 次
+  注入 barrier_fails：23 次
+  注入 read_fails：28 次
+  注入 read_returns_corrupted_bytes：18 次
+  注入 write_fails：26 次
+  收尾「历史停在别的东西上」：23 次
+  收尾「没走到」：1 次
+  收尾「被容错、历史跑完」：71 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 28 次
+  PublishWithoutUnits 上注入 3 次
+  CloseAndMountWritable 上注入 33 次
+  CloseAndMountRollback 上注入 18 次
+  RaiseRollbackFloor 上注入 8 次
+  ColdStartRecover 上注入 3 次
+    注入点 CloseAndMountRollback/barrier：3 次
+    注入点 CloseAndMountRollback/read：10 次
+    注入点 CloseAndMountRollback/root_record_fua：2 次
+    注入点 CloseAndMountRollback/unit_write：3 次
+    注入点 CloseAndMountWritable/barrier：8 次
+    注入点 CloseAndMountWritable/journal_record：3 次
+    注入点 CloseAndMountWritable/read：18 次
+    注入点 CloseAndMountWritable/root_record_fua：1 次
+    注入点 CloseAndMountWritable/system_configuration_slot：2 次
+    注入点 CloseAndMountWritable/unit_write：1 次
+    注入点 ColdStartRecover/read：3 次
+    注入点 PublishFirstFile/unit_write：1 次
+    注入点 PublishOverwrite/barrier：10 次
+    注入点 PublishOverwrite/journal_record：1 次
+    注入点 PublishOverwrite/read：7 次
+    注入点 PublishOverwrite/system_configuration_slot：1 次
+    注入点 PublishOverwrite/unit_write：9 次
+    注入点 PublishWithoutUnits/barrier：2 次
+    注入点 PublishWithoutUnits/journal_record：1 次
+    注入点 RaiseRollbackFloor/read：8 次
+  没命中的注入点 22 个：PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishFirstFile/barrier、PublishOverwrite/root_record_fua、PublishWithoutUnits/unit_write、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、CloseAndMountRollback/journal_record、CloseAndMountRollback/system_configuration_slot、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/barrier
+重开 95 次：读回文件 65、没有文件 30、走读失败 0
+  走到模型认下的某一版 74 次、走到失败那一步正在写的那一版 7 次（收口表第 40 行那一格，只记不判）、模型都不允许的 14 次
+注入之后的镜像上跑池级 checker 95 次：判绿 2411 条次、不适用 330 条次
+以「已知红」收尾 {0: 5, 1: 4}、新发现 38
+「已知红」第 0 条：5 次，第一次在种子 7463871032432355119（write_fails：整池第 111 次write，落在第 4 步（PublishOverwrite））
+「已知红」第 1 条：4 次，第一次在种子 7463871032432355129（write_fails：整池第 320 次write，落在第 18 步（PublishOverwrite））
+种子 7463871032432355114 barrier_fails：整池第 7 次barrier，落在第 12 步（CloseAndMountWritable）：ModelDisagreement { aspect: "模型说该成、实现拒了" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（模型说该成、实现拒了）：模型 MountWritable 该成（写出 [(1, 1), (2, 1)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::InstanceRowsOnVersionWithoutFileUnsupported
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "写的实例表行" }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32633 字节）
+  模型对不上（写的实例表行）：模型 写行 [ModelInstanceRow { instance: ModelInstanceGeneration(1), selected_root_txg: ModelCheckpointTxg(4), applied_transaction_high_water: 0, is_rollback: false }]；实现 写行 [ModelInstanceRow { instance: ModelInstanceGeneration(1), selected_root_txg: ModelCheckpointTxg(5), applied_transaction_high_water: 0, is_rollback: false }]
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "冷启动读回" }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32633 字节）
+  模型对不上（冷启动读回）：模型 择到的根要是模型提交过的某一版；实现 走到实例 2 第 7 代根，模型从没提交过这一版（所选根 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(7), instance: ModelInstanceGeneration(2) }，读回 32633 字节（末字节 Some(74)））
+种子 7463871032432355116 write_fails：整池第 327 次write，落在第 17 步（CloseAndMountRollback）：ModelDisagreement { aspect: "取到的实例代号" }
+  重开：OutsideEverythingTheModelAllows（走到实例 6 第 22 代根、读回 0 字节）
+  模型对不上（取到的实例代号）：模型 取号 5；实现 取号 6
+种子 7463871032432355122 barrier_fails：整池第 31 次barrier，落在第 2 步（CloseAndMountRollback）：ModelDisagreement { aspect: "模型说该拒、实现做成了" }
+  重开：OutsideEverythingTheModelAllows（走到实例 3 第 8 代根、读回 14913 字节）
+  模型对不上（模型说该拒、实现做成了）：模型 MountRollback 该拒：["回退目标不在根环里"]；实现 做成了
+种子 7463871032432355133 write_fails：整池第 35 次write，落在第 2 步（PublishFirstFile）：CheckerViolations { invariants: ["I-7.8"] }
+  重开：CommittedByTheModel（走到实例 1 第 3 代根、没有文件）
+  I-7.8：根环水位最大 11，盘上出现过的最大树 ID 14
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test fault_injection_fast_tier_returns_errors_instead_of_panicking ... FAILED
+
+failures:
+
+failures:
+    fault_injection_fast_tier_returns_errors_instead_of_panicking
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.46s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_fault_injection`

@@ -1,0 +1,37 @@
+--- repo/crates/singlefs-checker/src/walk.rs	2026-09-23 23:52:06.163119337 +0000
++++ repo-fixE/crates/singlefs-checker/src/walk.rs	2026-09-24 01:25:58.690906900 +0000
+@@ -1584,8 +1584,25 @@
+     candidate_indexes: &[usize],
+     versions_applied_only_by_records: &[VersionAppliedOnlyByRecords],
+     cache: &mut IndexNodeCache,
++    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
++    newest_root: (u32, u64),
+ ) -> Vec<PointerView> {
+     let mut tree_table_pointers: Vec<PointerView> = Vec::new();
++    // 副本上的改法 E（攻方腿，被攻过零轮）：恢复下一次挂载要施加的那一版也读——同实例、txg = 最新根 + 1、带提交标记、
++    // 根环里没有它的根。只接一步，不复刻恢复的整条前缀规则。
++    for (_, records) in records_by_device {
++        for record in records.values() {
++            if record.commit_marker == CommitMarker::Present
++                && record.instance == newest_root.0
++                && record.checkpoint_txg == newest_root.1 + 1
++                && !roots.iter().any(|(_, _, root)| {
++                    root.instance == record.instance && root.checkpoint_txg == record.checkpoint_txg
++                })
++            {
++                tree_table_pointers.push(parse_node_pointer(&record.new_root_segment[0..86]));
++            }
++        }
++    }
+     let mut allocation_node_pointers: Vec<PointerView> = Vec::new();
+     for index in candidate_indexes.iter().copied() {
+         let record = &roots[index].2.record_bytes;
+@@ -2936,6 +2953,8 @@
+         &candidate_indexes,
+         &versions_applied_only_by_records,
+         &mut index_node_cache,
++        &journal_records_by_device,
++        (roots[newest_index].2.instance, roots[newest_index].2.checkpoint_txg),
+     );
+     judge_allocation_generations_against_unit_births(
+         reader,

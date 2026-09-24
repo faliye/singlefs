@@ -30,8 +30,9 @@ const COMMON_PREFIX_BYTES: u64 = 42;
 const NONCE_MAC_RESERVED_BYTES: u64 = 29;
 /// D22（单元原子性怎么合成） 已定项 7 的字段表：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8
 /// + 树表单元指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表单元指针 86
-/// + 中央映射树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（末尾三段 2026-09-14 用户定案加）。
-const ROOT_RECORD_BYTES: u64 = 371;
+/// + 中央映射树根指针 86 + 分配记录树根指针 86（C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案加）
+/// + 算法类型 1 + nonce 12 + MAC 16（末尾三段 2026-09-14 用户定案加）。
+const ROOT_RECORD_BYTES: u64 = 457;
 /// D19（块指针的结构与宽度预算） 已定项 4：设备 4 + 16 KiB 槽号 6 + 密文校验和 4。
 const LOC_ENTRY: u64 = 14; // naming-lint:external 名字由 kb 的 format-const 登记位定（D19 已定项 4），门禁按这个名字绑值
 /// D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11 的偏移表：MAC 16（偏移 0）+ nonce 12（16）+ 算法类型 1（28）
@@ -250,7 +251,7 @@ const FIRST_INSTANCE_GENERATION: u32 = 1;
 /// D22（单元原子性怎么合成） 已定项 16：系统配置槽世代号从 1 起、每写一次 +1，写世代号 g 的那一次落在槽 `g mod 2`。
 const SYSTEM_CONFIGURATION_GENERATION_AT_MKFS: u64 = 1;
 const SYSTEM_CONFIGURATION_GENERATION_AT_INSTANCE_ACQUISITION: u64 = 2;
-/// D16 已定项 8（暖机取甲′，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
+/// D16 已定项 8（暖机取戊，2026-09-13 用户定案）：mkfs 之后第一次可写挂载先连推空发布，直到本实例写成的根覆盖两块盘；
 /// 第一版几何区域 1 / 2 分住两块盘 ⇒ 两次（txg 1、2），第一个事务从 txg 3 起。
 const WARM_UP_EMPTY_PUBLISHES: u64 = 2;
 const FIRST_TRANSACTION_TXG: u64 = 3;
@@ -641,6 +642,11 @@ enum StepKind {
     RootRecordFua,
     /// 系统配置槽的一次写。
     SystemConfigurationSlot,
+    /// mkfs 把根环三个区域与 journal 环各整段写 0（D22（单元原子性怎么合成） 已定项 8 第 3 条，
+    /// 2026-09-23 用户定案改写）：两者都由 mkfs 自己经块设备的写零动作发出，每块盘上四段（根环三个区域各一段 +
+    /// journal 环一段）各一次调用，区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部四段，共 8 步；
+    /// 录制流里各记一步整段清零，清零几段之间不加屏障。不是 FUA。
+    ZeroFill,
 }
 
 impl StepKind {
@@ -651,13 +657,14 @@ impl StepKind {
             StepKind::JournalRecord => "journal_record",
             StepKind::RootRecordFua => "root_record_fua",
             StepKind::SystemConfigurationSlot => "system_configuration_slot",
+            StepKind::ZeroFill => "zero_fill",
         }
     }
     /// FUA 由步骤种类决定，不再是调用点各传各的布尔：系统配置槽写不可能是 FUA，这样它写不出来。
     fn is_fua(self) -> bool {
         match self {
             StepKind::RootRecordFua => true,
-            StepKind::UnitWrite | StepKind::JournalRecord | StepKind::SystemConfigurationSlot => false,
+            StepKind::UnitWrite | StepKind::JournalRecord | StepKind::SystemConfigurationSlot | StepKind::ZeroFill => false,
         }
     }
 }
@@ -715,6 +722,14 @@ impl RecordingPool {
     fn write(&mut self, device: DeviceIdentity, offset: DeviceOffset, bytes: &[u8], kind: StepKind) {
         self.pool.devices[device.0 as usize].write(offset, bytes);
         self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: bytes.to_vec(), kind }));
+    }
+    /// mkfs 的整段清零（D22（单元原子性怎么合成） 已定项 8 第 3 条）：只记一步操作，不真的把字节灌进
+    /// `SparseDevice` 的扇区表。稀疏镜像没写过的扇区恒读 0（`SparseDevice` 的文档），根环区域与
+    /// journal 环这两类清零写的本来就是全 0 的字节，语义上跟真写一遍没有分别；journal 环有 768 MiB，
+    /// 真按扇区写一遍会让 `mkfs()` 每次调用都往 `BTreeMap` 里插上百万条目——78 条变异 × 50 个单测
+    /// 每条都要跑一次 `mkfs()`，会把这个装置拖到不可用，`mutate.sh` 单条变异 120 秒的超时也会被跑穿。
+    fn record_zero_fill(&mut self, device: DeviceIdentity, offset: DeviceOffset) {
+        self.operations.push(RecordedOperation::Write(WriteRequest { device, offset, bytes: Vec::new(), kind: StepKind::ZeroFill }));
     }
     fn barrier(&mut self) {
         self.operations.push(RecordedOperation::Barrier);
@@ -1258,7 +1273,7 @@ fn data_unit_payload(bytes: &[u8], declared_length: u16) -> &[u8] {
 
 // ───────────────────────── 根记录、系统配置、journal 记录 ─────────────────────────
 
-/// D22（单元原子性怎么合成） 已定项 7 的字段表，371 字节，字段序照那张表（gap G4：字节表七的行序与它不同，两处都没写偏移）。
+/// D22（单元原子性怎么合成） 已定项 7 的字段表，457 字节，字段序照那张表（gap G4：字节表七的行序与它不同，两处都没写偏移）。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct RootRecord {
     fsid: [u8; 16],
@@ -1270,12 +1285,16 @@ struct RootRecord {
     instance_table: NodePointer,
     /// D19（块指针的结构与宽度预算） 已定项 11（2026-09-13 用户定案）：中央映射树的根住根记录。
     mapping_root: NodePointer,
+    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案：只有「树表 0 条、写过行」
+    /// 的一版指着写行那次发布写的那一片分配记录节点；这个装置从不建那一格（E142（第一个事务的干跑） 只有
+    /// mkfs、暖机与带文件的一版，milestone 二「第三次可写挂载」不在射程内），恒为 `NodePointer::empty_root()`。
+    allocation_record_tree_root: NodePointer,
 }
 
 const ROOT_CHECKSUM_OFFSET: usize = 4 + 16 + 4 + 4 + 8 + NODE_POINTER_BYTES as usize + 8 + 8;
 
 impl RootRecord {
-    /// 写成一个判定宽度的槽：记录 371 字节，其余补 0；
+    /// 写成一个判定宽度的槽：记录 457 字节，其余补 0；
     /// 自证校验和覆盖**整个 512 槽含补齐**、自身按 0 参与（D18（块里携带什么信息） 已定项 17，2026-09-13 用户定案）。
     fn to_slot(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new(PHYSICAL_BLOCK_BYTES as usize);
@@ -1291,6 +1310,9 @@ impl RootRecord {
         writer.skip(WIDE_CHECKSUM_BYTES as usize);
         self.instance_table.write_to(&mut writer);
         self.mapping_root.write_to(&mut writer);
+        // C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案：分配记录树根指针紧跟映射根指针之后。
+        writer.assert_position(ROOT_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES + 2 * NODE_POINTER_BYTES, "根记录：分配记录树根指针起点");
+        self.allocation_record_tree_root.write_to(&mut writer);
         // D22 已定项 7 的表尾三段（2026-09-14 用户定案）：算法类型 1 + nonce 12 + MAC 16，第一版全 0 留位。
         writer.put_u8(0);
         writer.skip(12 + 16);
@@ -1322,7 +1344,8 @@ impl RootRecord {
         reader.skip(WIDE_CHECKSUM_BYTES as usize);
         let instance_table = NodePointer::read_from(&mut reader);
         let mapping_root = NodePointer::read_from(&mut reader);
-        Some(Self { fsid, instance, checkpoint_txg, tree_table, tree_identifier_watermark, rollback_floor, instance_table, mapping_root })
+        let allocation_record_tree_root = NodePointer::read_from(&mut reader);
+        Some(Self { fsid, instance, checkpoint_txg, tree_table, tree_identifier_watermark, rollback_floor, instance_table, mapping_root, allocation_record_tree_root })
     }
 }
 
@@ -1758,7 +1781,9 @@ impl InodeRecord {
         writer.put_u32(1); // nlink
         writer.assert_position(40, "size");
         writer.put_u64(self.size);
-        writer.put_u64(DATA_UNIT_BYTES / 512); // blocks，按 512 字节块计
+        // C480（inode 记录的 blocks 怎么算全仓没有条款） 2026-09-23 用户定案：blocks = ⌈文件字节数 ÷ 512⌉
+        // （逻辑长度的 512 字节块数，不表示分到的空间——不是 DATA_UNIT_BYTES / 512）。
+        writer.put_u64(self.size.div_ceil(512));
         writer.put_u64(0); // rdev
         writer.assert_position(64, "时间秒");
         for _ in 0..3 {
@@ -2028,6 +2053,17 @@ struct MkfsOutput {
 
 fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
     let mut pool = RecordingPool { pool: Pool { devices: vec![SparseDevice::default(); parameters.device_count] }, operations: Vec::new() };
+    // D22（单元原子性怎么合成） 已定项 8 第 3 条（2026-09-23 用户定案改写，追平 C484（mkfs 不清根环，同 fsid 重来旧根还择得中））：
+    // 根环三个区域与 journal 环都由 mkfs 经写零动作清，每块盘上四段（根环三个区域各一段 + journal 环一段）各一次调用，
+    // 区域归属只定根种在哪块盘、不定清哪块盘——两块盘各清全部四段，8 步；段序列与步数以
+    // `.claude/kb/layout/01-first-txn.md` 八「mkfs 种根」那一行为准（`12+1+1+1+4`、21 次操作、4114 个崩溃状态，
+    // 种类 `[zero_fill×8,unit_write×4,barrier]|...`）；清零几段之间不加屏障。
+    for device in parameters.devices() {
+        for region_index in 0..RING_REGIONS {
+            pool.record_zero_fill(device, ring_region_offset(region_index));
+        }
+        pool.record_zero_fill(device, DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES));
+    }
     // D23（journal 的角色与格式） 已定项 16：mkfs 写实例代号 0，单元写序 (0, 0)，第 0 代根实例代号 0。
     let instance = InstanceGeneration(MKFS_INSTANCE_GENERATION);
     let genesis = CheckpointTxg(0);
@@ -2083,6 +2119,8 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
         },
         // 中央映射树的根住根记录（D19 已定项 11）；mkfs 那一刻还没有映射树。
         mapping_root: NodePointer::empty_root(),
+        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零。
+        allocation_record_tree_root: NodePointer::empty_root(),
     };
     let root_slot = root.to_slot();
     // D22 已定项 8：第 0 代根种进全部区域，各自槽 0，FUA。
@@ -2309,6 +2347,8 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
             rollback_floor: genesis.root.rollback_floor,
             instance_table: genesis.root.instance_table,
             mapping_root: genesis.root.mapping_root,
+            // C512 2026-09-23 用户定案：零单元发布照抄上一版。
+            allocation_record_tree_root: genesis.root.allocation_record_tree_root,
         };
         let (region, ring_slot) = ring_target_for_publish(txg);
         pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
@@ -2630,6 +2670,8 @@ fn publish_first_file(
         rollback_floor: CheckpointTxg(0),
         instance_table: genesis.root.instance_table,
         mapping_root: mapping_pointer,
+        // C512 2026-09-23 用户定案：带文件的一版写全零（不是「树表 0 条、写过行」那一格）。
+        allocation_record_tree_root: NodePointer::empty_root(),
     };
     let (region, ring_slot) = ring_target_for_publish(txg);
     pool.write(parameters.region_devices[region as usize], ring_slot_offset(region, ring_slot), &root.to_slot(), StepKind::RootRecordFua);
@@ -2847,6 +2889,8 @@ fn replay_journal(
                 rollback_floor: record.new_rollback_floor,
                 instance_table: rebuilt.instance_table,
                 mapping_root: record.new_mapping_root,
+                // C512 2026-09-23 用户定案：journal 新根段不带这一项（宽度不变），施加记录时照抄被施加那条根的这一项。
+                allocation_record_tree_root: rebuilt.allocation_record_tree_root,
             };
         } else {
             report.verification_failed += 1;
@@ -3520,8 +3564,12 @@ fn explain_root_record_offset(offset: u64) -> (bool, String) {
                 (true, "mapping_root 指针其余字段".to_string())
             }
         }
-        342..=370 => (true, "算法类型 / nonce / MAC 留位（恒 0）".to_string()),
-        _ => (false, format!("根记录内偏移 {offset}：落在 371 字节字段表之外的补齐区，未登记")),
+        342..=427 => (
+            true,
+            "分配记录树根指针（C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案：这个装置的场景里恒 0，mkfs / 暖机 / 带文件的一版都不是「树表 0 条、写过行」那一格）".to_string(),
+        ),
+        428..=456 => (true, "算法类型 / nonce / MAC 留位（恒 0）".to_string()),
+        _ => (false, format!("根记录内偏移 {offset}：落在 457 字节字段表之外的补齐区，未登记")),
     }
 }
 
@@ -3666,7 +3714,7 @@ const GAPS: &[(&str, &str)] = &[
     ("G16", "已收口（2026-09-13 D19已定项9）：出生序号从0起、同一棵树内码2与码3共用一个计数、换checkpoint清零、同一checkpoint里重写换新号"),
     ("G17", "已收口（2026-09-13 C313用户定案）：FUA写算段边界；装置主臂按它枚举，另一读法只报数不判"),
     ("G18", "D23已定项12按「12项事务恰占1条记录」算余量，而D16的事务切分纪律让一次带8个数据单元的fsync至少是8个事务、8条记录；两条已定条款对同一负载算出的记录数不同"),
-    ("G19", "mkfs种根的13次操作（11写+2屏障，段序列4+1+1+1+4、34个崩溃状态）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住"),
+    ("G19", "mkfs种根的21次操作（19写+2屏障，段序列12+1+1+1+4、4114个崩溃状态，D22已定项8第3条2026-09-23用户定案改写之后含两块盘各清根环三区域与journal环共8步）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住，与layout/01-first-txn.md八「mkfs种根」那一行登记的真值一致"),
     ("G20", "已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错"),
     ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份系统配置之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[system_configuration_slot×2]"),
     ("G22", "**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节3472670720、全空聚簇段数3310、runs4三个数都随它变"),
@@ -3733,7 +3781,7 @@ fn main() {
         ("unit_reserved", 29, NONCE_MAC_RESERVED_BYTES),
         ("data_unit_header_with_reserved", 134, DATA_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES),
         ("packed_unit_header_with_reserved", 136, PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES),
-        ("root_record", 371, ROOT_RECORD_BYTES),
+        ("root_record", 457, ROOT_RECORD_BYTES),
         ("tree_table_entry", 200, TREE_TABLE_ENTRY_BYTES),
         ("journal_header", 307, JOURNAL_HEADER_BYTES),
         ("journal_header_ten_fields", 78, JOURNAL_HEADER_TEN_FIELD_BYTES),
@@ -4173,11 +4221,11 @@ mod tests {
     }
 
     #[test]
-    fn widths_equal_the_byte_table_and_the_root_record_is_371() {
+    fn widths_equal_the_byte_table_and_the_root_record_is_457() {
         // 每一行左边是字节表零到七写死的绝对值，右边是装置自己算出来的——不是几个常量互相比。
-        assert_eq!(ROOT_RECORD_BYTES, 371);
+        assert_eq!(ROOT_RECORD_BYTES, 457);
         assert_eq!(ROOT_CHECKSUM_OFFSET, 138, "自证校验和在根记录里的偏移");
-        assert_eq!(ROOT_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES + 2 * NODE_POINTER_BYTES + 1 + 12 + 16, ROOT_RECORD_BYTES);
+        assert_eq!(ROOT_CHECKSUM_OFFSET as u64 + WIDE_CHECKSUM_BYTES + 3 * NODE_POINTER_BYTES + 1 + 12 + 16, ROOT_RECORD_BYTES);
         assert_eq!(POINTER_HEAD_BYTES, 50);
         assert_eq!(POINTER_HEAD_BYTES + 2 * LOC_ENTRY + 4 + 4, NODE_POINTER_BYTES);
         assert_eq!(POINTER_HEAD_BYTES + 2 * LOC_ENTRY + 10, DATA_POINTER_BYTES);
@@ -4313,6 +4361,9 @@ mod tests {
         }
         assert_eq!(readable, 3);
         assert_eq!(ring_region_offset(2).0, 7 << 20);
+        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零（这里直接查 mkfs 自己构造的根，不是靠 to_slot/parse_slot 往返——
+        // 往返只证明「写的值读得回来」，证不了写的值就是全零，两者是不同的命题）。
+        assert!(genesis.root.allocation_record_tree_root.is_empty_root(), "mkfs 第 0 代的分配记录树根指针全零");
         // D23 已定项 16：mkfs 写实例代号 0，单元写序 (0, 0)；树 ID 水位就是第一个要发的树 ID。
         assert_eq!(genesis.root.instance, InstanceGeneration(0));
         assert_eq!(genesis.root.tree_identifier_watermark, 11);
@@ -4449,8 +4500,12 @@ mod tests {
         assert_eq!(closed_form_state_count(&segments), 524314);
     }
 
-    /// 段序列登记表（layout/01-first-txn 八）的五行由这条钉住：mkfs 4+1+1+1+4（13 次操作、34 个状态）、取号 2、
-    /// 暖机 2+1+2+2+1+2、事务 16+2+1+2、整条流 2+2+1+2+2+1+18+2+1+2。
+    /// 段序列登记表（layout/01-first-txn 八）的五行由这条钉住：mkfs 12+1+1+1+4（21 次操作、4114 个状态，
+    /// D22（单元原子性怎么合成） 已定项 8 第 3 条 2026-09-23 用户定案改写：根环三个区域与 journal 环都由 mkfs
+    /// 经写零动作清，每块盘四段各一次调用、两块盘共 8 步，段序列与步数以 `.claude/kb/layout/01-first-txn.md`
+    /// 八「mkfs 种根」那一行为准——这个值与 `.claude/kb/checks-owed.md` C484（mkfs 不清根环，同 fsid 重来旧根还择得中）/
+    /// C487（门禁 55 号拿活代码与不跟踪它的模型比） 登记的 `crates/` 真值一致）、取号 2、暖机 2+1+2+2+1+2、
+    /// 事务 16+2+1+2、整条流 2+2+1+2+2+1+18+2+1+2。
     /// 改任何一条路径里屏障或 FUA 的位置都红——mkfs 那一行不进层 0 枚举，这里是它唯一的会红检查。
     ///
     /// D17（实现分层与第三方管道） 已定项 2 的结构等价类要的是「段边界位置 + 每段步骤种类集合」，
@@ -4466,9 +4521,9 @@ mod tests {
         let warm_up_operations = &recording.operations[acquisition_operation_count..warm_up_operation_count];
         let transaction_operations = &recording.operations[warm_up_operation_count..];
         let post_mkfs_operations = &recording.operations[mkfs_operation_count..];
-        assert_eq!(mkfs_operations.len(), 13, "mkfs：11 次写（m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道屏障");
-        assert_eq!(sizes(mkfs_operations), vec![4, 1, 1, 1, 4]);
-        assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 34);
+        assert_eq!(mkfs_operations.len(), 21, "mkfs：19 次写（两块盘各清根环三区域与 journal 环共 8、m1/m2 各两盘、三个第 0 代根、两盘各两个系统配置槽）+ 2 道屏障");
+        assert_eq!(sizes(mkfs_operations), vec![12, 1, 1, 1, 4]);
+        assert_eq!(closed_form_state_count(&split_into_segments(mkfs_operations, true).1), 4114);
         assert_eq!(acquisition_operations.len(), 2, "取号：两盘各写一次系统配置槽，不另加屏障");
         assert_eq!(sizes(acquisition_operations), vec![2]);
         assert_eq!(sizes(warm_up_operations), vec![2, 1, 2, 2, 1, 2]);
@@ -4477,8 +4532,8 @@ mod tests {
 
         assert_eq!(
             kinds(mkfs_operations),
-            "[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]",
-            "mkfs：m1/m2 两个单元各两盘一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
+            "[unit_write×4,zero_fill×8,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]",
+            "mkfs：两块盘各清根环三区域与 journal 环（共 8）与 m1/m2 两个单元各两盘同一段、三个第 0 代根各自 FUA 一段、两盘各两个系统配置槽收尾"
         );
         assert_eq!(kinds(acquisition_operations), "[system_configuration_slot×2]", "取号那一段只有两次系统配置槽写");
         assert_eq!(
@@ -4501,9 +4556,17 @@ mod tests {
         for operations in [mkfs_operations, acquisition_operations, warm_up_operations, transaction_operations, post_mkfs_operations] {
             assert_eq!(segment_step_kinds(operations, true).iter().map(Vec::len).sum::<usize>(), operations.len());
         }
-        // 种类的字母表就这五个，别处不许冒出第六个。
+        // mkfs 之后的种类字母表仍是这五个：新的 zero_fill 只出现在 mkfs 自己的段里。
         let alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(post_mkfs_operations, true).concat().iter().map(|kind| kind.tag()).collect();
         assert_eq!(alphabet.into_iter().collect::<Vec<_>>(), vec!["barrier", "journal_record", "root_record_fua", "system_configuration_slot", "unit_write"]);
+        // 整条录制流（含 mkfs）的字母表五种改六种（D22 已定项 8 第 3 条 2026-09-23 用户定案改写，新增 zero_fill），
+        // 与 layout/01-first-txn.md 八「mkfs 种根」那一行登记的真值（六种）同形。
+        let global_alphabet: std::collections::BTreeSet<&str> = segment_step_kinds(&recording.operations, true).concat().iter().map(|kind| kind.tag()).collect();
+        assert_eq!(
+            global_alphabet.into_iter().collect::<Vec<_>>(),
+            vec!["barrier", "journal_record", "root_record_fua", "system_configuration_slot", "unit_write", "zero_fill"],
+            "步骤种类五种改六种（D22 已定项 8 第 3 条：mkfs 新增 zero_fill）"
+        );
     }
 
     /// 暖机（D16 已定项 8）：两次空发布，根落区域 1 与区域 2（分住两块盘），jsn 1、2 不点名任何单元，第一个事务从 txg 3 起。
@@ -4615,23 +4678,28 @@ mod tests {
         assert!(matches!(by_name["system_configuration_slot_one_both_devices"].outcome, RecoveryOutcome::FileRead { .. }));
     }
 
-    /// 根记录 371（D22 已定项 7 的字段表，2026-09-14 用户定案在中央映射树根指针之后加算法类型 1 + nonce 12 + MAC 16）：
-    /// 自证校验和罩整个 512 槽（D18 已定项 17），末尾 29 字节第一版全 0。
+    /// 根记录 457（D22 已定项 7 的字段表，2026-09-14 用户定案在中央映射树根指针之后加算法类型 1 + nonce 12 + MAC 16；
+    /// C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 2026-09-23 用户定案在映射树根指针与那三段之间再插分配记录树根指针 86）：
+    /// 自证校验和罩整个 512 槽（D18 已定项 17），末尾 29 字节第一版全 0，分配记录树根指针这个装置的场景里也恒 0。
     #[test]
-    fn root_record_is_371_bytes_and_carries_the_mapping_tree_root() {
+    fn root_record_is_457_bytes_and_carries_the_mapping_tree_root() {
         let BuiltPool { output, .. } = built_pool();
         let slot = output.root.to_slot();
         assert_eq!(slot.len(), PHYSICAL_BLOCK_BYTES as usize);
         assert_eq!(RootRecord::parse_slot(&slot, &FIXED_FSID), Some(output.root));
-        assert!(slot[ROOT_RECORD_BYTES as usize..].iter().all(|byte| *byte == 0), "371 之后的 141 字节补齐恒 0");
+        assert!(slot[ROOT_RECORD_BYTES as usize..].iter().all(|byte| *byte == 0), "457 之后的 55 字节补齐恒 0");
         let mut padded = slot.clone();
         padded[ROOT_RECORD_BYTES as usize] ^= 0x01;
         assert!(RootRecord::parse_slot(&padded, &FIXED_FSID).is_none(), "自证校验和罩到补齐区");
-        // 算法类型 / nonce / MAC 这 29 字节是第一版的留位，全 0；映射树根指针紧挨在它们之前。
-        assert!(slot[342..371].iter().all(|byte| *byte == 0), "算法类型 1 + nonce 12 + MAC 16 第一版全 0");
-        let mut mapping_pointer_bytes = ByteReader::at(&slot, (ROOT_RECORD_BYTES - NODE_POINTER_BYTES - 1 - 12 - 16) as usize);
+        // 分配记录树根指针这 86 字节这个装置的场景里恒 0（C512：只有「树表 0 条、写过行」的一版写非零，这个装置不建那一格）。
+        assert!(slot[342..428].iter().all(|byte| *byte == 0), "分配记录树根指针这个装置的场景里恒 0");
+        // 算法类型 / nonce / MAC 这 29 字节是第一版的留位，全 0；映射树根指针在它们之前隔着分配记录树根指针。
+        assert!(slot[428..457].iter().all(|byte| *byte == 0), "算法类型 1 + nonce 12 + MAC 16 第一版全 0");
+        let mut mapping_pointer_bytes = ByteReader::at(&slot, (ROOT_RECORD_BYTES - 2 * NODE_POINTER_BYTES - 1 - 12 - 16) as usize);
         assert_eq!(NodePointer::read_from(&mut mapping_pointer_bytes), output.root.mapping_root);
         assert_eq!(output.root.mapping_root.locations[0].slot, SlotNumber(SLOT_MAPPING_ROOT));
+        let mut allocation_record_tree_root_bytes = ByteReader::at(&slot, (ROOT_RECORD_BYTES - NODE_POINTER_BYTES - 1 - 12 - 16) as usize);
+        assert_eq!(NodePointer::read_from(&mut allocation_record_tree_root_bytes), output.root.allocation_record_tree_root);
     }
 
     /// journal 记录头 307（D23 已定项 15 的新根段 188 + 2026-09-14 加的 fsid 8 与 MAC 16）；
@@ -4815,6 +4883,10 @@ mod tests {
         assert_eq!(leaf.record_width as u64, INODE_RECORD_BYTES);
         assert_eq!(leaf.records.len(), 1);
         assert_eq!(InodeRecord::parse(&leaf.records[0]).expect("记录").size, 3000);
+        // C480（inode 记录的 blocks 怎么算全仓没有条款） 2026-09-23 用户定案：blocks = ⌈文件字节数 ÷ 512⌉ = ⌈3000 ÷ 512⌉ = 6
+        // （逻辑长度的 512 字节块数，不表示分到的空间）；blocks 不在 InodeRecord 结构体里（它是写时算的一个派生量，
+        // 不是从盘上读回来再参与判定的那种字段），这里直接按偏移 48 核对写出来的原始字节。
+        assert_eq!(u64::from_le_bytes(leaf.records[0][48..56].try_into().expect("切了 8 字节")), 6, "blocks");
         let tree_table = parse_index_node(&genesis.tree_table_genesis_unit).expect("树表第 0 版");
         assert_eq!(tree_table.entries.len(), 0);
     }

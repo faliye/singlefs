@@ -1,0 +1,125 @@
+--- crates/singlefs-harness/src/history.rs	2026-09-21 14:20:46.030581906 +0000
++++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/history.rs	2026-09-21 15:27:22.333567439 +0000
+@@ -53,6 +53,7 @@
+ use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
+ use crate::model::{
+     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
++    ModelDisagreementAspect,
+     ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRootKey, ObservedEffect,
+     ObservedOutcome, ObservedRefusalReason,
+ };
+@@ -2881,6 +2882,8 @@
+             image: &image,
+             model: &pool.model,
+         });
++        // 攻方腿 K2 探针之二：第一次注入的块设备错之后，把模型对拍整个挂起，只留 checker 与 panic 这两条不依赖模型的判据。
++        let mut the_model_is_suspended_after_a_device_error = false;
+         for (step_index, operation) in history.operations.iter().enumerate() {
+             let step_position = StepPosition::Operation(step_index);
+             position.set(step_position);
+@@ -2893,7 +2896,10 @@
+             if let Some(verdict) = &model_verdict {
+                 tally.note_model_verdict(verdict);
+             }
+-            let model_disagreement = model_verdict.and_then(|verdict| verdict.disagreement);
++            let mut model_disagreement = model_verdict.and_then(|verdict| verdict.disagreement);
++            if the_model_is_suspended_after_a_device_error {
++                model_disagreement = None;
++            }
+             if let Some(session) = &pool.session {
+                 tally.most_publishes_in_one_mount = tally
+                     .most_publishes_in_one_mount
+@@ -2950,9 +2956,40 @@
+                 let continues_past_the_ring_turn_form = per_step_checker
+                     == PerStepChecker::RunContinuingPastTheRingTurnForm
+                     && ring_turn_leaves_allocated_statistic_above_walked(&observation);
+-                if !continues_past_the_ring_turn_form {
++                // 攻方腿 K2 的探针（只在副本上，靠环境变量开）：注入的块设备错今天让模型必然报「该成却拒了」、执行器当场 return，
++                // 这一整段历史剩下的步一步都不跑。开了这个开关就照常往下跑，看「这次失败把池弄坏了、下一次发布才现形」这一类会不会现形。
++                let continues_past_an_injected_device_error = std::env::var(
++                    "SINGLEFS_FAULT_PROBE_CONTINUE_PAST_DEVICE_ERRORS",
++                )
++                .is_ok()
++                    && observation.violations.is_empty()
++                    && observation.panic.is_none()
++                    && observation.harness_judgement.is_none()
++                    && matches!(
++                        observation.model_disagreement.as_ref().map(|d| d.aspect),
++                        Some(ModelDisagreementAspect::RefusedWhenModelRequiresSuccess)
++                    )
++                    && matches!(
++                        outcomes.last(),
++                        Some(StepOutcome::Refused { member }) if member.contains("BlockDeviceError")
++                    );
++                if !continues_past_the_ring_turn_form && !continues_past_an_injected_device_error {
+                     return Some(observation);
+                 }
++                if continues_past_an_injected_device_error {
++                    if std::env::var("SINGLEFS_FAULT_PROBE_SUSPEND_MODEL_AFTER_DEVICE_ERRORS").is_ok()
++                    {
++                        the_model_is_suspended_after_a_device_error = true;
++                    }
++                    observer(&StepObservation {
++                        position: step_position,
++                        operation: Some(operation),
++                        outcome: outcomes.last(),
++                        image: &image,
++                        model: &pool.model,
++                    });
++                    continue;
++                }
+                 tally.ring_turn_form_steps_noted += 1;
+                 tally.histories_with_the_ring_turn_form_noted = 1;
+             }
+--- crates/singlefs-harness/src/fault_injection.rs	2026-09-21 14:32:46.516701658 +0000
++++ /tmp/claude-1000/m2s3i4-r1-opus/repo/crates/singlefs-harness/src/fault_injection.rs	2026-09-21 15:30:14.910334881 +0000
+@@ -1273,13 +1273,45 @@
+     accumulator: &mut FaultInjectionAccumulator<'_>,
+ ) {
+     let geometry = execution.device_width.fixed_geometry();
+-    let plan = SharedFaultPlan::armed(
+-        geometry,
+-        FaultSchedule::the_nth_call_across_the_pool(drawn.fault, drawn.call_ordinal),
+-    );
++    // 攻方腿 K1 的探针（只在副本上，靠环境变量开）：随机注入那一路今天只摆
++    // `FaultSchedule::the_nth_call_across_the_pool`（每块盘、任意落点、整池数、只在第 n 次上注入一次）。
++    // 「第 n 次起每一次」「只一块盘」这两维一次都没抽过；开了开关就换成那两种，别的一概不动。
++    let schedule = match std::env::var("SINGLEFS_FAULT_PROBE_SCHEDULE").as_deref() {
++        Ok("persistent") => FaultSchedule {
++            fault: drawn.fault,
++            device: FaultDeviceSelector::EveryDevice,
++            placement: FaultPlacement::AnyOffset,
++            counting: FaultCounting::AcrossThePool,
++            occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(drawn.call_ordinal),
++        },
++        // 起点那一段（mkfs、取号、暖机、第一个文件）是执行器自己的 `expect`，第一版探针从第 1 次调用起就注入，
++        // 撞出来的 49 次 panic 全在 `history.rs:832` 的 mkfs `expect` 上，不是 core 的缺口 —— 改成起点跑完再让盘 1 死掉。
++        Ok("persistent-one-device") => FaultSchedule {
++            fault: drawn.fault,
++            device: FaultDeviceSelector::OnlyDevice(DeviceIdentity(1)),
++            placement: FaultPlacement::AnyOffset,
++            counting: FaultCounting::PerDevice,
++            occurrence: FaultOccurrence::EveryMatchingCallFromTheNthOnward(u64::MAX),
++        },
++        _ => FaultSchedule::the_nth_call_across_the_pool(drawn.fault, drawn.call_ordinal),
++    };
++    let plan = SharedFaultPlan::armed(geometry, schedule);
+     let stream = SharedStream::retaining_contents();
+     let mut committed_by_the_armed_run: BTreeMap<ModelRootKey, Option<Rc<[u8]>>> = BTreeMap::new();
++    let arm_the_dead_device_after_the_starting_point =
++        std::env::var("SINGLEFS_FAULT_PROBE_SCHEDULE").as_deref() == Ok("persistent-one-device");
+     let run = execute_history_with_faults(history, execution, &stream, &plan, &mut |observation| {
++        if arm_the_dead_device_after_the_starting_point
++            && observation.position == StepPosition::StartingPoint
++        {
++            plan.arm(FaultSchedule {
++                fault: drawn.fault,
++                device: FaultDeviceSelector::OnlyDevice(DeviceIdentity(1)),
++                placement: FaultPlacement::AnyOffset,
++                counting: FaultCounting::PerDevice,
++                occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
++            });
++        }
+         for (key, file) in observation.model.committed_versions() {
+             committed_by_the_armed_run.insert(key, file);
+         }

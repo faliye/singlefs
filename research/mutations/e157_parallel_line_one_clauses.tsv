@@ -1,0 +1,7 @@
+M1_叶容量写死一百四十四不随node_bytes走	(node_bytes - EXTENT_NODE_HEADER_BYTES) / EXTENT_LEAF_RECORD_BYTES	144
+M2_树高从零起数少算一层	let mut height = 1u64;	let mut height = 0u64;
+M3_定位一页时不判跨不跨叶只按起点单元走	first_unit_index != last_unit_index && (first_unit_index / leaf_capacity) != (last_unit_index / leaf_capacity)	false
+M4_跨单元的页一律加一不判是否落在同一叶	(first_unit_index / leaf_capacity) != (last_unit_index / leaf_capacity)	true
+M5_还原单元序号时用写它那天的容量不用读回那天的容量	key_third_segment / capacity_at_read_time	key_third_segment / capacity_at_write_time
+M6_字节区间只比起点不比终点	byte_interval_start == written_start && byte_interval_end == written_end	byte_interval_start == written_start
+M13_净荷容量写成预留二十八那天的数	data_unit_count_of_a_sequential_write(boundary_file_bytes, PAYLOAD_CAPACITY_TODAY)	data_unit_count_of_a_sequential_write(boundary_file_bytes, PAYLOAD_CAPACITY_RESERVE_28_DAY)

@@ -1,0 +1,841 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	360448	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	458752	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFFM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) F:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFFF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) F:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFMF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) M:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFFO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) F:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFMM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) M:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFMO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) M:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFOF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) O:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFOM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) O:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFOO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) O:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMFF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) F:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMFM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) F:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMFO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) F:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMMF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) M:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMMM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) M:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMMO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) M:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMOF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) O:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMOM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) O:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMOO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) O:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOFF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) F:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOFM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) F:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOMF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) M:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOFO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) F:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOMM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) M:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOMO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) M:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOOM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) O:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOOF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) O:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOOO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) O:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OFO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OMO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OOO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OF	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) F:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OM	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) M:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	OO	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin) O:skip(panicked)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F7-map-bug-leaf-same-publish	N2-same-verdict-rebuild-tolerates-data	O	O:PANIC(同一个落点释放了两次：这块盘的记录是不是已释放由 transaction::placements_to_release_via_mappin)	skip	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	0	t1@50316:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	360448	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	458752	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable) F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable) M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable) O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable) F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable) O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable) M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	25	557056	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De F:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De O:refused(not-writable)	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	O	O:ok	mount-err:Publish(ReleaseTargetAlreadyReleased { unit: InstanceTable, device: De	same	I-3.9	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50304:released-and-isolated
+F6-map-bug-live-instance-table	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	393216	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	425984	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	21	393216	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	21	425984	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	21	425984	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	393216	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	425984	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	393216	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	25	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	25	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	25	524288	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	458752	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	25	557056	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	23	491520	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	15	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	393216	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	17	360448	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	19	425984	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	11	229376	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	294912	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	13	262144	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F5-rot-dev0	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	7	163840	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(3), CheckpointTxg(8))), failur	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(6), CheckpointTxg(16))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	393216	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(6), CheckpointTxg(16))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(6), CheckpointTxg(16))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(6), CheckpointTxg(16))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	21	393216	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(7), CheckpointTxg(19))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	20	327680	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	21	425984	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	21	425984	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	393216	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	393216	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	25	524288	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	458752	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	23	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	23	491520	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(3), CheckpointTxg(8))), failur	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	25	557056	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(6), CheckpointTxg(16))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	14	229376	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	15	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	393216	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	19	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	17	360448	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	fail:Failed { root: Some((InstanceGeneration(3), CheckpointTxg(8))), failur	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	425984	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	fail:Failed { root: Some((InstanceGeneration(5), CheckpointTxg(13))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	8	131072	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	11	229376	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	13	294912	0	0	t1@50182:released-and-isolated
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	fail:Failed { root: Some((InstanceGeneration(3), CheckpointTxg(8))), failur	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	fail:Failed { root: Some((InstanceGeneration(4), CheckpointTxg(10))), failu	I-2.1,I-4.8,I-7.2,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-
+F4-rot-both	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	I-2.1,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50182:released-and-isolated
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	5	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	21	393216	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	21	425984	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	21	425984	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	491520	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	524288	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	557056	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	4	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	15	294912	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	3	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	11	229376	0	2	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-
+F3-latent-eio-dev0	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	10	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	21	393216	0	8	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	21	425984	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	21	425984	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	23	458752	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	491520	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	524288	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	25	557056	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-
+F2-latent-eio-both	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	360448	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	20	393216	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	18	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	425984	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	22	458752	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	491520	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	524288	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	25	557056	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MF	M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MM	M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	MO	M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated
+F1-transient-eio-both	N2-same-verdict-rebuild-tolerates-data	M	M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-

@@ -1,0 +1,7 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	O	O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	7	163840	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	4	65536	0	0	-	[]	1	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OFO	O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[2, 2]	4	0	[0, 0]	19	393216	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMFOOO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	37	753664	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OM	O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	4	0	[0, 0]	13	262144	0	0	t1@50326:released-and-isolated	[]	0	0
+F10-writer-bug-disk-carried-leaf	N1A-any-isoAll-mem	OMFOFOFOFO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok F:ok(F=8,reclaimed=8) O:ok F:ok(F=9,reclaimed=8) O:ok F:ok(F=10,reclaimed=8) O:ok	ok	same	I-3.9	[0, 0]	4	0	[0, 0]	55	1081344	0	0	t1@50326:released-and-isolated	[]	0	0

@@ -1,0 +1,48 @@
+# K2 纯模型
+K2-MODEL arm=Today named_any=false by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 27] white=[0, 0, 9] disk_loss_LOST=[9, 9, 9]
+K2-MODEL arm=Today named_any=true by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 27] white=[0, 0, 9] disk_loss_LOST=[0, 0, 0]
+K2-MODEL arm=Cap(0) named_any=false by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[9, 9, 9] white=[0, 0, 0] disk_loss_LOST=[9, 9, 9]
+K2-MODEL arm=Cap(0) named_any=true by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[9, 9, 9] white=[0, 0, 0] disk_loss_LOST=[0, 0, 9]
+K2-MODEL arm=Cap(1) named_any=false by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 18] white=[0, 0, 9] disk_loss_LOST=[9, 9, 9]
+K2-MODEL arm=Cap(1) named_any=true by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 18] white=[0, 0, 9] disk_loss_LOST=[0, 0, 0]
+K2-MODEL arm=Jump named_any=false by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 18] white=[0, 0, 0] disk_loss_LOST=[9, 9, 9]
+K2-MODEL arm=Jump named_any=true by_first_txg_mod3: mounts=[9, 9, 9] publishes_per_mount_total=[18, 18, 18] white=[0, 0, 0] disk_loss_LOST=[0, 0, 0]
+K2-MODEL-CHAIN arm=Today previous_last_txg=3 publishes_per_mount=[2, 2, 3, 3, 3, 3] white_per_mount=[0, 0, 1, 1, 1, 1]
+K2-MODEL-CHAIN arm=Today previous_last_txg=4 publishes_per_mount=[3, 3, 3, 3, 3, 3] white_per_mount=[1, 1, 1, 1, 1, 1]
+K2-MODEL-CHAIN arm=Today previous_last_txg=5 publishes_per_mount=[2, 3, 3, 3, 3, 3] white_per_mount=[0, 1, 1, 1, 1, 1]
+K2-MODEL-CHAIN arm=Jump previous_last_txg=3 publishes_per_mount=[2, 2, 2, 2, 2, 2] white_per_mount=[0, 0, 0, 0, 0, 0]
+K2-MODEL-CHAIN arm=Jump previous_last_txg=4 publishes_per_mount=[2, 2, 2, 2, 2, 2] white_per_mount=[0, 0, 0, 0, 0, 0]
+K2-MODEL-CHAIN arm=Jump previous_last_txg=5 publishes_per_mount=[2, 2, 2, 2, 2, 2] white_per_mount=[0, 0, 0, 0, 0, 0]
+# K4 纯模型
+K4-MODEL-TALLY [today] all-P0-torn(no-anchor) OVER(接上不该接的) = 84
+K4-MODEL-TALLY [today] all-P0-torn(no-anchor) match = 147
+K4-MODEL-TALLY [today] all-P0-torn(no-anchor) match-none = 63
+K4-MODEL-TALLY [today] anchor-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [today] anchor-readable match = 147
+K4-MODEL-TALLY [today] anchor-readable match-none = 343
+K4-MODEL-TALLY [today] anchor-torn-other-P0-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [today] anchor-torn-other-P0-readable match-none = 196
+K4-MODEL-SUMMARY [today] cells=1372
+K4-MODEL-TALLY [max] all-P0-torn(no-anchor) OVER(接上不该接的) = 84
+K4-MODEL-TALLY [max] all-P0-torn(no-anchor) match = 147
+K4-MODEL-TALLY [max] all-P0-torn(no-anchor) match-none = 63
+K4-MODEL-TALLY [max] anchor-readable match = 343
+K4-MODEL-TALLY [max] anchor-readable match-none = 343
+K4-MODEL-TALLY [max] anchor-torn-other-P0-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [max] anchor-torn-other-P0-readable match-none = 196
+K4-MODEL-SUMMARY [max] cells=1372
+K4-MODEL-TALLY [stop] all-P0-torn(no-anchor) UNDER(少施加) = 147
+K4-MODEL-TALLY [stop] all-P0-torn(no-anchor) match-none = 147
+K4-MODEL-TALLY [stop] anchor-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [stop] anchor-readable match = 147
+K4-MODEL-TALLY [stop] anchor-readable match-none = 343
+K4-MODEL-TALLY [stop] anchor-torn-other-P0-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [stop] anchor-torn-other-P0-readable match-none = 196
+K4-MODEL-SUMMARY [stop] cells=1372
+K4-MODEL-TALLY [max-stop] all-P0-torn(no-anchor) UNDER(少施加) = 147
+K4-MODEL-TALLY [max-stop] all-P0-torn(no-anchor) match-none = 147
+K4-MODEL-TALLY [max-stop] anchor-readable match = 343
+K4-MODEL-TALLY [max-stop] anchor-readable match-none = 343
+K4-MODEL-TALLY [max-stop] anchor-torn-other-P0-readable UNDER(少施加) = 196
+K4-MODEL-TALLY [max-stop] anchor-torn-other-P0-readable match-none = 196
+K4-MODEL-SUMMARY [max-stop] cells=1372

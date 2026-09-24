@@ -1,0 +1,121 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFOF	F:noop F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFOM	F:noop F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFMO	F:noop F:noop M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFFO	F:noop F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFFF	F:noop F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFOO	F:noop F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFFM	F:noop F:noop F:noop M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFMF	F:noop F:noop M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFMM	F:noop F:noop M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMFF	F:noop M:ok[reuse] F:noop[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMFM	F:noop M:ok[reuse] F:noop[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMOF	F:noop M:ok[reuse] O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMFO	F:noop M:ok[reuse] F:noop[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOFF	F:noop O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMMF	F:noop M:ok[reuse] M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMMM	F:noop M:ok[reuse] M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-	[1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMOO	F:noop M:ok[reuse] O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated	[1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMMO	F:noop M:ok[reuse] M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated	[1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOMF	F:noop O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOOO	F:noop O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMOM	F:noop M:ok[reuse] O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated	[1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOFO	F:noop O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOFM	F:noop O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOMM	F:noop O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOMO	F:noop O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOOM	F:noop O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFFF	M:ok[reuse] F:noop[reuse] F:noop[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFOF	M:ok[reuse] F:noop[reuse] O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFMO	M:ok[reuse] F:noop[reuse] M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFFO	M:ok[reuse] F:noop[reuse] F:noop[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFFM	M:ok[reuse] F:noop[reuse] F:noop[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFOM	M:ok[reuse] F:noop[reuse] O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFMF	M:ok[reuse] F:noop[reuse] M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFOO	M:ok[reuse] F:noop[reuse] O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFMM	M:ok[reuse] F:noop[reuse] M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMFF	M:ok[reuse] M:ok[reuse] F:noop[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMFM	M:ok[reuse] M:ok[reuse] F:noop[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMOF	M:ok[reuse] M:ok[reuse] O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMMF	M:ok[reuse] M:ok[reuse] M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMFO	M:ok[reuse] M:ok[reuse] F:noop[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMMO	M:ok[reuse] M:ok[reuse] M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	21	393216	0	8	t1@50182:released-and-isolated	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMMM	M:ok[reuse] M:ok[reuse] M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	20	327680	0	10	-	[0, 1, 2, 3]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOFM	M:ok[reuse] O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOFF	M:ok[reuse] O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOFO	M:ok[reuse] O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMOM	M:ok[reuse] M:ok[reuse] O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	6	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMOO	M:ok[reuse] M:ok[reuse] O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	21	425984	0	6	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOOM	M:ok[reuse] O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOMM	M:ok[reuse] O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOOF	M:ok[reuse] O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	23	458752	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOMO	M:ok[reuse] O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	21	425984	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOOO	M:ok[reuse] O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOMF	M:ok[reuse] O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFFF	O:ok F:noop F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFFM	O:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFFO	O:ok F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFMF	O:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFOO	O:ok F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFMM	O:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMFO	O:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFMO	O:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFOM	O:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMFF	O:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMMF	O:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMFM	O:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMMM	O:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMOO	O:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	524288	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMMO	O:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	25	491520	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMOM	O:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFF	F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	-	[2, 2]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOOO	O:ok O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	25	557056	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFO	F:noop F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FFM	F:noop F:noop M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOOM	O:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOMO	O:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	491520	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOMM	O:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	23	458752	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOF	F:noop O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMO	F:noop M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMF	F:noop M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFF	M:ok[reuse] F:noop[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOM	F:noop O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FOO	F:noop O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FMM	F:noop M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFO	M:ok[reuse] F:noop[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MFM	M:ok[reuse] F:noop[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOF	M:ok[reuse] O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMO	M:ok[reuse] M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	15	294912	0	6	t1@50182:released-and-isolated	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMF	M:ok[reuse] M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFF	O:ok F:noop F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOM	M:ok[reuse] O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	15	294912	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MMM	M:ok[reuse] M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	8	-	[0, 1, 2]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MOO	M:ok[reuse] O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFM	O:ok F:noop M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMO	O:ok M:ok O:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	393216	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OFO	O:ok F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMF	O:ok M:ok F:noop	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[2, 2]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOO	O:ok O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	19	425984	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FF	F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OMM	O:ok M:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	19	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OOM	O:ok O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	17	360448	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FM	F:noop M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	FO	F:noop O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MF	M:ok[reuse] F:noop[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OF	O:ok F:noop	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MM	M:ok[reuse] M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	6	-	[0, 1]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	F	F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	MO	M:ok[reuse] O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	11	229376	0	4	t1@50182:released-and-isolated	[0]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OO	O:ok O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	13	294912	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	OM	O:ok M:ok	ok	same	-	[0, 0]	4	0	[0, 0]	13	262144	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	O	O:ok	ok	same	-	[2, 2]	4	0	[0, 0]	7	163840	0	2	t1@50182:released-and-isolated	[]	0	0
+F9-bad-media-rw-forever	N2-same-verdict-rebuild-tolerates-data	M	M:ok[reuse]	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	4	-	[0]	0	0

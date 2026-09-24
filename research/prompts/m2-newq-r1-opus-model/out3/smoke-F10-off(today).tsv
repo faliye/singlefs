@@ -1,0 +1,7 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F10-writer-bug-disk-carried-leaf	off(today)	OFO	O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	O	O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMFOOO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OM	O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMFOFOFOFO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok F:ok(F=8,reclaimed=8) O:ok F:ok(F=9,reclaimed=8) O:ok F:ok(F=10,reclaimed=8) O:ok	ok	same	I-3.9	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0

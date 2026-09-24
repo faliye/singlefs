@@ -1,0 +1,16 @@
+== 情形 A：全推出去了，工作区有改动
+  ① lib.sh diff_base（GATE_DIFF_BASE）：c2
+  ② changed-paths.sh gate：c3
+  ③ 61 号自带取法：c3
+  ④ 40/88 号自带取法：c3
+== 情形 B：本地多一个没推的提交 c4（第一次提交），工作区又改了（第二次）
+  ① lib.sh diff_base（GATE_DIFF_BASE）：c3
+  ② changed-paths.sh gate：c3
+  ③ 61 号自带取法：c4
+  ④ 40/88 号自带取法：c3
+== 情形 C：同 B，另有上一轮整轮全绿记下的 refs/sop/gate-ok = c4
+  ① lib.sh diff_base（GATE_DIFF_BASE）：c3
+  ② changed-paths.sh gate：c3
+  ③ 61 号自带取法：c4
+  ④ 40/88 号自带取法：c4
+现场：/tmp/claude-1000/gate-fix-forks-r1-opus/t5.KGO7Rp

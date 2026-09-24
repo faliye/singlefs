@@ -2,7 +2,7 @@
 # 跑 `gate.sh --staged`，整轮全绿才把 `refs/sop/staged-green` 前移到这一次被判的那棵暂存树。
 #
 #   gate-staged.sh [项目根] [传给 gate.sh 的别的参数…]
-#   gate-staged.sh --selftest
+#   gate-staged.sh --selftest   自证：转给 research/scripts/gate-staged-selftest.sh（临时仓 + 假 gate.sh，全绿 / 有红 / 跑的过程中暂存区变了，格数由它的成功行现算）
 #
 # 为什么前移放在外壳里：共享 `gate.sh` 在上游（`.claude/singlefs-ai-sop/scripts/`），本仓的
 # `.claude/scripts/gate.sh` 只是 `exec` 转发，中间没有钩子。前移那一句只能由**起门禁的人**来做。

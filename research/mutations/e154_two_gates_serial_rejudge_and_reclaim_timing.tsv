@@ -10,5 +10,5 @@ M9_写失败不推进txg	        pool.next_txg += 1;\n        return Err(Publish
 M10_覆盖判据mod改成0	if last_txg % RING_REGIONS == 1 { 3 } else { 2 }	if last_txg % RING_REGIONS == 0 { 3 } else { 2 }
 M11_失败窗口边界改成大于	if self.call_index >= self.window_start && self.remaining > 0 {	if self.call_index > self.window_start && self.remaining > 0 {
 M12_退化不再先判真卡死	if pool.allocation_failure_hit {\n        build_run_summary(arm, geometry, history, pool, "卡死".to_string(), -2, true, 0)\n    } else {\n        build_run_summary(arm, geometry, history, pool, "退化".to_string(), -3, false, 0)\n    }	build_run_summary(arm, geometry, history, pool, "退化".to_string(), -3, false, 0)
-M13_H5撇位首窗口起点改成2	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 1,	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 2,
+M13_H8位首窗口起点改成2	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 1,	        let window_start = *self.window_start.get_or_insert_with(|| match self.position {\n            FailurePosition::First => 2,
 M14_H4崩溃点不看第一道闸是否重判	    if gate1 >= need || !arm.gate.rejudges_first_gate() {	    if gate1 >= need {

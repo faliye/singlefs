@@ -1,0 +1,9 @@
+# E158（择根与修复四岔路）第一段：运行记录（供交回报告引用；replay.sh 比对的是同目录下不带此后缀的纯输出文件）
+开跑于 2026-09-23 22:1x JST 起；本文件生成于 2026-09-24 01:39:23 JST
+git rev-parse HEAD: 3b60f098e97dc4c4f3ed9c6355422b607db1c34c
+git status --porcelain crates/ 的行数（S4：开跑前与交回前各记一次，两次相同即主工作区在这一段稳定）：74
+sha256sum crates/singlefs-core/src/*.rs crates/singlefs-format/src/*.rs | sha256sum：c23b2008600d66067f63373474059f0aa62af1f9ab227a4fac20e8b95e704fc8
+跑法：cargo build --release -p singlefs-harness --bin e158_root_choice_repair && ./target/release/e158_root_choice_repair all
+挂钟：real 0m26.888s（本机、release 编译，含 4 个几何点的 H3 全枚举与 PC3；见交回报告 13.2 节命令）
+单测：cargo test -p singlefs-harness --bin e158_root_choice_repair -> 5 passed; 0 failed
+两次独立跑 all 模式，stdout 逐字节一致（已用 diff 核过）

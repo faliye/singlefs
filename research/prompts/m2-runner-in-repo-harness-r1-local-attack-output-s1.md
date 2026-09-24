@@ -1,0 +1,10 @@
+RED-CHECK: no, NONE (no check exists for shared-code risk; FACT-7,8,9,10 show gates check file naming, mutations, paths but not constant correctness) | REST-CHECK: REST-1: no, NONE (no machine check for read-only behavior; FACT-2 states restriction but no gate enforces it) REST-2: no, NONE (GATE-56-SCRIPT checks file naming in verification doc, not code changes to core/checker; FACT-3 and FACT-7) REST-3: yes, GATE-59-SCRIPT checks mutation rows by verifying original text matches and test turns red (FACT-8) | FIRST-FINDER: NOBODY (no scheduled check detects wrong constants; human would notice results) | SHARED-FILE: for W2, no; W1 needs new content check gate while W2 uses WRITE-GUARD-HOOK. For W3, no; W1 requires new gate while W3 needs planning document checks.
+
+RED-CHECK: yes, WRITE-GUARD-HOOK (blocks writes to core/checker; FACT-4 and FACT-5) | REST-CHECK: REST-1: no, NONE (same as W1) REST-2: yes, WRITE-GUARD-HOOK blocks writes to core/checker (FACT-4,5) REST-3: yes, GATE-59-SCRIPT (FACT-8) | FIRST-FINDER: WRITE-GUARD-HOOK (immediately blocks writes to restricted paths) | SHARED-FILE: for W1, no; W2's fix involves WRITE-GUARD-HOOK or WRITE-SCOPE-TABLE while W1 requires new gate. For W3, no; W2's fix uses WRITE-GUARD-HOOK while W3 requires planning document checks.
+
+RED-CHECK: no, NONE (no check for trigger condition; FACT-11 and 12 show no mentions of "in repo harness" in planning doc or gates) | REST-CHECK: REST-1: no, NONE (same as W1) REST-2: yes, WRITE-GUARD-HOOK (blocks writes; FACT-4,5) REST-3: yes, GATE-59-SCRIPT (FACT-8) | FIRST-FINDER: NOBODY (no check for trigger condition; human would notice) | SHARED-FILE: for W1, no; W3 requires planning document changes while W1 needs new gate. For W2, no; W3's fix needs planning document checks while W2 uses WRITE-GUARD-HOOK.
+
+W1 overturn condition: if a new gate checks constant correctness in harness and core crates.
+W2 overturn condition: if WRITE-SCOPE-TABLE grants runner access to core or checker.
+W3 overturn condition: if planning document includes explicit section for harness type declaration.
+UNKNOWN COUNT 0

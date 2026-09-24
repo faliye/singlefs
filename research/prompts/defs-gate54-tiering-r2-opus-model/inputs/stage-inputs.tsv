@@ -1,0 +1,15 @@
+# 每道阶段读哪几条路径。一行一条：<阶段文件名><制表符><路径，空格分隔><制表符>#<为什么是这几条>
+#
+# 用途：判「这一道能不能复用上一次的判定」。判据是 research/scripts/stage-must-run.sh：
+#   这几条路径，在 refs/sop/staged-green 那棵树与这一次的暂存树之间，git 说变没变。
+#
+# ⚠️ 这份清单**自己也进比对**（脚本无条件把它加进路径列表）。少写一条输入，那条输入就永远
+# 不会让这道阶段重跑——而清单本身变了必定重跑，改清单的代价因此是「下一趟全跑一次」，不是零。
+#
+# 宁宽勿窄：多写一条路径只会多跑几趟，少写一条会让一次真的改动被跳过。拿不准就写上。
+# 只写从仓库根起的路径；目录写成带斜杠的前缀（git diff 的路径限定就按前缀匹配）。
+54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
+55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock research/scripts/ research/results/	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 research/scripts/
+59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试
+74-model-differential.sh	crates/ Cargo.toml Cargo.lock	# 拿 crates 里的实现与只住内存的理想模型对拍
+87-replay.sh	crates/ Cargo.toml Cargo.lock research/e7-index-bench/ research/scripts/ research/results/	# 复跑入库的实验产物，装置在 research/e7-index-bench/，登记表与脚本在 research/scripts/

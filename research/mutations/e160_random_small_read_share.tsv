@@ -1,0 +1,17 @@
+M1_丙分母漏加写作业的4GiB	random_read_bytes / (random_read_bytes + sequential_read_bytes)	random_read_bytes / (random_read_bytes + sequential_read_bytes + RationalNumber::from_integer(WRITE_SEQUENTIAL_JOB_BYTES))
+M2_甲判据5误用请求数口径	classify_against_band(weight_byte_share, band_lower_bound(), band_upper_bound())	classify_against_band(request_share, band_lower_bound(), band_upper_bound())
+M3_门槛漏加五个百分点	RationalNumber::new(ANCHOR_MULTIPLIER_NUMERATOR, ANCHOR_MULTIPLIER_DENOMINATOR) + RationalNumber::new(5, 100)	RationalNumber::new(ANCHOR_MULTIPLIER_NUMERATOR, ANCHOR_MULTIPLIER_DENOMINATOR)
+M4_判据1用大于不用大于等于	value >= judgement_one_threshold()	value > judgement_one_threshold()
+M5_带内按越过进规则	side == ThresholdSide::AboveUpperBound	side != ThresholdSide::BelowLowerBound
+M6_单元期望漏减一	RationalNumber::one() + RationalNumber::from_integer((pages_covered - 1) as i128) / RationalNumber::from_integer(unit_pages as i128)	RationalNumber::one() + RationalNumber::from_integer(pages_covered as i128) / RationalNumber::from_integer(unit_pages as i128)
+M7_读法A用比值的均值不用均值之比	anchor_multiplier() * weighted_units_32 / weighted_units_16	size_distribution.iter().fold(RationalNumber::zero(), |accumulator, &(pages_covered, share)| accumulator + share * anchor_multiplier() * expected_units_touched(pages_covered, UNIT_PAGES_32) / expected_units_touched(pages_covered, UNIT_PAGES_16))
+M8_相加用最大值代替求和	load_level_cost_c1 + header_cost_c5 >= threshold_sum	load_level_cost_c1.maximum(header_cost_c5) >= threshold_sum
+M9_先到先触发写成两条都越过	judgement_one || judgement_five_reopens(judgement_five_side)	judgement_one && judgement_five_reopens(judgement_five_side)
+M10_丙分母漏加两遍缓存对照字节	random_read_bytes / (random_read_bytes + sequential_read_bytes)	random_read_bytes / (random_read_bytes + sequential_read_bytes + RationalNumber::from_integer(CONTROL_BUFFERED_READ_BYTES))
+M11_两类模型的比写成128	const DEFAULT_SEQUENTIAL_TO_RANDOM_SIZE_RATIO: i128 = 256;	const DEFAULT_SEQUENTIAL_TO_RANDOM_SIZE_RATIO: i128 = 128;
+M12_乙缺请求数时填零	let part_value = part?;	let part_value = part.unwrap_or(RationalNumber::zero());
+M13_净荷写成32635头133	const HEADER_WITH_RESERVE_BYTES: u64 = HEADER_REGISTERED_BYTES + NONCE_MAC_RESERVED_BYTES;	const HEADER_WITH_RESERVE_BYTES: u64 = 133;
+M14_页到单元按整单元除	spans_two_units_given_payload(NET_PAYLOAD_BYTES, page_index)	spans_two_units_given_payload(UNIT_BYTES_32, page_index)
+M17_丙把随机作业的读量取成声明的文件大小	random_reads_per_second * RationalNumber::from_integer(PAGE_BYTES as i128) * RationalNumber::from_integer(RANDOM_JOB_RUNTIME_SECONDS)	RationalNumber::from_integer(DECLARED_SEQUENTIAL_FILE_BYTES)
+M18_甲不按权重直接取b的平均	accumulator + weights[tier_index] * random_shares_within_tier[tier_index]	accumulator + random_shares_within_tier[tier_index] / RationalNumber::from_integer(5)
+M21_读法A的倍数里混进占比	read_form_a_multiplier_over_distribution(size_distribution) // M21 目标	read_form_a_multiplier_over_distribution(size_distribution) * (RationalNumber::one() - byte_share) + byte_share // M21 目标

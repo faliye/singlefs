@@ -1,0 +1,84 @@
+=========== M1 恢复里那一道整单元校验和比对改成恒真
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-core/src/recovery.rs
+test the_known_panic_list_matches_by_file_and_message_not_by_line_number ... ok
+test the_location_entry_checksum_refuses_the_unit_that_was_resealed_with_only_its_own_checksums ... FAILED
+test every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched ... ok
+test bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites ... FAILED
+test the_report_is_the_same_with_one_worker_thread_and_four ... ok
+test result: FAILED. 3 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.19s
+--- 红在哪条断言：
+assertion `left == right` failed: 恢复读回了一版从没提交过的内容（里程碑增补 3 第 5 件的硬判据）：
+种子 7463871032432355115 坏法「判别力：数据单元整个重写、只重算它自己的两道校验和」：恢复读回了一版从没提交过的内容：读回 1912 字节（首字节 Some(165)、末字节 Some(165)），模型提交过的 5 版里没有这一份
+    坏在哪：判别力：盘 [0, 1] 槽 50184 的数据单元载荷（1912 字节）整个写成 0xa5，只重算它自己的两道校验和；extent 记录里的整单元校验和原样留着
+--
+  left: 8
+ right: 0
+
+
+
+=========== M2 条目宽那四条坏法一律交回「不适用」
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-harness/src/bad_disk_input.rs
+test every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched ... FAILED
+test bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites ... FAILED
+test result: FAILED. 3 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 16.12s
+--- 红在哪条断言：
+thread 'every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched' (1269668) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:273:32:
+坏法「条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算）」在这段历史的盘面上没有可坏的对象
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+--
+thread 'bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites' (1269667) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:109:9:
+坏法「条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算）」在这一档里一次都没造出坏镜像（12 段历史都没有它要坏的对象）：  历史 12 段（起点就失败、交不出合法镜像的 0 段）
+  三个读者：恢复 108 次（读回文件 33、没有文件 13、报错 62）、可写挂载 108 次（成 25、拒 31）、池级 checker 108 次
+  读回判定：模型提交过的某一版 46、报错 62、**从没提交过的内容 0**
+
+=========== M3 翻位坏法一位都不翻
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-harness/src/bad_disk_input.rs
+test every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched ... FAILED
+test result: FAILED. 4 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 20.18s
+--- 红在哪条断言：
+thread 'every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched' (1272177) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:275:9:
+坏法「翻位：写过的扇区里翻 4 位」说改了「翻位：盘 1 偏移 824249634 的第 2 位、盘 1 偏移 822157267 的第 4 位、盘 1 偏移 824554975 的第 7 位、盘 0 偏移 824642490 的第 3 位」，镜像却逐字节没变
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+=========== M4 各片按到达次序合并里的次序被打乱（片内倒序）
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-harness/src/bad_disk_input.rs
+test the_report_is_the_same_with_one_worker_thread_and_four ... FAILED
+test result: FAILED. 4 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 26.52s
+--- 红在哪条断言：
+thread 'the_report_is_the_same_with_one_worker_thread_and_four' (1273963) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:310:5:
+assertion `left == right` failed: 1 个工作线程与 4 个跑出来的报告不一样：并起来的次序或者留第一个的规则与线程数有关
+  left: "坏盘输入：种子 [7463871032432355113, 7463871032432355119) × 每段 4 步；比重「各类操作都抽（快档、大档）」；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘\n  按种子次序的摘要 0a378fdcdc0e4276\n  历史 6 段（起点就失败、交不出合法镜像的 0 段）\n  三个读者：恢复 69 次（读回文件 15、没有文件 6、报错 40）、可写挂载 69 次（成 14、拒 14）、池级 checker 69 次\n  读回判定：模型提交过的某一版 21、报错 40、**从没提交过的内容 0**\n  逐坏法（造出 / 不适用 / 被读者看见）：\n    翻位：写过的扇区里翻 4 位 | 6 / 0 / 6 | 盲坏法（不指着普查里的某一族）\n    清零：一个写过的扇区整个清零 | 6 / 0 / 5 | 盲坏法（不指着普查里的某一族）\n    截尾：切点之后写过的扇区全丢掉 | 6 / 0 / 6 | 盲坏法（不指着普查里的某一族）\n    条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：inode 树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：分配记录树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：记账树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    分配器：一条分配记录的槽号落在单元区之外 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：一条分配记录的跨度越过单元区末尾 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：两条分配记录罩住同一个槽 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：一条分配记录的设备身份不在池里 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：记账树里 inode 号水位那一行被改挂到别的标签上 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    写侧断言：系统配置里的区域数越过那个长 3 的数组 | 6 / 0 / 6 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）\n    写侧断言：一条指针的两条位置条目槽号不等 | 6 / 0 / 6 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）\n    判别力：数据单元整个重写、只重算它自己的两道校验和 | 3 / 3 / 3 | 不指 panic：指着恢复里那一道整单元校验和比对\n  清单里的 panic（KNOWN_PANIC_SITES，今天还没修的缺口）：{\"checker 拿盘上的区域数下标一个长 3 的数组\": 6, \"checker 的小端读法在窄条目上越界\": 8, \"checker 走读 extent 记录时按固定偏移切\": 4, \"core 的条目解析器按固定偏移切窄条目\": 24, \"分配器按槽号算下标时下溢\": 4, \"分配器重建时两条记录罩住同一个槽\": 8, \"分配记录的盘不在池里\": 4, \"挂载重建分配器时的两盘同槽断言\": 1, \"记账树里没有 inode 号水位那一行\": 4, \"释放判定里的两盘同槽断言\": 4}；清单外的 panic 0 次\n  池级 checker 在坏镜像上判红：{\"I-1.1\": 20, \"I-2.1\": 49, \"I-2.3\": 4, \"I-3.1\": 4, \"I-4.8\": 49, \"I-5.1\": 6, \"I-5.4\": 8, \"I-7.1\": 1, \"I-7.2\": 35, \"I-7.4\": 49}\n  新发现：0\n"
+ right: "坏盘输入：种子 [7463871032432355113, 7463871032432355119) × 每段 4 步；比重「各类操作都抽（快档、大档）」；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘\n  按种子次序的摘要 2ed9ece96e2aa1e6\n  历史 6 段（起点就失败、交不出合法镜像的 0 段）\n  三个读者：恢复 69 次（读回文件 15、没有文件 6、报错 40）、可写挂载 69 次（成 14、拒 14）、池级 checker 69 次\n  读回判定：模型提交过的某一版 21、报错 40、**从没提交过的内容 0**\n  逐坏法（造出 / 不适用 / 被读者看见）：\n    翻位：写过的扇区里翻 4 位 | 6 / 0 / 6 | 盲坏法（不指着普查里的某一族）\n    清零：一个写过的扇区整个清零 | 6 / 0 / 5 | 盲坏法（不指着普查里的某一族）\n    截尾：切点之后写过的扇区全丢掉 | 6 / 0 / 6 | 盲坏法（不指着普查里的某一族）\n    条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：inode 树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：分配记录树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    条目宽：记账树根自述的条目宽缩到 key 宽（链上校验和重算） | 4 / 2 / 4 | 普查第一族：条目宽度没有下界判（R1–R4、R13）\n    分配器：一条分配记录的槽号落在单元区之外 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：一条分配记录的跨度越过单元区末尾 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：两条分配记录罩住同一个槽 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：一条分配记录的设备身份不在池里 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    分配器：记账树里 inode 号水位那一行被改挂到别的标签上 | 4 / 2 / 4 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）\n    写侧断言：系统配置里的区域数越过那个长 3 的数组 | 6 / 0 / 6 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）\n    写侧断言：一条指针的两条位置条目槽号不等 | 6 / 0 / 6 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）\n    判别力：数据单元整个重写、只重算它自己的两道校验和 | 3 / 3 / 3 | 不指 panic：指着恢复里那一道整单元校验和比对\n  清单里的 panic（KNOWN_PANIC_SITES，今天还没修的缺口）：{\"checker 拿盘上的区域数下标一个长 3 的数组\": 6, \"checker 的小端读法在窄条目上越界\": 8, \"checker 走读 extent 记录时按固定偏移切\": 4, \"core 的条目解析器按固定偏移切窄条目\": 24, \"分配器按槽号算下标时下溢\": 4, \"分配器重建时两条记录罩住同一个槽\": 8, \"分配记录的盘不在池里\": 4, \"挂载重建分配器时的两盘同槽断言\": 1, \"记账树里没有 inode 号水位那一行\": 4, \"释放判定里的两盘同槽断言\": 4}；清单外的 panic 0 次\n  池级 checker 在坏镜像上判红：{\"I-1.1\": 20, \"I-2.1\": 49, \"I-2.3\": 4, \"I-3.1\": 4, \"I-4.8\": 49, \"I-5.1\": 6, \"I-5.4\": 8, \"I-7.1\": 1, \"I-7.2\": 35, \"I-7.4\": 49}\n  新发现：0\n"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+=========== M5 已知 panic 清单按整条位置相等认人（等于按行号认）
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-harness/src/bad_disk_input.rs
+test the_known_panic_list_matches_by_file_and_message_not_by_line_number ... FAILED
+test bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites ... FAILED
+test result: FAILED. 3 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 18.82s
+--- 红在哪条断言：
+thread 'the_known_panic_list_matches_by_file_and_message_not_by_line_number' (1274824) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:342:9:
+assertion `left == right` failed: 同一处 panic 换了行号就认不出来了：KnownPanicSite { registry_name: "core 的条目解析器按固定偏移切窄条目", panic_survey_item: "R1 / R2 / R3 / R4", file: "crates/singlefs-core/src/bytes.rs", message_fragment: "out of range for slice of length", how_it_is_reached: "条目宽那四条坏法；`ByteReader::take` / `get_*` 在 24 / 8 / 10 / 22 字节的条目上越界" }
+  left: None
+ right: Some("R1 / R2 / R3 / R4")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+--
+thread 'bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites' (1274822) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs:161:5:
+assertion `left == right` failed: 撞到 KNOWN_PANIC_SITES 之外的 panic：
+种子 7463871032432355113 坏法「写侧断言：系统配置里的区域数越过那个长 3 的数组」：池级 checker panic 在 crates/singlefs-checker/src/image.rs:206：index out of bounds: the len is 3 but the index is 3（不在 KNOWN_PANIC_SITES 里）
+    坏在哪：写侧断言：区域数改到数组之外——盘 0 偏移 0（3 → 4）、盘 0 偏移 4096（3 → 4）、盘 1 偏移 0（3 → 4）、盘 1 偏移 4096（3 → 4）
+    观察：恢复 Finished { how: "NoFile（实例 1 第 3 代根）" }；可写挂载 Finished { how: "Err(InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) })" }；checker 判红 []
+
+=========== M6 inode 树那条坏法与 extent 那条重名
+改了 /tmp/claude-1000/supp3-item5-bad-disk/scratch/crates/singlefs-harness/src/bad_disk_input.rs
+test bad_disk_input::tests::every_damage_kind_is_listed_once_and_names_are_distinct ... FAILED
+test result: FAILED. 59 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.10s
+--- 红在哪条断言：
+thread 'bad_disk_input::tests::every_damage_kind_is_listed_once_and_names_are_distinct' (1275137) panicked at crates/singlefs-harness/src/bad_disk_input.rs:1961:9:
+assertion `left == right` failed: 每种坏法一个名字，报告按名字分格
+  left: 14
+ right: 15
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+

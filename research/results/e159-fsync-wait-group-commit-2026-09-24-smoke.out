@@ -1,0 +1,190 @@
+# E159（fsync 等待时间随并发数：组提交与 WAL 两臂）——装置与冒烟证据存档
+# 只做到「装置与冒烟」这一段（正式计时的主网格、PC1–PC3、AA、G8、G1、G6 五轮不在这一次范围内）。
+# 这份文件不是入库的判据产物（判据钉在源码里的单测与变异表），是 gate 69「产物新于源码」
+# 与门禁审计要的存证：单测、变异表全量跑、以及首次真机冒烟（含一次真的 read_at 对齐 bug 与修复前后对照）。
+# 命令与时刻见 /tmp/claude-1000/e159-s1/report.md。本机口径：AMD Ryzen 9 9950X + NVMe KINGSTON SNV3S4000G，
+# 来宾 8 vCPU / 2048M 内存（vm-bench.sh 默认）、virtio-blk cache=none,aio=native。
+
+## 一、cargo test（release，54/54）——跑于 2026-09-24 03:45 UTC
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+warning: unused variable: `inode_container_catch_up`
+    --> e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:2013:27
+     |
+2013 |     let (extent_catch_up, inode_container_catch_up, inode_root_catch_up, extra_named_items) = match arm {
+     |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_inode_container_catch_up`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `e7-index-bench` (bin "e159-fsync-wait-group-commit" test) generated 1 warning (run `cargo fix --bin "e159-fsync-wait-group-commit" -p e7-index-bench --tests` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.88s
+     Running unittests src/bin/e159_fsync_wait_group_commit.rs (target/release/deps/e159_fsync_wait_group_commit-3419f076821ef678)
+
+running 54 tests
+test capacity_tests::capacities_match_the_preregistration_anchors ... ok
+test capacity_tests::accounting_internal_capacity_and_identity_reference_variant_match_the_anchors ... ok
+test capacity_tests::inode_tree_is_at_least_two_layers_even_with_one_entry ... ok
+test capacity_tests::extent_tree_reaches_two_layers_at_file_count_145 ... ok
+test convergence_and_saturation_status_tests::convergence_and_saturation_status_reports_both_conditions_independently ... ok
+test e159_anchor_and_rule_tests::checkpoint_trigger_fires_on_time_threshold_with_correct_constant_but_not_with_mutated_one ... ok
+test convergence_and_saturation_status_tests::layer_zero_below_sixty_four_nodes_never_triggers_second_half ... ok
+test e159_anchor_and_rule_tests::checkpoint_trigger_fires_on_dirty_bytes_threshold_even_before_time_threshold ... ok
+test e159_anchor_and_rule_tests::checkpoint_time_threshold_constant_is_five_seconds ... ok
+test e159_anchor_and_rule_tests::containment_violation_detected_when_order_broken ... ok
+test convergence_and_saturation_status_tests::layer_zero_at_or_above_sixty_four_nodes_triggers_at_the_fifty_percent_boundary ... ok
+test e159_anchor_and_rule_tests::classify_ratio_boundary_at_threshold_counts_as_crossed ... ok
+test e159_anchor_and_rule_tests::main_geometry_write_ahead_log_batch_expected_bytes ... ok
+test e159_anchor_and_rule_tests::main_geometry_primary_physical_block_size_is_512 ... ok
+test e159_anchor_and_rule_tests::drain_batch_from_queue_collects_everything_when_group_commit_is_on ... ok
+test e159_anchor_and_rule_tests::mann_whitney_a_is_one_half_when_samples_are_identical_distributions ... ok
+test e159_anchor_and_rule_tests::drain_batch_from_queue_collects_only_one_when_group_commit_is_off ... ok
+test e159_anchor_and_rule_tests::merge_five_rounds_four_against_one_is_unstable_not_majority ... ok
+test e159_anchor_and_rule_tests::plan_batch_for_arm_routes_each_arm_to_its_own_solver_not_a_different_one ... ok
+test e159_anchor_and_rule_tests::jia_single_fsync_batch_matches_crates_test_table ... ok
+test e159_anchor_and_rule_tests::merge_five_rounds_unanimous_reports_that_verdict ... ok
+test e159_anchor_and_rule_tests::mann_whitney_a_is_near_one_when_a_always_greater ... ok
+test e159_anchor_and_rule_tests::release_to_wake_is_positive_when_release_precedes_return ... ok
+test e159_anchor_and_rule_tests::round_stochastic_is_unbiased_over_many_draws ... ok
+test e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order ... ok
+test e159_anchor_and_rule_tests::open_loop_issued_at_uses_scheduled_instant_not_actual ... ok
+test e159_anchor_and_rule_tests::root_slot_width_is_primary_physical_block_size ... ok
+test group_formula_tests::single_continuous_group_never_exceeds_node_count ... ok
+test group_formula_tests::far_policy_touches_more_nodes_than_near_policy_when_multi_node ... ok
+test e159_anchor_and_rule_tests::jia_durable_instant_is_not_earlier_than_the_root_slot_fua ... ok
+test group_formula_tests::scattered_continuous_groups_differ_from_independent_scattered_points ... ok
+test group_formula_tests::scattered_group_saturates_to_region_node_count_as_touch_count_grows ... ok
+test jia_anchor_tests::fixed_point_converges_well_below_the_iteration_ceiling ... ok
+test group_formula_tests::balanced_random_far_fraction_is_one_minus_previous_touch_fraction_not_the_fraction_itself ... ok
+test group_formula_tests::combine_touches_never_exceeds_node_count ... ok
+test jia_anchor_tests::fixed_point_iteration_ceiling_triggers_at_file_count_1e8_one_data_unit_per_file_random_balanced ... ok
+test jia_anchor_tests::eight_adjacent_family_extent_dirty_nodes_above_leaf_layer_stay_at_or_below_two ... ok
+test jia_anchor_tests::jia_matches_the_anchor_at_file_count_1_on_every_position_policy ... ok
+test jia_anchor_tests::layer_zero_saturation_triggers_on_allocation_tree_at_file_count_1e6_one_data_unit_per_file_random_far ... ok
+test e159_anchor_and_rule_tests::write_ahead_log_full_single_fsync_batch_anchor ... ok
+test e159_anchor_and_rule_tests::round_stochastic_never_returns_negative_or_absurd_values_for_zero ... ok
+test group_formula_tests::single_node_class_is_always_fully_dirty_when_active ... ok
+test e159_anchor_and_rule_tests::trend_rule_expanding_requires_three_consecutive_five_percent_steps ... ok
+test jia_anchor_tests::allocation_tree_height_threshold_moves_from_205_to_181_after_counting_data_units_in_backlog ... ok
+test jia_anchor_tests::jia_at_file_count_145_matches_the_anchor ... ok
+test e159_anchor_and_rule_tests::write_ahead_log_leaf_single_fsync_batch_anchor ... ok
+test jia_anchor_tests::jia_has_exactly_two_barriers_and_one_fua_on_every_grid_point ... ok
+test group_formula_tests::allocation_tree_new_data_placement_scattered_under_far_policy_and_random_placement ... ok
+test group_formula_tests::data_unit_class_far_fraction_ignores_position_policy ... ok
+test jia_anchor_tests::jia_dirty_node_counts_never_exceed_their_own_layer_node_counts ... ok
+test group_formula_tests::near_policy_never_creates_a_far_group ... ok
+test e159_anchor_and_rule_tests::system_configuration_slot_is_read_twice_before_being_written ... ok
+test e159_anchor_and_rule_tests::pc1_injected_wait_lands_before_release_not_after ... ok
+test e159_anchor_and_rule_tests::closed_loop_queueing_delay_is_counted_when_group_commit_is_off ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+
+## 二、mutate.sh（14/14 全抓，第二次跑：加了 read_at 修复与 anchors 重构之后）——跑于 2026-09-24 03:44 UTC
+基线：全绿
+✅ [M1_甲发布去掉第二道屏障] 红：e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order
+✅ [M2_第一道屏障之后就放行] 红：e159_anchor_and_rule_tests::jia_durable_instant_is_not_earlier_than_the_root_slot_fua
+✅ [M3_WAL臂写混成甲的规划函数] 红：e159_anchor_and_rule_tests::plan_batch_for_arm_routes_each_arm_to_its_own_solver_not_a_different_one
+✅ [M4_组提交开也把批封顶为1] 红：e159_anchor_and_rule_tests::drain_batch_from_queue_collects_everything_when_group_commit_is_on
+✅ [M5_t_issue改成在收批时刻取] 红：e159_anchor_and_rule_tests::closed_loop_queueing_delay_is_counted_when_group_commit_is_off
+✅ [M6_PC1忙等挪到放行之后] 红：e159_anchor_and_rule_tests::pc1_injected_wait_lands_before_release_not_after
+✅ [M7_随机取整换成向下取整] 红：e159_anchor_and_rule_tests::round_stochastic_is_unbiased_over_many_draws
+✅ [M8_T_time常量读成50秒] 红：e159_anchor_and_rule_tests::checkpoint_time_threshold_constant_is_five_seconds
+✅ [M9_系统配置槽写之前不读] 红：e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order,e159_anchor_and_rule_tests::system_configuration_slot_is_read_twice_before_being_written
+✅ [M10_根槽写4096字节而不是512] 红：e159_anchor_and_rule_tests::root_slot_width_is_primary_physical_block_size
+✅ [M11_J1比较从大于等于改成大于] 红：e159_anchor_and_rule_tests::classify_ratio_boundary_at_threshold_counts_as_crossed
+✅ [M12_五轮合并改成多数轮说了算] 红：e159_anchor_and_rule_tests::merge_five_rounds_four_against_one_is_unstable_not_majority
+✅ [M13_开环issued_at改取实际发出时刻] 红：e159_anchor_and_rule_tests::open_loop_issued_at_uses_scheduled_instant_not_actual
+✅ [M14_放行到醒这一段漏掉唤醒] 红：e159_anchor_and_rule_tests::release_to_wake_is_positive_when_release_precedes_return
+已还原，基线仍全绿
+
+## 三、真机冒烟：S3 探针（logical_block_size）——跑于 2026-09-24 03:44 UTC（修复之后）
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+E7RESULT E159PROBE device=vda logical_block_size=512
+E7RESULT name=done emitted=2
+  ✓ 退出码 0，抓到 2 条结果（与程序声称的 2 条相符）
+
+## 四、真机冒烟：第一次真跑撞见的真 bug（修复前，2026-09-24 01:31 UTC）
+# `RealBlockDevice::read_at` 把数据读进一块普通 `vec![0u8; length]`（不对齐），O_DIRECT 下
+# EINVAL；这一条之前没有任何单测覆盖到 `RealBlockDevice`（全部 48 条旧单测只用
+# `RecordingBlockDevice` 或 `SleepingBlockDevice`）。命令：
+#   vm-bench.sh <musl 二进制> cell --device /dev/vda --arm jia --k 1024 --group-commit on
+#     --warmup-seconds 0.3 --duration-seconds 3 --seed 1 --file-count 10000 --family f8a
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✗ 读不到退出标记，判定不明，整轮作废
+     → 怎么办：虚机可能没启动完就超时了；去下面打出的控制台尾部日志确认内核与二进制路径正确、initramfs 有没有打包漏东西。
+        c[?7l[2JSeaBIOS (version 1.16.3-debian-1.16.3-2)
+
+
+        iPXE (https://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+7EFCAD80+7EF0AD80 CA00
+        Press Ctrl-B to configure iPXE (PCI 00:03.0)...
+
+
+        Booting from ROM...
+        c[?7l[2J
+        thread '<unnamed>' (100) panicked at e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs:2184:53:
+        read_at 失败：设备或对齐有问题: Os { code: 22, kind: InvalidInput, message: "Invalid argument" }
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+        qemu-system-x86_64: terminating on signal 15 from pid 4066353 (timeout)
+
+## 五、真机冒烟：修复之后，同一条命令换 k=4（无预分配，稀疏盘，2026-09-24 03:34 UTC）
+# 不再 panic；samples=0 是稀疏盘首次触碰扇区要改宿主 ext4 元数据（第五节 5.3「测量之前整盘写一遍」
+# 那一步这次没做），不是 bug——见下一节加了 VM_DISK_PREALLOCATE=1 之后 samples 变正。
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+E7RESULT E159RESULT arm=jia k=4 group_commit=true samples=0 median_ns=0 p99_ns=0 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=1917952
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=3746 sectors_read_diff=32 writes_completed_diff=94 reads_completed_diff=4
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+## 六、真机冒烟：三条臂各跑一格（fallocate 预分配，2026-09-24 03:36–03:37 UTC）
+### 甲，k=1，group-commit on，duration=3s
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=jia k=1 group_commit=true samples=5 median_ns=162480071 p99_ns=2478662723 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=5623808
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=10984 sectors_read_diff=128 writes_completed_diff=315 reads_completed_diff=16
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+### wal_full-K10，k=2，group-commit on，duration=4s（未触发 checkpoint：T_time=5s 未到、T_dirty 256MiB 未到）
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=wal_full-K10 k=2 group_commit=true samples=50 median_ns=111053287 p99_ns=277548579 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=20590592
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=40216 sectors_read_diff=0 writes_completed_diff=897 reads_completed_diff=0
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+### yi-M-K10，k=2，group-commit on，duration=6s（触发 checkpoint_count=1，checkpoint 机制真跑通过）
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=yi-M-K10 k=2 group_commit=true samples=37 median_ns=193801295 p99_ns=854997334 containment_violations=0 checkpoint_count=1 checkpoint_bytes=434688 bytes_written_estimate=12751360
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=24905 sectors_read_diff=16 writes_completed_diff=540 reads_completed_diff=2
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+## 七、真机冒烟：最终确认（read_at 修复 + anchors 重构之后再跑一遍，2026-09-24 03:44 UTC）
+### 甲，k=4，group-commit on，duration=3s（fallocate 预分配）
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=jia k=4 group_commit=true samples=137 median_ns=90944244 p99_ns=167275766 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=58545152
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=114346 sectors_read_diff=672 writes_completed_diff=2544 reads_completed_diff=84
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）

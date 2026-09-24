@@ -432,3 +432,15 @@ path = "src/bin/e155_third_run_release_cascade.rs"
 [[bin]]
 name = "e155-fourth-run-group-commit-concurrency"
 path = "src/bin/e155_fourth_run_group_commit_concurrency.rs"
+
+[[bin]]
+name = "e157-parallel-line-one-clauses"
+path = "src/bin/e157_parallel_line_one_clauses.rs"
+
+[[bin]]
+name = "e160-random-small-read-share"
+path = "src/bin/e160_random_small_read_share.rs"
+
+[[bin]]
+name = "e159-fsync-wait-group-commit"
+path = "src/bin/e159_fsync_wait_group_commit.rs"

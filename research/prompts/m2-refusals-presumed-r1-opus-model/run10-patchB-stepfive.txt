@@ -1,0 +1,12 @@
+
+thread 'raising_the_floor_on_a_current_version_without_a_rewritten_instance_table_unit_is_refused_instead_of_panicking' (2047200) panicked at crates/singlefs-harness/tests/second_transaction_step_five_reuse.rs:619:5:
+第一个事务之后直接抬 F：现行版本里没有重写过的实例表单元：Some(RollbackFloorAboveCeiling { requested: CheckpointTxg(1), ceiling: CheckpointTxg(0) })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    raising_the_floor_on_a_current_version_without_a_rewritten_instance_table_unit_is_refused_instead_of_panicking
+
+test result: FAILED. 11 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.39s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_step_five_reuse`

@@ -154,7 +154,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|@driver_e142||e142-first-txn-dry-run-2026-09-18-change-count-three.out|exact
+E142|@driver_e142||e142-first-txn-dry-run-2026-09-23-decisions-catchup.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -166,12 +166,26 @@ E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026
 E144|e144-header-checksum-cost||e144-header-checksum-cost-2026-09-13.out|timing
 E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
-E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out|exact
-E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out|exact
-E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-17-stage4.out|exact
-E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-19-stage2.out|exact
+E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-24-rename.out|exact
+E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-24-rename.out|exact
+E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-24-rename.out|exact
+E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-24-rename.out|exact
 E155R3|e155-third-run-release-cascade||e155-third-run-release-cascade-2026-09-20-stage1.out|exact
 E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-concurrency-2026-09-21.out|exact
+E156|@driver_e156||e156-alloc-basis-counts-2026-09-24-stage4.out|exact
+E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-22.out|exact
+E160|e160-random-small-read-share||e160-random-small-read-share-segment1-2026-09-24.out|exact
+E158|@driver_e158||e158-root-choice-repair-2026-09-24-segment1-rerun.out|exact
+E158|@driver_e158_q3_1_g0||e158-root-choice-repair-2026-09-24-q3-1-g0.out|exact
+E158|@driver_e158_q3_1_s16||e158-root-choice-repair-2026-09-24-q3-1-s16.out|exact
+E158|@driver_e158_q3_1_small_ring||e158-root-choice-repair-2026-09-24-q3-1-small-ring.out|exact
+E158|@driver_e158_q3_1_s4||e158-root-choice-repair-2026-09-24-q3-1-s4.out|exact
+E158|@driver_e158_q1_g0||e158-root-choice-repair-2026-09-24-q1-g0-today.out|exact
+E158|@driver_e158_q2_1_g0||e158-root-choice-repair-2026-09-24-q2-1-g0-today.out|exact
+E158|@driver_e158_q2_2a_g0||e158-root-choice-repair-2026-09-24-q2-2a-g0-today.out|exact
+E158|@driver_e158_q2_1_pc2||e158-root-choice-repair-2026-09-24-pc2-today.out|exact
+E158|@driver_e158_q2_1_g0_session_s5||e158-root-choice-repair-2026-09-24-q2-1-g0-today-session-s5.out|exact
+E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-24-anchors.out|exact
 TSV
 )
 
@@ -380,6 +394,88 @@ driver_e142() {
   cat "$impl_snapshot"
 }
 
+# E156（入库装置，跑前登记「一」读法写死第 1 行；重跑登记 `research/prompts/e156-r2-prereg.md`「五、5.7」
+# 第一、二、三段都在同一个二进制里，产物是累计的：2026-09-24 stage2.out 前 324 行是第一段（岔路 7），
+# 之后是第二段（岔路 3，run_hf_single_cell）与第三段（岔路 1，run_hh_cell）新加的行。
+# stage3.out（2026-09-24，重跑登记「十二」修订这一段）在 stage2.out 的基础上追加：Q1 诊断溯源
+# （`q1_delta_debug`／已回收未覆盖记录过滤，见修订）、岔路 1 的 S = 4 第二个几何取样点（`q1_hh`／
+# `q1d_*` 的 `s=` 字段、`anchor_k8`、`q1_geometry_sensitivity_s`）、K9 前提现核（`k9_precondition`）；
+# 在 stage2.out 原有的 329 行共有格式上逐字节相同（`e156-s4/report.md` 的对拍命令），Q3e（X8-A）仍
+# `status=not_done`，未做。stage4.out（2026-09-24，续派第二段）在 stage3.out 的基础上追加：岔路 1
+# 步数对齐对照（`q1_step_matched_diff`，`run_hh_cell` 新增 `matched_to_holes` 参数）、岔路 3 的
+# Q3e（X8-A/HY，`run_x8a_cell`，独立 128 槽小池）与 Q3d（`q3d_derived`）；在 stage3.out 原有的 323 行
+# （K1/legal_state/s1d_step/Q7 全家/PC-检查三条/HK-HR-H0 构造）共有格式上逐字节相同。
+# 整个装置就活在 crates/singlefs-harness 里，没有 research/e7-index-bench 侧的配对二进制，先例同 E142（第 371 行注释）——
+# 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-24 现查，见实验页）。
+driver_e156() {
+  (cd .. && cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts)
+}
+
+# E158（第一段，入库装置，跑前登记「装置写在哪」写死第 5 行）：同 E156 的先例，两个 cargo workspace
+# 互相看不到对方，不能合并成一次调用。`all` 模式跑 5.7 常量回比、第七节锚点、S5 独立解码对拍、
+# H3（岔路 3）四个几何点不注入全枚举、Q3-2/Q2-3 算术、PC3。
+# 2026-09-23 产物在 `crates/` 落地 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 定案（拿掉
+# 「回退到无文件那一版」的拒绝）之后结构性对不上（50 行不同，原因见实验页与
+# `/tmp/claude-1000/e158-s2/report.md` 第 1 节）；2026-09-24 主 agent 定这一行承重
+# `e158-root-choice-repair-2026-09-24-segment1-rerun.out`（旧产物 `…-2026-09-23-segment1.out`
+# 原样留着，对应 C512 落地之前的代码，不再是这一行比对的对象）。
+driver_e158() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- all)
+}
+
+# E158 第二段 Q3-1（岔路 3 候选 3 那一半，2026-09-24）：`q3-1-g0` 模式只跑 G0 几何上的
+# H3 × Φ3（|F|≤2）违例枚举，不跑第一段的 H3 全枚举（那部分归 `driver_e158`）。
+driver_e158_q3_1_g0() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-g0)
+}
+# 第八节敏感性（行 3）三个取样点：S16、小环（环长现算，产物里的 `small_ring_search` 那行同时钉住取到的环长）、
+# S4（`sigma_length_limit=4`，比其余三点多穷举一层，代价数量级最大，real 约 18 分钟，2026-09-24 现查）。
+driver_e158_q3_1_s16() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s16)
+}
+driver_e158_q3_1_small_ring() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-small-ring)
+}
+driver_e158_q3_1_s4() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-s4)
+}
+# E158 岔路单第 1 行（C393）：`q1-g0` 模式在今天的 `crates/`（候选 (c)）上跑 H1 家族 + Φ1 故障注入 +
+# PC1-a/PC1-b，只跑 G0 几何（2026-09-24 session s3，见实验页）。候选 (a)（A1 副本）的同一份数只存产物
+# `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，**不登记在这张表里**：它要在
+# `research/mutations/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
+# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。
+driver_e158_q1_g0() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-g0)
+}
+# E158 岔路单第 2 行 ①（C331 修法，session s4，2026-09-24 session s5 起废弃，见下）：`q2-1-g0` 在
+# 今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
+# 下界搜索。**session s5 查出这条产物是在故障装配 bug 存在时跑出来的**（`attempt_rootback_probe_
+# and_advance` 一块盘只装得上一个故障目标，权重 ≥ 2 就可能漏装——见跑前登记「十二、修订」session s5
+# 条目第 2 条）：bug 修好之后同一个 n1 范围重跑给出不同结果（甲-txg 臂从「0 命中」变成「k_min=4」），
+# 这条产物与它对应的 `driver_e158_q2_1_g0` 不能再当「今天/丙 0 命中」的依据引用，只留着当「bug 修前
+# 长什么样」的历史对照。承重的是下面 `driver_e158_q2_1_g0_session_s5`。
+driver_e158_q2_1_g0() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
+}
+# E158 岔路单第 2 行 ②（每条修法每次发布多写几字节，session s4）：`q2-2a-g0` 在今天的 `crates/` 上跑
+# 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
+driver_e158_q2_2a_g0() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-2a-g0)
+}
+# E158 岔路单第 2 行 PC2（阳性对照，session s5）：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
+# 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」session s5。
+# 乙-只配置候选的同一份数只存产物（副本上的数，副本没有 `published_txg` 字段就编不过，不登记在这张
+# 表里，复跑步骤见实验页与 `research/mutations/e158_arms.tsv`）。
+driver_e158_q2_1_pc2() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-pc2)
+}
+# E158 岔路单第 2 行 ①（C331 修法，2026-09-24 session s5，承重）：修好故障装配 bug 之后，`q2-1-g0`
+# 在今天的 `crates/`（丙 = 甲-jsn）上重跑 H2 主族，n1 范围从 {0,1,2,3} 补齐到跑前登记 5.1 要求的
+# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。
+driver_e158_q2_1_g0_session_s5() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
+}
+
 ONLY=("$@")
 # 替换表按 E103 这种带 E 的形态登记；裸数字会匹配 0 条并报全零（2026-09-05 在 E103 上踩过两次）。
 for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
@@ -410,24 +506,25 @@ CLAIM_QUEUE=()
 
 printf '%-5s %-24s %-10s %s\n' 实验 二进制 判定 说明
 printf '%s\n' "-------------------------------------------------------------------------"
-while IFS='|' read -r exp bin args stored kind; do
-  [[ -z "$exp" ]] && continue
-  want "$exp" || continue
-  args="${args//\$REPLAY_DEV140/$REPLAY_DEV140}"  # 先换长的，否则前缀会被短的吃掉
-  args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"
-  args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"
-  args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
-  fresh="$OUT_DIR/$exp.out"
+# 一条实验的复跑：并发起的，所以计数、结果行与 claim 队列都落到自己的文件，
+# 父进程按登记表的顺序回读（command-safety.md「并行不许把失败吃掉」「输出不许直接往 stdout 写」）。
+replay_one() {
+  # 第 2 个参数是这一条在登记表里的序号：同一个实验号可以有两行（E16 就是，一行比 e16-journal、
+  # 一行带 args=bytes 比 e16-bytes），按实验号命名输出文件时两条会并发写同一个文件，
+  # 后写完的那份整份留下、另一条的结果彻底消失，而「派多少收多少」那道闸只判文件存不存在、看不出来。
+  local exp="$1" seq="$2" bin="$3" args="$4" stored="$5" kind="$6" tag fresh rc gate2 n
+  tag="$exp.$seq"
+  fresh="$OUT_DIR/$tag.out"
   rm -f "$fresh"                                    # 闸 1：不许跨轮复用
   if [[ "$bin" == @* ]]; then
-    "${bin#@}" >"$fresh" 2>"$OUT_DIR/$exp.err"
+    "${bin#@}" >"$fresh" 2>"$OUT_DIR/$tag.err"
   else
     # shellcheck disable=SC2086
-    ./target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$exp.err"
+    ./target/release/"$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err"
   fi
   rc=$?
   if [[ $rc -ne 0 ]]; then                          # 闸 3
-    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "退出码 $rc，见 $OUT_DIR/$exp.err"; broken=$((broken+1)); continue
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "退出码 $rc，见 $OUT_DIR/$tag.err" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"; return
   fi
   # 闸 2：**逐段**核。产物可能是多次运行拼起来的（E9 就是 25 段），
   # 只看最后一个 name=done 会让前 24 段的缺行全部漏过去。
@@ -440,32 +537,80 @@ while IFS='|' read -r exp bin args stored kind; do
                }
                END{ if (!bad) { if (segs==0) print "没有收尾行 name=done"; else if (n>0) print "最后一段没有收尾行，尾巴 " n " 条" } }' "$fresh")
   if [[ -n "$gate2" ]]; then
-    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "$gate2"; broken=$((broken+1)); continue
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "$gate2" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"; return
   fi
   # 留存产物已按「每次提交删上一次的实验记录」归档进版本库时，这一档不比对。
   # 不报成「对不上」：那与「装置真的改坏了、复跑出不同字节」长得一模一样，读的人会以为实验坏了
   # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
   if [[ ! -f "results/$stored" ]]; then
-    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 产物已归档 "$stored 不在树里；本次跑得出来，逐字节这一档不比对"
-    archived=$((archived+1)); CLAIM_QUEUE+=("$exp|$fresh"); continue
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 产物已归档 "$stored 不在树里；本次跑得出来，逐字节这一档不比对" >"$OUT_DIR/$tag.line"
+    echo archived >"$OUT_DIR/$tag.verdict"; echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"; return
   fi
   if diff -q "$fresh" "results/$stored" >/dev/null 2>&1; then
-    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 字节一致 "$stored"; pass=$((pass+1))
-    CLAIM_QUEUE+=("$exp|$fresh"); continue
+    printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 字节一致 "$stored" >"$OUT_DIR/$tag.line"; echo pass >"$OUT_DIR/$tag.verdict"
+    echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"; return
   fi
   if diff -q <(strip_timing <"$fresh") <(strip_timing <"results/$stored") >/dev/null 2>&1; then
     if [[ "$kind" == timing ]]; then
-      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 仅计时不同 "$stored（结构一致，符合声明）"; timing_only=$((timing_only+1))
-      CLAIM_QUEUE+=("$exp|$fresh")
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 仅计时不同 "$stored（结构一致，符合声明）" >"$OUT_DIR/$tag.line"; echo timing_only >"$OUT_DIR/$tag.verdict"
+      echo "$exp|$fresh" >"$OUT_DIR/$tag.claim"
     else
-      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 判据写错 "$stored 声明 exact 却只在抹掉计时后才一致"; drift=$((drift+1))
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 判据写错 "$stored 声明 exact 却只在抹掉计时后才一致" >"$OUT_DIR/$tag.line"; echo drift >"$OUT_DIR/$tag.verdict"
     fi
-    continue
+    return
   fi
   n=$(diff <(strip_timing <"$fresh") <(strip_timing <"results/$stored") | grep -c '^[<>]')
-  printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 对不上 "$stored，$n 行不同 → diff $fresh results/$stored"
-  drift=$((drift+1))
+  printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 对不上 "$stored，$n 行不同 → diff $fresh results/$stored" >"$OUT_DIR/$tag.line"
+  echo drift >"$OUT_DIR/$tag.verdict"
+}
+
+# 并发度：这些实验多是跑 release 二进制的 CPU 活，按核数定；有几个自己就是多线程的，所以不吃满。
+# REPLAY_JOBS 压过它。各条实验的产物、镜像（e9/e45/e58/e140.img）与结果文件各用各的，没有共用的可写状态。
+REPLAY_JOBS="${REPLAY_JOBS:-$(( $(nproc 2>/dev/null || echo 4) / 2 ))}"
+[[ "$REPLAY_JOBS" -lt 1 ]] && REPLAY_JOBS=1
+declare -a REPLAY_PIDS=() REPLAY_ORDER=()
+running=0
+row_sequence=0
+while IFS='|' read -r exp bin args stored kind; do
+  [[ -z "$exp" ]] && continue
+  want "$exp" || continue
+  args="${args//\$REPLAY_DEV140/$REPLAY_DEV140}"  # 先换长的，否则前缀会被短的吃掉
+  args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"
+  args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"
+  args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
+  row_sequence=$((row_sequence+1))
+  REPLAY_ORDER+=("$exp.$row_sequence")
+  replay_one "$exp" "$row_sequence" "$bin" "$args" "$stored" "$kind" &
+  REPLAY_PIDS+=($!)
+  running=$((running+1))
+  if (( running >= REPLAY_JOBS )); then wait -n 2>/dev/null || true; running=$((running-1)); fi
 done <<<"$TABLE"
+# 逐个 wait 写死的 pid，不写不带参数的 wait（它的退出码恒为 0，红了几个一个字都不说）
+for pid in ${REPLAY_PIDS[@]+"${REPLAY_PIDS[@]}"}; do wait "$pid" 2>/dev/null || true; done
+
+# 派出去多少条就要收回来多少条：对不上整道红，不许少跑一条还报绿
+collected=0
+for tag in ${REPLAY_ORDER[@]+"${REPLAY_ORDER[@]}"}; do
+  [[ -f "$OUT_DIR/$tag.line" ]] && collected=$((collected+1))
+done
+if (( collected != ${#REPLAY_ORDER[@]} )); then
+  echo "  ✗ 派出去 ${#REPLAY_ORDER[@]} 条复跑，只收回 $collected 条结果行"
+  echo "     → 怎么办：这是并发收束自己的完整性闸红了，不是实验的问题；REPLAY_JOBS=1 再跑一遍看串行下全不全，"
+  echo "       全的话去查 replay_one 与它的 pid 收束那一段。"
+  exit 1
+fi
+
+# 按登记表的顺序回读：输出与并发度无关，REPLAY_JOBS=1 与 =16 逐字相同
+for tag in ${REPLAY_ORDER[@]+"${REPLAY_ORDER[@]}"}; do
+  cat "$OUT_DIR/$tag.line"
+  if [[ -f "$OUT_DIR/$tag.verdict" ]]; then
+    case "$(cat "$OUT_DIR/$tag.verdict")" in
+      pass) pass=$((pass+1)) ;; timing_only) timing_only=$((timing_only+1)) ;;
+      drift) drift=$((drift+1)) ;; broken) broken=$((broken+1)) ;; archived) archived=$((archived+1)) ;;
+    esac
+  fi
+  [[ -f "$OUT_DIR/$tag.claim" ]] && CLAIM_QUEUE+=("$(cat "$OUT_DIR/$tag.claim")")
+done
 
 printf '%s\n' "-------------------------------------------------------------------------"
 echo "结论区间断言（计时实验复跑不出同样的字节，靠这些把 kb 里的数钉住）："

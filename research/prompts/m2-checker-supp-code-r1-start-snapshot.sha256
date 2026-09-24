@@ -1,0 +1,9 @@
+b900b29fa6ccb30b8ebd095c2b31e545af07395c45d0c0a540ba795ab7d46ca5  crates/singlefs-checker/src/walk.rs
+3feab65f12cb90d4194fab6d19bd1f5e67138c0d3096e3562672e86ce1dd5f8e  crates/singlefs-checker/src/image.rs
+ae2cd66a4224ad32dca6786669a0b003159b452d6a470b4e7d4990116e24a94f  crates/singlefs-core/src/transaction.rs
+229ec48d2951bd5ac2db6cc02853f44bac86fe8792979bda4138c06a1230e1b0  crates/singlefs-core/src/mount.rs
+a452b38c8822789757a3a5c6953a6463670ecc14806048671a004636d78ad21b  crates/singlefs-core/src/recovery.rs
+890b75765e129b60ab51e24d9c3daee43a580e4d47604f1b6008bc3cd1f70c9e  .claude/kb/invariants.md
+cd9ea9f97c61c27c91219a14f07677309a4ab6b76bc136ed147bf355e5f6a482  .claude/kb/checks-owed.md
+c3e07269d4c9ca005bdd232b3e5446cccc665cad92536b94e69588f5ae9e37e4  .claude/kb/decisions/23-journal的角色与格式.md
+4a003d9fc894352f8d899ae4712e68949cf2549305f51ad7b267fe8255c5c0af  research/prompts/_m2-checker-supp-code-r1-body.md

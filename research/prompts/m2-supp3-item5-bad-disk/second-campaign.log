@@ -1,0 +1,83 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running tests/second_transaction_supplement_three_bad_disk_input.rs (/tmp/claude-1000/supp3-item5-bad-disk/target-main/debug/deps/second_transaction_supplement_three_bad_disk_input-bdf1d308d2eaa394)
+
+running 6 tests
+test the_large_tier_of_bad_disk_inputs ... ignored, 大档按环境变量跑，不进每次的 cargo test
+BAD_DISK_INPUT_START seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 configured_worker_threads=32 worker_threads_source=available_parallelism
+BAD_DISK_INPUT_START seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller
+test the_known_panic_list_matches_by_file_and_message_not_by_line_number ... ok
+翻位：写过的扇区里翻 4 位 → 翻位：盘 1 偏移 824249634 的第 2 位、盘 1 偏移 822157267 的第 4 位、盘 1 偏移 824554975 的第 7 位、盘 0 偏移 824642490 的第 3 位
+清零：一个写过的扇区整个清零 → 清零：盘 1 偏移 822268928 那一个扇区整个写 0
+截尾：切点之后写过的扇区全丢掉 → 截尾：两块盘上偏移 ≥ 824234496 的写过的扇区全丢掉（共 1710 个扇区）
+条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算） → 条目宽：树种类 1 的根（盘 [0, 1] 槽 50327，层级 0）条目宽 112 → 24（= key 宽）、条目数 1 → 1、声明长度 → 24；链上三道校验和重算
+条目宽：inode 树根自述的条目宽缩到 key 宽（链上校验和重算） → 条目宽：树种类 2 的根（盘 [0, 1] 槽 50330，层级 1）条目宽 120 → 8（= key 宽）、条目数 1 → 1、声明长度 → 8；链上三道校验和重算
+条目宽：分配记录树根自述的条目宽缩到 key 宽（链上校验和重算） → 条目宽：树种类 3 的根（盘 [0, 1] 槽 50331，层级 0）条目宽 20 → 10（= key 宽）、条目数 94 → 1、声明长度 → 10；链上三道校验和重算
+条目宽：记账树根自述的条目宽缩到 key 宽（链上校验和重算） → 条目宽：树种类 4 的根（盘 [0, 1] 槽 50332，层级 0）条目宽 34 → 22（= key 宽）、条目数 15 → 1、声明长度 → 22；链上三道校验和重算
+分配器：一条分配记录的槽号落在单元区之外 → 分配器：第一条分配记录的槽号 50176 → 1024（单元区起点是 50176）
+分配器：一条分配记录的跨度越过单元区末尾 → 分配器：第一条分配记录的跨度字段 0x8002 → 0x7fff（跨度 2 → 32767 槽，已释放位清掉）
+分配器：两条分配记录罩住同一个槽 → 分配器：第一条分配记录的 key 换成第二条的（盘 0、槽 50178），两条罩住同一个槽
+坏在哪：判别力：盘 [0, 1] 槽 50186 的数据单元载荷（32633 字节）整个写成 0xa5，只重算它自己的两道校验和；extent 记录里的整单元校验和原样留着
+分配器：一条分配记录的设备身份不在池里 → 分配器：第一条分配记录的设备身份 0 → 7（池里只有 0 与 1）
+分配器：记账树里 inode 号水位那一行被改挂到别的标签上 → 分配器：记账树第 14 条的统计量标签 12（inode 号水位）→ 60000
+写侧断言：系统配置里的区域数越过那个长 3 的数组 → 写侧断言：区域数改到数组之外——盘 0 偏移 0（3 → 4）、盘 0 偏移 4096（3 → 4）、盘 1 偏移 0（3 → 4）、盘 1 偏移 4096（3 → 4）
+写侧断言：一条指针的两条位置条目槽号不等 → 写侧断言：盘 0 偏移 1060864 的根记录里实例表指针，第二条位置条目的槽号 50304 → 50305（第一条还是 50304）
+判别力：数据单元整个重写、只重算它自己的两道校验和 → 判别力：盘 [0, 1] 槽 50186 的数据单元载荷（32633 字节）整个写成 0xa5，只重算它自己的两道校验和；extent 记录里的整单元校验和原样留着
+test every_damage_kind_changes_the_image_and_leaves_the_base_image_untouched ... ok
+BAD_DISK_INPUT_PROGRESS slice=8/12 seeds=[7463871032432355120,7463871032432355121) finished_slices=1/12 finished_histories=1/12 elapsed_seconds=1.5
+恢复：Finished { how: "Failed（MappingStillUnreadable { slot: SlotNumber(50186) }（所选根 Some((InstanceGeneration(2), CheckpointTxg(9)))））" }
+可写挂载：Finished { how: "Err(Recovery(UnitUnreadable { slot: SlotNumber(50186) }))" }
+读回判定：ReportedAnError { what: "MappingStillUnreadable { slot: SlotNumber(50186) }（所选根 Some((InstanceGeneration(2), CheckpointTxg(9)))）" }
+test a_data_unit_resealed_with_only_its_own_checksums_is_caught_by_the_location_entry_checksum ... ok
+BAD_DISK_INPUT_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355114) finished_slices=1/4 finished_histories=1/4 elapsed_seconds=1.7
+BAD_DISK_INPUT_PROGRESS slice=1/12 seeds=[7463871032432355113,7463871032432355114) finished_slices=2/12 finished_histories=2/12 elapsed_seconds=1.7
+BAD_DISK_INPUT_PROGRESS slice=11/12 seeds=[7463871032432355123,7463871032432355124) finished_slices=3/12 finished_histories=3/12 elapsed_seconds=2.1
+BAD_DISK_INPUT_PROGRESS slice=2/12 seeds=[7463871032432355114,7463871032432355115) finished_slices=4/12 finished_histories=4/12 elapsed_seconds=2.4
+BAD_DISK_INPUT_PROGRESS slice=2/4 seeds=[7463871032432355114,7463871032432355115) finished_slices=2/4 finished_histories=2/4 elapsed_seconds=3.1
+BAD_DISK_INPUT_PROGRESS slice=6/12 seeds=[7463871032432355118,7463871032432355119) finished_slices=5/12 finished_histories=5/12 elapsed_seconds=3.7
+BAD_DISK_INPUT_PROGRESS slice=5/12 seeds=[7463871032432355117,7463871032432355118) finished_slices=6/12 finished_histories=6/12 elapsed_seconds=4.5
+BAD_DISK_INPUT_PROGRESS slice=10/12 seeds=[7463871032432355122,7463871032432355123) finished_slices=7/12 finished_histories=7/12 elapsed_seconds=5.2
+BAD_DISK_INPUT_PROGRESS slice=9/12 seeds=[7463871032432355121,7463871032432355122) finished_slices=8/12 finished_histories=8/12 elapsed_seconds=5.3
+BAD_DISK_INPUT_PROGRESS slice=4/12 seeds=[7463871032432355116,7463871032432355117) finished_slices=9/12 finished_histories=9/12 elapsed_seconds=5.7
+BAD_DISK_INPUT_PROGRESS slice=3/12 seeds=[7463871032432355115,7463871032432355116) finished_slices=10/12 finished_histories=10/12 elapsed_seconds=6.0
+BAD_DISK_INPUT_PROGRESS slice=7/12 seeds=[7463871032432355119,7463871032432355120) finished_slices=11/12 finished_histories=11/12 elapsed_seconds=6.6
+BAD_DISK_INPUT_PROGRESS slice=12/12 seeds=[7463871032432355124,7463871032432355125) finished_slices=12/12 finished_histories=12/12 elapsed_seconds=7.2
+BAD_DISK_INPUT_FINISHED seeds=[7463871032432355113,7463871032432355125) slices=12 worker_threads=12 elapsed_seconds=7.2
+坏盘输入：种子 [7463871032432355113, 7463871032432355125) × 每段 16 步；比重「各类操作都抽（快档、大档）」；不跑池级 checker（只由模型、执行器的判定与 panic 判）；两块 4 GiB 的盘
+  历史 12 段（起点就失败、交不出合法镜像的 0 段）
+  三个读者：恢复 140 次（读回文件 33、没有文件 13、报错 78）、可写挂载 140 次（成 25、拒 31）、池级 checker 140 次
+  读回判定：模型提交过的某一版 46、报错 78、**从没提交过的内容 0**
+  逐坏法（造出 / 不适用 / 被读者看见）：
+    翻位：写过的扇区里翻 4 位 | 12 / 0 / 12 | 盲坏法（不指着普查里的某一族）
+    清零：一个写过的扇区整个清零 | 12 / 0 / 11 | 盲坏法（不指着普查里的某一族）
+    截尾：切点之后写过的扇区全丢掉 | 12 / 0 / 11 | 盲坏法（不指着普查里的某一族）
+    条目宽：extent 树根自述的条目宽缩到 key 宽（链上校验和重算） | 8 / 4 / 8 | 普查第一族：条目宽度没有下界判（R1–R4、R13）
+    条目宽：inode 树根自述的条目宽缩到 key 宽（链上校验和重算） | 8 / 4 / 8 | 普查第一族：条目宽度没有下界判（R1–R4、R13）
+    条目宽：分配记录树根自述的条目宽缩到 key 宽（链上校验和重算） | 8 / 4 / 8 | 普查第一族：条目宽度没有下界判（R1–R4、R13）
+    条目宽：记账树根自述的条目宽缩到 key 宽（链上校验和重算） | 8 / 4 / 8 | 普查第一族：条目宽度没有下界判（R1–R4、R13）
+    分配器：一条分配记录的槽号落在单元区之外 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：一条分配记录的跨度越过单元区末尾 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：两条分配记录罩住同一个槽 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：一条分配记录的设备身份不在池里 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    分配器：记账树里 inode 号水位那一行被改挂到别的标签上 | 8 / 4 / 8 | 普查第二族之一：结构值不判就喂进分配器（R6–R11）
+    写侧断言：系统配置里的区域数越过那个长 3 的数组 | 12 / 0 / 12 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）
+    写侧断言：一条指针的两条位置条目槽号不等 | 12 / 0 / 12 | 普查第二族之二：结构值不判就喂进写侧断言（R5、R12）
+    判别力：数据单元整个重写、只重算它自己的两道校验和 | 8 / 4 / 8 | 不指 panic：指着恢复里那一道整单元校验和比对
+  清单里的 panic（KNOWN_PANIC_SITES，今天还没修的缺口）：{"checker 拿盘上的区域数下标一个长 3 的数组": 12, "checker 的小端读法在窄条目上越界": 16, "checker 走读 extent 记录时按固定偏移切": 8, "core 的条目解析器按固定偏移切窄条目": 48, "分配器按槽号算下标时下溢": 8, "分配器重建时两条记录罩住同一个槽": 16, "分配记录的盘不在池里": 8, "挂载重建分配器时的两盘同槽断言": 4, "记账树里没有 inode 号水位那一行": 8, "释放判定里的两盘同槽断言": 8}；清单外的 panic 0 次
+  池级 checker 在坏镜像上判红：{"I-1.1": 40, "I-2.1": 99, "I-2.3": 8, "I-3.1": 8, "I-3.9": 6, "I-4.8": 99, "I-5.1": 12, "I-5.4": 16, "I-7.1": 1, "I-7.2": 69, "I-7.4": 99}
+  新发现：0
+⚠️ 增补 3 第 5 件的验收「写死的种子数上零 panic」今天不成立：KNOWN_PANIC_SITES 里还有 10 条，         这一档撞到 136 次。清单空掉那条验收才算成立。
+test bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites ... ok
+BAD_DISK_INPUT_PROGRESS slice=3/4 seeds=[7463871032432355115,7463871032432355116) finished_slices=3/4 finished_histories=3/4 elapsed_seconds=7.2
+BAD_DISK_INPUT_PROGRESS slice=4/4 seeds=[7463871032432355116,7463871032432355117) finished_slices=4/4 finished_histories=4/4 elapsed_seconds=12.3
+BAD_DISK_INPUT_FINISHED seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=1 elapsed_seconds=12.3
+BAD_DISK_INPUT_START seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 configured_worker_threads=4 worker_threads_source=given_by_caller
+BAD_DISK_INPUT_PROGRESS slice=2/4 seeds=[7463871032432355114,7463871032432355115) finished_slices=1/4 finished_histories=1/4 elapsed_seconds=0.8
+BAD_DISK_INPUT_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355114) finished_slices=2/4 finished_histories=2/4 elapsed_seconds=0.9
+BAD_DISK_INPUT_PROGRESS slice=4/4 seeds=[7463871032432355116,7463871032432355117) finished_slices=3/4 finished_histories=3/4 elapsed_seconds=3.0
+BAD_DISK_INPUT_PROGRESS slice=3/4 seeds=[7463871032432355115,7463871032432355116) finished_slices=4/4 finished_histories=4/4 elapsed_seconds=3.8
+BAD_DISK_INPUT_FINISHED seeds=[7463871032432355113,7463871032432355117) slices=4 worker_threads=4 elapsed_seconds=3.8
+test the_report_is_the_same_with_one_worker_thread_and_four ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 16.08s
+

@@ -1,0 +1,48 @@
+--- /tmp/claude-1000/m2-refusals-opus/mount.rs.orig	2026-09-22 21:50:22.669904563 +0000
++++ /tmp/claude-1000/m2-refusals-opus/repo/crates/singlefs-core/src/mount.rs	2026-09-22 21:54:29.247365810 +0000
+@@ -653,13 +653,19 @@
+     shadow_ledger: ShadowLedger,
+ ) -> Result<RaisedFloor, MountError> {
+     let system_configuration = choose_system_configuration(&*devices)?;
+-    let instance_table_unit = current
++    // 攻方腿改法 Q1-F1（只在副本上量过、被攻过零轮）：`units` 里没有重写过的实例表单元时，
++    // 从现行根自己的实例表指针上把这一版的表读回来——那就是这一版有效的那张表。
++    let table = match current
+         .units
+         .iter()
+         .find(|unit| unit.identity == TransactionUnit::InstanceTable)
+-        .ok_or(MountError::RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion)?;
+-    let table = InstanceTableRecords::parse(&instance_table_unit.bytes)
+-        .ok_or(MountError::InstanceTableMalformed)?;
++    {
++        Some(unit) => {
++            InstanceTableRecords::parse(&unit.bytes).ok_or(MountError::InstanceTableMalformed)?
++        }
++        None => instance_table_of_root(&*devices, &current.root)
++            .ok_or(MountError::InstanceTableMalformed)?,
++    };
+     let ceiling = rollback_floor_ceiling(
+         devices,
+         &system_configuration,
+@@ -1050,9 +1056,18 @@
+     let warm_up_publishes_planned = warm_up_publish_txgs(parameters, &all_devices, start.first_txg);
+     let instance_to_acquire = instance_generation_to_acquire(&pool);
+     // 要写的行按要取的号先列出来：实例表那一项准入按它算，取号之后写行也用这一份（号在写之前重算、不等就不写）。
+-    let rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
+-    refuse_instance_rows_on_version_without_file(&start, instance_to_acquire)?;
+-    refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(parameters, &start)?;
++    let mut rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
++    // 攻方腿改法 R1-F1（只在副本上量过、被攻过零轮）：树表 0 条的一版上不写行、照零单元发布走。
++    if std::env::var_os("OPUS_SKIP_R1").is_some() {
++        if matches!(start.previous, PreviousVersion::WithoutFile(_)) {
++            rows_written = Vec::new();
++        }
++    } else {
++        refuse_instance_rows_on_version_without_file(&start, instance_to_acquire)?;
++    }
++    if std::env::var_os("OPUS_SKIP_R4").is_none() {
++        refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(parameters, &start)?;
++    }
+     refuse_publishes_before_acquisition_that_do_not_pass_admission(
+         &allocator,
+         &start,

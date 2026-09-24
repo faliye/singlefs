@@ -1,4 +1,4 @@
-M1_root_record_250	const ROOT_RECORD_BYTES: u64 = 371;	const ROOT_RECORD_BYTES: u64 = 333;
+M1_root_record_250	const ROOT_RECORD_BYTES: u64 = 457;	const ROOT_RECORD_BYTES: u64 = 333;
 M2_drop_second_barrier	    }\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。	    }\n    pool.operations.pop();\n\n    // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
 M3_oracle_ignores_walk_failure	        RecoveryOutcome::Failed { reason, .. } => Some(format!("走读失败：{reason}")),	        RecoveryOutcome::Failed { .. } => None,
 M4_accept_unit_without_checksum	        if castagnoli_crc32(&bytes) == location.unit_checksum {	        if true {
@@ -73,3 +73,7 @@ M72_structure_sets_match_tolerates_a_one_element_difference	    left == right	  
 M73_compare_region_treats_matching_sha256_as_unequal	    if impl_sha256 == device_sha256 {	    if impl_sha256 != device_sha256 {
 M74_compare_region_ignores_a_declared_length_mismatch	    if impl_length != region_length {	    if false {
 M75_compare_region_never_checks_the_sampled_head	            if impl_head != *device_head {	            if impl_head == *device_head {
+M76_root_ring_zero_fill_skips_last_region	        for region_index in 0..RING_REGIONS {	        for region_index in 0..RING_REGIONS - 1 {
+M77_mkfs_allocation_record_tree_root_nonzero	        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零。\n        allocation_record_tree_root: NodePointer::empty_root(),	        // C512 2026-09-23 用户定案：mkfs 第 0 代写全零。\n        allocation_record_tree_root: NodePointer { head: PointerHead { birth_tree: TreeIdentifier(1), birth_txg: CheckpointTxg(1) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(1), unit_checksum: 1 }, LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(1), unit_checksum: 1 }], instance: InstanceGeneration(1), birth_sequence: BirthSequence(1) },
+M78_inode_blocks_back_to_data_unit_bytes	        writer.put_u64(self.size.div_ceil(512));	        writer.put_u64(DATA_UNIT_BYTES / 512);
+M79_zero_fill_only_the_owning_device	    for device in parameters.devices() {\n        for region_index in 0..RING_REGIONS {\n            pool.record_zero_fill(device, ring_region_offset(region_index));	    for device in parameters.devices().into_iter().take(1) {\n        for region_index in 0..RING_REGIONS {\n            pool.record_zero_fill(device, ring_region_offset(region_index));

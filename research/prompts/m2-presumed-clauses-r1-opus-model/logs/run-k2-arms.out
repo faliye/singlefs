@@ -1,0 +1,56 @@
+A1-today exit=0
+K2-SUMMARY [cap=- jump=-] crash-then-remount states=11332 remount_errors=0 disk_loss_failures=11332 mounts_by_row_mod3=[3095, 5135, 3102] white_by_row_mod3=[0, 0, 3102]
+K2-CHAIN [cap=- jump=-] extra=0 publishes_per_mount=[2, 2, 3, 3, 3, 3]
+K2-CHAIN [cap=- jump=-] extra=1 publishes_per_mount=[3, 3, 3, 3, 3, 3]
+K2-CHAIN [cap=- jump=-] extra=2 publishes_per_mount=[2, 3, 3, 3, 3, 3]
+K2-SUMMARY [cap=- jump=-] rollback mounts=20 disk_loss_failures=20
+K2-SUMMARY [cap=- jump=-] subsequent mounts=24 white_publishes=2 disk_loss_failures=24
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 756.65s
+A2-any exit=0
+K2-SUMMARY [cap=- jump=-] crash-then-remount states=11332 remount_errors=0 disk_loss_failures=0 mounts_by_row_mod3=[3095, 5135, 3102] white_by_row_mod3=[0, 0, 3102]
+K2-CHAIN [cap=- jump=-] extra=0 publishes_per_mount=[2, 2, 3, 3, 3, 3]
+K2-CHAIN [cap=- jump=-] extra=1 publishes_per_mount=[3, 3, 3, 3, 3, 3]
+K2-CHAIN [cap=- jump=-] extra=2 publishes_per_mount=[2, 3, 3, 3, 3, 3]
+K2-SUMMARY [cap=- jump=-] rollback mounts=20 disk_loss_failures=0
+K2-SUMMARY [cap=- jump=-] subsequent mounts=24 white_publishes=2 disk_loss_failures=0
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 756.81s
+A3-any-cap0 exit=0
+K2-SUMMARY [cap=0 jump=-] crash-then-remount states=5170 remount_errors=0 disk_loss_failures=1041 mounts_by_row_mod3=[2061, 2068, 1041] white_by_row_mod3=[0, 0, 0]
+K2-CHAIN [cap=0 jump=-] extra=0 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-CHAIN [cap=0 jump=-] extra=1 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-CHAIN [cap=0 jump=-] extra=2 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-SUMMARY [cap=0 jump=-] rollback mounts=20 disk_loss_failures=8
+K2-SUMMARY [cap=0 jump=-] subsequent mounts=24 white_publishes=0 disk_loss_failures=8
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 374.34s
+A4-any-cap1 exit=0
+K2-SUMMARY [cap=1 jump=-] crash-then-remount states=10305 remount_errors=0 disk_loss_failures=0 mounts_by_row_mod3=[3095, 4115, 3095] white_by_row_mod3=[0, 0, 3095]
+K2-CHAIN [cap=1 jump=-] extra=0 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=1 jump=-] extra=1 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=1 jump=-] extra=2 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-SUMMARY [cap=1 jump=-] rollback mounts=20 disk_loss_failures=0
+K2-SUMMARY [cap=1 jump=-] subsequent mounts=24 white_publishes=8 disk_loss_failures=0
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 746.44s
+A5-any-jump exit=0
+K2-SUMMARY [cap=- jump=1] crash-then-remount states=10305 remount_errors=0 disk_loss_failures=0 mounts_by_row_mod3=[5170, 5135, 0] white_by_row_mod3=[0, 0, 0]
+K2-CHAIN [cap=- jump=1] extra=0 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=- jump=1] extra=1 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=- jump=1] extra=2 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-SUMMARY [cap=- jump=1] rollback mounts=20 disk_loss_failures=0
+K2-SUMMARY [cap=- jump=1] subsequent mounts=24 white_publishes=0 disk_loss_failures=0
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 743.74s
+A6-cap0 exit=0
+K2-SUMMARY [cap=0 jump=-] crash-then-remount states=5170 remount_errors=0 disk_loss_failures=5170 mounts_by_row_mod3=[2061, 2068, 1041] white_by_row_mod3=[0, 0, 0]
+K2-CHAIN [cap=0 jump=-] extra=0 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-CHAIN [cap=0 jump=-] extra=1 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-CHAIN [cap=0 jump=-] extra=2 publishes_per_mount=[1, 1, 1, 1, 1, 1]
+K2-SUMMARY [cap=0 jump=-] rollback mounts=20 disk_loss_failures=20
+K2-SUMMARY [cap=0 jump=-] subsequent mounts=24 white_publishes=0 disk_loss_failures=24
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 375.60s
+A7-jump exit=0
+K2-SUMMARY [cap=- jump=1] crash-then-remount states=10305 remount_errors=0 disk_loss_failures=10305 mounts_by_row_mod3=[5170, 5135, 0] white_by_row_mod3=[0, 0, 0]
+K2-CHAIN [cap=- jump=1] extra=0 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=- jump=1] extra=1 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-CHAIN [cap=- jump=1] extra=2 publishes_per_mount=[2, 2, 2, 2, 2, 2]
+K2-SUMMARY [cap=- jump=1] rollback mounts=20 disk_loss_failures=20
+K2-SUMMARY [cap=- jump=1] subsequent mounts=24 white_publishes=0 disk_loss_failures=24
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 756.81s

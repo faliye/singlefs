@@ -1,0 +1,94 @@
+════ S3a × f3
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：yes｜门禁起在收尾 --full 的：before] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：yes｜门禁起在收尾 --full 的：during] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:10Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：yes｜门禁起在收尾 --full 的：after] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:13Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：no｜门禁起在收尾 --full 的：before] 标记格数 0
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s6/a-no-before/.git/singlefs-layer0-full-green.0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050）
+    [gate --staged 里 54 号的退出码 1]
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：no｜门禁起在收尾 --full 的：during] 标记格数 0
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s6/a-no-during/.git/singlefs-layer0-full-green.0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050）
+    [gate --staged 里 54 号的退出码 1]
+  (f3 打上：3 处)
+── [f3｜验证员先跑过：no｜门禁起在收尾 --full 的：after] 标记格数 0
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:16Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+════ S3b × f3
+  (f3 打上：3 处)
+    A 的 --full 退出码 0
+    B 的 --full 退出码 0
+── [f3｜B 的结果：green｜先后：A-then-B] 标记格数 2
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:16Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    B 的 --full 退出码 0
+    A 的 --full 退出码 0
+── [f3｜B 的结果：green｜先后：B-then-A] 标记格数 2
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:16Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    B 的 --full 退出码 0
+    A 的 --full 退出码 0
+── [f3｜B 的结果：green｜先后：B-inside-A] 标记格数 2
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:19Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    A 的 --full 退出码 0
+    B 的 --full 退出码 0
+── [f3｜B 的结果：green｜先后：A-inside-B] 标记格数 2
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:20Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    A 的 --full 退出码 0
+    B 的 --full 退出码 1
+── [f3｜B 的结果：red｜先后：A-then-B] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:22Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    B 的 --full 退出码 1
+    A 的 --full 退出码 0
+── [f3｜B 的结果：red｜先后：B-then-A] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:23Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    B 的 --full 退出码 1
+    A 的 --full 退出码 0
+── [f3｜B 的结果：red｜先后：B-inside-A] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:26Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+  (f3 打上：3 处)
+    A 的 --full 退出码 0
+    B 的 --full 退出码 1
+── [f3｜B 的结果：red｜先后：A-inside-B] 标记格数 1
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:27Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+════ S4 × f5
+  工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾（f5）：bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>
+      ✗ 层 0 不是全量：LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+    [标记不在]
+  ── gate.sh --staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s6/s4-f5/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]

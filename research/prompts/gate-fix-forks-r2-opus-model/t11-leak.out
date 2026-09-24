@@ -1,0 +1,14 @@
+  认法甲  GATE_DIFF_BASE=（不设）                              stage-selftest 退出码 0；判错：
+  认法甲  GATE_DIFF_BASE=3b60f098e97dc4c4f3ed9c6355422b607db1c34c  stage-selftest 退出码 0；判错：
+  认法甲  GATE_DIFF_BASE=master                                    stage-selftest 退出码 1；判错：61-settled-same-file.sh red 期望退出 1，实测 77;61-settled-same-file.sh red 输出里找不到「本次新增了「已定」小节，而这条未定项一个字都没动」;
+  认法甲  GATE_DIFF_BASE=HEAD                                      stage-selftest 退出码 1；判错：61-settled-same-file.sh red 期望退出 1，实测 77;61-settled-same-file.sh red 输出里找不到「本次新增了「已定」小节，而这条未定项一个字都没动」;
+  认法乙  GATE_DIFF_BASE=（不设）                              stage-selftest 退出码 0；判错：
+  认法乙  GATE_DIFF_BASE=3b60f098e97dc4c4f3ed9c6355422b607db1c34c  stage-selftest 退出码 0；判错：
+  认法乙  GATE_DIFF_BASE=master                                    stage-selftest 退出码 0；判错：
+  认法乙  GATE_DIFF_BASE=HEAD                                      stage-selftest 退出码 0；判错：
+  （GATE_DIFF_BASE=master 就是有人跑「GATE_BASE=master bash .claude/scripts/gate.sh」时 gate.sh 导出的值：lib.sh 的 diff_base 原样交回 GATE_BASE）
+  同一漏法的第二条路：47 号跑的「bash research/scripts/changed-paths.sh --selftest」只清 GATE_BASE
+  认法甲  GATE_DIFF_BASE=master 共用脚本 --selftest 退 1；GATE_BASE 是个提交就用它：期望「ea8170dbcec06f8abbf8c6b80039d0dabbada
+  认法甲  GATE_DIFF_BASE=HEAD   共用脚本 --selftest 退 1；GATE_BASE 是个提交就用它：期望「ea8170dbcec06f8abbf8c6b80039d0dabbada
+  认法乙  GATE_DIFF_BASE=master 共用脚本 --selftest 退 0；
+  认法乙  GATE_DIFF_BASE=HEAD   共用脚本 --selftest 退 0；

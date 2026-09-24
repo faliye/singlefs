@@ -1,0 +1,121 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F10-writer-bug-disk-carried-leaf	off(today)	FFFF	F:ok(F=6,reclaimed=18) F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFFO	F:ok(F=6,reclaimed=18) F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFOF	F:ok(F=6,reclaimed=18) F:noop O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFFM	F:ok(F=6,reclaimed=18) F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFMO	F:ok(F=6,reclaimed=18) F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFMF	F:ok(F=6,reclaimed=18) F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFOM	F:ok(F=6,reclaimed=18) F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFMM	F:ok(F=6,reclaimed=18) F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFOO	F:ok(F=6,reclaimed=18) F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMMF	F:ok(F=6,reclaimed=18) M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMFF	F:ok(F=6,reclaimed=18) M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMOF	F:ok(F=6,reclaimed=18) M:ok O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMFO	F:ok(F=6,reclaimed=18) M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMFM	F:ok(F=6,reclaimed=18) M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOFM	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMOM	F:ok(F=6,reclaimed=18) M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMMO	F:ok(F=6,reclaimed=18) M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMMM	F:ok(F=6,reclaimed=18) M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOFF	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOFO	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMOO	F:ok(F=6,reclaimed=18) M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOMF	F:ok(F=6,reclaimed=18) O:ok M:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOMO	F:ok(F=6,reclaimed=18) O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOOO	F:ok(F=6,reclaimed=18) O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOMM	F:ok(F=6,reclaimed=18) O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOOF	F:ok(F=6,reclaimed=18) O:ok O:ok F:ok(F=8,reclaimed=14)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOOM	F:ok(F=6,reclaimed=18) O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFMO	M:ok F:ok(F=6,reclaimed=18) M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFFM	M:ok F:ok(F=6,reclaimed=18) F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFFF	M:ok F:ok(F=6,reclaimed=18) F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFFO	M:ok F:ok(F=6,reclaimed=18) F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFMF	M:ok F:ok(F=6,reclaimed=18) M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFMM	M:ok F:ok(F=6,reclaimed=18) M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFOO	M:ok F:ok(F=6,reclaimed=18) O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFOF	M:ok F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFOM	M:ok F:ok(F=6,reclaimed=18) O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMFO	M:ok M:ok F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMFM	M:ok M:ok F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMMF	M:ok M:ok M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMMO	M:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMFF	M:ok M:ok F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMOF	M:ok M:ok O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMOM	M:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMMM	M:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOFF	M:ok O:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOMM	M:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOFO	M:ok O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOOM	M:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMOO	M:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOMF	M:ok O:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOOO	M:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOOF	M:ok O:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOFM	M:ok O:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFFM	O:ok F:ok(F=7,reclaimed=24) F:noop M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFMO	O:ok F:ok(F=7,reclaimed=24) M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOMO	M:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFMF	O:ok F:ok(F=7,reclaimed=24) M:ok F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFOM	O:ok F:ok(F=7,reclaimed=24) O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFFF	O:ok F:ok(F=7,reclaimed=24) F:noop F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFFO	O:ok F:ok(F=7,reclaimed=24) F:noop O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFMM	O:ok F:ok(F=7,reclaimed=24) M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFOO	O:ok F:ok(F=7,reclaimed=24) O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFOF	O:ok F:ok(F=7,reclaimed=24) O:ok F:ok(F=8,reclaimed=8)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMFM	O:ok M:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMFO	O:ok M:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMFF	O:ok M:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMMF	O:ok M:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMOF	O:ok M:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMMO	O:ok M:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOFF	O:ok O:ok F:ok(F=8,reclaimed=32) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMMM	O:ok M:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOFM	O:ok O:ok F:ok(F=8,reclaimed=32) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOFO	O:ok O:ok F:ok(F=8,reclaimed=32) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMOO	O:ok M:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMOM	O:ok M:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOMO	O:ok O:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFF	F:ok(F=6,reclaimed=18) F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOOO	O:ok O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOMF	O:ok O:ok M:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOOM	O:ok O:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOOF	O:ok O:ok O:ok F:ok(F=9,reclaimed=40)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOMM	O:ok O:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOF	F:ok(F=6,reclaimed=18) O:ok F:ok(F=7,reclaimed=6)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFM	F:ok(F=6,reclaimed=18) F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMO	F:ok(F=6,reclaimed=18) M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMF	F:ok(F=6,reclaimed=18) M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FFO	F:ok(F=6,reclaimed=18) F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FMM	F:ok(F=6,reclaimed=18) M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOM	F:ok(F=6,reclaimed=18) O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFO	M:ok F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FOO	F:ok(F=6,reclaimed=18) O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFF	M:ok F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MFM	M:ok F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFF	O:ok F:ok(F=7,reclaimed=24) F:noop	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOF	M:ok O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFM	O:ok F:ok(F=7,reclaimed=24) M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMO	M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOO	M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OFO	O:ok F:ok(F=7,reclaimed=24) O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMF	M:ok M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMF	O:ok M:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MMM	M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MOM	M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOM	O:ok O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOF	O:ok O:ok F:ok(F=8,reclaimed=32)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OOO	O:ok O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMM	O:ok M:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OMO	O:ok M:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FF	F:ok(F=6,reclaimed=18) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MF	M:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OF	O:ok F:ok(F=7,reclaimed=24)	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FO	F:ok(F=6,reclaimed=18) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MO	M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	MM	M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OM	O:ok M:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	OO	O:ok O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	FM	F:ok(F=6,reclaimed=18) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	F	F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	O	O:ok	ok	same	I-2.1,I-3.9,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0
+F10-writer-bug-disk-carried-leaf	off(today)	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	0	0

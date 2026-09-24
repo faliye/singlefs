@@ -1,0 +1,68 @@
+--- recovery.rs.orig	2026-09-23 15:18:11.749391751 +0000
++++ repo/crates/singlefs-core/src/recovery.rs	2026-09-23 15:27:54.217345097 +0000
+@@ -1168,12 +1168,26 @@
+     // 链首接在所选根自己那条记录（同实例、checkpoint_txg 相等）之后；那条记录读不出（两份都撕了）时不知道它的 jsn，
+     // 链首只能是 checkpoint_txg = 根的 txg + 1 的那条（第一版一次发布一条记录、txg 每次加一）：水位之上最小的那条若 txg 更大，
+     // 中间就少了一条，断号即止照样成立（里程碑「第二个事务」步 3 三方第一轮攻方腿打中：无锚点时无条件接上会跳过撕掉的一条）。
+-    let root_own_record_counter = records
+-        .values()
+-        .find(|record| {
+-            record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg
+-        })
+-        .map(|record| record.counter);
++    // 副本臂（presumed-r1 opus，零轮）：PRESUMED_R1_CHAIN_HEAD = max / stop / max-stop。
++    let chain_head_arm = std::env::var("PRESUMED_R1_CHAIN_HEAD").unwrap_or_default();
++    let anchor_takes_the_largest_counter = chain_head_arm == "max" || chain_head_arm == "max-stop";
++    let no_anchor_stops = chain_head_arm == "stop" || chain_head_arm == "max-stop";
++    let root_own_record_counter = if anchor_takes_the_largest_counter {
++        records
++            .values()
++            .filter(|record| {
++                record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg
++            })
++            .map(|record| record.counter)
++            .max()
++    } else {
++        records
++            .values()
++            .find(|record| {
++                record.instance == root.instance && record.checkpoint_txg == root.checkpoint_txg
++            })
++            .map(|record| record.counter)
++    };
+     let mut expected_next: Option<(InstanceGeneration, u64)> =
+         root_own_record_counter.map(|counter| (root.instance, counter + 1));
+     let chain_start_txg_without_anchor = CheckpointTxg(root.checkpoint_txg.0 + 1);
+@@ -1182,7 +1196,7 @@
+             if (record.instance, record.counter) != expected_key {
+                 break;
+             }
+-        } else if record.checkpoint_txg != chain_start_txg_without_anchor {
++        } else if no_anchor_stops || record.checkpoint_txg != chain_start_txg_without_anchor {
+             break;
+         }
+         // 前缀第五条：所选根的实例有回退行时只施加到回退行的 W 为止——W = 0 就是「之后的一个都不算」，
+@@ -1201,7 +1215,7 @@
+                 let Some(unit_bytes) = unit_bytes_for_class(named.unit_class) else {
+                     return false;
+                 };
+-                named.locations.iter().all(|location| {
++                let location_verifies = |location: &crate::pointer::LocationEntry| {
+                     reader
+                         .read(
+                             location.device,
+@@ -1209,7 +1223,13 @@
+                             unit_bytes,
+                         )
+                         .is_some_and(|bytes| crc32_castagnoli(&bytes) == location.unit_checksum)
+-                })
++                };
++                // 副本臂（presumed-r1 opus，零轮）：点名单元两条位置条目任一条验得过就算验过。
++                if std::env::var("PRESUMED_R1_NAMED_ANY").is_ok_and(|text| text == "1") {
++                    named.locations.iter().any(location_verifies)
++                } else {
++                    named.locations.iter().all(location_verifies)
++                }
+             });
+         if !all_verified {
+             report.verification_failed += 1;

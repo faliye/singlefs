@@ -1147,7 +1147,7 @@ struct WriteAheadLogCheckpointOutcomeWithVariant {
     core: FixedPointCoreOutcome,
 }
 
-/// WAL 一次 checkpoint（间隔 N=16 次 fsync，登记第一节「一次持久化」）；K9′ 恒开
+/// WAL 一次 checkpoint（间隔 N=16 次 fsync，登记第一节「一次持久化」）；K10 恒开
 /// （这一次不再比较 K9，第二次已经比过，第三节 3.2 与第七节 A5）。
 fn solve_write_ahead_log_checkpoint_with_variant(shape: PoolShape, arm: WriteAheadLogArm, interval_fsyncs: u64, variant: AllocationVariant, damping_alpha: f64, maximum_iterations: u64, record_rounds: bool) -> WriteAheadLogCheckpointOutcomeWithVariant {
     let geometry = shape.geometry;

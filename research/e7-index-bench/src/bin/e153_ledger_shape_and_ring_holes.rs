@@ -11,7 +11,7 @@
 //! 中央映射树、extent 根、inode 根、分配记录树、记账树、数据单元、inode 叶容器；
 //! O 触碰其中 8 个（放 10 槽）、E 触碰其中 4 个（放 4 槽）、W = E 的 4 个加实例表单元（放 6 槽）。
 //!
-//! 记账第 1/5 项对「甲-T1」「G12」两条主谓词按登记第五节的「环′」公式现算（与物理是否已回收无关）；
+//! 记账第 1/5 项对「甲-T1」「G12」两条主谓词按登记第五节的「记账环」公式现算（与物理是否已回收无关）；
 //! 第 2 项走独立的事件路径（分配减、记录由不可再分配变可再分配时加）。基线臂「今」的记账三项直接
 //! 反映分配器的物理状态（`allocated_slots` / `free_slots` / `deferred_slots`，与 `crates/singlefs-core/src/allocator.rs`
 //! 同构），回收只在挂载 / 切换 / 回退重建 / 抬 F 时发生。
@@ -310,7 +310,7 @@ enum Predicate {
 enum ShadowLedger {
     /// 保守读法：环里每条被抛弃根的账里未释放的槽全部隔离，含当前账 / 候选账也引用的。
     Conservative,
-    /// G5″：只隔离「被抛弃根引用 − 候选根引用」的差集。
+    /// G28：只隔离「被抛弃根引用 − 候选根引用」的差集。
     Narrow,
 }
 
@@ -486,7 +486,7 @@ fn candidate_reference_union_size(arm: &ArmExecutor, txgs: &[u64]) -> u64 {
     candidate_reference_union(arm, txgs).len() as u64
 }
 
-/// Q10：G12×G5″ 的候选引用推法（登记第五节「G12」定义：「候选根 r 引用槽 x ⟺ 当前账里 x 的记录
+/// Q10：G12×G28 的候选引用推法（登记第五节「G12」定义：「候选根 r 引用槽 x ⟺ 当前账里 x 的记录
 /// 分配代 ≤ txg(r) ∧（未释放 ∨ txg(r) < 释放代）」）——从这条臂自己的账本直接推，不读候选根自己的
 /// 账（`root_accounts`）。与 `candidate_reference_union`（M0.6 走读）比较得到 Q10。
 fn interval_inferred_candidate_references(arm: &ArmExecutor, candidate_txgs: &[u64]) -> BTreeSet<u64> {
@@ -532,7 +532,7 @@ fn abandoned_root_item1_bounds(arms: &[ArmExecutor; 5], abandoned_txgs: &[u64]) 
 
 /// Q8（坏镜像矩阵）：一个 (臂, 格) 组合在某个合法基底状态上的记账三项与三种引用集合大小——
 /// 臂内候选并集（I-3.1 臂内读法）、今天读法候选并集（I-3.1 今天 checker 读法）、最新根自己的
-/// 引用集合（G8′）。坏镜像只改 `accounting`，三种引用集合大小保持基底不变（登记：B1a/B1b/B2/Bk1/Bk2
+/// 引用集合（G27）。坏镜像只改 `accounting`，三种引用集合大小保持基底不变（登记：B1a/B1b/B2/Bk1/Bk2
 /// 只改 D0 的记账，不改盘上单元本身，所以走读得到的引用集合不受影响）。
 #[derive(Clone, Copy, Debug, Default)]
 struct BaseImageState {
@@ -642,7 +642,7 @@ fn abandoned_root_bound_check(isolated_slots: u64, newest_abandoned_item1: u64, 
     }
 }
 
-/// Q10 的一次核对：只在 IntervalNarrow（G12×G5″）这条臂上有意义（登记第五节 G12 的「支持它的人认的
+/// Q10 的一次核对：只在 IntervalNarrow（G12×G28）这条臂上有意义（登记第五节 G12 的「支持它的人认的
 /// 样子」只对这条组合许诺「不另读候选根的树」）；别的臂调用这个函数不做任何事。核对不一致时累计
 /// `interval_candidate_inference_mismatch_count`，不改变任何实际状态——它是一次旁路核对，不参与隔离集计算
 /// （隔离集仍按 `recompute_shadow` / `isolate_additional_for_raised_floor` 里已经写好的走读路径算，
@@ -698,11 +698,11 @@ struct ArmExecutor {
     pending: Vec<PendingRecord>,
     /// 测量臂：独立事件路径的空闲计数，与 pending 同一门槛（物理，驱动多扣）。
     item2_total: u64,
-    /// 测量臂：记账行公式专用——与 pending 同源（release 时一起 push），但门槛用「环′」
+    /// 测量臂：记账行公式专用——与 pending 同源（release 时一起 push），但门槛用「记账环」
     /// （p 自己的账已经换进环之后）。只影响写进根里的第 1/5 项，不影响物理占用（登记第五节
-    /// 「发布 p 的记账行」：环′ 是记账用的环，不是回收步物理用的环）。
+    /// 「发布 p 的记账行」：记账环 是记账用的环，不是回收步物理用的环）。
     formula_pending: Vec<PendingRecord>,
-    /// 测量臂：记账第 2 项公式专用，独立事件路径，门槛同 formula_pending（环′）。
+    /// 测量臂：记账第 2 项公式专用，独立事件路径，门槛同 formula_pending（记账环）。
     formula_item2_total: u64,
     /// 基线：占着（含 defer）、空闲、defer 三个物理计数器，直接对应 allocator.rs 三个字段。
     baseline_allocated_slots: u64,
@@ -724,9 +724,9 @@ struct ArmExecutor {
     /// 违例计数（Q4i 候选根那一半、Q4ii 被抛弃根那一半）。
     violations_candidate: u64,
     violations_abandoned: u64,
-    /// Q10：G12×G5″ 的候选引用推法（登记第五节「G12」支持者形态：「候选根 r 引用槽 x ⟺ 当前账里 x 的
+    /// Q10：G12×G28 的候选引用推法（登记第五节「G12」支持者形态：「候选根 r 引用槽 x ⟺ 当前账里 x 的
     /// 记录分配代 ≤ txg(r) ∧（未释放 ∨ txg(r) < 释放代）」，不另读候选根的树）与按 M0.6 走读候选根账
-    /// 得到的并集不一致的回收步数。只在 IntervalNarrow 这条臂上累计（G12 与 G5″ 都齐才有意义）。
+    /// 得到的并集不一致的回收步数。只在 IntervalNarrow 这条臂上累计（G12 与 G28 都齐才有意义）。
     interval_candidate_inference_mismatch_count: u64,
 }
 
@@ -740,7 +740,7 @@ struct PendingRecord {
 
 /// 两种主谓词的可再分配判定（登记第五节「主谓词 甲-T1 / G12」）：
 /// 甲-T1 = 已释放 ∧ 释放代 ≤ 门槛；G12 = 已释放 ∧ 环里没有根 r：txg(r) ∈ [分配代, 释放代) 且 r 属于
-/// blocking 集合（候选集 ∪ 被抛弃根，由调用方按环′或环算好传入）。两条重算路径（物理回收、记账
+/// blocking 集合（候选集 ∪ 被抛弃根，由调用方按记账环或环算好传入）。两条重算路径（物理回收、记账
 /// 公式）共用这一处判定，改一处两边同步（M1–M6 的变异锚点）。
 fn is_record_reclaimable(predicate: Predicate, threshold: u64, blocking: Option<&BTreeSet<u64>>, record: &PendingRecord) -> bool {
     match predicate {
@@ -997,7 +997,7 @@ impl ArmExecutor {
         self.reads_last_reclaim_step = reads;
     }
 
-    /// 记账行公式专用的重算：用环′门槛把 formula_pending 里越过门槛的记录移出（登记第五节「发布 p
+    /// 记账行公式专用的重算：用记账环门槛把 formula_pending 里越过门槛的记录移出（登记第五节「发布 p
     /// 的记账行」）。只影响 formula_item2_total / formula_pending，不碰 occupied——它不是物理回收，
     /// 只是「如果現在就按这条根持久之后的环重新判一次，第 1/5 项该是多少」。
     fn drain_formula_pending(&mut self, threshold: u64, blocking: Option<&BTreeSet<u64>>) {
@@ -1079,7 +1079,7 @@ impl ArmExecutor {
         }
     }
 
-    /// 重算隔离集（整个替换）：保守 = ∪被抛弃根账；G5″/基线 = ∪被抛弃根账 − ∪候选根账。
+    /// 重算隔离集（整个替换）：保守 = ∪被抛弃根账；G28/基线 = ∪被抛弃根账 − ∪候选根账。
     /// 摘掉不再隔离的槽时，若它已经越过测量臂的门槛（已经不在 pending 里、也不在 occupied 之外的
     /// 已回收记录里）就从 occupied 摘掉；仍未达门槛的保持在 occupied（因为它本来就该被回收步扣着）。
     fn recompute_shadow(&mut self, abandoned_txgs: &[u64], candidate_txgs: &[u64]) {
@@ -1225,7 +1225,7 @@ impl ArmExecutor {
         }
         if self.arm.is_measured() {
             self.allocated_span_total = self.ledger.values().filter(|entry| !entry.released).map(|entry| entry.span_in_slots).sum();
-            // 重建那一刻，记账公式与物理回收共用同一个门槛（还没有「环′ 比环多一代」这回事——
+            // 重建那一刻，记账公式与物理回收共用同一个门槛（还没有「记账环 比环多一代」这回事——
             // 那个差异是接下来正常发布之后才会长出来的），所以两份 pending/item2 先置成一样。
             self.formula_pending = self.pending.clone();
             self.formula_item2_total = self.item2_total;
@@ -1259,7 +1259,7 @@ struct InvariantSnapshot {
     oldest_valid_root_lag: u64,
     /// Q12：最新持久根带的 F（`current_rollback_floor`）> F_生效（跨盘取最小）。
     floor_only_on_one_disk: bool,
-    /// Q7：G8′（记账第 1 项 − 第 5 项 == 最新根走读引用，去重求和）判红。
+    /// Q7：G27（记账第 1 项 − 第 5 项 == 最新根走读引用，去重求和）判红。
     allocated_minus_deferred_reference_mismatch: [bool; 5],
 }
 
@@ -1339,9 +1339,9 @@ impl World {
         let instance = self.pool.current_instance;
 
         // 「多扣」与违例检查用的候选 / 被抛弃账：这一刻（这次发布释放与分配之前）的环，
-        // 也就是「环」而不是「环′」——p 自己还没有账，它这一刻的内容仍是它前一个根的账，
+        // 也就是「环」而不是「记账环」——p 自己还没有账，它这一刻的内容仍是它前一个根的账，
         // 已经由前一个根自己的 txg 代表，不需要再算一次（登记第一节「多扣」：「这一刻」）。
-        // 物理回收步（驱动 occupied / 多扣 / 落点）也用这份「环」门槛——它与记账行公式（环′）不是
+        // 物理回收步（驱动 occupied / 多扣 / 落点）也用这份「环」门槛——它与记账行公式（记账环）不是
         // 同一件事：见 ArmExecutor::drain_formula_pending 的注。
         let candidate_txgs_before: Vec<u64> = self.pool.candidate_roots().iter().map(|entry| entry.txg).collect();
         let abandoned_txgs_before: Vec<u64> = self.pool.abandoned_roots().iter().map(|entry| entry.txg).collect();
@@ -1349,13 +1349,13 @@ impl World {
         let old_ring_threshold = self.pool.reclaim_threshold();
         let old_ring_blocking = self.pool.interval_blocking_generations();
 
-        // 环′：把 p 的根槽先换成根 p（登记第五节「发布 p 的记账行」），记账三项的公式门槛用这份环。
+        // 记账环：把 p 的根槽先换成根 p（登记第五节「发布 p 的记账行」），记账三项的公式门槛用这份环。
         // 写失败时不做这一步（ring 保留旧内容）。
         if !root_slot_write_fails {
             self.pool.commit_root(next_txg, instance, rollback_floor, is_nonempty);
         }
-        let ring_prime_threshold = self.pool.reclaim_threshold();
-        let ring_prime_blocking = self.pool.interval_blocking_generations();
+        let accounting_ring_threshold = self.pool.reclaim_threshold();
+        let accounting_ring_blocking = self.pool.interval_blocking_generations();
 
         let mut pre = [PreAllocationSnapshot::default(); 5];
         for (index, arm) in self.arms.iter_mut().enumerate() {
@@ -1405,8 +1405,8 @@ impl World {
             arm.violations_candidate += violations_candidate[index];
             arm.violations_abandoned += violations_abandoned[index];
             if arm.arm.is_measured() {
-                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&ring_prime_blocking);
-                arm.drain_formula_pending(ring_prime_threshold, blocking);
+                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&accounting_ring_blocking);
+                arm.drain_formula_pending(accounting_ring_threshold, blocking);
             }
             accounting[index] = arm.accounting_row();
         }
@@ -1482,7 +1482,7 @@ impl World {
             snapshot.allocated_statistic_mismatch_by_arm_reading[index] = row.item1_occupied_slots != union_by_effective_floor;
             snapshot.allocated_statistic_mismatch_by_today_checker_reading[index] = row.item1_occupied_slots != union_by_newest_root_floor;
             snapshot.free_statistic_mismatch[index] = row.item1_occupied_slots + row.item2_free_slots != UNIT_AREA_CAPACITY_SLOTS;
-            // G8′（登记第一节）：逐盘 第 1 项 − 第 5 项 == 最新根走读引用（去重求和）。「最新根走读引用」=
+            // G27（登记第一节）：逐盘 第 1 项 − 第 5 项 == 最新根走读引用（去重求和）。「最新根走读引用」=
             // 这条臂现在的 refs 展开（就是 root_accounts.get(current_txg) 的账，因为 current_txg 这一刻
             // 的账刚由 account_from_refs(&arm.refs) 写入，见 publish_inner/publish_empty_no_roles/
             // publish_write_row_inner 收尾那几行）。
@@ -1526,7 +1526,7 @@ impl World {
         let next_txg = self.pool.current_txg + 1;
         let rollback_floor = self.pool.current_rollback_floor;
         let instance = self.pool.current_instance;
-        // 「多扣」与物理回收步用「环」（这一刻，p 还没有账）；记账公式用「环′」（先换根之后）——
+        // 「多扣」与物理回收步用「环」（这一刻，p 还没有账）；记账公式用「记账环」（先换根之后）——
         // 两个不同的环，见 publish_inner 的注。
         let candidate_txgs_before: Vec<u64> = self.pool.candidate_roots().iter().map(|entry| entry.txg).collect();
         let abandoned_txgs_before: Vec<u64> = self.pool.abandoned_roots().iter().map(|entry| entry.txg).collect();
@@ -1534,8 +1534,8 @@ impl World {
         let old_ring_threshold = self.pool.reclaim_threshold();
         let old_ring_blocking = self.pool.interval_blocking_generations();
         self.pool.commit_root(next_txg, instance, rollback_floor, false);
-        let ring_prime_threshold = self.pool.reclaim_threshold();
-        let ring_prime_blocking = self.pool.interval_blocking_generations();
+        let accounting_ring_threshold = self.pool.reclaim_threshold();
+        let accounting_ring_blocking = self.pool.interval_blocking_generations();
         let mut pre = [PreAllocationSnapshot::default(); 5];
         for (index, arm) in self.arms.iter_mut().enumerate() {
             if arm.arm.is_measured() {
@@ -1556,8 +1556,8 @@ impl World {
         let mut accounting = [AccountingRow::default(); 5];
         for (index, arm) in self.arms.iter_mut().enumerate() {
             if arm.arm.is_measured() {
-                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&ring_prime_blocking);
-                arm.drain_formula_pending(ring_prime_threshold, blocking);
+                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&accounting_ring_blocking);
+                arm.drain_formula_pending(accounting_ring_threshold, blocking);
             }
             accounting[index] = arm.accounting_row();
         }
@@ -1691,8 +1691,8 @@ impl World {
             let old_ring_threshold = self.pool.reclaim_threshold();
             let old_ring_blocking = self.pool.interval_blocking_generations();
             self.pool.commit_root(next_txg, instance, target_floor, false);
-            let ring_prime_threshold = self.pool.reclaim_threshold();
-            let ring_prime_blocking = self.pool.interval_blocking_generations();
+            let accounting_ring_threshold = self.pool.reclaim_threshold();
+            let accounting_ring_blocking = self.pool.interval_blocking_generations();
             let mut pre = [PreAllocationSnapshot::default(); 5];
             for (index, arm) in self.arms.iter_mut().enumerate() {
                 if arm.arm.is_measured() {
@@ -1721,8 +1721,8 @@ impl World {
             let mut accounting = [AccountingRow::default(); 5];
             for (index, arm) in self.arms.iter_mut().enumerate() {
                 if arm.arm.is_measured() {
-                    let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&ring_prime_blocking);
-                    arm.drain_formula_pending(ring_prime_threshold, blocking);
+                    let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&accounting_ring_blocking);
+                    arm.drain_formula_pending(accounting_ring_threshold, blocking);
                 }
                 accounting[index] = arm.accounting_row();
             }
@@ -1840,8 +1840,8 @@ impl World {
         if !root_slot_write_fails {
             self.pool.commit_root(txg, instance, rollback_floor, redo_overwrite);
         }
-        let ring_prime_threshold = self.pool.reclaim_threshold();
-        let ring_prime_blocking = self.pool.interval_blocking_generations();
+        let accounting_ring_threshold = self.pool.reclaim_threshold();
+        let accounting_ring_blocking = self.pool.interval_blocking_generations();
         let mut pre = [PreAllocationSnapshot::default(); 5];
         for (index, arm) in self.arms.iter_mut().enumerate() {
             if arm.arm.is_measured() {
@@ -1870,8 +1870,8 @@ impl World {
         let mut accounting = [AccountingRow::default(); 5];
         for (index, arm) in self.arms.iter_mut().enumerate() {
             if arm.arm.is_measured() {
-                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&ring_prime_blocking);
-                arm.drain_formula_pending(ring_prime_threshold, blocking);
+                let blocking = matches!(arm.arm.predicate(), Some(Predicate::IntervalBlocking)).then_some(&accounting_ring_blocking);
+                arm.drain_formula_pending(accounting_ring_threshold, blocking);
             }
             accounting[index] = arm.accounting_row();
         }
@@ -2139,7 +2139,7 @@ fn main() {
     println!(
         "{}",
         emitter.emit_raw(
-            "name=scope covers=K1,K2,K3,K4,K5,A1,A2,A3,A4,A5,A6,A7,U1..U15,Q1,Q2,Q3,Q4i,Q4ii,Q5,Q6,Q6b(甲/乙两读法),Q7(G8′),Q9a(峰值/均值/末值),Q9b(峰值/均值/末值，发布前步/重建步分开),Q10,Q11,Q12,Q13(H1,H2,H3phi0/1/2,H3sq,H4d2,H4dNm2,H5early,H5late,H6,H7,12格),Q8(部分：B1a/B1b/B2/Bk1/Bk2，β1/β2 两基底) missing=Q8(部分：B3a/B3b/B4a/B4b/B4c 未实现，需要重新跑一遍历史（回收步一律不回收）或强制落点碰撞，本段未建），crash_branches(c1/c2/L2/L3，登记估过是千万发布级，本段未建：需要一个与 plain_remount 不同的『施加一条 dangling 记录』恢复路径，语义复杂度与规模都超出本段能安全完成的范围，量级见下） note=第五段新增 Q6b/Q7/Q10 与 Q8 的 B1a/B1b/B2/Bk1/Bk2 五种坏镜像（20 条新单测、10 条新变异，全部先证明会红）；G8′、Q10 推法分歧、Q6b 上界不成立三项发现见实验页「产物里的数」。崩溃支线（L2/L3）与 Q8 剩余三种坏镜像（B3a/B3b/B4a/B4b/B4c）留给下一段：前者需要新的恢复函数与千万级发布量的可行性评估（见跑前登记第十二节第五段），后者需要「重跑历史且禁用回收」与「强制落点碰撞」两种新机制"
+            "name=scope covers=K1,K2,K3,K4,K5,A1,A2,A3,A4,A5,A6,A7,U1..U15,Q1,Q2,Q3,Q4i,Q4ii,Q5,Q6,Q6b(甲/乙两读法),Q7(G27),Q9a(峰值/均值/末值),Q9b(峰值/均值/末值，发布前步/重建步分开),Q10,Q11,Q12,Q13(H1,H2,H3phi0/1/2,H3sq,H4d2,H4dNm2,H5early,H5late,H6,H7,12格),Q8(部分：B1a/B1b/B2/Bk1/Bk2，β1/β2 两基底) missing=Q8(部分：B3a/B3b/B4a/B4b/B4c 未实现，需要重新跑一遍历史（回收步一律不回收）或强制落点碰撞，本段未建），crash_branches(c1/c2/L2/L3，登记估过是千万发布级，本段未建：需要一个与 plain_remount 不同的『施加一条 dangling 记录』恢复路径，语义复杂度与规模都超出本段能安全完成的范围，量级见下） note=第五段新增 Q6b/Q7/Q10 与 Q8 的 B1a/B1b/B2/Bk1/Bk2 五种坏镜像（20 条新单测、10 条新变异，全部先证明会红）；G27、Q10 推法分歧、Q6b 上界不成立三项发现见实验页「产物里的数」。崩溃支线（L2/L3）与 Q8 剩余三种坏镜像（B3a/B3b/B4a/B4b/B4c）留给下一段：前者需要新的恢复函数与千万级发布量的可行性评估（见跑前登记第十二节第五段），后者需要「重跑历史且禁用回收」与「强制落点碰撞」两种新机制"
         )
     );
 
@@ -2251,7 +2251,7 @@ fn main() {
     }
 
     // 第四段：H1、H2、H3φ(0/1/2)、H3²、H4(d=2)、H4(d=N-2)、H5早、H5晚、H6、H7，全部 12 格，
-    // Q1-Q6、Q9(峰值/均值/末值轨迹)、Q11-Q13。崩溃支线（L2/L3）、G8′/坏镜像矩阵（Q7/Q8/Q10）留到第五段
+    // Q1-Q6、Q9(峰值/均值/末值轨迹)、Q11-Q13。崩溃支线（L2/L3）、G27/坏镜像矩阵（Q7/Q8/Q10）留到第五段
     // （见跑前登记第十二节第四段与实验页「它答不了的」）。
     let families: [(&str, fn(&mut World) -> Option<Vec<PublishOutcome>>); 9] = [
         ("H1", |world| Some(world.history_continuous_overwrite())),
@@ -2369,7 +2369,7 @@ fn main() {
                             emitter.emit_raw(&format!(
                                 "name=q_family family={family} s={} placement={:?} period={} arm={arm_tag} publishes={} \
                                  q1_i31_arm_red_states={allocated_mismatch_arm_reading_count} q2_i31_today_red_states={allocated_mismatch_today_reading_count} q3_i52_red_states={free_mismatch_count} \
-                                 q7_g8prime_red_states={allocated_minus_deferred_reference_mismatch_count} \
+                                 q7_g27_red_states={allocated_minus_deferred_reference_mismatch_count} \
                                  q4i_violations_candidate={} q4ii_violations_abandoned={} \
                                  q5_over_held_peak={over_held_peak} q5_over_held_positive_publishes={over_held_positive_publishes} q5_over_held_end={over_held_end} \
                                  q6_isolated_peak={isolated_peak} q6_isolated_positive_publishes={isolated_positive_publishes} q6_isolated_end={isolated_end} \
@@ -2576,8 +2576,8 @@ mod tests {
         assert_eq!(UNIT_AREA_CAPACITY_SLOTS, 211968);
     }
 
-    /// Q7/G8′（第五段）：第一个事务这一格，第 1 项 13 − 第 5 项 1 == 最新根走读引用 12（A6 已经钉过
-    /// 13/1，这里补上 G8′ 自己的算式，五条臂、全部 12 格都要成立——U11 的锚点正是这一行）。
+    /// Q7/G27（第五段）：第一个事务这一格，第 1 项 13 − 第 5 项 1 == 最新根走读引用 12（A6 已经钉过
+    /// 13/1，这里补上 G27 自己的算式，五条臂、全部 12 格都要成立——U11 的锚点正是这一行）。
     #[test]
     fn allocated_minus_deferred_matches_reference_on_first_transaction_for_every_arm_and_cell() {
         for cell in all_geometry_cells() {
@@ -2586,12 +2586,12 @@ mod tests {
             for (index, arm) in world.arms.iter().enumerate() {
                 let row = arm.accounting_row();
                 assert_eq!(row.item1_occupied_slots - row.item5_deferred_slots, 12, "{:?} cell={:?}", arm.arm, cell);
-                assert!(!snapshot.allocated_minus_deferred_reference_mismatch[index], "G8′ 不该在第一个事务这一格误红：{:?} cell={:?}", arm.arm, cell);
+                assert!(!snapshot.allocated_minus_deferred_reference_mismatch[index], "G27 不该在第一个事务这一格误红：{:?} cell={:?}", arm.arm, cell);
             }
         }
     }
 
-    /// U11（登记第九节 M19）：G8′ 不减第 5 项时，txg=3 这一行会误报——手写谓词核对变异表要抓的形状，
+    /// U11（登记第九节 M19）：G27 不减第 5 项时，txg=3 这一行会误报——手写谓词核对变异表要抓的形状，
     /// 不依赖 `invariant_snapshot` 里已经写好的算式（那条算式本身就是被测对象）。
     #[test]
     fn without_subtracting_deferred_the_check_would_misreport_at_first_transaction() {
@@ -2711,7 +2711,7 @@ mod tests {
         }
     }
 
-    /// Q8 起手式：合成的绿色基底四个检查都不判红（对应登记「先证明 G8′ 在全部合法状态上 0 误红，
+    /// Q8 起手式：合成的绿色基底四个检查都不判红（对应登记「先证明 G27 在全部合法状态上 0 误红，
     /// 再报坏镜像」那句话的最小形态）。
     #[test]
     fn accounting_checks_of_a_well_formed_base_state_are_all_green() {
@@ -2725,17 +2725,17 @@ mod tests {
         assert_eq!(checks, AccountingChecks::default(), "B1a 只翻记录标志，四个检查都不该判红");
     }
 
-    /// B1b：B1a 再把第 5 项加 2——只有 G8′（读第 5 项）判得出，I-3.1/I-5.2 都不读第 5 项。
+    /// B1b：B1a 再把第 5 项加 2——只有 G27（读第 5 项）判得出，I-3.1/I-5.2 都不读第 5 项。
     #[test]
     fn bad_image_b1b_is_caught_only_by_the_allocated_minus_deferred_check() {
         let checks = accounting_checks(bad_image_b1b(green_base_state()));
-        assert!(checks.allocated_minus_deferred_red, "第 5 项多 2，G8′ 该判红");
+        assert!(checks.allocated_minus_deferred_red, "第 5 项多 2，G27 该判红");
         assert!(!checks.allocated_statistic_mismatch_by_arm_reading, "I-3.1（臂内读法）不读第 5 项");
         assert!(!checks.allocated_statistic_mismatch_by_today_reading, "I-3.1（今天读法）不读第 5 项");
         assert!(!checks.free_statistic_mismatch, "I-5.2 不读第 5 项");
     }
 
-    /// B2：第 5 项单独多报一槽——形状与 B1b 相同（只是幅度不同），同样只有 G8′ 判得出。
+    /// B2：第 5 项单独多报一槽——形状与 B1b 相同（只是幅度不同），同样只有 G27 判得出。
     #[test]
     fn bad_image_deferred_overcount_by_one_is_caught_only_by_the_allocated_minus_deferred_check() {
         let checks = accounting_checks(bad_image_deferred_overcount_by_one(green_base_state()));
@@ -2744,7 +2744,7 @@ mod tests {
     }
 
     /// PC-F 的 Bk1（阳性对照）：D0 第 1 项多 1 槽——三个基于「第 1 项 vs 引用集合大小」比较的检查
-    /// 都该判红（I-3.1 两种读法与 G8′）；它同时也会破坏 I-5.2（第 1+2 项之和），这是数值上的必然
+    /// 都该判红（I-3.1 两种读法与 G27）；它同时也会破坏 I-5.2（第 1+2 项之和），这是数值上的必然
     /// 结果，不是登记「必须看到」那句要否定的东西。
     #[test]
     fn bad_image_bk1_is_caught_by_the_reference_comparison_checks() {
@@ -2758,7 +2758,7 @@ mod tests {
         let checks = accounting_checks(bad_image_bk2(green_base_state()));
         assert!(checks.free_statistic_mismatch, "第 2 项少 1，I-5.2 该判红");
         assert!(!checks.allocated_statistic_mismatch_by_arm_reading && !checks.allocated_statistic_mismatch_by_today_reading, "候选并集比较用的是第 1 项，没变");
-        assert!(!checks.allocated_minus_deferred_red, "G8′ 用第 1 项减第 5 项，都没变");
+        assert!(!checks.allocated_minus_deferred_red, "G27 用第 1 项减第 5 项，都没变");
     }
 
     /// Q8 基底：β1（H1 末态）、β2（H4dNm2 回退后第 S 次工作负载之后）两个真实历史算出来的基底状态，
@@ -3245,7 +3245,7 @@ mod tests {
     }
 
     /// 第三段冒烟：新增的六族历史函数在全部 12 格上都跑得完、不 panic，且落地一批基本形状——
-    /// 每族至少推进了 txg、Q3（I-5.2）全程不红（模型构造的两条累加路径应当恒等，PC-C′ 的变异改的是
+    /// 每族至少推进了 txg、Q3（I-5.2）全程不红（模型构造的两条累加路径应当恒等，PC-G 的变异改的是
     /// 「让它不恒等」那一条独立路径，不影响正常跑）。
     #[test]
     fn all_history_families_run_to_completion_on_every_geometry_cell() {

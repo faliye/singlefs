@@ -1,0 +1,15 @@
+90c63a198f724df7922afce16aa9f5497c05f65ad3b0882debd0a433d6717209  crates/singlefs-core/src/mount.rs
+a1b312de8088402c730f61eea3f9a0d885cc4d40468ae3ac5c7a45555f517920  crates/singlefs-core/src/transaction.rs
+bca60ce40bb7d36d5a8961e126bf9818a3f50a72a7e34d704ebe50f169ebb798  crates/singlefs-core/src/make_filesystem.rs
+ad6d3ee5d330da1fd4e4b32d67d164c36b463f6e3583bb4b6a8e8119b716fe8b  crates/singlefs-core/src/recovery.rs
+23ca03d9d489bfa2ad300127c532628b5ba969c62cbbaa61173437479e74fb36  .claude/kb/decisions/16-发布语义.md
+c3e07269d4c9ca005bdd232b3e5446cccc665cad92536b94e69588f5ae9e37e4  .claude/kb/decisions/23-journal的角色与格式.md
+5d30efd2e0c09db399f1342e27d5a2eba8e826de333b66dd67b8643448160ab4  .claude/kb/decisions/03-空间分配.md
+f56030d8c1d8c1d5ae76185b10df5a77233c06845390e7cd6d732f987b2994ba  .claude/kb/decisions/02-RAID条带策略.md
+abca791f41d85b9801eda9b837c61b95aaf2c77fd940d6a470ab09e52b3d23d7  .claude/kb/decisions/18-块里携带什么信息.md
+31f6889bf90a94f6be46b0c0c29cca320bd1189156c541aea55e208c14c8d26a  .claude/kb/decisions/22-单元原子性怎么合成.md
+e1e1734c8aedd5ba13766082bc06b8bb550fdd4ef2f819dc1770126ee7cc35ca  .claude/kb/decisions/28-挂载期承诺量.md
+1aeff8a5193b49cd2aa520877c4b65021fb1691a6e8e777ddd26d500f5c81d06  .claude/kb/checks-owed.md
+29539d24a49a38748c17ed86fc2b4a8f7a922f177992612aea9c2e80bbf4bf2b  .claude/kb/invariants.md
+f5d7f4c032014a23046d40fc3d201aa0bd09bb1e498f0b2b2cad85f775b54e1c  .claude/kb/milestone/02-second-txn.md
+c6e9f4f0f4ccd60e13823a6d010f411d22bebadd1a4cb7f1fca578736003d3f7  research/prompts/_m2-refusals-presumed-r1-body.md

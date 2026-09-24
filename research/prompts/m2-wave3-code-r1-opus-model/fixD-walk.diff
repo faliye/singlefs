@@ -1,0 +1,59 @@
+--- repo/crates/singlefs-checker/src/walk.rs	2026-09-23 23:52:06.163119337 +0000
++++ repo-fixD/crates/singlefs-checker/src/walk.rs	2026-09-24 01:07:16.602326343 +0000
+@@ -128,6 +128,8 @@
+     published_checkpoint_txg: u64,
+     /// 这一行记的 W：属于该实例的、被这次重放施加的最大事务号。
+     applied_transaction_high_water_mark: u64,
++    /// 副本上的改法 D（攻方腿，被攻过零轮）：flags bit0 = 回退行。
++    is_rollback: bool,
+ }
+ 
+ /// 指针尾段装的那个量：码 1 的指针 88 尾段是写序的事务号（6 字节），码 2 / 码 3 的指针 86 尾段是出生序号（4 字节）
+@@ -753,6 +755,7 @@
+                         applied_transaction_high_water_mark: u64::from_le_bytes(
+                             row[13..21].try_into().expect("8 字节"),
+                         ),
++                        is_rollback: row[21] & 1 == 1,
+                     });
+                     if instance >= mount_root_instance {
+                         below_mount_root = false;
+@@ -857,6 +860,8 @@
+     reader: &dyn ImageReader,
+     geometry: &PoolGeometry,
+     newest_published_txg: u64,
++    instance_table_rows: &[InstanceTableRow],
++    filesystem_identifier_low: u64,
+ ) -> BTreeSet<u64> {
+     let mut identifiers = BTreeSet::new();
+     for device in reader.devices() {
+@@ -875,6 +880,15 @@
+             if header_end < bytes.len()
+                 && checksum_field_holds(&bytes, header_end, 10)
+                 && read_u64(&bytes, 52 + 2 * usize::from(bytes[51])) <= newest_published_txg
++                && !unit_write_order_instance(&bytes, filesystem_identifier_low).is_some_and(|instance| {
++                    let birth = read_u64(&bytes, 52 + 2 * usize::from(bytes[51]));
++                    instance_table_rows.iter().any(|row| {
++                        row.instance == instance
++                            && !row.is_rollback
++                            && row.published_checkpoint_txg > 0
++                            && birth > row.published_checkpoint_txg
++                    })
++                })
+             {
+                 identifiers.insert(read_u64(&bytes, 42));
+             }
+@@ -3061,7 +3075,13 @@
+         .map(|(_, _, root)| root.checkpoint_txg)
+         .max()
+         .unwrap_or(0);
+-    let mut seen = scanned_tree_identifiers(reader, &geometry, newest_published_txg);
++    let mut seen = scanned_tree_identifiers(
++        reader,
++        &geometry,
++        newest_published_txg,
++        &instance_table_rows,
++        filesystem_identifier_low,
++    );
+     seen.extend(walk.tree_identifiers_in_tables.iter().copied());
+     let highest_seen = seen.iter().max().copied().unwrap_or(0);
+     judgements.judge("I-7.8", watermark > highest_seen, || {

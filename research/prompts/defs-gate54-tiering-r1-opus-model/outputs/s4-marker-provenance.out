@@ -1,0 +1,36 @@
+════ S4 [post] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s4/repo-post/.git/singlefs-layer0-full-green（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-23T23:28:08Z，跑完 2026-09-23T23:28:09Z）
+    [标记：input_hash=ad967f0e6db52cb2… judged_root=/tmp/claude-1000/defs54-attack/s4/repo-post；exhaustive=false]
+  ── gate.sh --staged
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:09Z，标记里的计数行原样：
+          LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+    [gate --staged 里 54 号的退出码 0]
+════ S4 [pre] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── gate.sh --staged
+      ✗ 层 0 不是全量：LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+    [gate --staged 里 54 号的退出码 1]
+════ S4 [f4a] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s4/repo-f4a/.git/singlefs-layer0-full-green（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-23T23:28:09Z，跑完 2026-09-23T23:28:09Z）
+    [标记：input_hash=ad967f0e6db52cb2… judged_root=/tmp/claude-1000/defs54-attack/s4/repo-f4a；exhaustive=false]
+  ── gate.sh --staged
+      ✗ （f4a）标记里的 LAYER0 / LAYER0B 两行不都是 exhaustive=true：LAYER0 exhaustive=false LAYER0B exhaustive=true
+    [gate --staged 里 54 号的退出码 1]
+════ S4 [f4b] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+      ✓ 全绿标记写进 /tmp/claude-1000/defs54-attack/s4/repo-f4b/.git/singlefs-layer0-full-green（输入哈希 ad967f0e6db52cb2…，8 个文件；开跑 2026-09-23T23:28:09Z，跑完 2026-09-23T23:28:09Z）
+    [标记：input_hash=ad967f0e6db52cb2… judged_root=/tmp/claude-1000/defs54-attack/s4/repo-f4b；exhaustive=false]
+  ── gate.sh --staged
+      ✗ （f4b）标记不是这一版 54 号写的
+    [gate --staged 里 54 号的退出码 1]

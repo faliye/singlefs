@@ -1,0 +1,21 @@
+== G：61 号，D1 这一批新加「### 已定（…）」小节，同时在它唯一那条未定项上补了一句复核（该绿）
+  （不配）               快照 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、0 节待议
+                             HEAD 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过
+  color.ui=always            快照 61 退 1 | ✗ 01-甲.md:13 本次新增了「已定」小节，而这条未定项一个字都没动
+                             HEAD 61 退 0 | ✓ 本次 diff 没有新增「已定」小节，本阶段无对象可判
+  diff.external=<草稿>/fake-external-diff.sh 快照 61 退 1 | ✗ 01-甲.md:13 本次新增了「已定」小节，而这条未定项一个字都没动
+                             HEAD 61 退 0 | ✓ 本次 diff 没有新增「已定」小节，本阶段无对象可判
+
+== H：40、88 号与 git commit --amend
+  amend 之前（产物只剩 HEAD 里那一份） 快照 40 退 0 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+                                       HEAD 40 退 1 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  amend 之前（产物只剩 HEAD 里那一份） 快照 88 退 0 | ✓ 这次改动新增或改写的 kb 正文里整行抄的产物行都在产物里逐字找得到（判了 1 行，对照 1 份产物）
+                                       HEAD 88 退 1 | ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里
+  amend 之后：产物在哪个提交里都没有了——git log --all --diff-filter=D 找到 0 条、HEAD 里 没有
+  amend 之后                            快照 40 退 1 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  amend 之后                            快照 88 退 1 | ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里
+
+== H2 对照（放开用户动作）：同一段历史，误删之后不 amend、另起一次提交
+  另起一次提交之后：git log --all --diff-filter=D 找到 1 条
+  另起一次提交之后                    快照 40 退 0 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  另起一次提交之后                    快照 88 退 0 | ✓ 这次改动新增或改写的 kb 正文里整行抄的产物行都在产物里逐字找得到（判了 1 行，对照 1 份产物）

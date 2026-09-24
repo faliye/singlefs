@@ -1,0 +1,44 @@
+原脚本对改过的红样本：退 1
+    ✗ 段序列登记表与 E142 产物的 name=segments 行（或第二条流与钉它的用例）对不上，共 14 处：
+       甲路径（path=a）：kb 写的段序列是 `3+1`，产物里是 `2+1`
+       乙路径（path=b）：kb 写的种类是 `[x]|[z]`，产物里 kinds 是 `[x]|[y]`
+       丙路径（path=c）：kb 写的操作次数是 3，产物里 operations 是 2
+       丁路径（path=d）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3
+       戊路径：登记表引用 path=e，产物 syn.out 里没有这个 path 的 name=segments 行
+       己路径：这一行不是预想，却没有可比对的段序列数字串
+       庚路径（path=g）：kb 写了种类 `[x]|[y]`，产物这一行却没有 kinds= 字段——产物是第五次跑之前的，要重跑 E142
+       辛路径：出处指的用例文件 crates/demo/tests/gone.rs 不存在
+       壬路径：出处指的用例文件里找不到 `fn renamed_sequence`
+       癸路径：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修
+       ⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）（path=m）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3
+       第二条流 `2+1`：数字串加起来是 3 次写，kb 写的是 4
+       第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉这个数组 `[2, 1]`
+       第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉状态数 5
+       → 怎么办：表是抄错了，就照产物改 .claude/kb/layout/01-first-txn.md 那一行；
+         产物是过期了，就重跑 E142（第一个事务的干跑），更新 research/results/ 下的文件，
+         再让 research/scripts/replay.sh 里 E142 那一行的入库产物名字跟上。
+expect 15 条 want
+
+现场：research/results/e142-first-txn-dry-run-2026-09-23-decisions-catchup.out；第八节点名的 .rs 4 份；输入的 sha256：
+  1a19966618db859e976a23d935d48b4d8c70c302493b58d53428272593b8b632  .claude/kb/layout/01-first-txn.md
+  4675ffb17c6ca72c2b2c70cd2f3bc6b4b321a573d1f989e48e6a9094d46e7b9d  research/results/e142-first-txn-dry-run-2026-09-23-decisions-catchup.out
+  5122b1135de7031bb497120523ada5f6277b723f27f87b51cdba69ab3c2b48a1  crates/singlefs-core/src/transaction.rs
+  8a299efcfbbb1fb8e340c07a849a91fa77cef31e7deed84500e651c8805fa9e0  crates/singlefs-harness/tests/first_transaction_step_one_mkfs.rs
+  2a0bdb89d14ab61291761068d05044281701d5c275f25fa1a847d613f46549e5  crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool_layer0.rs
+  5fda7c0492f7fade48a22f3e249706a542925b51381afebd9d60630b140cae8f  crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs
+  ef71ed03bccc9a658a86332a5cb8482346941a08a25a71d60a5bf702a9c40dec  research/scripts/check-segment-registry.py
+  674b3d9de7db9fb54829a909a368cebde4281c29ede4b6562bc826d6135def26  .claude/gate.d/52-segment-registry.sh
+
+变异                               | 47 号 --selftest | 52 号样本自检（判错几条） | 埋错（原脚本 52 号 → 变异后 52 号）
+无                                  | 退 0 | 退 0（0 条）| 「无」：0 → 0
+M1 产物行不比种类（第二轮，对照） | 退 0 | 退 1（2 条）| 「取号行种类」：1 → 0
+N1 整条流不比状态数          | 退 0 | 退 1（2 条）| 「整条流状态数」：1 → 0
+N2 第二条流不核用例里的数组 | 退 0 | 退 1（2 条）| 「第二条流两段对调」：1 → 0
+N3 第二条流不核写数          | 退 0 | 退 1（2 条）| 「第二条流写数」：1 → 0
+N4 第二条流不核用例里的状态数 | 退 0 | 退 1（2 条）| 「用例丢了状态数」：1 → 0
+N5 钉活代码的用例文件不在就放过 | 退 0 | 退 1（2 条）| 「钉 mkfs 的用例搬走」：1 → 0
+N6 用例里找不到函数就放过 | 退 0 | 退 1（2 条）| 「钉 mkfs 的用例函数改名」：1 → 0
+N7 出处既无 path 也无用例就放过 | 退 0 | 退 1（2 条）| 「mkfs 行出处丢了用例」：1 → 0
+N8 不是预想却没有段序列就放过 | 退 0 | 退 1（2 条）| 「取号行段序列丢了反引号」：1 → 0
+N9 产物行没有 kinds 就放过   | 退 0 | 退 1（2 条）| 「产物取号行没有 kinds」：1 → 0
+N10 声明路径剩不下恰好一条也照认第一条 | 退 0 | 退 0（0 条）| 「声明多出一条路径」：1 → 0

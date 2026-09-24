@@ -1,0 +1,123 @@
+改过的树：/tmp/claude-1000/gate-fix-forks-r3-opus/run/fix/tree（改动见上面的脚本；共用脚本自证 退 0）
+
+######## t1-scenes（改过的树）
+基线（D1 欠账块等 E2、E5；E2 未跑、表里只有 D3；E5 已跑、表里只有 D3）：快照 75 退 0 | ✓ 决策与实验双向登记对得上
+
+== A：E2 未跑 → 某个「跑完了」的写法，只回看 D3 那一行，D1 没动（快照 75）
+  「已跑（2026-09-24）」 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  「已跑两轮（2026-09-24）」 退 0 | ✓ 决策与实验双向登记对得上
+  「首轮已跑（2026-09-24）」 退 0 | ✓ 决策与实验双向登记对得上
+  「已测（2026-09-24）」 退 0 | ✓ 决策与实验双向登记对得上
+  「**已跑**（2026-09-24）」 退 0 | ✓ 决策与实验双向登记对得上
+  「已跑 (2026-09-24)」  退 0 | ✓ 决策与实验双向登记对得上
+  「已跑：结论不碰甲」 退 0 | ✓ 决策与实验双向登记对得上
+  「已跑，结论不碰甲」 退 0 | ✓ 决策与实验双向登记对得上
+  「已跑。」            退 0 | ✓ 决策与实验双向登记对得上
+
+== B：D1 欠账块换一种 doc-lint 认的写法提到 E2（doc-lint.sh 的 G 检查认粗体、反引号、空格、半角括号），E2 改成已跑（快照 75）
+  std    基线 退 0 | ✓ 决策与实验双向登记对得上；改成已跑 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  bold   基线 退 0 | ✓ 决策与实验双向登记对得上；改成已跑 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  code   基线 退 0 | ✓ 决策与实验双向登记对得上；改成已跑 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  space  基线 退 0 | ✓ 决策与实验双向登记对得上；改成已跑 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  half   基线 退 0 | ✓ 决策与实验双向登记对得上；改成已跑 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+
+== C：同一批里 D1 有一处与 E2 无关的改动（全仓术语改名这类），D1 欠账块照旧等 E2
+  C1 工作区直接跑：快照 75 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  C2 这一批暂存了翻状态，别的会话在工作区改了 D1 没暂存；工作区直接跑：快照 75 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+     照 gate.sh --staged 的做法在临时 worktree 上跑（GATE_BASE=HEAD）：快照 75 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+
+== D：E5 早就已跑，D1 欠账块等它、E5 的表里没有 D1
+  D1 只把 E5 的页 git mv 换个文件名（path-moves 许可的搬家），一个字不改：快照 75 退 0 | ✓ 决策与实验双向登记对得上
+                                                       HEAD 75 退 0 | ✓ 决策与实验双向登记对得上
+  D2 同上但用 mv、不暂存：快照 75 退 0 | ✓ 决策与实验双向登记对得上；HEAD 75 退 0 | ✓ 决策与实验双向登记对得上
+  D3 在 D2 上给 E5 的表补一行 D1（不影响）：快照 75 退 0 | ✓ 决策与实验双向登记对得上
+  D4 E5 重跑、结论翻了（标题照旧是已跑），只回看 D3 那一行，D1 没动：快照 75 退 0 | ✓ 决策与实验双向登记对得上
+
+== E：10 号并进 ⑨ 之后——名字或结论里带「退役」「作废」两个字、结论照样成立的实验
+  E9「退役盘的重建代价」没有一条决策引它、表里只有不影响：快照 75 退 0 | ✓ 决策与实验双向登记对得上
+      HEAD 10 号第 4 段：✗ E9 已跑，但决策正文一次都没引用它——它的结论悬空了
+  E9「坏盘的重建代价」没有一条决策引它、表里只有不影响：快照 75 退 1 | [没对应决策] .claude/kb/experiments/09-样本9.md：E9 的影响的决策表里没有一行是支撑 / 推翻 / 备料
+      HEAD 10 号第 4 段：✗ E9 已跑，但决策正文一次都没引用它——它的结论悬空了
+
+== F（归 T5：75 号自己那份按行号取新增行的函数）：同 A 第一格（该红），只多一条使用者的 git 配置
+  color.ui=always                          快照 75 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+  diff.external=<草稿>/fake-external-diff.sh 快照 75 退 1 | [没回看引用它的决策] .claude/kb/experiments/02-样本2.md：这次改动把 E2 改成已跑，.claude/kb/decisions/01-甲.md 的正文引了它
+
+######## t5-config-amend（改过的树）
+== G：61 号，D1 这一批新加「### 已定（…）」小节，同时在它唯一那条未定项上补了一句复核（该绿）
+  （不配）               快照 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、0 节待议
+                             HEAD 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过
+  color.ui=always            快照 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、0 节待议
+                             HEAD 61 退 0 | ✓ 本次 diff 没有新增「已定」小节，本阶段无对象可判
+  diff.external=<草稿>/fake-external-diff.sh 快照 61 退 0 | ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 1 份，查了 1 条未定项、0 节待议
+                             HEAD 61 退 0 | ✓ 本次 diff 没有新增「已定」小节，本阶段无对象可判
+
+== H：40、88 号与 git commit --amend
+  amend 之前（产物只剩 HEAD 里那一份） 快照 40 退 0 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+                                       HEAD 40 退 1 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  amend 之前（产物只剩 HEAD 里那一份） 快照 88 退 0 | ✓ 这次改动新增或改写的 kb 正文里整行抄的产物行都在产物里逐字找得到（判了 1 行，对照 1 份产物）
+                                       HEAD 88 退 1 | ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里
+  amend 之后：产物在哪个提交里都没有了——git log --all --diff-filter=D 找到 0 条、HEAD 里 没有
+  amend 之后                            快照 40 退 1 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  amend 之后                            快照 88 退 1 | ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里
+
+== H2 对照（放开用户动作）：同一段历史，误删之后不 amend、另起一次提交
+  另起一次提交之后：git log --all --diff-filter=D 找到 1 条
+  另起一次提交之后                    快照 40 退 0 | ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）
+  另起一次提交之后                    快照 88 退 0 | ✓ 这次改动新增或改写的 kb 正文里整行抄的产物行都在产物里逐字找得到（判了 1 行，对照 1 份产物）
+
+######## t5-states（改过的树）
+（* = 阶段报「取不到这次改动碰了哪些路径 / 新增了哪些行」退出）
+  刚 git init、还没有提交，文件都未跟踪 快照 11:1 56:77 68:1 69:0 75:0 97:0 61:0 
+                                               HEAD 11:1 56:77 68:1 69:0 75:0 97:0 61:0 
+  一个提交、没有上游、工作区改了一处 快照 11:1 56:1 68:1 69:0 75:0 97:0 61:77 
+                                               HEAD 11:1 56:1 68:1 69:0 75:0 97:0 61:0 
+  同一个仓切到 orphan 分支（HEAD 未出生） 快照 11:1 56:77 68:1 69:0 75:0 97:0 61:0 
+                                               HEAD 11:1 56:77 68:1 69:0 75:0 97:0 61:0 
+  浅克隆（--depth 1，有上游）、工作区改了一处 快照 11:1 56:1 68:1 69:0 75:1 97:0 61:77 
+                                               HEAD 11:1 56:1 68:1 69:0 75:1 97:0 61:0 
+  浅克隆，上游又前进两步（merge-base 取不到） 快照 11:1 56:1 68:1 69:0 75:1 97:0 61:77 
+                                               HEAD 11:1 56:77 68:77 69:0 75:1 97:0 61:0 
+  照 gate.sh --staged 建的临时 worktree   快照 11:1 56:1 68:1 69:77 75:1 97:0 61:77 
+
+######## 样本自检：原快照树与改过的树，各自的 gate.d 逐个样本（10 号两棵树一样红：它读的 lib-owed.py 不在快照清单里）
+== 原快照树
+✗ 10-kb-rot.sh                 green 期望退出 0，实测 1
+✗ 10-kb-rot.sh                 green 输出里找不到「kb 腐化审计通过」
+✗ 10-kb-rot.sh                 green 输出里找不到「欠检查 1 条、已还清 1 条」
+✗ 10-kb-rot.sh                 red   输出里找不到「checks-owed.md 里一行 `| C<n> ` 都没数到（欠着 0、已还清 0）」
+✗ 2 个样本判错（判对 14 个，8 个阶段没有样本）
+✓ 40-results-cited.sh          green 判得对
+✓ 40-results-cited.sh          red   判得对
+✓ 52-segment-registry.sh       green 判得对
+✓ 52-segment-registry.sh       red   判得对
+✓ 61-settled-same-file.sh      green 判得对
+✓ 61-settled-same-file.sh      red   判得对
+✓ 64-change-range-single-source.sh green 判得对
+✓ 64-change-range-single-source.sh red   判得对
+✓ 75-decision-experiment-links.sh green 判得对
+✓ 75-decision-experiment-links.sh red   判得对
+✓ 80-absolute-assertions.sh    green 判得对
+✓ 80-absolute-assertions.sh    red   判得对
+✓ 88-quoted-result-lines.sh    green 判得对
+✓ 88-quoted-result-lines.sh    red   判得对
+== 改过的树
+✗ 10-kb-rot.sh                 green 期望退出 0，实测 1
+✗ 10-kb-rot.sh                 green 输出里找不到「kb 腐化审计通过」
+✗ 10-kb-rot.sh                 green 输出里找不到「欠检查 1 条、已还清 1 条」
+✗ 10-kb-rot.sh                 red   输出里找不到「checks-owed.md 里一行 `| C<n> ` 都没数到（欠着 0、已还清 0）」
+✗ 2 个样本判错（判对 14 个，8 个阶段没有样本）
+✓ 40-results-cited.sh          green 判得对
+✓ 40-results-cited.sh          red   判得对
+✓ 52-segment-registry.sh       green 判得对
+✓ 52-segment-registry.sh       red   判得对
+✓ 61-settled-same-file.sh      green 判得对
+✓ 61-settled-same-file.sh      red   判得对
+✓ 64-change-range-single-source.sh green 判得对
+✓ 64-change-range-single-source.sh red   判得对
+✓ 75-decision-experiment-links.sh green 判得对
+✓ 75-decision-experiment-links.sh red   判得对
+✓ 80-absolute-assertions.sh    green 判得对
+✓ 80-absolute-assertions.sh    red   判得对
+✓ 88-quoted-result-lines.sh    green 判得对
+✓ 88-quoted-result-lines.sh    red   判得对

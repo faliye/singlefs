@@ -1,0 +1,58 @@
+2026-09-24T06:44:50Z
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:665:13
+    |
+665 |         let mut write_units = |p: &mut Pool, only_split: Option<bool>| {
+    |             ----^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:1199:9
+     |
+1199 |     let mut eval = |persisted: &[bool], t: &mut Tally, unreadable: &BTreeSet<usize>, overlay_for: Option<&Version>| {
+     |         ----^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: `singlefs-harness` (test "treesplit_opus_prototype") generated 2 warnings (run `cargo fix --test "treesplit_opus_prototype" -p singlefs-harness` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running tests/treesplit_opus_prototype.rs (/tmp/claude-1000/m2-treesplit-opus/target/release/deps/treesplit_opus_prototype-dfdc33c111dbeffa)
+
+running 4 tests
+test print_prefix_shapes ... PREFIX Middle PA height=1 nodes=4 L1<10:[10, 20, 30] 40:[40, 50, 60] 70:[70, 80]>
+PREFIX Middle PB height=2 nodes=10 L2<10:L1<10:[10, 20, 30] 40:[40, 50, 60] 70:[70, 80, 90]> 100:L1<100:[100, 110, 120] 130:[130, 140, 150] 160:[160, 170, 180] 190:[190, 200]>>
+PREFIX Middle PC height=2 nodes=9 L2<10:L1<10:[10, 20] 40:[80, 90]> 100:L1<100:[100, 110] 130:[140, 150] 160:[160, 170, 180] 190:[190, 200]>>
+PREFIX Middle PD height=3 nodes=31 L3<10:L2<10:L1<10:[10, 20, 30] 40:[40, 50, 60] 70:[70, 80, 90]> 100:L1<100:[100, 110, 120] 130:[130, 140, 150] 160:[160, 170, 180]> 190:L1<190:[190, 200, 210] 220:[220, 230, 240] 250:[250, 260, 270]>> 280:L2<280:L1<280:[280, 290, 300] 310:[310, 320, 330] 340:[340, 350, 360]> 370:L1<370:[370, 380, 390] 400:[400, 410, 420] 430:[430, 440, 450]> 460:L1<460:[460, 470, 480] 490:[490, 500, 510] 520:[520, 530, 540]> 550:L1<550:[550, 560, 570] 580:[580, 590, 600] 610:[610, 620, 630, 640]>>>
+PREFIX Middle PE height=1 nodes=5 L1<10:[10, 20, 30, 35] 40:[40, 50, 60, 65] 70:[70, 80, 90, 95] 100:[100, 110, 120]>
+PREFIX Tail PA height=1 nodes=3 L1<10:[10, 20, 30, 40] 50:[50, 60, 70, 80]>
+PREFIX Tail PB height=2 nodes=8 L2<10:L1<10:[10, 20, 30, 40] 50:[50, 60, 70, 80] 90:[90, 100, 110, 120]> 130:L1<130:[130, 140, 150, 160] 170:[170, 180, 190, 200]>>
+PREFIX Tail PC height=2 nodes=8 L2<10:L1<10:[10, 20] 50:[80, 90] 100:[100, 110]> 130:L1<130:[140, 150, 160] 170:[170, 180, 190, 200]>>
+PREFIX Tail PD height=3 nodes=24 L3<10:L2<10:L1<10:[10, 20, 30, 40] 50:[50, 60, 70, 80] 90:[90, 100, 110, 120]> 130:L1<130:[130, 140, 150, 160] 170:[170, 180, 190, 200] 210:[210, 220, 230, 240]> 250:L1<250:[250, 260, 270, 280] 290:[290, 300, 310, 320] 330:[330, 340, 350, 360]>> 370:L2<370:L1<370:[370, 380, 390, 400] 410:[410, 420, 430, 440] 450:[450, 460, 470, 480]> 490:L1<490:[490, 500, 510, 520] 530:[530, 540, 550, 560] 570:[570, 580, 590, 600] 610:[610, 620, 630, 640]>>>
+PREFIX Tail PE height=2 nodes=9 L2<10:L1<10:[10, 20, 30] 35:[35, 40] 50:[50, 60, 65]> 70:L1<70:[70, 80] 90:[90, 95, 100] 110:[110, 120]>>
+ok
+test scan_t1_candidates ... ok
+test scan_t6_candidates ... CFG T6/Refuse/named_cap=3 histories=8684 states=317674 closed_form=317674 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=3479 refused_histories=2875 publishes=13889 restructure_publishes=0 units=24204 split_units=470 ev_split=470 ev_height_up=0 ev_height_down=34 ev_node_removed=1112 max_segment_writes=6 overlay_states=926570 overlay_red=0
+  SHAPE T6/Refuse/named_cap=3 split=Middle sep=Maintained shrink=Merge { min_fill: 2, borrow: true } step=OnePublish last=Refuse leaf_cap=4 int_cap=4 named_cap=3
+CFG T6/SpreadLiteral/named_cap=3 histories=8684 states=2814312 closed_form=2814312 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=8826 unverified_applied=8826 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=17368 restructure_publishes=0 units=53076 split_units=4893 ev_split=2486 ev_height_up=932 ev_height_down=124 ev_node_removed=2468 max_segment_writes=10 overlay_states=17747219 overlay_red=53520
+  SHAPE T6/SpreadLiteral/named_cap=3 split=Middle sep=Maintained shrink=Merge { min_fill: 2, borrow: true } step=OnePublish last=SpreadLiteral leaf_cap=4 int_cap=4 named_cap=3
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(1)], [Ins(25)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d0] unreadable={}
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(1)], [Ins(25)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d1] unreadable={}
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(1)], [Ins(25)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d0,Rec(25)@d1] unreadable={}
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(15)], [Ins(35)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d0] unreadable={}
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(15)], [Ins(35)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d1] unreadable={}
+  EXAMPLE T6/SpreadLiteral/named_cap=3 CUT_PUBLISH_APPLIED: recovered txg 22; prefix=[[Ins(10)], [Ins(20)], [Ins(30)], [Ins(40)], [Ins(50)], [Ins(60)], [Ins(70)], [Ins(80)], [Ins(90)], [Ins(100)], [Ins(110)], [Ins(120)], [Ins(130)], [Ins(140)], [Ins(150)], [Ins(160)], [Ins(170)], [Ins(180)], [Ins(190)], [Ins(200)]] suffix=[[Ins(15)], [Ins(35)]] persisted=[Unit(151)@d0,Unit(151)@d1,Unit(152)@d0,Unit(152)@d1,Unit(153)@d0,Unit(153)@d1,Rec(24)@d0,Rec(24)@d1,Root(5)@d1,Unit(154)@d0,Unit(154)@d1,Unit(155)@d0,Unit(155)@d1,Unit(156)@d0,Unit(156)@d1,Unit(157)@d0,Unit(157)@d1,Rec(25)@d0,Rec(25)@d1] unreadable={}
+CFG T6/SpreadFlag/named_cap=3 histories=8684 states=2814312 closed_form=2814312 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=17368 restructure_publishes=0 units=53076 split_units=4893 ev_split=2486 ev_height_up=932 ev_height_down=124 ev_node_removed=2468 max_segment_writes=10 overlay_states=17747219 overlay_red=0
+  SHAPE T6/SpreadFlag/named_cap=3 split=Middle sep=Maintained shrink=Merge { min_fill: 2, borrow: true } step=OnePublish last=SpreadFlag leaf_cap=4 int_cap=4 named_cap=3
+CFG T6/CutPublish/named_cap=3 histories=8684 states=329815 closed_form=329815 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=4279 refused_histories=2875 publishes=14528 restructure_publishes=0 units=25482 split_units=470 ev_split=470 ev_height_up=0 ev_height_down=34 ev_node_removed=1112 max_segment_writes=6 overlay_states=965064 overlay_red=0
+  SHAPE T6/CutPublish/named_cap=3 split=Middle sep=Maintained shrink=Merge { min_fill: 2, borrow: true } step=OnePublish last=CutPublish leaf_cap=4 int_cap=4 named_cap=3
+ok
+test self_test_the_checker_and_oracle_can_go_red ... SELFTEST ok
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.76s
+
+exit=0
+2026-09-24T06:45:22Z

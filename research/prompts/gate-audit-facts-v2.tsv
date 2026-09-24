@@ -1,0 +1,23 @@
+编号	旧事实	新事实	检索词	出处
+F1	新立：checks-owed.md 没有 C520–C532 这 13 笔门禁修复三轮三方新立的欠账	checks-owed.md 新增 C520（75 号只认状态段恰好是已跑）到 C532（归档产物只剩区间断言）共 13 笔欠账	C520	H1
+F2	C46（门禁阶段自己不会红） 仍欠 8 个阶段的样本（15-research-build、21-decision-items-sync、70-citations、87-replay 前置是真的；47、52、54、55 号在各自脚本头部写明为什么装不进沙箱）	C46（门禁阶段自己不会红） 仍欠 4 个阶段的样本（15-research-build、87-replay 前置是真的；47、54 号在各自脚本头部写明为什么装不进沙箱），名单以上游样本自检每轮列出的「仍未自检」为准，不在这里抄	仍欠.*个阶段的样本	H1
+F3	新立：仓里没有统一禁止撇号角标（U+2032、U+2033、U+2034、U+02B9、U+02BA）当变体命名的门禁，`.claude/rules/path-moves.md` 没有「变体起新名字，不用角标」一节	门禁 12 号扫全仓（含冻结证据）零撇号角标；`.claude/rules/path-moves.md` 新增「变体起新名字，不用角标」一节；全仓 117 份文件里带撇号的变体名（如乙、甲、K9、命题 4 后面加撇号的那几个）改成不带撇号的新名字（如庚、丁、戊、K10、命题 5），受影响的决策变更史条目与实验页回看行只动了措辞	角标	H2;H3;H4;H5;H6;H7
+F4	新立：门禁阶段各自算改动范围，没有共用脚本	`research/scripts/changed-paths.sh` 是门禁阶段取改动范围的唯一一份代码（`gate_diff_base`、`gate_changed_paths`、`gate_added_lines`），11、40、56、61、68、69、75、88、92、97 号改用它	changed-paths\.sh	工作区（done.md 项 1）
+F5	新立：没有门禁判「改动范围只许一份取法」	门禁 64 号新立，判三条：① 基准不许自己算 ② git 列路径要带 quotepath=false ③ 调共用脚本要查退出码	改动范围只许一份取法	工作区（done.md 项 2）
+F6	`.claude/gate.d/10-kb-rot.sh` 第 3 项（已跑实验的状态变动有没有同批动决策）只在 `decisions.md` 索引页里找实验引用，匹配不到 `decisions/*.md` 与 `decisions-history.md`，除个别实验外每个都在第一步 `continue`，既不算 ok 也不算 bad，末尾照样报绿（C114）	门禁 10 号撤掉第 3 节（剩三节），「已跑实验的状态变动有没有同批动决策」并进 75 号第 ⑤ 条后一半与第 ⑨ 条	10 号阶段第 3 项	H1
+F7	门禁 75 号把依据段里任何 `E<号>（` 形式都当成一条引用，「无实验」那一段里出现实验编号会被误判双向不对称；不认粗体、反引号、空格、半角括号这类写法	门禁 75 号认粗体、反引号、空格、半角括号写法的实验引用；搬家的实验页按实验号找基准里的标题；作废 / 退役的写法放宽；新增行的取法带 --no-renames --no-color --no-ext-diff	75 号.{0,50}(只认|E<号>（|正文提到)	H1
+F8	门禁 40 号新加的第三道只扫 `.claude/kb/experiments.md` 与实验页里的产物引用，够不着 `research/prompts/` 下判决里的模型引用（C440）；40、88 号找新增行、61 号找未跟踪的决策文件都没有用共用脚本	门禁 61 号改用共用脚本（未跟踪的决策文件也算，git diff 带 --no-color --no-ext-diff）；40、88 号改用共用脚本取新增行，认 HEAD 树里的归档产物	(61|40|88) 号.{0,50}(新增行|未跟踪|归档|改动范围)	H1
+F9	新立：`.claude/gate.d/` 下 23 道阶段在 `cd` 到项目根之后才用 `$(dirname "$0")` 找共用脚本或生成器，用相对路径调、又另给一个项目根时找不到	门禁 31、52 号在 cd 之前取仓库根，找不到生成器 / 转发脚本退 1；门禁 77 号脚本不在不判红	阶段在 cd 之后找自己旁边的文件	H1
+F9b	上游样本自检脚本已经把「无对象可判」记成不是「判绿」「通过」，但门禁 15、28、32、35、48、60 等项目本地阶段「无对象可判」时退出码仍是 0	门禁 15、28、32、35、48、60 等阶段「无对象可判」从退 0 改成退 77，与「无对象可判」不算通过的记法一致	无对象可判.{0,30}(退 0|判绿|通过)	工作区（done.md 项 7）
+F10	新立：门禁 80 号（绝对断言）不扫 `crates/*/src/bin/` 与 `research/*/src/bin/` 下的 `e<数字>_*.rs`	门禁 80 号射程加 `crates/*/src/bin/` 与 `research/*/src/bin/` 下的 `e<数字>_*.rs`	80 号射程加	工作区（done.md 项 8）
+F11	新立：`.claude/scripts/gen-decision-items.py` 截断分项摘要时会切断被截断的半个 ASCII 词，也会剥掉 not-numbers 里登记过的编号词尾	生成器截断时整词退让，不切断半个 ASCII 词；not-numbers 里登记过的编号词尾不剥	生成器截断	工作区（done.md 项 9）
+F12	`.claude/agent-common.md` 第 4 行与 `.claude/rules/implementation-workflow.md` 第 18 行都写「门禁 71 号判这一条」	两处都改写成「上游门禁的『规则纪律（项目本地）』阶段判这一条」（agent-common.md 后缀改成规则出处，implementation-workflow.md 后缀改成「rules-lint 扫这三处」）	步骤、约束、判据、交付	工作区（done.md 项 10）
+F12b	新立：`.claude/rules/implementation-workflow.md` 没有「三步在定义上各取什么」一段	新增「三步在定义上各取什么」一段：第 1 步不适用（定义是文档，只改文档和脚本除外）；第 2 步是「改它们与改 crates/ 同规矩」那一轮三方；第 3 步照 show-me-test.md「这条同样管设计论证」那一句，三方打中的每一条先在模型里做成必须报非 0 的世界再改定义	三步在定义上各取什么	工作区（done.md 项 10）
+F13	新立：没有 hook 在书记员写入之后核相关记录跟没跟上；kb-scribe-followup.sh 还没有被真派发用过	新立 hook `.claude/hooks/kb-scribe-followup.sh`（登记表 `.claude/hooks/kb-scribe-followups.tsv`），注册在 `.claude/settings.json`，门禁 63 号第 ⑪ 条判它注册了、自证过了；两次真派发的书记员用过它，抓出一次「只读命令误认成写 kb 的修正」	kb-scribe-followup	工作区（done.md 项 11 与第一次用上的一段）
+F14	新立：`.claude/batch-scope` 没有一次性插入 71 行的记录	`research/scripts/insert-row.py` 往 `.claude/batch-scope` 一次插了 71 行	batch-scope.*71 行	工作区（done.md 第一次用上的一段）
+F15	新立：门禁 12 号还没有被真扫过全仓	门禁 12 号第一次真扫过全仓：查了 1991 份文本文件，0 处角标	门禁 12 号.*全仓	工作区（done.md 第一次用上的一段）
+F16	新立：`changed-paths.sh` 还没有被门禁阶段真调用过	共用脚本 `changed-paths.sh` 第一次真派发里被十道门禁阶段调用	changed-paths\.sh	工作区（done.md 第一次用上的一段）
+F17	新立：这一批要碰的触发文件、样本目录没有登记进 `stage-owners.tsv`、`doc-lint-exclude`、`batch-scope`	`.claude/gate.d/stage-owners.tsv` 登记 12、64 号；`.claude/doc-lint-exclude` 登记 40、52、12 号的样本目录；`.claude/batch-scope` 登记这一批的触发文件	登记 12、64 号	工作区（done.md 项 13）
+F18	新立：门禁修复三方（gate-fix-forks）还没有判完	三方论证 gate-fix-forks 三轮判完，T2、T7（kb 目录与 git 两类）、T11 交用户定	gate-fix-forks	工作区（done.md 项 14）
+F19	新立：上游样本自检 `stage-selftest.sh` 跑样本时不清 `GATE_DIFF_BASE`	上游样本自检 `stage-selftest.sh` 跑样本时一并清掉 `GATE_DIFF_BASE`，已填进上游三语仓工作区，等发版（不在本仓）	样本自检.*GATE_DIFF_BASE	工作区（done.md 项 15）
+F20	`replay.sh` 里 E153、E154、E155（第一、二次跑）那几行指向已归档的旧产物文件名（例如 `e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out`），树里没有不比这几份源码新的产物；E153、E154 回看格里的原理由被改名覆盖掉	E153、E154、E155 按全仓禁用角标把装置字段名、变异表变体名与产物文件名改掉之后复跑，存了四份 `research/results/*-2026-09-24-rename.out`（E153 一份、E154 一份、E155 两份：第一、二次跑各一份），`replay.sh` 四行改指它们；E153、E154 的回看格补回被改名覆盖掉的原理由	e153-ledger-shape-and-ring-holes-2026-09-17-stage5\.out|e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4\.out|e155-fsync-write-volume-2026-09-17-stage4\.out|e155-second-run-fsync-write-volume-2026-09-19-stage2\.out	H8;H9;H10

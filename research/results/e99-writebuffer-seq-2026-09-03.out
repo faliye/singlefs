@@ -1,0 +1,37 @@
+E7RESULT name=config txg_bits=64 publish_per_sec=2785 t_dirty=2147483648 acct_entry=30
+E7RESULT name=seq_width seq_bytes=8 txg_bits=64 window_bits=0
+E7RESULT name=seq_width seq_bytes=10 txg_bits=64 window_bits=16
+E7RESULT name=seq_width seq_bytes=12 txg_bits=64 window_bits=32
+E7RESULT name=seq_width seq_bytes=16 txg_bits=64 window_bits=64
+E7RESULT name=window_need max_updates_per_window=71582788 bits_needed=27
+E7RESULT name=seq_need key_shape=WithGeneration window_bits_needed=27 seq_bytes_needed=4 txg_is_duplicate_of_key_segment=1
+E7RESULT name=seq_need key_shape=Unknown window_bits_needed=27 seq_bytes_needed=NOT_APPLICABLE txg_is_duplicate_of_key_segment=0
+E7RESULT name=truncate gen_bits_kept=8 publishes=1000 wrap_publishes=256 wrap_millis=91 wrongly_merged_pairs=1464
+E7RESULT name=truncate gen_bits_kept=8 publishes=100000 wrap_publishes=256 wrap_millis=91 wrongly_merged_pairs=19481280
+E7RESULT name=truncate gen_bits_kept=8 publishes=10000000 wrap_publishes=256 wrap_millis=91 wrongly_merged_pairs=195307500032
+E7RESULT name=truncate gen_bits_kept=16 publishes=1000 wrap_publishes=65536 wrap_millis=23531 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=16 publishes=100000 wrap_publishes=65536 wrap_millis=23531 wrongly_merged_pairs=34464
+E7RESULT name=truncate gen_bits_kept=16 publishes=10000000 wrap_publishes=65536 wrap_millis=23531 wrongly_merged_pairs=757947392
+E7RESULT name=truncate gen_bits_kept=32 publishes=1000 wrap_publishes=4294967296 wrap_millis=1542178562 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=32 publishes=100000 wrap_publishes=4294967296 wrap_millis=1542178562 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=32 publishes=10000000 wrap_publishes=4294967296 wrap_millis=1542178562 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=48 publishes=1000 wrap_publishes=281474976710656 wrap_millis=101068214258763 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=48 publishes=100000 wrap_publishes=281474976710656 wrap_millis=101068214258763 wrongly_merged_pairs=0
+E7RESULT name=truncate gen_bits_kept=48 publishes=10000000 wrap_publishes=281474976710656 wrap_millis=101068214258763 wrongly_merged_pairs=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=none arm=NoSeq wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=none arm=WallClock wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=none arm=MountLocal wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=none arm=TxgPlusWindow wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=4 arm=NoSeq wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=4 arm=WallClock wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=4 arm=MountLocal wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=1 remount=4 arm=TxgPlusWindow wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=8 remount=none arm=NoSeq wrong_winners=0 undefined_winners=1000
+E7RESULT name=dedup keys=1000 per_key=8 remount=none arm=WallClock wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=8 remount=none arm=MountLocal wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=8 remount=none arm=TxgPlusWindow wrong_winners=0 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=8 remount=4 arm=NoSeq wrong_winners=0 undefined_winners=1000
+E7RESULT name=dedup keys=1000 per_key=8 remount=4 arm=WallClock wrong_winners=1000 undefined_winners=0
+E7RESULT name=dedup keys=1000 per_key=8 remount=4 arm=MountLocal wrong_winners=0 undefined_winners=1000
+E7RESULT name=dedup keys=1000 per_key=8 remount=4 arm=TxgPlusWindow wrong_winners=0 undefined_winners=0
+E7RESULT name=done emitted=37

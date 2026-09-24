@@ -1,0 +1,8 @@
+777d58abd7b5e7a302adea0bd506b7ecb1a84563765b4f363538930bffbc3fcf  .claude/agents/experiment-runner.md
+5603d227e484206f51c19cccafecead223f11d34f30d30687f27a5b94eaf1223  .claude/agents/crash-verifier.md
+99ccee14026a8367bf0398307ecff37fb2027442c2582df557d3d908cb7b78fd  .claude/main-agent.md
+c8ed3bbe97d44000d9eb01f7793e51ec8e57ef3b3d2ecb6b7275e24c1ddb60f3  .claude/hooks/agent-write-scope.tsv
+86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9  .claude/gate.d/54-layer0-replay.sh
+03314d49bf746b584c170722aaef29a1271120894c3dc952473d46509aab5acb  .claude/gate.d/stage-inputs.tsv
+78e07f3db6000743f2fc3800e77c5360f4c27b89835e50b8c157d3b46576c982  .claude/agent-common.md
+9628b6d55563fbacff367ef11aa1ccfb96d42ef5234a0b4308b0d703d3356dba  .claude/rules/implementation-workflow.md

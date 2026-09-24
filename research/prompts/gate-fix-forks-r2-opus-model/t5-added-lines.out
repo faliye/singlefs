@@ -1,0 +1,78 @@
+== C1 决策文件路径带空格：定案加在工作区，未定项没碰（61 本该红）
+    | .claude/kb/decisions/97 \346\240\267\346\234\254.md\t\t$
+    | .claude/kb/decisions/97 \346\240\267\346\234\254.md\t\t### \345\267\
+    | \262\345\256\232\351\241\271 2 \342\200\224\342\200\224 \345\267\262\
+    | \345\256\232\357\274\2102026-09-01\357\274\211\357\274\232\345\217\
+    | \226\347\224\262$
+    | .claude/kb/decisions/97 \346\240\267\346\234\254.md\t\t$
+    | .claude/kb/decisions/97 \346\240\267\346\234\254.md\t\t\344\276\235\
+    | \346\215\256\343\200\202$
+    gate_added_lines 退 0
+    新版 61-settled-same-file：退出码 77；  ! 本次 diff 没有新增「已定」小节，本阶段无对象可判 
+    HEAD 版 61-settled-same-file：退出码 1；  ✗ 97 样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动 
+== C2 实验页新增一行以「++ 」开头，其后新增一行抄错的 E7RESULT（88 本该红）
+    | \346\263\250\357\274\232\344\270\213\344\270\200\350\241\214\346\230\
+    | \257\346\212\204\347\232\204\344\272\247\347\211\251\tE7RESULT name=a\
+    |  value=2$
+    gate_added_lines 退 0
+    新版 88-quoted-result-lines：退出码 77；  ! 这次改动新增或改写的 kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判 
+    HEAD 版 88-quoted-result-lines：退出码 1；  ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到： 
+== C3 实验页新点名一份不存在的产物；同目录另有一份未跟踪的二进制文件（vim 交换文件，.gitignore 不管它）
+  -- 没有交换文件
+    新版 40-results-cited：退出码 1；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✗ 1 份被点名的产物既不在 research/results 下、也不在版本库历史里 
+    HEAD 版 40-results-cited：退出码 1；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✗ 1 份被点名的产物既不在 research/results 下、也不在版本库历史里 
+  -- 有交换文件（git status --porcelain： M .claude/kb/experiments/01-样本.md ?? .claude/kb/experiments/.01-样本.md.swp ）
+    新版 40-results-cited：退出码 0；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✓ 这次改动（基准 9c83fe83867647d8d1b384eb82cd9c5092994ca0）新增或改写的行点名的 0 份产物在树里或版本库历史里都找得到   ✓ 已跑的实验都点了名或写明了产物未留存 
+    HEAD 版 40-results-cited：退出码 1；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✗ 1 份被点名的产物既不在 research/results 下、也不在版本库历史里 
+== C4 一页带一行早先抄下、已对不上产物的 E7RESULT；只把它搬个家（不改一个字）
+  -- mv 之后、git add 之前
+    新版 88-quoted-result-lines：退出码 1；  ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到： 
+    HEAD 版 88-quoted-result-lines：退出码 77；  ! 这次改动新增或改写的 kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判 
+  -- git add -A 之后（暂存区里是一次改名）
+    新版 88-quoted-result-lines：退出码 77；  ! 这次改动新增或改写的 kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判 
+    HEAD 版 88-quoted-result-lines：退出码 1；  ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到： 
+  -- 同上，本仓配了 diff.renames=false
+    新版 88-quoted-result-lines：退出码 1；  ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到： 
+== C5 路径带制表符、未跟踪路径带制表符
+    | "b/k/t\\tx.md"\tb$
+    | k/u\ty.md\tc$
+    gate_added_lines 退 0
+== C6 git 配置扫一遍：只看 gate_added_lines 的输出与不配时逐字相同否
+    diff.noprefix=true：相同
+    diff.mnemonicPrefix=true：相同
+    diff.relative=true：相同
+    color.ui=always：相同
+    color.diff=always：相同
+    diff.renames=false：不同
+      2a3
+      >     | k/h.md\tx$
+    diff.renames=copies：相同
+    diff.algorithm=patience：相同
+    diff.algorithm=histogram：相同
+    diff.context=5：相同
+    diff.suppressBlankEmpty=true：相同
+    diff.interHunkContext=10：相同
+    core.quotepath=true：相同
+    diff.external=/bin/false：相同
+== C7 没有上游（本地分支没设 upstream、没有 gate-ok）：实验页已提交，点名一份不存在的产物、抄了一行对不上的 E7RESULT；工作区干净
+  -- 分支「功能分支」，没有上游；上游版 lib.sh diff_base 在这里取到 4c07349（master 的 merge-base），共用脚本 gate 取法取到 HEAD
+    新版 40-results-cited：退出码 0；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✓ 这次改动（基准 HEAD）新增或改写的行点名的 0 份产物在树里或版本库历史里都找得到   ✓ 已跑的实验都点了名或写明了产物未留存 
+    HEAD 版 40-results-cited：退出码 1；  ✓ research/results 下的实验产物全部被 experiments.md 点名（1 个文件）   ✗ 1 份被点名的产物既不在 research/results 下、也不在版本库历史里 
+    新版 88-quoted-result-lines：退出码 77；  ! 这次改动新增或改写的 kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判 
+    HEAD 版 88-quoted-result-lines：退出码 1；  ✗ 全量 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到： 
+== C8 git 失败时（索引文件坏了：git diff 退 128）：共用脚本退非 0，调用方判不判退出码
+  -- 索引完好
+    新版 56-crates-adversarial-review：退出码 1；  ✗ crates 改动里 1 个文件没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）： 
+  -- 索引坏了（git diff --name-only HEAD 退 128；gate_changed_paths 退 1）
+    新版 56-crates-adversarial-review：退出码 77；  ! 这次改动没碰 crates/*/src，本阶段无对象可判（基准 0e7516794fe26d122c877af79953813b4799631b） 
+  调 gate_changed_paths 而不判它退出码的地方（真仓现查）：
+    .claude/gate.d/11-batch-scope.sh:50:changed="$(gate_changed_paths "$(gate_diff_base head)" untracked)"
+    .claude/gate.d/56-crates-adversarial-review.sh:24:changed="$(gate_changed_paths "$base" untracked)"
+    .claude/gate.d/56-crates-adversarial-review.sh:30:added="$(gate_changed_paths "$base" untracked A)"
+    .claude/gate.d/68-knowledge-sync.sh:73:changed="$(gate_changed_paths "$base" untracked)"
+    .claude/gate.d/69-evidence-in-repo.sh:61:changed="$(gate_changed_paths "$base" untracked)"
+    .claude/gate.d/69-evidence-in-repo.sh:62:added="$(gate_changed_paths "$base" untracked A)"
+    .claude/gate.d/72-agent-def-adversarial-review.sh:24:changed="$(gate_changed_paths "$base" untracked)"
+    .claude/gate.d/72-agent-def-adversarial-review.sh:30:added="$(gate_changed_paths "$base" untracked A)"
+    .claude/gate.d/75-decision-experiment-links.sh:53:  changed="$(gate_changed_paths "$base" untracked)"
+    .claude/gate.d/97-invariant-field-anchors.sh:36:added="$(gate_changed_paths "$base" untracked A)"

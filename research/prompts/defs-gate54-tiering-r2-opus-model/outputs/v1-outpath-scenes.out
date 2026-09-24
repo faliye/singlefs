@@ -1,0 +1,63 @@
+════ V1-a 暂存区为空：代码轮刚改完 crates/、还没暂存，崩溃验证员照定义第 2 步在主工作区跑 54 号（默认快档）
+  ── 暂存区：[] 工作区相对 HEAD：crates/singlefs-harness/src/crash.rs 
+  ── 崩溃验证员的快档，退出码 1
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 74f88a29d4fc1e39…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+  ── 红句里打出的三行与 54 号出路函数的三行逐字相同（cmp 0）
+  ── 照红句三行原样跑完
+  · --full 开跑（2026-09-24T01:38:32Z）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 ccec9defeddec16d…（4 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-a/.git/singlefs-layer0-full-green.ccec9defeddec16d8b0a1f9419f2fb8d0764b102ae19d1e21fa132d21b
+      [格] ccec9defedde worker_threads=32 judged_root=…/tmp.2LaIeWSGDo/tree
+  ── 崩溃验证员再跑快档，退出码 1
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 74f88a29d4fc1e39…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+  ── gate --staged（暂存区为空）
+  ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
+    [gate --staged 里 54 号退出码 77]
+
+════ V1-b 暂存区里只有别的会话的东西：X 这一批只改文档；Y 暂存了 crates/ 改动、还没跑它自己的 --full
+  ── 暂存区：crates/singlefs-harness/src/crash.rs docs/note.md 
+  ── X 起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 183ed074847ba599…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── X 照出路三行跑
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-b/.git/singlefs-layer0-full-green.183ed074847ba5992ae7ed5344054fa674d589a1ff3e07ac4a7c03159d
+  ── X 再起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（183ed074847ba599…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:38:38Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ V1-c HEAD 变了：出路第 1 行跑完、第 2 行之前，别的会话提交（whole-index）
+  ── 暂存区：crates/singlefs-harness/src/crash.rs crates/singlefs-harness/src/lib.rs 
+  ── 插进来的提交之后 HEAD=689b043，暂存区：
+error: patch failed: crates/singlefs-harness/src/crash.rs:1
+error: crates/singlefs-harness/src/crash.rs: patch does not apply
+error: patch failed: crates/singlefs-harness/src/lib.rs:1
+error: crates/singlefs-harness/src/lib.rs: patch does not apply
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-c-whole-index/.git/singlefs-layer0-full-green.fa259cbe6ccfc67a407e6fa7019093b1f2e19ff555580f
+      [格] fa259cbe6ccf worker_threads=32 judged_root=…/tmp.eIAqs6KF49/tree
+  ── 起门禁
+  ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间一个改动都没有（干净工作树；要重新验 HEAD 用 SINGLEFS_GATE_FULL=1）
+    [gate --staged 里 54 号退出码 77]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ V1-c HEAD 变了：出路第 1 行跑完、第 2 行之前，别的会话提交（own-paths）
+  ── 暂存区：crates/singlefs-harness/src/crash.rs crates/singlefs-harness/src/lib.rs 
+  ── 插进来的提交之后 HEAD=94dda68，暂存区：crates/singlefs-harness/src/crash.rs 
+error: patch failed: crates/singlefs-harness/src/lib.rs:1
+error: crates/singlefs-harness/src/lib.rs: patch does not apply
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/v1-c-own-paths/.git/singlefs-layer0-full-green.87c99ba1851fb6ec8abc75e2c9c14bcf601327c99868fce8
+      [格] 87c99ba1851f worker_threads=32 judged_root=…/tmp.b1Swuek3w5/tree
+  ── 起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 fa259cbe6ccfc67a…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 真值
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ V1-d $TMPDIR 里留下的目录：同一条出路连跑两次，看第二次读没读第一次留下的东西
+  ── 第一次留下：tmp.eF1YXiiBLP：staged.patch ；第二次留下：tmp.7zfUrReqzk：staged.patch 
+  ── 两次的 staged.patch 相同吗：不同；第二次那一趟的 judged_root：tmp.7zfUrReqzk tmp.eF1YXiiBLP 
+  ── worktree 登记：1 条（只剩主工作树）
+      [格] 5d2faafdac28 worker_threads=32 judged_root=…/tmp.7zfUrReqzk/tree
+      [格] f2cdc9f6f74f worker_threads=32 judged_root=…/tmp.eF1YXiiBLP/tree

@@ -1,0 +1,14 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-refusals-opus/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-refusals-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.11s
+     Running tests/opus_patched_refusals.rs (target/debug/deps/opus_patched_refusals-0a8122923a7f2769)
+
+running 2 tests
+test opus_q1_fix_lets_the_raise_go_through_on_the_mkfs_process_version ... [Q1-F1] 抬 F 到 3 做成了：上限 3，空发布 2 次（txg [7, 8]），回收 1 个落点
+ok
+test opus_r1_fix_shows_the_next_wall_on_the_second_mount_of_a_formatted_pool ... [R1-F1] OPUS_SKIP_R1 = false，OPUS_SKIP_R4 = false
+[R1-F1] 第二次可写挂载还是被拒：InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) }
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+

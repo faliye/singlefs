@@ -13,7 +13,8 @@ const HEADER_WITHOUT_KEY_RANGE: u64 = 81;
 /// D18 已定项 14：nonce / MAC 预留位。
 const NONCE_MAC_RESERVED_BYTES: u64 = 28;
 /// D19 已定项 7 / 已定项 8：指向码 2 / 码 3 的指针。
-const NODE_POINTER_BYTES: u64 = 83;
+// 这个实验跑的时候指针宽是 83；今天的宽登记在 format-const NODE_POINTER_BYTES（86）。这里留当时的值，改名是为了不与现行常量同名。
+const NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN: u64 = 83;
 /// D8 已定项 8。
 const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 /// 树表一个单元装几条，取 D22（单元原子性怎么合成） 已定项 7 的口径 ⌊(16384 − 131) / 200⌋ = 81。⚠️ 它随条目宽变，改 TREE_TABLE_ENTRY_BYTES 要一起改这一行。
@@ -86,7 +87,7 @@ impl TreeShape {
         self.payload_bytes() / self.entry_bytes()
     }
     fn internal_fanout(self) -> u64 {
-        self.payload_bytes() / (self.key_bytes + NODE_POINTER_BYTES)
+        self.payload_bytes() / (self.key_bytes + NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN)
     }
     fn height(self, entries: u64) -> u64 {
         tree_height(entries, self.leaf_fanout(), self.internal_fanout())
@@ -171,7 +172,7 @@ fn emit(emitter: &mut Emitter, line: &str) {
 fn main() {
     let mut emitter = Emitter::new();
     emit(&mut emitter, &format!(
-        "name=config node_bytes={NODE_BYTES} header_without_key_range={HEADER_WITHOUT_KEY_RANGE} reserved={NONCE_MAC_RESERVED_BYTES} node_pointer={NODE_POINTER_BYTES} head_tree_identifier={HEAD_TREE_IDENTIFIER_BYTES} mapping_key_data={MAPPING_KEY_DATA_BYTES} mapping_key_node={MAPPING_KEY_NODE_BYTES} unit_bytes={UNIT_BYTES} tree_table_entry={TREE_TABLE_ENTRY_BYTES} data_units_per_node={DATA_UNITS_PER_NODE}"
+        "name=config node_bytes={NODE_BYTES} header_without_key_range={HEADER_WITHOUT_KEY_RANGE} reserved={NONCE_MAC_RESERVED_BYTES} node_pointer={NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN} head_tree_identifier={HEAD_TREE_IDENTIFIER_BYTES} mapping_key_data={MAPPING_KEY_DATA_BYTES} mapping_key_node={MAPPING_KEY_NODE_BYTES} unit_bytes={UNIT_BYTES} tree_table_entry={TREE_TABLE_ENTRY_BYTES} data_units_per_node={DATA_UNITS_PER_NODE}"
     ));
     let mut height_grid_differences_from_legacy = 0u64;
     let mut pad_heights = Vec::new();
@@ -245,7 +246,7 @@ mod tests {
         assert_eq!(NODE_BYTES, 16384, "D8 已定项 2");
         assert_eq!(HEADER_WITHOUT_KEY_RANGE, 81, "D18 已定项 7");
         assert_eq!(NONCE_MAC_RESERVED_BYTES, 28, "D18 已定项 14");
-        assert_eq!(NODE_POINTER_BYTES, 83, "D19 已定项 7");
+        assert_eq!(NODE_POINTER_BYTES_WHEN_THIS_EXPERIMENT_RAN, 83, "D19 已定项 7");
         assert_eq!(HEAD_TREE_IDENTIFIER_BYTES + MAPPING_KEY_DATA_BYTES, 35, "头树 ID 8 + 码 1 映射 key 27");
         assert_eq!(HEAD_TREE_IDENTIFIER_BYTES + MAPPING_KEY_NODE_BYTES, 33, "头树 ID 8 + 码 2 / 3 映射 key 25");
         assert_eq!(LEGACY_E130_ENTRY_BYTES, 24, "E130 的作废形态");

@@ -1,0 +1,14 @@
+# E158 第一段：cargo test -p singlefs-harness --bin e158_root_choice_repair 的原样输出
+跑于 2026-09-24 01:39:33 JST
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/bin/e158_root_choice_repair.rs (target/debug/deps/e158_root_choice_repair-510106b7a4fcb6a3)
+
+running 5 tests
+test tests::constants_and_anchors_all_pass ... ok
+test tests::local_constants_match_crates_today ... ok
+test tests::pc_nw_does_not_count_a_rollback_event_whose_abandoned_roots_are_all_unreadable ... ok
+test tests::pc_nw_counts_two_live_rollback_events_from_a_hand_written_ledger ... ok
+test tests::bootstrap_timeline_matches_independent_decode ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+

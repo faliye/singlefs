@@ -1,0 +1,37 @@
+--- /tmp/claude-1000/m2-refusals-opus/mount.rs.orig	2026-09-22 13:55:44.314265694 +0000
++++ crates/singlefs-core/src/mount.rs	2026-09-22 13:55:44.324462500 +0000
+@@ -862,6 +862,10 @@
+     start: &InstanceStart,
+     instance_to_acquire: InstanceGeneration,
+ ) -> Result<(), MountError> {
++    // 攻方腿副本补丁：这个拒绝关掉。
++    if true {
++        return Ok(());
++    }
+     let first_row_instance = start.previous_row.instance.0.max(1);
+     match &start.previous {
+         PreviousVersion::WithoutFile(chosen_root) if first_row_instance < instance_to_acquire.0 => {
+@@ -889,6 +893,10 @@
+     let device_of_txg = |txg: CheckpointTxg| {
+         parameters.region_devices[usize::try_from(target_for_publish(txg).region).expect("区域号")]
+     };
++    // 攻方腿副本补丁：形状判定关掉。
++    if true {
++        return Ok(());
++    }
+     match &start.previous {
+         PreviousVersion::WithoutFile(chosen_root) => {
+             let shaped_like_the_first_transaction = start.first_txg == CheckpointTxg(1)
+@@ -1050,7 +1058,11 @@
+     let warm_up_publishes_planned = warm_up_publish_txgs(parameters, &all_devices, start.first_txg);
+     let instance_to_acquire = instance_generation_to_acquire(&pool);
+     // 要写的行按要取的号先列出来：实例表那一项准入按它算，取号之后写行也用这一份（号在写之前重算、不等就不写）。
+-    let rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
++    let mut rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
++    // 攻方腿副本补丁：树表 0 条的一版上这次不写行（与只做过 mkfs 的池第一次可写挂载同形）。
++    if matches!(start.previous, PreviousVersion::WithoutFile(_)) {
++        rows_written.clear();
++    }
+     refuse_instance_rows_on_version_without_file(&start, instance_to_acquire)?;
+     refuse_formatted_pool_mount_not_shaped_like_the_first_transaction(parameters, &start)?;
+     refuse_publishes_before_acquisition_that_do_not_pass_admission(

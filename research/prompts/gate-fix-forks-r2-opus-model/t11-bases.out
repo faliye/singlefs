@@ -1,0 +1,21 @@
+== 两个取法在八种仓状态下取到的提交（提交名是提交说明）
+  S1 master 全推出去了，工作区有改动 diff_base → c2        gate_diff_base gate → c3
+  S2 master 本地多一个没推的提交 c3  diff_base → c2        gate_diff_base gate → c2
+  S3 master 没配上游                       diff_base → c2        gate_diff_base gate → c3
+  S4 功能分支 c4，没配上游            diff_base → c3        gate_diff_base gate → c4
+  S5 功能分支 c4，上游是它自己、全推出去了 diff_base → c3        gate_diff_base gate → c4
+  S6 游离 HEAD（在 c3 上）               diff_base → c2        gate_diff_base gate → c3
+  S7 master 全推出去了，gate-ok 在 c2   diff_base → c2        gate_diff_base gate → c3
+  S8 master 落后上游一个提交（fetch 了没合） diff_base → c1        gate_diff_base gate → c2
+
+== 61 号（真仓现在的文件）：定案已提交、未定项没碰；工作区另改一个无关文件。「不认」= 直接跑，「认」= GATE_BASE=diff_base
+  S3  不认：77   ! 本次 diff 没有新增「已定」小节，本阶段无对象可判
+  S3  认（GATE_BASE=决策）：1   ✗ 97-样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动
+  S4  不认：77   ! 本次 diff 没有新增「已定」小节，本阶段无对象可判
+  S4  认（GATE_BASE=决策）：1   ✗ 97-样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动
+  S6  不认：77   ! 本次 diff 没有新增「已定」小节，本阶段无对象可判
+  S6  认（GATE_BASE=决策）：1   ✗ 97-样本.md:7 本次新增了「已定」小节，而这条未定项一个字都没动
+
+== 88 号：S1（全推出去了）。上一轮提交抄了产物行并已推；这一批照归档规则删掉上一轮的产物、换上新产物、页里点名新产物
+  不认：77   ! 这次改动新增或改写的 kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判
+  认（GATE_BASE=第一轮产物）：1   ✗ 这次改动新增或改写的 kb 正文里有 1 行整行抄的产物行，在 research/results/ 的 1 份产物里一份都找不到：

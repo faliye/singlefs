@@ -1,0 +1,6 @@
+88：1 份正文里整行抄的 E7RESULT 行 0 行；树里、归档、HEAD 删掉的产物里都找不到的 0 行，分在 0 份：
+Traceback (most recent call last):
+  File "/tmp/claude-1000/gate-fix-forks-r3-verifier/opus-rerun/model/t5-moved-pages.py", line 64, in <module>
+    for number, line in enumerate(open(path, encoding='utf-8').read().split('\n'), 1):
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '.claude/kb/experiments.md'

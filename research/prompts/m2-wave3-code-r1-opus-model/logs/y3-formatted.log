@@ -1,0 +1,129 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/opus_attack_y3.rs (/tmp/claude-1000/m2-wave3-opus/target/debug/deps/opus_attack_y3-ea4ea815743599c4)
+
+running 1 test
+test y3_crash_inside_first_writable_mount_of_a_formatted_pool ... === first writable mount ops [21, 37) ===
+k=21 last=- crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=21 step=mount root=(1,2) red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=21 step=first-file txg=3 red=[] I-3.10=Holds
+k=21 step=overwrite1 txg=4 red=[] I-3.10=Holds
+k=21 step=overwrite2 txg=5 red=[] I-3.10=Holds
+k=21 step=overwrite3 txg=6 red=[] I-3.10=Holds
+k=21 step=remount ok=true red=[] I-3.10=Holds
+k=22 last=write@dev0+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=22 step=mount root=(2,2) red=[] I-3.10=Holds
+k=22 step=first-file txg=3 red=[] I-3.10=Holds
+k=22 step=overwrite1 txg=4 red=[] I-3.10=Holds
+k=22 step=overwrite2 txg=5 red=[] I-3.10=Holds
+k=22 step=overwrite3 txg=6 red=[] I-3.10=Holds
+k=22 step=remount ok=true red=[] I-3.10=Holds
+k=23 last=write@dev1+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=23 step=mount root=(2,2) red=[] I-3.10=Holds
+k=23 step=first-file txg=3 red=[] I-3.10=Holds
+k=23 step=overwrite1 txg=4 red=[] I-3.10=Holds
+k=23 step=overwrite2 txg=5 red=[] I-3.10=Holds
+k=23 step=overwrite3 txg=6 red=[] I-3.10=Holds
+k=23 step=remount ok=true red=[] I-3.10=Holds
+k=24 last=barrier@dev0+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=24 step=mount root=(2,2) red=[] I-3.10=Holds
+k=24 step=first-file txg=3 red=[] I-3.10=Holds
+k=24 step=overwrite1 txg=4 red=[] I-3.10=Holds
+k=24 step=overwrite2 txg=5 red=[] I-3.10=Holds
+k=24 step=overwrite3 txg=6 red=[] I-3.10=Holds
+k=24 step=remount ok=true red=[] I-3.10=Holds
+k=25 last=write@dev0+16777216 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=25 step=mount root=(2,4) red=[] I-3.10=Holds
+k=25 step=first-file txg=5 red=[] I-3.10=Holds
+k=25 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=25 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=25 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=25 step=remount ok=true red=[] I-3.10=Holds
+k=26 last=write@dev1+16777216 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=26 step=mount root=(2,4) red=[] I-3.10=Holds
+k=26 step=first-file txg=5 red=[] I-3.10=Holds
+k=26 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=26 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=26 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=26 step=remount ok=true red=[] I-3.10=Holds
+k=27 last=barrier@dev0+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=27 step=mount root=(2,4) red=[] I-3.10=Holds
+k=27 step=first-file txg=5 red=[] I-3.10=Holds
+k=27 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=27 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=27 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=27 step=remount ok=true red=[] I-3.10=Holds
+k=28 last=fua@dev1+4194304 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=28 step=mount root=(2,4) red=[] I-3.10=Holds
+k=28 step=first-file txg=5 red=[] I-3.10=Holds
+k=28 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=28 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=28 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=28 step=remount ok=true red=[] I-3.10=Holds
+k=29 last=write@dev0+4096 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=29 step=mount root=(2,4) red=[] I-3.10=Holds
+k=29 step=first-file txg=5 red=[] I-3.10=Holds
+k=29 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=29 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=29 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=29 step=remount ok=true red=[] I-3.10=Holds
+k=30 last=write@dev1+4096 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=30 step=mount root=(2,4) red=[] I-3.10=Holds
+k=30 step=first-file txg=5 red=[] I-3.10=Holds
+k=30 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=30 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=30 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=30 step=remount ok=true red=[] I-3.10=Holds
+k=31 last=barrier@dev0+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=31 step=mount root=(2,4) red=[] I-3.10=Holds
+k=31 step=first-file txg=5 red=[] I-3.10=Holds
+k=31 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=31 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=31 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=31 step=remount ok=true red=[] I-3.10=Holds
+k=32 last=write@dev0+16781312 crash-image: prefix_applied=1 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=32 step=mount root=(2,4) red=[] I-3.10=Holds
+k=32 step=first-file txg=5 red=[] I-3.10=Holds
+k=32 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=32 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=32 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=32 step=remount ok=true red=[] I-3.10=Holds
+k=33 last=write@dev1+16781312 crash-image: prefix_applied=1 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=33 step=mount root=(2,4) red=[] I-3.10=Holds
+k=33 step=first-file txg=5 red=[] I-3.10=Holds
+k=33 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=33 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=33 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=33 step=remount ok=true red=[] I-3.10=Holds
+k=34 last=barrier@dev0+0 crash-image: prefix_applied=1 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=34 step=mount root=(2,4) red=[] I-3.10=Holds
+k=34 step=first-file txg=5 red=[] I-3.10=Holds
+k=34 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=34 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=34 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=34 step=remount ok=true red=[] I-3.10=Holds
+k=35 last=fua@dev0+7340032 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=35 step=mount root=(2,4) red=[] I-3.10=Holds
+k=35 step=first-file txg=5 red=[] I-3.10=Holds
+k=35 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=35 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=35 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=35 step=remount ok=true red=[] I-3.10=Holds
+k=36 last=write@dev0+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=36 step=mount root=(2,4) red=[] I-3.10=Holds
+k=36 step=first-file txg=5 red=[] I-3.10=Holds
+k=36 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=36 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=36 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=36 step=remount ok=true red=[] I-3.10=Holds
+k=37 last=write@dev1+0 crash-image: prefix_applied=0 red=[] I-3.10=NotApplicable("候选集里没有一片分配记录树走得到未释放的记录（第 0 代树表是空的，或分配记录树读不出、有
+k=37 step=mount root=(2,4) red=[] I-3.10=Holds
+k=37 step=first-file txg=5 red=[] I-3.10=Holds
+k=37 step=overwrite1 txg=6 red=[] I-3.10=Holds
+k=37 step=overwrite2 txg=7 red=[] I-3.10=Holds
+k=37 step=overwrite3 txg=8 red=[] I-3.10=Holds
+k=37 step=remount ok=true red=[] I-3.10=Holds
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 14.72s
+
+exit=0

@@ -1,6 +1,6 @@
-# D16（发布语义） 未定项 1 第三轮——主 agent 对正推腿「G′ 同样出局」的复现与机制探针
+# D16（发布语义） 未定项 1 第三轮——主 agent 对正推腿「G放回 同样出局」的复现与机制探针
 
-**口径**：2026-09-12 凌晨（JST）主 agent 做。正推腿（`d16-item1-r3-sonnet-output.md`）报告：把臂 G 的处置改成「做到这次删的块放回为止」（材料的 G′）之后，
+**口径**：2026-09-12 凌晨（JST）主 agent 做。正推腿（`d16-item1-r3-sonnet-output.md`）报告：把臂 G 的处置改成「做到这次删的块放回为止」（材料的 G放回）之后，
 近满盘上删了再写仍然失败，与原臂 G 逐种子相同。主 agent 在仓外副本（`research/` 整拷、不带 `target/`）里独立复现，并加一个探针看冷启动那一刻的账。
 **这是机制探针，不是跑前登记过的实验**：只跑了 `near_full` 这一个世界，没进故障世界；「准入按最坏残留收费」那一形要当候选，得另立实验。
 
@@ -61,7 +61,7 @@
 +
 +    #[test]
 +    fn probe_variant_summary() {
-+        for (label, arm, is_full, is_charged) in [("G_original", Arm::FloorPerDisk, false, false), ("G_prime", Arm::FloorPerDisk, true, false),
++        for (label, arm, is_full, is_charged) in [("G_original", Arm::FloorPerDisk, false, false), ("G_put_back", Arm::FloorPerDisk, true, false),
 +                                                  ("G_charged", Arm::FloorPerDisk, false, true), ("A", Arm::RingPersisted, false, false)] {
 +            for slots_per_region in [4u64, 16] {
 +                for cost in [1u64, 5] {
@@ -92,7 +92,7 @@
 +
 +    #[test]
 +    fn probe_cold_start() {
-+        for (label, arm, is_full) in [("G_original", Arm::FloorPerDisk, false), ("G_prime", Arm::FloorPerDisk, true), ("A", Arm::RingPersisted, false)] {
++        for (label, arm, is_full) in [("G_original", Arm::FloorPerDisk, false), ("G_put_back", Arm::FloorPerDisk, true), ("A", Arm::RingPersisted, false)] {
 +            for slots_per_region in [4u64, 16] {
 +                let mut failure_windows: Vec<(u64, u64)> = Vec::new();
 +                for seed in 0..SEED_COUNT {
@@ -145,18 +145,18 @@ G_original s=4 seed=0 cycle window=3 NoSpace
   after:  reusable=45 pinned=30 reserve=40 residue=30 df_raw=75 df_g_signed=5 user_alloc=5 floor_c=217 floor_a=217 txg=223
 SUMMARY G_original s=4 c=5 failures=24 seeds_with_failure=24 failure_windows={3}
 SUMMARY G_original s=16 c=5 failures=24 seeds_with_failure=24 failure_windows={1}
-SUMMARY G_prime s=4 c=5 failures=24 seeds_with_failure=24 failure_windows={3}
-SUMMARY G_prime s=16 c=5 failures=24 seeds_with_failure=24 failure_windows={2}
+SUMMARY G_put_back s=4 c=5 failures=24 seeds_with_failure=24 failure_windows={3}
+SUMMARY G_put_back s=16 c=5 failures=24 seeds_with_failure=24 failure_windows={2}
 SUMMARY A s=4 c=5 failures=0 seeds_with_failure=0 failure_windows={}
 SUMMARY A s=16 c=5 failures=0 seeds_with_failure=0 failure_windows={}
 VARIANT G_original s=4 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
 VARIANT G_original s=4 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
 VARIANT G_original s=16 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
 VARIANT G_original s=16 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
-VARIANT G_prime s=4 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
-VARIANT G_prime s=4 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
-VARIANT G_prime s=16 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
-VARIANT G_prime s=16 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
+VARIANT G_put_back s=4 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
+VARIANT G_put_back s=4 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
+VARIANT G_put_back s=16 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
+VARIANT G_put_back s=16 c=5 write_after_delete_failed=24 false_guaranteed=0 false_raw=48 true_enospc=48 stalls=0 max_publications=7 fakes=0
 VARIANT G_charged s=4 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
 VARIANT G_charged s=4 c=5 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0
 VARIANT G_charged s=16 c=1 write_after_delete_failed=0 false_guaranteed=0 false_raw=24 true_enospc=24 stalls=0 max_publications=7 fakes=0

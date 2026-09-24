@@ -1,0 +1,52 @@
+── 故障注入快档 ──
+故障注入：种子 [7463871032432355113, 7463871032432355137)（种子基是这个测试周期写死的那一个）、每段 20 步、每段注入 4 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
+历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 95 次
+  注入 barrier_fails：23 次
+  注入 read_fails：28 次
+  注入 read_returns_corrupted_bytes：18 次
+  注入 write_fails：26 次
+  收尾「历史停在别的东西上」：78 次
+  收尾「返回了错误」：17 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 29 次
+  PublishWithoutUnits 上注入 3 次
+  CloseAndMountWritable 上注入 33 次
+  CloseAndMountRollback 上注入 18 次
+  RaiseRollbackFloor 上注入 8 次
+  ColdStartRecover 上注入 3 次
+    注入点 CloseAndMountRollback/barrier：3 次
+    注入点 CloseAndMountRollback/read：10 次
+    注入点 CloseAndMountRollback/system_configuration_slot：2 次
+    注入点 CloseAndMountRollback/unit_write：3 次
+    注入点 CloseAndMountWritable/barrier：8 次
+    注入点 CloseAndMountWritable/read：18 次
+    注入点 CloseAndMountWritable/system_configuration_slot：6 次
+    注入点 CloseAndMountWritable/unit_write：1 次
+    注入点 ColdStartRecover/read：3 次
+    注入点 PublishFirstFile/system_configuration_slot：1 次
+    注入点 PublishOverwrite/barrier：10 次
+    注入点 PublishOverwrite/read：7 次
+    注入点 PublishOverwrite/system_configuration_slot：9 次
+    注入点 PublishOverwrite/unit_write：3 次
+    注入点 PublishWithoutUnits/barrier：2 次
+    注入点 PublishWithoutUnits/system_configuration_slot：1 次
+    注入点 RaiseRollbackFloor/read：8 次
+  没命中的注入点 25 个：PublishFirstFile/unit_write、PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/read、PublishFirstFile/barrier、PublishOverwrite/journal_record、PublishOverwrite/root_record_fua、PublishWithoutUnits/unit_write、PublishWithoutUnits/journal_record、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/read、CloseAndMountWritable/journal_record、CloseAndMountWritable/root_record_fua、CloseAndMountRollback/journal_record、CloseAndMountRollback/root_record_fua、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/barrier
+  返回的错误成员 MountError::Acquisition(BlockDeviceError::InputOutput)：10 次
+  返回的错误成员 MountError::Recovery(RecoveryFailure::NoValidSystemConfiguration)：5 次
+  返回的错误成员 PublishError::BlockDevice(BlockDeviceError::InputOutput)：1 次
+重开 95 次：读回文件 35、没有文件 60、走读失败 0
+  走到模型认下的某一版 95 次、走到失败那一步正在写的那一版 0 次（收口表第 40 行那一格，只记不判）、模型都不允许的 0 次
+注入之后的镜像上跑池级 checker 95 次：判绿 2066 条次、不适用 689 条次
+以「已知红」收尾 {}、新发现 78
+种子 7463871032432355113 write_fails：整池第 25 次write，落在第 1 步（PublishWithoutUnits）：ModelDisagreement { aspect: "模型说该成、实现拒了" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（模型说该成、实现拒了）：模型 MountWritable 该成（写出 [(1, 1), (2, 1)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::Acquisition(BlockDeviceError::InputOutput)
+种子 7463871032432355114 read_fails：整池第 1251967 次read，落在第 8 步（CloseAndMountRollback）：HarnessJudgement { judgement: "checker 判绿的镜像上冷启动恢复报错" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（冷启动读回）：模型 所选根 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(0), instance: ModelInstanceGeneration(0) }，没有文件；实现 读回失败：NoValidSystemConfiguration { device: DeviceIdentity(1) }（所选根 None）
+种子 7463871032432355117 read_returns_corrupted_bytes：整池第 872699 次read，落在第 11 步（CloseAndMountWritable）：ModelDisagreement { aspect: "拒绝的理由" }
+  重开：CommittedByTheModel（走到实例 1 第 3 代根、读回 3000 字节）
+  模型对不上（拒绝的理由）：模型 RaiseRollbackFloor 该拒：["要抬的 F 超过上限"]；实现 拒了：MountError::Recovery(RecoveryFailure::NoValidSystemConfiguration)
+用时 6.6 秒

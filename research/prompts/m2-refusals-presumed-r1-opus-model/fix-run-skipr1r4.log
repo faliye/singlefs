@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_patched_refusals.rs (target/debug/deps/opus_patched_refusals-0a8122923a7f2769)
+
+running 1 test
+test opus_r1_fix_shows_the_next_wall_on_the_second_mount_of_a_formatted_pool ... [R1-F1] OPUS_SKIP_R1 = true，OPUS_SKIP_R4 = true
+[R1-F1] 第二次可写挂载做成了：实例 2，写行 0 条，写行那次 txg 3，暖机 1 次（txg [4]）
+[R1-F1] 第一个文件版本被拒：FirstFileVersionNotRightAfterTheSecondWarmUp { previous_record: Some((CheckpointTxg(4), 4)) }
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.72s
+

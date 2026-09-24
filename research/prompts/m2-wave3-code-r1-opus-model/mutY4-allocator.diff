@@ -1,0 +1,18 @@
+--- repo/crates/singlefs-core/src/allocator.rs	2026-09-23 10:55:41.212931401 +0000
++++ repo-mutY4/crates/singlefs-core/src/allocator.rs	2026-09-24 01:11:24.618536085 +0000
+@@ -782,7 +782,7 @@
+                         device: device.device,
+                         slot: placement.slot,
+                         span_slots: u16::try_from(placement.span).expect("跨度 2 字节"),
+-                        generation,
++                        generation: if OPUS_Y4_MUTATE.load(std::sync::atomic::Ordering::SeqCst) { CheckpointTxg(generation.0 + 1) } else { generation },
+                         is_released: false,
+                     });
+                 }
+@@ -1580,3 +1580,6 @@
+         );
+     }
+ }
++
++/// 攻方腿副本上的变异开关：开着时新记的分配记录分配代写成 txg + 1。
++pub static OPUS_Y4_MUTATE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

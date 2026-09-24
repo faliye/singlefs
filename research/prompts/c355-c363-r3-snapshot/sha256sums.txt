@@ -1,0 +1,13 @@
+ad543c125ff679f4a5946d8c082a566cadfdd1ee932ccc6fdedabd3bfe667fea  .claude/kb/checks-owed.md
+e1e1734c8aedd5ba13766082bc06b8bb550fdd4ef2f819dc1770126ee7cc35ca  .claude/kb/decisions/28-挂载期承诺量.md
+0b80b498c953645a47f6386c172dfabb432c961819a86297d5288cb575210cd7  .claude/kb/decisions/05-快照-空间记账机制.md
+f34911b32826f3a7fe7d5cccd6fd90297cb942affbd8cfe9bffa3075be9d59c6  .claude/kb/decisions/03-空间分配.md
+33012d81b3bfc129a23813f41844ea40aea081cbf20332252a28cb8d5bbe10cd  .claude/kb/decisions/16-发布语义.md
+f56030d8c1d8c1d5ae76185b10df5a77233c06845390e7cd6d732f987b2994ba  .claude/kb/decisions/02-RAID条带策略.md
+7a5c6d6188bdbb0a4b41c0505b0b407292fa51c78aa8033f57e4dda87ec87a84  .claude/kb/invariants.md
+9db289932f176e2cc0784859596aa92a61778f6d4963825663d12cf4eb1f1b34  .claude/gate.d/51-admission-terms-covered.sh
+5a49002f14dfa13896ac6c1e7f0e1ca0994a159800e6dbec4787abcde3e45e79  crates/singlefs-core/src/allocator.rs
+8215f08c699d542a6d3137dbe97b6010c6341f761a14c6d468d327d5b34ddace  crates/singlefs-core/src/mount.rs
+5122b1135de7031bb497120523ada5f6277b723f27f87b51cdba69ab3c2b48a1  crates/singlefs-core/src/transaction.rs
+26e7dad8f081f70928e2ab78dfbec9912706e5fe66cc32f487b15e6b17c55cf7  crates/singlefs-harness/src/model.rs
+0f3200f434b728d3d4d8e513ccad9358d5907f53c30afd85b5568f2a546f5f7a  research/prompts/_c355-c363-r3-body.md

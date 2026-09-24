@@ -1,0 +1,21 @@
+30-decision-history.sh:59 [b] untracked="$(git ls-files --others --exclude-standard -- "${HIST[@]}")" || git_failed "ls-files --others" "$?"
+40-results-cited.sh:88 [de] BASE="$(git rev-parse --verify --quiet refs/sop/gate-ok || git rev-parse --verify --quiet refs/singlefs/gate-ok || git rev-parse --verify --quiet "@{u
+40-results-cited.sh:108 [a] if [[ -n "$(git log --all --diff-filter=D --format=%h --name-only -- "*$name" 2>/dev/null | head -1)" ]]; then
+40-results-cited.sh:117 [a] echo "     → 怎么办：产物归档了就该能从历史取回（git log --all --diff-filter=D --name-only 找删它的提交，"
+61-settled-same-file.sh:38 [c] BASE="$(git merge-base HEAD "$def" 2>/dev/null)" && break
+61-settled-same-file.sh:46 [a] changed_names="$(git -c core.quotepath=false diff --name-only "$BASE" -- "$DEC")" || {
+61-settled-same-file.sh:48 [a] echo "  ✗ git diff --name-only $BASE 跑不起来（退出码 $names_rc），这次改了哪些决策文件没取到"
+61-settled-same-file.sh:113 [a] idx_names=$(git -c core.quotepath=false diff --name-only "$BASE" -- "$IDX" 2>/dev/null || true)
+66-abandoned-rounds.sh:64 [a] log = subprocess.run(["git", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
+72-agent-def-adversarial-review.sh:22 [d] elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1; then
+72-agent-def-adversarial-review.sh:23 [cd] base="$(git merge-base HEAD '@{upstream}')"
+72-agent-def-adversarial-review.sh:25 [ab] changed="$( { git -c core.quotepath=false diff --name-only "$base" -- ; git -c core.quotepath=false diff --name-only --cached -- ; git -c core.quotepa
+72-agent-def-adversarial-review.sh:31 [ab] added="$( { git -c core.quotepath=false diff --name-only --diff-filter=A "$base" -- ; git -c core.quotepath=false diff --name-only --cached --diff-fil
+88-quoted-result-lines.sh:30 [de] BASE="$(git rev-parse --verify --quiet refs/sop/gate-ok || git rev-parse --verify --quiet refs/singlefs/gate-ok || git rev-parse --verify --quiet '@{u
+88-quoted-result-lines.sh:97 [a] log = subprocess.run(['git', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
+92-layout-checker-sync.sh:155 [a] for args in (["diff", "--name-only", base, "--"],
+92-layout-checker-sync.sh:156 [a] ["diff", "--name-only", "--cached", "--"],
+92-layout-checker-sync.sh:157 [b] ["ls-files", "--others", "--exclude-standard", "--"]):
+95-fixture-claims.sh:173 [b] done < <(git ls-files -z --cached --others --exclude-standard | sort -z -u)
+95-fixture-claims.sh:190 [b] done < <(git ls-files -z --cached --others --exclude-standard '.claude/gate.d/fixtures/' | sort -z -u)
+命中 20 行，8 个阶段

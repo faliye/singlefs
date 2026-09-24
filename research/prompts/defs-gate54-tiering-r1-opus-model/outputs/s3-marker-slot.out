@@ -1,0 +1,83 @@
+════ S3a
+── [验证员先跑过 --full：yes｜门禁起在收尾 --full 的：before] 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/a-yes-before；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:47Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+── [验证员先跑过 --full：yes｜门禁起在收尾 --full 的：during] 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/a-yes-during；exhaustive=true]
+    (收尾 --full 正在跑：[标记不在])
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s3/a-yes-during/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+── [验证员先跑过 --full：yes｜门禁起在收尾 --full 的：after] 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/a-yes-after；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:50Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+── [验证员先跑过 --full：no｜门禁起在收尾 --full 的：before] 起门禁前 [标记不在]
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s3/a-no-before/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+── [验证员先跑过 --full：no｜门禁起在收尾 --full 的：during] 起门禁前 [标记不在]
+    (收尾 --full 正在跑：[标记不在])
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s3/a-no-during/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+── [验证员先跑过 --full：no｜门禁起在收尾 --full 的：after] 起门禁前 [标记不在]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:53Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+── [pre 臂：分档前的 54 号，门禁自己在临时 worktree 里跑全量]
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+════ S3b
+    A 的 --full 退出码 0（出路 worktree）
+    B 的 --full 退出码 0（主工作区）
+── [B 的结果：green｜先后：A-then-B] A 起门禁前 [标记：input_hash=236ceeb156f952b4… judged_root=/tmp/claude-1000/defs54-attack/s3/b-green-A-then-B；exhaustive=true]
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（236ceeb156f952b4cf895ec4a5b450e7174e7587fe2d2a29415aa924958fcda2）与这一次的（0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050，8 个文件）不同
+    [gate --staged 里 54 号的退出码 1]
+    B 的 --full 退出码 0（主工作区）
+    A 的 --full 退出码 0（出路 worktree）
+── [B 的结果：green｜先后：B-then-A] A 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/b-green-B-then-A-outlet；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:53Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+    B 的 --full 退出码 0（主工作区）
+    A 的 --full 退出码 0（出路 worktree）
+── [B 的结果：green｜先后：B-inside-A] A 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/b-green-B-inside-A-outlet；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:27:57Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+    A 的 --full 退出码 0（出路 worktree）
+    B 的 --full 退出码 0（主工作区）
+── [B 的结果：green｜先后：A-inside-B] A 起门禁前 [标记：input_hash=236ceeb156f952b4… judged_root=/tmp/claude-1000/defs54-attack/s3/b-green-A-inside-B；exhaustive=true]
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（236ceeb156f952b4cf895ec4a5b450e7174e7587fe2d2a29415aa924958fcda2）与这一次的（0a906e4b33b85a9b1db07a72f1059b9f0b804a7451e0a614f7374247be631050，8 个文件）不同
+    [gate --staged 里 54 号的退出码 1]
+    A 的 --full 退出码 0（出路 worktree）
+    B 的 --full 退出码 1（主工作区）
+── [B 的结果：red｜先后：A-then-B] A 起门禁前 [标记不在]
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-attack/s3/b-red-A-then-B/.git/singlefs-layer0-full-green）
+    [gate --staged 里 54 号的退出码 1]
+    B 的 --full 退出码 1（主工作区）
+    A 的 --full 退出码 0（出路 worktree）
+── [B 的结果：red｜先后：B-then-A] A 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/b-red-B-then-A-outlet；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:00Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+    B 的 --full 退出码 1（主工作区）
+    A 的 --full 退出码 0（出路 worktree）
+── [B 的结果：red｜先后：B-inside-A] A 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/b-red-B-inside-A-outlet；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:03Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+    A 的 --full 退出码 0（出路 worktree）
+    B 的 --full 退出码 1（主工作区）
+── [B 的结果：red｜先后：A-inside-B] A 起门禁前 [标记：input_hash=0a906e4b33b85a9b… judged_root=/tmp/claude-1000/defs54-attack/s3/b-red-A-inside-B-outlet；exhaustive=true]
+      ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+      ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-23T23:28:04Z，标记里的计数行原样：
+    [gate --staged 里 54 号的退出码 0]
+── [pre 臂：B 的半成品红在主工作区，A 的门禁在临时 worktree 里自己跑全量]
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+════ S3c 两份定义里「别的 gate.sh 在跑」那道等待（crash-verifier.md 第 23 行、gate-triage.md 第 24 行）看得见收尾那一趟吗
+    收尾 --full 的进程（pid 2015562）的命令行：bash .claude/gate.d/54-layer0-replay.sh --full
+    这条命令行里含 gate.sh 的次数：0

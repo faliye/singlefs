@@ -1,0 +1,13 @@
+CM.leaf_cap floor((16384 - 169) / 55) = floor(16215 / 55) = 294. This would be refuted by changing the header size from FACT 2 or the leaf-entry width from FACT 3.
+CM.fanout floor((16384 - 169) / 113) = floor(16215 / 113) = 143. This would be refuted by changing the header size from FACT 2 or the internal-entry width from FACT 6.
+CM.h3 For N=1000: h=1 gives capacity 294*143^0=294 which is less than 1000; h=2 gives capacity 294*143^1=42042 which is greater than or equal to 1000. So h=2. This would be refuted by changing the leaf capacity or internal fanout.
+CM.h4 For N=10000: h=1 gives capacity 294 which is less than 10000; h=2 gives capacity 42042 which is greater than or equal to 10000. So h=2. This would be refuted by changing the leaf capacity or internal fanout.
+CM.h5 For N=100000: h=1 gives capacity 294 which is less than 100000; h=2 gives capacity 42042 which is less than 100000; h=3 gives capacity 294*143^2=6012006 which is greater than or equal to 100000. So h=3. This would be refuted by changing the leaf capacity or internal fanout.
+CM.h6 For N=1000000: h=1 gives capacity 294 which is less than 1000000; h=2 gives capacity 42042 which is less than 1000000; h=3 gives capacity 6012006 which is greater than or equal to 1000000. So h=3. This would be refuted by changing the leaf capacity or internal fanout.
+CM.n3 nodes_written(N) equals height(N), so for N=1000 the value is 2. This would be refuted by changing the height calculation for N=1000.
+CM.n4 nodes_written(N) equals height(N), so for N=10000 the value is 2. This would be refuted by changing the height calculation for N=10000.
+CM.n5 nodes_written(N) equals height(N), so for N=100000 the value is 3. This would be refuted by changing the height calculation for N=100000.
+CM.n6 nodes_written(N) equals height(N), so for N=1000000 the value is 3. This would be refuted by changing the height calculation for N=1000000.
+CM.s_k1 s(1)=ceiling(1 / 294)=1; s(2)=ceiling(1 / 143)=1; s(3)=ceiling(1 / 143)=1. Total split count=1+1+1=3. Since s(3)=1≠0, the tree height grows. This would be refuted by changing the leaf capacity, internal fanout, or k=1 for this item.
+CM.s_k10 s(1)=ceiling(10 / 294)=1; s(2)=ceiling(1 / 143)=1; s(3)=ceiling(1 / 143)=1. Total split count=1+1+1=3. Since s(3)=1≠0, the tree height grows. This would be refuted by changing the leaf capacity, internal fanout, or k=10 for this item.
+CM.s_k100 s(1)=ceiling(100 / 294)=1; s(2)=ceiling(1 / 143)=1; s(3)=ceiling(1 / 143)=1. Total split count=1+1+1=3. Since s(3)=1≠0, the tree height grows. This would be refuted by changing the leaf capacity, internal fanout, or k=100 for this item.

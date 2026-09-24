@@ -1,0 +1,133 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/second_transaction_supplement_three_fault_injection.rs (target/release/deps/second_transaction_supplement_three_fault_injection-3200eca44feecba4)
+
+running 1 test
+FAULT_INJECTION_START seeds=[7463871032432355113,7463871032432355137) slices=4 worker_threads=1 configured_worker_threads=1 worker_threads_source=environment_variable
+FAULT_INJECTION_PROGRESS slice=1/4 seeds=[7463871032432355113,7463871032432355119) finished_slices=1/4 finished_histories=6/24 elapsed_seconds=7.1
+FAULT_INJECTION_PROGRESS slice=2/4 seeds=[7463871032432355119,7463871032432355125) finished_slices=2/4 finished_histories=12/24 elapsed_seconds=15.6
+FAULT_INJECTION_PROGRESS slice=3/4 seeds=[7463871032432355125,7463871032432355131) finished_slices=3/4 finished_histories=18/24 elapsed_seconds=24.0
+FAULT_INJECTION_PROGRESS slice=4/4 seeds=[7463871032432355131,7463871032432355137) finished_slices=4/4 finished_histories=24/24 elapsed_seconds=31.8
+FAULT_INJECTION_FINISHED seeds=[7463871032432355113,7463871032432355137) slices=4 worker_threads=1 elapsed_seconds=31.8
+── 故障注入快档 ──
+故障注入：种子 [7463871032432355113, 7463871032432355137)（种子基是这个测试周期写死的那一个）、每段 20 步、每段注入 4 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
+历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 95 次
+  注入 barrier_fails：23 次
+  注入 read_fails：28 次
+  注入 read_returns_corrupted_bytes：18 次
+  注入 write_fails：26 次
+  收尾「历史停在别的东西上」：7 次
+  收尾「没走到」：1 次
+  收尾「被容错、历史跑完」：87 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 28 次
+  PublishWithoutUnits 上注入 3 次
+  CloseAndMountWritable 上注入 33 次
+  CloseAndMountRollback 上注入 18 次
+  RaiseRollbackFloor 上注入 8 次
+  ColdStartRecover 上注入 3 次
+    注入点 CloseAndMountRollback/barrier：3 次
+    注入点 CloseAndMountRollback/read：10 次
+    注入点 CloseAndMountRollback/root_record_fua：2 次
+    注入点 CloseAndMountRollback/unit_write：3 次
+    注入点 CloseAndMountWritable/barrier：8 次
+    注入点 CloseAndMountWritable/journal_record：3 次
+    注入点 CloseAndMountWritable/read：18 次
+    注入点 CloseAndMountWritable/root_record_fua：1 次
+    注入点 CloseAndMountWritable/system_configuration_slot：2 次
+    注入点 CloseAndMountWritable/unit_write：1 次
+    注入点 ColdStartRecover/read：3 次
+    注入点 PublishFirstFile/unit_write：1 次
+    注入点 PublishOverwrite/barrier：10 次
+    注入点 PublishOverwrite/journal_record：1 次
+    注入点 PublishOverwrite/read：7 次
+    注入点 PublishOverwrite/system_configuration_slot：1 次
+    注入点 PublishOverwrite/unit_write：9 次
+    注入点 PublishWithoutUnits/barrier：2 次
+    注入点 PublishWithoutUnits/journal_record：1 次
+    注入点 RaiseRollbackFloor/read：8 次
+  没命中的注入点 22 个：PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishFirstFile/barrier、PublishOverwrite/root_record_fua、PublishWithoutUnits/unit_write、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、CloseAndMountRollback/journal_record、CloseAndMountRollback/system_configuration_slot、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/barrier
+重开 95 次：读回文件 65、没有文件 30、走读失败 0
+  走到模型认下的某一版 74 次、走到失败那一步正在写的那一版 7 次（收口表第 40 行那一格，只记不判）、模型都不允许的 14 次
+注入之后的镜像上跑池级 checker 95 次：判绿 2411 条次、不适用 330 条次
+以「已知红」收尾 {0: 5, 1: 4}、新发现 22
+「已知红」第 0 条：5 次，第一次在种子 7463871032432355119（write_fails：整池第 111 次write，落在第 4 步（PublishOverwrite））
+「已知红」第 1 条：4 次，第一次在种子 7463871032432355129（write_fails：整池第 320 次write，落在第 18 步（PublishOverwrite））
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "冷启动读回" }
+  重开：OutsideEverythingTheModelAllows（走到实例 6 第 22 代根、读回 0 字节）
+  模型对不上（冷启动读回）：模型 择到的根要是模型提交过的某一版；实现 走到实例 6 第 22 代根，模型从没提交过这一版（所选根 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(22), instance: ModelInstanceGeneration(6) }，读回 0 字节（末字节 None））
+种子 7463871032432355119 barrier_fails：整池第 19 次barrier，落在第 1 步（PublishOverwrite）：CheckerViolations { invariants: ["I-3.1"] }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32634 字节）
+  I-3.1：盘 0：记账的已分配 Some(606208)，遍历全部有效根得到 540672；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+种子 7463871032432355133 write_fails：整池第 35 次write，落在第 2 步（PublishFirstFile）：CheckerViolations { invariants: ["I-7.8"] }
+  重开：CommittedByTheModel（走到实例 1 第 3 代根、没有文件）
+  I-7.8：根环水位最大 11，盘上出现过的最大树 ID 14
+用时 31.8 秒
+
+thread 'fault_injection_fast_tier_returns_errors_instead_of_panicking' (2683696) panicked at crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs:110:5:
+注入之后「已知红」清单外的失败；重放：SINGLEFS_FAULT_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_FAULT_INJECTION_SEEDS=24 SINGLEFS_FAULT_INJECTION_OPERATIONS=20 SINGLEFS_FAULT_INJECTION_FAULTS=4 跑大档那条 #[ignore] 用例
+故障注入：种子 [7463871032432355113, 7463871032432355137)（种子基是这个测试周期写死的那一个）、每段 20 步、每段注入 4 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
+历史 24 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 95 次
+  注入 barrier_fails：23 次
+  注入 read_fails：28 次
+  注入 read_returns_corrupted_bytes：18 次
+  注入 write_fails：26 次
+  收尾「历史停在别的东西上」：7 次
+  收尾「没走到」：1 次
+  收尾「被容错、历史跑完」：87 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 28 次
+  PublishWithoutUnits 上注入 3 次
+  CloseAndMountWritable 上注入 33 次
+  CloseAndMountRollback 上注入 18 次
+  RaiseRollbackFloor 上注入 8 次
+  ColdStartRecover 上注入 3 次
+    注入点 CloseAndMountRollback/barrier：3 次
+    注入点 CloseAndMountRollback/read：10 次
+    注入点 CloseAndMountRollback/root_record_fua：2 次
+    注入点 CloseAndMountRollback/unit_write：3 次
+    注入点 CloseAndMountWritable/barrier：8 次
+    注入点 CloseAndMountWritable/journal_record：3 次
+    注入点 CloseAndMountWritable/read：18 次
+    注入点 CloseAndMountWritable/root_record_fua：1 次
+    注入点 CloseAndMountWritable/system_configuration_slot：2 次
+    注入点 CloseAndMountWritable/unit_write：1 次
+    注入点 ColdStartRecover/read：3 次
+    注入点 PublishFirstFile/unit_write：1 次
+    注入点 PublishOverwrite/barrier：10 次
+    注入点 PublishOverwrite/journal_record：1 次
+    注入点 PublishOverwrite/read：7 次
+    注入点 PublishOverwrite/system_configuration_slot：1 次
+    注入点 PublishOverwrite/unit_write：9 次
+    注入点 PublishWithoutUnits/barrier：2 次
+    注入点 PublishWithoutUnits/journal_record：1 次
+    注入点 RaiseRollbackFloor/read：8 次
+  没命中的注入点 22 个：PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishFirstFile/barrier、PublishOverwrite/root_record_fua、PublishWithoutUnits/unit_write、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、CloseAndMountRollback/journal_record、CloseAndMountRollback/system_configuration_slot、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/barrier
+重开 95 次：读回文件 65、没有文件 30、走读失败 0
+  走到模型认下的某一版 74 次、走到失败那一步正在写的那一版 7 次（收口表第 40 行那一格，只记不判）、模型都不允许的 14 次
+注入之后的镜像上跑池级 checker 95 次：判绿 2411 条次、不适用 330 条次
+以「已知红」收尾 {0: 5, 1: 4}、新发现 22
+「已知红」第 0 条：5 次，第一次在种子 7463871032432355119（write_fails：整池第 111 次write，落在第 4 步（PublishOverwrite））
+「已知红」第 1 条：4 次，第一次在种子 7463871032432355129（write_fails：整池第 320 次write，落在第 18 步（PublishOverwrite））
+种子 7463871032432355116 write_fails：整池第 85 次write，落在第 6 步（PublishOverwrite）：ModelDisagreement { aspect: "冷启动读回" }
+  重开：OutsideEverythingTheModelAllows（走到实例 6 第 22 代根、读回 0 字节）
+  模型对不上（冷启动读回）：模型 择到的根要是模型提交过的某一版；实现 走到实例 6 第 22 代根，模型从没提交过这一版（所选根 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(22), instance: ModelInstanceGeneration(6) }，读回 0 字节（末字节 None））
+种子 7463871032432355119 barrier_fails：整池第 19 次barrier，落在第 1 步（PublishOverwrite）：CheckerViolations { invariants: ["I-3.1"] }
+  重开：OutsideEverythingTheModelAllows（走到实例 2 第 7 代根、读回 32634 字节）
+  I-3.1：盘 0：记账的已分配 Some(606208)，遍历全部有效根得到 540672；机理：根环槽数 24、最新根 txg 7、环里自证过的根槽 7 个、最老的自证过的根 txg 0、遍历的候选根槽 7 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+种子 7463871032432355133 write_fails：整池第 35 次write，落在第 2 步（PublishFirstFile）：CheckerViolations { invariants: ["I-7.8"] }
+  重开：CommittedByTheModel（走到实例 1 第 3 代根、没有文件）
+  I-7.8：根环水位最大 11，盘上出现过的最大树 ID 14
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test fault_injection_fast_tier_returns_errors_instead_of_panicking ... FAILED
+
+failures:
+
+failures:
+    fault_injection_fast_tier_returns_errors_instead_of_panicking
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 31.80s
+
+error: test failed, to rerun pass `-p singlefs-harness --test second_transaction_supplement_three_fault_injection`

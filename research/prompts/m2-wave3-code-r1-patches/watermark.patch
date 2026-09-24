@@ -1,0 +1,2295 @@
+--- a/crates/mutations.tsv
++++ b/crates/mutations.tsv
+@@ -67,7 +67,6 @@
+ 步 3：零单元发布在记录与根之间少一道屏障	crates/singlefs-core/src/transaction.rs	        writer.perform(CommitStep::Barrier)?;\n        persist_the_root_then_rotate_the_system_configuration(\n            writer,\n            plan.txg,	        persist_the_root_then_rotate_the_system_configuration(\n            writer,\n            plan.txg,	-p singlefs-harness --test second_transaction_step_three_formatted_pool_layer0 -- the_formatted_pool_mount_and_first_file_stream	the_formatted_pool_mount_and_first_file_stream_keeps_the_first_transaction_segment_sequence
+ 步 3：只做过 mkfs 的池重开后把 mkfs 实例表按 1 槽记	crates/singlefs-core/src/mount.rs	        placement_of(&root.instance_table, TransactionUnit::InstanceTable)?;	        placement_of(&root.instance_table, TransactionUnit::TreeTable)?;	-p singlefs-harness --test second_transaction_step_three_formatted_pool_layer0 -- every_crash_state_outside_the_unit_segment_of_the_formatted_pool	every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recovers_to_the_version_its_root_claims
+ 步 3：树表 0 条的一版上写行时，这次要写的行没接进重写出去的那片实例表	crates/singlefs-core/src/mount.rs	            table_after.rows.extend_from_slice(&rows_written);	            table_after.rows.extend_from_slice(&[]);	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- a_formatted_pool_mounted_twice	a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold
+-步 4：回退到树表 0 条的根、而环里还留着带文件版本的根，不在写之前拒绝	crates/singlefs-core/src/mount.rs	    if target_has_no_file {\n        if let Some(file_version_root) = roots	    if false {\n        if let Some(file_version_root) = roots	-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_a_warm_up_root	rolling_back_to_a_warm_up_root_while_the_ring_still_holds_a_file_version_is_refused_before_any_write
+ 步 5：算抬 F 上限时有效根的树表读不出，按「树表里没有这两棵树」猜而不是拒绝	crates/singlefs-core/src/mount.rs	        Ok(pointers) => Ok(pointers),\n        Err(failure) => Err(	        Ok(pointers) => Ok(pointers),\n        Err(_failure) if true => Ok(UserVisibleTreeRootPointers::ABSENT),\n        Err(failure) => Err(	-p singlefs-harness --test second_transaction_step_five_reuse -- raising_the_floor_is_refused_when	raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable
+ 步 3：取号不核判定时算出的号（瞬时读错让判定与取号算出不同号，写进新号之后才发现）	crates/singlefs-core/src/transaction.rs	    if recomputed != expected {	    if false {	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- transient_system_configuration_read_errors_between	transient_system_configuration_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write
+ 第一个事务 步 1：mkfs 不核根环区域归属是不是第一版写死的 0 / 1 / 0	crates/singlefs-core/src/make_filesystem.rs	    if devices.len() == 2 && parameters.region_devices != FIRST_VERSION_REGION_DEVICES {	    if false {	-p singlefs-harness --test first_transaction_step_one_mkfs -- region_layout_other_than	region_layout_other_than_zero_one_zero_is_refused_before_any_write
+@@ -162,9 +161,6 @@
+ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条的改法）：胶水把回退目标「被抛弃」映射成「低于 F」	crates/singlefs-harness/src/model_comparison.rs	        RollbackCandidateExclusion::OnAbandonedTimeline => {\n            ModelRefusalReason::RollbackTargetOnAbandonedTimeline\n        }	        RollbackCandidateExclusion::OnAbandonedTimeline => {\n            ModelRefusalReason::RollbackTargetBelowEffectiveFloor\n        }	-p singlefs-harness --test second_transaction_supplement_three_random_history -- rolling_back_onto_an_abandoned_root_above_the_floor	rolling_back_onto_an_abandoned_root_above_the_floor_is_refused_for_being_abandoned
+ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条，C368 仍欠的那一半）：发布层把分配器的落点拒绝一律报成「每块盘上都没有」	crates/singlefs-core/src/transaction.rs	        unit: identity,\n        refusal,\n    })\n}	        unit: identity,\n        refusal: {\n            let _ = refusal;\n            PlacementRefusal::NoFreeSlotOnAnyDevice\n        },\n    })\n}	-p singlefs-harness --test second_transaction_supplement_two_unequal_devices -- filling_the_smaller_device	filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking
+ 增补 3 第 2 件（代码三方第一轮判决第三节第 2 条的改法）：胶水把小盘写满、各盘落点不一致也映射成单元区墙	crates/singlefs-harness/src/model_comparison.rs	        } => ObservedRefusalReason::Unexplained,	        } => explained(ModelRefusalReason::UnitAreaWall),	-p singlefs-harness --lib -- model_comparison::tests::only_a_placement_refused	only_a_placement_refused_on_every_device_passes_as_the_unit_area_wall
+-增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根、而环里还有带文件的根（在候选集里、条款没写重新建树的诞生代）报成候选排除「低于 F」	crates/singlefs-core/src/mount.rs	            return Err(\n                MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {\n                    target,\n                    file_version_root: RollbackTarget {\n                        instance: file_version_root.instance,\n                        checkpoint_txg: file_version_root.checkpoint_txg,\n                    },\n                },\n            );	            return Err(MountError::RollbackTargetNotACandidate {\n                target,\n                exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n            });	-p singlefs-harness --test second_transaction_supplement_three_random_history -- random_histories_fast_tier	random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
+-增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：回退到树表 0 条的根、而环里还有带文件的根报成候选排除「低于 F」；步 4 那条写死的用例判出	crates/singlefs-core/src/mount.rs	            return Err(\n                MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {\n                    target,\n                    file_version_root: RollbackTarget {\n                        instance: file_version_root.instance,\n                        checkpoint_txg: file_version_root.checkpoint_txg,\n                    },\n                },\n            );	            return Err(MountError::RollbackTargetNotACandidate {\n                target,\n                exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n            });	-p singlefs-harness --test second_transaction_step_four_rollback -- rolling_back_to_a_warm_up_root	rolling_back_to_a_warm_up_root_while_the_ring_still_holds_a_file_version_is_refused_before_any_write
+-增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：候选排除「低于 F」报成「树表 0 条、环里还有带文件的根」；偏向回退那一档抽样判出（这一档的必红是抽样断言，随测试周期的种子基重验，见 d13-item4-fua-r1 判决）	crates/singlefs-core/src/mount.rs	        return Err(MountError::RollbackTargetNotACandidate {\n            target,\n            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n        });	        return Err(\n            MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {\n                target,\n                file_version_root: target,\n            },\n        );	-p singlefs-harness --test second_transaction_supplement_three_random_history -- rollback_heavy_random_histories	rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 1 条的改法）：胶水把回退候选排除的三条揉成一条（「不在环里」也报成「低于 F」）	crates/singlefs-harness/src/model_comparison.rs	        RollbackCandidateExclusion::NotInRing => ModelRefusalReason::RollbackTargetNotInRing,	        RollbackCandidateExclusion::NotInRing => ModelRefusalReason::RollbackTargetBelowEffectiveFloor,	-p singlefs-harness --lib -- model_comparison::tests::each_rollback_candidate_exclusion	each_rollback_candidate_exclusion_maps_to_its_own_reason
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2h）：分配器用户数据那一处把「每块盘上都没有」报成「小盘写满」；小盘段判出	crates/singlefs-core/src/allocator.rs	            DeviceAgreement::Agreed(slot) => slot,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);	            DeviceAgreement::Agreed(slot) => slot,\n            DeviceAgreement::NoAnswerOnAnyDevice => {\n                return Err(PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices: Vec::new() });	-p singlefs-harness --test second_transaction_supplement_three_random_history -- unit_area_wall_sampling	unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2i）：分配器用户数据那一处把「小盘写满」报成「每块盘上都没有」；等大的小盘走不到，不等盘那条用例判出	crates/singlefs-core/src/allocator.rs	            DeviceAgreement::SomeDevicesWithoutAnswer(full_devices) => {\n                return Err(\n                    PlacementRefusal::SomeDevicesFullDeviceSetSelectionUndefined { full_devices },\n                );\n            }\n            DeviceAgreement::AnswersDiffer(slot_per_device) => {	            DeviceAgreement::SomeDevicesWithoutAnswer(_full_devices) => {\n                return Err(PlacementRefusal::NoFreeSlotOnAnyDevice);\n            }\n            DeviceAgreement::AnswersDiffer(slot_per_device) => {	-p singlefs-harness --test second_transaction_supplement_two_unequal_devices -- filling_the_smaller_device	filling_the_smaller_device_to_the_end_of_its_unit_area_refuses_further_placements_instead_of_panicking
+@@ -175,7 +171,6 @@
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 3 条的改法）：「已知红第 0 条那一形只记不停」退回成判红就停；逼近分配记录墙那一段走不到墙	crates/singlefs-harness/src/history.rs	                if !continues_past_the_ring_turn_form {\n                    return Some(observation);\n                }	                if true || !continues_past_the_ring_turn_form {\n                    return Some(observation);\n                }	-p singlefs-harness --test second_transaction_supplement_three_random_history -- allocation_record_wall_sampling	allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1c；要带调试符号的构建，函数改名会悄悄失效）：只在抬 F 路径的准入里多算一个角色；抬 F 逼近墙的写死用例判出	crates/singlefs-core/src/transaction.rs	        records_before_this_publish + rewritten.len() * allocator.devices.len();	        records_before_this_publish + (rewritten.len() + usize::from(std::backtrace::Backtrace::force_capture().to_string().contains("raise_rollback_floor"))) * allocator.devices.len();	-p singlefs-harness --test second_transaction_supplement_three_random_history -- raising_the_floor_with_a_second_empty_publish	raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds
+ 增补 3 第 2 件（代码三方第二轮判决第三节第 4 条，攻方变异 m1d；要带调试符号的构建，函数改名会悄悄失效）：只在回退路径的准入里多算一个角色；回退逼近墙的写死用例判出	crates/singlefs-core/src/transaction.rs	        records_before_this_publish + rewritten.len() * allocator.devices.len();	        records_before_this_publish + (rewritten.len() + usize::from(std::backtrace::Backtrace::force_capture().to_string().contains("mount_rollback"))) * allocator.devices.len();	-p singlefs-harness --test second_transaction_supplement_three_random_history -- rolling_back_to_a_root_whose_warm_up	rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds
+-增补 3 第 2 件（代码三方第二轮判决第三节第 1 条）：候选排除「低于 F」报成「树表 0 条、环里还有带文件的根」；回退到 F 之下的写死用例判出（门禁五段各只红 1 段）	crates/singlefs-core/src/mount.rs	        return Err(MountError::RollbackTargetNotACandidate {\n            target,\n            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,\n        });	        return Err(\n            MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {\n                target,\n                file_version_root: target,\n            },\n        );	-p singlefs-harness --test second_transaction_supplement_three_random_history -- rolling_back_below_the_effective_floor	rolling_back_below_the_effective_floor_is_refused_for_being_below_the_floor
+ 增补 3 第 3 件：抽 0 个崩溃点时照样抽一个（抽崩溃点会改变这段历史怎么跑，判别力那一半失效）	crates/singlefs-harness/src/crash_injection.rs	            for _ in 0..crash_points_per_history {	            for _ in 0..crash_points_per_history.max(1) {	-p singlefs-harness --test second_transaction_supplement_three_crash_injection -- drawing_crash_points	drawing_crash_points_does_not_change_the_generated_history
+ 增补 3 第 3 件：判崩溃点时取择根而不是施加记录前缀之后实际走的那条根（记录已写、根槽未写那一格内容与根身份配不上）	crates/singlefs-harness/src/crash_injection.rs	        let read_back = observed_read_back_after_a_crash(&report);	        let read_back = crate::model_comparison::observed_read_back(&report.outcome);	-p singlefs-harness --test second_transaction_supplement_three_crash_injection -- crash_injection_fast_tier	crash_injection_fast_tier_recovers_only_into_versions_the_model_committed
+ 增补 3 第 3 件（用户 2026-09-20 定案第 1 条）：屏障不再切段（屏障进了枚举域，少一道屏障就把两段并成一段）	crates/singlefs-harness/src/crash.rs	            RecordedOperationKind::Barrier => {\n                if !current.is_empty() {\n                    segments.push(std::mem::take(&mut current));\n                }\n            }	            RecordedOperationKind::Barrier => {}	-p singlefs-harness --test second_transaction_supplement_three_crash_injection -- every_crash_state_of_a_written_out_history	every_crash_state_of_a_written_out_history_recovers_into_a_committed_version
+@@ -301,7 +296,7 @@
+ 步 3（R1）：树表 0 条的一版上写行时，被换下的那片实例表不释放（defer 队列里少 2 槽）	crates/singlefs-core/src/transaction.rs	    allocator.release(released, txg);	    let _ = released;	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- a_formatted_pool_mounted_twice	a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold
+ 步 3（三处写死的前提之二）：第一个文件版本照抄的实例表指针取错成树表指针	crates/singlefs-core/src/transaction.rs	            instance_table: InstanceTablePlan::Carry(version_to_build_on.instance_table),	            instance_table: InstanceTablePlan::Carry(version_to_build_on.tree_table),	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- a_formatted_pool_mounted_twice	a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold
+ 步 3（R8）：树表 0 条、而根指着的实例表或树表不是 mkfs 写的那一版时照样重建账（被换下的那一片成了空闲槽）	crates/singlefs-core/src/mount.rs	    if root.instance_table.head.birth_txg != CheckpointTxg(0)\n        || root.tree_table.head.birth_txg != CheckpointTxg(0)\n    {	    if false {	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- a_third_writable_mount	a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator
+-步 3：publish_first_file 不核要建在上面的那一版有没有过文件版本（再走一次会重新建树、重新发对象出生代）	crates/singlefs-core/src/transaction.rs	    if version_to_build_on.tree_identifier_watermark != TREE_IDENTIFIER_WATERMARK_AT_MKFS {	    if false {	-p singlefs-harness --test second_transaction_supplement_three_random_history -- random_histories_fast_tier	random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
++步 3：publish_first_file 不核要建在上面的那一版有没有过文件版本（再走一次会重新建树、重新发对象出生代）；C511 第 3 步起判的是树表条数	crates/singlefs-core/src/transaction.rs	    if tree_table_entries != 0 {	    if false {	-p singlefs-harness --test second_transaction_supplement_three_random_history -- random_histories_fast_tier	random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation
+ 步 4：影子账不认树表 0 条的被抛弃根（它那片实例表既不隔离也不在任何账里，回退之后当空闲槽发出去）	crates/singlefs-core/src/mount.rs	            Some(placements)\n        }\n        Ok(false) => Some(	            let _ = placements;\n            None\n        }\n        Ok(false) => Some(	-p singlefs-harness --test second_transaction_step_three_formatted_pool -- rolling_back_to_a_warm_up_root_before_any_file_version	rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_instance_table
+ C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）：复用豁免不看更晚那次写持没持久（回到落地版，更晚那次写没落盘的真洞上失声）	crates/singlefs-harness/src/crash.rs	                && in_place(later_index)	                && true	-p singlefs-harness --test second_transaction_step_zero_layer0 -- a_unit_whose_only_later_write	a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker
+ C507：复用豁免把「更晚那次写已持久」判反（合法复用被判成单元缺席，增补 2 收口表第 55 行那 8 个误报回来）	crates/singlefs-harness/src/crash.rs	                && in_place(later_index)	                && !in_place(later_index)	-p singlefs-harness --test second_transaction_step_zero_layer0 -- stale_tail_with_a_reused_named_unit	stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -9,7 +9,7 @@
+ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, ALLOCATION_RECORD_BYTES, DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES,
+     INODE_INTERNAL_ENTRY, JOURNAL_RECORD_BYTES, MAPPING_ENTRY_BYTES, NODE_BYTES, SLOT_BYTES,
+-    TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_TABLE_ENTRY_BYTES,
++    TREE_TABLE_ENTRY_BYTES,
+ };
+ 
+ use crate::image::{
+@@ -460,9 +460,13 @@
+         for entry in &tree_table.entries {
+             self.walk_tree_table_entry(entry);
+         }
++        // 中央映射树不进树表，引用它的是那条映射根指针（根记录里的，或由记录施加出来那一版的新根段里的）：
++        // I-1.3（块头树 ID 一致） 的「实际引用它的树」按那条指针头部的出生树取（D19（块指针的结构与宽度预算） 已定项 7），
++        // 与树表条目里的树 ID 对树表指着的根是同一个读法。号不写死 15：回退到树表 0 条的一版之后再发第一个文件版本，
++        // 八棵树从水位重新发号（C511（回退到无文件那一版之后诞生代怎么接））。
+         if let Some(mapping) = self.read_index_node(
+             mapping_root_pointer,
+-            TREE_IDENTIFIER_CENTRAL_MAPPING,
++            parse_node_pointer(mapping_root_pointer).birth_tree,
+             KEY_SCHEMA_MAPPING,
+             "中央映射树的根",
+         ) {
+--- a/crates/singlefs-core/src/mounted_read.rs
++++ b/crates/singlefs-core/src/mounted_read.rs
+@@ -20,10 +20,7 @@
+ 
+ use std::cell::Cell;
+ 
+-use singlefs_format::{
+-    DATA_UNIT_BYTES, INODE_RECORD_BYTES, MAPPING_KEY_BYTES, NODE_BYTES,
+-    TREE_IDENTIFIER_CENTRAL_MAPPING,
+-};
++use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, MAPPING_KEY_BYTES, NODE_BYTES};
+ 
+ use crate::address::{
+     DataUnitIndexInFile, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
+@@ -327,9 +324,11 @@
+         unit_filesystem_identifier(&root.filesystem_identifier);
+ 
+     // 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）；它自己不进映射（自举豁免）。
++    // 它不进树表，是哪棵树由根记录里它那条根指针的出生树说（第一个文件版本那次从水位发的号）。
++    let mapping_tree = root.mapping_root.head.birth_tree;
+     let mapping_root = read_tree_root(
+         reader,
+-        TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
++        mapping_tree,
+         usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+         &root.mapping_root,
+         root,
+@@ -337,7 +336,7 @@
+     )?;
+     if mapping_root.level != CENTRAL_MAPPING_TREE_ROOT_LEVEL {
+         return Err(OpenPoolForReadFailure::TreeLevelUnexpected {
+-            tree: TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
++            tree: mapping_tree,
+             expected_level: CENTRAL_MAPPING_TREE_ROOT_LEVEL,
+             found_level: mapping_root.level,
+         });
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -12,10 +12,10 @@
+ use crate::recovery::{
+     allocation_records_of_version_without_file, allocation_records_under_root, choose_root,
+     choose_system_configuration, effective_rollback_floor, highest_root_txg,
+-    instance_table_of_root, readable_roots, rebuild_version, replay_journal,
+-    rollback_high_water_of_root, scan_journal, tree_table_has_no_entries,
+-    user_visible_tree_root_pointers, JournalScanReport, RebuildVersionFailure, RebuiltVersion,
+-    RecoveryFailure, UserVisibleTreeRootPointers,
++    highest_tree_identifier_watermark_in_the_ring, instance_table_of_root, readable_roots,
++    rebuild_version, replay_journal, rollback_high_water_of_root, scan_journal,
++    tree_table_has_no_entries, user_visible_tree_root_pointers, JournalScanReport,
++    RebuildVersionFailure, RebuiltVersion, RecoveryFailure, UserVisibleTreeRootPointers,
+ };
+ use crate::root_record::RootRecord;
+ use crate::root_ring::target_for_publish;
+@@ -52,19 +52,6 @@
+         target: RollbackTarget,
+         exclusion: RollbackCandidateExclusion,
+     },
+-    /// 回退的目标那一版树表 0 条（还没发布过文件版本），而根环里还有别的根带着文件版本（树表非 0 条）：
+-    /// 回退本身做得成，但回退之后这个池要再往前走只剩「再发一次第一个文件版本」这一条路，而那一次会**重新建树、重新发对象出生代**——
+-    /// 树 11 的树表条目诞生 txg 就与环里那些旧根记的不同（I-9.14（树表条目的诞生 txg 跨根不变） 逐字要求跨根不变），
+-    /// inode 1 的对象出生代也换了一代（I-9.10（对象出生代与 inode 记录相符））。
+-    /// 「回退到没有文件的一版之后重新建树，诞生代怎么算」**没有条款——这是一处设计空白，交主 agent**
+-    /// （2026-09-23 崩溃注入快档三条新发现都是它：I-9.10 与 I-9.14 红在同一格）。
+-    /// 在它有条款之前，这一格在任何写之前拒绝，盘上逐字节不变。
+-    /// **不是候选排除**（候选集只有 `RollbackCandidateExclusion` 那三条，D23（journal 的角色与格式） 已定项 14；
+-    /// C493（回退候选集条文与实现说反话） 由此还清）：环里没有带文件的根时，回退到树表 0 条的根照常做。
+-    RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {
+-        target: RollbackTarget,
+-        file_version_root: RollbackTarget,
+-    },
+     /// 要抬的 F 超过上限 min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根)（D16（发布语义） 已定项 1）。
+     RollbackFloorAboveCeiling {
+         requested: CheckpointTxg,
+@@ -295,6 +282,10 @@
+     previous_row: PreviousInstanceRow,
+     first_txg: CheckpointTxg,
+     next_counter: u64,
++    /// 本实例第一次发布（写行那一次）要带的树 ID 水位：根环里全部自证过的根与环里全部自证通过的记录各自带的水位取 max
++    /// （D8（核心索引结构） 已定项 8 ②；`recovery::highest_tree_identifier_watermark_in_the_ring`）。回退时它可以高于
++    /// 回退到的那一版自己带的——被抛弃时间线上的根仍承载它们那一代发过的号，回退之后再发第一个文件版本就从这里往上发。
++    tree_identifier_watermark_of_the_ring: u64,
+     /// 新实例的根带的回退下界 = 恢复后生效的 F（各幸存盘所带 F 最大值的最小值）：与重建分配器时回收用的同一个值，
+     /// 一条根带的 F 与它的记账行才说同一件事。
+     effective_floor: CheckpointTxg,
+@@ -326,6 +317,28 @@
+     CheckpointTxg(highest_ring_txg.max(highest_record_txg).0 + 1)
+ }
+ 
++/// 本实例第一次发布要带的树 ID 水位（D8（核心索引结构） 已定项 8 ②「根环里全部根记录该字段的 max」）：
++/// 根环里全部自证过的根与 `records`（环里全部自证通过的记录）各自带的水位取 max，再与这次要接在后面的那一版自己带的取 max——
++/// 那一版是从环里读出来的根或从环里的记录施加出来的，按构造已经在内；再取一次是为了两次读环之间的瞬时读错
++/// （择根那一遍读到了它、这一遍没读到）不把水位拉低。读不出的根怎么算见 `highest_tree_identifier_watermark_in_the_ring`。
++fn tree_identifier_watermark_of_the_ring<Device: BlockDevice>(
++    devices: &[(DeviceIdentity, Device)],
++    system_configuration: &crate::system_configuration::SystemConfiguration,
++    records: &std::collections::BTreeMap<(InstanceGeneration, u64), crate::journal::JournalRecord>,
++    version_to_build_on: &RootRecord,
++) -> u64 {
++    highest_tree_identifier_watermark_in_the_ring(
++        devices,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++        records,
++    )
++    .map_or(version_to_build_on.tree_identifier_watermark, |ring| {
++        ring.max(version_to_build_on.tree_identifier_watermark)
++    })
++}
++
+ /// 可再分配谓词的门槛（D16（发布语义） 已定项 1「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）：根环 R × S 槽（S 读自系统配置），第 0 代根被盖之前
+ /// 环里最旧有效根恒 0、门槛就是 F_生效；盖掉之后由环里最旧的有效根接管。
+ #[must_use]
+@@ -852,6 +865,7 @@
+                 new_inode_records: &[],
+                 instance_table: InstanceTablePlan::Carry(current.root.instance_table),
+                 tree_birth_txg: current.tree_birth_txg(),
++                // 一个树 ID 都不发：现行那一版的水位就是根环里的 max（本会话每次发布只照抄或推高它）。
+                 tree_identifier_watermark: current.root.tree_identifier_watermark,
+                 rollback_floor: new_floor,
+             },
+@@ -879,6 +893,9 @@
+     counter: u64,
+     instance: InstanceGeneration,
+     rollback_floor: CheckpointTxg,
++    /// 根环里全部根记录的树 ID 水位取 max（`InstanceStart::tree_identifier_watermark_of_the_ring`）：写行那次发布一个号都不发，
++    /// 新根的水位就是它（D8（核心索引结构） 已定项 8 ②）。
++    tree_identifier_watermark: u64,
+ }
+ 
+ /// 写行那次发布、上一版带文件：在上一版那张实例表后面接上这次写的行，重写实例表与四个固定点单元（D18（块里携带什么信息） 已定项 11；
+@@ -909,7 +926,7 @@
+             new_inode_records: &[],
+             instance_table: InstanceTablePlan::Rewrite(table_after.to_records()),
+             tree_birth_txg: previous.tree_birth_txg(),
+-            tree_identifier_watermark: previous.root.tree_identifier_watermark,
++            tree_identifier_watermark: identity.tree_identifier_watermark,
+             rollback_floor: identity.rollback_floor,
+         },
+         Some(previous),
+@@ -939,13 +956,17 @@
+                 new_inode_records: &[],
+                 instance_table: InstanceTablePlan::Carry(current_file_version.root.instance_table),
+                 tree_birth_txg: current_file_version.tree_birth_txg(),
++                // 暖机接在本实例写行那次发布之后：那一版的水位已经取过根环里的 max，这里照抄。
+                 tree_identifier_watermark: current_file_version.root.tree_identifier_watermark,
+                 rollback_floor: current_file_version.root.rollback_floor,
+             };
+             // 取号之前那道准入按 `PublishShape::EMPTY_PUBLISH` 算这一次要加几条分配记录；这里钉住它算的就是这张计划的形状。
+             // 形状要先把计划算成「这次之后 inode 树是什么样、重写哪些角色」才知道（`PublishPlan::resolve`），
+             // 而算它只读、不发写：算不过就在这里交回，盘上逐字节不变。
+-            let resolved_empty_publish = plan.resolve(Some(current_file_version))?;
++            let resolved_empty_publish = plan.resolve(
++                Some(current_file_version),
++                &current_file_version.tree_identifiers,
++            )?;
+             assert_eq!(
+                 resolved_empty_publish.shape(),
+                 PublishShape::EMPTY_PUBLISH,
+@@ -969,6 +990,10 @@
+                 instance,
+                 back_chain: back_chain_of(&current_version_without_file.record_bytes),
+                 rollback_floor: current_version_without_file.root.rollback_floor,
++                // 暖机接在本实例写行那次发布之后：那一版的水位已经取过根环里的 max，这里照抄。
++                tree_identifier_watermark: current_version_without_file
++                    .root
++                    .tree_identifier_watermark,
+             },
+         )
+         .map(PoolVersion::WithoutFile)
+@@ -1158,6 +1183,7 @@
+                     counter: start.next_counter,
+                     instance,
+                     rollback_floor: start.effective_floor,
++                    tree_identifier_watermark: start.tree_identifier_watermark_of_the_ring,
+                 },
+             )?)
+         }
+@@ -1176,6 +1202,7 @@
+                         instance,
+                         back_chain: 0,
+                         rollback_floor: start.effective_floor,
++                        tree_identifier_watermark: start.tree_identifier_watermark_of_the_ring,
+                     },
+                 )
+                 .map_err(PublishError::from)?,
+@@ -1197,6 +1224,7 @@
+                     back_chain: 0,
+                     rollback_floor: start.effective_floor,
+                     instance_table_records: &instance_table_records,
++                    tree_identifier_watermark: start.tree_identifier_watermark_of_the_ring,
+                 },
+             )?)
+         }
+@@ -1280,6 +1308,12 @@
+         .unwrap_or(0)
+         + 1;
+     let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
++    let tree_identifier_watermark_of_the_ring = tree_identifier_watermark_of_the_ring(
++        devices,
++        &system_configuration,
++        &records,
++        &effective_root,
++    );
+     let rebuilt = rebuilt_allocator(
+         devices,
+         &system_configuration,
+@@ -1310,6 +1344,7 @@
+             previous_row,
+             first_txg,
+             next_counter,
++            tree_identifier_watermark_of_the_ring,
+             effective_floor,
+             abandoned_roots_unreadable,
+             shadow_ledger: ShadowLedger::On,
+@@ -1379,24 +1414,10 @@
+     // 回退到树表 0 条的根（例如第一个事务里 txg 1、2 的暖机根）：候选集只有上面那三条（D23（journal 的角色与格式） 已定项 14），
+     // 「树表 0 条」不在其内，照常回退——回退行走写行那条只重写实例表的发布路径
+     // （`publish_instance_table_on_version_without_file`；C493（回退候选集条文与实现说反话） 由此还清）。
+-    // 只有环里还留着带文件版本的根时拒绝，理由见那个成员的文档注释（重新建树的诞生代没有条款）。
++    // 环里还留着带文件版本的根时同样照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）：回退行那次发布带环里的
++    // 树 ID 水位 max（`tree_identifier_watermark_of_the_ring`），之后再发第一个文件版本从它往上发号，不重发被抛弃的根用过的号；
++    // I-9.14（树表条目的诞生 txg 跨根不变） 只比同一条时间线上的根，被这次回退切掉的那几条不与新线比。
+     let target_has_no_file = tree_table_has_no_entries(&*devices, &target_root)?;
+-    if target_has_no_file {
+-        if let Some(file_version_root) = roots
+-            .iter()
+-            .find(|root| matches!(tree_table_has_no_entries(&*devices, root), Ok(false)))
+-        {
+-            return Err(
+-                MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {
+-                    target,
+-                    file_version_root: RollbackTarget {
+-                        instance: file_version_root.instance,
+-                        checkpoint_txg: file_version_root.checkpoint_txg,
+-                    },
+-                },
+-            );
+-        }
+-    }
+     // R_old 自己那条记录读得出就拿它当上一版的记录（只有 jsn 会被用到），读不出就拿最大 jsn 那条顶着，与可写挂载同一条路。
+     // 树表 0 条的目标用不到记录（只做过 mkfs 的池环里一条都没有）：那一格一条都拿不出来也照走，与 `mount_writable` 同一条读法；
+     // 「一条记录都拿不出来」只有带文件版本的目标才是错（从盘上重建上一版要一条记录顶着）。
+@@ -1432,6 +1453,15 @@
+         maximum_applied_transaction: 0,
+     };
+     let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
++    // 回退到的那一版自己带的水位可以低于环里被这次回退抛弃的根带的（回退到树表 0 条的暖机根，而环里还留着带文件版本的根）：
++    // 那些根发过的号不许再发（D8（核心索引结构） 已定项 8 ②），回退行那次发布带的是环里的 max，
++    // 之后再发第一个文件版本就从它往上发（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
++    let tree_identifier_watermark_of_the_ring = tree_identifier_watermark_of_the_ring(
++        devices,
++        &system_configuration,
++        &records,
++        &target_root,
++    );
+     // 影子账：这次回退新抛弃的根 = 根环里 (txg, 实例) 大于 R_old 的每一条可读根；只被它们引用的槽隔离，
+     // 连同按实例表早已被抛弃的根一起在重建里算。
+     let newly_abandoned = |root: &RootRecord| {
+@@ -1466,6 +1496,7 @@
+             previous_row,
+             first_txg,
+             next_counter,
++            tree_identifier_watermark_of_the_ring,
+             effective_floor,
+             abandoned_roots_unreadable,
+             shadow_ledger,
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -14,7 +14,7 @@
+     DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+     INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES, JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT,
+     MAPPING_ENTRY_BYTES, NODE_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+-    SYSTEM_CONFIGURATION_SLOT_BYTES, TREE_IDENTIFIER_CENTRAL_MAPPING, UNIT_AREA_START_SLOT,
++    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
+ };
+ 
+ use crate::address::{
+@@ -42,8 +42,8 @@
+     SystemConfiguration, SystemConfigurationSlotRefusal, SystemImmutableSizes,
+ };
+ use crate::transaction::{
+-    InodeLeafContainerVersion, PublishedUnit, TransactionOutput, TransactionUnit,
+-    FIRST_INODE_NUMBER,
++    FileVersionTreeIdentifiers, InodeLeafContainerVersion, PublishedUnit, TransactionOutput,
++    TransactionUnit, FIRST_INODE_NUMBER,
+ };
+ use crate::unit::{
+     data_unit_payload, parse_data_unit, parse_index_node, parse_packed_unit,
+@@ -248,8 +248,8 @@
+ 
+ /// 按指针里的位置条目读一个单元：逐条试，整单元 CRC-32C 等于条目里的校验和才算读到。
+ /// 挂载态的读（`crate::mounted_read`）打开时走同一条，不另写一份。
+-pub(crate) fn read_unit_via_locations(
+-    reader: &dyn PoolReader,
++pub(crate) fn read_unit_via_locations<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
+     locations: &[LocationEntry; 2],
+     unit_bytes: usize,
+ ) -> Result<Vec<u8>, RecoveryFailure> {
+@@ -443,6 +443,40 @@
+     highest
+ }
+ 
++/// 本实例第一次发布要带的树 ID 水位：根环全部自证过的根的「树 ID 水位」取 max（D8（核心索引结构） 已定项 8 ②
++/// 「根环里全部根记录该字段的 max」——被抛弃时间线上的根也算，它们仍承载那一代发过的号），
++/// 并上 `records`（环里全部自证通过的 journal 记录）新根段里带的水位（D23（journal 的角色与格式） 已定项 15）。
++///
++/// 记录那一半是根读不出时的最保守读法：根槽撕了、被盖了或那块盘掉了，而它那次发布的记录还在，就按记录带的水位算
++/// （C342（树 ID 水位在根读不出时退回去重发） 的载体；条款没写读不出的根怎么算，报告里交主 agent）。
++/// 根与它那条记录都读不出的那一格仍然盖不住。与新实例第一次发布的 txg 取 max(环里的根, 环里的记录) 同一个形态
++/// （D23（journal 的角色与格式） 已定项 14 第 3 条）。一条根、一条记录都没有时 None。
++#[must_use]
++pub fn highest_tree_identifier_watermark_in_the_ring<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    region_devices: &[DeviceIdentity; 3],
++    immutable_sizes: &SystemImmutableSizes,
++    filesystem_identifier: &[u8; 16],
++    records: &BTreeMap<(InstanceGeneration, u64), JournalRecord>,
++) -> Option<u64> {
++    let mut highest: Option<u64> = records
++        .values()
++        .map(|record| record.new_tree_identifier_watermark)
++        .max();
++    visit_valid_roots(
++        reader,
++        region_devices,
++        immutable_sizes,
++        filesystem_identifier,
++        |root| {
++            highest = Some(highest.map_or(root.tree_identifier_watermark, |current| {
++                current.max(root.tree_identifier_watermark)
++            }));
++        },
++    );
++    highest
++}
++
+ /// 根环里全部自证过的根，每个可读根槽一条（回退候选集与影子账从这里取）。
+ #[must_use]
+ pub fn readable_roots<Reader: PoolReader + ?Sized>(
+@@ -664,13 +698,25 @@
+     reader: &dyn PoolReader,
+     root: &RootRecord,
+ ) -> Result<bool, RecoveryFailure> {
++    Ok(tree_table_entry_count(reader, root)? == 0)
++}
++
++/// 一条根指着的树表有几条条目：0 条就是 mkfs 的第 0 代树表（这条根下面还没有发布过文件版本）。
++/// 发布路径（`transaction::publish_first_file`）拿写者手里那串盘直接读，所以读者按泛型收、不要求有大小。
++///
++/// # Errors
++/// 树表单元读不到、解不开。
++pub fn tree_table_entry_count<Reader: PoolReader + ?Sized>(
++    reader: &Reader,
++    root: &RootRecord,
++) -> Result<usize, RecoveryFailure> {
+     let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+     let tree_table_bytes = read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+     let tree_table =
+         parse_index_node(&tree_table_bytes).map_err(|_error| RecoveryFailure::UnitMalformed {
+             what: "树表单元",
+         })?;
+-    Ok(tree_table.entries.is_empty())
++    Ok(tree_table.entries.len())
+ }
+ 
+ /// 所选根的实例在它自己指着的实例表里有回退行时，回退行的 W（D23（journal 的角色与格式） 已定项 14 前缀第五条：
+@@ -759,6 +805,27 @@
+     let inode_root_pointer = pointer_of(TREE_KIND_INODE)?;
+     let allocation_pointer = pointer_of(TREE_KIND_ALLOCATION)?;
+     let accounting_pointer = pointer_of(TREE_KIND_ACCOUNTING)?;
++    // 这一版那八棵树各自的号照盘上读回来：七棵按树表条目的种类取条目里的树 ID，中央映射树不进树表、取根记录里
++    // 它那条根指针的出生树（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11）。接着这一版的发布照抄它们，不另发。
++    let tree_of = |kind: u16| {
++        tree_table_entries
++            .iter()
++            .find(|entry| entry.kind == kind)
++            .map(|entry| entry.tree)
++            .ok_or(RecoveryFailure::UnitMalformed {
++                what: "树表里没有那棵树",
++            })
++    };
++    let tree_identifiers = FileVersionTreeIdentifiers {
++        extent: tree_of(TREE_KIND_EXTENT)?,
++        inode: tree_of(TREE_KIND_INODE)?,
++        allocation_records: tree_of(TREE_KIND_ALLOCATION)?,
++        accounting: tree_of(TREE_KIND_ACCOUNTING)?,
++        central_mapping: root.mapping_root.head.birth_tree,
++        livelist: tree_of(TREE_KIND_LIVELIST)?,
++        sparse_side_table: tree_of(TREE_KIND_SPARSE_SIDE_TABLE)?,
++        deadlist: tree_of(TREE_KIND_DEADLIST)?,
++    };
+     let read_node = |pointer: &NodePointer, what: &'static str| {
+         let bytes = read_unit_via_locations(reader, &pointer.locations, node_bytes)?;
+         let node =
+@@ -974,6 +1041,7 @@
+         allocation_records,
+         accounting_entries,
+         tree_table_entries,
++        tree_identifiers,
+         inode_record,
+         inode_leaf_containers,
+         mapped_units,
+@@ -1459,9 +1527,10 @@
+         inode: take(TREE_KIND_INODE)?,
+         allocation: take(TREE_KIND_ALLOCATION)?,
+         accounting: take(TREE_KIND_ACCOUNTING)?,
++        // 中央映射树不进树表：它是哪棵树由根记录里它那条根指针的出生树说（第一个文件版本那次从水位发的号）。
+         mapping: read_tree_root(
+             reader,
+-            TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
++            root.mapping_root.head.birth_tree,
+             27,
+             &root.mapping_root,
+             root,
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -52,7 +52,10 @@
+     STATISTIC_UNRECLAIMABLE_BYTES, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST,
+     TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE,
+ };
+-use crate::recovery::{highest_root_instance, verified_system_configuration_slots};
++use crate::recovery::{
++    highest_root_instance, tree_table_entry_count, verified_system_configuration_slots,
++    RecoveryFailure,
++};
+ use crate::root_record::RootRecord;
+ use crate::root_ring::{slot_offset, target_for_publish};
+ use crate::system_configuration::{
+@@ -503,6 +506,8 @@
+                 instance,
+                 back_chain: previous_record_bytes.as_deref().map_or(0, back_chain_of),
+                 rollback_floor: genesis.rollback_floor,
++                // mkfs 同一个进程里那条流：mkfs 之后根环里只有 mkfs 的第 0 代根，暖机根照抄它（D16（发布语义） 已定项 9）。
++                tree_identifier_watermark: genesis.tree_identifier_watermark,
+             },
+         )?;
+         previous_counter = output.record.counter;
+@@ -529,6 +534,10 @@
+     /// 反向链：本实例的第一条恒 0（D23（journal 的角色与格式） 已定项 19 ②）。
+     pub back_chain: u32,
+     pub rollback_floor: CheckpointTxg,
++    /// 这次写进根记录与记录新根段的树 ID 水位：max(根环里全部根记录的该字段, 本次发出的最高树 ID + 1)
++    /// （D8（核心索引结构） 已定项 8 ②），零单元发布一个号都不发 ⇒ 就是根环里的 max。本实例的第一次发布由挂载按环算
++    /// （回退到的那一版的水位可以低于环里被抛弃的根带的）；之后接着本会话现行那一版的根照抄。
++    pub tree_identifier_watermark: u64,
+ }
+ 
+ /// 树表 0 条的一版上一次发布写出的东西：根、记录、记录的字节（下一条的反向链要罩它）、按结构种类的写。
+@@ -563,7 +572,8 @@
+ }
+ 
+ /// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
+-/// 空记录不点名任何单元、事务号 0、提交标记 1，新根段照上一版的根，根记录照上一版的根、只换 checkpoint_txg、实例代号与回退下界。
++/// 空记录不点名任何单元、事务号 0、提交标记 1，新根段照上一版的根，根记录照上一版的根、只换 checkpoint_txg、实例代号、回退下界
++/// 与树 ID 水位（取计划里给的，D8（核心索引结构） 已定项 8 ②）。
+ /// 第一次可写挂载的暖机与「只做过 mkfs 的池」上的可写挂载都走它（第一个事务的字节不变）。
+ ///
+ /// # Errors
+@@ -583,7 +593,7 @@
+         filesystem_identifier: unit_filesystem_identifier(&pool.parameters.filesystem_identifier),
+         new_tree_table: previous_root.tree_table,
+         new_mapping_root: previous_root.mapping_root,
+-        new_tree_identifier_watermark: previous_root.tree_identifier_watermark,
++        new_tree_identifier_watermark: plan.tree_identifier_watermark,
+         new_rollback_floor: plan.rollback_floor,
+         named: Vec::new(),
+     };
+@@ -593,7 +603,7 @@
+         instance: plan.instance,
+         checkpoint_txg: plan.txg,
+         tree_table: previous_root.tree_table,
+-        tree_identifier_watermark: previous_root.tree_identifier_watermark,
++        tree_identifier_watermark: plan.tree_identifier_watermark,
+         rollback_floor: plan.rollback_floor,
+         instance_table: previous_root.instance_table,
+         mapping_root: previous_root.mapping_root,
+@@ -644,6 +654,9 @@
+     pub back_chain: u32,
+     pub rollback_floor: CheckpointTxg,
+     pub instance_table_records: &'records [Vec<u8>],
++    /// 这次写进根记录与记录新根段的树 ID 水位，同 `ZeroUnitPublishPlan::tree_identifier_watermark`：写行那次发布一个树 ID 都不发，
++    /// 就是根环里全部根记录的 max（D8（核心索引结构） 已定项 8 ②）——回退到树表 0 条的一版时它高于那一版自己带的。
++    pub tree_identifier_watermark: u64,
+ }
+ 
+ /// 写行那次发布，上一版树表 0 条：**重写实例表与分配记录树两个单元**，落盘顺序同别的发布（D16（发布语义） 已定项 7）——
+@@ -662,8 +675,8 @@
+ /// 落点从上一版根记录里那两条指针取，三样逐盘核过（`placement_to_release_after_checking_every_device`）。
+ /// 上一版是 mkfs 的第 0 代（分配记录树根指针全零）时只释放实例表那一片。
+ ///
+-/// 新根照上一版的根，只换 checkpoint_txg、实例代号、回退下界、实例表指针与分配记录树根指针：树表、映射树根、树 ID 水位都照抄
+-/// （这一版的树表仍是 mkfs 那片 0 条的）。
++/// 新根照上一版的根，只换 checkpoint_txg、实例代号、回退下界、实例表指针、分配记录树根指针与树 ID 水位（取计划里给的，
++/// D8（核心索引结构） 已定项 8 ②）：树表、映射树根照抄（这一版的树表仍是 mkfs 那片 0 条的）。
+ ///
+ /// # Errors
+ /// 被换下的那两片任一片的三样核不过（`ReleaseTarget*` / `ReleaseSpanMismatch`）、这次之后的分配记录装不进一个节点
+@@ -773,8 +786,8 @@
+ /// 两条发布路径共用这一处——带文件的那一版的 t5 与树表 0 条那一版写行时的那一片，装出来的字节按同一条规则；
+ /// 两处各抄一份会分叉，而「重开之后从这一片重建出来的账与发布时那个分配器相同」正压在两处装的是同一个东西上。
+ ///
+-/// `tree` 两条路径不同，这是唯一的差别：带文件的那一版里它是登记在树表里的分配记录树（树 ID 13）；
+-/// 树表 0 条那一版还没登记过任何树（树 ID 水位仍是 mkfs 的 11，写 13 会当场判红 I-7.8（树 ID 水位不小于盘上出现过的最大树 ID）），
++/// `tree` 两条路径不同，这是唯一的差别：带文件的那一版里它是登记在树表里的分配记录树（第一个文件版本那次发的号，mkfs 那条流上是 13）；
++/// 树表 0 条那一版还没登记过任何树（那一版的水位还没被那几个号推过，写 13 会当场判红 I-7.8（树 ID 水位不小于盘上出现过的最大树 ID）），
+ /// 那一片**不属于任何树**（树 ID 0）、由根记录独占持有，与树表单元、实例表单元同一个身份（D22（单元原子性怎么合成） 已定项 7 / 已定项 12）。
+ ///
+ /// # Panics
+@@ -904,14 +917,15 @@
+         filesystem_identifier: unit_filesystem_identifier(filesystem_identifier),
+         new_tree_table: previous_root.tree_table,
+         new_mapping_root: previous_root.mapping_root,
+-        new_tree_identifier_watermark: previous_root.tree_identifier_watermark,
++        new_tree_identifier_watermark: plan.tree_identifier_watermark,
+         new_rollback_floor: plan.rollback_floor,
+         // 点名项（D23（journal 的角色与格式） 已定项 17）：这次重写的角色各一项——实例表与分配记录树。
+         named: vec![
+             NamedUnit {
+                 locations,
+                 unit_class: identity.unit_class(),
+-                birth_tree: identity.tree(),
++                // 实例表单元不属于任何一棵树（树 0）；这一版还没发过树 ID，不按 `TransactionUnit::tree` 取。
++                birth_tree: TreeIdentifier(TREE_IDENTIFIER_NONE),
+                 birth_txg: txg,
+                 key_tail: node_key_tail(instance, birth_sequence),
+             },
+@@ -931,7 +945,7 @@
+         instance,
+         checkpoint_txg: txg,
+         tree_table: previous_root.tree_table,
+-        tree_identifier_watermark: previous_root.tree_identifier_watermark,
++        tree_identifier_watermark: plan.tree_identifier_watermark,
+         rollback_floor: plan.rollback_floor,
+         instance_table: instance_table_pointer,
+         mapping_root: previous_root.mapping_root,
+@@ -1129,19 +1143,16 @@
+         }
+     }
+ 
+-    /// 点名项里的归属树；树表单元不属于任何一棵树（写 0）。
++    /// 点名项里的归属树：这一版那几棵树各自的号（`trees`，第一个文件版本那次从水位发出来、之后照抄）；
++    /// 树表单元与实例表单元不属于任何一棵树（写 0）。
+     #[must_use]
+-    pub const fn tree(self) -> TreeIdentifier {
++    pub const fn tree(self, trees: &FileVersionTreeIdentifiers) -> TreeIdentifier {
+         match self {
+-            TransactionUnit::Data | TransactionUnit::ExtentRoot => {
+-                TreeIdentifier(TREE_IDENTIFIER_EXTENT)
+-            }
+-            TransactionUnit::InodeLeafContainer(_) | TransactionUnit::InodeRoot => {
+-                TreeIdentifier(TREE_IDENTIFIER_INODE)
+-            }
+-            TransactionUnit::AllocationTree => TreeIdentifier(TREE_IDENTIFIER_ALLOCATION_RECORDS),
+-            TransactionUnit::AccountingTree => TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING),
+-            TransactionUnit::MappingTree => TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
++            TransactionUnit::Data | TransactionUnit::ExtentRoot => trees.extent,
++            TransactionUnit::InodeLeafContainer(_) | TransactionUnit::InodeRoot => trees.inode,
++            TransactionUnit::AllocationTree => trees.allocation_records,
++            TransactionUnit::AccountingTree => trees.accounting,
++            TransactionUnit::MappingTree => trees.central_mapping,
+             TransactionUnit::TreeTable | TransactionUnit::InstanceTable => {
+                 TreeIdentifier(TREE_IDENTIFIER_NONE)
+             }
+@@ -1172,6 +1183,110 @@
+     CommitGenerated(UnitFootprint),
+ }
+ 
++/// 带文件的一版那八棵树各自的树 ID，按 D8（核心索引结构） 已定项 11 的次序：extent、inode、分配记录、记账、中央映射、
++/// livelist、稀疏旁表、deadlist。
++///
++/// 第一个文件版本那次发布从它要建在上面的那一版的树 ID 水位起，按这个次序连号发这八个号
++/// （[`FileVersionTreeIdentifiers::issued_from_watermark`]）；之后每一版照抄，再不发号。
++/// mkfs 那条流上那一版的水位是 mkfs 种下的 11，发出来就是已定项 11 登记的 11..18；回退到树表 0 条的一版之后再发，
++/// 那一版的水位带着回退之前根环里的 max（D8（核心索引结构） 已定项 8 ②），发出来的号高于此前发过的每一个——号永不重发
++/// （里程碑「第二个事务」增补 2 收口表第 ④ 行；C511（回退到无文件那一版之后诞生代怎么接））。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct FileVersionTreeIdentifiers {
++    pub extent: TreeIdentifier,
++    pub inode: TreeIdentifier,
++    pub allocation_records: TreeIdentifier,
++    pub accounting: TreeIdentifier,
++    pub central_mapping: TreeIdentifier,
++    pub livelist: TreeIdentifier,
++    pub sparse_side_table: TreeIdentifier,
++    pub deadlist: TreeIdentifier,
++}
++
++/// 从水位起连号发八个树 ID 时，水位装不下：盘上读来的 8 字节水位离 `u64::MAX` 不到八个号。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees {
++    pub tree_identifier_watermark: u64,
++}
++
++impl FileVersionTreeIdentifiers {
++    /// 八棵树在发号次序里各自离水位几个号：mkfs 水位 11 时发出来的就是 D8（核心索引结构） 已定项 11 登记的常量，
++    /// 偏移从那几个常量现算，不另抄一份次序。
++    const OFFSETS_FROM_THE_WATERMARK_IN_ISSUE_ORDER: [u64; 8] = [
++        TREE_IDENTIFIER_EXTENT - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_INODE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_ALLOCATION_RECORDS - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_ACCOUNTING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_CENTRAL_MAPPING - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_LIVELIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_SPARSE_SIDE_TABLE - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++        TREE_IDENTIFIER_DEADLIST - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++    ];
++
++    /// 从 `tree_identifier_watermark`（下一个可用号）起按 D8（核心索引结构） 已定项 11 的次序连号发八个号，
++    /// 连同发完之后的下一个可用号（最大那个号 + 1）。
++    ///
++    /// # Errors
++    /// 水位加八个号越过 `u64::MAX`（水位是盘上读来的 8 字节）⇒ `TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees`。
++    pub fn issued_from_watermark(
++        tree_identifier_watermark: u64,
++    ) -> Result<(Self, u64), TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees> {
++        let next_available_after_this_issue = tree_identifier_watermark
++            .checked_add(
++                TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH - TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++            )
++            .ok_or(TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees {
++                tree_identifier_watermark,
++            })?;
++        let issued =
++            Self::OFFSETS_FROM_THE_WATERMARK_IN_ISSUE_ORDER.map(|offset_from_the_watermark| {
++                TreeIdentifier(tree_identifier_watermark + offset_from_the_watermark)
++            });
++        let [extent, inode, allocation_records, accounting, central_mapping, livelist, sparse_side_table, deadlist] =
++            issued;
++        let trees = FileVersionTreeIdentifiers {
++            extent,
++            inode,
++            allocation_records,
++            accounting,
++            central_mapping,
++            livelist,
++            sparse_side_table,
++            deadlist,
++        };
++        assert_eq!(
++            trees.highest().0 + 1,
++            next_available_after_this_issue,
++            "八个号连号发、最大的是 deadlist：发完之后的下一个可用号就是 mkfs 那条流上第一次发布之后的水位 19 平移过来"
++        );
++        Ok((trees, next_available_after_this_issue))
++    }
++
++    /// 八个号按发号次序。
++    #[must_use]
++    pub const fn in_issue_order(&self) -> [TreeIdentifier; 8] {
++        [
++            self.extent,
++            self.inode,
++            self.allocation_records,
++            self.accounting,
++            self.central_mapping,
++            self.livelist,
++            self.sparse_side_table,
++            self.deadlist,
++        ]
++    }
++
++    /// 这八个号里最大的那一个。
++    #[must_use]
++    pub fn highest(&self) -> TreeIdentifier {
++        self.in_issue_order()
++            .into_iter()
++            .max()
++            .expect("八个号，数组非空")
++    }
++}
++
+ /// 一个写出去的单元：落点、身份、字节。
+ #[derive(Clone, Debug, PartialEq, Eq)]
+ pub struct PublishedUnit {
+@@ -1195,6 +1310,9 @@
+     pub allocation_records: Vec<AllocationRecord>,
+     pub accounting_entries: Vec<AccountingEntry>,
+     pub tree_table_entries: Vec<TreeTableEntry>,
++    /// 这一版那八棵树各自的号：第一个文件版本那次从水位发出来，之后每一版照抄（从盘上重建的版本按树表条目的种类与根记录里
++    /// 中央映射树根指针的出生树读回来）。
++    pub tree_identifiers: FileVersionTreeIdentifiers,
+     /// 这一版第一个文件那条 inode 记录（覆盖写要接着它的对象出生代）。
+     pub inode_record: InodeRecord,
+     /// 这一版 inode 树里的全部叶容器，左起按 key 序：每片的身份、它装的记录、这一版它的指针
+@@ -1579,16 +1697,26 @@
+         version_to_build_on: CheckpointTxg,
+         previous_record: Option<(CheckpointTxg, u64)>,
+     },
+-    /// `publish_first_file` 要建在上面的那一版已经有过文件版本（树 ID 水位是第一次发布之后的
+-    /// `TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH`，不是 mkfs 的 `TREE_IDENTIFIER_WATERMARK_AT_MKFS`）：
+-    /// 这条路径按「树还没建起来」写——`previous` 传 `None`、inode 树与 extent 树从头建、树表条目的诞生 txg 与
+-    /// inode 1 的对象出生代都取这次发布的 txg。接在已经有文件的一版后面写出来的那条根，会与根环里那些旧根在
+-    /// I-9.14（树表条目的诞生 txg 跨根不变） 与 I-9.10（对象出生代与 inode 记录相符） 上对不上
+-    /// （2026-09-23 崩溃注入快档打中；此前是 txg 写死 3 顺带挡住的，射程收窄之后要自己判）。
++    /// `publish_first_file` 要建在上面的那一版已经有过文件版本（它的树表不是 0 条，`tree_table_entries` 是条数）：
++    /// 这条路径按「树还没建起来」写——`previous` 传 `None`、八棵树从水位重新发号、inode 树与 extent 树从头建、
++    /// 树表条目的诞生 txg 与 inode 1 的对象出生代都取这次发布的 txg。接在已经有文件的一版后面写出来的那条根，
++    /// 会与同一条时间线上的旧根在 I-9.14（树表条目的诞生 txg 跨根不变） 与 I-9.10（对象出生代与 inode 记录相符） 上对不上
++    /// （2026-09-23 崩溃注入快档打中）。判的是树表条数，不是水位（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：
++    /// 回退到树表 0 条的一版时水位带着根环里的 max，已经不是 mkfs 的 11）。
+     /// 同一个文件再写一版走 `publish_overwrite`。一个字节都不写。
+     FirstFileVersionOnAVersionThatAlreadyHasAFile {
+-        tree_identifier_watermark: u64,
++        tree_table_entries: usize,
++    },
++    /// `publish_first_file` 要判「那一版有没有过文件版本」得读它的树表单元，而那一片两份都读不出或解不开
++    /// （`failure` 原样带着恢复路径那一格的原因）：判不了就不写，一个字节都不写。
++    TreeTableOfTheVersionToBuildOnUnreadable {
++        failure: RecoveryFailure,
+     },
++    /// `publish_first_file` 从那一版的树 ID 水位起连号发八棵树的号，而水位（盘上读来的 8 字节）加八个号越过 `u64::MAX`：
++    /// 发不出号就不写，一个字节都不写。
++    TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(
++        TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees,
++    ),
+     BlockDevice(BlockDeviceError),
+ }
+ 
+@@ -1741,6 +1869,7 @@
+     pub instance_table: InstanceTablePlan,
+     /// 树表条目的诞生 txg：树建起来那次发布，之后每一版重写都不改。
+     pub tree_birth_txg: CheckpointTxg,
++    /// 这次发布写进根记录与记录新根段的树 ID 水位（D8（核心索引结构） 已定项 8 ②：max(根环里全部根记录的该字段, 本次发出的最高树 ID + 1)）。
+     pub tree_identifier_watermark: u64,
+     pub rollback_floor: CheckpointTxg,
+ }
+@@ -1846,13 +1975,15 @@
+         records
+     }
+ 
+-    /// 把这张计划算成「这次之后 inode 树是什么样、这次重写哪些角色」。
++    /// 把这张计划算成「这次之后 inode 树是什么样、这次重写哪些角色」。`trees` 是这一版那八棵树的号
++    /// （接在上一版之后就是上一版的，第一个文件版本是这次发出来的），新分裂出来的叶容器的出生树取其中的 inode 树。
+     ///
+     /// # Errors
+     /// inode 记录的落法要的条款仓里还没定 ⇒ `InodeTreeWriteRefused`（`crate::inode_tree` 的三格）。
+     pub fn resolve(
+         &self,
+         previous: Option<&TransactionOutput>,
++        trees: &FileVersionTreeIdentifiers,
+     ) -> Result<ResolvedPublish, PublishError> {
+         let containers_before = previous
+             .map(TransactionOutput::inode_leaf_container_contents)
+@@ -1861,7 +1992,7 @@
+             &containers_before,
+             &self.inode_record_writes(),
+             self.txg,
+-            TreeIdentifier(TREE_IDENTIFIER_INODE),
++            trees.inode,
+         )?;
+         let mut rewritten_roles = Vec::new();
+         if self.file.is_some() {
+@@ -1913,12 +2044,20 @@
+ /// `FIRST_TRANSACTION_TXG` 只管 mkfs 同一个进程里那条流（mkfs → 取号 → 暖机两次 → 第一个事务），不管任何池的第一个文件版本
+ /// （2026-09-23 用户定案）。只做过 mkfs 的池重开一次可写挂载之后再写文件时，那一版已经推到 txg 4，这里接着写 txg 5。
+ ///
++/// 这一版的八棵树从 `version_to_build_on` 的树 ID 水位起连号发（[`FileVersionTreeIdentifiers::issued_from_watermark`]），
++/// 新水位 = max(那一版的水位, 发出的最高号 + 1)（D8（核心索引结构） 已定项 8 ②）。那一版的水位就是根环里全部根记录的 max：
++/// 它是这个会话里的现行那一版，挂载时本实例的第一次发布取过环里的 max（`mount` 的 `tree_identifier_watermark_of_the_ring`），
++/// 之后每次发布只照抄或推高它，而环里后来写进去的根都是这个会话自己写的。mkfs 同一个进程里那条流上环里只有 mkfs 的根与暖机根，
++/// 都带 mkfs 种下的 11。
++///
+ /// # Errors
+-/// `version_to_build_on` 那一版已经有过文件版本 ⇒ `FirstFileVersionOnAVersionThatAlreadyHasAFile`（同一个文件再写一版走
++/// `version_to_build_on` 那一版的树表读不出、解不开 ⇒ `TreeTableOfTheVersionToBuildOnUnreadable`；
++/// 那一版的树表不是 0 条（已经有过文件版本）⇒ `FirstFileVersionOnAVersionThatAlreadyHasAFile`（同一个文件再写一版走
+ /// `publish_overwrite`）。`previous_record_bytes` 解不出本池的记录，或它的 checkpoint_txg 与 `version_to_build_on` 那条根的不同
+ /// （两者要说同一版，新根才恒落在它上面一格）⇒ `FirstFileVersionDoesNotFollowTheVersionItBuildsOn`
+ /// （m2-emptypool-nonempty-r1 云端攻方腿 Z3-A：拿 txg 4 的暖机根配 txg 2 的记录，新根盖在已有的根上、冷恢复读不到）。
+-/// 两样都在任何写之前返回，一个字节都不写。其余同 `publish_version`。
++/// 那一版的水位离 `u64::MAX` 不到八个号 ⇒ `TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees`。
++/// 这几样都在任何写之前返回，一个字节都不写。其余同 `publish_version`。
+ pub fn publish_first_file<Device: BlockDevice>(
+     pool: &mut PoolWriter<'_, Device>,
+     allocator: &mut PoolAllocator,
+@@ -1927,13 +2066,13 @@
+     instance: InstanceGeneration,
+     previous_record_bytes: &[u8],
+ ) -> Result<TransactionOutput, PublishError> {
+-    // 树 ID 水位分得开「树还没建起来」与「已经有过文件版本」：mkfs 种下 11，第一个文件版本把它推到 19，
+-    // 零单元发布与写行那次发布都照抄上一版的（D5（快照 / 空间记账机制） 已定项 9）。
+-    if version_to_build_on.tree_identifier_watermark != TREE_IDENTIFIER_WATERMARK_AT_MKFS {
++    // 「树还没建起来」看那一版的树表有几条（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步），不看水位：
++    // 回退到树表 0 条的一版时水位带着根环里的 max（D8（核心索引结构） 已定项 8 ②），那一版没有树、水位却早已不是 mkfs 的 11。
++    let tree_table_entries = tree_table_entry_count(&*pool.devices, version_to_build_on)
++        .map_err(|failure| PublishError::TreeTableOfTheVersionToBuildOnUnreadable { failure })?;
++    if tree_table_entries != 0 {
+         return Err(
+-            PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile {
+-                tree_identifier_watermark: version_to_build_on.tree_identifier_watermark,
+-            },
++            PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile { tree_table_entries },
+         );
+     }
+     let previous_record = JournalRecord::parse(
+@@ -1953,8 +2092,15 @@
+     }
+     let (_, previous_counter) =
+         previous_record.expect("follows_directly 为真时上一条记录解得出（is_some_and）");
++    // 八棵树从那一版的水位（下一个可用号）起连号发：水位是 mkfs 的 11 时就是 D8（核心索引结构） 已定项 11 那几个常量，
++    // 回退到树表 0 条的一版之后水位带着环里的 max，号高于此前发过的每一个，不重发。
++    let (tree_identifiers, next_available_after_this_issue) =
++        FileVersionTreeIdentifiers::issued_from_watermark(
++            version_to_build_on.tree_identifier_watermark,
++        )
++        .map_err(PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees)?;
+     let first_file_version_txg = CheckpointTxg(version_to_build_on.checkpoint_txg.0 + 1);
+-    publish_version(
++    publish_version_of_trees(
+         pool,
+         allocator,
+         PublishPlan {
+@@ -1979,12 +2125,17 @@
+             new_inode_records: &[],
+             instance_table: InstanceTablePlan::Carry(version_to_build_on.instance_table),
+             tree_birth_txg: first_file_version_txg,
+-            tree_identifier_watermark: TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
++            // D8（核心索引结构） 已定项 8 ②：max(根环里全部根记录的该字段, 本次发出的最高树 ID + 1)；
++            // 前一项就是那一版的水位（见文档注释），后一项恒更大。
++            tree_identifier_watermark: version_to_build_on
++                .tree_identifier_watermark
++                .max(next_available_after_this_issue),
+             // F 照抄建在上面的那一版（D16（发布语义） 已定项 1：F 只升不降）。mkfs 同一个进程里那条流上它恒是 0，
+             // 重开之后写行那次发布带的是恢复后生效的 F，这里接着带它。
+             rollback_floor: version_to_build_on.rollback_floor,
+         },
+         None,
++        tree_identifiers,
+     )
+ }
+ 
+@@ -2023,6 +2174,7 @@
+             new_inode_records: &[],
+             instance_table: InstanceTablePlan::Carry(previous.root.instance_table),
+             tree_birth_txg: previous.tree_birth_txg(),
++            // 这次一个树 ID 都不发：上一版的水位就是根环里全部根记录的 max（本会话每次发布只照抄或推高它，见 `publish_first_file`）。
+             tree_identifier_watermark: previous.root.tree_identifier_watermark,
+             rollback_floor: previous.root.rollback_floor,
+         },
+@@ -2144,18 +2296,50 @@
+ /// 释放与分配都不算数（第二轮攻方腿：落点被拒（当时叫 `NoSpaceFor`）在释放之后、分配到一半返回，留下半新的池，拿同一个上一版重试撞断言）；
+ /// 落盘那几步里失败的，这次已记的写进写入口的失败账（增补 2 第 20b 行，`PoolWriter::writes_of_failed_publishes`）。
+ ///
++/// 这一版那八棵树的号：接在上一版之后照抄上一版的（树 ID 只在第一个文件版本那次发）。没有上一版的只有第一个文件版本，
++/// 这里按 mkfs 那条流的水位 11 发（D8（核心索引结构） 已定项 11 登记的那几个常量）；从别的水位发号的第一个文件版本
++/// （回退到树表 0 条的一版之后）走 `publish_first_file`，它按要建在上面的那一版的水位发。
++///
+ /// # Errors
+ /// `InodeTreeWriteRefused`、`MoreNamedUnitsThanOneJournalRecordHolds`、`ContentExceedsDataUnit`、
+ /// `AllocationRecordsExceedOneNode`、`AccountingEntriesExceedOneNode`、`MappingEntriesExceedOneNode`、
+ /// 释放判定路径的四种错、`PlacementRefused`、块设备错。
++///
++/// # Panics
++/// 没有上一版、而计划写的新水位不是 mkfs 那条流第一次发布之后的 19：调用方把一个水位早已推高的池当成了 mkfs 那条流，
++/// 按 11 发号会重发已经发过的号（D8（核心索引结构） 已定项 8 ②）。
+ pub fn publish_version<Device: BlockDevice>(
+     pool: &mut PoolWriter<'_, Device>,
+     allocator: &mut PoolAllocator,
+     plan: PublishPlan<'_>,
+     previous: Option<&TransactionOutput>,
+ ) -> Result<TransactionOutput, PublishError> {
++    let trees = match previous {
++        Some(previous_version) => previous_version.tree_identifiers,
++        None => {
++            assert_eq!(
++                plan.tree_identifier_watermark, TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
++                "没有上一版的发布在这里按 mkfs 那条流的水位 11 发号：计划写的新水位必须就是那条流的 19，别的水位走 publish_first_file"
++            );
++            FileVersionTreeIdentifiers::issued_from_watermark(TREE_IDENTIFIER_WATERMARK_AT_MKFS)
++                .expect("11 加八个号装得下")
++                .0
++        }
++    };
++    publish_version_of_trees(pool, allocator, plan, previous, trees)
++}
++
++/// `publish_version` 的本体，这一版那八棵树的号由调用方给：`publish_first_file` 给它这次从水位发出来的，
++/// `publish_version` 给上一版的（或 mkfs 那条流的）。
++fn publish_version_of_trees<Device: BlockDevice>(
++    pool: &mut PoolWriter<'_, Device>,
++    allocator: &mut PoolAllocator,
++    plan: PublishPlan<'_>,
++    previous: Option<&TransactionOutput>,
++    trees: FileVersionTreeIdentifiers,
++) -> Result<TransactionOutput, PublishError> {
+     // 先算这次之后 inode 树是什么样、这次重写哪些角色：只读，条款没写的那几格在这里交回，盘上逐字节不变。
+-    let resolved = plan.resolve(previous)?;
++    let resolved = plan.resolve(previous, &trees)?;
+     let rewritten = resolved.rewritten_roles.clone();
+     // 点名项一条记录装 67 个（D23（journal 的角色与格式） 已定项 12 / 已定项 17）：这次重写的角色多于它就要写成多条记录，
+     // 而多条记录时共享的提交内生块在哪一条里点名还没定 ⇒ 在动分配器之前拒掉。
+@@ -2190,7 +2374,7 @@
+     publish_admission(allocator, &rewritten, resolved.inode_tree.containers.len())?;
+     // 整个分配器拷一份、失败就换回去：第一版每次发布约 450 KiB 的拷贝（两盘各一张 211968 位的位图），换来失败路径不留半新的池。
+     let allocator_before_this_publish = allocator.clone();
+-    let outcome = publish_admitted(pool, allocator, &plan, previous, &resolved, &release);
++    let outcome = publish_admitted(pool, allocator, &plan, previous, &resolved, &release, trees);
+     if outcome.is_err() {
+         *allocator = allocator_before_this_publish;
+     }
+@@ -2353,6 +2537,8 @@
+ struct FileVersionCheckpoint<'checkpoint> {
+     txg: CheckpointTxg,
+     write_order: WriteOrder,
++    /// 这一版那八棵树各自的号（单元头与指针头部的出生树按它写）。
++    trees: FileVersionTreeIdentifiers,
+     filesystem_identifier: &'checkpoint [u8; 16],
+     /// 位置条目按设备身份升序（I-2.5）。
+     device_identities: &'checkpoint [DeviceIdentity],
+@@ -2379,7 +2565,7 @@
+     let filesystem_identifier = checkpoint.filesystem_identifier;
+     // t1 数据单元（字节表二）。
+     let data_identity = DataUnitIdentity {
+-        tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
++        tree: checkpoint.trees.extent,
+         object: FIRST_INODE_NUMBER,
+         object_birth: file.inode_object_birth,
+         anchor_offset: 0,
+@@ -2393,7 +2579,7 @@
+     );
+     let data_pointer = DataPointer {
+         head: PointerHead {
+-            birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
++            birth_tree: checkpoint.trees.extent,
+             birth_txg: txg,
+         },
+         locations: location_entries(checkpoint.device_identities, slots.data, &data_unit),
+@@ -2406,9 +2592,9 @@
+     let key_order_mismatches = count_key_order_mismatches(&[extent_key]);
+ 
+     // t2 extent 树根兼叶（字节表四·二）。
+-    let extent_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_EXTENT), txg, instance);
++    let extent_sequence = sequences.next(checkpoint.trees.extent, txg, instance);
+     let extent_unit = build_index_node(
+-        TreeIdentifier(TREE_IDENTIFIER_EXTENT),
++        checkpoint.trees.extent,
+         0,
+         usize::try_from(EXTENT_KEY_BYTES).expect("24"),
+         &extent_key,
+@@ -2470,7 +2656,7 @@
+ ) -> InodeTreeUnits {
+     let txg = checkpoint.txg;
+     let instance = checkpoint.write_order.instance;
+-    let inode_tree_identifier = TreeIdentifier(TREE_IDENTIFIER_INODE);
++    let inode_tree_identifier = checkpoint.trees.inode;
+     let mut leaf_containers = Vec::with_capacity(inode_tree.containers.len());
+     for (position, contents) in inode_tree.containers.iter().enumerate() {
+         let index = InodeLeafContainerIndexInTree::of_position(position);
+@@ -2584,7 +2770,7 @@
+         data_pointer: carried.data_pointer,
+         extent_unit: carried.unit(TransactionUnit::ExtentRoot).bytes.clone(),
+         extent_sequence: carried
+-            .tree_root_pointer(TREE_IDENTIFIER_EXTENT)
++            .tree_root_pointer(carried.tree_identifiers.extent.0)
+             .birth_sequence,
+         key_order_mismatches: 0,
+     }
+@@ -2602,6 +2788,7 @@
+     previous: Option<&TransactionOutput>,
+     resolved: &ResolvedPublish,
+     release: &[Placement],
++    trees: FileVersionTreeIdentifiers,
+ ) -> Result<TransactionOutput, PublishError> {
+     let rewritten = &resolved.rewritten_roles;
+     let txg = plan.txg;
+@@ -2630,6 +2817,7 @@
+     let checkpoint = FileVersionCheckpoint {
+         txg,
+         write_order,
++        trees,
+         filesystem_identifier,
+         device_identities: &device_identities,
+     };
+@@ -2720,16 +2908,12 @@
+     };
+ 
+     // t5 分配记录树（字节表五）：mkfs 的两个单元分配代 0、其余是各自分配那次发布的 txg，每盘各一条，按 (设备, 槽号) 升序。
+-    let allocation_sequence = sequences.next(
+-        TreeIdentifier(TREE_IDENTIFIER_ALLOCATION_RECORDS),
+-        txg,
+-        instance,
+-    );
++    let allocation_sequence = sequences.next(trees.allocation_records, txg, instance);
+     let mut allocation_records: Vec<AllocationRecord> = allocator.records().to_vec();
+     allocation_records.sort_by_key(AllocationRecord::sort_key);
+     let allocation_unit = build_allocation_record_node(
+         allocator,
+-        TreeIdentifier(TREE_IDENTIFIER_ALLOCATION_RECORDS),
++        trees.allocation_records,
+         txg,
+         filesystem_identifier,
+         instance,
+@@ -2738,9 +2922,9 @@
+ 
+     // t6 记账树（D5（快照 / 空间记账机制） 已定项 8）：两盘 15 行——带设备维的六项每盘一行、池级三行；
+     // 全部来自分配器在分配那一刻增量维护的数，不扫盘（`.claude/rules/fs-design.md` 第一格）。seq 一律 1（D8（核心索引结构） 已定项 10）。
+-    let pool_wide = |statistic: u16, tree: u64, value: u64| AccountingEntry {
++    let pool_wide = |statistic: u16, tree: TreeIdentifier, value: u64| AccountingEntry {
+         statistic,
+-        tree: TreeIdentifier(tree),
++        tree,
+         device: DeviceIdentity(STATISTIC_NO_DEVICE_DIMENSION),
+         generation: txg,
+         value,
+@@ -2759,13 +2943,17 @@
+     let mut accounting_entries = vec![
+         pool_wide(
+             STATISTIC_INODE_WATERMARK,
+-            TREE_IDENTIFIER_INODE,
++            trees.inode,
+             inode_number_watermark,
+         ),
+-        pool_wide(STATISTIC_PENDING_DELETE_BYTES, TREE_IDENTIFIER_NONE, 0),
++        pool_wide(
++            STATISTIC_PENDING_DELETE_BYTES,
++            TreeIdentifier(TREE_IDENTIFIER_NONE),
++            0,
++        ),
+         pool_wide(
+             STATISTIC_COMMITTED_RESERVATION_BYTES,
+-            TREE_IDENTIFIER_NONE,
++            TreeIdentifier(TREE_IDENTIFIER_NONE),
+             0,
+         ),
+     ];
+@@ -2808,10 +2996,9 @@
+         "准入按 accounting_entry_count 判过装不装得下：这里装的行数要与它相等，改了行的构成要一起改那两个常量"
+     );
+     accounting_entries.sort_by_key(AccountingEntry::sort_key);
+-    let accounting_sequence =
+-        sequences.next(TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING), txg, instance);
++    let accounting_sequence = sequences.next(trees.accounting, txg, instance);
+     let accounting_unit = build_index_node(
+-        TreeIdentifier(TREE_IDENTIFIER_ACCOUNTING),
++        trees.accounting,
+         0,
+         usize::try_from(ACCOUNTING_KEY_BYTES).expect("22"),
+         &accounting_entries[0].key_bytes(),
+@@ -2827,47 +3014,49 @@
+             .collect::<Vec<_>>(),
+     );
+ 
+-    let node_pointer =
+-        |tree: u64, identity: TransactionUnit, unit: &[u8], sequence: BirthSequence| NodePointer {
+-            head: PointerHead {
+-                birth_tree: TreeIdentifier(tree),
+-                birth_txg: txg,
+-            },
+-            locations: pool.location_entries(slot_of(identity), unit),
+-            instance,
+-            birth_sequence: sequence,
+-        };
++    let node_pointer = |tree: TreeIdentifier,
++                        identity: TransactionUnit,
++                        unit: &[u8],
++                        sequence: BirthSequence| NodePointer {
++        head: PointerHead {
++            birth_tree: tree,
++            birth_txg: txg,
++        },
++        locations: pool.location_entries(slot_of(identity), unit),
++        instance,
++        birth_sequence: sequence,
++    };
+     // 文件内容角色的指针：重写的按这次的落点算，照抄的取上一版。
+     let extent_pointer = match carried_file {
+         None => node_pointer(
+-            TREE_IDENTIFIER_EXTENT,
++            trees.extent,
+             TransactionUnit::ExtentRoot,
+             &extent_unit,
+             extent_sequence,
+         ),
+-        Some(carried) => carried.tree_root_pointer(TREE_IDENTIFIER_EXTENT),
++        Some(carried) => carried.tree_root_pointer(trees.extent.0),
+     };
+     // inode 树根的指针：这次重写了就按这次的落点算，一片叶都没重写就取上一版树表里那一条。
+     let inode_root_pointer = match (&inode_tree_units.rewritten_root, previous) {
+         (Some(root), _) => node_pointer(
+-            TREE_IDENTIFIER_INODE,
++            trees.inode,
+             TransactionUnit::InodeRoot,
+             &root.bytes,
+             root.birth_sequence,
+         ),
+-        (None, Some(carried)) => carried.tree_root_pointer(TREE_IDENTIFIER_INODE),
++        (None, Some(carried)) => carried.tree_root_pointer(trees.inode.0),
+         (None, None) => {
+             unreachable!("没有上一版的发布（第一个文件版本）恒要写 inode 记录 ⇒ 恒重写 inode 树")
+         }
+     };
+     let allocation_pointer = node_pointer(
+-        TREE_IDENTIFIER_ALLOCATION_RECORDS,
++        trees.allocation_records,
+         TransactionUnit::AllocationTree,
+         &allocation_unit,
+         allocation_sequence,
+     );
+     let accounting_pointer = node_pointer(
+-        TREE_IDENTIFIER_ACCOUNTING,
++        trees.accounting,
+         TransactionUnit::AccountingTree,
+         &accounting_unit,
+         accounting_sequence,
+@@ -2926,13 +3115,9 @@
+         "准入按 mapping_entry_count 判过装不装得下：这里装的条目数要与它相等，改了进映射的角色要一起改那个常量"
+     );
+     mapping_entries.sort_by_key(|(key, _)| mapping_key_sort_key(key));
+-    let mapping_sequence = sequences.next(
+-        TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
+-        txg,
+-        instance,
+-    );
++    let mapping_sequence = sequences.next(trees.central_mapping, txg, instance);
+     let mapping_unit = build_index_node(
+-        TreeIdentifier(TREE_IDENTIFIER_CENTRAL_MAPPING),
++        trees.central_mapping,
+         0,
+         usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+         &mapping_entries[0].0,
+@@ -2948,7 +3133,7 @@
+             .collect::<Vec<_>>(),
+     );
+     let mapping_pointer = node_pointer(
+-        TREE_IDENTIFIER_CENTRAL_MAPPING,
++        trees.central_mapping,
+         TransactionUnit::MappingTree,
+         &mapping_unit,
+         mapping_sequence,
+@@ -2957,9 +3142,9 @@
+     // t8 树表单元：七条按树 ID 升序（D8（核心索引结构） 已定项 8）；映射树的根住根记录、不进树表（D19（块指针的结构与宽度预算） 已定项 11）；
+     // 头 ID（D5（快照 / 空间记账机制） 已定项 9）：inode 树写自己、extent 树写它服务的头，其余 0。
+     let table_entry =
+-        |kind: u16, tree: u64, root: NodePointer, head_identifier: u64| TreeTableEntry {
++        |kind: u16, tree: TreeIdentifier, root: NodePointer, head_identifier: u64| TreeTableEntry {
+             kind,
+-            tree: TreeIdentifier(tree),
++            tree,
+             root,
+             birth_txg: plan.tree_birth_txg,
+             head_identifier,
+@@ -2967,54 +3152,60 @@
+     let tree_table_entries = vec![
+         table_entry(
+             TREE_KIND_EXTENT,
+-            TREE_IDENTIFIER_EXTENT,
++            trees.extent,
+             extent_pointer,
+-            TREE_IDENTIFIER_INODE,
++            trees.inode.0,
+         ),
+         table_entry(
+             TREE_KIND_INODE,
+-            TREE_IDENTIFIER_INODE,
++            trees.inode,
+             inode_root_pointer,
+-            TREE_IDENTIFIER_INODE,
++            trees.inode.0,
+         ),
+         table_entry(
+             TREE_KIND_ALLOCATION,
+-            TREE_IDENTIFIER_ALLOCATION_RECORDS,
++            trees.allocation_records,
+             allocation_pointer,
+             0,
+         ),
+         table_entry(
+             TREE_KIND_ACCOUNTING,
+-            TREE_IDENTIFIER_ACCOUNTING,
++            trees.accounting,
+             accounting_pointer,
+             0,
+         ),
+         table_entry(
+             TREE_KIND_LIVELIST,
+-            TREE_IDENTIFIER_LIVELIST,
++            trees.livelist,
+             NodePointer::empty_root(),
+             0,
+         ),
+         table_entry(
+             TREE_KIND_SPARSE_SIDE_TABLE,
+-            TREE_IDENTIFIER_SPARSE_SIDE_TABLE,
++            trees.sparse_side_table,
+             NodePointer::empty_root(),
+             0,
+         ),
+         table_entry(
+             TREE_KIND_DEADLIST,
+-            TREE_IDENTIFIER_DEADLIST,
++            trees.deadlist,
+             NodePointer::empty_root(),
+             0,
+         ),
+     ];
++    assert!(
++        tree_table_entries
++            .windows(2)
++            .all(|pair| pair[0].tree < pair[1].tree),
++        "树表条目按树 ID 升序（D8（核心索引结构） 已定项 8 排序契约）：八个号连号发、中央映射树不进树表，剩下七条仍按发号次序升序"
++    );
+     let tree_table_sequence = sequences.next(TreeIdentifier(TREE_IDENTIFIER_NONE), txg, instance);
+     let tree_table_unit = build_index_node(
+         TreeIdentifier(TREE_IDENTIFIER_NONE),
+         0,
+         TREE_TABLE_KEY_WIDTH,
+-        &TREE_IDENTIFIER_EXTENT.to_le_bytes(),
+-        &TREE_IDENTIFIER_DEADLIST.to_le_bytes(),
++        &trees.extent.0.to_le_bytes(),
++        &trees.deadlist.0.to_le_bytes(),
+         txg,
+         filesystem_identifier,
+         instance,
+@@ -3026,7 +3217,7 @@
+             .collect::<Vec<_>>(),
+     );
+     let tree_table_pointer = node_pointer(
+-        TREE_IDENTIFIER_NONE,
++        TreeIdentifier(TREE_IDENTIFIER_NONE),
+         TransactionUnit::TreeTable,
+         &tree_table_unit,
+         tree_table_sequence,
+@@ -3147,7 +3338,7 @@
+         .map(|unit| NamedUnit {
+             locations: pool.location_entries(unit.slot, &unit.bytes),
+             unit_class: unit.identity.unit_class(),
+-            birth_tree: unit.identity.tree(),
++            birth_tree: unit.identity.tree(&trees),
+             birth_txg: txg,
+             key_tail: key_tail_of(unit.identity),
+         })
+@@ -3176,7 +3367,7 @@
+         rollback_floor: plan.rollback_floor,
+         instance_table: instance_table_pointer,
+         mapping_root: mapping_pointer,
+-        // 带文件的一版的分配记录树住树表条目（树 ID 13，D8（核心索引结构） 已定项 8）：根记录这一项恒全零，
++        // 带文件的一版的分配记录树住树表条目（D8（核心索引结构） 已定项 8）：根记录这一项恒全零，
+         // 两处都写就成了同一个量的两份手抄。`root_record_of_a_file_version_leaves_the_allocation_record_tree_pointer_zero` 钉住。
+         allocation_record_tree_root: NodePointer::empty_root(),
+     };
+@@ -3224,6 +3415,7 @@
+         allocation_records,
+         accounting_entries,
+         tree_table_entries,
++        tree_identifiers: trees,
+         inode_record,
+         inode_leaf_containers: inode_tree_units
+             .leaf_containers
+@@ -3324,6 +3516,11 @@
+                 instance,
+                 transaction: FIRST_TRANSACTION_NUMBER,
+             },
++            trees: FileVersionTreeIdentifiers::issued_from_watermark(
++                TREE_IDENTIFIER_WATERMARK_AT_MKFS,
++            )
++            .expect("11 加八个号装得下")
++            .0,
+             filesystem_identifier: &filesystem_identifier,
+             device_identities: &device_identities,
+         };
+@@ -3462,8 +3659,11 @@
+             "第二片叶容器的步号：字节表七只登记了一片那一档的 t3"
+         );
+         assert_eq!(TransactionUnit::Data.placement(), PlacementRule::UserData);
++        let (trees_issued_from_the_make_filesystem_watermark, _) =
++            FileVersionTreeIdentifiers::issued_from_watermark(TREE_IDENTIFIER_WATERMARK_AT_MKFS)
++                .expect("11 加八个号装得下");
+         assert_eq!(
+-            TransactionUnit::TreeTable.tree(),
++            TransactionUnit::TreeTable.tree(&trees_issued_from_the_make_filesystem_watermark),
+             TreeIdentifier(0),
+             "树表单元不属于任何一棵树"
+         );
+--- a/crates/singlefs-harness/src/history.rs
++++ b/crates/singlefs-harness/src/history.rs
+@@ -1973,6 +1973,12 @@
+         PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile { .. } => {
+             "FirstFileVersionOnAVersionThatAlreadyHasAFile"
+         }
++        PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. } => {
++            "TreeTableOfTheVersionToBuildOnUnreadable"
++        }
++        PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_) => {
++            "TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees"
++        }
+         PublishError::BlockDevice(cause) => {
+             return format!(
+                 "PublishError::BlockDevice({})",
+@@ -2056,9 +2062,6 @@
+         MountError::RollbackTargetNotACandidate { exclusion, .. } => {
+             return format!("MountError::RollbackTargetNotACandidate({exclusion:?})")
+         }
+-        MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion { .. } => {
+-            "RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion"
+-        }
+         MountError::RollbackFloorAboveCeiling { .. } => "RollbackFloorAboveCeiling",
+         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
+             "VersionWithoutFileNotWrittenByMakeFilesystem"
+@@ -2377,6 +2380,8 @@
+         instance: session.instance,
+         back_chain: back_chain_of(&previous.record_bytes),
+         rollback_floor: previous.root.rollback_floor,
++        // 会话里接着现行那一版：它的水位已经是根环里的 max（挂载时本实例第一次发布取过，之后只照抄或推高）。
++        tree_identifier_watermark: previous.root.tree_identifier_watermark,
+     };
+     let previous_root = previous.root;
+     let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+--- a/crates/singlefs-harness/src/model_comparison.rs
++++ b/crates/singlefs-harness/src/model_comparison.rs
+@@ -186,6 +186,9 @@
+         | PublishError::ReleaseTargetLocationsOnDifferentSlots { .. }
+         | PublishError::ReleaseSpanMismatch { .. }
+         | PublishError::MappingEntryNarrowerThanItsFieldTable { .. }
++        // 第一个文件版本读不出那一版的树表、水位离 u64::MAX 不到八个号：健康的内存盘上都不该出现。
++        | PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. }
++        | PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_)
+         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
+     }
+ }
+@@ -207,7 +210,7 @@
+ 
+ /// 回退目标不在候选集里的那一条说的是哪条理由：按字段一对一映射，不看给人看的文字（增补 3 第 2 件代码三方第一轮判决第三节第 2 条）。
+ /// 「树表 0 条」不在这里：候选集只有这三条（D23（journal 的角色与格式） 已定项 14），目标那一版树表 0 条不是排除项
+-/// （C493（回退候选集条文与实现说反话） 还清）；环里还留着带文件版本的根时那一格是 `MountError` 单独一个成员。
++/// （C493（回退候选集条文与实现说反话） 还清）；环里还留着带文件版本的根时照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
+ #[must_use]
+ pub fn refusal_reason_of_rollback_candidate_exclusion(
+     exclusion: RollbackCandidateExclusion,
+@@ -250,12 +253,6 @@
+         MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported { .. } => {
+             explained(ModelRefusalReason::InstanceTableOnePageWall)
+         }
+-        // 回退到树表 0 条的根、而环里还有带文件的根：零故障走得到，模型照代码今天的读法划进必须拒。
+-        MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion { .. } => {
+-            explained(
+-                ModelRefusalReason::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion,
+-            )
+-        }
+         // 树表 0 条、而实例表已经不是 mkfs 那一片：零故障走得到（写过行的那一版上再挂载一次），模型照代码今天的读法划进必须拒。
+         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
+             explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
+@@ -285,7 +282,6 @@
+         | MountError::Acquisition(_)
+         | MountError::Publish(_)
+         | MountError::RollbackTargetNotACandidate { .. }
+-        | MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion { .. }
+         | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
+         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
+         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+--- a/crates/singlefs-harness/src/model.rs
++++ b/crates/singlefs-harness/src/model.rs
+@@ -284,10 +284,6 @@
+     RollbackTargetBelowEffectiveFloor,
+     /// 回退目标在被抛弃的时间线上（D23（journal 的角色与格式） 已定项 14：有行 (i, Ti, Wi) 且 T > Ti）。
+     RollbackTargetOnAbandonedTimeline,
+-    /// 回退目标那一版树表 0 条、而根环里还留着带文件版本的根：回退之后只能再发一次「第一个文件版本」，
+-    /// 那一次重新建树、重新发对象出生代，树表条目的诞生 txg 与 inode 1 的对象出生代都与环里那些旧根记的不同
+-    /// （I-9.14、I-9.10）。重新建树的诞生代怎么算没有条款（设计空白，交主 agent）。
+-    RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion,
+     /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）：
+     /// 被换下的那一片记在哪没有条款——树表 0 条 ⇒ 这一版没有分配记录树，那次释放只住内存，重开之后账取不回来，
+     /// 而根环里更旧的候选根还指着它。第一版不支持（设计空白，交主 agent）。
+@@ -316,9 +312,6 @@
+             ModelRefusalReason::RollbackTargetNotInRing => "回退目标不在根环里",
+             ModelRefusalReason::RollbackTargetBelowEffectiveFloor => "回退目标低于 F_生效",
+             ModelRefusalReason::RollbackTargetOnAbandonedTimeline => "回退目标在被抛弃的时间线上",
+-            ModelRefusalReason::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion => {
+-                "回退到树表 0 条的根、而环里还有带文件的根（条款没写重新建树的诞生代）"
+-            }
+             ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem => {
+                 "树表 0 条、而实例表已经不是 mkfs 那一片（条款没写被换下的那一片记在哪）"
+             }
+@@ -341,7 +334,6 @@
+             | ModelRefusalReason::RollbackTargetNotInRing
+             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
+             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
+-            | ModelRefusalReason::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion
+             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
+             | ModelRefusalReason::FloorAboveCeiling
+             | ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported => false,
+@@ -1099,14 +1091,9 @@
+         if Self::is_abandoned_by(target_root, &self.newest_root().instance_table_rows) {
+             reasons.insert(ModelRefusalReason::RollbackTargetOnAbandonedTimeline);
+         }
+-        // 候选集只有上面那三条（D23（journal 的角色与格式） 已定项 14）：目标那一版树表 0 条不是排除项。
+-        // 只有环里还留着带文件版本的根时拒绝：回退之后再发一次「第一个文件版本」会重新建树、重新发对象出生代，
+-        // 与环里那些旧根记的对不上（I-9.14、I-9.10），重新建树的诞生代怎么算没有条款。
+-        if target_root.file.is_none() && self.ring.values().any(|root| root.file.is_some()) {
+-            reasons.insert(
+-                ModelRefusalReason::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion,
+-            );
+-        }
++        // 候选集只有上面那三条（D23（journal 的角色与格式） 已定项 14）：目标那一版树表 0 条不是排除项，
++        // 环里还留着带文件版本的根时也照常回退（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：回退那一版带环里的树 ID 水位 max，
++        // 再发第一个文件版本从它往上发号；I-9.14 只比同一条时间线上的根）。
+         if !reasons.is_empty() {
+             return refused(reasons);
+         }
+@@ -1414,7 +1401,6 @@
+             | ModelRefusalReason::RollbackTargetNotInRing
+             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
+             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
+-            | ModelRefusalReason::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion
+             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
+             | ModelRefusalReason::FloorAboveCeiling
+             | ModelRefusalReason::RaiseWithFormatTimeInstanceTableUnsupported => false,
+--- a/crates/singlefs-harness/tests/checker_known_bad_images.rs
++++ b/crates/singlefs-harness/tests/checker_known_bad_images.rs
+@@ -1866,6 +1866,72 @@
+     }
+ }
+ 
++/// 第一个事务写出的中央映射树根（bump 次序：分配记录树、记账树、映射树、树表）。
++const MAPPING_ROOT: u64 = 50247;
++/// 根记录里中央映射树根指针的出生树：指针在根记录偏移 256（D22（单元原子性怎么合成） 已定项 7），出生树在指针偏移 34
++/// （D19（块指针的结构与宽度预算） 已定项 11）。
++const ROOT_RECORD_MAPPING_POINTER_BIRTH_TREE_OFFSET: usize = 256 + 34;
++/// 这个池发过、又不是中央映射树的一个号（livelist 树 16），低于水位 19。
++const ANOTHER_ISSUED_TREE_BELOW_THE_WATERMARK: u64 = 16;
++
++/// 中央映射树不进树表：I-1.3（块头树 ID 一致） 对它的根，「实际引用它的树」按根记录里那条根指针的出生树取
++/// （回退到树表 0 条的一版之后再发第一个文件版本，八棵树从水位重新发号，映射树不再恒是 15——C511（回退到无文件那一版之后诞生代怎么接））。
++/// 两份坏镜像各只改一边、都只有 I-1.3 红：映射树根头里的树 ID 改成 16（指针仍说 15），与根记录里那条指针的出生树改成 16
++/// （头仍说 15，重封根槽的自证校验和）。后一份钉的是「按指针判」这个读法：checker 退回写死 15 时它不红。
++/// 取 16 不取一个大数：16 是这个池发过的号（livelist 树）、低于水位 19，改成水位之上的号会让 I-7.8（根记录树 ID 水位不低于全池最大树 ID）
++/// 跟着红（它扫码 2 单元头），判别力就算不到 I-1.3 一条头上。
++#[test]
++fn a_central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tree_reddens_only_the_tree_identifier_invariant(
++) {
++    let clean = build_pool("known-bad-central-mapping-tree").memory_pool();
++    let violated_on_the_clean_image = violated_invariants(&check_pool_image(&clean));
++    assert!(
++        violated_on_the_clean_image.is_empty(),
++        "干净镜像上一条违例都没有：{violated_on_the_clean_image:?}"
++    );
++    let header_says_another_tree: Mutation = Box::new(|image: &mut MemoryPool| {
++        mutate_unit(
++            image,
++            MAPPING_ROOT,
++            |bytes| set_u64(bytes, 42, ANOTHER_ISSUED_TREE_BELOW_THE_WATERMARK),
++            true,
++        );
++    });
++    let root_pointer_says_another_tree: Mutation = Box::new(|image: &mut MemoryPool| {
++        let (device, offset) = FIRST_TRANSACTION_ROOT_SLOT;
++        let mut root_slot = read(image, device, offset, 512);
++        assert_eq!(
++            get_u64(&root_slot, ROOT_RECORD_MAPPING_POINTER_BIRTH_TREE_OFFSET),
++            15,
++            "第一个事务那条根的映射树根指针说出生树 15"
++        );
++        set_u64(
++            &mut root_slot,
++            ROOT_RECORD_MAPPING_POINTER_BIRTH_TREE_OFFSET,
++            ANOTHER_ISSUED_TREE_BELOW_THE_WATERMARK,
++        );
++        let digest = wide_checksum_with_field_zeroed(&root_slot, 512, 138);
++        root_slot[138..170].copy_from_slice(&digest);
++        write(image, device, offset, &root_slot);
++    });
++    for (which_side, mutation) in [
++        ("映射树根头里的树 ID", header_says_another_tree),
++        (
++            "根记录里映射树根指针的出生树",
++            root_pointer_says_another_tree,
++        ),
++    ] {
++        let mut image = clean.clone();
++        mutation(&mut image);
++        let verdicts = check_pool_image(&image);
++        assert_eq!(
++            violated_invariants(&verdicts),
++            ["I-1.3"],
++            "只改了{which_side}：判红的该只有 I-1.3：{verdicts:?}"
++        );
++    }
++}
++
+ /// 记账树叶里 (统计量, 设备) 那一行的值改成 value（偏移口径同 `adjust_accounting`）。
+ fn set_accounting(bytes: &mut [u8], statistic: u16, device: u32, value: u64) {
+     let count = usize::from(u16::from_le_bytes([bytes[82 + 44], bytes[83 + 44]]));
+--- a/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs
++++ b/crates/singlefs-harness/tests/first_transaction_step_five_publish.rs
+@@ -543,7 +543,10 @@
+             continue;
+         }
+         let view = index_node_view(&unit.bytes).expect("码 2 节点");
+-        assert_eq!(view.tree_identifier, unit.identity.tree().0);
++        assert_eq!(
++            view.tree_identifier,
++            unit.identity.tree(&pool.output.tree_identifiers).0
++        );
+         let schema = match unit.identity {
+             TransactionUnit::MappingTree => KEY_SCHEMA_MAPPING,
+             TransactionUnit::TreeTable => KEY_SCHEMA_TREE_TABLE,
+@@ -553,7 +556,9 @@
+             | TransactionUnit::AccountingTree => {
+                 let kind = tree_table_entries
+                     .iter()
+-                    .find(|entry| entry.tree.0 == unit.identity.tree().0)
++                    .find(|entry| {
++                        entry.tree.0 == unit.identity.tree(&pool.output.tree_identifiers).0
++                    })
+                     .expect("在树表里")
+                     .kind;
+                 key_schema_for_tree_kind(kind).expect("有节点的树都有 key 形态")
+--- a/crates/singlefs-harness/tests/second_transaction_step_four_rollback.rs
++++ b/crates/singlefs-harness/tests/second_transaction_step_four_rollback.rs
+@@ -5,16 +5,17 @@
+ mod common;
+ 
+ use common::{
+-    build_pool, disk_snapshot, file_content, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS,
+-    IMAGE_BYTES,
++    build_pool, file_content, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+ };
+ use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::index_node_view;
+ use singlefs_checker::walk::check_pool_image;
+ use singlefs_core::address::{
+-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
++    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, TreeIdentifier,
+ };
+-use singlefs_core::allocator::unit_area_slots_of_device;
++use singlefs_core::allocator::{unit_area_slots_of_device, PoolAllocator};
+ use singlefs_core::block_device::{BlockDevice, WriteDurability};
++use singlefs_core::journal::back_chain_of;
+ use singlefs_core::mount::{
+     mount_rollback, mount_writable, InstanceRow, MountError, Mounted, RollbackCandidateExclusion,
+     RollbackTarget, ShadowLedger,
+@@ -22,15 +23,19 @@
+ use singlefs_core::pointer::LocationEntry;
+ use singlefs_core::records::TREE_KIND_ALLOCATION;
+ use singlefs_core::recovery::{
+-    allocation_records_under_root, choose_root, choose_system_configuration, readable_roots,
+-    recover, replay_journal, scan_journal, JournalPolicy, RecoveryFailure, RecoveryOutcome,
++    allocation_records_under_root, choose_root, choose_system_configuration,
++    highest_tree_identifier_watermark_in_the_ring, readable_roots, recover, replay_journal,
++    scan_journal, tree_table_has_no_entries, JournalPolicy, RecoveryFailure, RecoveryOutcome,
+ };
+ use singlefs_core::root_ring::{slot_offset, target_for_publish};
+ use singlefs_core::transaction::{
+-    publish_overwrite, FirstFile, PoolWriter, TransactionOutput, TransactionUnit,
++    publish_first_file, publish_overwrite, publish_without_units, FirstFile, PoolVersion,
++    PoolWriter, TransactionOutput, TransactionUnit, VersionWithoutFilePublishOutput,
++    ZeroUnitPublishPlan,
+ };
+-use singlefs_format::UNIT_AREA_START_SLOT;
++use singlefs_format::{ROOT_RING_REGIONS, UNIT_AREA_START_SLOT};
+ use singlefs_harness::bad_disk_input::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
++use singlefs_harness::crash::MemoryPool;
+ use singlefs_harness::fault_injection::{
+     NamedRootRingSlots, PoolReaderWithUnreadableRootRingSlots, RootRingSlotTarget,
+ };
+@@ -93,45 +98,452 @@
+     pool
+ }
+ 
+-/// 回退到树表 0 条的根（第一个事务里 txg 2 的暖机根）：候选集只有「在根环里」「txg ≥ F_生效」「按实例表判仍然有效」三条
+-/// （D23（journal 的角色与格式） 已定项 14 / D16（发布语义） 已定项 1），「树表 0 条」**不在其内**——报的不再是候选排除
+-/// （C493（回退候选集条文与实现说反话） 还清）。这个池里环里还留着带文件版本的根 (1, 3) ⇒ 返回
+-/// `RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion`：回退之后只能再发一次「第一个文件版本」，
+-/// 那一次重新建树、重新发对象出生代，树表条目的诞生 txg 与 inode 1 的对象出生代都与 (1, 3) 记的不同
+-/// （I-9.14、I-9.10；2026-09-23 崩溃注入快档三条新发现都是它）——重新建树的诞生代怎么算没有条款。
+-/// 在任何写之前拒绝，盘上逐字节不变。
+-/// 环里没有带文件的根时回退照常做，由 `second_transaction_step_three_formatted_pool.rs` 的
+-/// `rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_instance_table` 钉住。
+-#[test]
+-fn rolling_back_to_a_warm_up_root_while_the_ring_still_holds_a_file_version_is_refused_before_any_write(
++/// 根环全部自证过的根带的树 ID 水位取 max（D8（核心索引结构） 已定项 8 ② 的那个量，也是 I-7.8（根记录树 ID 水位不低于全池最大树 ID）
++/// 取 max 的范围）：用例拿它核「回退之前环里的最大水位」。
++fn highest_watermark_among_ring_roots(image: &MemoryPool) -> u64 {
++    let parameters = parameters();
++    readable_roots(
++        image,
++        &parameters.region_devices,
++        &parameters.geometry,
++        &parameters.filesystem_identifier,
++    )
++    .iter()
++    .map(|root| root.tree_identifier_watermark)
++    .max()
++    .expect("环里至少有一条自证过的根")
++}
++
++/// 池级 checker 一条违例都没有；交回全部判定，调用方再点名要真被判过（不是「不适用」）的那几条。
++fn verdicts_without_any_violation(
++    image: &MemoryPool,
++    step: &str,
++) -> Vec<(&'static str, InvariantVerdict)> {
++    let verdicts = check_pool_image(image);
++    let violated: Vec<(&str, &InvariantVerdict)> = verdicts
++        .iter()
++        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++        .map(|(invariant, verdict)| (*invariant, verdict))
++        .collect();
++    assert!(
++        violated.is_empty(),
++        "{step}：池级 checker 一条违例都没有：{violated:?}"
++    );
++    verdicts
++}
++
++fn assert_judged_and_holding(
++    verdicts: &[(&'static str, InvariantVerdict)],
++    invariants: &[&str],
++    step: &str,
+ ) {
+-    let mut pool = build_pool("step-four-rollback-to-warm-up-root");
+-    let warm_up_root = RollbackTarget {
++    for invariant in invariants {
++        assert!(
++            verdicts
++                .iter()
++                .any(|(name, verdict)| name == invariant && *verdict == InvariantVerdict::Holds),
++            "{step}：{invariant} 真被判过且成立：{:?}",
++            verdicts.iter().find(|(name, _)| name == invariant)
++        );
++    }
++}
++
++fn warm_up_root() -> RollbackTarget {
++    RollbackTarget {
+         instance: InstanceGeneration(1),
+         checkpoint_txg: CheckpointTxg(2),
++    }
++}
++
++/// 回退之后那个会话的现行那一版（树表 0 条）：根、记录、记录的字节。
++fn current_version_without_file(current: &PoolVersion) -> VersionWithoutFilePublishOutput {
++    let PoolVersion::WithoutFile(version) = current else {
++        panic!("回退到树表 0 条的暖机根：现行那一版仍是「没有文件版本」的一版")
+     };
+-    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
++    version.clone()
++}
++
++/// 在回退之后那个会话里接着现行那一版（树表 0 条）发第一个文件版本，回来的那一版装回 pool。
++fn publish_first_file_after_the_rollback(
++    pool: &mut BuiltPool,
++    allocator: &mut PoolAllocator,
++    current: &PoolVersion,
++    instance: InstanceGeneration,
++    content: &[u8],
++) -> TransactionOutput {
++    let version = current_version_without_file(current);
++    let publish_parameters = parameters();
++    let devices = pool.devices.as_mut().expect("镜像还开着");
++    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++    let output = publish_first_file(
++        &mut writer,
++        allocator,
++        &version.root,
++        FirstFile {
++            content,
++            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
++        },
++        instance,
++        &version.record_bytes,
++    )
++    .expect("回退到树表 0 条的一版之后再发第一个文件版本");
++    pool.output = output.clone();
++    pool.allocator = allocator.clone();
++    output
++}
++
++/// 新发出来的八个号都不低于回退那一版带过来的水位、都高于回退之前发过的每一个号；八个号互不相同；
++/// 树表七条与中央映射树根的头里写的就是这几个号；新水位 = 最大那个号 + 1（D8（核心索引结构） 已定项 8 ②）。
++fn assert_fresh_tree_identifiers(
++    output: &TransactionOutput,
++    watermark_carried_by_the_rollback: u64,
++    highest_tree_identifier_before_the_rollback: TreeIdentifier,
++) {
++    let issued = output.tree_identifiers.in_issue_order();
++    for tree in issued {
++        assert!(
++            tree.0 >= watermark_carried_by_the_rollback
++                && tree > highest_tree_identifier_before_the_rollback,
++            "新发的号 {tree:?} 不低于回退带过来的水位 {watermark_carried_by_the_rollback}、高于此前最大的 {highest_tree_identifier_before_the_rollback:?}"
++        );
++    }
++    assert_eq!(
++        issued.iter().collect::<BTreeSet<_>>().len(),
++        8,
++        "八个号互不相同"
++    );
++    assert_eq!(
++        output.root.tree_identifier_watermark,
++        output.tree_identifiers.highest().0 + 1,
++        "新水位 = 这次发出的最高号 + 1（它高于环里任何一条根带的）"
++    );
++    let tree_table_trees: BTreeSet<TreeIdentifier> = output
++        .tree_table_entries
++        .iter()
++        .map(|entry| entry.tree)
++        .collect();
++    let issued_without_the_central_mapping: BTreeSet<TreeIdentifier> = issued
++        .into_iter()
++        .filter(|tree| *tree != output.tree_identifiers.central_mapping)
++        .collect();
++    assert_eq!(
++        tree_table_trees, issued_without_the_central_mapping,
++        "树表七条就是这次发的号（中央映射树不进树表）"
++    );
++    let mapping_node = index_node_view(&output.unit(TransactionUnit::MappingTree).bytes)
++        .expect("中央映射树根是码 2 节点");
++    assert_eq!(
++        (
++            mapping_node.tree_identifier,
++            output.root.mapping_root.head.birth_tree
++        ),
++        (
++            output.tree_identifiers.central_mapping.0,
++            output.tree_identifiers.central_mapping
++        ),
++        "中央映射树根的头与根记录里它那条指针的出生树都是这次发的号"
++    );
++}
++
++/// C511（回退到无文件那一版之后诞生代怎么接） 第 3 步：环里还留着带文件版本的根 (1, 3)（树 11..18、水位 19）时回退到树表 0 条的
++/// 暖机根 (1, 2)——回退照常做，不再在写之前拒绝；回退行那次发布的根带回退之前根环里的水位 max 19（D8（核心索引结构） 已定项 8 ②），
++/// 不带暖机根自己的 11。接着在同一个会话里再发第一个文件版本：八棵树从 19 起连号发、新水位 27，高于此前发过的每一个号；
++/// 再覆盖写一版，让 I-9.14（树表条目的诞生 txg 跨根不变） 在同一条时间线上有两个树表可比。每一步池级 checker 一条违例都没有，
++/// 最后 I-7.8（根记录树 ID 水位不低于全池最大树 ID）、I-9.14、I-9.10（对象出生代三处一致） 都真被判过且成立；冷启动读回覆盖写的内容。
++#[test]
++fn rolling_back_to_a_warm_up_root_while_the_ring_still_holds_a_file_version_carries_the_ring_watermark_and_the_next_first_file_issues_fresh_tree_identifiers(
++) {
++    let mut pool = build_pool("step-four-rollback-to-warm-up-root-then-first-file");
++    let highest_tree_identifier_before_the_rollback = pool.output.tree_identifiers.highest();
++    let ring_watermark_before_the_rollback =
++        highest_watermark_among_ring_roots(&pool.memory_pool());
++    assert_eq!(
++        (
++            highest_tree_identifier_before_the_rollback,
++            ring_watermark_before_the_rollback
++        ),
++        (TreeIdentifier(18), 19),
++        "回退之前：第一个事务发了 11..18，(1, 3) 带水位 19"
++    );
++    let parameters_of_the_pool = parameters();
++    let warm_up_root_record = readable_roots(
++        &pool.memory_pool(),
++        &parameters_of_the_pool.region_devices,
++        &parameters_of_the_pool.geometry,
++        &parameters_of_the_pool.filesystem_identifier,
++    )
++    .into_iter()
++    .find(|root| {
++        (root.instance, root.checkpoint_txg)
++            == (warm_up_root().instance, warm_up_root().checkpoint_txg)
++    })
++    .expect("暖机根 (1, 2) 还在环里");
++    assert_eq!(
++        warm_up_root_record.tree_identifier_watermark, 11,
++        "回退到的那一版自己带的是 mkfs 种下的 11：沿它带就会低于环里的 max"
++    );
++
+     let mut devices = pool.reopen_recorded();
+-    let refused = mount_rollback(&parameters(), &mut devices, warm_up_root, ShadowLedger::On);
++    let rolled_back = mount_rollback(
++        &parameters(),
++        &mut devices,
++        warm_up_root(),
++        ShadowLedger::On,
++    )
++    .expect("环里还留着带文件版本的根时回退照常做");
+     pool.devices = Some(devices);
++    let PoolVersion::WithoutFile(row) = &rolled_back.output.row_publish else {
++        panic!("回退到树表 0 条的暖机根：回退行那次发布仍是「没有文件版本」的一版")
++    };
++    assert_eq!(
++        (
++            row.root.tree_identifier_watermark,
++            row.record.new_tree_identifier_watermark
++        ),
++        (
++            ring_watermark_before_the_rollback,
++            ring_watermark_before_the_rollback
++        ),
++        "回退行那次发布的根与记录新根段都带回退之前根环里的水位 max，不带暖机根自己的 11"
++    );
++    let rolled_back_verdicts =
++        verdicts_without_any_violation(&pool.memory_pool(), "回退之后（环里还有 (1, 3)）");
++    assert_judged_and_holding(&rolled_back_verdicts, &["I-7.8"], "回退之后");
++
++    let instance = rolled_back.output.instance;
++    let mut allocator = rolled_back.allocator.clone();
++    let first_content = content_of(3300, 17);
++    let first_after_rollback = publish_first_file_after_the_rollback(
++        &mut pool,
++        &mut allocator,
++        &rolled_back.current,
++        instance,
++        &first_content,
++    );
++    assert_fresh_tree_identifiers(
++        &first_after_rollback,
++        ring_watermark_before_the_rollback,
++        highest_tree_identifier_before_the_rollback,
++    );
++    assert_eq!(
++        first_after_rollback.tree_identifiers.extent,
++        TreeIdentifier(ring_watermark_before_the_rollback),
++        "从回退带过来的水位起连号发：extent 树拿到的就是 19"
++    );
++    verdicts_without_any_violation(&pool.memory_pool(), "回退之后再发第一个文件版本");
++
++    let overwrite_content = content_of(2900, 23);
++    let overwritten = overwrite_in_process(&mut pool, &overwrite_content, instance);
++    assert_eq!(
++        overwritten.tree_identifiers, first_after_rollback.tree_identifiers,
++        "覆盖写照抄这八个号，不另发"
++    );
++    let final_verdicts =
++        verdicts_without_any_violation(&pool.memory_pool(), "回退之后第一个文件版本再覆盖写一版");
++    assert_judged_and_holding(
++        &final_verdicts,
++        &["I-7.8", "I-9.14", "I-9.10"],
++        "回退之后第一个文件版本再覆盖写一版",
++    );
++    assert_eq!(
++        recover(&pool.memory_pool(), JournalPolicy::Consult).outcome,
++        RecoveryOutcome::FileRead {
++            root: (instance, overwritten.root.checkpoint_txg),
++            content: overwrite_content,
++        },
++        "冷启动择覆盖写那一版的根，读回它的内容"
++    );
++}
++
++/// C511（回退到无文件那一版之后诞生代怎么接） 判别力那一格：回退到暖机根 (1, 2) 之后在同一个会话里连推零单元发布，直到根环里一条
++/// 带文件版本的根都不剩（(1, 3) 的根槽被轮转盖掉），盘上仍留着 (1, 3) 那一版写出的 11..18 号码 2 单元（被抛弃、影子账隔离着，
++/// 零单元发布一个槽都不取）。这时 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 只剩新线上的根可取 max：回退那一版带环里的 max 19
++/// 并一路照抄下来就成立；沿回退到的那一版带（暖机根的 11，今天之前的取法）就是 11 ≤ 18，当场红。
++/// 之后退出、重开可写挂载（写行那次发布按环算水位：环里只剩新线上带 19 的根），再发第一个文件版本、覆盖写一版：
++/// 八个号从 19 起发，池级 checker 一条违例都没有，I-7.8、I-9.14（树表条目的诞生 txg 跨根不变）、I-9.10（对象出生代三处一致） 都真被判过。
++/// 重开这一步不省：同一个会话里转满一圈根环之后，被换下的 mkfs 实例表还在 defer 队列里、已经没有一条环里的根引用它，
++/// I-3.1（已分配统计对得上） 在那里判红——那是里程碑「第二个事务」增补 2 收口表第 ② 行记着的「一次挂载转过一整圈根环」那一族，
++/// 与水位无关；重开时的回收把它还回去。
++#[test]
++fn after_rolling_back_to_a_warm_up_root_the_ring_watermark_outlives_the_file_version_roots_leaving_the_ring(
++) {
++    let mut pool = build_pool("step-four-rollback-to-warm-up-root-ring-turns");
++    let highest_tree_identifier_before_the_rollback = pool.output.tree_identifiers.highest();
++    let ring_watermark_before_the_rollback =
++        highest_watermark_among_ring_roots(&pool.memory_pool());
++    let mut devices_for_the_rollback = pool.reopen_recorded();
++    let rolled_back = mount_rollback(
++        &parameters(),
++        &mut devices_for_the_rollback,
++        warm_up_root(),
++        ShadowLedger::On,
++    )
++    .expect("环里还留着带文件版本的根时回退照常做");
++    pool.devices = Some(devices_for_the_rollback);
++    let instance = rolled_back.output.instance;
++    let mut current = rolled_back.current.clone();
++    let parameters_of_the_pool = parameters();
++    let ring_slots = parameters_of_the_pool
++        .geometry
++        .root_ring_slots_per_region
++        .count()
++        * ROOT_RING_REGIONS;
++    let ring_still_holds_a_file_version = |image: &MemoryPool| {
++        readable_roots(
++            image,
++            &parameters_of_the_pool.region_devices,
++            &parameters_of_the_pool.geometry,
++            &parameters_of_the_pool.filesystem_identifier,
++        )
++        .iter()
++        .any(|root| matches!(tree_table_has_no_entries(image, root), Ok(false)))
++    };
+     assert!(
+-        matches!(
+-            refused,
+-            Err(MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion {
+-                target,
+-                file_version_root: RollbackTarget {
+-                    instance: InstanceGeneration(1),
+-                    checkpoint_txg: CheckpointTxg(3),
+-                },
+-            }) if target == warm_up_root
+-        ),
+-        "暖机根下面没有文件版本，而环里还有 (1, 3)：{:?}",
+-        refused.as_ref().err()
+-    );
+-    assert_eq!(
+-        disk_snapshot(&pool.memory_pool(), &pool.stream),
+-        before,
+-        "盘上逐字节不变"
++        ring_still_holds_a_file_version(&pool.memory_pool()),
++        "回退刚做完：(1, 3) 还在环里"
++    );
++    let mut empty_publishes = 0u64;
++    while ring_still_holds_a_file_version(&pool.memory_pool()) {
++        assert!(
++            empty_publishes < ring_slots,
++            "推满一圈根环 {ring_slots} 次之前 (1, 3) 的根槽一定被盖掉"
++        );
++        let version = current_version_without_file(&current);
++        let open_devices = pool.devices.as_mut().expect("镜像还开着");
++        let mut writer = PoolWriter::new(&parameters_of_the_pool, open_devices.as_mut_slice());
++        let next = publish_without_units(
++            &mut writer,
++            &version.root,
++            ZeroUnitPublishPlan {
++                txg: CheckpointTxg(version.root.checkpoint_txg.0 + 1),
++                counter: version.record.counter + 1,
++                instance,
++                back_chain: back_chain_of(&version.record_bytes),
++                rollback_floor: version.root.rollback_floor,
++                // 会话里接着现行那一版：它的水位就是根环里的 max（回退行那次发布取过，之后照抄）。
++                tree_identifier_watermark: version.root.tree_identifier_watermark,
++            },
++        )
++        .expect("零单元发布");
++        current = PoolVersion::WithoutFile(next);
++        empty_publishes += 1;
++    }
++    // 先判 checker 再核水位：沿回退到的那一版带水位时，这一步要红在 I-7.8 上（判别力自证就看这一格）。
++    let turned_verdicts = verdicts_without_any_violation(
++        &pool.memory_pool(),
++        "回退之后推零单元发布到 (1, 3) 离开根环",
++    );
++    assert_judged_and_holding(&turned_verdicts, &["I-7.8"], "(1, 3) 离开根环之后");
++    assert_eq!(
++        highest_watermark_among_ring_roots(&pool.memory_pool()),
++        ring_watermark_before_the_rollback,
++        "(1, 3) 离开根环之后，环里新线上的根仍带 19"
++    );
++
++    let mut devices_for_the_remount = pool.reopen_recorded();
++    let remounted =
++        mount_writable(&parameters(), &mut devices_for_the_remount).expect("重开可写挂载");
++    pool.devices = Some(devices_for_the_remount);
++    assert_eq!(
++        remounted.current.root().tree_identifier_watermark,
++        ring_watermark_before_the_rollback,
++        "重开时写行那次发布按环算水位：环里只剩新线上的根，都带 19"
++    );
++    let remounted_instance = remounted.output.instance;
++    let mut allocator = remounted.allocator.clone();
++    let first_after_rollback = publish_first_file_after_the_rollback(
++        &mut pool,
++        &mut allocator,
++        &remounted.current,
++        remounted_instance,
++        &content_of(3100, 29),
++    );
++    assert_fresh_tree_identifiers(
++        &first_after_rollback,
++        ring_watermark_before_the_rollback,
++        highest_tree_identifier_before_the_rollback,
++    );
++    verdicts_without_any_violation(
++        &pool.memory_pool(),
++        "(1, 3) 离开根环、重开之后再发第一个文件版本",
++    );
++    overwrite_in_process(&mut pool, &content_of(2700, 31), remounted_instance);
++    let final_verdicts = verdicts_without_any_violation(
++        &pool.memory_pool(),
++        "(1, 3) 离开根环、重开之后第一个文件版本再覆盖写一版",
++    );
++    assert_judged_and_holding(
++        &final_verdicts,
++        &["I-7.8", "I-9.14", "I-9.10"],
++        "(1, 3) 离开根环、重开之后第一个文件版本再覆盖写一版",
++    );
++}
++
++/// C511（回退到无文件那一版之后诞生代怎么接） 第 3 步里条款没写的那一格（根环里读不出的根怎么算）按最保守的读法做：
++/// 带文件版本的根 (1, 3) 那一槽读不出（介质错、持续），而它那次发布的记录还在环里——本实例第一次发布要带的水位
++/// 仍是 19，取自那条记录的新根段（D23（journal 的角色与格式） 已定项 15）。只看读得出的根就只剩带 mkfs 种下的 11 的那几条，
++/// 回退到暖机根之后再发第一个文件版本就会重发 (1, 3) 用过的 11..18（D8（核心索引结构） 已定项 8 ②）。
++#[test]
++fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record(
++) {
++    let pool = build_pool("step-four-unreadable-file-version-root-watermark");
++    let image = pool.memory_pool();
++    let system_configuration = choose_system_configuration(&image).expect("系统配置");
++    let immutable = &system_configuration.immutable;
++    let file_version_root_slot = target_for_publish(
++        CheckpointTxg(3),
++        parameters().geometry.root_ring_slots_per_region,
++    );
++    let unreadable = PoolReaderWithUnreadableRootRingSlots::new(
++        &image,
++        RootRingSlotTarget {
++            named_slots: NamedRootRingSlots::naming(&[file_version_root_slot]),
++            region_devices: immutable.region_devices,
++            fixed_structure_slot_spacing: immutable.sizes.fixed_structure_slot_spacing,
++        },
++    );
++    let readable = readable_roots(
++        &unreadable,
++        &immutable.region_devices,
++        &immutable.sizes,
++        &immutable.filesystem_identifier,
++    );
++    assert!(
++        !readable.is_empty()
++            && readable
++                .iter()
++                .all(|root| root.checkpoint_txg != CheckpointTxg(3)),
++        "(1, 3) 那一槽读不出、别的根读得出：{:?}",
++        readable
++            .iter()
++            .map(|root| (root.instance, root.checkpoint_txg))
++            .collect::<Vec<_>>()
++    );
++    assert_eq!(
++        readable
++            .iter()
++            .map(|root| root.tree_identifier_watermark)
++            .max(),
++        Some(11),
++        "读得出的根都带 mkfs 种下的 11"
++    );
++    let records = scan_journal(&unreadable, &system_configuration);
++    assert!(
++        records
++            .values()
++            .any(|record| record.new_tree_identifier_watermark == 19),
++        "(1, 3) 那次发布的记录还在环里，新根段带 19"
++    );
++    assert_eq!(
++        highest_tree_identifier_watermark_in_the_ring(
++            &unreadable,
++            &immutable.region_devices,
++            &immutable.sizes,
++            &immutable.filesystem_identifier,
++            &records,
++        ),
++        Some(19),
++        "根读不出、记录还在：水位按记录带的 19 算，不退回读得出的根带的 11"
+     );
+ }
+ 
+--- a/crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs
++++ b/crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs
+@@ -30,12 +30,14 @@
+     mount_rollback, mount_writable, InstanceRow, MountError, RollbackTarget, ShadowLedger,
+ };
+ use singlefs_core::recovery::{
+-    choose_root, choose_system_configuration, recover, JournalPolicy, RecoveryOutcome,
++    choose_root, choose_system_configuration, recover, JournalPolicy, RecoveryFailure,
++    RecoveryOutcome,
+ };
+ use singlefs_core::root_ring::{slot_offset, target_for_publish};
+ use singlefs_core::transaction::{
+     acquire_instance, publish_first_file, publish_without_units, warm_up, FirstFile, PoolVersion,
+-    PoolWriter, PublishError, ZeroUnitPublishPlan,
++    PoolWriter, PublishError, TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees,
++    ZeroUnitPublishPlan,
+ };
+ use singlefs_harness::crash::writes_and_segments;
+ use singlefs_harness::fault_injection::{
+@@ -317,6 +319,11 @@
+             instance,
+             back_chain: back_chain_of(&warmed.last_record_bytes),
+             rollback_floor: CheckpointTxg(0),
++            tree_identifier_watermark: warmed
++                .roots
++                .last()
++                .expect("暖机两代根")
++                .tree_identifier_watermark,
+         },
+     )
+     .expect("第三次零单元发布");
+@@ -368,6 +375,113 @@
+     );
+     assert_eq!(allocator.records(), records_before.as_slice(), "分配器没动");
+ }
++
++/// C511（回退到无文件那一版之后诞生代怎么接） 第 3 步给 `publish_first_file` 新加的两道，都在任何写之前返回：
++/// ① 判「那一版有没有过文件版本」改看它的树表条数，而那一版的树表单元两份都读不出（两盘上 mkfs 那片树表整个写零）
++///    ⇒ `TreeTableOfTheVersionToBuildOnUnreadable`，带着恢复路径那一格的原因；
++/// ② 八棵树从那一版的水位（盘上读来的 8 字节）起连号发，而水位离 `u64::MAX` 不到八个号
++///    ⇒ `TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees`，带着那个水位。
++/// 两格都是一个写、一道屏障都没发（录制流一步不多）、分配器不动。
++#[test]
++fn first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any_write() {
++    let mut formatted = format_pool("step-three-formatted-first-file-cannot-issue-trees");
++    let publish_parameters = parameters();
++    let genesis_root = formatted.genesis.root;
++    let open_devices = formatted.devices.as_mut().expect("镜像还开着");
++    let mut writer = PoolWriter::new(&publish_parameters, open_devices.as_mut_slice());
++    let instance = acquire_instance(&mut writer).expect("取号");
++    let warmed = warm_up(&mut writer, &genesis_root, instance).expect("暖机");
++    let warm_up_root = *warmed.roots.last().expect("暖机两代根");
++    let mut allocator = PoolAllocator::new(vec![
++        DeviceFreeMap::new(DeviceIdentity(0), common::IMAGE_BYTES),
++        DeviceFreeMap::new(DeviceIdentity(1), common::IMAGE_BYTES),
++    ]);
++    allocator.mark_format_time_units(
++        Placement {
++            slot: INSTANCE_TABLE_SLOT,
++            span: 2,
++        },
++        Placement {
++            slot: TREE_TABLE_GENESIS_SLOT,
++            span: 1,
++        },
++    );
++    let records_before = allocator.records().to_vec();
++    let content = file_content();
++
++    // ②：水位离 u64::MAX 只剩三个号。
++    let mut root_with_no_room_for_eight_trees = warm_up_root;
++    root_with_no_room_for_eight_trees.tree_identifier_watermark = u64::MAX - 3;
++    let recorded_before_the_watermark_case = formatted.stream.operations().len();
++    let refused_for_the_watermark = publish_first_file(
++        &mut writer,
++        &mut allocator,
++        &root_with_no_room_for_eight_trees,
++        FirstFile {
++            content: &content,
++            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
++        },
++        instance,
++        &warmed.last_record_bytes,
++    );
++    assert!(
++        matches!(
++            refused_for_the_watermark,
++            Err(PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(
++                TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees {
++                    tree_identifier_watermark
++                }
++            )) if tree_identifier_watermark == u64::MAX - 3
++        ),
++        "水位离 u64::MAX 不到八个号：{:?}",
++        refused_for_the_watermark.as_ref().err()
++    );
++    assert_eq!(
++        formatted.stream.operations().len(),
++        recorded_before_the_watermark_case,
++        "水位那一格：一个写、一道屏障都没发"
++    );
++    assert_eq!(allocator.records(), records_before.as_slice(), "分配器没动");
++
++    // ①：两盘上 mkfs 那片树表整个写零（整单元校验和对不上），那一版的树表两份都读不出。
++    for (_, device) in writer.devices.iter_mut() {
++        device
++            .write_at(
++                DeviceOffsetInBytes(TREE_TABLE_GENESIS_SLOT.0 * 16384),
++                &[0u8; 16384],
++                WriteDurability::ForceUnitAccess,
++            )
++            .expect("抹树表写得进去");
++    }
++    let recorded_before_the_tree_table_case = formatted.stream.operations().len();
++    let refused_for_the_tree_table = publish_first_file(
++        &mut writer,
++        &mut allocator,
++        &warm_up_root,
++        FirstFile {
++            content: &content,
++            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
++        },
++        instance,
++        &warmed.last_record_bytes,
++    );
++    assert!(
++        matches!(
++            refused_for_the_tree_table,
++            Err(PublishError::TreeTableOfTheVersionToBuildOnUnreadable {
++                failure: RecoveryFailure::UnitUnreadable { slot }
++            }) if slot == TREE_TABLE_GENESIS_SLOT
++        ),
++        "那一版的树表两份都读不出：{:?}",
++        refused_for_the_tree_table.as_ref().err()
++    );
++    assert_eq!(
++        formatted.stream.operations().len(),
++        recorded_before_the_tree_table_case,
++        "树表那一格：一个写、一道屏障都没发"
++    );
++    assert_eq!(allocator.records(), records_before.as_slice(), "分配器没动");
++}
+ 
+ fn region_device(txg: u64) -> DeviceIdentity {
+     let target = target_for_publish(
+--- a/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs
++++ b/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs
+@@ -339,6 +339,11 @@
+     // 位置条目那份上恢复**读回了文件**（那条指针指的实例表不在读路径上，两条位置条目的第一条又还是好的）——
+     // 这一条钉的正是「改法没有把读路径也一起拒掉」。
+     //
++    // ⚠️ 这段写死的历史第 4 步是「回退到环里第 3 新的根」，那是一条暖机根、而环里还留着带文件的根：C511（回退到无文件那一版之后诞生代怎么接）
++    // 第 3 步之前那一步在写之前被拒、之后几步没有会话；拿掉那道拒绝之后它照常回退，后面接着再发第一个文件版本、覆盖写、重开（实例 3），
++    // 盘面跟着变：实例表那个落点从槽 50304 挪到 50368，恢复择到的根从 (2, 9) 变成 (3, 13)。下面几处槽号与根照今天的盘面写，
++    // 钉的错误成员一个没变。
++    //
+     // ⚠️ 「跨度越过单元区末尾」那条坏法在**两块 4 GiB 的盘**上够不着它名字里说的那一格：跨度写成 0x7FFF = 32767 槽，
+     // 从 50176 起到 82943，而单元区末尾是槽 262144（4 GiB ÷ 16 KiB）。它实际打中的是同一批判定里的
+     // 「同一块盘上两条分配记录罩住同一个槽」——32767 槽罩过了后面每一条记录。照实钉，不按坏法的名字钉。
+@@ -392,7 +397,7 @@
+             DamageKind::AllocationRecordReleasedOnTheSecondDeviceOnly,
+             "InvariantViolated { invariant: \"E142 走读同款\", detail: \"分配记录不是每个落点每盘各一条",
+             "ReleaseTargetAlreadyReleased { unit: InstanceTable, device: DeviceIdentity(1), \
+-             slot: SlotNumber(50304) }",
++             slot: SlotNumber(50368) }",
+         ),
+         (
+             DamageKind::RelabelledInodeWatermarkAccountingRow,
+@@ -401,10 +406,10 @@
+         ),
+         (
+             DamageKind::TwoLocationEntriesOfOnePointerDisagreeingOnTheSlot,
+-            "FileRead（实例 2 第 9 代根",
++            "FileRead（实例 3 第 13 代根",
+             "ReleaseTargetLocationsOnDifferentSlots { unit: InstanceTable, disagreement: \
+              LocationEntriesOnDifferentSlots { devices: [DeviceIdentity(0), DeviceIdentity(1)], \
+-             slots: [SlotNumber(50304), SlotNumber(50305)] } }",
++             slots: [SlotNumber(50368), SlotNumber(50369)] } }",
+         ),
+         // 第十三条是 C504（树表条目宽在走读里无守卫，今天没坏法打得到）：坏的是**树表单元自己**，不是它指着的某棵树的根。
+         // 两个读者都走 `TreeTableEntry::parse`（它先判「这条条目正好 200 字节」），所以两侧同一个成员；
+--- a/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
++++ b/crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs
+@@ -116,7 +116,6 @@
+     for member in [
+         "MountError::RollbackFloorAboveCeiling",
+         "MountError::RollbackTargetNotACandidate(NotInRing)",
+-        "MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion",
+         "PublishError::ContentExceedsDataUnit",
+         "PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile",
+     ] {

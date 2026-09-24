@@ -1,0 +1,11 @@
+232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7  .claude/gate.d/54-layer0-replay.sh
+03314d49bf746b584c170722aaef29a1271120894c3dc952473d46509aab5acb  .claude/gate.d/stage-inputs.tsv
+14a43f860469aa17823e9330f6625316eb963e6b2a627382cf88501b7474d265  .claude/main-agent.md
+3cfbf2e57a969c189e5dc754f26fdd76d4c030ac417596954415763590cd719f  .claude/agents/crash-verifier.md
+bd6dcd4599819c083f77a69873e611790846e23b387b10336a2ea88b38a5a322  .claude/agents/experiment-runner.md
+c8ed3bbe97d44000d9eb01f7793e51ec8e57ef3b3d2ecb6b7275e24c1ddb60f3  .claude/hooks/agent-write-scope.tsv
+36127a3487648563a159374d4583806ded41784a661ea148e3790de75cc4b472  .claude/rules/implementation-workflow.md
+cfb904f8fc7d2b0fa393fc75d1cd53e90d1efa46497556d20cd696acd2c32394  README.md
+aaf59b21df8a35619e911e0f023174744c7370b678e14ef4f089e53bfea78089  .claude/singlefs-ai-sop/rules/evidence-discipline.md
+5a6e9a511ec16a47f56ef365099918be3739780edf097d0c667a0d0c95cc8eaf  .claude/singlefs-ai-sop/rules/session-wrapup.md
+ff01c8c58f84bbb93eec600645a0358051e46a8b050fbecc8acc262e250e42bc  .claude/kb/checks-owed.md

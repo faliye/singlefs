@@ -1,0 +1,121 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFFF	F:noop F:noop F:noop F:noop	mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFMO	F:noop F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFFM	F:noop F:noop F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFOM	F:noop F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFOF	F:noop F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFFO	F:noop F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFMF	F:noop F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFOO	F:noop F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFMM	F:noop F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMFF	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMFO	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMMF	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMMM	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMFM	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMMO	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMOO	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMOF	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOFF	F:noop O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMOM	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOFO	F:noop O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOFM	F:noop O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOMF	F:noop O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOMO	F:noop O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOOF	F:noop O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOOO	F:noop O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOOM	F:noop O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOMM	F:noop O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFFF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) F:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFFO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) F:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFFM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) F:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFMF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFOF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) O:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFMM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFOM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) O:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFMO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFOO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) O:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMFO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMFF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMFM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMOF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMMF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMMO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMMM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	229376	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOFF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) F:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMOO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	16	327680	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOFM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) F:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMOM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	14	262144	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOFO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) F:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOMF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOOF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) O:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOMM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFFF	O:ok F:noop F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOOO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) O:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOMO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOOM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) O:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFFM	O:ok F:noop F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFFO	O:ok F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFOM	O:ok F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFMF	O:ok F:noop M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFOF	O:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFOO	O:ok F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFMM	O:ok F:noop M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFMO	O:ok F:noop M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMFF	O:ok M:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMFM	O:ok M:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMFO	O:ok M:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOFF	O:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMMM	O:ok M:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMOO	O:ok M:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	524288	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMOF	O:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMMF	O:ok M:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMOM	O:ok M:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMMO	O:ok M:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	491520	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOFM	O:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOFO	O:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFF	F:noop F:noop F:noop	mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOMF	O:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOOF	O:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOOO	O:ok O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	25	557056	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOMO	O:ok O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOOM	O:ok O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	491520	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFO	F:noop F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOMM	O:ok O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	23	458752	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMF	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FFM	F:noop F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOO	F:noop O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOF	F:noop O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMO	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FOM	F:noop O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FMM	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MFO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFF	O:ok F:noop F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFO	O:ok F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OFM	O:ok F:noop M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MOO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	10	196608	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MMM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	8	131072	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMF	O:ok M:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOF	O:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FF	F:noop F:noop	mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMO	O:ok M:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	393216	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOO	O:ok O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	425984	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OOM	O:ok O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	17	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FO	F:noop O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MF	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) F:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OMM	O:ok M:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	19	360448	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MM	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	4	65536	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	MO	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) }) O:refused(not-writable)	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	FM	F:noop M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OF	O:ok F:noop	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	F	F:noop	mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OO	O:ok O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	294912	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	OM	O:ok M:ok	ok	same	-	[0, 0]	0	0	[0, 0]	13	262144	0	1	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	M	M:mount-err:Recovery(UnitUnreadable { slot: SlotNumber(50182) })	ok	same	-	[0, 0]	0	0	[0, 0]	0	0	0	2	-	[]	0	0
+F1-transient-eio-both	N1D-reread-then-mismatch-keep-allocated	O	O:ok	ok	same	-	[0, 0]	0	0	[0, 0]	7	163840	0	1	-	[]	0	0

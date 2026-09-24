@@ -1,0 +1,142 @@
+════ H-A [post] Y 在 T0 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之后）：
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+      [格] 一格都没有
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 b42259802ccae17c…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [post] Y 在 T1 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T1-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be8486
+      [格] b42259802cca worker_threads=1 judged_root=…/tmp.poU65Fs6mr/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:33Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [post] Y 在 T2 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T2-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be8486
+      [格] b42259802cca worker_threads=1 judged_root=…/tmp.hX12iDdU8P/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:36Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [post] Y 在 T3 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T3-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be8486
+      [格] b42259802cca worker_threads=1 judged_root=…/tmp.NG0gn7SgVA/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:37Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+  ── Y 起门禁；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:37Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（Y 门禁那一刻）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [pre] Y 在 T0 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [pre] Y 在 T1 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [pre] Y 在 T2 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-A [pre] Y 在 T3 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；1 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violation
+  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；1 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violatio
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+  ── Y 起门禁；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（Y 门禁那一刻）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════════ 对照：X 的内容本来就是多线程（new 54 --full 也该绿）
+════ H-A [post] Y 在 T1 暂存 54；X 的 crash.rs 记号=多线程
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T1-multi-54/.git/singlefs-layer0-full-green.b072e4406ece014d1818833c8741174d2a3843c0c3
+      [格] b072e4406ece worker_threads=32 judged_root=…/tmp.k0H03dyMhk/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b072e4406ece014d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:53Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ H-A [post] Y 在 T3 暂存 54；X 的 crash.rs 记号=多线程
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T3-multi-54/.git/singlefs-layer0-full-green.b072e4406ece014d1818833c8741174d2a3843c0c3
+      [格] b072e4406ece worker_threads=32 judged_root=…/tmp.fI94uX0s4I/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b072e4406ece014d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:54Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+  ── Y 起门禁；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b072e4406ece014d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:54Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 真值（Y 门禁那一刻）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════════ 对照：Y 放进来的是登记的输入（crates/）
+════ H-A [post] Y 在 T1 暂存 crates；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T1-SINGLE_THREADED-crates/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be
+      [格] b42259802cca worker_threads=1 judged_root=…/tmp.saSu1gNC33/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs crates/singlefs-harness/src/lib.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 3b3a12dba1800f79…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+
+════ H-A [post] Y 在 T2 暂存 crates；X 的 crash.rs 记号=SINGLE_THREADED
+  ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
+  ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T2-SINGLE_THREADED-crates/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be
+      [格] b42259802cca worker_threads=1 judged_root=…/tmp.d3rATLZEak/tree
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：crates/singlefs-harness/src/crash.rs crates/singlefs-harness/src/lib.rs 
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 3b3a12dba1800f79…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 真值（X 门禁那一刻的 HEAD + 暂存区）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
+

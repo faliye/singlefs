@@ -1,0 +1,39 @@
+2026-09-24T06:59:16Z
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-treesplit-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:665:13
+    |
+665 |         let mut write_units = |p: &mut Pool, only_split: Option<bool>| {
+    |             ----^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+    --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:1199:9
+     |
+1199 |     let mut eval = |persisted: &[bool], t: &mut Tally, unreadable: &BTreeSet<usize>, overlay_for: Option<&Version>| {
+     |         ----^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: `singlefs-harness` (test "treesplit_opus_prototype") generated 2 warnings (run `cargo fix --test "treesplit_opus_prototype" -p singlefs-harness` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2m 52s
+     Running tests/treesplit_opus_prototype.rs (/tmp/claude-1000/m2-treesplit-opus/target/release/deps/treesplit_opus_prototype-dfdc33c111dbeffa)
+
+running 2 tests
+test borrow_from_the_right_under_the_creation_min_separator ... BORROW sep=CreationMin tree=L1<10:[40, 50] 50:[60, 70, 80]> checker=red: 槽 117 分隔 key 50 ≤ 左邻孩子区间上界 50 lookup_misses=1 keys=[40, 50, 60, 70, 80]
+BORROW_ENUM sep=CreationMin CFG borrow histories=1 states=99 closed_form=99 recover_fail=0 check_red=4 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=2 restructure_publishes=0 units=5 split_units=0 ev_split=0 ev_height_up=0 ev_height_down=0 ev_node_removed=0 max_segment_writes=6 overlay_states=0 overlay_red=0
+BORROW sep=Maintained tree=L1<10:[40, 50] 60:[60, 70, 80]> checker=green lookup_misses=0 keys=[40, 50, 60, 70, 80]
+BORROW_ENUM sep=Maintained CFG borrow histories=1 states=99 closed_form=99 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=2 restructure_publishes=0 units=5 split_units=0 ev_split=0 ev_height_up=0 ev_height_down=0 ev_node_removed=0 max_segment_writes=6 overlay_states=0 overlay_red=0
+ok
+test tail_split_root_growth_is_enumerated ... TAILROOT step=OnePublish prefix_len=52 CFG tail-root histories=1 states=4359 closed_form=4359 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=2 restructure_publishes=0 units=10 split_units=4 ev_split=1 ev_height_up=1 ev_height_down=0 ev_node_removed=0 max_segment_writes=12 overlay_states=0 overlay_red=0
+TAILROOT step=SplitOwnBarrier prefix_len=52 CFG tail-root histories=1 states=534 closed_form=534 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=2 restructure_publishes=0 units=10 split_units=4 ev_split=1 ev_height_up=1 ev_height_down=0 ev_node_removed=0 max_segment_writes=8 overlay_states=0 overlay_red=0
+TAILROOT step=SplitOwnPublish prefix_len=16 CFG tail-root histories=1 states=16714 closed_form=16714 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=3 restructure_publishes=1 units=14 split_units=4 ev_split=1 ev_height_up=1 ev_height_down=1 ev_node_removed=1 max_segment_writes=14 overlay_states=0 overlay_red=0
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.28s
+
+exit=0
+2026-09-24T07:02:09Z

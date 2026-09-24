@@ -1,0 +1,76 @@
+--- model/opus_attack_y3.rs	2026-09-24 01:10:36.851340571 +0000
++++ repo-mutY4/crates/singlefs-harness/tests/opus_attack_y3.rs	2026-09-24 01:11:25.912519557 +0000
+@@ -75,7 +75,8 @@
+     )
+     .expect("A");
+     let start = stream.operation_count();
+-    publish_overwrite(
++    singlefs_core::allocator::OPUS_Y4_MUTATE.store(std::env::var("OPUS_Y4").is_ok(), std::sync::atomic::Ordering::SeqCst);
++    let b = publish_overwrite(
+         &mut pool,
+         &mut allocator,
+         &a,
+@@ -83,6 +84,8 @@
+         instance,
+     )
+     .expect("B");
++    singlefs_core::allocator::OPUS_Y4_MUTATE.store(false, std::sync::atomic::Ordering::SeqCst);
++    let _ = b;
+     let end = stream.operation_count();
+     (stream, start, end)
+ }
+@@ -151,54 +154,3 @@
+     println!("=== Y4 overwrite B ops [{start}, {end}) ===");
+     main_sweep(&stream, start, end, 1);
+ }
+-
+-/// 只做过 mkfs 的池：第一次可写挂载（写行 + 暖机，树表 0 条那一版上写实例表与一片分配记录节点）里每个前缀崩溃 →
+-/// 再可写挂载 → 放开扫：什么都不做 / 发第一个文件版本再覆盖写 3 次，每一步判。C533 那两格（记录新根段里没有实例表指针与
+-/// 分配记录树根）在这条流上走得到。
+-#[test]
+-fn y3_crash_inside_first_writable_mount_of_a_formatted_pool() {
+-    let stream = SharedStream::retaining_contents();
+-    let mut devices = devices_of(&MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES), &stream);
+-    make_filesystem(&parameters(), &mut devices).expect("mkfs");
+-    let start = stream.operation_count();
+-    mount_writable(&parameters(), &mut devices).expect("第一次可写挂载");
+-    let end = stream.operation_count();
+-    println!("=== first writable mount ops [{start}, {end}) ===");
+-    for k in start..=end {
+-        let crash = memory_of(&stream, k);
+-        let recovered = recover(&crash, JournalPolicy::Consult);
+-        let (red0, i310_0, _) = summary(&crash);
+-        println!(
+-            "k={k} last={} crash-image: prefix_applied={} red={:?} I-3.10={}",
+-            if k > start { kind_name(&stream, k - 1) } else { "-".into() },
+-            recovered.journal.prefix_applied, red0, i310_0
+-        );
+-        let side = SharedStream::retaining_contents();
+-        let mut devs = devices_of(&crash, &side);
+-        let mounted = match mount_writable(&parameters(), &mut devs) {
+-            Ok(m) => m,
+-            Err(e) => { println!("k={k} mount err {e:?}"); continue; }
+-        };
+-        let (red, i310, _) = summary(&image_of(&devs));
+-        println!("k={k} step=mount root=({},{}) red={:?} I-3.10={}", mounted.current.root().instance.0, mounted.current.root().checkpoint_txg.0, red, i310);
+-        let PoolVersion::WithoutFile(version) = &mounted.current else { println!("k={k} with file?"); continue };
+-        let mut allocator = mounted.allocator.clone();
+-        let params = parameters();
+-        let mut current = {
+-            let mut writer = PoolWriter::new(&params, devs.as_mut_slice());
+-            publish_first_file(&mut writer, &mut allocator, &version.root,
+-                FirstFile { content: &content(3000, 1), write_time_seconds: FIXED_WRITE_TIME_SECONDS },
+-                mounted.output.instance, &version.record_bytes).expect("第一个文件版本")
+-        };
+-        let (red, i310, _) = summary(&image_of(&devs));
+-        println!("k={k} step=first-file txg={} red={:?} I-3.10={}", current.root.checkpoint_txg.0, red, i310);
+-        for n in 1..=3 {
+-            current = overwrite(&mut devs, &mut allocator, &current, mounted.output.instance, n);
+-            let (red, i310, _) = summary(&image_of(&devs));
+-            println!("k={k} step=overwrite{n} txg={} red={:?} I-3.10={}", current.root.checkpoint_txg.0, red, i310);
+-        }
+-        let again = mount_writable(&parameters(), &mut devs);
+-        let (red, i310, _) = summary(&image_of(&devs));
+-        println!("k={k} step=remount ok={} red={:?} I-3.10={}", again.is_ok(), red, i310);
+-    }
+-}

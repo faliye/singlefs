@@ -1,0 +1,121 @@
+fault	arm	suffix	steps	final_mount	readback	violated	isolated_per_device	isolated_by_check	isolated_at_mount	free_minus_allocatable	check_reads	check_read_bytes	switches	reads_refused	check_events	reuse_steps	rebuild_mapping_mismatch	writes_refused
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFFO	F:noop F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFOF	F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFFF	F:noop F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFMF	F:noop F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFFM	F:noop F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFMO	F:noop F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFOM	F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFOO	F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFMM	F:noop F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMFO	F:noop M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMFF	F:noop M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMMF	F:noop M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMOF	F:noop M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMFM	F:noop M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMMO	F:noop M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMOO	F:noop M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	360448	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMMM	F:noop M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOFF	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMOM	F:noop M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOFO	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOFM	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOMF	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOOO	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOOF	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOMO	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOMM	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFFM	M:ok F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOOM	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFFF	M:ok F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFFO	M:ok F:noop F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFMF	M:ok F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFMO	M:ok F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFOO	M:ok F:noop O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	360448	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFOF	M:ok F:noop O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFOM	M:ok F:noop O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMFF	M:ok M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFMM	M:ok F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMFM	M:ok M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMFO	M:ok M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMOF	M:ok M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMMF	M:ok M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMMO	M:ok M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	24	425984	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMMM	M:ok M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	24	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOFF	M:ok O:ok F:ok(F=3,reclaimed=1) F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMOO	M:ok M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	24	458752	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMOM	M:ok M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOFM	M:ok O:ok F:ok(F=3,reclaimed=1) M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOMO	M:ok O:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOFO	M:ok O:ok F:ok(F=3,reclaimed=1) O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOOF	M:ok O:ok O:ok F:ok(F=6,reclaimed=18)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOMF	M:ok O:ok M:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOMM	M:ok O:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	393216	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOOO	M:ok O:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	24	491520	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFFO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOOM	M:ok O:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	22	425984	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFFF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFFM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFMO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFMF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFMM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFOF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFOO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFOM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMFF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMFM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMFO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMMF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMOF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOFO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOFF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMOM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMMO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMOO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	360448	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOFM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMMM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOOF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOMM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFF	F:noop F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOMO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOMF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOOO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOOM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFO	F:noop F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FFM	F:noop F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMF	F:noop M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOO	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOF	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMO	F:noop M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FOM	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FMM	F:noop M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFO	M:ok F:noop O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOF	M:ok O:ok F:ok(F=3,reclaimed=1)	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFF	M:ok F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MFM	M:ok F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOM	M:ok O:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	16	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMO	M:ok M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	327680	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMF	M:ok M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MMM	M:ok M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	294912	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MOO	M:ok O:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	18	360448	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OFM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FF	F:noop F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FM	F:noop M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OMM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	FO	F:noop O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OOM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MF	M:ok F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MO	M:ok O:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	229376	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OF	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OM	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	MM	M:ok M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	12	196608	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	OO	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	F	F:noop	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	M	M:ok	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	6	98304	0	0	-	[]	1	0
+F11-writer-bug-disk-unallocated-slot	N3-keep-allocated	O	O:err:ReleaseTargetNotAllocated { unit: Data, device: DeviceIdentity(0), slo	ok	same	I-2.1,I-4.8,I-7.4	[0, 0]	0	0	[0, 0]	0	0	0	0	-	[]	1	0

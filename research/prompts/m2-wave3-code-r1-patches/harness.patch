@@ -1,0 +1,1494 @@
+diff --git a/crates/singlefs-harness/src/bad_disk_input.rs b/crates/singlefs-harness/src/bad_disk_input.rs
+--- a/crates/singlefs-harness/src/bad_disk_input.rs
++++ b/crates/singlefs-harness/src/bad_disk_input.rs
+@@ -497,6 +497,8 @@
+ #[derive(Clone, Debug)]
+ pub struct BadDiskFinding {
+     pub seed: HistorySeed,
++    /// 坏的是哪一档的基线镜像。
++    pub tier: BaseImageTier,
+     pub kind: DamageKind,
+     pub what: String,
+     /// 一句话说清是哪一类失败。
+@@ -520,8 +522,9 @@
+     #[must_use]
+     pub fn render(&self) -> String {
+         format!(
+-            "种子 {} 坏法「{}」：{}\n    坏在哪：{}\n    观察：{}",
++            "种子 {} 基线档「{}」坏法「{}」：{}\n    坏在哪：{}\n    观察：{}",
+             self.seed.0,
++            self.tier.name(),
+             self.kind.name(),
+             self.headline,
+             self.what,
+@@ -536,6 +539,10 @@
+     pub histories: u64,
+     /// 历史跑完之后一份可用的合法镜像都没交出来的段数（起点就失败）。
+     pub histories_without_a_base_image: u64,
++    /// 各基线档（[`BaseImageTier::name`]）抽到基线镜像的段数：一段历史每档至多一份。
++    pub base_images_by_tier: BTreeMap<&'static str, u64>,
++    /// 各基线档的基线镜像上造出的坏镜像数。
++    pub damaged_images_by_tier: BTreeMap<&'static str, u64>,
+     /// 各坏法各造出几份坏镜像。
+     pub damaged_images_by_kind: BTreeMap<&'static str, u64>,
+     /// 各坏法在这个盘面上没有可坏的对象、照实记「不适用」的次数。
+@@ -571,6 +578,14 @@
+         self.histories += following.histories;
+         self.histories_without_a_base_image += following.histories_without_a_base_image;
+         absorb_counts(
++            &mut self.base_images_by_tier,
++            &following.base_images_by_tier,
++        );
++        absorb_counts(
++            &mut self.damaged_images_by_tier,
++            &following.damaged_images_by_tier,
++        );
++        absorb_counts(
+             &mut self.damaged_images_by_kind,
+             &following.damaged_images_by_kind,
+         );
+@@ -604,6 +619,21 @@
+         );
+     }
+ 
++    /// 抽到过基线镜像的档数：[`EVERY_BASE_IMAGE_TIER`] 里至少一段历史抽到了一份的那几档。
++    #[must_use]
++    pub fn base_image_tiers_sampled(&self) -> usize {
++        EVERY_BASE_IMAGE_TIER
++            .into_iter()
++            .filter(|tier| {
++                self.base_images_by_tier
++                    .get(tier.name())
++                    .copied()
++                    .unwrap_or(0)
++                    > 0
++            })
++            .count()
++    }
++
+     /// 报告正文。
+     #[must_use]
+     pub fn render(&self) -> String {
+@@ -613,6 +643,30 @@
+             "  历史 {} 段（起点就失败、交不出合法镜像的 {} 段）",
+             self.histories, self.histories_without_a_base_image
+         );
++        let per_tier: Vec<String> = EVERY_BASE_IMAGE_TIER
++            .into_iter()
++            .map(|tier| {
++                format!(
++                    "「{}」{} 段、坏镜像 {} 份",
++                    tier.name(),
++                    self.base_images_by_tier
++                        .get(tier.name())
++                        .copied()
++                        .unwrap_or(0),
++                    self.damaged_images_by_tier
++                        .get(tier.name())
++                        .copied()
++                        .unwrap_or(0)
++                )
++            })
++            .collect();
++        let _ = writeln!(
++            text,
++            "  基线档 {} / {} 档抽到过镜像：{}",
++            self.base_image_tiers_sampled(),
++            EVERY_BASE_IMAGE_TIER.len(),
++            per_tier.join("；")
++        );
+         let _ = writeln!(
+             text,
+             "  三个读者：恢复 {} 次（读回文件 {}、没有文件 {}、报错 {}）、可写挂载 {} 次（成 {}、拒 {}）、池级 checker {} 次",
+@@ -799,12 +853,80 @@
+             .is_some_and(|chain| IndexNodeEntryLayout::of(&chain.tree_root_node).entry_count > 0)
+ }
+ 
+-/// 跑一段历史，拿它交出来的一份合法镜像逐个坏法坏一遍，每份坏镜像喂给恢复、可写挂载与池级 checker。
++/// 一份镜像上最新那条根指着的树表是 0 条：只做过 mkfs、第一个文件版本之前的写行与暖机那几版、回退到这样一版的根。
++/// C481（坏盘输入的基线镜像取不到树表 0 条的盘面） 要的那一档基线就是它。树表走不到（根择不出、指针全零、条目宽不是 200）不算。
++#[must_use]
++pub fn newest_root_tree_table_has_no_entries(image: &MemoryPool) -> bool {
++    reach_the_tree_table(image)
++        .is_some_and(|reached| IndexNodeEntryLayout::of(&reached.tree_table_node).entry_count == 0)
++}
++
++/// 一段历史里按哪一档抽基线镜像。每一档各按种子抽一份（蓄水池抽样），抽到的每一份都把全部坏法跑一遍、判据相同。
++#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
++pub enum BaseImageTier {
++    /// 最新那条根下面指着普查那几族的坏法要坏的树都在（[`newest_root_has_the_trees_the_targeted_damages_need`]）；
++    /// 一段历史里一步都不合格时退回最后那一步的镜像，盲坏法照样跑。
++    NewestRootHasTheTreesTheTargetedDamagesNeed,
++    /// 最新那条根指着的树表 0 条（[`newest_root_tree_table_has_no_entries`]，C481）。一段历史里一步都没有就这一段不抽，不退回。
++    TreeTableWithoutEntries,
++}
++
++/// 全部基线档，报告按这个次序逐档报。
++pub const EVERY_BASE_IMAGE_TIER: [BaseImageTier; 2] = [
++    BaseImageTier::NewestRootHasTheTreesTheTargetedDamagesNeed,
++    BaseImageTier::TreeTableWithoutEntries,
++];
++
++/// 树表 0 条那一档的蓄水池与坏法随机源另加的盐：与三棵树都在那一档岔开，那一档每个种子抽到的镜像、坏成的样子都与加这一档之前逐字节相同。
++const TREE_TABLE_WITHOUT_ENTRIES_TIER_SALT: u64 = 0x74_72_65_65_30_00_00_00;
++
++impl BaseImageTier {
++    /// 报告与计数里的名字。
++    #[must_use]
++    pub fn name(self) -> &'static str {
++        match self {
++            BaseImageTier::NewestRootHasTheTreesTheTargetedDamagesNeed => "三棵树都在",
++            BaseImageTier::TreeTableWithoutEntries => "树表 0 条",
++        }
++    }
++
++    /// 这一步的镜像够不够进这一档的蓄水池。
++    #[must_use]
++    pub fn admits(self, image: &MemoryPool) -> bool {
++        match self {
++            BaseImageTier::NewestRootHasTheTreesTheTargetedDamagesNeed => {
++                newest_root_has_the_trees_the_targeted_damages_need(image)
++            }
++            BaseImageTier::TreeTableWithoutEntries => newest_root_tree_table_has_no_entries(image),
++        }
++    }
++
++    /// 这一档的随机源在种子上另异或的盐（蓄水池与坏法共用）。
++    const fn salt(self) -> u64 {
++        match self {
++            BaseImageTier::NewestRootHasTheTreesTheTargetedDamagesNeed => 0,
++            BaseImageTier::TreeTableWithoutEntries => TREE_TABLE_WITHOUT_ENTRIES_TIER_SALT,
++        }
++    }
++}
++
++/// 一档基线的蓄水池：合格的镜像见过几份、手里留的是哪一份。
++struct BaseImageReservoir {
++    tier: BaseImageTier,
++    qualifying_images_seen: u64,
++    chosen: Option<MemoryPool>,
++    random: SeededRandomSource,
++}
++
++/// 跑一段历史，按 [`EVERY_BASE_IMAGE_TIER`] 每一档各抽一份合法镜像，逐个坏法坏一遍，每份坏镜像喂给恢复、可写挂载与池级 checker。
++///
++/// 每一档的基线镜像取**按种子抽中的那一步**之后的那一份（蓄水池抽样，每档只留一份：一段历史几十步，全留下几十份稀疏镜像太占内存）：
++/// - 「三棵树都在」那一档只在最新那条根下面该有的那几棵树都在的那几步里抽（[`newest_root_has_the_trees_the_targeted_damages_need`]）：
++///   树表 0 条的盘面上指着普查那几族的坏法一样也做不出来，抽中它这一档就只跑了三个盲坏法。一步都不合格时退回最后那一步的镜像。
++/// - 「树表 0 条」那一档只在最新那条根的树表 0 条的那几步里抽（C481（坏盘输入的基线镜像取不到树表 0 条的盘面））：
++///   只做过 mkfs 的池、第一个文件版本之前的写行与暖机、回退到这样一版——这些盘面从前一档都没打过。一步都没有就这一段不抽。
+ ///
+-/// 基线镜像取**按种子抽中的那一步**之后的那一份（蓄水池抽样，只留一份：一段历史几十步，全留下几十份稀疏镜像太占内存），
+-/// 而且只在「最新那条根下面该有的那几棵树都在」的那几步里抽（[`newest_root_has_the_trees_the_targeted_damages_need`]）：
+-/// 树表 0 条的盘面上指着普查那几族的坏法一样也做不出来，抽中它整段历史就只跑了三个盲坏法。
+-/// 一段历史里一步都不合格时退回最后那一步的镜像——盲坏法照样跑，指着普查的那几条照实记「不适用」。
++/// 两档的判据相同（不许读回没提交过的内容、不许 panic），坏法照旧全部跑，做不出来的照实记「不适用」。
+ #[must_use]
+ pub fn feed_bad_disk_inputs_from_history(
+     seed: HistorySeed,
+@@ -814,10 +936,16 @@
+ ) -> HistoryBadDiskInput {
+     let history = generate_history_with_weights(seed, operations_per_history, weights);
+     let mut committed_contents: BTreeSet<Option<Vec<u8>>> = BTreeSet::new();
+-    let mut base_image: Option<MemoryPool> = None;
+     let mut last_image: Option<MemoryPool> = None;
+-    let mut qualifying_images_seen = 0u64;
+-    let mut reservoir = SeededRandomSource::from_seed(seed.0 ^ BAD_DISK_SEED_SALT);
++    let mut reservoirs: Vec<BaseImageReservoir> = EVERY_BASE_IMAGE_TIER
++        .into_iter()
++        .map(|tier| BaseImageReservoir {
++            tier,
++            qualifying_images_seen: 0,
++            chosen: None,
++            random: SeededRandomSource::from_seed(seed.0 ^ BAD_DISK_SEED_SALT ^ tier.salt()),
++        })
++        .collect();
+     execute_history_with(
+         &history,
+         execution,
+@@ -827,13 +955,15 @@
+                 committed_contents.insert(file.map(|content| content.to_vec()));
+             }
+             last_image = Some(observation.image.clone());
+-            if !newest_root_has_the_trees_the_targeted_damages_need(observation.image) {
+-                return;
+-            }
+-            qualifying_images_seen += 1;
+-            // 蓄水池抽样：第 n 份合格镜像以 1/n 的概率换下手里那一份，跑完手里就是合格那几步里均匀抽的一份。
+-            if reservoir.below(qualifying_images_seen) == 0 {
+-                base_image = Some(observation.image.clone());
++            for reservoir in &mut reservoirs {
++                if !reservoir.tier.admits(observation.image) {
++                    continue;
++                }
++                reservoir.qualifying_images_seen += 1;
++                // 蓄水池抽样：第 n 份合格镜像以 1/n 的概率换下手里那一份，跑完手里就是合格那几步里均匀抽的一份。
++                if reservoir.random.below(reservoir.qualifying_images_seen) == 0 {
++                    reservoir.chosen = Some(observation.image.clone());
++                }
+             }
+         },
+     );
+@@ -842,46 +972,63 @@
+         histories: 1,
+         ..BadDiskTally::default()
+     };
+-    let Some(base_image) = base_image.or(last_image) else {
++    if last_image.is_none() {
+         tally.histories_without_a_base_image = 1;
+         return HistoryBadDiskInput {
+             seed,
+             tally,
+             findings: Vec::new(),
+         };
+-    };
++    }
++    let base_images: Vec<(BaseImageTier, MemoryPool)> = reservoirs
++        .into_iter()
++        .filter_map(|reservoir| {
++            let chosen = match reservoir.tier {
++                BaseImageTier::NewestRootHasTheTreesTheTargetedDamagesNeed => {
++                    reservoir.chosen.or_else(|| last_image.clone())
++                }
++                BaseImageTier::TreeTableWithoutEntries => reservoir.chosen,
++            };
++            chosen.map(|image| (reservoir.tier, image))
++        })
++        .collect();
+ 
+     let parameters = execution.device_width.parameters();
+     let mut findings = Vec::new();
+-    for (kind_index, kind) in EVERY_DAMAGE_KIND.into_iter().enumerate() {
+-        let mut random = SeededRandomSource::from_seed(
+-            seed.0
+-                .wrapping_mul(u64::try_from(EVERY_DAMAGE_KIND.len()).expect("坏法数"))
+-                .wrapping_add(u64::try_from(kind_index).expect("坏法序号"))
+-                ^ BAD_DISK_SEED_SALT,
+-        );
+-        let Some(damaged) = damage_image(&base_image, kind, &mut random) else {
+-            *tally
+-                .damages_not_applicable_by_kind
+-                .entry(kind.name())
+-                .or_insert(0) += 1;
+-            continue;
+-        };
+-        *tally.damaged_images_by_kind.entry(kind.name()).or_insert(0) += 1;
+-        let observation = feed_a_damaged_image(
+-            &damaged,
+-            &committed_contents,
+-            &parameters,
+-            execution.device_width,
+-        );
+-        absorb_observation(&mut tally, &observation);
+-        if observation.was_seen_by_a_reader() {
+-            *tally
+-                .damages_seen_by_a_reader_by_kind
+-                .entry(kind.name())
+-                .or_insert(0) += 1;
++    for (tier, base_image) in &base_images {
++        *tally.base_images_by_tier.entry(tier.name()).or_insert(0) += 1;
++        for (kind_index, kind) in EVERY_DAMAGE_KIND.into_iter().enumerate() {
++            let mut random = SeededRandomSource::from_seed(
++                seed.0
++                    .wrapping_mul(u64::try_from(EVERY_DAMAGE_KIND.len()).expect("坏法数"))
++                    .wrapping_add(u64::try_from(kind_index).expect("坏法序号"))
++                    ^ BAD_DISK_SEED_SALT
++                    ^ tier.salt(),
++            );
++            let Some(damaged) = damage_image(base_image, kind, &mut random) else {
++                *tally
++                    .damages_not_applicable_by_kind
++                    .entry(kind.name())
++                    .or_insert(0) += 1;
++                continue;
++            };
++            *tally.damaged_images_by_kind.entry(kind.name()).or_insert(0) += 1;
++            *tally.damaged_images_by_tier.entry(tier.name()).or_insert(0) += 1;
++            let observation = feed_a_damaged_image(
++                &damaged,
++                &committed_contents,
++                &parameters,
++                execution.device_width,
++            );
++            absorb_observation(&mut tally, &observation);
++            if observation.was_seen_by_a_reader() {
++                *tally
++                    .damages_seen_by_a_reader_by_kind
++                    .entry(kind.name())
++                    .or_insert(0) += 1;
++            }
++            findings.extend(findings_in(seed, *tier, &observation));
+         }
+-        findings.extend(findings_in(seed, &observation));
+     }
+     HistoryBadDiskInput {
+         seed,
+@@ -940,7 +1087,11 @@
+     }
+ }
+ 
+-fn findings_in(seed: HistorySeed, observation: &BadDiskObservation) -> Vec<BadDiskFinding> {
++fn findings_in(
++    seed: HistorySeed,
++    tier: BaseImageTier,
++    observation: &BadDiskObservation,
++) -> Vec<BadDiskFinding> {
+     let mut findings = Vec::new();
+     for (reader, captured) in observation.panics() {
+         if known_panic_site_of(&captured).is_some() {
+@@ -948,6 +1099,7 @@
+         }
+         findings.push(BadDiskFinding {
+             seed,
++            tier,
+             kind: observation.kind,
+             what: observation.what.clone(),
+             headline: format!(
+@@ -960,6 +1112,7 @@
+     if let ReadBackVerdict::ReadBackAVersionNeverCommitted { what } = &observation.read_back {
+         findings.push(BadDiskFinding {
+             seed,
++            tier,
+             kind: observation.kind,
+             what: observation.what.clone(),
+             headline: format!("恢复读回了一版从没提交过的内容：{what}"),
+diff --git a/crates/singlefs-harness/src/crash.rs b/crates/singlefs-harness/src/crash.rs
+--- a/crates/singlefs-harness/src/crash.rs
++++ b/crates/singlefs-harness/src/crash.rs
+@@ -707,10 +707,74 @@
+     check
+ }
+ 
++/// 层 0 的一个崩溃状态按发布归到哪一格（里程碑「第二个事务」步 6 验收第 1 条「每次发布各多少」）。
++/// 归法按段：状态所在的那一段往后数，第一次根槽 FUA 写所在的那一段写出的根，就是这个状态归的那次发布——
++/// 上一次发布的根槽写之后、这一次发布的根槽写为止，崩在中间的状态都归这一次。上一次发布的系统配置槽轮换与这一次的单元写
++/// 之间没有屏障、并在同一段时，那一段整段归这一次：段是枚举的最小单位，一个状态落在哪一段是确定的，落在哪一次写上不是。
++#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
++pub enum Layer0PublishOfState {
++    /// 这次发布的根槽 FUA 写：写表里的下标（按它排就是录制流里的次序）与它写出的根的实例代号、checkpoint_txg。
++    UpToTheRootOf {
++        root_write_index: usize,
++        instance: InstanceGeneration,
++        checkpoint_txg: CheckpointTxg,
++    },
++    /// 写表里最后一次根槽写之后的段（最后那次发布的系统配置槽轮换）：后面没有根槽写可归。
++    AfterTheLastRoot,
++    /// 每一段都整段持久的那一个状态（闭式 1 + Σ(2^|段| − 1) 里的那个 1）。
++    EveryWritePersisted,
++}
++
++impl Layer0PublishOfState {
++    /// 计数行里的名字：`instance2_txg5`、`after_the_last_root`、`every_write_persisted`。
++    #[must_use]
++    pub fn name(self) -> String {
++        match self {
++            Layer0PublishOfState::UpToTheRootOf {
++                instance,
++                checkpoint_txg,
++                ..
++            } => format!("instance{}_txg{}", instance.0, checkpoint_txg.0),
++            Layer0PublishOfState::AfterTheLastRoot => "after_the_last_root".to_string(),
++            Layer0PublishOfState::EveryWritePersisted => "every_write_persisted".to_string(),
++        }
++    }
++}
++
++/// 每一段归哪次发布（[`Layer0PublishOfState`] 的归法）：从最后一段往前走，记着「后面最近的那次根槽写」。
++#[must_use]
++pub fn publish_of_each_segment(
++    writes: &[RetainedWrite],
++    segments: &[Vec<usize>],
++) -> Vec<Layer0PublishOfState> {
++    let mut next_root: Option<Layer0PublishOfState> = None;
++    let mut publish_of_segment = vec![Layer0PublishOfState::AfterTheLastRoot; segments.len()];
++    for (segment_index, segment) in segments.iter().enumerate().rev() {
++        if let Some(root_write_index) = segment.iter().rev().copied().find(|write_index| {
++            writes
++                .get(*write_index)
++                .is_some_and(|write| write.kind == StepKind::RootRecordFua)
++        }) {
++            let (instance, checkpoint_txg) = root_identity_of_write(&writes[root_write_index]);
++            next_root = Some(Layer0PublishOfState::UpToTheRootOf {
++                root_write_index,
++                instance,
++                checkpoint_txg,
++            });
++        }
++        publish_of_segment[segment_index] =
++            next_root.unwrap_or(Layer0PublishOfState::AfterTheLastRoot);
++    }
++    publish_of_segment
++}
++
+ /// 层 0 的计数：每个状态跑一遍看 journal 的恢复与一遍不看的，oracle 只判前者。
+ #[derive(Clone, Debug, Default, PartialEq, Eq)]
+ pub struct Layer0Tally {
+     pub states: u64,
++    /// 枚举出来的状态按发布分（[`Layer0PublishOfState`] 的归法）：各格之和 = `states`。只有按段枚举的那几个入口
++    /// （`enumerate_layer0*`）记这一项；直接调 [`evaluate_state_for_versions`] 评手摆的状态时它是空的。
++    pub states_by_publish: BTreeMap<Layer0PublishOfState, u64>,
+     pub violations: u64,
+     pub root_persisted_states: u64,
+     pub no_file_states: u64,
+@@ -758,11 +822,22 @@
+             .join(" ")
+     }
+ 
++    /// 按发布分的状态数报成一段：`instance1_txg1=15 … after_the_last_root=3 every_write_persisted=1`，次序照录制流。
++    #[must_use]
++    pub fn states_by_publish_text(&self) -> String {
++        self.states_by_publish
++            .iter()
++            .map(|(publish, states)| format!("{}={states}", publish.name()))
++            .collect::<Vec<String>>()
++            .join(" ")
++    }
++
+     /// 把紧跟在后面的那一片的计数并进来：计数逐项相加；「第一处」只在前面各片都没有时取这一片的。各片按状态序号从小到大并，
+     /// 「第一处」就是序号最小的那一处，与单线程逐个跑逐项相同。按字段拆开写全：新加一个字段而这里没并，编译不过。
+     fn absorb_following_slice(&mut self, following_slice: Layer0Tally) {
+         let Layer0Tally {
+             states,
++            states_by_publish,
+             violations,
+             root_persisted_states,
+             no_file_states,
+@@ -782,6 +857,9 @@
+             checker_not_applicable_states,
+         } = following_slice;
+         self.states += states;
++        for (publish, publish_states) in states_by_publish {
++            *self.states_by_publish.entry(publish).or_insert(0) += publish_states;
++        }
+         self.violations += violations;
+         self.root_persisted_states += root_persisted_states;
+         self.no_file_states += no_file_states;
+@@ -1212,11 +1290,17 @@
+     state_ranges_by_segment: Vec<Range<u64>>,
+     /// 状态总数：各段展开出来的，再加最后全部持久那一个。
+     state_count: u64,
++    /// 每一段归哪次发布（[`publish_of_each_segment`]），与 `segments` 同序。
++    publish_of_segment: Vec<Layer0PublishOfState>,
+ }
+ 
+ impl<'segments> Layer0StatePlan<'segments> {
+     /// `expand` 只在调用线程上逐段问一次，所以它不必能跨线程。
+-    fn new(segments: &'segments [Vec<usize>], expand: &dyn Fn(usize, &[usize]) -> bool) -> Self {
++    fn new(
++        writes: &[RetainedWrite],
++        segments: &'segments [Vec<usize>],
++        expand: &dyn Fn(usize, &[usize]) -> bool,
++    ) -> Self {
+         let mut next_ordinal = 0u64;
+         let state_ranges_by_segment = segments
+             .iter()
+@@ -1233,6 +1317,7 @@
+             segments,
+             state_ranges_by_segment,
+             state_count: next_ordinal + 1,
++            publish_of_segment: publish_of_each_segment(writes, segments),
+         }
+     }
+ 
+@@ -1242,6 +1327,14 @@
+             .partition_point(|state_range| state_range.end <= ordinal)
+     }
+ 
++    /// 这个状态归哪次发布：所在那一段归的那一次；最后全部持久那一个状态单列一格。
++    fn publish_of_state(&self, ordinal: u64) -> Layer0PublishOfState {
++        self.publish_of_segment
++            .get(self.segment_of_state(ordinal))
++            .copied()
++            .unwrap_or(Layer0PublishOfState::EveryWritePersisted)
++    }
++
+     /// 这个状态里持久了的写：所在的段之前每一段整段持久（展不展开都一样），所在的段按段内子集掩码（第 k 位对应段里第 k 个写）。
+     fn persisted_writes_of_state(&self, ordinal: u64, write_count: usize) -> Vec<bool> {
+         let segment_of_state = self.segment_of_state(ordinal);
+@@ -1347,6 +1440,10 @@
+     let mut tally = Layer0Tally::default();
+     let mut observed_states = Vec::new();
+     for ordinal in slice {
++        *tally
++            .states_by_publish
++            .entry(plan.publish_of_state(ordinal))
++            .or_insert(0) += 1;
+         let persisted = plan.persisted_writes_of_state(ordinal, writes.len());
+         match retention {
+             StateReportRetention::HandEachStateToObserver => {
+@@ -1451,7 +1548,7 @@
+     parallelism: Layer0Parallelism,
+     mut observe_state: Option<Layer0StateObserver<'_>>,
+ ) -> Layer0Tally {
+-    let plan = Layer0StatePlan::new(segments, expand);
++    let plan = Layer0StatePlan::new(writes, segments, expand);
+     let slices = state_slices(plan.state_count, &parallelism);
+     let spawned_worker_threads = parallelism.worker_threads.get().min(slices.len());
+     let retention = match observe_state {
+@@ -1679,7 +1776,8 @@
+             |_segment_index: usize, segment: &[usize]| segment.len() == 4;
+         let assert_plan_matches_the_walk = |expand: &dyn Fn(usize, &[usize]) -> bool| {
+             let walked = persisted_sets_walking_segment_by_segment(&segments, write_count, expand);
+-            let plan = Layer0StatePlan::new(&segments, expand);
++            // 这条只核序号与持久集合的对应，不带写表：每一段都归「最后一次根槽写之后」。
++            let plan = Layer0StatePlan::new(&[], &segments, expand);
+             assert_eq!(
+                 plan.state_count,
+                 u64::try_from(walked.len()).expect("状态数"),
+@@ -1816,8 +1914,14 @@
+     /// 并片：计数相加，「第一处」取前面那一片的；前面那一片没有才取后面的。
+     #[test]
+     fn absorbing_a_following_slice_adds_counts_and_keeps_the_earlier_first_violation() {
++        let first_publish = Layer0PublishOfState::UpToTheRootOf {
++            root_write_index: 4,
++            instance: InstanceGeneration(1),
++            checkpoint_txg: CheckpointTxg(1),
++        };
+         let mut earlier = Layer0Tally {
+             states: 3,
++            states_by_publish: BTreeMap::from([(first_publish, 3)]),
+             violations: 1,
+             root_persisted_states: 0,
+             no_file_states: 3,
+@@ -1838,6 +1942,11 @@
+         };
+         let following = Layer0Tally {
+             states: 5,
++            states_by_publish: BTreeMap::from([
++                (first_publish, 2),
++                (Layer0PublishOfState::AfterTheLastRoot, 2),
++                (Layer0PublishOfState::EveryWritePersisted, 1),
++            ]),
+             violations: 2,
+             root_persisted_states: 5,
+             no_file_states: 0,
+@@ -1876,6 +1985,15 @@
+             (8, 3, 1, 3, 5, 5, 1, 1, 1, 1),
+             "计数逐项相加"
+         );
++        assert_eq!(
++            earlier.states_by_publish,
++            BTreeMap::from([
++                (first_publish, 5),
++                (Layer0PublishOfState::AfterTheLastRoot, 2),
++                (Layer0PublishOfState::EveryWritePersisted, 1),
++            ]),
++            "按发布分的状态数逐格相加"
++        );
+         assert_eq!(earlier.first_violation.as_deref(), Some("前面那一片的"));
+         assert_eq!(
+             earlier.first_ignored_violation.as_deref(),
+@@ -1912,6 +2030,7 @@
+     ) -> Layer0Tally {
+         Layer0Tally {
+             states,
++            states_by_publish: BTreeMap::new(),
+             violations: 0,
+             root_persisted_states: 0,
+             no_file_states: states,
+diff --git a/crates/singlefs-harness/src/fault_injection.rs b/crates/singlefs-harness/src/fault_injection.rs
+--- a/crates/singlefs-harness/src/fault_injection.rs
++++ b/crates/singlefs-harness/src/fault_injection.rs
+@@ -29,12 +29,14 @@
+ 
+ use singlefs_checker::image::InvariantVerdict;
+ use singlefs_checker::walk::check_pool_image;
+-use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration};
+ use singlefs_core::block_device::{
+     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
+ };
++use singlefs_core::make_filesystem::MKFS_INSTANCE_GENERATION;
+ use singlefs_core::recovery::{
+-    choose_root, choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryOutcome,
++    choose_root, choose_system_configuration, readable_roots, recover, JournalPolicy, PoolReader,
++    RecoveryOutcome,
+ };
+ use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+ use singlefs_format::{ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM};
+@@ -1265,6 +1267,9 @@
+     /// 起点段哪一步把错交回来了（`StartingPointStep::name`）：改法二把 `HistoryPool::start` 那四处 `expect`
+     /// 改成可失败之后才有这一格，改之前起点段一次都摆不到。
+     pub starting_point_failures: BTreeMap<&'static str, u64>,
++    /// 取号之后挂载报错、新号没回卷的次数，按 [`AcquiredInstanceLeftAfterAFailedMount::name`] 分（C378；认下的已知行为，
++    /// 不算新发现，在报告里点名）。
++    pub acquired_instances_left_after_a_failed_mount: BTreeMap<&'static str, u64>,
+     pub reopens: u64,
+     pub reopens_reading_a_file: u64,
+     pub reopens_without_a_file: u64,
+@@ -1314,6 +1319,12 @@
+         for (key, count) in &other.starting_point_failures {
+             *self.starting_point_failures.entry(key).or_insert(0) += count;
+         }
++        for (key, count) in &other.acquired_instances_left_after_a_failed_mount {
++            *self
++                .acquired_instances_left_after_a_failed_mount
++                .entry(key)
++                .or_insert(0) += count;
++        }
+         self.reopens += other.reopens;
+         self.reopens_reading_a_file += other.reopens_reading_a_file;
+         self.reopens_without_a_file += other.reopens_without_a_file;
+@@ -1418,6 +1429,27 @@
+         }
+         let _ = writeln!(
+             text,
++            "取号之后挂载报错、新号不回卷（C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）：用户 2026-09-23 认下的已知行为，D23（journal 的角色与格式） 已定项 16）：{} 次",
++            self.acquired_instances_left_after_a_failed_mount
++                .values()
++                .sum::<u64>()
++        );
++        for kind in [
++            AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot,
++            AcquiredInstanceLeftAfterAFailedMount::WithTheRowPublishRoot,
++        ] {
++            let _ = writeln!(
++                text,
++                "  {}：{} 次",
++                kind.name(),
++                self.acquired_instances_left_after_a_failed_mount
++                    .get(kind.name())
++                    .copied()
++                    .unwrap_or(0)
++            );
++        }
++        let _ = writeln!(
++            text,
+             "重开 {} 次：读回文件 {}、没有文件 {}、走读失败 {}",
+             self.reopens,
+             self.reopens_reading_a_file,
+@@ -1448,12 +1480,46 @@
+     }
+ }
+ 
+-/// 测量跑里每一步跑完时记下的东西：这一步是什么、到这一步为止读 / 写 / 刷盘各调了多少次、模型到这一步提交过哪些版本。
++/// 测量跑里每一步跑完时记下的东西：这一步是什么、到这一步为止读 / 写 / 刷盘各调了多少次、模型到这一步提交过哪些版本、
++/// 这一步跑完时盘上择到的系统配置带的实例代号（C378 那一格按它判「这一步取了号」）。
+ struct StepMark {
+     position: StepPosition,
+     operation_kind: Option<HistoryOperationKind>,
+     calls: FaultCallCounts,
+     committed_versions: BTreeMap<ModelRootKey, Option<Rc<[u8]>>>,
++    system_configuration_instance: Option<InstanceGeneration>,
++}
++
++/// 取号之后这一步报了错、写进系统配置的新号没有回卷时，重开之后盘上是哪一格（C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）；
++/// 用户 2026-09-23 定「认了，写成已知行为」，D23（journal 的角色与格式） 已定项 16 的射程）。这不是失败，是认下来的行为：
++/// 只记账、在报告里点名，不进新发现。
++#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
++pub enum AcquiredInstanceLeftAfterAFailedMount {
++    /// 写行那次发布的根没落盘：新号一条根都没有，就此烧掉（下一次可写挂载按 max + 1 取下一个，给它写一行）。
++    WithoutAnyRoot,
++    /// 写行那次的根已落盘，之后暖机（或写行那次的系统配置槽轮换）报错：新号有根，挂载照样报错返回。
++    WithTheRowPublishRoot,
++}
++
++impl AcquiredInstanceLeftAfterAFailedMount {
++    /// 计数与报告里的名字。
++    #[must_use]
++    pub const fn name(self) -> &'static str {
++        match self {
++            AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot => "新号一条根都没有（烧掉）",
++            AcquiredInstanceLeftAfterAFailedMount::WithTheRowPublishRoot => "新号已有写行那次的根",
++        }
++    }
++}
++
++/// 一次注入落在取号之后、挂载报错、新号没回卷的那一格：注入点、这一步之前与重开之后盘上系统配置的实例代号、根环里最大的实例代号。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct AcquiredInstanceLeft {
++    pub drawn: DrawnFault,
++    pub kind: AcquiredInstanceLeftAfterAFailedMount,
++    pub system_configuration_instance_before_the_step: InstanceGeneration,
++    pub system_configuration_instance_after_the_reopen: InstanceGeneration,
++    pub highest_root_instance_after_the_reopen: Option<InstanceGeneration>,
+ }
+ 
+ /// 一段历史注入故障之后交回的东西。
+@@ -1466,6 +1532,66 @@
+     pub known_red_hits: Vec<KnownRedAtAFault>,
+     /// 同一段历史里同一个签名只留第一个。
+     pub new_findings: Vec<FaultFinding>,
++    /// 取号之后挂载报错、新号没回卷的那几次（C378；认下的已知行为，不算新发现）。
++    pub acquired_instances_left: Vec<AcquiredInstanceLeft>,
++}
++
++/// 注入那一步是不是一次挂载（起点段里有取号与暖机、可写挂载、回退挂载），是就交回这一步之前盘上系统配置的实例代号。
++/// 起点段之前是 mkfs 写的 0；别的步取测量跑里上一步跑完时的那个。不是挂载的几类操作不取号，交回 `None`。
++fn system_configuration_instance_before_a_mount_step(
++    marks: &[StepMark],
++    segment: FaultedSegment,
++) -> Option<InstanceGeneration> {
++    match segment {
++        FaultedSegment::TheStartingPoint => Some(MKFS_INSTANCE_GENERATION),
++        FaultedSegment::Operation { operation_kind, .. } => match operation_kind {
++            HistoryOperationKind::CloseAndMountWritable
++            | HistoryOperationKind::CloseAndMountRollback => {
++                let index = marks
++                    .iter()
++                    .position(|mark| mark.position == segment.position())?;
++                marks[index.checked_sub(1)?].system_configuration_instance
++            }
++            HistoryOperationKind::PublishFirstFile
++            | HistoryOperationKind::PublishOverwrite
++            | HistoryOperationKind::PublishWithoutUnits
++            | HistoryOperationKind::RaiseRollbackFloor
++            | HistoryOperationKind::ColdStartRecover => None,
++        },
++    }
++}
++
++/// 一次挂载报了错之后重开的盘上，系统配置的实例代号比这一步之前大（这一步取了号、没回卷）：按根环里有没有带新号的根分两格。
++/// 系统配置择不出、或者号没变大（取号自己那几次写报错、回卷做成了），交回 `None`。
++fn acquired_instance_left_after_a_failed_mount(
++    image: &MemoryPool,
++    marks: &[StepMark],
++    drawn: DrawnFault,
++) -> Option<AcquiredInstanceLeft> {
++    let before = system_configuration_instance_before_a_mount_step(marks, drawn.segment)?;
++    let system_configuration = choose_system_configuration(image).ok()?;
++    let after = system_configuration.quantities.journal_instance;
++    if after <= before {
++        return None;
++    }
++    let roots = readable_roots(
++        image,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    let kind = if roots.iter().any(|root| root.instance == after) {
++        AcquiredInstanceLeftAfterAFailedMount::WithTheRowPublishRoot
++    } else {
++        AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot
++    };
++    Some(AcquiredInstanceLeft {
++        drawn,
++        kind,
++        system_configuration_instance_before_the_step: before,
++        system_configuration_instance_after_the_reopen: after,
++        highest_root_instance_after_the_reopen: roots.iter().map(|root| root.instance).max(),
++    })
+ }
+ 
+ /// 这个镜像上，最新那条根带的回退下界 F 落不落在回退留下的空档里（与活盘面、崩溃状态两路同一个谓词、同一份实现）。
+@@ -1599,13 +1725,60 @@
+     execution: HistoryExecution,
+     faults_per_history: usize,
+ ) -> HistoryFaultInjection {
+-    let geometry = execution.device_width.fixed_geometry();
+     let mut tally = FaultInjectionTally {
+         histories: 1,
+         ..FaultInjectionTally::default()
+     };
++    let marks = measure_history(history, execution, &mut tally);
++    let drawn_faults = draw_faults(history.seed, &marks, faults_per_history);
++    inject_the_drawn_faults(history, execution, &marks, drawn_faults, tally)
++}
+ 
+-    // 一、测量跑：不注入，不跑池级 checker（那一档由随机历史与崩溃注入罩着），只要每一步的调用数与模型目录。
++/// 同 [`inject_faults_into_history`]，注入点不按种子抽，由调用方写死：`segment` 那一段发出的第 `call_within_the_segment` 次
++/// `fault` 那一种调用（1 起）。写死的用例用它把注入点摆在点名的那一次调用上（C378：取号之后的写行、暖机）。
++///
++/// # Panics
++/// 测量跑没走到那一段，或者那一段发出的这一种调用不到 `call_within_the_segment` 次（写死的用例把注入点摆错了）。
++#[must_use]
++pub fn inject_one_fault_into_the_segment(
++    history: &GeneratedHistory,
++    execution: HistoryExecution,
++    fault: InjectedFault,
++    segment: FaultedSegment,
++    call_within_the_segment: u64,
++) -> HistoryFaultInjection {
++    let mut tally = FaultInjectionTally {
++        histories: 1,
++        ..FaultInjectionTally::default()
++    };
++    let marks = measure_history(history, execution, &mut tally);
++    let index = marks
++        .iter()
++        .position(|mark| mark.position == segment.position())
++        .unwrap_or_else(|| panic!("测量跑没走到{}", segment.render()));
++    let kind = fault.call_kind();
++    let calls_in_the_segment = marks[index].calls.of(kind) - calls_before(&marks, index).of(kind);
++    assert!(
++        (1..=calls_in_the_segment).contains(&call_within_the_segment),
++        "{}只发了 {calls_in_the_segment} 次{}，摆不到第 {call_within_the_segment} 次",
++        segment.render(),
++        kind.name()
++    );
++    let drawn = DrawnFault {
++        fault,
++        call_ordinal: calls_before(&marks, index).of(kind) + call_within_the_segment,
++        segment,
++    };
++    inject_the_drawn_faults(history, execution, &marks, vec![drawn], tally)
++}
++
++/// 测量跑：不注入，不跑池级 checker（那一档由随机历史与崩溃注入罩着），只要每一步的调用数、模型目录与系统配置的实例代号。
++fn measure_history(
++    history: &GeneratedHistory,
++    execution: HistoryExecution,
++    tally: &mut FaultInjectionTally,
++) -> Vec<StepMark> {
++    let geometry = execution.device_width.fixed_geometry();
+     let measurement_execution = HistoryExecution {
+         per_step_checker: PerStepChecker::Skipped,
+         device_width: execution.device_width,
+@@ -1628,6 +1801,9 @@
+                 operation_kind: observation.operation.map(HistoryOperation::kind),
+                 calls: measurement_plan.calls(),
+                 committed_versions: committed_so_far.clone(),
++                system_configuration_instance: choose_system_configuration(observation.image)
++                    .ok()
++                    .map(|system_configuration| system_configuration.quantities.journal_instance),
+             });
+         },
+     );
+@@ -1637,21 +1813,32 @@
+             tally.histories_whose_measurement_run_stopped_early = 1;
+         }
+     }
++    marks
++}
+ 
+-    let drawn_faults = draw_faults(history.seed, &marks, faults_per_history);
++/// 摆好的每个注入点各重跑一遍这段历史（[`inject_one_fault`]），攒成一段的结果。
++fn inject_the_drawn_faults(
++    history: &GeneratedHistory,
++    execution: HistoryExecution,
++    marks: &[StepMark],
++    drawn_faults: Vec<DrawnFault>,
++    mut tally: FaultInjectionTally,
++) -> HistoryFaultInjection {
+     if drawn_faults.is_empty() {
+         tally.histories_without_any_injection_point = 1;
+     }
+     let mut known_red_hits = Vec::new();
+     let mut new_findings: Vec<FaultFinding> = Vec::new();
++    let mut acquired_instances_left: Vec<AcquiredInstanceLeft> = Vec::new();
+     {
+         let mut accumulator = FaultInjectionAccumulator {
+             tally: &mut tally,
+             known_red_hits: &mut known_red_hits,
+             new_findings: &mut new_findings,
++            acquired_instances_left: &mut acquired_instances_left,
+         };
+         for drawn in &drawn_faults {
+-            inject_one_fault(history, execution, &marks, drawn, &mut accumulator);
++            inject_one_fault(history, execution, marks, drawn, &mut accumulator);
+         }
+     }
+     HistoryFaultInjection {
+@@ -1660,14 +1847,16 @@
+         tally,
+         known_red_hits,
+         new_findings,
++        acquired_instances_left,
+     }
+ }
+ 
+-/// 一批注入攒出来的东西：计数、「已知红」命中、新发现。
++/// 一批注入攒出来的东西：计数、「已知红」命中、新发现、取号之后挂载报错而新号没回卷的那几次。
+ struct FaultInjectionAccumulator<'run> {
+     tally: &'run mut FaultInjectionTally,
+     known_red_hits: &'run mut Vec<KnownRedAtAFault>,
+     new_findings: &'run mut Vec<FaultFinding>,
++    acquired_instances_left: &'run mut Vec<AcquiredInstanceLeft>,
+ }
+ 
+ /// 注入那一段的结局是不是「入口返回了错误」：没 panic、checker 没判红，而且那一段要么返回了 `Err`，
+@@ -1911,6 +2100,18 @@
+     };
+     let violations_after_the_fault = checker_violations_on(&image, accumulator.tally);
+     let reopen_text = format!("{reopened:?}（{}）", describe_read_back(&read_back));
++    // C378：注入落在一次挂载里、那一步返回了错误，而重开的盘上系统配置的实例代号比这一步之前大——取号之后的写行或暖机报了错，
++    // 新号没回卷。认下的已知行为：记进这一格、在报告里点名，不进新发现，也不挡下面的判定。
++    if surfaced {
++        if let Some(left) = acquired_instance_left_after_a_failed_mount(&image, marks, *drawn) {
++            *accumulator
++                .tally
++                .acquired_instances_left_after_a_failed_mount
++                .entry(left.kind.name())
++                .or_insert(0) += 1;
++            accumulator.acquired_instances_left.push(left);
++        }
++    }
+ 
+     // 三、判：注入那一步返回错误的那一格不算失败；别的失败（panic、checker 判红、重开走到模型不允许的版本）逐条分类。
+     let mut failures: Vec<FailureObservation> = Vec::new();
+diff --git a/crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs b/crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+--- a/crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
++++ b/crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+@@ -186,7 +186,7 @@
+         &file_content(),
+     );
+     println!(
+-        "LAYER0 states={} closed_form={closed_form} violations={} root_persisted_states={} no_file={} file_read={} failed={} verification_ran={} verification_failed={} journal_differing={} exhaustive={}",
++        "LAYER0 states={} closed_form={closed_form} violations={} root_persisted_states={} no_file={} file_read={} failed={} verification_ran={} verification_failed={} journal_differing={} exhaustive={} states_by_publish=[{}]",
+         tally.states,
+         tally.violations,
+         tally.root_persisted_states,
+@@ -196,7 +196,8 @@
+         tally.verification_ran_states,
+         tally.verification_failed_states,
+         tally.journal_differing_states,
+-        tally.states == closed_form
++        tally.states == closed_form,
++        tally.states_by_publish_text()
+     );
+     println!("{}", checker_line(&tally));
+     println!("CHECKER_FIRST {:?}", tally.checker_first_violation);
+@@ -221,6 +222,12 @@
+         }
+     );
+     assert_eq!(closed_form, 262_165, "全量：枚举到的状态数等于闭式");
++    // 按发布分（里程碑「第二个事务」步 6 验收第 1 条的口径，第一条流同样报）：暖机 txg 1、2 各 3 + 3 + 1，
++    // A 是 18 写段 262143 + 记录段 3 + 根槽段 1，A 的系统配置槽轮换 3，再加全部持久那一个。
++    assert_eq!(
++        tally.states_by_publish_text(),
++        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=262147 after_the_last_root=3 every_write_persisted=1"
++    );
+     assert_checker_counts(&tally, 262_165, 4, 4);
+ }
+ 
+@@ -254,6 +261,11 @@
+         },
+         "少展开的只有 18 个写那一段的 262143 个子集：文件在 / 根已持久 / 验证跑过 / journal 承重的状态数都与全量相同"
+     );
++    assert_eq!(
++        tally.states_by_publish_text(),
++        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=4 after_the_last_root=3 every_write_persisted=1",
++        "22 个状态按发布分：少的只在 A 那一格（18 写段不展开）"
++    );
+     assert_checker_counts(&tally, 22, 4, 4);
+     assert_eq!(closed_form_state_count(&prepared.segments), 262_165);
+ }
+diff --git a/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs b/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
+--- a/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
++++ b/crates/singlefs-harness/tests/second_transaction_step_one_overwrite.rs
+@@ -17,6 +17,7 @@
+ use singlefs_core::allocator::{PlacementRefusal, UnitFootprint};
+ use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
+ use singlefs_core::journal::{back_chain_of, record_offset};
++use singlefs_core::mounted_read::mount_read_only;
+ use singlefs_core::records::{
+     build_mapping_entry, parse_mapping_entry, STATISTIC_ALLOCATED_BYTES,
+     STATISTIC_DEFER_QUEUE_BYTES, STATISTIC_EMPTY_CLUSTER_SEGMENTS, STATISTIC_FRAGMENTATION_RUNS,
+@@ -31,6 +32,7 @@
+ use singlefs_core::transaction::{
+     mapping_locations_for_key, placements_to_release_via_mapping, publish_overwrite, FirstFile,
+     MappingLookup, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
++    FIRST_INODE_NUMBER,
+ };
+ use singlefs_core::unit::{
+     build_index_node, data_unit_payload_capacity, index_node_entry_capacity, parse_index_node,
+@@ -349,6 +351,20 @@
+         },
+         "第一次的内容从最新根出发读不到"
+     );
++    // 步 1 验收第 4 条「inode 记录的写入时间留成 A 的 ⇒ 判红」：从盘上读回 inode 记录，不看发布交回的内存结构——
++    // 只读挂载走的是挂载态那一条读路径（`mounted_read`），与发布路径不共用代码。
++    let mounted_read_only = mount_read_only(&reopened).expect("B 之后只读挂载");
++    let first_file_inode_record = mounted_read_only
++        .mounted
++        .inode_records()
++        .iter()
++        .find(|record| record.inode == FIRST_INODE_NUMBER)
++        .expect("第一个文件那条 inode 记录在挂载态里");
++    assert_eq!(
++        first_file_inode_record.write_time_seconds,
++        FIXED_WRITE_TIME_SECONDS + 60,
++        "盘上 inode 记录的写入时间是 B 那一次写入的时间，不是 A 的 {FIXED_WRITE_TIME_SECONDS}"
++    );
+ 
+     let verdicts = check_pool_image(&image);
+     for (invariant, verdict) in &verdicts {
+diff --git a/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs b/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs
+--- a/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs
++++ b/crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs
+@@ -460,10 +460,29 @@
+         "1 + 二十个 2 写段各 3 + 两个 4 写段各 15 + 十七个 1 写段各 1"
+     );
+     println!(
+-        "LAYER0B_FAST states={} checker_by_invariant(evaluated/violated/not_applicable) {}",
++        "LAYER0B_FAST states={} states_by_publish=[{}] checker_by_invariant(evaluated/violated/not_applicable) {}",
+         tally.states,
++        tally.states_by_publish_text(),
+         tally.checker_counts_by_invariant()
+     );
++    // 步 6 验收第 1 条「每次发布各多少」：按段归到后面最近的那次根槽写（`crash::Layer0PublishOfState`）。
++    // 每次发布记录段 2 写（3）+ 根槽段 1 写（1）= 4；暖机 txg 1、2 各多一段 2 写（取号那段、上一次的系统配置槽轮换）= 7；
++    // 写行 txg 5 与回退 txg 9 各多一段 4 写（上一次的轮换并上取号，15）= 19；18 写与 10 写的段不展开；
++    // 最后一次根槽写之后是 E 的轮换那一段 2 写（3），再加全部持久那一个。
++    assert_eq!(
++        tally.states_by_publish_text(),
++        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=4 instance1_txg4=4 \
++         instance2_txg5=19 instance2_txg6=4 instance2_txg7=4 instance2_txg8=4 \
++         instance3_txg9=19 instance3_txg10=4 instance3_txg11=4 instance3_txg12=4 instance3_txg13=4 \
++         instance3_txg14=4 instance3_txg15=4 instance3_txg16=4 instance3_txg17=4 \
++         after_the_last_root=3 every_write_persisted=1",
++        "平时跑的那 108 个状态按发布分"
++    );
++    assert_eq!(
++        tally.states_by_publish.values().sum::<u64>(),
++        tally.states,
++        "按发布分的各格加起来就是状态数：一个状态不漏、不重"
++    );
+     assert_eq!(
+         tally.violations, 0,
+         "第一处违例：{:?}",
+@@ -556,9 +575,10 @@
+     );
+     let checker_violations: u64 = tally.checker_violated_states.values().sum();
+     // 每条不变量报成 `I-x.y=评估过/判违例/不适用` 夹在 checker_violations 与 first_violation 之间（步 6 验收第 3 条：阴性结果与「代码没跑到」分开）；
+-    // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。
++    // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
++    // checker 那一段与 first_violation 之间，随整行一起进门禁的成功句。
+     println!(
+-        "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} first_violation={}",
++        "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} states_by_publish=[{}] first_violation={}",
+         tally.states,
+         tally.states == closed_form,
+         tally.violations,
+@@ -572,9 +592,22 @@
+         tally.record_root_without_record,
+         tally.record_claimed_state_missing_unit,
+         tally.checker_counts_by_invariant(),
++        tally.states_by_publish_text(),
+         tally.first_violation.as_deref().unwrap_or("none")
+     );
+     assert_eq!(tally.states, closed_form, "枚举到的状态数要等于闭式");
++    // 每次发布：18 写段 262143 或 10 写段 1023，加记录段 3、根槽段 1；写行 txg 5 与回退 txg 9 多一段 4 写（15）；
++    // 暖机 txg 1、2 是 2 写段 + 记录段 + 根槽段（7）。
++    assert_eq!(
++        tally.states_by_publish_text(),
++        "instance1_txg1=7 instance1_txg2=7 instance1_txg3=262147 instance1_txg4=262147 \
++         instance2_txg5=1042 instance2_txg6=1027 instance2_txg7=1027 instance2_txg8=262147 \
++         instance3_txg9=1042 instance3_txg10=1027 instance3_txg11=262147 instance3_txg12=262147 \
++         instance3_txg13=262147 instance3_txg14=262147 instance3_txg15=1027 instance3_txg16=1027 \
++         instance3_txg17=262147 after_the_last_root=3 every_write_persisted=1",
++        "全量 2104413 个状态按发布分"
++    );
++    assert_eq!(tally.states_by_publish.values().sum::<u64>(), tally.states);
+     assert_eq!(
+         tally.violations, 0,
+         "第一处违例：{:?}",
+diff --git a/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs b/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs
+--- a/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs
++++ b/crates/singlefs-harness/tests/second_transaction_supplement_three_bad_disk_input.rs
+@@ -25,7 +25,7 @@
+     newest_root_has_the_trees_the_targeted_damages_need, run_bad_disk_campaign, BadDiskCampaign,
+     BadDiskFinding, BadDiskInputWorkerThreads, BadDiskReport, DamageKind, KnownPanicSite,
+     ReadBackVerdict, ReaderOutcome, BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+-    EVERY_DAMAGE_KIND, KNOWN_PANIC_SITES,
++    EVERY_BASE_IMAGE_TIER, EVERY_DAMAGE_KIND, KNOWN_PANIC_SITES,
+ };
+ use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+ use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+@@ -140,6 +140,42 @@
+             report.tally.render()
+         );
+     }
++    // C481（坏盘输入的基线镜像取不到树表 0 条的盘面）：基线按档抽，每一档都要真抽到过镜像、真造出过坏镜像。
++    // 报告里那一句「基线档 N / M 档抽到过镜像」的 N 由这里钉住——把树表 0 条那一档从抽样里拿掉，N 由 2 变 1，这里红。
++    assert_eq!(
++        report.tally.base_image_tiers_sampled(),
++        EVERY_BASE_IMAGE_TIER.len(),
++        "有基线档一段历史都没抽到镜像：{}",
++        report.tally.render()
++    );
++    assert!(
++        report.render().contains(&format!(
++            "基线档 {} / {} 档抽到过镜像",
++            EVERY_BASE_IMAGE_TIER.len(),
++            EVERY_BASE_IMAGE_TIER.len()
++        )),
++        "报告里报基线档数的那一句：{}",
++        report.render()
++    );
++    for tier in EVERY_BASE_IMAGE_TIER {
++        assert!(
++            report
++                .tally
++                .damaged_images_by_tier
++                .get(tier.name())
++                .copied()
++                .unwrap_or(0)
++                > 0,
++            "基线档「{}」上一份坏镜像都没造出来：{}",
++            tier.name(),
++            report.tally.render()
++        );
++    }
++    assert_eq!(
++        report.tally.damaged_images_by_tier.values().sum::<u64>(),
++        damaged_images,
++        "逐档的坏镜像数加起来就是逐坏法的"
++    );
+     assert_eq!(
+         report.tally.recoveries, damaged_images,
+         "每一份坏镜像都要喂给恢复"
+diff --git a/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs b/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
+--- a/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
++++ b/crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs
+@@ -9,7 +9,7 @@
+ 
+ use singlefs_checker::image::InvariantVerdict;
+ use singlefs_checker::walk::check_pool_image;
+-use singlefs_core::address::{CheckpointTxg, DeviceIdentity};
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+ use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+ use singlefs_core::make_filesystem::{
+@@ -26,7 +26,8 @@
+ use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+ use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+ use singlefs_harness::fault_injection::{
+-    inject_faults_into_history, run_fault_injection_campaign, DrawnFault, FaultCounting,
++    inject_faults_into_history, inject_one_fault_into_the_segment, run_fault_injection_campaign,
++    AcquiredInstanceLeft, AcquiredInstanceLeftAfterAFailedMount, DrawnFault, FaultCounting,
+     FaultDeviceSelector, FaultInjectingBlockDevice, FaultInjectionCampaign, FaultInjectionReport,
+     FaultInjectionWorkerThreads, FaultOccurrence, FaultOutcome, FaultPlacement, FaultSchedule,
+     FaultedSegment, FaultedSegmentKind, FlippedBit, InjectedFault, SharedFaultPlan,
+@@ -34,7 +35,8 @@
+ use singlefs_harness::history::{
+     execute_history_with_faults, generate_history_with_weights, GeneratedHistory,
+     GenerationWeights, HarnessJudgement, HistoryDeviceWidth, HistoryEnding, HistoryExecution,
+-    HistoryOperationKind, HistoryRun, HistorySeed, PerStepChecker, StartingPointStep,
++    HistoryOperation, HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint,
++    PerStepChecker, StartingPointStep,
+ };
+ use singlefs_harness::scenario::{e142_parameters, first_file_content, FIXED_WRITE_TIME_SECONDS};
+ use singlefs_harness::segments::{FixedGeometry, StepKind};
+@@ -660,6 +662,118 @@
+     );
+ }
+ 
++/// 起点（mkfs、取号 1、暖机、第一个文件）之后只做一步：关掉会话、可写挂载（取号 2 → 写行 → 暖机）。
++fn a_history_that_mounts_once_after_the_first_file() -> GeneratedHistory {
++    GeneratedHistory {
++        seed: HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
++        starting_point: HistoryStartingPoint::AfterFirstFile,
++        operations: vec![HistoryOperation::CloseAndMountWritable],
++    }
++}
++
++/// 那一步可写挂载里的第几次写：取号是头两次（两块盘各一次系统配置槽写），写行那次发布的第一个单元写是第 3 次；
++/// 写行那次发布一共 15 次写（实例表与四个固定点单元各两盘 10 次、记录两盘 2 次、根槽 1 次、系统配置槽轮换 2 次），
++/// 暖机第一次空发布的第一个单元写是第 2 + 15 + 1 = 18 次。
++const FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT: u64 = 3;
++const FIRST_WARM_UP_WRITE_OF_THE_MOUNT: u64 = 18;
++
++/// C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）按用户 2026-09-23 定的那一边（认了，写成已知行为；
++/// D23（journal 的角色与格式） 已定项 16 的射程）断言：取号之后写行或暖机那一次写报块设备错，挂载返回错误，
++/// 重开的盘上系统配置的实例代号**还是新号 2**（没回卷成 1），这一次记进故障注入的失败账
++/// （`FaultInjectionTally::acquired_instances_left_after_a_failed_mount`）、报告里点名。两格各一条：
++/// 写行那次的第一个单元写报错 ⇒ 新号一条根都没有（烧掉）；暖机第一次的第一个单元写报错 ⇒ 新号已有写行那次的根。
++///
++/// 判别力自证：把挂载改成「发布报错之后把系统配置的实例代号写回旧号」（回卷，`crates/mutations.tsv` 里那一条），
++/// 重开的盘上系统配置是 1，这一格记不上，这里红。
++#[test]
++fn a_write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_configuration_and_the_report_names_it(
++) {
++    let history = a_history_that_mounts_once_after_the_first_file();
++    let mount_step = FaultedSegment::Operation {
++        step_index: 0,
++        operation_kind: HistoryOperationKind::CloseAndMountWritable,
++    };
++    for (call_within_the_mount, expected_kind, expected_highest_root_instance) in [
++        (
++            FIRST_ROW_PUBLISH_WRITE_OF_THE_MOUNT,
++            AcquiredInstanceLeftAfterAFailedMount::WithoutAnyRoot,
++            InstanceGeneration(1),
++        ),
++        (
++            FIRST_WARM_UP_WRITE_OF_THE_MOUNT,
++            AcquiredInstanceLeftAfterAFailedMount::WithTheRowPublishRoot,
++            InstanceGeneration(2),
++        ),
++    ] {
++        let injection = inject_one_fault_into_the_segment(
++            &history,
++            CHECKED_PAST_THE_RING_TURN,
++            InjectedFault::WriteFails,
++            mount_step,
++            call_within_the_mount,
++        );
++        let rendered = injection.tally.render();
++        print_uncaptured(&format!(
++            "── C378：可写挂载第 {call_within_the_mount} 次写报错 ──\n{rendered}"
++        ));
++        assert_eq!(
++            injection.acquired_instances_left,
++            vec![AcquiredInstanceLeft {
++                drawn: injection.drawn_faults[0],
++                kind: expected_kind,
++                system_configuration_instance_before_the_step: InstanceGeneration(1),
++                system_configuration_instance_after_the_reopen: InstanceGeneration(2),
++                highest_root_instance_after_the_reopen: Some(expected_highest_root_instance),
++            }],
++            "取号之后第 {call_within_the_mount} 次写报错：重开的盘上系统配置还是新号 2、不回卷成 1\n{rendered}"
++        );
++        assert_eq!(
++            injection.tally.acquired_instances_left_after_a_failed_mount,
++            BTreeMap::from([(expected_kind.name(), 1)]),
++            "失败账记下这一次\n{rendered}"
++        );
++        assert!(
++            rendered.contains("取号之后挂载报错、新号不回卷（C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）")
++                && rendered.contains(&format!("  {}：1 次", expected_kind.name())),
++            "报告里点名这一格\n{rendered}"
++        );
++        // 注入真打在那一步可写挂载的单元写上，那一步返回了错误：不是别处先停了。
++        assert_eq!(
++            injection.tally.faults_by_injection_point,
++            BTreeMap::from([("CloseAndMountWritable/unit_write".to_string(), 1)]),
++            "注入点\n{rendered}"
++        );
++        assert_eq!(
++            injection
++                .tally
++                .faults_by_outcome
++                .get(FaultOutcome::SurfacedAsAnError.name())
++                .copied(),
++            Some(1),
++            "可写挂载返回了错误\n{rendered}"
++        );
++        // 记下的错误成员恰好一次、而且是发布那一步的：空表上「每一个都是」恒真，所以先钉条数。
++        assert_eq!(
++            injection.tally.refusal_members.values().sum::<u64>(),
++            1,
++            "注入那一步返回的错误成员记了一次\n{rendered}"
++        );
++        assert!(
++            injection
++                .tally
++                .refusal_members
++                .keys()
++                .all(|member| member.starts_with("MountError::Publish(")),
++            "返回的是发布那一步的错误成员\n{rendered}"
++        );
++        assert_eq!(injection.tally.faults_that_panicked, 0, "{rendered}");
++        assert!(
++            injection.new_findings.is_empty(),
++            "认下的行为不算新发现，别的也不许有\n{rendered}"
++        );
++    }
++}
++
+ /// 发布 B 的内容（4100 字节，与虚机二进制 `second-transaction` 模式相同）。
+ fn second_content() -> Vec<u8> {
+     (0..4100usize)
+diff --git a/crates/singlefs-harness/tests/second_transaction_step_three_acquisition_barrier_layer0.rs b/crates/singlefs-harness/tests/second_transaction_step_three_acquisition_barrier_layer0.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/singlefs-harness/tests/second_transaction_step_three_acquisition_barrier_layer0.rs
+@@ -0,0 +1,207 @@
++//! 里程碑「第二个事务」步 3 验收的变异「取号之后没有屏障 ⇒ 层 0 里出现「系统配置已是 2、单元却先持久」的状态，
++//! I-7.7（系统配置实例代号不低于根环） 那一族判红」要红在的那一条层 0 用例。
++//!
++//! 流：mkfs → 取号 1 → 暖机 → A → B（同一个进程）→ 进程退出、重开可写挂载（取号 2 → 写行 → 暖机）。
++//! 取号那两次系统配置槽写与 B 的两次系统配置槽轮换同一段（进程退出与重开之间没有屏障，登记表八那条 ⚠️），
++//! 取号那道屏障把它们与写行那次发布的单元写隔开（D23（journal 的角色与格式） 已定项 16「取号那一步的屏障」）。
++//! 平时展开的只有这两段：取号所在的那一段、取号之后第一个带单元写的那一段——少了取号那道屏障，两段并成一段，
++//! 枚举就摆得出「实例 2 的单元已持久、两块盘的系统配置还都是 1」的状态。
++//! 展开哪几段按写在录制流里的位置挑（重开之后的第一个写起），不按段的写数挑：并段之后段变长，按写数挑会把并出来的那一段漏掉。
++//!
++//! 这条流的段序列就是第二条流（`second_transaction_step_zero_layer0.rs`）发 C 之前那一截：前 22 段逐段相同，
++//! 末段是暖机第二次的系统配置槽轮换（第二条流里它与 C 的单元写并成 18 写一段）。展开的这两段在第二条流里是第 13、14 段，
++//! 全量（门禁 54 号 `--full`）已经罩着；这一条不多罩崩溃状态，多的是在平时的 `cargo test` 里展开它们、按 I-7.7 判——
++//! 第二条流的快用例只展开写数小于 10 的段，写行那一段（10 写）与并段之后的 14 写一段都不展开。
++
++mod common;
++
++use common::{
++    build_pool, file_content, geometry, parameters, publish_overwrite_in_process,
++    FIXED_WRITE_TIME_SECONDS,
++};
++use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
++use singlefs_core::mount::mount_writable;
++use singlefs_harness::crash::{
++    closed_form_state_count, enumerate_layer0_selecting_versions,
++    writes_and_segments_with_stream_indexes, PublishedVersion,
++};
++use singlefs_harness::segments::StepKind;
++
++/// B 的内容：与第一个文件不同长、不同字节（同 `second_transaction_step_one_overwrite.rs` 的第二次写）。
++const SECOND_FILE_BYTES: usize = 4100;
++
++fn second_content() -> Vec<u8> {
++    (0..SECOND_FILE_BYTES)
++        .map(|index| u8::try_from((index * 7 + 3) % 253).expect("小于 256"))
++        .collect()
++}
++
++/// I-7.7（系统配置实例代号不低于根环） 在池级 checker 里的名字。
++const SYSTEM_CONFIGURATION_INSTANCE_INVARIANT: &str = "I-7.7";
++
++#[test]
++fn no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_crash_state_of_the_remount(
++) {
++    let mut pool = build_pool("acquisition-barrier-layer0");
++    let previous = pool.output.clone();
++    let second = publish_overwrite_in_process(
++        &mut pool,
++        &previous,
++        &second_content(),
++        FIXED_WRITE_TIME_SECONDS + 60,
++        InstanceGeneration(1),
++    )
++    .expect("覆盖写 B");
++    pool.output = second;
++    let operations_before_the_remount = pool.stream.operations().len();
++    let mut devices = pool.reopen_recorded();
++    let mounted = mount_writable(&parameters(), &mut devices).expect("重开之后可写挂载");
++    pool.devices = Some(devices);
++    assert_eq!(mounted.output.instance, InstanceGeneration(2), "重开取号 2");
++
++    let mut versions = vec![
++        PublishedVersion {
++            instance: InstanceGeneration(1),
++            checkpoint_txg: CheckpointTxg(3),
++            content: file_content(),
++        },
++        PublishedVersion {
++            instance: InstanceGeneration(1),
++            checkpoint_txg: CheckpointTxg(4),
++            content: second_content(),
++        },
++    ];
++    for version in
++        std::iter::once(&mounted.output.row_publish).chain(mounted.output.warm_up_publishes.iter())
++    {
++        versions.push(PublishedVersion {
++            instance: version.root().instance,
++            checkpoint_txg: version.root().checkpoint_txg,
++            content: second_content(),
++        });
++    }
++
++    let base = pool.memory_pool_after_mkfs();
++    let operations = pool.retained_operations();
++    let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
++        &operations[pool.mkfs_operation_count..],
++        &geometry(),
++    );
++    let first_stream_index_of_the_remount =
++        operations_before_the_remount - pool.mkfs_operation_count;
++    let remount_writes: Vec<usize> = (0..writes.len())
++        .filter(|write_index| stream_indexes[*write_index] >= first_stream_index_of_the_remount)
++        .collect();
++    let first_remount_write = *remount_writes.first().expect("重开之后发过写");
++    assert_eq!(
++        remount_writes[..2]
++            .iter()
++            .map(|write_index| writes[*write_index].kind)
++            .collect::<Vec<StepKind>>(),
++        vec![StepKind::SystemConfigurationSlot; 2],
++        "重开之后头两个写是取号那两次系统配置槽写（两块盘各一次）"
++    );
++    let first_unit_write_of_the_remount = *remount_writes
++        .iter()
++        .find(|write_index| writes[**write_index].kind == StepKind::UnitWrite)
++        .expect("写行那次发布写单元");
++    let segment_of = |write_index: usize| {
++        segments
++            .iter()
++            .position(|segment| segment.contains(&write_index))
++            .expect("每个写都在某一段里")
++    };
++    let acquisition_segment = segment_of(first_remount_write);
++    let first_unit_segment = segment_of(first_unit_write_of_the_remount);
++    let expand = |segment_index: usize, _segment: &[usize]| {
++        segment_index == acquisition_segment || segment_index == first_unit_segment
++    };
++    let judged_root_index = writes
++        .iter()
++        .rposition(|write| write.kind == StepKind::RootRecordFua)
++        .expect("写流里有根槽写");
++    let tally = enumerate_layer0_selecting_versions(
++        &base,
++        &writes,
++        &segments,
++        judged_root_index,
++        &versions,
++        &expand,
++    );
++    let expanded: Vec<Vec<usize>> = segments
++        .iter()
++        .enumerate()
++        .filter(|(segment_index, segment)| expand(*segment_index, segment))
++        .map(|(_, segment)| segment.clone())
++        .collect();
++    println!(
++        "LAYER0_ACQUISITION_BARRIER states={} expanded_segment_sizes={:?} checker_by_invariant(evaluated/violated/not_applicable) {}",
++        tally.states,
++        expanded.iter().map(Vec::len).collect::<Vec<usize>>(),
++        tally.checker_counts_by_invariant()
++    );
++
++    // 变异「取号之后没有屏障」要红在这一条上：新实例的单元先于新号持久，I-7.7 ① 判红。
++    assert_eq!(
++        tally
++            .checker_violated_states
++            .get(SYSTEM_CONFIGURATION_INSTANCE_INVARIANT)
++            .copied()
++            .unwrap_or(0),
++        0,
++        "取号那一段与写行的第一段展开之后，出现了新实例的写先于新号持久的状态：{:?}",
++        tally
++            .checker_first_violation
++            .get(SYSTEM_CONFIGURATION_INSTANCE_INVARIANT)
++    );
++    assert_eq!(
++        tally
++            .checker_evaluated_states
++            .get(SYSTEM_CONFIGURATION_INSTANCE_INVARIANT)
++            .copied()
++            .unwrap_or(0),
++        tally.states,
++        "I-7.7 在展开出来的每个状态上都真被评估过（阴性结果与「代码没跑到」分开）：{}",
++        tally.checker_counts_by_invariant()
++    );
++    assert_eq!(
++        tally.violations, 0,
++        "多版本 oracle 的第一处违例：{:?}",
++        tally.first_violation
++    );
++    assert_eq!(
++        tally.ignored_violations, 0,
++        "不看 journal 那一遍恢复同样过 oracle：{:?}",
++        tally.first_ignored_violation
++    );
++    let checker_violations: u64 = tally.checker_violated_states.values().sum();
++    assert_eq!(
++        checker_violations, 0,
++        "别的不变量也不许判红：{:?}",
++        tally.checker_first_violation
++    );
++
++    // 状态数钉绝对值：取号那一段是 B 的两次系统配置槽轮换并上取号两次（4 写，15 个真子集），
++    // 写行那次发布的单元写一段（实例表 + 四个固定点单元，各两盘：10 写，1023 个），再加全部持久那一个。
++    assert_ne!(
++        acquisition_segment, first_unit_segment,
++        "取号那一段与写行的第一段之间隔着一道屏障"
++    );
++    assert_eq!(
++        expanded.iter().map(Vec::len).collect::<Vec<usize>>(),
++        vec![4, 10]
++    );
++    assert_eq!(tally.states, closed_form_state_count(&expanded));
++    assert_eq!(tally.states, 1 + 15 + 1023);
++    // 与第二条流发 C 之前那一截逐段相同（门禁 52 号核的那个数组的前 22 段），末段 2 写是暖机第二次的系统配置槽轮换。
++    assert_eq!(
++        segments.iter().map(Vec::len).collect::<Vec<usize>>(),
++        vec![2, 2, 1, 2, 2, 1, 18, 2, 1, 18, 2, 1, 4, 10, 2, 1, 10, 2, 1, 10, 2, 1, 2],
++        "段序列是第二条流发 C 之前那一截"
++    );
++    assert_eq!(
++        (acquisition_segment, first_unit_segment),
++        (12, 13),
++        "展开的是第二条流的第 13、14 段（从 1 数）"
++    );
++}

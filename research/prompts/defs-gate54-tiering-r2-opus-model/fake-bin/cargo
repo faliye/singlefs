@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# 假 cargo（defs-gate54-tiering-r2 攻方模型）：只认 `cargo test ... --test <名字> -- [--include-ignored] --nocapture`，
+# 打合成日志。结论由「调用那一刻」当前目录下 crates/singlefs-harness/src/crash.rs 的内容与仓外的假工具链版本决定：
+#   crash.rs 含 SINGLE_THREADED        ⇒ 全量两条流的 LAYER0_PARALLEL_FINISHED 报 worker_threads=1（线程数没传进去）
+#   crash.rs 含 TOOLCHAIN_SENSITIVE    ⇒ 假工具链版本（$FAKE_TOOLCHAIN_FILE 的内容）是 2 时全量用例判红
+#   FAKE_CARGO_HOLD=<前缀>              ⇒ 全量第一条流开跑时建 <前缀>.started，等 <前缀>.release 出现才往下（最多 120 秒）
+if [[ "${1:-}" == -V || "${1:-}" == --version ]]; then echo "cargo 1.99.0 (fake toolchain $(cat "${FAKE_TOOLCHAIN_FILE:-/nonexistent}" 2>/dev/null || echo 1))"; exit 0; fi
+test_name=""; include_ignored=0; previous=""
+for argument in "$@"; do
+  [[ "$previous" == "--test" ]] && test_name="$argument"
+  [[ "$argument" == "--include-ignored" ]] && include_ignored=1
+  previous="$argument"
+done
+crash_source="crates/singlefs-harness/src/crash.rs"
+toolchain_version="$(cat "${FAKE_TOOLCHAIN_FILE:-/nonexistent}" 2>/dev/null || echo 1)"
+worker_threads=32
+grep -q SINGLE_THREADED "$crash_source" 2>/dev/null && worker_threads=1
+echo "running 6 tests (fake cargo, test=$test_name, include_ignored=$include_ignored, toolchain=$toolchain_version, cwd=$PWD)"
+if [[ "$include_ignored" == 1 ]]; then
+  if [[ "$test_name" == first_transaction_step_seven_layer0 && -n "${FAKE_CARGO_HOLD:-}" ]]; then
+    : > "$FAKE_CARGO_HOLD.started"
+    for _ in $(seq 1 1200); do [[ -e "$FAKE_CARGO_HOLD.release" ]] && break; sleep 0.1; done
+  fi
+  if grep -q TOOLCHAIN_SENSITIVE "$crash_source" 2>/dev/null && [[ "$toolchain_version" == 2 ]]; then
+    echo "test full_enumeration ... FAILED (fake: toolchain 2 miscompiles TOOLCHAIN_SENSITIVE)"
+    echo "test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+    exit 101
+  fi
+  case "$test_name" in
+    first_transaction_step_seven_layer0)
+      echo "LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0"
+      echo "LAYER0_PARALLEL_FINISHED states=262165 slices=2 worker_threads=$worker_threads configured_worker_threads=$worker_threads worker_threads_source=environment elapsed_seconds=2.0"
+      echo "LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true"
+      echo "CHECKER record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0"
+      ;;
+    second_transaction_step_zero_layer0)
+      echo "LAYER0_PARALLEL_FINISHED states=2104413 slices=64 worker_threads=$worker_threads configured_worker_threads=$worker_threads worker_threads_source=environment elapsed_seconds=3.0"
+      echo "LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none"
+      ;;
+  esac
+  echo "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+else
+  echo "test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+fi

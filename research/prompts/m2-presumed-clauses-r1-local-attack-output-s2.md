@@ -1,0 +1,15 @@
+1. For K1-row-1: Under K1-A, the statement "central-mapping-tree role is second-to-last and tree-table unit is last" remains true (t7 is second-to-last, t8 is last). Under K1-B, the statement is false (t8 is second-to-last, instance-table is last). Under K1-C, the statement is false (instance-table is second-to-last, t8 is last). The three candidates disagree on this. This would be overturned if the actual write sequence during the first mount shows t7 as second-to-last under K1-B or K1-C.
+
+2. For K1-row-2: For K1-A, K1-B, and K1-C, the instance-table unit is compatible with being classified as either commit-generated or user-data; the classification is not forced by the candidate but merely permitted. All three candidates agree on this. This would be overturned if the allocation mechanism for instance-table during warm-up requires it to be exclusively commit-generated or user-data regardless of position.
+
+3. For K1-row-3: For K1-A, K1-B, and K1-C, the instance-table unit is written during warm-up empty publishes, contradicting the clause’s "zero units" statement since the instance-table is written despite the tree table having zero entries. All three candidates agree on this. This would be overturned if the warm-up publishes for the first mount write zero units without including the instance-table.
+
+4. For K1-row-4: For K1-A, K1-B, and K1-C, moving the instance-table unit’s position does not change the warm-up publish count (2) or first-transaction txg (3), as these are derived solely from disk-ownership geometry. All three candidates agree on this. This would be overturned if changing the instance-table’s write order alters the disk-ownership mapping or requires recomputing the constants.
+
+5. For K3-row-1: Under both K3-1 and K3-2, the admission formula and procedure do not read any clean-shutdown marker bit, so the admission outcome is identical for the same on-disk state. The two candidates agree on this. This would be overturned if the admission calculation depends on a clean-shutdown marker bit.
+
+6. For K3-row-2: Under both K3-1 and K3-2, the clause requires warm-up unconditionally; no exception for a valid clean-shutdown marker exists in the clause’s text. The two candidates agree on this. This would be overturned if the warm-up requirement is explicitly bypassed when a valid clean-shutdown marker is present.
+
+7. For K3-row-3: Under both K3-1 and K3-2, the rollback candidate set is computed identically by scanning the root ring and instance table on disk, with no dependence on clean-shutdown status. The two candidates agree on this. This would be overturned if the candidate set computation reads a clean-shutdown marker.
+
+8. For K3-row-4: Under K3-1, the effective F computation method applies unconditionally after recovery. Under K3-2, if recovery is skipped due to a valid marker, the method does not apply and a different method is needed. The two candidates disagree on this. This would be overturned if the effective F computation method remains unchanged even when recovery is skipped.

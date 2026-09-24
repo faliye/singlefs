@@ -1,0 +1,125 @@
+════ S2 [lock-only｜post] 暂存的路径：Cargo.lock ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-lock-only-post；exhaustive=true]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [lock-only｜pre] 暂存的路径：Cargo.lock ｜K3 字面触发 --full：no｜[标记不在]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [lock-only｜fix] 暂存的路径：Cargo.lock ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-lock-only-fix；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（8896f264c959b0563a497d21e258fa1a170fc38465398ae5802c4e86cb449918，8 个文件）不同
+             内容不同：Cargo.lock
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（8896f264c959b0563a497d21e258fa1a170fc38465398ae5802c4e86cb449918，8 个文件）不同
+             内容不同：Cargo.lock
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [toml-only｜post] 暂存的路径：Cargo.toml ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-toml-only-post；exhaustive=true]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [toml-only｜pre] 暂存的路径：Cargo.toml ｜K3 字面触发 --full：no｜[标记不在]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [toml-only｜fix] 暂存的路径：Cargo.toml ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-toml-only-fix；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（d1cd05492c98b660dfd2ffcc46538bff89e3edbd7940557b881dec22813b7693，8 个文件）不同
+             内容不同：Cargo.toml
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（d1cd05492c98b660dfd2ffcc46538bff89e3edbd7940557b881dec22813b7693，8 个文件）不同
+             内容不同：Cargo.toml
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [test-only｜post] 暂存的路径：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs ｜K3 字面触发 --full：yes｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-test-only-post；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936，8 个文件）不同
+             内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936，8 个文件）不同
+             内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [test-only｜pre] 暂存的路径：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs ｜K3 字面触发 --full：yes｜[标记不在]
+  ── 起门禁：gate-triage
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+  ── 起门禁：gate-staged
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+════ S2 [test-only｜fix] 暂存的路径：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs ｜K3 字面触发 --full：yes｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-test-only-fix；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936，8 个文件）不同
+             内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（b21d2a103829ec5cb7a756d4be380b992f2585d8a1df877cdb6f76395cd89936，8 个文件）不同
+             内容不同：crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [mutations-only｜post] 暂存的路径：crates/mutations.tsv ｜K3 字面触发 --full：yes｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-mutations-only-post；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b，8 个文件）不同
+             内容不同：crates/mutations.tsv
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b，8 个文件）不同
+             内容不同：crates/mutations.tsv
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [mutations-only｜pre] 暂存的路径：crates/mutations.tsv ｜K3 字面触发 --full：yes｜[标记不在]
+  ── 起门禁：gate-triage
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+  ── 起门禁：gate-staged
+      ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
+      ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+      ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
+    [gate --staged 里 54 号的退出码 0]
+════ S2 [mutations-only｜fix] 暂存的路径：crates/mutations.tsv ｜K3 字面触发 --full：yes｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-mutations-only-fix；exhaustive=true]
+  ── 起门禁：gate-triage
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b，8 个文件）不同
+             内容不同：crates/mutations.tsv
+    [gate --staged 里 54 号的退出码 1]
+  ── 起门禁：gate-staged
+      ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但全绿标记记的输入哈希（c07850adb431b3cb8b56efb1ed16f6b7cbd7ee3ac64a8fb28eb05ecb3a00383b）与这一次的（2cfd45abffe5a5a237c549137a94ec6d08430da8c8efc86682395dbe004fb86b，8 个文件）不同
+             内容不同：crates/mutations.tsv
+    [gate --staged 里 54 号的退出码 1]
+════ S2 [other-session-crates｜post] 暂存的路径：NOTES.md ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-other-session-crates-post；exhaustive=true]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（be9e1aba2894）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [other-session-crates｜pre] 暂存的路径：NOTES.md ｜K3 字面触发 --full：no｜[标记不在]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（dc7e9986d2d7）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/ .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+    [gate --staged 里 54 号的退出码 77]
+════ S2 [other-session-crates｜fix] 暂存的路径：NOTES.md ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-other-session-crates-fix；exhaustive=true]
+  ── 起门禁：gate-triage
+      ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lock 底下
+    [gate --staged 里 54 号的退出码 77]
+  ── 起门禁：gate-staged
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（53cf5323cc28）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+    [gate --staged 里 54 号的退出码 77]

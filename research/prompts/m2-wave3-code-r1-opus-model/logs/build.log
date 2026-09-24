@@ -1,0 +1,6 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-wave3-opus/repo/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 00s
+exit=0

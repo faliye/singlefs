@@ -1,0 +1,13 @@
+warning: unused import: `singlefs_core::recovery::UserVisibleTreeRootPointers`
+  --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:17:5
+warning: unused import: `singlefs_core::mount::user_visible_trees_changed`
+  --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:18:5
+   --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:667:13
+    --> crates/singlefs-harness/tests/treesplit_opus_prototype.rs:1201:9
+CFG T1/Middle/Maintained/Merge{min_fill:2,borrow:true}/OnePublish histories=42875 states=35893515 closed_form=35893515 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 cut_publish_applied=0 unverified_applied=0 lookup_miss=0 refused_publishes=0 refused_histories=0 publishes=85750 restructure_publishes=0 units=340727 split_units=15962 ev_split=13491 ev_height_up=932 ev_height_down=124 ev_n
+
+real	13m59.454s
+user	14m20.120s
+sys	0m6.000s
+
+[exited with code 0]

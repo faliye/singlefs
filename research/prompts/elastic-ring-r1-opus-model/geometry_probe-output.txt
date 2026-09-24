@@ -1,0 +1,69 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/zz_elastic_ring_probe.rs (target/debug/deps/zz_elastic_ring_probe-b5e2974cdce7c86e)
+
+running 2 tests
+== A 默认环：盘 4096 MiB，环 768 MiB
+   mkfs 接受
+   环占槽 [1024, 50176)；代码里单元区起点常量 UNIT_AREA_START_SLOT = 50176
+   空洞 0 槽 = 0 MiB（既不是环也不是单元区）
+   mkfs 的两个单元落槽 50176 与 50178；在环里吗：false / false
+   分配器：单元区 211968 槽，起点 50176；环里还被当成空闲的第一个槽 None
+   盘上字段：环长 805306368 字节，单元区起点 50176（偏移 333 / 417）
+   choose_system_configuration 读回环长：Ok(805306368)
+== 1 GiB 环上的第一个事务：环占槽 [1024, 66560)
+   第一个事务发布成功：txg CheckpointTxg(3)
+   checker：33 条判决，成立 20，违例 []
+== B 环取容量四分之一（1 GiB）：盘 4096 MiB，环 1024 MiB
+   mkfs 接受
+   环占槽 [1024, 66560)；代码里单元区起点常量 UNIT_AREA_START_SLOT = 50176
+   重叠 16384 槽 = 256 MiB（环盖住单元区开头）
+   mkfs 的两个单元落槽 50176 与 50178；在环里吗：true / true
+   写到实例表那一槽的是 jsn 196609（record_offset 复核 822083584，实例表在 822083584）
+   分配器：单元区 211968 槽，起点 50176；环里还被当成空闲的第一个槽 Some(50176)
+   盘上字段：环长 1073741824 字节，单元区起点 50176（偏移 333 / 417）
+   choose_system_configuration 读回环长：Ok(1073741824)
+   checker：33 条判决，成立 20，违例 []
+== C 小镜像按参数缩（1 GiB 盘、256 MiB 环）：盘 1024 MiB，环 256 MiB
+   mkfs 接受
+   环占槽 [1024, 17408)；代码里单元区起点常量 UNIT_AREA_START_SLOT = 50176
+   空洞 32768 槽 = 512 MiB（既不是环也不是单元区）
+   mkfs 的两个单元落槽 50176 与 50178；在环里吗：false / false
+   分配器：单元区 15360 槽，起点 50176；环里还被当成空闲的第一个槽 None
+   盘上字段：环长 268435456 字节，单元区起点 50176（偏移 333 / 417）
+   choose_system_configuration 读回环长：Ok(268435456)
+   checker：33 条判决，成立 20，违例 []
+== D 环 64 MiB（4 GiB 盘）：盘 4096 MiB，环 64 MiB
+   mkfs 接受
+   环占槽 [1024, 5120)；代码里单元区起点常量 UNIT_AREA_START_SLOT = 50176
+   空洞 45056 槽 = 704 MiB（既不是环也不是单元区）
+   mkfs 的两个单元落槽 50176 与 50178；在环里吗：false / false
+   分配器：单元区 211968 槽，起点 50176；环里还被当成空闲的第一个槽 None
+   盘上字段：环长 67108864 字节，单元区起点 50176（偏移 333 / 417）
+   choose_system_configuration 读回环长：Ok(67108864)
+   checker：33 条判决，成立 20，违例 []
+== E 环 12 KiB（I-8.1 按「任一事务」读的下界）：盘 4096 MiB，环 0.01171875 MiB
+   mkfs 接受
+   环占槽 [1024, 1024)；代码里单元区起点常量 UNIT_AREA_START_SLOT = 50176
+   空洞 49152 槽 = 768 MiB（既不是环也不是单元区）
+   mkfs 的两个单元落槽 50176 与 50178；在环里吗：false / false
+   分配器：单元区 211968 槽，起点 50176；环里还被当成空闲的第一个槽 None
+   盘上字段：环长 12288 字节，单元区起点 50176（偏移 333 / 417）
+   choose_system_configuration 读回环长：Ok(12288)
+   checker：违例 []
+   （单元落槽见下面这份 output 的 debug）
+   RootRecord { filesystem_identifier: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7], instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(3), tree_table: NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(3) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50248), unit_checksum: 1380691816 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50248), unit_checksum: 1380691816 }], instance: InstanceGeneration(1), birth_sequence: BirthSequence(0) }, tree_identifier_watermark: 19, rollback_floor: CheckpointTxg(0), instance_table: NodePointer { head: PointerHead { birth_tree: TreeIdentifier(0), birth_txg: CheckpointTxg(0) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50176), unit_checksum: 2795991603 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50176), unit_checksum: 2795991603 }], instance: InstanceGeneration(0), birth_sequence: BirthSequence(0) }, mapping_root: NodePointer { head: PointerHead { birth_tree: TreeIdentifier(15), birth_txg: CheckpointTxg(3) }, locations: [LocationEntry { device: DeviceIdentity(0), slot: SlotNumber(50247), unit_checksum: 811818568 }, LocationEntry { device: DeviceIdentity(1), slot: SlotNumber(50247), unit_checksum: 811818568 }], instance: InstanceGeneration(1), birth_sequence: BirthSequence(0) } }
+test first_transaction_with_a_one_gibibyte_ring ... ok
+   checker：33 条判决，成立 20，违例 []
+test elastic_ring_probe ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/zz_ring_field_offset2.rs (target/debug/deps/zz_ring_field_offset2-0fa1a146eec78ced)
+
+running 1 test
+环长改动的字节位置（校验和 32 字节另算）：[155, 156, 157, 158, 336, 345, 346, 347, 350, 351, 352]
+io_min 改动的字节位置：[155, 156, 157, 158, 426]
+test locate_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,266 @@
+════ H-B [post] 漂移=54 用户动作=during
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:56Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:59Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.sDFcW7mxhC/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.mW0CMJ6bPb/tree
+  ── --full 还在跑（54 号 pid 2198424），起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:35:56Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.sDFcW7mxhC/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=kill9
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:03Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:03Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.7Qr0tQMWy7/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.MikedbFGOO/tree
+  ── 54 号 pid 2199195 被 SIGKILL 之后起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:03Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.7Qr0tQMWy7/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.MikedbFGOO/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=oom
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:06Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:07Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.ikk1rPjVhi/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.pPEf6ara6E/tree
+  ── 假 cargo pid 2200054 被 SIGKILL（仿 OOM）之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 f56ecab4287c8f55…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.ikk1rPjVhi/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=term
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:10Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:10Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.MyTqcTb14y/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.whLUtuHwFY/tree
+  ── 54 号 pid 2200796 被 SIGTERM 之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 f56ecab4287c8f55…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.MyTqcTb14y/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=54 用户动作=finish
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（f56ecab4287c8f55…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:19Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:22Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.PEGZWym9ck/tree
+      [格] f56ecab4287c worker_threads=1 judged_root=…/tmp.0FSQvhCbql/tree
+  ── --full 跑完之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 f56ecab4287c8f55…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.PEGZWym9ck/tree
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [pre] 漂移=54 用户动作=none
+  ── 提交 A 之前的门禁（C0，旧 54 号）
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；1 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violation
+  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；1 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violatio
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，新 54 号）
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violatio
+  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violati
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 一格都没有
+  ── 起门禁（分档之前：门禁自己在临时 worktree 里跑全量）
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [gate --staged 里 54 号退出码 1]
+  ── 真值
+  ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=during
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:35Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:35Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.jovdEAoVVA/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.q7G5udlBIr/tree
+  ── --full 还在跑（54 号 pid 2203334），起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:35Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.q7G5udlBIr/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=kill9
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:44Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:46Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.SCZamCiGYu/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.vq23hsvJXN/tree
+  ── 54 号 pid 2204210 被 SIGKILL 之后起门禁
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:44Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.SCZamCiGYu/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.vq23hsvJXN/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=oom
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:50Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:50Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.Ds0WcSwa1A/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.vduRbUXd3B/tree
+  ── 假 cargo pid 2204961 被 SIGKILL（仿 OOM）之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 63342786f92e3d2d…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.vduRbUXd3B/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=term
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:36:54Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:37:04Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.EcteN9QXys/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.pvLZJPVmoZ/tree
+  ── 54 号 pid 2205907 被 SIGTERM 之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 63342786f92e3d2d…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+      （没打出判定行）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.pvLZJPVmoZ/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [post] 漂移=toolchain 用户动作=finish
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（63342786f92e3d2d…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:37:26Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
+  ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（74f88a29d4fc1e39…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24T01:37:28Z，标记里的计数行原样
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 63342786f92e worker_threads=32 judged_root=…/tmp.FrYGLjS2J4/tree
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.0u1Ho5daTG/tree
+  ── --full 跑完之后起门禁
+  ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 63342786f92e3d2d…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/m
+    [gate --staged 里 54 号退出码 1]
+  ── 这一趟 --full 的判定行：
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+      [格] 74f88a29d4fc worker_threads=32 judged_root=…/tmp.0u1Ho5daTG/tree
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+
+════ H-B [pre] 漂移=toolchain 用户动作=none
+  ── 提交 A 之前的门禁（C0，工具链 1）
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violatio
+  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violati
+    [gate --staged 里 54 号退出码 0]
+  ── 提交 B 之前的门禁（C1，工具链 2）
+  ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violatio
+  ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
+  ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violati
+    [gate --staged 里 54 号退出码 0]
+  ── 这一批：git checkout A -- crates/，暂存区：crates/singlefs-harness/src/crash.rs 
+      [格] 一格都没有
+  ── 起门禁（分档之前：门禁自己在临时 worktree 里跑全量）
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [gate --staged 里 54 号退出码 1]
+  ── 真值
+  ✗ 层 0 崩溃点重放的用例判红（上面是 cargo test 的尾部）
+    [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
+

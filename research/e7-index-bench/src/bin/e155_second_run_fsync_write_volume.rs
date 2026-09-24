@@ -1,5 +1,5 @@
-//! E155 第二次跑：岔路单第 6 行 —— 三臂（甲 / wal_full-K9′ / 乙-M-K9′）在同一批取样点上的
-//! fsync 行、摊销行、之比与 K9′ 相对 K9 的增量。确定性计数模型。
+//! E155 第二次跑：岔路单第 6 行 —— 三臂（甲 / wal_full-K10 / 乙-M-K10）在同一批取样点上的
+//! fsync 行、摊销行、之比与 K10 相对 K9 的增量。确定性计数模型。
 //!
 //! 判据、失败条款、变异表的权威登记在 `research/prompts/e155-r2-prereg.md`（第五节 5.1 R1–R8、
 //! 第六节 Q6.x、第七节 B1/B2/B4/B5/B7/B10/B11/B15–B19）。第一次跑的登记 `research/prompts/
@@ -21,7 +21,7 @@
 //! 第二段交付（R8 组提交、第 7 行）：R8、第 7 行主表（`row7_grid`，1800 格）、B12–B14、
 //! 阳性对照（`positive_control_row7`）、变异 M9–M13/M16/M17（表里的 R2_M9–R2_M17）、
 //! 翻面点 Q7.3/Q7.3b（`row7_fold_point`）、反向取样点「N 按批计」（`geometry_sensitivity_sample_row7`
-//! 的 `interval_counted_by_batch`）。**还没做**：第 7 行判定格上 φ=0.5/K3′/g=0/pbs=4096/K9′-b 五个
+//! 的 `interval_counted_by_batch`）。**还没做**：第 7 行判定格上 φ=0.5/K11/g=0/pbs=4096/K12 五个
 //! 反向取样点、「不共享取随机」（F9，只留了一条 `unshared_random_not_modeled_this_pass` 占位说明）、
 //! 沿 k 轴的判别力自证——这些交主 agent 定要不要续（见岔路表）。
 
@@ -58,7 +58,7 @@ const REVERSE_PHYSICAL_BLOCK_SIZE_BYTES: u64 = 4096;
 const NODE_HEADER_BASE_BYTES: u64 = 86 + 29;
 /// 节点指针宽（D19 已定项 8）。
 const NODE_POINTER_BYTES: u64 = 86;
-/// K3′ 反向取样点：内部条目再加身份引用 26 字节。
+/// K11 反向取样点：内部条目再加身份引用 26 字节。
 const IDENTITY_REFERENCE_EXTRA_BYTES: u64 = 26;
 
 const EXTENT_KEY_BYTES: u64 = 24;
@@ -98,7 +98,7 @@ const fn node_capacity(key_bytes: u64, entry_bytes: u64) -> u64 {
     (NODE_BYTES - node_header_bytes(key_bytes)) / entry_bytes
 }
 
-/// 内部节点条目宽：分隔 key + 子指针（K3 主几何）；K3′ 反向取样点再加身份引用 26 字节。
+/// 内部节点条目宽：分隔 key + 子指针（K3 主几何）；K11 反向取样点再加身份引用 26 字节。
 const fn internal_entry_bytes(key_bytes: u64, identity_reference: bool) -> u64 {
     key_bytes + NODE_POINTER_BYTES + if identity_reference { IDENTITY_REFERENCE_EXTRA_BYTES } else { 0 }
 }
@@ -181,10 +181,10 @@ mod capacity_tests {
     #[test]
     fn accounting_internal_capacity_and_identity_reference_variant_match_the_anchors() {
         assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, false)), 150);
-        assert_eq!(node_capacity(EXTENT_KEY_BYTES, internal_entry_bytes(EXTENT_KEY_BYTES, true)), 119, "K3′ extent");
-        assert_eq!(node_capacity(ALLOCATION_KEY_BYTES, internal_entry_bytes(ALLOCATION_KEY_BYTES, true)), 133, "K3′ 分配记录");
-        assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, true)), 121, "K3′ 记账");
-        assert_eq!(node_capacity(MAPPING_KEY_BYTES, internal_entry_bytes(MAPPING_KEY_BYTES, true)), 116, "K3′ 映射");
+        assert_eq!(node_capacity(EXTENT_KEY_BYTES, internal_entry_bytes(EXTENT_KEY_BYTES, true)), 119, "K11 extent");
+        assert_eq!(node_capacity(ALLOCATION_KEY_BYTES, internal_entry_bytes(ALLOCATION_KEY_BYTES, true)), 133, "K11 分配记录");
+        assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, true)), 121, "K11 记账");
+        assert_eq!(node_capacity(MAPPING_KEY_BYTES, internal_entry_bytes(MAPPING_KEY_BYTES, true)), 116, "K11 映射");
     }
 
     #[test]
@@ -414,7 +414,7 @@ fn multiclass_tree_dirty_nodes_per_layer(
     dirty_per_layer
 }
 
-/// 分配记录树一块盘一层的期望脏节点数（R1/R3/R4 合并处理；K9′ 的中间版释放记录 R7(a) 只进尾部插入）。
+/// 分配记录树一块盘一层的期望脏节点数（R1/R3/R4 合并处理；K10 的中间版释放记录 R7(a) 只进尾部插入）。
 /// 节点写（新落点 + 旧版按 K8/R2 策略）与数据单元写（新落点 + 旧版按 R3/R4）的「远」贡献合并成
 /// **一个**连续组或散组，不是两个独立类各自算完再相加——登记第七节 B17 手算格是这样验证的
 /// （`allocation_tree_dirty_this_layer` 名字与手算格逐字节相同的读法：一块盘的分配记录区间共享同一层，
@@ -457,7 +457,7 @@ fn allocation_tree_dirty_this_layer(
     let data_new_scattered = if data_new_placement_scattered { data_units } else { 0.0 };
 
     // 尾部：节点新落点（恒在尾部）+ 节点旧版的近份 + 数据新落点（除非 R4 把它挪去散组）+ 数据旧版的近份
-    // + K9′ 中间版释放记录（R7(a)，恒在尾部，不参与远近判定）。
+    // + K10 中间版释放记录（R7(a)，恒在尾部，不参与远近判定）。
     let tail_group = node_units + node_near + data_new_in_tail + data_near + extra_release_only_insertions;
     // 远：节点旧版的远份 + 数据旧版的远份 + （R4 触发时）数据新落点，三者合并成一个连续组或散组。
     let far_total = node_far + data_far + data_new_scattered;
@@ -568,7 +568,7 @@ mod group_formula_tests {
 }
 
 // ============================================================
-// 四、族与几何：一格的输入（与第一次逐字相同，加 K9′ 开关的实际接线）
+// 四、族与几何：一格的输入（与第一次逐字相同，加 K10 开关的实际接线）
 // ============================================================
 
 /// 族（5.2）：F1 每个文件 1 个数据单元；F8A 一次 fsync 改 8 个相邻数据单元。
@@ -602,12 +602,12 @@ impl Family {
 }
 
 /// 一格的几何输入（5.6）：主几何 φ=1、K3、g=24、pbs=512；反向取样点各自单独翻一个。
-/// `intermediate_version_policy`（K9 / K9′）不放在这里——它只对 WAL checkpoint 有意义，
+/// `intermediate_version_policy`（K9 / K10）不放在这里——它只对 WAL checkpoint 有意义，
 /// 是 `solve_write_ahead_log_checkpoint` 的独立参数（见 `IntermediateVersionPolicy`）。
 #[derive(Clone, Copy, Debug)]
 struct Geometry {
     fill_ratio: FillRatio,
-    identity_reference: bool, // K3（false）/ K3′（true）
+    identity_reference: bool, // K3（false）/ K11（true）
     backlog_generations: u64, // g：主 24，反向 0
     physical_block_size_bytes: u64,
 }
@@ -636,13 +636,13 @@ struct PoolShape {
     geometry: Geometry,
 }
 
-/// K9 / K9′（岔路单第 6 行，登记 5.1 R7）：间隔内被换掉的中间版要不要各自补一条已释放的分配记录、
+/// K9 / K10（岔路单第 6 行，登记 5.1 R7）：间隔内被换掉的中间版要不要各自补一条已释放的分配记录、
 /// 进 K6 积压。只对 WAL checkpoint 有意义——甲每次 fsync 就是一次发布，没有中间版。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum IntermediateVersionPolicy {
     /// K9（第一次登记）：中间版不写分配记录、不进映射、不进积压。
     NotTracked,
-    /// K9′（这一次登记）：每个中间版每盘写一条已释放的分配记录，(a) 并进分配记录树区间尾部、
+    /// K10（这一次登记）：每个中间版每盘写一条已释放的分配记录，(a) 并进分配记录树区间尾部、
     /// (b) 进 K6 积压（每个 checkpoint 的释放数加 I）。
     ReleasedAndBacklogged,
 }
@@ -791,7 +791,7 @@ struct SuppressedFixedPoints {
 
 /// 5.3 不动点核心（R1/R3/R4/R7 在这一版改过；R2 在 `class_dirty_nodes_this_layer` 里已经改）：
 /// extent / inode 用 `extent_touch` / `inode_touch` 指定这次持久化怎么碰它们；
-/// `extra_allocation_release_insertions`：K9′（R7）每个中间版每盘写一条已释放的分配记录，
+/// `extra_allocation_release_insertions`：K10（R7）每个中间版每盘写一条已释放的分配记录，
 /// 只并进分配记录树尾部插入、进 K6 积压，K9 与甲恒传 0。
 #[allow(clippy::too_many_arguments)]
 fn solve_fixed_point_core(
@@ -875,7 +875,7 @@ fn solve_fixed_point_core(
             + tree_table_total_nodes as f64
             + 1.0;
 
-        // R1（第三节 3.2 ①）：K6 积压的「每次持久化释放的单元数」要含数据单元；K9′（R7(b)）再加中间版 I。
+        // R1（第三节 3.2 ①）：K6 积压的「每次持久化释放的单元数」要含数据单元；K10（R7(b)）再加中间版 I。
         let release_backlog_units = previous_written_units + distinct_data_units_touched + extra_allocation_release_insertions;
         let allocation_entries = device_count * (live_units + geometry.backlog_generations as f64 * release_backlog_units);
         let allocation_layers_now = tree_layers(allocation_entries.round() as u64, allocation_leaf_cap, allocation_internal_cap, 1);
@@ -1020,7 +1020,7 @@ fn solve_jia_publish_with_suppressed_fixed_points_and_tree_count(shape: PoolShap
         geometry,
         suppressed,
         tree_table_entry_count,
-        0.0, // 甲没有中间版（K9′ 只对 WAL 两臂有意义）。
+        0.0, // 甲没有中间版（K10 只对 WAL 两臂有意义）。
     );
 
     let written_units = fsync_data_unit_count as f64 + core.written_units;
@@ -1539,7 +1539,7 @@ mod jia_anchor_tests {
 }
 
 // ============================================================
-// 六、5.4 wal_full 与乙-M（K9′，第 6 行三臂）
+// 六、5.4 wal_full 与乙-M（K10，第 6 行三臂）
 // ============================================================
 
 /// 岔路单第 6 行的 WAL 两臂。
@@ -1675,7 +1675,7 @@ fn solve_write_ahead_log_batch_fsync(shape: PoolShape, arm: WriteAheadLogArm, co
 }
 
 /// WAL 两臂一次 checkpoint 写出的东西：四样固定点的间隔净改动 + 乙额外补的用户树祖先追赶
-/// + K9′（R7）中间版释放记录的支撑量（Q6.6/Q6.9/B11）。
+/// + K10（R7）中间版释放记录的支撑量（Q6.6/Q6.9/B11）。
 #[derive(Clone, Debug)]
 struct WriteAheadLogCheckpointOutcome {
     extent_catch_up_bytes: u64,
@@ -1752,7 +1752,7 @@ fn jia_convergence_and_saturation_status(outcome: &JiaPublishOutcome) -> (bool, 
     )
 }
 
-/// WAL checkpoint 结果上的 F2 判定（第 6 行 wal_full / 乙-M 两臂，K9 与 K9′ 都要看）。
+/// WAL checkpoint 结果上的 F2 判定（第 6 行 wal_full / 乙-M 两臂，K9 与 K10 都要看）。
 fn checkpoint_convergence_and_saturation_status(outcome: &WriteAheadLogCheckpointOutcome) -> (bool, Vec<&'static str>) {
     convergence_and_saturation_status(
         outcome.fixed_point_iterations,
@@ -2023,7 +2023,7 @@ fn solve_write_ahead_log_batch_checkpoint(shape: PoolShape, arm: WriteAheadLogAr
 }
 
 /// 求一格 WAL 两臂一次 checkpoint（间隔 `interval_fsyncs` 次 fsync 之后）的写出。
-/// `intermediate_version_policy`：K9（不进积压）或 K9′（R7，中间版进积压 + 尾部插入）。
+/// `intermediate_version_policy`：K9（不进积压）或 K10（R7，中间版进积压 + 尾部插入）。
 fn solve_write_ahead_log_checkpoint(shape: PoolShape, arm: WriteAheadLogArm, interval_fsyncs: u64, intermediate_version_policy: IntermediateVersionPolicy) -> WriteAheadLogCheckpointOutcome {
     let geometry = shape.geometry;
     let data_unit_count = shape.family.data_unit_count(shape.file_count);
@@ -2151,7 +2151,7 @@ mod write_ahead_log_anchor_tests {
         PoolShape { file_count, family, placement, policy, geometry: Geometry::main() }
     }
 
-    /// B4（第七节 7.2）：wal_full-K9′，P=1、F1、seq、主几何；K9 与 K9′ 在 N=1 逐字段相同（B19）。
+    /// B4（第七节 7.2）：wal_full-K10，P=1、F1、seq、主几何；K9 与 K10 在 N=1 逐字段相同（B19）。
     #[test]
     fn write_ahead_log_full_at_file_count_1_matches_the_anchor() {
         let fsync = solve_write_ahead_log_fsync(shape_at(1, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced), WriteAheadLogArm::WriteAheadLogFull);
@@ -2173,7 +2173,7 @@ mod write_ahead_log_anchor_tests {
         }
     }
 
-    /// B5（第七节 7.2）：乙-M-K9′，P=1、F1、seq、主几何。
+    /// B5（第七节 7.2）：乙-M-K10，P=1、F1、seq、主几何。
     #[test]
     fn write_ahead_log_leaf_at_file_count_1_matches_the_anchor() {
         let fsync = solve_write_ahead_log_fsync(shape_at(1, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced), WriteAheadLogArm::WriteAheadLogLeaf);
@@ -2212,16 +2212,16 @@ mod write_ahead_log_anchor_tests {
         assert!(checkpoint_at_file_count_145.extent_catch_up_bytes > 0, "extent 根追赶应该非零");
         assert!(checkpoint_at_file_count_145.inode_catch_up_bytes > 0, "inode 根追赶应该非零");
 
-        // K9′：P=1、N=16 一格 wal_full 中间版 60、分配记录树 [5,1]；乙-M 中间版 45、[4,1]（B11）。
+        // K10：P=1、N=16 一格 wal_full 中间版 60、分配记录树 [5,1]；乙-M 中间版 45、[4,1]（B11）。
         let checkpoint_full_released_and_backlogged = solve_write_ahead_log_checkpoint(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogFull, 16, IntermediateVersionPolicy::ReleasedAndBacklogged);
         assert_eq!(checkpoint_full_released_and_backlogged.intermediate_version_total, 60.0, "wal_full 中间版：数据 15+extent 15+inode 叶 15+inode 根 15");
-        assert_eq!(checkpoint_full_released_and_backlogged.allocation_layers, vec![5, 1], "wal_full-K9′ 分配记录树 [5,1]");
+        assert_eq!(checkpoint_full_released_and_backlogged.allocation_layers, vec![5, 1], "wal_full-K10 分配记录树 [5,1]");
         let checkpoint_leaf_released_and_backlogged = solve_write_ahead_log_checkpoint(shape_at_file_count_1, WriteAheadLogArm::WriteAheadLogLeaf, 16, IntermediateVersionPolicy::ReleasedAndBacklogged);
         assert_eq!(checkpoint_leaf_released_and_backlogged.intermediate_version_total, 45.0, "乙-M 中间版：数据 15+extent 15+inode 叶 15（无 inode 根）");
-        assert_eq!(checkpoint_leaf_released_and_backlogged.allocation_layers, vec![4, 1], "乙-M-K9′ 分配记录树 [4,1]");
+        assert_eq!(checkpoint_leaf_released_and_backlogged.allocation_layers, vec![4, 1], "乙-M-K10 分配记录树 [4,1]");
     }
 
-    /// B19：N_b=1（N=1、concurrent_fsync_count=1）的格上，K9 与 K9′ 逐字段相同——中间版恒 0。
+    /// B19：N_b=1（N=1、concurrent_fsync_count=1）的格上，K9 与 K10 逐字段相同——中间版恒 0。
     #[test]
     fn batch_count_equal_one_cells_have_zero_intermediate_versions_and_not_tracked_equals_released_and_backlogged() {
         let shape = shape_at(1, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced);
@@ -2229,7 +2229,7 @@ mod write_ahead_log_anchor_tests {
             let not_tracked = solve_write_ahead_log_checkpoint(shape, arm, 1, IntermediateVersionPolicy::NotTracked);
             let released_and_backlogged = solve_write_ahead_log_checkpoint(shape, arm, 1, IntermediateVersionPolicy::ReleasedAndBacklogged);
             assert_eq!(released_and_backlogged.intermediate_version_total, 0.0, "arm={arm:?}");
-            assert_eq!(not_tracked.total_bytes(), released_and_backlogged.total_bytes(), "arm={arm:?}：N=1 时 K9 与 K9′ 应该逐字节相同");
+            assert_eq!(not_tracked.total_bytes(), released_and_backlogged.total_bytes(), "arm={arm:?}：N=1 时 K9 与 K10 应该逐字节相同");
             assert_eq!(not_tracked.write_calls, released_and_backlogged.write_calls, "arm={arm:?}");
         }
         // wal_full − 甲 = 8192（一条记录的差，第一节「读法写死」N_b=1 那一条）。
@@ -2260,7 +2260,7 @@ mod write_ahead_log_anchor_tests {
         }
     }
 
-    /// V2：K9′ 的摊销字节 / 写请求不小于 K9（R7(b) 只加，不减）。
+    /// V2：K10 的摊销字节 / 写请求不小于 K9（R7(b) 只加，不减）。
     #[test]
     fn released_and_backlogged_never_amortizes_cheaper_than_not_tracked() {
         for file_count in [1u64, 145, 10_000] {
@@ -2330,8 +2330,8 @@ mod row7_group_commit_tests {
         assert!((amortize_batch_per_fsync(jia.total_bytes(), 2) - 205_056.0).abs() < 1e-9);
         assert!((amortize_batch_per_fsync(jia.write_calls, 2) - 11.5).abs() < 1e-9);
 
-        // g=0、N=16（N_b=8）：wal_full-K9′ / 乙-M-K9′ checkpoint 与摊销；中间版 21 / 14；
-        // g=0 下 K9′ 与 K9 字节相同（积压乘数是 0）。
+        // g=0、N=16（N_b=8）：wal_full-K10 / 乙-M-K10 checkpoint 与摊销；中间版 21 / 14；
+        // g=0 下 K10 与 K9 字节相同（积压乘数是 0）。
         let no_backlog_shape = shape_at(100, Family::OneDataUnitPerFile, Placement::Sequential, PositionPolicy::Balanced);
         let no_backlog_shape = PoolShape { geometry: Geometry { backlog_generations: 0, ..no_backlog_shape.geometry }, ..no_backlog_shape };
         let write_ahead_log_full_fsync = solve_write_ahead_log_batch_fsync(no_backlog_shape, WriteAheadLogArm::WriteAheadLogFull, 2, true);
@@ -2347,7 +2347,7 @@ mod row7_group_commit_tests {
         assert_eq!(checkpoint_leaf_released_and_backlogged.write_calls, 15);
         assert_eq!(checkpoint_full_released_and_backlogged.intermediate_version_total, 21.0, "wal_full 中间版");
         assert_eq!(checkpoint_leaf_released_and_backlogged.intermediate_version_total, 14.0, "乙-M 中间版");
-        assert_eq!(checkpoint_full_released_and_backlogged.total_bytes(), checkpoint_full_not_tracked.total_bytes(), "g=0 下 K9′ 与 K9 字节应该相同");
+        assert_eq!(checkpoint_full_released_and_backlogged.total_bytes(), checkpoint_full_not_tracked.total_bytes(), "g=0 下 K10 与 K9 字节应该相同");
 
         let amortized_full = (write_ahead_log_full_fsync.total_bytes() as f64 * 8.0 + checkpoint_full_released_and_backlogged.total_bytes() as f64) / 16.0;
         let amortized_leaf = (write_ahead_log_leaf_fsync.total_bytes() as f64 * 8.0 + checkpoint_leaf_released_and_backlogged.total_bytes() as f64) / 16.0;
@@ -2871,7 +2871,7 @@ fn main() {
         ))
     );
 
-    // 阳性对照（5.5）：三条臂各自的格与「必须出现的差」，K9 与 K9′ 都报。
+    // 阳性对照（5.5）：三条臂各自的格与「必须出现的差」，K9 与 K10 都报。
     let control_shape = PoolShape { file_count: 1, family: Family::OneDataUnitPerFile, placement: Placement::Sequential, policy: PositionPolicy::Balanced, geometry: Geometry::main() };
     let jia_fsync = solve_jia_publish(control_shape).total_bytes();
     let write_ahead_log_full_fsync = solve_write_ahead_log_fsync(control_shape, WriteAheadLogArm::WriteAheadLogFull).total_bytes();
@@ -2918,7 +2918,7 @@ fn main() {
                         let amortized_full_released_and_backlogged = amortize(write_ahead_log_full_fsync.total_bytes(), cp_full_released_and_backlogged.total_bytes(), interval);
                         let amortized_leaf_released_and_backlogged = amortize(write_ahead_log_leaf_fsync.total_bytes(), cp_leaf_released_and_backlogged.total_bytes(), interval);
 
-                        // Q6.3：三条臂之比（fsync 行 / 摊销行都报，用 K9′ 的摊销值）。
+                        // Q6.3：三条臂之比（fsync 行 / 摊销行都报，用 K10 的摊销值）。
                         let ratio_jia_over_full = jia_bytes as f64 / amortized_full_released_and_backlogged;
                         let ratio_jia_over_leaf = jia_bytes as f64 / amortized_leaf_released_and_backlogged;
                         let ratio_full_over_leaf = amortized_full_released_and_backlogged / amortized_leaf_released_and_backlogged;
@@ -2927,12 +2927,12 @@ fn main() {
                         let saved_share_write_ahead_log_full_bytes = 1.0 - amortized_full_released_and_backlogged / jia_bytes as f64;
                         let saved_share_write_ahead_log_leaf_bytes = 1.0 - amortized_leaf_released_and_backlogged / jia_bytes as f64;
 
-                        // Q6.6：K9′ 比 K9 多写多少。
+                        // Q6.6：K10 比 K9 多写多少。
                         let delta_full_bytes = amortized_full_released_and_backlogged - amortized_full_not_tracked;
                         let delta_leaf_bytes = amortized_leaf_released_and_backlogged - amortized_leaf_not_tracked;
 
                         // F2（第十节）：不动点第一半（撞迭代上限未收敛）与第二半（某棵树第 0 层节点数 ≥ 64
-                        // 且脏节点占比 ≥ 50%）——甲与四条 WAL checkpoint 核心（K9 / K9′ × wal_full / 乙-M）分开判。
+                        // 且脏节点占比 ≥ 50%）——甲与四条 WAL checkpoint 核心（K9 / K10 × wal_full / 乙-M）分开判。
                         let (jia_unconverged, jia_saturated_trees) = jia_convergence_and_saturation_status(&jia);
                         let (full_not_tracked_unconverged, full_not_tracked_saturated_trees) = checkpoint_convergence_and_saturation_status(&cp_full_not_tracked);
                         let (full_released_and_backlogged_unconverged, full_released_and_backlogged_saturated_trees) = checkpoint_convergence_and_saturation_status(&cp_full_released_and_backlogged);
@@ -3039,7 +3039,7 @@ fn main() {
         let no_backlog_shape = PoolShape { geometry: Geometry { backlog_generations: 0, ..Geometry::main() }, ..base_shape };
         let reverse_pbs_shape = PoolShape { geometry: Geometry { physical_block_size_bytes: REVERSE_PHYSICAL_BLOCK_SIZE_BYTES, ..Geometry::main() }, ..base_shape };
 
-        for (label, shape) in [("phi_0.5", half_fill_shape), ("k3_prime", reverse_identity_reference_shape), ("g_0", no_backlog_shape), ("pbs_4096", reverse_pbs_shape)] {
+        for (label, shape) in [("phi_0.5", half_fill_shape), ("k11", reverse_identity_reference_shape), ("g_0", no_backlog_shape), ("pbs_4096", reverse_pbs_shape)] {
             let jia = solve_jia_publish(shape).total_bytes();
             let write_ahead_log_full = solve_write_ahead_log_fsync(shape, WriteAheadLogArm::WriteAheadLogFull).total_bytes();
             let write_ahead_log_leaf = solve_write_ahead_log_fsync(shape, WriteAheadLogArm::WriteAheadLogLeaf).total_bytes();
@@ -3055,9 +3055,9 @@ fn main() {
             );
         }
 
-        // K9′-b（R7 反向取样点）：中间版不进积压——只影响 s，不影响 jia/fsync。
-        let intermediate_version_alternate_reading_note = "K9′-b（中间版不进积压）与 N 按批计（第 7 行才有 concurrent_fsync_count 轴，这一次只报占位）在这一版未建独立开关，交主 agent";
-        println!("{}", emitter.emit_raw(&format!("name=geometry_sensitivity_sample_row6 point=k9prime_b_not_modeled_this_pass p={representative_file_count} note={intermediate_version_alternate_reading_note:?}")));
+        // K12（R7 反向取样点）：中间版不进积压——只影响 s，不影响 jia/fsync。
+        let intermediate_version_alternate_reading_note = "K12（中间版不进积压）与 N 按批计（第 7 行才有 concurrent_fsync_count 轴，这一次只报占位）在这一版未建独立开关，交主 agent";
+        println!("{}", emitter.emit_raw(&format!("name=geometry_sensitivity_sample_row6 point=k12_not_modeled_this_pass p={representative_file_count} note={intermediate_version_alternate_reading_note:?}")));
 
         // 独立散点（R6 反向取样点）：rand 下把间隔并集当独立散点，不当散连续组。
         let rand_shape = PoolShape { placement: Placement::Random, ..base_shape };
@@ -3181,7 +3181,7 @@ fn main() {
                                     }
                                 }
 
-                                // F2（第十节）：甲与两条 WAL checkpoint 核心（K9′）分开判；不拿 F2 触发的格判臂（登记原文）。
+                                // F2（第十节）：甲与两条 WAL checkpoint 核心（K10）分开判；不拿 F2 触发的格判臂（登记原文）。
                                 let (jia_unconverged, jia_saturated_trees) = jia_convergence_and_saturation_status(&jia);
                                 let (full_unconverged, full_saturated_trees) = checkpoint_convergence_and_saturation_status(&checkpoint_full);
                                 let (leaf_unconverged, leaf_saturated_trees) = checkpoint_convergence_and_saturation_status(&checkpoint_leaf);
@@ -3265,7 +3265,7 @@ fn main() {
             ))
         );
 
-        // 不共享取随机（F9）：这一版没有建独立开关（与 K9′-b、N 按批计不同，这一条完全未实现）。
+        // 不共享取随机（F9）：这一版没有建独立开关（与 K12、N 按批计不同，这一条完全未实现）。
         let unshared_random_note = "不共享取随机（k 个文件在全池均匀独立地落，R6 的 N_g=concurrent_fsync_count、s=d）这一版没有建可计算的开关，F9 答不了，交下一段或主 agent";
         println!("{}", emitter.emit_raw(&format!("name=geometry_sensitivity_sample_row7 point=unshared_random_not_modeled_this_pass p=10000 note={unshared_random_note:?}")));
     }

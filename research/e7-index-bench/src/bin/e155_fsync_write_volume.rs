@@ -45,7 +45,7 @@ const REVERSE_PHYSICAL_BLOCK_SIZE_BYTES: u64 = 4096;
 const NODE_HEADER_BASE_BYTES: u64 = 86 + 29;
 /// 节点指针宽（D19 已定项 8）。
 const NODE_POINTER_BYTES: u64 = 86;
-/// K3′ 反向取样点：内部条目再加身份引用 26 字节。
+/// K11 反向取样点：内部条目再加身份引用 26 字节。
 const IDENTITY_REFERENCE_EXTRA_BYTES: u64 = 26;
 
 const EXTENT_KEY_BYTES: u64 = 24;
@@ -87,7 +87,7 @@ const fn node_capacity(key_bytes: u64, entry_bytes: u64) -> u64 {
     (NODE_BYTES - node_header_bytes(key_bytes)) / entry_bytes
 }
 
-/// 内部节点条目宽：分隔 key + 子指针（K3 主几何）；K3′ 反向取样点再加身份引用 26 字节。
+/// 内部节点条目宽：分隔 key + 子指针（K3 主几何）；K11 反向取样点再加身份引用 26 字节。
 const fn internal_entry_bytes(key_bytes: u64, identity_reference: bool) -> u64 {
     key_bytes + NODE_POINTER_BYTES + if identity_reference { IDENTITY_REFERENCE_EXTRA_BYTES } else { 0 }
 }
@@ -167,14 +167,14 @@ mod capacity_tests {
         assert_eq!(UNIT_BYTES - 105 - 29, 32634, "数据单元载荷上限");
     }
 
-    /// B1 补充（`anchors2.py`）：记账内部扇出、K3′ 反向取样点的四棵树内部容量。
+    /// B1 补充（`anchors2.py`）：记账内部扇出、K11 反向取样点的四棵树内部容量。
     #[test]
     fn accounting_internal_capacity_and_identity_reference_variant_match_the_anchors() {
         assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, false)), 150);
-        assert_eq!(node_capacity(EXTENT_KEY_BYTES, internal_entry_bytes(EXTENT_KEY_BYTES, true)), 119, "K3′ extent");
-        assert_eq!(node_capacity(ALLOCATION_KEY_BYTES, internal_entry_bytes(ALLOCATION_KEY_BYTES, true)), 133, "K3′ 分配记录");
-        assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, true)), 121, "K3′ 记账");
-        assert_eq!(node_capacity(MAPPING_KEY_BYTES, internal_entry_bytes(MAPPING_KEY_BYTES, true)), 116, "K3′ 映射");
+        assert_eq!(node_capacity(EXTENT_KEY_BYTES, internal_entry_bytes(EXTENT_KEY_BYTES, true)), 119, "K11 extent");
+        assert_eq!(node_capacity(ALLOCATION_KEY_BYTES, internal_entry_bytes(ALLOCATION_KEY_BYTES, true)), 133, "K11 分配记录");
+        assert_eq!(node_capacity(ACCOUNTING_KEY_BYTES, internal_entry_bytes(ACCOUNTING_KEY_BYTES, true)), 121, "K11 记账");
+        assert_eq!(node_capacity(MAPPING_KEY_BYTES, internal_entry_bytes(MAPPING_KEY_BYTES, true)), 116, "K11 映射");
     }
 
     /// K2：inode 树恒 ≥ 2 层，即便条目数只有 1（D8 已定项 6，根恒码 2）。
@@ -473,10 +473,10 @@ impl Family {
 #[derive(Clone, Copy, Debug)]
 struct Geometry {
     fill_ratio: FillRatio,
-    identity_reference: bool, // K3（false）/ K3′（true）
+    identity_reference: bool, // K3（false）/ K11（true）
     backlog_generations: u64, // g：主 24，反向 0
     physical_block_size_bytes: u64,
-    unaccounted_switchback: bool, // K9′（true）：WAL 两臂 checkpoint 多写已释放记录，甲不受影响
+    unaccounted_switchback: bool, // K10（true）：WAL 两臂 checkpoint 多写已释放记录，甲不受影响
 }
 
 impl Geometry {
@@ -2101,7 +2101,7 @@ fn main() {
 
         for (label, shape) in [
             ("phi_0.5", half_fill_shape),
-            ("k3_prime", reverse_identity_reference_shape),
+            ("k11", reverse_identity_reference_shape),
             ("g_0", no_backlog_shape),
             ("pbs_4096", reverse_pbs_shape),
         ] {
@@ -2118,13 +2118,13 @@ fn main() {
             );
         }
 
-        // K9′：只对 WAL 两臂 checkpoint 有意义（甲不受影响）。
+        // K10：只对 WAL 两臂 checkpoint 有意义（甲不受影响）。
         let checkpoint_full = solve_write_ahead_log_checkpoint(base_shape, WriteAheadLogArm::WriteAheadLogFull, 16).total_bytes();
         let checkpoint_leaf = solve_write_ahead_log_checkpoint(base_shape, WriteAheadLogArm::WriteAheadLogLeaf, 16).total_bytes();
         println!(
             "{}",
             emitter.emit_raw(&format!(
-                "name=geometry_sensitivity_sample point=k9_prime_not_modeled p={representative_file_count} note=K9′（间隔内被换掉的中间版也写一条已释放的分配记录）未建，checkpoint_bytes_k9_full={checkpoint_full} checkpoint_bytes_k9_leaf={checkpoint_leaf}"
+                "name=geometry_sensitivity_sample point=k10_not_modeled p={representative_file_count} note=K10（间隔内被换掉的中间版也写一条已释放的分配记录）未建，checkpoint_bytes_k9_full={checkpoint_full} checkpoint_bytes_k9_leaf={checkpoint_leaf}"
             ))
         );
     }

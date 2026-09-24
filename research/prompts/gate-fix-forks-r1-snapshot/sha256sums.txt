@@ -1,0 +1,21 @@
+91dab06d9b1964e8b58bc31cbed28848591a5a9a74905fcc52bdb3ee85600c7c  .claude/gate.d/10-kb-rot.sh
+865ba03772bb15b518f471eb4f782fa832a8f6ff8a4f75281e3719a7e4d72015  .claude/gate.d/80-absolute-assertions.sh
+5aa063ea5fbaeb10bd6460389ac1da4d25cead3f56e8ff947145197f6227bb51  .claude/gate.d/52-segment-registry.sh
+75579fc6133dbcbd764af6af9b64b0e09223317d60675148deb66ad93d9d1ba0  .claude/gate.d/21-decision-items-sync.sh
+7cf3437a8c97317e24886210d14b40ca62080255d359c290eaf73245ff610e9d  .claude/gate.d/31-blocking-verdict.sh
+d4f65a4c1eaa1a61bb6f059a2eae3eb6d30fa2807445d8cbd1db42631745e865  .claude/gate.d/57-lkmm.sh
+748cf0ef4a5d9d04c7ef79d65521a51c6df1806615e6c64621706e19ae090aa9  .claude/gate.d/70-citations.sh
+725267e91ca5fb7fc28ceab3eea72ad5b93fea0ac4cc6cf55dbf30c969da2a44  .claude/gate.d/73-research-gate-lint.sh
+735ef6e92f72e06b039d312ceda756dd2592c42e2b031238e28b2e40c3ddfce9  .claude/gate.d/77-test-environment.sh
+1d38c9300281932b854d01589c37d5dd2e3bb55288316cc9b92cf9167b73cc0b  .claude/gate.d/92-layout-checker-sync.sh
+91e2bd90df9dfe2cb947b40080c819ce08168238b2832a53c4677776fd2c130e  .claude/gate.d/47-research-script-selftests.sh
+07d8378da3aeb7ba5b213d4b9c07579959ca4ed4a6e1d1499d5686b9470dbe4f  .claude/gate.d/lib-history-brief.py
+2bd4d38937196fff38336fda62ad5b990c7936e67b82ab321b8a773b2f442253  .claude/gate.d/lib-format-const.py
+9cc1b232540d5a831a244b6cdcf1badbe35f85d622be10324a4dae545e4c0864  research/scripts/changed-paths.sh
+f6fbaddc486bc1562f89ae2e4da416b018f6338d14c5073a5039414d2337c42e  .claude/scripts/gen-decision-items.py
+f76610e36b32be9ae795d7eee44f776d4f15764ed9649ebc8438606f5dd5a6d8  .claude/kb/decisions/08-核心索引结构.md
+c7476cbd10c4453b0977bdfd29bb2d7b7ddb147dd32a0a0cf470b3ff9494fd9e  .claude/rules/fs-design.md
+e5f8f74065813f05e90ea1a57345df4df1bbe4ae9e24f33df57ae8c1ecfb9424  .claude/rules/implementation-workflow.md
+dfaa21a2520b570606ed1f1b8056011fd46bbd10585124db0da328e567ea01f4  .claude/rules/path-moves.md
+4f9b28e6ca839bb49e2b1001116038a53508f78db2e0e4c7477f446237def5f0  .claude/rules/three-way-inference.md
+快照时刻 14:09:00 UTC

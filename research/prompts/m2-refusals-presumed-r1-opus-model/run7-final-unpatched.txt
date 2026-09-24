@@ -1,0 +1,32 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.24s
+     Running tests/opus_m2_refusals_r1.rs (target/debug/deps/opus_m2_refusals_r1-d5800afe1ef4426e)
+
+running 9 tests
+test probe_q1_raising_the_floor_in_the_pool_creating_process ... probe Q1 现行 txg=CheckpointTxg(9)，根指着的实例表诞生 txg=CheckpointTxg(0)
+probe Q1 抬 F 前后盘上快照相等: true（录制流步数 198 → 198）
+probe Q1 抬 F 到 4: RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion
+probe Q1 checker 违例: []
+ok
+test probe_what_actually_blocks_the_second_mount_of_a_formatted_pool ... probe 第一次挂载 Ok: instance=InstanceGeneration(1) row_publish_txg=CheckpointTxg(1) warm_ups=1
+probe 第二次挂载 InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) }
+probe checker 违例: []
+ok
+test q1_raising_the_floor_is_refused_for_the_whole_life_of_the_pool_creating_process ... Q1 重开之后抬 F 到 8: Ok(ceiling=CheckpointTxg(9), publishes=2, reclaimed=41)
+ok
+test r1_a_crash_right_after_the_very_first_acquisition_bricks_a_brand_new_pool ... R1 只读挂载: Open(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+ok
+test r1_the_bricked_pool_has_no_rollback_door_either ... R1 两扇门: 可写挂载 Some("InstanceRowsOnVersionWithoutFileUnsupported { chosen_root: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, first_row_instance: InstanceGeneration(1), instance_to_acquire: InstanceGeneration(2) }") / 回退到 (0, 0) Some("RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) })")
+ok
+test r2_rolling_back_to_the_mkfs_root_or_a_warm_up_root_is_refused ... R2 回退到 RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }: RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) })
+R2 回退到 RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }: RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) })
+R2 回退到 RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }: RollbackToVersionWithoutFileUnsupported(RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) })
+ok
+test r3_how_many_independent_faults_it_takes_to_reach_the_refusal ... R3 环里自证过的记录: [1, 2, 3, 4]
+R3 抹掉 3 条记录（6 处独立故障）、留一条之后可写挂载: Ok
+R3 抹掉全部 4 条记录（8 处独立故障）之后可写挂载: FileVersionWithoutAnyJournalRecord
+ok
+test r4_the_same_pool_is_fine_when_the_first_file_version_lands_in_the_mounting_process ... ok
+test r4_the_writable_mount_of_a_formatted_pool_is_honoured_only_once_and_the_refusal_is_r1 ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.66s
+

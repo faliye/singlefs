@@ -1,0 +1,21 @@
+diff --git a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+index fded170..81b10a0 100644
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -856,7 +856,15 @@ pub fn raise_rollback_floor<Device: BlockDevice>(
+                 rollback_floor: new_floor,
+             },
+             Some(&*current),
+-        )?;
++        );
++        // c355-r3 攻方副本变异 V1「失败路径放开扣住」：推空发布半路分不到落点时把扣住的回收槽放开再报错。
++        let next = match next {
++            Ok(next) => next,
++            Err(error) => {
++                allocator.release_reclaim_holds();
++                return Err(error.into());
++            }
++        };
+         let device = device_of_txg(next.root.checkpoint_txg);
+         if !covered.contains(&device) {
+             covered.push(device);

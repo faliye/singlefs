@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# `stage-must-run.sh` 的自证：在一个临时小仓里造七种局面，逐格核它判「要跑」还是「可跳过」。
+# `stage-must-run.sh` 的自证：在一个临时小仓里造几种局面，逐格核它判「要跑」还是「可跳过」；格数由成功行现算。
 # 判别力靠的是**同一个仓、同一道阶段，只换一样东西**，两次判定必须不同；只证明会红不够，
 # 还要证明它分得出差别（`.claude/singlefs-ai-sop/rules/test-discipline.md`「检查本身也可能是错的」）。
 set -uo pipefail
@@ -8,11 +8,13 @@ PREDICATE="$HERE/stage-must-run.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "${work:?}"' EXIT
 failures=0
+checked=0
 
 note() { printf '  %s %s\n' "$1" "$2"; }
 expect() { # <期望退出码> <说明> <环境赋值…>
   local want="$1" what="$2"; shift 2
   local out rc
+  checked=$((checked + 1))
   out="$(env "$@" bash "$PREDICATE" "$work" 59-demo.sh 2>&1)"; rc=$?
   if [[ "$rc" == "$want" ]]; then
     note "✓" "$what（退出码 $rc）"
@@ -65,10 +67,22 @@ expect 0 "到了复用上限就强制跑" SINGLEFS_STAGED_TREE="$base_tree" SING
 expect 1 "上限没到时照旧可跳过" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_REUSE_HOURS=9999
 # ⑧ 强制全跑
 expect 0 "SINGLEFS_GATE_FULL=1 强制跑" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_GATE_FULL=1
+# ⑨ 只改阶段脚本自己 ⇒ 要跑（判据本身变了，上一次的判定不再作数；清单里没登记它也一样）
+printf '#!/usr/bin/env bash\nexit 0\n' > "$work/.claude/gate.d/59-demo.sh"
+git -C "$work" add -A
+expect 0 "只改阶段脚本自己也判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
+rm -f "${work:?}/.claude/gate.d/59-demo.sh" && git -C "$work" add -A
+# ⑩ 同一道阶段在清单里写了两行 ⇒ 两行的路径都要进比对；只动第二行登记的路径也判要跑
+mkdir -p "$work/docs" && printf 'v1\n' > "$work/docs/d.md"
+printf "# 清单\n59-demo.sh\tcrates/ Cargo.toml Cargo.lock\t# 第一行\n59-demo.sh\tdocs/\t# 第二行\n" > "$work/.claude/gate.d/stage-inputs.tsv"
+git -C "$work" add -A && set_green "$(tree_now)"
+expect 1 "两行登记的路径都没变时可跳过" SINGLEFS_STAGED_TREE="$(tree_now)"
+printf 'v2\n' > "$work/docs/d.md" && git -C "$work" add -A
+expect 0 "只动第二行登记的路径也判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
 
 if ((failures > 0)); then
   echo "  ✗ stage-must-run.sh 自证没过：$failures 格判错"
   echo "     → 怎么办：照上面每一格的「要 X 实际 Y」改被测脚本；判据与为什么这么定见它的文件头。"
   exit 1
 fi
-echo "  ✓ stage-must-run.sh 自证通过：9 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、上限到点与没到、强制全跑）"
+echo "  ✓ stage-must-run.sh 自证通过：$checked 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、上限到点与没到、强制全跑、阶段脚本自己变了、清单里同一道阶段写两行）"

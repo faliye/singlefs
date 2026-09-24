@@ -1,0 +1,24 @@
+## P1（base）：抬 F 被拒且原因是每块盘上都没有，按这一步写了几次分组
+raise_writes=0 35
+raise_writes=15 25
+raise_writes=30 5
+## P1（base）总段数 / 抬 F 做成
+75
+10
+## P2（base）
+# P2 summary: histories=3978 escaped=2127
+in-process suffixes: 1430 escaped: 0
+escaped with a mount in the suffix: 2127 escaped without: 0
+## V1 对拍：各臂结局
+base     990 Completed 
+v1     726 Completed     264 NewFinding 
+v2     990 Completed 
+## V1（v1 臂）判红的段按抬 F 那一步的结局分组
+RaisedFloor(F=20,publishes=2)(30) 66 0
+RaisedFloor(F=36,publishes=2)(30) 66 0
+Refused(MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)))(0) 462 264
+Refused(MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)))(15) 330 0
+Refused(MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)))(30) 66 0
+## V2：P1 里抬 F 的结局
+     55 RaisedFloor(F=*,publishes=2)
+     20 RaisedFloor(F=*,publishes=3)
