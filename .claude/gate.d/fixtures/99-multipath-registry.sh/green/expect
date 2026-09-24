@@ -1,2 +1,3 @@
 exit=0
 want=1 份、3 条路径
+want=还没写登记节的 1 份在 multipath-registry-lag.tsv 里、每一份都现存且确实还没写，与基准 HEAD 比没涨

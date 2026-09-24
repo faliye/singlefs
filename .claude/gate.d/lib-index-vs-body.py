@@ -52,7 +52,10 @@ def count_items(body):
         seg = m.group(1) if m else ""
         cut = re.search(r'^#{4}\s', seg, flags=re.M)
         top = seg[:cut.start()] if cut else seg
-        got.append(len(re.findall(r'^\|\s*\d+\s*\|', top, flags=re.M))
+        # 表格行要有**闭合的第二根竖线**，与 `.claude/scripts/gen-decision-items.py` 的 harvest、
+        # `.claude/gate.d/lib-item-ref-status.py` 的分项表逐字同口径：口径不一时，一行畸形表格
+        # 会一边数得到、一边数不到，而两边都不报错。
+        got.append(len(re.findall(r'^\|\s*(\d+)\s*\|[^|]*\|', top, flags=re.M))
                    or len(re.findall(r'^\d+\.\s', top, flags=re.M)))
     return got[0], got[1]
 
@@ -72,9 +75,7 @@ for p in bodies:
         fail = 1
         continue
     num, bs = m.group(1), m.group(2)
-    row = re.search(r'^\| %s（[^|]*\) *\| ([^|]+)\|' % num, idx, flags=re.M)
-    if not row:
-        row = re.search(r'^\| %s（[^|]*） *\| ([^|]+)\|' % num, idx, flags=re.M)
+    row = re.search(r'^\| %s（[^|]*） *\| ([^|]+)\|' % num, idx, flags=re.M)
     if not row:
         print(f"  ✗ {num} 在 decisions.md 索引里找不到对应行")
         print("     → 怎么办：给它补一行 `| D<n>（简称） | 状态 | 结论（简报） | 正文 |`，")

@@ -8,7 +8,7 @@
 #
 # 宁宽勿窄：多写一条路径只会多跑几趟，少写一条会让一次真的改动被跳过。拿不准就写上。
 # 只写从仓库根起的路径；目录写成带斜杠的前缀（git diff 的路径限定就按前缀匹配）。
-54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/	# 跑 crates 的崩溃点重放，与字节布局表、入库产物逐字比对
+54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
 55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock research/scripts/ research/results/	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 research/scripts/
 59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试
 74-model-differential.sh	crates/ Cargo.toml Cargo.lock	# 拿 crates 里的实现与只住内存的理想模型对拍

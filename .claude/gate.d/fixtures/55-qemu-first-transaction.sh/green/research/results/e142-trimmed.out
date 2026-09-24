@@ -1,0 +1,6 @@
+E7RESULT name=segments path=mkfs operations=13 segments=4+1+1+1+4 closed_form=34 kinds=[unit_write×4,barrier]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier]
+E7RESULT name=segments path=instance_acquisition operations=2 segments=2 closed_form=4 kinds=[system_configuration_slot×2]
+E7RESULT name=segments path=warm_up operations=14 segments=2+1+2+2+1+2 closed_form=15 kinds=[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_form=65543 kinds=[unit_write×16,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+E7RESULT name=segments path=post_mkfs_stream operations=39 segments=2+2+1+2+2+1+18+2+1+2 closed_form=262165 kinds=[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[unit_write×16,system_configuration_slot×2,barrier]|[journal_record×2,barrier]|[root_record_fua]|[system_configuration_slot×2]
+E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=19 rollback_floor=0 record_bytes=4096 back_chain=628216162

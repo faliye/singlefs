@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: kb 腐化
+# gate-stage: kb 腐化（1–2 实验号与决策号的引用都有定义；3 不变量声明条数与表对得上、欠账表数得出条数）
 #
 # kb 腐化审计：查「一处改了、引用它的地方没跟着改」。
 #
@@ -9,10 +9,18 @@
 # 这类腐化对模型比对人更危险——检索会把陈旧的那一条**单独**端出来，
 # 既没有上下文也没有对照（singlefs-ai-sop/rules/kb-discipline.md 第 7 条）。
 #
-# 三类机械可判的：
-#   1. 实验状态与引用它的决策不同步（按 git 判：改状态的那个提交有没有同时动 decisions.md）
-#   2. 正文里写死的条数与实际条数对不上
-#   3. 引用了不存在的编号（doc-lint 已覆盖一部分，这里补实验号）
+# 三段，都是机械可判的：
+#   1–2. 引用了不存在的实验号 / 决策号（doc-lint 已覆盖一部分，这里补实验号）
+#   3. 正文写死的条数与实际条数对不上；欠账表数不出条数
+# 实验与决策之间的两件事不在这里判，都归门禁 75 号（三方判决 gate-fix-forks-r1、r2 的 T1）：
+#   「实验改成已跑、引用它的决策有没有同批回看」归 ⑤——表里改过一行不够，正文引了它的每条决策都要回看；
+#   「已跑的实验有没有对应的决策」归 ⑨——表里至少一行支撑、推翻或备料，标题写了作废或退役的不判。
+#
+# 每段的成功行都报检查了多少项；本该有对象却一个都没扫到的，判红
+# （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
+#
+# 判别力：fixtures/10-kb-rot.sh/red 必须判红（悬空的实验号、invariants.md 丢了登记标记、欠账表一行都数不出）；
+# green 必须判绿。
 set -uo pipefail
 # 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。
 cd "${1:-$(dirname "$0")/../..}" || exit 2
@@ -28,126 +36,130 @@ howto() { printf '     → 怎么办： %s\n' "$1"; shift; for l in "$@"; do pri
 # 实测拆分之后这段检查有一段时间对决策文件里的引用完全失明。
 echo "══ kb 腐化审计 ══"
 echo
+# 扫的文件：kb 下全部 .md（递归）加项目规则。数组装、不靠 $(find …) 的分词，文件名里有空格也不散。
+kb_md_files=()
+while IFS= read -r -d '' found_file; do kb_md_files+=("$found_file"); done \
+  < <(find "$KB" -name '*.md' -print0 2>/dev/null)
+shopt -s nullglob
+rule_md_files=(.claude/rules/*.md)
+shopt -u nullglob
+scanned_md_files=("${kb_md_files[@]}" "${rule_md_files[@]}")
+scanned_note="扫 ${#kb_md_files[@]} 份 kb 文件、${#rule_md_files[@]} 份规则"
+
 echo "── 1. 实验号引用是否都有定义 ──"
 missing=0
+experiment_refs=()
 # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
-for e in $(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
-             | grep -oE 'E[0-9]{1,3}' | sort -u); do
-  grep -rqE "^## $e " "$KB/experiments" || { bad "$e 被引用但 experiments/ 下没有它"
+if [[ ${#scanned_md_files[@]} -gt 0 ]]; then
+  mapfile -t experiment_refs < <(grep -ohE '(^|[^A-Za-z0-9/-])E[0-9]{1,3}([^A-Za-z0-9-]|$)' "${scanned_md_files[@]}" 2>/dev/null \
+                                   | grep -oE 'E[0-9]{1,3}' | sort -u)
+fi
+for e in "${experiment_refs[@]}"; do
+  grep -rqE "^## $e " "$KB/experiments" 2>/dev/null || { bad "$e 被引用但 experiments/ 下没有它"
     howto "要么在 experiments/ 下给它建正文（\`## $e <简称>\` 起头），" \
           "要么把引用它的那处改成真实存在的实验号——编号引用悬空，检索到的人会自己补一个。"
     missing=1; }
 done
-[[ $missing -eq 0 ]] && ok "实验号引用全部有定义"
+if [[ ${#experiment_refs[@]} -eq 0 ]]; then
+  bad "一个实验号引用都没扫到（$scanned_note）——这一段没有对象可判"
+  howto "确认门禁是在仓库根上跑的（第一个参数是仓库根）、$KB 目录在；" \
+        "扫到 0 项不是通过（.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。"
+elif [[ $missing -eq 0 ]]; then
+  ok "实验号引用全部有定义：${#experiment_refs[@]} 个不同的实验号（$scanned_note）"
+fi
 
 echo
 echo "── 2. 决策号引用是否都有定义 ──"
 missing=0
-for d in $(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,3}([^A-Za-z0-9-]|$)' $(find "$KB" -name "*.md") .claude/rules/*.md 2>/dev/null \
-             | grep -oE 'D[0-9]{1,3}' | sort -u); do
-  grep -rqE "^## $d " "$KB/decisions"  || { bad "$d 被引用但 decisions/ 下没有它"
+decision_refs=()
+if [[ ${#scanned_md_files[@]} -gt 0 ]]; then
+  mapfile -t decision_refs < <(grep -ohE '(^|[^A-Za-z0-9/-])D[0-9]{1,3}([^A-Za-z0-9-]|$)' "${scanned_md_files[@]}" 2>/dev/null \
+                                 | grep -oE 'D[0-9]{1,3}' | sort -u)
+fi
+for d in "${decision_refs[@]}"; do
+  grep -rqE "^## $d " "$KB/decisions" 2>/dev/null || { bad "$d 被引用但 decisions/ 下没有它"
     howto "要么在 decisions/ 下给它建正文（\`## $d <简称>\` 起头），" \
           "要么把引用它的那处改成真实存在的决策号。"
     missing=1; }
 done
-[[ $missing -eq 0 ]] && ok "决策号引用全部有定义"
-
-echo
-echo "── 3. 已跑的实验，引用它的决策有没有跟着改 ──"
-# 判据：该实验状态行最后一次变动的提交，有没有同时改 decisions.md。
-# 没有 ⇒ 至少要人看一眼。这不是「一定错」，是「一定没人对过」。
-stale=0
-while read -r line; do
-  e="${line%% *}"
-  grep -q "已跑" <<<"$line" || continue
-  # 引用它的决策
-  refs=$(grep -nE "\b$e\b" "$KB/decisions.md" | head -3 | cut -d: -f1 | paste -sd, -)
-  [[ -n "$refs" ]] || continue
-  c=$(git log -1 --format=%h -S"## $e " -- "$KB/experiments" "$KB/experiments.md" 2>/dev/null)
-  [[ -n "$c" ]] || continue
-  # ⚠️ **不许写成 `git show ... | grep -q`**：本脚本开头是 `set -uo pipefail`，
-  # 而 `grep -q` 一命中就退出 ⇒ 前段还没写完就吃 SIGPIPE ⇒ 管道整体 141
-  # ⇒ 一次**命中**被读成「没动过 decisions.md」。
-  # 实测（2026-09-10）：整轮门禁（cargo 构建压着机器）里 E109 那一格判红一次，
-  # 同一份输入空载连跑 23 次全绿——两次的提交号与相邻那格逐字相同，只有这条管道的退出码翻了。
-  # 出路是 `.claude/singlefs-ai-sop/rules/command-safety.md` 自己写的那条：
-  # 先把输出落到变量，判完退出码再处理。
-  stat_out=$(git show --stat --format= "$c" 2>/dev/null || true)
-  if grep -q "decisions.md" <<<"$stat_out"; then
-    ok "$e 已跑，其状态变动的提交 $c 同时动过 decisions.md"
-  else
-    bad "$e 已跑，但把它改成已跑的提交 $c **没有动 decisions.md**（decisions.md 第 $refs 行引用了它）"
-    howto "把这个实验的结论写回它支撑的那条决策，与状态变动同批提交；" \
-          "结论没改变任何决策的话，在实验正文里写明这一点（零结论也是结论）。"
-    stale=1
-  fi
-done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
-[[ $stale -eq 0 ]] && ok "已跑实验与引用它的决策都在同一个提交里动过"
-
-echo
-echo "── 4. 已跑的实验有没有决策引用 ──"
-# 一个实验跑完、产出了决策相关的结果，却没有任何决策引用它 ⇒ 那个结果没落进任何判断。
-# 这不是「引用格式问题」，是**结论悬空**。
-# 出路二：实验正文里一行「**备料**：」，点名它等着的决策或欠账（编号带简称），而且那个编号在 kb 里真有。
-# 此前出路里写着这一句而检查并不认它，照做了也还是红（2026-09-15 E152（按里程碑对比六家文件系统的文件性能） 撞上）；
-# 点名一个不存在的编号照样红，否则「备料」两个字就成了免检章。
-orphan=0
-while read -r line; do
-  e="${line%% *}"
-  grep -q "已跑" <<<"$line" || continue
-  n=$(cat "$KB/decisions.md" "$KB"/decisions/*.md | grep -cE "(^|[^A-Za-z0-9/-])$e([^A-Za-z0-9-]|$)")
-  [[ "$n" -gt 0 ]] && continue
-  body="$(grep -lE "^## $e " "$KB"/experiments/*.md 2>/dev/null | head -1)"
-  reserve=""
-  [[ -n "$body" ]] && reserve="$(grep -m1 -E '^\*\*备料\*\*：' "$body")"
-  waiting_for=""
-  for token in $(grep -oE '(D|C)[0-9]{1,3}（' <<<"$reserve" | tr -d '（' | sort -u); do
-    case "$token" in
-      D*) grep -rqE "^## $token " "$KB/decisions" && waiting_for="$waiting_for $token" ;;
-      C*) grep -qE "^\| $token \|" "$KB/checks-owed.md" && waiting_for="$waiting_for $token" ;;
-    esac
-  done
-  if [[ -n "$waiting_for" ]]; then
-    ok "$e 不被任何决策引用，正文写明是备料，等$waiting_for"
-    continue
-  fi
-  bad "$e 已跑，但决策正文一次都没引用它——它的结论悬空了"
-  howto "在它支撑（或推翻）的那条决策正文里点它的名，写清它证明了什么；" \
-        "确实谁也不支撑的话，在实验正文里写一行「**备料**：……」，点名它等着的决策或欠账（编号带简称，例：D23（journal 的角色与格式）），" \
-        "那个编号要在 decisions/ 下有正文、或在 checks-owed.md 里有一行。"
-  orphan=1
-done < <(cat "$KB"/experiments/*.md | grep -E "^## E[0-9]+ " | sed 's/^## //')
-[[ $orphan -eq 0 ]] && ok "每个已跑实验都被决策引用，或正文写明了备料在等谁"
-
-echo
-echo "── 5. 正文写死的条数 vs 实际条数 ──"
-inv_actual=$(grep -cE '^\| I-[0-9]+\.[0-9]+ ' "$KB/invariants.md")
-# 表里第 2 列是简称（singlefs-ai-sop/rules/kb-discipline.md 第 5 条），陈述在第 3 列
-inv_retired=$(grep -cE '^\| I-[0-9]+\.[0-9]+ \| [^|]* \| \*\*此编号不再使用' "$KB/invariants.md")
-inv_live=$(( inv_actual - inv_retired ))
-# 当前条数的权威登记位是 <!-- invariant-count --> 下一行那句（2026-09-18 立）：历史版本里也有「现共 N 条在用」，
-# 那是当时的数、不跟着改，按文件序取第一处会取到历史里的那一句（实测：2026-09-18 取到 2026-09-14 那条的 66）。
-inv_claim=$(awk '/<!-- invariant-count -->/{found=1; next} found && /现共 [0-9]+ 条在用/{print; exit}' "$KB/invariants.md" | grep -oE '[0-9]+' | head -1)
-if [[ -z "$inv_claim" ]]; then
-  inv_claim=$(grep -oE '现共 [0-9]+ 条在用' "$KB/invariants.md" | head -1 | grep -oE '[0-9]+')
+if [[ ${#decision_refs[@]} -eq 0 ]]; then
+  bad "一个决策号引用都没扫到（$scanned_note）——这一段没有对象可判"
+  howto "确认门禁是在仓库根上跑的、$KB 目录在；" \
+        "扫到 0 项不是通过（.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。"
+elif [[ $missing -eq 0 ]]; then
+  ok "决策号引用全部有定义：${#decision_refs[@]} 个不同的决策号（$scanned_note）"
 fi
-if [[ -n "$inv_claim" && "$inv_claim" != "$inv_live" ]]; then
-  bad "invariants.md 正文声称在用 $inv_claim 条，实际 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
-  howto "把正文那句「现共 N 条在用」改成 $inv_live，或者补回漏掉的那几条——" \
-        "两个数对不上时，读的人不知道该信哪一个。"
+
+echo
+echo "── 3. 正文写死的条数 vs 实际条数 ──"
+if [[ ! -f "$KB/invariants.md" ]]; then
+  bad "找不到 $KB/invariants.md，不变量条数无从核对"
+  howto "确认门禁是在仓库根上跑的；文件真搬了家的话，按 .claude/rules/path-moves.md 把这里的路径一起改。"
 else
-  ok "不变量条数一致：在用 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
+  inv_actual=$(grep -cE '^\| I-[0-9]+\.[0-9]+ ' "$KB/invariants.md")
+  # 表里第 2 列是简称（singlefs-ai-sop/rules/kb-discipline.md 第 5 条），陈述在第 3 列
+  inv_retired=$(grep -cE '^\| I-[0-9]+\.[0-9]+ \| [^|]* \| \*\*此编号不再使用' "$KB/invariants.md")
+  inv_live=$(( inv_actual - inv_retired ))
+  # 当前条数的权威登记位是 <!-- invariant-count --> 下一行那句（2026-09-18 立）：历史版本里也有「现共 N 条在用」，
+  # 那是当时的数、不跟着改，按文件序取第一处会取到历史里的那一句（实测：2026-09-18 取到 2026-09-14 那条的 66）。
+  # 标记丢了、或下一行读不出那句，都判红：退回去取文件里第一处「N 条在用」，取到的正是那句历史。
+  marker_line_number=$(grep -n -m1 -F '<!-- invariant-count -->' "$KB/invariants.md" | cut -d: -f1)
+  if [[ "$inv_actual" -eq 0 ]]; then
+    bad "invariants.md 里一行 \`| I-<章>.<号> \` 表行都没数到——不变量表的写法变了，或这份文件是空的"
+    howto "表行形如 \`| I-1.1 | 简称 | 陈述 | … |\`；写法真改了的话，这里与 36 号的正则一起改。"
+  elif [[ -z "$marker_line_number" ]]; then
+    bad "invariants.md 里没有 <!-- invariant-count --> 标记——当前条数的登记位丢了，读不出正文声称几条（表里在用 $inv_live 条）"
+    howto "在「现共 N 条在用」那句的上一行补回 <!-- invariant-count -->；" \
+          "不许让检查退回去取文件里第一处「N 条在用」：历史版本里那几句记的是当时的数。"
+  else
+    claim_line=$(sed -n "$((marker_line_number + 1))p" "$KB/invariants.md")
+    inv_claim=$(grep -oE '现共 [0-9]+ 条在用' <<<"$claim_line" | grep -oE '[0-9]+' | head -1)
+    if [[ -z "$inv_claim" ]]; then
+      bad "invariants.md 第 $((marker_line_number + 1)) 行（<!-- invariant-count --> 的下一行）读不出「现共 N 条在用」：${claim_line:0:60}"
+      howto "标记的下一行就写那句「现共 $inv_live 条在用（…）」，中间不空行；" \
+            "读不出声明就是没核过，不许当成一致。"
+    elif [[ "$inv_claim" != "$inv_live" ]]; then
+      bad "invariants.md 正文声称在用 $inv_claim 条，实际 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
+      howto "把正文那句「现共 N 条在用」改成 $inv_live，或者补回漏掉的那几条——" \
+            "两个数对不上时，读的人不知道该信哪一个。"
+    else
+      ok "不变量条数一致：正文声称 $inv_claim 条在用，表里在用 $inv_live 条（总行 $inv_actual，退役 $inv_retired）"
+    fi
+  fi
 fi
 # 三段各数各的：欠着的那张表、「### 已还清」那张表、「## 历史版本」里的条目。
 # ⚠️ **分界线是「### 已还清」，不是「## 历史版本」**：已还清那张表住在历史版本**之前**，
 # 按历史版本切会把还清的全算进欠账里——2026-09-16 现查它报「欠 326、已还清 0」，
 # 真数是 297 / 29。一条报错数的检查与没有这条检查，在门禁输出里长得一模一样。
-read -r chk_actual chk_done < <(awk '
-  /^### 已还清/{sec=1; next}
-  /^## 历史版本/{sec=2; next}
-  /^\| C[0-9]+ /{ if(sec==0) a++; else if(sec==1) d++ }
-  END{print a+0, d+0}' "$KB/checks-owed.md")
-ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
+# 数不出来（文件不在、awk 出错、两张表一行都没数到）判红：两个空白或两个 0 印在成功行里，看着就像数过了。
+if [[ ! -f "$KB/checks-owed.md" ]]; then
+  bad "找不到 $KB/checks-owed.md，欠账条数取不到"
+  howto "确认门禁是在仓库根上跑的；文件真搬了家的话，按 .claude/rules/path-moves.md 把这里的路径一起改。"
+else
+  # 开着与已还清的切法用共用读法 lib-owed.py（67、92、96 号同一份），不在这里再抄一份 awk
+  chk_counts=""
+  if chk_counts=$(python3 - "$(cd "$(dirname "$0")" && pwd)/lib-owed.py" "$KB/checks-owed.md" <<'PY_OWED'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("lib_owed", sys.argv[1])
+lib_owed = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib_owed)
+table = lib_owed.read_owed_table(sys.argv[2])
+print(len(table.open_names), len(table.paid_names), int(table.paid_heading_found))
+PY_OWED
+  ); then :; else chk_counts=""; fi
+  read -r chk_actual chk_done chk_heading <<<"$chk_counts"
+  if [[ -z "${chk_actual:-}" || -z "${chk_done:-}" ]]; then
+    bad "共用读法 lib-owed.py 没数出 checks-owed.md 的条数（输出「$chk_counts」）"
+    howto "单独跑一遍上面那段 python 看它报什么错；数不出来就是没核过，不许当成数过了。"
+  elif [[ $((chk_actual + chk_done)) -eq 0 ]]; then
+    bad "checks-owed.md 里一行 \`| C<n> \` 都没数到（欠着 0、已还清 0）——欠账表的写法变了，或这份文件是空的"
+    howto "欠账行形如 \`| C12 | 简称 | … |\`；写法真改了的话，改 .claude/gate.d/lib-owed.py 的正则，67、92、96 号与这里一起跟上。"
+  elif [[ "${chk_heading:-0}" != 1 ]]; then
+    bad "checks-owed.md 里认不出「已还清」标题——开着的与已还清的分不开，$chk_actual 条全被算成欠着"
+    howto "已还清那张表上面要有一行「### 已还清」；标题改过名的话，改 .claude/gate.d/lib-owed.py 认标题的那条正则。"
+  else
+    ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
+  fi
+fi
 
 echo
 if [[ $fail -ne 0 ]]; then

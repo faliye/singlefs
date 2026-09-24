@@ -7,7 +7,7 @@
 #
 # 边界（rules/command-safety.md）：**本脚本不跑 sudo。**
 # 系统包只打印那条命令，由人自己执行——静默改系统比缺个包危险得多。
-source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../singlefs-ai-sop/scripts/lib.sh"
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/singlefs"
 KTREE_CACHE="$CACHE/linux-memory-model"

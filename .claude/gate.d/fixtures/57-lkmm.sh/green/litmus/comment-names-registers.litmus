@@ -1,0 +1,24 @@
+C comment-names-registers
+
+(*
+ * 样本：头部注释里写寄存器名。读者把标志读进 r0；注释里提到的 r1、r2 不是用了它们，
+ * 寄存器声明只在剥掉注释的正文里查，这一条不该因为 r1、r2 判红。
+ *
+ * singlefs-expect: Sometimes
+ *)
+
+{}
+
+P0(int *flag)
+{
+	WRITE_ONCE(*flag, 1);
+}
+
+P1(int *flag)
+{
+	int r0;
+
+	r0 = READ_ONCE(*flag);
+}
+
+exists (1:r0=0)

@@ -61,7 +61,7 @@ legacy_leg_form = re.compile(r"^(?P<prefix>[^_].*?)(?:(?:-(?:forward|reverse|att
 # 而登记表本身是归档规则明令保留的（门禁 66 号的输入），两边对不上不是登记错了，是这道检查只看了树。
 archived_names = set()
 try:
-    log = subprocess.run(["git", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
+    log = subprocess.run(["git", "-c", "core.quotepath=false", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
                           "--", prompts_dir], capture_output=True, text=True, check=True).stdout
     for entry in log.split("\n"):
         entry = entry.strip()

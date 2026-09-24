@@ -6,7 +6,7 @@
 # 派 sweep 做阶段同步，主 agent 判完每处命中写一份同步记录。这一道判的是那份记录的形式。
 #
 # 改动范围：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；工作区、暂存区与未跟踪文件都算
-# （取法与 56-crates-adversarial-review.sh 相同，只多一个 core.quotepath=false：不加的话中文路径被 git 转成带引号的八进制，载体对不上）。
+# （取法用共用库 research/scripts/changed-paths.sh 的 gate 取法，与 56、69、97 号同一份代码；它的 git 调用带 core.quotepath=false，中文路径不转义）。
 #
 # 判据：
 #   ① 触发文件：改动范围里命中 `.claude/gate.d/knowledge-sync-triggers.tsv` 里任一条正则的路径。
@@ -66,13 +66,15 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
-base="HEAD"
-if [[ -n "${GATE_BASE:-}" ]] && git rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
-  base="$GATE_BASE"
-elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1; then
-  base="$(git merge-base HEAD '@{upstream}')"
-fi
-changed="$( { git -c core.quotepath=false diff --name-only "$base" -- ; git -c core.quotepath=false diff --name-only --cached -- ; git -c core.quotepath=false ls-files --others --exclude-standard -- ; } | sort -u )"
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里再抄一份。"; exit 1; }
+base="$(gate_diff_base gate)"
+changed="$(gate_changed_paths "$base" untracked)" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 $base）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
+  exit 1
+}
 # 改动清单经进程替换当文件传：当成一个命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
 python3 - "$base" <(printf '%s\n' "$changed") <<'PY'
 import os, re, subprocess, sys

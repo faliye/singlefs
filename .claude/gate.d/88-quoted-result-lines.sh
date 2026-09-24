@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: kb 正文里整行抄的产物行，产物里逐字找得到
+# gate-stage: kb 与 research 正文里整行抄的产物行（只认去掉首尾空白后以 `E7RESULT ` 开头的行），产物里逐字找得到
 #
 # 判据：kb 正文（「## 历史版本」之前；*-history.md 与 decisions-history/ 不算）里去掉首尾空白后
 # 以 `E7RESULT ` 开头的行，必须在 research/results/*.out 的某一行里逐字出现。
@@ -19,17 +19,30 @@
 #   4. **只判这次改动新增或改写的行**（用户 2026-09-21 定）：正文里早先抄下的行是历史，仅作参考——
 #      那一轮跑过、当时对得上，之后产物按「每次提交删上一次的实验记录」删掉了，再判就是判一个不存在的对照。
 #      要推翻早先的结论，按 `.claude/rules/three-way-inference.md` 重新跑三腿，那时产物是新的、本阶段照样判得到。
-#      拿不到 diff 基准时**退回全量判**（保守：宁可多判，不可漏判）。
+#      不在 git 仓里、或取不到新增行（git 失败）时**退回全量判**（保守：宁可多判，不可漏判）。
+#      ⚠️ 没有上游、也没设 GATE_BASE 时，共用脚本的基准是 HEAD，窗口只含工作区与暂存区：已提交没推的那几次不在里面。
+#      这一格与「共用脚本认不认门禁导出的 GATE_DIFF_BASE」同根，交用户定（research/prompts/gate-fix-forks-r1-forks.md 的 T11）。
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 [[ -d .claude/kb ]] || { echo "  ! 找不到 .claude/kb，本阶段无对象可判"; exit 77; }
 
-BASE="${GATE_BASE:-}"
-if [[ -z "$BASE" ]]; then
-  BASE="$(git rev-parse --verify --quiet refs/sop/gate-ok || git rev-parse --verify --quiet refs/singlefs/gate-ok || git rev-parse --verify --quiet '@{upstream}' || true)"
+# 改动范围取共用脚本 research/scripts/changed-paths.sh（门禁 64 号判阶段里不另算一份）：基准 gate_diff_base gate，
+# 新增行 gate_added_lines——未跟踪的文件整份算新增，新写的 kb 页在 git add 之前抄的产物行也要判。
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+ADDED_LINES="$(mktemp)"
+trap 'rm -f "$ADDED_LINES"' EXIT
+SCOPE_BASE=""
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  base="$(gate_diff_base gate)"
+  # research/ 只取 .md：未跟踪的产物可能很大，整份读一遍白费
+  if gate_added_lines "$base" .claude/kb ':(glob)research/**/*.md' > "$ADDED_LINES"; then
+    SCOPE_BASE="$base"
+  fi
 fi
-export GATE_BASE_RESOLVED="$BASE"
+export SCOPE_BASE ADDED_LINES
 
 python3 - <<'PY'
 import glob, os, subprocess, sys
@@ -51,28 +64,19 @@ for path in kb:
         stripped = line.strip()
         if stripped.startswith('E7RESULT '):
             quoted.append((path, number, stripped))
-# 只判这次改动新增或改写的行：拿 diff 基准算出每份 kb 文件新增的 E7RESULT 行，
-# 基准取不到就退回全量判（保守，宁可多判不可漏判）。
-base = os.environ.get('GATE_BASE_RESOLVED', '').strip()
+# 只判这次改动新增或改写的行：共用脚本交来的新增行（路径<TAB>行文）里挑 E7RESULT 行，
+# 不在 git 仓里或取不到新增行（SCOPE_BASE 为空）就退回全量判（保守，宁可多判不可漏判）。
 scope = '全量'
-if base:
+if os.environ.get('SCOPE_BASE', '').strip():
     added = set()
-    for path in kb:
-        try:
-            diff = subprocess.run(['git', 'diff', '--unified=0', base, '--', path],
-                                  capture_output=True, text=True, check=True).stdout
-        except subprocess.CalledProcessError:
-            added = None
-            break
-        for line in diff.split('\n'):
-            if line.startswith('+') and not line.startswith('+++'):
-                stripped = line[1:].strip()
-                if stripped.startswith('E7RESULT '):
-                    added.add((path, stripped))
-    if added is not None:
-        quoted = [(path, number, stripped) for path, number, stripped in quoted
-                  if (path, stripped) in added]
-        scope = '这次改动新增或改写的'
+    with open(os.environ['ADDED_LINES'], encoding='utf-8', errors='replace') as added_handle:
+        for record in added_handle.read().split('\n'):
+            added_path, separator, added_text = record.partition('\t')
+            if separator and added_text.strip().startswith('E7RESULT '):
+                added.add((added_path, added_text.strip()))
+    quoted = [(path, number, stripped) for path, number, stripped in quoted
+              if (path, stripped) in added]
+    scope = '这次改动新增或改写的'
 
 if not quoted:
     print('  ! %s kb 正文里没有整行抄的 E7RESULT 行，本阶段无对象可判' % scope)
@@ -94,7 +98,7 @@ archived_count = 0
 def archived_product_lines():
     global archived_count
     lines = set()
-    log = subprocess.run(['git', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
+    log = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
                           '--', 'research/results'], capture_output=True, text=True).stdout
     commit = None
     for entry in log.split('\n'):
@@ -107,6 +111,18 @@ def archived_product_lines():
         if commit and entry.endswith('.out'):
             blob = subprocess.run(['git', 'show', '%s^:%s' % (commit, entry)],
                                   capture_output=True, text=True)
+            if blob.returncode == 0:
+                archived_count += 1
+                for one in blob.stdout.split('\n'):
+                    lines.add(one.strip().replace('\r', ''))
+    # 正在归档的：HEAD 里还在、工作区里已经删了的产物（这一批照归档规则删上一轮的产物，删除还没提交，
+    # git log --diff-filter=D 还找不到它）。它们的字节就在 HEAD 里，与已提交的归档是同一件事。
+    in_head = subprocess.run(['git', '-c', 'core.quotepath=false', 'ls-tree', '-r', '--name-only', 'HEAD', '--', 'research/results'],
+                             capture_output=True, text=True)
+    for entry in in_head.stdout.split('\n') if in_head.returncode == 0 else []:
+        entry = entry.strip()
+        if entry.endswith('.out') and not os.path.exists(entry):
+            blob = subprocess.run(['git', 'show', 'HEAD:%s' % entry], capture_output=True, text=True)
             if blob.returncode == 0:
                 archived_count += 1
                 for one in blob.stdout.split('\n'):

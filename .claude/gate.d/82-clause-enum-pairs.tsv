@@ -1,0 +1,18 @@
+# 条文里逐个列出来的封闭集合，与代码里兑现它的那个 Rust 枚举，逐个成员对上。
+#
+# 为什么要这张表：2026-09-23 一天之内查出四例「条文与实现说反话」，其中三例的形状相同——
+# 条文列了一个集合，代码里的枚举比它多一个或少一个成员，而没有任何东西会红。
+# 门禁 27 号只管登记过的格式常量，92 号只判「格式变了 checker 没跟」，两道都够不着这一类。
+#
+# 五段，制表符分隔：
+#   1 决策分项（写成「D<n> 已定项 <k>」，门禁按它去 .claude/kb/decisions/ 里找那一节）
+#   2 枚举的源码落点（<文件>:<枚举名>）
+#   3 Rust 变体名
+#   4 条文里对应它的那个名字（逐字，门禁在那一节的正文里找这个串）
+#   5 为什么这一对承重（一句话）
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	ZeroFill	整段清零	等价类按每段的步骤种类集合判，种类表多一个少一个就换了判据
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	UnitWrite	写单元	同上
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	JournalRecord	写 journal 记录	同上
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	RootRecordFua	根槽 FUA 写	同上
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	SystemConfigurationSlot	系统配置槽原地覆写	同上
+D17 已定项 2	crates/singlefs-harness/src/segments.rs:StepKind	Barrier	屏障	同上

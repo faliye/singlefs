@@ -29,18 +29,53 @@ def clip(text, n):
     而那条检查是对的：半个简称比没有简称更容易被误读。
     """
     t = text[:n]
+    # 按长度截断落在一个 ASCII 词中间（例「SHA256」截成「SH」、「D22」截成「D2」）：半截整个去掉。
+    # 半截的编号尤其危险——「D2」是另一个真实存在的编号，留着就成了一条指错对象的引用。
+    if len(text) > n and re.match(r'[A-Za-z0-9._-]', text[n]) and re.search(r'[A-Za-z0-9._-]$', t):
+        t = re.sub(r'[A-Za-z0-9._-]+$', '', t).rstrip()
     while t.count('（') > t.count('）'):
         t = t[:t.rindex('（')].rstrip()
     # 截断还可能在编号后面切掉它的简称，留下一个**裸引用**——doc-lint 同样判红，
     # 而它判得对：一个只剩符号的编号，含义可以被悄悄改掉而没有一个字看起来别扭
     # （`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 5 条）。把这种尾巴一并去掉。
+    # ⚠️ **只在真截断过时剥**（按长度截了，或上面剥过半个括注）：没截断的名字结尾那串是原文自己写的，剥掉就丢了原文。
+    # 编号按 doc-lint 认编号的同一个形状剥：整词（`[A-Z]+-?数字(.数字)*`），前一个字符不是字母、数字、`.`、`_`、`-`。
+    # 不带左边界时，截断正好停在「SHA256」「RAID5」之后会从词中间咬走「A256」「D5」，剩下半截「SH」「RAI」。
+    # kb 里 `<!-- doc-lint:not-numbers … -->` 登记过的领域词（SHA256、RAID5、M1……）doc-lint 不当编号，不剥：
+    # 剥了只是丢原文（三方判决 gate-fix-forks-r1、r2 的 T8）。
+    if t == text:
+        return t.rstrip()
     while True:
-        t2 = re.sub(r'[A-Z]-?\d+(?:\.\d+)?\s*$', '', t)
+        tail = re.search(r'(?<![A-Za-z0-9._-])([A-Z]+-?\d+(?:\.\d+)*)\s*$', t)
+        t2 = t[:tail.start()] if tail and tail.group(1) not in not_number_tokens() else t
         t2 = re.sub(r'[\s/、,，·的与和]+$', '', t2)
         if t2 == t:
             break
         t = t2
     return t.rstrip()
+
+
+_NOT_NUMBER_TOKENS = None
+
+
+def not_number_tokens():
+    """kb 里 `<!-- doc-lint:not-numbers … -->` 标记登记的领域词（doc-lint 不把它们当编号）。按 cwd 下的 kb 读，读一次。
+    读法与 doc-lint 同一套：代码围栏里的不算（围栏里「举例」写的一行声明不打开豁免），标记写在一行之内。"""
+    global _NOT_NUMBER_TOKENS
+    if _NOT_NUMBER_TOKENS is None:
+        _NOT_NUMBER_TOKENS = set()
+        for kb_path in glob.glob('.claude/kb/**/*.md', recursive=True):
+            in_fence = False
+            with open(kb_path, encoding='utf-8') as handle:
+                for line in handle:
+                    if re.match(r'^[ \t]*```', line):
+                        in_fence = not in_fence
+                        continue
+                    if in_fence:
+                        continue
+                    for marker in re.finditer(r'<!-- *doc-lint:not-numbers([^>]*)-->', line):
+                        _NOT_NUMBER_TOKENS.update(marker.group(1).split())
+    return _NOT_NUMBER_TOKENS
 
 
 def name_of(txt):
@@ -71,8 +106,8 @@ def harvest(sec):
     return re.findall(r'^(\d+)\.\s+(.*)$', top, re.M)
 
 
-def items_of(body):
-    """返回 [(编号, 名字, 状态)]，两节合起来按编号排。"""
+def items_of(body, where):
+    """返回 [(编号, 名字, 状态)]，两节合起来按编号排。where 是「文件（决策号）」，只用在报错里。"""
     res = []
     for head, st in (('已定项', '已定'), ('未定项', '**未定**')):
         m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % head, body, re.M | re.S)
@@ -85,7 +120,7 @@ def items_of(body):
         # 于是那一节没写索引表这件事在索引页上躺了很久没人看见。
         if not got:
             raise SystemExit(
-                f"  ✗ 「### {head}」一节里取不到编号项\n"
+                f"  ✗ {where} 的「### {head}」一节里取不到编号项\n"
                 f"     → 该节要有索引表（`| # | 分项 | 状态 |`）或编号列表，"
                 f"每条分项一行、编号连号不重排")
         for n, txt in got:
@@ -103,11 +138,16 @@ for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
     title = s.split('\n', 1)[0]
     # 破折号前有没有空格两种都有（D14 没有），不能只认一种
     mm = re.match(r'## (D\d+) (.+?)\s*—— *(.+)$', title)
+    # 首行读不出就报错，不许跳过：跳过的那条决策从分项清单里整条消失，21 号只会报一句
+    # 「索引表里有行而 decisions/ 下没有它的正文」，31 号则一条未定项都不替它查。
     if not mm:
-        continue
+        raise SystemExit(
+            f"  ✗ {f} 首行读不出 `## D<n> 简称 —— 状态`：{title[:40]!r}\n"
+            f"     → 把首行写成 `## D3 空间分配 —— 半定（…）`，首行之前不许有空行或 BOM；"
+            f"decisions/ 下只放决策正文")
     num, name, status = mm.group(1), mm.group(2).strip(), mm.group(3).strip()
     body = s.split('\n## 历史版本')[0]
-    its = items_of(body)
+    its = items_of(body, f"{f}（{num}）")
     open_n = sum(1 for _, _, st in its if '未定' in st)
     kind = re.match(r'(已定|半定|待定)', status)
     kind = kind.group(1) if kind else status[:6]

@@ -19,14 +19,24 @@
 #   bash .claude/gate.d/21-decision-items-sync.sh          只比对
 #   bash .claude/gate.d/21-decision-items-sync.sh --write  重新生成并写回
 set -uo pipefail
-cd "${1:-$(dirname "$0")/../..}" 2>/dev/null || true
-[[ "${1:-}" == "--write" ]] && { cd "$(dirname "$0")/../.." || exit 2; WRITE=1; } || WRITE=0
+# 生成器按**脚本自身的位置**取，不按 cwd（与 31 号同一个理由）：判别力样本把 cwd 换成只放着样本 kb 的临时目录，
+# 那里没有 `.claude/scripts/`，按 cwd 取会「找不到生成器 ⇒ 跳过」，红样本安静地退 77。生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
+GEN="$(cd "$(dirname "$0")/../.." && pwd)/.claude/scripts/gen-decision-items.py"
+# 先认 --write，再按第一个参数 cd：cd 失败就退 2（老写法 `cd … 2>/dev/null || true` 在参数指错时
+# 留在调用方的 cwd 里，判的是调用方所在的那个仓，还报绿）。
+if [[ "${1:-}" == "--write" ]]; then
+  cd "$(dirname "$0")/../.." || exit 2
+  WRITE=1
+else
+  cd "${1:-$(dirname "$0")/../..}" || exit 2
+  WRITE=0
+fi
 IDX=.claude/kb/decisions.md
-GEN=.claude/scripts/gen-decision-items.py
 S='<!-- gen:decision-items:start -->'
 E='<!-- gen:decision-items:end -->'
 
-[[ -f "$IDX" && -f "$GEN" ]] || { echo "  ! 找不到 $IDX 或 $GEN，本阶段跳过"; exit 77; }
+[[ -f "$GEN" ]] || { echo "  ✗ 找不到生成器 $GEN"; echo "     → 生成器随门禁住在同一个仓的 .claude/scripts/ 下：它丢了这一阶段什么都判不了，从 git 里找回它"; exit 1; }
+[[ -f "$IDX" ]] || { echo "  ! 找不到 $IDX，本阶段无对象可判"; exit 77; }
 grep -qF "$S" "$IDX" || { echo "  ✗ $IDX 里没有生成块标记 $S"; echo "     → 加回标记，或跑 --write 重建"; exit 1; }
 
 gen_err="$(mktemp)"
@@ -49,12 +59,11 @@ got="$(awk -v s="$S" -v e="$E" 'index($0,s){f=1;next} index($0,e){f=0} f' "$IDX"
 fail=0
 
 if [[ "$WRITE" == "1" ]]; then
-  python3 - "$IDX" "$S" "$E" <<'PY'
+  python3 - "$IDX" "$S" "$E" "$GEN" <<'PY'
 import sys, subprocess
-idx, s, e = sys.argv[1:4]
+idx, s, e, gen = sys.argv[1:5]
 body = open(idx, encoding='utf-8').read()
-new = subprocess.run(['python3', '.claude/scripts/gen-decision-items.py'],
-                     capture_output=True, text=True).stdout.rstrip()
+new = subprocess.run(['python3', gen], capture_output=True, text=True).stdout.rstrip()
 a = body.index(s) + len(s)
 b = body.index(e)
 open(idx, 'w', encoding='utf-8').write(body[:a] + "\n" + new + "\n" + body[b:])

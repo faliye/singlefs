@@ -8,7 +8,7 @@ mkdir -p .claude/kb/decisions .claude/kb/experiments research/results research/p
 cat > .claude/kb/decisions/01-甲.md <<'EOF'
 ## D1 甲 —— 已定
 
-射程：样本决策。
+射程：样本决策，E4（样本实验四） 的结论也在这里。
 
 ### 已定项
 
@@ -109,6 +109,19 @@ cat > .claude/kb/experiments/03-样本三.md <<'EOF'
 EOF
 printf 'D2  # 样本：还没瘦身\nE2  # 样本：还没回填\n' > .claude/decision-links-pending
 printf 'v1\n' > research/results/e1-sample.out
+cat > .claude/kb/experiments/04-样本四.md <<'EOF'
+## E4 样本实验四 —— 已跑
+
+正文提到 D3（丙）；D1 在它的射程那一句里引着 E4，表里没有 D1 那一行——搬家时 D1 不该被当成「没回看」。
+
+### 影响的决策
+
+| 决策分项 | 关系 | 回看 |
+|---|---|---|
+| D3（丙） | 备料 | 2026-09-18 不受影响：只作背景 |
+
+## 历史版本
+EOF
 git add -A && git commit -qm base
 # 这次改动：E1 正文改了、产物换了，同时回看两行；新判决；D1 改了一句
 sed -i 's/^正文提到 D1/正文（重跑之后）提到 D1/' .claude/kb/experiments/01-样本一.md
@@ -124,3 +137,5 @@ cat > research/prompts/sample-r1-main-verification.md <<'EOF'
 |---|---|---|
 | D1（甲） 已定项 1 | 支撑 | 2026-09-19 改了 |
 EOF
+# E4 早就已跑，这一批只把它的页换个文件名：搬家不算「改成已跑」，D1 这一批没点到 E4 也不该红
+git mv .claude/kb/experiments/04-样本四.md .claude/kb/experiments/04-样本四搬家.md

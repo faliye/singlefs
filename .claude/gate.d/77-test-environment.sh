@@ -18,6 +18,7 @@
 #
 # 样本：被判目录里没有 `research/scripts/test-environment-check.py` 而有 `test-environment-check-output.log` 时，
 # 不跑脚本、只判那份录好的输出（`.claude/gate.d/fixtures/77-test-environment.sh/` 的红绿样本走这一支）。
+# 脚本与录好的输出都没有：判红，不当跳过——它随仓走，不在就是本该在仓里的东西不在（与 57、70、73 同一条）。
 #
 #   bash .claude/gate.d/77-test-environment.sh [项目根]
 set -uo pipefail
@@ -64,8 +65,9 @@ elif [[ -f test-environment-check-output.log ]]; then
   cp test-environment-check-output.log "$log"
 else
   rm -f "$log"
-  echo "  ! 没有 $SCRIPT，本阶段跳过"
-  exit 77
+  echo "  ✗ 没有 $SCRIPT：它随仓走，不在就是被删了或挪了，机器干不干净这一轮没人查"
+  echo "     → 怎么办：从 git 找回它（git log --diff-filter=D -- $SCRIPT 找删它的提交）；挪了地方就改这一阶段的 SCRIPT。"
+  exit 1
 fi
 
 summary="$(grep -o '判红 [0-9]* 类' "$log" | tail -1)"

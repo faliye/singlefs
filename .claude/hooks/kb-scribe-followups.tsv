@@ -1,0 +1,15 @@
+# 书记官（kb-scribe）写入之后要跟上的相关记录：写了哪类文件 → 跑哪几道门禁阶段，核相关记录跟没跟上。
+# 一行一条，三列用制表符分隔：<路径正则，从仓库根起> <阶段文件名，空格分隔> #<这几道核的是哪些相关记录>
+# 读它的是 .claude/hooks/kb-scribe-followup.sh（PostToolUse 钩子）；登记的阶段文件不存在时，钩子把这一行当配置错报出来。
+# 只登记快的阶段（每道一两秒以内），钩子每写一次都跑它们。慢的不进这张表：10 号约 14 秒、32 号约 7 秒、70 号约 127 秒、
+# doc-lint 约 87 秒——书记官收尾时照它定义的第 4 步，把阶段归属表登记给它的阶段全跑一遍。
+^\.claude/kb/decisions/	21-decision-items-sync.sh 30-decision-history.sh 20-kb-shape.sh 22-item-ref-status.sh 24-status-redundancy.sh 28-cross-decision-status.sh 29-settled-item-self-open.sh 31-blocking-verdict.sh 44-settled-ref-says-open.sh 60-stale-open-items.sh 61-settled-same-file.sh 75-decision-experiment-links.sh	# 决策正文 ↔ 分项清单投影与索引状态列、变更史条目、别处引用的分项状态、实验页的「影响的决策」
+^\.claude/kb/decisions\.md$	21-decision-items-sync.sh 37-decision-summary-width.sh	# 索引页的生成块与状态列、结论列宽度
+^\.claude/kb/decisions-history(/|\.md$)	48-history-month-file.sh 49-history-brief.sh 30-decision-history.sh	# 变更史条目住对月份、快查与汇总同步、决策正文改了有没有对应条目
+^\.claude/kb/experiments(/|\.md$)	75-decision-experiment-links.sh 34-experiment-index-sync.sh 85-repro-command.sh	# 实验页的「影响的决策」↔ 决策分项的依据、实验索引 ↔ 实验页、点名了产物的有复跑命令
+^\.claude/kb/invariants\.md$	36-invariant-count-cross-file.sh 97-invariant-field-anchors.sh	# 不变量条数在别处的抄写、新写的不变量点名字段落点
+^\.claude/kb/checks-owed\.md$	43-owed-table-shape.sh 67-milestone-closeout-owed.sh 78-owed-cited-tests.sh 53-format-const-placeholders.sh	# 欠账表行形状、收口表收全开着的账、已还清行点名的测试还在、格式常量占位指得到欠账
+^\.claude/kb/layout/	27-format-constants.sh 39-field-table-sum.sh 42-first-txn-trio.sh 52-segment-registry.sh 76-second-txn-hooks.sh 92-layout-checker-sync.sh	# 字节布局表 ↔ 格式常量、字段表合计、里程碑挂钩、段序列登记、布局常量变了 checker 跟没跟
+^\.claude/kb/milestone/	42-first-txn-trio.sh 67-milestone-closeout-owed.sh 76-second-txn-hooks.sh	# 里程碑 ↔ 字节表、收口表收全开着的账
+^\.claude/kb/feature-bits\.md$	93-feature-bits.sh	# feature bit 记账表 ↔ D15（格式冻结政策） 登记表与代码
+^\.claude/kb/	98-kb-registry.sh	# kb 新增的文件在 CLAUDE.md「项目本地事实」表里有行

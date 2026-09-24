@@ -11,13 +11,22 @@
 # 为什么：阶段归谁跑，原来在 CLAUDE.md 与 kb-scribe 定义里各手抄一份清单，没有任何东西盯着它们与目录同步——
 # CLAUDE.md 那份 52 行清单里 87 号的说明已经与脚本头部对不上（records/2026-09-17-CLAUDE.md去冗余.md）。
 # 表只写一份，各 agent 按自己的名字从表里取；新加一个阶段忘了登记、删了一个定义没改表，这一道当场红。
+# ① ② 的双向比对与读表用共用库 lib-manifest.py，与 50、63、98 号同一份代码。
 #
 #   bash .claude/gate.d/62-stage-owners.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-python3 - <<'PY'
-import glob, os, sys
+python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" <<'PY'
+import glob, importlib.util, os, sys
+try:
+    spec = importlib.util.spec_from_file_location("lib_manifest", sys.argv[1])
+    manifest = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(manifest)
+except OSError as error:
+    print(f"  ✗ 读不到共用库 {sys.argv[1]}：{error}")
+    print("     → 怎么办：目录与清单的双向比对只有那一份，恢复它，别在阶段里再抄一份。")
+    sys.exit(1)
 table_path = ".claude/gate.d/stage-owners.tsv"
 if not os.path.isfile(table_path):
     print(f"  ✗ 没有 {table_path}")
@@ -27,11 +36,8 @@ stage_files = sorted(os.path.basename(path) for path in glob.glob(".claude/gate.
 rows_by_stage = {}
 malformed_rows = []
 unknown_owner_rows = []
-for line_number, line in enumerate(open(table_path, encoding="utf-8"), 1):
-    line = line.rstrip("\n")
-    if not line.strip() or line.startswith("#"):
-        continue
-    fields = line.split("\t")
+table = manifest.table_rows(table_path)
+for line_number, line, fields in table:
     if len(fields) != 3 or not fields[1].strip() or not fields[2].strip():
         malformed_rows.append(f"第 {line_number} 行：{line}")
         continue
@@ -40,9 +46,8 @@ for line_number, line in enumerate(open(table_path, encoding="utf-8"), 1):
     for owner in owners.split(","):
         if not os.path.isfile(f".claude/agents/{owner.strip()}.md"):
             unknown_owner_rows.append(f"第 {line_number} 行 {stage}：{owner.strip()}")
-missing_from_table = [stage for stage in stage_files if stage not in rows_by_stage]
+missing_from_table, not_on_disk = manifest.two_way(stage_files, list(rows_by_stage))
 duplicated = [f"{stage}（第 {', '.join(map(str, numbers))} 行）" for stage, numbers in rows_by_stage.items() if len(numbers) > 1]
-not_on_disk = [stage for stage in rows_by_stage if stage not in stage_files]
 failed = False
 if malformed_rows:
     failed = True
@@ -76,6 +81,6 @@ if unknown_owner_rows:
     print("     → 怎么办：改成已有定义的名字（文件名去掉 .md），或先建那个定义。")
 if failed:
     sys.exit(1)
-owners = sorted({owner.strip() for line in open(table_path, encoding="utf-8") if line.strip() and not line.startswith("#") for owner in line.split("\t")[1].split(",")})
+owners = sorted({owner.strip() for _line_number, _line, fields in table for owner in fields[1].split(",")})
 print(f"  ✓ 阶段归属表与门禁目录一致（{len(stage_files)} 个阶段，归 {len(owners)} 个 agent）")
 PY

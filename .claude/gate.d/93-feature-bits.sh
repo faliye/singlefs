@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: feature bit 位号在记账表、D15 登记表与代码三处一致
+# gate-stage: feature bit 位号：记账表与 D15 登记表逐行一致、不跳号，代码引用的位都在记账表里
 #
 # 还 C11（feature bit 跳号）。D15（格式冻结政策） 已定项 10 逐字写着记账落在 `.claude/kb/feature-bits.md`，
 # 位号的唯一登记位是 D15（格式冻结政策） 已定项 4 那张表；两处都是人手写的，没有任何东西盯着它们与代码同步。

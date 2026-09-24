@@ -23,7 +23,8 @@
 #   `.claude/gate.d/experiment-seed-fold-lag.tsv`（挂 C59）
 #   `.claude/gate.d/experiment-constant-reading-lag.tsv`（挂 C60）
 # 两张表都是四列用制表符分隔：文件路径、定位（①写行号，②写 `结构体.字段`）、欠账编号、为什么还没改。
-# 表对它们的三条闸：编号要在欠账表欠着那一张里找得到；每一行都要对得上这一轮真扫出来的一处违规
+# 表对它们的三条闸：编号要在欠账表欠着那一张里找得到（按 `lib-owed.py` 读，67、92 号用的是同一份：
+# 「### 已还清」整行标题之前的是开着的；认不出那个标题就判红，不对着一张认不出的表判）；每一行都要对得上这一轮真扫出来的一处违规
 # （对不上就是已经改好了或者行号挪了，删掉或改掉这一行）；**只缩不涨**——
 # 与基准提交比，同一个文件的登记行数不许变多，基准里没有的文件不许出现。
 # 少了最后这一条，「新写的实验不在豁免表里判红」一行 tsv 就能绕过去。
@@ -42,26 +43,29 @@
 #   两张豁免表的「只缩不涨」按**每个文件的登记行数**比，不按逐行比：行号会随无关改动漂。
 #   代价是同一个文件里删一行再加一行它看不出来。
 #
-# 判别力：fixtures/96-experiment-source-discipline.sh/red 是一个同时犯两条的小仓，必须判红；
+# 判别力：fixtures/96-experiment-source-discipline.sh/red 是一个同时犯两条的小仓，另带一张挂在认不出的欠账表上的豁免表，必须判红；
 # green 是同一份源码加上两张对得上的豁免表，必须判绿。
 #
 #   bash .claude/gate.d/96-experiment-source-discipline.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+OWED_LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-owed.py"
 cd "$ROOT" 2>/dev/null || exit 2
 base=""
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  base="HEAD"
-  if [[ -n "${GATE_BASE:-}" ]] && git rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
-    base="$GATE_BASE"
-  elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1; then
-    base="$(git merge-base HEAD '@{upstream}')"
-  fi
+  # 基准取法与 56、68、69、75、97 号同一份：research/scripts/changed-paths.sh 的 gate 取法
+  LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+  # shellcheck source=../../research/scripts/changed-paths.sh
+  source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+  base="$(gate_diff_base gate)"
 fi
-python3 - "$base" <<'PY'
-import glob, os, re, subprocess, sys
+python3 - "$base" "$OWED_LIBRARY" <<'PY'
+import glob, importlib.util, os, re, subprocess, sys
 
 base = sys.argv[1]
+owed_library_spec = importlib.util.spec_from_file_location("owed", sys.argv[2])
+owed_library = importlib.util.module_from_spec(owed_library_spec)
+owed_library_spec.loader.exec_module(owed_library)
 BIN_GLOB = "research/e7-index-bench/src/bin/*.rs"
 OWED_PATH = ".claude/kb/checks-owed.md"
 SEED_LAG = ".claude/gate.d/experiment-seed-fold-lag.tsv"
@@ -176,10 +180,9 @@ if unreadable:
             "          而一个整批读不动的目录会让两条判据都扫到 0 项，末尾照样报绿。"])
 
 # ── 豁免表 ─────────────────────────────────────────────────────────────
-owed_open = set()
-if os.path.isfile(OWED_PATH):
-    owed_text = open(OWED_PATH, encoding="utf-8").read()
-    owed_open = set(re.findall(r"^\|\s*(C\d+)\s*\|", owed_text.split("### 已还清")[0], re.M))
+owed_table = owed_library.read_owed_table(OWED_PATH)
+owed_open = set(owed_table.open_names)
+owed_unrecognised = owed_table.file_found and not owed_table.paid_heading_found
 
 def read_lag(path, label):
     """读一张豁免表，返回 {(文件, 定位): (欠账编号, 行号)}；形状坏了的行当场登记成拒绝。"""
@@ -235,9 +238,13 @@ def judge(label, owed_number, lag_path, violations, locator_of, what_to_fix, how
                 "               改了就要重跑这个实验并按新产物逐个回对正文引的数（门禁 87 号会逐字节判红直到重跑）。",
                 f"               ② 今天改不动的，登记进 {lag_path}：四列写文件路径、定位、{owed_number}、为什么还没改。",
                 f"               ⚠️ 这张表只缩不涨——新写的实验源码一律走出路 ①，{what_to_fix}。"])
+    if lag and owed_unrecognised:
+        reject(f"{label}：豁免表有 {len(lag)} 行要核欠账编号，而 {OWED_PATH} 里认不出「### 已还清」那一行标题，分不出哪些账还开着", [],
+               ["怎么办：欠账表按「### 已还清」整行标题切成开着与还清两段（.claude/gate.d/lib-owed.py）；标题改了名或丢了就改回来，",
+                "               别让这一道对着一张认不出的表判——认不出时连历史版本节里的表格行都会被算成开着的账。"])
     dangling = [f"{source}:{locator} 挂的是 {number}（第 {line_number} 行）"
                 for (source, locator), (number, line_number) in sorted(lag.items())
-                if number not in owed_open]
+                if number not in owed_open and not owed_unrecognised]
     if dangling:
         reject(f"{label}：豁免表里 {len(dangling)} 行挂的欠账编号不在 {OWED_PATH} 欠着那张表里：", dangling,
                ["怎么办：登记一条豁免，等于承认这一处今天还没改，那笔账要有人排期。",

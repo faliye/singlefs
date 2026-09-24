@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 引用写着「已定项」，紧跟着却说它没定
+# gate-stage: 状态一致性：引用写着「已定项」，紧跟着却说它没定
 #
 # 一条分项从未定翻成已定之后，全仓的引用要从「未定项 k」改写成「已定项 k」（22 号阶段逼的）；
 # 改完标签，**句子本身**常常还在说它没定：「D19 已定项 6 未定」「那个 key 是 D19 已定项 6、今天没定」。
@@ -17,8 +17,9 @@ exec python3 - "$LIB" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location('item_ref_status', sys.argv[1])
 lib = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib)
-item_map, names = lib.load_map()
-self_map = lib.self_decisions()
+heads, unreadable = lib.decision_heads(strict=False)
+item_map, names = lib.load_map(heads)
+self_map = lib.self_decisions(heads)
 files = [f for f in lib.scanned_files()
          if not f.endswith(('decisions-history.md', 'experiments-history.md')) and '/decisions-history/' not in f
          and not f.startswith('records/')]
@@ -31,10 +32,18 @@ for path in files:
         if lib.says_open_after(line, m.end()):
             snippet = line[max(0, m.start() - 20):m.end() + 30].strip()
             bad.append(f"{path}:{ln} 「{owner}（{names[owner]}） {m.group(0)}」后面紧跟着说它没定：…{snippet}…")
+if unreadable:
+    lib.report_unreadable(unreadable)
 if bad:
     print(f"  ✗ 引用写着已定项、紧跟着却说它没定 {len(bad)} 处")
     for b in bad[:40]: print("    ", b)
     print("     → 那条分项已经定了：把句子改成它定下来之后的说法（定成了什么、这一处按它重算了没有），别只改标签。")
+if bad or unreadable:
     sys.exit(1)
+# 一处归属到已定分项的「已定项」引用都没扫到，这一轮什么都没判过：退 77，不报绿
+# （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+if seen == 0:
+    print(f"  ! 扫了 {len(files)} 个文件，没有一处归属到已定分项的「已定项」引用，本阶段无对象可判")
+    sys.exit(77)
 print(f"  ✓ 扫了 {len(files)} 个文件、{seen} 处已定项引用，没有一处紧跟着说它没定")
 PY

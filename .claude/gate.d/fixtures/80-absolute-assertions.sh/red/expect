@@ -1,2 +1,3 @@
 exit=1
-want=一条绝对值断言都没有
+want=e1_relative.rs 一条绝对值断言都没有
+want=crates/demo/src/bin/e2_crates_relative.rs 一条绝对值断言都没有

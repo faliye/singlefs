@@ -7,7 +7,8 @@
 # 同一批里顺手修的两个脚本贡献了 249 行候选，逐行判下来 249 行全是「不相干」，多花的挂钟以小时计。
 # 写一句「先判阻塞」拦不住手，拦得住的是暂存之后当场红的一道闸（C472（暂存区里多出来的触发文件没人拦））。
 #
-# 改动范围：**还没进 HEAD 的**——工作区、暂存区与未跟踪文件，基准是 HEAD，不是 GATE_BASE。
+# 改动范围：**还没进 HEAD 的**——工作区、暂存区与未跟踪文件，基准是 HEAD，不是 GATE_BASE
+# （取法用共用库 research/scripts/changed-paths.sh 的 head 取法，与 56、68、69、97 号同一份代码）。
 # 与 68 号的基准不同是有意的，两者回答的不是同一个问题：
 #   68 号问「这一轮要回扫哪些」，一轮可以跨几个提交，范围取 GATE_BASE；
 #   这一道问「这一次提交要带哪些」，那就只能是还没进 HEAD 的那几个。
@@ -43,7 +44,14 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
-changed="$( { git -c core.quotepath=false diff --name-only HEAD -- ; git -c core.quotepath=false diff --name-only --cached -- ; git -c core.quotepath=false ls-files --others --exclude-standard -- ; } | sort -u )"
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里再抄一份。"; exit 1; }
+changed="$(gate_changed_paths "$(gate_diff_base head)" untracked)" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 HEAD）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
+  exit 1
+}
 # 改动清单经进程替换当文件传：当成一个命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
 python3 - <(printf '%s\n' "$changed") <<'PY'
 import os, re, sys

@@ -1,0 +1,13 @@
+这两份样本里的 out.txt / vm-exit / check.txt / check-exit 是 2026-09-21 在本机真起虚机跑出来的原样输出，
+五个模式各一份（VM_DISKS=2 VM_DISK_MB=4096，research/scripts/vm-bench.sh 送进 QEMU，宿主一侧
+target/debug/first_transaction_device_log_check 判设备侧日志）。research/results/e142-trimmed.out 是
+E142 产物里本阶段会读的那几行（name=segments 五行、name=root_record 一行），research/scripts/replay.sh
+只留 E142 那一行——本阶段从这两处现取段序列与反向链。
+
+green：五档原样，本阶段该判全过（预录档退 3，不退 0）。
+red：把 second-transaction 盘 0 的 observed_writes 从 33 改成 23，也就是「盘上没有比第一个事务多收到写」。
+     它排在判定次序的最后一段，所以这一份红样本要先走完前面每一档的段序列、冷重开根、必须出现与不许出现的行、
+     块层 FLUSH 算术，才会红在那一格——前面任何一条误红，expect 里的 want 都对不上。
+
+重新生成：跑一遍本阶段（不带 .qemu-prerecorded），把它临时工作目录里每个模式的那四个文件拷过来；
+工作目录默认跑完就删，要留现场在 vm-bench.sh 那一层设 VM_KEEP=1，或者照本文件头一段自己起五次 vm-bench.sh。

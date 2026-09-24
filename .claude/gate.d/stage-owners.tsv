@@ -3,7 +3,9 @@
 # 表与目录、定义逐项一致由 62-stage-owners.sh 判；各 agent 怎么从表里取自己的阶段，见 .claude/agent-common.md「门禁」。
 10-kb-rot.sh	kb-scribe	kb 内部的引用、结论与条数
 11-batch-scope.sh	gate-triage	这一批的触发文件有没有登记进 .claude/batch-scope：判据是暂存区，而暂存与提交归主 agent，跑整轮门禁的分诊先替它看一眼
+12-no-prime-marks.sh	gate-triage	全仓不许用角标写法给变体起名：谁写文件都可能写进一撇，收尾跑整轮门禁时一并判
 15-research-build.sh	gate-triage	research 构建与单测（全工作区十几分钟，2026-09-17 从 experiment-runner 挪到收尾：执行员前台等它会让缓存过期、整份上下文重写）
+16-freeze-layer-membership.sh	kb-scribe	冻结层归属登记表是 kb：每个结构的行、态别与退不退出冻结、依据分项都由书记员写回，写完就跑
 20-kb-shape.sh	kb-scribe	kb 用词、指代、链接、条数与标题
 21-decision-items-sync.sh	kb-scribe	决策分项清单与正文
 22-item-ref-status.sh	kb-scribe	分项引用写的状态
@@ -20,7 +22,7 @@
 36-invariant-count-cross-file.sh	kb-scribe	不变量条数跨文件
 37-decision-summary-width.sh	kb-scribe	决策索引结论列宽度
 38-field-table-projection.sh	kb-scribe	决策里定的字段投影进字节表
-39-field-table-sum.sh	kb-scribe	字段表合计
+39-field-table-sum.sh	kb-scribe	字段表合计、表前说明句里的总宽与增量、字节布局表里结构总宽的登记：都是 kb 正文里的数，写回的人改完就跑
 40-results-cited.sh	experiment-runner	实验产物写回
 42-first-txn-trio.sh	kb-scribe	字节表、里程碑、决策索引三份互相挂钩
 43-owed-table-shape.sh	kb-scribe	欠账表行形状
@@ -48,6 +50,7 @@
 87-replay.sh	gate-triage	入库实验复现（全部实验复跑十几分钟，2026-09-17 从 experiment-runner 挪到收尾，理由同 15 号；执行员只跑自己那一个实验的 replay.sh）
 88-quoted-result-lines.sh	experiment-runner	正文整行抄的产物行
 63-agent-write-scope.sh	gate-triage	看项目 settings 里的写范围闸与写范围表
+64-change-range-single-source.sh	gate-triage	门禁阶段自己算 diff 基准、列路径不带 quotepath：谁改门禁阶段都可能再抄一份取法，提交前核
 66-abandoned-rounds.sh	gate-triage	判决文件与撂下登记都由主 agent 写；三方轮次在跑时本来就没有判决，材料员与腿跑它只会红，提交前核
 67-milestone-closeout-owed.sh	kb-scribe	里程碑文件与欠账表都由书记员照规格写回：新立的欠账被里程碑点名、欠账挪进已还清、收口表改了行，都在它手上变红
 68-knowledge-sync.sh	gate-triage	同步记录由主 agent 在阶段收尾时写；提交前核
@@ -70,3 +73,8 @@
 93-feature-bits.sh	kb-scribe,implementation-writer	feature bit 位号三处一致：记账表与 D15 已定项 4 登记表都是 kb（书记员改），crates/ 里的位掩码常量是实现员改，改完各自就跑
 
 99-multipath-registry.sh	experiment-runner	多条路径互证的登记：路径、源码落点与共用项由跑实验的人写，写完就跑
+79-tree-table-reserve.sh	kb-scribe	树表预留 76 字节的认购表：认购者与出处都住在决策正文里，定案之后写回 kb 的那一步就该把它带上
+89-closeout-row27-preconditions.sh	implementation-writer	收口表第 27 行那几笔的前置探针：探针盯的是 crates/ 里那几段代码的形态，动它们的就是实现员
+81-audit-contradictions.sh	kb-scribe,gate-triage	最近一次总审核第五节每行都有去向：跨 records/ 与 checks-owed 的回扫闸，归提交前跑整轮的那一位；「已改」行要引今天正文的原文，书记员改决策正文可能删掉被引的那句，写完也跑
+82-clause-enum-pairs.sh	kb-scribe	条文列的集合与代码里的枚举逐个对上：改分项正文是决策变更，归写回 kb 的那一位
+83-closeout-row-numbers.sh	kb-scribe	收口表行号的形态：改号连带改全仓引用，归写回 kb 的那一位

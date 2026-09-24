@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 未定项有没有被别处定了
+# gate-stage: 状态一致性：未定项有没有被别处定了
 #
 # 还 checks-owed.md C31（未定项被别处定了却没回收）。
 #
@@ -18,7 +18,8 @@
 set -uo pipefail
 REVIEW_LIB="$(cd "$(dirname "$0")" && pwd)/lib-open-item-review.py"
 DEC=.claude/kb/decisions
-[[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
 # 每个决策状态行最后一次变动的提交时间
@@ -42,11 +43,14 @@ for f in "$DEC"/*.md; do
 done
 
 flagged=0
+open_items=0     # 扫到的未定项条数
+judged_items=0   # 其中点名了「定过东西的别的决策」、真拿去比过复核时间的条数
 for f in "$DEC"/*.md; do
   self=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}')
   # 未定项行：编号开头且标着未定
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
+    open_items=$((open_items + 1))
     # ⚠️ **要看整个条目块的最新改动，不是首行。**
     # 复核通常写在条目下面，首行的 blame 时间不动——只看首行会让
     # 复核过的条目永远红着，检查退化成噪声（实测踩过）。
@@ -72,12 +76,20 @@ for f in "$DEC"/*.md; do
       (( dt > 0 )) && deps+=("$d:$dt")
     done
     (( ${#deps[@]} > 0 )) || continue
+    judged_items=$((judged_items + 1))
+    # 复核判据的输出先落到变量、判过退出码再读：接进 `< <(…)` 时它崩了只是少打几行，这一条被读成「复核过了」
+    review_out="$(python3 "$REVIEW_LIB" "$f" "$ln" "${deps[@]}")" || {
+      review_rc=$?
+      echo "  ✗ $(basename "$f"):$ln 的复核判据没跑成（lib-open-item-review.py 退出码 $review_rc），这一条没比过"
+      echo "     → 按上面的报错修 .claude/gate.d/lib-open-item-review.py 或这一份决策正文；判据没跑成不是通过。"
+      exit 1
+    }
     while IFS= read -r d; do
       [[ -n "$d" ]] || continue
       echo "  ✗ $(basename "$f"):$ln 的未定项点名了 $d，而 $d 的状态行在它之后变过"
       echo "     ⇒ 复核这一项是不是已经被 $d 定掉了；复核完在这一条里写一句点名 $d 的复核记录。原文：${text:0:60}"
       flagged=1
-    done < <(python3 "$REVIEW_LIB" "$f" "$ln" "${deps[@]}")
+    done <<<"$review_out"
   # ⚠️ **列表式未定项的行内不含「未定」二字**——那两个字在小节标题上。
   # 第一版按行内关键字过滤，把 D22 那三条陈旧项全滤掉了，于是检查恒绿。
   # 改成：取「### 未定项」小节内的条目行，再排掉已经标了「已定」的。
@@ -104,4 +116,10 @@ if ((flagged)); then
   echo "               仍然开着的就把点名改成不构成依赖的写法。"
   exit 1
 fi
-echo "  ✓ 没有未定项被别处的更新甩在后面"
+# 没有一条未定项点名定过东西的别的决策，这一轮一次复核时间都没比：退 77，不报绿
+# （`.claude/singlefs-ai-sop/rules/show-me-test.md`「扫到 0 项也不是通过」）。
+if ((judged_items == 0)); then
+  echo "  ! 查了 $open_items 条未定项，没有一条点名定过东西的别的决策，本阶段无对象可判"
+  exit 77
+fi
+echo "  ✓ 没有未定项被别处的更新甩在后面（查了 $open_items 条未定项，其中 $judged_items 条点名了定过东西的别的决策、逐条比过复核时间）"

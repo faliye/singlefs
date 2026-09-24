@@ -1,0 +1,3 @@
+exit=1
+want=second-transaction 盘 0：盘上收到的写（23）没有多于第一个事务那段（23）
+want=这一档该在第一个事务之后再发布一次

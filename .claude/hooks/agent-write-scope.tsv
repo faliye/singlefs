@@ -1,5 +1,7 @@
 # 项目 subagent 用 Write / Edit 时的写范围：一个 agent 一个或几个路径模式，一行一个。由 agent-write-scope.sh 在 PreToolUse 里判。
 # 三列用制表符分隔：agent 名、路径模式、出处。路径模式相对仓根，以 / 开头的是绝对路径；** 跨目录，* 不跨目录。
+# ⚠️ 模式里只有 ** 与 * 两个元字符：write-guard.sh 的 glob_to_regex 把别的字符一律 re.escape，
+#    写 e[0-9]*.rs 会被当成字面的「e[0-9]」、永远匹配不上，而闸只报「越出写范围」、不会说模式没写对（2026-09-22 踩过）。
 # 只登记 tools 里有 Write 或 Edit 的定义；表与定义逐项一致由 63-agent-write-scope.sh 判。Bash 里的写不经过这道闸。
 implementation-writer	crates/**	implementation-writer.md「写范围」
 implementation-writer	litmus/**	implementation-writer.md「写范围」
@@ -7,6 +9,8 @@ implementation-writer	/tmp/claude-1000/**	报告文件与草稿目录（定义�
 kb-scribe	.claude/kb/**	kb-scribe.md「写范围」；relabel-item.py 改写的别处文件只许那个脚本改，不经 Edit
 kb-scribe	/tmp/claude-1000/**	报告文件与草稿目录
 experiment-runner	research/e7-index-bench/src/bin/**	experiment-runner.md「写范围」：bin 源文件
+experiment-runner	crates/singlefs-harness/src/bin/e*.rs	实验装置要驱动真实 crates/ 代码时的只读 bin（2026-09-22 E156 撞上：岔路问的是「今天这份代码的性质」，另写一份独立模型答不了）。限定 e 开头加数字，碰不到 first_transaction_* 那几个生产装置；这个 bin 不许改 core/checker，由代码三方与门禁 56 号管
+experiment-runner	crates/mutations.tsv	入库装置的变异行只追加进末尾（experiment-runner.md 第 2 步与「写范围」；2026-09-23 E158 撞上：闸拒了那次追加，三行落进 research/mutations/ 下、门禁 59 号复跑不到）
 experiment-runner	research/mutations/**	变异表
 experiment-runner	research/results/**	这个实验的产物
 experiment-runner	research/scripts/replay.sh	复跑登记行

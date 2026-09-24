@@ -16,14 +16,25 @@
 # ⚠️ 射程：判的是「登记了没有」，判不了那一行写得对不对——后者要人看。
 # `decisions-history/` 这类由别的阶段管形状的子目录同样要有一行，表里写它与谁同进退。
 #
+# 双向比对用共用库 lib-manifest.py，与 50、62、63 号同一份代码。
+#
 # 判别力：fixtures/98-kb-registry.sh/red 放一份没登记的 kb 文件与一行指向空处的登记，必须判红；green 两边对齐。
 #
 #   bash .claude/gate.d/98-kb-registry.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
-python3 - <<'PY'
-import glob, os, re, sys
+python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" <<'PY'
+import glob, importlib.util, os, re, sys
+
+try:
+    spec = importlib.util.spec_from_file_location("lib_manifest", sys.argv[1])
+    manifest = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(manifest)
+except OSError as error:
+    print(f"  ✗ 读不到共用库 {sys.argv[1]}：{error}")
+    print("     → 怎么办：目录与清单的双向比对只有那一份，恢复它，别在阶段里再抄一份。")
+    sys.exit(1)
 
 KB = ".claude/kb"
 MANIFEST = "CLAUDE.md"
@@ -69,10 +80,12 @@ def is_registered(path):
     # 表里写成带月份占位的形态（`.claude/kb/decisions-history/<年-月>.md`）时，按目录前缀认
     return any(entry.startswith(path) or path.startswith(entry.rstrip("/") + "/") for entry in registered if entry != path)
 
-missing = sorted(path for path in on_disk if not is_registered(path))
-dangling = sorted(entry for entry in registered
-                  if not os.path.exists(entry) and not os.path.exists(entry.rstrip("/"))
-                  and "<" not in entry)
+def points_at_something(entry):
+    # 带占位的形态（`<年-月>`）不是一个具体路径，不判它指不指得到
+    return os.path.exists(entry) or os.path.exists(entry.rstrip("/")) or "<" in entry
+
+missing, dangling = manifest.two_way(sorted(on_disk), sorted(registered),
+                                     is_registered=is_registered, exists=points_at_something)
 
 failed = False
 if missing:

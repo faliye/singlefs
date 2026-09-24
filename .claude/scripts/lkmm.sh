@@ -22,7 +22,7 @@
 # 判定与声明不符 → 失败。没有声明 → 失败（不许「跑了但没人看结果」）。
 #
 # 会失败的检查（都是踩过的坑，做成拒绝执行而不是提醒句）：
-#   1. 用了 rN 却没有 `int rN;` 声明 —— herd7 不管，klitmus7 会在生成 C 之后
+#   1. 用了 rN 却没有 `int rN;` 声明（用法只在剥掉 (* … *) 注释的正文里认）—— herd7 不管，klitmus7 会在生成 C 之后
 #      才报 undeclared，那时已经很难定位。这里提前拦。
 #   2. init 块里给 atomic_t 形参赋初值不带类型 —— herd7 照跑且判定正确，
 #      只有 klitmus7 会炸。也就是说这个错能一路混过模型判定，必须在这里拦。
@@ -72,6 +72,17 @@ mapfile -t FILES < <(find "$LITMUS_DIR" -name '*.litmus' -exec readlink -f {} \;
         "或者删掉空的 litmus/ 目录。"; exit 1; }
 
 # ── 静态检查：期望声明 / 寄存器声明 / atomic_t 初值类型 ──
+# 寄存器用法只在剥掉注释的正文里找：头部 (* … *) 注释里写 r1、r2 不是用了它，不能逼人往 litmus 里塞一个没人用的声明。
+# 注释只认行首起的那种，与 is_fence_removal_of 同一条判据：代码里的 `WRITE_ONCE(*x, 1)` 也有「(*」。
+litmus_code_without_comments() { # litmus_code_without_comments <litmus 文件>
+  python3 - "$1" <<'PY'
+import re
+import sys
+
+text = open(sys.argv[1], encoding='utf-8').read()
+sys.stdout.write(re.sub(r'^[ \t]*\(\*.*?\*\)', '', text, flags=re.S | re.M))
+PY
+}
 fails=0
 declare -A EXPECT
 for f in "${FILES[@]}"; do
@@ -83,14 +94,20 @@ for f in "${FILES[@]}"; do
        howto "在文件头注释块里写明期望判定。没有声明 = 跑了但没人看结果，不算验证。"
        fails=$((fails+1)); continue ;;
   esac
-  for r in $(grep -oE '\br[0-9]+\b' "$f" | sort -u); do
-    grep -qE "^[[:space:]]*int[[:space:]]+$r[[:space:]]*;" "$f" \
+  if ! code_without_comments="$(litmus_code_without_comments "$f")"; then
+    bad "$rel 剥不掉注释（python3 读它失败），寄存器声明没法查"
+    howto "看上面 python3 的报错：多半是文件不是 UTF-8。照 litmus/ 现有文件的编码存一遍再跑。"
+    fails=$((fails+1)); continue
+  fi
+  for r in $(printf '%s\n' "$code_without_comments" | grep -oE '\br[0-9]+\b' | sort -u); do
+    grep -qE "^[[:space:]]*int[[:space:]]+$r[[:space:]]*;" <<<"$code_without_comments" \
       || { bad "$rel 用了 $r 但没有 'int $r;'（klitmus7 会在生成 C 之后才报）"
            howto "在用到 $r 的进程体开头补一行 'int $r;'。"
            fails=$((fails+1)); }
   done
-  init="$(awk '/^\{/{f=1} f{print} f&&/\}/{exit}' "$f")"
-  for v in $(grep -oE 'atomic_t[[:space:]]*\*[[:space:]]*[A-Za-z_][A-Za-z0-9_]*' "$f" \
+  # 声明、init 块与 atomic_t 形参同样只在剥掉注释的正文里找：注释里单独一行 `int r2;` 不是声明过
+  init="$(awk '/^\{/{f=1} f{print} f&&/\}/{exit}' <<<"$code_without_comments")"
+  for v in $(grep -oE 'atomic_t[[:space:]]*\*[[:space:]]*[A-Za-z_][A-Za-z0-9_]*' <<<"$code_without_comments" \
              | sed -E 's/.*\*[[:space:]]*//' | sort -u); do
     printf '%s\n' "$init" | grep -qE "(^|[^[:alnum:]_])$v[[:space:]]*=" || continue
     printf '%s\n' "$init" | grep -qE "atomic_t[[:space:]]+$v[[:space:]]*=" \

@@ -2,3 +2,8 @@ exit=1
 want=const SAMPLE_HDR = 84
 want=定的现行值是 86
 want=上界 428
+want=01-样本.md:5  format-const 标记按文法读不出来
+want=SAMPLE_EXTRA_KEY = 5 note=多写的键
+want=SAMPLE_TWICE：登记了 2 处（.claude/kb/layout/01-样本.md:6 与 .claude/kb/layout/01-样本.md:10）
+want=research/declarations.rs:2  const SAMPLE_WRAPPED = 84，而 .claude/kb/layout/01-样本.md 定的现行值是 86
+want=research/declarations.rs:4  const SAMPLE_CRATE_VISIBLE = 84

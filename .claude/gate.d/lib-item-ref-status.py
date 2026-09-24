@@ -17,14 +17,43 @@
 import re, glob, sys, os
 
 
-def load_map():
-    m, name = {}, {}
+def decision_heads(strict=True):
+    """decisions/*.md 每一份首行的 ({路径: (决策号, 简称)}, [(首行读不出的路径, 首行)])。
+
+    首行读不出 `## D<n> 简称 —— 状态` 的（多一份 README、首行前有空行或 BOM、漏了破折号）一份都不跳过，
+    也不让调用方撞上裸的 AttributeError：strict 时当场打印 ✗ 与出路、退出码 1；
+    不 strict 时交回清单，由调用方在报完自己的问题之后调 report_unreadable 并判红。
+    跳过它的代价实测过：那条决策的分项从表里消失，写给它的「已定项 k」被改判到行内更早出现的另一条决策上并判绿。
+    load_map 与 self_decisions 都从这里取，两处的口径不许分叉（写法照 lib-index-vs-body.py 读首行那一段）。
+    """
+    heads, unreadable = {}, []
     for f in sorted(glob.glob('.claude/kb/decisions/*.md')):
+        first = open(f, encoding='utf-8').read().split('\n', 1)[0]
+        mm = re.match(r'## (D\d+) (.+?)\s*——', first)
+        if mm:
+            heads[f] = (mm.group(1), mm.group(2).strip())
+        else:
+            unreadable.append((f, first))
+    if unreadable and strict:
+        report_unreadable(unreadable)
+        sys.exit(1)
+    return heads, unreadable
+
+
+def report_unreadable(unreadable):
+    print(f"  ✗ decisions/ 下有 {len(unreadable)} 份首行读不出 `## D<n> 简称 —— 状态`，这几份的分项一条都没核过")  # gate-lint:summary
+    for f, first in unreadable:
+        print(f"     {f}：首行是 {first[:40]!r}")  # gate-lint:detail
+    print("     → 怎么办：把首行写成 `## D3 空间分配 —— 半定（…）`，首行之前不许有空行或 BOM；")
+    print("       decisions/ 下只放决策正文，说明性的文字写进 decisions.md。读不出来就是这一份没核过，不许当成通过。")
+
+
+def load_map(heads=None):
+    """heads 不给就现读，首行读不出的当场判红退出（decision_heads 的 strict）。"""
+    m, name = {}, {}
+    for f, (d, short_name) in sorted((heads if heads is not None else decision_heads()[0]).items()):
         s = open(f, encoding='utf-8').read()
-        t = s.split('\n', 1)[0]
-        mm = re.match(r'## (D\d+) (.+?)\s*——', t)
-        if not mm: continue
-        d = mm.group(1); name[d] = mm.group(2).strip(); m[d] = {}
+        name[d] = short_name; m[d] = {}
         for head, st in (('已定项', '已'), ('未定项', '未')):
             sec = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % head, s, re.M | re.S)
             if not sec: continue
@@ -42,7 +71,7 @@ def load_map():
 def scanned_files():
     files = sorted(set(sum([glob.glob(p, recursive=True) for p in
         ('.claude/kb/**/*.md', 'records/**/*.md', 'research/**/*.md',
-         'research/**/*.rs', '.claude/rules/*.md')], [])))
+         'research/**/*.rs', 'crates/**/*.rs', '.claude/rules/*.md')], [])))
     # research/prompts/ 显式排除，理由与 26 号门禁相同：那是原样发给模型的提示与模型的原样输出，
     # 与 research/results/ 里的产物一一对应，事后改它等于让产物对不上输入。
     # 实测（2026-09-03）：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
@@ -50,9 +79,8 @@ def scanned_files():
     return [f for f in files if '/prompts/' not in f]
 
 
-def self_decisions():
-    return {f: re.match(r'## (D\d+)', open(f, encoding='utf-8').read()).group(1)
-            for f in glob.glob('.claude/kb/decisions/*.md')}
+def self_decisions(heads=None):
+    return {f: d for f, (d, _) in (heads if heads is not None else decision_heads()[0]).items()}
 
 
 def references(path, item_map, self_map):
@@ -107,11 +135,13 @@ def says_open_after(line, end):
 
 
 def main():
-    item_map, names = load_map()
-    self_map = self_decisions()
-    bad = []
-    for path in scanned_files():
+    heads, unreadable = decision_heads(strict=False)
+    item_map, names = load_map(heads)
+    self_map = self_decisions(heads)
+    bad = []; files = scanned_files(); refs = 0
+    for path in files:
         for ln, line, m, want, owner, missing, _ in references(path, item_map, self_map):
+            refs += 1
             k = int(m.group(2))
             if missing:
                 bad.append(f"{path}:{ln} 「{m.group(0)}」指名 {missing}"
@@ -121,15 +151,23 @@ def main():
             elif item_map[owner][k] != want:
                 bad.append(f"{path}:{ln} 「{m.group(0)}」写的是{want}定，而 {owner}"
                            f"（{names[owner]}） 正文里第 {k} 条是{item_map[owner][k]}定：{line.strip()[:60]}")
+    if unreadable:
+        report_unreadable(unreadable)
     if bad:
         print(f"  ✗ 分项引用与正文状态不一致 {len(bad)} 处")
         for b in bad[:40]: print("    ", b)
         print("     → 权威是各决策正文的「### 已定项 / ### 未定项」两张表；改引用处，或先改正文再改引用。")
         print("     → 报「指名 Dn 而它没有第 k 条」的：那个编号引不到任何东西，去查它本来想指哪一条。")
         print("     → 一条分项刚翻了状态、引用一大片对不上的：用 research/scripts/relabel-item.py D<n> <k> 按同一份归属规则改写。")
+    if bad or unreadable:
         sys.exit(1)
     n = sum(len(v) for v in item_map.values())
-    print(f"  ✓ 分项引用与正文状态一致（{len(item_map)} 条决策、{n} 个分项）")
+    # 一处引用都没扫到，这一轮什么都没比过：退 77，门禁记「本次未跑」而不是通过
+    # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+    if refs == 0:
+        print(f"  ! 扫了 {len(files)} 个文件，一处分项引用都没有（{len(item_map)} 条决策、{n} 个分项），本阶段无对象可判")
+        sys.exit(77)
+    print(f"  ✓ 分项引用与正文状态一致（{len(item_map)} 条决策、{n} 个分项；扫了 {len(files)} 个文件、{refs} 处分项引用）")
 
 
 if __name__ == '__main__':

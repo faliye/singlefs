@@ -15,6 +15,7 @@
 # 当轮把 `GATE_REPLAY_FULL=1` 补跑了一次才发现：E58 的产物早已对不上（源码的指针载荷
 # 108 → 53 改过而产物没重跑），E17 在 release 下直接 panic 跑不起来——而默认档一直是绿的。
 set -uo pipefail
+ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 
 # 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
 # 它判的是入库实验数今天还复现不复现得出来，输入是实验二进制、replay.sh 的表与留存产物；

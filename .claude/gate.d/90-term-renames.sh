@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 改过名的术语，全仓不再出现旧名（research/prompts/、research/results/、crates/ 都算）
+# gate-stage: 改过名的术语，全仓不再出现旧名（排除表见 .claude/term-rename-exempt，没扫的逐项列在成功行里）
 #
 # 规则见 .claude/kb/term-renames.md：每改一个全仓术语，往那张登记表加一行「旧 新 匹配」，这道阶段从此替你盯着。
 # 实测（2026-09-21）：「系统配置 → 系统配置」第一批只扫了现状类 96 份 1273 处，而全仓真实残余是 1137 份 22741 处——

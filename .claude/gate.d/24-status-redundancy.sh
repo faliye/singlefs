@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 状态别说两遍，也别挂错节
+# gate-stage: 状态一致性：状态别说两遍，也别挂错节（小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行的「状态：」与所在节一致）
 #
 # 分项已经按状态分住「### 已定项」与「### 未定项」两节 ⇒ **节本身就是状态**。
 # 再在标题或条目里写一遍「—— 已定」，同一个词就说了两遍；
@@ -10,6 +10,11 @@
 #   1. 小节标题不许写成「已定项 N —— 已定…」（节名已经说过了）
 #   2. 同一个条目不许既有「—— 已定」又有「状态：已定」
 #   3. 条目的「状态：」必须与它所在的节一致（已定项节里不许有状态：未定）
+#   2、3 只看每节的索引（第一个 `####` 之前），与 20-kb-shape.sh 第 5 段同一条边界；
+#   `####` 之下的论证里另有编号列表，不是分项。
+#
+# 判别力：fixtures/24-status-redundancy.sh/red 三样各犯一次，必须判红；
+# green 里另放一份论证带「3. …状态：未定」的决策，必须判绿。
 #
 # ⚠️ 只认**显式的**「状态：X」与破折号形态，不认句中随口提到的「已定」——
 #    一条未定项里出现「D18 已定项 3 已定」是正常引用，不是它自己的状态。
@@ -28,6 +33,7 @@ python3 - "$DEC" .claude/kb/experiments records <<'PY'
 import re, sys, glob, os
 bad = []
 files = []
+rows_checked = 0
 for d in sys.argv[1:]:
     if os.path.isdir(d):
         files += sorted(glob.glob(os.path.join(d, '**', '*.md'), recursive=True))
@@ -42,14 +48,21 @@ for f in files:
             bad.append((name, i, '标题重复', line.strip()[:60]))
 
     # 2 / 3. 条目层
+    # 只看每节的**索引**：节到下一个一至三级标题为止，再在第一个 `####` 处收口——
+    # `####` 之下是各分项自己的论证，里面另有编号列表（「3. …状态：未定」这类），那些不是分项。
+    # 边界与 20-kb-shape.sh 第 5 段的 index_of、lib-index-vs-body.py 的 count_items 同一条。
     for sec_name, want in (('已定项', '已定'), ('未定项', '未定')):
-        m = re.search(r'^### %s\s*$(.*?)(?=^#{2,3} |\Z)' % sec_name, body, re.M | re.S)
+        m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % sec_name, body, re.M | re.S)
         if not m:
             continue
+        section_text = m.group(1)
+        first_subheading = re.search(r'^#{4}\s', section_text, re.M)
+        index_text = section_text[:first_subheading.start()] if first_subheading else section_text
         base = body[:m.start(1)].count('\n') + 1
-        for off, line in enumerate(m.group(1).split('\n')):
+        for off, line in enumerate(index_text.split('\n')):
             if not re.match(r'^(?:\d+\.|\|\s*\d+\s*\|)', line):
                 continue
+            rows_checked += 1
             ln = base + off
             dash = re.search(r'——\s*\*{0,2}(已定|未定)', line)
             stat = re.search(r'状态：\s*\*{0,2}(已定|未定)', line)
@@ -72,5 +85,5 @@ if bad:
 
 # 报出扫了多少份：扫到 0 份也会走到这一句，不报数就看不出来
 # （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
-print(f'  ✓ 状态只说一遍，且分项都在对的节里（扫 {len(files)} 份）')
+print(f'  ✓ 状态只说一遍，且分项都在对的节里（扫 {len(files)} 份、核 {rows_checked} 条分项索引行）')
 PY

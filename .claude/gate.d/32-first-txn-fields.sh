@@ -23,8 +23,9 @@ ROOT="${1:-.}"
 KB="$ROOT/.claude/kb"
 TABLE="$KB/layout/01-first-txn.md"
 
-[[ -f "$TABLE" ]] || { echo "  ✓ 没有 $TABLE，无对象可判"; exit 0; }
-[[ -d "$KB/decisions" ]] || { echo "  ✓ 没有 $KB/decisions，无对象可判"; exit 0; }
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -f "$TABLE" ]] || { echo "  ! 没有 $TABLE，本阶段无对象可判"; exit 77; }
+[[ -d "$KB/decisions" ]] || { echo "  ! 没有 $KB/decisions，本阶段无对象可判"; exit 77; }
 
 bad=0
 checked=0
@@ -82,4 +83,8 @@ if ((bad)); then
   exit 1
 fi
 
+if ((checked == 0)); then
+  echo "  ! $TABLE 里一处「D<n>（简称） 已定项 / 未定项 k」引用都没有，本阶段无对象可判"
+  exit 77
+fi
 echo "  ✓ 第一个事务的字段表指向都成立（查了 $checked 处引用）"

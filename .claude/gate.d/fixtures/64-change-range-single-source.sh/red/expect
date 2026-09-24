@@ -1,0 +1,15 @@
+exit=1
+want=4 行在阶段里自己算 diff 基准
+want=.claude/gate.d/50-样本自己算基准.sh:3
+want=.claude/gate.d/52-样本攻方的八种写法.sh:3
+want=.claude/gate.d/52-样本攻方的八种写法.sh:4
+want=.claude/gate.d/52-样本攻方的八种写法.sh:5
+want=6 行列路径的 git 调用没带 -c core.quotepath=false
+want=.claude/gate.d/51-样本列路径不带选项.sh:3
+want=.claude/gate.d/52-样本攻方的八种写法.sh:6
+want=.claude/gate.d/52-样本攻方的八种写法.sh:7
+want=.claude/gate.d/52-样本攻方的八种写法.sh:8
+want=.claude/gate.d/53-样本包装函数叫git.py:5
+want=.claude/gate.d/53-样本包装函数叫git.py:7
+want=1 处调共用取法（gate_changed_paths / gate_added_lines）没判退出码
+want=.claude/gate.d/54-样本不判退出码.sh:5

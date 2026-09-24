@@ -1,3 +1,4 @@
 exit=1
 want=E999 被引用但 experiments/ 下没有它
-want=E343 已跑，但决策正文一次都没引用它
+want=invariants.md 里没有 <!-- invariant-count --> 标记
+want=checks-owed.md 里一行 `| C<n> ` 都没数到（欠着 0、已还清 0）

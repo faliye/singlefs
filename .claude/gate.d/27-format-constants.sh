@@ -22,15 +22,28 @@
 #
 # ⚠️ **它管得了哪一半**：只检查**已经登记了标记**的常量。一个新加的、没登记标记的
 # 格式常量仍然可以静默漂移——那一半靠人，落点见 kb/checks-owed.md。
+#
+# 标记与 Rust const 的解析在 `lib-format-const.py`，39、92 号用的是同一份，不另抄。
+# 以 `<!-- format-const` 开头而按文法读不出来的（多写了一个键、值不是整数）判红，不跳过；
+# 同一个名字登记两次判红，同一份文件里写两次也算——第二个值不许被静默丢掉。
+# 源码一侧只认类型是单个标识符的 const（`u64`、`usize`），值要是整数字面量：
+# 实验里同名的扫描表（`const NODE_BYTES: [u64; 2] = …`）不是那个格式常量。
+#
+# 判别力：fixtures/27-format-constants.sh/red 放一处源码落后于 kb 的常量、一处正文残留的旧值、
+# 一条多写了键的标记、一个同一份文件里登记两次的名字，以及值跨行写、带 pub(crate) 的两处落后声明，必须判红；
+# green 另放一张与格式常量同名的扫描表（数组类型），必须判绿。
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+LIB="$(cd "$(dirname "$0")" && pwd)/lib-format-const.py"
 cd "$ROOT" 2>/dev/null || exit 2
 [[ -d .claude/kb ]] || { echo "  ! 找不到 kb，本阶段跳过"; exit 77; }
 
-python3 - <<'PY'
-import re, glob, sys, os
+python3 - "$LIB" <<'PY'
+import glob, importlib.util, sys
 
-MARK = re.compile(r'<!--\s*format-const:\s*(\w+)\s*=\s*(-?\d+)\s*(?:stale=([^>]*?))?\s*-->')
+library_spec = importlib.util.spec_from_file_location("format_const", sys.argv[1])
+format_const = importlib.util.module_from_spec(library_spec)
+library_spec.loader.exec_module(format_const)
 
 def body_of(text):
     """正文 = 「## 历史版本」之前那一段。历史里留旧值是文档纪律要求的，不判红。"""
@@ -43,21 +56,25 @@ def body_of(text):
 kb_all = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
 kb_files = [f for f in kb_all if not f.endswith('-history.md') and '/decisions-history/' not in f]
 
-# ---- 1. 收标记，且同一个常量只许登记一处（kb-discipline 第 4 条）----
-marks, dup = {}, []
+# ---- 1. 收标记：读不出来的判红；同一个常量只许登记一处，同一份文件里写两次也算（kb-discipline 第 4 条）----
+marks, registrations, bad = {}, {}, []
+unparsable_count = 0
 for f in kb_files:
-    text = open(f, encoding='utf-8').read()
-    for name, val, stale in MARK.findall(text):
-        stale = [s for s in (stale or '').split('|') if s.strip()]
-        if name in marks and marks[name][0] != f:
-            dup.append((name, marks[name][0], f))
-        marks.setdefault(name, (f, int(val), stale))
+    parsed = format_const.parse_marks(open(f, encoding='utf-8').read())
+    for unparsable in parsed.unparsable:
+        unparsable_count += 1
+        bad.append(f'{f}:{unparsable.line_number}  format-const 标记按文法读不出来：「{unparsable.excerpt}」')
+    for mark in parsed.marks:
+        registrations.setdefault(mark.name, []).append(f'{f}:{mark.line_number}')
+        marks.setdefault(mark.name, (f, mark.value, list(mark.stale_literals)))
 
-bad = []
-for name, a, b in dup:
-    bad.append(f'{name}：登记了两处（{a} 与 {b}）—— 同一个事实只许一处权威记录')
+duplicate_count = 0
+for name, places in registrations.items():
+    if len(places) > 1:
+        duplicate_count += 1
+        bad.append(f'{name}：登记了 {len(places)} 处（{" 与 ".join(places)}）—— 同一个事实只许一处权威记录')
 
-if not marks:
+if not marks and not bad:
     print('  ! kb 里一个 format-const 标记都没有，本阶段**什么也没验**')
     print('     → 在定住格式常量的那句话旁边加 <!-- format-const: 名字 = 值 stale=旧字面串 -->')
     sys.exit(1)
@@ -66,29 +83,27 @@ if not marks:
 srcs = sorted(glob.glob('research/**/*.rs', recursive=True) + glob.glob('crates/**/*.rs', recursive=True))  # 2026-09-14 起格式常量模块住 crates/singlefs-format，同一套标记绑住它
 seen_in_src = set()
 for f in srcs:
-    for i, line in enumerate(open(f, encoding='utf-8', errors='ignore'), 1):
+    source_text = open(f, encoding='utf-8', errors='ignore').read()
+    for declaration in format_const.read_rust_consts(source_text, only_scalar_types=True):
+        if declaration.name not in marks:
+            continue
+        name = declaration.name
+        seen_in_src.add(name)
         # 值要读到分号为止：只取开头那段数字时，`16384 * 2` 读成 16384 判通过（静默放行），
         # `16 * 1024` 与 `16_384` 读成 16 判红（2026-09-11 改名回扫时实测）。
-        m = re.match(r'\s*(?:pub\s+)?const\s+(\w+)\s*:\s*\w+\s*=\s*([^;]+);', line)
-        if not m or m.group(1) not in marks:
+        if declaration.value is None:
+            shown = format_const.normalized_value_text(declaration.value_text)
+            bad.append(f'{f}:{declaration.line_number}  const {name} 的值写成了「{shown}」，门禁读不出它等于几 → 写成整数字面量（可带 _ 分隔）')
             continue
-        name, rhs = m.group(1), m.group(2).strip()
-        literal = re.fullmatch(r'(-?[0-9][0-9_]*)(?:[iu](?:8|16|32|64|128|size))?', rhs)
-        seen_in_src.add(name)
-        if not literal:
-            bad.append(f'{f}:{i}  const {name} 的值写成了「{rhs}」，门禁读不出它等于几 → 写成整数字面量（可带 _ 分隔）')
-            continue
-        val = int(literal.group(1).replace('_', ''))
         kbf, want, _ = marks[name]
-        if val != want:
-            bad.append(f'{f}:{i}  const {name} = {val}，而 {kbf} 定的现行值是 {want}')
+        if declaration.value != want:
+            bad.append(f'{f}:{declaration.line_number}  const {name} = {declaration.value}，而 {kbf} 定的现行值是 {want}')
 
 # ---- 3. 旧值的字面串不许留在正文与源码里 ----
 # ⚠️ `research/results/` **不在扫描范围**，理由与阶段 26 排除 `research/prompts/` 同一条：
 # 产物是**那一轮的原始输出**，改它等于产物不再对应它的输入，证据链当场断掉。
 # 「源码改了而产物没重跑」由 `87-replay.sh` 逐字节比对抓——改了源码它就会红，直到重跑。
-scan = [(f, MARK.sub('', body_of(open(f, encoding='utf-8').read()))) for f in kb_files
-        if not f.endswith('-history.md') and '/decisions-history/' not in f]
+scan = [(f, format_const.strip_marks(body_of(open(f, encoding='utf-8').read()))) for f in kb_files]
 scan += [(f, open(f, encoding='utf-8', errors='ignore').read()) for f in srcs]
 
 for name, (kbf, want, stale) in sorted(marks.items()):
@@ -107,6 +122,12 @@ if bad:
     print('     → 权威是 kb 里的 format-const 标记。改常量要三处一起动：')
     print('       ① kb 标记与正文 ② 实验源码的 const 与钉死它的单测 ③ 重跑实验并更新 research/results/ 的产物')
     print('     → 旧值只许留在「## 历史版本」之后与 *-history.md 里。')
+    if unparsable_count:
+        print('     → 读不出来的标记照这一条文法改写：<!-- format-const: 名字 = 整数 stale=旧串|旧串 -->，')
+        print('       stale= 之外不许有别的键；它读不出来时，这个常量在本阶段眼里就没登记过。')
+        print('       它只是正文里举的例子、不是登记，就去掉 <!--，写成「`format-const: 名字 = 值`」。')
+    if duplicate_count:
+        print('     → 一个名字只留一处登记（定这个值的那一处）；别处要提它，写成不带 <!-- 的文字，例如「`format-const: 名字`」。')
     sys.exit(1)
 
 only_kb = sorted(set(marks) - seen_in_src)

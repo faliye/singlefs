@@ -32,8 +32,9 @@ shopt -s nullglob
 decision_files+=(.claude/kb/decisions/*.md)
 shopt -u nullglob
 if ((${#files[@]} + ${#stray_files[@]} + ${#decision_files[@]} == 0)); then
-  ok "没有决策变更史文件，也没有决策正文，本阶段无对象可判"
-  exit 0
+  # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+  echo "  ! 没有决策变更史文件，也没有决策正文，本阶段无对象可判"
+  exit 77
 fi
 
 misplaced=(); checked=0

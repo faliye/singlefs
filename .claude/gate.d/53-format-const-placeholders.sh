@@ -33,8 +33,11 @@ for path in sorted(glob.glob('crates/singlefs-format/src/**/*.rs', recursive=Tru
             if not files:
                 bad.append((path, number, f'D{n} 没有决策文件')); continue
             body = open(files[0], encoding='utf-8').read()
-            # 索引行 `| k | **…` 或正文标题 `#### 已定项 k（`，两种形态任一命中即可
-            hit = re.search(rf'^\|\s*{k}\s*\|', body, re.M) or re.search(rf'^#{{3,5}}\s*{kind}\s*{k}[（:：]', body, re.M)
+            # 索引行 `| k | **…` 或正文标题 `#### 已定项 k（`，两种形态任一命中即可。
+            # 索引行只在同名那一节（`### 已定项` / `### 未定项`）第一个 #### 之前找：不分节时 `未定项 2` 会被已定项表的第 2 行放行
+            section = re.search(rf'^### {kind}[ \t]*$(.*?)(?=^#{{2,4}} |\Z)', body, re.M | re.S)
+            index_table = section.group(1) if section else ''
+            hit = re.search(rf'^\|\s*{k}\s*\|', index_table, re.M) or re.search(rf'^#{{3,5}}\s*{kind}\s*{k}[（:：]', body, re.M)
             if not hit:
                 bad.append((path, number, f'D{n} 里找不到 {kind} {k}'))
         elif c:

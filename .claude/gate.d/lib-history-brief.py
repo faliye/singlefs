@@ -14,7 +14,8 @@ MONTH_DIR = '.claude/kb/decisions-history'
 START = '<!-- gen:history-brief:start -->'
 END = '<!-- gen:history-brief:end -->'
 PENDING = '（待补）'
-HISTORY_ANCHOR = '\n## 历史版本\n'
+# 行尾多一个空格的「## 历史版本 」也认（doc-lint 认它是历史节）；认不出锚的那一份由调用方判红，不当成没有条目
+HISTORY_ANCHOR = re.compile(r'(?m)^## 历史版本[ \t]*(?:\n|\Z)')
 ENTRY_START = re.compile(r'(?m)^(?=### 20\d\d-\d\d-\d\d)')
 HEADING = re.compile(r'### (20\d\d-\d\d-\d\d(?:（其[^）]*）)?)[：: ]*(.*)')
 QUICK = re.compile(r'(?m)^> 快查·(改了什么|改前|改后)：(.*)$')
@@ -28,11 +29,15 @@ def month_files():
 
 
 def split_month(text):
-    """返回（条目之前的部分, [条目块]）。条目块从 `### 日期` 起，到下一条之前为止。"""
-    anchor = text.find(HISTORY_ANCHOR)
-    if anchor < 0:
-        return text, []
-    cut = anchor + len(HISTORY_ANCHOR)
+    """返回（条目之前的部分, [条目块]）。条目块从 `### 日期` 起，到下一条之前为止。
+
+    找不到「## 历史版本」返回 None：条目住在那一节下面，找不到锚就一条都读不到。
+    不能当成「这一份没有条目」——那样整份的条目静默消失，49 号报「查了 0 条条目」绿着，而 48 号数得出它们。
+    """
+    anchor = HISTORY_ANCHOR.search(text)
+    if anchor is None:
+        return None
+    cut = anchor.end()
     parts = ENTRY_START.split(text[cut:])
     return text[:cut] + parts[0], parts[1:]
 
@@ -45,11 +50,22 @@ def parse_block(block, month):
 
 
 def load_entries():
-    entries = []
+    """返回（条目, 找不到「## 历史版本」的月文件）。后者非空时条目不全，调用方要判红。"""
+    entries, anchorless = [], []
     for path in month_files():
-        _, blocks = split_month(open(path, encoding='utf-8').read())
-        entries += [parse_block(block, os.path.basename(path)[:-3]) for block in blocks]
-    return entries
+        split = split_month(open(path, encoding='utf-8').read())
+        if split is None:
+            anchorless.append(path)
+            continue
+        entries += [parse_block(block, os.path.basename(path)[:-3]) for block in split[1]]
+    return entries, anchorless
+
+
+def report_anchorless(anchorless):
+    print(f'  ✗ {len(anchorless)} 份按月的变更史里找不到「## 历史版本」，那几份的条目一条都没读到')  # gate-lint:summary
+    for path in anchorless:
+        print(f'     {path}')  # gate-lint:detail
+    print('     → 条目住在「## 历史版本」下面：把这一行加回文件头之后、第一条 `### 日期` 之前，再跑 bash .claude/gate.d/49-history-brief.sh。')
 
 
 def required_labels(entry):
@@ -124,22 +140,49 @@ def recent_line(count):
     return f'共改过 {count} 次，只列最近 {RECENT_PER_DECISION} 次，更早的在 `decisions-history/` 的原文里：'
 
 
+class EntriesLost(Exception):
+    """条目点名的决策在 decisions/ 下都没有读得出首行的正文：它既不进任何 `## D<n>` 节，也不进「不挂在某一条决策上的」。"""
+
+    def __init__(self, lost):
+        super().__init__(f'{len(lost)} 条条目没有归进任何一节')
+        self.lost = lost
+
+
 def render(entries):
+    """收尾核「归进了某一节的条目数 == 条目总数」，对不上抛 EntriesLost。
+
+    check 与 write 用的是同一个 render：少了这道核，漏掉的条目两边一起漏，比对照样判绿。
+    """
     status = index_status()
     lines = [START, '']
+    placed = set()
     for number, name in decision_names():
         touched = [entry for entry in entries if number in mentions(entry)]
+        placed.update(id(entry) for entry in touched)
         lines += [f'## D{number}（{name}）', '']
         if number in status:
             lines += [f'**现状**：{status[number][0]}。{status[number][1]}', '']
         lines += ([recent_line(len(touched)), ''] + table(touched)) if touched else ['变更史里还没有点名它的条目。']
         lines.append('')
     others = [entry for entry in entries if not mentions(entry)]
+    placed.update(id(entry) for entry in others)
     lines += ['## 不挂在某一条决策上的', '',
               '「改了什么」「改前」「改后」三格里都没点名哪一条决策的变更：门禁、审核、跨决策的整理这一类。', '']
     lines += ([recent_line(len(others)), ''] + table(others)) if others else ['没有。']
     lines += ['', END]
+    if len(placed) != len(entries):
+        raise EntriesLost([entry for entry in entries if id(entry) not in placed])
     return '\n'.join(lines)
+
+
+def report_lost(lost):
+    print(f'  ✗ {len(lost)} 条变更史条目没有归进生成块的任何一节：它点名的决策在 decisions/ 下都没有首行读得出的正文')  # gate-lint:summary
+    for entry in lost:
+        named = '、'.join(f'D{number}' for number in sorted(mentions(entry)))
+        print(f'     decisions-history/{entry["month"]}.md {entry["key"]} 点名 {named}：{what_of(entry)[:30]}')  # gate-lint:detail
+    print('     → 对着那一条原文核编号：快查或标题里写错了，就改成原文里写着的那条决策再跑 --write；')
+    print('       编号没写错而那条决策的正文不在 decisions/ 下（首行读不出、删了或并走了），先把正文的去向查清报给主 agent——')
+    print('       这类条目该归进生成块的哪一节还没有条款定，别为了转绿改历史条目。')
 
 
 def foreign_tokens(summary, source):
@@ -157,6 +200,25 @@ def split_main():
 
 
 def write():
+    # 条目不全（有月份找不到锚）或有条目进不了生成块时，一个字节都不写：写出去的生成块会少条目，而下一次比对照样判绿
+    entries, anchorless = load_entries()
+    if anchorless:
+        report_anchorless(anchorless)
+        return 1
+    try:
+        render(entries)
+    except EntriesLost as error:
+        report_lost(error.lost)
+        return 1
+    if not os.path.isfile(MAIN):
+        print(f'  ✗ 找不到 {MAIN}，生成块没处写')  # gate-lint:summary
+        print(f'     → 先建 {MAIN}，文件头之后放一对标记 {START} 与 {END}，再跑 --write')
+        return 1
+    parts = split_main()
+    if parts is None:
+        print(f'  ✗ {MAIN} 里的生成块标记不是恰好一对（{START} … {END}）')  # gate-lint:summary
+        print('     → 加回这一对标记再跑 --write')
+        return 1
     placeholders = 0
     for path in month_files():
         text = open(path, encoding='utf-8').read()
@@ -171,12 +233,7 @@ def write():
         new_text = prefix + ''.join(new_blocks)
         if new_text != text:
             open(path, 'w', encoding='utf-8').write(new_text)
-    parts = split_main()
-    if parts is None:
-        print(f'  ✗ {MAIN} 里的生成块标记不是恰好一对（{START} … {END}）')  # gate-lint:summary
-        print('     → 加回这一对标记再跑 --write')
-        return 1
-    entries = load_entries()
+    entries, _ = load_entries()
     open(MAIN, 'w', encoding='utf-8').write(parts[0] + render(entries) + parts[2])
     print(f'  ✓ 按原文重新生成了 {MAIN}：{len(entries)} 条条目，这次补了 {placeholders} 条「（待补）」快查')
     return 0
@@ -184,14 +241,24 @@ def write():
 
 def check():
     if not os.path.isfile(MAIN):
-        print(f'  ! 找不到 {MAIN}，本阶段跳过')
-        return 0
+        # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+        print(f'  ! 找不到 {MAIN}，本阶段无对象可判')
+        return 77
     parts = split_main()
     if parts is None:
         print(f'  ✗ {MAIN} 里的生成块标记不是恰好一对（{START} … {END}）')  # gate-lint:summary
         print('     → 加回这一对标记，再跑 bash .claude/gate.d/49-history-brief.sh --write')
         return 1
-    entries = load_entries()
+    entries, anchorless = load_entries()
+    failed = False
+    if anchorless:
+        report_anchorless(anchorless)
+        failed = True
+    try:
+        rendered = render(entries)
+    except EntriesLost as error:
+        report_lost(error.lost)
+        failed, rendered = True, None
     problems, checked = [], 0
     for entry in entries:
         for label in required_labels(entry):
@@ -203,7 +270,8 @@ def check():
             foreign = foreign_tokens(summary, entry['source'])
             if foreign:
                 problems.append(f'decisions-history/{entry["month"]}.md {entry["key"]}  「快查·{label}」里有原文没有的数或编号：{"、".join(foreign)}')
-    if not problems and parts[1] != render(entries):
+    # 条目不全时（上面两种已经判红）拿生成块去比没有意义，比了只会多报一处
+    if not problems and not failed and parts[1] != rendered:
         problems.append(f'{MAIN} 的生成块与按原文重新生成的不一致')
     if problems:
         print(f'  ✗ 决策变更史的快查与原文有 {len(problems)} 处对不上')  # gate-lint:summary
@@ -214,6 +282,8 @@ def check():
         print('     → 每条原文标题下写两行快查：「> 快查·改前：……」「> 快查·改后：……」（标题只有日期的再写「> 快查·改了什么：……」），')
         print('       数字、编号、「已定项 k」照那一条原文抄，编号带简称；快查里冒出原文没有的数或编号，就改回原文里写着的。')
         print('     → 原文或快查改完，跑 bash .claude/gate.d/49-history-brief.sh --write 重新生成 decisions-history.md。')
+        failed = True
+    if failed:
         return 1
     print(f'  ✓ 决策变更史的快查与原文同步：查了 {len(entries)} 条条目、{checked} 格快查，decisions-history.md 与原文一致')
     return 0

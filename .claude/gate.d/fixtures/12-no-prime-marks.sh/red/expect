@@ -1,0 +1,4 @@
+exit=1
+want=2 行用了角标写法
+want=.claude/kb/候选.md:3
+want=crates/demo/src/main.rs:1

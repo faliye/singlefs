@@ -1,2 +1,4 @@
 exit=1
 want=没被 experiments.md 点名
+want=E98 点名 e98-nowhere-2026-09-24.out —— 树里没有，git 历史里也没有
+want=1 份被点名的产物既不在 research/results 下、也不在版本库历史里

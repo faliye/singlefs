@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 已定分项的正文里说自己还没定
+# gate-stage: 状态一致性：已定分项的正文说它自己、或同一条决策里另一条已定分项还没定
 #
 # **判据**：在一条决策的「已定项」小节（含各 `#### 已定项 N` 论证）里，
 # 凡出现「X 仍未定 / X 还没定 / X 尚未定」这样的断言，就查 X 是谁：
@@ -20,12 +20,14 @@
 # 真要收拾它，该做的是把那个子问题升成独立分项，而不是把这句话删掉。
 # 判据因此只认自指与兄弟分项两种，**宁可漏，不可假红**。
 #
-# 判别力：样本 red 里已定项 1 的正文写「取值仍未定」，必须红；
+# 判别力：样本 red 里已定项 1 的正文写「取值仍未定」（a 支），必须红；另一份 red 样本在已定项 2 的正文里
+# 说「校验算法选哪个仍未定」，而已定项 1 的标题就是它（b 支），也必须红，两支各有一条 want；
 # green 里同一句挪进未定项小节，必须绿。
 set -uo pipefail
 ROOT="${1:-.}"
 DEC="$ROOT/.claude/kb/decisions"
-[[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
 
 python3 - "$DEC" <<'PY'
 import re, sys, pathlib
@@ -37,7 +39,11 @@ OPEN = re.compile(r'(仍然未定|仍未定|尚未定(?!案)|还没定|均未定
 PHRASE = re.compile(r'([^\s。，、；：（）()「」|*`＊>#⚠️⇒—]{2,12})$')
 
 bad = []
-for f in sorted(dec.glob("*.md")):
+decision_files = sorted(dec.glob("*.md"))
+if not decision_files:
+    print(f"  ! {dec} 下没有决策正文，本阶段无对象可判")
+    sys.exit(77)
+for f in decision_files:
     lines = f.read_text(encoding="utf-8").splitlines()
 
     # 已定项小节 = `### 已定项` 索引表 + 各 `#### 已定项 N` 论证
@@ -88,5 +94,5 @@ if bad:
     print("     → 怎么办：这是定案之后没清理的推导过程。把这句改写成定案后的现状；")
     print("               若那个子问题真的还开着，把它升成一条独立的未定项，别留在已定项正文里。")
     sys.exit(1)
-print(f"  ✓ 已定项的正文没有把已经定了的东西说成未定（扫 {len(list(dec.glob('*.md')))} 条决策）")
+print(f"  ✓ 已定项的正文没有把已经定了的东西说成未定（扫 {len(decision_files)} 条决策）")
 PY

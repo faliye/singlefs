@@ -1,3 +1,6 @@
 exit=1
 want=「快查·改后」还没写
 want=「快查·改后」里有原文没有的数或编号：32
+want=1 份按月的变更史里找不到「## 历史版本」
+want=.claude/kb/decisions-history/2026-08.md
+want=decisions-history/2026-09.md 2026-09-12 点名 D214

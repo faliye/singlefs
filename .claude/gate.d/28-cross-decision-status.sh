@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 说某条决策未定，而它已经定了
+# gate-stage: 状态一致性：说某条决策未定，而它已经定了
 #
 # **判据**：kb 正文里凡是紧贴着「D<n>（简称）」写下「未定」的句子，
 # 拿它与那条决策**状态行**上的实际状态比对；实际不是「待定」就判红。
@@ -29,7 +29,8 @@
 set -uo pipefail
 ROOT="${1:-.}"
 KB="$ROOT/.claude/kb"
-[[ -d "$KB/decisions" ]] || { echo "  ✓ 没有 $KB/decisions，无对象可判"; exit 0; }
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -d "$KB/decisions" ]] || { echo "  ! 没有 $KB/decisions，本阶段无对象可判"; exit 77; }
 
 python3 - "$KB" <<'PY'
 import re, sys, pathlib
@@ -57,7 +58,7 @@ if unparsed:
     print("     → 标题要写成 `## D<n> 简称 —— 状态`。解析不了就等于没扫，不许当成通过。")
     sys.exit(1)
 if not status:
-    print("  ✓ 没有决策正文，无对象可判"); sys.exit(0)
+    print("  ! 没有决策正文，本阶段无对象可判"); sys.exit(77)
 
 # 2) 紧贴写法：D<n>（简称） 之后只允许空白 / 逗号 / 括号 / 「取值」「状态」
 #    再接可选的「仍/仍然/尚/都/均」，然后就是「未定」，且不许是「未定项」。

@@ -101,10 +101,11 @@ waaagh！
 提交前跑门禁：
 
 ```bash
-bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 全量与 QEMU 真设备，要十几分钟）
+bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 快档与全绿标记核对、QEMU 真设备，要十几分钟；层 0 全量不在里面）
 
 cargo test --workspace                    # 平时的单测；层 0 全量标 ignored，这里只跑缩小版
-bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放全量（release）
+bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放快档，并核这批输入有没有全量的全绿标记
+bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记
 bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
 bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）

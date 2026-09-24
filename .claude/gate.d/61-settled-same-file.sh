@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 定了新东西之后有没有回头看同文件的未定项
+# gate-stage: 状态一致性：定了新东西之后有没有回头看同文件的未定项
 #
 # 还 checks-owed.md C36（未定项检查的三个盲区）的前两条。
 #
@@ -26,19 +26,24 @@
 set -uo pipefail
 DEC=.claude/kb/decisions
 IDX=.claude/kb/decisions.md
-[[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，本阶段跳过"; exit 77; }
 
-# diff 基准：与共享门禁的 Show me test 同一套口径
-BASE="${GATE_BASE:-}"
-if [[ -z "$BASE" ]]; then
-  for def in master main; do
-    if git rev-parse --verify -q "$def" >/dev/null; then
-      BASE="$(git merge-base HEAD "$def" 2>/dev/null)" && break
-    fi
-  done
-fi
-[[ -n "$BASE" ]] || BASE=HEAD
+# 改动范围取共用脚本 research/scripts/changed-paths.sh（门禁 64 号判阶段里不另算一份）：
+# 基准是 gate_diff_base gate，名单带未跟踪文件——新写的决策文件在 git add 之前也算这次改动。
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+BASE="$(gate_diff_base gate)"
+
+# 本次改动碰过的决策文件。名单先落到变量、判过退出码再读：git 失败时名单是空的，会被读成「本次没有新增已定小节」。
+all_changed="$(gate_changed_paths "$BASE" untracked)" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 $BASE），这次改了哪些决策文件没取到"
+  echo "     → 按上面 git 的报错修好仓库状态（基准 $BASE 要存在；仓里还没有提交就先提交一次）再跑；git 失败时这一阶段什么都没比，不是通过。"
+  exit 1
+}
+changed_names="$(grep "^\.claude/kb/decisions/" <<<"$all_changed" || true)"
 
 # 本次 diff 里**新增**了「已定」小节标题的决策文件
 settled_files=()
@@ -51,26 +56,41 @@ while IFS= read -r f; do
   # 合成仓双向验的时候当场红——**这就是「新增的检查必须先证明它会红」拦下来的那一次**。
   # 同 10-kb-rot.sh 那条：pipefail + `grep -q` 提前退出 ⇒ 前段 SIGPIPE ⇒ 命中被读成没命中。
   # `git diff` 的输出可以很大，这里比那条更容易撞上。
-  diff_out=$(git diff "$BASE" -- "$f" || true)
-  if grep -qE '^\+#{2,4} .*—— 已定|^\+#{2,4} 已定[（(]' <<<"$diff_out"; then
+  # 新增行按共用脚本取（未跟踪的文件整份算新增）；取不到就判红，不当「没有新增」
+  added_out="$(gate_added_lines "$BASE" "$f")" || {
+    echo "  ✗ 取不到 $f 这次新增了哪些行（基准 $BASE）"
+    echo "     → 按上面 git 的报错修好仓库状态再跑；取不到新增行时这一阶段什么都没比，不是通过。"
+    exit 1
+  }
+  added_text="$(cut -f2- <<<"$added_out")"
+  if grep -qE '^#{2,4} .*—— 已定|^#{2,4} 已定[（(]' <<<"$added_text"; then
     settled_files+=("$f")
   fi
-done < <(git -c core.quotepath=false diff --name-only "$BASE" -- "$DEC" 2>/dev/null)
+done <<<"$changed_names"
 
 if ((${#settled_files[@]} == 0)); then
-  echo "  ✓ 本次 diff 没有新增「已定」小节，本阶段无对象可判"
-  exit 0
+  # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+  echo "  ! 本次 diff 没有新增「已定」小节，本阶段无对象可判"
+  exit 77
 fi
 
 flagged=0
+open_checked=0      # 查过的未定项条数（新增了已定小节的那几份里）
+pending_checked=0   # 查过的索引页「待议」节数
 
 # ── ① 同文件里还开着、而本次一个都没碰的未定项 ──────────────────
 for f in "${settled_files[@]}"; do
   # 本次 diff 在这个文件里碰过的行号（新文件侧）
-  touched="$(git diff -U0 "$BASE" -- "$f" \
-            | awk 'match($0,/^@@ .* \+([0-9]+)(,([0-9]+))? @@/,m){s=m[1]; n=(m[3]==""?1:m[3]); for(i=0;i<n;i++) print s+i}')"
+  # 未跟踪的新文件整份都是这次写的：每一行都算碰过
+  if git -c core.quotepath=false ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+    touched="$(git diff --no-color --no-ext-diff -U0 "$BASE" -- "$f" \
+              | awk 'match($0,/^@@ .* \+([0-9]+)(,([0-9]+))? @@/,m){s=m[1]; n=(m[3]==""?1:m[3]); for(i=0;i<n;i++) print s+i}')"
+  else
+    touched="$(seq 1 "$(wc -l < "$f")")"
+  fi
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
+    open_checked=$((open_checked + 1))
     end=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^### /||/^## /){print NR-1; exit}' "$f")
     [[ -n "$end" ]] || end=$((ln+20))
     # 这个条目块里有没有任何一行在本次 diff 里被碰过
@@ -96,11 +116,11 @@ done
 if [[ -f "$IDX" ]]; then
   idx_touched=0
   # 同上：`grep -q .` 在第一行就退出，前段 SIGPIPE 会让「动过」被读成「没动过」。
-  idx_names=$(git -c core.quotepath=false diff --name-only "$BASE" -- "$IDX" 2>/dev/null || true)
-  [[ -n "$idx_names" ]] && idx_touched=1
+  grep -qxF "$IDX" <<<"$all_changed" && idx_touched=1
   while IFS=: read -r ln text; do
     [[ -n "$ln" ]] || continue
     grep -qE '已回收|已收摊|已并入' <<<"$text" && continue
+    pending_checked=$((pending_checked + 1))
     (( idx_touched )) && continue
     echo "  ✗ $(basename "$IDX"):$ln 本次有决策定案，而这一节「待议」一个字都没动"
     echo "     ⇒ 复核它是不是被这次定案实质回答/否决了。原文：${text:0:60}"
@@ -114,4 +134,4 @@ if ((flagged)); then
   echo "               后一种做法本身就是这条检查要的东西——它要的是一次回头看，不是一次沉默。"
   exit 1
 fi
-echo "  ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过"
+echo "  ✓ 本次定案之后，同文件的未定项与索引页的待议节都被回头看过（新增已定小节的决策 ${#settled_files[@]} 份，查了 $open_checked 条未定项、$pending_checked 节待议）"

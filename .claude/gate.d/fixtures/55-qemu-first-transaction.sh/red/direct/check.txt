@@ -1,0 +1,5 @@
+E7RESULT name=device_log device=0 declared_entries=36 expected_writes=23 expected_flushes=12 observed_writes=23 observed_flushes=13 trailing_flushes=1 divergence=none
+E7RESULT name=device_log device=1 declared_entries=32 expected_writes=21 expected_flushes=10 observed_writes=21 observed_flushes=11 trailing_flushes=1 divergence=none
+E7RESULT name=device_log_verdict matches=true
+E7RESULT name=host_recover outcome=file_read root=1:3 content_matches=true valid_records=3
+E7RESULT name=done emitted=5

@@ -1,0 +1,2 @@
+E7RESULT name=segments path=a operations=3 segments=2+1 closed_form=5 kinds=[x×2]|[y]
+E7RESULT name=segments path=b operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]

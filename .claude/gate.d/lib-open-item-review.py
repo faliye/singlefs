@@ -18,7 +18,7 @@ import re
 import subprocess
 import sys
 
-ITEM_BOUNDARY = re.compile(r'^\s*\d+\.\s|^### |^## |^\|\s*\d+\s*\|')
+ITEM_BOUNDARY = re.compile(r'^\s*\d+\.\s|^#{2,6} |^\|\s*\d+\s*\|')
 
 
 def block_end(lines, start_index):

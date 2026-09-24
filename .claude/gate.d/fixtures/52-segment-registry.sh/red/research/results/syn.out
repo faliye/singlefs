@@ -1,0 +1,7 @@
+E7RESULT name=segments path=a operations=3 segments=2+1 closed_form=5 kinds=[x×2]|[y]
+E7RESULT name=segments path=b operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]
+E7RESULT name=segments path=c operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]
+E7RESULT name=segments path=d operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]
+E7RESULT name=segments path=f operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]
+E7RESULT name=segments path=m operations=2 segments=1+1 closed_form=3 kinds=[x]|[y]
+E7RESULT name=segments path=g operations=2 segments=1+1 closed_form=3

@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# gate-stage: 三方论证那几个 research 脚本的自证还会红
+# gate-stage: research/scripts/ 里声称有 --selftest 的脚本，自证都有阶段在跑、而且还会红
 #
-# 判据：`research/scripts/ask-local-selftest.sh`、`checklist-specs.py --selftest`、`quote-kb.py --selftest`、
-# `insert-row.py --selftest`、`sweep-term.py --selftest`、`archive-past-rounds.py --selftest`、`kb-sections.py --selftest`、`check-segment-registry.py --selftest`、`replace-once.py --selftest`、`replace-batch.py --selftest`、`e152-tables.py --selftest`、`agent-watch.py --selftest`、`quote-rust-items.py --selftest`、`cache-keepalive.sh --selftest`、`stale-candidates.py --selftest` 与 `--benchmark`、`test-environment-check.py --selftest`、`change-touches-crates.sh --selftest`、`verify-citations.sh --selftest`，上面列出的每一份都要通过（份数不在这里写死：加一份就要改两处，而这句注释没有任何东西盯着它；运行时那句报的数由下面的 runner 表现算，`stale-candidates` 占两条所以比脚本份数多一）。
+# 判据：下面 runner 表里的每一条自证都要通过；research/scripts/ 里出现 `--selftest` 的脚本，要么有阶段在调用它
+# （本阶段的 runner 表，或 15 号那种先赋给变量再调的写法），要么登记进 NOT_RUN_HERE 并写明为什么。份数不在注释里写死，成功行现算。
 # 为什么：这几份自证此前都写着，却没有任何门禁阶段在跑（2026-09-12 现查 gate.d 与 .claude/scripts 零处调用）——自证只在写它的那天被跑过一次，
 # 之后脚本改坏了也没人知道。2026-09-12 实测的两个坑都住在这里：
 # ask-local.sh 判红时正文照样打到 stdout（一份作废输出顶着 -output-s1.md 落盘），
 # 以及取法用不加引号的 $SPECS 传过 shell 被拆词（checklist-specs.py 就是为它写的）。
 #
-# check-segment-registry.py 不是三方论证脚本，但同一个道理成立：它调用外部真实的
-# .claude/kb/layout/01-first-txn.md 与 research/results/ 产物，52 号阶段（段序列登记表
-# 与 E142 产物逐字比对）没法像别的阶段那样用 .claude/gate.d/fixtures/ 隔离沙箱验证判别力，
-# 只能靠它自己的 --selftest；那份 --selftest 同样要有人在门禁里替它复跑，不然只在写它的那天跑过一次。
+# check-segment-registry.py 不是三方论证脚本，但同一个道理成立：52 号阶段（段序列登记表与 E142 产物逐字比对）的
+# 判别力样本只放三样合成输入，钉活代码的那几句与真产物的解析靠它自己的 --selftest 拿真文件测；
+# 那份 --selftest 同样要有人在门禁里替它复跑，不然只在写它的那天跑过一次。
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" || exit 1
@@ -26,10 +25,14 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
               "python3 research/scripts/sweep-term.py --selftest" "python3 research/scripts/archive-past-rounds.py --selftest" \
               "python3 research/scripts/insert-row.py --selftest" \
               "bash research/scripts/cache-keepalive.sh --selftest" \
+              "bash research/scripts/watch.sh --selftest" \
               "python3 research/scripts/stale-candidates.py --selftest" "python3 research/scripts/stale-candidates.py --benchmark" \
               "python3 research/scripts/test-environment-check.py --selftest" \
               "bash research/scripts/change-touches-crates.sh --selftest" \
-              "bash research/scripts/verify-citations.sh --selftest"; do
+              "bash research/scripts/verify-citations.sh --selftest" \
+              "python3 research/scripts/agent-handover.py --selftest" "python3 research/scripts/decision-slim-check.py --selftest" \
+              "python3 research/scripts/pdf-text.py --selftest" "python3 research/scripts/rules-sweep-audit.py --selftest" \
+              "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest" "bash research/scripts/gate-staged.sh --selftest"; do
   checked=$((checked + 1))
   output="$($runner 2>&1)"; rc=$?
   if [[ $rc -ne 0 ]]; then
@@ -40,4 +43,53 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
   fi
 done
 ((failed)) && exit 1
-echo "  ✓ research 脚本的自证都通过（查了 $checked 份：ask-local 判红分支、清单生成取法、机械整抄、小节清单、段序列登记表比对、定点替换、批量定点替换、E152 出表、子 agent 监控、按项名抽 Rust 代码、读子进程输出的计时写法、子 agent 的缓存计时器、阶段同步的候选表与它的阳性对照、测试环境残留与宿主盘检查、引文核的是哪棵树）"
+
+# ── 覆盖：research/scripts/ 里出现 `--selftest` 的脚本，都要有门禁阶段在跑它，或者登记进豁免表 ──
+# 被扫集合现算，不手抄份数（show-me-test.md「跳过清单要与被扫集合出自同一份数据、现算」）。
+# 认两种调用写法：脚本名后面直接跟 --selftest，或先赋给变量再 "$变量" --selftest（15 号那样）；注释行不算调用。
+NOT_RUN_HERE=(
+  "research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
+)
+coverage="$(python3 - "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
+import glob, os, re, sys
+exempt = dict(row.split("\t", 1) for row in sys.argv[1:])
+claimed = sorted(path for path in glob.glob("research/scripts/*")
+                 if os.path.isfile(path) and "--selftest" in open(path, encoding="utf-8", errors="replace").read())
+run = set()
+for stage in sorted(glob.glob(".claude/gate.d/[0-9][0-9]-*.sh")):
+    code = "\n".join(line for line in open(stage, encoding="utf-8").read().splitlines() if not line.lstrip().startswith("#"))
+    variables = dict(re.findall(r'^\s*(\w+)="[^"\n]*?([\w.-]+\.(?:py|sh))"', code, re.M))
+    for script in claimed:
+        base = os.path.basename(script)
+        if re.search(re.escape(base) + r'["\']?\s+--selftest', code):
+            run.add(script)
+        for variable, target in variables.items():
+            if target == base and re.search(r'"\$' + variable + r'"\s+--selftest', code):
+                run.add(script)
+print(f"CLAIMED\t{len(claimed)}\tRUN\t{len(run)}")
+for script in claimed:
+    if script not in run and script not in exempt:
+        print(f"MISSING\t{script}")
+for path, why in exempt.items():
+    if path not in claimed or path in run:
+        print(f"STALE\t{path}\t{'已经有阶段在跑它' if path in run else '它已经不声称有 --selftest，或文件不在了'}")
+    else:
+        print(f"EXEMPT\t{path}\t{why}")
+PY_COVERAGE
+)" || { echo "  ✗ 自证覆盖的对账脚本没跑成"; echo "  → 怎么办：看上面 python 的报错修这一段；对账没跑等于这一格没验。"; exit 1; }
+if grep -q '^MISSING' <<<"$coverage"; then
+  echo "  ✗ 这些 research 脚本声称有 --selftest，却没有任何门禁阶段在跑它："
+  grep '^MISSING' <<<"$coverage" | cut -f2 | sed 's/^/      /'   # gate-lint:detail
+  echo "  → 怎么办：把它加进上面的 runner 表；确实不该每轮跑的，登记进 NOT_RUN_HERE 并写明为什么——没人跑的自证只在写它的那天跑过一次。"
+  exit 1
+fi
+if grep -q '^STALE' <<<"$coverage"; then
+  echo "  ✗ NOT_RUN_HERE 里有过期的豁免："
+  grep '^STALE' <<<"$coverage" | cut -f2,3 | sed 's/\t/：/; s/^/      /'   # gate-lint:detail
+  echo "  → 怎么办：从 NOT_RUN_HERE 里删掉这一行；留着它会让人以为那份脚本还被绕开着。"
+  exit 1
+fi
+read -r _ claimed_count _ run_count < <(grep '^CLAIMED' <<<"$coverage")
+echo "  ✓ research 脚本的自证都通过（本阶段跑了 $checked 条；research/scripts/ 里声称有 --selftest 的 $claimed_count 份中 $run_count 份有门禁阶段在跑）"
+echo "    没跑的 $(grep -c '^EXEMPT' <<<"$coverage") 份（登记在本阶段的 NOT_RUN_HERE）："
+grep '^EXEMPT' <<<"$coverage" | cut -f2,3 | sed 's/\t/：/; s/^/      /'

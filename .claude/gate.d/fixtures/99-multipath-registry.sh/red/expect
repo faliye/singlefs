@@ -1,3 +1,8 @@
 exit=1
 want=源码落点指不到文件
 want=共用项那一格是空的或只写了
+want=multipath-registry-lag.tsv 第 3 行：指向的实验页不存在：.claude/kb/experiments/993-不存在的样本页.md
+want=multipath-registry-lag.tsv 第 4 行：.claude/kb/experiments/991-多路径样本.md 已经写了「### 路径与结论登记」，这一行过期了
+want=multipath-registry-lag.tsv 第 6 行：不是两列（页面路径、普查判定的依据）或有一列是空的：.claude/kb/experiments/996-没写依据的那一行.md
+want=滞后表涨了：这些实验页的编号，基准 HEAD 的滞后表里没有
+want=     .claude/kb/experiments/995-多路径欠登记样本丁.md

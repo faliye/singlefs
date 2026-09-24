@@ -7,8 +7,8 @@
 # /tmp 下的草稿目录会话一重启就没了，那一轮的活等于白干，而此前没有任何东西报警。用户 2026-09-18 定：这类事拿门禁约束。
 #
 # 改动范围：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；
-# 工作区、暂存区与未跟踪文件都算（取法与 56-crates-adversarial-review.sh、68-knowledge-sync.sh 相同，
-# 多一个 core.quotepath=false：不加的话中文路径被 git 转成带引号的八进制，对不上）。
+# 工作区、暂存区与未跟踪文件都算（取法用共用库 research/scripts/changed-paths.sh 的 gate 取法，与 56、68、97 号同一份代码；
+# 它的 git 调用带 core.quotepath=false，中文路径不转义）。
 #
 # 判据一「实验跑了没留存」：改动范围里每个还在盘上的
 #   research/e7-index-bench/src/bin/e<号>_*.rs 或 research/mutations/e<号>_*.tsv，
@@ -54,14 +54,20 @@ if [[ "$(git rev-parse --git-dir 2>/dev/null)" == */worktrees/* ]]; then
   echo "    不带 --staged 在工作区里跑一遍 bash .claude/scripts/gate.sh 才判得了这一道。"
   exit 77
 fi
-base="HEAD"
-if [[ -n "${GATE_BASE:-}" ]] && git rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
-  base="$GATE_BASE"
-elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1; then
-  base="$(git merge-base HEAD '@{upstream}')"
-fi
-changed="$( { git -c core.quotepath=false diff --name-only "$base" -- ; git -c core.quotepath=false diff --name-only --cached -- ; git -c core.quotepath=false ls-files --others --exclude-standard -- ; } | sort -u )"
-added="$( { git -c core.quotepath=false diff --name-only --diff-filter=A "$base" -- ; git -c core.quotepath=false diff --name-only --diff-filter=A --cached -- ; git -c core.quotepath=false ls-files --others --exclude-standard -- ; } | sort -u )"
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用库 $LIB_CHANGED_PATHS"; echo "     → 怎么办：改动范围的取法只有那一份，恢复它，别在阶段里再抄一份。"; exit 1; }
+base="$(gate_diff_base gate)"
+changed="$(gate_changed_paths "$base" untracked)" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 $base）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
+  exit 1
+}
+added="$(gate_changed_paths "$base" untracked A)" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 $base）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一阶段什么都没比，不是通过。"
+  exit 1
+}
 # 两份清单经进程替换当文件传：当成命令行参数传时，单个参数超过 128 KiB 就起不来（Linux 的 MAX_ARG_STRLEN）。
 python3 - "$base" <(printf '%s\n' "$changed") <(printf '%s\n' "$added") <<'PY'
 import os, re, subprocess, sys

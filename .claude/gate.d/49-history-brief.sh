@@ -6,7 +6,9 @@
 # 手抄一份就会漂，而漂了没有任何东西会发现（`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条）。
 #
 # 本阶段判四样：条目没写快查；快查还是「（待补）」；快查里冒出那一条原文里没有的数字、D / E / C / I 编号或
-# 「已定项 k」；decisions-history.md 与按原文重新生成的不一致。
+# 「已定项 k」；decisions-history.md 与按原文重新生成的不一致。另有两样让条目读不全的也判红：按月的文件里找不到「## 历史版本」
+# （那一份的条目一条都读不到）；条目点名的决策在 decisions/ 下都没有正文（它进不了生成块的任何一节）。
+# 找不到 decisions-history.md 退 77（本次无对象可判）。
 # ⚠️ 它判不了快查写得对不对——那要人拿原文对。它只拦「漏写」与「数和编号走样」这两种机器看得见的。
 #
 #   bash .claude/gate.d/49-history-brief.sh          只比对

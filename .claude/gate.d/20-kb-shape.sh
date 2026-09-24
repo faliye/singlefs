@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: kb 形状
+# gate-stage: kb 形状（1 未定项 / 已定项只许一种叫法；3 kb 文件不许链回自己；4 上游规则路径带 .claude/；5 决策标题连号带状态、分项两节不串味不重号、标题未定条数与列表相符；7 索引页状态列的分项计数与正文相符）
 #
 # kb 形状检查：查「同一件事在 kb 里有两种写法」。
 # 指代（位置指代、自指称呼、时间指代）由上游 doc-lint.sh 判，这里不重复。
@@ -11,6 +11,10 @@
 #   kb 按「被单条取出」设计（.claude/singlefs-ai-sop/rules/kb-discipline.md）。
 #   同一概念两个名字（未答项 / 未定项）会让按其中一个名字的检索漏掉另一半；
 #   标题里写死的条数与列表对不上，检索到标题的人拿到的就是错的。
+#
+# 判别力：fixtures/20-kb-shape.sh/red 每一段都至少犯一次，必须判红；green 必须判绿。
+# 第 7 段「一条决策的索引行都没核到」与「状态列的分项计数与正文不符」互斥（后者要先核到一行），
+# 红样本里放的是后者。
 set -uo pipefail
 cd "${1:-$(dirname "$0")/../..}" || exit 2
 KB=.claude/kb
@@ -37,11 +41,41 @@ else ok "已定项 / 未定项 小节标题统一"; fi
 
 echo
 echo "── 3. 文件内自指链接 ──"
-hit=$(grep -n '\[decisions\.md\](decisions\.md)' $KB/decisions.md || true)
-if [[ -n "$hit" ]]; then
-  bad "decisions.md 里链接到它自己"; printf '%s\n' "$hit" | sed 's/^/     /'
-  howto "同一文件内直接写决策号（D8），不要链回本文件。"
-else ok "没有文件内自指链接"; fi
+# 扫 kb 下每一份 .md：链接目标（去掉 #锚点）按这份文件自己的目录解析之后就是它自己，判红。
+# 历史类文件（`*-history.md`、`decisions-history/` 下的月份文件）整份跳过：它们逐字记着当时的原文，
+# 里面抄录的链接改了就成假话（`.claude/rules/path-moves.md`「历史类文件保留旧名」同一条判据）。
+self_link_report=$(python3 - "$KB" <<'PY'
+import os, re, sys, glob
+kb = sys.argv[1]
+scanned = 0
+for path in sorted(glob.glob(os.path.join(kb, "**", "*.md"), recursive=True)):
+    if os.path.basename(path).endswith("-history.md") or "/decisions-history/" in path:
+        continue
+    scanned += 1
+    own = os.path.normpath(path)
+    with open(path, encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            for link in re.finditer(r'\[[^\]\n]*\]\(([^)\s]+)\)', line):
+                target = link.group(1).split("#", 1)[0]
+                if not target or "://" in target:
+                    continue
+                if os.path.normpath(os.path.join(os.path.dirname(path), target)) == own:
+                    print(f"HIT {path}:{line_number}: {link.group(0)}")
+print(f"SCANNED {scanned}")
+PY
+)
+self_link_scanned=$(sed -n 's/^SCANNED //p' <<<"$self_link_report")
+hit=$(sed -n 's/^HIT //p' <<<"$self_link_report")
+if [[ -z "$self_link_scanned" ]]; then
+  bad "扫自指链接的 python 没跑完（没报出扫了几份），这一段等于没判"
+  howto "单独跑这一段看它报什么错（多半是某份文件不是 UTF-8）；没跑完不许当成没有自指链接。"
+elif [[ "$self_link_scanned" -eq 0 ]]; then
+  bad "一份 kb 文件都没扫到（$KB 下的 .md，历史类文件除外）——这一段没有对象可判"
+  howto "确认门禁是在仓库根上跑的、$KB 目录在；扫到 0 项不是通过（.claude/singlefs-ai-sop/rules/show-me-test.md）。"
+elif [[ -n "$hit" ]]; then
+  bad "kb 文件里有链接指回它自己：$(grep -c . <<<"$hit") 处（扫 $self_link_scanned 份）"; printf '%s\n' "$hit" | sed 's/^/     /'
+  howto "同一文件内直接写编号带简称（例：D8（核心索引结构））或小节标题，不要链回本文件。"
+else ok "没有文件内自指链接（扫 $self_link_scanned 份 kb 文件，历史类文件除外）"; fi
 
 echo
 echo "── 4. 上游规则的路径写法 ──"

@@ -27,21 +27,41 @@ bad() { printf '  ✗ %s\n' "$*"; }
 ok()  { printf '  ✓ %s\n' "$*"; }
 howto() { printf '     → %s\n' "$*"; }
 
-if git diff --quiet HEAD -- "${KB[@]}" 2>/dev/null; then
-  ok "决策正文与 HEAD 无差异，本阶段无对象可判"
-  exit 0
+# 不在 git 仓里没有「改了什么」可比：退 77（本次无对象可判）。老写法把 git 的报错丢进 /dev/null，
+# 每一道 git 都失败、行数读成 0，于是「只改了 0 行，按小改动放行」报绿。
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "  ! 不在 git 仓库里，本阶段无对象可判"
+  exit 77
 fi
+# 在仓里时每一道 git 都要成功：失败了这一阶段什么都没比，判红，不许读成「没改」。
+git_failed() {
+  bad "git $1 跑不起来（退出码 $2），决策正文改了多少、变更史加了几条都没数出来"
+  howto "按上面 git 的报错修好仓库状态再跑（常见是还没有任何提交、HEAD 不存在：先提交一次）；"
+  howto "  git 失败时这一阶段什么都没比，不是通过。"
+  exit 1
+}
+diff_rc=0
+git diff --quiet HEAD -- "${KB[@]}" || diff_rc=$?
+case "$diff_rc" in
+  0) echo "  ! 决策正文与 HEAD 无差异，本阶段无对象可判"; exit 77 ;;
+  1) ;;
+  *) git_failed "diff --quiet HEAD" "$diff_rc" ;;
+esac
 
 # 决策正文改了多少行（增 + 删，各文件相加）
-changed=$(git diff HEAD --numstat -- "${KB[@]}" | awk '{n+=$1+$2} END{print n+0}')
+numstat="$(git diff HEAD --numstat -- "${KB[@]}")" || git_failed "diff --numstat" "$?"
+changed=$(awk '{n+=$1+$2} END{print n+0}' <<<"$numstat")
 # 本次 diff 往变更史里加了几条日期标题
 added=0
 if ((${#HIST[@]})); then
-  added=$(git diff HEAD -- "${HIST[@]}" | grep -c '^+### 20[0-9][0-9]-' || true)
+  hist_diff="$(git diff HEAD -- "${HIST[@]}")" || git_failed "diff（变更史）" "$?"
+  added=$(grep -c '^+### 20[0-9][0-9]-' <<<"$hist_diff" || true)
+  untracked="$(git -c core.quotepath=false ls-files --others --exclude-standard -- "${HIST[@]}")" || git_failed "ls-files --others" "$?"
   while IFS= read -r untracked_history; do
+    [[ -n "$untracked_history" ]] || continue
     untracked_count=$(grep -c '^### 20[0-9][0-9]-' "$untracked_history" || true)
     added=$((added + untracked_count))
-  done < <(git ls-files --others --exclude-standard -- "${HIST[@]}")
+  done <<<"$untracked"
 fi
 
 if [[ "$added" -gt 0 ]]; then

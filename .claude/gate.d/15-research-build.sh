@@ -9,9 +9,13 @@
 # ⚠️ **实测踩过（2026-08-29）**：`Cargo.toml` 里留了一个指向已删源码的 `[[bin]]`，
 # `cargo test` 直接报 `can't find bin`——**而门禁全绿**。
 # 一个连编都编不过的证据仓库，比没有证据更糟：它看起来还在。
+#
+#   bash .claude/gate.d/15-research-build.sh [项目根]
 set -uo pipefail
+ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+cd "$ROOT" || exit 2
 R=research
-[[ -f "$R/Cargo.toml" ]] || { echo "  ✓ 没有 $R/Cargo.toml，本阶段无对象可判"; exit 0; }
+[[ -f "$R/Cargo.toml" ]] || { echo "  ! 没有 $R/Cargo.toml，本阶段无对象可判"; exit 77; }
 command -v cargo >/dev/null || {
   echo "  ✗ 没有 cargo，装不了就没法验 research 的证据"
   echo "     → 怎么办：装 Rust 工具链（curl https://sh.rustup.rs -sSf | sh），"

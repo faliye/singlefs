@@ -13,7 +13,14 @@
 # 判别力已双向证过（2026-08-29）：
 #   FS_REFS=/nonexistent ⇒ 32 条未命中、rc=1；
 #   把 spa.h 的 SPA_BLKPTRSHIFT 从 7 改成 9 ⇒ 该条未命中、rc=1。
+#
+# 样本：fixtures/70-citations.sh/red 是一个没有 verify-citations.sh 的仓，必须判红。没有 green：
+# verify-citations.sh 读的是两个本机绝对路径下的源码树（FS_REFS、KERNEL_TREE 的默认值），装不进密封的样本目录。
+#
+#   bash .claude/gate.d/70-citations.sh [项目根]
 set -uo pipefail
+ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+cd "$ROOT" || exit 2
 S=research/scripts/verify-citations.sh
 [[ -f "$S" ]] || {
   echo "  ✗ 找不到 $S"

@@ -1,5 +1,8 @@
 exit=1
 want=补上第二个参数
-want=research/scripts/ 或 .claude/hooks/ 里有不带出路的拒绝
+want=research/scripts/、.claude/hooks/ 或 .claude/scripts/ 里有不带出路的拒绝
+want=wrapper-without-howto.sh:6  拒绝但没有出路
+want=wrapper-without-howto.sh:12  不带参数的 wait
+want=.claude/scripts 里有违反 shell 纪律的写法
 want=外面拿不到这个值
 want=里有违反 shell 纪律的写法

@@ -1,0 +1,2 @@
+exit=0
+want=查了 .claude/gate.d/ 下 6 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码

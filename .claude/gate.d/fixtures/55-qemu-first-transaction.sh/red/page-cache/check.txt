@@ -1,0 +1,4 @@
+E7RESULT name=device_log device=0 declared_entries=29 expected_writes=23 expected_flushes=12 observed_writes=16 observed_flushes=13 trailing_flushes=0 divergence=at=0program=Some(Write{offset:DeviceOffsetInBytes(822083584),length:32768,content_hash:16131730768948563977})device=Some(Write{offset:DeviceOffsetInBytes(822083584),length:49152,content_hash:4737997700246274661})
+E7RESULT name=device_log device=1 declared_entries=25 expected_writes=21 expected_flushes=10 observed_writes=14 observed_flushes=11 trailing_flushes=0 divergence=at=0program=Some(Write{offset:DeviceOffsetInBytes(822083584),length:32768,content_hash:16131730768948563977})device=Some(Write{offset:DeviceOffsetInBytes(822083584),length:49152,content_hash:4737997700246274661})
+E7RESULT name=device_log_verdict matches=false
+E7RESULT name=done emitted=4

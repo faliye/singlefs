@@ -19,29 +19,63 @@
 # `format-spec/<组件>.toml` 求，而那份 toml 今天一个都不存在（C119（冻结组件没有 spec 文件））。
 # 在它出现之前，这一道拿「常量名 → 值的集合」当变更探测器——哈希本来就只是变更探测器，
 # 而一次 diff 也是。spec toml 有了就把抽取源换过去，四条判据不变。
-# 常量从两处抽：`.rs` 里的 `pub const 名字: 类型 = 值;`，`.md` 里的 `<!-- format-const: 名字 = 值 … -->` 标记。
+# 常量从两处抽：`.rs` 里顶格的 `pub const 名字: 类型 = 值;`，`.md` 里的 `<!-- format-const: 名字 = 值 … -->` 标记。
+# 两种都按 `lib-format-const.py` 读（27、39 号用的是同一份）：标记按文法读不出来的、同一份格式定义里
+# 同一个名字登记了不止一次的，这一道判红——前者在变更探测里看不见，后者两个值里改了哪个说不清。
+# `.rs` 的值按空白归一后的原文比（value_reading="normalized_text"），不像 27 号那样要求整数字面量：
+# 格式常量模块里有 `DATA_UNIT_HEADER_BYTES + …` 这类算出来的常量，这一道只问它变没变。
 #
-# 改动范围与 56 号同一条：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，
-# 都没有就与 HEAD 比；工作区、暂存区与未跟踪文件都算。
+# 改动范围（基准与路径集合）都取共用脚本 research/scripts/changed-paths.sh：gate_diff_base gate 与
+# gate_changed_paths 带未跟踪文件，不在这里另算一份（门禁 64 号判）。git 调用一律带 `-c core.quotepath=false`：
+# 默认的 quoting 把中文路径打成八进制引号串，与布局清单里的路径逐字比对不上，checker 明明跟了也判「没碰」。
 #
-# 判别力：fixtures/92-layout-checker-sync.sh/red 是一个改了格式常量、没碰 checker 的小仓，必须判红；
-# green 是同一处改动加上 checker 跟着改，必须判绿。
+# 滞后登记表指的欠账号开没开着，按 `lib-owed.py` 读 checks-owed.md（67、96 号用的是同一份）：
+# 「### 已还清」整行标题之前的是开着的；认不出那个标题就判红，不对着一张认不出的表判。
+#
+# 滞后表、标记与第 ④ 条三样都判完再退出，一次把问题说全。
+#
+# 判别力：fixtures/92-layout-checker-sync.sh/red 是一个改了格式常量、没碰 checker 的小仓，
+# 另带一份多写了键又重复登记的格式定义、一张挂在认不出的欠账表上的滞后表，必须判红；
+# green 是同一处改动加上 checker 跟着改（checker 路径是中文文件名），另带一张滞后表，挂的欠账号
+# 排在一行正文提到「### 已还清」的开着的账后面，必须判绿。
 #
 #   bash .claude/gate.d/92-layout-checker-sync.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+LIBRARY_DIRECTORY="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT" 2>/dev/null || exit 2
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $ROOT 不是 git 仓，本阶段跳过"; exit 77; }
-base="HEAD"
-if [[ -n "${GATE_BASE:-}" ]] && git rev-parse --verify -q "${GATE_BASE}^{commit}" >/dev/null 2>&1; then
-  base="$GATE_BASE"
-elif git rev-parse --verify -q '@{upstream}' >/dev/null 2>&1; then
-  base="$(git merge-base HEAD '@{upstream}')"
-fi
-python3 - "$base" <<'PY'
-import os, re, subprocess, sys
+# 基准取法与 56、68、69、75、97 号同一份：research/scripts/changed-paths.sh 的 gate 取法
+LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/changed-paths.sh"
+# shellcheck source=../../research/scripts/changed-paths.sh
+source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+base="$(gate_diff_base gate)"
+CHANGED_PATHS="$(mktemp)"
+trap 'rm -f "$CHANGED_PATHS"' EXIT
+# 路径集合先落到文件、判过退出码再交给 python：git 失败时集合静默为空，会被读成「这次什么都没碰」
+gate_changed_paths "$base" untracked > "$CHANGED_PATHS" || {
+  echo "  ✗ 取不到这次改动碰了哪些路径（基准 $base，gate_changed_paths 退出码 $?）"
+  echo "     → 怎么办：按上面 git 的报错修好仓库状态再跑；取不到改动范围时第 ④ 条什么都没比，不是通过。"
+  exit 1
+}
+python3 - "$base" "$LIBRARY_DIRECTORY" "$CHANGED_PATHS" <<'PY'
+import importlib.util, os, re, subprocess, sys
 
-base = sys.argv[1]
+base, library_directory, changed_paths_file = sys.argv[1], sys.argv[2], sys.argv[3]
+
+def load_library(module_name, file_name):
+    library_spec = importlib.util.spec_from_file_location(module_name, os.path.join(library_directory, file_name))
+    library = importlib.util.module_from_spec(library_spec)
+    library_spec.loader.exec_module(library)
+    return library
+
+format_const = load_library("format_const", "lib-format-const.py")
+owed_library = load_library("owed", "lib-owed.py")
+# 27 号读 .rs 的值要整数字面量（integer_literal）；这一道沿用只做空白归一的旧口径，
+# 两道该不该统一成一种还没定，统一时改这一个名字。
+RUST_VALUE_READING = "normalized_text"
+GIT = ["git", "-c", "core.quotepath=false"]
+
 manifest_path = ".claude/gate.d/layouts.tsv"
 lag_path = ".claude/gate.d/layouts-checker-lag.tsv"
 registry_path = ".claude/kb/decisions/15-格式冻结政策.md"
@@ -125,28 +159,32 @@ if unregistered:
     sys.exit(1)
 
 # ④ 格式常量集合变了，checker 判定路径要跟
-changed = set()
-for args in (["diff", "--name-only", base, "--"],
-             ["diff", "--name-only", "--cached", "--"],
-             ["ls-files", "--others", "--exclude-standard", "--"]):
-    result = subprocess.run(["git", *args], capture_output=True, text=True)
-    changed.update(name for name in result.stdout.split("\n") if name.strip())
+with open(changed_paths_file, encoding="utf-8") as changed_paths_handle:
+    changed = {name for name in changed_paths_handle.read().split("\n") if name.strip()}
 
-RUST_CONST = re.compile(r"^pub const\s+(\w+)\s*:[^=]+=\s*(.+?);", re.M | re.S)
-MARK_CONST = re.compile(r"<!--\s*format-const:\s*(\w+)\s*=\s*(-?\d+)")
+marker_problems = []
 
-def constants_in(text, path):
+def constants_in(text, path, record_problems):
+    """常量名 → 值的原文；record_problems 为真时把读不出来的标记与重复登记记进 marker_problems。"""
     found = {}
     if path.endswith(".rs"):
-        for name, value in RUST_CONST.findall(text):
-            found[name] = re.sub(r"\s+", " ", value).strip()
-    else:
-        for name, value in MARK_CONST.findall(text):
-            found[name] = value
+        for declaration in format_const.read_rust_consts(text, value_reading=RUST_VALUE_READING,
+                                                         only_top_level_public=True):
+            found[declaration.name] = declaration.value
+        return found
+    parsed = format_const.parse_marks(text)
+    for mark in parsed.marks:
+        found[mark.name] = mark.value_text
+    if record_problems:
+        for unparsable in parsed.unparsable:
+            marker_problems.append(f"{path}:{unparsable.line_number}  标记按文法读不出来：「{unparsable.excerpt}」")
+        for duplicate in parsed.duplicates:
+            marker_problems.append(f"{path}  {duplicate.name} 在这一份里登记了 {len(duplicate.line_numbers)} 次"
+                                   f"（第 {'、'.join(str(line_number) for line_number in duplicate.line_numbers)} 行）")
     return found
 
 def baseline_text(path):
-    result = subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True)
+    result = subprocess.run([*GIT, "show", f"{base}:{path}"], capture_output=True, text=True)
     return result.stdout if result.returncode == 0 else ""
 
 lag = {}
@@ -162,26 +200,30 @@ if os.path.isfile(lag_path):
             ])
         lag[fields[0].strip()] = (fields[1].strip(), line_number)
 
+failures = []   # 每项是一段要打印的拒绝：(摘要, 明细, 出路)
+
 if lag:
+    owed = owed_library.read_owed_table(owed_path)
     if not os.path.isfile(owed_path):
-        fail(f"滞后登记表有 {len(lag)} 行，而找不到欠账表 {owed_path}", [
+        failures.append((f"滞后登记表有 {len(lag)} 行，而找不到欠账表 {owed_path}", [], [
             "怎么办：欠账表挪了位置就同步改这个阶段里的路径；没有欠账表就核不了滞后登记指的账开没开着，",
             "          而一条指向空处的滞后登记，与 checker 真的跟上了在这一道的输出里一模一样。",
-        ])
-    owed_text = open(owed_path, encoding="utf-8").read()
-    head = owed_text.split("### 已还清")[0]
-    owed_open = set(re.findall(r"^\|\s*(C\d+)\s*\|", head, re.M))
-    dangling = [f"{name}：{number}（第 {line_number} 行）"
-                for name, (number, line_number) in sorted(lag.items())
-                if number not in owed_open]
-    if dangling:
-        print(f"  ✗ 滞后登记表里 {len(dangling)} 行指的欠账编号不在 checks-owed.md 欠着那张表里：")  # gate-lint:summary
-        for entry in dangling:
-            print(f"      {entry}")  # gate-lint:detail
-        print(f"     → 怎么办：登记一条滞后，等于承认这个格式常量今天 checker 判不了，那笔账要有人排期。")
-        print(f"               去 {owed_path} 立一条欠账（写清拦什么、怎么拦会红、缺什么前置），把它的编号写回这一行；")
-        print("               那笔账已经还清了就把这一行删掉——checker 跟上了就不该再登记滞后。")
-        sys.exit(1)
+        ]))
+    elif not owed.paid_heading_found:
+        failures.append((f"滞后登记表有 {len(lag)} 行，而 {owed_path} 里认不出「### 已还清」那一行标题，分不出哪些账还开着", [], [
+            "怎么办：欠账表按「### 已还清」整行标题切成开着与还清两段（.claude/gate.d/lib-owed.py）；标题改了名或丢了就改回来，",
+            "          别让这一道对着一张认不出的表判——认不出时连历史版本节里的表格行都会被算成开着的账。",
+        ]))
+    else:
+        dangling = [f"{name}：{number}（第 {line_number} 行）"
+                    for name, (number, line_number) in sorted(lag.items())
+                    if number not in owed.open_names]
+        if dangling:
+            failures.append((f"滞后登记表里 {len(dangling)} 行指的欠账编号不在 checks-owed.md 欠着那张表里：", dangling, [
+                "怎么办：登记一条滞后，等于承认这个格式常量今天 checker 判不了，那笔账要有人排期。",
+                f"          去 {owed_path} 立一条欠账（写清拦什么、怎么拦会红、缺什么前置），把它的编号写回这一行；",
+                "          那笔账已经还清了就把这一行删掉——checker 跟上了就不该再登记滞后。",
+            ]))
 
 # 键是（格式定义路径, 常量名），不是光一个常量名：同一个常量在 kb 字段表与常量模块里各登记一次
 # （门禁 27 号绑住这两处），按名字合并时后读到的那一份会把前一份盖掉，那一侧的改值就此看不见。
@@ -189,12 +231,12 @@ drifted, empty_sources, checked_constants, excused, followed = [], [], 0, [], []
 for row in rows:
     current, baseline = {}, {}
     for path in row["format"]:
-        found = constants_in(open(path, encoding="utf-8").read(), path)
+        found = constants_in(open(path, encoding="utf-8").read(), path, record_problems=True)
         if not found:
             empty_sources.append(f'{row["name"]}：{path}')
         for name, value in found.items():
             current[(path, name)] = value
-        for name, value in constants_in(baseline_text(path), path).items():
+        for name, value in constants_in(baseline_text(path), path, record_problems=False).items():
             baseline[(path, name)] = value
     checked_constants += len(current)
     changes = []
@@ -216,17 +258,33 @@ for row in rows:
     if unexcused:
         drifted.append((row, unexcused))
 
+if marker_problems:
+    failures.append((f"格式定义里 {len(marker_problems)} 处 format-const 标记读不出来或重复登记，变更探测对它们不作数：", marker_problems, [
+        "怎么办：读不出来的照 <!-- format-const: 名字 = 整数 stale=旧串|旧串 --> 改写，stale= 之外不许有别的键；",
+        "          它只是正文里举的例子、不是登记，就去掉 <!--，写成「`format-const: 名字 = 值`」；",
+        "          重复的只留定这个值的那一处，别处要提它写成不带 <!-- 的文字（例如「`format-const: 名字`」）。",
+    ]))
+
 if drifted:
     total = sum(len(entries) for _, entries in drifted)
-    print(f"  ✗ {total} 个格式常量在这次改动里变了，而它所属布局的 checker 判定路径一个都没被碰（基准 {base}）：")  # gate-lint:summary
+    details = []
     for row, entries in drifted:
-        print(f'      {row["name"]}（checker 判定路径：{", ".join(row["checker"])}）')  # gate-lint:detail
-        for entry in entries:
-            print(f"        {entry}")  # gate-lint:detail
-    print("     → 怎么办：两条出路。① 在同一次改动里改这套布局的 checker 判定路径，让它按新格式判——")
-    print("               格式走了一步而 checker 停在旧口径时，它会拿旧宽度去解新字节，而且全绿；")
-    print(f"               ② checker 今天确实判不了它，就把常量名登记进 {lag_path}：")
-    print("               三列写常量名、一条开着的欠账编号、为什么今天不判。账在册才有人排期。")
+        details.append(f'{row["name"]}（checker 判定路径：{", ".join(row["checker"])}）')
+        details.extend(f"  {entry}" for entry in entries)
+    failures.append((f"{total} 个格式常量在这次改动里变了，而它所属布局的 checker 判定路径一个都没被碰（基准 {base}）：", details, [
+        "怎么办：两条出路。① 在同一次改动里改这套布局的 checker 判定路径，让它按新格式判——",
+        "          格式走了一步而 checker 停在旧口径时，它会拿旧宽度去解新字节，而且全绿；",
+        f"          ② checker 今天确实判不了它，就把常量名登记进 {lag_path}：",
+        "          三列写常量名、一条开着的欠账编号、为什么今天不判。账在册才有人排期。",
+    ]))
+
+if failures:
+    for summary, details, steps in failures:
+        print(f"  ✗ {summary}")  # gate-lint:summary
+        for detail in details:
+            print(f"      {detail}")  # gate-lint:detail
+        for step in steps:
+            print(f"     → {step}" if step.startswith("怎么办") else f"     {step}")
     sys.exit(1)
 
 paths_total = sum(len(row["format"]) + len(row["checker"]) for row in rows)

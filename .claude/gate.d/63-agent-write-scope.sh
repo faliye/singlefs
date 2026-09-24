@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 项目 subagent 的写范围闸注册着、会拒绝，写范围表与定义一致
+# gate-stage: PreToolUse 五个钩子、SessionStart 的压缩后提示与 PostToolUse 的书记官写入后核对注册着、五个项目 hook 自证通过、写范围表与定义双向一致、每个定义带 omitClaudeMd 与「开工先读：」
 #
 # 判据，任一条不成立判红：
 #   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `write-guard.sh` 的 hook（写范围与整份覆盖未跟踪文件两道合在里面）；
@@ -11,7 +11,11 @@
 #   ⑦ PreToolUse 里有一条 matcher 覆盖 SendMessage、命令指向 `continuation-guard.sh` 的 hook，且它的 `--selftest` 通过（给最近一次任务通知是 failed 或 killed 的子 agent 续做会被拒，上下文多大不拦）；
 #   ⑧ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）；
 #   ⑨ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向上游 SOP 的 `claude-hooks/pattern-process-guard.sh` 的 hook，且那个文件在
-#     （按模式找进程在执行前拒绝；它的判别力由上游 selftest 的样本管，门禁「门禁自检」阶段跑它，这里只查注册着、文件在）。
+#     （按模式找进程在执行前拒绝；它的判别力由上游 selftest 的样本管，门禁「门禁自检」阶段跑它，这里只查注册着、文件在）；
+#   ⑪ PostToolUse 里有一条 matcher 同时覆盖 Write、Edit、Bash、命令指向 `kb-scribe-followup.sh` 的 hook，且它的 `--selftest` 通过（书记官写 kb 之后按 kb-scribe-followups.tsv 核相关记录跟没跟上）。
+#   ⑩ SessionStart 里有一条 matcher 覆盖 compact、命令指向 `after-compact.sh` 的 hook，且 `.claude/hooks/after-compact.sh --selftest` 通过（压缩上下文之后补回分支、未提交数、最近的记录与看门狗命令；这里只跑自证，不查它在 SessionStart 的注册）。
+# ③ ④ 的双向比对与读表用共用库 lib-manifest.py，与 50、62、98 号同一份代码。
+# 自证跑的是这份脚本旁边 ../hooks/ 下的 hook（取自 $0 的目录，不取项目根）：样本仓里放坏的 hook 碰不到它。
 #
 # 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、自证坏了、新加一个能写文件的定义忘了登记，
 # 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话（与 46 号同一个道理）。
@@ -22,8 +26,16 @@ set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 HOOK="$(cd "$(dirname "$0")/../hooks" && pwd)/write-guard.sh"
 cd "$ROOT" 2>/dev/null || exit 2
-table_output="$(python3 - <<'PY'
-import glob, json, os, re, sys
+table_output="$(python3 - "$(cd "$(dirname "$0")" && pwd)/lib-manifest.py" <<'PY'
+import glob, importlib.util, json, os, re, sys
+try:
+    spec = importlib.util.spec_from_file_location("lib_manifest", sys.argv[1])
+    manifest = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(manifest)
+except OSError as error:
+    print(f"  ✗ 读不到共用库 {sys.argv[1]}：{error}")
+    print("     → 怎么办：目录与清单的双向比对只有那一份，恢复它，别在阶段里再抄一份。")
+    sys.exit(1)
 failed = False
 settings_path = ".claude/settings.json"
 def matcher_covers(matcher, tool):
@@ -83,14 +95,34 @@ if entries is not None:
         failed = True
         print(f"  ✗ 注册了按模式找进程的钩子，文件 .claude/{pattern_guard} 却不在：会话里每条 Bash 命令都会报钩子错")
         print("     → 怎么办：规范副本旧于 0.0.52 或没装全，按 CLAUDE.md「规范从哪来」那一行重新同步副本、跑 install.sh。")
+try:
+    session_entries = (json.load(open(settings_path, encoding="utf-8")).get("hooks") or {}).get("SessionStart") or []
+except Exception:
+    session_entries = None  # 读不了这份 JSON 的那一条上面已经报过、已判红
+if session_entries is not None:
+    after_compact_registered = [entry for entry in session_entries
+                                if matcher_covers(entry.get("matcher", ""), "compact")
+                                and any("after-compact.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not after_compact_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册压缩后提示 hook：SessionStart 里没有 matcher 覆盖 compact、命令指向 after-compact.sh 的一条")
+        print('     → 怎么办：在 hooks.SessionStart 里加一条 matcher "compact"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/after-compact.sh"。')
+try:
+    post_entries = (json.load(open(settings_path, encoding="utf-8")).get("hooks") or {}).get("PostToolUse") or []
+except Exception:
+    post_entries = None  # 读不了这份 JSON 的那一条上面已经报过、已判红
+if post_entries is not None:
+    followup_registered = [entry for entry in post_entries
+                           if all(matcher_covers(entry.get("matcher", ""), tool) for tool in ("Write", "Edit", "Bash"))
+                           and any("kb-scribe-followup.sh" in (hook.get("command") or "") for hook in entry.get("hooks") or [])]
+    if not followup_registered:
+        failed = True
+        print(f"  ✗ {settings_path} 没注册书记官写入后的核对 hook：PostToolUse 里没有 matcher 同时覆盖 Write、Edit、Bash、命令指向 kb-scribe-followup.sh 的一条")
+        print('     → 怎么办：在 hooks.PostToolUse 里加一条 matcher "Write|Edit|Bash"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/kb-scribe-followup.sh"。')
 table_path = ".claude/hooks/agent-write-scope.tsv"
 patterns_by_agent, malformed = {}, []
 if os.path.isfile(table_path):
-    for line_number, line in enumerate(open(table_path, encoding="utf-8"), 1):
-        line = line.rstrip("\n")
-        if not line.strip() or line.startswith("#"):
-            continue
-        fields = line.split("\t")
+    for line_number, line, fields in manifest.table_rows(table_path):
         if len(fields) < 2 or not fields[0].strip() or not fields[1].strip():
             malformed.append(f"第 {line_number} 行：{line}")
             continue
@@ -118,14 +150,15 @@ if malformed:
     for entry in malformed:
         print(f"     {entry}")  # gate-lint:detail
     print("     → 怎么办：每行至少写 agent 名与路径模式两列，用制表符分隔。")
-unscoped = [name for name in writers if name not in patterns_by_agent]
+# ③ 有 Write 或 Edit 的定义要在表里登记；④ 表里的名字要有定义。两个方向的盘上集合不同，各给各的判定。
+unscoped, ghosts = manifest.two_way(writers, list(patterns_by_agent),
+                                    exists=lambda name: os.path.isfile(f".claude/agents/{name}.md"))
 if unscoped:
     failed = True
     print("  ✗ 这些定义的 tools 里有 Write 或 Edit，写范围表里却没有登记——hook 会把它们的每次写都拒掉：")  # gate-lint:summary
     for name in unscoped:
         print(f"     {name}")  # gate-lint:detail
     print(f"     → 怎么办：照它定义里「写范围」一节，在 {table_path} 给它加路径模式。")
-ghosts = [name for name in patterns_by_agent if not os.path.isfile(f".claude/agents/{name}.md")]
 if ghosts:
     failed = True
     print("  ✗ 写范围表里登记的这些 agent 在 .claude/agents/ 里没有定义：")  # gate-lint:summary
@@ -181,4 +214,18 @@ if [[ $continuation_rc -ne 0 ]]; then
   echo "     → 怎么办：修 .claude/hooks/continuation-guard.sh 的 decide() 或入口，再跑 --selftest 看它转绿。"
   exit 1
 fi
-echo "  ✓ 写范围闸、Bash 检出 hook、续派闸与续做闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"
+after_compact_output="$(bash "$(dirname "$HOOK")/after-compact.sh" --selftest 2>&1)"; after_compact_rc=$?
+if [[ $after_compact_rc -ne 0 ]]; then
+  echo "  ✗ after-compact.sh 的自证没过："
+  printf '%s\n' "$after_compact_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/after-compact.sh 的 reminder() 或入口，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+followup_output="$(bash "$(dirname "$HOOK")/kb-scribe-followup.sh" --selftest 2>&1)"; followup_rc=$?
+if [[ $followup_rc -ne 0 ]]; then
+  echo "  ✗ kb-scribe-followup.sh 的自证没过："
+  printf '%s\n' "$followup_output" | sed 's/^/    /'   # gate-lint:detail
+  echo "     → 怎么办：修 .claude/hooks/kb-scribe-followup.sh 的 decide() / touched_paths() 或登记表 kb-scribe-followups.tsv，再跑 --selftest 看它转绿。"
+  exit 1
+fi
+echo "  ✓ 写范围闸、Bash 检出 hook、续派闸与续做闸注册着、自证通过，按模式找进程的上游钩子注册着、文件在，压缩后提示 hook 自证通过，书记官写入后的核对 hook 注册着、自证通过，表与定义一致（${writer_count} 个有 Write 或 Edit 的定义、${pattern_count} 条路径模式）"

@@ -2,3 +2,7 @@ exit=1
 want=格式常量在这次改动里变了
 want=改值 SAMPLE_UNIT_BYTES：16384 → 32768
 want=checker 判定路径一个都没被碰
+want=滞后登记表有 1 行，而 .claude/kb/checks-owed.md 里认不出「### 已还清」那一行标题
+want=format/布局.md:5  标记按文法读不出来
+want=SAMPLE_LAYOUT_EXTRA = 8 note=多写的键
+want=format/布局.md  SAMPLE_LAYOUT_TWICE 在这一份里登记了 2 次（第 6、8 行）

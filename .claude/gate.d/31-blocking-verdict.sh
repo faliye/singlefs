@@ -55,15 +55,19 @@
 # 与 21 阶段同一个权威解析器。本阶段自己定位登记行，所以另加一道**条数比对**——
 # 两侧对不上就说明定位漏了或多了，判红而不是安静地少查几条。
 set -uo pipefail
-cd "${1:-$(dirname "$0")/../..}" 2>/dev/null || true
+# 阶段自己的位置在 cd 之前取：用相对路径调本阶段、又另给项目根时，cd 之后 $(dirname "$0") 就解析不到了
+REPOSITORY="$(cd "$(dirname "$0")/../.." && pwd)"
+# cd 失败就退 2：老写法 `cd … 2>/dev/null || true` 在参数指错时留在调用方的 cwd 里，判的是调用方所在的那个仓，还报绿
+cd "${1:-$REPOSITORY}" || exit 2
 DEC=.claude/kb/decisions
 # ⚠️ 生成器按**脚本自身的位置**取，不按 cwd——判别力样本会把 cwd 换成一个只放着
 # 样本决策文件的临时目录，那里没有 `.claude/scripts/`。按 cwd 取会「找不到生成器 ⇒ 跳过」，
 # 于是红样本安静地绿掉，而这条检查看起来一切正常。生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
-GEN="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd)/.claude/scripts/gen-decision-items.py"
-[[ -f "$GEN" ]] || GEN=.claude/scripts/gen-decision-items.py
-[[ -d "$DEC" ]] || { echo "  ✓ 没有 $DEC，无对象可判"; exit 0; }
-[[ -f "$GEN" ]] || { echo "  ! 找不到 $GEN，本阶段跳过"; exit 77; }
+GEN="$REPOSITORY/.claude/scripts/gen-decision-items.py"
+# 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
+[[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，本阶段无对象可判"; exit 77; }
+# 生成器随仓走，不在就是被删了或挪了——退 1 不退 77，与 21 号依赖同一个生成器时的退法一致（三方判决 gate-fix-forks-r1 的 T7）
+[[ -f "$GEN" ]] || { echo "  ✗ 找不到生成器 $GEN"; echo "     → 生成器随门禁住在同一个仓的 .claude/scripts/ 下：它丢了这一阶段什么都判不了，从 git 里找回它"; exit 1; }
 
 python3 - "$DEC" "$GEN" <<'PY'
 import re, sys, glob, subprocess, os
@@ -165,6 +169,9 @@ if bad:
         print("               两把量的不是一个集合。")
     sys.exit(1)
 
+if not seen:
+    print("  ! 没有一条未定项，本阶段无对象可判")
+    sys.exit(77)
 print(f"  ✓ {len(seen)} 条未定项两把尺都判过："
       + "、".join(f"{name}" for name, _, _ in RULERS))
 PY

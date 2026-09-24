@@ -61,7 +61,7 @@ for line in formula_lines[formula_line + 1:]:
             break
         inside_block = True
         continue
-    if inside_block and line.strip().startswith('可用 ='):
+    if inside_block and re.match(r'^可用(\(d\))?\s*=', line.strip()):
         formula_text = line.strip()
         break
 if formula_text is None:
@@ -70,8 +70,9 @@ if formula_text is None:
     sys.exit(1)
 
 right_hand_side = formula_text.split('=', 1)[1]
+right_hand_side = right_hand_side.replace('(d)', '').replace('（d）', '')
 right_hand_side = right_hand_side.replace('Σ设备(', ' ').replace('Σ设备（', ' ').replace('(', ' ').replace(')', ' ').replace('（', ' ').replace('）', ' ')
-formula_terms = [term.strip() for term in right_hand_side.split('−') if term.strip()]
+formula_terms = [re.sub(r'\s*÷\s*副本数$', '', term.strip()) for term in right_hand_side.split('−') if term.strip()]
 
 terms_path, terms_line, terms_lines = terms_hits[0]
 mapping = {}
@@ -142,7 +143,9 @@ canonical = re.sub(r'[\s`]', '', formula_text)
 copies = 0
 for path, text in texts.items():
     for number, line in enumerate(text.split('\n'), 1):
-        position = line.find('可用 = Σ设备')
+        position = line.find('可用(d) =')
+        if position < 0:
+            position = line.find('可用 = Σ设备')
         if position < 0:
             position = line.find('可用 =Σ设备')
         if position < 0:

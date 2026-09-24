@@ -1,0 +1,16 @@
+exit=1
+want=对不上，共 14 处
+want=甲路径（path=a）：kb 写的段序列是 `3+1`，产物里是 `2+1`
+want=乙路径（path=b）：kb 写的种类是 `[x]|[z]`，产物里 kinds 是 `[x]|[y]`
+want=丙路径（path=c）：kb 写的操作次数是 3，产物里 operations 是 2
+want=丁路径（path=d）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3
+want=戊路径：登记表引用 path=e，产物 syn.out 里没有这个 path 的 name=segments 行
+want=己路径：这一行不是预想，却没有可比对的段序列数字串
+want=庚路径（path=g）：kb 写了种类 `[x]|[y]`，产物这一行却没有 kinds= 字段——产物是第五次跑之前的，要重跑 E142
+want=辛路径：出处指的用例文件 crates/demo/tests/gone.rs 不存在
+want=壬路径：出处指的用例文件里找不到 `fn renamed_sequence`
+want=癸路径：这一行不是预想，「出处」栏里既没有 `path=...` 引用、也没有指到一条钉住活代码的用例（`<文件>.rs` 加测试函数名），登记表这一行本身要修
+want=⚠️ 整条流（发布与下一次发布之间没有屏障那句提示）（path=m）：kb 写的崩溃状态数是 4，产物里 closed_form 是 3
+want=第二条流 `2+1`：数字串加起来是 3 次写，kb 写的是 4
+want=第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉这个数组 `[2, 1]`
+want=第二条流 `2+1`：用例文件 crates/demo/tests/pin.rs 里没有钉状态数 5

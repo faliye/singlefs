@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 分项引用的状态与正文相符
+# gate-stage: 状态一致性：分项引用的状态与正文相符
 #
 # 每一处「D<n>（简称） 已定项 k / 未定项 k」的前缀都在**断言那条分项的状态**。
 # 写错了没有任何东西会发现：检索会把「已定项 5」当成已经定了的东西端出去，
@@ -7,7 +7,7 @@
 # （检索不会把两条都端出来，它会挑一条，而且不告诉你它挑了）。
 #
 # 权威是各决策正文的「### 已定项」与「### 未定项」两张索引表；
-# 引用处一律是投影。扫 kb / records / research 全域，含 .rs 注释。
+# 引用处一律是投影。扫 kb / records / research / crates 全域，含 .rs 注释。
 #
 #   bash .claude/gate.d/22-item-ref-status.sh
 set -uo pipefail

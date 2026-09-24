@@ -3,3 +3,4 @@ want=C59（种子折叠成同一个状态）：1 处违规没有登记在豁免�
 want=research/e7-index-bench/src/bin/e1_sample.rs:17    seed | 1
 want=C60（恒定读数没有故障注入自证）：1 处违规没有登记在豁免表里
 want=research/e7-index-bench/src/bin/e1_sample.rs:Reading.units_read_on_commit
+want=C59（种子折叠成同一个状态）：豁免表有 1 行要核欠账编号，而 .claude/kb/checks-owed.md 里认不出「### 已还清」那一行标题

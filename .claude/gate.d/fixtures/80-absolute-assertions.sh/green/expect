@@ -1,1 +1,4 @@
 exit=0
+want=✓ 2 个实验二进制各自至少有一条绝对值断言（research/e7-index-bench/src/bin 下 1 份，别处 src/bin 下以 e<数字>_ 开头的 1 份）
+want=没判的 1 份（别处 src/bin 下不以 e<数字>_ 开头，按装置工具算）
+want=crates/demo/src/bin/probe.rs

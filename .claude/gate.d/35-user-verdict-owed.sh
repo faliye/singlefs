@@ -49,4 +49,10 @@ if [[ $fail -gt 0 ]]; then
   echo "               这一条已经复核完了就把「待用户复核」改成结论。"
   exit 1
 fi
+# 一处「待用户复核」都没有，这一轮什么都没判：退 77，门禁记「本次未跑」，不记通过
+# （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
+if [[ $checked -eq 0 ]]; then
+  echo "  ! 决策正文里没有一处标着待用户复核，本阶段无对象可判"
+  exit 77
+fi
 echo "  ✓ 待用户复核的条款都有未还的账盯着（共 $checked 处）"

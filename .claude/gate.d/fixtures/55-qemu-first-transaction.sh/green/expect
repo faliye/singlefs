@@ -1,0 +1,5 @@
+exit=3
+want=预录档（.qemu-prerecorded，没起虚机）
+want=判了 5 档 direct skip-first-transaction-barrier page-cache second-transaction second-instance
+want=样本里没摆的 0 档：无
+want=这一档不算真跑过 QEMU

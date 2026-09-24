@@ -7,7 +7,8 @@
 #
 # 判据：
 #   ① 收口表用一行标记指明：`<!-- milestone:closeout-table -->`，紧挨着写在表上方（中间只许空行），一份里程碑文件至多一处。
-#   ② 还开着的欠账号：checks-owed.md 里「### 已还清」标题之前、表格首列是 C<编号> 的行。
+#   ② 还开着的欠账号：checks-owed.md 里「### 已还清」标题之前、表格首列是 C<编号> 的行
+#      （按 `lib-owed.py` 读，92、96 号用的是同一份，不另抄）。
 #   ③ 带标记的文件，全文（含历史版本节）出现的每个 C<编号>，若还开着，要么在收口表的某一行里出现，
 #      要么在表后（表结束到下一个标题之前）有一行显式豁免，形态：`- 不收口 C<编号>（简称）：为什么不收`。
 #   任一个开着的编号两处都没有 ⇒ 红。豁免行写坏（没有编号、冒号后面是空的）、同一个编号既豁免又进了表、
@@ -22,9 +23,14 @@
 #   bash .claude/gate.d/67-milestone-closeout-owed.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+OWED_LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-owed.py"
 cd "$ROOT" 2>/dev/null || exit 2
-python3 - <<'PY'
-import glob, os, re, sys
+python3 - "$OWED_LIBRARY" <<'PY'
+import glob, importlib.util, os, re, sys
+
+owed_library_spec = importlib.util.spec_from_file_location("owed", sys.argv[1])
+owed_library = importlib.util.module_from_spec(owed_library_spec)
+owed_library_spec.loader.exec_module(owed_library)
 
 milestone_dir = ".claude/kb/milestone"
 owed_path = ".claude/kb/checks-owed.md"
@@ -57,15 +63,9 @@ if not os.path.isfile(owed_path):
     print(f"     → 怎么办：确认欠账表还在 {owed_path}；搬过家就照 .claude/rules/path-moves.md 改，并改本阶段的路径。")
     sys.exit(1)
 
-open_owed_names = {}
-found_paid_heading = False
-for line in open(owed_path, encoding="utf-8"):
-    if re.match(r"^#+\s*已还清\s*$", line):
-        found_paid_heading = True
-        break
-    match = re.match(r"^\|\s*(C[0-9]+)\s*\|\s*([^|]*?)\s*\|", line)
-    if match:
-        open_owed_names[match.group(1)] = match.group(2)
+owed_table = owed_library.read_owed_table(owed_path)
+open_owed_names = owed_table.open_names
+found_paid_heading = owed_table.paid_heading_found
 if not found_paid_heading or not open_owed_names:
     print(f"  ✗ {owed_path} 里认不出还开着的欠账：找到「已还清」标题 {found_paid_heading}，标题之前首列是 C<编号> 的表格行 {len(open_owed_names)} 行")
     print(f"     → 怎么办：本阶段按「### 已还清 之前、表格首列是 C<编号>」认开着的账；欠账表改了形状，就同步改本阶段的解析，别让它对着一张认不出的表判绿。")
