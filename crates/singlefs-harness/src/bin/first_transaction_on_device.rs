@@ -1,6 +1,6 @@
 //! 虚机档（QEMU/KVM）：在两块真 virtio 盘上跑第一个事务的整条写路，冷重开再恢复读回文件。
 //!
-//!   first_transaction_on_device /dev/vda /dev/vdb <direct | page-cache | skip-first-transaction-barrier | second-transaction | second-instance>
+//!   first_transaction_on_device /dev/vda /dev/vdb <direct | page-cache | skip-first-transaction-barrier | second-transaction | second-instance | raise-rollback-floor>
 //!
 //! 由 `research/scripts/vm-bench.sh` 送进虚机（`VM_DISKS=2`，设备路径排在参数前面）。结果行以 `E7RESULT` 打头、
 //! 末行报条数（vm-bench.sh 的完整性闸）。这个二进制只判它自己判得了的（恢复读回文件、段序列）；
@@ -13,6 +13,11 @@
 //! `second-instance`：发布 B 之后丢掉写的那一套句柄、同一对盘冷重开，走可写挂载（恢复、取号、写行、暖机，里程碑「第二个事务」步 3），
 //! 再发布一次（发布 C）；挂载一行、发布 C 一行，写行与挂载里的每次暖机、发布 C 各一行 `name=publish_writes`，挂载与发布 C 各一段窗口行；
 //! 冷重开读回的是第三版（实例 2 的根）。前四个模式打的行一行不变。
+//! `raise-rollback-floor`：`second-instance` 那条路走完，同一次挂载里再覆盖写一次（发布 D，第 4 新的非空有效根落到 A 上），接着把 F 抬到上限
+//! （里程碑「第二个事务」增补 2 收口表第 58 行：抬 F 那一串发布的账在二进制这一侧与设备一层判相等）；发布 D 与发布 C 同样打一行、一行
+//! `name=publish_writes`、一段窗口行，抬 F 一行、那一串空发布各一行 `name=publish_writes`、这一段一行窗口行；失败时照发布失败那样打失败账。
+//! 冷重开读回的是第四版（最后一次抬 F 的空发布的根）；`name=recover_cold` 之后多打一行 `name=recover_cold_rollback_floor`：
+//! 冷重开择到的根与它从盘上读回的 F（`rollback_floor_on_disk=`，代码轮第二轮判决 Z10）。前五个模式打的行一行不变。
 //! 每次发布（两次暖机、第一个事务、`second-transaction` 模式下的发布 B）各打一行 `name=publish_writes`：写入口按结构种类记的写调用数与写字节
 //! （里程碑「第二个事务」增补 1 第 1 件）；每段窗口（两次暖机合一段、第一个事务、发布 B）再打一行 `name=publish_writes_against_device`，
 //! 按种类的合计与设备一层数的（`FaultInjectingDevice`，两盘相加）逐项比，对不上 `matches=false`、退出码 1。
@@ -24,13 +29,16 @@
 use std::path::Path;
 
 use singlefs_core::address::DeviceIdentity;
+use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::block_device::{
     probe_queue_number_under, probe_queue_text_under, BlockDevice, DirectInputOutputBlockDevice,
     PageCachePolicy, PhysicalBlockSizeSource, SYSFS_CLASS_BLOCK,
 };
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
-use singlefs_core::mount::{mount_writable, MountError, Mounted};
-use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
+use singlefs_core::mount::{mount_writable, MountError, Mounted, PublishSequenceFailed};
+use singlefs_core::recovery::{
+    choose_root, choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryOutcome,
+};
 use singlefs_core::transaction::{PoolVersion, TransactionOutput};
 use singlefs_core::write_accounting::{
     WriteCallsAndBytes, WritesByStructureKind, WrittenStructureKind,
@@ -40,7 +48,8 @@ use singlefs_harness::fault_injection::{
     FaultOccurrence, FaultPlacement, FaultSchedule, InjectedFault, SharedFaultPlan,
 };
 use singlefs_harness::on_device_modes::{
-    allocator_rebuilt_from_the_records_of, publish_the_second_version, publish_the_third_version,
+    allocator_rebuilt_from_the_records_of, publish_the_fourth_version, publish_the_second_version,
+    publish_the_third_version, raise_the_rollback_floor_to_its_ceiling, FailedPublish,
     OnDeviceRunMode, PublishesAfterTheFirstTransaction,
 };
 use singlefs_harness::scenario::{
@@ -83,6 +92,18 @@ fn registered_segments_of(mode: OnDeviceRunMode) -> &'static [&'static str] {
             "second_transaction",
             "reopen_and_writable_mount",
             "third_transaction",
+            "cold_reopen_and_recover",
+        ],
+        OnDeviceRunMode::RaiseRollbackFloor => &[
+            "mkfs",
+            "instance_acquisition",
+            "warm_up",
+            "first_transaction",
+            "second_transaction",
+            "reopen_and_writable_mount",
+            "third_transaction",
+            "fourth_transaction",
+            "raise_rollback_floor",
             "cold_reopen_and_recover",
         ],
     }
@@ -414,6 +435,22 @@ impl Emitter {
     }
 }
 
+/// 发布 B 之后那几段（可写挂载、发布 C、抬 F）攒下的结果行：分段时间那几行是在那几个函数里取的表，挑出来并进分段行
+/// （跑完一起打），别的结果行照旧按次序打。
+fn emit_the_lines_after_the_second_version(
+    emitter: &mut Emitter,
+    segment_timing_lines: &mut Vec<String>,
+    lines: &[String],
+) {
+    for line in lines {
+        if line.starts_with("name=segment_timing ") {
+            segment_timing_lines.push(line.clone());
+        } else {
+            emitter.emit(line);
+        }
+    }
+}
+
 /// 块层计数（`/sys/class/block/<名>/stat`，内核 `Documentation/block/stat.rst` 的字段序）：写请求数（下标 4）、写扇区数（下标 6）、
 /// FLUSH 请求数（下标 15，5.5 起才有，老内核没有就是 None）。
 fn block_layer_counters(device_path: &str) -> Option<(u64, u64, Option<u64>)> {
@@ -574,10 +611,14 @@ fn publish_the_second_version_and_describe<Inner: BlockDevice>(
     })
 }
 
-/// `second-instance` 模式在发布 B 之后写出的东西：重开之后的那一套句柄（冷恢复之前要丢掉）、按次序要打的结果行、
+/// `second-instance` 模式在发布 B 之后写出的东西：重开之后的那一套句柄（冷恢复之前要丢掉）、挂载交回又被发布 C 推进过的分配器、
+/// 现行那一版（发布 C；`raise-rollback-floor` 抬完 F 之后是最后一次抬 F 的空发布）、重开之后这一段的注入计划、按次序要打的结果行、
 /// 每段窗口按种类的合计与设备一层是否都相等。
 struct SecondInstanceRun<Inner: BlockDevice> {
     devices: Vec<(DeviceIdentity, CountedDevice<Inner>)>,
+    allocator: PoolAllocator,
+    current_version: TransactionOutput,
+    plan: SharedFaultPlan,
     lines: Vec<String>,
     every_window_matches_device: bool,
 }
@@ -714,16 +755,20 @@ where
                 | MountError::FileVersionWithoutAnyJournalRecord
                 | MountError::InstanceTableMalformed
                 | MountError::Acquisition(_)
-                | MountError::RaiseFloorSequencePublishFailed { .. }
+                | MountError::RaiseFloorSequencePublishFailed(_)
+                | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
                 | MountError::RollbackTargetNotACandidate { .. }
                 | MountError::RollbackFloorAboveCeiling { .. }
                 | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
                 | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
                 | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
                 | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
+                | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
                 | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
-                | MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => {
+                | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
+                | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
+                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
                     vec![describe_run_failure("reopen_and_writable_mount", &cause)]
                 }
             };
@@ -821,70 +866,356 @@ fn publish_the_third_version_and_describe<Inner: BlockDevice>(
         return Err(FailedRun { lines, cause });
     };
     let instance = mounted.output.instance;
-    let operations_before_third = stream.operations().len();
-    let third_started = Instant::now();
-    let published = publish_the_third_version(
-        parameters,
-        devices.as_mut_slice(),
-        &mut mounted.allocator,
-        &current,
-        instance,
-    );
-    let third_nanoseconds = third_started.elapsed().as_nanos();
-    let counts_after_third = device_call_counts(&devices, &plan);
-    let third = match published {
+    let third = match publish_an_overwrite_in_the_mounted_instance_and_describe(
+        "third_transaction",
+        &mut devices,
+        &plan,
+        &counts_after_mount,
+        stream,
+        geometry,
+        |devices| {
+            publish_the_third_version(
+                parameters,
+                devices,
+                &mut mounted.allocator,
+                &current,
+                instance,
+            )
+        },
+    ) {
         Ok(third) => third,
         Err(failed) => {
-            let cause = format!("{:?}", failed.cause);
-            let (failure_lines, _) = describe_failed_window(
-                "third_transaction",
-                &cause,
-                &[],
-                &failed.writes_of_failed_publishes,
-                pool_writes_between(&counts_after_mount, &counts_after_third),
-            );
-            lines.extend(failure_lines);
+            lines.extend(failed.lines);
             return Err(FailedRun {
                 lines,
-                cause: format!("发布 C：{cause}"),
+                cause: format!("发布 C：{}", failed.cause),
             });
         }
     };
-    let third_operations = stream.operations();
-    let third_segments =
-        split_into_segments(&third_operations[operations_before_third..], geometry);
-    let per_device_third: Vec<String> = counts_after_third
-        .iter()
-        .enumerate()
-        .map(|(index, later)| later.since(counts_after_mount[index]).describe(index))
-        .collect();
-    lines.push(format!(
-        "name=third_transaction root_txg={} transaction={} released={} nanoseconds={third_nanoseconds} operations={} segments={} closed_form={} {}",
-        third.root.checkpoint_txg.0,
-        third.record.transaction,
-        third.released.len(),
-        third_operations.len() - operations_before_third,
-        segment_sizes_text(&third_segments),
-        closed_form_state_count(&third_segments),
-        per_device_third.join(" ")
-    ));
-    lines.push(describe_publish_writes(
-        "third_transaction",
-        third.root.checkpoint_txg.0,
-        &third.writes,
-    ));
-    let (third_window_line, third_window_matches) = publish_writes_against_device(
-        "third_transaction",
-        &[&third.writes],
-        pool_writes_between(&counts_after_mount, &counts_after_third),
-    );
-    lines.push(third_window_line);
+    lines.extend(third.lines);
     lines.push(clock.mark("third_transaction"));
 
     Ok(SecondInstanceRun {
         devices,
+        allocator: mounted.allocator,
+        current_version: third.version,
+        plan,
         lines,
-        every_window_matches_device: mount_window_matches_device && third_window_matches,
+        every_window_matches_device: mount_window_matches_device && third.window_matches_device,
+    })
+}
+
+/// 同一次挂载里一次覆盖写成功之后：这一版、这一段的结果行（发布一行、`name=publish_writes` 一行、窗口行一行）、
+/// 这一段按种类的合计与设备一层是否相等。
+struct OverwriteInTheMountedInstance {
+    version: TransactionOutput,
+    lines: Vec<String>,
+    window_matches_device: bool,
+}
+
+/// 同一次挂载里的一次覆盖写（发布 C；`raise-rollback-floor` 还有发布 D）：`publish` 发这一次，挂钟只计它；
+/// 窗口从 `counts_before` 那一刻算起、到它返回为止，按种类的合计与设备一层逐项比。结果行以 `window` 为名（`name=<window>` 一行
+/// 与 `publish=<window>`、`window=<window>` 各一行）。
+///
+/// # Errors
+/// 发布失败：交回失败账那几行（增补 2 收口表第 58 行）与失败原因的 Debug 文本，调用方在前面接上它前面几段的结果行。
+fn publish_an_overwrite_in_the_mounted_instance_and_describe<Inner, Publish>(
+    window: &str,
+    devices: &mut [(DeviceIdentity, CountedDevice<Inner>)],
+    plan: &SharedFaultPlan,
+    counts_before: &[DeviceCallCounts],
+    stream: &SharedStream,
+    geometry: &FixedGeometry,
+    publish: Publish,
+) -> Result<OverwriteInTheMountedInstance, FailedRun>
+where
+    Inner: BlockDevice,
+    Publish: FnOnce(
+        &mut [(DeviceIdentity, CountedDevice<Inner>)],
+    ) -> Result<TransactionOutput, FailedPublish>,
+{
+    let operations_before = stream.operations().len();
+    let started = Instant::now();
+    let published = publish(devices);
+    let nanoseconds = started.elapsed().as_nanos();
+    let counts_after = device_call_counts(devices, plan);
+    let version = match published {
+        Ok(version) => version,
+        Err(failed) => {
+            let cause = format!("{:?}", failed.cause);
+            let (failure_lines, _) = describe_failed_window(
+                window,
+                &cause,
+                &[],
+                &failed.writes_of_failed_publishes,
+                pool_writes_between(counts_before, &counts_after),
+            );
+            return Err(FailedRun {
+                lines: failure_lines,
+                cause,
+            });
+        }
+    };
+    let operations = stream.operations();
+    let segments = split_into_segments(&operations[operations_before..], geometry);
+    let per_device: Vec<String> = counts_after
+        .iter()
+        .enumerate()
+        .map(|(index, later)| later.since(counts_before[index]).describe(index))
+        .collect();
+    let mut lines = vec![
+        format!(
+            "name={window} root_txg={} transaction={} released={} nanoseconds={nanoseconds} operations={} segments={} closed_form={} {}",
+            version.root.checkpoint_txg.0,
+            version.record.transaction,
+            version.released.len(),
+            operations.len() - operations_before,
+            segment_sizes_text(&segments),
+            closed_form_state_count(&segments),
+            per_device.join(" ")
+        ),
+        describe_publish_writes(window, version.root.checkpoint_txg.0, &version.writes),
+    ];
+    let (window_line, window_matches_device) = publish_writes_against_device(
+        window,
+        &[&version.writes],
+        pool_writes_between(counts_before, &counts_after),
+    );
+    lines.push(window_line);
+    Ok(OverwriteInTheMountedInstance {
+        version,
+        lines,
+        window_matches_device,
+    })
+}
+
+/// `raise-rollback-floor` 的发布 D：发布 C 之后、同一次挂载里接在发布 C 那一版上再覆盖写一次（`publish_the_fourth_version`，
+/// 宿主检查重跑同一份），这一段窗口从发布 C 返回那一刻算起。结果行与发布 C 同形，名字是 `fourth_transaction`。
+///
+/// # Errors
+/// 发布 D 失败：接在前面几段的结果行后面交回失败账那几行（增补 2 收口表第 58 行）与一句原因。
+fn publish_the_fourth_version_and_describe<Inner: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    second_instance_run: SecondInstanceRun<Inner>,
+    stream: &SharedStream,
+    geometry: &FixedGeometry,
+    clock: &mut SegmentClock,
+) -> Result<SecondInstanceRun<Inner>, FailedRun> {
+    let SecondInstanceRun {
+        mut devices,
+        mut allocator,
+        current_version: third_version,
+        plan,
+        mut lines,
+        every_window_matches_device,
+    } = second_instance_run;
+    let counts_after_third = device_call_counts(&devices, &plan);
+    let fourth = match publish_an_overwrite_in_the_mounted_instance_and_describe(
+        "fourth_transaction",
+        &mut devices,
+        &plan,
+        &counts_after_third,
+        stream,
+        geometry,
+        |devices| publish_the_fourth_version(parameters, devices, &mut allocator, &third_version),
+    ) {
+        Ok(fourth) => fourth,
+        Err(failed) => {
+            lines.extend(failed.lines);
+            return Err(FailedRun {
+                lines,
+                cause: format!("发布 D：{}", failed.cause),
+            });
+        }
+    };
+    lines.extend(fourth.lines);
+    lines.push(clock.mark("fourth_transaction"));
+
+    Ok(SecondInstanceRun {
+        devices,
+        allocator,
+        current_version: fourth.version,
+        plan,
+        lines,
+        every_window_matches_device: every_window_matches_device && fourth.window_matches_device,
+    })
+}
+
+/// `raise-rollback-floor` 在发布 C 之后的两段：同一次挂载里发布 D（第 4 新的非空有效根落到 A 上），再把 F 抬到上限。`main` 与用例走这同一个函数。
+///
+/// # Errors
+/// 发布 D 或抬 F 失败：交回到那一刻为止的结果行（失败账那几行在内）与一句原因。
+fn publish_the_fourth_version_and_raise_the_rollback_floor<Inner: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    third_version_run: SecondInstanceRun<Inner>,
+    stream: &SharedStream,
+    geometry: &FixedGeometry,
+    clock: &mut SegmentClock,
+) -> Result<SecondInstanceRun<Inner>, FailedRun> {
+    let fourth_version_run = publish_the_fourth_version_and_describe(
+        parameters,
+        third_version_run,
+        stream,
+        geometry,
+        clock,
+    )?;
+    raise_the_rollback_floor_and_describe(parameters, fourth_version_run, stream, geometry, clock)
+}
+
+/// `raise-rollback-floor` 模式冷重开之后打的那一行：所选根从盘上读回的回退下界 F（代码轮第二轮判决 Z10，
+/// `research/prompts/m2-final-code-r2-main-verification.md` 第四节第 5 条）。所选根照恢复择根的同一套规则现读
+/// （`choose_system_configuration` + `choose_root`：先跳过被回退见证抛弃的根，再按 (txg, 实例) 择新），F 取那条根记录自己的字段——
+/// 不取 `name=raise_rollback_floor` 那一行里内存那一版的 `requested_floor`。择不出系统配置或根时两段都写 `none`。
+fn rollback_floor_read_back_from_the_chosen_root_line(reader: &dyn PoolReader) -> String {
+    let chosen_root = choose_system_configuration(reader)
+        .ok()
+        .and_then(|system_configuration| choose_root(reader, &system_configuration));
+    match chosen_root {
+        Some(root) => format!(
+            "name=recover_cold_rollback_floor chosen_root={}:{} rollback_floor_on_disk={}",
+            root.instance.0, root.checkpoint_txg.0, root.rollback_floor.0
+        ),
+        None => "name=recover_cold_rollback_floor chosen_root=none rollback_floor_on_disk=none"
+            .to_string(),
+    }
+}
+
+/// `raise-rollback-floor`：发布 D 之后、同一次挂载里把 F 抬到上限（`raise_the_rollback_floor_to_its_ceiling`，宿主检查重跑同一份）。
+/// 这一段窗口从抬 F 之前那一刻算起、到它返回为止，按种类的合计是那一串空发布之和，与设备一层逐项比（增补 2 收口表第 58 行
+/// 「二进制那一侧判相等」）。抬 F 只有测试入口（`raise_rollback_floor` 的文档注释），这一档就是那个入口在真设备上的一次。
+/// 结果行里 `requested_floor` 是抬完之后最后一次空发布的根带的 F，`ceiling` 是 core 抬 F 时算的上限。
+///
+/// # Errors
+/// 抬 F 失败：那一串空发布里有一次发不出去时，失败账那几行照可写挂载失败的判法打（已落盘的那几次各一行、失败那一次一行、
+/// 两样相加与设备一层比一行）；别的错在任何写之前，只打停下的原因。都接在前面几段的结果行后面交回。
+fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    second_instance_run: SecondInstanceRun<Inner>,
+    stream: &SharedStream,
+    geometry: &FixedGeometry,
+    clock: &mut SegmentClock,
+) -> Result<SecondInstanceRun<Inner>, FailedRun> {
+    let SecondInstanceRun {
+        mut devices,
+        mut allocator,
+        mut current_version,
+        plan,
+        mut lines,
+        every_window_matches_device,
+    } = second_instance_run;
+    let floor_before_raise = current_version.root.rollback_floor;
+    let counts_before_raise = device_call_counts(&devices, &plan);
+    let operations_before_raise = stream.operations().len();
+    let raise_started = Instant::now();
+    let raised = raise_the_rollback_floor_to_its_ceiling(
+        parameters,
+        &mut devices,
+        &mut allocator,
+        &mut current_version,
+    );
+    let raise_nanoseconds = raise_started.elapsed().as_nanos();
+    let counts_after_raise = device_call_counts(&devices, &plan);
+    let raised = match raised {
+        Ok(raised) => raised,
+        Err(failure) => {
+            let cause = format!("{failure:?}");
+            let failure_lines = match &failure {
+                // 抬 F 的写入口随错丢掉，这一串的账随错交回（已经落盘的那几次空发布、失败那一次已记的写）。
+                MountError::RaiseFloorSequencePublishFailed(PublishSequenceFailed {
+                    cause: _,
+                    writes_of_persisted_publishes,
+                    writes_of_failed_publishes,
+                }) => {
+                    describe_failed_window(
+                        "raise_rollback_floor",
+                        &cause,
+                        writes_of_persisted_publishes,
+                        writes_of_failed_publishes,
+                        pool_writes_between(&counts_before_raise, &counts_after_raise),
+                    )
+                    .0
+                }
+                // 在第一次空发布之前就停下的：选系统配置、读实例表、算上限、超上限、整串预演里有一次报错，这一段没有发布的账可比。
+                // 可写挂载与回退那几条（取号、写行、暖机、回退目标）抬 F 走不到，照样列全，不写通配臂。
+                MountError::Recovery(_)
+                | MountError::FileVersionWithoutAnyJournalRecord
+                | MountError::InstanceTableMalformed
+                | MountError::Acquisition(_)
+                | MountError::Publish(_)
+                | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
+                | MountError::RollbackTargetNotACandidate { .. }
+                | MountError::RollbackFloorAboveCeiling { .. }
+                | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
+                | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
+                | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
+                | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
+                | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
+                | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
+                | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
+                | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
+                | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
+                | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
+                    vec![describe_run_failure("raise_rollback_floor", &cause)]
+                }
+            };
+            lines.extend(failure_lines);
+            return Err(FailedRun {
+                lines,
+                cause: format!("抬 F：{cause}"),
+            });
+        }
+    };
+    let raise_operations = stream.operations();
+    let raise_segments =
+        split_into_segments(&raise_operations[operations_before_raise..], geometry);
+    let per_device_raise: Vec<String> = counts_after_raise
+        .iter()
+        .enumerate()
+        .map(|(index, later)| later.since(counts_before_raise[index]).describe(index))
+        .collect();
+    let raise_txgs: Vec<String> = raised
+        .publishes
+        .iter()
+        .map(|publish| publish.root.checkpoint_txg.0.to_string())
+        .collect();
+    lines.push(format!(
+        "name=raise_rollback_floor floor_before={} requested_floor={} ceiling={} publishes={} root_txgs={} reclaimed={} abandoned_roots_unreadable={} nanoseconds={raise_nanoseconds} operations={} segments={} closed_form={} {}",
+        floor_before_raise.0,
+        current_version.root.rollback_floor.0,
+        raised.ceiling.0,
+        raised.publishes.len(),
+        raise_txgs.join(","),
+        raised.reclaimed.len(),
+        raised.abandoned_roots_unreadable,
+        raise_operations.len() - operations_before_raise,
+        segment_sizes_text(&raise_segments),
+        closed_form_state_count(&raise_segments),
+        per_device_raise.join(" ")
+    ));
+    let mut raise_publishes: Vec<&WritesByStructureKind> = Vec::new();
+    for raise_publish in &raised.publishes {
+        lines.push(describe_publish_writes(
+            "raise_rollback_floor",
+            raise_publish.root.checkpoint_txg.0,
+            &raise_publish.writes,
+        ));
+        raise_publishes.push(&raise_publish.writes);
+    }
+    let (raise_window_line, raise_window_matches) = publish_writes_against_device(
+        "raise_rollback_floor",
+        &raise_publishes,
+        pool_writes_between(&counts_before_raise, &counts_after_raise),
+    );
+    lines.push(raise_window_line);
+    lines.push(clock.mark("raise_rollback_floor"));
+
+    Ok(SecondInstanceRun {
+        devices,
+        allocator,
+        current_version,
+        plan,
+        lines,
+        every_window_matches_device: every_window_matches_device && raise_window_matches,
     })
 }
 
@@ -910,7 +1241,8 @@ fn main() {
         OnDeviceRunMode::Direct
         | OnDeviceRunMode::SkipFirstTransactionBarrier
         | OnDeviceRunMode::SecondTransaction
-        | OnDeviceRunMode::SecondInstance => PageCachePolicy::BypassWithDirectInputOutput,
+        | OnDeviceRunMode::SecondInstance
+        | OnDeviceRunMode::RaiseRollbackFloor => PageCachePolicy::BypassWithDirectInputOutput,
         OnDeviceRunMode::PageCache => PageCachePolicy::GoThroughPageCache,
     };
     let mut emitter = Emitter { emitted: 0 };
@@ -1111,8 +1443,7 @@ fn main() {
     emitter.emit(&first_transaction_line);
     let mut every_window_matches_device = warm_up_matches && first_transaction_matches;
     emitter.emit(&format!(
-        "name=transaction policy_mismatches={} key_order_mismatches={} root_txg={} back_chain={}",
-        run.policy_mismatches,
+        "name=transaction key_order_mismatches={} root_txg={} back_chain={}",
         run.output.key_order_mismatches,
         run.output.root.checkpoint_txg.0,
         run.output.record.back_chain
@@ -1122,7 +1453,8 @@ fn main() {
     match mode.publishes_after_the_first_transaction() {
         PublishesAfterTheFirstTransaction::Nothing => {}
         PublishesAfterTheFirstTransaction::SecondVersion
-        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => {
+        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance
+        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
             let second = publish_the_second_version_and_describe(
                 &parameters,
                 &mut devices,
@@ -1140,7 +1472,20 @@ fn main() {
         }
     }
 
-    // `second-instance`：发布 B 之后同一对盘冷重开、可写挂载，再发布 C。
+    // `second-instance`：发布 B 之后同一对盘冷重开、可写挂载，再发布 C；`raise-rollback-floor` 接着在同一次挂载里发布 D、抬 F。
+    let reopen_by_path = |closed_devices: Vec<(DeviceIdentity, DirectInputOutputBlockDevice)>| {
+        drop(closed_devices);
+        device_paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                (
+                    DeviceIdentity(u32::try_from(index).expect("设备号")),
+                    open(path, policy),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
     let devices = match mode.publishes_after_the_first_transaction() {
         PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => {
             let switched = switch_instance_and_publish_third_version(
@@ -1149,32 +1494,43 @@ fn main() {
                 &stream,
                 &geometry,
                 &mut clock,
-                |closed_devices| {
-                    drop(closed_devices);
-                    device_paths
-                        .iter()
-                        .enumerate()
-                        .map(|(index, path)| {
-                            (
-                                DeviceIdentity(u32::try_from(index).expect("设备号")),
-                                open(path, policy),
-                            )
-                        })
-                        .collect()
-                },
+                reopen_by_path,
             )
             .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
-            // 这一档的两条分段行是在那个函数里取的表，攒在它的 `lines` 里；挑出来并进分段行，
-            // 别的结果行照旧按次序打。
-            for line in &switched.lines {
-                if line.starts_with("name=segment_timing ") {
-                    segment_timing_lines.push(line.clone());
-                } else {
-                    emitter.emit(line);
-                }
-            }
+            emit_the_lines_after_the_second_version(
+                &mut emitter,
+                &mut segment_timing_lines,
+                &switched.lines,
+            );
             every_window_matches_device &= switched.every_window_matches_device;
             switched.devices
+        }
+        PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
+            let raised = switch_instance_and_publish_third_version(
+                &parameters,
+                devices,
+                &stream,
+                &geometry,
+                &mut clock,
+                reopen_by_path,
+            )
+            .and_then(|switched| {
+                publish_the_fourth_version_and_raise_the_rollback_floor(
+                    &parameters,
+                    switched,
+                    &stream,
+                    &geometry,
+                    &mut clock,
+                )
+            })
+            .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
+            emit_the_lines_after_the_second_version(
+                &mut emitter,
+                &mut segment_timing_lines,
+                &raised.lines,
+            );
+            every_window_matches_device &= raised.every_window_matches_device;
+            raised.devices
         }
         PublishesAfterTheFirstTransaction::Nothing
         | PublishesAfterTheFirstTransaction::SecondVersion => devices,
@@ -1194,6 +1550,16 @@ fn main() {
         })
         .collect();
     let report = recover(&reopened, JournalPolicy::Consult);
+    // 抬 F 模式多打一行：所选根从盘上读回的 F（代码轮第二轮判决 Z10：`name=raise_rollback_floor` 那一行的 `requested_floor=`
+    // 是内存里那一版的 F，冷重开择根并不看它，55 号要独立读回盘上的 F 才判得出「F 抬到 3」）。别的模式一行不多。
+    let rollback_floor_read_back_line = match mode.publishes_after_the_first_transaction() {
+        PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
+            Some(rollback_floor_read_back_from_the_chosen_root_line(&reopened))
+        }
+        PublishesAfterTheFirstTransaction::Nothing
+        | PublishesAfterTheFirstTransaction::SecondVersion
+        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => None,
+    };
     let (outcome, root, content_matches) = match &report.outcome {
         RecoveryOutcome::FileRead { root, content } => (
             "file_read",
@@ -1220,6 +1586,9 @@ fn main() {
         "name=recover_cold outcome={outcome} root={root} content_matches={content_matches} valid_records={} above_water={} applied={} verification_passed={} mapping_fallbacks={}",
         report.journal.valid_records, report.journal.above_water, report.journal.prefix_applied, report.journal.verification_passed, report.mapping_fallbacks
     ));
+    if let Some(line) = &rollback_floor_read_back_line {
+        emitter.emit(line);
+    }
     // 分段挂钟：每段一行，最后一行是包含自检（各段之和不超过整条路）。
     for line in &segment_timing_lines {
         emitter.emit(line);
@@ -1256,8 +1625,8 @@ mod tests {
     use singlefs_harness::crash::SparseBlockDevice;
     use singlefs_harness::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
     use singlefs_harness::on_device_modes::{
-        allocator_rebuilt_from_the_records_of, publish_the_second_version, third_file_content,
-        OnDeviceRunMode,
+        allocator_rebuilt_from_the_records_of, fourth_file_content, publish_the_second_version,
+        third_file_content, OnDeviceRunMode,
     };
     use singlefs_harness::scenario::{e142_parameters, run_first_transaction};
     use singlefs_harness::segments::FixedGeometry;
@@ -1612,7 +1981,8 @@ mod tests {
     }
 
     /// 每一档登记的段都互不相同、而且都在这一档真会走到的那几段里：
-    /// `second-instance` 比 `second-transaction` 多两段（重开可写挂载、发布 C），后者比 `direct` 多一段（发布 B）。
+    /// `second-instance` 比 `second-transaction` 多两段（重开可写挂载、发布 C），后者比 `direct` 多一段（发布 B）；
+    /// `raise-rollback-floor` 比 `second-instance` 多两段（发布 D、抬 F）。
     #[test]
     fn every_mode_registers_its_own_segments_with_no_repeats() {
         for mode in OnDeviceRunMode::ALL {
@@ -1637,12 +2007,31 @@ mod tests {
             registered_segments_of(OnDeviceRunMode::SecondInstance).len(),
             8
         );
+        assert_eq!(
+            registered_segments_of(OnDeviceRunMode::RaiseRollbackFloor),
+            [
+                "mkfs",
+                "instance_acquisition",
+                "warm_up",
+                "first_transaction",
+                "second_transaction",
+                "reopen_and_writable_mount",
+                "third_transaction",
+                "fourth_transaction",
+                "raise_rollback_floor",
+                "cold_reopen_and_recover"
+            ],
+            "raise-rollback-floor 比 second-instance 多发布 D 与抬 F 两段，排在发布 C 之后、冷重开之前"
+        );
     }
 
     use super::{
         describe_first_transaction_path_failure, device_call_counts,
+        publish_the_fourth_version_and_describe,
+        publish_the_fourth_version_and_raise_the_rollback_floor,
         publish_the_second_version_and_describe, publish_the_third_version_and_describe,
-        reopen_and_mount_writable, FailedRun,
+        raise_the_rollback_floor_and_describe, reopen_and_mount_writable, FailedRun,
+        SecondInstanceRun,
     };
     use singlefs_harness::device_log::{expected_device_events, DeviceEvent};
     use singlefs_harness::fault_injection::{FaultSchedule, InjectedFault};
@@ -2021,6 +2410,424 @@ mod tests {
                 window_write_calls,
             );
         }
+    }
+
+    /// `second-instance` 那条路在宿主上走到发布 C（实例 2，txg 8）：稀疏内存盘代替 virtio 盘，「冷重开」把镜像交给新句柄。
+    /// 交回这一段的注入计划还没装注入。
+    fn second_instance_run_up_to_the_third_version(
+        parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters,
+        geometry: &FixedGeometry,
+        stream: &SharedStream,
+        clock: &mut SegmentClock,
+    ) -> SecondInstanceRun<SparseBlockDevice> {
+        let plan = SharedFaultPlan::unarmed(*geometry);
+        let mut devices = counted_sparse_devices(stream, &plan);
+        let run = run_first_transaction(parameters, &mut devices, stream, |_point, _devices| {})
+            .expect("第一个事务");
+        let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+        publish_the_second_version(parameters, &mut devices, &mut allocator, &run.output)
+            .expect("发布 B");
+        let switched = match switch_instance_and_publish_third_version(
+            parameters,
+            devices,
+            stream,
+            geometry,
+            clock,
+            reopen_sparse_devices,
+        ) {
+            Ok(switched) => switched,
+            Err(failed) => panic!("第二个实例：{failed:?}"),
+        };
+        assert_eq!(
+            switched.current_version.root.checkpoint_txg,
+            CheckpointTxg(8),
+            "发布 C"
+        );
+        switched
+    }
+
+    /// `raise-rollback-floor` 模式在宿主上照同一条路跑一遍（增补 2 收口表第 58 行「二进制那一侧判相等」，成功那一路）：
+    /// 发布 C（txg 8）之后同一次挂载里发布 D（txg 9，第四版），再把 F 抬到上限。发布 D 之后按新到旧数非空有效根是 D、C、B、A（txg 9、8、4、3），
+    /// 上限 = min(每块盘上最新的有效根, 第 4 新的非空有效根) = min(盘 1 的 txg 7, txg 3) = 3（D16（发布语义） 已定项 1「抬 F 的上限」；
+    /// 根环三个区域的设备归属是 0 / 1 / 0，按 txg 轮流落，盘 0 上最新的是 txg 9、盘 1 上是 txg 7）。推两次带 F = 3 的空发布 txg 10、11，
+    /// 两块盘各落一条（生效）。F 的两个数排在最前：没有发布 D 时第 4 新的非空有效根够不到 A，上限是 0，红在这里。
+    /// 发布 D 一行、抬 F 一行、三次发布各一行 `name=publish_writes`、两段窗口按种类的合计与设备一层逐项相等；录制流投到每块盘上的写与 FLUSH
+    /// 与设备一层数到的相等（宿主检查拿这个投法当程序的信念，发布 D 与抬 F 两段也一样）；冷恢复择 (2, 11) 读回第四版。
+    #[test]
+    fn raise_rollback_floor_mode_publishes_the_fourth_version_raises_the_floor_to_its_ceiling_above_zero_and_every_window_matches_the_device_layer_count(
+    ) {
+        let parameters = e142_parameters(512, 512);
+        let geometry = geometry_of(&parameters);
+        let stream = SharedStream::new();
+        let mut clock = SegmentClock::start();
+        let switched = second_instance_run_up_to_the_third_version(
+            &parameters,
+            &geometry,
+            &stream,
+            &mut clock,
+        );
+        let lines_before_the_fourth_version = switched.lines.len();
+        let operations_before_the_fourth_version = stream.operation_count();
+        let counts_before_the_fourth_version =
+            device_call_counts(&switched.devices, &switched.plan);
+        let raised = match publish_the_fourth_version_and_raise_the_rollback_floor(
+            &parameters,
+            switched,
+            &stream,
+            &geometry,
+            &mut clock,
+        ) {
+            Ok(raised) => raised,
+            Err(failed) => panic!("发布 D、抬 F：{failed:?}"),
+        };
+        let new_lines = &raised.lines[lines_before_the_fourth_version..];
+
+        let raise_line = lines_named(new_lines, "raise_rollback_floor");
+        assert_eq!(raise_line.len(), 1, "{new_lines:#?}");
+        let raise_line = raise_line[0];
+        assert_eq!(
+            field(raise_line, "ceiling"),
+            Some("3"),
+            "第 4 新的非空有效根是 A（txg 3），比盘 1 上最新的 txg 7 小：{raise_line}"
+        );
+        assert_eq!(
+            field(raise_line, "requested_floor"),
+            Some("3"),
+            "F 抬到上限：{raise_line}"
+        );
+        assert_eq!(raised.current_version.root.rollback_floor, CheckpointTxg(3));
+        assert_eq!(field(raise_line, "floor_before"), Some("0"), "{raise_line}");
+        assert_eq!(field(raise_line, "publishes"), Some("2"), "{raise_line}");
+        assert_eq!(
+            field(raise_line, "root_txgs"),
+            Some("10,11"),
+            "{raise_line}"
+        );
+        assert_eq!(
+            field(raise_line, "reclaimed"),
+            Some("1"),
+            "释放代 ≤ 3 的已释放落点（两盘同槽，按盘 0 报）：{raise_line}"
+        );
+        assert_eq!(
+            raised.current_version.root.checkpoint_txg,
+            CheckpointTxg(11)
+        );
+
+        let fourth_lines = lines_named(new_lines, "fourth_transaction");
+        assert_eq!(fourth_lines.len(), 1, "{new_lines:#?}");
+        assert_eq!(field(fourth_lines[0], "root_txg"), Some("9"));
+        assert_eq!(
+            field(fourth_lines[0], "transaction"),
+            Some("2"),
+            "同一个实例里发布 C 之后的下一个事务号"
+        );
+        assert_eq!(
+            field(fourth_lines[0], "segments"),
+            Some("16+2+1+2"),
+            "发布 D 与发布 C 同型"
+        );
+
+        let publish_lines: Vec<(Option<&str>, Option<&str>)> =
+            lines_named(new_lines, "publish_writes")
+                .into_iter()
+                .map(|line| (field(line, "publish"), field(line, "txg")))
+                .collect();
+        assert_eq!(
+            publish_lines,
+            vec![
+                (Some("fourth_transaction"), Some("9")),
+                (Some("raise_rollback_floor"), Some("10")),
+                (Some("raise_rollback_floor"), Some("11")),
+            ]
+        );
+        let windows = lines_named(new_lines, "publish_writes_against_device");
+        let window_summary: Vec<(Option<&str>, Option<&str>, Option<&str>)> = windows
+            .iter()
+            .map(|line| {
+                (
+                    field(line, "window"),
+                    field(line, "publishes"),
+                    field(line, "matches"),
+                )
+            })
+            .collect();
+        assert_eq!(
+            window_summary,
+            vec![
+                (Some("fourth_transaction"), Some("1"), Some("true")),
+                (Some("raise_rollback_floor"), Some("2"), Some("true")),
+            ],
+            "发布 D 与抬 F 那一串空发布按种类的合计都等于设备一层数的：{windows:#?}"
+        );
+        for window in &windows {
+            assert_eq!(
+                field(window, "by_kind_write_calls"),
+                field(window, "device_write_calls"),
+                "{window}"
+            );
+            assert_eq!(
+                field(window, "by_kind_written_bytes"),
+                field(window, "device_written_bytes"),
+                "{window}"
+            );
+        }
+        assert!(raised.every_window_matches_device);
+        assert_eq!(
+            clock.marked_segments(),
+            [
+                "reopen_and_writable_mount",
+                "third_transaction",
+                "fourth_transaction",
+                "raise_rollback_floor"
+            ]
+        );
+        assert_eq!(
+            lines_named(new_lines, "segment_timing").len(),
+            2,
+            "发布 D 与抬 F 各自的分段行：{new_lines:#?}"
+        );
+
+        let operations = stream.retained_operations();
+        let new_operations = &operations[operations_before_the_fourth_version..];
+        let counts_after_the_raise = device_call_counts(&raised.devices, &raised.plan);
+        for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
+            .into_iter()
+            .enumerate()
+        {
+            let counted =
+                counts_after_the_raise[index].since(counts_before_the_fourth_version[index]);
+            let projected = expected_device_events(new_operations, identity);
+            let projected_writes = projected
+                .iter()
+                .filter(|event| matches!(event, DeviceEvent::Write { .. }))
+                .count();
+            let projected_flushes = projected
+                .iter()
+                .filter(|event| matches!(event, DeviceEvent::Flush))
+                .count();
+            assert!(
+                counted.write_calls > 0,
+                "发布 D 与抬 F 两段盘 {} 收到了写",
+                identity.0
+            );
+            assert_eq!(
+                u64::try_from(projected_writes).expect("件数"),
+                counted.write_calls,
+                "发布 D 与抬 F 两段盘 {}：录制流投出的写与设备一层数到的",
+                identity.0
+            );
+            assert_eq!(
+                u64::try_from(projected_flushes).expect("件数"),
+                counted.barrier_calls + counted.force_unit_access_writes,
+                "发布 D 与抬 F 两段盘 {}：录制流投出的 FLUSH 与设备一层转发的屏障 + FUA 写",
+                identity.0
+            );
+        }
+
+        let cold: Vec<(DeviceIdentity, SparseBlockDevice)> = raised
+            .devices
+            .into_iter()
+            .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+            .collect();
+        let report = recover(&cold, JournalPolicy::Consult);
+        match report.outcome {
+            RecoveryOutcome::FileRead { root, content } => {
+                assert_eq!(root, (InstanceGeneration(2), CheckpointTxg(11)));
+                assert!(content == fourth_file_content(), "冷恢复读回第四版");
+            }
+            RecoveryOutcome::NoFile { root } => panic!("冷恢复择到 {root:?} 却没有文件"),
+            RecoveryOutcome::Failed { root, failure } => {
+                panic!("冷恢复失败：{root:?} {failure:?}")
+            }
+        }
+    }
+
+    /// 代码轮第二轮判决 Z10（`research/prompts/m2-final-code-r2-main-verification.md` 第四节第 5 条）：`raise-rollback-floor` 那条路在宿主上走到
+    /// 抬 F 之后冷重开，多打的那一行 `name=recover_cold_rollback_floor` 报的是冷重开择到的根 (2, 11) 与它从盘上读回的 F = 3，
+    /// 不是 `name=raise_rollback_floor` 里内存那一版的 `requested_floor`。同一段历史抬 F 之前的盘面上（发布 C 之后、择到 (2, 8)）读回的是 0：
+    /// 这一行跟着盘上的根走，不是写死的数。
+    #[test]
+    fn raise_rollback_floor_mode_prints_the_floor_read_back_from_the_chosen_root_after_the_cold_reopen(
+    ) {
+        let parameters = e142_parameters(512, 512);
+        let geometry = geometry_of(&parameters);
+        let stream = SharedStream::new();
+        let mut clock = SegmentClock::start();
+        let switched = second_instance_run_up_to_the_third_version(
+            &parameters,
+            &geometry,
+            &stream,
+            &mut clock,
+        );
+        let before_the_raise: Vec<(DeviceIdentity, SparseBlockDevice)> = switched
+            .devices
+            .iter()
+            .map(|(identity, device)| {
+                let mut copy =
+                    SparseBlockDevice::new(SPARSE_DEVICE_BYTES, PhysicalBlockSizeInBytes(512));
+                copy.image = device.inner().inner().image.clone();
+                (*identity, copy)
+            })
+            .collect();
+        let line_before_the_raise =
+            super::rollback_floor_read_back_from_the_chosen_root_line(&before_the_raise);
+        assert_eq!(
+            field(&line_before_the_raise, "chosen_root"),
+            Some("2:8"),
+            "发布 C 之后择到 (2, 8)：{line_before_the_raise}"
+        );
+        assert_eq!(
+            field(&line_before_the_raise, "rollback_floor_on_disk"),
+            Some("0"),
+            "抬 F 之前盘上的 F 是 0：{line_before_the_raise}"
+        );
+        let raised = match publish_the_fourth_version_and_raise_the_rollback_floor(
+            &parameters,
+            switched,
+            &stream,
+            &geometry,
+            &mut clock,
+        ) {
+            Ok(raised) => raised,
+            Err(failed) => panic!("发布 D、抬 F：{failed:?}"),
+        };
+        let cold: Vec<(DeviceIdentity, SparseBlockDevice)> = raised
+            .devices
+            .into_iter()
+            .map(|(identity, device)| (identity, device.into_inner().into_inner_and_operations().0))
+            .collect();
+        let line = super::rollback_floor_read_back_from_the_chosen_root_line(&cold);
+        assert_eq!(
+            field(&line, "name"),
+            Some("recover_cold_rollback_floor"),
+            "{line}"
+        );
+        assert_eq!(
+            field(&line, "chosen_root"),
+            Some("2:11"),
+            "冷重开择到最后一次抬 F 的空发布的根：{line}"
+        );
+        assert_eq!(
+            field(&line, "rollback_floor_on_disk"),
+            Some("3"),
+            "所选根从盘上读回的 F 是抬到的上限 3：{line}"
+        );
+    }
+
+    /// 增补 2 收口表第 58 行，发布 D 那一段（`raise-rollback-floor`）：发布 C 之后装上注入，发布 D 整池第 5 次写报错。
+    /// 挂载与发布 C 那几行照打在前面，失败账 4 次写与设备一层（重开之后那个注入计划数的）逐项相等；发布 D 没做成就不抬 F。
+    #[test]
+    fn fourth_version_publish_failing_midway_reports_the_writes_it_landed_and_they_equal_the_device_layer_count(
+    ) {
+        let parameters = e142_parameters(512, 512);
+        let geometry = geometry_of(&parameters);
+        let stream = SharedStream::new();
+        let mut clock = SegmentClock::start();
+        let switched = second_instance_run_up_to_the_third_version(
+            &parameters,
+            &geometry,
+            &stream,
+            &mut clock,
+        );
+        switched
+            .plan
+            .arm(FaultSchedule::the_nth_call_across_the_pool(
+                InjectedFault::WriteFails,
+                5,
+            ));
+        let failed = failed_run_of(
+            publish_the_fourth_version_and_raise_the_rollback_floor(
+                &parameters,
+                switched,
+                &stream,
+                &geometry,
+                &mut clock,
+            ),
+            "发布 D",
+        );
+        for earlier_line in ["writable_mount", "third_transaction"] {
+            assert_eq!(
+                lines_named(&failed.lines, earlier_line).len(),
+                1,
+                "{earlier_line} 那一行在失败那几行前面照打：{:#?}",
+                failed.lines
+            );
+        }
+        assert_the_failed_window_is_reconciled(&failed.lines, "fourth_transaction", &[], "4", "4");
+        assert!(lines_named(&failed.lines, "fourth_transaction").is_empty());
+        assert!(
+            lines_named(&failed.lines, "raise_rollback_floor").is_empty(),
+            "发布 D 没做成就不抬 F：{:#?}",
+            failed.lines
+        );
+        assert!(failed.cause.starts_with("发布 D："), "{}", failed.cause);
+    }
+
+    /// 抬 F 失败（增补 2 收口表第 58 行「`raise_rollback_floor` 同形」）：抬 F 的写入口是它自己开的、随错丢掉，
+    /// 已经落盘的那几次空发布与失败那一次已记的写随 `MountError::RaiseFloorSequencePublishFailed` 交回；`raise-rollback-floor`
+    /// 模式走的那个函数（`raise_the_rollback_floor_and_describe`）照可写挂载那一段的判法打失败账、与设备一层逐项比。
+    /// `raise-rollback-floor` 那条路走到发布 D（txg 9），装上注入，把 F 抬到上限（3）——推空发布直到两块盘上都有一条带这个 F 的根。
+    /// 注入摆在之后整池第 16 次写：第一次空发布（txg 10）13 次写已经落盘（四个固定点单元与 journal 记录每盘一份、根槽一次、系统配置每盘一次），
+    /// 第二次的第 3 个写报错 ⇒ 失败账 2 次写，两样相加 15 次与设备一层逐项相等。前面几段的结果行照打在失败那几行前面，成功那一行不打。
+    #[test]
+    fn failed_raise_of_the_rollback_floor_reports_every_publish_it_wrote_and_they_equal_the_device_layer_count(
+    ) {
+        let parameters = e142_parameters(512, 512);
+        let geometry = geometry_of(&parameters);
+        let stream = SharedStream::new();
+        let mut clock = SegmentClock::start();
+        let switched = second_instance_run_up_to_the_third_version(
+            &parameters,
+            &geometry,
+            &stream,
+            &mut clock,
+        );
+        let published_the_fourth_version = match publish_the_fourth_version_and_describe(
+            &parameters,
+            switched,
+            &stream,
+            &geometry,
+            &mut clock,
+        ) {
+            Ok(published) => published,
+            Err(failed) => panic!("发布 D：{failed:?}"),
+        };
+        published_the_fourth_version
+            .plan
+            .arm(FaultSchedule::the_nth_call_across_the_pool(
+                InjectedFault::WriteFails,
+                16,
+            ));
+        let failed = failed_run_of(
+            raise_the_rollback_floor_and_describe(
+                &parameters,
+                published_the_fourth_version,
+                &stream,
+                &geometry,
+                &mut clock,
+            ),
+            "抬 F",
+        );
+        for earlier_line in ["writable_mount", "third_transaction", "fourth_transaction"] {
+            assert_eq!(
+                lines_named(&failed.lines, earlier_line).len(),
+                1,
+                "{earlier_line} 那一行在失败那几行前面照打：{:#?}",
+                failed.lines
+            );
+        }
+        assert_the_failed_window_is_reconciled(
+            &failed.lines,
+            "raise_rollback_floor",
+            &["13"],
+            "2",
+            "15",
+        );
+        assert!(
+            lines_named(&failed.lines, "raise_rollback_floor").is_empty(),
+            "失败的抬 F 不打成功那一行"
+        );
+        assert!(failed.cause.starts_with("抬 F："), "{}", failed.cause);
     }
 
     /// 宿主检查（`first_transaction_device_log_check`）拿录制流投到每块盘上的事件当「程序的信念」：每个写一件、FUA 写之后一个 FLUSH、

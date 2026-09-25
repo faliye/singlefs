@@ -10,6 +10,7 @@ use common::{build_pool, format_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SE
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::make_filesystem::TREE_TABLE_GENESIS_SLOT;
 use singlefs_core::mount::mount_writable;
@@ -192,7 +193,9 @@ const OVERWRITE_IN_THE_SMALL_POOL: HistoryOperation =
 
 /// 两块单元区 384 槽的小盘上跑一段历史（起点：mkfs 同一个进程里发完第一个文件），不跑池级 checker——这里只比每一步入口的结局，
 /// 转环之后的记账由 `turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`
-/// 在 4 GiB 的盘上跑 checker 判。
+/// 在 4 GiB 的盘上跑 checker 判。空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：
+/// 判着准入时这块小盘上式子在挂载之后第 11 次覆盖写就拒（D28（挂载期承诺量） 已定项 1 的式子扣切换预留与保留池、defer 按读法甲扣两次），
+/// 走不到这里要比的「根环转过之后落点取不到」那一格。
 fn run_on_the_small_pool(operations: Vec<HistoryOperation>) -> HistoryRun {
     execute_history_with(
         &GeneratedHistory {
@@ -203,6 +206,7 @@ fn run_on_the_small_pool(operations: Vec<HistoryOperation>) -> HistoryRun {
         HistoryExecution {
             per_step_checker: PerStepChecker::Skipped,
             device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
         &SharedStream::new(),
         &mut |_| {},

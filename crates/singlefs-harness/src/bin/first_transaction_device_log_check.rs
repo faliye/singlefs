@@ -4,7 +4,8 @@
 //!
 //! 模式就是虚机里那一次 `first_transaction_on_device` 的模式，宿主照它重跑同样几步（`singlefs_harness::on_device_modes`，两边跑同一份）：
 //! 前三个模式停在第一个事务；`second-transaction` 接着发布 B；`second-instance` 再接着冷重开、可写挂载与发布 C
-//! （里程碑「第二个事务」增补 2 收口表第 30 行：在这之前宿主只重跑第一个事务，后面三段的写逐项比不到）。
+//! （里程碑「第二个事务」增补 2 收口表第 30 行：在这之前宿主只重跑第一个事务，后面三段的写逐项比不到）；
+//! `raise-rollback-floor` 在发布 C 之后同一次挂载里再发布 D、再把 F 抬到上限（第 58 行：抬 F 那一串空发布同样逐项比）。
 //! 三个数取虚机里那次跑的 `name=geometry` 行。判据：程序的事件是设备侧日志的逐项前缀，前缀之后至多一个 FLUSH
 //! （虚机关机时补的那一个；2026-09-14 第一次跑 direct 时每块盘各多出这一个，见 records 十一·六）。
 //! 每块盘另报程序每一段在这块盘上投出几件事（`expected_events_by_window`），与第一处不一致落在哪一段（`divergence_window`；
@@ -13,6 +14,7 @@
 //! 1 = 有一块盘对不上（打印第一处）或读不回；2 = 用法、日志读不了、或宿主重跑那条写路失败。结果行同样以 `E7RESULT` 打头。
 
 use singlefs_core::address::DeviceIdentity;
+use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::block_device::{
     DirectInputOutputBlockDevice, PageCachePolicy, PhysicalBlockSizeInBytes,
     PhysicalBlockSizeSource,
@@ -20,14 +22,16 @@ use singlefs_core::block_device::{
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
+use singlefs_core::transaction::TransactionOutput;
 use singlefs_harness::crash::SparseBlockDevice;
 use singlefs_harness::device_log::{
     compare_allowing_trailing_flushes, declared_zero_fills, expected_device_events,
     fold_declared_zero_fills, parse_device_log, DeviceEvent, DeviceLog,
 };
 use singlefs_harness::on_device_modes::{
-    allocator_rebuilt_from_the_records_of, publish_the_second_version, publish_the_third_version,
-    OnDeviceRunMode, PublishesAfterTheFirstTransaction,
+    allocator_rebuilt_from_the_records_of, publish_the_fourth_version, publish_the_second_version,
+    publish_the_third_version, raise_the_rollback_floor_to_its_ceiling, OnDeviceRunMode,
+    PublishesAfterTheFirstTransaction,
 };
 use singlefs_harness::scenario::{e142_parameters, run_first_transaction, ScenarioPoint};
 use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
@@ -48,6 +52,8 @@ enum ProgramWindow {
     SecondTransaction,
     ReopenAndWritableMount,
     ThirdTransaction,
+    FourthTransaction,
+    RaiseRollbackFloor,
 }
 
 impl ProgramWindow {
@@ -60,6 +66,8 @@ impl ProgramWindow {
             ProgramWindow::SecondTransaction => "second_transaction",
             ProgramWindow::ReopenAndWritableMount => "reopen_and_writable_mount",
             ProgramWindow::ThirdTransaction => "third_transaction",
+            ProgramWindow::FourthTransaction => "fourth_transaction",
+            ProgramWindow::RaiseRollbackFloor => "raise_rollback_floor",
         }
     }
 }
@@ -142,7 +150,8 @@ fn rerun_the_program_on_the_host(
     match publishes {
         PublishesAfterTheFirstTransaction::Nothing => {}
         PublishesAfterTheFirstTransaction::SecondVersion
-        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => {
+        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance
+        | PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
             let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
             publish_the_second_version(parameters, &mut devices, &mut allocator, &run.output)
                 .map_err(|failed| format!("发布 B：{:?}", failed.cause))?;
@@ -153,43 +162,91 @@ fn rerun_the_program_on_the_host(
         PublishesAfterTheFirstTransaction::Nothing
         | PublishesAfterTheFirstTransaction::SecondVersion => {}
         PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstance => {
-            let mut reopened: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
-                devices
-                    .into_iter()
-                    .map(|(identity, closed)| {
-                        (
-                            identity,
-                            RecordingBlockDevice::with_shared_stream(
-                                identity,
-                                closed.into_inner_and_operations().0,
-                                stream.clone(),
-                            ),
-                        )
-                    })
-                    .collect();
-            let mut mounted = mount_writable(parameters, &mut reopened)
-                .map_err(|failure| format!("可写挂载：{failure:?}"))?;
-            window_ends.push((
-                ProgramWindow::ReopenAndWritableMount,
-                stream.operation_count(),
-            ));
-            let mounted_version = mounted.current.file_version().cloned().ok_or_else(|| {
-                "可写挂载之后现行那一版没有文件：发布 B 之后重开，上一版带文件".to_string()
-            })?;
-            publish_the_third_version(
+            rerun_the_second_instance_on_the_host(parameters, devices, stream, &mut window_ends)?;
+        }
+        PublishesAfterTheFirstTransaction::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
+            let mut second_instance =
+                rerun_the_second_instance_on_the_host(parameters, devices, stream, &mut window_ends)?;
+            let mut current_version = publish_the_fourth_version(
                 parameters,
-                &mut reopened,
-                &mut mounted.allocator,
-                &mounted_version,
-                mounted.output.instance,
+                &mut second_instance.devices,
+                &mut second_instance.allocator,
+                &second_instance.current_version,
             )
-            .map_err(|failed| format!("发布 C：{:?}", failed.cause))?;
-            window_ends.push((ProgramWindow::ThirdTransaction, stream.operation_count()));
+            .map_err(|failed| format!("发布 D：{:?}", failed.cause))?;
+            window_ends.push((ProgramWindow::FourthTransaction, stream.operation_count()));
+            raise_the_rollback_floor_to_its_ceiling(
+                parameters,
+                &mut second_instance.devices,
+                &mut second_instance.allocator,
+                &mut current_version,
+            )
+            .map_err(|failure| format!("抬 F：{failure:?}"))?;
+            window_ends.push((ProgramWindow::RaiseRollbackFloor, stream.operation_count()));
         }
     }
     Ok(HostRerun {
         operations: stream.retained_operations(),
         window_ends,
+    })
+}
+
+/// 宿主重跑到发布 C 为止之后的样子：重开之后的那一套盘、挂载交回又被发布 C 推进过的分配器、现行那一版（发布 C）。
+struct SecondInstanceOnTheHost {
+    devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)>,
+    allocator: PoolAllocator,
+    current_version: TransactionOutput,
+}
+
+/// 发布 B 之后：同一份镜像交给新的录制器（冷重开）、可写挂载、发布 C，两段的终点记进 `window_ends`。
+///
+/// # Errors
+/// 可写挂载失败、挂载之后现行那一版没有文件、发布 C 失败：交回一句原因。
+fn rerun_the_second_instance_on_the_host(
+    parameters: &MakeFilesystemParameters,
+    devices_after_the_second_version: Vec<(
+        DeviceIdentity,
+        RecordingBlockDevice<SparseBlockDevice>,
+    )>,
+    stream: &SharedStream,
+    window_ends: &mut Vec<(ProgramWindow, usize)>,
+) -> Result<SecondInstanceOnTheHost, String> {
+    let mut reopened: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
+        devices_after_the_second_version
+            .into_iter()
+            .map(|(identity, closed)| {
+                (
+                    identity,
+                    RecordingBlockDevice::with_shared_stream(
+                        identity,
+                        closed.into_inner_and_operations().0,
+                        stream.clone(),
+                    ),
+                )
+            })
+            .collect();
+    let mut mounted = mount_writable(parameters, &mut reopened)
+        .map_err(|failure| format!("可写挂载：{failure:?}"))?;
+    window_ends.push((
+        ProgramWindow::ReopenAndWritableMount,
+        stream.operation_count(),
+    ));
+    let mounted_version = mounted.current.file_version().cloned().ok_or_else(|| {
+        "可写挂载之后现行那一版没有文件：发布 B 之后重开，上一版带文件".to_string()
+    })?;
+    let third_version = publish_the_third_version(
+        parameters,
+        &mut reopened,
+        &mut mounted.allocator,
+        &mounted_version,
+        mounted.output.instance,
+    )
+    .map_err(|failed| format!("发布 C：{:?}", failed.cause))?;
+    window_ends.push((ProgramWindow::ThirdTransaction, stream.operation_count()));
+    Ok(SecondInstanceOnTheHost {
+        devices: reopened,
+        allocator: mounted.allocator,
+        current_version: third_version,
     })
 }
 
@@ -534,6 +591,9 @@ mod tests {
                 OnDeviceRunMode::SecondInstance => {
                     "mkfs,instance_acquisition,warm_up,first_transaction,second_transaction,reopen_and_writable_mount,third_transaction"
                 }
+                OnDeviceRunMode::RaiseRollbackFloor => {
+                    "mkfs,instance_acquisition,warm_up,first_transaction,second_transaction,reopen_and_writable_mount,third_transaction,fourth_transaction,raise_rollback_floor"
+                }
             };
             let described = rerun.describe(mode);
             assert_eq!(field(&described, "mode"), Some(mode.argument()));
@@ -725,6 +785,131 @@ mod tests {
             assert_eq!(
                 field(&extra_flush.line, "divergence_window"),
                 Some(AFTER_THE_PROGRAM)
+            );
+        }
+    }
+
+    /// `raise-rollback-floor`：发布 D 与抬 F 两段真在比对里（增补 2 收口表第 58 行）。每一段里改一步（少一个写、少一个 FLUSH、
+    /// 最后一个写的内容变了）两块盘都判红、红在被改的那一段（`fourth_transaction` / `raise_rollback_floor`）；`second-instance` 的盘
+    /// （没有发布 D、没抬 F）拿这个模式去比，程序的事件在发布 D 那一段开头对不上；反过来这个模式的盘拿 `second-instance` 去比，红在程序之后。
+    #[test]
+    fn raise_rollback_floor_mode_compares_the_raise_window_and_is_red_there_when_one_step_changed()
+    {
+        let raise = rerun_of(OnDeviceRunMode::RaiseRollbackFloor);
+        let second_instance = rerun_of(OnDeviceRunMode::SecondInstance);
+        type StepChange = fn(&mut Vec<DeviceEvent>) -> bool;
+        let changes: [(&str, StepChange); 3] = [
+            ("少一个写", |events| {
+                match events
+                    .iter()
+                    .position(|event| matches!(event, DeviceEvent::Write { .. }))
+                {
+                    Some(position) => {
+                        events.remove(position);
+                        true
+                    }
+                    None => false,
+                }
+            }),
+            ("少一个 FLUSH", |events| {
+                match events
+                    .iter()
+                    .position(|event| matches!(event, DeviceEvent::Flush))
+                {
+                    Some(position) => {
+                        events.remove(position);
+                        true
+                    }
+                    None => false,
+                }
+            }),
+            ("最后一个写的内容变了", |events| {
+                match events
+                    .iter_mut()
+                    .rev()
+                    .find(|event| matches!(event, DeviceEvent::Write { .. }))
+                {
+                    Some(DeviceEvent::Write { content_hash, .. }) => {
+                        *content_hash ^= 1;
+                        true
+                    }
+                    Some(DeviceEvent::Flush | DeviceEvent::Discard { .. } | DeviceEvent::Mark)
+                    | None => false,
+                }
+            }),
+        ];
+        for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
+            let unchanged = compare_one_device(
+                &raise,
+                identity,
+                &device_log_that_received(
+                    &raise,
+                    identity,
+                    flattened(events_by_window(&raise, identity)),
+                ),
+            );
+            assert!(unchanged.matches, "{}", unchanged.line);
+            for changed_window in [
+                ProgramWindow::FourthTransaction,
+                ProgramWindow::RaiseRollbackFloor,
+            ] {
+                for (change_name, change) in &changes {
+                    let mut windows = events_by_window(&raise, identity);
+                    let (_, events) = windows
+                        .iter_mut()
+                        .find(|(window, _)| *window == changed_window)
+                        .expect("raise-rollback-floor 跑了发布 D 与抬 F 两段");
+                    assert!(
+                        change(events),
+                        "盘 {} 的 {} 里找不到可改的那一步（{change_name}）",
+                        identity.0,
+                        changed_window.name()
+                    );
+                    let log = device_log_that_received(&raise, identity, flattened(windows));
+                    let comparison = compare_one_device(&raise, identity, &log);
+                    assert!(
+                        !comparison.matches,
+                        "盘 {} 的 {} {change_name}：必须判红\n{}",
+                        identity.0,
+                        changed_window.name(),
+                        comparison.line
+                    );
+                    assert_eq!(
+                        field(&comparison.line, "divergence_window"),
+                        Some(changed_window.name()),
+                        "{change_name}：{}",
+                        comparison.line
+                    );
+                }
+            }
+
+            let without_the_raise = device_log_that_received(
+                &second_instance,
+                identity,
+                flattened(events_by_window(&second_instance, identity)),
+            );
+            let missing_raise = compare_one_device(&raise, identity, &without_the_raise);
+            assert!(!missing_raise.matches);
+            assert_eq!(
+                field(&missing_raise.line, "divergence_window"),
+                Some(ProgramWindow::FourthTransaction.name()),
+                "{}",
+                missing_raise.line
+            );
+
+            let with_the_raise = device_log_that_received(
+                &raise,
+                identity,
+                flattened(events_by_window(&raise, identity)),
+            );
+            let raise_not_in_the_program =
+                compare_one_device(&second_instance, identity, &with_the_raise);
+            assert!(!raise_not_in_the_program.matches);
+            assert_eq!(
+                field(&raise_not_in_the_program.line, "divergence_window"),
+                Some(AFTER_THE_PROGRAM),
+                "{}",
+                raise_not_in_the_program.line
             );
         }
     }

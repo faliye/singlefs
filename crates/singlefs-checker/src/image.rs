@@ -34,12 +34,12 @@ pub enum InvariantVerdict {
 }
 
 /// 第一版 checker 判的不变量，按这个次序报；每次都全部报出来，没评估到的报「不适用」。
-pub const IMPLEMENTED_INVARIANTS: [&str; 41] = [
+pub const IMPLEMENTED_INVARIANTS: [&str; 46] = [
     "I-1.1", "I-1.2", "I-1.3", "I-1.4", "I-1.6", "I-1.7", "I-1.8", "I-1.10", "I-2.1", "I-2.3",
     "I-2.4", "I-2.5", "I-3.1", "I-3.8", "I-3.9", "I-3.10", "I-3.11", "I-4.2", "I-4.8", "I-5.1",
-    "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.3", "I-7.4", "I-7.6", "I-7.7", "I-7.8", "I-8.6",
-    "I-8.7", "I-8.8", "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13",
-    "I-9.14",
+    "I-5.2", "I-5.4", "I-7.1", "I-7.2", "I-7.3", "I-7.4", "I-7.6", "I-7.7", "I-7.8", "I-7.9",
+    "I-7.10", "I-7.11", "I-8.6", "I-8.7", "I-8.8", "I-8.9", "I-9.1", "I-9.2", "I-9.4", "I-9.6",
+    "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
 ];
 
 /// 判定累加器：每条不变量记评估了几次、第一处违例、以及整条不适用的理由。
@@ -204,6 +204,77 @@ pub fn verified_system_configuration_slots(
             (device, slot_zero.into_iter().chain(slot_one).collect())
         })
         .collect()
+}
+
+/// 一个自证过的系统配置槽里的回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」）：哪块盘、槽世代号、解出来的条目或解不开的那一样。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RollbackWitnessOfASlot {
+    pub device: u32,
+    pub slot_generation: u64,
+    pub witness: Result<Vec<crate::RollbackWitnessEntryView>, &'static str>,
+}
+
+/// 每盘两槽里自证过的系统配置槽各自的回退见证表（读法与 `verified_system_configuration_slots` 相同：槽 1 按槽 0 记的槽距找）。
+/// 条数上限按那一槽自述的 R、S 算（R × S − 1）。
+#[must_use]
+pub fn rollback_witness_of_every_verified_slot(
+    reader: &dyn ImageReader,
+) -> Vec<RollbackWitnessOfASlot> {
+    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut witnesses = Vec::new();
+    for device in reader.devices() {
+        let slot_zero = reader.read(device, 0, slot_bytes);
+        let spacing = slot_zero
+            .as_deref()
+            .and_then(parse_system_configuration_slot)
+            .map_or(
+                FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
+                |(_, geometry)| geometry.slot_spacing,
+            );
+        let slot_one = reader.read(device, spacing, slot_bytes);
+        for bytes in [slot_zero, slot_one].into_iter().flatten() {
+            let Some((view, geometry)) = parse_system_configuration_slot(&bytes) else {
+                continue;
+            };
+            witnesses.push(RollbackWitnessOfASlot {
+                device,
+                slot_generation: view.slot_generation,
+                witness: crate::rollback_witness_of_system_configuration_slot(
+                    &bytes,
+                    (geometry.regions * geometry.slots_per_region).saturating_sub(1),
+                ),
+            });
+        }
+    }
+    witnesses
+}
+
+/// 一个池此刻的回退见证：每块盘上见证表解得开的槽里世代号最大的那一槽的条目，各盘取并集（与实现同一个读法：解不开见证表的槽
+/// 在实现那边就是读不出的槽，不参与择槽）。
+#[must_use]
+pub fn rollback_witness_of_the_pool(
+    slots: &[RollbackWitnessOfASlot],
+) -> Vec<crate::RollbackWitnessEntryView> {
+    let mut chosen_per_device: BTreeMap<u32, (u64, &Vec<crate::RollbackWitnessEntryView>)> =
+        BTreeMap::new();
+    for slot in slots {
+        let Ok(entries) = &slot.witness else {
+            continue;
+        };
+        let is_newer = chosen_per_device
+            .get(&slot.device)
+            .is_none_or(|(generation, _)| slot.slot_generation > *generation);
+        if is_newer {
+            chosen_per_device.insert(slot.device, (slot.slot_generation, entries));
+        }
+    }
+    let mut union: Vec<crate::RollbackWitnessEntryView> = chosen_per_device
+        .values()
+        .flat_map(|(_, entries)| entries.iter().copied())
+        .collect();
+    union.sort_unstable();
+    union.dedup();
+    union
 }
 
 /// 每盘择一个系统配置：两槽里世代号大的那一份（相等取槽 0）。

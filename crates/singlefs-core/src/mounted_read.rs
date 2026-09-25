@@ -17,29 +17,35 @@
 //!   记录条数要等于文件大小按 D4（校验和位置） 已定项 5 的除法算出来的单元数；对不上就拒绝打开这个文件，不猜。
 //!   于是「第 i 条记录就是文件第 i 个数据单元」这件事由 key 本身担保，解引用时再核单元头的锚点偏移与 key 相等。
 //!
-//! extent 树的节点只在打开时读（[`MountedPoolForRead::extent_tree_reads_at_open`]）：之后按偏移读一个字节都不再碰它，
-//! 顺序读 M 个单元时 extent 节点的读取次数 ≤ 树高 + 叶数（里程碑「第二个事务」并行线一验收第 2 条）。
+//! extent 树按需读（D8（核心索引结构） 已定项 14「挂载怎么读」，用户 K4）：打开池时不读它，打开一个文件时从上段根按 inode 号的位置
+//! 走到它那一条叶条目、再把它的下段整段读下来（内联的就是那一个数据指针）——[`OpenFileForRead::extent_tree_reads_at_open`]；
+//! 之后按偏移读一个字节都不再碰它，顺序读 M 个单元时 extent 节点的读取次数 ≤ 树高 + 叶数（里程碑「第二个事务」并行线一验收第 2 条）。
 
 use std::cell::Cell;
 
-use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, MAPPING_KEY_BYTES, NODE_BYTES};
+use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, NODE_BYTES};
 
 use crate::address::{
     DataUnitIndexInFile, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
 };
 use crate::checksum::crc32_castagnoli;
+use crate::code_two_tree::{read_code_two_tree, CodeTwoTreeHeaderJudgement};
+use crate::extent_tree::{
+    extent_key_bytes, find_upper_leaf_entry, read_lower_segment, ExtentTreeHeaderJudgement,
+    ExtentTreeReading, ExtentUpperLeafTarget,
+};
 use crate::pointer::{DataPointer, LocationEntry, NodePointer};
 use crate::records::{
-    mapping_key_for_data, parse_extent_record, parse_inode_internal_entry, parse_mapping_entry,
-    InodeRecord, TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE,
+    mapping_key_for_data, parse_inode_internal_entry, parse_mapping_entry, InodeRecord,
+    TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE,
 };
 use crate::recovery::{
     choose_root, choose_system_configuration, read_mapped_tree_node_via_hint_then_central_mapping,
-    read_mapped_tree_root, read_tree_root, read_unit_via_locations, replay_journal,
-    rollback_high_water_of_root, scan_journal, JournalScanReport, MappedTreeNodeClass, PoolReader,
-    RecoveryFailure,
+    read_mapped_tree_root, read_unit_via_locations, replay_journal, rollback_high_water_of_root,
+    scan_journal, JournalScanReport, MappedTreeNodeClass, PoolReader, RecoveryFailure,
 };
 use crate::root_record::RootRecord;
+use crate::transaction::MultiLevelCodeTwoTree;
 use crate::unit::{
     data_unit_payload, data_unit_payload_capacity, parse_data_unit, parse_index_node,
     parse_packed_unit, unit_filesystem_identifier, DataUnitHeader, UnitError, PACKED_TYPE_INODE,
@@ -50,19 +56,9 @@ use crate::write_request_split::data_unit_count_of_a_sequential_write;
 const EXTENT_KEY_INODE_SEGMENT_OFFSET_IN_BYTES: usize = 8;
 /// extent 叶记录 key 第三段（offset 段，文件字节偏移，D8（核心索引结构） 已定项 3）的起点。
 const EXTENT_KEY_THIRD_SEGMENT_OFFSET_IN_BYTES: usize = 16;
-/// extent 树的根兼叶层级：第一版一棵树只有一个节点，记录直接装在根里（`transaction::build_file_version_units`）。
-const EXTENT_TREE_ROOT_LEVEL: u8 = 0;
-/// 中央映射树的根兼叶层级：第一版同样只有一个节点，55 字节的映射条目直接装在根里。
-/// 挂载态把这一片**整个**读进内存，于是解引用时查映射不再发设备读——[`OpenFileForRead::read_at`] 报的
-/// `device_reads_issued` 是按这个前提算的（提示过期的一次解引用 = 两条提示各试一次 + 映射落点一次 = 3）。
-/// 映射长到根成了内部节点的那天这条前提不再成立，第一版不走树：在这里拒绝，不把内部条目当映射条目解
-/// （D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」：整片读、多层拒绝打开，第一版的限制；
-/// 那一维正是已定项 5 自陈零测量的缓存命中维，C418（位置权威三臂的缓存命中维零测量））。
-const CENTRAL_MAPPING_TREE_ROOT_LEVEL: u8 = 0;
 /// inode 树根的层级：根是内部节点，每条条目指一片码 3 叶容器（D8（核心索引结构） 已定项 6）。
 const INODE_TREE_ROOT_LEVEL: u8 = 1;
-/// extent 叶记录 key 宽 24，inode 树 key 宽 8（`recovery::key_width_for_kind` 同一份登记）。
-const EXTENT_KEY_WIDTH_IN_BYTES: usize = 24;
+/// inode 树 key 宽 8（`recovery::key_width_for_kind` 同一份登记）。
 const INODE_KEY_WIDTH_IN_BYTES: usize = 8;
 
 /// 读路径的运行时观测点：并行线二验收第 4 条要的两个数（这次读了几个单元、位置提示过期的多跳次数），
@@ -202,13 +198,6 @@ pub enum OpenPoolForReadFailure {
         expected_level: u8,
         found_level: u8,
     },
-    /// 中央映射树长成了多层（根不是根兼叶）：第一版挂载态把映射整片读进来、之后查映射不发读，
-    /// 多层映射第一版不支持，拒绝打开（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）。
-    /// 在读映射树根之后、读任何别的单元之前返回。
-    CentralMappingWithMoreThanOneLevelIsNotSupportedInTheFirstVersion {
-        mapping_tree: TreeIdentifier,
-        mapping_root_level: u8,
-    },
     /// 读回来的单元解不开（头坏了、载荷校验和不对、补齐非零）。
     UnitMalformed {
         what: &'static str,
@@ -233,6 +222,9 @@ impl From<RecoveryFailure> for OpenPoolForReadFailure {
 pub enum OpenFileFailure {
     /// inode 树里没有这个号。
     NoSuchInode { inode: InodeNumber },
+    /// 按位置走 extent 树（上段到这个 inode 的叶条目、再到它的下段）时读不到、解不开或位置核不过
+    /// （`extent_tree::find_upper_leaf_entry` / `read_lower_segment` 的判定，与冷启动走读同一套口径）。
+    ExtentTreeWalk(RecoveryFailure),
     /// 这个 inode 的第 `unit_index_in_file` 条 extent 叶记录，key 的 offset 段不是那个单元第一个字节的文件偏移
     /// （`unit_index_in_file` × 净荷容量，D8（核心索引结构） 已定项 3）：记录错位、有洞，或 offset 段写成了单元序号。
     /// 报第一处对不上的那一条；不按位次猜着往下读。
@@ -296,18 +288,25 @@ pub struct FileReadOutput {
     pub observation: ReadPathObservation,
 }
 
-/// 打开挂载态时沿 extent 树读了几个节点，与这棵树的高度、叶片数（里程碑「第二个事务」并行线一验收第 2 条的观测点）。
+/// 打开一个文件时沿 extent 树读了几个节点，与这一路的高度、叶片数（里程碑「第二个事务」并行线一验收第 2 条的观测点）。
 /// 打开之后按偏移读一个 extent 节点都不再读 ⇒ 顺序读 M 个单元时 extent 节点的读取次数就是 `node_reads`，
-/// 验收要它 ≤ `height + leaves`，不是每个单元从 inode 重走一遍。第一版 extent 树只有一个节点（根兼叶；长出内部节点那一档
-/// 写侧在落盘之前拒掉，`transaction::PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided`）。
+/// 验收要它 ≤ `height + leaves`，不是每个单元从 inode 重走一遍。按位置寻址的两段（D8（核心索引结构） 已定项 14）：
+/// 上段从根走到这个 inode 那一片叶，一层读一个；下段整段读（内联时没有下段）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ExtentTreeReadsAtOpen {
     /// 打开时向块层要过几个 extent 树节点（每读一个节点算一次，不按位置条目数）。
     pub node_reads: u64,
-    /// 树高：根的层级加一（层级 0 是叶）。
+    /// 这一路的高：上段的高加这个文件下段的高（内联时下段是 0）。
     pub height: u64,
-    /// 叶片数：读到的层级 0 的节点个数。
+    /// 叶片数：读到的层级 0 的节点个数（上段那一片叶加下段的叶）。
     pub leaves: u64,
+}
+
+/// 打开挂载态时读中央映射树读了几个节点（每个节点一次，不按位置条目数）与树高（根的层级加一）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CentralMappingTreeReadsAtOpen {
+    pub node_reads: u64,
+    pub height: u64,
 }
 
 /// 挂载态：池打开之后留在内存里的派生态（D21（权威态与派生态的分界））。**不存数据单元的载荷**——
@@ -316,12 +315,13 @@ pub struct MountedPoolForRead {
     root: RootRecord,
     filesystem_identifier_in_unit_headers: u64,
     extent_tree: TreeIdentifier,
-    extent_tree_reads_at_open: ExtentTreeReadsAtOpen,
-    /// extent 树根兼叶里的记录，**按盘上次序**（= key 升序，I-9.12（分隔 key 落在孩子区间之外） 那一族由 checker 判）。
-    extent_leaf_records: Vec<ExtentLeafRecordInMountState>,
+    /// extent 树根（上段的根）的指针：树表条目里那一条。打开池时不读 extent 树，打开文件时从它按位置走下去（用户 K4）。
+    extent_tree_root: NodePointer,
     /// inode 树全部叶容器里的记录，按叶序、叶内次序。
     inode_records: Vec<InodeRecord>,
     central_mapping_entries: Vec<CentralMappingEntryInMountState>,
+    /// 打开时读进来的中央映射树有几个节点、多高（D19（块指针的结构与宽度预算） 已定项 5：多层时整棵读进挂载态）。
+    central_mapping_tree_reads_at_open: CentralMappingTreeReadsAtOpen,
     observation_since_open: Cell<ReadPathObservation>,
     /// 打开这一趟里树节点（extent 树根、inode 树根、inode 叶容器）的位置提示读不出、转去查中央映射的次数
     /// （D19（块指针的结构与宽度预算） 已定项 5 硬规则 3 的观测点；与 [`ReadPathObservation`] 分开数，
@@ -331,14 +331,14 @@ pub struct MountedPoolForRead {
 
 /// 打开挂载态：把根记录到树表条目到两棵用户可见的树这一段读回内存，之后按偏移读不再碰它们。
 ///
-/// 读的次序：中央映射树的根（自举豁免，只按提示读，D19（块指针的结构与宽度预算） 已定项 8）→ 树表（同样豁免）
+/// 读的次序：中央映射树（自举豁免，只按父指针里的位置条目读，D19（块指针的结构与宽度预算） 已定项 8；多层时整棵读进来）→ 树表（同样豁免）
 /// → 树表条目 → extent 树根兼叶 → inode 树根 → 每一片 inode 叶容器。
 ///
 /// **树节点的位置提示读不出时经中央映射回退**（D19（块指针的结构与宽度预算） 已定项 8）：extent 树根、inode 树根、
 /// 每一片 inode 叶容器走 `recovery::read_mapped_tree_node_via_hint_then_central_mapping`，与冷启动走读
 /// （`recovery::walk_to_file`）同一条；查的是这一趟最先读进来的那片映射条目。映射树根与树表是自举豁免，只按提示读。
 ///
-/// 打开这一段发了几次块层读**不由核心层自己数**：这几步走的是恢复路径那几个读者（`read_tree_root`、
+/// 打开这一段发了几次块层读**不由核心层自己数**：这几步走的是恢复路径那几个读者（`code_two_tree::read_code_two_tree`、
 /// `read_unit_via_locations`），它们不带计数。要这个数就在块层数（D17（实现分层与第三方管道） 已定项 5 射程 ①：
 /// 录制钩子挂在块设备接口上），装置侧的计数器在 `singlefs_harness::read_tally`。
 /// 核心层自己报的那几个数只罩打开之后的每一次读（[`ReadPathObservation`]）。
@@ -353,29 +353,30 @@ pub fn open_pool_for_read(
     let filesystem_identifier_in_unit_headers =
         unit_filesystem_identifier(&root.filesystem_identifier);
 
-    // 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）；它自己不进映射（自举豁免）。
+    // 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）；它的节点都不进映射（自举豁免），只按父指针里的位置条目读。
     // 它不进树表，是哪棵树由根记录里它那条根指针的出生树说（第一个文件版本那次从水位发的号）。
-    let mapping_tree = root.mapping_root.head.birth_tree;
-    let mapping_root = read_tree_root(
-        reader,
-        mapping_tree,
-        usize::try_from(MAPPING_KEY_BYTES).expect("27"),
+    // 多层时整棵读进挂载态（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）：之后解引用查的是这份内存里的条目，
+    // 不再为映射发设备读——[`OpenFileForRead::read_at`] 报的 `device_reads_issued` 按这个前提算
+    // （提示过期的一次解引用 = 两条提示各试一次 + 映射落点一次 = 3，不随映射树有几层变）。每个节点按父条目核层级与区间
+    // （`code_two_tree::read_code_two_tree`，与冷启动走读同一套）。
+    let mapping_tree = read_code_two_tree(
         &root.mapping_root,
+        &MultiLevelCodeTwoTree::CentralMapping.read_expectation(root.mapping_root.head.birth_tree),
+        CodeTwoTreeHeaderJudgement::EveryHeaderAgainstItsReference,
         root,
         filesystem_identifier_in_unit_headers,
+        &mut |pointer: &NodePointer| {
+            read_unit_via_locations(reader, &pointer.locations, node_bytes)
+        },
     )?;
-    if mapping_root.level != CENTRAL_MAPPING_TREE_ROOT_LEVEL {
-        return Err(
-            OpenPoolForReadFailure::CentralMappingWithMoreThanOneLevelIsNotSupportedInTheFirstVersion {
-                mapping_tree,
-                mapping_root_level: mapping_root.level,
-            },
-        );
-    }
-    // 映射条目的宽度是映射树根自述的（`read_tree_root` 只判了它 ≥ key 宽 27）：切到偏移 55 之前判一次，
-    // 窄的报 `RecordMalformed`，不按字段表的固定偏移切下去（panic 面普查 R2）。
-    let mut central_mapping_entries = Vec::with_capacity(mapping_root.entries.len());
-    for entry_bytes in &mapping_root.entries {
+    let central_mapping_tree_node_reads_at_open =
+        u64::try_from(mapping_tree.version.node_count()).expect("节点数");
+    let central_mapping_tree_height_at_open = mapping_tree.version.shape.height();
+    // 映射条目的宽度是映射树叶自述的（读树那一步判过它不窄于 55）：这里仍按条目解，窄的报 `RecordMalformed`，
+    // 不按字段表的固定偏移切下去（panic 面普查 R2）。
+    let mut central_mapping_entries =
+        Vec::with_capacity(mapping_tree.leaf_entries_in_key_order.len());
+    for entry_bytes in &mapping_tree.leaf_entries_in_key_order {
         let (key, locations) =
             parse_mapping_entry(entry_bytes).ok_or(OpenPoolForReadFailure::RecordMalformed {
                 what: "映射条目",
@@ -418,36 +419,9 @@ pub fn open_pool_for_read(
             .map(|entry| entry.locations))
     };
     let mut tree_node_stale_location_hint_hops: usize = 0;
+    // extent 树打开池时不读（D8（核心索引结构） 已定项 14「挂载怎么读」：按需，打开文件时按位置走下去，用户 K4）：
+    // 这里只记下树表条目里它的号与根指针。
     let extent_entry = entry_of_kind(TREE_KIND_EXTENT)?;
-    let extent_root = read_mapped_tree_root(
-        reader,
-        extent_entry.tree,
-        EXTENT_KEY_WIDTH_IN_BYTES,
-        &extent_entry.root,
-        root,
-        filesystem_identifier_in_unit_headers,
-        &central_mapping_locations_of_key,
-        &mut tree_node_stale_location_hint_hops,
-    )?;
-    let extent_tree_node_reads = 1;
-    if extent_root.level != EXTENT_TREE_ROOT_LEVEL {
-        return Err(OpenPoolForReadFailure::TreeLevelUnexpected {
-            tree: extent_entry.tree,
-            expected_level: EXTENT_TREE_ROOT_LEVEL,
-            found_level: extent_root.level,
-        });
-    }
-    let mut extent_leaf_records = Vec::with_capacity(extent_root.entries.len());
-    for record_bytes in &extent_root.entries {
-        let (key, data_unit_pointer) =
-            parse_extent_record(record_bytes).ok_or(OpenPoolForReadFailure::RecordMalformed {
-                what: "extent 叶记录",
-            })?;
-        extent_leaf_records.push(ExtentLeafRecordInMountState {
-            key,
-            data_unit_pointer,
-        });
-    }
 
     let inode_entry = entry_of_kind(TREE_KIND_INODE)?;
     let inode_root = read_mapped_tree_root(
@@ -528,15 +502,13 @@ pub fn open_pool_for_read(
         root: *root,
         filesystem_identifier_in_unit_headers,
         extent_tree: extent_entry.tree,
-        extent_tree_reads_at_open: ExtentTreeReadsAtOpen {
-            node_reads: extent_tree_node_reads,
-            height: u64::from(extent_root.level) + 1,
-            // 根的层级核过是 0（根兼叶）：读到的叶就是根这一片。
-            leaves: 1,
-        },
-        extent_leaf_records,
+        extent_tree_root: extent_entry.root,
         inode_records,
         central_mapping_entries,
+        central_mapping_tree_reads_at_open: CentralMappingTreeReadsAtOpen {
+            node_reads: central_mapping_tree_node_reads_at_open,
+            height: central_mapping_tree_height_at_open,
+        },
         observation_since_open: Cell::new(ReadPathObservation::default()),
         tree_node_stale_location_hint_hops_at_open: u64::try_from(
             tree_node_stale_location_hint_hops,
@@ -586,7 +558,8 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         &records,
         true,
         rollback_high_water_of_root(reader, &chosen_root),
-    );
+    )
+    .map_err(MountReadOnlyFailure::Recovery)?;
     let mounted =
         open_pool_for_read(reader, &effective_root).map_err(MountReadOnlyFailure::Open)?;
     Ok(MountedReadOnly {
@@ -616,10 +589,11 @@ impl MountedPoolForRead {
         self.tree_node_stale_location_hint_hops_at_open
     }
 
-    /// 打开时沿 extent 树读了几个节点、树高、叶片数：之后按偏移读不再碰 extent 树，顺序读 M 个单元的 extent 节点读取次数就是它。
+    /// 打开时把中央映射树读进挂载态读了几个节点、树高：之后解引用查映射一次设备读都不发，多层也一样
+    /// （D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）。
     #[must_use]
-    pub const fn extent_tree_reads_at_open(&self) -> ExtentTreeReadsAtOpen {
-        self.extent_tree_reads_at_open
+    pub const fn central_mapping_tree_reads_at_open(&self) -> CentralMappingTreeReadsAtOpen {
+        self.central_mapping_tree_reads_at_open
     }
 
     /// 挂载态里这一版的 inode 记录（按叶序、叶内次序）。
@@ -628,32 +602,99 @@ impl MountedPoolForRead {
         &self.inode_records
     }
 
-    /// 挂载态里这一版的 extent 叶记录（按盘上次序）。
-    #[must_use]
-    pub fn extent_leaf_records(&self) -> &[ExtentLeafRecordInMountState] {
-        &self.extent_leaf_records
-    }
-
-    /// 打开一个文件：从挂载态里挑出它的 inode 记录与它的数据单元记录，当场核位次定位的前提。
+    /// 打开一个文件：从挂载态里挑出它的 inode 记录，再按位置走 extent 树拿它的数据单元记录（D8（核心索引结构） 已定项 14「挂载怎么读」：
+    /// extent 树按需读，用户 K4）——上段从根按 inode 号的位置走到它那一片叶、取它那一条叶条目（`extent_tree::find_upper_leaf_entry`），
+    /// 标签 1 就把它的下段整段读下来（`extent_tree::read_lower_segment`），标签 2 就是内联的那一个数据指针，标签 0 与缺席一个单元都没有。
+    /// 每个节点按位置核（与冷启动走读同一套），提示读不出经中央映射回退（查的是打开池时读进来的那份映射条目，不再发设备读）。
+    /// 读完当场核位次定位的前提。
     ///
     /// # Errors
-    /// 见 [`OpenFileFailure`]：没有这个 inode / 记录不是按 key 升序 / 记录条数与文件大小算出的单元数对不上。
-    pub fn open_file(&self, inode: InodeNumber) -> Result<OpenFileForRead<'_>, OpenFileFailure> {
+    /// 见 [`OpenFileFailure`]：没有这个 inode / 走 extent 树读不到或核不过 / 记录条数与文件大小算出的单元数对不上。
+    pub fn open_file(
+        &self,
+        reader: &dyn PoolReader,
+        inode: InodeNumber,
+    ) -> Result<OpenFileForRead<'_>, OpenFileFailure> {
         let inode_record = self
             .inode_records
             .iter()
             .find(|record| record.inode == inode.0)
             .copied()
             .ok_or(OpenFileFailure::NoSuchInode { inode })?;
-        let data_unit_records: Vec<ExtentLeafRecordInMountState> = self
-            .extent_leaf_records
-            .iter()
-            .filter(|record| record.inode_number() == inode)
-            .copied()
+        let reading = ExtentTreeReading {
+            tree: self.extent_tree,
+            judgement: ExtentTreeHeaderJudgement::EveryHeaderAgainstItsReference,
+            root: &self.root,
+            expected_filesystem_identifier: self.filesystem_identifier_in_unit_headers,
+        };
+        let central_mapping_locations_of_key =
+            |mapping_key: &[u8]| Ok(self.central_mapping_lookup(mapping_key));
+        let mut tree_node_stale_location_hint_hops: usize = 0;
+        let mut node_reads: u64 = 0;
+        let mut read_node = |pointer: &NodePointer| {
+            node_reads += 1;
+            read_mapped_tree_node_via_hint_then_central_mapping(
+                reader,
+                pointer,
+                MappedTreeNodeClass::IndexNode,
+                &central_mapping_locations_of_key,
+                &mut tree_node_stale_location_hint_hops,
+            )
+        };
+        let (entry, upper_nodes_read) =
+            find_upper_leaf_entry(&reading, &self.extent_tree_root, inode.0, &mut read_node)
+                .map_err(OpenFileFailure::ExtentTreeWalk)?;
+        // 上段每一层读一个节点（叶那一片在内），所以上段的高就是这一路读的上段节点数。
+        let upper_height = upper_nodes_read;
+        let (data_pointers, lower_height, lower_leaves): (Vec<(u64, DataPointer)>, u64, u64) =
+            match entry.map(|found| found.target) {
+                None | Some(ExtentUpperLeafTarget::NoDataUnit) => (Vec::new(), 0, 0),
+                Some(ExtentUpperLeafTarget::InlineDataUnit(pointer)) => (vec![(0, pointer)], 0, 0),
+                Some(ExtentUpperLeafTarget::LowerSegmentRoot(lower_root)) => {
+                    let segment = read_lower_segment(
+                        &reading,
+                        inode.0,
+                        &lower_root,
+                        &mut read_node,
+                        &mut std::collections::BTreeSet::new(),
+                    )
+                    .map_err(OpenFileFailure::ExtentTreeWalk)?;
+                    let lower_height = segment
+                        .nodes
+                        .last()
+                        .map_or(0, |(position, _, _)| u64::from(position.level) + 1);
+                    let lower_leaves = u64::try_from(
+                        segment
+                            .nodes
+                            .iter()
+                            .filter(|(position, _, _)| position.level == 0)
+                            .count(),
+                    )
+                    .expect("叶片数");
+                    (segment.data_pointers, lower_height, lower_leaves)
+                }
+            };
+        let extent_tree_reads_at_open = ExtentTreeReadsAtOpen {
+            node_reads,
+            height: upper_height + lower_height,
+            leaves: 1 + lower_leaves,
+        };
+        let payload_capacity = payload_capacity_in_bytes();
+        let data_unit_records: Vec<ExtentLeafRecordInMountState> = data_pointers
+            .into_iter()
+            .map(|(unit, data_unit_pointer)| {
+                let key: [u8; 24] =
+                    extent_key_bytes(inode.0, unit.saturating_mul(payload_capacity))
+                        .try_into()
+                        .expect("extent key 24 字节");
+                ExtentLeafRecordInMountState {
+                    key,
+                    data_unit_pointer,
+                }
+            })
             .collect();
         // 第 i 条记录的 offset 段要等于第 i 个单元第一个字节的文件偏移（D8（核心索引结构） 已定项 3）：
         // 于是「第 i 条记录 = 文件第 i 个数据单元」由 key 本身担保，读的时候按单元序号取记录。
-        let payload_capacity = payload_capacity_in_bytes();
         for (position, record) in data_unit_records.iter().enumerate() {
             let unit_index_in_file =
                 DataUnitIndexInFile(u64::try_from(position).expect("单元序号"));
@@ -686,6 +727,11 @@ impl MountedPoolForRead {
             mount: self,
             inode_record,
             data_unit_records,
+            extent_tree_reads_at_open,
+            tree_node_stale_location_hint_hops_at_open: u64::try_from(
+                tree_node_stale_location_hint_hops,
+            )
+            .expect("多跳次数不超过这一趟读的节点数"),
         })
     }
 
@@ -709,6 +755,8 @@ pub struct OpenFileForRead<'mount> {
     inode_record: InodeRecord,
     /// 第 i 项就是文件第 i 个数据单元（位次定位，前提在 [`MountedPoolForRead::open_file`] 里核过）。
     data_unit_records: Vec<ExtentLeafRecordInMountState>,
+    extent_tree_reads_at_open: ExtentTreeReadsAtOpen,
+    tree_node_stale_location_hint_hops_at_open: u64,
 }
 
 impl OpenFileForRead<'_> {
@@ -716,6 +764,25 @@ impl OpenFileForRead<'_> {
     #[must_use]
     pub const fn inode_record(&self) -> InodeRecord {
         self.inode_record
+    }
+
+    /// 打开这个文件时沿 extent 树读了几个节点、这一路的高、叶片数：之后按偏移读不再碰 extent 树，
+    /// 顺序读 M 个单元的 extent 节点读取次数就是它。
+    #[must_use]
+    pub const fn extent_tree_reads_at_open(&self) -> ExtentTreeReadsAtOpen {
+        self.extent_tree_reads_at_open
+    }
+
+    /// 打开这个文件那一趟里 extent 树节点的位置提示读不出、经中央映射回退的次数（D19（块指针的结构与宽度预算） 已定项 5 硬规则 3）。
+    #[must_use]
+    pub const fn tree_node_stale_location_hint_hops_at_open(&self) -> u64 {
+        self.tree_node_stale_location_hint_hops_at_open
+    }
+
+    /// 这个文件按位次排好的数据单元记录（第 i 项是文件第 i 个数据单元）。
+    #[must_use]
+    pub fn data_unit_records(&self) -> &[ExtentLeafRecordInMountState] {
+        &self.data_unit_records
     }
 
     /// 这个文件有几个数据单元。

@@ -10,6 +10,7 @@
 //! sha256 是 FIPS 180-4 给这个算法起的名字，不是我们的缩写；值与仓外 `sha256sum` 打出来的逐字相同。
 
 use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
+use singlefs_core::rollback_witness::RollbackWitnessTable;
 use singlefs_core::root_ring::RootRingSlotsPerRegion;
 use singlefs_core::system_configuration::{
     SlotBytesByMutability, SystemConfiguration, SystemImmutableConfiguration, SystemImmutableSizes,
@@ -41,6 +42,8 @@ fn system_configuration_at_mkfs() -> SystemConfiguration {
             journal_tail: 0,
             journal_instance: InstanceGeneration(0),
         },
+        // 没回退过：见证表空，槽内 481 之后那 753 字节全 0，两个摘要照旧（分类与见证表都不改这些样本的字节）。
+        rollback_witness: RollbackWitnessTable::EMPTY,
     }
 }
 
@@ -71,6 +74,8 @@ fn system_configuration_after_the_first_transaction() -> SystemConfiguration {
             journal_tail: 3,
             journal_instance: InstanceGeneration(1),
         },
+        // 没回退过：见证表空，槽内 481 之后那 753 字节全 0，两个摘要照旧（分类与见证表都不改这些样本的字节）。
+        rollback_witness: RollbackWitnessTable::EMPTY,
     }
 }
 

@@ -1,8 +1,9 @@
 //! 里程碑「第二个事务」增补 2 收口表第 62 行（C533（记录新根段缺实例表与分配记录树两个根指针））：复现，只坐实、不修。
 //!
 //! 历史：只做过 mkfs 的池 → 可写挂载（取号 1、不写行、零单元发布 txg 1、暖机 txg 2）→ 进程退出 → 再可写挂载：取号 2，
-//! 写行那次发布在树表 0 条的一版上另写实例表与一片分配记录节点（D16（发布语义） 已定项 9），txg 3、jsn 3——
-//! 崩在这次发布的记录落盘之后、根槽落盘之前 → 重开。
+//! 写行那次发布在树表 0 条的一版上另写实例表与一棵分配记录树（D16（发布语义） 已定项 9；按位置寻址，D8（核心索引结构） 已定项 14：
+//! 4 GiB 两块盘上五个节点），txg 3、jsn 3——崩在这次发布的记录落盘之后、根槽落盘之前 → 重开。
+//! 下文说的「那两个单元」指实例表与分配记录树（后者是五个节点），一共六个单元。
 //!
 //! 这条用例钉住今天的样子，逐条对着收口表第 62 行要问的几样：
 //! - 那两个单元落在哪：写行那次发布取的两个落点，崩溃镜像上两块盘都有、校验和对得上；记录 jsn 3 两份也在。
@@ -83,16 +84,29 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         ),
         (InstanceGeneration(2), CheckpointTxg(3), 3)
     );
+    // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，写行那次写出五个节点
+    // （两块盘各自的叶 61、各自的第 1 层节点 0 与根），加实例表共六个单元。
     assert_eq!(
         row_publish.record.named.len(),
-        2,
-        "写行那次发布点名实例表与分配记录节点两个单元"
+        6,
+        "写行那次发布点名实例表与分配记录树五个节点，六个单元"
     );
-    let instance_table_slot = row_publish.root.instance_table.locations[0].slot;
-    let allocation_record_node_slot =
-        row_publish.root.allocation_record_tree_root.locations[0].slot;
+    let unit_slots_of_the_row_publish = |named: &[singlefs_core::journal::NamedUnit]| {
+        named
+            .iter()
+            .map(|named| {
+                assert_eq!(named.locations[1].slot, named.locations[0].slot, "两盘同槽");
+                named.locations[0].slot
+            })
+            .collect::<Vec<SlotNumber>>()
+    };
+    let slots_of_the_crashed_row_publish = unit_slots_of_the_row_publish(&row_publish.record.named);
+    assert!(slots_of_the_crashed_row_publish
+        .contains(&row_publish.root.instance_table.locations[0].slot));
+    assert!(slots_of_the_crashed_row_publish
+        .contains(&row_publish.root.allocation_record_tree_root.locations[0].slot));
 
-    // 崩溃状态：第二次挂载写出去的写里，根槽写之前的全部持久（取号两写、两个单元各两写、记录两写），根槽与之后的一个都没有。
+    // 崩溃状态：第二次挂载写出去的写里，根槽写之前的全部持久（取号两写、六个单元各两写、记录两写），根槽与之后的一个都没有。
     let operations = formatted.retained_operations();
     let mut base = MemoryPool::with_devices(&BOTH_DEVICES, IMAGE_BYTES);
     base.apply(&operations[..operations_before_the_second_mount]);
@@ -110,17 +124,12 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         .collect();
     assert_eq!(
         persisted_kinds,
-        vec![
-            StepKind::SystemConfigurationSlot,
-            StepKind::SystemConfigurationSlot,
-            StepKind::UnitWrite,
-            StepKind::UnitWrite,
-            StepKind::UnitWrite,
-            StepKind::UnitWrite,
-            StepKind::JournalRecord,
-            StepKind::JournalRecord,
-        ],
-        "根槽写之前是取号两写、两个单元各两写、记录两写"
+        [StepKind::SystemConfigurationSlot; 2]
+            .into_iter()
+            .chain([StepKind::UnitWrite; 12])
+            .chain([StepKind::JournalRecord; 2])
+            .collect::<Vec<_>>(),
+        "根槽写之前是取号两写、六个单元各两写、记录两写"
     );
     let persisted: Vec<bool> = (0..writes.len())
         .map(|write_index| write_index < first_root_write)
@@ -198,7 +207,8 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         &records,
         true,
         rollback_high_water_of_root(&crash_image, &chosen_root),
-    );
+    )
+    .expect("所选根那次发布只有一条记录带末条标志：锚点认得出");
     assert_eq!(rebuilt_root, chosen_root, "重建出来的根就是所选根本身");
     assert_eq!(
         rebuilt_root.instance_table, formatted.genesis.root.instance_table,
@@ -260,38 +270,31 @@ fn c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_nev
         (CheckpointTxg(4), 4),
         "txg 与 jsn 都从环里那条孤记录（txg 3、jsn 3）之后接"
     );
-    let reused: (SlotNumber, SlotNumber) = (
-        rewritten_row_publish.root.instance_table.locations[0].slot,
-        rewritten_row_publish
-            .root
-            .allocation_record_tree_root
-            .locations[0]
-            .slot,
-    );
     assert_eq!(
-        reused,
-        (instance_table_slot, allocation_record_node_slot),
-        "分配器不认得崩掉那次写的两个落点：这次写行取到的正是它们"
+        unit_slots_of_the_row_publish(&rewritten_row_publish.record.named),
+        slots_of_the_crashed_row_publish,
+        "分配器不认得崩掉那次写的六个落点：这次写行取到的正是它们，次序也一样"
     );
     let mut orphan_placements_in_the_rebuilt_records = third_mount
         .allocator
         .records()
         .iter()
-        .filter(|record| {
-            record.slot == instance_table_slot || record.slot == allocation_record_node_slot
-        })
+        .filter(|record| slots_of_the_crashed_row_publish.contains(&record.slot))
         .map(|record| (record.device, record.slot, record.is_released))
         .collect::<Vec<_>>();
     orphan_placements_in_the_rebuilt_records.sort();
+    let mut expected_records: Vec<(DeviceIdentity, SlotNumber, bool)> = BOTH_DEVICES
+        .iter()
+        .flat_map(|device| {
+            slots_of_the_crashed_row_publish
+                .iter()
+                .map(move |slot| (*device, *slot, false))
+        })
+        .collect();
+    expected_records.sort();
     assert_eq!(
-        orphan_placements_in_the_rebuilt_records,
-        vec![
-            (DeviceIdentity(0), instance_table_slot, false),
-            (DeviceIdentity(0), allocation_record_node_slot, false),
-            (DeviceIdentity(1), instance_table_slot, false),
-            (DeviceIdentity(1), allocation_record_node_slot, false),
-        ],
-        "挂载之后罩着这两个槽的只有这次写行新记的那几条（两盘各两条、都未释放）"
+        orphan_placements_in_the_rebuilt_records, expected_records,
+        "挂载之后罩着这六个槽的只有这次写行新记的那几条（两盘各六条、都未释放）"
     );
     assert_no_invariant_is_violated(
         &memory_pool_of_sparse_devices(&devices),

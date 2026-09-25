@@ -380,12 +380,14 @@ fn assert_checker_and_record_checker_counts(
     // 与 C374（释放代与树表诞生 txg 只有验收断言盯着） 定案接的两条（I-3.9、I-9.14——这条流上发布 B 起每次发布都重写树表，
     // 跨根比得出来）、代码三方第二轮 Z1-d 之后接的 I-5.4（分配记录罩住的槽互不相交）、代码轮第一轮判定四之后接的
     // I-8.7（实例内事务号不重号——这条流上同一实例发布 A、B 两个承载事务的版本，事务号 1 与 2 比得出来）、
-    // 增补 2 收口第 44 行接的 I-3.10 与岔路 7（G27）立的 I-3.11（已分配减 defer 等于最新根走读——发布 A 起记账树在最新根下面）：
+    // 增补 2 收口第 44 行接的 I-3.10 与岔路 7（G27）立的 I-3.11（已分配减 defer 等于最新根走读——发布 A 起记账树在最新根下面）、
+    // 收口第 46 行接的 I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉——发布 A 起 inode 树在最新根下面）：
     // 阴性结果要与「代码没跑到」分开，每条至少在一个状态上真被评估过；评估过的与报「不适用」的加起来恰是状态数，
-    // 一个状态都不漏记。
+    // 一个状态都不漏记。I-7.9（回退下界 F 不高于抬 F 的上限） 只在抬过 F 的脚本上评估得到，不进这张共用的名单，
+    // 见 `assert_the_rollback_floor_raise_was_judged`。
     for must_evaluate in [
         "I-3.1", "I-5.2", "I-5.1", "I-7.2", "I-2.1", "I-3.8", "I-7.4", "I-4.8", "I-3.9", "I-9.14",
-        "I-5.4", "I-8.7", "I-3.10", "I-3.11",
+        "I-5.4", "I-8.7", "I-3.10", "I-3.11", "I-9.15",
     ] {
         assert!(
             tally
@@ -414,6 +416,22 @@ fn assert_checker_and_record_checker_counts(
             "{invariant} 评估过的状态数 + 不适用的状态数 = 状态数"
         );
     }
+}
+
+/// 抬过 F 的两个脚本（`Script::ReuseAfterRaisingFloor` 与 `Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish`，E 之前把 F 抬到 11）：
+/// I-7.9（回退下界 F 不高于抬 F 的上限，收口表第 26 行）在抬 F 的根（txg 15）落盘之后的状态上真被评估过——阴性结果要与「代码没跑到」分开。
+/// 没抬过 F 的状态（txg 15 的根还没落盘）上它报不适用，共用的那一道已钉住「评估过的 + 不适用的 = 状态数」。
+fn assert_the_rollback_floor_raise_was_judged(tally: &Layer0Tally) {
+    assert!(
+        tally
+            .checker_evaluated_states
+            .get("I-7.9")
+            .copied()
+            .unwrap_or(0)
+            > 0,
+        "I-7.9 至少在一个状态上真被评估过：{}",
+        tally.checker_counts_by_invariant()
+    );
 }
 
 /// 到 C 为止的固定脚本：段序列登记表（layout/01-first-txn.md 八）「装置钉住」的那条数组由 `prepare` 里的断言钉住；层 0 全量与快的那条都在到 D 的脚本上跑。
@@ -496,6 +514,7 @@ fn every_crash_state_outside_the_two_unit_segments_recovers_to_the_version_its_r
     );
     assert!(tally.file_read_states > 0 && tally.no_file_states > 0);
     assert_checker_and_record_checker_clean(&tally);
+    assert_the_rollback_floor_raise_was_judged(&tally);
 }
 
 /// 层 0 按状态序号区间切片、多线程跑（2026-09-18 用户定：测试与崩溃检测优先多线程）：到 E 的固定脚本、平时跑的那 108 个状态，
@@ -621,6 +640,7 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
     );
     assert_eq!(tally.failed_states, 0);
     assert_checker_and_record_checker_clean(&tally);
+    assert_the_rollback_floor_raise_was_judged(&tally);
 }
 
 /// 靶向的阳性对照：把持久集合手工摆成四个形状，oracle、journal 承重、记录核对器各要在它该红的那一格红。
@@ -1216,6 +1236,7 @@ fn stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_
     // 把豁免收严成「更晚那次写也已持久」之后，这 8 个仍然判绿。豁免整个撤回、或者把那个持久判定取反，这条用例就红
     //（`crates/mutations.tsv`）。
     assert_checker_and_record_checker_counts(&tally, &[]);
+    assert_the_rollback_floor_raise_was_judged(&tally);
 
     // 撕裂注入：txg 18 的记录已持久、根槽与系统配置槽没持久，再把它点名的数据单元两份都改坏——施加前验证判失败、恢复停在 E (3, 17)、
     // 验证失败恰为 1 次：陈旧 tail 之后那条点名块已被复用的记录（jsn 3）不进这个计数器，真撕裂与陈旧失配分得开。

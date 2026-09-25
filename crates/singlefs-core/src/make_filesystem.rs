@@ -349,6 +349,8 @@ pub fn make_filesystem<Device: BlockDevice>(
                 journal_tail: 0,
                 journal_instance: instance,
             },
+            // mkfs 之后还没有回退过：见证表空，槽内那 753 字节全 0（第一个事务的字节不变）。
+            rollback_witness: crate::rollback_witness::RollbackWitnessTable::EMPTY,
         };
         let slot = system_configuration.to_slot();
         for slot_index in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {

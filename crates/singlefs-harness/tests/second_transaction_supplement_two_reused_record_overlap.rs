@@ -9,6 +9,8 @@
 //! 两块 4 GiB 内存盘，mkfs → 第一个文件 →「可写挂载 → 覆盖写 2 次」× 7 → 第 8 次可写挂载 → 覆盖写 1 次（txg 38，inode 叶容器
 //! 两槽落在 50320，50320 与 50321 上各一条跨 1 的已回收记录）→ 第 9、10 次可写挂载。覆盖写的内容与写入时刻照探针取。
 //! 改之前：txg 38 那次之后 50320 跨 2 与 50321 跨 1 两条记录重叠，第 9 次挂载在 `allocator.rs` 的 `mark_allocated` 断言上 panic。
+//! 分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）每次发布多写几个节点，落点整体后移：同一条历史里换跨度的复用仍在 txg 38，
+//! 落在 50332（50332 与 50333 上各一条跨 1 的已回收记录，草稿副本上沿这条历史逐次覆盖写查出来的）。
 
 mod common;
 
@@ -107,8 +109,11 @@ fn record_at(
     allocator.record_for(device, SlotNumber(slot)).copied()
 }
 
+/// txg 38 那次覆盖写换跨度复用的那一槽：它与下一槽上各一条跨 1 的已回收记录，两槽的 inode 叶容器落在它上面。
+const SPAN_CHANGING_REUSE_SLOT: u64 = 50332;
+
 /// 验收：攻方那条历史走完，第 9、10 次可写挂载都成功；每次挂载与每次覆盖写之后 I-5.4 都成立。txg 38 那次覆盖写正是复用时换跨度的那一次：
-/// 之前 50320、50321 两块盘上各一条跨 1 的已释放记录，之后 50320 那条改写成跨 2、代 38，50321 那条删掉。
+/// 之前 50332、50333 两块盘上各一条跨 1 的已释放记录，之后 50332 那条改写成跨 2、代 38，50333 那条删掉。
 #[test]
 fn reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_and_the_ninth_mount_succeeds(
 ) {
@@ -140,7 +145,7 @@ fn reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_
             let is_the_span_changing_reuse = mount_number == 8;
             if is_the_span_changing_reuse {
                 for device in DISKS {
-                    for slot in [50320u64, 50321] {
+                    for slot in [SPAN_CHANGING_REUSE_SLOT, SPAN_CHANGING_REUSE_SLOT + 1] {
                         let record = record_at(&allocator, device, slot).unwrap_or_else(|| {
                             panic!("盘 {device:?} 槽 {slot} 在 txg 38 之前有记录")
                         });
@@ -163,7 +168,8 @@ fn reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_
             if is_the_span_changing_reuse {
                 assert_eq!(current.root.checkpoint_txg, CheckpointTxg(38));
                 for device in DISKS {
-                    let rewritten = record_at(&allocator, device, 50320).expect("50320 那条改写了");
+                    let rewritten = record_at(&allocator, device, SPAN_CHANGING_REUSE_SLOT)
+                        .expect("换跨度复用的那一槽那条改写了");
                     assert_eq!(
                         (
                             rewritten.span_slots,
@@ -171,12 +177,13 @@ fn reusing_two_reclaimed_one_slot_records_for_a_two_slot_unit_leaves_no_overlap_
                             rewritten.is_released
                         ),
                         (2, CheckpointTxg(38), false),
-                        "盘 {device:?}：50320 那条改写成这次的分配、跨 2"
+                        "盘 {device:?}：{SPAN_CHANGING_REUSE_SLOT} 那条改写成这次的分配、跨 2"
                     );
                     assert_eq!(
-                        record_at(&allocator, device, 50321),
+                        record_at(&allocator, device, SPAN_CHANGING_REUSE_SLOT + 1),
                         None,
-                        "盘 {device:?}：50321 那条被新记录罩住，随这次分配删掉"
+                        "盘 {device:?}：{} 那条被新记录罩住，随这次分配删掉",
+                        SPAN_CHANGING_REUSE_SLOT + 1
                     );
                 }
             }

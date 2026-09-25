@@ -14,6 +14,9 @@ use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes, InodeNumber,
     InstanceGeneration, TreeIdentifier,
 };
+use singlefs_core::allocation_record_tree::{
+    AllocationRecordTreeNode, AllocationRecordTreeNodePosition,
+};
 use singlefs_core::allocator::{unit_area_slots_of_device, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::journal::back_chain_of;
@@ -27,7 +30,8 @@ use singlefs_core::records::TREE_KIND_ALLOCATION;
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_root, choose_system_configuration,
     highest_tree_identifier_watermark_in_the_ring, readable_roots, recover, replay_journal,
-    scan_journal, tree_table_has_no_entries, JournalPolicy, RecoveryFailure, RecoveryOutcome,
+    scan_journal, tree_table_has_no_entries, walk_to_file, JournalPolicy, RecoveryFailure,
+    RecoveryOutcome,
 };
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
@@ -406,7 +410,7 @@ fn the_read_only_mount_after_rolling_back_to_a_warm_up_root_finds_the_central_ma
     );
     let file = mounted
         .mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&image, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
     let output = file
         .read_at(
@@ -651,7 +655,7 @@ fn slots_of(output: &TransactionOutput, device: DeviceIdentity) -> BTreeSet<u64>
 }
 
 /// 验收第一条：回退行 (1, 3, 0)、中间实例行 (2, 0, 0)；D 的根 (3, 9)、jsn 9（接在环里最大的 jsn 8 之后，C340 取 P2）、事务号 0、反向链 0，
-/// 重写实例表 + 四个固定点单元；暖机一次落到另一块盘；一条记录都不施加；冷启动读回第一次的内容；被抛弃根独占的槽逐盘 34 个、
+/// 重写实例表 + 四个固定点单元；暖机一次落到另一块盘；一条记录都不施加；冷启动读回第一次的内容；被抛弃根独占的槽逐盘 54 个、
 /// D 与暖机一个都不落在上面；checker 全绿（I-3.1 的并集按实例表把被抛弃的根排除，I-3.8 看见回退行）。
 #[test]
 fn rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_row_and_cold_start_reads_the_first_content(
@@ -702,10 +706,25 @@ fn rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_r
         (InstanceGeneration(3), CheckpointTxg(9), 9, 0, 0),
         "D：txg = max(根环 8, 记录 8) + 1；jsn 接在环里最大的 8 之后（C340 取 P2，被抛弃的记录一条不盖）；本实例第一条反向链 0"
     );
+    // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：D 这一版的账里有被抛弃的 B、C 那几次发布之后才用到的槽（叶 62），
+    // 写行那次两块盘各重写叶 61、叶 62、第 1 层那一个与根，先叶后根。
+    let allocation_record_tree_node = |level: u8, device: u32, index_in_device: u64| {
+        TransactionUnit::AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition {
+            level,
+            device: DeviceIdentity(device),
+            index_in_device,
+        })
+    };
     assert_eq!(
         rollback_publish.rewritten,
         vec![
             TransactionUnit::InstanceTable,
+            allocation_record_tree_node(0, 0, 61),
+            allocation_record_tree_node(0, 0, 62),
+            allocation_record_tree_node(0, 1, 61),
+            allocation_record_tree_node(0, 1, 62),
+            allocation_record_tree_node(1, 0, 0),
+            allocation_record_tree_node(1, 1, 0),
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
             TransactionUnit::MappingTree,
@@ -724,17 +743,18 @@ fn rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_r
     assert_ne!(region_device(9), region_device(10));
     assert_eq!(warm_up.record.counter, 10);
 
-    // 影子账：被抛弃的根 B、(2, 5)、(2, 6)、(2, 7)、C 引用而 A 不引用的槽——B 10、写行 6、暖机 4 + 4、C 10 = 34 个槽，逐盘。
+    // 影子账：被抛弃的根 B、(2, 5)、(2, 6)、(2, 7)、C 引用而 A 不引用的槽——B 14、写行 10、暖机 8 + 8、C 14 = 54 个槽，逐盘
+    // （每次发布连分配记录树五个节点，D8（核心索引结构） 已定项 14）。
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
         let abandoned: BTreeSet<u64> = slots_of(&third, device)
             .difference(&slots_of(rollback_publish, device))
             .copied()
             .collect();
-        assert_eq!(abandoned.len(), 34, "盘 {device:?} 上只被被抛弃根引用的槽");
-        // 影子账按窄读法只隔离这 34 个：mkfs 实例表那 2 个槽 A（候选）与 B 都引用，不在其内。
+        assert_eq!(abandoned.len(), 54, "盘 {device:?} 上只被被抛弃根引用的槽");
+        // 影子账按窄读法只隔离这 54 个：mkfs 实例表那 2 个槽 A（候选）与 B 都引用，不在其内。
         assert!(
-            output.isolated_slots_per_device.contains(&(device, 34)),
-            "隔离的槽数 = 只被被抛弃根引用的 34 个 {:?}",
+            output.isolated_slots_per_device.contains(&(device, 54)),
+            "隔离的槽数 = 只被被抛弃根引用的 54 个 {:?}",
             output.isolated_slots_per_device
         );
         for publish in std::iter::once(rollback_publish).chain(
@@ -776,9 +796,10 @@ fn rolling_back_to_the_first_root_writes_the_rollback_row_and_the_intermediate_r
     );
     let verdicts = check_pool_image(&image);
     for (invariant, verdict) in &verdicts {
-        if *invariant == "I-8.8" {
+        if *invariant == "I-8.8" || *invariant == "I-7.9" {
             // 一事务一条、每条都带提交标记：I-8.8（前缀里的事务不被切开） 的 ③ ④ 没有对象，报不适用
-            // （判别力在 `checker_known_bad_images.rs`）。
+            // （判别力在 `checker_known_bad_images.rs`）。这段历史没抬过 F：I-7.9（回退下界 F 不高于抬 F 的上限） 没有抬 F 的根可判，
+            // 报不适用（回退那条根带的是恢复算出的 F_生效，不算抬；阳性对照与坏镜像同在 `checker_known_bad_images.rs`）。
             assert!(
                 matches!(verdict, InvariantVerdict::NotApplicable(_)),
                 "{invariant} 在回退之后的镜像上报不适用：{verdict:?}"
@@ -842,11 +863,33 @@ fn rolling_back_onto_an_abandoned_timeline_or_a_missing_root_is_refused() {
     }
 }
 
+/// 被抛弃的 C 那条根 (2, 8) 从盘上读出来，沿它走到文件（`recovery::walk_to_file`：恢复择到一条根之后走的同一段；
+/// C 之上没有实例 2 的记录要施加）。回退见证（D23（journal 的角色与格式） 已定项 14「回退见证」）让恢复不再择它；
+/// 它仍是影子账要护的对象：回退那一次挂载崩在写行的根落了、轮换还没落的那一格（post 写序认下的窗口），回退实例的根又全读不出时，
+/// 恢复择的就是它（`second_transaction_supplement_two_rollback_witness.rs` 的 Z9-B 那条用例 m = 0 那一格）。
+fn walk_to_the_file_under_the_abandoned_root_c(
+    reader: &dyn singlefs_core::recovery::PoolReader,
+) -> Result<Option<Vec<u8>>, RecoveryFailure> {
+    let system_configuration = choose_system_configuration(reader).expect("系统配置");
+    let root_c = readable_roots(
+        reader,
+        &system_configuration.immutable.region_devices,
+        &system_configuration.immutable.sizes,
+        &system_configuration.immutable.filesystem_identifier,
+    )
+    .into_iter()
+    .find(|root| (root.instance, root.checkpoint_txg) == (InstanceGeneration(2), CheckpointTxg(8)))
+    .expect("C 的根 (2, 8) 还在根环里、读得出");
+    walk_to_file(reader, &root_c, &mut 0)
+}
+
 /// C314（回退可以复用被抛弃的根引用的单元） 那一格的必红，影子账开关强制进入：关掉影子账，回退之后再发两版文件，
-/// 数据单元落回 B 与 C 的数据槽（50182、50184）；把实例 3 的四个根槽都改坏，恢复挂上 C 的根 (2, 8)，它的数据单元已被盖掉，读不出第三次的内容。
-/// 影子账开着：两版数据落 50186、50188，同样改坏四个根槽之后恢复挂上 C 的根、第三次的内容原样读回。
+/// 数据单元落回 B 与 C 的数据槽（50182、50184）；沿 C 的根 (2, 8) 走到文件，它的数据单元已被盖掉，读不出第三次的内容。
+/// 影子账开着：两版数据落 50186、50188，沿 C 的根走到文件、第三次的内容原样读回。
+/// 把实例 3 的四个根槽都改坏之后，恢复不再挂上 C：回退见证 (3, 1, 3) 抛弃 B、C（D23（journal 的角色与格式） 已定项 14「回退见证」），
+/// 两臂都落到 R_old (1, 3)、读回第一次的内容——实二二三之前恢复挂上的是 C，这条用例在那里判影子账（那时它红在这一处）。
 #[test]
-fn without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_data_slots_and_a_recovery_onto_the_abandoned_root_reads_a_torn_unit(
+fn without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_data_slots_and_the_abandoned_root_reads_a_torn_unit_while_the_witness_keeps_recovery_off_it(
 ) {
     for (shadow_ledger, expected_slots, expect_third_content_readable) in [
         (ShadowLedger::Off, [50182, 50184], false),
@@ -856,7 +899,7 @@ fn without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_da
         let rolled_back = rollback_to_first_root(&mut pool, shadow_ledger);
         // 五条硬要求第 4 条：分支必须可观测。⚠️ 光看 `isolated_slots_per_device` 分不开两臂——
         // `Off` 恒 0，而 `On` 在「没有被抛弃根、或它们引用的槽都还被候选集引用着」时也是 0；
-        // 这条脚本恰好隔离了 34 个，换一段历史就不一定。分支名两臂永远不同。
+        // 这条脚本恰好隔离了 54 个，换一段历史就不一定。分支名两臂永远不同。
         assert_eq!(
             rolled_back.output.shadow_ledger_branch,
             shadow_ledger.branch_name(),
@@ -873,7 +916,7 @@ fn without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_da
             "两臂报的分支名不许相同：相同就等于运行时看不出走了哪一条"
         );
         let expected_isolated = if shadow_ledger == ShadowLedger::On {
-            34
+            54
         } else {
             0
         };
@@ -905,23 +948,26 @@ fn without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_da
             image.flip_byte(region_device(txg), slot_offset(target, 4096), 100);
         }
         let report = recover(&image, JournalPolicy::Consult);
+        assert_eq!(
+            report.outcome,
+            RecoveryOutcome::FileRead {
+                root: (InstanceGeneration(1), CheckpointTxg(3)),
+                content: file_content()
+            },
+            "{shadow_ledger:?}：回退见证抛弃 B、C，实例 3 的根全读不出时恢复落到 R_old (1, 3)"
+        );
+        let walked_under_c = walk_to_the_file_under_the_abandoned_root_c(&image);
         if expect_third_content_readable {
             assert_eq!(
-                report.outcome,
-                RecoveryOutcome::FileRead {
-                    root: (InstanceGeneration(2), CheckpointTxg(8)),
-                    content: third_content()
-                },
-                "影子账开着：C 引用的单元一个没被盖，回到 C 读第三次的内容"
+                walked_under_c,
+                Ok(Some(third_content())),
+                "影子账开着：C 引用的单元一个没被盖，沿 C 的根读回第三次的内容"
             );
         } else {
             assert_ne!(
-                report.outcome,
-                RecoveryOutcome::FileRead {
-                    root: (InstanceGeneration(2), CheckpointTxg(8)),
-                    content: third_content()
-                },
-                "影子账关着：C 的数据单元已被第五版盖掉，第三次的内容读不回来"
+                walked_under_c,
+                Ok(Some(third_content())),
+                "影子账关着：C 的数据单元已被第五版盖掉，沿 C 的根读不回第三次的内容"
             );
         }
     }
@@ -945,13 +991,15 @@ fn root_ring_slots_of_the_rollback_instance() -> NamedRootRingSlots {
 /// 与同一个文件里那条用 `flip_byte` 改坏根槽的用例分工不同：那条造的是「读得出、自证不过」（字节坏了），
 /// 这条造的是「读返回失败」（介质错），而且**持续**——第一版没有根环槽的重定位
 /// （C335（根槽持续读不出时实例表只增不减）），读不出的槽永远读不通，重试一遍还是读不出。
-/// C332（回退实例两个根都读不出时回退被撤销） 要的正是这一形：回退实例的根在两块盘上都读不出时，
-/// 恢复退到被抛弃时间线上的根 (2, 8)，回退被静默撤销。
+/// C332（回退实例两个根都读不出时回退被撤销） 要的正是这一形：回退实例的根在两块盘上都读不出。回退见证（D23（journal 的角色与格式）
+/// 已定项 14「回退见证」，C332 的修法）之后恢复不再退到被抛弃时间线上的根 (2, 8)：见证 (3, 1, 3) 抛弃 B、C，两臂都落到 R_old (1, 3)、
+/// 读回第一次的内容，两遍结论逐字相同（实二二三之前退到的是 C，这条用例在那里红）。
 ///
-/// 影子账关着：回退之后两版数据落回 B 与 C 的数据槽，退到 C 的根时它的数据单元已被盖掉 ⇒ 读不回第三次的内容（红）。
-/// 影子账开着：同样的四个槽全读不出，退到 C 的根照样把第三次的内容原样读回（绿）。判别力自证就是这两遍的差。
+/// 影子账那一半改成沿 C 的根直接走到文件（`walk_to_the_file_under_the_abandoned_root_c`；恢复择 C 的那一格见那个函数的注释）：
+/// 影子账关着：回退之后两版数据落回 B 与 C 的数据槽，C 的数据单元已被盖掉 ⇒ 读不回第三次的内容；
+/// 影子账开着：C 引用的单元一个没被盖，第三次的内容原样读回。判别力自证就是这两遍的差。
 #[test]
-fn with_the_shadow_ledger_off_and_every_root_of_the_rollback_instance_unreadable_the_recovery_falls_back_onto_the_abandoned_root_and_reads_a_torn_unit(
+fn with_the_shadow_ledger_off_and_every_root_of_the_rollback_instance_unreadable_the_witness_keeps_recovery_on_the_rollback_target_and_the_abandoned_root_reads_a_torn_unit(
 ) {
     for (shadow_ledger, expect_third_content_readable) in
         [(ShadowLedger::Off, false), (ShadowLedger::On, true)]
@@ -998,19 +1046,26 @@ fn with_the_shadow_ledger_off_and_every_root_of_the_rollback_instance_unreadable
 
         let outcome = recover(&unreadable, JournalPolicy::Consult).outcome;
         let refused_after_the_first_recovery = unreadable.reads_refused();
-        let read_back_onto_the_abandoned_root = RecoveryOutcome::FileRead {
-            root: (InstanceGeneration(2), CheckpointTxg(8)),
-            content: third_content(),
-        };
+        assert_eq!(
+            outcome,
+            RecoveryOutcome::FileRead {
+                root: (InstanceGeneration(1), CheckpointTxg(3)),
+                content: file_content(),
+            },
+            "{shadow_ledger:?}：回退见证抛弃 B、C，四条根读不出之后恢复落到 R_old (1, 3)、读回第一次的内容"
+        );
+        let walked_under_c = walk_to_the_file_under_the_abandoned_root_c(&unreadable);
         if expect_third_content_readable {
             assert_eq!(
-                outcome, read_back_onto_the_abandoned_root,
-                "影子账开着：C 引用的单元一个没被盖，四条根读不出之后退到 C 读第三次的内容"
+                walked_under_c,
+                Ok(Some(third_content())),
+                "影子账开着：C 引用的单元一个没被盖，沿 C 的根读回第三次的内容"
             );
         } else {
             assert_ne!(
-                outcome, read_back_onto_the_abandoned_root,
-                "影子账关着：C 的数据单元已被回退之后那两版盖掉，退到 C 读不回第三次的内容"
+                walked_under_c,
+                Ok(Some(third_content())),
+                "影子账关着：C 的数据单元已被回退之后那两版盖掉，沿 C 的根读不回第三次的内容"
             );
         }
         // 持续：同一份镜像再恢复一遍，拦下的读数接着涨、结论逐字相同（一次瞬时错顶不上 C335 的论证）。
@@ -1063,7 +1118,8 @@ fn the_rollback_row_caps_the_prefix_of_the_chosen_roots_instance_at_its_high_wat
             &records,
             true,
             high_water,
-        );
+        )
+        .expect("所选根那次发布只有一条记录带末条标志：锚点认得出");
         assert_eq!(
             (report.prefix_applied, effective.checkpoint_txg.0),
             (expected_applied, expected_txg),
@@ -1106,8 +1162,9 @@ fn rolling_back_keeps_the_abandoned_records_in_the_ring_and_a_plain_remount_keep
     assert_eq!(remounted.output.instance, InstanceGeneration(4));
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 34), (DeviceIdentity(1), 34)],
-        "按 D 那一版实例表判被抛弃的根（B、实例 2 的四条）引用的槽，普通重开照样隔离"
+        vec![(DeviceIdentity(0), 54), (DeviceIdentity(1), 54)],
+        "按 D 那一版实例表判被抛弃的根（B、实例 2 的四条）引用的槽，普通重开照样隔离：B 14、写行 10、两次暖机各 8、C 14 \
+         （每次发布连分配记录树五个节点，D8（核心索引结构） 已定项 14）"
     );
     assert_eq!(remounted.output.abandoned_roots_unreadable, 0);
     // 被抛弃根引用的槽：B 的数据 50182–50183、C 的数据 50184–50185 与它们的节点（隔离），以及 mkfs 实例表 50176–50177
@@ -1151,8 +1208,8 @@ fn torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount()
     // C 独占的槽（它的数据 2 + 它的节点）罩不到；B、写行与暖机那些照旧隔离。
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 24), (DeviceIdentity(1), 24)],
-        "少了只被 C 引用的 10 个槽"
+        vec![(DeviceIdentity(0), 40), (DeviceIdentity(1), 40)],
+        "少了只被 C 引用的 14 个槽"
     );
 }
 
@@ -1238,18 +1295,18 @@ fn write_unit_to_every_location(
 
 /// panic 面普查 R7（被抛弃根那棵账里的槽号与跨度 ⇒ `DeviceFreeMap::isolate` 的跨度断言）：
 /// 影子账把**被抛弃根**那棵账里的每条记录原样喂进 `PoolAllocator::isolate_abandoned`，而那棵账是盘上读来的。
-/// 这里把被抛弃根 C 那棵账里第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」，链上五道校验和逐道重算——
+/// 这里把被抛弃根 C 那棵账最左那片叶的第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」，链上校验和逐道重算——
 /// 少重算一道，`allocation_records_under_root` 在读单元那一步就先拒了，坏法打不到要打的那一处。
 ///
-/// 钉三样：**一、挂载不 panic**（这样的记录在进分配器之前由 `recovery::allocation_records_fit_the_pool_geometry`
-/// 判掉，返回 `AllocationRecordOutsideThePoolGeometry`）；二、C 因此被计成一条「账读不出的被抛弃根」，挂载照样成功
-/// （与树表撕裂那一条同一条口径：一条被抛弃根的账坏了不能让每次挂载都失败）；三、只被 C 引用的槽因此罩不到，
-/// 隔离数与树表撕裂那一条相同。
+/// 钉三样：**一、挂载不 panic**（这样的记录在进分配器之前判掉，返回 `AllocationRecordOutsideThePoolGeometry`）；
+/// 二、C 因此被计成一条「账读不出的被抛弃根」，挂载照样成功（与树表撕裂那一条同一条口径：一条被抛弃根的账坏了不能让每次挂载都失败）；
+/// 三、只被 C 引用的槽因此罩不到，隔离数与树表撕裂那一条相同。
 ///
-/// 这条用例钉的是**那道判与这条调用链接上了**：把那道跨度判删掉，挂载就在 `isolate` 的
-/// `assert!(end <= self.allocated.len(), "跨度越过单元区末尾")` 上 panic
-/// （2026-09-22 在副本上实测过；起点不挪到单元区末尾的话这一判会被「同盘两条罩同一个槽」那一判遮蔽，
-/// 删掉它也不红——见 `bad_disk_input::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain` 的注）。
+/// 分配记录树按绝对槽号按位置寻址之后（D8（核心索引结构） 已定项 14），接走这条记录的是读树那一步的叶判：起点不在它所在叶按位置罩的
+/// 那一段里（`allocation_record_tree::read_allocation_record_tree`）。此前钉的是 `recovery::allocation_records_fit_the_pool_geometry`
+/// 里「跨度越过单元区末尾」那一判与这条调用链接上了（删掉它挂载就在 `isolate` 的跨度断言上 panic）；那一判如今只有罩着盘末尾的那片叶
+/// 上的记录够得着，这条坏法打不到它（见 `bad_disk_input::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain`
+/// 的注），交回里写明。
 #[test]
 fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic(
 ) {
@@ -1265,29 +1322,69 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
         .find(|entry| entry.kind == TREE_KIND_ALLOCATION)
         .expect("C 的树表里有分配记录树")
         .root;
+    assert_eq!(
+        Some(allocation_tree_pointer),
+        third
+            .allocation_record_tree
+            .pointer_of(AllocationRecordTreeNode::Root),
+        "树表里那条根指针就是 C 那棵分配记录树的根"
+    );
+    // 从根沿每层第 0 条条目往下的那一路（D8（核心索引结构） 已定项 14：内部条目按孩子那一段的起点升序，第 0 条是盘 0 最低的那一段）：
+    // 根、盘 0 第 1 层第 0 个、盘 0 最低那片叶。
+    let lowest_leaf_of_device_zero = third
+        .allocation_record_tree
+        .nodes
+        .iter()
+        .filter_map(|(node, _)| match node {
+            AllocationRecordTreeNode::BelowTheRoot(position)
+                if position.level == 0 && position.device == DeviceIdentity(0) =>
+            {
+                Some(*node)
+            }
+            AllocationRecordTreeNode::BelowTheRoot(_) | AllocationRecordTreeNode::Root => None,
+        })
+        .min()
+        .expect("盘 0 上至少一片装着记录的叶");
+    let path_pointers: Vec<_> = [
+        AllocationRecordTreeNode::Root,
+        AllocationRecordTreeNode::BelowTheRoot(AllocationRecordTreeNodePosition {
+            level: 1,
+            device: DeviceIdentity(0),
+            index_in_device: 0,
+        }),
+        lowest_leaf_of_device_zero,
+    ]
+    .into_iter()
+    .map(|node| {
+        third
+            .allocation_record_tree
+            .pointer_of(node)
+            .expect("C 那棵树里有这个节点")
+    })
+    .collect();
     let root_slot_position = root_slot_position_of(third.root.checkpoint_txg.0);
     let mut root_slot = read_root_slot(&mut devices, root_slot_position);
     let mut tree_table_node =
         read_unit_at(&mut devices, third.root.tree_table.locations[0], node_bytes);
-    let mut allocation_tree_node = read_unit_at(
-        &mut devices,
-        allocation_tree_pointer.locations[0],
-        node_bytes,
-    );
+    let mut allocation_tree_nodes_from_the_root: Vec<Vec<u8>> = path_pointers
+        .iter()
+        .map(|pointer| read_unit_at(&mut devices, pointer.locations[0], node_bytes))
+        .collect();
 
     let unit_area_end_slot = UNIT_AREA_START_SLOT + unit_area_slots_of_device(IMAGE_BYTES);
     let what = move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain(
         &mut root_slot,
         &mut tree_table_node,
-        &mut allocation_tree_node,
+        &mut allocation_tree_nodes_from_the_root,
         unit_area_end_slot,
     )
-    .expect("C 那棵账是一个非空的叶");
-    write_unit_to_every_location(
-        &mut devices,
-        allocation_tree_pointer.locations,
-        &allocation_tree_node,
-    );
+    .expect("C 那棵账最左那片叶装着记录");
+    for (pointer, bytes) in path_pointers
+        .iter()
+        .zip(&allocation_tree_nodes_from_the_root)
+    {
+        write_unit_to_every_location(&mut devices, pointer.locations, bytes);
+    }
     write_unit_to_every_location(
         &mut devices,
         third.root.tree_table.locations,
@@ -1295,8 +1392,8 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
     );
     write_root_slot(&mut devices, root_slot_position, &root_slot);
 
-    // 先直接钉住那道判交回的**成员**：链上五道校验和都重算过，读得出、解得开，拦着这条记录的只有几何那一判，
-    // 而且是它那四样里的「跨度越过单元区末尾」那一样。少钉这一格，用例在「链没重算全、单元根本读不出来」
+    // 先直接钉住那道判交回的**成员**：链上校验和都重算过，读得出、解得开，拦着这条记录的只有位置那一判
+    // （它不在所在叶按位置罩的那一段里）。少钉这一格，用例在「链没重算全、单元根本读不出来」
     // 那种情形下也照样绿——影子账对「读不出」与「判红」做的是同一件事（只计数）。
     // 根要从盘上重新读回来：`third.root` 是改坏之前那一份，它那条树表指针里的整单元校验和还是旧的。
     let system_configuration = choose_system_configuration(&devices).expect("系统配置");
@@ -1318,10 +1415,10 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
         matches!(
             ledger,
             Err(RecoveryFailure::AllocationRecordOutsideThePoolGeometry {
-                what: "分配记录的跨度越过单元区末尾"
+                what: "分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽"
             })
         ),
-        "C 那棵账该报「跨度越过单元区末尾」，实际交回的是 {ledger:?}（{what}；C 的树表在槽 {:?}、分配记录树根在槽 {:?}）",
+        "C 那棵账该报「不在它所在叶按位置罩的那一段里」，实际交回的是 {ledger:?}（{what}；C 的树表在槽 {:?}、分配记录树根在槽 {:?}）",
         third.root.tree_table.locations.map(|location| location.slot),
         allocation_tree_pointer.locations.map(|location| location.slot)
     );
@@ -1334,7 +1431,7 @@ fn an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_co
     );
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 24), (DeviceIdentity(1), 24)],
-        "只被 C 引用的 10 个槽罩不到，与树表撕裂那一条同一个数"
+        vec![(DeviceIdentity(0), 40), (DeviceIdentity(1), 40)],
+        "只被 C 引用的 14 个槽罩不到，与树表撕裂那一条同一个数"
     );
 }

@@ -104,8 +104,10 @@ fn assert_checker_and_record_checker_clean(tally: &Layer0Tally) {
             tally.checker_first_violation.get(invariant)
         );
     }
+    // I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）：第一个文件那条 inode 记录一落盘（txg 3 的根持久）就判得到。
+    // I-7.9（回退下界 F 不高于抬 F 的上限） 不在这里：这条流上没抬过 F，每个状态都报不适用。
     for must_evaluate in [
-        "I-3.1", "I-3.11", "I-5.2", "I-5.1", "I-5.4", "I-7.2", "I-7.7",
+        "I-3.1", "I-3.11", "I-5.2", "I-5.1", "I-5.4", "I-7.2", "I-7.7", "I-9.15",
     ] {
         assert!(
             tally

@@ -8,6 +8,7 @@
 
 use std::io::Write as _;
 
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_harness::crash_injection::{
     inject_crashes_into_history, run_crash_injection_campaign, CrashInjectionCampaign,
     CrashInjectionReport, CrashInjectionWorkerThreads, CrashPointDraw, FailureImageRetention,
@@ -33,6 +34,7 @@ const FAST_TIER_DRAW: CrashPointDraw = CrashPointDraw::Sampled {
 const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     per_step_checker: PerStepChecker::Skipped,
     device_width: HistoryDeviceWidth::FourGibibytes,
+    space_admission: SpaceAdmission::JudgedByTheFormula,
 };
 
 /// 报告直接写进进程的标准输出，不经 libtest 的捕获：通过时计数照样出现在 `check.sh` 的输出里
@@ -532,6 +534,7 @@ fn crash_injection_large_tier_from_the_environment() {
         execution: HistoryExecution {
             per_step_checker: PerStepChecker::Skipped,
             device_width,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
         },
         worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
         image_retention: FailureImageRetention::KeepTheImageFiles,

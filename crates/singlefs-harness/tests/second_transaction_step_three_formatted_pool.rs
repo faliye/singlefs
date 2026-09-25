@@ -24,7 +24,9 @@ use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::pointer::NodePointer;
 
-use singlefs_core::journal::{back_chain_of, JournalRecordOrdinalWithinPublish};
+use singlefs_core::journal::{
+    back_chain_of, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
+};
 use singlefs_core::make_filesystem::{INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
 use singlefs_core::mount::{
     mount_rollback, mount_writable, InstanceRow, MountError, RollbackTarget, ShadowLedger,
@@ -62,8 +64,17 @@ fn fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(
     }
 }
 
+/// 一次可写挂载里每块盘上第几次读系统配置槽 0 是取号之前的判定那一读（`transaction::instance_generation_to_acquire`）。
+/// 判定之前每块盘各读槽 0 六次：`mount_writable` 择系统配置一次（`recovery::choose_system_configuration`）、择根读回退见证一次
+/// （`recovery::choose_root` → `rollback_witness_of_the_pool`）；重放里择系统配置、读回退见证各一次（`recovery::replay_journal`）；
+/// 重建分配器时择根读一次、影子账再读一次回退见证（`mount::rebuilt_allocator`）。判定之后还有两读：写回退见证表之前读一次
+/// （`mount::rollback_witness_tables_of_this_mount`）、取号写之前重算一次。数法：给读槽 0 的地方各打一行，照这一次挂载的次序数出来的；
+/// 读法变了（多读或少读一次），这个数跟着改，注入点就还是判定那一读。
+const DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT: u64 = 7;
+
 /// 取号之前判定算出的号与取号写之前重算的号不同，取号不写、报错（m2-emptypool-nonempty-r1 云端攻方腿 Z2）：mkfs 之后第一次可写挂载崩在
-/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘第 2 次读系统配置槽 0 各报一次瞬时读错——
+/// 取号两写之后（同一个进程里取号就停、镜像关掉；两盘系统配置槽 0 已是号 1），重开时两块盘在判定那一读上（第 7 次读系统配置槽 0，
+/// `DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT`）各报一次瞬时读错——
 /// 判定那一遍只看到 mkfs 的槽 1（号 0）、算出号 1、要写的行区间为空放行；取号重算读到号 1、算出号 2 ⇒ 返回
 /// `InstanceGenerationChangedBeforeAcquisition { expected: 1, recomputed: 2 }`，`DiskSnapshot` 不变。
 #[test]
@@ -82,7 +93,9 @@ fn transient_system_configuration_read_errors_between_the_refusal_and_the_acquis
     let before = disk_snapshot(&formatted.memory_pool(), &formatted.stream);
     let plan = SharedFaultPlan::armed(
         geometry(),
-        fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(2),
+        fail_the_nth_read_of_system_configuration_slot_zero_on_each_device(
+            DECISION_READ_OF_SYSTEM_CONFIGURATION_SLOT_ZERO_IN_A_WRITABLE_MOUNT,
+        ),
     );
     let mut devices: Vec<(DeviceIdentity, FaultInjectingBlockDevice<_>)> = formatted
         .reopen_recorded()
@@ -160,13 +173,18 @@ fn writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_f
             row.record.back_chain,
             row.record.named.len()
         ),
-        (InstanceGeneration(2), CheckpointTxg(1), 1, 0, 0, 2),
-        "txg 1、jsn 1、事务号 0、本实例第一条反向链 0；点名实例表与分配记录树两个单元"
+        (InstanceGeneration(2), CheckpointTxg(1), 1, 0, 0, 6),
+        "txg 1、jsn 1、事务号 0、本实例第一条反向链 0；点名实例表与分配记录树五个节点（按位置寻址，D8（核心索引结构） 已定项 14）"
     );
     assert_eq!(
         row.record.ordinal_within_publish,
         JournalRecordOrdinalWithinPublish::FIRST,
         "写行那次发布只有这一条记录：本次发布内序号 1（D23（journal 的角色与格式） 已定项 4）"
+    );
+    assert_eq!(
+        row.record.place_in_publish,
+        JournalRecordPlaceInPublish::LastRecordOfThePublish,
+        "写行那次发布只有这一条记录：它就是本次发布末条，记录标志位 0 写 1（D23（journal 的角色与格式） 已定项 17）"
     );
     assert_eq!(
         row.root.tree_table, formatted.genesis.root.tree_table,
@@ -496,28 +514,32 @@ fn region_device(txg: u64) -> DeviceIdentity {
     parameters().region_devices[usize::try_from(target.region).expect("区域号")]
 }
 
-/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 18 条；
-/// 其余 23 条要真被评估过且成立。I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由：最新根下面没有记账树。I-9.14（树表条目的诞生 txg 跨根不变） 在这里报不适用是因为 mkfs 种的第 0 版树表是空的：
+/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 20 条；
+/// 其余 24 条要真被评估过且成立。I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由：最新根下面没有记账树。I-9.14（树表条目的诞生 txg 跨根不变） 在这里报不适用是因为 mkfs 种的第 0 版树表是空的：
 /// 一棵树的条目都没有，跨根比不出来（有了文件版本之后也只有一条根有条目，见 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION`）；
 /// I-5.4（分配记录罩住的槽互不相交） 同一个理由：第 0 版树表里没有分配记录树，候选集里一条根的记录都走不到；
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 也是这个理由。
 /// I-1.10（码 2 条目宽等于字段表宽） 也是这个理由：一条树表条目都没有，就没有哪个码 2 节点的条目宽可比。
 /// I-8.7（实例内事务号不重号） 在这里报不适用是因为环里一条非 0 事务号的记录都没有：写行与暖机的空发布都写 0
 /// （D23（journal 的角色与格式） 已定项 19 ①）。I-8.8（前缀里的事务不被切开） 是因为没有哪个非 0 事务号落了两条记录、
-/// 也没有哪一组一条提交标记都没有。
-const NOT_APPLICABLE_WITHOUT_FILE: [&str; 18] = [
-    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-8.7", "I-8.8", "I-9.1",
-    "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14",
+/// 也没有哪一组一条提交标记都没有。I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉） 与 I-9.7 同一个理由：一条 inode 记录都没有。
+/// I-7.9（回退下界 F 不高于抬 F 的上限） 是因为没抬过 F：每条根带的 F 都是 0（这个文件里哪一步都不抬，下面四张表都有它）。
+const NOT_APPLICABLE_WITHOUT_FILE: [&str; 20] = [
+    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.7", "I-8.8",
+    "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
 ];
 
-/// mkfs 刚写完那一份要多报一条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 没有判的对象。
-/// 可写挂载之后环里有记录（写行 / 暖机的空发布），它就真被评估过了——所以这一条只在 mkfs 之后那一格。
-const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 19] = [
-    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-8.6", "I-8.7", "I-8.8",
-    "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14",
+/// mkfs 刚写完那一份要多报两条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 与
+/// I-8.9（一次发布的记录序号连续且只有末条带标志） 都没有判的对象。
+/// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这两条只在 mkfs 之后那一格。
+const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 22] = [
+    "I-1.10", "I-3.1", "I-3.9", "I-3.10", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.6", "I-8.7",
+    "I-8.8", "I-8.9", "I-9.1", "I-9.2", "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13",
+    "I-9.14", "I-9.15",
 ];
 
-/// 写完第一个文件版本之后仍报不适用的那三条：
+/// 写完第一个文件版本之后仍报不适用的那四条：
+/// I-7.9（回退下界 F 不高于抬 F 的上限）——没抬过 F，没有抬 F 的根可判（坏镜像与阳性对照在 `checker_known_bad_images.rs` 步 5 那段历史上）；
 /// I-9.14——树表条目只出现在这一条根的树表里（mkfs 种的第 0 版树表是空的、两次暖机空发布不写树表），
 /// 它要同一棵树的条目出现在两个树表单元里才比得出来；
 /// I-8.7——这个实例只发过一个承载事务的版本（事务号 1），环里其余记录都是事务号 0 的空发布，
@@ -525,15 +547,17 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 19] = [
 /// I-8.8（前缀里的事务不被切开）——第一版一事务一条、每条都带提交标记，③ ④ 没有对象。
 /// 三条比得出来的镜像都在 `checker_known_bad_images.rs`（再覆盖写一次：树表两版、事务号 1 与 2；
 /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
-const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 3] = ["I-8.7", "I-8.8", "I-9.14"];
+const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 4] = ["I-7.9", "I-8.7", "I-8.8", "I-9.14"];
 
 /// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）
-/// 一条。写行那次发布写了一片分配记录节点、根指针住根记录（C512（树表 0 条的一版上被换下的单元记在哪），D16（发布语义） 已定项 9），
-/// 里面未释放的那几条记录（被换下的 mkfs 那片实例表已带释放标志，归 I-3.9）起点槽上都读得出单元头，I-3.10 在这一格真被评估过。
-/// I-5.4（分配记录罩住的槽互不相交） 仍报不适用：它只从树表条目找分配记录树，不读根记录直接持有的那一片。
-const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 17] = [
-    "I-1.10", "I-3.1", "I-3.9", "I-3.11", "I-5.2", "I-5.4", "I-8.7", "I-8.8", "I-9.1", "I-9.2",
-    "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14",
+/// 与 I-1.10（码 2 条目宽等于字段表宽）两条。写行那次发布写了一棵分配记录树、根指针住根记录（C512（树表 0 条的一版上被换下的单元记在哪），
+/// D16（发布语义） 已定项 9），里面未释放的那几条记录（被换下的 mkfs 那片实例表已带释放标志，归 I-3.9）起点槽上都读得出单元头，
+/// I-3.10 在这一格真被评估过；这棵树按位置寻址（D8（核心索引结构） 已定项 14），checker 从根记录那一项按位置走下去、每个节点判条目宽，
+/// I-1.10 也真被评估过。
+/// I-5.4（分配记录罩住的槽互不相交） 仍报不适用：它只从树表条目找分配记录树，不读根记录直接持有的那一棵。
+const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 18] = [
+    "I-3.1", "I-3.9", "I-3.11", "I-5.2", "I-5.4", "I-7.9", "I-8.7", "I-8.8", "I-9.1", "I-9.2",
+    "I-9.4", "I-9.6", "I-9.7", "I-9.10", "I-9.12", "I-9.13", "I-9.14", "I-9.15",
 ];
 
 /// 这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用，其余每一条都真被评估过且成立（一条违例都没有）。
@@ -612,8 +636,8 @@ fn writable_mount_after_a_crash_between_warm_up_and_the_first_file_writes_the_ro
             row.record.back_chain,
             row.record.named.len()
         ),
-        (CheckpointTxg(3), 3, 0, 0, 2),
-        "txg 3、jsn 3、事务号 0、本实例第一条反向链 0；点名实例表与分配记录树两个单元"
+        (CheckpointTxg(3), 3, 0, 0, 6),
+        "txg 3、jsn 3、事务号 0、本实例第一条反向链 0；点名实例表与分配记录树五个节点（按位置寻址，D8（核心索引结构） 已定项 14）"
     );
     assert_eq!(region_device(3), DeviceIdentity(0), "txg 3 落盘 0");
     assert_eq!(
@@ -1152,8 +1176,8 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
             row.record.back_chain,
             row.record.named.len()
         ),
-        (InstanceGeneration(2), CheckpointTxg(3), 3, 0, 0, 2),
-        "写行那次发布：txg 3、jsn 3、事务号 0、反向链 0、点名实例表与分配记录树两个单元"
+        (InstanceGeneration(2), CheckpointTxg(3), 3, 0, 0, 6),
+        "写行那次发布：txg 3、jsn 3、事务号 0、反向链 0、点名实例表与分配记录树五个节点（按位置寻址，D8（核心索引结构） 已定项 14）"
     );
     assert_eq!(
         row.root.tree_table, formatted.genesis.root.tree_table,
@@ -1180,8 +1204,8 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
     for device_map in &second_mount.allocator.devices {
         assert_eq!(
             (device_map.allocated_slots(), device_map.deferred_slots()),
-            (6, 2),
-            "mkfs 的实例表 2 槽 + 树表 1 槽 + 新写的实例表 2 槽 + 这一版自己那片分配记录树 1 槽（C512）；换下的 2 槽在 defer 队列里"
+            (10, 2),
+            "mkfs 的实例表 2 槽 + 树表 1 槽 + 新写的实例表 2 槽 + 这一版自己那棵分配记录树五个节点 5 槽（C512；按位置寻址，D8（核心索引结构） 已定项 14）；换下的 2 槽在 defer 队列里"
         );
     }
     assert_checker_verdicts(
@@ -1237,19 +1261,26 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
         first_file.root.instance_table, row.root.instance_table,
         "照抄的是写行之后那一版的实例表指针，不是 mkfs 那一版"
     );
+    // 写行那一版自己那棵分配记录树的五个节点（按位置寻址，D8（核心索引结构） 已定项 14）：它那次发布点名的单元里实例表之外的那几个，
+    // 先叶后根；第一个文件版本改的记录都在那两片叶里，五个都重写、都换下。
+    let allocation_record_tree_nodes_of_the_row_version: Vec<Placement> = row
+        .record
+        .named
+        .iter()
+        .map(|named| named.locations[0].slot)
+        .filter(|slot| *slot != row.root.instance_table.locations[0].slot)
+        .map(|slot| Placement { slot, span: 1 })
+        .collect();
+    assert_eq!(allocation_record_tree_nodes_of_the_row_version.len(), 5);
     assert_eq!(
         first_file.released,
-        vec![
-            Placement {
-                slot: TREE_TABLE_GENESIS_SLOT,
-                span: 1
-            },
-            Placement {
-                slot: row.root.allocation_record_tree_root.locations[0].slot,
-                span: 1
-            }
-        ],
-        "换下 mkfs 那片第 0 版树表，加写行那一版自己那片分配记录树（C512）"
+        std::iter::once(Placement {
+            slot: TREE_TABLE_GENESIS_SLOT,
+            span: 1
+        })
+        .chain(allocation_record_tree_nodes_of_the_row_version)
+        .collect::<Vec<_>>(),
+        "换下 mkfs 那片第 0 版树表，加写行那一版自己那棵分配记录树的五个节点（C512）"
     );
 
     // 四、冷启动读回来逐字节相同，行还在。
@@ -1295,10 +1326,11 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
 /// 这次回退把它们抛弃，而它们没有分配记录树——影子账要按根记录那两条指针把它隔离，不然回退这次的新实例表就发在它上面
 /// （2026-09-23 崩溃注入打中的那一格）。
 /// 影子账罩着被抛弃根那片分配记录树节点（D23（journal 的角色与格式） 已定项 14：被抛弃时间线的根离开根环之前，它们引用的单元
-/// 不许重新分配）。同一段历史：第二次可写挂载在树表 0 条的一版上写行（实例 2，txg 3 重写实例表与分配记录树两个单元、txg 4 暖机照抄），
-/// 再回退到 (1, 2)——实例 2 那两条根被抛弃，它们引用的那片实例表（2 槽）与那片分配记录树节点（1 槽，根指针住根记录那一项）
-/// 都只被被抛弃根引用，每块盘隔离 3 槽，那片节点的槽回退之后不空闲；回退那次发布写的实例表与分配记录树一片都不落在它上面。
-/// 只认根记录里实例表与树表两条指针时那片节点每盘少隔离 1 槽，回退之后它是空闲槽。
+/// 不许重新分配）。同一段历史：第二次可写挂载在树表 0 条的一版上写行（实例 2，txg 3 重写实例表与分配记录树、txg 4 暖机照抄），
+/// 再回退到 (1, 2)——实例 2 那两条根被抛弃，它们引用的那片实例表（2 槽）与那棵分配记录树的五个节点（按位置寻址，D8（核心索引结构）
+/// 已定项 14：4 GiB 两块盘上根在第 2 层，两块盘各一片叶、各一个第 1 层节点、根；根指针住根记录那一项）
+/// 都只被被抛弃根引用，每块盘隔离 7 槽，那几个节点的槽回退之后不空闲；回退那次发布写的实例表与分配记录树一片都不落在它们上面。
+/// 只认根记录里实例表与树表两条指针时那五个节点每盘少隔离 5 槽，回退之后它们是空闲槽。
 #[test]
 fn rolling_back_before_any_file_version_isolates_the_allocation_record_node_only_the_abandoned_roots_reference(
 ) {
@@ -1309,20 +1341,30 @@ fn rolling_back_before_any_file_version_isolates_the_allocation_record_node_only
     let mut second = formatted.reopen_recorded();
     let row_written = mount_writable(&parameters(), &mut second).expect("第二次可写挂载：写行");
     formatted.devices = Some(second);
-    let abandoned_node_locations = row_written
-        .current
-        .root()
-        .allocation_record_tree_root
-        .locations;
     assert_ne!(
         row_written.current.root().allocation_record_tree_root,
         NodePointer::empty_root(),
         "写行那次发布把分配记录树的根写进了根记录"
     );
-    let abandoned_node_slot = abandoned_node_locations[0].slot;
+    // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，写行那次写出五个节点（两块盘各自的叶 61、
+    // 各自的第 1 层节点 0 与根），都点名在那次发布的记录里；实例表那一项之外就是它们。
+    let abandoned_instance_table_slot = row_written.current.root().instance_table.locations[0].slot;
+    let abandoned_node_slots: Vec<SlotNumber> = row_written
+        .output
+        .row_publish
+        .record()
+        .named
+        .iter()
+        .map(|named| {
+            assert_eq!(named.locations[1].slot, named.locations[0].slot, "两盘同槽");
+            named.locations[0].slot
+        })
+        .filter(|slot| *slot != abandoned_instance_table_slot)
+        .collect();
     assert_eq!(
-        abandoned_node_locations[1].slot, abandoned_node_slot,
-        "两盘同槽"
+        abandoned_node_slots.len(),
+        5,
+        "写行那次发布写的分配记录树节点：两块盘各一片叶、各一个第 1 层节点、根"
     );
 
     let mut devices = formatted.reopen_recorded();
@@ -1339,30 +1381,42 @@ fn rolling_back_before_any_file_version_isolates_the_allocation_record_node_only
     formatted.devices = Some(devices);
     assert_eq!(
         rolled_back.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 3), (DeviceIdentity(1), 3)],
-        "实例 2 那片实例表 2 槽加那片分配记录树节点 1 槽，逐盘"
+        vec![(DeviceIdentity(0), 7), (DeviceIdentity(1), 7)],
+        "实例 2 那片实例表 2 槽加那五个分配记录树节点 5 槽，逐盘"
     );
     assert_eq!(rolled_back.output.abandoned_roots_unreadable, 0);
     for device_map in &rolled_back.allocator.devices {
-        assert!(
-            !device_map.is_free(abandoned_node_slot),
-            "盘 {:?}：被抛弃根那片分配记录树节点（槽 {abandoned_node_slot:?}）回退之后不空闲",
-            device_map.device
-        );
+        for abandoned_node_slot in &abandoned_node_slots {
+            assert!(
+                !device_map.is_free(*abandoned_node_slot),
+                "盘 {:?}：被抛弃根那棵分配记录树的节点（槽 {abandoned_node_slot:?}）回退之后不空闲",
+                device_map.device
+            );
+        }
     }
     let PoolVersion::WithoutFile(row) = &rolled_back.output.row_publish else {
         panic!("树表 0 条：回退行那次发布仍是「没有文件版本」的一版")
     };
     let instance_table_slot = row.root.instance_table.locations[0].slot;
-    let written_by_the_rollback = [
-        instance_table_slot,
-        SlotNumber(instance_table_slot.0 + 1),
-        row.root.allocation_record_tree_root.locations[0].slot,
-    ];
+    let written_by_the_rollback: Vec<SlotNumber> = row
+        .record
+        .named
+        .iter()
+        .map(|named| named.locations[0].slot)
+        .chain([SlotNumber(instance_table_slot.0 + 1)])
+        .collect();
     assert!(
-        !written_by_the_rollback.contains(&abandoned_node_slot),
-        "回退那次发布写的实例表与分配记录树（槽 {written_by_the_rollback:?}）不落在被抛弃根那片节点（槽 {abandoned_node_slot:?}）上"
+        written_by_the_rollback.contains(&instance_table_slot)
+            && written_by_the_rollback
+                .contains(&row.root.allocation_record_tree_root.locations[0].slot),
+        "回退那次发布点名了它写的实例表与分配记录树的根：{written_by_the_rollback:?}"
     );
+    for abandoned_node_slot in &abandoned_node_slots {
+        assert!(
+            !written_by_the_rollback.contains(abandoned_node_slot),
+            "回退那次发布写的实例表与分配记录树（槽 {written_by_the_rollback:?}）不落在被抛弃根那棵树的节点（槽 {abandoned_node_slot:?}）上"
+        );
+    }
 }
 
 #[test]
@@ -1414,8 +1468,8 @@ fn rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_inst
             row.record.counter,
             row.record.named.len()
         ),
-        (InstanceGeneration(3), CheckpointTxg(5), 5, 2),
-        "txg = 环里最大 4 + 1；jsn 接在环里最大的 4 之后；点名实例表与分配记录树两个单元"
+        (InstanceGeneration(3), CheckpointTxg(5), 5, 6),
+        "txg = 环里最大 4 + 1；jsn 接在环里最大的 4 之后；点名实例表与分配记录树五个节点（按位置寻址，D8（核心索引结构） 已定项 14）"
     );
     assert_ne!(
         row.root.instance_table.locations[0].slot, instance_table_written_by_the_row_publish,

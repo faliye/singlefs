@@ -7,21 +7,27 @@
 use std::io::Write as _;
 
 use singlefs_checker::image::{chosen_system_configurations, valid_roots};
-use singlefs_core::address::CheckpointTxg;
-use singlefs_harness::crash::{MemoryPool, RecordCheck};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
+use singlefs_core::allocator::PlacementRefusal;
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::mount::{mount_writable_with_space_admission, MountError};
+use singlefs_core::transaction::TransactionUnit;
+use singlefs_harness::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use singlefs_harness::crash_injection::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
     allocated_and_walked_bytes, allocation_records_on_the_image_under, classify_failure,
     execute_history, execute_history_observing, execute_history_with, generate_history,
-    raised_floor_lands_only_on_abandoned_roots, run_history_campaign, shrink_to_reproduction,
-    AppliedEffect, ContentChoice, ContentLength, FailureObservation, FailureSignature,
-    FindingShrinking, FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDeviceWidth,
-    HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistoryRun,
-    HistorySeed, HistoryStartingPoint, HistoryTally, MountAllocationComparison, NewFindingReport,
-    PerStepChecker, RecordReuse, RollbackTargetChoice, StepOutcome, StepPosition, KNOWN_RED_FORMS,
+    generate_history_with_weights, raised_floor_lands_only_on_abandoned_roots,
+    run_history_campaign, shrink_to_reproduction, AppliedEffect, ContentChoice, ContentLength,
+    FailureObservation, FailureSignature, FindingShrinking, FloorTargetChoice, GeneratedHistory,
+    GenerationWeights, HistoryDeviceWidth, HistoryEnding, HistoryExecution, HistoryOperation,
+    HistoryOperationKind, HistoryRun, HistorySeed, HistoryStartingPoint, HistoryTally,
+    MountAllocationComparison, NewFindingReport, PerStepChecker, RecordReuse, RollbackTargetChoice,
+    StepOutcome, StepPosition, KNOWN_RED_FORMS,
 };
 use singlefs_harness::model::{ModelCheckpointTxg, ModelInstanceGeneration, ModelRootKey};
-use singlefs_harness::SharedStream;
+use singlefs_harness::{RecordingBlockDevice, SharedStream};
 
 // 下面五段的种子基都是同一个：这个测试周期开头抽一次、抽完在这个周期之内写死的那个数
 // （`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，崩溃注入那个二进制用的是同一个；用户 2026-09-20 定案第 7 条）。
@@ -43,7 +49,7 @@ const ROLLBACK_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const ROLLBACK_SAMPLING_SEEDS: u64 = 48;
 const ROLLBACK_SAMPLING_OPERATIONS_PER_HISTORY: usize = 30;
 
-/// 分配记录墙那一格的取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
+/// 原分配记录墙那一格的取样点：种子区间与每段步数，写死（判出率见那条用例的注释）。
 const WALL_SAMPLING_FIRST_SEED: u64 = SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 const WALL_SAMPLING_SEEDS: u64 = 32;
 const WALL_SAMPLING_OPERATIONS_PER_HISTORY: usize = 150;
@@ -64,7 +70,7 @@ fn the_five_sampling_tiers_start_from_the_test_cycle_seed_base() {
         ("快档", FAST_TIER_FIRST_SEED),
         ("偏向抬 F 之后复用的取样点", REUSE_SAMPLING_FIRST_SEED),
         ("偏向抬 F 之后回退的取样点", ROLLBACK_SAMPLING_FIRST_SEED),
-        ("逼近分配记录墙的取样点", WALL_SAMPLING_FIRST_SEED),
+        ("越过原分配记录墙的取样点", WALL_SAMPLING_FIRST_SEED),
         (
             "小盘上逼近单元区墙的取样点",
             UNIT_AREA_WALL_SAMPLING_FIRST_SEED,
@@ -178,8 +184,9 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
         count_of(&tally.recovery_outcomes, "FileRead") >= 1,
         "冷启动一次都没读回文件"
     );
-    // I-3.11（已分配减 defer 等于最新根走读） 也要在随机历史上真被判成立过：零违例之外，还要分得开「判过、成立」与「全是不适用」。
-    for invariant in ["I-3.1", "I-5.4", "I-3.11"] {
+    // I-3.11（已分配减 defer 等于最新根走读）、I-7.9（回退下界 F 不高于抬 F 的上限） 与 I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）
+    // 也要在随机历史上真被判成立过：零违例之外，还要分得开「判过、成立」与「全是不适用」。
+    for invariant in ["I-3.1", "I-5.4", "I-3.11", "I-7.9", "I-9.15"] {
         assert!(
             tally.invariant_holds.get(invariant).copied().unwrap_or(0) >= 1,
             "checker 一次都没判过 {invariant}（全是不适用）"
@@ -316,15 +323,15 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
     );
 }
 
-/// 分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：比重取 `GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL`，
-/// 种子与步数见常量。墙拒时执行器按 checker 的解析从镜像上数准入基数，真条数 ≤ 812 而实现拒了，模型判对不上。每一步之后照跑池级 checker、
-/// 判红就停（第二轮判决第三节第 3 条：第一轮这一段不跑 checker，走到 812 条要在根环转过之后连发几十次，而攻方两条只有 checker 看得见的
-/// 变异——根环转过之后回收门槛多一代、分配记录过 600 条之后「已分配」少记一槽——在它上面一段都不红）。先判没有新发现（checker 的判红、
-/// 模型对不上、执行器判出的、panic 都算），再核这一路真的跑到了：checker 真的跑过、分配记录墙拒过且模型按真条数放行过——这个数只在放行时加，
-/// 变异下被拒、判红的是分类，不是这条计数。
+/// 原分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：比重取 `GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL`，
+/// 种子与步数见常量。分配记录树按绝对槽号按位置寻址之后（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）没有「一个节点 812 条」那道墙，
+/// 模型也没有那条拒绝理由：越过 812 条之后实现因为分配记录拒一次，模型就判对不上。每一步之后照跑池级 checker、判红就停（第二轮判决第三节
+/// 第 3 条：攻方两条只有 checker 看得见的变异——根环转过之后回收门槛多一代、分配记录过 600 条之后「已分配」少记一槽——要 checker 才看得见）。
+/// 先判没有新发现（checker 的判红、模型对不上、执行器判出的、panic 都算），再核这一路真的跑到了：checker 真的跑过、有一段历史的某一版
+/// 分配记录多于 812 条（多叶的树真的写过、读过、判过）。
 #[test]
-fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_by_the_true_count()
-{
+fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall(
+) {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
         WALL_SAMPLING_FIRST_SEED,
@@ -337,7 +344,7 @@ fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_
     );
     let rendered = report.render();
     print_uncaptured(&format!(
-        "── 随机历史：逼近分配记录墙的取样点 ──\n{rendered}用时 {:.1} 秒\n",
+        "── 随机历史：越过原分配记录墙的取样点 ──\n{rendered}用时 {:.1} 秒\n",
         started.elapsed().as_secs_f64()
     ));
     assert!(
@@ -349,12 +356,9 @@ fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_
         "这一段每一步之后跑池级 checker"
     );
     assert!(
-        report
-            .tally
-            .model_counts
-            .allocation_record_wall_refusals_over_one_node
-            >= 1,
-        "分配记录墙一次都没按真条数放行过（墙那一格没跑到）"
+        report.tally.most_allocation_records_in_one_version > 812,
+        "没有一段历史越过 812 条分配记录（原先那道墙那一格没跑到）：最多 {} 条",
+        report.tally.most_allocation_records_in_one_version
     );
 }
 
@@ -364,6 +368,9 @@ fn allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_node_
 /// 4 GiB 的盘上前四段一次落点拒绝都走不到，攻方把分配器「每块盘上都没有」报成「小盘写满」（只换原因）四段全绿；这里单元区写得满，
 /// 胶水只把「每块盘上都没有」映射成单元区墙，别的原因映射成模型没有的理由、判对不上。先判没有新发现，再核这一路真的跑到了：
 /// 发布里见过「每块盘上都没有」、模型在单元区墙的区间里放行过。
+/// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时这几块小盘上式子先拒，一次落点拒绝都走不到
+/// （准入判着的那一档见 `unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval`）；
+/// 这一档测的是准入放行之后落点仍取不到时那一条兜底拒绝（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））。
 #[test]
 fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device() {
     let started = std::time::Instant::now();
@@ -375,6 +382,7 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
         HistoryExecution {
             per_step_checker: PerStepChecker::Run,
             device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
         },
         worker_threads_by_default(),
         FindingShrinking::ReportSeedsOnly,
@@ -412,6 +420,73 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
     );
 }
 
+/// 同一段取样（两块单元区 256 槽的小盘、逼近单元区墙的比重、同一批种子与步数），空间准入判着（产品路径）：
+/// D28（挂载期承诺量） 已定项 1 的式子接进发布与可写挂载之后（C363 (b) 判决第四节第 2 条），这几块小盘上墙由式子先拒——
+/// 覆盖写被 `PublishError::SpaceAdmissionRefused` 拒、可写挂载在取号之前被 `MountError::SpaceAdmissionRefusedBeforeAcquisition` 拒，
+/// 胶水把两者都映射成模型的单元区墙，模型全在允许拒绝的区间里放行（没有新发现：拒之前一个字节都没写、拒的都在区间里）。
+/// 先判没有新发现，再核这一路真的跑到了：发布与挂载各被式子拒过、模型在区间里放行过；落点那一道一次都没走到（式子先拒）。
+#[test]
+fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval(
+) {
+    let started = std::time::Instant::now();
+    let report = run_history_campaign(
+        UNIT_AREA_WALL_SAMPLING_FIRST_SEED,
+        UNIT_AREA_WALL_SAMPLING_SEEDS,
+        UNIT_AREA_WALL_SAMPLING_OPERATIONS_PER_HISTORY,
+        &GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::UnitAreaOf256Slots,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        },
+        worker_threads_by_default(),
+        FindingShrinking::ReportSeedsOnly,
+    );
+    let rendered = report.render();
+    print_uncaptured(&format!(
+        "── 随机历史：小盘上逼近单元区墙的取样点（空间准入判着） ──\n{rendered}用时 {:.1} 秒\n",
+        started.elapsed().as_secs_f64()
+    ));
+    assert!(
+        report.new_findings.is_empty(),
+        "新发现（checker 的判红、模型、执行器的判定与 panic）：\n{rendered}"
+    );
+    assert!(
+        count_of(
+            &report.tally.refusals_by_member,
+            "PublishError::SpaceAdmissionRefused"
+        ) >= 1,
+        "覆盖写一次都没被空间准入拒过（发布路径那一处没跑到）"
+    );
+    assert!(
+        count_of(
+            &report.tally.refusals_by_member,
+            "MountError::SpaceAdmissionRefusedBeforeAcquisition"
+        ) >= 1,
+        "可写挂载一次都没在取号之前被空间准入拒过（可写挂载那一处没跑到）"
+    );
+    assert_eq!(
+        count_of(
+            &report.tally.refusals_by_member,
+            "PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)"
+        ),
+        0,
+        "准入判着时式子先拒，落点那一道走不到"
+    );
+    assert!(
+        report
+            .tally
+            .model_counts
+            .unit_area_wall_refusals_in_the_interval
+            >= 1,
+        "模型一次都没在单元区墙的区间里放行过（准入拒绝那一格没判过）"
+    );
+    assert!(
+        report.tally.checker_runs > 0,
+        "这一段每一步之后跑池级 checker"
+    );
+}
+
 /// 镜像上最新那条根（按 checker 的读法，(txg, 实例) 最大）的身份。
 fn newest_root_on_the_image(image: &MemoryPool) -> ModelRootKey {
     let geometry = chosen_system_configurations(image)
@@ -428,10 +503,12 @@ fn newest_root_on_the_image(image: &MemoryPool) -> ModelRootKey {
     }
 }
 
-/// 分配记录墙的基数按 checker 的解析从镜像上数（`allocation_records_on_the_image_under`，不看分配器）：一条记录记一个单元、每盘一条、
+/// 分配记录条数按 checker 的解析从镜像上数（`allocation_records_on_the_image_under`，不看分配器）：一条记录记一个单元、每盘一条、
 /// 释放只改写不删（D3（空间分配） 已定项 7）。从 mkfs 起：第 0 代根与零单元写行、暖机那几版树表 0 条、没有分配记录树，数出 0 条；
-/// 第一个文件那一版 20 条（八个单元加 mkfs 的实例表与第 0 版树表，每盘各一条）。从第一个文件起连着覆盖写（回收之前不复用），
-/// 每次每盘加 8 条：36、52、68。
+/// 第一个文件那一版 28 条：七个单元（数据、extent 根、inode 叶、inode 根、记账、映射、树表）加分配记录树五个节点
+/// （D8（核心索引结构） 已定项 14：4 GiB 两块盘上根在第 2 层，每块盘第 1 层一个、单元区起点那片叶一个），加 mkfs 的实例表与第 0 版树表，
+/// 每盘各一条。从第一个文件起连着覆盖写（回收之前不复用；这几次的落点都还在单元区起点那片叶里，分配记录树每次重写那五个节点），
+/// 每次每盘加 12 条：52、76、100。
 #[test]
 fn allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_without_a_file() {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
@@ -462,7 +539,7 @@ fn allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_
     };
     assert_eq!(
         count_after_each_step(&from_make_filesystem),
-        vec![Some(0), Some(0), Some(20)],
+        vec![Some(0), Some(0), Some(28)],
         "起点（txg 0）、挂载的零单元写行与暖机（txg 1、2）、第一个文件（txg 3）"
     );
     let from_the_first_file = GeneratedHistory {
@@ -472,7 +549,198 @@ fn allocation_records_counted_on_the_image_are_one_per_unit_per_device_and_zero_
     };
     assert_eq!(
         count_after_each_step(&from_the_first_file),
-        vec![Some(20), Some(36), Some(52), Some(68)]
+        vec![Some(28), Some(52), Some(76), Some(100)]
+    );
+}
+
+/// 内容为空的覆盖写：每次重写一个数据单元与提交内生块（extent 根、inode 叶与根、记账树、映射树、树表，加分配记录树按位置寻址
+/// 重写的根与装着改了的记录的那几片叶，D8（核心索引结构） 已定项 14），小盘上每盘占 12 至 14 槽。
+const EMPTY_CONTENT_OVERWRITE: HistoryOperation =
+    HistoryOperation::PublishOverwrite(ContentChoice {
+        length: ContentLength::Empty,
+        fill_seed: 0,
+    });
+
+/// 增补 2 收口表第 39 行那一族（取号之前的准入不算落点）：两块单元区 240 槽的小盘，从第一个文件起在 mkfs 那条会话里
+/// 覆盖写 16 次（txg 4–19；分配记录树按位置寻址之后每次多写几个节点，原先是 22 次，D8（核心索引结构） 已定项 14），
+/// 再可写挂载——挂载自己那一串（写行与暖机）拿不到落点。这段历史是单元区墙取样点的比重
+/// （`GenerationWeights::TOWARD_THE_UNIT_AREA_WALL`）在 240 槽上跑出来、收缩到最短的（种子 7463871032432355113 在第 28 步
+/// 撞上「拒绝之前写了盘」）。改之前取号写完、写行那次才被落点拒绝（`MountError::Publish`）：实例代号一去不回、录制流里多了写与屏障，
+/// 模型判「拒绝之前写了盘」。今天取号之前在分配器的拷贝上就取不到，返回 `PlacementRefusedBeforeAcquisitionMountAdmissionUndecided`：
+/// 那一步前后镜像逐字节相同、录制流一步没多，跑完、每一步之后池级 checker 判绿。
+/// 同一份盘面（第 16 次覆盖写之后的镜像）另起两块内存盘直接调 `mount_writable`，钉住成员的每个字段，录制流一步都不许有。
+/// 覆盖写的次数在草稿副本上按 5–39 次扫过：16、17 两档「每一次都做成、挂载那一步被落点拒」，18 次起覆盖写自己先被拒；
+/// 17 次那一档写行那次自己就取不到，16 次这一档写行与第一次暖机都取得到、第二次暖机才取不到——取这一档，钉住预演罩到暖机那几次。
+/// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`，执行器与直接调挂载两处都关）：判着准入时 240 槽的盘上
+/// 覆盖写没到 16 次就被式子拒、挂载在取号之前被式子拒，走不到预演取不到落点那一道——这里测的是准入放行之后那一条兜底拒绝。
+#[test]
+fn a_writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquisition_with_the_disk_unchanged(
+) {
+    const OVERWRITES: usize = 16;
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: std::iter::repeat_n(EMPTY_CONTENT_OVERWRITE, OVERWRITES)
+            .chain(std::iter::once(HistoryOperation::CloseAndMountWritable))
+            .collect(),
+    };
+    let device_width = HistoryDeviceWidth::UnitAreaOf240Slots;
+    let stream = SharedStream::new();
+    let mut images_after_each_step: Vec<MemoryPool> = Vec::new();
+    let mut recorded_steps_after_each_step: Vec<usize> = Vec::new();
+    let run = execute_history_with(
+        &history,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+        },
+        &stream,
+        &mut |observation| {
+            images_after_each_step.push(observation.image.clone());
+            recorded_steps_after_each_step.push(stream.operations().len());
+        },
+    );
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert!(
+        run.outcomes[..OVERWRITES].iter().all(|outcome| matches!(
+            outcome,
+            StepOutcome::Applied(AppliedEffect::Published { .. })
+        )),
+        "{OVERWRITES} 次覆盖写都做成：{:?}",
+        &run.outcomes[..OVERWRITES]
+    );
+    assert_eq!(
+        run.outcomes[OVERWRITES],
+        StepOutcome::Refused {
+            member:
+                "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)"
+                    .to_string()
+        }
+    );
+    assert_eq!(
+        images_after_each_step.len(),
+        OVERWRITES + 2,
+        "起点与每一步各一份镜像"
+    );
+    assert!(
+        images_after_each_step[OVERWRITES] == images_after_each_step[OVERWRITES + 1],
+        "挂载那一步前后镜像逐字节相同"
+    );
+    assert_eq!(
+        recorded_steps_after_each_step[OVERWRITES],
+        recorded_steps_after_each_step[OVERWRITES + 1],
+        "挂载那一步录制流一步没多：一个写、一道屏障都没发"
+    );
+
+    let direct_stream = SharedStream::new();
+    let image_before_the_mount = &images_after_each_step[OVERWRITES];
+    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
+        image_before_the_mount
+            .devices
+            .iter()
+            .map(|(identity, image)| {
+                let mut device = SparseBlockDevice::new(
+                    image_before_the_mount.device_size_in_bytes,
+                    PhysicalBlockSizeInBytes(512),
+                );
+                device.image = image.clone();
+                (
+                    *identity,
+                    RecordingBlockDevice::with_shared_stream(
+                        *identity,
+                        device,
+                        direct_stream.clone(),
+                    ),
+                )
+            })
+            .collect();
+    let refused = mount_writable_with_space_admission(
+        &device_width.parameters(),
+        &mut devices,
+        SpaceAdmission::SkippedByTheTestOnlySwitch,
+    );
+    assert!(
+        matches!(
+            refused,
+            Err(
+                MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
+                    instance_to_acquire: InstanceGeneration(2),
+                    publish_index: 2,
+                    warm_up_publishes_planned: 2,
+                    unit: TransactionUnit::TreeTable,
+                    refusal: PlacementRefusal::NoFreeSlotOnAnyDevice,
+                }
+            )
+        ),
+        "写行那次与第一次暖机在拷贝上都取得到，第二次暖机的最后一个固定点（树表）取不到：{:?}",
+        refused.as_ref().err()
+    );
+    assert!(
+        direct_stream.operations().is_empty(),
+        "在任何写之前返回：{:?}",
+        direct_stream.operations()
+    );
+    for (identity, device) in &devices {
+        assert!(
+            device.inner().image == image_before_the_mount.devices[identity],
+            "盘 {identity:?} 逐字节不变"
+        );
+    }
+}
+
+/// 取号之前在分配器的拷贝上预演那一串（`mount::dry_run_of_the_publishes_after_acquisition`，走的是发布路径落盘之前那一段）要连写行换下的
+/// 落点一起释放：两块单元区 384 槽的小盘，第一个文件之后可写挂载（实例 2），再覆盖写 24 次，此时根环 24 槽正好是回退目标之后连着的
+/// 23 条根加它自己；回退到环里最旧的那条根（实例 3），其余 23 条全被抛弃。写行那次的根正好盖掉回退目标那一槽，环里再没有比它旧的有效根，
+/// 按可再分配谓词当场回收写行换下的那几片，暖机复用它们（真发起来改写了 8 条已回收的记录）。
+/// 拷贝上不释放那几片的话，预演与真发取到的落点分叉——挂载自己的断言判出，或这一串在取号之前就被判「取不到落点」。
+/// 今天回退做成、每一步之后池级 checker 判绿；拷贝上取的与真发的逐次相同由挂载自己断言。
+/// 分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）每次发布多写几个节点，原先那一档（240 槽、覆盖写 21 次）在回退那一步被落点拒；
+/// 这一档是在草稿副本上重扫（盘宽 240 / 256 / 384、覆盖写 18–35 次、回退目标取环里第 22 / 23 新）挑出来的：240 槽上回退一概被拒，
+/// 256 槽上回退到最旧的根一概被拒；384 槽上回退到最旧的根都做成，覆盖写 24 次那一档暖机改写了 8 条已回收的记录（与原先那一档同一个数）。
+/// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时 384 槽的盘上挂载之后第 11 次覆盖写就被式子拒，
+/// 根环凑不满这 24 条根，这一格（预演与真发在根环转满时逐次相同）就造不出来。
+#[test]
+fn rolling_back_to_the_oldest_ring_root_reuses_what_the_row_publish_released_and_is_not_refused_before_acquisition(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: std::iter::once(HistoryOperation::CloseAndMountWritable)
+            .chain(std::iter::repeat_n(EMPTY_CONTENT_OVERWRITE, 24))
+            .chain([
+                HistoryOperation::CloseAndMountRollback(RollbackTargetChoice::RingRoot {
+                    index_from_newest: 23,
+                }),
+                EMPTY_CONTENT_OVERWRITE,
+            ])
+            .collect(),
+    };
+    let run = execute_history_with(
+        &history,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+        },
+        &SharedStream::new(),
+        &mut |_| {},
+    );
+    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
+    assert_eq!(
+        run.outcomes[25],
+        StepOutcome::Applied(AppliedEffect::Mounted {
+            instance: InstanceGeneration(3),
+            publishes: 2,
+            allocation_records_compared: MountAllocationComparison::Compared { publishes: 2 },
+            reuse: RecordReuse {
+                rewritten_from_released: 8,
+                rewritten_with_changed_span: 2,
+                released_records_removed: 0,
+                released_records_covered: 0,
+            },
+        }),
+        "回退做成：写行与一次暖机，暖机复用写行当场回收的那几片"
     );
 }
 
@@ -482,16 +750,15 @@ const RAISE_TO_THE_CURRENT_FLOOR: HistoryOperation =
         steps_above_current_floor: 0,
     });
 
-/// 逼近分配记录墙那三条写死用例共用的覆盖写：内容长度固定在一个数据单元之内，每次重写八个角色、每盘各一条记录。
+/// 越过原分配记录墙那一条写死用例的覆盖写：内容长度固定在一个数据单元之内。
 const WALL_OVERWRITE: HistoryOperation = HistoryOperation::PublishOverwrite(ContentChoice {
     length: ContentLength::InsideOneDataUnit { selector: 2999 },
     fill_seed: 1,
 });
 
-/// 逼近分配记录墙那三条写死用例共用的前缀：从第一个文件（txg 3，20 条）起在 mkfs 同一个进程那条会话里覆盖写 20 次（txg 4–23，
-/// 这一段根环还没转过、每次正好加 16 条，340 条），再连着可写挂载 `mounts` 次（写行与暖机每次加 2 到 26 条，随复用走）。
-/// 之后的覆盖写、抬 F 与回退各由用例接上。根环转过之后，按可再分配谓词回收的槽被之后的发布复用改写（D3（空间分配） 已定项 7：
-/// 释放只改写不删），每一步加几条随复用走——三条用例里的条数都是在今天的代码上逐步量出来钉死的。
+/// 越过原分配记录墙那一条写死用例的前缀（原先逼近墙那三条共用的）：从第一个文件（txg 3）起在 mkfs 同一个进程那条会话里覆盖写 20 次
+/// （txg 4–23，这一段根环还没转过），再连着可写挂载 `mounts` 次。根环转过之后，按可再分配谓词回收的槽被之后的发布复用改写
+/// （D3（空间分配） 已定项 7：释放只改写不删），每一步加几条随复用走。
 fn wall_prefix(mounts: usize) -> impl Iterator<Item = HistoryOperation> {
     std::iter::repeat_n(WALL_OVERWRITE, 20).chain(std::iter::repeat_n(
         HistoryOperation::CloseAndMountWritable,
@@ -499,60 +766,45 @@ fn wall_prefix(mounts: usize) -> impl Iterator<Item = HistoryOperation> {
     ))
 }
 
-/// 分配记录墙的边沿（增补 3 第 2 件代码三方第一轮判决第三节第 1 条，攻方变异 W1 的形态：墙的 `>` 写成 `>=`，正好 812 条也拒）。
-/// 前缀（`wall_prefix`，挂载 9 次：最后一次挂载做完 txg 49、520 条）之后连着覆盖写：第 44 次（txg 93）之后 796 条，
-/// 第 45 次（txg 94）的准入基数 796 + 16 = 812——一个节点正好装满，条款说装得下；它复用改写了 2 条已回收的记录，镜像上 810 条；
-/// 第 46 次要 810 + 16 = 826 条、被墙拒。每一步之后跑池级 checker。今天的代码上这段跑完：812 条那一次做成，
-/// 826 条那一次被拒、模型按镜像上的真条数放行。W1 下 812 条那一次被拒，模型判「模型说该成、实现拒了」。
+/// 原先分配记录墙那三格（覆盖写正好到 812 条、抬 F 的第二次空发布正好到 812 条、回退的第二次暖机正好到 812 条；增补 3 第 2 件
+/// 代码三方第一轮判决第三节第 1 条、第二轮判决第三节第 4 条）拆墙之后（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）并成这一条：
+/// 同样的前缀（`wall_prefix`，挂载 9 次）之后覆盖写 46 次、抬到现行的 F、回退到最新那条根、再覆盖写 5 次，一步都不拒，
+/// 镜像上按 checker 的解析数的分配记录条数越过 812；每一步之后跑池级 checker、模型逐步比（跑完即都对得上）。
+/// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
 #[test]
-fn an_overwrite_that_fills_the_allocation_node_to_exactly_812_records_succeeds_and_the_next_is_refused(
-) {
+fn overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all_succeed() {
     let history = GeneratedHistory {
         seed: HistorySeed(0),
         starting_point: HistoryStartingPoint::AfterFirstFile,
         operations: wall_prefix(9)
             .chain(std::iter::repeat_n(WALL_OVERWRITE, 46))
+            .chain(std::iter::once(RAISE_TO_THE_CURRENT_FLOOR))
+            .chain(std::iter::once(HistoryOperation::CloseAndMountRollback(
+                RollbackTargetChoice::RingRoot {
+                    index_from_newest: 0,
+                },
+            )))
+            .chain(std::iter::repeat_n(WALL_OVERWRITE, 5))
             .collect(),
     };
     let (run, counted_after_each_step) = run_counting_allocation_records_after_each_step(&history);
     assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
-    assert_eq!(
-        (counted_after_each_step[20], counted_after_each_step[29]),
-        (Some(340), Some(520)),
-        "mkfs 那条会话里 20 次覆盖写之后、9 次挂载之后镜像上数的条数"
-    );
-    assert_eq!(
-        counted_after_each_step[73],
-        Some(796),
-        "挂载之后第 44 次覆盖写之后镜像上 796 条"
-    );
+    let refused: Vec<&StepOutcome> = run
+        .outcomes
+        .iter()
+        .filter(|outcome| !matches!(outcome, StepOutcome::Applied(_)))
+        .collect();
+    assert_eq!(refused, Vec::<&StepOutcome>::new(), "一步都不拒");
+    let most_counted = counted_after_each_step
+        .iter()
+        .map(|counted| counted.expect("每一步之后镜像上都数得出最新那条根下的分配记录"))
+        .max()
+        .expect("至少起点那一次");
     assert!(
-        matches!(
-            run.outcomes[73],
-            StepOutcome::Applied(AppliedEffect::Published { .. })
-        ),
-        "挂载之后第 45 次覆盖写的准入正好 812 条，要做成：{:?}",
-        run.outcomes[73]
+        most_counted > 812,
+        "镜像上数的分配记录条数要越过 812，最多 {most_counted} 条"
     );
-    assert_eq!(
-        counted_after_each_step[74],
-        Some(810),
-        "那一次复用改写了 2 条已回收的记录"
-    );
-    assert_eq!(
-        run.outcomes[74],
-        StepOutcome::Refused {
-            member: "PublishError::AllocationRecordsExceedOneNode".to_string()
-        },
-        "第 46 次要 826 条"
-    );
-    assert_eq!(
-        run.tally
-            .model_counts
-            .allocation_record_wall_refusals_over_one_node,
-        1,
-        "模型按镜像上的真条数放行了那一次"
-    );
+    assert!(run.tally.checker_runs > 0, "每一步之后跑池级 checker");
 }
 
 /// 一段写死的历史在 4 GiB 的盘上每一步之后跑池级 checker、跑完，交回每一步之后（含起点）镜像上最新那条根下的分配记录条数。
@@ -572,98 +824,6 @@ fn run_counting_allocation_records_after_each_step(
         },
     );
     (run, counted_after_each_step)
-}
-
-/// 抬 F 那一路逼近分配记录墙（增补 3 第 2 件代码三方第二轮判决第三节第 4 条：攻方变异 m1c「只在抬 F 路径的准入里多算一个角色」在门禁
-/// 32 个种子里只红 1 段，按 32 个一窗切 15 窗有 5 窗一段都不红）。前缀（`wall_prefix`，挂载 9 次）之后覆盖写 44 次（txg 50–93，796 条），
-/// 再抬到现行的 F（0；推 txg 94、95 两次空发布，每次每盘 4 条、都不复用；释放代 ≤ 0 的一条都没有，一个落点都不回收）。
-/// 所以两次空发布的准入基数正好 796、804 条，第二次之后 812 条——一个节点正好装满，条款说装得下。今天的代码上这段跑完、抬 F 做成两次发布；
-/// m1c 下第二次空发布按 804 + 10 = 814 条被拒，模型按镜像上数的真条数（804 + 8）判「模型说该成、实现拒了」。
-/// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
-#[test]
-fn raising_the_floor_with_a_second_empty_publish_that_fills_the_allocation_node_to_exactly_812_records_succeeds(
-) {
-    let history = GeneratedHistory {
-        seed: HistorySeed(0),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: wall_prefix(9)
-            .chain(std::iter::repeat_n(WALL_OVERWRITE, 44))
-            .chain(std::iter::once(RAISE_TO_THE_CURRENT_FLOOR))
-            .collect(),
-    };
-    let (run, counted_after_each_step) = run_counting_allocation_records_after_each_step(&history);
-    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
-    assert_eq!(
-        (counted_after_each_step[20], counted_after_each_step[29]),
-        (Some(340), Some(520)),
-        "mkfs 那条会话里 20 次覆盖写之后、9 次挂载之后镜像上数的条数"
-    );
-    assert_eq!(
-        counted_after_each_step[73],
-        Some(796),
-        "抬 F 之前（它前面第 44 次覆盖写之后）镜像上 796 条"
-    );
-    assert!(
-        matches!(
-            run.outcomes[73],
-            StepOutcome::Applied(AppliedEffect::RaisedFloor {
-                new_floor: CheckpointTxg(0),
-                publishes: 2,
-                ..
-            })
-        ),
-        "抬 F 推两次空发布、第二次之后正好 812 条，要做成：{:?}",
-        run.outcomes[73]
-    );
-    assert_eq!(
-        counted_after_each_step[74],
-        Some(812),
-        "抬 F 之后镜像上正好 812 条"
-    );
-}
-
-/// 回退那一路逼近分配记录墙（同一判决第三节第 4 条：攻方变异 m1d「只在回退路径的准入里多算一个角色」在门禁 32 个种子里只红 1 段，
-/// 15 窗里 7 窗一段都不红）。回退那一串的准入要在最后一次正好到 812 条：一次写行（每盘 5 个角色）加两次暖机（每盘 4 个）时回退目标
-/// 那一版要 786 条。前缀（`wall_prefix`，挂载 8 次：最后一次挂载做完 txg 46、494 条）之后覆盖写 45 次（txg 47–91，786 条），
-/// 回退到最新那条根 (91, 实例 9)：它在回退候选集里、带文件；回退的写行 txg 92、暖机 txg 93、94（txg 92 与 93 都落盘 0），
-/// 取号之前一串算完的准入是 786 + 10 = 796、796 + 8 = 804、804 + 8 = 812 条——一个节点正好装满，条款说装得下。
-/// 今天的代码上这段跑完、回退做成三次发布；m1d 下第二次暖机按 804 + 10 = 814 条在取号之前被拒，模型按镜像上数的回退目标那一版的
-/// 真条数（786 + 10 + 8 + 8）判「模型说该成、实现拒了」。一段历史每一步接着上一步的盘面，不切片并行。
-#[test]
-fn rolling_back_to_a_root_whose_warm_up_fills_the_allocation_node_to_exactly_812_records_succeeds()
-{
-    let history = GeneratedHistory {
-        seed: HistorySeed(0),
-        starting_point: HistoryStartingPoint::AfterFirstFile,
-        operations: wall_prefix(8)
-            .chain(std::iter::repeat_n(WALL_OVERWRITE, 45))
-            .chain(std::iter::once(HistoryOperation::CloseAndMountRollback(
-                RollbackTargetChoice::RingRoot {
-                    index_from_newest: 0,
-                },
-            )))
-            .collect(),
-    };
-    let (run, counted_after_each_step) = run_counting_allocation_records_after_each_step(&history);
-    assert_eq!(run.ending, HistoryEnding::Completed, "{:?}", run.ending);
-    assert_eq!(
-        (counted_after_each_step[20], counted_after_each_step[28]),
-        (Some(340), Some(494)),
-        "mkfs 那条会话里 20 次覆盖写之后、8 次挂载之后镜像上数的条数"
-    );
-    assert_eq!(
-        counted_after_each_step[73],
-        Some(786),
-        "回退目标那一版（挂载之后第 45 次覆盖写，txg 91）镜像上 786 条"
-    );
-    assert!(
-        matches!(
-            run.outcomes[73],
-            StepOutcome::Applied(AppliedEffect::Mounted { publishes: 3, .. })
-        ),
-        "回退写行与两次暖机、准入到 812 条，要做成：{:?}",
-        run.outcomes[73]
-    );
 }
 
 /// 回退到被抛弃时间线上的根（F 还是 0，不低于 F）要拒，理由是「被抛弃」；模型按判别字段比理由（增补 3 第 2 件代码三方第一轮判决
@@ -894,8 +1054,9 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
 /// 「已知红」清单那一条（增补 2 收口表第 43 行）的复现，2026-09-18 在快档种子 80 上撞到、收缩出来的那一段（种子号随生成器的比重变，
 /// 这一段不随）：可写挂载（实例 2，txg 4、5）、覆盖写两次（6、7）、回退到 (2, 7)（实例 3，txg 8–10）、再回退到 (2, 7)（实例 4，
 /// txg 11–13：实例 3 的三条根被抛弃）、覆盖写（14）、可写挂载（实例 5，txg 15、16）、覆盖写三次（17–19）、抬 F 到 8（txg 20–22）。
-/// F = 8 那个 txg 上的根被抛弃了，(2, 7) 落到 F 之下出了候选集，而它的实例表与四个固定点单元（6 槽）在 txg 11 才释放、释放代 11 > 8
-/// 不回收 ⇒ 记账比遍历多 6 × 16384 字节，I-3.1 红。这一条修好之后本用例要红——那时把清单里这一条删掉、这里改成「跑完」。
+/// F = 8 那个 txg 上的根被抛弃了，(2, 7) 落到 F 之下出了候选集，而它写行那次换下的实例表与固定点单元（实例表 2 槽，记账树、映射树、
+/// 树表各 1 槽，加分配记录树按位置寻址那一次重写的几个节点，D8（核心索引结构） 已定项 14；合 12 槽）在 txg 11 才释放、释放代 11 > 8
+/// 不回收 ⇒ 记账比遍历多 12 × 16384 字节，I-3.1 红。这一条修好之后本用例要红——那时把清单里这一条删掉、这里改成「跑完」。
 #[test]
 fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_of_closeout_row_43()
 {
@@ -937,7 +1098,7 @@ fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_
         StepOutcome::Applied(AppliedEffect::RaisedFloor {
             new_floor: CheckpointTxg(8),
             publishes: 3,
-            reclaimed_placements: 26,
+            reclaimed_placements: 42,
             reuse: RecordReuse::default(),
         })
     );
@@ -945,8 +1106,8 @@ fn raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_known_red_form_
         .expect("I-3.1 的违例文字带记账与遍历两个数");
     assert_eq!(
         allocated - walked,
-        6 * 16384,
-        "(2, 7) 的实例表 2 槽与四个固定点单元各 1 槽"
+        12 * 16384,
+        "(2, 7) 的实例表 2 槽、记账树·映射树·树表各 1 槽、分配记录树那一次重写的节点，合 12 槽"
     );
 }
 
@@ -1110,6 +1271,82 @@ fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
     assert!(first_images == second_images, "每一步之后的镜像逐字节相同");
 }
 
+/// 代码三方 `research/prompts/m2-final-code-r3-main-verification.md` 第三节「越格线索」的两个种子（攻方
+/// `research/prompts/m2-final-code-r3-opus-model/rerun.sh` 里 `z13_one_seed` 那一格：比重 `REUSE_AFTER_RAISING_THE_FLOOR`、60 步、
+/// 两块单元区 240 槽的小盘、每一步之后跑池级 checker），空间准入关掉（判着准入时这几块小盘上式子先拒，走不到抬 F 那一串撞墙）。
+/// 两段历史都在一次回退之后把 F 抬进回退留下的空档：种子 4000000045 第 27 步抬到 7（回退目标 (1, 5) 在 F 之下，它那一版被
+/// txg 8 换下的单元释放代 8 > 7 不回收），种子 4000000204 第 31 步抬到 20（回退目标 (3, 18) 在 F 之下，释放代 22 > 20）。
+/// 这一串要推 `publishes_in_the_sequence` 次空发布（种子 4000000045 那一步两次、4000000204 那一步三次），第二次取不到落点。
+/// 改之前逐次发：第一次（带新 F 的根）已经落盘、第二次才被拒，那条落了盘的新 F 让 checker 在那一步判 I-3.1 红、记账比遍历多
+/// 8 × 16384（收口表第 43 行那一形，但这一步不是做成的抬 F，已知红清单不接，判成新发现，历史停在那一步）；
+/// 扣住的槽也留在进程里（C546（抬 F 被拒时扣住的槽不退回） 第二次起那一半）。
+/// 今天这一串在任何写之前整串预演，第二次取不到落点就一次都不发：那一步报 `RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite`、
+/// 盘上一个字节都没动（录制流不多一步，那一步不跑 checker），60 步跑完、每一步之后池级 checker 判绿、模型逐步对得上。
+fn the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+    seed: u64,
+    step_of_the_raise: usize,
+    publishes_in_the_sequence: usize,
+) {
+    let history = generate_history_with_weights(
+        HistorySeed(seed),
+        60,
+        &GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+    );
+    let run = execute_history_with(
+        &history,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::UnitAreaOf240Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+        },
+        &SharedStream::new(),
+        &mut |_| {},
+    );
+    assert!(
+        matches!(
+            history.operations[step_of_the_raise],
+            HistoryOperation::RaiseRollbackFloor(_)
+        ),
+        "种子 {seed} 第 {step_of_the_raise} 步是抬 F"
+    );
+    assert_eq!(
+        run.outcomes.get(step_of_the_raise),
+        Some(&StepOutcome::Refused {
+            member: format!(
+                "MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish 2 of {publishes_in_the_sequence}, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))"
+            ),
+        }),
+        "种子 {seed} 第 {step_of_the_raise} 步：这一串的第二次在预演里取不到落点，一次都不发（历史停在：{:?}）",
+        run.ending
+    );
+    assert_eq!(
+        run.ending,
+        HistoryEnding::Completed,
+        "种子 {seed}：60 步跑完，每一步之后池级 checker 判绿"
+    );
+    assert_eq!(run.outcomes.len(), 60);
+}
+
+#[test]
+fn seed_4000000045_raising_the_floor_into_a_rollback_gap_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+) {
+    the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+        4_000_000_045,
+        27,
+        2,
+    );
+}
+
+#[test]
+fn seed_4000000204_raising_the_floor_into_a_rollback_gap_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
+) {
+    the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(
+        4_000_000_204,
+        31,
+        3,
+    );
+}
+
 /// 大档与收缩用的跑法：checker（`SINGLEFS_RANDOM_HISTORY_CHECKER`：`run` / `skip`，默认 `run`）与盘宽
 /// （`SINGLEFS_RANDOM_HISTORY_DEVICES`：`4gib` / `small`，默认 `4gib`）从环境变量取——门禁里那几段的跑法都能在大档上换种子重跑。
 fn execution_from_the_environment() -> HistoryExecution {
@@ -1132,6 +1369,7 @@ fn execution_from_the_environment() -> HistoryExecution {
     HistoryExecution {
         per_step_checker,
         device_width,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
     }
 }
 

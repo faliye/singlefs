@@ -13,19 +13,43 @@
 
 mod common;
 
-use common::{build_pool, disk_snapshot, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+use common::{
+    build_pool, disk_snapshot, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+};
+use singlefs_checker::check_journal_record;
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration};
+use singlefs_core::address::{
+    CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration,
+};
+use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
 use singlefs_core::inode_tree::{
     leaf_containers_one_root_node_holds, InodeLeafContainerIndexInTree,
 };
+use singlefs_core::journal::record_offset;
 use singlefs_core::records::InodeRecord;
-use singlefs_core::recovery::{rebuild_version, recover, JournalPolicy, RebuiltVersion};
+use singlefs_core::recovery::{
+    rebuild_version, recover, JournalPolicy, PoolReader, RebuiltVersion,
+};
 use singlefs_core::transaction::{
     publish_new_inodes, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
 };
-use singlefs_format::{INODE_LEAF_RECORDS, JOURNAL_NAMED_ENTRIES_PER_RECORD};
+use singlefs_core::unit::unit_filesystem_identifier;
+use singlefs_format::{
+    INODE_LEAF_RECORDS, JOURNAL_NAMED_ENTRIES_PER_RECORD, JOURNAL_RECORD_BYTES,
+    JOURNAL_RING_DEFAULT_BYTES,
+};
+use singlefs_harness::crash::MemoryPool;
+use singlefs_harness::RecordedOperationKind;
+
+/// 分配记录树根之下 (层级, 盘, 同盘同层序号) 那个节点的角色（D8（核心索引结构） 已定项 14：按绝对槽号按位置寻址）。
+fn allocation_record_tree_node(level: u8, device: u32, index_in_device: u64) -> TransactionUnit {
+    TransactionUnit::AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition {
+        level,
+        device: DeviceIdentity(device),
+        index_in_device,
+    })
+}
 
 /// 第一个事务之后树里已有的那一条（inode 1）。建 N 个之后树里共 N + 1 条、水位 N + 2。
 const INODES_BEFORE: u64 = 1;
@@ -130,13 +154,18 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
         "右半出生树 = 执行这次分裂的那棵树"
     );
 
-    // ③ 这次重写了哪些角色：两片叶容器 + inode 根 + 四个固定点单元；数据单元与 extent 树根照抄。
+    // ③ 这次重写了哪些角色：两片叶容器 + inode 根 + 四个固定点单元，加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）
+    // 重写的根之下那几个节点（4 GiB 两块盘上根在第 2 层，改的记录都在两块盘各自的叶 61 里，先叶后根）；数据单元与 extent 树根照抄。
     assert_eq!(
         after.rewritten,
         vec![
             leftmost,
             second_container,
             TransactionUnit::InodeRoot,
+            allocation_record_tree_node(0, 0, 61),
+            allocation_record_tree_node(0, 1, 61),
+            allocation_record_tree_node(1, 0, 0),
+            allocation_record_tree_node(1, 1, 0),
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
             TransactionUnit::MappingTree,
@@ -144,7 +173,7 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
         ],
         "建 inode 不写用户数据：数据单元与 extent 树根这次不重写"
     );
-    assert_eq!(after.record.named.len(), 7, "点名项 = 这次重写的单元数");
+    assert_eq!(after.record.named.len(), 11, "点名项 = 这次重写的单元数");
     for carried in [
         TransactionUnit::Data(DataUnitIndexInFile::FIRST),
         TransactionUnit::ExtentRoot,
@@ -167,6 +196,10 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
         [
             leftmost,
             TransactionUnit::InodeRoot,
+            allocation_record_tree_node(0, 0, 61),
+            allocation_record_tree_node(0, 1, 61),
+            allocation_record_tree_node(1, 0, 0),
+            allocation_record_tree_node(1, 1, 0),
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
             TransactionUnit::MappingTree,
@@ -279,7 +312,7 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
     }
 }
 
-/// 一次只建一个 inode、离 233 还远：树里仍只有一片叶容器，重写的也只有它与根 + 四个固定点单元。
+/// 一次只建一个 inode、离 233 还远：树里仍只有一片叶容器，重写的也只有它与根 + 四个固定点单元（加分配记录树根之下那几个节点）。
 /// 这一档钉住「没跨过门槛就不分裂」——分裂条件写成「≥ 233」或「> 0」时这条红。
 #[test]
 fn creating_one_inode_below_the_threshold_keeps_one_container_and_bumps_the_watermark_by_one() {
@@ -310,6 +343,10 @@ fn creating_one_inode_below_the_threshold_keeps_one_container_and_bumps_the_wate
         vec![
             TransactionUnit::InodeLeafContainer(InodeLeafContainerIndexInTree::LEFTMOST),
             TransactionUnit::InodeRoot,
+            allocation_record_tree_node(0, 0, 61),
+            allocation_record_tree_node(0, 1, 61),
+            allocation_record_tree_node(1, 0, 0),
+            allocation_record_tree_node(1, 1, 0),
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
             TransactionUnit::MappingTree,
@@ -362,38 +399,197 @@ fn more_leaf_containers_than_one_root_node_holds_is_refused_before_anything_reac
     );
 }
 
+/// 录制流前 `operation_count` 步施加到两块空内存盘上：崩在那一步之前的镜像。
+fn memory_pool_of_the_first(pool: &BuiltPool, operation_count: usize) -> MemoryPool {
+    let mut image = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
+    image.apply(&pool.retained_operations()[..operation_count]);
+    image
+}
+
+/// 录制流里第一次写到 `counter` 那条 journal 记录的槽（两盘同偏移）的那一步：崩在它之前，那条记录一份都没落。
+fn first_write_of_the_record(pool: &BuiltPool, counter: u64) -> usize {
+    let offset = record_offset(counter, JOURNAL_RING_DEFAULT_BYTES);
+    pool.retained_operations()
+        .iter()
+        .position(|retained| {
+            retained.operation.kind == RecordedOperationKind::Write
+                && retained.operation.offset == offset
+        })
+        .expect("那条记录写过")
+}
+
+/// 录制流里最后一次根槽 FUA 写的下标：崩在它之前，这次发布的单元与记录都落了、根没落。
+fn index_of_the_last_root_slot_write(pool: &BuiltPool) -> usize {
+    pool.retained_operations()
+        .iter()
+        .rposition(|retained| {
+            retained.operation.kind == RecordedOperationKind::WriteForceUnitAccess
+        })
+        .expect("至少一次发布写过根槽")
+}
+
+/// 一份镜像上 `invariant` 的判定。
+fn verdict_on(image: &MemoryPool, invariant: &str) -> InvariantVerdict {
+    check_pool_image(image)
+        .into_iter()
+        .find(|(name, _)| *name == invariant)
+        .map(|(_, verdict)| verdict)
+        .expect("checker 报了这一条")
+}
+
+fn assert_no_invariant_is_violated(image: &MemoryPool, what: &str) {
+    for (invariant, verdict) in check_pool_image(image) {
+        assert!(
+            !matches!(verdict, InvariantVerdict::Violated(_)),
+            "{what}：{invariant} 判红：{verdict:?}"
+        );
+    }
+}
+
 /// 一次建的 inode 多到这次要点名的单元超过一条 journal 记录装得下的 67 项：建 inode 是一个事务、一个数据单元都不写，
-/// 这次发布只有一条记录，它点名的全是共享的提交内生块；D23（journal 的角色与格式） 已定项 17 定了共享内生块只在最后一条点名，
-/// 装不进最后一条时怎么办没有条款 ⇒ 落盘之前拒掉。
+/// 它点名的全是共享的提交内生块。D23（journal 的角色与格式） 已定项 17（用户 2026-09-24 定）：**末条再跨记录**——
+/// 按 bump 次序装满 67 项再开下一条；两条都属于这一个事务（已定项 7：同一事务的记录共享事务号，提交标记只在它的最后一条），
+/// 本次发布内序号 1、2（已定项 4），只有第二条带「本次发布末条」标志（记录标志位 0，已定项 17）。
+/// 盘上的字段用 checker 的独立解析从盘上读（不信写者交回的）。之后：
+/// - 发布做完：冷启动读回 1 + N 条 inode 记录；池级 checker 一条违例都没有，I-8.8（前缀里的事务不被切开） 这一回有了对象
+///   （一个事务两条记录）、I-8.9（一次发布的记录序号连续且只有末条带标志） 都真被评估过且成立；
+/// - 崩在根槽 FUA 之前（两条记录都落了）：恢复由记录施加这一版——第一条不带提交标记，恢复不在它那里停（一事务一条时的
+///   「不带提交标记就停」在这一格少施加一整次发布）；
+/// - 崩在第二条记录之前（第一条两份都落了）：末条没到，这次发布整体不施加，走的还是上一版的根。
 #[test]
-fn a_publish_naming_more_units_than_one_journal_record_holds_is_refused_before_anything_reaches_the_disk(
+fn a_publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transaction_over_two_records_and_only_the_second_ends_the_publish(
 ) {
-    let mut pool = build_pool("parallel-line-three-too-many-named");
-    // 非叶容器的角色有五个（inode 根、分配记录树、记账树、映射树、树表）⇒ 容器数超过 67 − 5 = 62 就点不下。
-    let containers_that_fit = JOURNAL_NAMED_ENTRIES_PER_RECORD - 5;
+    let mut pool = build_pool("parallel-line-three-spill-over-two-records");
+    let before = pool.output.clone();
+    // 非叶容器的角色有十一个：inode 根、记账树、映射树、树表，加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）重写的七个节点——
+    // 这次新写的五十几片容器从 50253 往后排、越过 50344，改的记录落在两块盘各自的叶 61 与叶 62 里，
+    // 加两块盘各自的第 1 层节点 0 与根 ⇒ 容器数超过 67 − 11 = 56 就点不下一条记录。
+    let containers_that_fit = JOURNAL_NAMED_ENTRIES_PER_RECORD - 11;
     let new_inode_count = (containers_that_fit + 1) * INODE_LEAF_RECORDS - INODES_BEFORE;
+    let named_unit_capacity = usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("67");
 
-    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    let refusal = create_inodes(&mut pool, new_inode_count, FIXED_WRITE_TIME_SECONDS + 120)
-        .expect_err("点名项装不下一条记录");
+    let after = create_inodes(&mut pool, new_inode_count, FIXED_WRITE_TIME_SECONDS + 120)
+        .expect("点名项装不下一条记录时末条再跨记录，不拒");
+    pool.output = after.clone();
+    assert_eq!(
+        after.rewritten.len(),
+        named_unit_capacity + 1,
+        "这次重写 57 片叶容器 + 11 个非叶容器角色 = 68 个单元"
+    );
+    assert_eq!(
+        after.earlier_records_of_this_publish.len(),
+        1,
+        "68 项 = 装满的一条 67 项 + 跨出去的一条 1 项"
+    );
+    let first_counter = after.earlier_records_of_this_publish[0].record.counter;
+    assert_eq!(
+        (first_counter, after.record.counter),
+        (before.record.counter + 1, before.record.counter + 2),
+        "两条记录紧接在上一版那条之后"
+    );
 
-    let PublishError::MoreNamedUnitsThanOneJournalRecordHolds {
-        named_units,
-        capacity,
-    } = refusal
-    else {
-        panic!("该报点名项装不下，实际 {refusal:?}");
+    // ① 盘上两条记录的字段（checker 的独立解析）。
+    let image = pool.memory_pool();
+    let filesystem_identifier = unit_filesystem_identifier(&parameters().filesystem_identifier);
+    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+    let on_disk: Vec<(u64, u64, u8, u32, u8, usize)> = [first_counter, after.record.counter]
+        .into_iter()
+        .map(|counter| {
+            let bytes = PoolReader::read(
+                &image,
+                DeviceIdentity(0),
+                record_offset(counter, JOURNAL_RING_DEFAULT_BYTES),
+                record_bytes,
+            )
+            .expect("记录落了");
+            let view = check_journal_record(&bytes, filesystem_identifier).expect("记录自证过");
+            (
+                view.checkpoint_txg,
+                view.transaction,
+                view.commit_marker_byte,
+                view.ordinal_within_publish,
+                view.record_flags_byte,
+                view.named.len(),
+            )
+        })
+        .collect();
+    let txg = after.root.checkpoint_txg.0;
+    let transaction = before.highest_transaction_number_in_this_instance + 1;
+    assert_eq!(
+        on_disk,
+        vec![
+            (txg, transaction, 0, 1, 0, named_unit_capacity),
+            (txg, transaction, 1, 2, 1, 1),
+        ],
+        "(txg, 事务号, 提交标记, 本次发布内序号, 记录标志, 点名项数)：同一事务、提交标记与末条标志只在第二条，第一条装满 67 项"
+    );
+    let named_in_bump_order: Vec<_> = after.earlier_records_of_this_publish[0]
+        .record
+        .named
+        .iter()
+        .chain(after.record.named.iter())
+        .map(|named| named.mapping_key())
+        .collect();
+    assert_eq!(
+        named_in_bump_order.len(),
+        after.rewritten.len(),
+        "两条合起来恰好点名这次重写的每个单元一次"
+    );
+
+    // ② 发布做完：冷启动读回、池级 checker。
+    let reopened = pool.reopen_cold();
+    let rebuilt = rebuild_version(&reopened, &after.root, Some(after.record.clone()))
+        .expect("冷启动重建这一版");
+    let RebuiltVersion::WithFile(cold) = rebuilt else {
+        panic!("这一版有文件");
     };
     assert_eq!(
-        (named_units, capacity),
+        cold.inode_leaf_containers
+            .iter()
+            .map(|container| container.contents.records.len())
+            .sum::<usize>(),
+        usize::try_from(INODES_BEFORE + new_inode_count).expect("记录数"),
+        "树里共 1 + N 条记录"
+    );
+    assert_no_invariant_is_violated(&image, "发布做完");
+    for must_hold in ["I-8.8", "I-8.9"] {
+        assert_eq!(
+            verdict_on(&image, must_hold),
+            InvariantVerdict::Holds,
+            "发布做完：{must_hold} 真被评估过且成立"
+        );
+    }
+
+    // ③ 崩在根槽 FUA 之前：两条记录都落了，恢复由记录施加这一版。
+    let crash_before_the_root =
+        memory_pool_of_the_first(&pool, index_of_the_last_root_slot_write(&pool));
+    let report_before_the_root = recover(&crash_before_the_root, JournalPolicy::Consult);
+    assert_eq!(
         (
-            usize::try_from(containers_that_fit + 1 + 5).expect("68"),
-            usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD).expect("67")
-        )
+            report_before_the_root.effective_root,
+            report_before_the_root.journal.prefix_applied
+        ),
+        (Some((InstanceGeneration(1), after.root.checkpoint_txg)), 2),
+        "崩在根之前：两条记录整次施加，走的是这一版（{:?}）",
+        report_before_the_root.journal
     );
-    let after = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    assert!(
-        after == before,
-        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数都没动"
+    assert_no_invariant_is_violated(&crash_before_the_root, "崩在根之前");
+
+    // ④ 崩在第二条记录之前：末条没到，整次不施加。
+    let crash_before_the_second_record = memory_pool_of_the_first(
+        &pool,
+        first_write_of_the_record(&pool, after.record.counter),
     );
+    let report_before_the_second_record =
+        recover(&crash_before_the_second_record, JournalPolicy::Consult);
+    assert_eq!(
+        (
+            report_before_the_second_record.effective_root,
+            report_before_the_second_record.journal.prefix_applied
+        ),
+        (Some((InstanceGeneration(1), before.root.checkpoint_txg)), 0),
+        "崩在第二条之前：这次发布整体不施加，走的还是上一版的根（{:?}）",
+        report_before_the_second_record.journal
+    );
+    assert_no_invariant_is_violated(&crash_before_the_second_record, "崩在第二条之前");
 }

@@ -12,8 +12,8 @@ use singlefs_core::make_filesystem::{
 };
 use singlefs_core::mount::mount_writable;
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
-    TransactionOutput, WarmUpOutput,
+    acquire_instance, publish_first_file, publish_overwrite, resend_the_frozen_publish, warm_up,
+    FirstFile, PoolVersion, PoolWriter, TransactionOutput, WarmUpOutput,
 };
 use singlefs_core::write_accounting::{
     WriteCallsAndBytes, WritesByStructureKind, WrittenStructureKind,
@@ -121,7 +121,12 @@ const JOURNAL_RECORD_ROOT_SLOT_SYSTEM_CONFIGURATION_SLOTS: [(
     ),
 ];
 
+/// 分配记录树在 4 GiB 两块盘上的一次重写：根在第 2 层（D8（核心索引结构） 已定项 14，按绝对槽号按位置寻址），
+/// 这几次发布改的记录都在两块盘各自的叶 61 里 ⇒ 两片叶、两个第 1 层节点与根，五个节点。
+const ALLOCATION_RECORD_TREE_NODES_REWRITTEN: u64 = 5;
+
 /// 一张期望表：列出的单元种类各两盘一份（给定单元宽度），其余单元种类为零，末尾接固定结构三样。
+/// 分配记录树节点一次写 `ALLOCATION_RECORD_TREE_NODES_REWRITTEN` 个，别的种类一次一个。
 fn expected_by_kind(
     units_written_to_both_devices: &[(WrittenStructureKind, u64)],
 ) -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
@@ -143,7 +148,23 @@ fn expected_by_kind(
                 .iter()
                 .find(|(written_kind, _)| written_kind == kind)
                 .map_or(WriteCallsAndBytes::NONE, |(_, unit_bytes)| {
-                    calls_and_bytes(2, 2 * unit_bytes)
+                    let units = match kind {
+                        WrittenStructureKind::AllocationRecordTreeNode => {
+                            ALLOCATION_RECORD_TREE_NODES_REWRITTEN
+                        }
+                        WrittenStructureKind::DataUnit
+                        | WrittenStructureKind::ExtentTreeNode
+                        | WrittenStructureKind::InodeTreeLeafContainer
+                        | WrittenStructureKind::InodeTreeRoot
+                        | WrittenStructureKind::AccountingTreeNode
+                        | WrittenStructureKind::CentralMappingTreeNode
+                        | WrittenStructureKind::TreeTableUnit
+                        | WrittenStructureKind::InstanceTableUnit
+                        | WrittenStructureKind::JournalRecord
+                        | WrittenStructureKind::RootSlot
+                        | WrittenStructureKind::SystemConfigurationSlot => 1,
+                    };
+                    calls_and_bytes(2 * units, 2 * units * unit_bytes)
                 });
             (*kind, writes)
         })
@@ -152,7 +173,8 @@ fn expected_by_kind(
     expected
 }
 
-/// 带文件的一版（第一个事务、覆盖写）：字节表零 t1..t8，数据单元与 inode 树叶容器 32768、其余六个 16384。
+/// 带文件的一版（第一个事务、覆盖写）：字节表零 t1..t8，数据单元与 inode 树叶容器 32768、其余六个角色 16384，
+/// 分配记录树那一个角色按位置寻址之后是五个节点（`ALLOCATION_RECORD_TREE_NODES_REWRITTEN`）。
 fn file_version_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
         (WrittenStructureKind::DataUnit, 32768),
@@ -171,7 +193,8 @@ fn zero_unit_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)
     expected_by_kind(&[])
 }
 
-/// 后续可写挂载写行那次发布：实例表单元 32768 + 分配记录、记账、映射、树表四个固定点单元各 16384（字节表八「第一次之后的可写挂载（写行）」）。
+/// 后续可写挂载写行那次发布：实例表单元 32768 + 分配记录、记账、映射、树表四个固定点单元各 16384（字节表八「第一次之后的可写挂载（写行）」），
+/// 分配记录树是五个节点。
 fn row_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
         (WrittenStructureKind::AllocationRecordTreeNode, 16384),
@@ -182,7 +205,8 @@ fn row_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     ])
 }
 
-/// 后续可写挂载的暖机空发布：四个固定点单元各 16384（字节表八「空发布（暖机，后续可写挂载的实例，写 c_max 个固定点单元）」）。
+/// 后续可写挂载的暖机空发布：四个固定点单元各 16384（字节表八「空发布（暖机，后续可写挂载的实例，写 c_max 个固定点单元）」），
+/// 分配记录树是五个节点。
 fn later_warm_up_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
         (WrittenStructureKind::AllocationRecordTreeNode, 16384),
@@ -302,7 +326,8 @@ fn publish_through_overwrite() -> PublishedThroughOverwrite {
     }
 }
 
-/// 验收第 1 条：暖机两次、第一个事务、发布 B 各自按种类的合计与录制器逐项相等；发布 B 与第一个事务都是 21 次写调用、344 576 字节，
+/// 验收第 1 条：暖机两次、第一个事务、发布 B 各自按种类的合计与录制器逐项相等；发布 B 与第一个事务都是 29 次写调用、475 648 字节
+/// （分配记录树按位置寻址之后，D8（核心索引结构） 已定项 14：原先一个节点、21 次 344 576 字节，多出四个节点两盘各一份 = 8 次 131 072 字节），
 /// 每次暖机 5 次、16 896 字节；每一种钉成字节表的数。
 #[test]
 fn first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table()
@@ -339,13 +364,13 @@ fn first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_
     }
     assert_eq!(
         published.first_transaction.writes.total(),
-        calls_and_bytes(21, 344_576),
-        "第一个事务：单元 8 × 2 盘 = 16 次 327 680 字节 + 记录 2 次 8192 + 根槽 1 次 512 + 系统配置槽 2 次 8192"
+        calls_and_bytes(29, 475_648),
+        "第一个事务：单元 12 × 2 盘 = 24 次 458 752 字节 + 记录 2 次 8192 + 根槽 1 次 512 + 系统配置槽 2 次 8192"
     );
     assert_eq!(
         published.overwrite.writes.total(),
-        calls_and_bytes(21, 344_576),
-        "发布 B 与第一个事务写同样八个角色：E152 量到的 344 576 字节、21 次写调用"
+        calls_and_bytes(29, 475_648),
+        "发布 B 与第一个事务写同样的十二个单元：29 次写调用、475 648 字节（E152 量到的 21 次 344 576 字节是分配记录树一个节点那一版）"
     );
 
     for (warm_up_index, warm_up_writes) in published.warm_up.writes.iter().enumerate() {
@@ -367,8 +392,9 @@ fn first_transaction_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_
     );
 }
 
-/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 2 次系统配置槽写不属于任何一次发布；写行那次发布 15 次、
-/// 213 504 字节；之后两次暖机空发布各 13 次、147 968 字节；整段录制器记下的写 == 取号 + 三次发布的合计。
+/// 验收第 1 条里「写行与暖机的空发布各自一份」：发布 B 之后可写挂载——取号 2 次系统配置槽写不属于任何一次发布；写行那次发布 23 次、
+/// 344 576 字节；之后两次暖机空发布各 21 次、279 040 字节（分配记录树五个节点，D8（核心索引结构） 已定项 14）；
+/// 整段录制器记下的写 == 取号 + 三次发布的合计。
 #[test]
 fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_writes() {
     let mut published = publish_through_overwrite();
@@ -409,14 +435,14 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
     );
     assert_eq!(
         row_publish.writes.total(),
-        calls_and_bytes(15, 213_504),
-        "写行：实例表单元 + 四个固定点单元 × 2 盘 = 10 次 196 608 字节 + 记录、根槽、系统配置槽 5 次 16 896"
+        calls_and_bytes(23, 344_576),
+        "写行：实例表单元 + 四个固定点单元（分配记录树五个节点）× 2 盘 = 18 次 327 680 字节 + 记录、根槽、系统配置槽 5 次 16 896"
     );
     for (warm_up_index, warm_up_publish) in warm_up_publishes.iter().enumerate() {
         assert_eq!(
             warm_up_publish.writes.total(),
-            calls_and_bytes(13, 147_968),
-            "第 {} 次暖机：四个固定点单元 × 2 盘 = 8 次 131 072 字节 + 5 次 16 896",
+            calls_and_bytes(21, 279_040),
+            "第 {} 次暖机：四个固定点单元（分配记录树五个节点）× 2 盘 = 16 次 262 144 字节 + 5 次 16 896",
             warm_up_index + 1
         );
     }
@@ -431,8 +457,10 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
     }
 }
 
-/// 中途失败的那次发布 C 已记的写：单元按 bump 次序两盘各一份，写到第六个单元（记账树节点）的盘 1 那一次时报错 ⇒
-/// 前五个单元两盘各一份、记账树节点只有盘 0 那一份，映射树、树表与固定结构三样一次都没走到。十二种全列。
+/// 中途失败的那次发布 C 已记的写：单元按 bump 次序两盘各一份，写到第六个单元（分配记录树盘 1 那片叶 61，按位置寻址之后
+/// 分配记录树的五个节点先叶后根排在 inode 树根之后，D8（核心索引结构） 已定项 14）的盘 1 那一次时报错 ⇒
+/// 前五个单元（第五个是盘 0 那片叶）两盘各一份、第六个只有盘 0 那一份，其余三个分配记录树节点、记账树、映射树、树表与固定结构三样
+/// 一次都没走到。十二种全列。
 fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     vec![
         (WrittenStructureKind::DataUnit, calls_and_bytes(2, 65_536)),
@@ -450,11 +478,11 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
         ),
         (
             WrittenStructureKind::AllocationRecordTreeNode,
-            calls_and_bytes(2, 32_768),
+            calls_and_bytes(3, 49_152),
         ),
         (
             WrittenStructureKind::AccountingTreeNode,
-            calls_and_bytes(1, 16_384),
+            WriteCallsAndBytes::NONE,
         ),
         (
             WrittenStructureKind::CentralMappingTreeNode,
@@ -488,12 +516,12 @@ fn third_file_content() -> Vec<u8> {
 }
 
 /// 增补 1 验收加的那一条（增补 2 第 20b 行，代码三方第一轮打中，判决第二节第 2 行）：一次发布中途设备写报错、调用方重试成功之后，
-/// 按种类的合计与设备一层记的仍对得上。
+/// 按种类的合计与设备一层记的仍对得上。重试 = 把冻结的那次原样重发（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）。
 ///
 /// 一次发布的账是发布前后两次快照之差、两次都在成功路径上取 ⇒ 中途任一步返回时已落盘的写不属于任何一次发布的账；
 /// 不把它交出去，这一段窗口里设备一层数到的写就比按种类的合计多（攻方探针：按种类 21 次 / 344 576，设备 25 次 / 442 880）。
 /// 这里让盘 1 的第 6 次写报错（发布 C 写第六个单元时）：失败那次已记 11 次写、245 760 字节（数据单元、extent 树根、inode 树叶容器、
-/// inode 树根、分配记录树节点两盘各一份 + 记账树节点盘 0 那一份），重试整整 21 次 / 344 576 字节，两份相加正好是录制器在这段里记下的。
+/// inode 树根、分配记录树盘 0 那片叶两盘各一份 + 盘 1 那片叶盘 0 那一份），重试整整 29 次 / 475 648 字节，两份相加正好是录制器在这段里记下的。
 #[test]
 fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_adds_up() {
     let mut published = publish_through_overwrite();
@@ -525,17 +553,12 @@ fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_
             "中途失败的是设备写：{failure:?}"
         );
         published.fault_plan.disarm();
-        let retry = publish_overwrite(
-            &mut writer,
-            &mut published.allocator,
-            &published.overwrite,
-            FirstFile {
-                content: &content,
-                write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
-            },
-            InstanceGeneration(1),
-        )
-        .expect("盘好了，拿同一个上一版重试");
+        // 这一版发布不接受失败（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）：失败的那次冻结在分配器上，
+        // 重试就是把它逐字节原样重发一遍（`resend_the_frozen_publish`），不再拿同一个上一版另建一次。
+        let retry = resend_the_frozen_publish(&mut writer, &mut published.allocator)
+            .expect("盘好了，原样重发")
+            .and_then(PoolVersion::into_file_version)
+            .expect("冻结着的是带文件的发布 C");
         (writer.writes_of_failed_publishes().to_vec(), retry)
     };
     let operations = published.stream.operations();
@@ -553,7 +576,7 @@ fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_
     );
     assert_eq!(
         retry.writes.total(),
-        calls_and_bytes(21, 344_576),
+        calls_and_bytes(29, 475_648),
         "重试那次是完整的一次发布"
     );
     every_kind_matches(
@@ -568,7 +591,7 @@ fn publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_
     );
     assert_eq!(
         recorded_writes(&operations[window_start..]),
-        calls_and_bytes(32, 590_336),
-        "设备一层：11 + 21 次、245 760 + 344 576 字节"
+        calls_and_bytes(40, 721_408),
+        "设备一层：11 + 29 次、245 760 + 475 648 字节"
     );
 }

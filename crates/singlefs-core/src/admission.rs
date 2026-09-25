@@ -6,15 +6,25 @@
 //!
 //! 全是只读的纯函数：不动分配器、不发一个写。
 //!
-//! ⚠️ **这一版只有读数与合取，发布路径与可写挂载都还不调它**（调用点全在用例里）。九项里有两样的数条款没给，这里不替它们定，
-//! 由调用方给：
-//! - checkpoint 保留池要的 ckpt_cost（D28（挂载期承诺量） 已定项 4：Σ（每棵记录树当前的高）+ 记账树每发布的节点数）：
-//!   树高从哪读、「记录树」指哪几棵没有条款（C363（现算保留池时树高从哪读没有条款），用户 2026-09-23 定另开一题，新题还没开）；
-//!   「按每次发布写多少算」那一读法在增补 2 收口表第 ② 行的岔路里。
-//! - 挂载期承诺量里暖机那一半的 c_max：D28（挂载期承诺量） 已定项 4 末条定它与保留池「按同一个现算的 c_max 取」，同一个空白。
+//! 接在两处（C363 (b) 判决 `research/prompts/c363b-r1-main-verification.md` 第四节第 2 条，里程碑「第二个事务」增补 2 收口表第 5 行）：
+//! - 发布路径：`transaction::prepare_the_version_publish` 在算定这次发布的样子之后、读盘核与动分配器之前，按
+//!   [`admission_reading_before_a_publish`] 取读数、按 [`demand_of_the_roles_on_each_device`] 取这次的需求，逐设备合取；
+//! - 可写挂载：`mount::establish_instance` 在取号之前按同一份读数判「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），需求逐盘 0。
 //!
-//! 需求怎么摊到每块盘（C370（需求、可用与 df 没有共同单位））同样由调用方给。准入不够时先推空发布抬 F 再判
-//! （D16（发布语义） 已定项 1，C283（准入失败时不先推发布就报 ENOSPC））不在这里：它押在准入接进发布路径上。
+//! 条款给的量：checkpoint 保留池的 ckpt_cost 按 D28（挂载期承诺量） 已定项 4 的 Σ 名单（分配记录树、中央映射树按树高，
+//! 记账树按每发布的节点数，树表一项，实例表链不进；[`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
+//! 与保留池「按同一个现算的 c_max 取」（D28（挂载期承诺量） 已定项 4 末条）。
+//!
+//! ⚠️ 实现员取的读法（条款没写，交主 agent；[`space_budget_of_role`] 与 [`admission_reading_before_a_publish`] 的文档注释写了依据）：
+//! - 需求只算这次发布的普通分配（用户数据单元、extent 树与 inode 树的节点），固定点与实例表链各有自己那一项保留，不重复算需求；
+//!   一次发布一个普通分配都没有（空发布、写行）就不判——它们的空间在保留池与切换预留里，判它们会让推空发布抬 F（D3（空间分配）
+//!   已定项 17「释放空间这个操作本身不需要申请空间」）与挂载自己那一串被式子挡住；
+//! - 需求按盘字节记（C370（需求、可用与 df 没有共同单位） 2026-09-17 收窄：与「已分配」同口径只能读成盘字节），第一版每个单元落每块盘，
+//!   每块盘的需求相同；
+//! - 读数取分配器此刻的计数（挂载时是回收与影子账隔离之后、写行之前那一刻；admission 读哪一个在那两段里条款没写，见
+//!   [`AdmissionReading::of_allocator`]）。
+//!
+//! 准入不够时先推空发布抬 F 再判（D16（发布语义） 已定项 1，C283（准入失败时不先推发布就报 ENOSPC））没有实现：直接在任何写之前拒。
 
 use std::collections::BTreeSet;
 use std::num::NonZeroU64;
@@ -22,8 +32,9 @@ use std::num::NonZeroU64;
 use singlefs_format::{INSTANCE_TABLE_PAGE_RECORDS, SLOT_BYTES};
 
 use crate::address::DeviceIdentity;
+use crate::allocation_record_tree::AllocationRecordTreeGeometry;
 use crate::allocator::PoolAllocator;
-use crate::transaction::TransactionUnit;
+use crate::transaction::{MultiLevelCodeTwoTree, TransactionOutput, TransactionUnit};
 
 /// 一块盘上的物理字节：D5（快照 / 空间记账机制） 已定项 7「已分配」的口径——分配记录每个落点每盘一条，逐盘记的是这块盘上真占的字节。
 /// 一份副本的大小也用它：一份副本整个落在一块盘上。
@@ -439,6 +450,151 @@ pub fn admit_on_every_device(
     } else {
         Err(AdmissionRefusedOnSomeDevices { short_devices })
     }
+}
+
+/// 只供测试的开关（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：发布与可写挂载判不判空间准入。产品路径恒 `JudgedByTheFormula`。
+/// 准入接进来之后，「准入放行而落点仍取不到、在任何写之前拒绝」那一条（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））
+/// 在健康的历史里走不到——小盘上式子先拒。关掉准入，那一条拒绝路径（取号之前的预演取不到落点、发布取不到落点、抬 F 的空发布取不到固定点）
+/// 照样测得到。装在分配器上（`PoolAllocator::set_space_admission`），可写挂载按调用方给的装（`mount::mount_writable_with_space_admission`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpaceAdmission {
+    JudgedByTheFormula,
+    SkippedByTheTestOnlySwitch,
+}
+
+impl SpaceAdmission {
+    /// 这一次走的是哪一臂，运行时报得出（五条硬要求第 4 条：分支必须可观测）。
+    #[must_use]
+    pub const fn branch_name(self) -> &'static str {
+        match self {
+            SpaceAdmission::JudgedByTheFormula => "space_admission=judged",
+            SpaceAdmission::SkippedByTheTestOnlySwitch => "space_admission=skipped",
+        }
+    }
+}
+
+/// checkpoint 保留池的 ckpt_cost（D28（挂载期承诺量） 已定项 4，Σ 名单照 `research/prompts/c363b-r1-main-verification.md` 第三节 V2-2）：
+/// Σ（分配记录树与中央映射树当前的高）+ 记账树每发布的节点数 + 1（树表每次发布重写一个单元，D16（发布语义） 已定项 9）；
+/// 实例表链不进（它的开销归已定项 3 的切换预留）。「当前」= 这次发布要接在后面的那一版：
+/// - 带文件的一版：两棵树的高从各自根节点的码 2 头里现读（层级 + 1，不用内存里另存一份，已定项 4）；记账树每次发布整批重写
+///   （`transaction` 装记账行那一段），每发布的节点数就是这一版记账树的节点数。
+/// - 树表 0 条的一版（`None`）：没有中央映射树与记账树（0 与 0）；分配记录树只在那一版写过行时有（分配器记着它，
+///   `PoolAllocator::allocation_record_tree_of_the_version_without_file`），它按位置寻址、根的层级由池几何定（D8（核心索引结构） 已定项 14），
+///   高取几何的高——这一处分配器里只有节点与指针、没有根节点的字节可读；没写过行的（mkfs 的第 0 代）一棵都没有，取 0。
+///
+/// 同一个数也是挂载期承诺量里暖机那一半的 c_max（已定项 4 末条「按同一个现算的 c_max 取」）。
+#[must_use]
+pub fn checkpoint_cost_of_the_version_to_build_on(
+    version_to_build_on: Option<&TransactionOutput>,
+    allocator: &PoolAllocator,
+) -> MetadataBlocks {
+    const TREE_TABLE_UNITS_PER_PUBLISH: u64 = 1;
+    let record_trees_and_accounting_nodes = match version_to_build_on {
+        Some(file_version) => {
+            file_version
+                .position_addressed_tree_heights_read_from_the_root_node_headers()
+                .allocation_record_tree
+                + file_version
+                    .height_read_from_the_root_node_header(MultiLevelCodeTwoTree::CentralMapping)
+                + u64::try_from(file_version.accounting_tree.node_count())
+                    .expect("记账树的节点数装得进 u64")
+        }
+        None => match allocator.allocation_record_tree_of_the_version_without_file() {
+            Some(_) => AllocationRecordTreeGeometry::of_allocator(allocator).height(),
+            None => 0,
+        },
+    };
+    MetadataBlocks(record_trees_and_accounting_nodes + TREE_TABLE_UNITS_PER_PUBLISH)
+}
+
+/// 一次发布里一个角色的空间归哪一格（实现员取的读法，条款没写；依据见各成员）：
+/// 准入不等式另一边的「需求」只算 [`SpaceBudgetOfARole::Demand`] 那一格，另外两格已经作为式子里的一项扣在「可用」那一边。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpaceBudgetOfARole {
+    /// 普通分配：用户数据单元，与因为用户这次改了内容才重写的 extent 树、inode 树的节点。保留池对它是纯税
+    /// （D23（journal 的角色与格式） 已定项 24「保留池是给 checkpoint 开的一道地板，对普通分配是纯税」）。
+    Demand,
+    /// checkpoint 自己的固定点：ckpt_cost 的 Σ 名单里那几棵（分配记录树、中央映射树、记账树）与树表。
+    /// 它们从式子第八项 checkpoint 保留池里出（D28（挂载期承诺量） 已定项 1「它保证 checkpoint 自己的固定点写得出去」）。
+    CheckpointReservePool,
+    /// 实例表链：写行那次整条重写，从挂载期承诺量里的实例切换预留出（D28（挂载期承诺量） 已定项 3「多的一份给写行那次发布的元数据」、
+    /// 已定项 4「实例表链不进 ckpt_cost，它的开销归已定项 3 的切换预留」）。
+    InstanceSwitchReserve,
+}
+
+/// 这个角色的空间归哪一格（[`SpaceBudgetOfARole`]）。
+#[must_use]
+pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
+    match role {
+        TransactionUnit::Data(_)
+        | TransactionUnit::ExtentLowerNode(_)
+        | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
+        | TransactionUnit::ExtentRoot
+        | TransactionUnit::InodeLeafContainer(_)
+        | TransactionUnit::InodeRoot => SpaceBudgetOfARole::Demand,
+        TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
+        | TransactionUnit::AllocationTree
+        | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
+        | TransactionUnit::AccountingTree
+        | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
+        | TransactionUnit::MappingTree
+        | TransactionUnit::TreeTable => SpaceBudgetOfARole::CheckpointReservePool,
+        TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
+            SpaceBudgetOfARole::InstanceSwitchReserve
+        }
+    }
+}
+
+/// 一次发布重写的角色里算需求的那几个（[`space_budget_of_role`] 是 `Demand` 的）要在每块盘上新占的物理字节：
+/// 第一版每个单元落池里每一块盘（`ReplicaCount::of_every_device_in_the_pool` 同一条理由），每块盘的需求相同；
+/// 按盘字节记（C370（需求、可用与 df 没有共同单位） 2026-09-17 收窄：需求要与逐盘物理字节的「已分配」同口径）。
+/// 按 `devices` 的次序每块盘一条，需求为零也写 0（`admit_on_every_device` 要逐盘写全）。
+///
+/// # Panics
+/// 字节数装不进 u64：一次发布的角色数有上界（一版的节点数），装不下说明调用方给的不是一次发布的角色清单。
+#[must_use]
+pub fn demand_of_the_roles_on_each_device(
+    rewritten_roles: &[TransactionUnit],
+    devices: &[DeviceIdentity],
+) -> Vec<DemandOnDevice> {
+    let slots_of_the_demand: u64 = rewritten_roles
+        .iter()
+        .filter(|role| space_budget_of_role(**role) == SpaceBudgetOfARole::Demand)
+        .map(|role| role.span_slots())
+        .sum();
+    let bytes = BytesOnOneDevice::of_slots(slots_of_the_demand);
+    devices
+        .iter()
+        .map(|device| DemandOnDevice {
+            device: *device,
+            bytes,
+        })
+        .collect()
+}
+
+/// 一次发布之前的准入读数（D28（挂载期承诺量） 已定项 1 的九项）：逐盘各项取分配器此刻的计数（[`AdmissionReading::of_allocator`]）；
+/// 挂载期承诺量 = 实例切换的预留（已定项 3），rows0 取这次挂载记在分配器上的那个数
+/// （`PoolAllocator::instance_rows_after_this_mounts_row_publish`，挂载期间常量；mkfs 同一个进程里是 0：mkfs 的实例表一行都没有、
+/// 实例 1 不写行），c_max 与 checkpoint 保留池的 ckpt_cost 是同一个现算的数（[`checkpoint_cost_of_the_version_to_build_on`]）；
+/// 待删占用与已承诺预留取第一版的两个 0。可写挂载在取号之前判的也是这一份（挂载那一刻 rows0 已经记在分配器上）。
+#[must_use]
+pub fn admission_reading_before_a_publish(
+    allocator: &PoolAllocator,
+    version_to_build_on: Option<&TransactionOutput>,
+) -> AdmissionReading {
+    let checkpoint_cost =
+        checkpoint_cost_of_the_version_to_build_on(version_to_build_on, allocator);
+    AdmissionReading::of_allocator(
+        allocator,
+        instance_switch_reserve_on_one_device(
+            allocator.instance_rows_after_this_mounts_row_publish(),
+            checkpoint_cost,
+        ),
+        PoolWideCommitments::of_the_first_version(checkpoint_reserve_pool(
+            checkpoint_cost,
+            ReplicaCount::of_every_device_in_the_pool(allocator),
+        )),
+    )
 }
 
 #[cfg(test)]

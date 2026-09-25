@@ -179,7 +179,7 @@ fn slots_whose_freedom_differs(left: &PoolAllocator, right: &PoolAllocator) -> V
 }
 
 /// 收口表第 27 行「被抛弃根的根槽读不出时既不隔离也不计数」：一条被抛弃根的根槽持续读不出时，
-/// 只有它引用的那四个槽从隔离集里掉出来（发得出去了），而报出来的读不出计数仍然是 0——
+/// 只有它引用的那八个槽从隔离集里掉出来（发得出去了），而报出来的读不出计数仍然是 0——
 /// 两半都没人罩，外面看不出少罩了几个槽。
 #[test]
 fn an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_counted() {
@@ -205,13 +205,13 @@ fn an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_c
 
     assert_eq!(
         readable.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 34), (DeviceIdentity(1), 34)],
-        "根槽都读得出时影子账罩住 34 个槽：B 与实例 2 那几条被抛弃根引用、而候选集与 A 这一版账里都不引用的那些"
+        vec![(DeviceIdentity(0), 54), (DeviceIdentity(1), 54)],
+        "根槽都读得出时影子账罩住 54 个槽：B 与实例 2 那几条被抛弃根引用、而候选集与 A 这一版账里都不引用的那些"
     );
     assert_eq!(
         unreadable.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 30), (DeviceIdentity(1), 30)],
-        "B 的根槽读不出：它独占的四个槽掉出隔离集，两块盘各少罩 4 个"
+        vec![(DeviceIdentity(0), 46), (DeviceIdentity(1), 46)],
+        "B 的根槽读不出：它独占的八个槽掉出隔离集，两块盘各少罩 8 个"
     );
     assert_eq!(
         unreadable.abandoned_roots_unreadable, 0,
@@ -226,11 +226,11 @@ fn an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_c
     let differing_slots = slots_whose_freedom_differs(&readable.allocator, &unreadable.allocator);
     assert_eq!(
         differing_slots,
-        vec![50253, 50254, 50255, 50256],
-        "B 独占的四个一槽单元：根槽读得出时罩着，读不出时发得出去"
+        SLOTS_ONLY_THE_ABANDONED_ROOT_B_REFERENCES.to_vec(),
+        "B 独占的八个一槽单元：根槽读得出时罩着，读不出时发得出去"
     );
     assert_eq!(
-        u64::try_from(differing_slots.len()).expect("四个"),
+        u64::try_from(differing_slots.len()).expect("八个"),
         readable.isolated_slots_per_device[0].1 - unreadable.isolated_slots_per_device[0].1,
         "逐槽比出来的差与报出来的隔离计数之差对得上"
     );
@@ -288,14 +288,16 @@ fn overwrite_after_the_rollback_up_to(
     published
 }
 
-/// B 那次发布独占的四个一槽单元（它的四个固定点）：候选集与 A 这一版账里都不引用，回退时影子账隔离着。
-const SLOTS_ONLY_THE_ABANDONED_ROOT_B_REFERENCES: [u64; 4] = [50253, 50254, 50255, 50256];
+/// B 那次发布独占的八个一槽单元（它的四个固定点：分配记录树按位置寻址之后是五个节点——两块盘各自的叶 61、各自的第 1 层节点 0 与根，
+/// D8（核心索引结构） 已定项 14——加记账树、映射树、树表）：候选集与 A 这一版账里都不引用，回退时影子账隔离着。
+const SLOTS_ONLY_THE_ABANDONED_ROOT_B_REFERENCES: [u64; 8] =
+    [50257, 50258, 50259, 50260, 50261, 50262, 50263, 50264];
 
 /// 收口表第 27 行「alloc-basis 第三轮转来的四条」里的第 ④ 条，C503（隔离位清零的时机条文与实现说反话） 用户 2026-09-23 定改代码：
 /// D28（挂载期承诺量） 已定项 1 第九项「被抛弃的根被轮转覆写时清零」。被抛弃根 B（txg 4）的根槽在同一次挂载里被 txg 28 的根盖掉，
-/// 那一次发布里清掉**只有 B 撑着**的隔离位：B 独占的四个固定点，加 txg 27 那次挂载内回收时因 B 还引用着而补隔离的 mkfs 那片实例表
+/// 那一次发布里清掉**只有 B 撑着**的隔离位：B 独占的四个固定点（分配记录树五个节点加三个角色，八槽），加 txg 27 那次挂载内回收时因 B 还引用着而补隔离的 mkfs 那片实例表
 /// （两槽，见 `a_slot_reclaimed_while_an_abandoned_root_still_references_it_stays_isolated_until_that_root_leaves_the_ring`）——
-/// 两块盘各从 36 掉回 30；B 与实例 2 那几条根共用的槽（实例 2 那几条还在环里）照旧隔离着。
+/// 两块盘各从 56 掉回 46；B 与实例 2 那几条根共用的槽（实例 2 那几条还在环里）照旧隔离着。
 /// 先用纯算术钉住轮转真的发生了（txg 28 的落点就是 txg 4 那个槽），再看那几个槽：盖掉之前一个都发不出去，盖掉之后都回到空闲、没有新记录。
 #[test]
 fn the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_that_overwrites_its_root_slot(
@@ -322,8 +324,8 @@ fn the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_t
             .iter()
             .map(|device_map| device_map.isolated_slots())
             .collect::<Vec<_>>(),
-        vec![34, 34],
-        "回退那一刻影子账两块盘各罩住 34 个槽"
+        vec![54, 54],
+        "回退那一刻影子账两块盘各罩住 54 个槽"
     );
     continue_in_the_rollback_mount(&mut facts);
     let up_to_txg_27 = overwrite_after_the_rollback_up_to(&mut facts, CheckpointTxg(27));
@@ -341,8 +343,8 @@ fn the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_t
         .collect();
     assert_eq!(
         isolated_before_the_overwrite,
-        vec![36, 36],
-        "盖掉 B 的根槽之前：34 个，加 txg 27 那次回收时补隔离的 mkfs 实例表两槽"
+        vec![56, 56],
+        "盖掉 B 的根槽之前：54 个，加 txg 27 那次回收时补隔离的 mkfs 实例表两槽"
     );
     for slot in SLOTS_ONLY_THE_ABANDONED_ROOT_B_REFERENCES {
         for device_map in &facts._pool.allocator.devices {
@@ -371,8 +373,8 @@ fn the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_t
             .iter()
             .map(|device_map| device_map.isolated_slots())
             .collect::<Vec<_>>(),
-        vec![30, 30],
-        "B 的根槽被盖掉那一次发布里，只有 B 撑着的六个隔离位（四个固定点、mkfs 实例表两槽）两块盘各清掉"
+        vec![46, 46],
+        "B 的根槽被盖掉那一次发布里，只有 B 撑着的十个隔离位（四个固定点八槽、mkfs 实例表两槽）两块盘各清掉"
     );
     for slot in SLOTS_ONLY_THE_ABANDONED_ROOT_B_REFERENCES {
         for device_map in &facts._pool.allocator.devices {
@@ -431,8 +433,8 @@ fn a_slot_reclaimed_while_an_abandoned_root_still_references_it_stays_isolated_u
         .map(|record| u64::from(record.span_slots))
         .sum();
     assert_eq!(
-        released_by_the_rollback_row_publish, 6,
-        "回退那次写行（txg 9）换下 A 那一版的实例表（两槽）与四个固定点"
+        released_by_the_rollback_row_publish, 10,
+        "回退那次写行（txg 9）换下 A 那一版的实例表（两槽）与四个固定点（分配记录树五个节点加三个角色，八槽）"
     );
     let up_to_txg_27 = overwrite_after_the_rollback_up_to(&mut facts, CheckpointTxg(27));
     let (_, txg_27) = up_to_txg_27.last().expect("发了 txg 27");
@@ -440,7 +442,7 @@ fn a_slot_reclaimed_while_an_abandoned_root_still_references_it_stays_isolated_u
     assert_eq!(
         facts._pool.allocator.devices[0].deferred_slots() + released_by_the_rollback_row_publish,
         deferred_before_txg_27 + released_by_txg_27,
-        "txg 27 盖掉 A 之后环里最旧有效根是 9：释放代 9 的六个槽（mkfs 实例表那两槽在内）按谓词回收、离开 defer 队列"
+        "txg 27 盖掉 A 之后环里最旧有效根是 9：释放代 9 的十个槽（mkfs 实例表那两槽在内）按谓词回收、离开 defer 队列"
     );
     for device_map in &facts._pool.allocator.devices {
         for slot in [mkfs_instance_table.0, mkfs_instance_table.0 + 1] {

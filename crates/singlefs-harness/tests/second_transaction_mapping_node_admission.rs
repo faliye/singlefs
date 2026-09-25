@@ -1,174 +1,104 @@
-//! 写侧准入的第三条（中央映射树）：映射树第一版也只有一个节点（key 27、条目 55，装 294 条），
-//! 一次发布写的映射条目 = 进映射的五个固定角色（数据单元、extent 根、inode 根、分配记录树、记账树）
-//! 加这一版每片 inode 叶容器各一条 ⇒ 叶容器多到 290 片时是 295 条，装不下。
-//! 改之前分配记录树与记账树各有一条这样的准入，映射树一条都没有：装不下时直接走到 `build_index_node` 的断言 panic。
+//! 写侧准入的中央映射树那一条（D19（块指针的结构与宽度预算） 已定项 5：写侧每次发布按映射树现在的条目数与这次发布最多新增的条目数
+//! 做映射树容量准入，不靠别的树容量上的数字巧合）。映射树长成多层之后（D8（核心索引结构） 已定项 11），条目装不下一个节点时
+//! 照分裂规则长出内部节点、不拒。分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）没有「一个节点装不下」那道墙，
+//! 可写挂载取号之前那一串（写行 + 暖机）的预演走的就是发布路径落盘之前那一段（`transaction::prepare_the_version_publish` 等），
+//! 不再另推每次重写几个角色；预演与真发取到的落点逐项相同由 `mount::establish_instance` 在那一串发完之后断言，每条可写挂载的用例都走到它。
+//! 长到 257 层（码 2 头的层级是 1 字节，D18（块里携带什么信息） 已定项 18）是多层之后唯一的结构上限，走得到要 256 层，
+//! 在规划那一步由 `code_two_tree` 的单测钉住。
 //!
-//! 今天 panic 不了，靠的是两棵无关的树之间的数字巧合：inode 树根一个节点只装得下 135 片叶容器
-//! （`InodeTreeWriteRefusal::MoreLeafContainersThanOneRootNodeHolds` 在发布路径之前就拒了），
-//! 5 + 135 = 140 < 294。两个数各自由各自的字段表定，谁先动谁就把巧合弄没了 ⇒ 这一条准入自己判自己那棵树。
-//! 本文件三条用例：把两个数与那五个固定角色钉死、正好装满的一次发布照常过准入、多一片叶容器在取号之前被拒且盘上逐字节不变。
-//!
-//! 让映射树能分裂不在这一轮里（2026-09-23 用户定案：树的分裂估计里程碑 4 或 5 才做），这一轮只加闸。
+//! 本文件两条用例：数字钉死（叶 294 / 内部 143、第一个文件版本 6 条）；295 条的映射树长成两层而不是被拒（规划那一步，产品容量）。
 
 mod common;
+mod common_tree_split;
 
-use common::{build_pool, disk_snapshot};
-use singlefs_core::inode_tree::leaf_containers_one_root_node_holds;
-use singlefs_core::transaction::{
-    publish_admission, publish_sequence_admission, PublishError, PublishShape,
+use std::collections::BTreeSet;
+
+use common_tree_split::TreeSplitPool;
+use singlefs_core::code_two_tree::{
+    plan_the_tree_after_this_publish, CodeTwoKeyFieldWidths, CodeTwoTreeKey,
+    CodeTwoTreeNodeContents, CodeTwoTreeShape,
 };
-use singlefs_core::unit::index_node_entry_capacity;
-use singlefs_format::{MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES};
+use singlefs_core::transaction::{CodeTwoTreeNodeCapacities, MultiLevelCodeTwoTree};
+use singlefs_format::MAPPING_KEY_BYTES;
 
-/// 映射树第一版那一个节点装得下几条条目。
-fn mapping_node_capacity() -> usize {
-    index_node_entry_capacity(
-        usize::try_from(MAPPING_KEY_BYTES).expect("27"),
-        usize::try_from(MAPPING_ENTRY_BYTES).expect("55"),
-    )
-}
-
-/// 进映射而与 inode 叶容器无关的角色数：数据单元、extent 根、inode 根、分配记录树、记账树。
-/// 这里另写一遍，不从核心层取：准入的算术要有一个独立的对照物，共用同一个常量就对照不出东西来。
-/// 数据单元那一个是「文件只有一个数据单元」那一档（第一个事务的文件）：一个文件跨多个单元时每个单元各一条
-/// （并行线一），那一档由 `second_transaction_parallel_line_one_multi_unit_file.rs` 判。
-const MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS: usize = 5;
-
-/// 这几条用例的文件都是第一个事务写的那一个：一个数据单元。
-const DATA_UNITS_OF_THE_FIRST_FILE: usize = 1;
-
-/// 叶容器数取到这个值时，映射条目正好把一个节点装满。
-fn inode_leaf_containers_that_exactly_fill_the_mapping_node() -> usize {
-    mapping_node_capacity() - MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS
-}
+/// 进映射而与 inode 叶容器、分配记录树都无关的角色数：数据单元、extent 根（一个单元的文件内联，extent 树只有上段根兼叶）、
+/// inode 根、记账树（根兼叶时一个节点）。分配记录树每个节点各一条（D8（核心索引结构） 已定项 14：按位置寻址，节点数随池的形状走）。
+/// 这里另写一遍，不从核心层取：条目数的算术要有一个独立的对照物。
+const MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS_AND_THE_ALLOCATION_RECORD_TREE: usize = 4;
 
 #[test]
-fn the_mapping_node_holds_two_hundred_ninety_four_entries_and_five_of_them_are_not_inode_leaf_containers(
+fn the_central_mapping_node_holds_two_hundred_ninety_four_entries_and_an_internal_node_one_hundred_forty_three(
 ) {
-    assert_eq!(mapping_node_capacity(), 294, "key 27、条目 55 的码 2 节点");
+    let capacity = MultiLevelCodeTwoTree::CentralMapping.node_capacity_of_the_node_format();
     assert_eq!(
-        inode_leaf_containers_that_exactly_fill_the_mapping_node(),
-        289
+        (capacity.leaf_entries, capacity.internal_entries),
+        (294, 143),
+        "key 27、叶条目 55、内部条目 27 + 86 = 113 的码 2 节点（D8 已定项 11）"
     );
-    // 今天走得到的最大条目数：inode 树根装得下几片叶，映射节点就最多这么多条加五条。
-    assert_eq!(
-        leaf_containers_one_root_node_holds(),
-        135,
-        "key 8、条目 120 的码 2 根"
+    let pool = TreeSplitPool::with_the_first_file_version_under(
+        CodeTwoTreeNodeCapacities::FromTheNodeFormat,
     );
-    assert_eq!(
-        MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS + leaf_containers_one_root_node_holds(),
-        140,
-        "今天的上界 140 < 294：映射树不翻车靠的是这个巧合，不是有人判过"
-    );
-}
-
-#[test]
-fn a_publish_whose_mapping_entries_exactly_fill_the_node_passes_admission() {
-    let pool = build_pool("mapping-node-admission-exactly-full");
-    let containers = inode_leaf_containers_that_exactly_fill_the_mapping_node();
-    let shape = PublishShape::EMPTY_PUBLISH;
-    publish_admission(
-        &pool.allocator,
-        &shape.rewritten_roles(),
-        containers,
-        DATA_UNITS_OF_THE_FIRST_FILE,
-    )
-    .expect("289 片叶容器：5 + 289 = 294 条，正好装满");
-    publish_sequence_admission(
-        &pool.allocator,
-        &[shape],
-        containers,
-        DATA_UNITS_OF_THE_FIRST_FILE,
-    )
-    .expect("同一条算术，取号之前那一遍");
-}
-
-#[test]
-fn one_inode_leaf_container_past_the_mapping_node_is_refused_before_the_instance_generation_is_acquired(
-) {
-    let pool = build_pool("mapping-node-admission-one-past-full");
-    let containers = inode_leaf_containers_that_exactly_fill_the_mapping_node() + 1;
-    let shape = PublishShape::ROW_PUBLISH;
-    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    let records_before = pool.allocator.records().len();
-
-    let refused = publish_admission(
-        &pool.allocator,
-        &shape.rewritten_roles(),
-        containers,
-        DATA_UNITS_OF_THE_FIRST_FILE,
-    );
-    assert!(
-        matches!(
-            refused,
-            Err(PublishError::MappingEntriesExceedOneNode {
-                entries: 295,
-                capacity: 294
-            })
-        ),
-        "290 片叶容器要 5 + 290 = 295 条：{refused:?}"
-    );
-
-    let refused_before_acquisition = publish_sequence_admission(
-        &pool.allocator,
-        &[shape],
-        containers,
-        DATA_UNITS_OF_THE_FIRST_FILE,
-    );
-    match refused_before_acquisition {
-        Err(refusal) => {
-            assert_eq!(refusal.publish_index, 0, "这一串里第 0 次就算不过");
-            assert!(
-                matches!(
-                    refusal.cause,
-                    PublishError::MappingEntriesExceedOneNode {
-                        entries: 295,
-                        capacity: 294
-                    }
-                ),
-                "取号之前那一遍报的是同一个成员：{:?}",
-                refusal.cause
-            );
-        }
-        Ok(()) => panic!("取号之前那一遍也要算不过"),
-    }
-
-    assert_eq!(
-        pool.allocator.records().len(),
-        records_before,
-        "准入只读：分配记录一条都没加"
-    );
-    assert_eq!(
-        disk_snapshot(&pool.memory_pool(), &pool.stream),
-        before,
-        "两盘系统配置槽逐字节不变、根环没有新根、录制流一步都没多"
-    );
-    // 拒了之后这个池照旧能发布：准入不留下半新的状态。
-    let containers_that_fit = pool.output.inode_leaf_containers.len();
-    publish_admission(
-        &pool.allocator,
-        &PublishShape::ROW_PUBLISH.rewritten_roles(),
-        containers_that_fit,
-        DATA_UNITS_OF_THE_FIRST_FILE,
-    )
-    .expect("这一版只有一片叶容器，6 条映射条目");
-}
-
-#[test]
-fn a_published_version_writes_five_mapping_entries_plus_one_per_inode_leaf_container() {
-    let pool = build_pool("mapping-node-admission-entry-count");
     assert_eq!(
         pool.output.mapping_keys.len(),
-        MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS + pool.output.inode_leaf_containers.len(),
-        "准入算的条目数与真装进映射节点的条数是同一个"
+        MAPPING_ROLES_OUTSIDE_THE_INODE_LEAF_CONTAINERS_AND_THE_ALLOCATION_RECORD_TREE
+            + pool.output.allocation_record_tree.nodes.len()
+            + pool.output.inode_leaf_containers.len(),
+        "条目数与真装进映射树的条数是同一个"
     );
     assert_eq!(
         (
             pool.output.mapping_keys.len(),
-            pool.output.inode_leaf_containers.len()
+            pool.output.allocation_record_tree.nodes.len(),
+            pool.output.inode_leaf_containers.len(),
+            pool.output.central_mapping_tree.node_count()
         ),
-        (6, 1),
-        "第一个文件版本：一片叶容器，六条映射条目"
+        (10, 5, 1, 1),
+        "第一个文件版本：分配记录树五个节点（4 GiB 两块盘上根在第 2 层，每块盘第 1 层一个、单元区起点那片叶一个），\
+         一片叶容器，十条映射条目，映射树一个节点（根兼叶）"
+    );
+}
+
+/// 按产品容量（叶 294 条）：295 把 key 的映射树从空长起来，在第 295 把时根兼叶从中间切，长成两层（148 + 147 条两片叶），
+/// 不是被拒——改之前这一格是 `MappingEntriesExceedOneNode`。只走规划那一步（纯函数，不碰盘）：今天发布路径走得到的映射条目数
+/// 装不满一个节点（inode 树根一个节点装 135 片叶，5 + 135 < 294），要真发布出多层映射得压小容量（本文件第三条与分裂的那几份用例）。
+#[test]
+fn two_hundred_ninety_five_mapping_keys_grow_the_tree_to_two_levels_instead_of_being_refused() {
+    let key_width = usize::try_from(MAPPING_KEY_BYTES).expect("27");
+    let mapping_keys: BTreeSet<CodeTwoTreeKey> = (0..295u64)
+        .map(|value| {
+            let mut key = vec![0u8; key_width];
+            key[0] = 1;
+            key[9..17].copy_from_slice(&value.to_le_bytes());
+            CodeTwoTreeKey::new(&key, CodeTwoKeyFieldWidths::CENTRAL_MAPPING)
+        })
+        .collect();
+    let plan = plan_the_tree_after_this_publish(
+        &CodeTwoTreeShape::default(),
+        &mapping_keys,
+        MultiLevelCodeTwoTree::CentralMapping.node_capacity_of_the_node_format(),
+    )
+    .expect("两层装得下");
+    assert_eq!(
+        plan.shape.height(),
+        2,
+        "根兼叶装不下第 295 条：从中间切、长出新根"
+    );
+    assert_eq!(plan.shape.nodes().len(), 3, "两片叶加一个根");
+    let leaf_sizes: Vec<usize> = plan
+        .shape
+        .nodes()
+        .iter()
+        .filter(|node| node.position.level == 0)
+        .map(|node| match &node.contents {
+            CodeTwoTreeNodeContents::Leaf { keys } => keys.len(),
+            CodeTwoTreeNodeContents::Internal { .. } => {
+                unreachable!("层级 0 是叶")
+            }
+        })
+        .collect();
+    assert_eq!(
+        leaf_sizes,
+        vec![148, 147],
+        "295 条从中间切：左 ⌈295 ÷ 2⌉ = 148"
     );
 }

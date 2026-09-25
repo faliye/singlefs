@@ -331,6 +331,35 @@ pub fn disk_snapshot(image: &MemoryPool, stream: &SharedStream) -> DiskSnapshot 
     }
 }
 
+/// 把 `device` 那块盘上两个系统配置槽里的回退见证表换成 `table`（整槽校验和重封；写进内存镜像，不经写者）：
+/// 造见证表的坏镜像用（`second_transaction_supplement_two_rollback_witness.rs`、`checker_known_bad_images.rs`）。
+pub fn replace_the_witness_on_one_device(
+    image: &mut MemoryPool,
+    device: DeviceIdentity,
+    table: singlefs_core::rollback_witness::RollbackWitnessTable,
+) {
+    let spacing = u64::from(parameters().geometry.fixed_structure_slot_spacing);
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    for offset in [0, spacing] {
+        let bytes = singlefs_core::recovery::PoolReader::read(
+            &*image,
+            device,
+            singlefs_core::address::DeviceOffsetInBytes(offset),
+            slot_bytes,
+        )
+        .expect("系统配置槽读得到");
+        let mut system_configuration =
+            singlefs_core::system_configuration::SystemConfiguration::parse_slot(&bytes)
+                .expect("自证过");
+        system_configuration.rollback_witness = table;
+        image.devices.get_mut(&device).expect("有这块盘").write(
+            singlefs_core::address::DeviceOffsetInBytes(offset),
+            &system_configuration.to_slot(),
+        );
+    }
+}
+
 /// 第一个事务之后，在同一个进程里对同一个文件覆盖写一次（发布 B 起的每一次覆盖写走这一条）：
 /// 错误原样交回，要不要 `expect` 由调用方定。
 pub fn publish_overwrite_in_process(

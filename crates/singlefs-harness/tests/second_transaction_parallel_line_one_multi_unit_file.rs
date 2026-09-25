@@ -1,14 +1,16 @@
 //! 里程碑「第二个事务」并行线一（一个文件跨多个单元：大文件顺序写、顺序读）的验收。
 //!
 //! 压着它的条款：D8（核心索引结构） 已定项 3（extent key 的 offset 段是文件字节偏移）；D23（journal 的角色与格式） 已定项 17
-//! （一次发布切成 N 条记录时共享内生块只在最后一条点名）、已定项 14 注 1（链首锚在所选根覆盖的最后一条 = 同 txg 里 jsn 最大那条）
-//! 与第六条（发布边界：点名了共享内生块的那条是末条，末条没到的发布整体不施加）；C310（事务切分纪律与记录数口径打架）
+//! （一次发布切成 N 条记录时共享内生块只在最后一条点名，只有真正的最后一条带「本次发布末条」标志）、已定项 14 注 1
+//! （链首锚在所选根覆盖的最后一条 = 那次发布带末条标志的那条，读法乙）与第六条（发布边界按记录标志位 0 认，末条没到的发布整体不施加）；
+//! C310（事务切分纪律与记录数口径打架）
 //! 2026-09-16 用户定案（N 个数据单元 = N 个事务 = N 条记录）；D4（校验和位置） 已定项 5（净荷 32634，文件偏移到单元做除法）。
 //!
-//! 六条用例：
+//! 七条用例：
 //! 1. 写 68 个单元（跨过 67）再写 144 个单元（一片 extent 叶装满），冷启动顺序读回逐字节相同；一次发布的记录条数 = 数据单元数；
-//!    extent 树节点只在打开时读、读取次数 ≤ 树高 + 叶数（顺序读期间块层一次 16 KiB 节点读都没有）；池级 checker 一条违例都没有。
-//!    多于 144 个单元（extent 树要长内部节点）在落盘之前被拒，钉在 `parallel_line_one_sequential_write.rs`。
+//!    extent 树节点只在打开文件时按需读、读取次数 ≤ 树高 + 叶数（顺序读期间块层一次 16 KiB 节点读都没有）；池级 checker 一条违例都没有。
+//!    多于 144 个单元时 extent 树下段长成两层（D8（核心索引结构） 已定项 14），下段几种变形走一遍的是
+//!    `the_lower_extent_segment_grows_to_two_levels_past_one_leaf_and_shrinks_back_to_inline`。
 //! 2. 文件变短：上一版多出来的数据单元在同一次发布里释放；释放之前同样按映射条目的位置项读盘核校验和
 //!    （D19（块指针的结构与宽度预算） 已定项 5 硬规则 1），核出对不上的那一份隔离。
 //! 3. 进程重开之后可写挂载（重建上一版、写行、暖机都照抄多个数据单元），再顺序写一次：经映射释放重建出来的那几个单元。
@@ -32,6 +34,7 @@ use singlefs_core::address::{
 };
 use singlefs_core::allocator::Placement;
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
+use singlefs_core::extent_tree::{ExtentLowerNodePosition, ExtentUpperNodePosition};
 use singlefs_core::journal::record_offset;
 use singlefs_core::mount::mount_writable;
 use singlefs_core::mounted_read::mount_read_only;
@@ -40,7 +43,8 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::transaction::{
     publish_sequential_write, CopyQuarantinedAfterReleaseChecksumMismatch, FirstFile, PoolWriter,
-    TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
+    PositionAddressedTreeHeights, QuarantinedCopyReading, TransactionOutput, TransactionUnit,
+    FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{data_unit_payload_capacity, unit_filesystem_identifier};
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
@@ -130,28 +134,34 @@ fn records_on_disk_with_txg(reader: &dyn PoolReader, txg: CheckpointTxg) -> usiz
 }
 
 /// 冷启动顺序读：只读挂载（择根、扫环、施加前缀、打开挂载态），打开文件之后按单元一个一个往后读到文件末尾，
-/// 读回的字节拼起来与 `expected` 逐字节相同；extent 树节点只在打开时读，读取次数 ≤ 树高 + 叶数，
+/// 读回的字节拼起来与 `expected` 逐字节相同；extent 树节点只在打开文件时按需读（D8（核心索引结构） 已定项 14，K4），
+/// 读取次数 ≤ 树高 + 叶数，树高与叶数是 `extent_tree_height_and_leaves`（上段加下段）；
 /// 顺序读期间块层一次 16 KiB（码 2 节点）的读都没有——不是每个单元从 inode 重走一遍。
-fn cold_sequential_read_matches(reader: &dyn PoolReader, expected: &[u8], data_units: u64) {
+fn cold_sequential_read_matches(
+    reader: &dyn PoolReader,
+    expected: &[u8],
+    data_units: u64,
+    extent_tree_height_and_leaves: (u64, u64),
+) {
     let counting = ReadCountingPoolReader::new(
         reader,
         JournalRingRegion::starting_at_the_standard_slot(JOURNAL_RING_DEFAULT_BYTES),
     );
     let mounted = mount_read_only(&counting).expect("只读挂载");
-    let extent_tree_reads = mounted.mounted.extent_tree_reads_at_open();
+    let file = mounted
+        .mounted
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
+        .expect("打开文件");
+    let extent_tree_reads = file.extent_tree_reads_at_open();
     assert!(
         extent_tree_reads.node_reads <= extent_tree_reads.height + extent_tree_reads.leaves,
         "extent 树节点的读取次数 ≤ 树高 + 叶数：{extent_tree_reads:?}"
     );
     assert_eq!(
         (extent_tree_reads.height, extent_tree_reads.leaves),
-        (1, 1),
-        "144 个单元之内 extent 树是一个根兼叶"
+        extent_tree_height_and_leaves,
+        "extent 树打开时走过的高与叶数（上段加下段）"
     );
-    let file = mounted
-        .mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
-        .expect("打开文件");
     assert_eq!(file.data_unit_count(), data_units);
     counting.reset_tally();
     let payload_capacity = u64::try_from(data_unit_payload_capacity()).expect("32634");
@@ -201,7 +211,8 @@ fn units_written_across_the_sixty_seven_threshold_and_up_to_a_full_extent_leaf_r
         68,
         "一次发布的记录条数 = 数据单元数 68（C310 用户定案的口径），67 那个点名项上限够不着"
     );
-    cold_sequential_read_matches(&image_after_the_first, &sixty_eight_units, 68);
+    // 144 个单元之内（D8（核心索引结构） 已定项 14）：上段一片根兼叶，下段一片根兼叶。
+    cold_sequential_read_matches(&image_after_the_first, &sixty_eight_units, 68, (2, 2));
     let (content, effective_root) = recovered(&image_after_the_first);
     assert!(
         content == sixty_eight_units,
@@ -239,12 +250,93 @@ fn units_written_across_the_sixty_seven_threshold_and_up_to_a_full_extent_leaf_r
     );
     assert_the_pool_checker_finds_no_violation(&image_after_the_second, "144 个单元之后");
     let reopened_devices = pool.reopen_cold();
-    cold_sequential_read_matches(&reopened_devices, &one_hundred_forty_four_units, 144);
+    cold_sequential_read_matches(
+        &reopened_devices,
+        &one_hundred_forty_four_units,
+        144,
+        (2, 2),
+    );
     let (content_after_reopen, _) = recovered(&reopened_devices);
     assert!(
         content_after_reopen == one_hundred_forty_four_units,
         "进程退出、按路径重开镜像之后冷走读读回 144 个单元"
     );
+}
+
+/// extent 树下段按单元号按位置寻址（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K2），一个文件下段的形状跟着单元数走。
+/// 从第一个事务那一版（一个单元、内联）起四次顺序写，走遍下段的几种变形：
+/// 145 个单元（多于一片叶装得下的 144 个）⇒ 下段长成两层：单元 0..=143 那片叶、单元 144 那片叶、上面第 1 层第 0 个根；
+/// 再写 144 个单元 ⇒ 下段缩回一片根兼叶；再写一个单元 ⇒ 没有下段，那个数据指针内联在上段叶条目里；再写三个单元 ⇒ 下段又长出来。
+/// 上段恒只有 inode 1 所在那片根兼叶。每一次上一版下段的节点都在这次发布里释放；每一版冷启动顺序读回逐字节相同、
+/// 打开文件时走过的高与叶数（上段加下段）对得上、池级 checker 没有违例。
+#[test]
+fn the_lower_extent_segment_grows_to_two_levels_past_one_leaf_and_shrinks_back_to_inline() {
+    let mut pool = build_pool("parallel-line-one-extent-shapes");
+    let lower_leaf = |index| ExtentLowerNodePosition { level: 0, index };
+    let lower_root_over_two_leaves = ExtentLowerNodePosition { level: 1, index: 0 };
+    let steps = [
+        (
+            145_usize,
+            vec![lower_leaf(0), lower_leaf(1), lower_root_over_two_leaves],
+            (3, 3),
+        ),
+        (144, vec![lower_leaf(0)], (2, 2)),
+        (1, Vec::new(), (1, 1)),
+        (3, vec![lower_leaf(0)], (2, 2)),
+    ];
+    for (seed, (data_units, lower_shape, height_and_leaves)) in steps.into_iter().enumerate() {
+        let content = content_needing(data_units, 10 + seed);
+        let previous = pool.output.clone();
+        let output = sequential_write(&mut pool, &content, InstanceGeneration(1));
+        assert_eq!(
+            output
+                .extent_tree
+                .lower_nodes
+                .iter()
+                .map(|(position, _)| *position)
+                .collect::<Vec<_>>(),
+            lower_shape,
+            "{data_units} 个单元的下段"
+        );
+        assert_eq!(
+            output
+                .extent_tree
+                .upper_nodes
+                .iter()
+                .map(|(position, _)| *position)
+                .collect::<Vec<_>>(),
+            vec![ExtentUpperNodePosition { level: 0, index: 0 }],
+            "上段只有 inode 1 所在那片根兼叶"
+        );
+        // 树高从根节点头现读（D8（核心索引结构） 已定项 14 末句照已定项 11「根节点头层级 + 1」；D28（挂载期承诺量） 已定项 4 的 ckpt_cost 读它）：
+        // 4 GiB 两块盘上分配记录树根在第 2 层；extent 树上段只有根兼叶；下段的高就是读回来的高里减去上段那一层。
+        assert_eq!(
+            output.position_addressed_tree_heights_read_from_the_root_node_headers(),
+            PositionAddressedTreeHeights {
+                allocation_record_tree: 3,
+                extent_tree_upper_segment: 1,
+                extent_tree_lower_segment_of_the_file: height_and_leaves.0 - 1,
+            },
+            "{data_units} 个单元：从根节点头现读的树高"
+        );
+        for (position, pointer) in &previous.extent_tree.lower_nodes {
+            assert!(
+                output
+                    .released
+                    .iter()
+                    .any(|placement| placement.slot == pointer.locations[0].slot),
+                "上一版下段的 {position:?} 在写 {data_units} 个单元那次发布里释放"
+            );
+        }
+        let image = pool.memory_pool();
+        assert_the_pool_checker_finds_no_violation(&image, &format!("{data_units} 个单元之后"));
+        cold_sequential_read_matches(
+            &image,
+            &content,
+            u64::try_from(data_units).expect("单元数"),
+            height_and_leaves,
+        );
+    }
 }
 
 /// 文件变短：三个单元的文件再顺序写成一个单元，上一版第 1、2 个数据单元没有接替它们的新角色，同样在这次发布里释放
@@ -308,8 +400,9 @@ fn corrupt_the_copy_on(
 }
 
 /// 文件变短换下的尾巴也是经映射释放的，释放之前同样按映射条目的位置项读盘核校验和（D19（块指针的结构与宽度预算） 已定项 5
-/// 硬规则 1：经映射释放的每一个都核）：三个单元的文件，第 2 个数据单元在 0 号盘上那一份被改坏，再顺序写成一个单元——
-/// 第 2 个单元这次没有接替它的新角色，照样释放，核出 0 号盘那一份对不上 ⇒ 只隔离那一份，1 号盘那一份照常释放。
+/// 硬规则 1：经映射释放的每一个都核）：三个单元的文件，第 2 个数据单元两盘那一份都被改坏，再顺序写成一个单元——
+/// 第 2 个单元这次没有接替它的新角色，照样逻辑上释放，核出两份都对不上 ⇒ 两份都隔离（两盘那条记录留在已分配）。
+/// 只改坏一块盘那一份时两块盘那一份一起隔离（D19（块指针的结构与宽度预算） 已定项 5，`second_transaction_supplement_two_release_checksum_quarantine.rs` 用例 2）。
 #[test]
 fn shrinking_a_multi_unit_file_checks_the_released_tail_against_its_mapping_checksums_before_releasing_it(
 ) {
@@ -318,23 +411,29 @@ fn shrinking_a_multi_unit_file_checks_the_released_tail_against_its_mapping_chec
     let longer = sequential_write(&mut pool, &three_units, InstanceGeneration(1));
     let tail = TransactionUnit::Data(DataUnitIndexInFile(2));
     let tail_slot = longer.unit(tail).slot;
-    corrupt_the_copy_on(
-        pool.devices.as_mut().expect("镜像还开着"),
-        DeviceIdentity(0),
-        tail_slot,
-    );
+    for device in [DeviceIdentity(0), DeviceIdentity(1)] {
+        corrupt_the_copy_on(
+            pool.devices.as_mut().expect("镜像还开着"),
+            device,
+            tail_slot,
+        );
+    }
     let shorter = sequential_write(&mut pool, &content_of(1000, 6), InstanceGeneration(1));
+    let tail_placement = Placement {
+        slot: tail_slot,
+        span: tail.span_slots(),
+    };
     assert_eq!(
         shorter.quarantined_after_release_checksum_mismatch,
-        vec![CopyQuarantinedAfterReleaseChecksumMismatch {
-            unit: tail,
-            device: DeviceIdentity(0),
-            placement: Placement {
-                slot: tail_slot,
-                span: tail.span_slots(),
-            },
-        }],
-        "文件变短换下的第 2 个数据单元：0 号盘那一份核出对不上，只隔离它"
+        [DeviceIdentity(0), DeviceIdentity(1)]
+            .map(|device| CopyQuarantinedAfterReleaseChecksumMismatch {
+                unit: tail,
+                device,
+                placement: tail_placement,
+                reading: QuarantinedCopyReading::ChecksumMismatch,
+            })
+            .to_vec(),
+        "文件变短换下的第 2 个数据单元：两盘那一份都核出对不上，都隔离"
     );
     assert!(
         shorter
@@ -406,7 +505,7 @@ fn index_of_the_last_root_slot_write(operations: &[RetainedOperation]) -> usize 
 }
 
 /// P6 / C365（D23（journal 的角色与格式） 已定项 14 注 1）：所选根是两条记录的发布 B 的根，C 的记录落了、C 的根没落。
-/// 链首要锚在 B 的**末条**（同 txg 里 jsn 最大那条）之后，下一条就是 C 的记录 ⇒ C 施加、读回 C。
+/// 链首要锚在 B 的**末条**（带「本次发布末条」标志的那条，D23（journal 的角色与格式） 已定项 17）之后，下一条就是 C 的记录 ⇒ C 施加、读回 C。
 /// 锚在 B 的第一条时，期待的下一条是 B 自己的第二条（它不在水位之上），C 的记录对不上号、一条都不施加（三方第一轮 K3）。
 #[test]
 fn the_chain_head_anchors_on_the_last_record_of_the_chosen_roots_publish() {

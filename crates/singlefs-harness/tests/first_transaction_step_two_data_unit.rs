@@ -292,10 +292,6 @@ fn exactly_two_new_allocation_records_whose_slot_matches_the_recorded_write_offs
         ],
         "两盘各一次写，偏移 = 槽号 × 16384"
     );
-    assert_eq!(
-        pool.allocator.policy_mismatches, 0,
-        "C146 ② 的运行时计数第一个事务恒 0"
-    );
     assert_eq!(pool.allocator.devices[0].allocated_slots(), 5);
     assert_eq!(pool.allocator.devices[0].free_runs(), 2);
     remove_images(&pool);

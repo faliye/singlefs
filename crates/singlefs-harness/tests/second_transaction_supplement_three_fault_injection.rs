@@ -10,6 +10,7 @@ use std::io::Write as _;
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::make_filesystem::{
@@ -19,8 +20,8 @@ use singlefs_core::recovery::{
     choose_system_configuration, readable_roots, recover, JournalPolicy, RecoveryOutcome,
 };
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
-    PublishError,
+    acquire_instance, publish_first_file, publish_overwrite, resend_the_frozen_publish, warm_up,
+    FirstFile, PoolVersion, PoolWriter, PublishError,
 };
 use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
 use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
@@ -92,6 +93,12 @@ fn fast_tier_campaign(worker_threads: FaultInjectionWorkerThreads) -> FaultInjec
 
 /// 快档：这个测试周期的种子基起 24 段、每段 20 步、每段摆 4 个注入点。每个注入点重跑一遍这段历史，
 /// 判「返回错误而不是 panic」与「重开恢复到模型允许的版本」；「已知红」清单里的形态照记不停，清单外的一条都不许有。
+///
+/// 读出坏字节（`read_returns_corrupted_bytes`）只注入在一次读上：释放之前读盘核那一读撞上它时重读一次就对得上，不隔离
+/// （D19（块指针的结构与宽度预算） 已定项 5：核出对不上也先重读一次）。只重读的是读不出那一半时，这一格在种子 7463871032432355113
+/// 第 7 步（覆盖写）把一对好槽隔离掉、池级 checker 判 I-3.11 红。**每一读都给坏字节**（坏读一直在、盘上的字节是好的）时两次都对不上，
+/// 照规则隔离那一对好槽——那是「两次都对不上才隔离」认下的形态，不是新发现；随机注入不摆这一形（一次注入只坏一次调用），
+/// 它的样子钉在 `second_transaction_supplement_two_release_checksum_quarantine.rs` 的用例 13。
 #[test]
 fn fault_injection_fast_tier_returns_errors_instead_of_panicking() {
     let started = std::time::Instant::now();
@@ -240,6 +247,7 @@ fn fault_injection_large_tier_from_the_environment() {
         execution: HistoryExecution {
             per_step_checker: PerStepChecker::Run,
             device_width,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
         },
         worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
     });
@@ -258,6 +266,41 @@ fn fault_injection_large_tier_from_the_environment() {
         report.new_findings.is_empty(),
         "注入之后「已知红」清单外的失败；{}\n{rendered}",
         how_to_replay(&report)
+    );
+}
+
+/// 说谎的设备许可留下的盘面不一致里 `["I-3.1"]` 那一组的取样点（`fault_injection::INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE`；
+/// `crates/mutations.tsv` 钉着把那一组去掉的变异）。快档那 24 段里说谎的设备留下的不一致全落在另一组（`["I-2.1", "I-4.8", "I-7.4"]`），
+/// 那一组去掉了快档照样绿；大档（这个测试周期的种子基起 512 段、每段 30 步、注入 6 次）里 `["I-3.1"]` 那一组落在 13 个注入点上。
+/// 这里只跑其中一段：种子 7463871032432355306，同一组规模下抽出的 6 个注入点里有一次被吞掉的写（`write_is_swallowed`，
+/// 整池第 107 次写调用）落在 `step_index` 6 那一步（覆盖写）上，之后池级 checker 只判红 I-3.1。它要被白名单豁免、记进说谎那一格，
+/// 不算新发现（这一格为什么只剩 I-3.1、丢的是哪一份，没有逐字节追过）。
+#[test]
+fn a_swallowed_write_after_which_the_checker_flags_only_i_3_1_is_excused_as_what_a_lying_device_may_leave(
+) {
+    let report = run_fault_injection_campaign(&FaultInjectionCampaign {
+        first_seed: 7_463_871_032_432_355_306,
+        seed_count: 1,
+        operations_per_history: 30,
+        faults_per_history: 6,
+        weights: GenerationWeights::BROAD,
+        execution: CHECKED_AFTER_EVERY_STEP,
+        worker_threads: FaultInjectionWorkerThreads::from_the_environment(),
+    });
+    let rendered = report.render();
+    assert!(
+        report.new_findings.is_empty(),
+        "说谎的设备留下的 I-3.1 要被白名单豁免，不算新发现；{}\n{rendered}",
+        how_to_replay(&report)
+    );
+    assert_eq!(
+        report
+            .tally
+            .lying_device_signatures
+            .get("CheckerViolations { invariants: [\"I-3.1\"] }"),
+        Some(&2),
+        "这一段里被吞掉的那一次写之后只判红 I-3.1，记进说谎那一格——带着注入跑的那一遍里每一步之后的池级 checker 判红那一处、\
+         注入之后的镜像上再跑的那一遍，各记一次：\n{rendered}"
     );
 }
 
@@ -504,15 +547,14 @@ fn the_report_is_the_same_text_with_one_worker_thread_and_with_four() {
     );
 }
 
-/// 增补 2 收口表第 40 行（C381（根已落盘之后发布失败，分配器仍退回））的判别力：发布在最后一步（系统配置槽）失败时根已 FUA 落盘、
-/// 分配器照样退回，同一个写入口拿同一个上一版再发一次，就把那条根指着的单元原地盖掉——那一次再断电（这里用注入的根槽写错代替断电），
-/// 盘上留下的就是「最新的那条根指着一份内容已经换掉的单元」。
-///
-/// 这条用例钉的是**今天这个缺陷的现形**：池级 checker 判红、冷启动走不到那条根。
-/// C381 一旦按哪条候选改掉（发布失败之后那条根不再看得见，或者分配器不再退回），这条用例会转绿在别处、这里的断言会红——
-/// 那时候连同「已知红」的账一起改，不许把断言改松（`show-me-test.md`「改代码还是改断言，先想清楚是哪一种」）。
+/// 增补 2 收口表第 40 行（C381（根已落盘之后发布失败，分配器仍退回））那一格，按 D23（journal 的角色与格式） 已定项 14
+/// 「这一版的失败处置」（用户 2026-09-24 定：发布不接受失败，失败的那次冻结，下一次发布之前逐字节原样重发它）：
+/// 发布 B 在最后一步（系统配置槽）失败时根已 FUA 落盘、分配器退回——改之前同一个写入口拿同一个上一版再发一次 C，就把那条根指着的单元
+/// 原地盖掉，那一次再断电，盘上留下「最新的那条根指着一份内容已经换掉的单元」（池级 checker 判 I-7.4 / I-7.2 红、冷启动走不到那条根）。
+/// 现在 B 冻结在分配器上：再发 C 在任何写之前被拒；原样重发 B 之后那条根指着的单元就是它自己写的那一份，checker 不红、冷启动读回 B；
+/// 之后 C 接在 B 上照常发布。
 #[test]
-fn a_publish_that_fails_on_the_system_configuration_slot_leaves_a_root_whose_units_the_next_publish_overwrites(
+fn a_publish_that_fails_on_the_system_configuration_slot_is_frozen_so_the_next_publish_cannot_overwrite_the_units_of_its_root(
 ) {
     let parameters = e142_parameters(512, 512);
     let geometry = FixedGeometry {
@@ -611,11 +653,9 @@ fn a_publish_that_fails_on_the_system_configuration_slot_leaves_a_root_whose_uni
         "C381 的前提：这次发布报了失败，txg 4 那条根却已经 FUA 落盘、在环里读得出来；读到的是 {roots_after:?}"
     );
 
-    // 二、同一个写入口、同一个上一版再发一次（分配器已经退回，落点与发布 B 完全相同），在根槽 FUA 写上断电。
-    plan.arm(FaultSchedule::the_nth_call_across_the_pool(
-        InjectedFault::WriteFails,
-        19,
-    ));
+    // 二、同一个写入口、同一个上一版再发一次：B 冻结着，第一道就拒，一个写都不发。
+    let fired_before_the_refused_publish = plan.fired_count();
+    let operations_before_the_refused_publish = stream.operations().len();
     let refused_again = publish_overwrite(
         &mut writer,
         &mut allocator,
@@ -626,22 +666,35 @@ fn a_publish_that_fails_on_the_system_configuration_slot_leaves_a_root_whose_uni
         },
         instance,
     )
-    .expect_err("根槽 FUA 写报错，这次发布也必须失败");
+    .expect_err("B 冻结着，另建一次发布必须被拒");
     assert!(
-        matches!(refused_again, PublishError::BlockDevice(_)),
-        "报的应当是块设备错：{refused_again:?}"
+        matches!(
+            refused_again,
+            PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet {
+                checkpoint_txg: CheckpointTxg(4),
+                ..
+            }
+        ),
+        "报的应当是「B 冻结着、还没重发」：{refused_again:?}"
     );
-    let fired_again = plan.fired();
     assert_eq!(
-        fired_again.last().map(|last| last.written_structure),
-        Some(Some(StepKind::RootRecordFua)),
-        "一次发布的第 19 次写是根槽 FUA 写（字节表零 t1..t8 十六次单元写 + 两次 journal 记录 + 根槽）：{fired_again:?}"
+        (plan.fired_count(), stream.operations().len()),
+        (
+            fired_before_the_refused_publish,
+            operations_before_the_refused_publish
+        ),
+        "被拒的那一次一个写、一道屏障都没发"
     );
-    drop(writer);
 
-    // 三、现形：环里最新那条根还是发布 B 的 txg 4，它指着的单元已经被发布 C 原地盖掉。
-    let image = image_from(&stream);
-    let violations: Vec<&'static str> = check_pool_image(&image)
+    // 三、盘好了，原样重发 B；之后 C 接在 B 上照常发布。
+    plan.disarm();
+    let second = resend_the_frozen_publish(&mut writer, &mut allocator)
+        .expect("盘好了，重发这一遍不再报错")
+        .and_then(PoolVersion::into_file_version)
+        .expect("冻结着的是带文件的发布 B");
+    assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
+    let image_after_the_resend = image_from(&stream);
+    let violations_after_the_resend: Vec<&'static str> = check_pool_image(&image_after_the_resend)
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(_) => Some(invariant),
@@ -649,15 +702,31 @@ fn a_publish_that_fails_on_the_system_configuration_slot_leaves_a_root_whose_uni
         })
         .collect();
     assert!(
-        violations.contains(&"I-7.4") && violations.contains(&"I-7.2"),
-        "收口表第 40 行那一格的现形：最新根引用的单元已被复用（I-7.4）、最新根走不完（I-7.2）。判红的是 {violations:?}"
+        violations_after_the_resend.is_empty(),
+        "重发之后最新那条根（B 的 txg 4）指着的单元就是它自己写的那一份：checker 不红，判红的是 {violations_after_the_resend:?}"
     );
-    let recovery = recover(&image, JournalPolicy::Consult);
+    let recovery = recover(&image_after_the_resend, JournalPolicy::Consult);
     assert!(
-        matches!(recovery.outcome, RecoveryOutcome::Failed { .. }),
-        "重开走不到任何一条根（收口表第 40 行写的 `Recovery(UnitUnreadable)`）：{:?}",
+        matches!(
+            &recovery.outcome,
+            RecoveryOutcome::FileRead { root, content }
+                if *root == (instance, CheckpointTxg(4)) && *content == second_content()
+        ),
+        "冷启动读回 B：{:?}",
         recovery.outcome
     );
+    let third = publish_overwrite(
+        &mut writer,
+        &mut allocator,
+        &second,
+        FirstFile {
+            content: &third_content(),
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120,
+        },
+        instance,
+    )
+    .expect("重发之后 C 照常发布");
+    assert_eq!(third.root.checkpoint_txg, CheckpointTxg(5));
 }
 
 /// 起点（mkfs、取号 1、暖机、第一个文件）之后只做一步：关掉会话、可写挂载（取号 2 → 写行 → 暖机）。

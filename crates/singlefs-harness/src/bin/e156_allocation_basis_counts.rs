@@ -13,12 +13,12 @@
 //! 统计量行），不读内存里的 `PoolAllocator`；`allocated_minus_deferred_matches_referenced` 保留成内存读法，
 //! 只给 U8 的变异反面用（`crates/mutations.tsv` M21）。
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
-    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
 use singlefs_core::allocator::{
     DeviceFreeMap, Placement, PoolAllocator, ReclaimedReuse, ReuseWindow,
@@ -45,7 +45,8 @@ use singlefs_core::transaction::{
     InstanceTablePlan, PoolWriter, PublishError, PublishPlan, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::{
-    JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES, UNIT_AREA_START_SLOT,
+    CLUSTER_SEGMENT_SLOTS, JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES,
+    UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
 
@@ -71,15 +72,26 @@ const E156_UNIT_AREA_START_SLOT: u64 = 50176;
 /// `⌊(16384 − 135) ÷ 20⌋`；节点头 135 字节 = 86（固定头）+ 2 × 10（子节点指针，容量算式的一部分）+ 29（其余头字段）。
 const E156_ALLOCATION_RECORD_NODE_HEADER_BYTES: u64 = 86 + 2 * 10 + 29;
 const E156_ALLOCATION_RECORD_BYTES: u64 = 20;
-/// S1(e)：一次空发布 E 在 D0 上自己的释放槽数。抄自 `research/prompts/e156-preregistration.md` 第 431 行引用的
-/// E153 登记 M0.4；对不上就是「十一」S1 的停机条款，不是这一份自己定的门槛。
-const E156_EMPTY_PUBLISH_EXPECTED_RELEASED_SLOTS: u64 = 4;
-/// S1(e)：一次覆盖写 O 在 D0 上自己的释放槽数。抄自同一份 P11 修订 3（`503 = 13 + 49×10`，逐步都精确成立）。
-const E156_OVERWRITE_EXPECTED_RELEASED_SLOTS: u64 = 10;
-/// S1(f)：一次覆盖写让分配记录条数（D0 + D1 合计）增加多少。抄自登记「四」P18（「每次覆盖写每盘 + 8（共 16）」）。
-const E156_OVERWRITE_EXPECTED_RECORD_DELTA: usize = 16;
-/// S1(f)：第一个事务之后的分配记录条数。抄自登记「四」P18。
-const E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT: usize = 20;
+/// S1(f)：第一个事务之后的分配记录条数。E156 第 3 次重跑登记「七」7.2 K1-2（分配记录树按位置寻址之后，
+/// 五个树节点各占一条记录，28 = 2 × 14）；不再是登记第一、二版的 20（那时树只占 1 条记录）。
+const E156_FIRST_TRANSACTION_EXPECTED_RECORD_COUNT: usize = 28;
+/// R-3 本地常量①：分配记录树叶宽 W。**本地常量，值抄自 kb，不从 `crates/` 引**（`.claude/agents/
+/// experiment-runner.md` 入库装置第 ① 条）：抄自 `.claude/kb/decisions/08-核心索引结构.md:251`
+/// `<!-- format-const: ALLOCATION_RECORD_TREE_LEAF_SLOTS = 812 -->`。下面 `anchor_a_d8` 那一行把它
+/// 与 `singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS` 回比（只观测，F21：对不上不作废、不停机）。
+const E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
+/// R-3 本地常量②：分配记录树内部扇出 F。抄自 `.claude/kb/decisions/08-核心索引结构.md:254`
+/// `<!-- format-const: ALLOCATION_RECORD_TREE_INTERNAL_FANOUT = 169 -->`。
+const E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
+/// R-3：一次覆盖写里，非分配记录树自身的「其余单元」在 D0 上的释放槽数（E156 第 3 次重跑登记「七」7.2
+/// R-3：数据 2 + extent 1 + inode 叶 2 + inode 根 1 + 记账 1 + 映射 1 + 树表 1 = 9）。
+const E156_OVERWRITE_OTHER_UNITS_RELEASED_SLOTS: u64 = 9;
+/// R-3：同一批「其余单元」里会产生新分配记录条目的槽数（不含数据：数据槽被 `data_slot()` 复用同一个
+/// 已有的记录条目，不产生新条目，登记「七」7.2 R-4 的算术）。
+const E156_OVERWRITE_OTHER_UNITS_NEW_RECORD_SLOTS: u64 = 7;
+/// R-3：一次空发布里，非分配记录树自身的「其余单元」（记账 1 + 映射 1 + 树表 1 = 3，三者都走 bump、
+/// 每次都是新槽，释放与新增同值，登记「七」7.2 R-5）。
+const E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS: u64 = 3;
 
 fn parameters() -> MakeFilesystemParameters {
     MakeFilesystemParameters {
@@ -112,6 +124,160 @@ fn parameters_with_slots_per_region(count: u64) -> MakeFilesystemParameters {
             root_ring_slots_per_region: slots_per_region,
         },
     }
+}
+
+// ============================================================================================
+// R-3（E156 第 3 次重跑登记「七」7.2）：分配记录树按位置寻址之后，节点数不再是常数，只能从「这次发布
+// 实际改动的记录的槽号」现算。这一段只用 [`E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS`] /
+// [`E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT`] 两个本地常量与 `allocator.records()` 的真实读数，
+// 不调用 `crates/singlefs-core::allocation_record_tree` 的任何几何函数——那些函数就是被测的实装本身，
+// 拿它们来算「期望值」会让期望值与实装共用同一处错误。
+// ============================================================================================
+
+/// 一个槽所在的分配记录树叶位置 ⌊s ÷ W⌋（本地常量 W）。
+fn e156_leaf_position_of_slot(slot: u64) -> u64 {
+    slot / E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS
+}
+
+/// 一个叶位置所在的层级 1 位置 ⌊k ÷ F⌋（本地常量 F）。
+fn e156_level1_position_of_leaf(leaf: u64) -> u64 {
+    leaf / E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT
+}
+
+/// R-3：一次发布里分配记录树自身新写的节点数 = `devices × 叶数 + devices × 层级 1 数 + 1`（根只有一份，
+/// 两块盘共享；叶与层级 1 逐盘各一份，登记「七」7.2 R-3 逐字）。
+fn e156_allocation_record_tree_new_node_count(touched_leaves: &BTreeSet<u64>, devices: u64) -> u64 {
+    let touched_level1: BTreeSet<u64> = touched_leaves
+        .iter()
+        .map(|&leaf| e156_level1_position_of_leaf(leaf))
+        .collect();
+    devices * u64::try_from(touched_leaves.len()).expect("叶数落在 u64 内")
+        + devices * u64::try_from(touched_level1.len()).expect("层级 1 数落在 u64 内")
+        + 1
+}
+
+/// R-3：这次发布里被换下（COW 释放）的分配记录树旧节点数——只有这次触达、且这个位置在这次发布之前
+/// 已经有节点（叶位置 ∈ `existing_leaves`，或它的层级 1 位置 ∈ 现有层级 1 集合）的那些才会释放旧版本。
+fn e156_allocation_record_tree_replaced_node_count(
+    touched_leaves: &BTreeSet<u64>,
+    existing_leaves: &BTreeSet<u64>,
+    devices: u64,
+) -> u64 {
+    let touched_level1: BTreeSet<u64> = touched_leaves
+        .iter()
+        .map(|&leaf| e156_level1_position_of_leaf(leaf))
+        .collect();
+    let existing_level1: BTreeSet<u64> = existing_leaves
+        .iter()
+        .map(|&leaf| e156_level1_position_of_leaf(leaf))
+        .collect();
+    let leaves_kept = touched_leaves.intersection(existing_leaves).count();
+    let level1_kept = touched_level1.intersection(&existing_level1).count();
+    devices * u64::try_from(leaves_kept).expect("叶交集数落在 u64 内")
+        + devices * u64::try_from(level1_kept).expect("层级 1 交集数落在 u64 内")
+        + 1
+}
+
+/// R-3：D0 上这次发布之前，全部分配记录（不论已释放还是仍分配）所在的叶位置集合——「这个位置本来
+/// 有没有节点」的判据（D8（核心索引结构） 已定项 14「没有记录的一段 = 全空闲：那片叶不写」）。
+fn e156_existing_leaf_positions(allocator: &PoolAllocator, device: DeviceIdentity) -> BTreeSet<u64> {
+    allocator
+        .records()
+        .iter()
+        .filter(|record| record.device == device)
+        .map(|record| e156_leaf_position_of_slot(record.slot.0))
+        .collect()
+}
+
+/// R-3：D0 上这次发布翻成已释放或新加的全部记录所在的叶位置集合——真实记录的 `generation` 字段
+/// 在被触达的那一刻（无论新分配还是刚被释放）都改写成这次的 txg（D3（空间分配） 已定项 7 逐字），
+/// 用它筛出「这次改动的记录」不需要另外做前后快照 diff。
+fn e156_touched_leaf_positions(
+    allocator: &PoolAllocator,
+    device: DeviceIdentity,
+    txg: CheckpointTxg,
+) -> BTreeSet<u64> {
+    allocator
+        .records()
+        .iter()
+        .filter(|record| record.device == device && record.generation == txg)
+        .map(|record| e156_leaf_position_of_slot(record.slot.0))
+        .collect()
+}
+
+/// R-3：一次发布（覆盖写或空发布）D0 释放槽数与 D0+D1 记录增量的闭式期望值。
+/// `existing_leaves`：这次发布之前 D0 上已有记录的叶位置集合；`touched_leaves`：这次发布之后
+/// D0 上 `generation == 本次 txg` 的记录所在的叶位置集合。
+fn e156_closed_form_expected(
+    existing_leaves: &BTreeSet<u64>,
+    touched_leaves: &BTreeSet<u64>,
+    is_overwrite: bool,
+) -> (u64, u64) {
+    let new_nodes = e156_allocation_record_tree_new_node_count(touched_leaves, 2);
+    let replaced_nodes =
+        e156_allocation_record_tree_replaced_node_count(touched_leaves, existing_leaves, 2);
+    let (other_released, other_new_records) = if is_overwrite {
+        (
+            E156_OVERWRITE_OTHER_UNITS_RELEASED_SLOTS,
+            E156_OVERWRITE_OTHER_UNITS_NEW_RECORD_SLOTS,
+        )
+    } else {
+        (
+            E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS,
+            E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS,
+        )
+    };
+    (
+        other_released + replaced_nodes,
+        2 * (other_new_records + new_nodes),
+    )
+}
+
+/// R-7：一次推空发布（只改一片叶时）自己的固定点槽数——单设备的「新增记录」那一半，不乘 2（登记
+/// 「七」7.2 R-5「一次推空发布只改一片叶时的固定点 8 槽」，与 D0+D1 合计的记录增量相差一个 devices 因子）。
+fn e156_empty_publish_fixed_point_slots(existing_leaves: &BTreeSet<u64>) -> u64 {
+    E156_EMPTY_PUBLISH_OTHER_UNITS_SLOTS
+        + e156_allocation_record_tree_new_node_count(existing_leaves, 2)
+}
+
+/// R-3 本地常量③：根层级规则——最小的 R ≥ 1 使 Σ_盘 ⌈盘上槽数 ÷ (W × F^(R−1))⌉ ≤ F（D8（核心索引结构）
+/// 已定项 14「根罩整个 key 空间、按盘分流」那一行）。只用来与实装的 `AllocationRecordTreeGeometry`
+/// 回比（A-D8，只观测，F21：对不上不作废、不停机），不供 R-3 的节点数闭式使用。
+fn e156_root_level_for_symmetric_devices(unit_area_slots_per_device: u64, device_count: u64) -> u8 {
+    let mut level: u32 = 1;
+    loop {
+        let child_span = E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS
+            * E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT.pow(level - 1);
+        let total_cells = device_count * unit_area_slots_per_device.div_ceil(child_span);
+        if total_cells <= E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT {
+            return u8::try_from(level).expect("根层级落在 u8 内（池子不会大到需要 256 层）");
+        }
+        level += 1;
+    }
+}
+
+/// Q7d-1（R2 ⑤）：一组「这次发布自己的释放」样本的 (最小值, 最大值)——main() 与 U12 单测共用同一个
+/// 函数，M30（Q7d-1 覆盖写那一组退回字面 10）改这里，两处才会一起红。
+fn e156_minimum_and_maximum(samples: &[u64]) -> (u64, u64) {
+    (
+        samples.iter().min().copied().unwrap_or(0),
+        samples.iter().max().copied().unwrap_or(0),
+    )
+}
+
+/// R-7：一块盘开放聚簇段里当前的空闲槽数（登记「五」5.1 HY「e ≥ max(8, f)」的 e）。
+fn e156_open_segment_free_slots(allocator: &PoolAllocator, device: DeviceIdentity) -> u64 {
+    let Some(open_segment_start) = allocator.open_segment() else {
+        return 0;
+    };
+    let device_map = allocator
+        .devices
+        .iter()
+        .find(|map| map.device == device)
+        .expect("这块盘在池里");
+    (0..CLUSTER_SEGMENT_SLOTS)
+        .filter(|offset| device_map.is_free(SlotNumber(open_segment_start.0 + offset)))
+        .count() as u64
 }
 
 /// 覆盖写第 `step` 次的文件内容：定长 3000 字节，字节序列随 `step` 变，保证每次覆盖写都改变用户可见状态（骨架发布 的 O）。
@@ -706,9 +872,10 @@ fn run_pc_check(
     ));
 }
 
-/// Q7c①②：判别力自证。②在 `deferred == 0` 的基底上（β_syn、β_F0）无从执行（Bd(−1) 会把 item5 减成负数，
-/// 这是写装置时读出的一种真正的未定义输入，不是两种读法的分歧——见「十二」修订，这里记 `not_applicable=true`，
-/// 不算进任何门槛）。
+/// Q7c①②：判别力自证。②在 `deferred == 0` 的基底上（β_syn、β_F0，以及第 10 个基底 `beta_hr_rollback_row`，
+/// 见「十二」修订 4）无从执行（Bd(−1) 会把 item5 减成负数，这是写装置时读出的一种真正的未定义输入，不是两种
+/// 读法的分歧——见「十二」修订，这里记 `not_applicable=true`，不算进任何门槛）。①在 `beta_hr_rollback_row`
+/// 上第一次在**可达**基底上转色（此前 β0/β1/β2/βK-w/r/f/l2 七个可达基底 `deferred` 都 ≥ 1，①恒不转色）。
 fn q7c_self_test(
     emitter: &mut Emitter,
     basis: &str,
@@ -862,6 +1029,9 @@ fn run_hk_family(
     );
 
     // E（空发布）
+    let existing_leaves_before_empty_publish =
+        e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
+    let records_before_empty_publish = allocator.records().len();
     current = publish_empty(
         parameters,
         devices.as_mut_slice(),
@@ -875,6 +1045,37 @@ fn run_hk_family(
         DeviceIdentity(0),
         current.root.checkpoint_txg,
     );
+    // R-5（第七节 7.2）：HK 那一次空发布 D0 释放槽数与记录增量的闭式核对，只在 `label == "HK"`（真实、
+    // 可达的那一臂）上钉硬断言；HK-F0 只观测，不 panic（它的可达性本来就不参与 Q7b/Q7d 的统计）。
+    let touched_leaves_empty_publish = e156_touched_leaf_positions(
+        &allocator,
+        DeviceIdentity(0),
+        current.root.checkpoint_txg,
+    );
+    let (expected_empty_publish_released, expected_empty_publish_record_delta) =
+        e156_closed_form_expected(
+            &existing_leaves_before_empty_publish,
+            &touched_leaves_empty_publish,
+            false,
+        );
+    let empty_publish_record_delta = u64::try_from(
+        allocator.records().len() - records_before_empty_publish,
+    )
+    .expect("空发布的记录增量落在 u64 内");
+    emitter.emit(&format!(
+        "name=r5_empty_publish_closed_form label={label} released_d0={empty_publish_release_slots} expected_released_d0={expected_empty_publish_released} record_delta={empty_publish_record_delta} expected_record_delta={expected_empty_publish_record_delta} fixed_point_slots_one_leaf={}",
+        e156_empty_publish_fixed_point_slots(&existing_leaves_before_empty_publish),
+    ));
+    if label == "HK" {
+        assert_eq!(
+            empty_publish_release_slots, expected_empty_publish_released,
+            "R-5：HK 空发布 D0 释放槽数应等于闭式"
+        );
+        assert_eq!(
+            empty_publish_record_delta, expected_empty_publish_record_delta,
+            "R-5：HK 空发布记录增量应等于闭式"
+        );
+    }
     record_legal_state(
         emitter,
         legal_states,
@@ -1365,8 +1566,9 @@ fn run_s1c_rollback_isolation_scenario(
     );
     assert_eq!(
         remounted.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 34), (DeviceIdentity(1), 34)],
-        "S1c：按 D 那一版实例表判被抛弃的根引用的槽，普通重开照样隔离"
+        vec![(DeviceIdentity(0), 54), (DeviceIdentity(1), 54)],
+        "S1c：按 D 那一版实例表判被抛弃的根引用的槽，普通重开照样隔离（R-6，第七节 7.2：分配记录树\
+         按位置寻址之后每盘 54 槽，不再是原登记的 34）"
     );
     assert_eq!(
         remounted.output.abandoned_roots_unreadable, 0,
@@ -2014,6 +2216,17 @@ fn run_small_pool_cell(emitter: &mut Emitter, pool_label: &str, maximum_overwrit
     emitter.emit(&format!(
         "name=x8a_prefix pool={pool_label} overwrite_count={overwrite_count} stop_reason={stop_reason} allocated={allocated} free={free} deferred={deferred}"
     ));
+    // R-7（第七节 7.2）：HY 的定义改成 e ≥ max(8, f)——e 是这一刻开放段里的空槽数，f 是一次推空发布
+    // （只改一片叶时）自己的固定点槽数，两者都现算，不再是「≥ 8」这句原文的字面。HX 上同样报这一行，
+    // 只作观测（HX 的定义是填到耗尽，这一条件在 HX 上多半不成立，不构成对照失败）。
+    let open_segment_free_slots = e156_open_segment_free_slots(&allocator, DeviceIdentity(0));
+    let existing_leaves_at_raise = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
+    let fixed_point_slots = e156_empty_publish_fixed_point_slots(&existing_leaves_at_raise);
+    let hy_threshold = fixed_point_slots.max(8);
+    emitter.emit(&format!(
+        "name=r7_hy_condition pool={pool_label} open_segment_free_slots={open_segment_free_slots} fixed_point_slots={fixed_point_slots} threshold={hy_threshold} holds={}",
+        open_segment_free_slots >= hy_threshold
+    ));
 
     // 探上限：与 HF 单格同一个办法。
     let mut probe_devices = devices_from_memory_pool(&memory_pool_snapshot(&devices));
@@ -2169,6 +2382,23 @@ fn run_small_pool_cell(emitter: &mut Emitter, pool_label: &str, maximum_overwrit
         "name=q3e_x8a pool={pool_label} status=done f_kou_stuck={real_stuck} reconstructed_raise_stuck={reconstructed_raise_stuck} both_stuck_at_same_step={} note=see_x8a_held_measure_and_f_kou_g7_lines",
         real_stuck == reconstructed_raise_stuck,
     ));
+}
+
+/// R-7（第一节 R1、第七节 7.2）：HY 原来靠「只跑 3 次覆盖写」留出空间，`e ≥ 8` 从没被装置核过；
+/// 这一次改成 `e ≥ max(8, f)` 现核——3 次不满足就减少覆盖写次数直到满足（登记「五」5.1 逐字）。
+/// 只建前缀、量 `e`/`f`，不跑 `run_small_pool_cell` 的其余部分（避免为找 cap 打印一堆用不上的行）。
+fn e156_find_hy_cap_satisfying_open_segment_condition(parameters: &MakeFilesystemParameters) -> u64 {
+    for cap in (0..=3u64).rev() {
+        let (_devices, allocator, _instance, _current, _overwrite_count, _stop_reason) =
+            build_small_pool_prefix(parameters, Some(cap));
+        let open_segment_free_slots = e156_open_segment_free_slots(&allocator, DeviceIdentity(0));
+        let existing_leaves = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
+        let fixed_point_slots = e156_empty_publish_fixed_point_slots(&existing_leaves);
+        if open_segment_free_slots >= fixed_point_slots.max(8) {
+            return cap;
+        }
+    }
+    0
 }
 
 // ============================================================================================
@@ -2550,6 +2780,17 @@ fn main() {
         allocation_record_node_capacity, 812,
         "A7：分配记录节点容量应为 812"
     );
+    // A-D8（第七节 7.1）：本地叶宽 / 扇出与实装的 `singlefs_format` 同名常量回比，本地「根层级规则」
+    // 与实装的 `AllocationRecordTreeGeometry::of_allocator` 回比——只观测，不 assert：这两条出自被测
+    // 条款本身，对不上走 F21，不作废、不停机（第十节 F21、第七节 7.1 表头）。
+    let leaf_slots_match_format_crate = E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS
+        == singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS;
+    let internal_fanout_match_format_crate = E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT
+        == singlefs_format::ALLOCATION_RECORD_TREE_INTERNAL_FANOUT;
+    let my_root_level = e156_root_level_for_symmetric_devices(unit_area_slot_count, 2);
+    emitter.emit(&format!(
+        "name=anchor_a_d8 local_leaf_slots={E156_ALLOCATION_RECORD_TREE_LEAF_SLOTS} local_internal_fanout={E156_ALLOCATION_RECORD_TREE_INTERNAL_FANOUT} local_leaf_slots_matches_format_crate={leaf_slots_match_format_crate} local_internal_fanout_matches_format_crate={internal_fanout_match_format_crate} my_root_level={my_root_level}"
+    ));
 
     // ===== mkfs + 取号 + 暖机 + 第一个事务：K1、S1(a)(g)、H0/HR/HK 共用的起点 =====
     let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
@@ -2606,6 +2847,17 @@ fn main() {
             span: 1,
         },
     );
+    // A-D8（续）：实装的根层级只由每块盘的槽数决定，与记录内容无关，mkfs 之后就能读——与上面本地
+    // 算出的 `my_root_level` 回比（只观测，F21）。
+    let real_root_level =
+        singlefs_core::allocation_record_tree::AllocationRecordTreeGeometry::of_allocator(
+            &allocator,
+        )
+        .root_level();
+    emitter.emit(&format!(
+        "name=anchor_a_d8_root_level my_root_level={my_root_level} real_root_level={real_root_level} matches={}",
+        my_root_level == real_root_level
+    ));
     let instance = {
         let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         acquire_instance(&mut pool).expect("取号")
@@ -2631,16 +2883,18 @@ fn main() {
         .expect("第一个事务")
     };
 
-    // K1：txg 3 之后 D0 的记账第 1/2/5 项，与登记里钉的绝对值比对（S1(a)）。
+    // K1：txg 3 之后 D0 的记账第 1/2/5 项，与登记里钉的绝对值比对（S1(a)）。K1-1（第七节 7.2）：
+    // 分配记录树按位置寻址之后第 1 项为 17（不再是原登记的 13：多出的 4 槽是这五个树节点里比原来
+    // 单节点多出的那四个），第 5 项仍是 1。
     let (allocated0, free0, deferred0) = accounting_row_slots(&allocator, DeviceIdentity(0));
+    let k1_1_matches_registered_item1_of_17_and_item5_of_1 = allocated0 == 17 && deferred0 == 1;
     emitter.emit(&format!(
-        "name=k1_after_first_transaction txg={} allocated_slots={allocated0} free_slots={free0} deferred_slots={deferred0} registered_item1_slots=13 registered_item5_slots=1 matches_registered={}",
+        "name=k1_after_first_transaction txg={} allocated_slots={allocated0} free_slots={free0} deferred_slots={deferred0} registered_item1_slots=17 registered_item5_slots=1 matches_registered={k1_1_matches_registered_item1_of_17_and_item5_of_1}",
         current.root.checkpoint_txg.0,
-        allocated0 == 13 && deferred0 == 1,
     ));
     assert!(
-        allocated0 == 13 && deferred0 == 1,
-        "S1(a)：K1 应当逐字匹配登记"
+        k1_1_matches_registered_item1_of_17_and_item5_of_1,
+        "S1(a)：K1-1 应当逐字匹配登记（第七节 7.2，17/1）"
     );
     let mut placements: Vec<(u64, u64)> = current
         .units
@@ -2659,7 +2913,7 @@ fn main() {
     ));
 
     // S1(f)：第一个事务之后的分配记录条数（D0 + D1 合计）。
-    let mut previous_record_count = allocator.records().len();
+    let previous_record_count = allocator.records().len();
     emitter.emit(&format!(
         "name=s1f_record_count txg={} count={previous_record_count}",
         current.root.checkpoint_txg.0
@@ -2698,7 +2952,7 @@ fn main() {
         "β0 上镜像读法与内存读法应当一致（都还没 corrupt）"
     );
 
-    // ===== H0：暖机之后连续覆盖写 6N 次（N = 3S，S 是每区槽数；ρ = 1，每次都是 O），撞墙即截断 =====
+    // ===== H0：暖机之后连续覆盖写 6N 次（N = 3S，S 是每区槽数；ρ = 1，每次都是 O），写失败即截断 =====
     let ring_length = ROOT_RING_REGIONS * E156_SLOTS_PER_REGION;
     let baseline_workload_length = 6 * ring_length;
     let hr_prefix_length = 3 * ring_length;
@@ -2709,7 +2963,14 @@ fn main() {
 
     let s1d_cutoff = 3 * E156_SLOTS_PER_REGION + 6;
     let mut baseline_workload_actual_length: u64 = 0;
+    // Q3r.2（第七节 R-3）：闭式不再是常数，逐次核对，出不符不 panic（S1(e)(f) 现在是「两边都查」的
+    // 观测型停机，不是硬 panic：一次不符就让整轮产物都出不来，反而没法看后面每一步的读数）。
+    let mut overwrite_release_samples: Vec<u64> = Vec::new();
+    let mut s1ef_mismatches: u64 = 0;
+    let mut s1ef_leaf_count_histogram: BTreeMap<usize, u64> = BTreeMap::new();
     for step in 1..=baseline_workload_length {
+        let existing_leaves_before_step = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
+        let records_before_step = allocator.records().len();
         let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
         let outcome = publish_overwrite(
             &mut pool,
@@ -2724,40 +2985,49 @@ fn main() {
         let published = match outcome {
             Ok(published) => published,
             Err(failure) => {
-                if let PublishError::AllocationRecordsExceedOneNode { records, capacity } = failure
-                {
-                    assert_eq!(capacity, 812, "A7：撞墙时的节点容量应为 812");
-                    emitter.emit(&format!(
-                        "name=baseline_workload_truncated_by_write_failure requested_length={baseline_workload_length} actual_length={baseline_workload_actual_length} failed_at_step={step} records={records} capacity={capacity}"
-                    ));
-                } else {
-                    emitter.emit(&format!(
-                        "name=baseline_workload_truncated_by_write_failure requested_length={baseline_workload_length} actual_length={baseline_workload_actual_length} failed_at_step={step} failure={failure:?}"
-                    ));
-                }
+                // 分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）没有一个节点 812 条那道墙，截断只剩别的失败。
+                emitter.emit(&format!(
+                    "name=baseline_workload_truncated_by_write_failure requested_length={baseline_workload_length} actual_length={baseline_workload_actual_length} failed_at_step={step} failure={failure:?}"
+                ));
                 break;
             }
         };
         current = published;
         baseline_workload_actual_length = step;
-        // S1(e)：一次 O 自己的释放槽数应恒为 10。
+        // R-3a/R-3b（第七节 7.2）：一次 O 的释放槽数与记录增量按闭式逐次核对（Q3r.2）。
         let released = self_release_slots_of_this_publish(
             &allocator,
             DeviceIdentity(0),
             current.root.checkpoint_txg,
         );
-        assert_eq!(
-            released, E156_OVERWRITE_EXPECTED_RELEASED_SLOTS,
-            "S1(e)：第 {step} 次覆盖写自己的释放槽数应为 10"
+        let touched_leaves_this_step =
+            e156_touched_leaf_positions(&allocator, DeviceIdentity(0), current.root.checkpoint_txg);
+        let (expected_released, expected_record_delta) = e156_closed_form_expected(
+            &existing_leaves_before_step,
+            &touched_leaves_this_step,
+            true,
         );
-        // S1(f)：分配记录条数每次 O 应增 16。
         let record_count = allocator.records().len();
-        assert_eq!(
-            record_count,
-            previous_record_count + E156_OVERWRITE_EXPECTED_RECORD_DELTA,
-            "S1(f)：第 {step} 次覆盖写的分配记录条数增量应为 16"
-        );
-        previous_record_count = record_count;
+        let record_delta = u64::try_from(record_count - records_before_step)
+            .expect("这一步的记录增量落在 u64 内");
+        let step_matches = released == expected_released && record_delta == expected_record_delta;
+        if !step_matches {
+            s1ef_mismatches += 1;
+        }
+        let changed_internal_count = touched_leaves_this_step
+            .iter()
+            .map(|&leaf| e156_level1_position_of_leaf(leaf))
+            .collect::<BTreeSet<_>>()
+            .len();
+        *s1ef_leaf_count_histogram
+            .entry(touched_leaves_this_step.len())
+            .or_insert(0) += 1;
+        emitter.emit(&format!(
+            "name=s1ef_step step={step} txg={} changed_leaves={} changed_internal={changed_internal_count} released_d0={released} expected_released_d0={expected_released} record_delta={record_delta} expected_record_delta={expected_record_delta} matches={step_matches}",
+            current.root.checkpoint_txg.0,
+            touched_leaves_this_step.len(),
+        ));
+        overwrite_release_samples.push(released);
         let pool_snapshot = memory_pool_snapshot(&devices);
         // S1(d)：前 3S + 6 次逐次报第 1/2/5 项与今天两条检查（应当全绿：这些都是合法状态）。
         if step <= s1d_cutoff {
@@ -2786,6 +3056,16 @@ fn main() {
             "name=baseline_workload_completed_full_length length={baseline_workload_length}"
         ));
     }
+    // Q3r.2 汇总：H0 上逐次核对的不符次数与「改动落在几片叶」的直方图（第八节 8.2 要求两个方向都要有：
+    // 落在 1 片叶与落在 ≥ 2 片叶的步各至少一次）。
+    let s1ef_histogram_text: Vec<String> = s1ef_leaf_count_histogram
+        .iter()
+        .map(|(leaf_count, steps)| format!("{leaf_count}:{steps}"))
+        .collect();
+    emitter.emit(&format!(
+        "name=s1ef_summary steps={baseline_workload_actual_length} mismatches={s1ef_mismatches} steps_by_changed_leaf_count={}",
+        s1ef_histogram_text.join(",")
+    ));
     let beta1_basis = basis_of("beta1_h0", &memory_pool_snapshot(&devices), &current, true);
     emitter.emit(&format!(
         "name=beta1_h0_end txg={} accounting_slot={} referenced={}",
@@ -2851,7 +3131,7 @@ fn main() {
         &hr_current,
         &memory_pool_snapshot(&hr_devices),
     );
-    // 同 H0：分配记录树没有回收，前缀段大概率在到 3N 之前就撞上 `AllocationRecordsExceedOneNode`（见 H0 那段注释）。
+    // 同 H0：分配记录树按位置寻址之后（D8（核心索引结构） 已定项 14）没有一个节点 812 条那道墙，截断只剩别的失败。
     let mut hr_prefix_actual_length: u64 = 0;
     for step in 1..=hr_prefix_length {
         let mut pool = PoolWriter::new(&parameters, hr_devices.as_mut_slice());
@@ -2876,6 +3156,13 @@ fn main() {
         };
         hr_current = published;
         hr_prefix_actual_length = step;
+        // Q7d-1（R2 ⑤）：H0 与 HR 的每一次 O 都要计进「这次发布自己的释放」的取样；HR 这里只量测，
+        // 不逐次核闭式（Q3r.2 只在 H0 一条历史上核，第八节 8.2）。
+        overwrite_release_samples.push(self_release_slots_of_this_publish(
+            &hr_allocator,
+            DeviceIdentity(0),
+            hr_current.root.checkpoint_txg,
+        ));
         record_legal_state(
             &mut emitter,
             &mut legal_states,
@@ -2934,6 +3221,19 @@ fn main() {
             .expect("回退写行那一版带文件"),
         &memory_pool_snapshot(&hr_devices),
     );
+    // 第 10 个基底（E156 第 3 次重跑登记「十二」修订 4）：这一步是这个装置迄今第一个第 5 项恰为 0 的
+    // 可达合法状态（`q7d2_min_item5` 在这一步之后会读到 `family=HR kind=rollback_row txg=76`）——
+    // 岔路 7 Q7c① 的判别力自证隐含要求「基底第 5 项恰为 0」，此前 7 个可达基底都不满足，这里第一次有对象。
+    let beta_hr_rollback_row = basis_of(
+        "beta_hr_rollback_row",
+        &memory_pool_snapshot(&hr_devices),
+        mounted
+            .output
+            .row_publish
+            .file_version()
+            .expect("回退写行那一版带文件"),
+        true,
+    );
     for warm in &mounted.output.warm_up_publishes {
         record_legal_state(
             &mut emitter,
@@ -2975,6 +3275,11 @@ fn main() {
         };
         hr_current = published;
         hr_tail_actual_length = step;
+        overwrite_release_samples.push(self_release_slots_of_this_publish(
+            &hr_allocator,
+            DeviceIdentity(0),
+            hr_current.root.checkpoint_txg,
+        ));
         record_legal_state(
             &mut emitter,
             &mut legal_states,
@@ -3013,15 +3318,13 @@ fn main() {
         &mut emitter,
         &mut legal_states,
     );
-    // S1(e)：空发布 E 自己的释放槽数应为 4（E153 登记 M0.4）。
+    // S1(e)：空发布 E 自己的释放槽数不再是登记第一、二版钉的常数 4（分配记录树按位置寻址之后
+    // 不再是一个节点，R-5：这一次 = 8）；闭式核对已经在 `run_hk_family` 里对 `label == "HK"` 做过
+    // （`name=r5_empty_publish_closed_form`），这里只留一行观测方便直接搜。
     emitter.emit(&format!(
         "name=s1e_empty_publish_release slots={}",
         hk.empty_publish_release_slots
     ));
-    assert_eq!(
-        hk.empty_publish_release_slots, E156_EMPTY_PUBLISH_EXPECTED_RELEASED_SLOTS,
-        "S1(e)：空发布 E 自己的释放槽数与 E153 登记 M0.4 的 4 槽不等（停机）"
-    );
 
     let mut hk_forced_to_zero_legal_states: Vec<LegalState> = Vec::new();
     let hk_forced_to_zero = run_hk_family(
@@ -3104,15 +3407,14 @@ fn main() {
         first_red_legal_states.join(" | ")
     ));
 
-    // ===== Q7d-1：按发布种类分组的「这次发布自己的释放」（min/max/count）。H0/HR 的每一次 O 都在循环内被
-    // S1(e) 的 assert_eq! 钉死为 10（已即时核过，这里只汇总计数，不重新起分配器算一遍同一个数）；
-    // E 的唯一样本来自 HK（S1(e) 已单独报过）。 =====
-    let overwrite_count = legal_states
-        .iter()
-        .filter(|state| state.kind == "O")
-        .count();
+    // ===== Q7d-1（R2 ⑤，逐次现量）：按发布种类分组的「这次发布自己的释放」（min/max/count）。
+    // O 不再是常数：`overwrite_release_samples` 逐次收自 H0 与 HR（前缀 + 尾段）的每一次 O；
+    // E 的唯一样本来自 HK（`hk.empty_publish_release_slots`）。 =====
+    let (overwrite_release_minimum, overwrite_release_maximum) =
+        e156_minimum_and_maximum(&overwrite_release_samples);
     emitter.emit(&format!(
-        "name=q7d1_by_kind kind=O min=10 max=10 count={overwrite_count}"
+        "name=q7d1_by_kind kind=O min={overwrite_release_minimum} max={overwrite_release_maximum} count={}",
+        overwrite_release_samples.len()
     ));
     emitter.emit(&format!(
         "name=q7d1_by_kind kind=E min={0} max={0} count=1",
@@ -3142,7 +3444,9 @@ fn main() {
     emitter.emit(&format!("name=q7d3_pc_reachable hk_forced_to_zero_smallest_item5_item5={hk_forced_to_zero_smallest_item5} beta_syn_item5={syn_item5} holds={q7d3_holds}"));
 
     // ===== 统一的基底列表：Q7a（三档 delta）、Q7c①②、PC-检查、Q7f =====
-    let bases: [&BasisSnapshot; 9] = [
+    // 第 10 个（beta_hr_rollback_row，E156 第 3 次重跑登记「十二」修订 4）：唯一一个第 5 项恰为 0 的
+    // 可达基底，Q7c① 的判别力自证第一次在它上面有对象（见插入这个基底那一处的注释）。
+    let bases: [&BasisSnapshot; 10] = [
         &beta0_basis,
         &beta1_basis,
         &beta2_basis,
@@ -3150,6 +3454,7 @@ fn main() {
         &hk.beta_after_rollback,
         &hk.beta_after_raise_floor,
         &hk.beta_after_crash_recovery,
+        &beta_hr_rollback_row,
         &beta_syn,
         &beta_forced_to_zero,
     ];
@@ -3242,7 +3547,7 @@ fn main() {
 
     // ===== 完整性闸（V7）：族数、取样点数、逐发布行数（岔路 7，第一段）=====
     emitter.emit(&format!(
-        "name=integrity families=3 legal_state_rows={} hk_forced_to_zero_rows={} basis_count=9",
+        "name=integrity families=3 legal_state_rows={} hk_forced_to_zero_rows={} basis_count=10",
         legal_states.len(),
         hk_forced_to_zero_legal_states.len(),
     ));
@@ -3250,7 +3555,10 @@ fn main() {
     // ===== 岔路 3（第二段，缩小范围：S = 8、ρ = 1 一个几何取样点，见文件顶注释）=====
     run_hf_single_cell(&parameters, &mut emitter);
     run_small_pool_cell(&mut emitter, "hx", None);
-    run_small_pool_cell(&mut emitter, "hy", Some(3));
+    // R-7：HY 的覆盖写次数不再写死 3——3 次不满足 e ≥ max(8, f) 就减少直到满足（第十二节记录用了几次）。
+    let hy_cap = e156_find_hy_cap_satisfying_open_segment_condition(&small_pool_parameters());
+    emitter.emit(&format!("name=r7_hy_cap chosen_cap={hy_cap}"));
+    run_small_pool_cell(&mut emitter, "hy", Some(hy_cap));
 
     // ===== 岔路 1（第三段 a 的一部分，S 这一维：S = 8（mkfs 默认）与 S = 4（下界，方向相反，
     // 「五、5.6」第六类「至少一个方向相反的取样点」），ρ = 1、回收时点固定「实」、洞位置固定「后」，
@@ -3431,21 +3739,29 @@ mod tests {
     //! 的实例表兜底分支：删掉它，第一条测试必须红（`assert_eq!` 那一行断言 12，变异之后会算出 10）。
     use super::{
         accounting_row_slots, allocated_minus_deferred_matches_referenced,
-        allocated_minus_deferred_mismatches_referenced, corrupt_device_zero_accounting,
-        memory_pool_snapshot, parameters, referenced_slots, self_release_slots_of_this_publish,
-        FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+        allocated_minus_deferred_mismatches_referenced, basis_of, corrupt_device_zero_accounting,
+        e156_allocation_record_tree_new_node_count, e156_closed_form_expected,
+        e156_existing_leaf_positions, e156_touched_leaf_positions,
+        memory_pool_snapshot, mirror_accounting_row_slots, parameters, q7c_self_test,
+        referenced_slots, run_s1c_rollback_isolation_scenario,
+        self_release_slots_of_this_publish, Emitter, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
     };
-    use singlefs_core::address::DeviceIdentity;
-    use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator, ReclaimedReuse};
+    use std::collections::BTreeSet;
+    use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
+    use singlefs_core::allocator::{
+        AllocationRecord, DeviceFreeMap, Placement, PoolAllocator, ReclaimedReuse,
+    };
     use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
     use singlefs_core::make_filesystem::{
         make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
     };
+    use singlefs_core::mount::{mount_rollback, RollbackTarget, ShadowLedger};
+    use singlefs_core::recovery::{effective_rollback_floor, readable_roots};
     use singlefs_core::transaction::{
-        acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
-        TransactionUnit,
+        acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
+        TransactionOutput, TransactionUnit,
     };
-    use singlefs_format::SLOT_BYTES;
+    use singlefs_format::{ROOT_RING_REGIONS, SLOT_BYTES};
     use singlefs_harness::crash::SparseBlockDevice;
 
     fn first_transaction_state() -> (
@@ -3505,26 +3821,30 @@ mod tests {
         (allocator, first, devices)
     }
 
+    /// K1-1（E156 第 3 次重跑登记「七」7.2）：分配记录树按位置寻址之后第一个事务的记账第 1 项是 17
+    /// （五个树节点占五条记录，不再是登记第一、二版的单节点 13），第 5 项仍是 1。
     #[test]
     fn accounting_after_first_transaction_matches_the_registered_anchor() {
         let (allocator, first, _devices) = first_transaction_state();
         assert_eq!(first.root.checkpoint_txg.0, 3);
         let (allocated, _free, deferred) = accounting_row_slots(&allocator, DeviceIdentity(0));
-        assert_eq!(allocated, 13, "K1 第 1 项");
-        assert_eq!(deferred, 1, "K1 第 5 项");
+        assert_eq!(allocated, 17, "K1-1 第 1 项");
+        assert_eq!(deferred, 1, "K1-1 第 5 项");
     }
 
+    /// K1-3：β0 的最新根走读引用 = 16（实例表 2 槽 + 第一个事务九个角色共 14 槽，五个分配记录树节点
+    /// 记在这 14 槽里），不再是登记第一、二版的 12。
     #[test]
     fn referenced_slots_counts_the_carried_instance_table_before_its_first_rewrite() {
         let (allocator, first, _devices) = first_transaction_state();
         let referenced = referenced_slots(&first);
         assert_eq!(
-            referenced, 12,
-            "实例表 2 槽（未进 units，靠兜底加回）+ 第一个事务 8 个角色共 10 槽"
+            referenced, 16,
+            "实例表 2 槽（未进 units，靠兜底加回）+ 第一个事务九个角色共 14 槽（K1-3）"
         );
         assert!(
             allocated_minus_deferred_matches_referenced(&allocator, DeviceIdentity(0), referenced),
-            "第一个事务之后 G27 应当成立：13 − 1 == 12"
+            "第一个事务之后 G27 应当成立：17 − 1 == 16（K1-3）"
         );
     }
 
@@ -3572,8 +3892,8 @@ mod tests {
             accounting_row_slots(&allocator, DeviceIdentity(0));
         assert_eq!(
             (memory_allocated, memory_deferred),
-            (13, 1),
-            "U8：同一镜像上内存分配器的行没变（只改了镜像字节）"
+            (17, 1),
+            "U8：同一镜像上内存分配器的行没变（只改了镜像字节，K1-1：17/1）"
         );
     }
 
@@ -3705,4 +4025,272 @@ mod tests {
     // 不暴露推空循环中途的钩子，而空发布本身会重写树表单元（连带新分配 + 释放旧树表槽，登记 D16（发布语义）
     // 已定项 1「非空」段落逐字），使「推空前后记账第 1 项该差多少」不是一条简单算式，贸然钉一个数风险比价值大；
     // 写进交回报告的岔路表，留给下一段。
+
+    /// PC-闭式自测第一、二、四组（E156 第 3 次重跑登记「七」7.2 R-3c）：只在合成的叶位置集合上单测
+    /// 闭式函数本身，不依赖真实分配器。M27（闭式漏掉根）、M28（闭式每个改动的叶位置只算一块盘）应当
+    /// 分别让第一组从 5 变成 4 与 3。
+    #[test]
+    fn pc_closed_form_matches_the_registered_anchor_r3c() {
+        let one_leaf: BTreeSet<u64> = [61].into_iter().collect();
+        let two_leaves: BTreeSet<u64> = [61, 62].into_iter().collect();
+        let leaves_in_two_internal: BTreeSet<u64> = [61, 170].into_iter().collect();
+        assert_eq!(
+            e156_allocation_record_tree_new_node_count(&one_leaf, 2),
+            5,
+            "R-3c：只在第 61 片叶（两盘）"
+        );
+        assert_eq!(
+            e156_allocation_record_tree_new_node_count(&two_leaves, 2),
+            7,
+            "R-3c：第 61、62 片叶"
+        );
+        assert_eq!(
+            e156_allocation_record_tree_new_node_count(&leaves_in_two_internal, 2),
+            9,
+            "R-3c：第 61 与第 170 片叶（第 170 片在第二个层级 1 节点里）"
+        );
+        assert_eq!(
+            e156_allocation_record_tree_new_node_count(&one_leaf, 1),
+            3,
+            "R-3c：一盘、只在第 61 片叶"
+        );
+        assert!(
+            170 * 812 >= 812 * 169,
+            "R-3c：170 号叶应落在第二个层级 1 节点里"
+        );
+    }
+
+    /// PC-闭式第三组（R-3c，M29 的取样点）：合成一份记录——一条在第 61 片叶已释放、一条在第 170 片叶
+    /// 仍分配，两条 `generation` 都是这次的 txg。`e156_touched_leaf_positions` 应当把两条都算进
+    /// 「这次改动」，给出 9；M29（闭式的「改动的记录」只取这次分配的、不取这次释放的）应当让这一格
+    /// 只剩第 170 片叶一条，变成 5。
+    #[test]
+    fn pc_closed_form_third_group_counts_released_and_allocated_records() {
+        let devices = vec![DeviceFreeMap::new(DeviceIdentity(0), IMAGE_BYTES)];
+        let txg = CheckpointTxg(9);
+        let released_slot = 50245u64;
+        let allocated_slot = 170u64 * 812;
+        let records = vec![
+            AllocationRecord {
+                device: DeviceIdentity(0),
+                slot: SlotNumber(released_slot),
+                span_slots: 1,
+                generation: txg,
+                is_released: true,
+            },
+            AllocationRecord {
+                device: DeviceIdentity(0),
+                slot: SlotNumber(allocated_slot),
+                span_slots: 1,
+                generation: txg,
+                is_released: false,
+            },
+        ];
+        let allocator = PoolAllocator::rebuild_from_records(devices, records);
+        let touched = e156_touched_leaf_positions(&allocator, DeviceIdentity(0), txg);
+        assert_eq!(
+            touched, BTreeSet::from([61, 170]),
+            "PC-闭式第三组：应当同时看到释放在第 61 片、分配在第 170 片两条"
+        );
+        assert_eq!(
+            e156_allocation_record_tree_new_node_count(&touched, 2),
+            9,
+            "R-3c：第 61 与第 170 片叶应给出 9"
+        );
+    }
+
+    /// U10（第九节）：β0 之后连续覆盖写，逐次核对 R-3 的闭式；次序不钉死，只保证跑够多步、两个方向
+    /// （落在 1 片叶 / 落在 ≥ 2 片叶）都至少出现一次（第八节 8.2）。前 4 次另外钉 R-4 的绝对值
+    /// （released_d0=14、record_delta=24）。U12（Q7d-1，R2 ⑤）：这段历史上逐次现量的最小值 14、
+    /// 最大值 ≥ 16——M30（Q7d-1 覆盖写那一组退回字面 10）应当让最小值变成 10。
+    #[test]
+    fn overwrite_steps_match_the_closed_form_and_cross_a_second_leaf() {
+        let (mut allocator, first, mut devices) = first_transaction_state();
+        let parameters = parameters();
+        let instance = InstanceGeneration(1);
+        let mut current = first;
+        let mut release_samples: Vec<u64> = Vec::new();
+        let mut saw_single_leaf_step = false;
+        let mut saw_multi_leaf_step = false;
+        for step in 1..=12u64 {
+            let existing_leaves = e156_existing_leaf_positions(&allocator, DeviceIdentity(0));
+            let records_before = allocator.records().len();
+            current = {
+                let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+                singlefs_core::transaction::publish_overwrite(
+                    &mut pool,
+                    &mut allocator,
+                    &current,
+                    FirstFile {
+                        content: &super::overwrite_content(step),
+                        write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + step,
+                    },
+                    instance,
+                )
+                .expect("U10 覆盖写")
+            };
+            let released = self_release_slots_of_this_publish(
+                &allocator,
+                DeviceIdentity(0),
+                current.root.checkpoint_txg,
+            );
+            let touched = e156_touched_leaf_positions(
+                &allocator,
+                DeviceIdentity(0),
+                current.root.checkpoint_txg,
+            );
+            let (expected_released, expected_delta) =
+                e156_closed_form_expected(&existing_leaves, &touched, true);
+            let record_count = allocator.records().len();
+            let delta =
+                u64::try_from(record_count - records_before).expect("这一步的记录增量落在 u64 内");
+            assert_eq!(
+                released, expected_released,
+                "U10：第 {step} 次覆盖写释放槽数应等于闭式"
+            );
+            assert_eq!(
+                delta, expected_delta,
+                "U10：第 {step} 次覆盖写记录增量应等于闭式"
+            );
+            if step <= 4 {
+                assert_eq!(released, 14, "R-4：第 {step} 次覆盖写 D0 释放槽数应为 14");
+                assert_eq!(delta, 24, "R-4：第 {step} 次覆盖写记录增量应为 24");
+            }
+            release_samples.push(released);
+            if touched.len() <= 1 {
+                saw_single_leaf_step = true;
+            } else {
+                saw_multi_leaf_step = true;
+            }
+        }
+        assert!(saw_single_leaf_step, "U10：应当至少有一步只落在 1 片叶");
+        assert!(
+            saw_multi_leaf_step,
+            "U10：应当至少有一步跨到 ≥ 2 片叶（第八节 8.2）"
+        );
+        let (minimum, maximum) = super::e156_minimum_and_maximum(&release_samples);
+        assert_eq!(minimum, 14, "U12：Q7d-1 覆盖写那一组的最小值应为 14");
+        assert!(
+            maximum >= 16,
+            "U12：Q7d-1 覆盖写那一组的最大值应 ≥ 16（跨叶时更贵）"
+        );
+    }
+
+    /// U11（第九节，R-6）：重放 S1(c) 场景（`run_s1c_rollback_isolation_scenario` 内部的
+    /// `assert_eq!` 已经改成 54），只是从单测里再触发一次，M32（S1(c) 的隔离槽数退回 34）应当让这条
+    /// 测试红。
+    #[test]
+    fn rollback_isolation_scenario_matches_the_new_layout() {
+        let mut emitter = Emitter { emitted: 0 };
+        run_s1c_rollback_isolation_scenario(&mut emitter, &parameters());
+    }
+
+    /// U13（E156 第 3 次重跑登记「十二」修订 4，岔路 7 Q7c①）：独立重放 HR 家族到管理员回退写行那一步
+    /// （mkfs → 第一个事务 → 3N 次前缀覆盖写 → 回退到候选集里最旧的根，N = `ROOT_RING_REGIONS` ×
+    /// `E156_SLOTS_PER_REGION`），不调用 `main()` 里那一段代码，只借同样的公开入口独立走一遍。
+    /// 这一步应当落在 txg = 76、第 5 项恰为 0——此前 7 个可达基底（β0/β1/β2/βK-w/r/f/l2）第 5 项都
+    /// ≥ 1，`q7c_self_test` 的①在它们身上恒不转色（见 `q7c_self_test` 的推导：`flip1` 要求
+    /// `deferred == 0` 时 `without_subtracting_defer_is_red` 才会是 `false`）；这是第一次有一个
+    /// **可达**基底能让①转色。M33/M34（`crates/mutations.tsv`）分别改坏 `q7c_self_test` 里
+    /// `without_subtracting_defer_is_red` 与 `real_check_red_plus1` 的比较符号，应当让这条测试红。
+    #[test]
+    fn hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test() {
+        let parameters = parameters();
+        let (mut allocator, first, mut devices) = first_transaction_state();
+        let instance = InstanceGeneration(1);
+        let mut current = first;
+        let ring_length = ROOT_RING_REGIONS * super::E156_SLOTS_PER_REGION;
+        let prefix_length = 3 * ring_length;
+        let mut actual_length: u64 = 0;
+        for step in 1..=prefix_length {
+            let outcome = {
+                let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
+                publish_overwrite(
+                    &mut pool,
+                    &mut allocator,
+                    &current,
+                    FirstFile {
+                        content: &super::overwrite_content(step),
+                        write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 + step,
+                    },
+                    instance,
+                )
+            };
+            match outcome {
+                Ok(published) => {
+                    current = published;
+                    actual_length = step;
+                }
+                Err(failure) => panic!(
+                    "U13：HR 前缀第 {step} 步写失败：{failure:?}（这一格依赖跑满 {prefix_length} 步才能到 txg=76）"
+                ),
+            }
+        }
+        assert_eq!(
+            actual_length, prefix_length,
+            "U13：HR 前缀应跑满 {prefix_length} 步，不应撞上分配记录树的任何上限"
+        );
+
+        let region_devices = parameters.region_devices;
+        let effective_floor = effective_rollback_floor(
+            &devices,
+            &region_devices,
+            &parameters.geometry,
+            &parameters.filesystem_identifier,
+        );
+        let candidates = readable_roots(
+            &devices,
+            &region_devices,
+            &parameters.geometry,
+            &parameters.filesystem_identifier,
+        );
+        let oldest = candidates
+            .iter()
+            .filter(|root| root.checkpoint_txg.0 >= effective_floor.0)
+            .min_by_key(|root| root.checkpoint_txg.0)
+            .expect("U13：回退候选集至少一个根");
+        let rollback_target = RollbackTarget {
+            instance: oldest.instance,
+            checkpoint_txg: oldest.checkpoint_txg,
+        };
+        let mounted = mount_rollback(&parameters, &mut devices, rollback_target, ShadowLedger::On)
+            .expect("U13：HR 管理员回退");
+        let row_publish = mounted
+            .output
+            .row_publish
+            .file_version()
+            .expect("U13：回退写行那一版带文件");
+        assert_eq!(
+            row_publish.root.checkpoint_txg.0, 76,
+            "U13：回退写行那一版应落在 txg=76（这个装置今天实测到的取样点）"
+        );
+
+        let pool = memory_pool_snapshot(&devices);
+        let basis = basis_of("test_beta_hr_rollback_row", &pool, row_publish, true);
+        let (item1, _item2, item5) = mirror_accounting_row_slots(&basis.pool, basis.accounting_slot);
+        assert_eq!(item5, 0, "U13：这一格的第 5 项应恰为 0（Q7c① 判别力自证的前提）");
+        let check_is_red = item1 != item5 + basis.referenced;
+        assert!(
+            !check_is_red,
+            "U13：G27 在这个基底上应当判绿——它是一个真实的合法状态，不是坏镜像"
+        );
+
+        let mut emitter = Emitter { emitted: 0 };
+        let (flip1, flip2) = q7c_self_test(
+            &mut emitter,
+            "test_beta_hr_rollback_row",
+            &basis.pool,
+            basis.accounting_slot,
+            basis.referenced,
+        );
+        assert!(
+            flip1,
+            "U13：在这个第 5 项恰为 0 的可达基底上，Q7c① 必须转色——去掉『减 defer』那一步之后 \
+             corrupted 镜像的判定必须从红变绿，而 G27（减 defer 的真实检查）仍判红"
+        );
+        assert!(
+            !flip2,
+            "U13：Q7c② 在 deferred == 0 的基底上不适用（Bd(−1) 会让 item5 减成负数），不应转色"
+        );
+    }
 }

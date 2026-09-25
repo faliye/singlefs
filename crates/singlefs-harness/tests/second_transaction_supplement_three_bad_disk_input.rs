@@ -17,6 +17,7 @@
 use std::io::Write as _;
 
 use singlefs_core::address::DeviceIdentity;
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::transaction::TransactionUnit;
@@ -54,6 +55,7 @@ const SEED_OFFSET_OF_THE_FIXED_HISTORY: u64 = 4;
 const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     per_step_checker: PerStepChecker::Skipped,
     device_width: HistoryDeviceWidth::FourGibibytes,
+    space_admission: SpaceAdmission::JudgedByTheFormula,
 };
 
 /// 报告直接写进进程的标准输出，不经 libtest 的捕获：通过时计数照样出现在 `check.sh` 的输出里
@@ -344,48 +346,55 @@ fn every_fixed_panic_site_reports_its_own_error_member_instead_of_panicking() {
     // 钉的错误成员一个没变。
     //
     // ⚠️ 「跨度越过单元区末尾」那条坏法在**两块 4 GiB 的盘**上够不着它名字里说的那一格：跨度写成 0x7FFF = 32767 槽，
-    // 从 50176 起到 82943，而单元区末尾是槽 262144（4 GiB ÷ 16 KiB）。它实际打中的是同一批判定里的
-    // 「同一块盘上两条分配记录罩住同一个槽」——32767 槽罩过了后面每一条记录。照实钉，不按坏法的名字钉。
+    // 从 50176 起到 82943，而单元区末尾是槽 262144（4 GiB ÷ 16 KiB）。分配记录树按位置寻址之后，它先撞上的是叶判
+    // （末槽越过它所在叶的末槽）。照实钉，不按坏法的名字钉。
     let expected_error_member: [(DamageKind, &str, &str); 13] = [
+        // extent 树按位置寻址（D8（核心索引结构） 已定项 14）：第一个文件那一版的 extent 树根是上段根兼叶，条目是上段叶条目 113。
         (
             DamageKind::NarrowedEntryWidthOfTheExtentTreeRoot,
-            "EntryNarrowerThanItsFieldTable { what: \"extent 叶记录\"",
-            "EntryNarrowerThanItsFieldTable { what: \"extent 叶记录\"",
+            "EntryNarrowerThanItsFieldTable { what: \"extent 上段叶条目\"",
+            "EntryNarrowerThanItsFieldTable { what: \"extent 上段叶条目\"",
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheInodeTreeRoot,
             "EntryNarrowerThanItsFieldTable { what: \"inode 树内部条目\"",
             "EntryNarrowerThanItsFieldTable { what: \"inode 树内部条目\"",
         ),
+        // 分配记录树按位置寻址、根恒在第 1 层以上（D8（核心索引结构） 已定项 14）：根的条目是内部条目 96，两个读者都走整棵读，
+        // 先红在内部条目的宽度上。
         (
             DamageKind::NarrowedEntryWidthOfTheAllocationRecordsTreeRoot,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
-            "EntryNarrowerThanItsFieldTable { what: \"分配记录\"",
+            "EntryNarrowerThanItsFieldTable { what: \"分配记录树内部条目\"",
+            "EntryNarrowerThanItsFieldTable { what: \"分配记录树内部条目\"",
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot,
             "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
             "EntryNarrowerThanItsFieldTable { what: \"记账条目\"",
         ),
+        // 这四条坏的是最左那片叶的记录（分配记录树按位置寻址，D8（核心索引结构） 已定项 14）：记录的槽号、跨度、设备改了，
+        // 它就不在它所在叶按位置罩的那一段里，读树那一步的叶判先接走，两个读者同一个成员；两条记录的 key 撞在一起时
+        // 先红在「叶里的记录不按 key 严格递增」。`recovery::allocation_records_fit_the_pool_geometry` 那四样判在这四条上被叶判遮住，
+        // 它们只在罩着盘末尾的那片叶上够得着（交回里写明）。
         (
             DamageKind::AllocationRecordSlotBelowTheUnitArea,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
-            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录的槽号落在单元区起点之下\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
         ),
         (
             DamageKind::AllocationRecordSpanPastTheEndOfTheUnitArea,
-            "AllocationRecordOutsideThePoolGeometry { what: \"同一块盘上两条分配记录罩住同一个槽\" }",
-            "AllocationRecordOutsideThePoolGeometry { what: \"同一块盘上两条分配记录罩住同一个槽\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
         ),
         (
             DamageKind::TwoAllocationRecordsCoveringTheSameSlot,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
-            "AllocationRecordOutsideThePoolGeometry { what: \"同一块盘上两条分配记录罩住同一个槽\" }",
+            "InvariantViolated { invariant: \"I-1.1\", detail: \"分配记录树叶里的记录不按 key 严格递增\" }",
+            "InvariantViolated { invariant: \"I-1.1\", detail: \"分配记录树叶里的记录不按 key 严格递增\" }",
         ),
         (
             DamageKind::AllocationRecordOnADeviceOutsideThePool,
-            "InvariantViolated { invariant: \"I-1.1\", detail: \"根 key 区间与条目不符\" }",
-            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录的设备身份不在池里\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
+            "AllocationRecordOutsideThePoolGeometry { what: \"分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽\" }",
         ),
         (
             DamageKind::NarrowedEntryWidthOfTheCentralMappingTreeRoot,

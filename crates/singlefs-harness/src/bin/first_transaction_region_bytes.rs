@@ -112,10 +112,9 @@ fn main() {
 
     let mut emitter = Emitter { emitted: 0 };
     emitter.emit(&format!(
-        "name=impl_config devices={DEVICE_COUNT} image_bytes={TEST_IMAGE_DEFAULT_BYTES} physical_block_size={PHYSICAL_BLOCK_SIZE_IN_BYTES} minimum_input_output_bytes={MINIMUM_INPUT_OUTPUT_BYTES} file_bytes={FIRST_FILE_BYTES} write_time_seconds={FIXED_WRITE_TIME_SECONDS} filesystem_identifier={} checkpoint_txg={FIRST_TRANSACTION_TXG} mkfs_operations={} policy_mismatches={}",
+        "name=impl_config devices={DEVICE_COUNT} image_bytes={TEST_IMAGE_DEFAULT_BYTES} physical_block_size={PHYSICAL_BLOCK_SIZE_IN_BYTES} minimum_input_output_bytes={MINIMUM_INPUT_OUTPUT_BYTES} file_bytes={FIRST_FILE_BYTES} write_time_seconds={FIXED_WRITE_TIME_SECONDS} filesystem_identifier={} checkpoint_txg={FIRST_TRANSACTION_TXG} mkfs_operations={}",
         hexadecimal_text(&E142_FILESYSTEM_IDENTIFIER),
-        run.mkfs_operation_count,
-        run.policy_mismatches
+        run.mkfs_operation_count
     ));
     for line in region_result_lines(&image) {
         emitter.emit(&line);

@@ -8,10 +8,13 @@
 
 pub mod address;
 pub mod admission;
+pub mod allocation_record_tree;
 pub mod allocator;
 pub mod block_device;
 pub mod bytes;
 pub mod checksum;
+pub mod code_two_tree;
+pub mod extent_tree;
 pub mod inode_tree;
 pub mod instance_table;
 pub mod journal;
@@ -21,6 +24,7 @@ pub mod mounted_read;
 pub mod pointer;
 pub mod records;
 pub mod recovery;
+pub mod rollback_witness;
 pub mod root_record;
 pub mod root_ring;
 pub mod system_configuration;

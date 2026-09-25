@@ -9,6 +9,7 @@
 use singlefs_format::{
     journal_in_flight_record_limit, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY, NODE_BYTES,
+    ROLLBACK_WITNESS_TABLE_BYTES, ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT,
     ROOT_RING_BASE_SLOT, ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS,
     SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
     WIDE_CHECKSUM_BYTES,
@@ -17,6 +18,7 @@ use singlefs_format::{
 use crate::address::{DeviceIdentity, InstanceGeneration};
 use crate::bytes::{ByteReader, ByteWriter};
 use crate::checksum::{wide_checksum_field_holds, wide_checksum_with_field_zeroed};
+use crate::rollback_witness::{rollback_witness_capacity, RollbackWitnessTable};
 use crate::root_ring::{RootRingSlotsPerRegion, RootRingSlotsPerRegionOutOfRange};
 
 pub const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
@@ -194,13 +196,16 @@ impl SystemRuntimeQuantities {
     pub const FIELD_TABLE_BYTES: u64 = 52;
 }
 
-/// 一个系统配置槽的内容，按 D22（单元原子性怎么合成） 已定项 26 的可改性分四类装。
+/// 一个系统配置槽的内容，按 D22（单元原子性怎么合成） 已定项 26 的可改性分四类装，另加字段表之后的回退见证表。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SystemConfiguration {
     pub immutable: SystemImmutableConfiguration,
     pub mutable: SystemMutableConfiguration,
     pub runtime: SystemRuntimeConfiguration,
     pub quantities: SystemRuntimeQuantities,
+    /// 回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」）：住字段表之后、槽内偏移 481 起的 753 字节，
+    /// 不在 481 字节的字段表与四档可改性里——它不是配置，是文件系统自己维护的、随每一次系统配置写整张带着的表。
+    pub rollback_witness: RollbackWitnessTable,
 }
 
 fn slot_bytes() -> usize {
@@ -389,6 +394,13 @@ impl SystemConfiguration {
             writer.put_u32(self.quantities.journal_instance.0);
         });
         let (mut bytes, accounting) = slot.finish();
+        // 回退见证表紧接字段表（D23（journal 的角色与格式） 已定项 14「回退见证」）：越过 512、罩在下面那个整槽校验和里。
+        let witness_start =
+            usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
+                .expect("481");
+        let witness_end =
+            witness_start + usize::try_from(ROLLBACK_WITNESS_TABLE_BYTES).expect("753");
+        bytes[witness_start..witness_end].copy_from_slice(&self.rollback_witness.to_bytes());
         let digest = wide_checksum_with_field_zeroed(
             &bytes,
             slot_bytes(),
@@ -420,6 +432,15 @@ impl SystemConfiguration {
             u64::from(bytes[usize::try_from(ROOT_RING_SLOTS_PER_REGION_OFFSET).expect("362")]),
         )
         .map_err(SystemConfigurationSlotRefusal::RootRingSlotsPerRegionOutOfRange)?;
+        // 见证表读不出就是这一槽读不出（D23（journal 的角色与格式） 已定项 14「回退见证」）：条数上限按这一槽自述的 S 算。
+        let witness_start =
+            usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
+                .expect("481");
+        let rollback_witness = RollbackWitnessTable::parse(
+            &bytes[witness_start..],
+            rollback_witness_capacity(root_ring_slots_per_region),
+        )
+        .ok_or(SystemConfigurationSlotRefusal::NotSelfDescribing)?;
         let mut reader = ByteReader::at(bytes, FSID_OFFSET);
         let filesystem_identifier: [u8; 16] = reader.take(16).try_into().expect("切了 16 字节");
         reader.skip(16 + 4 + 1);
@@ -468,6 +489,7 @@ impl SystemConfiguration {
                 journal_tail,
                 journal_instance,
             },
+            rollback_witness,
         })
     }
 }
@@ -476,7 +498,8 @@ impl SystemConfiguration {
 /// 错误成员按调用方要做的决定分）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemConfigurationSlotRefusal {
-    /// magic、整槽校验和、incompat 位三关里有一关不过 ⇒ **这一槽不可择**：换一槽、换一盘还可以试，
+    /// magic、整槽校验和、incompat 位三关里有一关不过，或字段表之后的回退见证表读不出（D23（journal 的角色与格式） 已定项 14
+    /// 「回退见证」：见证表读不出就是系统配置槽读不出）⇒ **这一槽不可择**：换一槽、换一盘还可以试，
     /// 系统配置每盘两槽、池里每盘一份买的就是这份冗余（D22（单元原子性怎么合成） 已定项 8 第 1 条）。
     NotSelfDescribing,
     /// 自述的每区槽数 S 落在格式承诺的区间之外 ⇒ **整池拒绝挂载**，不换一槽再试：S 是池级字段，
@@ -522,7 +545,56 @@ mod tests {
                 journal_tail: 0,
                 journal_instance: InstanceGeneration(0),
             },
+            rollback_witness: RollbackWitnessTable::EMPTY,
         }
+    }
+
+    /// 回退见证表住字段表之后（偏移 481 起）、越过 512，跟着系统配置来回一趟不变；见证表读不出（条数超过这个池的上限 R × S − 1，
+    /// 整槽校验和照样重封过）就是这一槽读不出（D23（journal 的角色与格式） 已定项 14「回退见证」）。
+    #[test]
+    fn the_rollback_witness_rides_after_the_field_table_past_512_and_an_unreadable_one_makes_the_slot_unreadable(
+    ) {
+        use crate::address::CheckpointTxg;
+        use crate::rollback_witness::RollbackWitnessEntry;
+        let mut with_witness = sample();
+        with_witness.rollback_witness = RollbackWitnessTable::of_entries(
+            [
+                RollbackWitnessEntry {
+                    new_instance: InstanceGeneration(4),
+                    rollback_target_instance: InstanceGeneration(1),
+                    rollback_target_txg: CheckpointTxg(3),
+                },
+                RollbackWitnessEntry {
+                    new_instance: InstanceGeneration(6),
+                    rollback_target_instance: InstanceGeneration(4),
+                    rollback_target_txg: CheckpointTxg(9),
+                },
+            ],
+            23,
+        )
+        .expect("两条装得下");
+        let slot = with_witness.to_slot();
+        assert_eq!(slot[481], 2, "条数紧接字段表");
+        assert_eq!(
+            u64::from_le_bytes(slot[506..514].try_into().expect("8 字节")),
+            9,
+            "第二条占 [498, 514)，它的 txg 那 8 字节落在 [506, 514)：越过 512"
+        );
+        assert_eq!(SystemConfiguration::parse_slot(&slot), Ok(with_witness));
+        let mut unreadable = slot;
+        unreadable[481] = 24;
+        let digest = wide_checksum_with_field_zeroed(
+            &unreadable,
+            4096,
+            SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+        );
+        unreadable[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+            .copy_from_slice(&digest);
+        assert_eq!(
+            SystemConfiguration::parse_slot(&unreadable),
+            Err(SystemConfigurationSlotRefusal::NotSelfDescribing),
+            "S = 8 的池条数上限 23：见证表读不出，这一槽读不出"
+        );
     }
 
     #[test]

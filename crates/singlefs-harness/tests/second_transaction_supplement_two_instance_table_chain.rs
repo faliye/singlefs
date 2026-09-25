@@ -1,14 +1,13 @@
 //! 里程碑「第二个事务」增补 2 收口表第 38 行（实例表第二片）的读路径那一半：一张多于一片的实例表，读者沿链读、
-//! 准入按片数算、checker 沿链判（D18（块里携带什么信息） 已定项 11：根记录直接持有第 0 片，第 k 片末尾的链指针记录
+//! 准入沿链核、checker 沿链判（D18（块里携带什么信息） 已定项 11：根记录直接持有第 0 片，第 k 片末尾的链指针记录
 //! `kind 1 | 有无下一片 1 | 位置指针 86` 指着第 k + 1 片，身份四元组 (0, 4, 片序号, 0)）。
 //!
-//! **写路径今天只写一片**：第二片在提交内生块的 bump 次序里排第几（D3（空间分配） 已定项 10 ⑤ 只写「实例表单元最前」，
-//! 排序规则管的是「其余」，它同时定第二片的出生序号，D19（块指针的结构与宽度预算） 已定项 9）、行怎么分到各片，两处没有条款，
-//! 可写挂载与回退在取号之前就拒（`MountError::InstanceTableChainLongerThanOnePageUndecided`）。所以这里的两片链是用例手搭的：
+//! 这里的两片链是用例手搭的（真写者写出的多片链在 `second_transaction_supplement_two_instance_table_second_page_write.rs`）：
 //! mkfs 之后连着可写挂载几次、不写文件（树表 0 条的那一版上每次写行），把最新那一版的实例表拆成两片——第 0 片原地重写、
-//! 第二片写进一个远离开放段的空槽，指着第 0 片的每一条根补上它的新整单元校验和。第二片的出生序号随手取第 0 片的加一：
-//! 各片怎么发出生序号正是没定的那一格，读者与 checker 都不看它（实例表单元按 I-1.2（块头写序已发布） 那一行的例外不进出生身份那两格）。
-//! 树表 0 条的那一版没有记账树，I-3.1（已分配统计对得上） 不适用，手搭的第二片不进分配记录也不会让它红。
+//! 第二片写进一个远离开放段的空槽，指着第 0 片的每一条根补上它的新整单元校验和。第二片的出生序号随手取第 0 片的加一
+//! （读者与 checker 都不看它：实例表单元按 I-1.2（块头写序已发布） 那一行的例外不进出生身份那两格），
+//! 它也不进那一版的分配记录——树表 0 条的那一版没有记账树，I-3.1（已分配统计对得上） 不适用，手搭的第二片不进分配记录不会让它红；
+//! 可写挂载要把整条链换下，这一片不在账里，取号之前的准入就拒（`writable_mount_follows_the_chain_…`）。
 
 mod common;
 
@@ -37,6 +36,7 @@ use singlefs_core::recovery::{
 };
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
+use singlefs_core::transaction::{PublishError, TransactionUnit};
 use singlefs_core::unit::{build_packed_unit, parse_packed_unit};
 use singlefs_format::{DATA_UNIT_BYTES, INSTANCE_ROW_BYTES};
 use singlefs_harness::crash::SparseBlockDevice;
@@ -374,37 +374,34 @@ fn snapshot(devices: &Devices, stream: &SharedStream) -> DiskSnapshot {
     disk_snapshot(&memory_pool_of_sparse_devices(devices), stream)
 }
 
-/// 可写挂载的准入按片数算：这一版的表是两片（行数按两片接起来数，是 3 不是 2），第一版不重写多于一片的链
-/// （第二片怎么写没有条款）——在取号之前拒，盘上逐字节不变、系统配置里的实例代号不变。
+/// 可写挂载沿链读整张表、要把整条链换下：写行那次发布逐片释放旧链，取号之前的准入先按释放判定路径逐片核
+/// （`transaction::instance_table_chain_to_release`）。手搭的第二片不在这一版的分配记录里 ⇒ 在取号之前拒、点名第二片
+/// （只读第 0 片的写法看不到它，取号写完才在发布路径里撞上，号就烧了），盘上逐字节不变、系统配置里的实例代号不变。
 #[test]
-fn writable_mount_counts_the_rows_of_every_page_and_refuses_a_chain_longer_than_one_page_before_acquisition(
+fn writable_mount_follows_the_chain_and_refuses_a_page_missing_from_the_allocation_records_before_acquisition(
 ) {
-    let (mut devices, stream, _rows, _chain) = pool_with_a_valid_two_page_chain();
+    let (mut devices, stream, _rows, chain) = pool_with_a_valid_two_page_chain();
     let before = snapshot(&devices, &stream);
     let instances_before = system_configuration_instances(&devices);
     let refused: Result<Mounted, MountError> = mount_writable(&parameters(), &mut devices);
     match refused {
-        Err(MountError::InstanceTableChainLongerThanOnePageUndecided {
+        Err(MountError::RowPublishAdmissionRefusedBeforeAcquisition {
             instance_to_acquire,
-            rows_in_version,
-            pages_in_version,
-            rows_to_write,
-            pages_after_this_publish,
+            cause: PublishError::ReleaseTargetNotAllocated { unit, device, slot },
         }) => {
             assert_eq!(
+                (instance_to_acquire, unit, device, slot),
                 (
-                    instance_to_acquire,
-                    rows_in_version,
-                    pages_in_version,
-                    rows_to_write,
-                    pages_after_this_publish
+                    InstanceGeneration(5),
+                    TransactionUnit::InstanceTablePageAfterTheFirst(InstanceTablePageIndex(1)),
+                    DeviceIdentity(0),
+                    chain.second_page_pointer.locations[0].slot
                 ),
-                (InstanceGeneration(5), 3, 2, 1, 1),
-                "要取的号、这一版两片共几行、几片、这次要写几行、这次之后要几片"
+                "要取的号；沿链走到的第二片不在这一版的分配记录里"
             );
         }
         other => panic!(
-            "这一版的表是两片：要在取号之前拒绝：{:?}",
+            "第二片不在账里：要在取号之前拒绝：{:?}",
             other.map(|_| "挂上了")
         ),
     }
@@ -600,7 +597,9 @@ fn contradictory_chain_record_reddens_only_the_instance_table_invariant() {
 
 /// 影子账隔离被抛弃根引用的整条链（D23（journal 的角色与格式） 已定项 14「被抛弃时间线的根离开根环之前，它们引用的单元不许重新分配」）：
 /// 回退到实例 3 最后那条根，实例 4 的根全被抛弃；它们指着的两片实例表都只被被抛弃根引用，两片都隔离——每块盘 2 + 2 槽，
-/// 再加实例 4 写行那一版自己那片分配记录树节点 1 槽（根指针住根记录那一项，同样只被被抛弃根引用）。
+/// 再加实例 4 写行那一版自己那棵分配记录树的七个节点 7 槽（根指针住根记录那一项，同样只被被抛弃根引用；按位置寻址，
+/// D8（核心索引结构） 已定项 14：4 GiB 两块盘上根在第 2 层，账里的记录落在两块盘各自的叶 61 与第二片所在的叶 73 里，
+/// 四片叶、两块盘各自的第 1 层节点 0 与根）。
 /// 只认根记录里那一条实例表指针的话第二片那 2 槽不隔离，回退之后当空闲槽发得出去。
 #[test]
 fn rollback_isolates_every_page_of_the_instance_table_chain_that_only_abandoned_roots_reference() {
@@ -628,8 +627,8 @@ fn rollback_isolates_every_page_of_the_instance_table_chain_that_only_abandoned_
     .expect("实例 3 最后那条根在候选集里（第二片上实例 3 那一行的 T 就是它的 txg），回退那一版的表只有一片");
     assert_eq!(
         rolled_back.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 5), (DeviceIdentity(1), 5)],
-        "实例 4 那张表的第 0 片 2 槽、第二片 2 槽、实例 4 那片分配记录树节点 1 槽，逐盘"
+        vec![(DeviceIdentity(0), 11), (DeviceIdentity(1), 11)],
+        "实例 4 那张表的第 0 片 2 槽、第二片 2 槽、实例 4 那棵分配记录树七个节点 7 槽，逐盘"
     );
     assert_eq!(rolled_back.output.abandoned_roots_unreadable, 0);
 }

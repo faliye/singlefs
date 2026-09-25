@@ -13,16 +13,17 @@
 //!
 //! 模型不记落点：单元落在哪个槽、分配记录写得对不对（回收门槛、释放时改没改写记录、复用时罩住的槽删没删）归池级 checker 判，
 //! 模型只拿实现交回的每个单元那几条记录比「每块盘一条、仍分配、分配代等于写它的那次发布」（增补 3 第 2 件代码三方第一轮判决第一节 M4 那一格：
-//! 回收门槛差一、释放时不改写记录这几条变异，只留模型时三段都判不出，checker 都判红）。分配记录的真条数模型同样不记：分配记录墙拒时，
-//! 执行器按 checker 的解析从镜像上现数，交给模型判区间的下端（同一判决第三节第 1 条）。
+//! 回收门槛差一、释放时不改写记录这几条变异，只留模型时三段都判不出，checker 都判红）。分配记录的真条数模型同样不记；分配记录树按绝对槽号
+//! 按位置寻址之后（D8（核心索引结构） 已定项 14）没有「一个节点装不下」那道墙，模型也就没有那条拒绝理由。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use singlefs_format::{
-    index_node_header_bytes, ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES, ALLOCATION_RECORD_BYTES,
-    ALLOCATION_RECORD_KEY_BYTES, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, DATA_UNIT_PAYLOAD_OFFSET,
-    INSTANCE_TABLE_PAGE_RECORDS, NODE_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
+    index_node_header_bytes, ACCOUNTING_ENTRY_BYTES, ACCOUNTING_KEY_BYTES,
+    ALLOCATION_RECORD_TREE_INTERNAL_FANOUT, ALLOCATION_RECORD_TREE_LEAF_SLOTS,
+    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, DATA_UNIT_PAYLOAD_OFFSET, INSTANCE_TABLE_PAGE_RECORDS,
+    NODE_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
     ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 
@@ -110,23 +111,33 @@ enum ModelPublishKind {
     ZeroUnit,
 }
 
+/// 装得下 `rows` 行要几片（D18（块里携带什么信息） 已定项 11：一片 370 条记录，链指针记录恒为一片的最后一条、数据行 369；
+/// 0 行也是一片）。模型按条款自己算，不调实现的那一份。
+#[must_use]
+pub fn instance_table_pages_for_rows(rows: usize) -> u64 {
+    let rows_per_page = INSTANCE_TABLE_PAGE_RECORDS - 1;
+    u64::try_from(rows)
+        .expect("行数装得进 u64")
+        .div_ceil(rows_per_page)
+        .max(1)
+}
+
 impl ModelPublishKind {
-    /// 这次发布往分配记录树里加几条（每块盘一条）：重写的每个角色各一条。
-    /// 零单元发布一个字节都不写，一条不加；树表 0 条的一版上写行那次**建起这一版自己的分配记录树**
-    /// （C512（树表 0 条的一版上被换下的单元记在哪），2026-09-23 用户定案），实例表与那片节点各一条。
-    fn allocation_records_added_per_device(self) -> u64 {
+    /// 这次发布重写不重写实例表：写行那两种重写整条链，别的照抄。
+    fn rewrites_the_instance_table(self) -> bool {
         match self {
+            ModelPublishKind::RowsOnFileVersion | ModelPublishKind::RowsOnVersionWithoutFile => {
+                true
+            }
             ModelPublishKind::FirstFileVersion
             | ModelPublishKind::OverwriteFileVersion
-            | ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
-            | ModelPublishKind::RowsOnVersionWithoutFile => {
-                u64::try_from(self.rewritten_roles().len()).expect("至多九个角色")
-            }
-            ModelPublishKind::ZeroUnit => 0,
+            | ModelPublishKind::ZeroUnit => false,
         }
     }
 
+    /// 这次发布重写的角色。分配记录树（`ModelUnitRole::AllocationTree`）在这里只记它的根：根之下重写几个节点按位置寻址现算上界
+    /// （`IdealModel::allocation_record_tree_nodes_rewritten_upper_bound`），模型不记是哪几个。
     fn rewritten_roles(self) -> &'static [ModelUnitRole] {
         match self {
             ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => &[
@@ -191,13 +202,7 @@ pub struct ModelRoot {
     /// 这一版每个角色的单元是哪次发布写的：它的分配记录的分配代就是这个 txg（D3（空间分配） 已定项 3 / 7：value = 分配代；
     /// COW：单元只在分配它的那次发布里写）。mkfs 写的实例表与第 0 版树表记 txg 0。
     pub role_written_at: BTreeMap<ModelUnitRole, ModelCheckpointTxg>,
-    /// 这一版之后分配记录条数的上界：mkfs 两个单元每盘各一条，沿这一版的来路每次发布每个重写的角色每盘至多加一条
-    /// （D3（空间分配） 已定项 7：一条记一个单元、释放只改写不删）。回收、复用只会让真数比它小。
-    pub allocation_records_upper_bound: u64,
-    /// 写出这一版的那次发布按准入的口径新增几条分配记录：重写的每个角色每盘一条，不抵扣会被复用的已回收记录（增补 2 收口表第 39 行，
-    /// 2026-09-18 用户定保留这个上界准入）。第 0 代根记 mkfs 写的两个单元每盘一条。
-    pub allocation_records_added_by_its_publish: u64,
-    /// 同样口径的每盘已占槽数上界：沿来路每次发布写出的单元的槽数之和，释放与回收一概不扣。
+    /// 每盘已占槽数的上界：沿来路每次发布写出的单元的槽数之和，释放与回收一概不扣（分配记录树每次重写的节点数取按位置寻址现算的上界）。
     pub occupied_slots_upper_bound_per_device: u64,
 }
 
@@ -265,15 +270,8 @@ pub enum ModelRefusalReason {
     /// 第一个文件版本要建在上面的那一版已经有过文件版本：那条路径按「树还没建起来」写，树表条目的诞生 txg 与
     /// inode 1 的对象出生代都会取这次的 txg，与环里那些旧根记的对不上（I-9.14、I-9.10）。再写一版走覆盖写。
     FirstFileVersionOnAVersionThatAlreadyHasAFile,
-    /// 分配记录树第一版只有一个节点（容量墙，收口表第 39 行：模型答允许拒绝的区间）。
-    AllocationRecordNodeWall,
-    /// 记账树第一版只有一个节点。
-    AccountingNodeWall,
     /// 单元区装不下（D28（挂载期承诺量） 已定项 1 的准入；模型答允许拒绝的区间）。
     UnitAreaWall,
-    /// 实例表这次之后要多于一片（D18（块里携带什么信息） 已定项 11：一片 370 条含链指针）：第二片在 bump 次序里怎么排、
-    /// 行怎么分片没有条款（D3（空间分配） 已定项 10 ⑤ 只写「实例表单元最前」），第一版不写第二片。
-    InstanceTableChainLongerThanOnePageUndecided,
     /// 回退目标不在根环里（D23（journal 的角色与格式） 已定项 14：候选集是根环里的根）。
     RollbackTargetNotInRing,
     /// 回退目标的 txg 低于 F_生效（D16（发布语义） 已定项 1「回退候选集」）。
@@ -299,12 +297,7 @@ impl ModelRefusalReason {
             ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile => {
                 "要建在上面的那一版已经有过文件版本（再写一版走覆盖写）"
             }
-            ModelRefusalReason::AllocationRecordNodeWall => "分配记录树一个节点装不下",
-            ModelRefusalReason::AccountingNodeWall => "记账树一个节点装不下",
             ModelRefusalReason::UnitAreaWall => "单元区装不下",
-            ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided => {
-                "实例表要多于一片（第二片怎么写没有条款）"
-            }
             ModelRefusalReason::RollbackTargetNotInRing => "回退目标不在根环里",
             ModelRefusalReason::RollbackTargetBelowEffectiveFloor => "回退目标低于 F_生效",
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline => "回退目标在被抛弃的时间线上",
@@ -318,12 +311,10 @@ impl ModelRefusalReason {
     /// 容量墙：模型只答允许拒绝的区间（按这一步计划的每次发布之后的上界判），不答必须拒。
     fn is_capacity_wall_with_an_interval(self) -> bool {
         match self {
-            ModelRefusalReason::AllocationRecordNodeWall | ModelRefusalReason::UnitAreaWall => true,
+            ModelRefusalReason::UnitAreaWall => true,
             ModelRefusalReason::ContentExceedsDataUnitPayload
             | ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn
             | ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile
-            | ModelRefusalReason::AccountingNodeWall
-            | ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
@@ -357,12 +348,9 @@ pub enum ModelOperationKind {
     ColdStartRecover,
 }
 
-/// 一步里计划的一次发布之后的两个上界（容量墙区间的上端按它判），与这次发布按准入口径新增的分配记录条数（分配记录墙区间的下端：
-/// 从镜像上现数的基数加上它）。
+/// 一步里计划的一次发布之后的上界（单元区墙区间的上端按它判）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PlannedPublishUpperBounds {
-    allocation_records: u64,
-    allocation_records_added_by_the_admission: u64,
     occupied_slots_per_device: u64,
 }
 
@@ -383,29 +371,9 @@ pub struct ModelAnswer {
     /// 抬 F 时模型算的上限（D16（发布语义） 已定项 1），拒与成都要与实现报的相等。
     pub rollback_floor_ceiling: Option<ModelCheckpointTxg>,
     planned_publish_upper_bounds: Vec<PlannedPublishUpperBounds>,
-    /// 容量墙在第一次写之前一串判完（可写挂载、回退）还是逐次发布判（发布、抬 F）。
+    /// 容量墙在第一次写之前一串判完（可写挂载、回退、抬 F——实现在任何写之前把那一串整串预演一遍）还是逐次发布判（发布）。
     walls_are_judged_before_the_first_write: bool,
-    /// 这一步接在哪一版后面：发布与抬 F 是会话的现行版本，可写挂载是所选根，回退是目标根；冷启动与候选集外的回退没有。
-    starting_version: Option<ModelRootKey>,
     session_after_success: ModelSessionAfterSuccess,
-}
-
-impl ModelAnswer {
-    /// 分配记录墙拒在做完 `publishes_completed` 次发布之后时，执行器在镜像上数哪一条根下的分配记录：逐次判的（发布、抬 F）数拒之前
-    /// 最后写出的那一版（一次都没做完就是这一步的起点），一串判完的（可写挂载、回退）数这一步的起点——实现的准入基数就是这两处的
-    /// 分配器条数（`transaction::publish_admission`、`transaction::publish_sequence_admission`）。
-    #[must_use]
-    pub fn root_whose_allocation_records_the_wall_counts(
-        &self,
-        publishes_completed: usize,
-    ) -> Option<ModelRootKey> {
-        if self.walls_are_judged_before_the_first_write || publishes_completed == 0 {
-            return self.starting_version;
-        }
-        self.expected_roots
-            .get(publishes_completed - 1)
-            .map(|root| root.key)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -491,9 +459,6 @@ pub enum ObservedOutcome {
         wrote_anything: bool,
         /// 实现报的上限（抬 F 被上限拒时）。
         reported_ceiling: Option<ModelCheckpointTxg>,
-        /// 理由是分配记录墙时，执行器按 checker 的解析在镜像上数的准入基数：`ModelAnswer::root_whose_allocation_records_the_wall_counts`
-        /// 点名的那条根下有几条分配记录。别的理由不数；数不出（镜像上找不到那条根、树读不出）也是 None，这时模型不放行分配记录墙。
-        allocation_records_counted_on_the_image: Option<u64>,
     },
 }
 
@@ -576,8 +541,6 @@ pub struct ModelJudgementCounts {
     pub ceilings_compared: u64,
     /// 回退做成、目标的 txg 正好等于 F_生效且 F_生效 > 0（B2 那一格跑到了）。
     pub rollbacks_accepted_at_the_effective_floor: u64,
-    /// 分配记录墙拒、镜像上数的真条数越过一个节点而放行的次数（墙那一格的下端真的判过）。
-    pub allocation_record_wall_refusals_over_one_node: u64,
     /// 单元区墙拒（实现报每块盘上都没有合政策的落点）、在允许拒绝的区间里而放行的次数（小盘那一段的落点拒绝真的走到了、判过）。
     pub unit_area_wall_refusals_in_the_interval: u64,
 }
@@ -594,8 +557,6 @@ impl ModelJudgementCounts {
         self.ceilings_compared += other.ceilings_compared;
         self.rollbacks_accepted_at_the_effective_floor +=
             other.rollbacks_accepted_at_the_effective_floor;
-        self.allocation_record_wall_refusals_over_one_node +=
-            other.allocation_record_wall_refusals_over_one_node;
         self.unit_area_wall_refusals_in_the_interval +=
             other.unit_area_wall_refusals_in_the_interval;
     }
@@ -626,7 +587,6 @@ impl IdealModel {
     /// 没有可写会话。
     #[must_use]
     pub fn after_make_filesystem(geometry: ModelPoolGeometry) -> Self {
-        let device_count = u64::try_from(geometry.devices.len()).expect("盘数");
         let genesis = ModelRoot {
             key: ModelRootKey {
                 checkpoint_txg: MAKE_FILESYSTEM_TXG,
@@ -640,8 +600,6 @@ impl IdealModel {
                 (ModelUnitRole::InstanceTable, MAKE_FILESYSTEM_TXG),
                 (ModelUnitRole::TreeTable, MAKE_FILESYSTEM_TXG),
             ]),
-            allocation_records_upper_bound: 2 * device_count,
-            allocation_records_added_by_its_publish: 2 * device_count,
             occupied_slots_upper_bound_per_device: ModelUnitRole::InstanceTable.span_in_slots()
                 + ModelUnitRole::TreeTable.span_in_slots(),
         };
@@ -789,9 +747,58 @@ impl IdealModel {
         Some(newest_on_every_device.min(fourth_newest_non_empty))
     }
 
-    /// 分配记录树一个节点装几条（D3（空间分配） 已定项 11：key 10、条目 20）。
-    fn allocation_record_node_capacity() -> u64 {
-        index_node_entry_capacity(ALLOCATION_RECORD_KEY_BYTES, ALLOCATION_RECORD_BYTES)
+    /// 分配记录树一次发布至多重写几个节点（每个节点每盘占一个槽）。
+    ///
+    /// 树的形状照 D8（核心索引结构） 已定项 14 另算一份：按绝对槽号按位置寻址，叶罩 812 个槽，内部节点罩 169 个孩子那么宽的一段；
+    /// 根按盘分路，根的层号取「每块盘按下一层的宽度切出来的段数之和装得进一个根」的最低一层（实现员的取法，交回里写明）。
+    ///
+    /// 重写的是根，与这次之后还装着记录、内容变了的节点。模型不记哪几片变了，取「这次之后可能装着记录的节点」的全数：
+    /// 记录只住在落点上；落点按 D3（空间分配） 已定项 10 从最低处取（开新段取最低的全空段，回落取最低的空槽），每个落点至多多开一个
+    /// 64 槽的段 ⇒ 沿来路写过 P 个槽之后，落点都在单元区起点往后 `64 × P` 个槽里（单元区墙那一格同一个读法）。
+    /// 这次重写的节点自己也占槽，P 里含着要求的那个数：设重写数为 A，A ≤ g(A)（g 是「写过 P₀ + A 个槽之后可能装着记录的节点数」，
+    /// 对 A 单调不减），从 g(∞)（单元区里的全部节点）起往下迭代，每一步都仍是 A 的上界，停在不动点。
+    fn allocation_record_tree_nodes_rewritten_upper_bound(
+        &self,
+        occupied_slots_before_the_tree_nodes: u64,
+    ) -> u64 {
+        let device_slots = self.geometry.device_size_in_bytes / SLOT_BYTES;
+        let device_count = u64::try_from(self.geometry.devices.len()).expect("盘数");
+        let span_at_level = |level: u32| {
+            ALLOCATION_RECORD_TREE_LEAF_SLOTS
+                .saturating_mul(ALLOCATION_RECORD_TREE_INTERNAL_FANOUT.saturating_pow(level))
+        };
+        let root_level = (1_u32..)
+            .find(|level| {
+                device_count * device_slots.div_ceil(span_at_level(level - 1))
+                    <= ALLOCATION_RECORD_TREE_INTERNAL_FANOUT
+            })
+            .expect("层号往上走，每块盘切出来的段数终归是 1，盘数不到 169 就装得进一个根");
+        let nodes_that_may_hold_records = |occupied_slots: u64| {
+            let reach = UNIT_AREA_START_SLOT
+                .saturating_add(CLUSTER_SEGMENT_SLOTS.saturating_mul(occupied_slots))
+                .min(device_slots);
+            let per_device: u64 = if reach <= UNIT_AREA_START_SLOT {
+                0
+            } else {
+                (0..root_level)
+                    .map(|level| {
+                        let span = span_at_level(level);
+                        (reach - 1) / span - UNIT_AREA_START_SLOT / span + 1
+                    })
+                    .sum()
+            };
+            1 + device_count * per_device
+        };
+        let mut bound = nodes_that_may_hold_records(u64::MAX);
+        loop {
+            let next = nodes_that_may_hold_records(
+                occupied_slots_before_the_tree_nodes.saturating_add(bound),
+            );
+            if next >= bound {
+                return bound;
+            }
+            bound = next;
+        }
     }
 
     /// 一次写记账行的发布要几行、一个节点装几行（D5（快照 / 空间记账机制） 已定项 8）。
@@ -826,15 +833,31 @@ impl IdealModel {
             checkpoint_txg,
             instance,
         };
-        let device_count = u64::try_from(self.geometry.devices.len()).expect("盘数");
         let mut role_written_at = previous.role_written_at.clone();
         let mut slots_written = 0;
+        let mut rewrites_the_allocation_record_tree = false;
         let rewritten = kind.rewritten_roles();
         for role in rewritten {
             role_written_at.insert(*role, checkpoint_txg);
-            slots_written += role.span_in_slots();
+            if *role == ModelUnitRole::AllocationTree {
+                rewrites_the_allocation_record_tree = true;
+            } else {
+                slots_written += role.span_in_slots();
+            }
         }
-        let allocation_records_added = kind.allocation_records_added_per_device() * device_count;
+        // 实例表链多于一片时第 1 片起每一片也是一个重写的单元：`rewritten_roles` 里实例表只记一个角色，多出来的几片在这里补上。
+        let instance_table_pages_after_the_first = if kind.rewrites_the_instance_table() {
+            instance_table_pages_for_rows(instance_table_rows.len()) - 1
+        } else {
+            0
+        };
+        slots_written +=
+            instance_table_pages_after_the_first * ModelUnitRole::InstanceTable.span_in_slots();
+        if rewrites_the_allocation_record_tree {
+            slots_written += self.allocation_record_tree_nodes_rewritten_upper_bound(
+                previous.occupied_slots_upper_bound_per_device + slots_written,
+            ) * ModelUnitRole::AllocationTree.span_in_slots();
+        }
         let file = match new_file_content {
             Some(content) => Some(ModelFileVersion {
                 written_by: key,
@@ -849,9 +872,6 @@ impl IdealModel {
             file,
             instance_table_rows,
             role_written_at,
-            allocation_records_upper_bound: previous.allocation_records_upper_bound
-                + allocation_records_added,
-            allocation_records_added_by_its_publish: allocation_records_added,
             occupied_slots_upper_bound_per_device: previous.occupied_slots_upper_bound_per_device
                 + slots_written,
         }
@@ -861,9 +881,6 @@ impl IdealModel {
         roots
             .iter()
             .map(|root| PlannedPublishUpperBounds {
-                allocation_records: root.allocation_records_upper_bound,
-                allocation_records_added_by_the_admission: root
-                    .allocation_records_added_by_its_publish,
                 occupied_slots_per_device: root.occupied_slots_upper_bound_per_device,
             })
             .collect()
@@ -915,7 +932,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishFirstFile,
-            current.key,
             required_refusals,
             BTreeSet::new(),
             vec![root],
@@ -956,7 +972,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishOverwrite,
-            current.key,
             required_refusals,
             BTreeSet::new(),
             vec![root],
@@ -989,7 +1004,6 @@ impl IdealModel {
         );
         Ok(self.answer_for_publishes(
             ModelOperationKind::PublishWithoutUnits,
-            current.key,
             BTreeSet::new(),
             BTreeSet::new(),
             vec![root],
@@ -999,8 +1013,7 @@ impl IdealModel {
     fn answer_for_publishes(
         &self,
         operation: ModelOperationKind,
-        starting_version: ModelRootKey,
-        mut required_refusals: BTreeSet<ModelRefusalReason>,
+        required_refusals: BTreeSet<ModelRefusalReason>,
         permitted_refusals: BTreeSet<ModelRefusalReason>,
         roots: Vec<ModelRoot>,
     ) -> ModelAnswer {
@@ -1009,9 +1022,12 @@ impl IdealModel {
             root.role_written_at.get(&ModelUnitRole::AccountingTree)
                 == Some(&root.key.checkpoint_txg)
         });
-        if writes_accounting_rows && self.accounting_rows_exceed_one_node() {
-            required_refusals.insert(ModelRefusalReason::AccountingNodeWall);
-        }
+        // 记账行装不下一个节点时记账树分裂、不拒（D8（核心索引结构） 已定项 11），分裂多出来的节点每个各占一个槽；
+        // 模型的占槽上界按「记账树一个节点」数，只罩行数装得进一个节点的池（盘数不到 80）——超出就是模型没罩到，不是实现错。
+        assert!(
+            !(writes_accounting_rows && self.accounting_rows_exceed_one_node()),
+            "模型今天只罩记账树一个节点的池：分裂多出来的节点模型的占槽上界没算"
+        );
         ModelAnswer {
             operation,
             required_refusals,
@@ -1022,7 +1038,6 @@ impl IdealModel {
             expected_read_back: None,
             rollback_floor_ceiling: None,
             walls_are_judged_before_the_first_write: false,
-            starting_version: Some(starting_version),
             session_after_success: ModelSessionAfterSuccess::StaysOpen,
         }
     }
@@ -1058,7 +1073,6 @@ impl IdealModel {
             rollback_floor_ceiling: None,
             planned_publish_upper_bounds: Vec::new(),
             walls_are_judged_before_the_first_write: true,
-            starting_version: None,
             session_after_success: ModelSessionAfterSuccess::Closed,
         };
         let Some(target_root) = self.root_with_key(target) else {
@@ -1126,7 +1140,7 @@ impl IdealModel {
         let first_journal_counter = ModelJournalCounter(self.highest_journal_counter.0 + 1);
         // 新实例的根带的 F = 恢复后生效的 F（D16（发布语义） 已定项 1「生效」）：预想，跟收口表第 ② 行。
         let rollback_floor = self.effective_rollback_floor();
-        let mut required_refusals = BTreeSet::new();
+        let required_refusals = BTreeSet::new();
         let has_file = base.file.is_some();
         // 树表 0 条、而这一版的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）**此前是必拒的一格**：
         // 重建账时只剩根记录那两条指针，被换下的那一片成了空闲槽。C512（树表 0 条的一版上被换下的单元记在哪）
@@ -1134,14 +1148,8 @@ impl IdealModel {
         // 模型因此**一条都不列**：实现要是还在这一格上拒，对拍当场报「模型说该成、实现拒了」——
         // 那正是这条定案要盯住的回退面。`MountError::VersionWithoutFileNotWrittenByMakeFilesystem` 今天只剩
         // 「树表或实例表不是 mkfs 写的那一版、而这一版又没有自己的分配记录树」那种手造镜像走得到，随机历史里造不出来。
-        let rows_after =
-            u64::try_from(base.instance_table_rows.len() + rows_to_write.len()).expect("行数");
-        // 一片 370 条，链指针记录恒为一片的最后一条（D18（块里携带什么信息） 已定项 11）；这次之后要多于一片时，第二片怎么写没有条款，
-        // 第一版不写第二片。两臂都判：树表 0 条的一版上写行同样重写整张实例表。
-        if rows_after + 1 > INSTANCE_TABLE_PAGE_RECORDS {
-            required_refusals
-                .insert(ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided);
-        }
+        // 实例表多于一片不再拒（用户 2026-09-24 定尾片先、一片写满 369 行再开下一片）：写行那次发布整条链重写，
+        // 有几片就多几个实例表单元（`next_root` 按这次之后的行数现算片数）。
         let table_after: Rc<Vec<ModelInstanceRow>> = if rows_to_write.is_empty() {
             Rc::clone(&base.instance_table_rows)
         } else {
@@ -1196,13 +1204,8 @@ impl IdealModel {
             ));
             warm_up_publishes += 1;
         }
-        let mut answer = self.answer_for_publishes(
-            operation,
-            base.key,
-            required_refusals,
-            BTreeSet::new(),
-            roots,
-        );
+        let mut answer =
+            self.answer_for_publishes(operation, required_refusals, BTreeSet::new(), roots);
         answer.walls_are_judged_before_the_first_write = true;
         answer.expected_mount = Some((instance, rows_to_write));
         answer.session_after_success = ModelSessionAfterSuccess::OpenedAs(instance);
@@ -1284,12 +1287,13 @@ impl IdealModel {
         }
         let mut answer = self.answer_for_publishes(
             ModelOperationKind::RaiseRollbackFloor,
-            current.key,
             required_refusals,
             permitted_refusals,
             roots,
         );
         answer.rollback_floor_ceiling = ceiling;
+        // 实现在任何写之前把这一串整串预演一遍（`mount::raise_rollback_floor`），哪一次撞墙都在第一次写之前拒、一次都不发。
+        answer.walls_are_judged_before_the_first_write = true;
         Ok(answer)
     }
 
@@ -1314,20 +1318,12 @@ impl IdealModel {
             rollback_floor_ceiling: None,
             planned_publish_upper_bounds: Vec::new(),
             walls_are_judged_before_the_first_write: true,
-            starting_version: None,
             session_after_success: ModelSessionAfterSuccess::Closed,
         }
     }
 
-    /// 容量墙的区间（收口表第 39 行那种：条款把答案留给实现取上界，模型答允许拒绝的区间）：
-    /// - 分配记录树（预想，跟收口表第 39 行）：允许拒要两头都过。上界这一头：这一步计划的那次发布之后、沿来路每次发布每个角色每盘都新加一条的
-    ///   上界超过一个节点——一条记一个单元、释放只改写不删（D3（空间分配） 已定项 7），条目 20 字节、key 10（D3（空间分配） 已定项 11），
-    ///   节点 16 KiB 减头（D8（核心索引结构） 已定项 11）⇒ 812 条；模型的上界沿来路累加、不看分配器此刻的条数，只会比真数宽。
-    ///   真条数这一头：执行器按 checker 的解析在镜像上现数的准入基数（`ModelAnswer::root_whose_allocation_records_the_wall_counts` 点名的那一版），
-    ///   加上计划里到那一次为止每次按准入口径新增的条数（每个重写的角色每盘一条，2026-09-18 用户定保留的上界准入），超过 812 才算装不下；
-    ///   真条数 ≤ 812 而实现拒了是对不上，数不出基数也不放行（增补 3 第 2 件代码三方第一轮判决第三节第 1 条：此前只有上界那一头，
-    ///   宽到接得住「差一」的误拒——攻方把墙的 `>` 改成 `>=`，长历史里在条款说装得下的格上拒了 44 次，那一刻上界 1376–1778，一次都没判出）。
-    ///   必须拒那一头（真条数装不下而实现做成了）不判：装不下还去写会 panic，由第 1 件判。
+    /// 容量墙的区间（收口表第 39 行那种：条款把答案留给实现取上界，模型答允许拒绝的区间）。分配记录树按位置寻址之后
+    /// （D8（核心索引结构） 已定项 14）没有「一个节点装不下」那道墙，剩单元区这一道：
     /// - 单元区：真条数那一头不判；上界那一头是占槽上界 × 一个聚簇段的槽数超过单元区（每个落点最坏独占一段：已分配 + defer ≤ 2 × 上界，
     ///   保留池 10 + 7 c_max 与切换预留（D16（发布语义） 已定项 1；D28（挂载期承诺量） 已定项 3）在 64 倍里）。预想：D28 已定项 1 的准入式子
     ///   第一版没实现，各项没有现值。
@@ -1336,9 +1332,8 @@ impl IdealModel {
         reason: ModelRefusalReason,
         answer: &ModelAnswer,
         publishes_completed: usize,
-        allocation_records_counted_on_the_image: Option<u64>,
     ) -> bool {
-        // 一串判完的（可写挂载、回退）看计划里的每一次；逐次判的（发布、抬 F）只看拒的那一次。
+        // 一串判完的（可写挂载、回退、抬 F）看计划里的每一次；逐次判的（发布）只看拒的那一次。
         let judged_publishes: &[PlannedPublishUpperBounds] =
             if answer.walls_are_judged_before_the_first_write {
                 &answer.planned_publish_upper_bounds
@@ -1349,23 +1344,6 @@ impl IdealModel {
                     .unwrap_or(&[])
             };
         match reason {
-            ModelRefusalReason::AllocationRecordNodeWall => {
-                let capacity = Self::allocation_record_node_capacity();
-                let upper_bound_exceeds = judged_publishes
-                    .iter()
-                    .any(|planned| planned.allocation_records > capacity);
-                let true_count_exceeds =
-                    allocation_records_counted_on_the_image.is_some_and(|counted| {
-                        judged_publishes
-                            .iter()
-                            .scan(counted, |records, planned| {
-                                *records += planned.allocation_records_added_by_the_admission;
-                                Some(*records)
-                            })
-                            .any(|records_after_the_publish| records_after_the_publish > capacity)
-                    });
-                upper_bound_exceeds && true_count_exceeds
-            }
             ModelRefusalReason::UnitAreaWall => judged_publishes.iter().any(|planned| {
                 planned.occupied_slots_per_device * CLUSTER_SEGMENT_SLOTS
                     > self.unit_area_slots_per_device()
@@ -1373,8 +1351,6 @@ impl IdealModel {
             ModelRefusalReason::ContentExceedsDataUnitPayload
             | ModelRefusalReason::FirstFileVersionDoesNotFollowTheVersionItBuildsOn
             | ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile
-            | ModelRefusalReason::AccountingNodeWall
-            | ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
@@ -1400,7 +1376,6 @@ impl IdealModel {
                 publishes_completed,
                 wrote_anything,
                 reported_ceiling,
-                allocation_records_counted_on_the_image,
             } => {
                 self.judge_reported_ceiling(answer, *reported_ceiling, &mut counts)?;
                 let accepted = match reason {
@@ -1413,7 +1388,6 @@ impl IdealModel {
                                         *candidate,
                                         answer,
                                         *publishes_completed,
-                                        *allocation_records_counted_on_the_image,
                                     ))
                         })
                     }
@@ -1425,14 +1399,10 @@ impl IdealModel {
                     } else {
                         ModelDisagreementAspect::RefusalReason
                     };
-                    let counted_on_the_image = match allocation_records_counted_on_the_image {
-                        Some(counted) => format!("（镜像上数的准入基数 {counted} 条）"),
-                        None => String::new(),
-                    };
                     return Err(ModelDisagreement::new(
                         aspect,
                         describe_answer(answer),
-                        format!("拒了：{member}{counted_on_the_image}"),
+                        format!("拒了：{member}"),
                     ));
                 };
                 let partial_publishes_allowed = !answer.walls_are_judged_before_the_first_write
@@ -1462,9 +1432,6 @@ impl IdealModel {
                     counts.required_refusals_matched += 1;
                 } else {
                     counts.permitted_refusals_taken += 1;
-                }
-                if accepted_reason == ModelRefusalReason::AllocationRecordNodeWall {
-                    counts.allocation_record_wall_refusals_over_one_node += 1;
                 }
                 if accepted_reason == ModelRefusalReason::UnitAreaWall {
                     counts.unit_area_wall_refusals_in_the_interval += 1;
@@ -1947,6 +1914,72 @@ mod tests {
         model
     }
 
+    /// 实例表多于一片（用户 2026-09-24 定尾片先、一片写满 369 行再开下一片）：可写挂载不再拒，写行那次发布整条链重写，
+    /// 链上每一片都是一个重写的单元、各占两个槽。第一个文件之后号推到 370（等于连着 369 次取号之后崩溃），
+    /// 下一次可写挂载取 371、写 [1, 371) 共 370 行 ⇒ 两片：写行那次发布占 2 × 2 + 3（记账树、映射树、树表）槽，
+    /// 加分配记录树这次至多重写的节点数。
+    #[test]
+    fn a_mount_that_writes_more_rows_than_one_page_holds_counts_every_page_of_the_instance_table_chain(
+    ) {
+        let mut model = two_device_model();
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        let first = model
+            .answer_publish_first_file(&[3])
+            .expect("会话开着、现行 txg 2");
+        succeed(&mut model, &first);
+        model.close_session();
+        model.highest_acquired_instance = ModelInstanceGeneration(370);
+        let mount = model.answer_mount_writable();
+        assert!(mount.required_refusals.is_empty(), "{mount:?}");
+        let (instance, rows_written) = mount.expected_mount.clone().expect("挂载做成");
+        assert_eq!(
+            (instance, rows_written.len()),
+            (ModelInstanceGeneration(371), 370)
+        );
+        let row_publish = &mount.expected_roots[0];
+        assert_eq!(row_publish.instance_table_rows.len(), 370);
+        let slots_before = model.newest_root().occupied_slots_upper_bound_per_device;
+        let slots_outside_the_allocation_record_tree = 2 * 2 + 3;
+        assert_eq!(
+            row_publish.occupied_slots_upper_bound_per_device - slots_before,
+            slots_outside_the_allocation_record_tree
+                + model.allocation_record_tree_nodes_rewritten_upper_bound(
+                    slots_before + slots_outside_the_allocation_record_tree
+                ),
+            "两片实例表各 2 槽、三个固定点单元各 1 槽，加分配记录树这次至多重写的节点"
+        );
+    }
+
+    /// 分配记录树一次发布至多重写几个节点（D8（核心索引结构） 已定项 14：叶罩 812 槽、内部扇出 169）：4 GiB 两块盘，根在第 2 层；
+    /// 第一个文件版本之前每盘写过 3 槽（mkfs 的实例表 2、树表 1），这次树之外写 9 槽（数据 2、extent 根 1、inode 叶 2、inode 根 1、
+    /// 记账树、映射树、树表各 1）。设这次重写 A 个节点：落点都在单元区起点 50176 往后 64 × (12 + A) 槽里。
+    /// A = 9 时那一段到 51520，罩叶 61..=63 三片、第 1 层 1 个 ⇒ 1 + 2 × 4 = 9，是不动点；从单元区全部 529 个节点往下迭代停在这里。
+    #[test]
+    fn allocation_record_tree_nodes_rewritten_by_the_first_file_version_on_4_gib_are_at_most_nine()
+    {
+        let model = two_device_model();
+        assert_eq!(
+            model.allocation_record_tree_nodes_rewritten_upper_bound(u64::MAX / 128),
+            1 + 2 * (262 + 2),
+            "单元区里的全部节点：每盘叶 61..=322、第 1 层 0..=1，加根"
+        );
+        assert_eq!(
+            model.allocation_record_tree_nodes_rewritten_upper_bound(3 + 9),
+            9
+        );
+        let mut model = model;
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        let slots_before = model.newest_root().occupied_slots_upper_bound_per_device;
+        assert_eq!(slots_before, 3, "暖机是零单元发布，一个槽都不占");
+        let first = model
+            .answer_publish_first_file(&[3])
+            .expect("会话开着、现行 txg 2");
+        assert_eq!(
+            first.expected_roots[0].occupied_slots_upper_bound_per_device,
+            3 + 9 + 9
+        );
+    }
+
     /// 内容装不装得下按 32768 含头与预留位算（D4（校验和位置） 已定项 5）：正好装满不拒，多一个字节才拒。
     #[test]
     fn content_of_exactly_the_payload_capacity_is_accepted_and_one_byte_more_is_refused() {
@@ -2100,137 +2133,5 @@ mod tests {
             .judge_allocation_generations(row_publish, &observed(4), &mut counts)
             .expect_err("照抄的数据单元分配代写成了这次的 txg");
         assert_eq!(wrong.aspect, ModelDisagreementAspect::AllocationGeneration);
-    }
-
-    fn refused_by_the_allocation_record_wall(
-        publishes_completed: usize,
-        allocation_records_counted_on_the_image: Option<u64>,
-    ) -> ObservedOutcome {
-        ObservedOutcome::Refused {
-            member: "PublishError::AllocationRecordsExceedOneNode".to_string(),
-            reason: ObservedRefusalReason::Explained(ModelRefusalReason::AllocationRecordNodeWall),
-            publishes_completed,
-            wrote_anything: publishes_completed > 0,
-            reported_ceiling: None,
-            allocation_records_counted_on_the_image,
-        }
-    }
-
-    /// 在第二个实例里再覆盖写 50 次：沿来路的上界 102 + 50 × 16 = 902，远过 812（区间的上界那一头早就开了）。
-    fn model_with_the_upper_bound_far_above_one_allocation_node() -> IdealModel {
-        let mut model = model_after_four_overwrites_in_a_second_instance();
-        for content_byte in 0_u8..50 {
-            let overwrite = model
-                .answer_publish_overwrite(&[content_byte])
-                .expect("会话开着、现行版本带文件");
-            succeed(&mut model, &overwrite);
-        }
-        model
-    }
-
-    /// 分配记录墙（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）：覆盖写每盘加 8 条；镜像上数的基数 796 ⇒ 这次之后正好 812 条、一个节点装得下，
-    /// 墙拒是「模型说该成、实现拒了」，哪怕沿来路的上界早过了 812；基数 797 ⇒ 813 条，放行；数不出基数不放行。
-    #[test]
-    fn the_allocation_record_wall_is_permitted_only_when_the_counted_records_plus_this_publish_exceed_812(
-    ) {
-        let model = model_with_the_upper_bound_far_above_one_allocation_node();
-        let answer = model
-            .answer_publish_overwrite(&[1])
-            .expect("会话开着、现行版本带文件");
-        assert_eq!(IdealModel::allocation_record_node_capacity(), 812);
-        assert!(
-            answer.planned_publish_upper_bounds[0].allocation_records > 812,
-            "上界那一头开着：{:?}",
-            answer.planned_publish_upper_bounds
-        );
-        assert_eq!(
-            answer.planned_publish_upper_bounds[0].allocation_records_added_by_the_admission,
-            16
-        );
-        assert_eq!(
-            answer.root_whose_allocation_records_the_wall_counts(0),
-            Some(model.session.as_ref().expect("会话开着").current.key),
-            "覆盖写数现行版本那一版"
-        );
-        let judged = |counted: Option<u64>| {
-            model
-                .clone()
-                .judge_and_advance(&answer, &refused_by_the_allocation_record_wall(0, counted))
-                .map(|counts| counts.allocation_record_wall_refusals_over_one_node)
-                .map_err(|disagreement| disagreement.aspect)
-        };
-        assert_eq!(
-            judged(Some(796)),
-            Err(ModelDisagreementAspect::RefusedWhenModelRequiresSuccess)
-        );
-        assert_eq!(judged(Some(797)), Ok(1));
-        assert_eq!(
-            judged(None),
-            Err(ModelDisagreementAspect::RefusedWhenModelRequiresSuccess)
-        );
-    }
-
-    /// 可写挂载在第一次写之前一串判完：基数是所选根那一版，加上写行（五个角色每盘一条）与每次暖机（四个角色每盘一条）；一串里有一次
-    /// 越过 812 才放行。抬 F 逐次判：做完一次之后被拒，基数数拒之前最后写出的那一版。
-    #[test]
-    fn mount_and_raise_count_the_wall_from_the_version_their_admission_starts_from() {
-        let mut model = model_with_the_upper_bound_far_above_one_allocation_node();
-        let raise = model
-            .answer_raise_rollback_floor(ModelCheckpointTxg(0))
-            .expect("会话开着、F 不往下抬");
-        assert!(
-            raise.expected_roots.len() >= 2,
-            "{:?}",
-            raise.expected_roots
-        );
-        assert_eq!(
-            raise.root_whose_allocation_records_the_wall_counts(1),
-            Some(raise.expected_roots[0].key),
-            "做完一次之后被拒：数第一次抬 F 写出的那一版"
-        );
-        let second_publish_added =
-            raise.planned_publish_upper_bounds[1].allocation_records_added_by_the_admission;
-        assert_eq!(second_publish_added, 8);
-        let judged_raise = |counted: u64| {
-            model
-                .clone()
-                .judge_and_advance(
-                    &raise,
-                    &refused_by_the_allocation_record_wall(1, Some(counted)),
-                )
-                .map_err(|disagreement| disagreement.aspect)
-                .is_ok()
-        };
-        assert!(!judged_raise(812 - second_publish_added));
-        assert!(judged_raise(813 - second_publish_added));
-
-        let chosen = model.newest_root().key;
-        model.close_session();
-        let mount = model.answer_mount_writable();
-        assert_eq!(
-            mount.root_whose_allocation_records_the_wall_counts(0),
-            Some(chosen)
-        );
-        let added_by_the_mount: u64 = mount
-            .planned_publish_upper_bounds
-            .iter()
-            .map(|planned| planned.allocation_records_added_by_the_admission)
-            .sum();
-        assert_eq!(
-            added_by_the_mount,
-            10 + 8 * u64::try_from(mount.planned_publish_upper_bounds.len() - 1).expect("次数"),
-            "写行每盘 5 条、每次暖机每盘 4 条"
-        );
-        let judged_mount = |counted: u64| {
-            model
-                .clone()
-                .judge_and_advance(
-                    &mount,
-                    &refused_by_the_allocation_record_wall(0, Some(counted)),
-                )
-                .is_ok()
-        };
-        assert!(!judged_mount(812 - added_by_the_mount));
-        assert!(judged_mount(813 - added_by_the_mount));
     }
 }

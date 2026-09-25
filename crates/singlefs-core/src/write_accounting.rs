@@ -49,14 +49,24 @@ impl WrittenStructureKind {
     pub const fn of_unit(identity: TransactionUnit) -> WrittenStructureKind {
         match identity {
             TransactionUnit::Data(_) => WrittenStructureKind::DataUnit,
-            TransactionUnit::ExtentRoot => WrittenStructureKind::ExtentTreeNode,
+            // 按 key 空间定形状的两棵树同样按树数、不按段与层数（extent 树上段与下段、分配记录树每一层都是这一种）。
+            TransactionUnit::ExtentLowerNode(_)
+            | TransactionUnit::ExtentUpperNodeBelowTheRoot(_)
+            | TransactionUnit::ExtentRoot => WrittenStructureKind::ExtentTreeNode,
             TransactionUnit::InodeLeafContainer(_) => WrittenStructureKind::InodeTreeLeafContainer,
             TransactionUnit::InodeRoot => WrittenStructureKind::InodeTreeRoot,
-            TransactionUnit::AllocationTree => WrittenStructureKind::AllocationRecordTreeNode,
-            TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
-            TransactionUnit::MappingTree => WrittenStructureKind::CentralMappingTreeNode,
+            TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
+            | TransactionUnit::AllocationTree => WrittenStructureKind::AllocationRecordTreeNode,
+            // 多层之后根之下的节点与根同一种：按树数，不按层数（增补 1 的账按结构种类记）。
+            TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
+            | TransactionUnit::AccountingTree => WrittenStructureKind::AccountingTreeNode,
+            TransactionUnit::MappingTreeNodeBelowTheRoot(_) | TransactionUnit::MappingTree => {
+                WrittenStructureKind::CentralMappingTreeNode
+            }
             TransactionUnit::TreeTable => WrittenStructureKind::TreeTableUnit,
-            TransactionUnit::InstanceTable => WrittenStructureKind::InstanceTableUnit,
+            TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
+                WrittenStructureKind::InstanceTableUnit
+            }
         }
     }
 

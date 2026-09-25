@@ -7,12 +7,15 @@
 #![forbid(unsafe_code)]
 
 pub mod image;
+pub mod position_addressed;
 pub mod walk;
 
 use singlefs_format::{
     index_node_header_bytes, DATA_UNIT_BYTES, DATA_UNIT_HEADER_BYTES, JOURNAL_HEADER_BYTES,
     JOURNAL_NAMED_ENTRY_BYTES, JOURNAL_RECORD_BYTES, NODE_BYTES,
-    NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES, ROOT_RECORD_BYTES,
+    NONCE_MAC_ALGORITHM_RESERVED_BYTES, PACKED_UNIT_HEADER_BYTES, ROLLBACK_WITNESS_COUNT_BYTES,
+    ROLLBACK_WITNESS_ENTRIES_MAXIMUM, ROLLBACK_WITNESS_ENTRY_BYTES,
+    ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT, ROOT_RECORD_BYTES,
     SYSTEM_CONFIGURATION_SLOT_BYTES, WIDE_CHECKSUM_BYTES,
 };
 
@@ -124,6 +127,69 @@ pub enum Verdict {
     /// 也不 panic：S = 0 会让环长变 0、实现侧取模除零。挂载侧同一条判定是
     /// `singlefs_core::recovery::RecoveryFailure::RootRingSlotsPerRegionOutOfRange`。
     RootRingSlotsPerRegionOutsideTheFormatInterval,
+}
+
+/// 回退见证表的一个条目（D23（journal 的角色与格式） 已定项 14「回退见证」）：新实例代号 4 + 回退目标 R_old 的实例代号 4 + txg 8，小端。
+/// 偏移与宽度只从 `singlefs-format` 取，解析在 checker 这边另写一份。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RollbackWitnessEntryView {
+    pub new_instance: u32,
+    pub rollback_target_instance: u32,
+    pub rollback_target_txg: u64,
+}
+
+impl RollbackWitnessEntryView {
+    /// (实例代号, txg) 这一处被这次回退抛弃：(r_old, T_old) < (i, T)（实例代号为主比）且 i < N。
+    #[must_use]
+    pub fn abandons(&self, instance: u32, checkpoint_txg: u64) -> bool {
+        (self.rollback_target_instance, self.rollback_target_txg) < (instance, checkpoint_txg)
+            && instance < self.new_instance
+    }
+}
+
+/// 一个自证过的系统配置槽里的回退见证表：槽内偏移 481 起，条数 1 字节 + 47 个 16 字节的条目位。`capacity` 是这个池的条数上限
+/// （R × S − 1，R、S 读自同一槽）。条数不超过上限、条目按 (N, r_old, T_old) 严格升序、每一条 r_old < N、条数之后的条目位全 0，
+/// 四样都满足才交回条目；不满足交回哪一样不满足（I-7.10（回退见证表各槽自洽、各盘一致） 的违例说明要它）。
+///
+/// # Errors
+/// 上面四样里第一样不满足的，一句话。
+pub fn rollback_witness_of_system_configuration_slot(
+    slot: &[u8],
+    capacity: u64,
+) -> Result<Vec<RollbackWitnessEntryView>, &'static str> {
+    let start = usize::try_from(ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT)
+        .expect("481");
+    let count_bytes = usize::try_from(ROLLBACK_WITNESS_COUNT_BYTES).expect("1");
+    let entry_bytes = usize::try_from(ROLLBACK_WITNESS_ENTRY_BYTES).expect("16");
+    let positions = usize::try_from(ROLLBACK_WITNESS_ENTRIES_MAXIMUM).expect("47");
+    if slot.len() < start + count_bytes + positions * entry_bytes {
+        return Err("槽比见证表的末尾短");
+    }
+    let count = u64::from(slot[start]);
+    if count > capacity.min(ROLLBACK_WITNESS_ENTRIES_MAXIMUM) {
+        return Err("条数超过这个池的上限 R × S − 1");
+    }
+    let mut entries: Vec<RollbackWitnessEntryView> = Vec::new();
+    for position in 0..positions {
+        let base = start + count_bytes + position * entry_bytes;
+        let entry = RollbackWitnessEntryView {
+            new_instance: read_u32(slot, base),
+            rollback_target_instance: read_u32(slot, base + 4),
+            rollback_target_txg: read_u64(slot, base + 8),
+        };
+        if u64::try_from(position).expect("47 以内") < count {
+            if entry.rollback_target_instance >= entry.new_instance {
+                return Err("有一条的回退目标实例代号不小于新实例代号");
+            }
+            if entries.last().is_some_and(|previous| *previous >= entry) {
+                return Err("条目不按 (新实例, 目标实例, 目标 txg) 严格升序");
+            }
+            entries.push(entry);
+        } else if slot[base..base + entry_bytes].iter().any(|byte| *byte != 0) {
+            return Err("条数之后的条目位不全是 0");
+        }
+    }
+    Ok(entries)
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -451,6 +517,28 @@ pub fn check_index_node_keys(view: &IndexNodeView, schema: KeySchema) -> Result<
     Ok(())
 }
 
+/// 判一个多层码 2 树内部节点的 key（D8（核心索引结构） 已定项 11）：自述 key 宽等于形态宽、条目按分隔 key 严格递增、节点不空。
+/// 头里的 key 区间是子树覆盖区间（D18（块里携带什么信息） 已定项 2），不贴紧首末两条分隔 key——它要等孩子读回来才判得了，
+/// 由走读的一方判，这里不判。
+pub fn check_internal_node_separators(
+    view: &IndexNodeView,
+    schema: KeySchema,
+) -> Result<(), Verdict> {
+    if schema.width() != view.key_width {
+        return Err(Verdict::KeyWidthMismatch);
+    }
+    if view.entries.is_empty() {
+        return Err(Verdict::KeyOutsideDeclaredRange);
+    }
+    let key_of = |entry: &Vec<u8>| schema.fields(&entry[..view.key_width]);
+    for pair in view.entries.windows(2) {
+        if key_of(&pair[0]) >= key_of(&pair[1]) {
+            return Err(Verdict::KeysNotStrictlyAscending);
+        }
+    }
+    Ok(())
+}
+
 /// 码 3 打包记录单元解出来的头与记录（D18（块里携带什么信息） 已定项 11 / 已定项 16：记录区从 136 起）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PackedUnitView {
@@ -497,9 +585,10 @@ pub fn packed_unit_view(unit: &[u8]) -> Result<PackedUnitView, Verdict> {
     })
 }
 
-/// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，
-/// 再是反向链 4、载荷校验和 4、新根段 188、fsid 8、MAC 16，头到 311 为止。
+/// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：magic 4 + 类型 2 + 算法类型 1 之后是记录标志 1；
+/// 事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，再是反向链 4、载荷校验和 4、新根段 188、fsid 8、MAC 16，头到 311 为止。
 const JOURNAL_MAGIC: &[u8; 4] = b"SFSJ";
+const JOURNAL_RECORD_FLAGS_OFFSET: usize = 7;
 const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 46;
 const JOURNAL_TRANSACTION_OFFSET: usize = 78;
 const JOURNAL_COMMIT_MARKER_OFFSET: usize = 86;
@@ -545,7 +634,11 @@ pub struct JournalRecordView {
     /// 所以不能只留 `is_commit`——那一步把 2..=255 静默读成「不带」。
     pub commit_marker_byte: u8,
     /// 本次发布内序号（D23（journal 的角色与格式） 已定项 4）：一次发布 N 条记录依次是 1..N，只有一条时是 1。
+    /// 读到的原样：序号 0 在这里不拒，I-8.9（一次发布的记录序号连续且只有末条带标志） 判红。
     pub ordinal_within_publish: u32,
+    /// 记录标志那 1 字节原样（D23（journal 的角色与格式） 已定项 4 / 已定项 17）：位 0 = 本次发布末条，其余位只许 0。
+    /// 不在这里拒其余位非 0 的记录，I-8.9（一次发布的记录序号连续且只有末条带标志） 判红——拒了它就看不见。
+    pub record_flags_byte: u8,
     pub back_chain: u32,
     /// 新根段 188 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8）。
     pub new_root_segment: Vec<u8>,
@@ -630,6 +723,7 @@ pub fn check_journal_record(
         is_commit: record[JOURNAL_COMMIT_MARKER_OFFSET] == 1,
         commit_marker_byte: record[JOURNAL_COMMIT_MARKER_OFFSET],
         ordinal_within_publish: read_u32(record, JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET),
+        record_flags_byte: record[JOURNAL_RECORD_FLAGS_OFFSET],
         back_chain: read_u32(record, JOURNAL_BACK_CHAIN_OFFSET),
         new_tree_identifier_watermark: read_u64(record, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86 + 86),
         new_rollback_floor: read_u64(record, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86 + 86 + 8),

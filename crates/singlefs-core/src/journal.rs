@@ -18,8 +18,48 @@ use crate::pointer::{LocationEntry, NodePointer};
 pub const JOURNAL_MAGIC: [u8; 4] = *b"SFSJ";
 /// 记录类型登记表（D23（journal 的角色与格式） 已定项 1）：0 无效、1 普通记录。
 pub const JOURNAL_RECORD_TYPE_ORDINARY: u16 = 1;
-/// magic 4 + 类型 2 + 算法类型 1 + 填充 1 + 记录长度 4 + 点名项数 4 + jsn 10 + checkpoint_txg 8 + nonce 12。
+/// magic 4 + 类型 2 + 算法类型 1 + 记录标志 1 + 记录长度 4 + 点名项数 4 + jsn 10 + checkpoint_txg 8 + nonce 12。
 pub const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 4 + 2 + 1 + 1 + 4 + 4 + 10 + 8 + 12;
+/// 记录标志 1 字节在 magic 4 + 类型 2 + 算法类型 1 之后（D23（journal 的角色与格式） 已定项 4，原「填充 1」那个字节）。
+pub const JOURNAL_RECORD_FLAGS_OFFSET: usize = 4 + 2 + 1;
+/// 记录标志位 0：本次发布末条（D23（journal 的角色与格式） 已定项 17）。其余位写 0，读到非 0 当损坏（已定项 4）。
+pub const JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH: u8 = 0b0000_0001;
+
+/// 这条记录在它那次发布里是不是末条：记录标志位 0（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。
+/// 一次发布的末条之外的记录写 0；每次只有一条记录的发布（含空发布记录）那一条也写 1。
+/// 恢复按它认一次发布的边界（已定项 14 第六条），所选根覆盖的最后一条也按它认（已定项 14 注 1）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum JournalRecordPlaceInPublish {
+    /// 位 0 = 1：本次发布末条。
+    LastRecordOfThePublish,
+    /// 位 0 = 0：这次发布在它之后还有记录。
+    MoreRecordsOfThePublishFollow,
+}
+
+impl JournalRecordPlaceInPublish {
+    /// 写进记录标志那 1 字节的值：只用位 0，其余位恒 0。
+    #[must_use]
+    pub const fn record_flags_byte(self) -> u8 {
+        match self {
+            JournalRecordPlaceInPublish::LastRecordOfThePublish => {
+                JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH
+            }
+            JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow => 0,
+        }
+    }
+
+    /// 从盘上读来的记录标志那 1 字节：位 0 之外有位为 1 ⇒ `None`（已定项 4「其余位写 0，读到非 0 当损坏」）。
+    #[must_use]
+    pub const fn from_record_flags_byte(record_flags_byte: u8) -> Option<Self> {
+        match record_flags_byte {
+            0 => Some(JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow),
+            JOURNAL_RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH => {
+                Some(JournalRecordPlaceInPublish::LastRecordOfThePublish)
+            }
+            _other_bits_set => None,
+        }
+    }
+}
 /// 本次发布内序号紧跟事务号 8 与提交标记 1（D23（journal 的角色与格式） 已定项 4）：头部校验和 32 之后。
 pub const JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET: usize =
     JOURNAL_HEADER_CHECKSUM_OFFSET + 32 + 8 + 1;
@@ -111,6 +151,8 @@ pub struct JournalRecord {
     pub transaction: u64,
     pub is_commit: bool,
     pub ordinal_within_publish: JournalRecordOrdinalWithinPublish,
+    /// 记录标志位 0（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。
+    pub place_in_publish: JournalRecordPlaceInPublish,
     pub back_chain: u32,
     pub filesystem_identifier: u64,
     pub new_tree_table: NodePointer,
@@ -148,7 +190,11 @@ impl JournalRecord {
         writer.put(&JOURNAL_MAGIC);
         writer.put_u16(JOURNAL_RECORD_TYPE_ORDINARY);
         writer.put_u8(0); // 算法类型
-        writer.put_u8(0); // 对齐填充
+        writer.assert_position(
+            u64::try_from(JOURNAL_RECORD_FLAGS_OFFSET).expect("偏移"),
+            "记录标志",
+        );
+        writer.put_u8(self.place_in_publish.record_flags_byte());
         writer.put_u32(u32::try_from(JOURNAL_RECORD_BYTES).expect("记录长度"));
         writer.put_u32(u32::try_from(self.named.len()).expect("点名项数 4 字节"));
         writer.put_u32(self.instance.0);
@@ -199,7 +245,9 @@ impl JournalRecord {
         bytes
     }
 
-    /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关；不查反向链（那是前缀取法的事）。
+    /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关，外加三条当损坏的（D23（journal 的角色与格式） 已定项 4 / 已定项 7）：
+    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
+    /// （已定项 22 断号即止）。不查反向链，也不查一次发布之内跳不跳号：那两样要看别的记录，是前缀取法的事。
     #[must_use]
     pub fn parse(bytes: &[u8], expected_filesystem_identifier: u64) -> Option<Self> {
         let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
@@ -213,7 +261,9 @@ impl JournalRecord {
         if reader.get_u16() != JOURNAL_RECORD_TYPE_ORDINARY {
             return None;
         }
-        reader.skip(1 + 1);
+        reader.skip(1); // 算法类型
+        let place_in_publish =
+            JournalRecordPlaceInPublish::from_record_flags_byte(reader.get_u8())?;
         if u64::from(reader.get_u32()) != JOURNAL_RECORD_BYTES {
             return None;
         }
@@ -223,8 +273,18 @@ impl JournalRecord {
         let checkpoint_txg = CheckpointTxg(reader.get_u64());
         reader.skip(12 + 32);
         let transaction = reader.get_u64();
-        let is_commit = reader.get_u8() == 1;
+        // 提交标记只有 0（不带）与 1（带）两个取值（D23（journal 的角色与格式） 已定项 7）：读到 2..=255 当这条记录损坏、断链即止，
+        // 与已定项 4 读者规则那几格同一处置（主 agent 2026-09-24 定：不许把它静默读成「不带」——checker 的 I-8.8 判它违例，两边说的要是一件事）。
+        let is_commit = match reader.get_u8() {
+            0 => false,
+            1 => true,
+            2..=u8::MAX => return None,
+        };
         let ordinal_within_publish = JournalRecordOrdinalWithinPublish(reader.get_u32());
+        // 序号从 1 起（已定项 4）：读到 0 当这条记录损坏。
+        if ordinal_within_publish.0 == 0 {
+            return None;
+        }
         let back_chain = reader.get_u32();
         let payload_checksum = reader.get_u32();
         let new_tree_table = NodePointer::read_from(&mut reader);
@@ -257,6 +317,7 @@ impl JournalRecord {
             transaction,
             is_commit,
             ordinal_within_publish,
+            place_in_publish,
             back_chain,
             filesystem_identifier,
             new_tree_table,
@@ -281,6 +342,7 @@ mod tests {
             transaction: 0,
             is_commit: true,
             ordinal_within_publish: JournalRecordOrdinalWithinPublish::FIRST,
+            place_in_publish: JournalRecordPlaceInPublish::LastRecordOfThePublish,
             back_chain: 0,
             filesystem_identifier: 7,
             new_tree_table: NodePointer::empty_root(),
@@ -335,6 +397,73 @@ mod tests {
             "MAC 16 占 [295, 311)，第一版全 0"
         );
         assert_eq!(JournalRecord::parse(&bytes, 7), Some(record));
+    }
+
+    /// 改过记录头某几个字节之后重封头部校验和（罩整条 4096、自身按 0 参与，D23（journal 的角色与格式） 已定项 13）：
+    /// 拦得住那条记录的只剩被改的字段本身。
+    fn reseal_header_checksum(bytes: &mut [u8]) {
+        let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
+        let digest =
+            wide_checksum_with_field_zeroed(bytes, record_bytes, JOURNAL_HEADER_CHECKSUM_OFFSET);
+        bytes[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32]
+            .copy_from_slice(&digest);
+    }
+
+    /// 记录标志 1 字节在偏移 7（magic 4 + 类型 2 + 算法类型 1，原「填充 1」那个字节，D23（journal 的角色与格式） 已定项 4）：
+    /// 本次发布末条写 1、不是末条写 0，两种都读得回。偏移按字段表手算、写成字面量，不从写者用的常量推（已定项 26 第 1 条）。
+    #[test]
+    fn the_record_flags_byte_at_offset_seven_carries_bit_zero_for_the_last_record_of_the_publish_and_round_trips(
+    ) {
+        let last = empty_record(3);
+        let last_bytes = last.to_bytes();
+        assert_eq!(last_bytes[7], 1, "本次发布末条：记录标志位 0 = 1，其余位 0");
+        assert_eq!(JournalRecord::parse(&last_bytes, 7), Some(last));
+        let not_last = JournalRecord {
+            place_in_publish: JournalRecordPlaceInPublish::MoreRecordsOfThePublishFollow,
+            ..empty_record(3)
+        };
+        let not_last_bytes = not_last.to_bytes();
+        assert_eq!(not_last_bytes[7], 0, "不是末条：记录标志整字节 0");
+        assert_eq!(JournalRecord::parse(&not_last_bytes, 7), Some(not_last));
+        let mut differing: Vec<usize> = (0..last_bytes.len())
+            .filter(|offset| last_bytes[*offset] != not_last_bytes[*offset])
+            .collect();
+        differing.retain(|offset| !(46..78).contains(offset));
+        assert_eq!(
+            differing,
+            vec![7],
+            "两条记录只差记录标志那 1 字节（与头部校验和）"
+        );
+    }
+
+    /// 记录标志位 0 之外有位为 1 的记录，读者当损坏（D23（journal 的角色与格式） 已定项 4「其余位写 0，读到非 0 当损坏」）：
+    /// 位 0 本身是不是 1 都一样拒。头部校验和按改过的字节重封过，拦住它的只有记录标志那一判。
+    #[test]
+    fn a_record_whose_flags_byte_sets_any_bit_other_than_bit_zero_is_refused_by_the_parser() {
+        for record_flags_byte in [0b0000_0010u8, 0b0000_0011, 0b1000_0001, 0xff] {
+            let mut bytes = empty_record(4).to_bytes();
+            bytes[7] = record_flags_byte;
+            reseal_header_checksum(&mut bytes);
+            assert_eq!(
+                JournalRecord::parse(&bytes, 7),
+                None,
+                "记录标志 {record_flags_byte:#010b}：位 0 之外有位为 1，当损坏"
+            );
+        }
+    }
+
+    /// 本次发布内序号为 0 的记录，读者当损坏（D23（journal 的角色与格式） 已定项 4：序号从 1 起，读到 0 当那条记录损坏、断链即止）。
+    /// 头部校验和按改过的字节重封过，拦住它的只有序号那一判。
+    #[test]
+    fn a_record_whose_ordinal_within_publish_is_zero_is_refused_by_the_parser() {
+        let mut bytes = empty_record(5).to_bytes();
+        bytes[87..91].copy_from_slice(&0u32.to_le_bytes());
+        reseal_header_checksum(&mut bytes);
+        assert_eq!(
+            JournalRecord::parse(&bytes, 7),
+            None,
+            "序号 0：当这条记录损坏"
+        );
     }
 
     /// 一次发布里从 0 数第 k 条记录的序号是 k + 1：第一条是 1（D23（journal 的角色与格式） 已定项 4「从 1 起」）。

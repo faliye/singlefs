@@ -3,15 +3,12 @@
 //! 三件事：
 //! ① 一次写请求按切分纪律切成若干一单元事务（D16（发布语义） 已定项 5 末段、D23（journal 的角色与格式） 已定项 7、
 //!    C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），切出一个事务的那一档与覆盖写走同一条发布路径、写出的字节一个不变；
-//! ② 切出不止一个事务时一次发布写出一个事务一条记录，跨过 67 那个点名项上限照样走得通，一片 extent 叶装满的 144 也走得通；
-//! ③ 多于 144 个单元时 extent 树要长出内部节点，而内部条目的格式没有条款 ⇒ 在任何落盘动作之前拒绝，盘上逐字节不变
-//!    （`DiskSnapshot`：两盘四个系统配置槽的原样字节、根环里全部自证过的根、录制流步数），分配器也一个记录都没动。
+//! ② 切出不止一个事务时一次发布写出一个事务一条记录，跨过 67 那个点名项上限照样走得通，一片 extent 叶装满的 144 也走得通，
+//!    多于 144 个单元时 extent 树下段长成两层（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K2），同样走得通。
 
 mod common;
 
-use common::{
-    build_pool, disk_snapshot, parameters, BuiltPool, DiskSnapshot, FIXED_WRITE_TIME_SECONDS,
-};
+use common::{build_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
 use singlefs_core::address::InstanceGeneration;
 use singlefs_core::transaction::{
     publish_overwrite, publish_sequential_write, FirstFile, PoolWriter, PublishError,
@@ -119,55 +116,15 @@ fn a_sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_
     );
 }
 
-/// 切出的单元多于一片 extent 叶装得下的 144 条 ⇒ extent 树要长出内部节点，而 extent 内部条目的格式没有条款
-/// （D8（核心索引结构） 已定项 11 只定码 2 节点的通用排法）⇒ 在任何落盘动作之前被拒：错误成员带切分算出的单元数与一片叶的容量，
-/// 盘上逐字节不变（系统配置槽、根环里的根、录制流步数），分配器的记录一条都没动。
-#[test]
-fn a_sequential_write_needing_more_data_units_than_one_extent_leaf_holds_is_refused_before_any_write(
-) {
-    assert_eq!(data_unit_payload_capacity(), 32_634);
-    let content = content_of(144 * 32_634 + 1);
-    assert_eq!(data_units_for(content.len()), 145);
-
-    let mut pool = build_pool("parallel-line-one-one-hundred-forty-five");
-    let records_before = pool.allocator.records().to_vec();
-    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
-
-    let refusal = try_sequential_write(&mut pool, &content);
-
-    let Err(PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided {
-        data_units,
-        extent_leaf_capacity,
-    }) = refusal
-    else {
-        panic!("要的是 extent 树长不出内部节点被拒，拿到 {refusal:?}");
-    };
-    assert_eq!(data_units, 145, "切分算出的单元数");
-    assert_eq!(
-        extent_leaf_capacity, 144,
-        "一片 extent 叶 (16384 − 163) ÷ 112 = 144 条"
-    );
-
-    let after: DiskSnapshot = disk_snapshot(&pool.memory_pool(), &pool.stream);
-    assert_eq!(
-        before, after,
-        "盘上逐字节不变：系统配置槽、根环里的根、录制流步数（一个写、一道屏障都没发）"
-    );
-    assert_eq!(
-        pool.allocator.records(),
-        &records_before[..],
-        "分配器一条记录都没动：拒在释放与分配之前"
-    );
-}
-
 /// 单元数跨过 67（一条 journal 记录的点名项上限）走得通：一次发布的记录条数 = 数据单元数
 /// （C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），67 那个点名项上限够不着——每条记录只点名一个数据单元，
-/// 末条再加共享的提交内生块。144（一片 extent 叶装满）也走得通，145 被拒（上一条用例）。
+/// 末条再加共享的提交内生块。144（一片 extent 叶装满）也走得通；145 起 extent 树下段长成两层（D8（核心索引结构） 已定项 14），
+/// 同样走得通（下段的形状钉在 `second_transaction_parallel_line_one_multi_unit_file.rs`）。
 #[test]
 fn a_sequential_write_publishes_one_record_per_data_unit_across_the_sixty_seven_threshold_up_to_a_full_extent_leaf(
 ) {
     let payload_capacity = data_unit_payload_capacity();
-    for expected_data_units in [2usize, 67, 68, 144] {
+    for expected_data_units in [2usize, 67, 68, 144, 145] {
         let content = content_of((expected_data_units - 1) * payload_capacity + 1);
         let expected_data_units_u64 = u64::try_from(expected_data_units).expect("单元数");
         assert_eq!(

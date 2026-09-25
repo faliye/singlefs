@@ -1,4 +1,4 @@
-//! 里程碑「第二个事务」步 5 的验收：回退之后再覆盖写四次（txg 11–14；第一次把 A 的八个单元释放、释放代 11），抬回退下界 F 到 11
+//! 里程碑「第二个事务」步 5 的验收：回退之后再覆盖写四次（txg 11–14；第一次把 A 的四个文件单元与暖机那一版的固定点释放、释放代 11），抬回退下界 F 到 11
 //! （上限 = min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根) = min(13, 11)；两次空发布 txg 15、16 让两块盘各有一条带 F = 11 的根），
 //! 释放代 ≤ 11 的落点回收、之后的仍在 defer 队列里；发布 E（txg 17）把数据单元落回 50178（mkfs 树表那 1 槽回收了、50179 从没分配过；mkfs 实例表那片 50176 也回收了但 B 的根还引用它、影子账隔离着；A 的数据单元 50180 排在后面）；冷启动读回 E；checker 全绿。
 //! 必红：不抬 F 就回收（复用窗口置 0），第 0 代根还在候选集里（F = 0）、它们引用的 mkfs 树表单元被 E 盖掉，checker 在它们上判 I-2.1 红。
@@ -86,7 +86,7 @@ fn build_through_rollback(tag: &str) -> BuiltPool {
     pool
 }
 
-/// 回退之后再覆盖写四次（txg 11–14）：第一次释放 A 的八个单元（释放代 11）。
+/// 回退之后再覆盖写四次（txg 11–14）：第一次释放 A 的四个文件单元与暖机那一版的固定点（释放代 11）。
 fn four_overwrites_after_the_rollback(pool: &mut BuiltPool) -> Vec<TransactionOutput> {
     [17usize, 19, 23, 29]
         .iter()
@@ -136,10 +136,13 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
     assert_eq!(overwrites[0].root.checkpoint_txg, CheckpointTxg(11));
     assert_eq!(overwrites[3].root.checkpoint_txg, CheckpointTxg(14));
     for device in &pool.allocator.devices {
+        // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层；D 那一版的账里有被抛弃的 B、C 之后才用到的槽
+        // （叶 62），D 重写两块盘各自的叶 61、叶 62、第 1 层节点 0 与根，暖机只重写叶 62 那一支，四次覆盖写都重写叶 61 与叶 62 两支。
         assert_eq!(
             device.deferred_slots(),
-            51,
-            "A 的账里 mkfs 树表 1 槽已释放；D 释放 A 的四个固定点单元与 mkfs 实例表（6 槽）、暖机释放 D 的四个（4 槽）、四次覆盖写各释放上一版的 10 个槽"
+            83,
+            "A 的账里 mkfs 树表 1 槽已释放；D 释放 A 的四个固定点单元（分配记录树五个节点加三个角色，8 槽）与 mkfs 实例表（共 10 槽）、\
+             暖机释放 D 的叶 62 那一支与三个角色（8 槽）、四次覆盖写各释放上一版的 16 个槽（文件四个单元 6 槽、分配记录树七个节点、三个角色）"
         );
     }
     let raised = raise_floor(&mut pool, CheckpointTxg(11)).expect("抬 F 到 11");
@@ -167,14 +170,14 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
     }));
     assert_eq!(
         raised.reclaimed.len(),
-        18,
-        "释放代 ≤ 11 的落点：A 放掉的 mkfs 树表（代 3）、D 放掉的 5 个（代 9）、暖机放掉的 4 个（代 10）、第一次覆盖写放掉 A 的 8 个（代 11）"
+        32,
+        "释放代 ≤ 11 的落点：A 放掉的 mkfs 树表（代 3）、D 放掉的 9 个（代 9）、暖机放掉的 8 个（代 10）、第一次覆盖写放掉的 14 个（代 11）"
     );
     for device in &pool.allocator.devices {
         assert_eq!(
             device.deferred_slots(),
-            38,
-            "回收了 1 + 6 + 4 + 10 = 21 个槽，抬 F 的两次空发布又各放掉上一版的 4 个"
+            64,
+            "回收了 1 + 10 + 8 + 16 = 35 个槽，抬 F 的两次空发布又各放掉上一版的 8 个"
         );
         assert!(device.is_free(SlotNumber(50180)) && device.is_free(SlotNumber(50181)));
         for later in &overwrites[..3] {
@@ -215,7 +218,7 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
         "同盘同槽只有一条记录"
     );
     for device in &pool.allocator.devices {
-        assert_eq!(device.deferred_slots(), 48, "E 又释放了第四版的 10 个槽");
+        assert_eq!(device.deferred_slots(), 80, "E 又释放了第四版的 16 个槽");
     }
     assert_eq!(newest_root_floor(&pool), CheckpointTxg(11));
     let image = pool.memory_pool();
@@ -259,7 +262,7 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
 #[test]
 fn one_device_carrying_the_floor_alone_does_not_take_effect_on_remount() {
     for (damage_second_carrier, expected_deferred, expected_chosen_txg) in
-        [(false, 52, 16), (true, 73, 15)]
+        [(false, 90, 16), (true, 125, 15)]
     {
         let mut pool = build_through_rollback("step-five-effective");
         four_overwrites_after_the_rollback(&mut pool);
@@ -503,7 +506,11 @@ fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_ref
     let reclaimed = pool
         .allocator
         .reclaim_released_up_to(CheckpointTxg(11), ReclaimedReuse::Immediately);
-    assert_eq!(reclaimed.len(), 18);
+    assert_eq!(
+        reclaimed.len(),
+        32,
+        "释放代 ≤ 11 的落点：mkfs 树表 1 个、D 放掉的 9 个、暖机放掉的 8 个、第一次覆盖写放掉的 14 个"
+    );
     let reuse = overwrite_in_process(&mut pool, &content_of(2000, 31), InstanceGeneration(3));
     assert_eq!(
         reuse.data_pointers[0].locations[0].slot,

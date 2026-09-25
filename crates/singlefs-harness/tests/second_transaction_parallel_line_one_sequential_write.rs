@@ -14,7 +14,9 @@
 mod common;
 
 use common::{build_pool, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
-use singlefs_core::address::{DataUnitIndexInFile, InstanceGeneration};
+use singlefs_core::address::{DataUnitIndexInFile, DeviceIdentity, InstanceGeneration};
+use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
+use singlefs_core::extent_tree::ExtentLowerNodePosition;
 use singlefs_core::journal::back_chain_of;
 use singlefs_core::records::{data_key_tail, parse_extent_record};
 use singlefs_core::transaction::{
@@ -89,22 +91,36 @@ fn the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_
     let content = content_of(PAYLOAD_CAPACITY_IN_BYTES + 1);
     let output = sequential_write(&mut pool, &content).expect("两个单元的顺序写");
 
-    let extent_root = parse_index_node(&output.unit(TransactionUnit::ExtentRoot).bytes)
-        .expect("刚写出的 extent 根兼叶解得开");
-    assert_eq!(extent_root.level, 0, "144 条之内一棵 extent 树只有根兼叶");
-    assert_eq!(extent_root.entries.len(), 2, "两个数据单元两条叶记录");
-    let mut second_key_expected = [0u8; 24];
-    second_key_expected[8..16].copy_from_slice(&FIRST_INODE_NUMBER.to_le_bytes());
-    second_key_expected[16..24].copy_from_slice(&32_634u64.to_le_bytes());
+    // extent 树按位置寻址（D8（核心索引结构） 已定项 14）：两个单元的文件在上段叶里是一条标签 1 的条目，指这个文件的下段；
+    // 144 个单元之内下段只有一片叶（根兼叶），两条叶记录都在它里面。
+    let lower_leaf = parse_index_node(
+        &output
+            .unit(TransactionUnit::ExtentLowerNode(ExtentLowerNodePosition {
+                level: 0,
+                index: 0,
+            }))
+            .bytes,
+    )
+    .expect("刚写出的 extent 下段叶解得开");
+    assert_eq!(lower_leaf.level, 0, "144 个单元之内下段只有根兼叶");
+    assert_eq!(lower_leaf.entries.len(), 2, "两个数据单元两条叶记录");
+    let key_of_offset = |offset: u64| {
+        let mut key = [0u8; 24];
+        key[8..16].copy_from_slice(&FIRST_INODE_NUMBER.to_le_bytes());
+        key[16..24].copy_from_slice(&offset.to_le_bytes());
+        key
+    };
+    let second_key_expected = key_of_offset(32_634);
     let (second_key, second_pointer) =
-        parse_extent_record(&extent_root.entries[1]).expect("第二条叶记录解得开");
+        parse_extent_record(&lower_leaf.entries[1]).expect("第二条叶记录解得开");
     assert_eq!(
         second_key, second_key_expected,
         "第二条叶记录的 key = (locality 0, inode 1, 文件字节偏移 32634)"
     );
     assert_eq!(
-        extent_root.largest_key, second_key_expected,
-        "节点头的 key 区间上界就是这条（I-1.1（key 区间罩住条目））"
+        lower_leaf.largest_key,
+        key_of_offset(144 * 32_634 - 1),
+        "节点头的 key 区间上界是这片叶按位置罩的那一段的末字节（I-1.1：单元 0–143）"
     );
     assert_eq!(second_pointer, output.data_pointers[1]);
 
@@ -151,14 +167,28 @@ fn a_publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_i
         .copied()
         .filter(|identity| !matches!(identity, TransactionUnit::Data(_)))
         .collect();
+    // 两棵按位置寻址的树（D8（核心索引结构） 已定项 14）：extent 树多出这个文件的下段叶（两个单元，先于上段叶），
+    // 分配记录树在 4 GiB 两块盘上是根在第 2 层，这次改的记录都在两块盘各自的叶 61 里，先叶后根。
+    let allocation_record_tree_node = |level: u8, device: u32, index_in_device: u64| {
+        TransactionUnit::AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition {
+            level,
+            device: DeviceIdentity(device),
+            index_in_device,
+        })
+    };
     assert_eq!(
         shared_roles,
         vec![
+            TransactionUnit::ExtentLowerNode(ExtentLowerNodePosition { level: 0, index: 0 }),
             TransactionUnit::ExtentRoot,
             TransactionUnit::InodeLeafContainer(
                 singlefs_core::inode_tree::InodeLeafContainerIndexInTree::LEFTMOST
             ),
             TransactionUnit::InodeRoot,
+            allocation_record_tree_node(0, 0, 61),
+            allocation_record_tree_node(0, 1, 61),
+            allocation_record_tree_node(1, 0, 0),
+            allocation_record_tree_node(1, 1, 0),
             TransactionUnit::AllocationTree,
             TransactionUnit::AccountingTree,
             TransactionUnit::MappingTree,

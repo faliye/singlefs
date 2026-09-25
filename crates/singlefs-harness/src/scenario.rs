@@ -58,7 +58,6 @@ pub struct FirstTransactionRun {
     pub mkfs_operation_count: usize,
     pub warm_up: WarmUpOutput,
     pub output: TransactionOutput,
-    pub policy_mismatches: u64,
 }
 
 /// 整条路上调用方被叫到的三处。
@@ -190,6 +189,5 @@ pub fn run_first_transaction<
         mkfs_operation_count,
         warm_up: warm_up_output,
         output,
-        policy_mismatches: allocator.policy_mismatches,
     })
 }

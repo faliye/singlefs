@@ -25,6 +25,7 @@ use singlefs_checker::image::{
 };
 use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator};
 use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
 use singlefs_core::journal::back_chain_of;
@@ -32,7 +33,8 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
-    mount_rollback, mount_writable, raise_rollback_floor, MountError, RollbackTarget, ShadowLedger,
+    mount_rollback_with_space_admission, mount_writable_with_space_admission, raise_rollback_floor,
+    MountError, RollbackTarget, ShadowLedger,
 };
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_root, choose_system_configuration,
@@ -51,8 +53,8 @@ use crate::crash::{MemoryPool, RecordCheck, SparseBlockDevice};
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::model::{
     IdealModel, ModelAnswer, ModelCheckpointTxg, ModelDeviceIdentity, ModelDisagreement,
-    ModelJudgementCounts, ModelPoolGeometry, ModelRefusalReason, ModelRootKey, ObservedEffect,
-    ObservedOutcome, ObservedRefusalReason,
+    ModelJudgementCounts, ModelPoolGeometry, ModelRootKey, ObservedEffect, ObservedOutcome,
+    ObservedRefusalReason,
 };
 use crate::model_comparison::{
     model_root_key, observed_mount, observed_read_back, observed_root_of_file_version,
@@ -78,6 +80,10 @@ pub enum HistoryDeviceWidth {
     /// （`make_filesystem::allocator_after_make_filesystem`），每条会话在根环转过之后都按谓词回收，稳态占用约是根环里那 24 版的账
     /// （每版每盘约 10 槽），384 槽那一档一次落点拒绝都走不到了；256 槽走得到用户数据那一处的拒绝。
     UnitAreaOf256Slots,
+    /// 单元区 240 槽的小盘（journal 环同 384 槽那一档）：可写挂载自己那一串（写行与暖机）在这么窄的盘上拿不到落点，
+    /// 走得到取号之后才被落点拒绝的那一格（增补 2 收口表第 39 行那一族：取号之前的准入不算落点）；256 槽那一档的单元区墙取样点上
+    /// 一次都没走到过。
+    UnitAreaOf240Slots,
 }
 
 /// 小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf384Slots`）：六个 64 槽的聚簇段。
@@ -85,6 +91,9 @@ const SMALL_DEVICE_UNIT_AREA_SLOTS: u64 = 384;
 
 /// 更小一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf256Slots`）：四个 64 槽的聚簇段。
 const SMALLER_DEVICE_UNIT_AREA_SLOTS: u64 = 256;
+
+/// 再窄一档小盘的单元区槽数（`HistoryDeviceWidth::UnitAreaOf240Slots`）：三个整 64 槽的聚簇段加 48 槽的尾巴。
+const NARROWEST_DEVICE_UNIT_AREA_SLOTS: u64 = 240;
 
 /// 小盘上的 journal 环字节数：不超过设备容量的四分之一（设备约 790 MiB）。
 const SMALL_DEVICE_JOURNAL_RING_BYTES: u64 = 128 << 20;
@@ -101,6 +110,9 @@ impl HistoryDeviceWidth {
             HistoryDeviceWidth::UnitAreaOf256Slots => {
                 (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
             }
+            HistoryDeviceWidth::UnitAreaOf240Slots => {
+                (UNIT_AREA_START_SLOT + NARROWEST_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+            }
         }
     }
 
@@ -110,7 +122,9 @@ impl HistoryDeviceWidth {
         let mut parameters = e142_parameters(512, 512);
         match self {
             HistoryDeviceWidth::FourGibibytes => {}
-            HistoryDeviceWidth::UnitAreaOf384Slots | HistoryDeviceWidth::UnitAreaOf256Slots => {
+            HistoryDeviceWidth::UnitAreaOf384Slots
+            | HistoryDeviceWidth::UnitAreaOf256Slots
+            | HistoryDeviceWidth::UnitAreaOf240Slots => {
                 parameters.geometry.journal_ring_bytes = SMALL_DEVICE_JOURNAL_RING_BYTES;
             }
         }
@@ -138,6 +152,9 @@ impl HistoryDeviceWidth {
             }
             HistoryDeviceWidth::UnitAreaOf256Slots => {
                 "两块单元区 256 槽的小盘（journal 环 128 MiB）"
+            }
+            HistoryDeviceWidth::UnitAreaOf240Slots => {
+                "两块单元区 240 槽的小盘（journal 环 128 MiB）"
             }
         }
     }
@@ -493,12 +510,12 @@ impl GenerationWeights {
         rollback_targets: RollbackTargetDraw::FloorRootHalfTheTime,
     };
 
-    /// 分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：一律从第一个文件起，带文件的版本上多半覆盖写
-    /// （每次每盘加 8 条），夹着可写挂载（写行与暖机每次加 18 或 26 条）、抬 F（回收之后复用改写记录，条数涨得慢）与少量回退，
-    /// 让逼近 812 条时的条数落在不同的余数上——墙的「差一」只在某次准入之后正好 812 条时分得出。配 `PerStepChecker::Run` 跑
+    /// 原分配记录墙那一格（增补 3 第 2 件代码三方第一轮判决第三节第 1 条）的取样点：一律从第一个文件起，带文件的版本上多半覆盖写，
+    /// 夹着可写挂载、抬 F（回收之后复用改写记录，条数涨得慢）与少量回退，把分配记录攒过 812 条。分配记录树按绝对槽号按位置寻址之后
+    /// （D8（核心索引结构） 已定项 14）那道墙拆了，这一段看的是越过 812 条之后多叶的树每一步都判绿、模型对得上。配 `PerStepChecker::Run` 跑
     /// （第二轮判决第三节第 3 条：第一轮配的是 `Skipped`，攻方两条只有 checker 看得见的变异在它上面一段都不红）。
     pub const TOWARD_THE_ALLOCATION_RECORD_WALL: GenerationWeights = GenerationWeights {
-        name: "逼近分配记录墙（812 条那一格的取样点）",
+        name: "越过原分配记录墙（812 条那一格的取样点）",
         starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
         with_session_closed: &[
             (HistoryOperationKind::CloseAndMountWritable, 95),
@@ -706,6 +723,8 @@ struct WritableSession {
 /// 一段历史跑到哪了：两块盘（与它们的宽度）、这个进程的会话、挂载的次数、理想模型、录制流（判「拒绝之前写没写盘」）。
 struct HistoryPool {
     device_width: HistoryDeviceWidth,
+    /// 判不判空间准入（只供测试的开关，`singlefs_core::admission::SpaceAdmission`）：起点那条会话装在分配器上，挂载照它传。
+    space_admission: SpaceAdmission,
     devices: Vec<(DeviceIdentity, HistoryDevice)>,
     session: Option<WritableSession>,
     successful_mounts: usize,
@@ -741,8 +760,7 @@ fn judge_by_model(
     }
 }
 
-/// 入口返回 Err 时交给模型的观测：成员映射成的理由、拒之前做完几次发布、录制流在这一步里有没有多出写或屏障；理由是分配记录墙时
-/// 连同从镜像上数的准入基数（`allocation_records_counted_for_the_wall`）。
+/// 入口返回 Err 时交给模型的观测：成员映射成的理由、拒之前做完几次发布、录制流在这一步里有没有多出写或屏障。
 fn observed_refusal(
     member: String,
     reason: ObservedRefusalReason,
@@ -750,7 +768,6 @@ fn observed_refusal(
     stream_length_before: usize,
     stream: &SharedStream,
     reported_ceiling: Option<ModelCheckpointTxg>,
-    allocation_records_counted_on_the_image: Option<u64>,
 ) -> ObservedOutcome {
     ObservedOutcome::Refused {
         member,
@@ -758,7 +775,6 @@ fn observed_refusal(
         publishes_completed,
         wrote_anything: stream.operation_count() != stream_length_before,
         reported_ceiling,
-        allocation_records_counted_on_the_image,
     }
 }
 
@@ -794,23 +810,6 @@ pub fn allocation_records_on_the_image_under(
         })?;
     let records = allocation_record_count_under_root(image, &view)?;
     Some(u64::try_from(records).expect("一个节点至多几百条"))
-}
-
-/// 分配记录墙拒时，从镜像上现数准入的基数（增补 3 第 2 件代码三方第一轮判决第三节第 1 条：用 checker 的解析读镜像，不用分配器的状态）：
-/// 模型点名的那一版下有几条分配记录。理由不是分配记录墙的不数；模型答不了这一步（答案本身就是对不上的那一格）也不数。
-fn allocation_records_counted_for_the_wall(
-    reason: ObservedRefusalReason,
-    answer: Option<&ModelAnswer>,
-    publishes_completed: usize,
-    devices: &[(DeviceIdentity, HistoryDevice)],
-    device_width: HistoryDeviceWidth,
-) -> Option<u64> {
-    let ObservedRefusalReason::Explained(ModelRefusalReason::AllocationRecordNodeWall) = reason
-    else {
-        return None;
-    };
-    let root = answer?.root_whose_allocation_records_the_wall_counts(publishes_completed)?;
-    allocation_records_on_the_image_under(&image_of(devices, device_width), root)
 }
 
 /// 起点段里 mkfs 之后那三步：取号、暖机、第一个文件。任一步返回错误就交回是哪一步、报的什么。
@@ -850,6 +849,7 @@ impl HistoryPool {
     fn start(
         starting_point: HistoryStartingPoint,
         device_width: HistoryDeviceWidth,
+        space_admission: SpaceAdmission,
         stream: &SharedStream,
         fault_plan: &SharedFaultPlan,
     ) -> Result<(Self, Option<ModelVerdict>), StartingPointFailure> {
@@ -899,6 +899,7 @@ impl HistoryPool {
                 // 与做过挂载的会话同一条路（增补 2 收口表第 ② 行）。
                 let mut allocator =
                     allocator_after_make_filesystem(&parameters, &devices, &genesis);
+                allocator.set_space_admission(space_admission);
                 let content = first_file_content();
                 let started = acquire_warm_up_and_publish_the_first_file(
                     &parameters,
@@ -938,6 +939,7 @@ impl HistoryPool {
         Ok((
             Self {
                 device_width,
+                space_admission,
                 devices,
                 session,
                 successful_mounts: 0,
@@ -1588,6 +1590,9 @@ pub struct HistoryTally {
     pub mount_publishes_compared: u64,
     pub mounts_with_previous_records_unreadable: u64,
     pub highest_checkpoint_txg: u64,
+    /// 一步之后可写会话的分配器里最多有几条分配记录（两块盘合计）：分配记录树按位置寻址之后没有一个节点 812 条那道墙
+    /// （D8（核心索引结构） 已定项 14），这个数越过 812 说明历史走过了原先那道墙。
+    pub most_allocation_records_in_one_version: u64,
     pub histories_that_turned_the_root_ring: u64,
     pub checker_runs: u64,
     /// 这一步一个写都没发（录制流一步没多）：镜像逐字节不变，checker 的结论沿用上一次，不重跑。
@@ -1653,6 +1658,9 @@ impl HistoryTally {
         self.highest_checkpoint_txg = self
             .highest_checkpoint_txg
             .max(other.highest_checkpoint_txg);
+        self.most_allocation_records_in_one_version = self
+            .most_allocation_records_in_one_version
+            .max(other.most_allocation_records_in_one_version);
         self.histories_that_turned_the_root_ring += other.histories_that_turned_the_root_ring;
         self.checker_runs += other.checker_runs;
         self.checker_runs_skipped_because_nothing_was_written +=
@@ -1762,13 +1770,14 @@ impl HistoryTally {
         let mut text = String::new();
         let _ = writeln!(
             text,
-            "历史 {} 段：跑完 {}、以已知红收尾 {:?}、新发现 {}；根环转过一圈的 {} 段；最高 txg {}",
+            "历史 {} 段：跑完 {}、以已知红收尾 {:?}、新发现 {}；根环转过一圈的 {} 段；最高 txg {}；一版里最多 {} 条分配记录",
             self.histories,
             self.histories_completed,
             self.histories_ended_known_red,
             self.histories_ended_new_finding,
             self.histories_that_turned_the_root_ring,
-            self.highest_checkpoint_txg
+            self.highest_checkpoint_txg,
+            self.most_allocation_records_in_one_version
         );
         for kind in HistoryOperationKind::ALL {
             let tally = self
@@ -1832,7 +1841,7 @@ impl HistoryTally {
         let counts = &self.model_counts;
         let _ = writeln!(
             text,
-            "  模型对拍 {} 步：该拒而拒 {}、区间里拒 {}、该成而成 {}；比过根 {} 条、分配记录 {} 条、冷启动内容 {} 次、抬 F 上限 {} 次；回退到 txg = F_生效 > 0 的根做成 {} 次；分配记录墙按镜像上的真条数放行 {} 次；单元区墙按区间放行 {} 次",
+            "  模型对拍 {} 步：该拒而拒 {}、区间里拒 {}、该成而成 {}；比过根 {} 条、分配记录 {} 条、冷启动内容 {} 次、抬 F 上限 {} 次；回退到 txg = F_生效 > 0 的根做成 {} 次；单元区墙按区间放行 {} 次",
             self.model_judged_steps,
             counts.required_refusals_matched,
             counts.permitted_refusals_taken,
@@ -1842,7 +1851,6 @@ impl HistoryTally {
             counts.cold_start_contents_compared,
             counts.ceilings_compared,
             counts.rollbacks_accepted_at_the_effective_floor,
-            counts.allocation_record_wall_refusals_over_one_node,
             counts.unit_area_wall_refusals_in_the_interval
         );
         for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
@@ -1912,9 +1920,11 @@ fn publish_error_member(error: &PublishError) -> String {
                 placement_refusal_member(refusal)
             )
         }
-        PublishError::AllocationRecordsExceedOneNode { .. } => "AllocationRecordsExceedOneNode",
-        PublishError::AccountingEntriesExceedOneNode { .. } => "AccountingEntriesExceedOneNode",
-        PublishError::MappingEntriesExceedOneNode { .. } => "MappingEntriesExceedOneNode",
+        PublishError::SpaceAdmissionRefused(_) => "SpaceAdmissionRefused",
+        PublishError::AllocationRecordTreeRewriteSetDidNotSettle { .. } => {
+            "AllocationRecordTreeRewriteSetDidNotSettle"
+        }
+        PublishError::MultiLevelCodeTwoTreeRefused { .. } => "MultiLevelCodeTwoTreeRefused",
         PublishError::ReleaseNotInMapping { .. } => "ReleaseNotInMapping",
         PublishError::ReleaseTargetNotAllocated { .. } => "ReleaseTargetNotAllocated",
         PublishError::ReleaseTargetAlreadyReleased { .. } => "ReleaseTargetAlreadyReleased",
@@ -1925,17 +1935,14 @@ fn publish_error_member(error: &PublishError) -> String {
         PublishError::MappingEntryNarrowerThanItsFieldTable { .. } => {
             "MappingEntryNarrowerThanItsFieldTable"
         }
-        PublishError::ReleaseChecksumReadFailedWhoseHandlingIsUndecided { .. } => {
-            "ReleaseChecksumReadFailedWhoseHandlingIsUndecided"
+        PublishError::MappingEntryLocationOnADeviceOutsideThePool { .. } => {
+            "MappingEntryLocationOnADeviceOutsideThePool"
+        }
+        PublishError::MappingEntryLocationsOnTheSameDevice { .. } => {
+            "MappingEntryLocationsOnTheSameDevice"
         }
         PublishError::ContentExceedsDataUnit { .. } => "ContentExceedsDataUnit",
-        PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided { .. } => {
-            "ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided"
-        }
         PublishError::InodeTreeWriteRefused(_) => "InodeTreeWriteRefused",
-        PublishError::MoreNamedUnitsThanOneJournalRecordHolds { .. } => {
-            "MoreNamedUnitsThanOneJournalRecordHolds"
-        }
         PublishError::FirstFileVersionDoesNotFollowTheVersionItBuildsOn { .. } => {
             "FirstFileVersionDoesNotFollowTheVersionItBuildsOn"
         }
@@ -1947,6 +1954,9 @@ fn publish_error_member(error: &PublishError) -> String {
         }
         PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_) => {
             "TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees"
+        }
+        PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. } => {
+            "PublishFrozenAfterAWriteFailureIsNotResentYet"
         }
         PublishError::BlockDevice(cause) => {
             return format!(
@@ -2006,6 +2016,13 @@ fn recovery_failure_member(failure: &RecoveryFailure) -> String {
         RecoveryFailure::MappingStillUnreadable { .. } => {
             "RecoveryFailure::MappingStillUnreadable".to_string()
         }
+        RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided {
+            ..
+        } => "RecoveryFailure::RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided"
+            .to_string(),
+        RecoveryFailure::RollbackWitnessTableFullWhoseHandlingIsUndecided { .. } => {
+            "RecoveryFailure::RollbackWitnessTableFullWhoseHandlingIsUndecided".to_string()
+        }
     }
 }
 
@@ -2028,12 +2045,20 @@ fn mount_error_member(error: &MountError) -> String {
                 publish_error_member(&failed.cause)
             )
         }
-        MountError::RaiseFloorSequencePublishFailed {
-            publishes_persisted,
+        MountError::RaiseFloorSequencePublishFailed(failed) => {
+            return format!(
+                "MountError::RaiseFloorSequencePublishFailed(publishes_persisted = {}, {})",
+                failed.writes_of_persisted_publishes.len(),
+                publish_error_member(&failed.cause)
+            )
+        }
+        MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite {
+            refused_publish_in_the_sequence,
+            publishes_in_the_sequence,
             cause,
         } => {
             return format!(
-                "MountError::RaiseFloorSequencePublishFailed(publishes_persisted = {publishes_persisted}, {})",
+                "MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite(publish {refused_publish_in_the_sequence} of {publishes_in_the_sequence}, {})",
                 publish_error_member(cause)
             )
         }
@@ -2056,6 +2081,9 @@ fn mount_error_member(error: &MountError) -> String {
         MountError::InstanceGenerationChangedBeforeAcquisition { .. } => {
             "InstanceGenerationChangedBeforeAcquisition"
         }
+        MountError::SpaceAdmissionRefusedBeforeAcquisition { .. } => {
+            "SpaceAdmissionRefusedBeforeAcquisition"
+        }
         MountError::RowPublishAdmissionRefusedBeforeAcquisition { cause, .. } => {
             return format!(
                 "MountError::RowPublishAdmissionRefusedBeforeAcquisition({})",
@@ -2068,8 +2096,19 @@ fn mount_error_member(error: &MountError) -> String {
                 publish_error_member(cause)
             )
         }
-        MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => {
-            "InstanceTableChainLongerThanOnePageUndecided"
+        MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
+            refusal, ..
+        } => {
+            return format!(
+                "MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided({})",
+                placement_refusal_member(refusal)
+            )
+        }
+        MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. } => {
+            "WritableMountRefusedByDevicesWithoutTheSelectedVersion"
+        }
+        MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
+            "WritableDeviceCountBelowTheStripeWidthLowerBound"
         }
     };
     format!("MountError::{member}")
@@ -2174,7 +2213,6 @@ fn apply_publish_first_file(
     write_time_seconds: u64,
 ) -> AppliedStep {
     let HistoryPool {
-        device_width,
         devices,
         session,
         model,
@@ -2203,37 +2241,22 @@ fn apply_publish_first_file(
         &previous_record_bytes,
     ) {
         Ok(output) => settle_file_publish(session, model, answer, &records_before, output),
-        Err(error) => settle_refused_file_publish(
-            model,
-            answer,
-            &error,
-            devices,
-            *device_width,
-            stream,
-            stream_length_before,
-        ),
+        Err(error) => {
+            settle_refused_file_publish(model, answer, &error, stream, stream_length_before)
+        }
     }
 }
 
-/// 第一个文件、覆盖写被拒：成员映射成理由、分配记录墙时从镜像上数准入基数，交模型比。
+/// 第一个文件、覆盖写被拒：成员映射成理由，交模型比。
 fn settle_refused_file_publish(
     model: &mut IdealModel,
     answer: Result<ModelAnswer, ModelDisagreement>,
     error: &PublishError,
-    devices: &[(DeviceIdentity, HistoryDevice)],
-    device_width: HistoryDeviceWidth,
     stream: &SharedStream,
     stream_length_before: usize,
 ) -> AppliedStep {
     let member = publish_error_member(error);
     let reason = refusal_reason_of_publish_error(error);
-    let counted = allocation_records_counted_for_the_wall(
-        reason,
-        answer.as_ref().ok(),
-        0,
-        devices,
-        device_width,
-    );
     let verdict = judge_by_model(
         model,
         answer,
@@ -2244,7 +2267,6 @@ fn settle_refused_file_publish(
             stream_length_before,
             stream,
             None,
-            counted,
         ),
     );
     AppliedStep::judged_by_outcome_and_model(StepOutcome::Refused { member }, verdict)
@@ -2290,7 +2312,6 @@ fn apply_publish_overwrite(
     write_time_seconds: u64,
 ) -> AppliedStep {
     let HistoryPool {
-        device_width,
         devices,
         session,
         model,
@@ -2320,15 +2341,9 @@ fn apply_publish_overwrite(
         session.instance,
     ) {
         Ok(output) => settle_file_publish(session, model, answer, &records_before, output),
-        Err(error) => settle_refused_file_publish(
-            model,
-            answer,
-            &error,
-            devices,
-            *device_width,
-            stream,
-            stream_length_before,
-        ),
+        Err(error) => {
+            settle_refused_file_publish(model, answer, &error, stream, stream_length_before)
+        }
     }
 }
 
@@ -2396,7 +2411,6 @@ fn apply_publish_without_units(
                     0,
                     stream_length_before,
                     stream,
-                    None,
                     None,
                 ),
             );
@@ -2515,13 +2529,6 @@ fn settle_mount(
         Err(error) => {
             let member = mount_error_member(&error);
             let reason = refusal_reason_of_mount_error(&error);
-            let counted = allocation_records_counted_for_the_wall(
-                reason,
-                Some(&answer),
-                0,
-                &pool.devices,
-                pool.device_width,
-            );
             let verdict = judge_by_model(
                 &mut pool.model,
                 Ok(answer),
@@ -2532,7 +2539,6 @@ fn settle_mount(
                     stream_length_before,
                     &pool.stream,
                     None,
-                    counted,
                 ),
             );
             AppliedStep::judged_by_outcome_and_model(StepOutcome::Refused { member }, verdict)
@@ -2550,7 +2556,8 @@ fn apply_mount_writable(
     let image_before_mount = pool.image();
     let answer = pool.model.answer_mount_writable();
     let stream_length_before = pool.stream.operation_count();
-    let mounted = mount_writable(parameters, &mut pool.devices);
+    let mounted =
+        mount_writable_with_space_admission(parameters, &mut pool.devices, pool.space_admission);
     settle_mount(
         pool,
         mounted,
@@ -2605,7 +2612,13 @@ fn apply_mount_rollback(
         .model
         .answer_mount_rollback(model_root_key(target.instance, target.checkpoint_txg));
     let stream_length_before = pool.stream.operation_count();
-    let mounted = mount_rollback(parameters, &mut pool.devices, target, ShadowLedger::On);
+    let mounted = mount_rollback_with_space_admission(
+        parameters,
+        &mut pool.devices,
+        target,
+        ShadowLedger::On,
+        pool.space_admission,
+    );
     settle_mount(
         pool,
         mounted,
@@ -2621,7 +2634,6 @@ fn apply_raise_rollback_floor(
     choice: FloorTargetChoice,
 ) -> AppliedStep {
     let HistoryPool {
-        device_width,
         devices,
         session,
         model,
@@ -2706,13 +2718,6 @@ fn apply_raise_rollback_floor(
         Err(error) => {
             let member = mount_error_member(&error);
             let reason = refusal_reason_of_mount_error(&error);
-            let counted = allocation_records_counted_for_the_wall(
-                reason,
-                answer.as_ref().ok(),
-                publishes_completed,
-                devices,
-                *device_width,
-            );
             let verdict = judge_by_model(
                 model,
                 answer,
@@ -2723,7 +2728,6 @@ fn apply_raise_rollback_floor(
                     stream_length_before,
                     stream,
                     reported_ceiling_of_mount_error(&error),
-                    counted,
                 ),
             );
             AppliedStep {
@@ -2857,6 +2861,9 @@ impl PerStepChecker {
 pub struct HistoryExecution {
     pub per_step_checker: PerStepChecker,
     pub device_width: HistoryDeviceWidth,
+    /// 判不判空间准入（只供测试的开关，`singlefs_core::admission::SpaceAdmission`）。取样点里要测「准入放行而落点取不到」那条兜底拒绝的
+    /// （小盘上式子先拒，走不到落点那一道）装 `SkippedByTheTestOnlySwitch`；别的一律判。
+    pub space_admission: SpaceAdmission,
 }
 
 impl HistoryExecution {
@@ -2864,16 +2871,25 @@ impl HistoryExecution {
     pub const CHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
         per_step_checker: PerStepChecker::Run,
         device_width: HistoryDeviceWidth::FourGibibytes,
+        space_admission: SpaceAdmission::JudgedByTheFormula,
     };
 
     /// 报告里的名字。
     #[must_use]
     pub fn name(self) -> String {
-        format!(
-            "{}；{}",
-            self.per_step_checker.name(),
-            self.device_width.name()
-        )
+        match self.space_admission {
+            SpaceAdmission::JudgedByTheFormula => format!(
+                "{}；{}",
+                self.per_step_checker.name(),
+                self.device_width.name()
+            ),
+            SpaceAdmission::SkippedByTheTestOnlySwitch => format!(
+                "{}；{}；空间准入关掉（只供测试的开关，{}）",
+                self.per_step_checker.name(),
+                self.device_width.name(),
+                self.space_admission.branch_name()
+            ),
+        }
     }
 }
 
@@ -2939,6 +2955,7 @@ pub fn execute_history_with_faults(
         let started = HistoryPool::start(
             history.starting_point,
             execution.device_width,
+            execution.space_admission,
             stream,
             fault_plan,
         );
@@ -3020,6 +3037,9 @@ pub fn execute_history_with_faults(
                 tally.highest_checkpoint_txg = tally
                     .highest_checkpoint_txg
                     .max(session.current.root().checkpoint_txg.0);
+                tally.most_allocation_records_in_one_version = tally
+                    .most_allocation_records_in_one_version
+                    .max(u64::try_from(session.allocator.records().len()).expect("条数装得进 u64"));
             }
             let raised_floor = if let StepOutcome::Applied(AppliedEffect::RaisedFloor {
                 new_floor,

@@ -10,6 +10,7 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, InstanceGeneration, SlotNumber,
 };
+use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;
 use singlefs_core::block_device::{BlockDevice, WriteDurability};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::back_chain_of;
@@ -21,11 +22,20 @@ use singlefs_core::records::{
 use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{
-    publish_overwrite, publish_version, FirstFile, InstanceTablePlan, PoolWriter, PublishPlan,
-    TransactionOutput, TransactionUnit,
+    publish_overwrite, publish_version, FirstFile, InstanceTablePlan, InstanceTableRewrite,
+    PoolWriter, PublishPlan, TransactionOutput, TransactionUnit,
 };
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
 use singlefs_format::SLOT_BYTES;
+
+/// 分配记录树根之下 (层级, 盘, 同盘同层序号) 那个节点的角色（D8（核心索引结构） 已定项 14：按绝对槽号按位置寻址）。
+fn allocation_record_tree_node(level: u8, device: u32, index_in_device: u64) -> TransactionUnit {
+    TransactionUnit::AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition {
+        level,
+        device: DeviceIdentity(device),
+        index_in_device,
+    })
+}
 
 const SECOND_FILE_BYTES: usize = 4100;
 const THIRD_FILE_BYTES: usize = 2500;
@@ -135,18 +145,28 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     assert_eq!(row.record.counter, 5, "jsn 全池接着走");
     assert_eq!(row.record.transaction, 0, "空发布的事务号 0");
     assert_eq!(row.record.back_chain, 0, "本实例的第一条反向链恒 0");
+    // 分配记录树按位置寻址（D8（核心索引结构） 已定项 14）：4 GiB 两块盘上根在第 2 层，这几次发布改的记录都在两块盘各自的叶 61 里，
+    // 每次重写两片叶、两个第 1 层节点与根，先叶后根。
+    let allocation_record_tree_nodes_below_the_root = [
+        allocation_record_tree_node(0, 0, 61),
+        allocation_record_tree_node(0, 1, 61),
+        allocation_record_tree_node(1, 0, 0),
+        allocation_record_tree_node(1, 1, 0),
+    ];
     assert_eq!(
         row.rewritten,
-        [
-            TransactionUnit::InstanceTable,
-            TransactionUnit::AllocationTree,
-            TransactionUnit::AccountingTree,
-            TransactionUnit::MappingTree,
-            TransactionUnit::TreeTable,
-        ],
-        "写行发布重写实例表 + 四个固定点单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9）"
+        std::iter::once(TransactionUnit::InstanceTable)
+            .chain(allocation_record_tree_nodes_below_the_root)
+            .chain([
+                TransactionUnit::AllocationTree,
+                TransactionUnit::AccountingTree,
+                TransactionUnit::MappingTree,
+                TransactionUnit::TreeTable,
+            ])
+            .collect::<Vec<_>>(),
+        "写行发布重写实例表 + 四个固定点单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9）+ 分配记录树根之下那四个节点"
     );
-    assert_eq!(row.record.named.len(), 5, "点名的只有重写的五个");
+    assert_eq!(row.record.named.len(), 9, "点名的只有重写的九个");
     assert_eq!(
         row.data_pointers[0], second.data_pointers[0],
         "文件角色照抄 B 的"
@@ -174,8 +194,8 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     assert_eq!(table.rows, output.rows_written);
     assert_eq!(
         row.released.len(),
-        5,
-        "写行发布释放 mkfs 的实例表单元 + B 的四个固定点单元"
+        9,
+        "写行发布释放 mkfs 的实例表单元 + B 的四个固定点单元与分配记录树根之下那四个节点"
     );
 
     assert_eq!(
@@ -197,18 +217,21 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     {
         assert_eq!(
             publish.rewritten,
-            [
-                TransactionUnit::AllocationTree,
-                TransactionUnit::AccountingTree,
-                TransactionUnit::MappingTree,
-                TransactionUnit::TreeTable,
-            ]
+            allocation_record_tree_nodes_below_the_root
+                .into_iter()
+                .chain([
+                    TransactionUnit::AllocationTree,
+                    TransactionUnit::AccountingTree,
+                    TransactionUnit::MappingTree,
+                    TransactionUnit::TreeTable,
+                ])
+                .collect::<Vec<_>>()
         );
         assert_eq!(publish.record.transaction, 0);
         assert_eq!(
             publish.released.len(),
-            4,
-            "每次暖机释放上一次的四个固定点单元"
+            8,
+            "每次暖机释放上一次的四个固定点单元与分配记录树根之下那四个节点"
         );
     }
     let current = mounted
@@ -255,11 +278,20 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         back_chain_of(&current.record_bytes),
         "反向链接 txg 7 那条"
     );
-    assert_eq!(third_publish.rewritten, TransactionUnit::IN_BUMP_ORDER);
+    assert_eq!(
+        third_publish.rewritten,
+        TransactionUnit::IN_BUMP_ORDER[..4]
+            .iter()
+            .copied()
+            .chain(allocation_record_tree_nodes_below_the_root)
+            .chain(TransactionUnit::IN_BUMP_ORDER[4..].iter().copied())
+            .collect::<Vec<_>>(),
+        "七个角色按 bump 次序，分配记录树根之下那四个节点排在它的根之前（先叶后根）"
+    );
     assert_eq!(
         third_publish.released.len(),
-        8,
-        "释放 B 的四个文件单元 + txg 7 的四个固定点单元"
+        12,
+        "释放 B 的四个文件单元 + txg 7 的四个固定点单元与分配记录树根之下那四个节点"
     );
     assert_eq!(
         third_publish.inode_record.object_birth,
@@ -267,23 +299,24 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         "对象出生代照旧"
     );
     let device_map = &mounted.allocator.devices[0];
-    // 占着：mkfs 3 + A 10 + B 10 + txg5（实例表 2 + 4）+ txg6 4 + txg7 4 + C 10 = 47；
-    // defer：mkfs 树表 1 + A 10 + B 10 + mkfs 实例表 2 + txg5 的 4 + txg6 的 4 + txg7 的 4 = 35。
-    assert_eq!(device_map.allocated_slots(), 47);
-    assert_eq!(device_map.deferred_slots(), 35);
-    assert_eq!(device_map.free_slots(), 211_968 - 47);
+    // 每版的固定点单元是四个角色加分配记录树根之下那四个节点，共 8 槽；带文件的一版再加文件四个单元 6 槽，共 14 槽。
+    // 占着：mkfs 3 + A 14 + B 14 + txg5（实例表 2 + 8）+ txg6 8 + txg7 8 + C 14 = 71；
+    // defer：mkfs 树表 1 + A 14 + B 14 + mkfs 实例表 2 + txg5 的 8 + txg6 的 8 + txg7 的 8 = 55。
+    assert_eq!(device_map.allocated_slots(), 71);
+    assert_eq!(device_map.deferred_slots(), 55);
+    assert_eq!(device_map.free_slots(), 211_968 - 71);
     for device in [DeviceIdentity(0), DeviceIdentity(1)] {
         assert_eq!(
             accounting_value(&third_publish, STATISTIC_ALLOCATED_BYTES, device),
-            47 * SLOT_BYTES
+            71 * SLOT_BYTES
         );
         assert_eq!(
             accounting_value(&third_publish, STATISTIC_DEFER_QUEUE_BYTES, device),
-            35 * SLOT_BYTES
+            55 * SLOT_BYTES
         );
         assert_eq!(
             accounting_value(&third_publish, STATISTIC_FREE_BYTES, device),
-            (211_968 - 47) * SLOT_BYTES
+            (211_968 - 71) * SLOT_BYTES
         );
     }
     assert_eq!(
@@ -475,7 +508,11 @@ fn checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_r
             file: None,
             // 写行那次发布不碰 inode 树。
             new_inode_records: &[],
-            instance_table: InstanceTablePlan::Rewrite(bad_table.to_records()),
+            instance_table: InstanceTablePlan::Rewrite(InstanceTableRewrite {
+                rows: bad_table.rows,
+                // 这一版的表只有一片：被换下的就是根记录指着的那一片。
+                replaced_chain: vec![current.root.instance_table],
+            }),
             tree_birth_txg: current.tree_birth_txg(),
             tree_identifier_watermark: current.root.tree_identifier_watermark,
             rollback_floor: current.root.rollback_floor,

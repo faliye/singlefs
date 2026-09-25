@@ -2,9 +2,9 @@
 //! 恢复（回退行的 W）、可写挂载与回退（写行）都从这里解；checker 是独立解析器，不共用这份。
 //!
 //! 一张实例表是一条链：根记录指着第 0 片，第 k 片的链指针记录指着第 k + 1 片，最后一片写「无下一片」
-//! （沿链读盘在 `recovery::instance_table_chain_of_root`）。**写者今天只写一片**：多于一片时各片在 bump 次序里怎么排
-//! （D3（空间分配） 已定项 10 ⑤ 只写了「实例表单元最前」，排序规则管的是「其余」）、行怎么分到各片，都没有条款，
-//! 可写挂载与回退在取号之前就拒（`mount::MountError::InstanceTableChainLongerThanOnePageUndecided`）。
+//! （沿链读盘在 `recovery::instance_table_chain_of_root`）。写者按用户 2026-09-24 的两条定案写多片：行一片写满 369 行再开下一片、
+//! 最后一片装剩下的（D18（块里携带什么信息） 已定项 11，[`instance_table_rows_of_each_page`]）；在提交内生块的 bump 次序里尾片先
+//! （D3（空间分配） 已定项 10 ⑤，装链在 `transaction::build_instance_table_chain`）。
 
 use crate::address::{CheckpointTxg, InstanceGeneration, TreeIdentifier};
 use crate::bytes::{ByteReader, ByteWriter};
@@ -86,7 +86,8 @@ const _CHAIN_RECORD_IS_KIND_FLAG_AND_POINTER_WITHOUT_RESERVE: () = assert!(
 );
 
 /// 实例表链上的第几片：身份四元组里的容器号就是它（D18（块里携带什么信息） 已定项 11「容器号 = 片序号从 0 起」）。
-#[derive(Clone, Copy)]
+/// 比较与排序那几样是它进 `transaction::TransactionUnit` 的角色（第 1 片起那一类）逼出来的，那个枚举要它们。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct InstanceTablePageIndex(pub u64);
 
 impl InstanceTablePageIndex {
@@ -127,6 +128,42 @@ pub fn instance_table_pages_for_rows(rows: usize) -> usize {
     rows.div_ceil(rows_per_page).max(1)
 }
 
+/// 一片装几行：370 条记录减去末尾那条链指针记录。
+fn instance_rows_per_page() -> usize {
+    usize::try_from(INSTANCE_TABLE_PAGE_RECORDS).expect("370") - 1
+}
+
+/// 一张表的行分到链上各片，按链上的次序（第 0 片在前）：一片写满 369 行再开下一片，最后一片装剩下的
+/// （D18（块里携带什么信息） 已定项 11，用户 2026-09-24 定案）；0 行也是一片（空的那一片）。片数恒等于
+/// [`instance_table_pages_for_rows`]。
+#[must_use]
+pub fn instance_table_rows_of_each_page(rows: &[InstanceRow]) -> Vec<&[InstanceRow]> {
+    if rows.is_empty() {
+        return vec![rows];
+    }
+    rows.chunks(instance_rows_per_page()).collect()
+}
+
+/// 链上一片的全部记录：这一片的行在前、链指针记录最末（D18（块里携带什么信息） 已定项 11「链指针记录恒为一片的最后一条」）。
+///
+/// # Panics
+/// 行数多于一片装得下的 369：调用方按 [`instance_table_rows_of_each_page`] 切的片，每片至多 369 行。
+#[must_use]
+pub fn instance_table_page_records(
+    rows: &[InstanceRow],
+    chain: &InstanceTableChainRecord,
+) -> Vec<Vec<u8>> {
+    assert!(
+        rows.len() <= instance_rows_per_page(),
+        "一片至多 {} 行：调用方按 instance_table_rows_of_each_page 切片（{} 行）",
+        instance_rows_per_page(),
+        rows.len()
+    );
+    let mut records: Vec<Vec<u8>> = rows.iter().map(InstanceRow::to_bytes).collect();
+    records.push(chain.to_bytes());
+    records
+}
+
 /// 链指针记录（`kind` 1，恒为一片的最后一条）：`kind 1 | 有无下一片 1 | 位置指针 86（无下一片时清零占位）| 预留 0`
 /// （D18（块里携带什么信息） 已定项 11；位置指针与根记录里的实例表单元指针同型，D19（块指针的结构与宽度预算） 已定项 7 / 8）。
 #[derive(Debug, PartialEq)]
@@ -138,6 +175,23 @@ pub enum InstanceTableChainRecord {
 }
 
 impl InstanceTableChainRecord {
+    /// 这条链指针记录的 88 字节：`kind 1 | 有无下一片 1 | 位置指针 86`。最后一片那一条与 mkfs 写的那一条逐字节相同
+    /// （`make_filesystem::instance_table_chain_record`，位置指针清零占位）。
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::LastPage => instance_table_chain_record(),
+            Self::NextPage(pointer) => {
+                let mut writer = ByteWriter::new(usize::try_from(INSTANCE_ROW_BYTES).expect("88"));
+                writer.put_u8(INSTANCE_ROW_KIND_CHAIN);
+                writer.put_u8(CHAIN_RECORD_HAS_NEXT_PAGE);
+                pointer.write_to(&mut writer);
+                writer.assert_position(INSTANCE_ROW_BYTES, "实例表链指针记录");
+                writer.into_bytes()
+            }
+        }
+    }
+
     /// 解一条链指针记录。宽不是 88、`kind` 不是 1、「有无下一片」不是 0 或 1、无下一片而位置指针不全零（条款：清零占位）、
     /// 有下一片而位置指针全零（指不到任何地方），都是 `None`。
     #[must_use]
@@ -210,31 +264,13 @@ impl InstanceTableRecords {
             InstanceTableChainRecord::NextPage(_) => None,
         }
     }
-
-    /// 写行那次发布重写出去的那一片的记录：行在前、「无下一片」的链指针记录最末（D18（块里携带什么信息） 已定项 11）。
-    ///
-    /// # Panics
-    /// 行数 + 1（链指针记录）多于一片的 370 条。产品路径走不到：写行只有 `mount` 的可写挂载与回退两条路，
-    /// 都经 `establish_instance` 在取号之前算这一版的行数加这次要写的行数，多于一片就拒
-    /// （`MountError::InstanceTableChainLongerThanOnePageUndecided`：第二片在 bump 次序里排第几、行怎么分片没有条款）。
-    #[must_use]
-    pub fn to_records(&self) -> Vec<Vec<u8>> {
-        let records_per_page = usize::try_from(INSTANCE_TABLE_PAGE_RECORDS).expect("370");
-        assert!(
-            self.rows.len() < records_per_page,
-            "{} 行加链指针记录装不进一片 {records_per_page} 条：可写挂载与回退在取号之前就该按片数拒掉",
-            self.rows.len()
-        );
-        let mut records: Vec<Vec<u8>> = self.rows.iter().map(InstanceRow::to_bytes).collect();
-        records.push(instance_table_chain_record());
-        records
-    }
 }
 
 #[cfg(test)]
 mod chain_record_tests {
     use super::{
-        instance_table_pages_for_rows, InstanceTableChainRecord, InstanceTablePage,
+        instance_table_page_records, instance_table_pages_for_rows,
+        instance_table_rows_of_each_page, InstanceRow, InstanceTableChainRecord, InstanceTablePage,
         InstanceTablePageIndex, InstanceTableRecords,
     };
     use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
@@ -362,5 +398,56 @@ mod chain_record_tests {
         assert_eq!(instance_table_pages_for_rows(370), 2);
         assert_eq!(instance_table_pages_for_rows(738), 2);
         assert_eq!(instance_table_pages_for_rows(739), 3);
+    }
+
+    /// 行分到各片（用户 2026-09-24 定：一片写满 369 行再开下一片，最后一片装剩下的）：各片的行数，片数与
+    /// `instance_table_pages_for_rows` 同一个数（写者按后者取落点、按前者装片，两者不等就有一片没有落点）；
+    /// 一片的记录 = 这一片的行 + 末尾一条链指针记录，「有下一片」那一条解回来就是写进去的那个指针。
+    #[test]
+    fn rows_fill_a_page_of_three_hundred_sixty_nine_before_the_next_page_opens() {
+        let rows_of = |count: u32| -> Vec<InstanceRow> {
+            (1..=count)
+                .map(|instance| InstanceRow {
+                    instance: InstanceGeneration(instance),
+                    selected_root_txg: CheckpointTxg(0),
+                    applied_transaction_high_water: 0,
+                    is_rollback: false,
+                })
+                .collect()
+        };
+        for (count, expected_rows_per_page) in [
+            (0, vec![0]),
+            (1, vec![1]),
+            (369, vec![369]),
+            (370, vec![369, 1]),
+            (738, vec![369, 369]),
+            (739, vec![369, 369, 1]),
+        ] {
+            let rows = rows_of(count);
+            let pages = instance_table_rows_of_each_page(&rows);
+            assert_eq!(
+                pages.iter().map(|page| page.len()).collect::<Vec<_>>(),
+                expected_rows_per_page,
+                "{count} 行"
+            );
+            assert_eq!(
+                pages.len(),
+                instance_table_pages_for_rows(rows.len()),
+                "{count} 行：片数与 instance_table_pages_for_rows 同一个数"
+            );
+        }
+        let pointer = next_page_pointer();
+        let records =
+            instance_table_page_records(&rows_of(2), &InstanceTableChainRecord::NextPage(pointer));
+        assert_eq!(records.len(), 3, "两行加末尾一条链指针记录");
+        assert_eq!(
+            InstanceTableChainRecord::parse(&records[2]),
+            Some(InstanceTableChainRecord::NextPage(pointer))
+        );
+        assert_eq!(
+            InstanceTableChainRecord::LastPage.to_bytes(),
+            instance_table_chain_record(),
+            "最后一片那一条与 mkfs 写的那一条逐字节相同"
+        );
     }
 }

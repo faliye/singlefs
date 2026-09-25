@@ -127,6 +127,39 @@ pub const ACCOUNTING_KEY_BYTES: u64 = 22;
 /// 记账条目一条：key 22 + value 8 + seq 4（D5（快照 / 空间记账机制） 已定项 5；D8（核心索引结构） 已定项 7）。format-const: ACCOUNTING_ENTRY_BYTES
 pub const ACCOUNTING_ENTRY_BYTES: u64 = 34;
 
+/// 记账树内部节点条目：分隔 key 22 + 子指针 86（D8（核心索引结构） 已定项 11「内部节点的条目 = 本树 key + 子指针 86」）。format-const: ACCOUNTING_INTERNAL_ENTRY_BYTES
+pub const ACCOUNTING_INTERNAL_ENTRY_BYTES: u64 = 108;
+
+/// 中央映射树内部节点条目：分隔 key 27 + 子指针 86（D8（核心索引结构） 已定项 11）。format-const: CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES
+pub const CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES: u64 = 113;
+
+/// 分配记录树一片叶罩几个槽（W，D8（核心索引结构） 已定项 14「分配记录树」：按绝对槽号按位置寻址，叶 k 罩 `[k × W, (k + 1) × W)`，
+/// W 取偶数、W ≤ 叶条目容量 812）：取叶条目容量本身 812。条款把具体取值交给实现员，交回里写明，主 agent 定后补进已定项 14。
+pub const ALLOCATION_RECORD_TREE_LEAF_SLOTS: u64 = 812;
+
+/// 分配记录树内部节点条目：孩子罩的那一段的起点 key 10 + 子指针 86（D8（核心索引结构） 已定项 11 那一行「照码 2 btree 做时它们的内部条目是 96」）。
+pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES: u64 = 96;
+
+/// 分配记录树内部节点的扇出：(16384 − 135) ÷ 96 的整数部分。一个内部节点罩 169 个孩子那么宽的一段。
+pub const ALLOCATION_RECORD_TREE_INTERNAL_FANOUT: u64 = 169;
+
+/// extent 树内部节点条目（上段与下段同一种）：孩子罩的那一段的起点 key 24 + 子指针 86（D8（核心索引结构） 已定项 11 那一行，
+/// extent 110 是用户 2026-09-24 定的）。
+pub const EXTENT_TREE_INTERNAL_ENTRY_BYTES: u64 = 110;
+
+/// extent 树内部节点的扇出（上段与下段同一种）：(16384 − 163) ÷ 110 的整数部分（D8（核心索引结构） 已定项 14「内部扇出 147」）。
+pub const EXTENT_TREE_INTERNAL_FANOUT: u64 = 147;
+
+/// extent 树下段一片叶罩几个数据单元（D8（核心索引结构） 已定项 14「叶罩 144 个单元」）：(16384 − 163) ÷ 112 的整数部分。
+pub const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 144;
+
+/// extent 树上段叶条目：key 24（locality 0、inode 号、offset 0）+ 标签 1 + 载荷 88（标签 1 时是下段根的节点指针 86 加 2 字节零，
+/// 标签 2 时是那个数据单元的数据指针 88，标签 0 时全零）。D8（核心索引结构） 已定项 14 把上段叶条目的完整字段表交给实现员，交回里写明。
+pub const EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES: u64 = 113;
+
+/// extent 树上段一片叶罩几个 inode 号：(16384 − 163) ÷ 113 的整数部分（一个 inode 号至多一条上段叶条目，叶永远装得下）。
+pub const EXTENT_TREE_UPPER_LEAF_INODES: u64 = 143;
+
 /// 第一个事务这次发布写出的记账行数（D5（快照 / 空间记账机制） 已定项 8，2026-09-14 用户定案 15 行）。
 pub const FIRST_TRANSACTION_ACCOUNTING_ROWS: u64 = 15;
 
@@ -222,6 +255,27 @@ pub const ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 = 8;
 
 pub const ROOT_RING_PRIME_STEP: u64 = 3;
 pub const ROOT_RING_CHUNK_BYTES: u64 = 1024 * 1024;
+
+/// 回退见证表（D23（journal 的角色与格式） 已定项 14「回退见证」，用户 2026-09-24 定）住系统配置槽里、紧接着字段表之后：
+/// 从槽内偏移 481（`SYSTEM_CONFIGURATION_BYTES`）起，罩在系统配置的整槽校验和里、越过 512 字节。落点随实现取在这里，
+/// 写回 D22（单元原子性怎么合成） 已定项 9 的字段表归书记员。
+pub const ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT: u64 =
+    SYSTEM_CONFIGURATION_BYTES;
+
+/// 见证表头：条数 1 字节（上限 47 装得下）。
+pub const ROLLBACK_WITNESS_COUNT_BYTES: u64 = 1;
+
+/// 一个见证条目：新实例代号 4 + 回退目标 R_old 的实例代号 4 + R_old 的 txg 8（已定项 14「回退见证」）。
+pub const ROLLBACK_WITNESS_ENTRY_BYTES: u64 = 16;
+
+/// 见证表按 S 的上界定宽：条数上限 = 根环槽数减 1（R × S − 1，只由根环几何定），S 取格式承诺区间的上界 16 时是 47 条。
+/// 一个池自己的上限按它系统配置里的 S 算（`R × S − 1`），多出来的条目位写 0。
+pub const ROLLBACK_WITNESS_ENTRIES_MAXIMUM: u64 =
+    ROOT_RING_REGIONS * ROOT_RING_SLOTS_PER_REGION_MAXIMUM - 1;
+
+/// 见证表的定宽：1 + 47 × 16 = 753 字节，占槽内 [481, 1234)。
+pub const ROLLBACK_WITNESS_TABLE_BYTES: u64 =
+    ROLLBACK_WITNESS_COUNT_BYTES + ROLLBACK_WITNESS_ENTRIES_MAXIMUM * ROLLBACK_WITNESS_ENTRY_BYTES;
 /// 根环起点是 16 KiB 槽号（1 MiB）。
 pub const ROOT_RING_BASE_SLOT: u64 = 64;
 /// 根环区域归属第一版写死 0 / 1 / 0（D2（RAID 条带策略） 已定项 7，2026-09-14 用户定案）。
@@ -262,6 +316,49 @@ mod tests {
         assert_eq!(NODE_POINTER_BYTES, 86, "指向码 2 / 码 3 的指针");
         assert_eq!(MAPPING_ENTRY_BYTES, 55, "映射条目一宽");
         assert_eq!(EXTENT_LEAF_RECORD_BYTES, 112, "extent 叶记录");
+        assert_eq!(
+            ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES,
+            ALLOCATION_RECORD_KEY_BYTES + NODE_POINTER_BYTES,
+            "分配记录树内部条目 = key 10 + 子指针"
+        );
+        assert_eq!(
+            ALLOCATION_RECORD_TREE_INTERNAL_FANOUT,
+            (NODE_BYTES - ALLOCATION_RECORDS_TREE_INDEX_NODE_HEADER_BYTES)
+                / ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES,
+            "分配记录树内部扇出 = 节点里条目区装得下几条内部条目"
+        );
+        assert!(
+            ALLOCATION_RECORD_TREE_LEAF_SLOTS.is_multiple_of(2)
+                && ALLOCATION_RECORD_TREE_LEAF_SLOTS
+                    <= (NODE_BYTES - ALLOCATION_RECORDS_TREE_INDEX_NODE_HEADER_BYTES)
+                        / ALLOCATION_RECORD_BYTES,
+            "分配记录树叶宽取偶数、不超过叶条目容量（D8 已定项 14）"
+        );
+        assert_eq!(
+            EXTENT_TREE_INTERNAL_ENTRY_BYTES,
+            EXTENT_KEY_BYTES + NODE_POINTER_BYTES,
+            "extent 内部条目 = key 24 + 子指针"
+        );
+        assert_eq!(
+            EXTENT_TREE_INTERNAL_FANOUT,
+            (NODE_BYTES - EXTENT_TREE_INDEX_NODE_HEADER_BYTES) / EXTENT_TREE_INTERNAL_ENTRY_BYTES,
+            "extent 内部扇出 147"
+        );
+        assert_eq!(
+            EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+            (NODE_BYTES - EXTENT_TREE_INDEX_NODE_HEADER_BYTES) / EXTENT_LEAF_RECORD_BYTES,
+            "extent 下段叶罩 144 个单元"
+        );
+        assert_eq!(
+            EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES,
+            EXTENT_KEY_BYTES + 1 + DATA_POINTER_BYTES,
+            "extent 上段叶条目 = key 24 + 标签 1 + 载荷 88（两种指针里宽的那一种）"
+        );
+        assert_eq!(
+            EXTENT_TREE_UPPER_LEAF_INODES,
+            (NODE_BYTES - EXTENT_TREE_INDEX_NODE_HEADER_BYTES) / EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES,
+            "extent 上段叶罩几个 inode 号"
+        );
         assert_eq!(
             INODE_INTERNAL_ENTRY,
             8 + 26 + NODE_POINTER_BYTES,
@@ -369,6 +466,16 @@ mod tests {
             ACCOUNTING_KEY_BYTES + 8 + 4,
             "记账条目 = key + value 8 + seq 4"
         );
+        assert_eq!(
+            ACCOUNTING_INTERNAL_ENTRY_BYTES,
+            ACCOUNTING_KEY_BYTES + NODE_POINTER_BYTES,
+            "记账树内部条目 = key + 指向码 2 的指针"
+        );
+        assert_eq!(
+            CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES,
+            MAPPING_KEY_BYTES + NODE_POINTER_BYTES,
+            "中央映射树内部条目 = key + 指向码 2 的指针"
+        );
     }
 
     /// 每棵树的码 2 节点头宽写成整数字面量（门禁 27 号要核），与 `index_node_header_bytes` 在那棵树的 key 宽上算出来的一个数不差；
@@ -404,6 +511,30 @@ mod tests {
             CENTRAL_MAPPING_TREE_INDEX_NODE_HEADER_BYTES,
             index_node_header_bytes(MAPPING_KEY_BYTES),
             "中央映射树：key 宽 27"
+        );
+    }
+
+    /// 回退见证表紧接着字段表、越过 512、装在 4096 的槽里（D23 已定项 14「回退见证」：放在字段表之后、越过 512，靠整槽校验和认撕裂）。
+    #[test]
+    fn the_rollback_witness_table_follows_the_field_table_crosses_512_and_fits_in_the_slot() {
+        let table_end = std::hint::black_box(
+            ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT
+                + ROLLBACK_WITNESS_TABLE_BYTES,
+        );
+        assert_eq!(
+            ROLLBACK_WITNESS_TABLE_OFFSET_IN_THE_SYSTEM_CONFIGURATION_SLOT,
+            481
+        );
+        assert_eq!(
+            ROLLBACK_WITNESS_ENTRIES_MAXIMUM, 47,
+            "R × S 上界 − 1 = 3 × 16 − 1"
+        );
+        assert_eq!(ROLLBACK_WITNESS_TABLE_BYTES, 753);
+        assert_eq!(table_end, 1234);
+        assert!(table_end > 512, "越过 512");
+        assert!(
+            table_end <= SYSTEM_CONFIGURATION_SLOT_BYTES,
+            "装在 4096 的槽里"
         );
     }
 

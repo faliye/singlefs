@@ -25,17 +25,21 @@ use singlefs_core::address::{
     CheckpointTxg, DataUnitIndexInFile, DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes,
     InodeNumber, InstanceGeneration, SlotNumber, TreeIdentifier,
 };
+use singlefs_core::extent_tree::{
+    build_upper_leaf, ExtentLowerNodePosition, ExtentTreeNodeIdentity, ExtentUpperLeafEntry,
+    ExtentUpperLeafTarget, ExtentUpperNodePosition,
+};
 use singlefs_core::make_filesystem::{location_entries, TREE_TABLE_KEY_WIDTH};
 use singlefs_core::mounted_read::{
-    data_unit_span_covering, mount_read_only, open_pool_for_read, FileReadFailure, OpenFileFailure,
-    OpenPoolForReadFailure, ReadPathObservation,
+    data_unit_span_covering, mount_read_only, open_pool_for_read, CentralMappingTreeReadsAtOpen,
+    FileReadFailure, OpenFileFailure, OpenPoolForReadFailure, ReadPathObservation,
 };
 use singlefs_core::pointer::{BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead};
 use singlefs_core::records::{
     build_extent_record, build_inode_internal_entry, build_mapping_entry, mapping_key_for_data,
     InodeRecord, TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE,
 };
-use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
+use singlefs_core::recovery::{recover, JournalPolicy, RecoveryFailure, RecoveryOutcome};
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::transaction::{FIRST_INODE_NUMBER, TREE_IDENTIFIER_NONE};
 use singlefs_core::unit::{
@@ -221,9 +225,9 @@ struct SyntheticImagePlan {
     /// inode 记录里写的文件大小。`None` = 按单元数算出来的真实大小；写别的值就造出
     /// 「extent 记录条数与文件大小算出的单元数对不上」那一格。
     declared_file_size_in_bytes: Option<u64>,
-    /// 中央映射树根自述的层级。第一版恒 0（根兼叶，55 字节条目直接装在根里）；写 1 就造出
-    /// 「映射长到根成了内部节点」那一格——挂载态整片读映射这件事对它不成立。
-    central_mapping_root_level: u8,
+    /// 中央映射树长什么样：根兼叶，两片叶上面一个根（多层，D8（核心索引结构） 已定项 11），
+    /// 或根自述层级 1 而条目仍是 55 字节的映射条目（读者要拒，不把映射条目当内部条目解）。
+    central_mapping_shape: SyntheticCentralMappingShape,
     /// 中央映射树根自述的条目宽，条目跟着截到这么宽。第一版恒 55（key 27 + 位置条目 14 × 2）；写 27（= key 宽）
     /// 就造出「条目宽窄于字段表」那一格——`parse_index_node` 只判了它 ≥ key 宽，切到偏移 55 就越界（panic 面普查 R2）。
     central_mapping_entry_width: u16,
@@ -237,23 +241,36 @@ impl SyntheticImagePlan {
             reading: ExtentKeyThirdSegmentReading::FileByteOffset,
             damage: LocationHintDamage::None,
             declared_file_size_in_bytes: None,
-            central_mapping_root_level: 0,
+            central_mapping_shape: SyntheticCentralMappingShape::RootAsLeaf,
             central_mapping_entry_width: 55,
         }
     }
 }
 
+/// 拼进镜像的中央映射树的形状。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SyntheticCentralMappingShape {
+    /// 一个节点（根兼叶），55 字节的映射条目直接装在根里。
+    RootAsLeaf,
+    /// 条目按 key 升序对半分到两片叶（层级 0），上面一个层级 1 的根：内部条目 = 分隔 key 27 + 子指针 86 = 113，
+    /// 根头里的 key 区间是子树覆盖区间（D8（核心索引结构） 已定项 11、D18（块里携带什么信息） 已定项 2）。
+    /// 两片叶的出生序号是 0、1，根是 2（树内先叶后根，D19（块指针的结构与宽度预算） 已定项 9）。
+    TwoLeavesUnderARoot,
+    /// 根自述层级 1、装的却是 55 字节的映射条目：内部条目要 113 字节，读者当场拒。
+    RootClaimingLevelOneOverMappingEntries,
+}
+
 /// 拼一份 `plan.unit_count` 个数据单元的镜像：最后一个单元装不满（声明长度那一格才有内容可判）。
 ///
-/// 槽位排布（都写两块盘、同槽）：数据单元各占 2 槽，之后依次是 extent 树根兼叶、inode 树根、inode 叶容器（2 槽）、
-/// 中央映射树根、树表单元，最后留一个空槽给「提示指错」那一档。
+/// 槽位排布（都写两块盘、同槽）：数据单元各占 2 槽，之后依次是 extent 树下段那片叶、inode 树根、inode 叶容器（2 槽）、
+/// 中央映射树根、树表单元，留一个空槽给「提示指错」那一档，再往后是两层映射那一档的两片映射叶，最后是 extent 树上段根兼叶。
 fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiUnitImage {
     let SyntheticImagePlan {
         unit_count,
         reading,
         damage,
         declared_file_size_in_bytes,
-        central_mapping_root_level,
+        central_mapping_shape,
         central_mapping_entry_width,
     } = plan;
     assert!(unit_count >= 2, "拼这份镜像就是为了跨单元那一格");
@@ -323,21 +340,54 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
         ));
     }
 
-    let extent_root_slot = SlotNumber(SYNTHETIC_BASE_SLOT + 2 * unit_count);
-    let extent_root_sequence = BirthSequence(0);
-    let extent_root = build_index_node(
+    // extent 树两段（D8（核心索引结构） 已定项 14）：下段一片叶（单元不到 144 个）罩单元 0 起的那一段，头里写位置规定的 key 区间；
+    // 上段根兼叶罩 inode 0 起的那一段，inode 1 那条条目标签 1、指着下段根。先下段后上段（树内 bump 次序）。
+    assert!(
+        unit_count <= singlefs_format::EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+        "这份镜像的下段只拼一片叶"
+    );
+    let lower_leaf_position = ExtentLowerNodePosition { level: 0, index: 0 };
+    let (lower_leaf_smallest_key, lower_leaf_largest_key) =
+        lower_leaf_position.key_range(FIRST_INODE_NUMBER);
+    let lower_leaf_slot = SlotNumber(SYNTHETIC_BASE_SLOT + 2 * unit_count);
+    let lower_leaf_sequence = BirthSequence(0);
+    let lower_leaf = build_index_node(
         TreeIdentifier(TREE_IDENTIFIER_EXTENT),
         0,
         usize::try_from(singlefs_format::EXTENT_KEY_BYTES).expect("24"),
-        &extent_records[0][..usize::try_from(singlefs_format::EXTENT_KEY_BYTES).expect("24")],
-        &extent_records[extent_records.len() - 1]
-            [..usize::try_from(singlefs_format::EXTENT_KEY_BYTES).expect("24")],
+        &lower_leaf_smallest_key,
+        &lower_leaf_largest_key,
         SYNTHETIC_TXG,
         &E142_FILESYSTEM_IDENTIFIER,
         SYNTHETIC_INSTANCE,
-        extent_root_sequence,
+        lower_leaf_sequence,
         u16::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112"),
         &extent_records,
+    );
+    let lower_leaf_locations = place_on_both_devices(&mut image, lower_leaf_slot, &lower_leaf);
+    let extent_root_slot = SlotNumber(SYNTHETIC_BASE_SLOT + 2 * unit_count + 9);
+    let extent_root_sequence = BirthSequence(1);
+    let extent_root = build_upper_leaf(
+        &ExtentTreeNodeIdentity {
+            tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
+            birth_txg: SYNTHETIC_TXG,
+            filesystem_identifier: &E142_FILESYSTEM_IDENTIFIER,
+            instance: SYNTHETIC_INSTANCE,
+        },
+        ExtentUpperNodePosition { level: 0, index: 0 },
+        &[ExtentUpperLeafEntry {
+            inode: FIRST_INODE_NUMBER,
+            target: ExtentUpperLeafTarget::LowerSegmentRoot(NodePointer {
+                head: PointerHead {
+                    birth_tree: TreeIdentifier(TREE_IDENTIFIER_EXTENT),
+                    birth_txg: SYNTHETIC_TXG,
+                },
+                locations: lower_leaf_locations,
+                instance: SYNTHETIC_INSTANCE,
+                birth_sequence: lower_leaf_sequence,
+            }),
+        }],
+        extent_root_sequence,
     );
     let extent_root_locations = place_on_both_devices(&mut image, extent_root_slot, &extent_root);
 
@@ -397,7 +447,6 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
     let inode_root_slot = SlotNumber(SYNTHETIC_BASE_SLOT + 2 * unit_count + 1);
     let inode_root_locations = place_on_both_devices(&mut image, inode_root_slot, &inode_root);
 
-    let mapping_root_sequence = BirthSequence(0);
     let mapping_key_width = usize::try_from(MAPPING_KEY_BYTES).expect("27");
     // 条目跟着自述的条目宽截：`central_mapping_entry_width` 不是 55 的那一档，节点里装的就是被截短的条目
     // （节点自己仍然自洽——条目数 × 条目宽 = 声明长度、两道校验和都对得上，挡着它的只能是读者那一判）。
@@ -410,20 +459,106 @@ fn build_synthetic_multi_unit_image(plan: SyntheticImagePlan) -> SyntheticMultiU
         .iter()
         .map(|entry| entry[..usize::from(central_mapping_entry_width)].to_vec())
         .collect();
-    let mapping_root = build_index_node(
-        TreeIdentifier(singlefs_format::TREE_IDENTIFIER_CENTRAL_MAPPING),
-        central_mapping_root_level,
-        mapping_key_width,
-        &mapping_entries[0][..mapping_key_width],
-        &mapping_entries[mapping_entries.len() - 1][..mapping_key_width],
-        SYNTHETIC_TXG,
-        &E142_FILESYSTEM_IDENTIFIER,
-        SYNTHETIC_INSTANCE,
-        mapping_root_sequence,
-        central_mapping_entry_width,
-        &mapping_entries_at_the_declared_width,
-    );
+    let mapping_node = |level: u8,
+                        entries: &[Vec<u8>],
+                        entry_width: u16,
+                        smallest: &[u8],
+                        largest: &[u8],
+                        sequence: BirthSequence| {
+        build_index_node(
+            TreeIdentifier(singlefs_format::TREE_IDENTIFIER_CENTRAL_MAPPING),
+            level,
+            mapping_key_width,
+            smallest,
+            largest,
+            SYNTHETIC_TXG,
+            &E142_FILESYSTEM_IDENTIFIER,
+            SYNTHETIC_INSTANCE,
+            sequence,
+            entry_width,
+            entries,
+        )
+    };
+    let key_of = |entry: &Vec<u8>| entry[..mapping_key_width].to_vec();
     let mapping_root_slot = SlotNumber(SYNTHETIC_BASE_SLOT + 2 * unit_count + 4);
+    let (mapping_root, mapping_root_sequence) = match central_mapping_shape {
+        SyntheticCentralMappingShape::RootAsLeaf
+        | SyntheticCentralMappingShape::RootClaimingLevelOneOverMappingEntries => {
+            let level = match central_mapping_shape {
+                SyntheticCentralMappingShape::RootClaimingLevelOneOverMappingEntries => 1,
+                SyntheticCentralMappingShape::RootAsLeaf
+                | SyntheticCentralMappingShape::TwoLeavesUnderARoot => 0,
+            };
+            (
+                mapping_node(
+                    level,
+                    &mapping_entries_at_the_declared_width,
+                    central_mapping_entry_width,
+                    &key_of(&mapping_entries[0]),
+                    &key_of(&mapping_entries[mapping_entries.len() - 1]),
+                    BirthSequence(0),
+                ),
+                BirthSequence(0),
+            )
+        }
+        SyntheticCentralMappingShape::TwoLeavesUnderARoot => {
+            let half = mapping_entries_at_the_declared_width.len().div_ceil(2);
+            let mut internal_entries = Vec::new();
+            for (leaf_number, leaf_entries) in mapping_entries_at_the_declared_width
+                .chunks(half)
+                .enumerate()
+            {
+                let sequence = BirthSequence(u32::try_from(leaf_number).expect("两片叶"));
+                let leaf = mapping_node(
+                    0,
+                    leaf_entries,
+                    central_mapping_entry_width,
+                    &key_of(&leaf_entries[0]),
+                    &key_of(&leaf_entries[leaf_entries.len() - 1]),
+                    sequence,
+                );
+                let mapping_leaf_slot = SlotNumber(
+                    SYNTHETIC_BASE_SLOT
+                        + 2 * unit_count
+                        + 7
+                        + u64::try_from(leaf_number).expect("叶序"),
+                );
+                let mapping_leaf_locations =
+                    place_on_both_devices(&mut image, mapping_leaf_slot, &leaf);
+                let mut internal_entry = key_of(&leaf_entries[0]);
+                let mut writer = singlefs_core::bytes::ByteWriter::new(
+                    usize::try_from(singlefs_format::NODE_POINTER_BYTES).expect("86"),
+                );
+                NodePointer {
+                    head: PointerHead {
+                        birth_tree: TreeIdentifier(
+                            singlefs_format::TREE_IDENTIFIER_CENTRAL_MAPPING,
+                        ),
+                        birth_txg: SYNTHETIC_TXG,
+                    },
+                    locations: mapping_leaf_locations,
+                    instance: SYNTHETIC_INSTANCE,
+                    birth_sequence: sequence,
+                }
+                .write_to(&mut writer);
+                internal_entry.extend(writer.into_bytes());
+                internal_entries.push(internal_entry);
+            }
+            let root_sequence = BirthSequence(2);
+            (
+                mapping_node(
+                    1,
+                    &internal_entries,
+                    u16::try_from(mapping_key_width).expect("27")
+                        + u16::try_from(singlefs_format::NODE_POINTER_BYTES).expect("86"),
+                    &key_of(&mapping_entries[0]),
+                    &key_of(&mapping_entries[mapping_entries.len() - 1]),
+                    root_sequence,
+                ),
+                root_sequence,
+            )
+        }
+    };
     let mapping_root_locations =
         place_on_both_devices(&mut image, mapping_root_slot, &mapping_root);
 
@@ -559,8 +694,19 @@ fn the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_byte
     counting.reset_tally();
     let file = mounted
         .mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
+    // extent 树按需读（D8（核心索引结构） 已定项 14，K4）：打开文件那一步按位置走到 inode 1 的上段叶条目，一个单元的文件内联在里面，
+    // 上段只有根兼叶 ⇒ 读一个节点。
+    assert_eq!(
+        (
+            counting.tally().reads,
+            file.extent_tree_reads_at_open().node_reads
+        ),
+        (1, 1),
+        "打开文件读 extent 树上段根兼叶那一个节点，块层数到的与实现自报的相等"
+    );
+    counting.reset_tally();
     let output = file
         .read_at(
             &counting,
@@ -611,8 +757,18 @@ fn random_four_kibibyte_reads_return_the_written_bytes_and_never_scan_the_journa
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
     counting.reset_tally();
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
+    // 四个单元的文件有下段（D8（核心索引结构） 已定项 14）：打开时读上段根兼叶、再读下段那片叶，两个节点。
+    assert_eq!(
+        (
+            counting.tally().reads,
+            file.extent_tree_reads_at_open().node_reads
+        ),
+        (2, 2),
+        "打开文件按需读 extent 树：上段根兼叶一个、下段叶一个"
+    );
+    counting.reset_tally();
 
     let mut offsets = PseudoRandomOffsets::seeded(0x9e37_79b9_7f4a_7c15);
     let capacity = payload_capacity();
@@ -700,10 +856,10 @@ fn every_aligned_page_reads_back_and_the_pages_that_cross_a_unit_boundary_read_t
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan::of_four_units());
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
-    counting.reset_tally();
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
+    counting.reset_tally();
 
     let whole_pages = built.file_size_in_bytes() / PAGE_BYTES;
     let mut pages_crossing_a_unit_boundary = Vec::new();
@@ -746,7 +902,7 @@ fn corrupting_one_byte_in_a_data_unit_makes_reads_over_it_report_a_checksum_erro
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
 
     // 第 16 页整个落在单元 2 里（65536 起，单元 2 是 [65268, 97902)）。
@@ -834,7 +990,7 @@ fn a_data_unit_resealed_with_only_its_own_checksums_is_caught_by_the_location_en
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
 
     // 第 9 页整个落在单元 1 里（36864 起，单元 1 是 [32634, 65268)）。
@@ -875,10 +1031,10 @@ fn a_location_hint_pointing_at_another_slot_still_reads_through_the_central_mapp
     });
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
-    counting.reset_tally();
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
+    counting.reset_tally();
 
     // 第 9 页整个落在单元 1 里（36864 起，单元 1 是 [32634, 65268)）。
     let offset = FileOffsetInBytes(9 * PAGE_BYTES);
@@ -945,8 +1101,8 @@ fn a_location_hint_pointing_at_another_slot_still_reads_through_the_central_mapp
 }
 
 /// extent 叶记录 key 第三段是文件字节偏移（D8（核心索引结构） 已定项 3）：按文件字节偏移写的镜像读回来的每一页与写入逐字节相同；
-/// 同一份内容把 key 第三段（连同锚点偏移）写成单元序号时，挂载态打开这个文件当场拒绝，报第一处对不上的是文件第 1 个单元
-/// （第 0 个单元两种读法都是 0、分不开），不按位次猜着往下读。C490（extent 叶 key 的 offset 段没定单位） 的读侧那一半。
+/// 同一份内容把 key 第三段（连同锚点偏移）写成单元序号时，挂载态打开这个文件当场拒绝，拒在下段叶里第 1 条记录（offset 1 除不尽净荷容量，
+/// 按位置寻址认不出它是哪个单元；第 0 条两种读法都是 0、分不开），不按位次猜着往下读。C490（extent 叶 key 的 offset 段没定单位） 的读侧那一半。
 #[test]
 fn a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_index_instead_of_the_file_byte_offset(
 ) {
@@ -966,7 +1122,7 @@ fn a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_ind
     let mounted =
         open_pool_for_read(&by_byte_offset.image, &by_byte_offset.root).expect("打开挂载态");
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&by_byte_offset.image, InodeNumber(FIRST_INODE_NUMBER))
         .expect("key 第三段是文件字节偏移的那一份打得开");
     for page in 0..by_byte_offset.file_size_in_bytes() / PAGE_BYTES {
         let output = file
@@ -987,41 +1143,102 @@ fn a_mount_state_open_refuses_an_extent_key_whose_offset_segment_is_the_unit_ind
     let mounted_by_unit_index = open_pool_for_read(&by_unit_index.image, &by_unit_index.root)
         .expect("打开挂载态：树与映射都解得开，拒绝落在打开文件那一步");
     let refusal = mounted_by_unit_index
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&by_unit_index.image, InodeNumber(FIRST_INODE_NUMBER))
         .err()
         .expect("key 第三段写成单元序号的那一份，打开文件当场拒绝");
+    // 下段叶按位置寻址（D8（核心索引结构） 已定项 14）：读者从 key 的 offset 段除净荷容量认单元号，除不尽就是位置不对（I-1.1），
+    // 第 1 条记录（offset 1）当场拒，走不到「第 i 条是不是单元 i」那一判。
     assert_eq!(
         refusal,
-        OpenFileFailure::ExtentRecordKeyIsNotTheFileOffsetOfItsUnit {
-            inode: InodeNumber(FIRST_INODE_NUMBER),
-            unit_index_in_file: DataUnitIndexInFile(1),
-            key_file_offset: FileOffsetInBytes(1),
-            expected_file_offset: FileOffsetInBytes(payload_capacity()),
-        }
+        OpenFileFailure::ExtentTreeWalk(RecoveryFailure::InvariantViolated {
+            invariant: "I-1.1",
+            detail: "extent 叶记录的 key 不是 (0, 这个文件, 单元号 × 净荷容量)",
+        })
     );
 }
 
-/// 中央映射的根成了内部节点（映射长到一个节点装不下）⇒ 打开挂载态当场拒绝，不把内部条目当 55 字节映射条目解。
-/// 这一条钉的是上面那个读数的前提：「提示过期的一次解引用 = 2 + 1 = 3 次设备读」里的 +1 之所以不带树高，
-/// 全靠整片映射在 `open_pool_for_read` 里就读进了挂载态。前提不成立的镜像今天不支持，要拒绝、不猜。
+/// 中央映射树长成两层（两片叶上面一个根，D8（核心索引结构） 已定项 11）：打开挂载态把整棵树读进内存
+/// （D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」），之后提示过期的一次解引用照旧是 2 + 1 = 3 次设备读——
+/// 查映射一次设备读都不发，不随映射树有几层变。这是已定项 5 那句「这个读数是根兼叶时量的，多层落地时由用例重量」的重量：
+/// 根兼叶那一档在上面 `a_location_hint_pointing_at_another_slot_...` 里钉着，这里是两层。
+/// 判别力：挂载态只读映射树根、不往下读叶，映射里就只剩内部条目、查不到数据单元的 key ⇒ 这一读报 `CentralMappingMiss`。
 #[test]
-fn a_central_mapping_root_that_is_an_internal_node_is_refused_instead_of_being_read_as_entries() {
+fn a_stale_hint_under_a_two_level_central_mapping_still_costs_three_device_reads_because_the_whole_tree_is_in_the_mount_state(
+) {
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
-        central_mapping_root_level: 1,
+        damage: LocationHintDamage::PointTheHintOfThisUnitAtAnEmptySlot(DataUnitIndexInFile(1)),
+        central_mapping_shape: SyntheticCentralMappingShape::TwoLeavesUnderARoot,
+        ..SyntheticImagePlan::of_four_units()
+    });
+    let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
+    let mounted = open_pool_for_read(&counting, &built.root).expect("两层映射照常打开");
+    assert_eq!(
+        mounted.central_mapping_tree_reads_at_open(),
+        CentralMappingTreeReadsAtOpen {
+            node_reads: 3,
+            height: 2,
+        },
+        "打开时整棵映射树读进挂载态：根与两片叶各一次"
+    );
+    let file = mounted
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
+        .expect("打开文件");
+    counting.reset_tally();
+    let offset = FileOffsetInBytes(9 * PAGE_BYTES);
+    let output = file
+        .read_at(&counting, offset, PAGE_BYTES)
+        .expect("提示指错，经映射仍读得到");
+    let start = usize::try_from(offset.0).expect("偏移");
+    assert_eq!(
+        output.bytes,
+        built.content[start..start + usize::try_from(PAGE_BYTES).expect("4096")],
+        "经映射读回来的字节与写入相同"
+    );
+    assert_eq!(
+        output.observation,
+        ReadPathObservation {
+            data_units_read: 1,
+            data_unit_dereferences: 1,
+            stale_location_hint_hops: 1,
+            device_reads_issued: 3,
+        },
+        "两层映射：两条提示各试一次，再按映射的一条就中 ⇒ 2 + 1 = 3，与根兼叶那一档同一个数"
+    );
+    assert_eq!(
+        counting.tally().reads,
+        3,
+        "块层数到的也是 3：查映射没为映射树发任何读"
+    );
+}
+
+/// 中央映射树的根自述层级 1、装的却是 55 字节的映射条目 ⇒ 打开挂载态当场拒绝：内部条目要 27 + 86 = 113 字节
+/// （D8（核心索引结构） 已定项 11），条目宽窄于它就不按内部条目切，也不把它们当映射条目解。
+/// 读完映射树根就停，树表、extent / inode 单元一个都不读。
+#[test]
+fn a_central_mapping_root_claiming_level_one_over_mapping_entries_is_refused_instead_of_being_read_as_entries(
+) {
+    let built = build_synthetic_multi_unit_image(SyntheticImagePlan {
+        central_mapping_shape: SyntheticCentralMappingShape::RootClaimingLevelOneOverMappingEntries,
         ..SyntheticImagePlan::of_four_units()
     });
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
 
     let failure = open_pool_for_read(&counting, &built.root)
         .err()
-        .expect("映射根不是根兼叶就要拒绝");
+        .expect("层级 1 的根装着 55 字节的条目就要拒绝");
     assert_eq!(
         failure,
-        OpenPoolForReadFailure::CentralMappingWithMoreThanOneLevelIsNotSupportedInTheFirstVersion {
-            mapping_tree: TreeIdentifier(singlefs_format::TREE_IDENTIFIER_CENTRAL_MAPPING),
-            mapping_root_level: 1,
-        },
-        "错误成员要说清是多层映射、第一版不支持（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）"
+        OpenPoolForReadFailure::Walk(RecoveryFailure::EntryNarrowerThanItsFieldTable {
+            what: "中央映射树内部条目",
+            entry_bytes: 55,
+            field_table_bytes: 113,
+        }),
+        "错误成员说清是内部条目窄于字段表（D8 已定项 11：记账 108、映射 113）"
+    );
+    assert_eq!(
+        counting.tally().reads,
+        1,
+        "只读了映射树根那一个节点（第一条位置条目就中）"
     );
 }
 
@@ -1066,7 +1283,7 @@ fn a_file_whose_extent_record_count_does_not_match_its_size_is_refused_instead_o
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
 
     let failure = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .err()
         .expect("条数对不上要拒绝");
     assert_eq!(
@@ -1087,10 +1304,10 @@ fn a_read_that_runs_past_the_end_of_the_file_is_refused_before_any_unit_is_deref
     let built = build_synthetic_multi_unit_image(SyntheticImagePlan::of_four_units());
     let counting = ReadCountingPoolReader::new(&built.image, journal_ring());
     let mounted = open_pool_for_read(&counting, &built.root).expect("打开挂载态");
-    counting.reset_tally();
     let file = mounted
-        .open_file(InodeNumber(FIRST_INODE_NUMBER))
+        .open_file(&counting, InodeNumber(FIRST_INODE_NUMBER))
         .expect("打开文件");
+    counting.reset_tally();
 
     let file_size = built.file_size_in_bytes();
     let failure = file

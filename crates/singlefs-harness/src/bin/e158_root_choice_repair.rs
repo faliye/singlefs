@@ -22,7 +22,7 @@ use singlefs_checker::image::{ImageReader, PoolGeometry};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
-use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
+use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
@@ -30,11 +30,19 @@ use singlefs_core::journal::{record_offset, JournalRecord};
 use singlefs_core::make_filesystem::{
     make_filesystem, MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
-use singlefs_core::mount::{mount_rollback, mount_writable, RollbackTarget, ShadowLedger};
+use singlefs_core::mount::{
+    mount_rollback, mount_writable, raise_rollback_floor, rollback_floor_ceiling, RollbackTarget,
+    ShadowLedger,
+};
 use singlefs_core::pointer::LocationEntry;
-use singlefs_core::records::{TreeTableEntry, TREE_KIND_ALLOCATION};
+use singlefs_core::records::{
+    parse_mapping_entry, TreeTableEntry, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION,
+    TREE_KIND_DEADLIST, TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LIVELIST,
+    TREE_KIND_SPARSE_SIDE_TABLE,
+};
 use singlefs_core::recovery::{
-    allocation_records_under_root, recover, tree_table_has_no_entries, JournalPolicy,
+    allocation_records_under_root, choose_system_configuration, instance_table_chain_of_root,
+    recover, replay_journal, scan_journal, tree_table_has_no_entries, JournalPolicy,
     RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
@@ -47,7 +55,7 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::{parse_index_node, unit_filesystem_identifier};
 use singlefs_core::write_accounting::{WritesByStructureKind, WrittenStructureKind};
 use singlefs_format::JOURNAL_RECORD_BYTES;
-use singlefs_harness::crash::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::crash::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::fault_injection::{
     injected_block_device_error, FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice,
     FaultOccurrence, FaultPlacement, FaultSchedule, InjectedFault, NamedRootRingSlots,
@@ -55,9 +63,21 @@ use singlefs_harness::fault_injection::{
 };
 use singlefs_harness::segments::FixedGeometry;
 
-/// Q2-1 的穷举下界搜索，一个模板至多枚举的子集数（跑前登记 5.1 写的上限是 2¹⁶；这一次因挂钟预算改
-/// 用一个更小的数——见交回报告「它答不了的」，这不是判据的修订）。
-const SUBSET_ENUMERATION_CAP: u64 = 20_000;
+/// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行还差项②）：旧的计数上限
+/// （`SUBSET_ENUMERATION_CAP=20_000`）会在权重档中途停手、不报「完整空间多大」，判「负结果」时
+/// 分不清是穷举完了还是撞了计数——按登记要求撤掉，换成下面两个按权重档边界决定停不停的常量。
+///
+/// 完整证据空间的子集数 ≤ 这个预算 ⇒ `weight_ceiling` 传 `None` 时穷举到 `maximum_weight`（真正的
+/// 完整空间）；超过 ⇒ 退到 `DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE`（权重 12，与丙的 k=12 可比，
+/// 岔路单原文「某个 n1 的完整空间大到按本机挂钟算不完的，按权重从小到大穷举到权重 12」）。100_000
+/// 个子集按 H-C1 下界探针实测速率（22558 个子集 real 2m45s ≈ 7.3ms/个，
+/// `research/results/e158-root-choice-repair-2026-09-24-q2-1-hc1-lower-bound.out`）折算约 12 分钟，
+/// 在一次前台或后台调用里可接受；调用方显式传 `Some(w)` 时这个自动判断不生效，直接用调用方给的
+/// 权重（例如 H-C1 下界探针自己要精确探到某一档）。
+const FEASIBLE_FULL_SEARCH_SUBSET_BUDGET: u64 = 100_000;
+/// 完整空间太大时退到的权重上限：丙（今天）在 n1=4 上实测恰好在权重 12 打中（H-C1 直接构造 +
+/// 下界探针，session s6），选它是为了让各修法在同一档权重上可比。
+const DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE: u64 = 12;
 
 /// 两块盘各自的字节数：够装全部取样点的几何（最大 journal 环 3 MiB、S 至多 16），4 GiB 与
 /// `crates/singlefs-harness/tests/common/mod.rs` 的 `IMAGE_BYTES` 同一个量级，不共用那份代码。
@@ -1782,9 +1802,16 @@ fn fault_targets_for(
 }
 
 #[derive(Clone, Debug)]
+#[allow(
+    clippy::enum_variant_names,
+    reason = "三个变体都是「哪一种挂载/抬 F 操作」，共享 Mount 前缀是命名准确，不是同一个词重复"
+)]
 enum FaultedOperationKind {
     MountWritable,
     MountRollbackTo(TimelineRoot),
+    /// op1 第三种变体（跑前登记 5.1 H1 行）：先不注入地做一次 `mount_writable`（只为打开会话，
+    /// 不是受注入的一步），再把这个目标 floor 值喂给受注入的 `raise_rollback_floor`。
+    MountWritableThenRaiseFloorTo(CheckpointTxg),
 }
 
 impl FaultedOperationKind {
@@ -1792,6 +1819,9 @@ impl FaultedOperationKind {
         match self {
             FaultedOperationKind::MountWritable => "mount_writable".to_string(),
             FaultedOperationKind::MountRollbackTo(target) => format!("mount_rollback({target:?})"),
+            FaultedOperationKind::MountWritableThenRaiseFloorTo(floor) => {
+                format!("mount_writable_then_raise_rollback_floor({floor:?})")
+            }
         }
     }
 }
@@ -1825,6 +1855,17 @@ fn attempt_faulted_operation(
     kind: &FaultedOperationKind,
     fault_targets: &[(DeviceIdentity, DeviceOffsetInBytes)],
 ) -> FaultedOperationAttempt {
+    // op1 第三种变体（session s10）：唯一一种需要在受注入的那一步**之前**先做一次完全不注入的
+    // `mount_writable`（打开会话）的 op1，装置结构与另外两种不同，另开一个函数、在这里提前分派。
+    if let FaultedOperationKind::MountWritableThenRaiseFloorTo(new_floor) = kind {
+        return attempt_mount_writable_then_raise_floor(
+            node,
+            parameters,
+            fixed_geometry,
+            *new_floor,
+            fault_targets,
+        );
+    }
     let plain = devices_from_pool(&node.pool, IMAGE_BYTES);
     let mut plans: Vec<(DeviceIdentity, SharedFaultPlan)> = Vec::new();
     let mut wrapped: Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)> =
@@ -1862,6 +1903,9 @@ fn attempt_faulted_operation(
             ShadowLedger::On,
         )
         .map(|mounted| mounted.output.abandoned_roots_unreadable),
+        FaultedOperationKind::MountWritableThenRaiseFloorTo(_) => {
+            unreachable!("MountWritableThenRaiseFloorTo 在函数开头已经提前分派、提前 return 过了")
+        }
     };
     let mut device_write_bytes = BTreeMap::new();
     for (identity, plan) in &plans {
@@ -1885,6 +1929,226 @@ fn attempt_faulted_operation(
             }
         }
     }
+}
+
+/// op1 第三种变体（跑前登记 H1 行「先不注入地 `mount_writable` 再 `raise_rollback_floor` 到
+/// [F+1, 上限] 里每一个值」）：floor 目标枚举成 (F, 上限] 半开区间——`current_floor` 本身不许再抬
+/// （抬到自己等于没抬），`ceiling` 一定要能抬到。`ceiling <= current_floor` 时天然给出空区间
+/// （Rust 的 `..=` 起点大于终点时不产出任何元素），不用另写一条判空分支。
+fn floor_targets_between(
+    current_floor: CheckpointTxg,
+    ceiling: CheckpointTxg,
+) -> Vec<CheckpointTxg> {
+    ((current_floor.0 + 1)..=ceiling.0)
+        .map(CheckpointTxg)
+        .collect()
+}
+
+/// op1 第三种变体的目标 floor 枚举：先不注入地做一次 `mount_writable`（试探性，用完即弃，只为量出
+/// 这一步的 F 与上限——它本身不是受注入的一步），从它交回的 `current.root.rollback_floor` 起算 F，
+/// 再用 `crates/` 已有的 `rollback_floor_ceiling`（与 `raise_rollback_floor` 内部用的是同一个函数）
+/// 算出上限。交回空 `Vec`：探测步骤失败（挂载不成功、没有文件、系统配置或实例表读不出、
+/// `rollback_floor_ceiling` 报错），或 F 已经等于上限（没有余量可抬）——两种都不是「该测到却漏了」，
+/// 是这条历史在这一格没有 op1 第三种变体可跑，调用方按 `raise_floor_history_nodes_without_room`
+/// 单独计一次，不归进任何触发计数。
+fn raise_floor_targets_for(
+    node: &SimNode,
+    parameters: &MakeFilesystemParameters,
+) -> Vec<CheckpointTxg> {
+    let mut probe_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+    let Ok(mounted) = mount_writable(parameters, &mut probe_devices) else {
+        return Vec::new();
+    };
+    let PoolVersion::WithFile(current) = mounted.current else {
+        return Vec::new();
+    };
+    let Ok(system_configuration) = choose_system_configuration(&probe_devices) else {
+        return Vec::new();
+    };
+    let Ok(table) = instance_table_chain_of_root(&probe_devices, &current.root) else {
+        return Vec::new();
+    };
+    let current_floor = current.root.rollback_floor;
+    let Ok(ceiling) = rollback_floor_ceiling(
+        &probe_devices,
+        &system_configuration,
+        current_floor,
+        &table.records,
+    ) else {
+        return Vec::new();
+    };
+    floor_targets_between(current_floor, ceiling)
+}
+
+/// op1 第三种变体的「试一次看结局，用完即弃」实现：第一步（打开会话）**不注入**——`raise_rollback_
+/// floor` 要 `&mut PoolAllocator`/`&mut TransactionOutput`（一个开着的会话），而这里进来的 `node`
+/// 已经「关闭」（`session: None`），受注入的一步只是 `raise_rollback_floor` 本身（跑前登记 5.1 H1
+/// 行「先不注入地 `mount_writable` 再 `raise_rollback_floor`」）。**不追加进 `node.timeline`**：
+/// `raise_rollback_floor` 交回的 `RaisedFloor::abandoned_roots_unreadable` 是从盘上现读实例表 +
+/// 现行根的候选集算出来的（`isolate_slots_referenced_only_by_abandoned_roots`，与
+/// `mount_writable`/`mount_rollback` 那两种 op1 共用同一条计数管道，`crates/singlefs-core/src/
+/// mount.rs` 第 1027 行起），不依赖装置自己的内存时间线；与 `MountRollbackTo` 分支同理——那个分支
+/// 交回的 `mounted.output.warm_up_publishes` 等中间根同样只用来读它的最终 `abandoned_roots_
+/// unreadable` 字段，从不追加进任何时间线（`attempt_faulted_operation` 整体是「试一次看结局，用完
+/// 即弃」，不产出可继续使用的 `SimNode`）。两步用的字节不共享（`devices_from_pool` 每次都深拷贝，
+/// 第一步之后的 `probe_devices` 直接喂给第二步的包装层，不再回读 `node.pool`），故障只出现在第二
+/// 步的 `wrapped`。
+fn attempt_mount_writable_then_raise_floor(
+    node: &SimNode,
+    parameters: &MakeFilesystemParameters,
+    fixed_geometry: FixedGeometry,
+    new_floor: CheckpointTxg,
+    fault_targets: &[(DeviceIdentity, DeviceOffsetInBytes)],
+) -> FaultedOperationAttempt {
+    let mut probe_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+    let mounted = match mount_writable(parameters, &mut probe_devices) {
+        Ok(mounted) => mounted,
+        Err(error) => {
+            return FaultedOperationAttempt {
+                abandoned_roots_unreadable: None,
+                error_debug: Some(format!("先不注入地 mount_writable 失败：{error:?}")),
+                error_member: Some("PrecedingUnfaultedMountWritableFailed".to_string()),
+                device_write_bytes: BTreeMap::new(),
+            };
+        }
+    };
+    let PoolVersion::WithFile(mut current) = mounted.current else {
+        return FaultedOperationAttempt {
+            abandoned_roots_unreadable: None,
+            error_debug: Some("先不注入地 mount_writable 交回的现行版本没有文件".to_string()),
+            error_member: Some("PrecedingUnfaultedMountWritableWithoutFile".to_string()),
+            device_write_bytes: BTreeMap::new(),
+        };
+    };
+    let mut allocator = mounted.allocator;
+    let mut plans: Vec<(DeviceIdentity, SharedFaultPlan)> = Vec::new();
+    let mut wrapped: Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)> =
+        Vec::new();
+    for (identity, device) in probe_devices {
+        let plan = SharedFaultPlan::unarmed(fixed_geometry);
+        if let Some((_, offset)) = fault_targets
+            .iter()
+            .find(|(target_device, _)| *target_device == identity)
+        {
+            plan.arm(FaultSchedule {
+                fault: InjectedFault::ReadFails,
+                device: FaultDeviceSelector::OnlyDevice(identity),
+                placement: FaultPlacement::OffsetExactly(*offset),
+                counting: FaultCounting::AcrossThePool,
+                occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
+            });
+        }
+        plans.push((identity, plan.clone()));
+        wrapped.push((
+            identity,
+            FaultInjectingBlockDevice::new(identity, device, plan),
+        ));
+    }
+    let raised = raise_rollback_floor(
+        parameters,
+        &mut wrapped,
+        &mut allocator,
+        &mut current,
+        new_floor,
+        ShadowLedger::On,
+    );
+    let mut device_write_bytes = BTreeMap::new();
+    for (identity, plan) in &plans {
+        device_write_bytes.insert(identity.0, plan.counts_of_device(*identity).written_bytes);
+    }
+    match raised {
+        Ok(raised) => FaultedOperationAttempt {
+            abandoned_roots_unreadable: Some(raised.abandoned_roots_unreadable),
+            error_debug: None,
+            error_member: None,
+            device_write_bytes,
+        },
+        Err(error) => {
+            let debug = format!("{error:?}");
+            let member = error_member_of_debug(&debug);
+            FaultedOperationAttempt {
+                abandoned_roots_unreadable: None,
+                error_debug: Some(debug),
+                error_member: Some(member),
+                device_write_bytes,
+            }
+        }
+    }
+}
+
+/// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 1 行还差项④）：op1 起的多次挂载轨迹——
+/// 第一节读法写死表「持续」＝从 op1 这次调用起到这段历史结束都有效，「瞬时」＝只在 op1 那次调用期间
+/// 有效；第八节 8.1「abandoned_roots_unreadable，按 op1 起的每一次挂载」要的轨迹正是这个函数产出的。
+/// **与 `attempt_faulted_operation` 的关键差别**：那个函数每次都从 `node.pool` 重新
+/// `devices_from_pool`，故障目标之外的写不回原池（`SparseDevice` 是普通值类型、`.clone()` 深拷贝，
+/// 不共享底层字节，这是刻意的「试一次看结局」语义，见它的用法）；这里要的是「op1 落盘之后接着挂」，
+/// 所以每一步显式把 `FaultInjectingBlockDevice::inner().image` 取出来拼回一个新的 `MemoryPool`，
+/// 喂给下一步——**这是这个函数与 `attempt_faulted_operation` 的唯一结构性差别，其余装故障、判结局的
+/// 写法逐字照抄，不引入第二套注入逻辑**。`persistent = true` 时每一步都用同一组 `fault_targets`
+/// （对应「持续」）；`persistent = false` 时只有第一步（op1 自己）带故障，之后的步不装任何故障
+/// （对应「瞬时」，且与「瞽时」的读法一致：故障在 op1 那次调用返回后即撤）。某一步交回 `Err` 就停在
+/// 那一步，`results` 里这一步与之后的步都记 `None`（挂载失败之后没有新的池状态可以接着挂，不能凭空
+/// 编一个「本该」发生的计数）。
+fn mount_writable_trajectory(
+    starting_pool: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    fixed_geometry: FixedGeometry,
+    fault_targets: &[(DeviceIdentity, DeviceOffsetInBytes)],
+    persistent: bool,
+    steps: usize,
+) -> Vec<Option<u64>> {
+    let mut pool = starting_pool.clone();
+    let mut results = Vec::new();
+    for step in 0..steps {
+        let active_targets: &[(DeviceIdentity, DeviceOffsetInBytes)] = if step == 0 || persistent {
+            fault_targets
+        } else {
+            &[]
+        };
+        let plain = devices_from_pool(&pool, IMAGE_BYTES);
+        let mut wrapped: Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)> =
+            Vec::new();
+        for (identity, device) in plain {
+            let plan = SharedFaultPlan::unarmed(fixed_geometry);
+            if let Some((_, offset)) = active_targets
+                .iter()
+                .find(|(target_device, _)| *target_device == identity)
+            {
+                plan.arm(FaultSchedule {
+                    fault: InjectedFault::ReadFails,
+                    device: FaultDeviceSelector::OnlyDevice(identity),
+                    placement: FaultPlacement::OffsetExactly(*offset),
+                    counting: FaultCounting::AcrossThePool,
+                    occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
+                });
+            }
+            wrapped.push((
+                identity,
+                FaultInjectingBlockDevice::new(identity, device, plan),
+            ));
+        }
+        match mount_writable(parameters, &mut wrapped) {
+            Ok(mounted) => {
+                results.push(Some(mounted.output.abandoned_roots_unreadable));
+                let next_devices: BTreeMap<DeviceIdentity, SparseDevice> = wrapped
+                    .iter()
+                    .map(|(identity, device)| (*identity, device.inner().image.clone()))
+                    .collect();
+                pool = MemoryPool {
+                    devices: next_devices,
+                    device_size_in_bytes: IMAGE_BYTES,
+                };
+            }
+            Err(_) => {
+                results.push(None);
+                break;
+            }
+        }
+    }
+    while results.len() < steps {
+        results.push(None);
+    }
+    results
 }
 
 /// H1 家族里的一个「op1 之前」节点：mkfs → `mount_writable` → 首个文件 →
@@ -2019,6 +2283,307 @@ fn tree_table_has_copy_elsewhere(
     false
 }
 
+/// 找被抛弃根在同一实例上、checkpoint_txg 更小、且今天仍读得出的那一条根——候选 (b) 树表指称
+/// 「crates 有路」子分支要从它出发（跑前登记 5.2 ②）。取 checkpoint_txg 最大的那一条（最近的祖先）。
+fn nearest_older_readable_root_on_same_instance(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    exclude: TimelineRoot,
+    target: &RootRecord,
+) -> Option<(TimelineRoot, RootRecord)> {
+    let mut best: Option<(TimelineRoot, RootRecord)> = None;
+    for candidate in readable_roots_independent(pool, geometry) {
+        if candidate == exclude {
+            continue;
+        }
+        let Some(record) = root_record_of(pool, geometry, candidate) else {
+            continue;
+        };
+        if record.instance != target.instance || record.checkpoint_txg >= target.checkpoint_txg {
+            continue;
+        }
+        let take_it = match &best {
+            None => true,
+            Some((_, current_best)) => record.checkpoint_txg > current_best.checkpoint_txg,
+        };
+        if take_it {
+            best = Some((candidate, record));
+        }
+    }
+    best
+}
+
+/// 候选 (b) 树表指称「crates 有路」子分支的结局（跑前登记 5.2 ②）。**这一支给出的是指针级别（位置 +
+/// 校验和）的复算，不是节点内容的 16 KiB 字节本身**——要拿到字节仍要照这个指针再读一次两份物理拷贝，
+/// 而那正是这一格要绕开的读；这个限定在交回报告里写清楚，不写成「crates 有路 = 给得出字节」。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TreeTableCratesHasAPathOutcome {
+    /// 没有更旧的可读同实例根：这条路径的前提不成立。
+    NoOlderReadableRootOnTimeline,
+    /// 装置自己解不出系统配置（独立扫描 journal 记录要用它），走不下去。
+    CannotDecodeSystemConfiguration,
+    /// replay 交回的根没有推进到目标的 checkpoint_txg：链断在中途（可能正是因为验证撞上了被注入的物理位置）。
+    DidNotReachTarget,
+    /// replay 推进到了目标的 checkpoint_txg，但交回的 `tree_table` 指针与目标不同——crates 这条路给出的答案本身不对。
+    ReachedTargetButPointerDiffers,
+    /// replay 推进到了目标的 checkpoint_txg，且交回的 `tree_table` 指针（位置 + 校验和）与目标逐字段相同。
+    ReachedTargetWithMatchingPointer,
+}
+
+impl TreeTableCratesHasAPathOutcome {
+    fn label(self) -> &'static str {
+        match self {
+            TreeTableCratesHasAPathOutcome::NoOlderReadableRootOnTimeline => {
+                "no_older_readable_root_on_timeline"
+            }
+            TreeTableCratesHasAPathOutcome::CannotDecodeSystemConfiguration => {
+                "cannot_decode_system_configuration"
+            }
+            TreeTableCratesHasAPathOutcome::DidNotReachTarget => "did_not_reach_target",
+            TreeTableCratesHasAPathOutcome::ReachedTargetButPointerDiffers => {
+                "reached_target_but_pointer_differs"
+            }
+            TreeTableCratesHasAPathOutcome::ReachedTargetWithMatchingPointer => {
+                "reached_target_with_matching_pointer"
+            }
+        }
+    }
+}
+
+/// 候选 (b) 树表指称「crates 有路」子分支（跑前登记 5.2 ②）：从同一实例上更旧的可读根出发，调
+/// `crates/` 已有的 `replay_journal`，看它能不能不读目标那两份物理拷贝就交回同一个 `tree_table` 指针。
+/// `verify_named_units` 两种都跑：`true` 走今天挂载真用的口径（逐项验证点名单元，可能因此撞上同一个
+/// 被注入的物理位置）；`false` 只信记录自带的新根段字段、不去验证任何单元字节。两者的差异本身就是
+/// 「这条路独不独立于那次被挡住的读」这句话的答案。
+fn tree_table_crates_has_a_path(
+    node: &SimNode,
+    fixed_geometry: FixedGeometry,
+    fault_targets: &[(DeviceIdentity, DeviceOffsetInBytes)],
+    geometry: &PoolGeometry,
+    exclude: TimelineRoot,
+    target: &RootRecord,
+    verify_named_units: bool,
+) -> TreeTableCratesHasAPathOutcome {
+    let Some((_, older_root)) =
+        nearest_older_readable_root_on_same_instance(&node.pool, geometry, exclude, target)
+    else {
+        return TreeTableCratesHasAPathOutcome::NoOlderReadableRootOnTimeline;
+    };
+    let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+    let Ok(system_configuration) = choose_system_configuration(&plain_devices) else {
+        return TreeTableCratesHasAPathOutcome::CannotDecodeSystemConfiguration;
+    };
+    // 记录本身不在这一格的故障目标里（Φ1 只挡树表或分配记录树那一个单元），按不注入的孪生镜像扫出全量——
+    // 独立扫描 journal 不是这一支要考的东西，考的是 replay 拿到记录之后还要不要碰目标那份物理拷贝。
+    let records = scan_journal(&plain_devices, &system_configuration);
+    let mut wrapped: Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)> =
+        Vec::new();
+    for (identity, device) in devices_from_pool(&node.pool, IMAGE_BYTES) {
+        let plan = SharedFaultPlan::unarmed(fixed_geometry);
+        if let Some((_, offset)) = fault_targets
+            .iter()
+            .find(|(target_device, _)| *target_device == identity)
+        {
+            plan.arm(FaultSchedule {
+                fault: InjectedFault::ReadFails,
+                device: FaultDeviceSelector::OnlyDevice(identity),
+                placement: FaultPlacement::OffsetExactly(*offset),
+                counting: FaultCounting::AcrossThePool,
+                occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
+            });
+        }
+        wrapped.push((
+            identity,
+            FaultInjectingBlockDevice::new(identity, device, plan),
+        ));
+    }
+    let (_report, replayed_root) = replay_journal(
+        &wrapped,
+        &older_root,
+        geometry.journal_ring_bytes,
+        &records,
+        verify_named_units,
+        None,
+    )
+    .expect("装置里的记录都由写者写出，所选根那次发布只有一条带末条标志：锚点认得出");
+    if replayed_root.instance != target.instance
+        || replayed_root.checkpoint_txg != target.checkpoint_txg
+    {
+        return TreeTableCratesHasAPathOutcome::DidNotReachTarget;
+    }
+    if replayed_root.tree_table == target.tree_table {
+        TreeTableCratesHasAPathOutcome::ReachedTargetWithMatchingPointer
+    } else {
+        TreeTableCratesHasAPathOutcome::ReachedTargetButPointerDiffers
+    }
+}
+
+/// 候选 (b) 分配记录树指称「从内容树反推占用集合」这一种操作化（跑前登记 5.2 ②，session s6 修订项 5
+/// 提出的思路）：不重读被注入的那一个分配记录树节点本身，改走中央映射树——它是这一版的逻辑到物理的
+/// 权威索引（D1（数据可移动性 / 反向索引）），每条条目携带两条独立于分配记录树的位置条目。对第一版这种
+/// 没有快照、只有一个活头的简单历史，中央映射树里出现过的落点集合就应当等于「未释放」的落点集合。
+/// **射程**：只走了中央映射树一条内容树（`crates::mounted_read::open_pool_for_read` 走读 extent / inode
+/// 树是为了服务文件读，与「占用集合」这个问题不是同一件事——占用靠中央映射，不靠 extent/inode）；
+/// 有快照、多版本共享落点的情形没有覆盖（第一版这批历史都不产生快照，见交回报告）。
+///
+/// **只读一层、把根当叶解**——实十九（2026-09-24 16:50 UTC 前后落地）之后，中央映射树条目数一旦
+/// 超过单节点叶容量（`transaction.rs` 第 1334 行「中央映射树叶 294」）就会长成多层，那时根节点是
+/// 内部节点（`level > 0`），装着的是子节点指针、不是 `parse_mapping_entry` 认得的叶条目格式。
+/// 这里显式核 `level == 0` 再往下解，不靠「宽度不够、`parse_mapping_entry` 自然读不出」这种隐式失败
+/// 兜底——内部条目宽约 114 字节（`transaction.rs` 同一行「内部 143」按 16384 / 143 反推），比
+/// `MAPPING_ENTRY_BYTES`=55 宽，`parse_mapping_entry` 的长度检查拦不住它，会把内部指针字节当叶
+/// 条目误解出一对看似合法的 `LocationEntry`——这正是「不许静默算错」要挡的那种失败，`level` 检查把
+/// 它变成一条会报错、不会算错的路。E158 这批历史全部只写一个文件、只有一个逻辑映射 key（跨 n1/m/σ
+/// 的全部覆盖写都在原地更新同一条条目，不新增条目），条目数最多到 1（见交回报告的现场核对），远低于
+/// 294，这批历史至今不会撞上多层——但装置不该靠这条事实免检，`level` 一变就该显式报错，不是碰巧躲过。
+///
+/// # Errors
+/// 中央映射树根两份都读不出、解不开，或根节点 `level != 0`（长成了多层，这个函数还不会整棵读）。
+fn allocation_record_tree_reachable_placements_via_central_mapping(
+    plain_devices: &[(DeviceIdentity, SparseBlockDevice)],
+    root: &RootRecord,
+) -> Result<BTreeSet<(u32, u64)>, String> {
+    let mapping_root_bytes = read_node_bytes(plain_devices, &root.mapping_root.locations)
+        .ok_or_else(|| "中央映射树根两份都读不出".to_string())?;
+    let mapping_root = parse_index_node(&mapping_root_bytes)
+        .map_err(|error| format!("中央映射树根解不开: {error:?}"))?;
+    if mapping_root.level != 0 {
+        return Err(format!(
+            "中央映射树根不是叶（level={}，entries={}）：树已经长成多层，这个函数只会整棵读单叶版本，不认内部节点条目",
+            mapping_root.level,
+            mapping_root.entries.len()
+        ));
+    }
+    let mut placements = BTreeSet::new();
+    for entry_bytes in &mapping_root.entries {
+        let (_key, locations) =
+            parse_mapping_entry(entry_bytes).ok_or_else(|| "中央映射条目解不开".to_string())?;
+        for location in locations {
+            placements.insert((location.device.0, location.slot.0));
+        }
+    }
+    Ok(placements)
+}
+
+/// 候选 (b) 分配记录树指称「从内容树反推占用集合」走全（session s8，跑前登记 5.2 ②「它答不了的」
+/// 缺口①）：在上一个函数（只走中央映射树这一条内容树）的基础上，把「码 2」结构节点自己的落点也并进
+/// 占用集合——`AllocationRecord`（`crates/singlefs-core/src/allocator.rs` 第 31 行）记的是**任意
+/// 已分配的跨度**，不只是中央映射树指向的数据单元；树表自己、树表里 `TREE_KIND_INODE` /
+/// `TREE_KIND_EXTENT` / `TREE_KIND_ACCOUNTING` 三种子树各自的根节点、以及中央映射树**自己**的根节点
+/// （区别于它指向的数据单元），都是「码 2 节点取最低空槽」（`allocator.rs` 第 6 行）分配出来的、理应
+/// 出现在「未释放」集合里的落点。`TREE_KIND_ALLOCATION` 不并进来——那是分配记录树自己，并进来是把
+/// 要验证的账当成账的输入，循环论证。**这仍不是穷举**：`TREE_KIND_LIVELIST` / `_SPARSE_SIDE_TABLE` /
+/// `_DEADLIST` 三种树表里可能存在的种类没有并入（第一版这批历史是否会产生它们、要不要算，留给下一段）。
+fn allocation_record_tree_reachable_placements_via_all_structural_trees(
+    plain_devices: &[(DeviceIdentity, SparseBlockDevice)],
+    root: &RootRecord,
+) -> Result<BTreeSet<(u32, u64)>, String> {
+    let mut placements =
+        allocation_record_tree_reachable_placements_via_central_mapping(plain_devices, root)?;
+    for location in &root.mapping_root.locations {
+        placements.insert((location.device.0, location.slot.0));
+    }
+    for location in &root.tree_table.locations {
+        placements.insert((location.device.0, location.slot.0));
+    }
+    let tree_table_bytes = read_node_bytes(plain_devices, &root.tree_table.locations)
+        .ok_or_else(|| "树表两份都读不出".to_string())?;
+    let tree_table =
+        parse_index_node(&tree_table_bytes).map_err(|error| format!("树表解不开: {error:?}"))?;
+    for entry_bytes in &tree_table.entries {
+        let Some(entry) = TreeTableEntry::parse(entry_bytes) else {
+            continue;
+        };
+        if matches!(
+            entry.kind,
+            TREE_KIND_INODE | TREE_KIND_EXTENT | TREE_KIND_ACCOUNTING
+        ) {
+            for location in &entry.root.locations {
+                placements.insert((location.device.0, location.slot.0));
+            }
+        }
+    }
+    Ok(placements)
+}
+
+/// session s9（跑前登记 5.2 ②「它答不了的」缺口①，`m2-rootchoice-repair-r1-forks.md` 第 1 行还差项）：
+/// `subset_of_pristine` 那些格里，`pristine − 走全` 差集的每一个 (设备, 槽) 按结构归类——先按跑前登记
+/// 5.2 表原文点名的五类结构逐项核对（分配记录树自己的节点；树表登记的 `LIVELIST` / `SPARSE_SIDE_TABLE`
+/// / `DEADLIST` 根，`transaction.rs` 的 `table_entry` 调用点显示这三类树表条目的根**恒为
+/// `NodePointer::empty_root()`**——这批历史、乃至今天全仓任何一条写路径都不产生这三类树的物理节点，
+/// 所以这一分支理论上永远查不到命中，仍按登记要求逐项核，核不到就如实报「查无归属」）；查无归属时按
+/// `AllocationRecord.span_slots` 分「码 2 结构节点（1 槽，`allocator.rs` 顶注『码 2 节点取最低空槽』）」
+/// 与「码 3 数据容器（2 槽，`DATA_UNIT_BYTES`=32768=2×`SLOT_BYTES`）」两档报告——span 是分配器自己写死
+/// 的界，不是这一段猜的。
+fn classify_diff_pair(
+    plain_devices: &[(DeviceIdentity, SparseBlockDevice)],
+    root: &RootRecord,
+    allocation_record_tree_locations: Option<[LocationEntry; 2]>,
+    records: &[AllocationRecord],
+    pair: (u32, u64),
+) -> &'static str {
+    // 根因排查②的实测结果（session s9）：171 格的差集**逐字节等于** `root.instance_table.locations`
+    // （实例表自己的物理节点，`RootRecord` 第 23 行，与 `tree_table` / `mapping_root` 是三条并列的独立
+    // 指针，不挂在树表的七条条目里，`allocation_record_tree_reachable_placements_via_all_structural_trees`
+    // 从未读过它）——`crates/singlefs-core/src/make_filesystem.rs` 第 44 行
+    // `INSTANCE_TABLE_SLOT = SlotNumber(UNIT_AREA_START_SLOT)`，`crates/singlefs-format/src/lib.rs`
+    // 第 231 行 `UNIT_AREA_START_SLOT: u64 = 50176`，与实测 `device=0/1 slot=50176` 逐位吻合；
+    // `mark_format_time_units` 给它的 `Placement { slot: INSTANCE_TABLE_SLOT, span: 2 }` 与实测
+    // `span=2`、`generation=0`（格式时刻分配，不是任何一次真实发布的 txg）吻合。**这不是 LIVELIST /
+    // SPARSE_SIDE_TABLE / DEADLIST 三种树的节点**（那三种树表条目的根恒为 `NodePointer::empty_root()`，
+    // `transaction.rs` 第 3644–3660 行 `publish_admitted` 每次发布都这样写，这批历史、乃至今天全仓任何
+    // 一条写路径都不产生它们的物理节点——判定见交回报告）。
+    if root
+        .instance_table
+        .locations
+        .iter()
+        .any(|location| location_key(location) == pair)
+    {
+        return "instance_table_self_node_not_walked_by_the_all_structural_trees_arm";
+    }
+    if let Some(locations) = allocation_record_tree_locations {
+        if locations
+            .iter()
+            .any(|location| location_key(location) == pair)
+        {
+            return "allocation_record_tree_self_node";
+        }
+    }
+    if let Some(tree_table_bytes) = read_node_bytes(plain_devices, &root.tree_table.locations) {
+        if let Ok(tree_table) = parse_index_node(&tree_table_bytes) {
+            for entry_bytes in &tree_table.entries {
+                if let Some(entry) = TreeTableEntry::parse(entry_bytes) {
+                    if matches!(
+                        entry.kind,
+                        TREE_KIND_LIVELIST | TREE_KIND_SPARSE_SIDE_TABLE | TREE_KIND_DEADLIST
+                    ) && entry
+                        .root
+                        .locations
+                        .iter()
+                        .any(|location| location_key(location) == pair)
+                    {
+                        return "livelist_sparse_deadlist_root_but_always_empty";
+                    }
+                }
+            }
+        }
+    }
+    match records
+        .iter()
+        .find(|record| (record.device.0, record.slot.0) == pair)
+        .map(|record| record.span_slots)
+    {
+        Some(2) => "span2_unclassified_not_instance_table_not_content_mapping",
+        Some(1) => "span1_structural_node_not_a_livelist_sparse_deadlist_root",
+        Some(_) => "span_other_unexpected",
+        None => "not_found_in_raw_allocation_records",
+    }
+}
+
+/// session s9：一个差集落点 (设备, 槽) 的聚合上下文——(最小分配记录代, 最大分配记录代,
+/// 最小被抛弃根 txg, 最大被抛弃根 txg, 是否在任何一条可读根自己的中央映射树里也出现过)。
+type SubsetDiffPairContext = (u64, u64, u64, u64, bool);
+
 #[derive(Default)]
 struct LedgerFaultFamilySummary {
     node_count: u64,
@@ -2035,14 +2600,43 @@ struct LedgerFaultFamilySummary {
     allocation_record_tree_released_nonzero: u64,
     tree_table_has_copy_elsewhere_count: u64,
     tree_table_no_copy_elsewhere_count: u64,
+    /// 候选 (b) 树表指称「crates 有路」子分支：键 = (verify_named_units, 结局标签)。
+    tree_table_crates_has_a_path_outcomes: BTreeMap<(bool, &'static str), u64>,
+    /// 候选 (b) 分配记录树指称「从内容树反推占用集合」（中央映射树）：outcome 标签 → 计数。
+    allocation_record_tree_from_content_trees_outcomes: BTreeMap<&'static str, u64>,
+    /// 同上，session s8「走全」版本（中央映射树 + 树表 / INODE / EXTENT / ACCOUNTING 四类结构节点）。
+    allocation_record_tree_from_all_structural_trees_outcomes: BTreeMap<&'static str, u64>,
+    /// session s9：`subset_of_pristine` 那些格里 `pristine − 走全` 差集的每个 (设备, 槽) 按结构归类，
+    /// 键 = (设备, 槽, 归类标签)，值 = 这个三元组在整个 H1 族里出现的次数（同一物理落点可能在多个
+    /// (历史节点, 被抛弃根) 组合上重复出现，去重看键、频次看值）。
+    subset_diff_pairs: BTreeMap<(u32, u64, &'static str), u64>,
+    /// session s9（根因排查②）：同一个 (设备, 槽) 差集对，跨全部触发它的 (历史节点, 被抛弃根) 聚合出的
+    /// 上下文——(最小分配记录代, 最大分配记录代, 最小被抛弃根 txg, 最大被抛弃根 txg,
+    /// 是否在任何一条可读根自己的中央映射树里也出现过)。最后一项为真 ⇒ 这个落点曾经是某条根的当前映射，
+    /// 佐证「超期未释放的历史内容单元」这个机制,而不是「结构树种类漏走」。
+    subset_diff_pair_context: BTreeMap<(u32, u64), SubsetDiffPairContext>,
     persistence_cost_values: BTreeSet<u64>,
     rejected_zero_device_bytes: u64,
     rejected_nonzero_device_bytes: u64,
     faulted_operation_kinds_tried: BTreeSet<String>,
+    /// session s10（岔路单第 1 行 op1 第三种变体，跑前登记 Q1-1c 原文「抬 F 那一处单独一行」）：
+    /// 不并进 `pairs`/`trigger_count`/`by_aspect_severity`/`error_members`——候选 (a) 的 A1 副本
+    /// 按 5.2 原文不改 `raise_rollback_floor`，混进同一组计数会让 Q1-1a/b 的既有读数（session
+    /// s3–s9 已经坐实）掺进一个定义上不同的入口点。
+    raise_floor_pairs: u64,
+    raise_floor_trigger_count: u64,
+    raise_floor_error_members: BTreeMap<String, u64>,
+    raise_floor_by_aspect_severity: BTreeMap<(&'static str, &'static str), (u64, u64)>,
+    /// 这个历史节点在这一步没有 [F+1, 上限] 的余量可抬（F 已到上限），或探测步骤本身失败——不是
+    /// 「该测到却漏了」，是这条历史在这一格没有 op1 第三种变体可跑（`raise_floor_targets_for` 的
+    /// 文档注）。
+    raise_floor_history_nodes_without_room: u64,
 }
 
-/// 跑前登记 5.1 Φ1 + 六、报哪些量：H1 全族 × 每条被抛弃可读根 × 2 个单元 × 3 个严重度（只做「瞬时」，
-/// 「持续」——op1 及其后两次挂载——这一段没有实现，见交回报告）。`is_a1_arm` 只影响 Q1-4/Q1-1c 的
+/// 跑前登记 5.1 Φ1 + 六、报哪些量：H1 全族 × 每条被抛弃可读根 × 2 个单元 × 3 个严重度 × op1 三种
+/// （`mount_writable`、`mount_rollback`、session s10 新增的「先不注入地 `mount_writable` 再
+/// `raise_rollback_floor`」，只做「瞬时」；「持续」只在 `mount_writable_trajectory`（session s9）
+/// 里单独测过 PC1-a 选中的那一个落点，这个主循环本身不做持续故障）。`is_a1_arm` 只影响 Q1-4/Q1-1c 的
 /// 报告措辞（候选 (a) 的错误成员字符串只在编译进 A1 副本时才会真的出现，装置源码两边共用一份，
 /// 靠字符串匹配、不靠枚举名，跨臂都能编译）。
 fn run_ledger_fault_family(geometry: &Geometry) -> LedgerFaultFamilySummary {
@@ -2071,6 +2665,13 @@ fn run_ledger_fault_family(geometry: &Geometry) -> LedgerFaultFamilySummary {
             .filter(|root| readable.contains(root))
             .collect();
         let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+        // session s10（岔路单第 1 行 op1 第三种变体）：这个历史节点上「先不注入地 mount_writable 再
+        // raise_rollback_floor」能测的每一个目标 floor 值，算一次即可，全部 (被抛弃根, 指称, 严重度)
+        // 组合共用（探测步骤本身不看被抛弃根、不看故障目标，与它们互不相关）。
+        let raise_floor_targets = raise_floor_targets_for(node, &parameters);
+        if raise_floor_targets.is_empty() {
+            summary.raise_floor_history_nodes_without_room += 1;
+        }
 
         // Φ1「外加空集」：每个节点一次，不注入任何故障时 op1 = mount_writable 是不是自然触发
         // （物理绕环等非注入原因）。故障数固定为 `FaultSeverity::Empty.fault_count()` = 0。
@@ -2214,6 +2815,210 @@ fn run_ledger_fault_family(geometry: &Geometry) -> LedgerFaultFamilySummary {
                                         .or_insert(0) += 1;
                                 }
                             }
+
+                            // 候选 (b) 分配记录树指称「从内容树反推占用集合」（session s6 修订项 5 提的操作化）：
+                            // 不重读这一格被注入的分配记录树节点本身，改走中央映射树（不受这一格故障影响，
+                            // Φ1 只挡树表或分配记录树那一个单元）。孪生镜像上各自独立算出两个集合再比对，
+                            // fault_targets 完全不参与这一支（这正是它不重读目标节点的证据）。
+                            let pristine_unreleased = allocation_records_under_root(
+                                &plain_devices,
+                                &record,
+                            )
+                            .map(|records| {
+                                records
+                                    .iter()
+                                    .filter(|allocation_record| !allocation_record.is_released)
+                                    .map(|allocation_record| {
+                                        (allocation_record.device.0, allocation_record.slot.0)
+                                    })
+                                    .collect::<BTreeSet<(u32, u64)>>()
+                            });
+                            let from_content_trees =
+                                allocation_record_tree_reachable_placements_via_central_mapping(
+                                    &plain_devices,
+                                    &record,
+                                );
+                            let outcome = match (pristine_unreleased, from_content_trees) {
+                                (Ok(pristine_set), Ok(mapped_set)) => {
+                                    if mapped_set == pristine_set {
+                                        "matches_pristine"
+                                    } else {
+                                        "unequal"
+                                    }
+                                }
+                                (Ok(_), Err(_)) => "central_mapping_unreadable",
+                                (Err(_), _) => "pristine_unreadable",
+                            };
+                            *summary
+                                .allocation_record_tree_from_content_trees_outcomes
+                                .entry(outcome)
+                                .or_insert(0) += 1;
+
+                            // 同上，session s8「走全」版本：与上面完全并行的第二次独立比对，同一个
+                            // (pristine_unreleased 再算一次, all_structural_trees) 对，gating 条件
+                            // 逐字相同，好让两个 outcome 表的分母可以直接对齐比较。
+                            let pristine_records_again =
+                                allocation_records_under_root(&plain_devices, &record);
+                            let pristine_unreleased_again =
+                                pristine_records_again.as_ref().map(|records| {
+                                    records
+                                        .iter()
+                                        .filter(|allocation_record| !allocation_record.is_released)
+                                        .map(|allocation_record| {
+                                            (allocation_record.device.0, allocation_record.slot.0)
+                                        })
+                                        .collect::<BTreeSet<(u32, u64)>>()
+                                });
+                            let from_all_structural_trees =
+                                allocation_record_tree_reachable_placements_via_all_structural_trees(
+                                    &plain_devices,
+                                    &record,
+                                );
+                            let all_structural_outcome =
+                                match (&pristine_unreleased_again, &from_all_structural_trees) {
+                                    (Ok(pristine_set), Ok(mapped_set)) => {
+                                        if mapped_set == pristine_set {
+                                            "matches_pristine"
+                                        } else if mapped_set.is_superset(pristine_set) {
+                                            "superset_of_pristine"
+                                        } else if mapped_set.is_subset(pristine_set) {
+                                            "subset_of_pristine"
+                                        } else {
+                                            "unequal_neither_subset_nor_superset"
+                                        }
+                                    }
+                                    (Ok(_), Err(_)) => "structural_trees_unreadable",
+                                    (Err(_), _) => "pristine_unreadable",
+                                };
+                            *summary
+                                .allocation_record_tree_from_all_structural_trees_outcomes
+                                .entry(all_structural_outcome)
+                                .or_insert(0) += 1;
+
+                            // session s9：171 格里的差集逐项归类（见 `classify_diff_pair` 文档注）。
+                            if all_structural_outcome == "subset_of_pristine" {
+                                if let (Ok(pristine_set), Ok(mapped_set), Ok(raw_records)) = (
+                                    &pristine_unreleased_again,
+                                    &from_all_structural_trees,
+                                    &pristine_records_again,
+                                ) {
+                                    for pair in pristine_set.difference(mapped_set) {
+                                        let label = classify_diff_pair(
+                                            &plain_devices,
+                                            &record,
+                                            allocation_locations.as_ref().ok().copied(),
+                                            raw_records,
+                                            *pair,
+                                        );
+                                        *summary
+                                            .subset_diff_pairs
+                                            .entry((pair.0, pair.1, label))
+                                            .or_insert(0) += 1;
+
+                                        // 根因排查②：这个落点的分配记录代、这个被抛弃根自己的 txg，
+                                        // 以及它是否在任何一条可读根**自己的**中央映射树里也出现过
+                                        // （出现过 ⇒ 它曾是某条根的当前内容，现在只是被更晚的版本
+                                        // 换下、还没被释放，不是遗漏了某种结构树）。
+                                        let generation = raw_records
+                                            .iter()
+                                            .find(|candidate| {
+                                                (candidate.device.0, candidate.slot.0) == *pair
+                                            })
+                                            .map(|candidate| candidate.generation.0)
+                                            .unwrap_or(u64::MAX);
+                                        let referenced_elsewhere = readable.iter().any(
+                                            |&candidate_root| {
+                                                root_record_of(
+                                                    &node.pool,
+                                                    &pool_geometry,
+                                                    candidate_root,
+                                                )
+                                                .and_then(|candidate_record| {
+                                                    allocation_record_tree_reachable_placements_via_central_mapping(
+                                                        &plain_devices,
+                                                        &candidate_record,
+                                                    )
+                                                    .ok()
+                                                })
+                                                .is_some_and(|mapped| mapped.contains(pair))
+                                            },
+                                        );
+                                        let context = summary
+                                            .subset_diff_pair_context
+                                            .entry((pair.0, pair.1))
+                                            .or_insert((
+                                                generation,
+                                                generation,
+                                                record.checkpoint_txg.0,
+                                                record.checkpoint_txg.0,
+                                                referenced_elsewhere,
+                                            ));
+                                        context.0 = context.0.min(generation);
+                                        context.1 = context.1.max(generation);
+                                        context.2 = context.2.min(record.checkpoint_txg.0);
+                                        context.3 = context.3.max(record.checkpoint_txg.0);
+                                        context.4 |= referenced_elsewhere;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 候选 (b) 树表指称「crates 有路」子分支（跑前登记 5.2 ②）：只在树表指称、
+                        // op1 = mount_writable 时做一次，两种 verify_named_units 都跑。
+                        if aspect == LedgerAspect::TreeTable
+                            && matches!(kind, FaultedOperationKind::MountWritable)
+                        {
+                            for verify_named_units in [true, false] {
+                                let outcome = tree_table_crates_has_a_path(
+                                    node,
+                                    fixed_geometry,
+                                    &fault_targets,
+                                    &pool_geometry,
+                                    abandoned_root,
+                                    &record,
+                                    verify_named_units,
+                                );
+                                *summary
+                                    .tree_table_crates_has_a_path_outcomes
+                                    .entry((verify_named_units, outcome.label()))
+                                    .or_insert(0) += 1;
+                            }
+                        }
+                    }
+
+                    // session s10（岔路单第 1 行 op1 第三种变体，「抬 F 那一处单独一行」——跑前登记
+                    // Q1-1c 原文）：这一支不并进上面的 `faulted_operation_kinds`/`summary.pairs`——
+                    // 候选 (a) 的 A1 副本按 5.2 原文不改 `raise_rollback_floor`，混进同一组计数会让
+                    // Q1-1a/b 的既有读数（session s3–s9 已经坐实）掺进一个定义上不同的入口点。
+                    for &target_floor in &raise_floor_targets {
+                        let kind =
+                            FaultedOperationKind::MountWritableThenRaiseFloorTo(target_floor);
+                        summary.faulted_operation_kinds_tried.insert(kind.label());
+                        let attempt = attempt_faulted_operation(
+                            node,
+                            &parameters,
+                            fixed_geometry,
+                            &kind,
+                            &fault_targets,
+                        );
+                        summary.raise_floor_pairs += 1;
+                        let key = (aspect.label(), severity.label());
+                        let entry = summary
+                            .raise_floor_by_aspect_severity
+                            .entry(key)
+                            .or_insert((0, 0));
+                        entry.1 += 1;
+                        if let Some(count) = attempt.abandoned_roots_unreadable {
+                            if count > 0 {
+                                summary.raise_floor_trigger_count += 1;
+                                entry.0 += 1;
+                            }
+                        }
+                        if let Some(member) = &attempt.error_member {
+                            *summary
+                                .raise_floor_error_members
+                                .entry(member.clone())
+                                .or_insert(0) += 1;
                         }
                     }
                 }
@@ -2268,6 +3073,27 @@ fn emit_ledger_fault_family_summary(geometry: &Geometry, summary: &LedgerFaultFa
             geometry.label
         ));
     }
+    // session s10（岔路单第 1 行 op1 第三种变体，跑前登记 Q1-1c 原文「抬 F 那一处单独一行」）：
+    // 单独一组名字（`raise_floor`），不与上面 mount_writable/mount_rollback 那两种 op1 的
+    // q1_1a_trigger_summary/q1_1a_by_aspect_severity/q1_1c_error_member 合并。
+    emit_result(&format!(
+        "name=q1_1a_raise_floor_trigger_summary geometry={} pairs={} trigger_count={} history_nodes_without_room={}",
+        geometry.label,
+        summary.raise_floor_pairs,
+        summary.raise_floor_trigger_count,
+        summary.raise_floor_history_nodes_without_room
+    ));
+    for ((aspect, severity), (trigger, pairs)) in &summary.raise_floor_by_aspect_severity {
+        emit_result(&format!(
+            "name=q1_1a_raise_floor_by_aspect_severity geometry={} aspect={aspect} severity={severity} pairs={pairs} trigger={trigger}"
+        , geometry.label));
+    }
+    for (member, count) in &summary.raise_floor_error_members {
+        emit_result(&format!(
+            "name=q1_1c_raise_floor_error_member geometry={} member={member} count={count}",
+            geometry.label
+        ));
+    }
     for (outcome, count) in &summary.allocation_record_tree_recompute_outcomes {
         emit_result(&format!(
             "name=q1_2_allocation_record_tree geometry={} outcome={outcome} count={count}",
@@ -2286,6 +3112,24 @@ fn emit_ledger_fault_family_summary(geometry: &Geometry, summary: &LedgerFaultFa
         summary.tree_table_has_copy_elsewhere_count,
         summary.tree_table_no_copy_elsewhere_count
     ));
+    for ((verify_named_units, outcome), count) in &summary.tree_table_crates_has_a_path_outcomes {
+        emit_result(&format!(
+            "name=q1_2_tree_table_crates_has_a_path geometry={} verify_named_units={verify_named_units} outcome={outcome} count={count}",
+            geometry.label
+        ));
+    }
+    for (outcome, count) in &summary.allocation_record_tree_from_content_trees_outcomes {
+        emit_result(&format!(
+            "name=q1_2_allocation_record_tree_from_content_trees geometry={} outcome={outcome} count={count}",
+            geometry.label
+        ));
+    }
+    for (outcome, count) in &summary.allocation_record_tree_from_all_structural_trees_outcomes {
+        emit_result(&format!(
+            "name=q1_2_allocation_record_tree_from_all_structural_trees geometry={} outcome={outcome} count={count}",
+            geometry.label
+        ));
+    }
     emit_result(&format!(
         "name=q1_3_persistence_cost_values geometry={} values={:?}",
         geometry.label, summary.persistence_cost_values
@@ -2296,6 +3140,43 @@ fn emit_ledger_fault_family_summary(geometry: &Geometry, summary: &LedgerFaultFa
         summary.rejected_zero_device_bytes,
         summary.rejected_nonzero_device_bytes
     ));
+    // session s9：171 格 subset_of_pristine 的差集逐项归类——先按 (设备, 槽, 标签) 去重打一行，
+    // 再按标签汇总出现次数，两张表合起来就是「逐个打出来 + 各属于哪种结构」。
+    let mut label_totals: BTreeMap<&'static str, u64> = BTreeMap::new();
+    for ((device, slot, label), occurrences) in &summary.subset_diff_pairs {
+        emit_result(&format!(
+            "name=q1_2_subset_diff_pair geometry={} device={device} slot={slot} label={label} occurrences={occurrences}",
+            geometry.label
+        ));
+        *label_totals.entry(label).or_insert(0) += occurrences;
+    }
+    for (label, total) in &label_totals {
+        emit_result(&format!(
+            "name=q1_2_subset_diff_label_total geometry={} label={label} occurrences={total}",
+            geometry.label
+        ));
+    }
+    emit_result(&format!(
+        "name=q1_2_subset_diff_distinct_pairs geometry={} distinct_pairs={}",
+        geometry.label,
+        summary.subset_diff_pairs.len()
+    ));
+    for (
+        (device, slot),
+        (
+            minimum_generation,
+            maximum_generation,
+            minimum_abandoned_root_txg,
+            maximum_abandoned_root_txg,
+            referenced_elsewhere,
+        ),
+    ) in &summary.subset_diff_pair_context
+    {
+        emit_result(&format!(
+            "name=q1_2_subset_diff_pair_context geometry={} device={device} slot={slot} minimum_generation={minimum_generation} maximum_generation={maximum_generation} minimum_abandoned_root_txg={minimum_abandoned_root_txg} maximum_abandoned_root_txg={maximum_abandoned_root_txg} referenced_by_some_readable_roots_own_mapping={referenced_elsewhere}",
+            geometry.label
+        ));
+    }
 }
 
 /// PC1-a / PC1-b（跑前登记 5.2 阳性对照）：H1 族按固定次序（`overwrites_before_rollback` 升序、
@@ -2388,6 +3269,36 @@ fn run_ledger_fault_positive_controls(geometry: &Geometry) {
                 allocation_attempt.error_debug,
                 allocation_total_bytes
             ));
+
+            // session s9（岔路单第 1 行还差项④，8.1「持续故障下 op1 及其后两次挂载各一个值；瞬时
+            // 故障下 op1 一个值、后两次（不注入）各一个值」）：用 PC1-a 已经选中的这同一个
+            // (历史, 被抛弃根, 分配记录树单元, 两份都读失败) 当轨迹的起点——`allocation_attempt`
+            // 已经证明这一格会触发，是这条轨迹天然、可复现的落点，不另挑一个未经验证的构造。
+            let persistent_trajectory = mount_writable_trajectory(
+                &node.pool,
+                &parameters,
+                fixed_geometry,
+                &allocation_fault_targets,
+                true,
+                3,
+            );
+            emit_result(&format!(
+                "name=q1_1a_op1_trajectory geometry={} mode=persistent trajectory={:?}",
+                geometry.label, persistent_trajectory
+            ));
+            let transient_trajectory = mount_writable_trajectory(
+                &node.pool,
+                &parameters,
+                fixed_geometry,
+                &allocation_fault_targets,
+                false,
+                3,
+            );
+            emit_result(&format!(
+                "name=q1_1a_op1_trajectory geometry={} mode=transient trajectory={:?}",
+                geometry.label, transient_trajectory
+            ));
+
             let pristine_allocation =
                 allocation_records_under_root(&plain_devices, &record).map(|records| {
                     records
@@ -2507,16 +3418,28 @@ fn run_ledger_fault_positive_controls(geometry: &Geometry) {
 //    择根无影响，跳过不改变这两条臂的搜索结果）、PC2 阳性对照（需要给每条臂的副本加一个只供本实验的
 //    环境变量开关，属于另一块工程量）、n2=2、n1>3。这一段只做：H2 主族（op2=`mount_writable`）在
 //    n1 ∈ {0,1,2,3}、n2=1 上、Φ2 = {根环槽, journal 记录} 两类证据的穷举下界。
+//
+//    session s8 补：系统配置证据项这一类补上了（`evidence_items_at` 新增
+//    `include_system_configuration_slots` 开关），但仍然**只在开关打开时**才进 Φ2——甲-txg、丙、
+//    今天（=甲-jsn）三条臂不读系统配置，开着这个开关也不会改变它们的搜索结果，只会白白扩大穷举
+//    空间；`run_rootback_tolerance_family`（既有六份副本用的那个）与 `search_minimum_weight_that_
+//    triggers_rootback` 的既有调用点都仍传 `false`，行为逐字节不变。新增
+//    `run_rootback_tolerance_family_with_system_configuration_evidence` 只在读系统配置的三条臂
+//    （乙-留环、丁-留环、丁-只配置）上跑。
 // ============================================================================
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum EvidenceKind {
     RootRingSlot,
     JournalRecord,
+    /// session s8 补的第三类（跑前登记 5.1「每块盘上每个自证的系统配置槽（权重 1）」）：只在
+    /// `evidence_items_at` 的 `include_system_configuration_slots` 打开时才会出现。
+    SystemConfigurationSlot,
 }
 
 /// Φ2 的一个证据项：根环槽权重恒 1（根环每个区域第一版只住一块盘，D22（单元原子性怎么合成） 已定项 16
-/// 第 4 条）；journal 记录的权重 = 它当下自证过的份数（`targets.len()`，不注入时通常 2）。
+/// 第 4 条）；journal 记录的权重 = 它当下自证过的份数（`targets.len()`，不注入时通常 2）；系统配置槽
+/// 权重恒 1（每个 (设备, 槽) 各自一份，不像根环槽那样跨盘）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct EvidenceItem {
     kind: EvidenceKind,
@@ -2524,9 +3447,27 @@ struct EvidenceItem {
     targets: Vec<(DeviceIdentity, DeviceOffsetInBytes)>,
 }
 
+/// 系统配置槽第 0、1 槽各自在两块盘上的 (设备, 槽号, 偏移)：槽 0 恒在偏移 0，槽 1 在偏移
+/// `slot_spacing`（`PoolGeometry` 已经把它解出来了，D2（RAID 条带策略） 已定项 19：
+/// `max(4096, mkfs 时探测的 io_min)`，池级一个值，两块盘同一个槽距）；固定两块盘（这个实验全程
+/// devs=2），不看几何里的 `regions`。
+fn system_configuration_slot_positions(slot_spacing: u64) -> [(u32, u64, u64); 4] {
+    [
+        (0, 0, 0),
+        (0, 1, slot_spacing),
+        (1, 0, 0),
+        (1, 1, slot_spacing),
+    ]
+}
+
 /// op2 那一刻不注入的孪生镜像上的证据项：根环里每个存着自证根的槽，加上 journal 环里每一条至少一份
-/// 自证的记录。系统配置槽这一类跳过（见本节顶部说明）。
-fn evidence_items_at(pool: &MemoryPool, geometry: &PoolGeometry) -> Vec<EvidenceItem> {
+/// 自证的记录；`include_system_configuration_slots` 打开时再加每块盘上每个自证过的系统配置槽
+/// （跑前登记 5.1 Φ2 定义的第三类，session s8 补——关着时行为与 s4/s6 逐字节不变，见本节顶部说明）。
+fn evidence_items_at(
+    pool: &MemoryPool,
+    geometry: &PoolGeometry,
+    include_system_configuration_slots: bool,
+) -> Vec<EvidenceItem> {
     let mut items = Vec::new();
     let valid_roots = checker_image::valid_roots(pool, geometry);
     let positions = checker_image::root_slot_positions(geometry);
@@ -2568,32 +3509,54 @@ fn evidence_items_at(pool: &MemoryPool, geometry: &PoolGeometry) -> Vec<Evidence
             });
         }
     }
+    if include_system_configuration_slots {
+        let slot_bytes =
+            usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+        for (device_number, slot_index, offset) in
+            system_configuration_slot_positions(geometry.slot_spacing)
+        {
+            if let Some(bytes) = pool.read(device_number, offset, slot_bytes) {
+                if singlefs_checker::check_system_configuration_slot(&bytes).is_ok() {
+                    items.push(EvidenceItem {
+                        kind: EvidenceKind::SystemConfigurationSlot,
+                        label: format!("configuration(device={device_number},slot={slot_index})"),
+                        targets: vec![(DeviceIdentity(device_number), DeviceOffsetInBytes(offset))],
+                    });
+                }
+            }
+        }
+    }
     items
 }
 
-/// 权重恰为 `weight` 的证据项子集：根槽（权重 1）取 `root_count` 个、记录（权重 2，见
-/// `evidence_items_at` 里 `targets` 恒两份）取 `record_count` 个，`root_count + 2 * record_count
-/// = weight`，逐个 `record_count` 值把两边的组合叉乘。
+/// 权重恰为 `weight` 的证据项子集：权重恒 1 的那一批（根槽；`include_system_configuration_slots`
+/// 打开时系统配置槽也并进这一批，两类都是权重 1，对这个函数的组合算术没有分别）取
+/// `weight_one_count` 个、记录（权重 2，见 `evidence_items_at` 里 `targets` 恒两份）取
+/// `record_count` 个，`weight_one_count + 2 * record_count = weight`，逐个 `record_count` 值把
+/// 两边的组合叉乘。
 fn candidate_fault_sets_of_weight(
-    root_slot_items: &[EvidenceItem],
+    weight_one_items: &[EvidenceItem],
     journal_record_items: &[EvidenceItem],
     weight: u64,
 ) -> Vec<Vec<EvidenceItem>> {
     let mut candidates = Vec::new();
     let mut record_count = 0u64;
     while record_count * 2 <= weight {
-        let root_count = weight - record_count * 2;
-        if let (Ok(root_count), Ok(record_count_usize)) =
-            (usize::try_from(root_count), usize::try_from(record_count))
-        {
-            if root_count <= root_slot_items.len()
+        let weight_one_count = weight - record_count * 2;
+        if let (Ok(weight_one_count), Ok(record_count_usize)) = (
+            usize::try_from(weight_one_count),
+            usize::try_from(record_count),
+        ) {
+            if weight_one_count <= weight_one_items.len()
                 && record_count_usize <= journal_record_items.len()
             {
-                for root_combination in combinations_of_size(root_slot_items, root_count) {
+                for weight_one_combination in
+                    combinations_of_size(weight_one_items, weight_one_count)
+                {
                     for record_combination in
                         combinations_of_size(journal_record_items, record_count_usize)
                     {
-                        let mut combination = root_combination.clone();
+                        let mut combination = weight_one_combination.clone();
                         combination.extend(record_combination.iter().cloned());
                         candidates.push(combination);
                     }
@@ -2777,7 +3740,9 @@ fn judge_recovery_outcome(
             (true, "ok".to_string())
         }
         RecoveryOutcome::NoFile { .. } if expected_content.is_none() => (true, "ok".to_string()),
-        _ => (
+        RecoveryOutcome::NoFile { .. }
+        | RecoveryOutcome::FileRead { .. }
+        | RecoveryOutcome::Failed { .. } => (
             false,
             format!("{label}: 读不回 outcome={outcome:?} expected={expected_content:?}"),
         ),
@@ -2833,7 +3798,9 @@ fn evaluate_rootback_predicate(
                         RecoveryOutcome::NoFile { .. } if expected_content.is_none() => {
                             (true, "ok".to_string())
                         }
-                        other => (
+                        other @ (RecoveryOutcome::NoFile { .. }
+                        | RecoveryOutcome::FileRead { .. }
+                        | RecoveryOutcome::Failed { .. }) => (
                             false,
                             format!(
                                 "unfaulted_mount_writable_then_recover: 读不回 outcome={other:?} expected={expected_content:?}"
@@ -2856,30 +3823,56 @@ struct RootbackToleranceSearchOutcome {
     /// 打中这一权重的第一个子集，按各证据项的 `label` 记（跑前登记 5.1「记下这一权重上打中的子集
     /// 个数与第一个子集」）。
     first_hit_combination_labels: Vec<String>,
+    /// 这一次搜索实际枚举过的子集总数（各完整权重档累计；从不在某一档中途停，见函数文档）。
     subsets_tried: u64,
-    capped_without_a_hit: bool,
+    /// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行还差项②）：搜到的最高一档权重，
+    /// 与 `weight_at_first_hit`/`stopped_by_weight_ceiling` 一起读——三者合起来就是
+    /// 「穷举到权重几」的完整交代，不许只报一个「capped」布尔值把这句话吞掉。
+    highest_weight_examined: u64,
+    /// 因为传了 `weight_ceiling` 而在权重档边界（不是档中途）停下、且这一档还没有打中、且没有到
+    /// `maximum_weight`（还有没搜到的档）。真时这一行必须同时报 `full_space_subset_count` 与
+    /// `highest_weight_examined`，不许只写「capped」三个字。
+    stopped_by_weight_ceiling: bool,
     rootback_probe_failures: u64,
     overwrite_failures: u64,
-    /// 这个模板 Φ2（根槽 + journal 记录两类）的证据项权重之和：`weight_at_first_hit` 为
-    /// `None` 且 `capped_without_a_hit` 为假时，说明穷举已经走完全部权重都没有打中——
-    /// 这个数就是「这个模板最多能凑出多大的故障集合」，交回报告解释「没打中」是不是因为
-    /// 证据本来就不够多。
+    /// 这个模板 Φ2（根槽 + journal 记录两类，`include_system_configuration_slots` 打开时再加系统
+    /// 配置槽）的证据项权重之和：`weight_at_first_hit` 为 `None` 且 `stopped_by_weight_ceiling` 为假
+    /// 时，说明穷举已经走完全部权重都没有打中——这个数就是「这个模板最多能凑出多大的故障集合」，
+    /// 交回报告解释「没打中」是不是因为证据本来就不够多。
     maximum_weight: u64,
+    /// 完整证据空间的子集总数 = 2^(权重一类证据项数 + 权重二类证据项数)——不管这次搜索实际走到
+    /// 哪一档，这个数恒报，回答「完整空间多大」（`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行
+    /// 还差项②逐字要求：「先对每个 n1 算出完整证据空间的子集数」）。
+    full_space_subset_count: u64,
 }
 
-/// Q2-1 的穷举下界：按总权重从小到大枚举 Φ2 子集，同权重内全枚举，打中就停；一个模板至多枚举
-/// `SUBSET_ENUMERATION_CAP` 个子集。
+/// Q2-1 的穷举下界：按总权重从小到大枚举 Φ2 子集，**同权重内全枚举、只在权重档的边界上决定停不停**
+/// （不在一档中途停——`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行还差项②：「这类故障、崩溃点的
+/// 枚举不为省时间缩范围……不许靠计数上限静默截断」）。`weight_ceiling` 为 `None` 时穷举到
+/// `maximum_weight`（完整证据空间的最高一档，等价于穷举完整个 2^N 子集空间）；为 `Some(w)` 时最多穷举
+/// 到权重 `w`（这一档仍然全枚举完才停，不掐在档中途），调用方要在结果行里同时报
+/// `full_space_subset_count`（完整空间多大）与 `highest_weight_examined`（穷举到权重几），不许只写
+/// 「capped」。`include_system_configuration_slots` 打开时 Φ2 加上跑前登记 5.1 的第三类证据
+/// （session s8）；既有调用点都传 `false`，行为不变（见十三节顶部说明）。
 fn search_minimum_weight_that_triggers_rootback(
     node_before_rootback_probe: &SimNode,
     parameters: &MakeFilesystemParameters,
     geometry_view: &PoolGeometry,
     overwrites_after_the_rootback_probe: u64,
-    subset_enumeration_cap: u64,
+    weight_ceiling: Option<u64>,
+    include_system_configuration_slots: bool,
 ) -> RootbackToleranceSearchOutcome {
-    let items = evidence_items_at(&node_before_rootback_probe.pool, geometry_view);
-    let root_slot_items: Vec<EvidenceItem> = items
+    let items = evidence_items_at(
+        &node_before_rootback_probe.pool,
+        geometry_view,
+        include_system_configuration_slots,
+    );
+    let weight_one_items: Vec<EvidenceItem> = items
         .iter()
-        .filter(|item| item.kind == EvidenceKind::RootRingSlot)
+        .filter(|item| {
+            item.kind == EvidenceKind::RootRingSlot
+                || item.kind == EvidenceKind::SystemConfigurationSlot
+        })
         .cloned()
         .collect();
     let journal_record_items: Vec<EvidenceItem> = items
@@ -2887,43 +3880,41 @@ fn search_minimum_weight_that_triggers_rootback(
         .filter(|item| item.kind == EvidenceKind::JournalRecord)
         .cloned()
         .collect();
-    let maximum_weight = u64::try_from(root_slot_items.len()).expect("证据项数装得进 u64")
-        + 2 * u64::try_from(journal_record_items.len()).expect("证据项数装得进 u64");
+    let weight_one_count = u64::try_from(weight_one_items.len()).expect("证据项数装得进 u64");
+    let journal_record_count =
+        u64::try_from(journal_record_items.len()).expect("证据项数装得进 u64");
+    let maximum_weight = weight_one_count + 2 * journal_record_count;
+    // 完整证据空间的子集总数 = 2^(权重一类证据项数 + 权重二类证据项数)：每一类证据项各自「选或不选」
+    // 独立自由，乘起来就是整棵幂集，与按权重分档遍历是同一个空间的两种数法（分档遍历把它切成
+    // maximum_weight+1 个互斥的档，各档之和恰等于这个数——这条恒等式本身也是「没有静默漏掉子集」的
+    // 一个自证）。
+    let total_items = weight_one_count + journal_record_count;
+    let full_space_subset_count = 1u64
+        .checked_shl(u32::try_from(total_items).unwrap_or(u32::MAX))
+        .unwrap_or(u64::MAX);
+    // 调用方显式给了权重上限就用它（截到 `maximum_weight` 之内，超过等于不设上限）；没给时，完整
+    // 空间装得进预算就穷举到底，装不进就退到 `DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE`（权重 12）——
+    // 这一步判断本身也在结果里报出来（`RootbackToleranceSearchOutcome::full_space_subset_count` 与
+    // `highest_weight_examined`），不是又一层静默截断。
+    let effective_ceiling = match weight_ceiling {
+        Some(explicit) => explicit.min(maximum_weight),
+        None if full_space_subset_count <= FEASIBLE_FULL_SEARCH_SUBSET_BUDGET => maximum_weight,
+        None => DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE.min(maximum_weight),
+    };
 
     let mut subsets_tried = 0u64;
     let mut rootback_probe_failures = 0u64;
     let mut overwrite_failures = 0u64;
     let mut weight = 0u64;
     loop {
-        if weight > maximum_weight {
-            return RootbackToleranceSearchOutcome {
-                weight_at_first_hit: None,
-                hit_count_at_that_weight: 0,
-                first_hit_combination_labels: Vec::new(),
-                subsets_tried,
-                capped_without_a_hit: false,
-                rootback_probe_failures,
-                overwrite_failures,
-                maximum_weight,
-            };
-        }
+        // 每一档都全枚举完才检查停不停——不在 `for combination in &candidates` 中途插入计数检查，
+        // 这正是「不许靠计数上限静默截断」要求的：停只停在档的边界上，且停的理由（到顶/到穷举上限）
+        // 与这一档、这一次穷举到的最高权重一起报出去，不许只留一个 `capped` 布尔值。
         let candidates =
-            candidate_fault_sets_of_weight(&root_slot_items, &journal_record_items, weight);
+            candidate_fault_sets_of_weight(&weight_one_items, &journal_record_items, weight);
         let mut hit_count = 0u64;
         let mut first_hit_combination_labels: Vec<String> = Vec::new();
         for combination in &candidates {
-            if subsets_tried >= subset_enumeration_cap {
-                return RootbackToleranceSearchOutcome {
-                    weight_at_first_hit: None,
-                    hit_count_at_that_weight: 0,
-                    first_hit_combination_labels: Vec::new(),
-                    subsets_tried,
-                    capped_without_a_hit: true,
-                    rootback_probe_failures,
-                    overwrite_failures,
-                    maximum_weight,
-                };
-            }
             subsets_tried += 1;
             let fault_targets: Vec<(DeviceIdentity, DeviceOffsetInBytes)> = combination
                 .iter()
@@ -2969,10 +3960,26 @@ fn search_minimum_weight_that_triggers_rootback(
                 hit_count_at_that_weight: hit_count,
                 first_hit_combination_labels,
                 subsets_tried,
-                capped_without_a_hit: false,
+                highest_weight_examined: weight,
+                stopped_by_weight_ceiling: false,
                 rootback_probe_failures,
                 overwrite_failures,
                 maximum_weight,
+                full_space_subset_count,
+            };
+        }
+        if weight >= effective_ceiling {
+            return RootbackToleranceSearchOutcome {
+                weight_at_first_hit: None,
+                hit_count_at_that_weight: 0,
+                first_hit_combination_labels: Vec::new(),
+                subsets_tried,
+                highest_weight_examined: weight,
+                stopped_by_weight_ceiling: weight < maximum_weight,
+                rootback_probe_failures,
+                overwrite_failures,
+                maximum_weight,
+                full_space_subset_count,
             };
         }
         weight += 1;
@@ -2983,9 +3990,27 @@ fn search_minimum_weight_that_triggers_rootback(
 /// op2 = `mount_writable`（受注入）→ 成功则 n2 次覆盖写 → 关闭 → 判 P331。n1 ∈ {0,...,6}（登记要求
 /// 的全范围，2026-09-24 session s5 从 {0,1,2,3} 补齐——上一段只跑到 3 是挂钟预算，不是构造上限；
 /// 另加 H2-R 的 `mount_rollback` 变体与 H2c 崩溃档，这两个仍没做，见交回报告「它答不了的」）。
-fn run_rootback_tolerance_family(geometry: &Geometry, overwrites_after_the_rootback_probe: u64) {
+/// `include_system_configuration_slots`：session s8 补的开关，打开时 Φ2 加系统配置槽这一类证据、
+/// 结果行改名 `q2_1_minimum_weight_with_configuration_evidence`（不与既有六份副本已经跑过的
+/// `q2_1_minimum_weight` 混在一起）；关着时逐字节复现既有调用点的行为。
+/// `overwrites_before_the_rootback_probe_range`：n1 的取值区间（跑前登记要求 {0,...,6} 全范围）；
+/// session s8 把它从写死的 `0..=6` 拆成参数，只为了能把一次挂钟预算装不下的全范围拆成几次跑
+/// （见 `main` 里 `q2-1-g0-configuration-evidence` 的可选命令行参数）——不改判据、不改任何一个 n1
+/// 值本身怎么算，只改跑哪几个 n1。既有调用点仍传 `0..=6`，行为不变。
+fn run_rootback_tolerance_family(
+    geometry: &Geometry,
+    overwrites_after_the_rootback_probe: u64,
+    include_system_configuration_slots: bool,
+    overwrites_before_the_rootback_probe_range: std::ops::RangeInclusive<u64>,
+    weight_ceiling: Option<u64>,
+) {
     let parameters = parameters_for(geometry);
-    for overwrites_before_the_rootback_probe in 0u64..=6 {
+    let result_name = if include_system_configuration_slots {
+        "q2_1_minimum_weight_with_configuration_evidence"
+    } else {
+        "q2_1_minimum_weight"
+    };
+    for overwrites_before_the_rootback_probe in overwrites_before_the_rootback_probe_range {
         let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
             Ok(node) => node,
             Err(error) => {
@@ -3011,25 +4036,27 @@ fn run_rootback_tolerance_family(geometry: &Geometry, overwrites_after_the_rootb
             &parameters,
             &geometry_view,
             overwrites_after_the_rootback_probe,
-            SUBSET_ENUMERATION_CAP,
+            weight_ceiling,
+            include_system_configuration_slots,
         );
         match outcome.weight_at_first_hit {
             Some(weight) => emit_result(&format!(
-                "name=q2_1_minimum_weight geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min={weight} hit_count_at_that_weight={} first_hit_combination={:?} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
+                "name={result_name} geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min={weight} hit_count_at_that_weight={} first_hit_combination={:?} subsets_tried={} full_space_subset_count={} rootback_probe_failures={} overwrite_failures={}",
                 geometry.label,
                 outcome.hit_count_at_that_weight,
                 outcome.first_hit_combination_labels,
                 outcome.subsets_tried,
+                outcome.full_space_subset_count,
                 outcome.rootback_probe_failures,
                 outcome.overwrite_failures
             )),
-            None if outcome.capped_without_a_hit => emit_result(&format!(
-                "name=q2_1_minimum_weight geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min=capped subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
-                geometry.label, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
+            None if outcome.stopped_by_weight_ceiling => emit_result(&format!(
+                "name={result_name} geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min=not_found_up_to_weight_ceiling highest_weight_examined={} maximum_weight_available={} full_space_subset_count={} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
+                geometry.label, outcome.highest_weight_examined, outcome.maximum_weight, outcome.full_space_subset_count, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
             )),
             None => emit_result(&format!(
-                "name=q2_1_minimum_weight geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min=none_found_within_full_evidence_space maximum_weight_available={} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
-                geometry.label, outcome.maximum_weight, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
+                "name={result_name} geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe={overwrites_after_the_rootback_probe} k_min=none_found_within_full_evidence_space maximum_weight_available={} full_space_subset_count={} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
+                geometry.label, outcome.maximum_weight, outcome.full_space_subset_count, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
             )),
         }
     }
@@ -3269,6 +4296,537 @@ fn run_positive_control_for_the_configuration_published_txg_candidate(geometry: 
     ));
 }
 
+/// H-C1 直接构造（判决 K2 给丙的具体历史，`m2-rootchoice-repair-r1-main-verification.md:50`：
+/// 「12 个」= 4 根槽 + 4 条记录各在两块盘上都读不出，总权重 4×1 + 4×2 = 12）。丙 = 今天的
+/// `first_txg_of_new_instance`，同时取根环与记录两路的 max（`mount.rs` 的
+/// `highest_ring_txg.max(highest_record_txg)`）——只挡根环（甲-txg 那种攻法）挡不住它：记录那一路
+/// 会把真实的 tip txg 重新暴露出来。这里在与甲-txg 同一段历史（n1 = 4，tip 落在顶上 4 条根槽）上，
+/// 除了精确点名顶上 4 条根槽（复用 `root_ring_slot_targets_for`，与 PC2 甲同一份坐标系），另外从
+/// `evidence_items_at` 取记录类证据项里计数器最大的 4 条（`evidence_items_at` 按 ring 槽位
+/// 0..ring_slots 递增枚举、无绕环时恰是计数器递增序，取尾部 4 条即计数器最大的 4 条），两份镜像上
+/// 各自的 (设备, 偏移) 全部拦下（每条记录 `targets.len()==2`，在不注入的孪生镜像上取到，权重恰为
+/// 2）。验证丙在这个具体构造下是否被打中，是不是恰好需要这 12 个。
+fn run_direct_construction_for_the_record_scan_watermark_candidate(geometry: &Geometry) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_record_scan_watermark geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_record_scan_watermark geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let topmost_four: BTreeSet<TimelineRoot> =
+        node.timeline.iter().rev().take(4).copied().collect();
+    let root_fault_targets = root_ring_slot_targets_for(&node.pool, &geometry_view, &topmost_four);
+    let root_target_count = root_fault_targets.len();
+
+    let evidence_items = evidence_items_at(&node.pool, &geometry_view, false);
+    let record_items: Vec<&EvidenceItem> = evidence_items
+        .iter()
+        .filter(|item| item.kind == EvidenceKind::JournalRecord)
+        .collect();
+    let top_four_records: Vec<&EvidenceItem> = record_items.iter().rev().take(4).copied().collect();
+    let top_four_record_labels: Vec<String> = top_four_records
+        .iter()
+        .map(|item| item.label.clone())
+        .collect();
+    let record_fault_targets: Vec<(DeviceIdentity, DeviceOffsetInBytes)> = top_four_records
+        .iter()
+        .flat_map(|item| item.targets.clone())
+        .collect();
+    let record_target_count = record_fault_targets.len();
+
+    let mut fault_targets = root_fault_targets;
+    fault_targets.extend(record_fault_targets);
+    let fault_target_count = fault_targets.len();
+    let fault_weight = root_target_count + 2 * top_four_records.len();
+
+    let node_after_the_faulted_mount = match attempt_a_faulted_mount_writable_and_append(
+        &node,
+        &parameters,
+        &fault_targets,
+    ) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_record_scan_watermark geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} topmost_four={topmost_four:?} record_labels={top_four_record_labels:?} root_target_count={root_target_count} record_target_count={record_target_count} fault_target_count={fault_target_count} fault_weight={fault_weight} error={error:?} stage=the_faulted_mount",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let node_after_the_confirmed_overwrite = match apply_overwrite(
+        &node_after_the_faulted_mount,
+        &parameters,
+    ) {
+        Ok(overwritten_node) => overwritten_node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_record_scan_watermark geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} topmost_four={topmost_four:?} record_labels={top_four_record_labels:?} root_target_count={root_target_count} record_target_count={record_target_count} fault_target_count={fault_target_count} fault_weight={fault_weight} error={error:?} stage=the_confirmed_overwrite",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let (hit, first_check_detail, second_check_detail) =
+        evaluate_rootback_predicate(&node_after_the_confirmed_overwrite, &parameters);
+    emit_result(&format!(
+        "name=q2_1_h_c1_record_scan_watermark geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe=1 topmost_four={topmost_four:?} record_labels={top_four_record_labels:?} root_target_count={root_target_count} record_target_count={record_target_count} fault_target_count={fault_target_count} fault_weight={fault_weight} expected_by_k2_table_fault_count=12 hit={hit} expected_by_k2_table_hit=true first_check={first_check_detail:?} second_check={second_check_detail:?}",
+        geometry.label
+    ));
+}
+
+/// H-C1 负对照：只拦 4 条根槽、不拦记录（= 甲-txg 那种攻法的目标集合），丙必须不打中——证明
+/// 「只挡根环挡不住丙」这句话，不是「随便挡够 4 个目标就够了」。
+fn run_negative_control_root_slots_only_for_the_record_scan_watermark_candidate(
+    geometry: &Geometry,
+) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_negative_control_root_slots_only geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_negative_control_root_slots_only geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let topmost_four: BTreeSet<TimelineRoot> =
+        node.timeline.iter().rev().take(4).copied().collect();
+    let fault_targets = root_ring_slot_targets_for(&node.pool, &geometry_view, &topmost_four);
+    let fault_target_count = fault_targets.len();
+    let node_after_the_faulted_mount = match attempt_a_faulted_mount_writable_and_append(
+        &node,
+        &parameters,
+        &fault_targets,
+    ) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_negative_control_root_slots_only geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} topmost_four={topmost_four:?} fault_target_count={fault_target_count} error={error:?} stage=the_faulted_mount",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let node_after_the_confirmed_overwrite = match apply_overwrite(
+        &node_after_the_faulted_mount,
+        &parameters,
+    ) {
+        Ok(overwritten_node) => overwritten_node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_negative_control_root_slots_only geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} topmost_four={topmost_four:?} fault_target_count={fault_target_count} error={error:?} stage=the_confirmed_overwrite",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let (hit, first_check_detail, second_check_detail) =
+        evaluate_rootback_predicate(&node_after_the_confirmed_overwrite, &parameters);
+    emit_result(&format!(
+        "name=q2_1_h_c1_negative_control_root_slots_only geometry={} candidate=record_scan_watermark overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe=1 topmost_four={topmost_four:?} fault_target_count={fault_target_count} expected_by_k2_table_fault_count=4 hit={hit} expected_hit=false first_check={first_check_detail:?} second_check={second_check_detail:?}",
+        geometry.label
+    ));
+}
+
+/// H-C1 下界探针（2026-09-24 session s6；session s9 改参数为 `weight_ceiling`）：直接构造（上面两个
+/// 函数）证实丙在 n1=4 这段历史上权重 12 能打中；`run_rootback_tolerance_family` 的主搜索在 n1=4 上
+/// 曾撞旧的计数上限提前停手，没有覆盖到权重 12 以下的全部组合。这里在同一个 n1=4 节点上，把
+/// `search_minimum_weight_that_triggers_rootback` 的 `weight_ceiling` 显式设成调用方给定的权重，
+/// 只为回答一个问题：穷举能不能在这一档权重内走到头（找到一个更小的命中会推翻「恰好 12」，走到权重
+/// 12 都没有命中而 12 本身打中会坐实「恰好 12」，`weight_ceiling` 传 `None` 时穷举到完整空间的顶）。
+/// 不改判据、不改臂定义，只是把已有搜索函数的一个参数换成调用方要的权重。
+fn run_record_scan_watermark_lower_bound_probe(geometry: &Geometry, weight_ceiling: Option<u64>) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_lower_bound_probe geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} weight_ceiling={weight_ceiling:?} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c1_lower_bound_probe geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} weight_ceiling={weight_ceiling:?} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let outcome = search_minimum_weight_that_triggers_rootback(
+        &node,
+        &parameters,
+        &geometry_view,
+        1,
+        weight_ceiling,
+        false,
+    );
+    match outcome.weight_at_first_hit {
+        Some(weight) => emit_result(&format!(
+            "name=q2_1_h_c1_lower_bound_probe geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} weight_ceiling={weight_ceiling:?} k_min={weight} hit_count_at_that_weight={} first_hit_combination={:?} subsets_tried={} full_space_subset_count={} rootback_probe_failures={} overwrite_failures={}",
+            geometry.label,
+            outcome.hit_count_at_that_weight,
+            outcome.first_hit_combination_labels,
+            outcome.subsets_tried,
+            outcome.full_space_subset_count,
+            outcome.rootback_probe_failures,
+            outcome.overwrite_failures
+        )),
+        None if outcome.stopped_by_weight_ceiling => emit_result(&format!(
+            "name=q2_1_h_c1_lower_bound_probe geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} weight_ceiling={weight_ceiling:?} k_min=not_found_up_to_weight_ceiling highest_weight_examined={} maximum_weight_available={} full_space_subset_count={} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
+            geometry.label, outcome.highest_weight_examined, outcome.maximum_weight, outcome.full_space_subset_count, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
+        )),
+        None => emit_result(&format!(
+            "name=q2_1_h_c1_lower_bound_probe geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} weight_ceiling={weight_ceiling:?} k_min=none_found_within_full_evidence_space maximum_weight_available={} full_space_subset_count={} subsets_tried={} rootback_probe_failures={} overwrite_failures={}",
+            geometry.label, outcome.maximum_weight, outcome.full_space_subset_count, outcome.subsets_tried, outcome.rootback_probe_failures, outcome.overwrite_failures
+        )),
+    }
+}
+
+// ============================================================================
+// 十三点六、H-C2 直接构造（session s8，岔路单第 2 行 Φ2 系统配置槽这一类证据）：
+//
+//    机制假说：`choose_system_configuration`（`crates/singlefs-core/src/recovery.rs` 第 516 行起
+//    现查）按 `reader.device_identities()` 的顺序取**第一块「至少有一份自证槽」的盘**的
+//    `best_on_device` 直接当 `chosen`——`chosen` 只在 `None` 时被赋值一次（第 559–560 行），后面的
+//    盘只核对 `filesystem_identifier` / `device_count` 一致，**不参与「取哪块盘的值」这一步**。
+//    只要把设备 0 上世代号更高的那一槽读失败，`best_on_device` 就回退到设备 0 自己世代号更旧的那
+//    一槽（两槽都自证过，见 `system_configuration_slot_positions`），`chosen` 里的 `published_txg`
+//    随之读成旧值——设备 1 上真实的新值完全不参与这一步。权重恰为 1。三个函数都用与 H-C1 相同的
+//    「append 不截断」挂载路径（`attempt_a_faulted_mount_writable_and_append`），与
+//    `run_rootback_tolerance_family_with_system_configuration_evidence` 的穷举路径
+//    （`attempt_rootback_probe_and_advance`）是两条独立的代码路径，互为校验。
+// ============================================================================
+
+/// 在孪生（不注入）镜像上找设备 0 两个槽里世代号更高的那一个：读原始字节、用
+/// `singlefs_checker::check_system_configuration_slot` 校验+解码，取 `slot_generation` 更大的那份。
+/// 两槽都读不出或都解不开 ⇒ `None`（这段历史还没轮换过第二次，构造不出，由调用方报错退出）。
+fn newest_self_certified_system_configuration_slot_on_device_zero(
+    pool: &MemoryPool,
+    slot_spacing: u64,
+) -> Option<(u64, u64)> {
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut newest: Option<(u64, u64)> = None;
+    for (device_number, slot_index, offset) in system_configuration_slot_positions(slot_spacing) {
+        if device_number != 0 {
+            continue;
+        }
+        let Some(bytes) = pool.read(device_number, offset, slot_bytes) else {
+            continue;
+        };
+        let Ok(view) = singlefs_checker::check_system_configuration_slot(&bytes) else {
+            continue;
+        };
+        if newest.is_none_or(|(_, generation)| view.slot_generation > generation) {
+            newest = Some((slot_index, view.slot_generation));
+        }
+    }
+    newest
+}
+
+/// 同上，取世代号更小（较旧）的那一份；两槽世代号相等（只轮换过一次）时交回 `None`（负对照这段
+/// 历史用不上，跳过不报错）。
+fn oldest_self_certified_system_configuration_slot_on_device_zero(
+    pool: &MemoryPool,
+    slot_spacing: u64,
+) -> Option<(u64, u64)> {
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut generations: Vec<(u64, u64)> = Vec::new();
+    for (device_number, slot_index, offset) in system_configuration_slot_positions(slot_spacing) {
+        if device_number != 0 {
+            continue;
+        }
+        let Some(bytes) = pool.read(device_number, offset, slot_bytes) else {
+            continue;
+        };
+        let Ok(view) = singlefs_checker::check_system_configuration_slot(&bytes) else {
+            continue;
+        };
+        generations.push((slot_index, view.slot_generation));
+    }
+    if generations.len() < 2 {
+        return None;
+    }
+    generations
+        .into_iter()
+        .min_by_key(|(_, generation)| *generation)
+}
+
+/// H-C2 直接构造：只把设备 0 上世代号更高的那一槽读失败（权重 1），验证机制假说描述的打中。
+fn run_direct_construction_for_the_system_configuration_evidence_class(geometry: &Geometry) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let Some((slot_index, generation)) =
+        newest_self_certified_system_configuration_slot_on_device_zero(
+            &node.pool,
+            geometry_view.slot_spacing,
+        )
+    else {
+        emit_result(&format!(
+            "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error=\"设备 0 上没有自证过的系统配置槽\" stage=find_newest_slot",
+            geometry.label
+        ));
+        return;
+    };
+    let offset = slot_index * geometry_view.slot_spacing;
+    let fault_targets = vec![(DeviceIdentity(0), DeviceOffsetInBytes(offset))];
+    let node_after_the_faulted_mount = match attempt_a_faulted_mount_writable_and_append(
+        &node,
+        &parameters,
+        &fault_targets,
+    ) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_faulted_mount",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let node_after_the_confirmed_overwrite = match apply_overwrite(
+        &node_after_the_faulted_mount,
+        &parameters,
+    ) {
+        Ok(overwritten_node) => overwritten_node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_confirmed_overwrite",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let (hit, first_check_detail, second_check_detail) =
+        evaluate_rootback_predicate(&node_after_the_confirmed_overwrite, &parameters);
+    emit_result(&format!(
+        "name=q2_1_h_c2_system_configuration_evidence geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe=1 device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 mechanism_hypothesis=fault_the_newer_generation_slot_on_device_0 hit={hit} first_check={first_check_detail:?} second_check={second_check_detail:?}",
+        geometry.label
+    ));
+}
+
+/// 负对照一：只把设备 0 上世代号更旧的那一槽读失败——`best_on_device` 应当仍旧解出自证过的、
+/// 世代号更高的那一槽，`chosen` 不受影响，必须不打中。历史上两槽世代号还没分开过（只轮换过一次）
+/// 时这段历史跳过，报 `skipped=true`，不算「不打中」。
+fn run_negative_control_older_slot_for_the_system_configuration_evidence_class(
+    geometry: &Geometry,
+) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let Some((slot_index, generation)) =
+        oldest_self_certified_system_configuration_slot_on_device_zero(
+            &node.pool,
+            geometry_view.slot_spacing,
+        )
+    else {
+        emit_result(&format!(
+            "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} skipped=true reason=\"设备 0 上两槽世代号还没分开过\"",
+            geometry.label
+        ));
+        return;
+    };
+    let offset = slot_index * geometry_view.slot_spacing;
+    let fault_targets = vec![(DeviceIdentity(0), DeviceOffsetInBytes(offset))];
+    let node_after_the_faulted_mount = match attempt_a_faulted_mount_writable_and_append(
+        &node,
+        &parameters,
+        &fault_targets,
+    ) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_faulted_mount",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let node_after_the_confirmed_overwrite = match apply_overwrite(
+        &node_after_the_faulted_mount,
+        &parameters,
+    ) {
+        Ok(overwritten_node) => overwritten_node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_confirmed_overwrite",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let (hit, first_check_detail, second_check_detail) =
+        evaluate_rootback_predicate(&node_after_the_confirmed_overwrite, &parameters);
+    emit_result(&format!(
+        "name=q2_1_h_c2_negative_control_older_slot geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe=1 device0_faulted_slot_index={slot_index} device0_faulted_slot_generation={generation} fault_target_count=1 skipped=false hit={hit} expected_hit=false first_check={first_check_detail:?} second_check={second_check_detail:?}",
+        geometry.label
+    ));
+}
+
+/// 负对照二：只把设备 1 上世代号更高的那一槽读失败（不碰设备 0）——机制假说说的是「先到手的那块盘
+/// 说了算」，设备 0 排在前面、没被碰过，`chosen` 应当仍取设备 0 的当前值，必须不打中。
+fn run_negative_control_other_device_for_the_system_configuration_evidence_class(
+    geometry: &Geometry,
+) {
+    let parameters = parameters_for(geometry);
+    let overwrites_before_the_rootback_probe = 4u64;
+    let node = match bootstrap(geometry, overwrites_before_the_rootback_probe) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error:?} stage=bootstrap",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let geometry_view = match independent_geometry(&node.pool) {
+        Ok(view) => view,
+        Err(error) => {
+            emit_result(&format!(
+                "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error={error} stage=geometry",
+                geometry.label
+            ));
+            return;
+        }
+    };
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut newest_on_device_one: Option<(u64, u64)> = None;
+    for (device_number, slot_index, offset) in
+        system_configuration_slot_positions(geometry_view.slot_spacing)
+    {
+        if device_number != 1 {
+            continue;
+        }
+        let Some(bytes) = node.pool.read(device_number, offset, slot_bytes) else {
+            continue;
+        };
+        let Ok(view) = singlefs_checker::check_system_configuration_slot(&bytes) else {
+            continue;
+        };
+        if newest_on_device_one.is_none_or(|(_, generation)| view.slot_generation > generation) {
+            newest_on_device_one = Some((slot_index, view.slot_generation));
+        }
+    }
+    let Some((slot_index, generation)) = newest_on_device_one else {
+        emit_result(&format!(
+            "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} error=\"设备 1 上没有自证过的系统配置槽\" stage=find_newest_slot",
+            geometry.label
+        ));
+        return;
+    };
+    let offset = slot_index * geometry_view.slot_spacing;
+    let fault_targets = vec![(DeviceIdentity(1), DeviceOffsetInBytes(offset))];
+    let node_after_the_faulted_mount = match attempt_a_faulted_mount_writable_and_append(
+        &node,
+        &parameters,
+        &fault_targets,
+    ) {
+        Ok(node) => node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device1_faulted_slot_index={slot_index} device1_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_faulted_mount",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let node_after_the_confirmed_overwrite = match apply_overwrite(
+        &node_after_the_faulted_mount,
+        &parameters,
+    ) {
+        Ok(overwritten_node) => overwritten_node,
+        Err(error) => {
+            emit_result(&format!(
+                    "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} device1_faulted_slot_index={slot_index} device1_faulted_slot_generation={generation} fault_target_count=1 error={error:?} stage=the_confirmed_overwrite",
+                    geometry.label
+                ));
+            return;
+        }
+    };
+    let (hit, first_check_detail, second_check_detail) =
+        evaluate_rootback_predicate(&node_after_the_confirmed_overwrite, &parameters);
+    emit_result(&format!(
+        "name=q2_1_h_c2_negative_control_other_device geometry={} overwrites_before_the_rootback_probe={overwrites_before_the_rootback_probe} overwrites_after_the_rootback_probe=1 device1_faulted_slot_index={slot_index} device1_faulted_slot_generation={generation} fault_target_count=1 hit={hit} expected_hit=false first_check={first_check_detail:?} second_check={second_check_detail:?}",
+        geometry.label
+    ));
+}
+
 // ============================================================================
 // 十四、Q2-2a（跑前登记岔路单第 2 行 ②）：固定脚本上，这一份 `crates/` 每次发布按结构种类写的字节。
 //
@@ -3385,7 +4943,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
     };
     let rollback_mounted = match mount_rollback(&parameters, &mut devices, target, ShadowLedger::On)
     {
-        Ok(mounted) => mounted,
+        Ok(rollback_mount_output) => rollback_mount_output,
         Err(error) => {
             emit_result(&format!("name=q2_2a_mount_rollback_failed error={error:?}"));
             return;
@@ -3404,7 +4962,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
         emit_writes_by_kind(&format!("rollback_warm_up_publish_{index}"), &writes);
     }
 
-    let mut allocator = rollback_mounted.allocator;
+    let mut rollback_allocator = rollback_mounted.allocator;
     let PoolVersion::WithFile(previous) = &rollback_mounted.current else {
         emit_result("name=q2_2a_final_overwrite_failed reason=\"回退之后现行版本没有文件\"");
         return;
@@ -3414,7 +4972,7 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
         let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
         match publish_overwrite(
             &mut writer,
-            &mut allocator,
+            &mut rollback_allocator,
             previous,
             FirstFile {
                 content: &content,
@@ -3572,18 +5130,55 @@ fn main() {
         run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &initial_overwrite_counts, 4);
     }
 
-    // Q1（跑前登记岔路单第 1 行，C393）：H1 家族 + Φ1 故障注入 + PC1-a/PC1-b。只在 G0 上跑
-    // （这一段没有做第八节的几何敏感性格），独立模式、不并进 "all"。
+    // Q1（跑前登记岔路单第 1 行，C393）：H1 家族 + Φ1 故障注入 + PC1-a/PC1-b。
     if mode == "q1-g0" {
         let summary = run_ledger_fault_family(&GEOMETRY_PRIMARY);
         emit_ledger_fault_family_summary(&GEOMETRY_PRIMARY, &summary);
         run_ledger_fault_positive_controls(&GEOMETRY_PRIMARY);
     }
 
+    // 第八节几何敏感性（2026-09-24 session s6，岔路单第 1 行判决格 = Q1-1a 的 N_trig）：
+    // S16（根环大一倍）与 S4（根环小一半）两个方向相反的取样点，复用同一套 H1 装置代码。
+    if mode == "q1-s16" {
+        let summary = run_ledger_fault_family(&GEOMETRY_LARGER_ROOT_RING);
+        emit_ledger_fault_family_summary(&GEOMETRY_LARGER_ROOT_RING, &summary);
+    }
+    if mode == "q1-s4" {
+        let summary = run_ledger_fault_family(&GEOMETRY_SMALLER_ROOT_RING);
+        emit_ledger_fault_family_summary(&GEOMETRY_SMALLER_ROOT_RING, &summary);
+    }
+
     // Q2-1（跑前登记岔路单第 2 行 ①，C331 修法）：H2 主族在 G0 上、n1 ∈ {0,1,2,3}、n2=1 的穷举下界。
     // 只在这一份 crates/ 上跑（同一个二进制在不同臂的副本目录里各编各的，命令与产物文件名分臂）。
     if mode == "q2-1-g0" {
-        run_rootback_tolerance_family(&GEOMETRY_PRIMARY, 1);
+        run_rootback_tolerance_family(&GEOMETRY_PRIMARY, 1, false, 0..=6, None);
+    }
+
+    // Q2-1，Φ2 加系统配置槽这一类证据（session s8，跑前登记岔路单第 2 行 ①）：只在读系统配置的
+    // 臂（乙-留环、丁-留环、丁-只配置）上有意义；跑在不读系统配置的臂上也不会红，只是白扩大搜索
+    // 空间，所以只在这三份副本上跑这个 mode。n1 区间可选从第二、三个命令行参数读（默认 0..=6，
+    // 缺省不改变行为）——只为了能把一次挂钟预算装不下的全范围拆成几次跑，不改判据。
+    if mode == "q2-1-g0-configuration-evidence" {
+        let range_start = command_line_arguments
+            .get(2)
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0);
+        let range_end = command_line_arguments
+            .get(3)
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(6);
+        run_rootback_tolerance_family(&GEOMETRY_PRIMARY, 1, true, range_start..=range_end, None);
+    }
+
+    // H-C2 直接构造 + 两个负对照（session s8，Φ2 系统配置槽这一类证据的独立构造，见十三点六节）。
+    if mode == "q2-1-hc2" {
+        run_direct_construction_for_the_system_configuration_evidence_class(&GEOMETRY_PRIMARY);
+        run_negative_control_older_slot_for_the_system_configuration_evidence_class(
+            &GEOMETRY_PRIMARY,
+        );
+        run_negative_control_other_device_for_the_system_configuration_evidence_class(
+            &GEOMETRY_PRIMARY,
+        );
     }
 
     // Q2-2a（跑前登记岔路单第 2 行 ②）：固定脚本上这一份 crates/ 每次发布按结构种类写的字节。
@@ -3597,6 +5192,26 @@ fn main() {
     if mode == "q2-1-pc2" {
         run_positive_control_for_the_root_ring_txg_only_candidate(&GEOMETRY_PRIMARY);
         run_positive_control_for_the_configuration_published_txg_candidate(&GEOMETRY_PRIMARY);
+    }
+
+    // H-C1 直接构造（2026-09-24 session s6，岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要
+    // 12 个故障（4 根槽 + 4 条记录各两块盘）才打得中；这一段不靠穷举（n1∈{4,5,6} 的完整空间太大，
+    // session s9 起改按权重上限 12 穷举，见下面「H-C1 下界探针」），直接按这个具体构造跑一次，
+    // 附一个只挡根槽的负对照。
+    if mode == "q2-1-hc1" {
+        run_direct_construction_for_the_record_scan_watermark_candidate(&GEOMETRY_PRIMARY);
+        run_negative_control_root_slots_only_for_the_record_scan_watermark_candidate(
+            &GEOMETRY_PRIMARY,
+        );
+    }
+
+    // H-C1 下界探针：权重上限从第二个命令行参数读，缺省 `None`（按 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`
+    // 自动判断——n1=4 这个节点的完整空间只有 2^15=32768，在预算内，所以缺省就是穷举到完整空间的顶）。
+    if mode == "q2-1-hc1-lower-bound" {
+        let weight_ceiling = command_line_arguments
+            .get(2)
+            .and_then(|value| value.parse::<u64>().ok());
+        run_record_scan_watermark_lower_bound_probe(&GEOMETRY_PRIMARY, weight_ceiling);
     }
 
     emit_result(&format!(
@@ -3687,7 +5302,7 @@ fn run_constants_and_anchors() -> bool {
         if region_ok { "pass" } else { "fail" }
     ));
 
-    let arithmetic_checks: [(&str, i64, i64); 11] = [
+    let arithmetic_checks: [(&str, i64, i64); 19] = [
         ("系统配置槽余量 4096-481", 4096 - 481, 3615),
         ("512-481", 512 - 481, 31),
         ("乙族字段表 481+8", 481 + 8, 489),
@@ -3703,6 +5318,20 @@ fn run_constants_and_anchors() -> bool {
         ("实例表行宽 1+4+8+8+1+66", 1 + 4 + 8 + 8 + 1 + 66, 88),
         ("实例表一片行数 370-1", 370 - 1, 369),
         ("今天那一臂系统配置那一类写字节 4096*2*1", 4096 * 2, 8192),
+        // 岔路单第 2 行 ③（2026-09-24 session s6）：四条修法与岔路 3 候选 2 抢不抢系统配置槽空间。
+        // 候选 2 表形态宽度取 Q3-2 已量出的 N_w=4（S4/L=4 那一点，四个几何点里最大的一个）。
+        // 甲（甲-txg、甲-jsn）与丙（今天）都不改系统配置字段表（仍是 481），与候选 2 同放时
+        // 余量按「单放」算（`512 - 481 - W`，跑前登记 Q3-2 定义原句）；乙、丁都把字段表改成 489
+        // （同一处 8 字节字段，只是取号时写占位 0 还是续传，写法宽度相同），余量按「与乙同放」算
+        // （`512 - 481 - 8 - W`）。
+        ("候选2表形态 1+16*N_w(N_w=4)", 1 + 16 * 4, 65),
+        ("候选2表形态 1+12*N_w(N_w=4)", 1 + 12 * 4, 49),
+        ("甲/丙同放候选2单条16 512-481-16", 512 - 481 - 16, 15),
+        ("甲/丙同放候选2单条12 512-481-12", 512 - 481 - 12, 19),
+        ("甲/丙同放候选2表形态65 512-481-65", 512 - 481 - 65, -34),
+        ("甲/丙同放候选2表形态49 512-481-49", 512 - 481 - 49, -18),
+        ("乙/丁同放候选2表形态65 512-489-65", 512 - 489 - 65, -42),
+        ("乙/丁同放候选2表形态49 512-489-49", 512 - 489 - 49, -26),
     ];
     for (name, computed, expected) in arithmetic_checks {
         let ok = computed == expected;
@@ -3784,6 +5413,8 @@ fn run_constants_and_anchors() -> bool {
 mod tests {
     use super::*;
     use singlefs_core::address::SlotNumber;
+    use singlefs_core::pointer::NodePointer;
+    use singlefs_core::unit::build_index_node;
 
     /// PC-Nw：手写一段假账（两次回退，两段被抛弃根都读得出），不碰 `crates/`，只证计数函数会数到 2。
     #[test]
@@ -3866,6 +5497,96 @@ mod tests {
         assert_eq!(FaultSeverity::Disk1.fault_count(), 1);
     }
 
+    /// op1 第三种变体（session s10）：`floor_targets_between` 从 F+1 起，含上限本身。
+    #[test]
+    fn floor_targets_between_starts_strictly_above_the_current_floor() {
+        let targets = floor_targets_between(CheckpointTxg(2), CheckpointTxg(4));
+        assert_eq!(targets, vec![CheckpointTxg(3), CheckpointTxg(4)]);
+    }
+
+    /// 同上：上限本身也是一个合法目标（半开区间是 (F, 上限]，不是 (F, 上限)）。
+    #[test]
+    fn floor_targets_between_includes_the_ceiling_itself() {
+        let targets = floor_targets_between(CheckpointTxg(2), CheckpointTxg(4));
+        assert!(
+            targets.contains(&CheckpointTxg(4)),
+            "上限本身也是一个合法目标，得到 {targets:?}"
+        );
+    }
+
+    /// 上限不高于现行 F 时没有余量可抬——`..=` 起点大于终点天然给出空区间，不用另写判空分支。
+    #[test]
+    fn floor_targets_between_is_empty_when_the_ceiling_does_not_exceed_the_current_floor() {
+        assert!(floor_targets_between(CheckpointTxg(5), CheckpointTxg(5)).is_empty());
+        assert!(floor_targets_between(CheckpointTxg(5), CheckpointTxg(3)).is_empty());
+    }
+
+    /// op1 第三种变体：探测出的 floor 目标落在 [F+1, 上限] 内时，不注入任何故障应当成功
+    /// （`error_member` 为 `None`）；换成对着某条被抛弃可读根的树表位置注入故障（两份都读失败），
+    /// 结局必须与不注入时不同——证明 `raise_rollback_floor` 真的读到了这组故障（不是被前面那一步
+    /// 「先不注入的 mount_writable」悄悄吸收掉）。`abandoned_roots_unreadable` 走的正是
+    /// `isolate_slots_referenced_only_by_abandoned_roots` 这条管道，与 `mount_writable`/
+    /// `mount_rollback` 那两种 op1 共用同一个计数函数（`crates/singlefs-core/src/mount.rs`
+    /// 第 1027 行起）。
+    #[test]
+    fn mount_writable_then_raise_floor_reaches_the_injected_fault() {
+        let parameters = parameters_for(&GEOMETRY_PRIMARY);
+        let fixed_geometry = fixed_geometry_for(&GEOMETRY_PRIMARY);
+        let family = ledger_fault_history_family(&GEOMETRY_PRIMARY);
+        let mut tested = false;
+        for history_node in &family.nodes {
+            let node = &history_node.node;
+            let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+                continue;
+            };
+            let readable = readable_roots_independent(&node.pool, &pool_geometry);
+            let Some(event) = node.rollback_events.first() else {
+                continue;
+            };
+            let abandoned_readable: Vec<TimelineRoot> = event
+                .abandoned
+                .iter()
+                .copied()
+                .filter(|root| readable.contains(root))
+                .collect();
+            let Some(&abandoned_root) = abandoned_readable.first() else {
+                continue;
+            };
+            let Some(record) = root_record_of(&node.pool, &pool_geometry, abandoned_root) else {
+                continue;
+            };
+            let targets = raise_floor_targets_for(node, &parameters);
+            let Some(&floor) = targets.first() else {
+                continue;
+            };
+            let kind = FaultedOperationKind::MountWritableThenRaiseFloorTo(floor);
+            let without_fault =
+                attempt_faulted_operation(node, &parameters, fixed_geometry, &kind, &[]);
+            assert!(
+                without_fault.error_member.is_none(),
+                "探测出的 floor 目标不注入任何故障应当成功，得到 {:?}",
+                without_fault.error_member
+            );
+            let fault_targets =
+                fault_targets_for(&record.tree_table.locations, FaultSeverity::Both);
+            let with_fault =
+                attempt_faulted_operation(node, &parameters, fixed_geometry, &kind, &fault_targets);
+            assert!(
+                with_fault.abandoned_roots_unreadable != without_fault.abandoned_roots_unreadable
+                    || with_fault.error_member.is_some(),
+                "对被抛弃根的树表两份都读失败注入之后，结局必须与不注入时不同（{:?} vs {:?}）",
+                with_fault.abandoned_roots_unreadable,
+                without_fault.abandoned_roots_unreadable
+            );
+            tested = true;
+            break;
+        }
+        assert!(
+            tested,
+            "H1 家族里应当至少有一个节点有 op1 第三种变体可跑（有余量、有可读被抛弃根）"
+        );
+    }
+
     /// `error_member_of_debug`：跨臂只用字符串比较（A1 副本新变体在「今天」那份编译单元里
     /// 根本不存在这个枚举成员，不能直接 `match` 枚举名），首词切分要认得三种括号/空格分隔形态。
     #[test]
@@ -3941,6 +5662,330 @@ mod tests {
         assert_eq!(
             readable, timeline_set,
             "不注入故障时，装置自记的时间线应当与根环里全部自证根的集合相同"
+        );
+    }
+
+    /// 候选 (b) 分配记录树指称「从内容树反推占用集合」：第一个文件版本上，中央映射树给出的落点
+    /// 集合非空（至少覆盖那次发布写的数据单元）；mkfs 那一版（`mapping_root` 恒
+    /// `NodePointer::empty_root()`）读不出——是报错，不是当空集读到。
+    #[test]
+    fn allocation_record_tree_reachable_placements_via_central_mapping_reflects_written_content_and_errors_on_an_empty_pointer(
+    ) {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 0).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let newest = readable_roots_independent(&node.pool, &geometry_view)
+            .into_iter()
+            .max()
+            .expect("bootstrap 之后至少有一条根");
+        let record = root_record_of(&node.pool, &geometry_view, newest).expect("根记录读得出");
+        let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+        let placements = allocation_record_tree_reachable_placements_via_central_mapping(
+            &plain_devices,
+            &record,
+        )
+        .expect("第一个文件版本的中央映射树应当读得出");
+        assert!(
+            !placements.is_empty(),
+            "第一个文件版本至少写了一个数据单元，中央映射树给出的落点集合不该是空集"
+        );
+
+        let genesis_record = RootRecord {
+            mapping_root: NodePointer::empty_root(),
+            ..record
+        };
+        assert!(
+            allocation_record_tree_reachable_placements_via_central_mapping(
+                &plain_devices,
+                &genesis_record,
+            )
+            .is_err(),
+            "mapping_root 是空指针时应当报错，不是读成空集"
+        );
+    }
+
+    /// 候选 (b) 分配记录树指称「从内容树反推占用集合」走全（session s8）：走全版本必须是只走中央映射
+    /// 版本的超集——至少多出树表自己的节点与中央映射树自己的节点这两个位置；空指针那一版同样报错
+    /// （走全版本第一步就调用只走中央映射的版本）。
+    #[test]
+    fn allocation_record_tree_reachable_placements_via_all_structural_trees_is_a_superset_of_the_central_mapping_only_version(
+    ) {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 0).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let newest = readable_roots_independent(&node.pool, &geometry_view)
+            .into_iter()
+            .max()
+            .expect("bootstrap 之后至少有一条根");
+        let record = root_record_of(&node.pool, &geometry_view, newest).expect("根记录读得出");
+        let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+        let central_mapping_only = allocation_record_tree_reachable_placements_via_central_mapping(
+            &plain_devices,
+            &record,
+        )
+        .expect("第一个文件版本的中央映射树应当读得出");
+        let all_structural_trees =
+            allocation_record_tree_reachable_placements_via_all_structural_trees(
+                &plain_devices,
+                &record,
+            )
+            .expect("走全版本在同一段历史上也应当读得出");
+        assert!(
+            all_structural_trees.is_superset(&central_mapping_only),
+            "走全版本必须包含只走中央映射版本给出的每一个落点"
+        );
+        let mapping_root_own_node = (
+            record.mapping_root.locations[0].device.0,
+            record.mapping_root.locations[0].slot.0,
+        );
+        let tree_table_own_node = (
+            record.tree_table.locations[0].device.0,
+            record.tree_table.locations[0].slot.0,
+        );
+        assert!(
+            all_structural_trees.contains(&mapping_root_own_node),
+            "走全版本要包含中央映射树自己的节点，不只是它指向的数据单元"
+        );
+        assert!(
+            all_structural_trees.contains(&tree_table_own_node),
+            "走全版本要包含树表自己的节点"
+        );
+
+        let genesis_record = RootRecord {
+            mapping_root: NodePointer::empty_root(),
+            ..record
+        };
+        assert!(
+            allocation_record_tree_reachable_placements_via_all_structural_trees(
+                &plain_devices,
+                &genesis_record,
+            )
+            .is_err(),
+            "mapping_root 是空指针时走全版本也应当报错（它第一步就调用只走中央映射的版本）"
+        );
+    }
+
+    /// session s9 根因排查②：171 格 `subset_of_pristine` 差集里的两个 (设备, 槽) 就是实例表自己的
+    /// 物理节点（`RootRecord::instance_table`），不是 LIVELIST/SPARSE_SIDE_TABLE/DEADLIST 的节点、
+    /// 也不是分配记录树自己的节点——`classify_diff_pair` 要能分辨这三种、且对查无归属的落点如实报告。
+    #[test]
+    fn classify_diff_pair_identifies_the_instance_table_self_node() {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 0).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let newest = readable_roots_independent(&node.pool, &geometry_view)
+            .into_iter()
+            .max()
+            .expect("bootstrap 之后至少有一条根");
+        let record = root_record_of(&node.pool, &geometry_view, newest).expect("根记录读得出");
+        let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+        let raw_records = allocation_records_under_root(&plain_devices, &record)
+            .expect("这段历史的分配记录树读得出");
+        let allocation_locations = locate_allocation_record_tree(&plain_devices, &record).ok();
+
+        let instance_table_pair = (
+            record.instance_table.locations[0].device.0,
+            record.instance_table.locations[0].slot.0,
+        );
+        assert_eq!(
+            classify_diff_pair(
+                &plain_devices,
+                &record,
+                allocation_locations,
+                &raw_records,
+                instance_table_pair,
+            ),
+            "instance_table_self_node_not_walked_by_the_all_structural_trees_arm",
+            "实例表自己的节点要被认出来，不能落进查无归属的兜底分支"
+        );
+
+        let allocation_record_tree_pair = (
+            allocation_locations.expect("这段历史的分配记录树有物理位置")[0]
+                .device
+                .0,
+            allocation_locations.expect("同上")[0].slot.0,
+        );
+        assert_eq!(
+            classify_diff_pair(
+                &plain_devices,
+                &record,
+                allocation_locations,
+                &raw_records,
+                allocation_record_tree_pair,
+            ),
+            "allocation_record_tree_self_node",
+            "分配记录树自己的节点不能被误判成实例表"
+        );
+
+        assert_eq!(
+            classify_diff_pair(
+                &plain_devices,
+                &record,
+                allocation_locations,
+                &raw_records,
+                (99, 999_999),
+            ),
+            "not_found_in_raw_allocation_records",
+            "查无归属的落点要如实报告，不能编一个假分类"
+        );
+    }
+
+    /// 候选 (b) 树表指称「crates 有路」子分支要用的量：同一实例上更旧的可读根，取的是
+    /// checkpoint_txg 最大的那一条祖先；不许把自己选成祖先，也不许漏掉更接近目标的候选。
+    #[test]
+    fn nearest_older_readable_root_on_same_instance_picks_the_closest_ancestor_on_the_same_instance(
+    ) {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 2).expect("bootstrap 应当成功（含 2 次覆盖写）");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let readable = readable_roots_independent(&node.pool, &geometry_view);
+        let newest = *readable.iter().max().expect("bootstrap 之后至少有一条根");
+        let target = root_record_of(&node.pool, &geometry_view, newest).expect("根记录读得出");
+        let (older_root, older_record) = nearest_older_readable_root_on_same_instance(
+            &node.pool,
+            &geometry_view,
+            newest,
+            &target,
+        )
+        .expect("同一实例上还有更旧的可读根（暖机与首个文件那几条）");
+        assert_eq!(
+            older_root.0, target.instance.0,
+            "找到的祖先要与目标同一实例"
+        );
+        assert!(
+            older_record.checkpoint_txg < target.checkpoint_txg,
+            "找到的祖先 checkpoint_txg 要严格小于目标"
+        );
+        let closer_candidate_exists = readable.iter().any(|candidate| {
+            candidate.0 == target.instance.0
+                && *candidate != older_root
+                && candidate.1 > older_root.1
+                && candidate.1 < target.checkpoint_txg.0
+        });
+        assert!(
+            !closer_candidate_exists,
+            "同一实例上存在 txg 更接近目标、却没被选中的候选"
+        );
+    }
+
+    /// `system_configuration_slot_positions`：槽 0 恒偏移 0，槽 1 偏移 = 槽距；两块盘各自独立。
+    #[test]
+    fn system_configuration_slot_positions_uses_slot_spacing_for_the_second_slot_on_each_device() {
+        assert_eq!(
+            system_configuration_slot_positions(4096),
+            [(0, 0, 0), (0, 1, 4096), (1, 0, 0), (1, 1, 4096)]
+        );
+        assert_eq!(
+            system_configuration_slot_positions(512),
+            [(0, 0, 0), (0, 1, 512), (1, 0, 0), (1, 1, 512)]
+        );
+    }
+
+    /// `evidence_items_at`（session s8）：`include_system_configuration_slots` 关着时一条
+    /// `SystemConfigurationSlot` 证据项都不出现（既有六份副本用的搜索不受影响）；打开时两块盘各自
+    /// 两个自证过的槽都进来，标签按 (设备, 槽号) 区分。
+    #[test]
+    fn evidence_items_at_includes_system_configuration_slots_only_when_asked() {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 1).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let without_configuration = evidence_items_at(&node.pool, &geometry_view, false);
+        assert!(
+            without_configuration
+                .iter()
+                .all(|item| item.kind != EvidenceKind::SystemConfigurationSlot),
+            "开关关着时不该有系统配置槽这一类证据项"
+        );
+        let with_configuration = evidence_items_at(&node.pool, &geometry_view, true);
+        let configuration_labels: BTreeSet<String> = with_configuration
+            .iter()
+            .filter(|item| item.kind == EvidenceKind::SystemConfigurationSlot)
+            .map(|item| item.label.clone())
+            .collect();
+        assert_eq!(
+            configuration_labels,
+            BTreeSet::from([
+                "configuration(device=0,slot=0)".to_string(),
+                "configuration(device=0,slot=1)".to_string(),
+                "configuration(device=1,slot=0)".to_string(),
+                "configuration(device=1,slot=1)".to_string(),
+            ]),
+            "mkfs 加暖机加首个文件加一次覆盖写之后，两块盘的两个槽都该已经轮换过、都自证得过"
+        );
+    }
+
+    /// `candidate_fault_sets_of_weight`：根槽与系统配置槽都是权重 1，合并成一批喂给这个函数之后，
+    /// 权重 2 的子集要既有「两个根槽」「两个配置槽」，也要有「一个根槽 + 一个配置槽」这种跨类组合，
+    /// 不能只按证据项个数枚举、漏掉跨类的那一种。
+    #[test]
+    fn candidate_fault_sets_of_weight_mixes_root_and_configuration_slots_by_weight() {
+        let weight_one_items = vec![
+            evidence_item(EvidenceKind::RootRingSlot, "root_a", 1),
+            evidence_item(EvidenceKind::SystemConfigurationSlot, "configuration_a", 1),
+        ];
+        let journal_record_items = Vec::new();
+        let candidates =
+            candidate_fault_sets_of_weight(&weight_one_items, &journal_record_items, 2);
+        let labels: BTreeSet<Vec<String>> = candidates
+            .iter()
+            .map(|combination| combination.iter().map(|item| item.label.clone()).collect())
+            .collect();
+        assert_eq!(
+            labels,
+            BTreeSet::from([vec!["root_a".to_string(), "configuration_a".to_string()]]),
+            "两个权重 1 的证据项只有一种取两个的组合：跨类那一对"
+        );
+    }
+
+    /// H-C2 机制假说的最小复现，不依赖任何臂改法：只把设备 0 上世代号更高的系统配置槽读失败，
+    /// `singlefs_core::recovery::choose_system_configuration` 交回的 `slot_generation` 应当退回
+    /// 设备 0 自己更旧的那一份，不看设备 1（`recovery.rs` 第 516 行起，`chosen` 只在 `None` 时
+    /// 赋值一次）。这条测试不碰任何臂改法，验证的是「今天」这份 `choose_system_configuration`
+    /// 本身的行为——H-C2 三个驱动函数（十三点六节）依赖的正是这个行为。
+    #[test]
+    fn faulting_the_newer_device_zero_system_configuration_slot_regresses_the_chosen_generation() {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 1).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let (newest_slot_index, newest_generation) =
+            newest_self_certified_system_configuration_slot_on_device_zero(
+                &node.pool,
+                geometry_view.slot_spacing,
+            )
+            .expect("这段历史上设备 0 应当至少有一个自证过的系统配置槽");
+        let (_, oldest_generation) =
+            oldest_self_certified_system_configuration_slot_on_device_zero(
+                &node.pool,
+                geometry_view.slot_spacing,
+            )
+            .expect("这段历史上设备 0 的两个槽应当都自证过（多次轮换之后）");
+        assert!(
+            oldest_generation < newest_generation,
+            "两槽世代号应当不同：oldest={oldest_generation} newest={newest_generation}"
+        );
+
+        let plain = devices_from_pool(&node.pool, IMAGE_BYTES);
+        let baseline = choose_system_configuration(&plain).expect("不注入时应当读得出系统配置");
+        assert_eq!(
+            baseline.quantities.slot_generation, newest_generation,
+            "不注入时 chosen 应当是当下最新那一份"
+        );
+
+        let offset = newest_slot_index * geometry_view.slot_spacing;
+        let mut wrapped: Vec<(DeviceIdentity, MultiOffsetReadFailingBlockDevice)> = Vec::new();
+        for (identity, device) in plain {
+            let failing_offsets: BTreeSet<u64> = if identity == DeviceIdentity(0) {
+                BTreeSet::from([offset])
+            } else {
+                BTreeSet::new()
+            };
+            wrapped.push((
+                identity,
+                MultiOffsetReadFailingBlockDevice {
+                    inner: device,
+                    failing_offsets,
+                },
+            ));
+        }
+        let faulted = choose_system_configuration(&wrapped).expect("设备 0 的另一槽仍自证得过");
+        assert_eq!(
+            faulted.quantities.slot_generation, oldest_generation,
+            "设备 0 的新槽读失败之后，chosen 应当退回设备 0 自己更旧的那一份；\
+             读成 {newest_generation}（未受影响的设备 1 的值）就说明选择逻辑其实看了别的盘"
         );
     }
 
@@ -4278,5 +6323,224 @@ mod tests {
             deduplicated.insert(*target);
         }
         assert_eq!(deduplicated.len(), 2, "两条根不应该解到同一个 (设备, 偏移)");
+    }
+
+    /// session s9（实十九提醒，2026-09-24 16:50 UTC 前后落地）：中央映射树条目数超过单节点叶容量
+    /// （`transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，根节点变成内部节点
+    /// （`level > 0`）。这里手工构造一个合法但 `level=1` 的假节点，覆盖真实中央映射树根的两份物理
+    /// 拷贝，验证 `allocation_record_tree_reachable_placements_via_central_mapping` 显式拦下它——
+    /// 不是靠 `parse_mapping_entry` 的宽度检查侥幸拦住：内部条目宽约 114 字节（`transaction.rs`
+    /// 同一行「内部 143」按 16384 / 143 反推），比 `MAPPING_ENTRY_BYTES`=55 宽，那条宽度检查拦不住它。
+    #[test]
+    fn allocation_record_tree_reachable_placements_via_central_mapping_rejects_a_multi_level_root()
+    {
+        let node = bootstrap(&GEOMETRY_PRIMARY, 0).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+        let newest = readable_roots_independent(&node.pool, &geometry_view)
+            .into_iter()
+            .max()
+            .expect("bootstrap 之后至少有一条根");
+        let record = root_record_of(&node.pool, &geometry_view, newest).expect("根记录读得出");
+        let mut plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+
+        let real_bytes = read_node_bytes(&plain_devices, &record.mapping_root.locations)
+            .expect("真实的中央映射树根读得出");
+        let real_header = parse_index_node(&real_bytes).expect("真实的中央映射树根解得开");
+        assert_eq!(real_header.level, 0, "bootstrap 之后中央映射树根应当仍是叶");
+
+        // 内部条目宽的估计值：只要比 MAPPING_ENTRY_BYTES=55 宽，就足够触发要测的那条路
+        // （宽度检查拦不住，必须靠显式的 level 检查）。
+        let fake_entry_width = 114u16;
+        let fake_bytes = build_index_node(
+            real_header.tree,
+            1,
+            real_header.key_width,
+            &real_header.smallest_key,
+            &real_header.largest_key,
+            real_header.birth_txg,
+            &FILESYSTEM_IDENTIFIER,
+            real_header.instance,
+            real_header.birth_sequence,
+            fake_entry_width,
+            &[vec![0u8; usize::from(fake_entry_width)]],
+        );
+
+        for location in &record.mapping_root.locations {
+            let (_, device) = plain_devices
+                .iter_mut()
+                .find(|(identity, _)| *identity == location.device)
+                .expect("这块盘在池里");
+            device
+                .write_at(
+                    location.slot.to_device_offset(),
+                    &fake_bytes,
+                    WriteDurability::Plain,
+                )
+                .expect("写入假节点应当成功");
+        }
+
+        let outcome = allocation_record_tree_reachable_placements_via_central_mapping(
+            &plain_devices,
+            &record,
+        );
+        let error = outcome.expect_err("level=1 的根节点必须被拒绝，不能被当成叶解出假的落点集合");
+        assert!(
+            error.contains("level=1"),
+            "错误信息要点名是哪个 level 拦下的，实际: {error}"
+        );
+    }
+
+    /// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 1 行还差项④）：持续故障与瞬时故障
+    /// 在 op1 起的三次挂载轨迹上必须不同——持续（`persistent=true`）故障不撤，每一步都该继续触发；
+    /// 瞬时（`persistent=false`）故障只在 op1 那一步有效，撤掉之后的两步该恢复成不触发。用与
+    /// `run_ledger_fault_positive_controls`（PC1-a）完全相同的「按固定次序找第一个满足『某条被抛弃
+    /// 根的分配记录树节点不共享』的历史」选出同一个落点，不是另挑一个未经验证的构造。
+    #[test]
+    fn mount_writable_trajectory_distinguishes_persistent_from_transient_faults() {
+        let geometry = &GEOMETRY_PRIMARY;
+        let parameters = parameters_for(geometry);
+        let fixed_geometry = fixed_geometry_for(geometry);
+        let family = ledger_fault_history_family(geometry);
+
+        for history_node in &family.nodes {
+            let node = &history_node.node;
+            let Ok(pool_geometry) = independent_geometry(&node.pool) else {
+                continue;
+            };
+            let readable = readable_roots_independent(&node.pool, &pool_geometry);
+            let Some(event) = node.rollback_events.first() else {
+                continue;
+            };
+            let abandoned_readable: Vec<TimelineRoot> = event
+                .abandoned
+                .iter()
+                .copied()
+                .filter(|root| readable.contains(root))
+                .collect();
+            let plain_devices = devices_from_pool(&node.pool, IMAGE_BYTES);
+
+            for &abandoned_root in &abandoned_readable {
+                let Some(record) = root_record_of(&node.pool, &pool_geometry, abandoned_root)
+                else {
+                    continue;
+                };
+                let Ok(allocation_locations) =
+                    locate_allocation_record_tree(&plain_devices, &record)
+                else {
+                    continue;
+                };
+                let allocation_keys: BTreeSet<(u32, u64)> =
+                    allocation_locations.iter().map(location_key).collect();
+                if is_unit_shared(
+                    &plain_devices,
+                    &node.pool,
+                    &pool_geometry,
+                    abandoned_root,
+                    &allocation_keys,
+                ) {
+                    continue;
+                }
+
+                let allocation_fault_targets =
+                    fault_targets_for(&allocation_locations, FaultSeverity::Both);
+                let persistent = mount_writable_trajectory(
+                    &node.pool,
+                    &parameters,
+                    fixed_geometry,
+                    &allocation_fault_targets,
+                    true,
+                    3,
+                );
+                let transient = mount_writable_trajectory(
+                    &node.pool,
+                    &parameters,
+                    fixed_geometry,
+                    &allocation_fault_targets,
+                    false,
+                    3,
+                );
+                assert_eq!(persistent.len(), 3, "轨迹要报满 3 步（跑前登记 8.1 原文）");
+                assert_eq!(transient.len(), 3);
+                assert_eq!(
+                    persistent[0], transient[0],
+                    "op1 这一步两种模式的故障目标相同，第一步的结局必须相同"
+                );
+                assert!(
+                    persistent[0].is_some_and(|count| count > 0),
+                    "PC1-a 已经证明这一格会触发，第一步的计数必须 > 0"
+                );
+                assert_eq!(
+                    persistent[1],
+                    persistent[0],
+                    "持续故障不撤，第二步该继续触发（这一格是单一故障不共享的落点，不随挂载次数变化）"
+                );
+                assert_eq!(persistent[2], persistent[0], "持续故障第三步同理");
+                assert_eq!(
+                    transient[1],
+                    Some(0),
+                    "瞬时故障撤掉之后，第二步该恢复成不触发"
+                );
+                assert_eq!(transient[2], Some(0), "瞬时故障第三步同理");
+                return;
+            }
+        }
+        panic!("H1 家族里应当至少有一格满足 PC1-a 的挑选条件（跑前登记 5.2 阳性对照）");
+    }
+
+    /// session s9（`m2-rootchoice-repair-r1-forks.md` 岔路单第 2 行还差项②）：权重上限机制——
+    /// 显式传 `Some(0)` 时只穷举权重 0 那一档就停（不管这一档打不打中），`stopped_by_weight_ceiling`
+    /// 如实反映「还有没搜到的档」；`full_space_subset_count` 恒等于完整证据空间的子集数，不随上限变，
+    /// 且不管停在哪一档，`subsets_tried` 都不超过它——这三条合起来就是「完整空间多大、穷举到权重几、
+    /// 没有截断」要报的东西。
+    #[test]
+    fn search_minimum_weight_that_triggers_rootback_honors_an_explicit_weight_ceiling() {
+        let geometry = &GEOMETRY_PRIMARY;
+        let parameters = parameters_for(geometry);
+        let node = bootstrap(geometry, 0).expect("bootstrap 应当成功");
+        let geometry_view = independent_geometry(&node.pool).expect("几何应当能独立解出来");
+
+        let full = search_minimum_weight_that_triggers_rootback(
+            &node,
+            &parameters,
+            &geometry_view,
+            1,
+            None,
+            false,
+        );
+        assert!(
+            full.full_space_subset_count > 1,
+            "这段历史至少有一个证据项，完整空间子集数要大于 1"
+        );
+        assert!(
+            full.subsets_tried <= full.full_space_subset_count,
+            "枚举过的子集数不能超过完整空间"
+        );
+
+        let capped = search_minimum_weight_that_triggers_rootback(
+            &node,
+            &parameters,
+            &geometry_view,
+            1,
+            Some(0),
+            false,
+        );
+        assert_eq!(
+            capped.full_space_subset_count, full.full_space_subset_count,
+            "权重上限不改变完整空间的大小，只改变搜到哪一档就停"
+        );
+        assert_eq!(
+            capped.highest_weight_examined, 0,
+            "传 Some(0) 时只穷举权重 0 那一档"
+        );
+        if capped.weight_at_first_hit.is_none() {
+            assert!(
+                capped.stopped_by_weight_ceiling,
+                "权重 0 没打中、且完整空间的最高权重大于 0 时，必须标『因权重上限而停』"
+            );
+        }
+        assert!(
+            capped.subsets_tried <= full.subsets_tried,
+            "权重上限更紧时枚举过的子集数不该比不设上限时更多"
+        );
     }
 }

@@ -830,24 +830,25 @@ pub fn newest_root_has_the_trees_the_targeted_damages_need(image: &MemoryPool) -
     let Some(reached) = reach_the_tree_table(image) else {
         return false;
     };
-    // extent / 分配记录 / 记账三棵要的是「非空的叶」：按记录改的那几条坏法只坏叶（那几棵树内部节点的条目格式
-    // 还没有条款）。inode 树只要非空：条目宽那一条对内部节点与叶都做得出来。
-    let non_empty_leaf = [
-        TREE_KIND_EXTENT,
-        TREE_KIND_ALLOCATION_RECORDS,
-        TREE_KIND_ACCOUNTING,
-    ]
-    .into_iter()
-    .all(|tree_kind| {
-        chain_from_the_tree_table(image, &reached, tree_kind).is_some_and(|chain| {
-            index_node_is_a_leaf(&chain.tree_root_node)
-                && IndexNodeEntryLayout::of(&chain.tree_root_node).entry_count > 0
-        })
-    });
+    // extent / 记账两棵要的是「非空的叶」：按记录改的那几条坏法坏的是根那一片（第一版只有 inode 1 有 extent，extent 树上段只有根兼叶；
+    // 记账树在两块盘的池上是根兼叶）。分配记录树按位置寻址、根恒在第 1 层以上（D8（核心索引结构） 已定项 14），坏记录的坏法沿路走到叶，
+    // 这里只要根非空。inode 树只要非空：条目宽那一条对内部节点与叶都做得出来。
+    let non_empty_leaf = [TREE_KIND_EXTENT, TREE_KIND_ACCOUNTING]
+        .into_iter()
+        .all(|tree_kind| {
+            chain_from_the_tree_table(image, &reached, tree_kind).is_some_and(|chain| {
+                index_node_is_a_leaf(&chain.tree_root_node)
+                    && IndexNodeEntryLayout::of(&chain.tree_root_node).entry_count > 0
+            })
+        });
+    let allocation_record_tree_is_non_empty =
+        chain_from_the_tree_table(image, &reached, TREE_KIND_ALLOCATION_RECORDS)
+            .is_some_and(|chain| IndexNodeEntryLayout::of(&chain.tree_root_node).entry_count > 0);
     // 中央映射树的根住根记录、不经树表（D19 已定项 11）：条目宽那一条要它非空。
     let central_mapping_is_non_empty = open_chain_to_the_central_mapping_tree_root(image)
         .is_some_and(|chain| IndexNodeEntryLayout::of(&chain.mapping_root_node).entry_count > 0);
     non_empty_leaf
+        && allocation_record_tree_is_non_empty
         && central_mapping_is_non_empty
         && chain_from_the_tree_table(image, &reached, TREE_KIND_INODE)
             .is_some_and(|chain| IndexNodeEntryLayout::of(&chain.tree_root_node).entry_count > 0)
@@ -1610,6 +1611,88 @@ fn seal_and_write_back_the_tree_table(mut reached: TreeTableReached, image: &mut
     }
 }
 
+/// 从一棵树的根往下走、沿路读到的一个节点：它落在的两块盘与槽、它的字节，与上一层里指着它的是第几条条目。
+struct NodeBelowTheRoot {
+    devices: [u32; 2],
+    slot: u64,
+    bytes: Vec<u8>,
+    entry_index_in_the_parent: usize,
+}
+
+/// 从一棵树的根（`root_node`）往下走到一片叶：每一层在内部条目里取 key 满足 `goes_at_or_before_the_target` 的最后一条
+/// （一条都不满足取第 0 条），读它的子指针（紧跟 key 的 86 字节）指的节点。交回沿路读到的节点，根之下第一层在前、叶在末；
+/// 根自己就是叶时交回空的。哪一层一条条目都没有、条目宽窄于 key + 子指针、子指针读不出来，交回 `None`。
+/// 分配记录树与 extent 树按位置寻址（D8（核心索引结构） 已定项 14），根之下还有节点，坏记录的坏法要走到叶。
+fn path_down_to_the_leaf_holding(
+    image: &MemoryPool,
+    root_node: &[u8],
+    goes_at_or_before_the_target: &dyn Fn(&[u8]) -> bool,
+) -> Option<Vec<NodeBelowTheRoot>> {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("16384");
+    let mut path: Vec<NodeBelowTheRoot> = Vec::new();
+    // 迭代上界是树高（码 2 头的层级是 1 字节，至多 256 层）；跨轮携带的是走到的那个节点。
+    for _level in 0..=u8::MAX {
+        let current: &[u8] = path.last().map_or(root_node, |node| node.bytes.as_slice());
+        if index_node_is_a_leaf(current) {
+            return Some(path);
+        }
+        let layout = IndexNodeEntryLayout::of(current);
+        let key_width = index_node_key_width(current);
+        if layout.entry_count == 0 || layout.entry_width < key_width + 86 {
+            return None;
+        }
+        let chosen = (0..layout.entry_count)
+            .rev()
+            .find(|index| {
+                let start = layout.offset_of_entry(*index);
+                goes_at_or_before_the_target(&current[start..start + key_width])
+            })
+            .unwrap_or(0);
+        let pointer_start = layout.offset_of_entry(chosen) + key_width;
+        let (devices, slot, bytes) = read_unit_via_pointer(
+            image,
+            &current[pointer_start..pointer_start + 86],
+            node_bytes,
+        )?;
+        path.push(NodeBelowTheRoot {
+            devices,
+            slot,
+            bytes,
+            entry_index_in_the_parent: chosen,
+        });
+    }
+    None
+}
+
+/// 沿 `path`（[`path_down_to_the_leaf_holding`] 交回的那一路）从叶往上：每个节点重封、写回它的两块盘，它的整单元校验和写进
+/// 上一层指着它的那条条目的子指针两条位置条目（最上面那个的上一层是 `root_node`）。根自己由调用方接着封
+/// （[`seal_and_write_back_the_chain`]）。
+fn reseal_the_path_below_the_root(
+    image: &mut MemoryPool,
+    root_node: &mut [u8],
+    path: &mut [NodeBelowTheRoot],
+) {
+    // 迭代上界是这一路的节点数；每一轮只动这一层与它上一层。
+    for position in (0..path.len()).rev() {
+        let (above, from_here) = path.split_at_mut(position);
+        let node = &mut from_here[0];
+        reseal_index_node(&mut node.bytes);
+        write_unit_to_both_devices(image, node.devices, node.slot, &node.bytes);
+        let checksum = crc32_castagnoli_table(&node.bytes);
+        let parent: &mut [u8] = match above.last_mut() {
+            Some(parent) => &mut parent.bytes,
+            None => root_node,
+        };
+        let pointer_start = IndexNodeEntryLayout::of(parent)
+            .offset_of_entry(node.entry_index_in_the_parent)
+            + index_node_key_width(parent);
+        write_unit_checksum_into_both_locations(
+            &mut parent[pointer_start..pointer_start + 86],
+            checksum,
+        );
+    }
+}
+
 /// 把改过的链逐环写回镜像：树根 → 树表条目里的整单元校验和 → 树表节点 → 根记录里的整单元校验和 → 根槽的自证校验和。
 /// 少重算一道，读者在解析之前就先拒了，指着普查那几族的坏法一次也打不到。
 fn seal_and_write_back_the_chain(mut chain: ChainToATreeRoot, image: &mut MemoryPool) {
@@ -1947,31 +2030,31 @@ enum AllocationRecordDamage {
     InstanceTablePlacementReleasedOnTheSecondDeviceOnly,
 }
 
-/// 把「根槽 → 树表 → 分配记录树根」这条链上第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」
-/// （越过单元区末尾，普查 R6 / R7），并把链上的五道校验和逐道重算：分配记录树根两道 →
-/// 树表条目里那条根指针的整单元校验和 → 树表节点两道 → 根槽里树表指针的整单元校验和 → 根槽的自证校验和。
+/// 把「根槽 → 树表 → 分配记录树根 → …… → 最左那片叶」这条链上那片叶的第一条分配记录改成「起点贴着单元区末尾、跨度 32767 槽」
+/// （越过单元区末尾，普查 R6 / R7），并把链上的校验和逐道重算：叶两道 → 上一层第 0 条条目子指针里的整单元校验和、那一层两道 →
+/// …… → 分配记录树根两道 → 树表条目里那条根指针的整单元校验和 → 树表节点两道 → 根槽里树表指针的整单元校验和 → 根槽的自证校验和。
 ///
-/// **槽号也要挪，只改跨度不够**：几何判那四样按「设备身份 → 槽号下界 → 跨度上界 → 同盘两条罩同一个槽」的次序判，
-/// 一条从单元区低处起跨 32767 槽的记录会先被**最后**那一样接走（它罩过了后面每一条记录），
-/// 于是「跨度越过单元区末尾」那一判被遮蔽、去掉它也不红。挪到 `unit_area_end_slot - 1` 之后这条记录谁都不罩，
-/// 跨度那一判是**唯一**拦着它的东西。
+/// **分配记录树按绝对槽号按位置寻址之后（D8（核心索引结构） 已定项 14）**，这条记录先撞上的是叶那一判：起点不在这片叶按位置罩的那一段里
+/// （读者报「分配记录不在它所在叶按位置罩的那一段里，或末槽越过叶的末槽」）。「跨度越过单元区末尾」那一判只剩罩着盘末尾的那片叶上
+/// 的记录够得着（一条落在叶里、末槽越过盘末尾的记录），这条坏法打不到它。
 ///
-/// **三份字节由调用方从盘上读来、改完自己写回去**：坏盘输入那一路读的是 [`MemoryPool`]，
-/// 步 4 回退那一路读的是录制设备，两边共用这一份，偏移与重算口径只有这一处
+/// **字节由调用方从盘上读来、改完自己写回去**：`allocation_tree_nodes_from_the_root` 是从根起、每层沿第 0 条条目往下读到的那一路
+/// （根在前、叶在末）。坏盘输入那一路读的是 [`MemoryPool`]，步 4 回退那一路读的是录制设备，两边共用这一份，偏移与重算口径只有这一处
 /// （`code-discipline.md`「重复要生成，不许手抄」）。跨度字段整个写成
 /// [`SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED`]：跨度取低 15 位的最大值、已释放位跟着清掉
 /// （只有还着的记录才会被影子账拿去隔离）。
 ///
-/// 交回「坏在哪」那句话；树表里没有分配记录树、它的根不是叶、或者一条记录都没有时交回 `None`。
+/// 交回「坏在哪」那句话；树表里没有分配记录树、这一路的末一个不是叶、中间有一层没有条目、或者叶里一条记录都没有时交回 `None`。
 #[must_use]
 pub fn move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain(
     root_slot: &mut [u8],
     tree_table_node: &mut [u8],
-    allocation_tree_node: &mut [u8],
+    allocation_tree_nodes_from_the_root: &mut [Vec<u8>],
     unit_area_end_slot: u64,
 ) -> Option<String> {
-    let layout = IndexNodeEntryLayout::of(allocation_tree_node);
-    if layout.entry_count == 0 || !index_node_is_a_leaf(allocation_tree_node) {
+    let leaf = allocation_tree_nodes_from_the_root.last_mut()?;
+    let layout = IndexNodeEntryLayout::of(leaf);
+    if layout.entry_count == 0 || !index_node_is_a_leaf(leaf) {
         return None;
     }
     let tree_table_layout = IndexNodeEntryLayout::of(tree_table_node);
@@ -1984,22 +2067,36 @@ pub fn move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal
 
     let first_entry = layout.offset_of_entry(0);
     let slot_offset = first_entry + ALLOCATION_RECORD_SLOT_OFFSET;
-    let old_slot = read_six_byte_unsigned_at(allocation_tree_node, slot_offset);
+    let old_slot = read_six_byte_unsigned_at(leaf, slot_offset);
     let last_slot_of_the_unit_area = unit_area_end_slot.checked_sub(1)?;
-    write_six_byte_unsigned_at(
-        allocation_tree_node,
-        slot_offset,
-        last_slot_of_the_unit_area,
-    );
+    write_six_byte_unsigned_at(leaf, slot_offset, last_slot_of_the_unit_area);
     let span_offset = first_entry + ALLOCATION_RECORD_SPAN_OFFSET;
-    let old_span_field = read_u16_at(allocation_tree_node, span_offset);
-    allocation_tree_node[span_offset..span_offset + 2]
+    let old_span_field = read_u16_at(leaf, span_offset);
+    leaf[span_offset..span_offset + 2]
         .copy_from_slice(&SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED.to_le_bytes());
-    reseal_index_node(allocation_tree_node);
+    reseal_index_node(leaf);
+    // 迭代上界是这一路的节点数；每一轮把下一层的整单元校验和写进这一层第 0 条条目的子指针、再封这一层。
+    for level_from_the_root in (0..allocation_tree_nodes_from_the_root.len() - 1).rev() {
+        let (above, below) =
+            allocation_tree_nodes_from_the_root.split_at_mut(level_from_the_root + 1);
+        let node = above.last_mut()?;
+        let child_checksum = crc32_castagnoli_table(&below[0]);
+        let node_layout = IndexNodeEntryLayout::of(node);
+        if node_layout.entry_count == 0 || index_node_is_a_leaf(node) {
+            return None;
+        }
+        let pointer_start = node_layout.offset_of_entry(0) + index_node_key_width(node);
+        write_unit_checksum_into_both_locations(
+            &mut node[pointer_start..pointer_start + 86],
+            child_checksum,
+        );
+        reseal_index_node(node);
+    }
+    let allocation_tree_root = allocation_tree_nodes_from_the_root.first()?;
 
     let root_pointer_start = tree_table_layout.offset_of_entry(allocation_entry_index)
         + TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET;
-    let allocation_tree_checksum = crc32_castagnoli_table(allocation_tree_node);
+    let allocation_tree_checksum = crc32_castagnoli_table(allocation_tree_root);
     write_unit_checksum_into_both_locations(
         &mut tree_table_node[root_pointer_start..root_pointer_start + 86],
         allocation_tree_checksum,
@@ -2015,31 +2112,73 @@ pub fn move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal
     reseal_wide_checksum_field(root_slot, cover_end, ROOT_SELF_CHECKSUM_OFFSET);
 
     Some(format!(
-        "分配器：这条根那棵账里第一条分配记录的槽号 {old_slot} → {last_slot_of_the_unit_area}（单元区末尾是 {unit_area_end_slot}）、跨度字段 {old_span_field:#06x} → {SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED:#06x}（跨度 {} → 32767 槽，已释放位清掉）；链上五道校验和重算",
+        "分配器：这条根那棵账里第一条分配记录的槽号 {old_slot} → {last_slot_of_the_unit_area}（单元区末尾是 {unit_area_end_slot}）、跨度字段 {old_span_field:#06x} → {SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED:#06x}（跨度 {} → 32767 槽，已释放位清掉）；链上每一道校验和重算",
         old_span_field & SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED
     ))
 }
 
-/// 分配器那一族：把分配记录树根里的一条记录改坏（普查 R6 / R7 / R8 / R9）。
+/// 分配记录树（按绝对槽号按位置寻址，D8（核心索引结构） 已定项 14）里一把 key 的两段：(盘, 槽号)，按数值比（盘上小端，逐字节比不对）。
+fn allocation_record_key_fields(key: &[u8]) -> (u32, u64) {
+    (
+        read_u32_at(key, ALLOCATION_RECORD_DEVICE_OFFSET),
+        read_six_byte_unsigned_at(key, ALLOCATION_RECORD_SLOT_OFFSET),
+    )
+}
+
+/// 分配器那一族：把分配记录树某一片叶里的一条记录改坏（普查 R6 / R7 / R8 / R9）。分配记录树按位置寻址、根恒在第 1 层以上
+/// （D8（核心索引结构） 已定项 14）：记录住在叶里，改哪一片叶按坏法定（实例表那一条改它所在的那片，别的改最左那片），
+/// 改完沿路往上把整单元校验和补到根、再补树表与根槽。
 fn rewrite_an_allocation_record(
     image: &mut MemoryPool,
     damage: AllocationRecordDamage,
 ) -> Option<String> {
     let mut chain = open_chain_to_the_root_of(image, TREE_KIND_ALLOCATION_RECORDS)?;
-    let layout = IndexNodeEntryLayout::of(&chain.tree_root_node);
-    // 内部节点的条目不是分配记录（那几棵树的内部条目格式还没有条款），只坏叶。
-    if layout.entry_count == 0 || !index_node_is_a_leaf(&chain.tree_root_node) {
+    let target_key = match damage {
+        AllocationRecordDamage::InstanceTablePlacementReleasedOnTheSecondDeviceOnly => {
+            let instance_table_pointer = &chain.root_slot
+                [ROOT_INSTANCE_TABLE_POINTER_OFFSET..ROOT_INSTANCE_TABLE_POINTER_OFFSET + 86];
+            (
+                read_u32_at(
+                    instance_table_pointer,
+                    POINTER_SECOND_LOCATION_OFFSET + LOCATION_DEVICE_OFFSET_IN_ENTRY,
+                ),
+                read_six_byte_unsigned_at(
+                    instance_table_pointer,
+                    POINTER_FIRST_LOCATION_OFFSET + LOCATION_SLOT_OFFSET_IN_ENTRY,
+                ),
+            )
+        }
+        AllocationRecordDamage::SlotBelowTheUnitArea
+        | AllocationRecordDamage::SpanPastTheEndOfTheUnitArea
+        | AllocationRecordDamage::SameSlotAsTheSecondRecord
+        | AllocationRecordDamage::DeviceOutsideThePool => (0, 0),
+    };
+    let mut path = path_down_to_the_leaf_holding(image, &chain.tree_root_node, &|entry_key| {
+        allocation_record_key_fields(entry_key) <= target_key
+    })?;
+    let leaf = &mut path.last_mut()?.bytes;
+    let what = damage_an_allocation_record_in_the_leaf(leaf, &chain.root_slot, damage)?;
+    reseal_the_path_below_the_root(image, &mut chain.tree_root_node, &mut path);
+    seal_and_write_back_the_chain(chain, image);
+    Some(what)
+}
+
+/// 把 `leaf`（分配记录树的一片叶）里的一条记录按坏法改掉；交回「坏在哪」那句话，这片叶上没有要坏的对象时交回 `None`。
+fn damage_an_allocation_record_in_the_leaf(
+    leaf: &mut [u8],
+    root_slot: &[u8],
+    damage: AllocationRecordDamage,
+) -> Option<String> {
+    let layout = IndexNodeEntryLayout::of(leaf);
+    if layout.entry_count == 0 || !index_node_is_a_leaf(leaf) {
         return None;
     }
     let first_entry = layout.offset_of_entry(0);
     let what = match damage {
         AllocationRecordDamage::SlotBelowTheUnitArea => {
-            let old = read_six_byte_unsigned_at(
-                &chain.tree_root_node,
-                first_entry + ALLOCATION_RECORD_SLOT_OFFSET,
-            );
+            let old = read_six_byte_unsigned_at(leaf, first_entry + ALLOCATION_RECORD_SLOT_OFFSET);
             write_six_byte_unsigned_at(
-                &mut chain.tree_root_node,
+                leaf,
                 first_entry + ALLOCATION_RECORD_SLOT_OFFSET,
                 SLOT_FAR_BELOW_THE_UNIT_AREA,
             );
@@ -2049,8 +2188,8 @@ fn rewrite_an_allocation_record(
         }
         AllocationRecordDamage::SpanPastTheEndOfTheUnitArea => {
             let span_offset = first_entry + ALLOCATION_RECORD_SPAN_OFFSET;
-            let old = read_u16_at(&chain.tree_root_node, span_offset);
-            chain.tree_root_node[span_offset..span_offset + 2].copy_from_slice(
+            let old = read_u16_at(leaf, span_offset);
+            leaf[span_offset..span_offset + 2].copy_from_slice(
                 &SPAN_FIELD_HOLDING_THE_LARGEST_SPAN_AND_NOT_RELEASED.to_le_bytes(),
             );
             format!(
@@ -2063,9 +2202,9 @@ fn rewrite_an_allocation_record(
                 return None;
             }
             let second_entry = layout.offset_of_entry(1);
-            let key_width = index_node_key_width(&chain.tree_root_node);
-            let second_key = chain.tree_root_node[second_entry..second_entry + key_width].to_vec();
-            chain.tree_root_node[first_entry..first_entry + key_width].copy_from_slice(&second_key);
+            let key_width = index_node_key_width(leaf);
+            let second_key = leaf[second_entry..second_entry + key_width].to_vec();
+            leaf[first_entry..first_entry + key_width].copy_from_slice(&second_key);
             format!(
                 "分配器：第一条分配记录的 key 换成第二条的（盘 {}、槽 {}），两条罩住同一个槽",
                 read_u32_at(&second_key, ALLOCATION_RECORD_DEVICE_OFFSET),
@@ -2074,8 +2213,8 @@ fn rewrite_an_allocation_record(
         }
         AllocationRecordDamage::DeviceOutsideThePool => {
             let device_offset = first_entry + ALLOCATION_RECORD_DEVICE_OFFSET;
-            let old = read_u32_at(&chain.tree_root_node, device_offset);
-            chain.tree_root_node[device_offset..device_offset + 4]
+            let old = read_u32_at(leaf, device_offset);
+            leaf[device_offset..device_offset + 4]
                 .copy_from_slice(&DEVICE_IDENTITY_OUTSIDE_THE_POOL.to_le_bytes());
             format!(
                 "分配器：第一条分配记录的设备身份 {old} → {DEVICE_IDENTITY_OUTSIDE_THE_POOL}（池里只有 0 与 1）"
@@ -2084,7 +2223,7 @@ fn rewrite_an_allocation_record(
         AllocationRecordDamage::InstanceTablePlacementReleasedOnTheSecondDeviceOnly => {
             // 这一版实例表的落点：每次发布都重写实例表，所以这个落点一定走到释放判定路径
             // （`TransactionUnit::InstanceTable` 的落点从根记录里那条指针取，不经映射）。
-            let instance_table_pointer = &chain.root_slot
+            let instance_table_pointer = &root_slot
                 [ROOT_INSTANCE_TABLE_POINTER_OFFSET..ROOT_INSTANCE_TABLE_POINTER_OFFSET + 86];
             let slot = read_six_byte_unsigned_at(
                 instance_table_pointer,
@@ -2097,30 +2236,25 @@ fn rewrite_an_allocation_record(
             );
             let entry_index = (0..layout.entry_count).find(|index| {
                 let entry = layout.offset_of_entry(*index);
-                read_u32_at(
-                    &chain.tree_root_node,
-                    entry + ALLOCATION_RECORD_DEVICE_OFFSET,
-                ) == second_device
-                    && read_six_byte_unsigned_at(
-                        &chain.tree_root_node,
-                        entry + ALLOCATION_RECORD_SLOT_OFFSET,
-                    ) == slot
+                read_u32_at(leaf, entry + ALLOCATION_RECORD_DEVICE_OFFSET) == second_device
+                    && read_six_byte_unsigned_at(leaf, entry + ALLOCATION_RECORD_SLOT_OFFSET)
+                        == slot
             })?;
             let entry = layout.offset_of_entry(entry_index);
             let span_offset = entry + ALLOCATION_RECORD_SPAN_OFFSET;
-            let old_span_field = read_u16_at(&chain.tree_root_node, span_offset);
+            let old_span_field = read_u16_at(leaf, span_offset);
             if old_span_field & SPAN_FIELD_RELEASED_BIT != 0 {
                 return None;
             }
-            chain.tree_root_node[span_offset..span_offset + 2]
+            leaf[span_offset..span_offset + 2]
                 .copy_from_slice(&(old_span_field | SPAN_FIELD_RELEASED_BIT).to_le_bytes());
             let generation_offset = entry + ALLOCATION_RECORD_GENERATION_OFFSET;
             let old_generation = u64::from_le_bytes(
-                chain.tree_root_node[generation_offset..generation_offset + 8]
+                leaf[generation_offset..generation_offset + 8]
                     .try_into()
                     .expect("8 字节"),
             );
-            chain.tree_root_node[generation_offset..generation_offset + 8]
+            leaf[generation_offset..generation_offset + 8]
                 .copy_from_slice(&RELEASE_GENERATION_ABOVE_EVERY_ROOT.to_le_bytes());
             format!(
                 "分配器：实例表落点（槽 {slot}）在盘 {second_device} 上那条分配记录（第 {entry_index} 条）改成已释放、释放代 {old_generation} → {RELEASE_GENERATION_ABOVE_EVERY_ROOT}（高过任何根，挂载时不会被回收掉）；盘 {} 上那条原样",
@@ -2131,7 +2265,6 @@ fn rewrite_an_allocation_record(
             )
         }
     };
-    seal_and_write_back_the_chain(chain, image);
     Some(what)
 }
 
@@ -2220,22 +2353,62 @@ fn make_two_location_entries_disagree_on_the_slot(image: &mut MemoryPool) -> Opt
     ))
 }
 
-/// 判别力那一条：把最新那条根下 extent 树第一条记录指的数据单元整个重写，**只**重算这个单元自己的两道校验和，
-/// extent 记录里位置条目上的整单元校验和原样留着。
-/// 挡着它的只有恢复里 `read_unit_via_locations` 那一道整单元 CRC 比对：去掉它，恢复就读回这一版从没提交过的内容。
-fn rewrite_a_data_unit_resealing_only_its_own_checksums(image: &mut MemoryPool) -> Option<String> {
+/// extent 树上段叶条目的标签：载荷是下段根的节点指针 / 这个文件唯一那个数据单元的数据指针（D8（核心索引结构） 已定项 14）。
+const EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT: u8 = 1;
+const EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT: u8 = 2;
+
+/// 最新那条根下 extent 树第一个数据单元的数据指针那 88 字节：extent 树按位置寻址（D8（核心索引结构） 已定项 14），
+/// 上段沿第 0 条条目走到最左那片叶，取第一条上段叶条目（key 24 + 标签 1 + 载荷 88）；标签 2 时载荷就是那个数据指针，
+/// 标签 1 时载荷的前 86 字节是下段根指针，下段再沿第 0 条条目走到最左那片叶，取第一条 extent 叶记录（key 24 + 数据指针 88）的指针。
+/// 哪一步走不通（条目宽窄于字段表、标签是 0 或不认识、节点读不出）交回 `None`。
+fn first_data_pointer_of_the_extent_tree(image: &MemoryPool) -> Option<Vec<u8>> {
     let chain = open_chain_to_the_root_of(image, TREE_KIND_EXTENT)?;
-    let layout = IndexNodeEntryLayout::of(&chain.tree_root_node);
-    if layout.entry_count == 0
-        || !index_node_is_a_leaf(&chain.tree_root_node)
-        || layout.entry_width < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112")
-    {
+    let upper_path = path_down_to_the_leaf_holding(image, &chain.tree_root_node, &|_| false)?;
+    let upper_leaf: &[u8] = upper_path
+        .last()
+        .map_or(chain.tree_root_node.as_slice(), |node| {
+            node.bytes.as_slice()
+        });
+    let upper_layout = IndexNodeEntryLayout::of(upper_leaf);
+    let key_width = index_node_key_width(upper_leaf);
+    if upper_layout.entry_count == 0 || upper_layout.entry_width < key_width + 1 + 88 {
         return None;
     }
-    let key_width = index_node_key_width(&chain.tree_root_node);
-    let data_pointer_start = layout.offset_of_entry(0) + key_width;
-    let view =
-        parse_data_pointer(&chain.tree_root_node[data_pointer_start..data_pointer_start + 88]);
+    let tag_offset = upper_layout.offset_of_entry(0) + key_width;
+    let payload = &upper_leaf[tag_offset + 1..tag_offset + 1 + 88];
+    match upper_leaf[tag_offset] {
+        EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT => Some(payload.to_vec()),
+        EXTENT_UPPER_LEAF_ENTRY_TAG_LOWER_SEGMENT_ROOT => {
+            let (_, _, lower_root) = read_unit_via_pointer(
+                image,
+                &payload[..86],
+                usize::try_from(NODE_BYTES).expect("16384"),
+            )?;
+            let lower_path = path_down_to_the_leaf_holding(image, &lower_root, &|_| false)?;
+            let lower_leaf: &[u8] = lower_path
+                .last()
+                .map_or(lower_root.as_slice(), |node| node.bytes.as_slice());
+            let lower_layout = IndexNodeEntryLayout::of(lower_leaf);
+            if lower_layout.entry_count == 0
+                || lower_layout.entry_width
+                    < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112")
+            {
+                return None;
+            }
+            let data_pointer_start =
+                lower_layout.offset_of_entry(0) + index_node_key_width(lower_leaf);
+            Some(lower_leaf[data_pointer_start..data_pointer_start + 88].to_vec())
+        }
+        _ => None,
+    }
+}
+
+/// 判别力那一条：把最新那条根下 extent 树第一个数据单元整个重写，**只**重算这个单元自己的两道校验和，
+/// 指着它的那条数据指针里位置条目上的整单元校验和原样留着。
+/// 挡着它的只有恢复里 `read_unit_via_locations` 那一道整单元 CRC 比对：去掉它，恢复就读回这一版从没提交过的内容。
+fn rewrite_a_data_unit_resealing_only_its_own_checksums(image: &mut MemoryPool) -> Option<String> {
+    let data_pointer = first_data_pointer_of_the_extent_tree(image)?;
+    let view = parse_data_pointer(&data_pointer);
     if view.all_zero || view.locations[0].slot != view.locations[1].slot {
         return None;
     }

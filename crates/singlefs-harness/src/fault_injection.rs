@@ -1782,6 +1782,7 @@ fn measure_history(
     let measurement_execution = HistoryExecution {
         per_step_checker: PerStepChecker::Skipped,
         device_width: execution.device_width,
+        space_admission: execution.space_admission,
     };
     let measurement_plan = SharedFaultPlan::unarmed(geometry);
     let measurement_stream = SharedStream::new();
@@ -1906,7 +1907,9 @@ fn the_fault_surfaced_as_an_error(
 ///
 /// **白名单之外的签名照报成新发现**（用户 2026-09-21 定的收严）：别的签名（I-3.9、I-5.4、I-9.14 这一类）意味着
 /// 丢一份内容之外还发生了别的事，那一格不默认豁免——那才可能是实现的缺口。
-/// 白名单少一组，被它罩住的那几次当场变成新发现、快档判红（`crates/mutations.tsv` 里钉着 `["I-3.1"]` 那一组）。
+/// 白名单少一组，被它罩住的那几次当场变成新发现。快档那 24 段里说谎的设备留下的不一致全落在前一组，`["I-3.1"]` 那一组一次都没有；
+/// 那一组的取样点是故障注入那个二进制里的 `a_swallowed_write_after_which_the_checker_flags_only_i_3_1_is_excused_as_what_a_lying_device_may_leave`
+/// （`crates/mutations.tsv` 里钉着把那一组去掉的变异）。
 const INCONSISTENCIES_A_LYING_DEVICE_MAY_LEAVE: &[&[&str]] =
     &[&["I-2.1", "I-4.8", "I-7.4"], &["I-3.1"]];
 

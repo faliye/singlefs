@@ -11,7 +11,7 @@ use singlefs_core::allocator::PlacementRefusal;
 use singlefs_core::block_device::BlockDeviceError;
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::mount::{
-    InstanceRow, MountError, Mounted, PublishAfterAcquisitionFailed, RollbackCandidateExclusion,
+    InstanceRow, MountError, Mounted, PublishSequenceFailed, RollbackCandidateExclusion,
 };
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
 use singlefs_core::transaction::{
@@ -42,9 +42,12 @@ pub fn model_root_key(instance: InstanceGeneration, checkpoint_txg: CheckpointTx
     }
 }
 
+/// 实现的一个单元是模型的哪个角色。分配记录树根之下的节点不对应角色（`None`）：D8（核心索引结构） 已定项 14 按绝对槽号按位置寻址，
+/// 一次发布重写根之下哪几片由这次动了哪些槽定，模型不记落点、不记是哪几片（占槽只取上界）；那几片的分配代、位置与记录归池级 checker 判
+/// （I-1.1 位置、I-3.10 每个节点都有记录）。
 #[must_use]
-pub fn model_unit_role(unit: TransactionUnit) -> ModelUnitRole {
-    match unit {
+pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
+    let role = match unit {
         // 模型罩的发布（第一个文件版本 / 覆盖写、写行、暖机空发布）写的文件恒只有一个数据单元：多单元只会从
         // `publish_sequential_write` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它。
         TransactionUnit::Data(index) => {
@@ -55,7 +58,15 @@ pub fn model_unit_role(unit: TransactionUnit) -> ModelUnitRole {
             );
             ModelUnitRole::Data
         }
+        // 模型罩的文件恒一个数据单元、只有 inode 1：extent 树上段只有根兼叶，那个单元内嵌在它的条目里（D8（核心索引结构） 已定项 14），
+        // 没有下段、上段也没有根之下的节点。
         TransactionUnit::ExtentRoot => ModelUnitRole::ExtentRoot,
+        TransactionUnit::ExtentLowerNode(position) => {
+            panic!("模型今天只罩一个数据单元的文件（内嵌、没有下段）：{position:?}")
+        }
+        TransactionUnit::ExtentUpperNodeBelowTheRoot(position) => {
+            panic!("模型今天只罩 inode 1 一个文件（上段只有根兼叶）：{position:?}")
+        }
         // 模型罩的三种发布（第一个文件版本 / 覆盖写、写行、暖机空发布）里 inode 树恒只有最左那一片叶容器：
         // 第二片只会从 `publish_new_inodes` 那条路径出来，而随机历史与层 0 的固定脚本一次都不调它
         // （`history.rs` 的操作集合里没有「建 inode」，`ModelPublishKind` 也只有那三种）。
@@ -69,11 +80,24 @@ pub fn model_unit_role(unit: TransactionUnit) -> ModelUnitRole {
         }
         TransactionUnit::InodeRoot => ModelUnitRole::InodeRoot,
         TransactionUnit::AllocationTree => ModelUnitRole::AllocationTree,
+        TransactionUnit::AllocationTreeNodeBelowTheRoot(_) => return None,
+        // 模型罩的池两块盘、15 行记账，映射条目恒 6 条：两棵树恒只有一个节点（根兼叶），根之下的节点只在压小容量的
+        // 只供测试的开关下、或记账行装不下一个节点的池（80 块盘起）上出现，随机历史与层 0 的固定脚本都不装那个开关。
+        TransactionUnit::AccountingTreeNodeBelowTheRoot(position) => {
+            panic!("模型今天只罩记账树一个节点的池：{position:?}")
+        }
         TransactionUnit::AccountingTree => ModelUnitRole::AccountingTree,
+        TransactionUnit::MappingTreeNodeBelowTheRoot(position) => {
+            panic!("模型今天只罩中央映射树一个节点的池：{position:?}")
+        }
         TransactionUnit::MappingTree => ModelUnitRole::MappingTree,
         TransactionUnit::TreeTable => ModelUnitRole::TreeTable,
-        TransactionUnit::InstanceTable => ModelUnitRole::InstanceTable,
-    }
+        // 模型把实例表链当一个角色：各片的落点与分配记录按这次之后的行数现算片数（`model::instance_table_pages_for_rows`）。
+        TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
+            ModelUnitRole::InstanceTable
+        }
+    };
+    Some(role)
 }
 
 #[must_use]
@@ -92,7 +116,8 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
     let unit_allocation_records = output
         .units
         .iter()
-        .map(|unit| {
+        .filter_map(|unit| {
+            let role = model_unit_role(unit.identity)?;
             let records = output
                 .allocation_records
                 .iter()
@@ -103,7 +128,7 @@ pub fn observed_root_of_file_version(output: &TransactionOutput) -> ObservedRoot
                     is_released: record.is_released,
                 })
                 .collect();
-            (model_unit_role(unit.identity), records)
+            Some((role, records))
         })
         .collect();
     ObservedRoot {
@@ -166,12 +191,8 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         PublishError::PlacementRefused { refusal, .. } => {
             refusal_reason_of_placement_refusal(refusal)
         }
-        PublishError::AllocationRecordsExceedOneNode { .. } => {
-            explained(ModelRefusalReason::AllocationRecordNodeWall)
-        }
-        PublishError::AccountingEntriesExceedOneNode { .. } => {
-            explained(ModelRefusalReason::AccountingNodeWall)
-        }
+        // 空间准入（D28（挂载期承诺量） 已定项 1 的式子）判这次的普通分配不够：模型的「单元区装不下」就是这一条准入（模型答允许拒绝的区间）。
+        PublishError::SpaceAdmissionRefused(_) => explained(ModelRefusalReason::UnitAreaWall),
         PublishError::ContentExceedsDataUnit { .. } => {
             explained(ModelRefusalReason::ContentExceedsDataUnitPayload)
         }
@@ -182,26 +203,29 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
             explained(ModelRefusalReason::FirstFileVersionOnAVersionThatAlreadyHasAFile)
         }
         // 释放判定路径的五种：上一版的映射或分配记录与上一版对不上、盘上那条指针的两条位置条目不同槽，健康的历史里不该出现。
-        // extent 树要长内部节点那一条同理：随机历史一次都不调 `publish_sequential_write`，写的文件恒一个数据单元，它出现就是对不上。
-        // inode 树写入被拒与点名项装不下那两条同样：随机历史一次都不调 `publish_new_inodes`，
+        // 分配记录树重写集合迭代不收敛那一条同理：只有强制复用窗口为 0 的只供测试的开关下才可能走到，随机历史不装那个开关。
+        // inode 树写入被拒那一条同样：随机历史一次都不调 `publish_new_inodes`，
         // 而它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
-        // 映射节点装不下那一条同理：条目数 = 五个固定角色 + 叶容器数，随机历史里恒是 1 片叶 ⇒ 恒 6 条，
-        // 离一个节点的 294 条差得远；它出现就是模型与实现对不上。
-        PublishError::MappingEntriesExceedOneNode { .. }
+        // 多层码 2 树算不出形状那一条同理：两棵树装不下一个节点时分裂、不拒，只有长到 257 层或上一版的形状按分隔 key 走不通才拒，
+        // 随机历史里两棵树恒只有一个节点；它出现就是模型与实现对不上。
+        PublishError::MultiLevelCodeTwoTreeRefused { .. }
         | PublishError::InodeTreeWriteRefused(_)
-        | PublishError::MoreNamedUnitsThanOneJournalRecordHolds { .. }
-        | PublishError::ExtentTreeNeedsAnInternalNodeWhoseEntryFormatIsUndecided { .. }
+        | PublishError::AllocationRecordTreeRewriteSetDidNotSettle { .. }
         | PublishError::ReleaseNotInMapping { .. }
         | PublishError::ReleaseTargetNotAllocated { .. }
         | PublishError::ReleaseTargetAlreadyReleased { .. }
         | PublishError::ReleaseTargetLocationsOnDifferentSlots { .. }
         | PublishError::ReleaseSpanMismatch { .. }
         | PublishError::MappingEntryNarrowerThanItsFieldTable { .. }
-        // 释放之前读盘核校验和那一读没读到：健康的内存盘上读不会失败，出现就是对不上（读失败怎么办条款没定，模型里没有它的理由）。
-        | PublishError::ReleaseChecksumReadFailedWhoseHandlingIsUndecided { .. }
+        // 映射条目的位置项指池外的盘、或两条指同一块盘（当映射条目损坏）：只有坏镜像、外来镜像上有；
+        // 健康的内存盘上都不该出现，模型里没有它们的理由。
+        | PublishError::MappingEntryLocationOnADeviceOutsideThePool { .. }
+        | PublishError::MappingEntryLocationsOnTheSameDevice { .. }
         // 第一个文件版本读不出那一版的树表、水位离 u64::MAX 不到八个号：健康的内存盘上都不该出现。
         | PublishError::TreeTableOfTheVersionToBuildOnUnreadable { .. }
         | PublishError::TreeIdentifierWatermarkLeavesNoRoomForTheFileVersionTrees(_)
+        // 冻结着一次没重发的发布：随机历史里一次发布失败就整段停下、不接着发，健康的内存盘上不该出现。
+        | PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
         | PublishError::BlockDevice(_) => ObservedRefusalReason::Unexplained,
     }
 }
@@ -249,8 +273,9 @@ pub fn refusal_reason_of_block_device_error(_error: &BlockDeviceError) -> Observ
 #[must_use]
 pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReason {
     match error {
-        MountError::Publish(PublishAfterAcquisitionFailed { cause, .. })
-        | MountError::RaiseFloorSequencePublishFailed { cause, .. }
+        MountError::Publish(PublishSequenceFailed { cause, .. })
+        | MountError::RaiseFloorSequencePublishFailed(PublishSequenceFailed { cause, .. })
+        | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { cause, .. }
         | MountError::RowPublishAdmissionRefusedBeforeAcquisition { cause, .. }
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { cause, .. } => {
             refusal_reason_of_publish_error(cause)
@@ -261,21 +286,29 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         MountError::RollbackFloorAboveCeiling { .. } => {
             explained(ModelRefusalReason::FloorAboveCeiling)
         }
-        MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => {
-            explained(ModelRefusalReason::InstanceTableChainLongerThanOnePageUndecided)
+        // 取号之后那一串自己的落点在取号之前就取不到：说的是分配器那一条原因（每块盘上都没有 = 单元区墙）。
+        MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided {
+            refusal, ..
+        } => refusal_reason_of_placement_refusal(refusal),
+        // 取号之前空间准入不够（实例切换的预留拿不到）：同发布那一条，是模型的单元区墙。
+        MountError::SpaceAdmissionRefusedBeforeAcquisition { .. } => {
+            explained(ModelRefusalReason::UnitAreaWall)
         }
         // 树表 0 条、而实例表已经不是 mkfs 那一片：零故障走得到（写过行的那一版上再挂载一次），模型照代码今天的读法划进必须拒。
         MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. } => {
             explained(ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem)
         }
-        // 恢复失败、记录读不出、表解不开、取号失败、坏盘上才有的根、判定与取号之间号变了：健康的内存盘上都不该出现。
+        // 恢复失败、记录读不出、表解不开、取号失败、坏盘上才有的根、判定与取号之间号变了、有盘不带所选那一版（空盘、停在旧状态）、
+        // 交进来的盘少于 w 的下限（随机历史每次都交整池两块盘）：健康的内存盘上都不该出现。
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
         | MountError::Acquisition(_)
         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
-        | MountError::InstanceGenerationChangedBeforeAcquisition { .. } => {
+        | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
+        | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
+        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => {
             ObservedRefusalReason::Unexplained
         }
     }
@@ -291,15 +324,19 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::InstanceTableMalformed
         | MountError::Acquisition(_)
         | MountError::Publish(_)
-        | MountError::RaiseFloorSequencePublishFailed { .. }
+        | MountError::RaiseFloorSequencePublishFailed(_)
+        | MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite { .. }
         | MountError::RollbackTargetNotACandidate { .. }
         | MountError::VersionWithoutFileNotWrittenByMakeFilesystem { .. }
         | MountError::FormatTimeUnitLocationsOnDifferentSlots { .. }
         | MountError::RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { .. }
         | MountError::InstanceGenerationChangedBeforeAcquisition { .. }
+        | MountError::SpaceAdmissionRefusedBeforeAcquisition { .. }
         | MountError::RowPublishAdmissionRefusedBeforeAcquisition { .. }
         | MountError::WarmUpAdmissionRefusedBeforeAcquisition { .. }
-        | MountError::InstanceTableChainLongerThanOnePageUndecided { .. } => None,
+        | MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { .. }
+        | MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion { .. }
+        | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. } => None,
     }
 }
 
@@ -385,7 +422,7 @@ mod tests {
         ]
     }
 
-    /// 单元区墙的区间开着时（单元区只有 640 槽的小盘，第一个文件之后占槽上界 13 × 64 > 640），发布的落点被拒：每块盘上都没有（容量不够）
+    /// 单元区墙的区间开着时（单元区只有 640 槽的小盘，第一个文件之后占槽上界 17 × 64 > 640），发布的落点被拒：每块盘上都没有（容量不够）
     /// 映射成单元区墙、模型放行；小盘写满、各盘落点不一致是第一版不支持的池形状，映射成模型没有的理由、判「模型说该成、实现拒了」
     /// （增补 3 第 2 件代码三方第一轮判决第三节第 2 条：此前 `NoSpaceFor` 装着这四种、一律映射成单元区墙，区间一开就被接走）。
     #[test]
@@ -414,7 +451,6 @@ mod tests {
                 publishes_completed: 0,
                 wrote_anything: false,
                 reported_ceiling: None,
-                allocation_records_counted_on_the_image: None,
             };
             let judged = model
                 .clone()

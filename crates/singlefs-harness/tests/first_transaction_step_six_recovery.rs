@@ -73,7 +73,8 @@ fn probes() -> Vec<Probe> {
         common::parameters().region_devices[usize::try_from(newest_root.region).expect("区域号")];
     let journal_record_three = record_offset(FIRST_TRANSACTION_TXG, JOURNAL_RING_DEFAULT_BYTES);
     let data_offset = SlotNumber(50180).to_device_offset();
-    let tree_table_offset = SlotNumber(50248).to_device_offset();
+    // 第一个事务的树表落在分配记录树五个节点、记账树、映射树之后（D8（核心索引结构） 已定项 14 之后是 50252）。
+    let tree_table_offset = SlotNumber(50252).to_device_offset();
     let both = |offset: DeviceOffsetInBytes, byte: u64| {
         vec![
             (DeviceIdentity(0), offset, byte),
@@ -184,7 +185,7 @@ fn probes_behave_as_milestone_step_six_expects() {
         (
             "tree_table_both_copies",
             failed(RecoveryFailure::UnitUnreadable {
-                slot: SlotNumber(50248),
+                slot: SlotNumber(50252),
             }),
             3,
             0,
