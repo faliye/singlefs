@@ -1,0 +1,10 @@
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-core/src/mount.rs	2026-09-25 01:54:51.710902883 +0000
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree/crates/singlefs-core/src/mount.rs	2026-09-25 04:21:04.018024353 +0000
+@@ -1854,6 +1854,7 @@
+     allocator.set_space_admission(start.space_admission);
+     match start.space_admission {
+         SpaceAdmission::JudgedByTheFormula => {
++            if std::env::var("SONNET_S4_TRACE").is_ok() { eprintln!("S4TRACE ==MOUNT_CHECK=="); }
+             let no_demand_on_any_device: Vec<DemandOnDevice> = allocator
+                 .devices
+                 .iter()

@@ -1,0 +1,7 @@
+R3OPUS-DRYRUN quarantined=false same=true publishes_planned=2 publishes_taken=2 differing=[] planned=[[50304, 50306, 50307, 50308, 50309, 50310, 50311], [50312, 50313, 50314, 50315, 50316, 50317]] taken=[[50304, 50306, 50307, 50308, 50309, 50310, 50311], [50312, 50313, 50314, 50315, 50316, 50317]]
+R3OPUS-RELEASED [[50176, 50245, 50246, 50247, 50248, 50249, 50250], [50306, 50307, 50308, 50309, 50310, 50311]]
+R3OPUS-BURN width=UnitAreaOf240Slots unit_area=Some("312") bad_slot=50245 fired=2 ending=NewFinding[ModelDisagreement { aspect: "拒绝之前写了盘" }]@Operation(25)
+R3OPUS-BURN step 24: Refused { member: "PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)" }
+R3OPUS-BURN step 25: Refused { member: "MountError::Publish(PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))" }
+R3OPUS-BURN after Operation(23): system configuration instance generation Ok(InstanceGeneration(2))
+R3OPUS-BURN after Operation(24): system configuration instance generation Ok(InstanceGeneration(2))

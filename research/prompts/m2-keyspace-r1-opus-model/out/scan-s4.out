@@ -1,0 +1,14 @@
+2026-09-24T09:31:43Z
+SCAN S4-Absent-LookBack-even-region32 histories=1148 publishes=2229 refused=0 too_big=498 states=131119117282 closed_form=9619586216744645104 classes=2035000152 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=34881 max_units=30 alloc_nodes=27617 ext_nodes=3633 leaves_by_alloc_chain=11802 max_segment_writes=60 red_reasons={} secs=3035
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=82
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=97
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=454
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=180
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=2221
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 3035.81s
+2026-09-24T10:22:19Z

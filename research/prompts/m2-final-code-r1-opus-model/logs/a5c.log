@@ -1,0 +1,69 @@
+2026-09-24T17:12:15Z
+warning: unused imports: `CheckpointTxg` and `InstanceGeneration`
+   --> crates/singlefs-harness/tests/opus_r1_attack.rs:386:30
+    |
+386 | use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
+    |                              ^^^^^^^^^^^^^                       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r1_attack") generated 1 warning (run `cargo fix --test "opus_r1_attack" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.81s
+     Running tests/opus_r1_attack.rs (/tmp/claude-1000/m2-final-code-r1-opus/target2/release/deps/opus_r1_attack-89915c639d7b9cff)
+
+running 1 test
+OBS a5c mount#0 ok instance=1 rows_written=0 allocation_records=4 released=0
+OBS a5c mount#25 ok instance=26 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#50 ok instance=51 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#75 ok instance=76 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#100 ok instance=101 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#125 ok instance=126 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#150 ok instance=151 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#175 ok instance=176 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#200 ok instance=201 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#225 ok instance=226 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#250 ok instance=251 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#275 ok instance=276 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#300 ok instance=301 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#325 ok instance=326 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#350 ok instance=351 rows_written=1 allocation_records=40 released=34
+OBS a5c mount#375 ok instance=376 rows_written=1 allocation_records=52 released=44
+OBS a5c mount#400 ok instance=401 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#425 ok instance=426 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#450 ok instance=451 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#475 ok instance=476 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#500 ok instance=501 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#525 ok instance=526 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#550 ok instance=551 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#575 ok instance=576 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#600 ok instance=601 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#625 ok instance=626 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#650 ok instance=651 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#675 ok instance=676 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#700 ok instance=701 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#725 ok instance=726 rows_written=1 allocation_records=58 released=50
+OBS a5c mount#750 ok instance=751 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#775 ok instance=776 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#800 ok instance=801 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#825 ok instance=826 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#850 ok instance=851 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#875 ok instance=876 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#900 ok instance=901 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#925 ok instance=926 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#950 ok instance=951 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#975 ok instance=976 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1000 ok instance=1001 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1025 ok instance=1026 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1050 ok instance=1051 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1075 ok instance=1076 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1100 ok instance=1101 rows_written=1 allocation_records=76 released=66
+OBS a5c mount#1125 ok instance=1126 rows_written=1 allocation_records=94 released=82
+OBS a5c mount#1150 ok instance=1151 rows_written=1 allocation_records=94 released=82
+OBS a5c mount#1175 ok instance=1176 rows_written=1 allocation_records=94 released=82
+OBS a5c no refusal in 1200 mounts; last: mount#1199 ok instance=1200 rows_written=1 allocation_records=94 released=82
+test z4_a5c_plain_mounts_on_a_pool_without_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 48.16s
+
+rc=0
+2026-09-24T17:13:06Z

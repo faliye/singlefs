@@ -1,0 +1,41 @@
+S1W	FourGibibytes	30	target=(13, 2)	control	ok#3	target_in_ring=false
+S1W	FourGibibytes	30	write	k=1	Acquisition	burned=false	target_in_ring=true	retry=ok#3	writable=ok#3	probe=-
+S1W	FourGibibytes	30	write	k=2	Acquisition	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=3	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=4	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=5	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=6	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=7	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=8	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=9	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=10	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=11	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=12	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=13	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=14	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=15	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=16	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=17	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=18	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=19	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=20	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=21	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=22	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=23	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=24	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=25	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=26	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=27	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	write	k=28	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=ABANDONED:Some((2, 35)):unreadable=1
+S1W	FourGibibytes	30	write	k=29	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=30	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=31	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=32	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=33	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=34	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=35	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=36	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=37	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=38	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=39	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1
+S1W	FourGibibytes	30	write	k=40	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 13)):unreadable=1

@@ -294,6 +294,12 @@ fn additive_conclusion_from_upper_bound(threshold_sum: RationalNumber) -> Option
         None
     }
 }
+/// `additive_conclusion_from_upper_bound` 的「不重开」只在 byte_share < band_lower_bound() 时
+/// 站得住：它依赖「C5 < 0」，而 C5 < 0 只在交叉点以下成立（登记第四节丙类）。byte_share 落在
+/// 带内或越过带上沿时，C5 符号未定，这个捷径不适用，要第二段实测。
+fn additive_upper_bound_shortcut_applicable(byte_share: RationalNumber) -> bool {
+    byte_share < band_lower_bound() // M23 目标：把 < 改成 <=，band_lower_bound 本身那一点就会误判成适用
+}
 
 // ============================== 两类模型换算 ==============================
 
@@ -391,6 +397,22 @@ fn random_share_mapping_only_random_tier() -> FiveTierShares {
 /// M2：「小操作档都是随机小读」(0, 1, 1, 0, 1)。
 fn random_share_mapping_small_operation_tiers() -> FiveTierShares {
     [RationalNumber::zero(), RationalNumber::one(), RationalNumber::one(), RationalNumber::zero(), RationalNumber::one()]
+}
+
+/// 用户 2026-09-24 给的 D25（目标负载优先级） 已定项 1 表权重列：seq 60、metaheavy 10、rand 10、
+/// multistream 10、smallfile 10（合计 100，单位 %）。原话与选项：
+/// `records/2026-09-24-里程碑二收尾调度.md` 第三节「D25 五档权重」那一行。
+/// 只是 w；b（各档自己的随机小读份额）在 E16、E140 里都读不到（文件头与第三节第 6 条：
+/// E16 的 `generate_operations` 只产写、没有读操作，`smallfile` 在 E16 里完全没有；E140 的
+/// 负载只有 `rand`/`randq`/`seq` 三档、不按 D25 的五档分），这个函数不产生 b，只产生 w。
+fn five_tier_weights_given_by_user_2026_09_24() -> FiveTierShares {
+    [
+        RationalNumber::new(60, 100), // seq
+        RationalNumber::new(10, 100), // metaheavy
+        RationalNumber::new(10, 100), // rand
+        RationalNumber::new(10, 100), // multistream
+        RationalNumber::new(10, 100), // smallfile
+    ]
 }
 
 const EPSILON_SAMPLE_POINTS: [(&str, i128, i128); 7] =
@@ -803,6 +825,40 @@ fn main() {
         ),
     );
 
+    // ---------- 甲：用户 2026-09-24 给的真实 D25 权重（w），b 仍缺（岔路单第 1 行的续做） ----------
+    // b（各档自己的随机小读份额）在 E16、E140 里都读不到，登记没有写死能从它们算出 b 的办法
+    // （见 five_tier_weights_given_by_user_2026_09_24 的文档注释）；这两行只是把真实 w 代进登记里已有的两组
+    // 「拍的」illustrative b（M1、M2），不是甲的真实占比。
+    let real_weights = five_tier_weights_given_by_user_2026_09_24();
+    for &(mapping_name, mapping) in &[
+        ("only_random_tier", random_share_mapping_only_random_tier()),
+        ("small_operation_tiers", random_share_mapping_small_operation_tiers()),
+    ] {
+        let byte_share = weighted_byte_share(real_weights, mapping);
+        emit_weight_instance(
+            &mut emitter,
+            "real_weight_2026_09_24_illustrative_random_share",
+            mapping_name,
+            "seq60_metaheavy10_rand10_multistream10_smallfile10",
+            byte_share,
+        );
+        // emit_weight_instance 打出的 additive_upper_bound_at_* 三个字段，「不重开」那一档
+        // 只在 byte_share < band_lower_bound() 时站得住（C5 < 0 只在交叉点以下成立，见第四节
+        // 丙类「带下沿以下 Σ 有上界」）；这两个实例的 byte_share 都 ≥ 1.0%，那三个字段对它们
+        // 不适用，另起一行给出正确的「相加」结论：要第二段实测 C1、C5 才能判。
+        print_and_emit(
+            &mut emitter,
+            &format!(
+                "name=weight_sample_additive_conclusion kind=real_weight_2026_09_24_illustrative_random_share mapping={mapping_name} upper_bound_shortcut_applicable={} additive_conclusion=要第二段 reason=byte_share不小于1.0%_此时C5符号未定_登记第四节丙类的上界捷径只对byte_share小于下沿成立",
+                additive_upper_bound_shortcut_applicable(byte_share)
+            ),
+        );
+    }
+    print_and_emit(
+        &mut emitter,
+        "name=weight_arm_true_occupancy_unavailable missing_input=b tiers_missing_b=seq,metaheavy,rand,multistream,smallfile written_method_in_registration=无 reason=E16负载生成器只产写不产读_E140读不按D25档分_smallfile在D25已定项1表三列未测 note=以上两行name=weight_sample_kind=real_weight_2026_09_24_illustrative_random_share是把真实w代进登记已有的illustrative_b_M1_M2不是甲的真实占比",
+    );
+
     println!("{}", emitter.finish());
 }
 
@@ -1047,6 +1103,65 @@ mod tests {
         assert_eq!(weighted_byte_share(epsilon_weights(RationalNumber::new(5, 100)), only_random), RationalNumber::new(1, 80));
         assert_eq!(weighted_byte_share(epsilon_weights(RationalNumber::new(2, 100)), small_operation), RationalNumber::new(3, 200));
         assert_eq!(weighted_byte_share(epsilon_weights(RationalNumber::new(1, 100)), small_operation), RationalNumber::new(3, 400));
+    }
+
+    /// D25（目标负载优先级） 已定项 1 表权重列（用户 2026-09-24 给，`records/2026-09-24-里程碑二收尾调度.md`
+    /// 第三节「D25 五档权重」）：五个值与合计各钉一遍，任何一个数字错都会破坏合计 = 100%。
+    #[test]
+    fn five_tier_weights_given_by_user_2026_09_24_sum_to_one_and_match_the_records_table() {
+        let weights = five_tier_weights_given_by_user_2026_09_24();
+        let total = weights.iter().fold(RationalNumber::zero(), |accumulator, &value| accumulator + value);
+        assert_eq!(total, RationalNumber::one(), "五档权重合计应为 100%");
+        assert_eq!(weights[0], RationalNumber::new(60, 100), "seq");
+        assert_eq!(weights[1], RationalNumber::new(10, 100), "metaheavy");
+        assert_eq!(weights[2], RationalNumber::new(10, 100), "rand");
+        assert_eq!(weights[3], RationalNumber::new(10, 100), "multistream");
+        assert_eq!(weights[4], RationalNumber::new(10, 100), "smallfile");
+    }
+
+    /// 真实 w 代进登记已有的两组 illustrative b（M1、M2）：只是把已有函数用在新输入上，
+    /// 不是甲的真实占比（b 仍缺，见 five_tier_weights_given_by_user_2026_09_24 的文档注释）。
+    /// 另外核一遍：D25 这组权重恰好等于 ε 参数化在 ε = 40% 时的形状（seq 拿 1−ε，其余四档各 ε/4），
+    /// 两条构造路径给出同一个数组，不是巧合地各自对——是同一件事的两种写法。
+    #[test]
+    fn real_weight_arm_illustrative_random_share_positive_controls() {
+        let real_weights = five_tier_weights_given_by_user_2026_09_24();
+        let only_random = random_share_mapping_only_random_tier();
+        let small_operation = random_share_mapping_small_operation_tiers();
+
+        let byte_share_only_random = weighted_byte_share(real_weights, only_random);
+        assert_eq!(byte_share_only_random, RationalNumber::new(1, 10), "M1：只有 rand 档（10%）算随机小读");
+        assert_eq!(classify_against_band(byte_share_only_random, band_lower_bound(), band_upper_bound()), ThresholdSide::AboveUpperBound);
+
+        let byte_share_small_operation = weighted_byte_share(real_weights, small_operation);
+        assert_eq!(byte_share_small_operation, RationalNumber::new(3, 10), "M2：metaheavy+rand+smallfile 各 10% 相加");
+        assert_eq!(classify_against_band(byte_share_small_operation, band_lower_bound(), band_upper_bound()), ThresholdSide::AboveUpperBound);
+
+        // Q13：判据 1（读法 A）与占比无关，这两个 illustrative 点上仍等于锚点、仍未触发。
+        let distribution = pure_four_kibibyte_distribution();
+        assert_eq!(instance_judgement_one_value(byte_share_only_random, &distribution), anchor_multiplier());
+        assert_eq!(instance_judgement_one_value(byte_share_small_operation, &distribution), anchor_multiplier());
+        assert!(!judgement_one_triggered(anchor_multiplier()));
+
+        let epsilon_forty_percent = epsilon_weights(RationalNumber::new(40, 100));
+        assert_eq!(epsilon_forty_percent, real_weights, "ε=40% 的参数化 [1−ε, ε/4×4] 与 D25 2026-09-24 权重逐档相同");
+
+        // 相加：这两个实例的 byte_share 都 ≥ 1.0%（band_lower），第四节丙类的上界捷径
+        // （C5 < 0）只在 byte_share < band_lower 时成立，这里不适用——要第二段实测 C1、C5
+        // 才能判「相加」，不能沿用 emit_weight_instance 打出的 additive_upper_bound_at_0.136。
+        assert!(byte_share_only_random >= band_lower_bound());
+        assert!(byte_share_small_operation >= band_lower_bound());
+        assert!(!additive_upper_bound_shortcut_applicable(byte_share_only_random));
+        assert!(!additive_upper_bound_shortcut_applicable(byte_share_small_operation));
+    }
+
+    /// `additive_upper_bound_shortcut_applicable` 的边界：band_lower_bound() 本身算「不适用」
+    /// （C5 < 0 只在严格低于交叉点下沿时成立，登记的带是 [1.0%, 1.5%] 闭区间，1.0% 已经在带内）。
+    #[test]
+    fn additive_upper_bound_shortcut_boundary() {
+        assert!(additive_upper_bound_shortcut_applicable(RationalNumber::new(1, 200)));
+        assert!(!additive_upper_bound_shortcut_applicable(band_lower_bound()));
+        assert!(!additive_upper_bound_shortcut_applicable(RationalNumber::new(1, 10)));
     }
 
     /// 第二类 B8：读放大。

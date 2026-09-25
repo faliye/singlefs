@@ -1,0 +1,60 @@
+Sep 25 07:57:22 jplife-black kernel: client.poll0 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2405 (ray::IDLE) total-vm:22011912kB, anon-rss:33792kB, file-rss:3272kB, shmem-rss:0kB, UID:1000 pgtables:648kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: Catalina-utilit invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2386 (ray::IDLE) total-vm:22011920kB, anon-rss:34560kB, file-rss:4176kB, shmem-rss:0kB, UID:1000 pgtables:640kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: task_event_buff invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2390 (ray::IDLE) total-vm:22012012kB, anon-rss:34816kB, file-rss:3792kB, shmem-rss:0kB, UID:1000 pgtables:640kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: systemd invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2385 (ray::IDLE) total-vm:22011992kB, anon-rss:34560kB, file-rss:3944kB, shmem-rss:0kB, UID:1000 pgtables:644kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: grpc_global_tim invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2395 (ray::IDLE) total-vm:22011992kB, anon-rss:33536kB, file-rss:4384kB, shmem-rss:0kB, UID:1000 pgtables:644kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: task_event_buff invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2407 (ray::IDLE) total-vm:22011972kB, anon-rss:34048kB, file-rss:3704kB, shmem-rss:0kB, UID:1000 pgtables:648kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: worker.io invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2406 (ray::IDLE) total-vm:22011912kB, anon-rss:33536kB, file-rss:3496kB, shmem-rss:0kB, UID:1000 pgtables:640kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2403 (ray::IDLE) total-vm:22011988kB, anon-rss:34304kB, file-rss:3332kB, shmem-rss:0kB, UID:1000 pgtables:644kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: task_event_buff invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2384 (ray::IDLE) total-vm:22011888kB, anon-rss:33756kB, file-rss:3560kB, shmem-rss:0kB, UID:1000 pgtables:644kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: rs:main Q:Reg invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2410 (ray::IDLE) total-vm:22011988kB, anon-rss:34208kB, file-rss:4080kB, shmem-rss:0kB, UID:1000 pgtables:644kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2409 (ray::IDLE) total-vm:22011900kB, anon-rss:32256kB, file-rss:3652kB, shmem-rss:0kB, UID:1000 pgtables:648kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2394 (ray::IDLE) total-vm:22011908kB, anon-rss:33536kB, file-rss:3300kB, shmem-rss:0kB, UID:1000 pgtables:640kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: client.poll0 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 2408 (ray::IDLE) total-vm:22011908kB, anon-rss:33196kB, file-rss:2508kB, shmem-rss:0kB, UID:1000 pgtables:648kB oom_score_adj:1000
+Sep 25 07:58:02 jplife-black kernel: in:imklog invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 07:58:02 jplife-black kernel: Out of memory: Killed process 1691212 (e142_region_dif) total-vm:67315408kB, anon-rss:56156416kB, file-rss:1460kB, shmem-rss:0kB, UID:1000 pgtables:120792kB oom_score_adj:0
+Sep 25 08:05:48 jplife-black kernel: worker.io invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 08:05:48 jplife-black kernel: Out of memory: Killed process 1721034 (ray::RayWorkerP) total-vm:161660896kB, anon-rss:1084460kB, file-rss:158376kB, shmem-rss:4364kB, UID:1000 pgtables:9348kB oom_score_adj:1000
+Sep 25 08:05:49 jplife-black kernel: tests::comparin invoked oom-killer: gfp_mask=0x140dca(GFP_HIGHUSER_MOVABLE|__GFP_ZERO|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:05:49 jplife-black kernel: Out of memory: Killed process 1719341 (ray::IDLE) total-vm:20926204kB, anon-rss:5120kB, file-rss:5384kB, shmem-rss:0kB, UID:1000 pgtables:636kB oom_score_adj:1000
+Sep 25 08:05:50 jplife-black kernel: tests::flipping invoked oom-killer: gfp_mask=0x140dca(GFP_HIGHUSER_MOVABLE|__GFP_ZERO|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719314 (ray::IDLE) total-vm:20926208kB, anon-rss:4608kB, file-rss:3680kB, shmem-rss:0kB, UID:1000 pgtables:628kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: claude invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719321 (ray::IDLE) total-vm:20926196kB, anon-rss:3328kB, file-rss:3892kB, shmem-rss:0kB, UID:1000 pgtables:624kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719317 (ray::IDLE) total-vm:20926300kB, anon-rss:4352kB, file-rss:3624kB, shmem-rss:0kB, UID:1000 pgtables:624kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: postgres invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719330 (ray::IDLE) total-vm:20926212kB, anon-rss:5120kB, file-rss:3172kB, shmem-rss:0kB, UID:1000 pgtables:636kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: tests::comparin invoked oom-killer: gfp_mask=0x140dca(GFP_HIGHUSER_MOVABLE|__GFP_ZERO|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719326 (ray::IDLE) total-vm:20926216kB, anon-rss:3436kB, file-rss:5320kB, shmem-rss:0kB, UID:1000 pgtables:628kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719318 (ray::IDLE) total-vm:20926264kB, anon-rss:3840kB, file-rss:4348kB, shmem-rss:0kB, UID:1000 pgtables:636kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: copilot-runtime invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719331 (ray::IDLE) total-vm:20926292kB, anon-rss:4096kB, file-rss:3796kB, shmem-rss:0kB, UID:1000 pgtables:624kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: call-log-writer invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719337 (ray::IDLE) total-vm:20926208kB, anon-rss:4608kB, file-rss:3160kB, shmem-rss:0kB, UID:1000 pgtables:628kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719323 (ray::IDLE) total-vm:20926208kB, anon-rss:3840kB, file-rss:4260kB, shmem-rss:0kB, UID:1000 pgtables:624kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: client.poll0 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719325 (ray::IDLE) total-vm:20926288kB, anon-rss:4096kB, file-rss:3812kB, shmem-rss:0kB, UID:1000 pgtables:624kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: server.poll2 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719338 (ray::IDLE) total-vm:20926212kB, anon-rss:3840kB, file-rss:3288kB, shmem-rss:0kB, UID:1000 pgtables:636kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: client.poll1 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719340 (ray::IDLE) total-vm:20926288kB, anon-rss:4864kB, file-rss:3896kB, shmem-rss:0kB, UID:1000 pgtables:632kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: nexting_thread invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=1000
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1719332 (ray::IDLE) total-vm:20926220kB, anon-rss:4096kB, file-rss:3204kB, shmem-rss:0kB, UID:1000 pgtables:628kB oom_score_adj:1000
+Sep 25 08:06:28 jplife-black kernel: client.poll0 invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0
+Sep 25 08:06:28 jplife-black kernel: Out of memory: Killed process 1902180 (e142_region_dif) total-vm:67315412kB, anon-rss:59381760kB, file-rss:1876kB, shmem-rss:0kB, UID:1000 pgtables:123872kB oom_score_adj:0

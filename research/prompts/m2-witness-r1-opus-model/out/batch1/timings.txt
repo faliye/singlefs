@@ -1,0 +1,13 @@
+w-family-c-pre-512-2 exit=101 seconds=0
+w-family-none-pre-512-2 exit=0 seconds=180
+w-family-none-pre-4096-2 exit=0 seconds=185
+w-family-b-pre-512-2 exit=0 seconds=200
+w-family-c-pre-4096-2 exit=101 seconds=0
+w-min-none-pre-512 exit=0 seconds=4
+w-min-a-pre-512 exit=0 seconds=6
+w-min-b-pre-512 exit=0 seconds=5
+w-min-c-pre-512 exit=101 seconds=0
+w-family-a-pre-512-2 exit=0 seconds=217
+w-family-b-pre-4096-2 exit=0 seconds=177
+w-family-a-pre-4096-2 exit=0 seconds=196
+batch batch1 finished

@@ -1,0 +1,8 @@
+bbf415ff933a5c7d7c6ad24da5a3626242abf3306f0aaee821f6663e3ad47cd6  defs/.claude/agent-common.md
+a61f4666447bd59d75ba114f7eda565951ba104bf83946fee43485726ec5f097  defs/.claude/agents/crash-verifier.md
+ef74ccd9930e6f4fb1879117565456555f1a3b2fca8d9ea28caddea7b77a3460  defs/.claude/agents/experiment-runner.md
+a0b04f473891e6457a0c6716e636575ff37d7c0481c770c197dfd7cbfee52e5b  defs/.claude/agents/gate-triage.md
+3ce6d977a6afe69ff7c7e473343932acf22f85a021eb29a0628dbcb1bea66ce3  defs/.claude/agents/implementation-writer.md
+e6ab8b41c98b227d3e2095b9de51532eeb421708ceb8ec616f922af0865737dc  defs/.claude/agents/mutation-triage.md
+3b46ad43dd1813b0f9c6c000fb4128948a5aa98a1e0760e3bf54fd8d43ea0f3a  defs/.claude/main-agent.md
+4c90f7d83ea8bdc66dd5b30946155c517915e7812e3588a3952524bcb4c22442  defs/.claude/rules/implementation-workflow.md

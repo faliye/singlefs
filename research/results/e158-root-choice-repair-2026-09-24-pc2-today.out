@@ -27,6 +27,14 @@ E7RESULT name=section_seven_two_arithmetic item="系统配置整槽校验和偏�
 E7RESULT name=section_seven_two_arithmetic item="实例表行宽 1+4+8+8+1+66" verdict=pass computed=88 registered=88
 E7RESULT name=section_seven_two_arithmetic item="实例表一片行数 370-1" verdict=pass computed=369 registered=369
 E7RESULT name=section_seven_two_arithmetic item="今天那一臂系统配置那一类写字节 4096*2*1" verdict=pass computed=8192 registered=8192
+E7RESULT name=section_seven_two_arithmetic item="候选2表形态 1+16*N_w(N_w=4)" verdict=pass computed=65 registered=65
+E7RESULT name=section_seven_two_arithmetic item="候选2表形态 1+12*N_w(N_w=4)" verdict=pass computed=49 registered=49
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2单条16 512-481-16" verdict=pass computed=15 registered=15
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2单条12 512-481-12" verdict=pass computed=19 registered=19
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2表形态65 512-481-65" verdict=pass computed=-34 registered=-34
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2表形态49 512-481-49" verdict=pass computed=-18 registered=-18
+E7RESULT name=section_seven_two_arithmetic item="乙/丁同放候选2表形态65 512-489-65" verdict=pass computed=-42 registered=-42
+E7RESULT name=section_seven_two_arithmetic item="乙/丁同放候选2表形态49 512-489-49" verdict=pass computed=-26 registered=-26
 E7RESULT name=root_ring_slot_total slots_per_region=4 verdict=pass computed=12 registered=12
 E7RESULT name=phi_three_fault_set_count slots_per_region=4 root_slots_with_a_root=12 verdict=pass computed=79 registered=79
 E7RESULT name=root_ring_slot_total slots_per_region=8 verdict=pass computed=24 registered=24
@@ -45,4 +53,4 @@ E7RESULT name=section_seven_three_row item="PC2/PC1-a/PC1-b/Q1-3" verdict=deferr
 E7RESULT name=s5_independent_decode_cross_check verdict=pass readable_root_count=6 readable_roots={(0, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5)}
 E7RESULT name=q2_1_pc2_root_ring_txg_only geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) candidate=root_ring_txg_only overwrites_before_the_rootback_probe=4 overwrites_after_the_rootback_probe=1 topmost_four={(1, 4), (1, 5), (1, 6), (1, 7)} fault_target_count=4 expected_by_k2_table_fault_count=4 hit=false expected_by_k2_table_hit=true first_check="ok" second_check="ok"
 E7RESULT name=q2_1_pc2_configuration_published_txg geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) candidate=configuration_published_txg overwrites_before_the_crash=2 acquired_instance_before_the_crash=2 injected_faults=0 crash_points=1 hit=false expected_by_k2_table=true first_check="ok" second_check="ok"
-E7RESULT name=done emitted=48
+E7RESULT name=done emitted=56

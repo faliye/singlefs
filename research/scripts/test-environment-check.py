@@ -60,7 +60,7 @@ ALLOWLIST = (
      '门禁 59 号的 cargo 编译产物目录，跨轮复用；带 -w<片号> 的是它分片并发跑时每片各自的那一个'
      '（.claude/gate.d/59-crates-mutation-replay.sh 的 prepare_shard）'),
     (re.compile(r'^singlefs-mutate-target$'),
-     'mutate.sh 的 cargo 编译产物目录，跨轮复用（research/scripts/mutate.sh 第 54 行）'),
+     'mutate.sh 的 cargo 编译产物目录，跨轮复用（research/scripts/mutate.sh 的 MUTATE_TARGET）'),
     (re.compile(r'^singlefs-e152-packages$'),
      'E152 六家文件系统的下载包缓存（research/scripts/e152-stage-root.sh 第 16 行）'),
     (re.compile(r'^singlefs-pdftext-[0-9]+$'),

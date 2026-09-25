@@ -1,0 +1,7 @@
+rc=101 (预期，D2 已定项 9 断言：第一版跑 2 块盘)
+
+thread 'main' (1637268) panicked at crates/singlefs-core/src/make_filesystem.rs:194:5:
+assertion `left == right` failed: 第一版跑 2 块盘（D2（RAID 条带策略） 已定项 9）
+  left: 1
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

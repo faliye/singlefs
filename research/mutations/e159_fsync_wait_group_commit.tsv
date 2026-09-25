@@ -12,3 +12,6 @@ M11_J1比较从大于等于改成大于	    if ratio >= threshold {\n        Rat
 M12_五轮合并改成多数轮说了算	    if verdicts.iter().all(|&verdict| verdict == verdicts[0]) {	    if verdicts.iter().filter(|&&verdict| verdict == verdicts[0]).count() >= 4 {
 M13_开环issued_at改取实际发出时刻	fn open_loop_issued_at(scheduled_instant: Instant, _actual_issue_instant: Instant) -> Instant {\n    scheduled_instant\n}	fn open_loop_issued_at(scheduled_instant: Instant, _actual_issue_instant: Instant) -> Instant {\n    let _ = scheduled_instant;\n    _actual_issue_instant\n}
 M14_放行到醒这一段漏掉唤醒	    fn release_to_wake_nanos(&self) -> u64 {\n        self.returned_at.saturating_duration_since(self.released_at).as_nanos() as u64\n    }	    fn release_to_wake_nanos(&self) -> u64 {\n        0\n    }
+M15_头宽退回307	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 307;
+M16_头宽过上边界	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 345;
+M17_头宽过下边界	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 288;

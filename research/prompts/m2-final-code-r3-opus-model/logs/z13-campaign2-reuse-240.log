@@ -1,0 +1,94 @@
+
+running 1 test
+R3OPUS-CAMPAIGN weights=reuse width=240 first_seed=4000000000 seeds=320 ops=60 new_findings=1 known_red=4 most_records=454 secs=55.0
+种子 [4000000000, 4000000320)，每段 60 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）；每一步之后跑池级 checker；两块单元区 240 槽的小盘（journal 环 128 MiB）
+历史 320 段：跑完 314、以已知红收尾 {0: 4}、新发现 2；根环转过一圈的 318 段；最高 txg 87；一版里最多 454 条分配记录
+  操作 PublishFirstFile：Ok 39、Err 146、前提不满足没调 57
+  操作 PublishOverwrite：Ok 5019、Err 1872、前提不满足没调 3467
+  操作 PublishWithoutUnits：Ok 12、Err 0、前提不满足没调 184
+  操作 CloseAndMountWritable：Ok 2434、Err 1137、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 182、Err 201、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 915、Err 1721、前提不满足没调 1433
+  操作 ColdStartRecover：Ok 204、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 694 次、发成 567 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 4236 次、发成 3507 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 509 次、发成 0 次
+  内容长度 载荷容量：入口被调 584 次、发成 486 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 459 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 594 次、发成 498 次
+  Err 成员 MountError::PlacementRefusedBeforeAcquisitionMountAdmissionUndecided(NoFreeSlotOnAnyDevice)：1243 次
+  Err 成员 MountError::RaiseFloorSequencePublishFailed(publishes_persisted = 0, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))：126 次
+  Err 成员 MountError::RaiseFloorSequencePublishFailed(publishes_persisted = 1, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))：94 次
+  Err 成员 MountError::RaiseFloorSequencePublishFailed(publishes_persisted = 2, PublishError::PlacementRefused(NoFreeSlotOnAnyDevice))：20 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：1481 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：6 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：86 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：3 次
+  Err 成员 PublishError::ContentExceedsDataUnit：950 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：139 次
+  Err 成员 PublishError::PlacementRefused(NoFreeSlotOnAnyDevice)：929 次
+  前提不满足（没有可写会话）：4250 次
+  前提不满足（现行版本带文件）：130 次
+  前提不满足（现行版本树表 0 条）：761 次
+  冷启动结局 FileRead：197 次
+  冷启动结局 NoFile：7 次
+  一次挂载里最多写出 34 条根；一段历史里最多挂载成功 24 次、最多试挂载 25 次
+  抬 F 回收到落点 546 次、共回收 21904 个落点；复用已释放的记录 76910 条（其中跨度变了 11950 条）；已释放的记录被罩住起点 6254 条、被删 6276 条
+  挂载写出的发布比过分配记录 5758 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 9035 次；一个写都没发、沿用上一次结论的 10308 步
+  模型对拍 14170 步：该拒而拒 2665、区间里拒 2412、该成而成 9093；比过根 13946 条、分配记录 236878 条、冷启动内容 197 次、抬 F 上限 2396 次；回退到 txg = F_生效 > 0 的根做成 0 次；单元区墙按区间放行 2412 次
+  I-1.1：判绿 9035 次、不适用 0 次
+  I-1.2：判绿 9035 次、不适用 0 次
+  I-1.3：判绿 9035 次、不适用 0 次
+  I-1.4：判绿 9035 次、不适用 0 次
+  I-1.6：判绿 9035 次、不适用 0 次
+  I-1.7：判绿 9035 次、不适用 0 次
+  I-1.8：判绿 9035 次、不适用 0 次
+  I-1.10：判绿 8966 次、不适用 69 次
+  I-2.1：判绿 9035 次、不适用 0 次
+  I-2.3：判绿 9035 次、不适用 0 次
+  I-2.4：判绿 9035 次、不适用 0 次
+  I-2.5：判绿 9035 次、不适用 0 次
+  I-3.1：判绿 8754 次、不适用 275 次
+  I-3.8：判绿 9035 次、不适用 0 次
+  I-3.9：判绿 8760 次、不适用 275 次
+  I-3.10：判绿 8966 次、不适用 69 次
+  I-3.11：判绿 8760 次、不适用 275 次
+  I-4.2：判绿 9035 次、不适用 0 次
+  I-4.8：判绿 9035 次、不适用 0 次
+  I-5.1：判绿 9035 次、不适用 0 次
+  I-5.2：判绿 8760 次、不适用 275 次
+  I-5.4：判绿 8760 次、不适用 275 次
+  I-7.1：判绿 9035 次、不适用 0 次
+  I-7.2：判绿 9035 次、不适用 0 次
+  I-7.3：判绿 9035 次、不适用 0 次
+  I-7.4：判绿 9035 次、不适用 0 次
+  I-7.6：判绿 9035 次、不适用 0 次
+  I-7.7：判绿 9035 次、不适用 0 次
+  I-7.8：判绿 9035 次、不适用 0 次
+  I-7.9：判绿 4894 次、不适用 4141 次
+  I-7.10：判绿 9035 次、不适用 0 次
+  I-7.11：判绿 9035 次、不适用 0 次
+  I-8.6：判绿 9003 次、不适用 32 次
+  I-8.7：判绿 8225 次、不适用 810 次
+  I-8.8：判绿 0 次、不适用 9035 次
+  I-8.9：判绿 9003 次、不适用 32 次
+  I-9.1：判绿 8760 次、不适用 275 次
+  I-9.2：判绿 8760 次、不适用 275 次
+  I-9.4：判绿 8760 次、不适用 275 次
+  I-9.6：判绿 8760 次、不适用 275 次
+  I-9.7：判绿 8760 次、不适用 275 次
+  I-9.10：判绿 8760 次、不适用 275 次
+  I-9.12：判绿 8760 次、不适用 275 次
+  I-9.13：判绿 8760 次、不适用 275 次
+  I-9.14：判绿 8433 次、不适用 602 次
+  I-9.15：判绿 8760 次、不适用 275 次
+已知红第 0 条（增补 2 收口表第 43 行）：4 段；前几个种子 [(4000000013, Operation(40)), (4000000026, Operation(20)), (4000000108, Operation(50)), (4000000266, Operation(9))]
+新发现 CheckerViolations { invariants: ["I-3.1"] }：第一个种子 4000000045（同签名的种子 [4000000045, 4000000204]），在 Operation(27)（Some(RaiseRollbackFloor)）之后
+  I-3.1：盘 0：记账的已分配 Some(2031616)，遍历全部有效根得到 1900544（其中隔离豁免 0）；机理：根环槽数 24、最新根 txg 27、环里自证过的根槽 24 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 11 个、回退下界 F 7、低于 F 的根槽 3 个
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=4000000045 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+test z13_campaign ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 55.01s
+

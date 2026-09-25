@@ -1,0 +1,1 @@
+Sep 25 08:45:47 jplife-black kernel: Memory cgroup out of memory: Killed process 2864932 (m2_test) total-vm:1119928kB, anon-rss:1045504kB, file-rss:2596kB, shmem-rss:0kB, UID:1000 pgtables:2124kB oom_score_adj:0

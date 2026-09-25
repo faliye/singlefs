@@ -1,0 +1,2 @@
+Z12 without-file caps=None named=Some("3") mounts=8: mounts_ok=266 refused={} panics=0
+Z12 with-file caps=None named=Some("3") rounds=8 inodes_every=0: mounts_ok=331 refused={} panics=0

@@ -11,11 +11,20 @@
 
 豁免写在项目根的 `.claude/term-rename-exempt`，一行一条、`#` 后写为什么；指向不存在的路径判红
 （不起作用的豁免项会让人以为那批文件已经被绕开了，判据与 `.claude/doc-lint-exclude` 同）。
+
+--apply 的写回不在原文件上就地写：每份文件同目录排他新建临时文件、fsync、照原权限位与属主、改名换上
+（`lib_atomic_replace.py`）。扫全仓会扫到 .sh 与 .py，正在按偏移边跑边读它的进程读的仍是旧 inode 的旧内容。
+一份被拒（多个硬链接、当前用户只读、建不了临时文件、写或改名失败）就跳过它、接着换别的，最后逐份列出。
+
+退出码：--check 0 搜不出旧名、1 还有旧名；--apply 0 换完、3 有文件没换上（那几份原文件没动、临时文件已删）；
+2 登记表或豁免表有问题。
 """
 import os
 import sys
 
 import re
+
+from lib_atomic_replace import ReplaceRefused, problems_with_replacement_by_rename, replace_file_contents_by_rename
 
 SKIP_DIRS = {".git", "target", "node_modules"}
 EXEMPT_FILE = ".claude/term-rename-exempt"
@@ -135,6 +144,7 @@ def sweep(root, apply_changes, defer=()):
     replacements, detect = compile_rules(pairs)
     files, occurrences, scanned = 0, 0, 0
     worst = []
+    refused = []
     for relative in walk(root, entries):
         try:
             text = open(os.path.join(root, relative), encoding="utf-8").read()
@@ -144,15 +154,28 @@ def sweep(root, apply_changes, defer=()):
         count = len(detect.findall(text))
         if not count:
             continue
-        files += 1
-        occurrences += count
-        worst.append((count, relative))
         if apply_changes:
             for pattern, new in replacements:
                 text = pattern.sub(new, text)
-            open(os.path.join(root, relative), "w", encoding="utf-8").write(text)
+            try:
+                notes = replace_file_contents_by_rename(os.path.join(root, relative), text)
+            except ReplaceRefused as refusal:
+                refused.append((relative, count, str(refusal)))
+                continue
+            for note in notes:
+                print("  ! %s" % note)
+        files += 1
+        occurrences += count
+        worst.append((count, relative))
     if apply_changes:
         print("  ✓ 换了 %d 份文件、%d 处（登记的改名 %d 条、豁免 %d 条）" % (files, occurrences, len(pairs), len(entries)))
+        if refused:
+            for relative, count, message in refused:                # gate-lint:detail
+                print("      %s（%d 处）：%s" % (relative, count, message))
+            print("  ✗ 有 %d 份文件没换上，那几份原文件没动、临时文件已删（逐份的原因与下一步在上面）" % len(refused))
+            print("     → 怎么办：按每份后面那行「→ 怎么办」处理（多半是有多个硬链接或当前用户只读），再跑一次 --apply；")
+            print("               已经换好的那些搜不出旧名，不会重复换。")
+            return 3
         print("     → 下一步：cargo build 与 cargo test --workspace，再 bash research/scripts/replay.sh 全量复跑，")
         print("               产物必须仍然逐字节一致 —— 源码与产物一起换，这一条才成立，要跑出来看，不能声称。")
         return 0
@@ -224,8 +247,40 @@ def selftest():
             print("  ✗ 自检失败：豁免登记表指不到文件时没判红")
             print("     → 怎么办：看 load_exempt() 的存在性断言。")
             return 1
-    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、豁免指不到文件判红")
+    # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接与只读拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
+    running_script = "#!/usr/bin/env bash\n" + "echo 前面这几行正在被 bash 边跑边读\n" * 20 + "run_step 超级块\nexit $?\n"
+    problems = problems_with_replacement_by_rename(
+        apply_to_this_file_only, running_script, running_script.replace("超级块", "系统配置", 1))
+    if problems:
+        print("  ✗ 自检失败：--apply 写回的方式不对")
+        for problem in problems:
+            print("     " + problem)  # gate-lint:detail
+        print("     → 怎么办：按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename，"
+              "以及 sweep() 里 --apply 那一段是不是还有就地写。")
+        return 1
+    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、豁免指不到文件判红；--apply 换上的是新 inode、权限位不变、"
+          "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
+          "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0
+
+
+def apply_to_this_file_only(path):
+    """自证用：把 path 所在的目录当仓根、登记一张只有「超级块 → 系统配置」的改名表，目录里别的条目全登记豁免，
+    让 --apply 只换 path 这一份（经符号链接那一格就一定走链接那一个名字）。返回退出码。"""
+    root = os.path.dirname(path)
+    target_name = os.path.basename(path)
+    other_names = sorted(name for name in os.listdir(root) if name not in (target_name, ".claude"))
+    os.makedirs(os.path.join(root, ".claude", "kb"), exist_ok=True)
+    with open(os.path.join(root, RENAMES_PATH), "w", encoding="utf-8") as handle:
+        handle.write("%s\n| 旧 | 新 | 匹配 | 是什么 |\n|---|---|---|---|\n| 超级块 | 系统配置 | 整串 | 中文 |\n" % TABLE_MARK)
+    with open(os.path.join(root, EXEMPT_FILE), "w", encoding="utf-8") as handle:
+        handle.write("%s  # 表自己写着旧名\n" % RENAMES_PATH)
+        for name in other_names:
+            handle.write("%s  # 自证只换 %s 这一份\n" % (name, target_name))
+    try:
+        return sweep(root, True)
+    except SystemExit as stop:
+        return stop.code
 
 
 def main(argv):

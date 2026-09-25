@@ -60,7 +60,7 @@ E42|e42_transaction_records||e42-txn-records-2026-08-29.out|exact
 E44|e44_jsn_width|$REPLAY_DEV45|e44-jsn-width-2026-08-30.out|timing
 E58|e58-csum-grain|$REPLAY_DEV58 1 none 4096 8192|e58-csum-grain-repro-2026-09-16.out|timing
 E140|e140-header-alignment|$REPLAY_DEV140 1 none 4096 8192|e140-header-alignment-repro-2026-09-13.out|timing
-E43|e43_extension_point_budget||e43-ext-budget-2026-09-14-round2.out|exact
+E43|e43_extension_point_budget||e43-ext-budget-2026-09-24-h311.out|exact
 E41|e41_root_ring_geom||e41-root-ring-geom-2026-08-30.out|exact
 E71|e71-accounting-keys||e71-accounting-keys-2026-09-01.out|exact
 E75|e75-record-size||e75-record-size-2026-09-01.out|exact
@@ -74,7 +74,7 @@ E114|e114-pack-ledger||e114-pack-ledger-2026-09-12.out|exact
 E117|e117-reserved-header||e117-reserved-header-2026-09-12.out|exact
 E118|e118-single-disk-recovery||e118-single-disk-recovery-2026-09-07.out|exact
 E122|e122-directory-locality||e122-dir-locality-2026-09-07.out|exact
-E116|e116-pack-settle||e116-pack-settle-2026-09-14-round2.out|exact
+E116|e116-pack-settle||e116-pack-settle-2026-09-24-h311.out|exact
 E119|e119-slot-tiers||e119-slot-tiers-2026-09-12.out|exact
 E120|e120-tier-ratio||e120-tier-ratio-2026-09-12.out|exact
 E121|e121-capacity-tiers||e121-cap-tiers-2026-09-12.out|exact
@@ -123,7 +123,7 @@ E46|e46_region_spacing||e46-region-spacing-2026-08-30.out|exact
 E47|e47_ring_loss||e47-ring-loss-2026-08-30.out|exact
 E48|e48_ring_placement||e48-ring-placement-2026-08-30.out|exact
 E50|e50_ring_slots||e50-ring-slots-2026-08-30.out|exact
-E49|e49_chain_width||e49-chain-width-2026-08-30.out|exact
+E49|e49_chain_width||e49-chain-width-2026-09-25.out|exact
 E51|e51_chain_chances||e51-chain-chances-2026-08-30.out|exact
 E52|e52_head_mechanisms||e52-head-mechanisms-2026-08-30.out|exact
 E54|e54_accounting_generations||e54-accounting-gen-2026-08-30.out|exact
@@ -154,7 +154,7 @@ E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
 E139|e139_tightened_floor||e139-tightened-floor-2026-09-12.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
-E142|@driver_e142||e142-first-txn-dry-run-2026-09-23-decisions-catchup.out|exact
+E142|@driver_e142||e142-first-txn-dry-run-2026-09-25-r16-combined.out|exact
 E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out|exact
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
@@ -168,24 +168,28 @@ E135|e135_rollback_floor||e135-rollback-floor-2026-09-11.out|exact
 E137|e137_map_key_performance||e137-map-key-performance-2026-09-11.out|exact
 E154|e154-two-gates-serial-rejudge-and-reclaim-timing||e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-24-rename.out|exact
 E153|e153-ledger-shape-and-ring-holes||e153-ledger-shape-and-ring-holes-2026-09-24-rename.out|exact
-E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-24-rename.out|exact
-E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-24-rename.out|exact
-E155R3|e155-third-run-release-cascade||e155-third-run-release-cascade-2026-09-20-stage1.out|exact
-E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-concurrency-2026-09-21.out|exact
-E156|@driver_e156||e156-alloc-basis-counts-2026-09-24-stage4.out|exact
-E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-22.out|exact
-E160|e160-random-small-read-share||e160-random-small-read-share-segment1-2026-09-24.out|exact
-E158|@driver_e158||e158-root-choice-repair-2026-09-24-segment1-rerun.out|exact
-E158|@driver_e158_q3_1_g0||e158-root-choice-repair-2026-09-24-q3-1-g0.out|exact
-E158|@driver_e158_q3_1_s16||e158-root-choice-repair-2026-09-24-q3-1-s16.out|exact
-E158|@driver_e158_q3_1_small_ring||e158-root-choice-repair-2026-09-24-q3-1-small-ring.out|exact
-E158|@driver_e158_q3_1_s4||e158-root-choice-repair-2026-09-24-q3-1-s4.out|exact
-E158|@driver_e158_q1_g0||e158-root-choice-repair-2026-09-24-q1-g0-today.out|exact
+E155|e155-fsync-write-volume||e155-fsync-write-volume-2026-09-25-h311-replay.out|exact
+E155R2|e155-second-run-fsync-write-volume||e155-second-run-fsync-write-volume-2026-09-25-h311-replay.out|exact
+E155R3|e155-third-run-release-cascade||e155-third-run-release-cascade-2026-09-25-h311-replay.out|exact
+E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-concurrency-2026-09-25-h311-replay.out|exact
+E156|@driver_e156||e156-alloc-basis-counts-2026-09-25-fork7-selfproof.out|exact
+E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-09-25-h311-replay.out|exact
+E160|e160-random-small-read-share||e160-random-small-read-share-segment1-2026-09-24-realweight.out|exact
+E158|@driver_e158||e158-root-choice-repair-2026-09-25-segment1-rerun.out|exact
+E158|@driver_e158_q3_1_g0||e158-root-choice-repair-2026-09-25-q3-1-g0.out|exact
+E158|@driver_e158_q3_1_s16||e158-root-choice-repair-2026-09-25-q3-1-s16.out|exact
+E158|@driver_e158_q3_1_small_ring||e158-root-choice-repair-2026-09-25-q3-1-small-ring.out|exact
+E158|@driver_e158_q3_1_s4||e158-root-choice-repair-2026-09-25-q3-1-s4.out|exact
+E158|@driver_e158_q1_g0||e158-root-choice-repair-2026-09-25-q1-g0-today.out|exact
 E158|@driver_e158_q2_1_g0||e158-root-choice-repair-2026-09-24-q2-1-g0-today.out|exact
-E158|@driver_e158_q2_2a_g0||e158-root-choice-repair-2026-09-24-q2-2a-g0-today.out|exact
+E158|@driver_e158_q2_2a_g0||e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out|exact
 E158|@driver_e158_q2_1_pc2||e158-root-choice-repair-2026-09-24-pc2-today.out|exact
 E158|@driver_e158_q2_1_g0_session_s5||e158-root-choice-repair-2026-09-24-q2-1-g0-today-session-s5.out|exact
-E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-24-anchors.out|exact
+E158|@driver_e158_q1_s16||e158-root-choice-repair-2026-09-25-q1-s16.out|exact
+E158|@driver_e158_q1_s4||e158-root-choice-repair-2026-09-25-q1-s4.out|exact
+E158|@driver_e158_q2_1_hc1||e158-root-choice-repair-2026-09-24-q2-1-hc1.out|exact
+E158|@driver_e158_q2_1_hc1_lower_bound||e158-root-choice-repair-2026-09-24-q2-1-hc1-lower-bound.out|exact
+E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
 TSV
 )
 
@@ -381,16 +385,34 @@ driver_e9() {
   done
 }
 
-# E142 第十一次跑（量 5）：装置↔crates/ 逐字节比对要跨两个 cargo workspace（research/ 与仓根的 crates/ workspace，
-# 仓根 Cargo.toml 显式 exclude = ["research"]，两边互相看不到对方，不能合并成一次 cargo 调用）。
-# crates 侧的只读产出（`cargo run -p singlefs-harness --bin first_transaction_region_bytes`，无参数、不碰真设备、确定性、
-# 2026-09-18 现查跑两遍逐字节一致）每次现跑现读，装置那个二进制的第一个命令行参数就是这份产出的文件路径——
-# 装置读盘做真比较，把 `name=impl_bytes_equal` 算出来；crates 那份产出本身也原样拼进产物尾部，供人核对 sha256 的算法与来源。
-# 两段都各自有自己的 `name=done`，闸 2 逐段核过。
+# E142 第十五次跑步④（重跑登记 `research/prompts/e142-r15-prereg.md` 第六节）：装置↔crates/ 逐字节比对
+# 要跨两个 cargo workspace（research/ 与仓根的 crates/ workspace，仓根 Cargo.toml 显式 exclude =
+# ["research"]，两边互相看不到对方，不能合并成一次 cargo 调用）。旧的 `first_transaction_region_bytes`
+# 读的是改位置寻址之前的旧布局（区域表写死八个单元，见该文件模块注释），已经比不出新写的五个分配记录树节点，
+# 换成只读导出 `e142_first_transaction_write_dump`（不带任何布局知识，逐次写按 (设备, 偏移, 长度, sha256,
+# 整段十六进制) 原样打出来）。装置的第一个命令行参数是这份导出的文件路径（做 Q142.1 真比对），第二个参数是
+# arm O 的历史留存产物（`第十五次跑步④` 起 Q142.8 用它算「哪些区域从旧布局变到了新布局」，
+# 交回报告 `research/prompts/e142-r15-step234-runner-report.md` 里写明这份参照为什么找不到能重新编译的
+# 源码、只能用留存产物）。两段都各自有自己的 `name=done`，闸 2 逐段核过。
+#
+# E142 第十六次跑第一段（重跑登记 `research/prompts/e142-r16-prereg.md`；交回报告
+# `/tmp/claude-1000/e142-r16-s1/report.md`）：α（内部/根节点一格）、β（根 largest_key）、ι（内部条目
+# key 取什么）、γ（extent 上段叶 key 区间）三格 5.1 的变体开关整套删除，改成 D8（核心索引结构） 已定项 14
+# 第 395/401 行、D18（块里携带什么信息） 已定项 2 射程写死的唯一写法（稀疏、整个 key 空间、按位置分片区间）；
+# δ（盘上槽数）收口成 `slots_of_device_bytes` 一个 const fn。第二个命令行参数从「第十四次跑 arm O 参照」
+# 改成「这一次步①现编现跑的臂 N15 参照」（`research/results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out`），
+# 按 (设备, 偏移, 长度) 配对出 `name=old_new_region`（Q142.19），不再按名字配对出旧的 `name=old_new_region`
+# 系列。新增 `name=g3_shape`（第八节 G3 五个几何点，不依赖 `crates/`）、`name=positive_control_p2`
+# （四个点，锚点随稀疏改成第 0 条条目）、`name=g4_bytes_equal_summary`（第三个命令行参数给才跑，这一次
+# `crates/` 一盘几何造不出（`make_filesystem.rs:194`，D2（RAID 条带策略） 已定项 9），不传，报
+# `skipped=true`）。`code2_field_rows` 从「非空格与第一个空格」改成「每条都列 + 补齐区一行」。
+# Q142.11（原 Q142.1）这一次判「全等」：29 个区域全部配上、29 个相等、0 个不等（三格上模型与 `crates/`
+# 逐字节相同，只说明 kb 转写与 `crates/` 一致，不说明条款本身对，见第十二节修订与第 5.4 节）。
 driver_e142() {
-  local impl_snapshot="$OUT_DIR/e142-impl-region-bytes.tmp"
-  (cd .. && cargo run -q -p singlefs-harness --bin first_transaction_region_bytes) >"$impl_snapshot" || return 1
-  ./target/release/e142-first-txn-dry-run "$impl_snapshot" || return 1
+  local impl_snapshot="$OUT_DIR/e142-crates-write-dump.tmp"
+  local arm_n15_reference="results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out"
+  (cd .. && cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump) >"$impl_snapshot" || return 1
+  ./target/release/e142-first-txn-dry-run "$impl_snapshot" "$arm_n15_reference" || return 1
   cat "$impl_snapshot"
 }
 
@@ -405,8 +427,31 @@ driver_e142() {
 # 步数对齐对照（`q1_step_matched_diff`，`run_hh_cell` 新增 `matched_to_holes` 参数）、岔路 3 的
 # Q3e（X8-A/HY，`run_x8a_cell`，独立 128 槽小池）与 Q3d（`q3d_derived`）；在 stage3.out 原有的 323 行
 # （K1/legal_state/s1d_step/Q7 全家/PC-检查三条/HK-HR-H0 构造）共有格式上逐字节相同。
+# r3.out（2026-09-25，第 3 次重跑登记 `research/prompts/e156-r3-prereg.md`：分配记录树按位置寻址之后
+# 重算钉着旧布局的常量）在 stage4.out 的基础上结构性改动，不是逐字节追加：分配记录树不再是单节点，
+# 装置里的三处常量与另外六处改成第七节 7.2 算出的闭式与绝对值（K1-1 第 1 项 13→17、β0 走读引用 12→16、
+# S1(c) 隔离槽数 34→54，其余变成随「这次改动的记录落在几片叶」现算的闭式，不再是常数）；新增
+# `anchor_a_d8`、`anchor_a_d8_root_level`、`s1ef_step`／`s1ef_summary`（Q3r.2 逐次闭式核对）、
+# `r5_empty_publish_closed_form`、`r7_hy_cap`／`r7_hy_condition`（HY 的覆盖写次数改成搜出满足
+# e ≥ max(8, f) 的那一档，这一轮搜到的是 0：搜索过程见交回报告，判定按登记走）行；H0／HR 不再撞
+# `AllocationRecordsExceedOneNode` 那道墙，跑满登记要求的全部步数（`baseline_workload_completed_full_length`
+# 取代 stage4.out 的 `baseline_workload_truncated_by_write_failure`）。Q3r.4（岔路 1、3、7 判定变不变）
+# 的比对命令与判定表见交回报告；核心结论：岔路 1（Q1d 在 S = 4 上从「单调」变「不单调」）与岔路 7
+# （`q7d2_min_item5` 从「非 0」变「= 0」，F16 从「触发」变「不触发」）判定变了，岔路 3（Q3c/Q3e/K9）
+# 在已核的量上不变。
+# fork7-selfproof.out（2026-09-25，续派，E156 第 3 次重跑登记「十二」修订 4）在 r3.out 的基础上加
+# 一个第 10 个基底 `beta_hr_rollback_row`：r3.out 的 `q7d2_min_item5` 第一次在可达状态上读到
+# `min_item5=0 family=HR kind=rollback_row txg=76`（此前 7 个可达基底第 5 项最小是 1），这里把这一步
+# 也捕成一个基底、并入既有的 `bases` 数组（9→10），让已有的 Q7a/Q7c①②/PC-检查循环再跑一遍，不改
+# `q7c_self_test` 的公式、不新写判定逻辑。核心结论：Q7c① 在这个基底上第一次转色（`q7c1_not_subtracting_defer
+# basis=beta_hr_rollback_row … flips_red_to_green=true`）——此前只有不可达的 β_syn 转过色；`basis_count`
+# 9→10，`q7a_summary` 的 `all_red_count` 18→20（该基底 delta=1/8 各命中一次），`q7c1_flip_seen`/
+# `q7c2_flip_seen` 字面不变（β_syn 已经让它们是 true）。在 r3.out 原有的 1076 行共有格式上逐字节相同，
+# 只在旧的 `q7a_summary`/`integrity` 两行与新增 9 行（`basis_snapshot`/`q7a` ×3/`q7c1`/`q7c2`/
+# `pc_check` ×3）上不同。
 # 整个装置就活在 crates/singlefs-harness 里，没有 research/e7-index-bench 侧的配对二进制，先例同 E142（第 371 行注释）——
-# 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-24 现查，见实验页）。
+# 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-25 现查：
+# 这一段的产物两次跑出 `cmp` 逐字节一致）。
 driver_e156() {
   (cd .. && cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts)
 }
@@ -419,12 +464,32 @@ driver_e156() {
 # `/tmp/claude-1000/e158-s2/report.md` 第 1 节）；2026-09-24 主 agent 定这一行承重
 # `e158-root-choice-repair-2026-09-24-segment1-rerun.out`（旧产物 `…-2026-09-23-segment1.out`
 # 原样留着，对应 C512 落地之前的代码，不再是这一行比对的对象）。
+# ⚠️ **2026-09-25（session s10）**：另一条并行线（主 agent 知会「实二六」）此刻在改
+# `mount.rs`/`allocator.rs`/`allocation_record_tree.rs`（抬 F、挂载读、分配记录树根层），这一份
+# `2026-09-24` 产物与今天重出的产物对不上，`pc3` 一行从 `recover_verdict=pass recover_root=
+# Some((1, 6))` 变成 `recover_verdict=fail recover_root=Some((0, 0))`——按今天日期另存
+# `e158-root-choice-repair-2026-09-25-segment1-rerun.out`，登记表这一行已改指向它；`…-09-24-…`
+# 原样留着不删。**这不是本轮代码改动引起的**（e158 装置本身这一段只加了 op1 第三种变体，没碰
+# `driver_e158`/`pc3` 这条路径），是不是要等 `crates/` 落定后再复核一遍交主 agent 定，详见跑前
+# 登记「十二、修订」session s10 条目第 6 条与交回报告。
 driver_e158() {
   (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- all)
 }
 
 # E158 第二段 Q3-1（岔路 3 候选 3 那一半，2026-09-24）：`q3-1-g0` 模式只跑 G0 几何上的
 # H3 × Φ3（|F|≤2）违例枚举，不跑第一段的 H3 全枚举（那部分归 `driver_e158`）。
+# ⚠️ **2026-09-25（session s10）：值得单独点名的一处现查**——G0/S16/小环三点，今天重出的
+# `pairs_with_any_violation` 从旧产物的 213 变成 0（`cold_recover_with_fault_failed`/
+# `mount_writable_with_fault_failed` 两点都仍是 0，不是新增了报错，是判定本身不再违例）；S4 那一点
+# 除了 `pairs_with_any_violation`（1355→0）之外，`cold_recover_with_fault_failed`/`mount_
+# writable_with_fault_failed` 还从 0 变成 239——即同一批构造里，以前是「成功但违例」，现在有 239
+# 个变成了「调用直接报错」，是两种不同的失效形态，不只是数字变化。与 `driver_e158` 的 `pc3` 翻转
+# 同一批文件改动引起（`mount.rs`/`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮
+# e158 装置改动）。**这条现查可能动到岔路单第 3 行「候选 3 = 今天」这个前提与 F2 的触发条件**——
+# C332 正文钉的「2 个故障就能撤销回退」在今天这份 `crates/` 上现在测不出来了，交主 agent 判断是要
+# 重新核对 F2、还是等这条并行线落定再复核；详见跑前登记「十二、修订」session s10 与交回报告。今天
+# 重出的产物按日期另存 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,
+# q3-1-s4}.out`，`…-09-24-…` 原样留着，登记表已改指向新文件。
 driver_e158_q3_1_g0() {
   (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q3-1-g0)
 }
@@ -443,7 +508,19 @@ driver_e158_q3_1_s4() {
 # PC1-a/PC1-b，只跑 G0 几何（2026-09-24 session s3，见实验页）。候选 (a)（A1 副本）的同一份数只存产物
 # `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，**不登记在这张表里**：它要在
 # `research/mutations/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
-# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。
+# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。session s9 起产物里
+# 多了 171 格差集的分类诊断（`q1_2_subset_diff_pair*`，根因是 `RootRecord::instance_table` 没被走
+# 全版本走到）与 op1 起三步挂载的持续/瞬时故障轨迹（`q1_1a_op1_trajectory`），纯增量追加。
+# **2026-09-25（session s10）**：加了 op1 第三种变体（`MountWritableThenRaiseFloorTo`），新增
+# `q1_1a_raise_floor_trigger_summary`/`q1_1a_raise_floor_by_aspect_severity`（G0：
+# `pairs=96 trigger_count=32 history_nodes_without_room=26`，both_copies 两个指称各 16/16 触发、
+# disk0_only/disk1_only 各 0/16，与既有 op1 两种同一批构造上的模式一致）——这一段是本轮新增、真实
+# 数据，不是噪声。⚠️ 同一份产物里还混着另一条并行线（`mount.rs`/`recovery.rs`）造成的漂移：
+# `q1_2_tree_table_crates_has_a_path`（`verify_named_units=false`）从「108+81」变成「189+0」（原来
+# 能不碰物理拷贝复算出指针的 81 格现在全部走不到了）、`pc1_a` 的 `device_write_bytes` 从 157184 变
+# 353792（`AllocationRecordTreeNode` 写得更多，与 `q2_2a_g0` 那条同一根因）——这两条与本轮 e158 装置
+# 改动无关，是现查到的既有漂移（与 session s9 报告的方向一致）。今天重出的产物按日期另存
+# `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着。
 driver_e158_q1_g0() {
   (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-g0)
 }
@@ -459,6 +536,11 @@ driver_e158_q2_1_g0() {
 }
 # E158 岔路单第 2 行 ②（每条修法每次发布多写几字节，session s4）：`q2-2a-g0` 在今天的 `crates/` 上跑
 # 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
+# ⚠️ **2026-09-25（session s10）**：`AllocationRecordTreeNode` 每次发布的 `write_calls`/
+# `written_bytes` 全面上涨（例如 `second_mount_row_publish` 从 `write_calls=2 written_bytes=32768`
+# 变成 `write_calls=10 written_bytes=163840`），与 `q1_g0` 的 `pc1_a` 字节变化同一根因
+# （`allocator.rs`/`allocation_record_tree.rs`，另一条并行线，非本轮 e158 装置改动）。今天重出的
+# 产物按日期另存 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
 driver_e158_q2_2a_g0() {
   (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-2a-g0)
 }
@@ -471,9 +553,44 @@ driver_e158_q2_1_pc2() {
 }
 # E158 岔路单第 2 行 ①（C331 修法，2026-09-24 session s5，承重）：修好故障装配 bug 之后，`q2-1-g0`
 # 在今天的 `crates/`（丙 = 甲-jsn）上重跑 H2 主族，n1 范围从 {0,1,2,3} 补齐到跑前登记 5.1 要求的
-# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。
+# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。**session s9
+# 撤掉了旧的计数上限（`SUBSET_ENUMERATION_CAP`，会在权重档中途停手）**，换成按权重档边界停的
+# `weight_ceiling` 机制：n1=0..3 仍是完整穷举（`subsets_tried`==`full_space_subset_count`）；n1=4、
+# 6 用新机制找到 `k_min=12`（此前因为撞旧计数上限报 `capped`，没有找到）；n1=5 如实报
+# `k_min=not_found_up_to_weight_ceiling`（完整空间 131072、只搜到权重 12 为止，未截断，见跑前登记
+# 「十二、修订」session s9）。**2026-09-25（session s10）复跑确认字节一致**——与 `q2_1_pc2`/
+# `q2_1_hc1`/`q2_1_hc1_lower_bound` 三行一样不受另一条并行线这一刻改动的影响（那条线动的是
+# `mount.rs`/`allocator.rs`/`allocation_record_tree.rs` 里 `q3-1`/`q1-g0`/`q2-2a-g0` 会读到的
+# 路径，H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过
+# 那几处改动），行 2「够判」的结论不受这一刻 crates/ 波动影响。
 driver_e158_q2_1_g0_session_s5() {
   (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-g0)
+}
+# 第八节几何敏感性（行 1，2026-09-24 session s6）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
+# 大一倍）与 S4（根环小一半）两个方向相反的取样点，复用 H1 装置代码（`run_ledger_fault_family` 本身
+# 就是几何参数化的）。两点都与 G0 逐字节等值（N_trig=798），判定不翻面，判别力自证「两点同值，自证
+# 不适用」。
+driver_e158_q1_s16() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s16)
+}
+driver_e158_q1_s4() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q1-s4)
+}
+# H-C1 直接构造（2026-09-24 session s6，岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
+# 故障（4 根槽 + 4 条记录各两块盘）才打得中；`run_rootback_tolerance_family` 的穷举在 n1∈{4,5,6}
+# 会撞 `SUBSET_ENUMERATION_CAP`，这里不靠穷举，直接按这个具体构造跑一次（hit=true, weight=12），
+# 附一个只挡 4 条根槽、不挡记录的负对照（hit=false，证明「只挡根环挡不住丙」）。
+driver_e158_q2_1_hc1() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1)
+}
+# H-C1 下界探针（2026-09-24 session s6；session s9 改参数为 weight_ceiling）：在同一个 n1=4 节点
+# 上，穷举权重 0..11 的全部组合（`subsets_tried=22558`，`full_space_subset_count=32768`，没有撞
+# 顶）都没有命中，权重 12 上第一个尝试的组合就命中。**这是「恰好 12」的严格证据**：不是构造上界，是
+# 穷举下界真正走到了 12 且之下全空。不传第二个参数时 `weight_ceiling=None`——n1=4 这个节点的完整
+# 空间只有 2^15=32768，在 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`=100000 预算内，`None` 就等于穷举到
+# 完整空间的顶，与 session s6 当年手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
+driver_e158_q2_1_hc1_lower_bound() {
+  (cd .. && cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
 }
 
 ONLY=("$@")

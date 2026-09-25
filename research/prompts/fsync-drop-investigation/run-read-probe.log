@@ -1,0 +1,38 @@
+warning: field `0` is never read
+   --> crates/singlefs-harness/tests/fsync_drop_investigation.rs:827:13
+    |
+827 |     Refused(String),
+    |     ------- ^^^^^^
+    |     |
+    |     field in this variant
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+    |
+827 -     Refused(String),
+827 +     Refused(()),
+    |
+
+warning: `singlefs-harness` (test "fsync_drop_investigation") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/fsync_drop_investigation.rs (/tmp/claude-1000/fsync-drop/target/debug/deps/fsync_drop_investigation-762a46eaccb692c0)
+
+running 1 test
+━━ 读路径格：盘 1 每一次读都报错、写照常
+  可写挂载：成功，实例 2，现行 txg 7
+  覆盖写：成功 txg 8，这次释放核验隔离了 20 份
+  覆盖写：成功 txg 9，这次释放核验隔离了 20 份
+  写完之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 12 实例 2 tail 9] [世代 11 实例 2 tail 8] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 1 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 53 盘1 53；记账 已分配字节 盘0 Some(1196032) 盘1 Some(1196032)
+    池级 checker 判红：["I-3.11"]
+test mount_writable_while_every_read_of_device_one_fails_is_recorded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.50s
+
+exit=0

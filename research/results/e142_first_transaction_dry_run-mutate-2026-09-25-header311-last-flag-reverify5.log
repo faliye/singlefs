@@ -1,0 +1,9 @@
+基线：全绿
+✅ [M31_apply_record_keeps_old_tree_table] 红：tests::primary_reader_rebuilds_the_tree_table_pointer_when_applying_a_record
+✅ [M67_apply_records_across_instance_boundary] 红：tests::primary_reader_does_not_apply_records_from_a_newer_instance_onto_the_genesis_root
+✅ [M84_clause_ignores_ordinal_zero] 红：tests::p6_reader_outcomes_match_the_clause_table
+✅ [M86_back_chain_hardcoded_307] 红：tests::back_chain_matches_an_independently_computed_crc_over_311_bytes
+✅ [M87_offset_table_reverts_to_307_layout] 红：tests::explain_journal_record_offset_labels_match_the_311_byte_field_table
+已还原，基线仍全绿
+
+[exited with code 0]

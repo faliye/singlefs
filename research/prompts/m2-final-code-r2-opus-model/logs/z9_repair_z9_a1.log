@@ -1,0 +1,31 @@
+
+running 1 test
+=== Z9-A1 sticky (1,29) then newest, crash after row-publish rotation
+k=1 ring_all_readable=true witness_entries_before=0 target=(1,29) new_instance=2 roots_written_txg=[31, 32] persisted_roots=1
+k=2 ring_all_readable=true witness_entries_before=1 target=(1,29) new_instance=3 roots_written_txg=[32, 33, 34] persisted_roots=1
+k=3 ring_all_readable=true witness_entries_before=2 target=(1,29) new_instance=4 roots_written_txg=[33, 34] persisted_roots=1
+k=4 ring_all_readable=true witness_entries_before=3 target=(1,29) new_instance=5 roots_written_txg=[34, 35] persisted_roots=1
+k=5 ring_all_readable=true witness_entries_before=4 target=(1,29) new_instance=6 roots_written_txg=[35, 36, 37] persisted_roots=1
+k=6 ring_all_readable=true witness_entries_before=5 target=(1,29) new_instance=7 roots_written_txg=[36, 37] persisted_roots=1
+k=7 ring_all_readable=true witness_entries_before=6 target=(1,29) new_instance=8 roots_written_txg=[37, 38] persisted_roots=1
+k=8 ring_all_readable=true witness_entries_before=7 target=(1,29) new_instance=9 roots_written_txg=[38, 39, 40] persisted_roots=1
+k=9 ring_all_readable=true witness_entries_before=8 target=(1,29) new_instance=10 roots_written_txg=[39, 40] persisted_roots=1
+k=10 ring_all_readable=true witness_entries_before=9 target=(1,29) new_instance=11 roots_written_txg=[40, 41] persisted_roots=1
+k=11 ring_all_readable=true witness_entries_before=10 target=(1,29) new_instance=12 roots_written_txg=[41, 42, 43] persisted_roots=1
+k=12 ring_all_readable=true witness_entries_before=11 target=(1,29) new_instance=13 roots_written_txg=[42, 43] persisted_roots=1
+k=13 ring_all_readable=true witness_entries_before=12 target=(1,29) new_instance=14 roots_written_txg=[43, 44] persisted_roots=1
+k=14 ring_all_readable=true witness_entries_before=13 target=(1,29) new_instance=15 roots_written_txg=[44, 45, 46] persisted_roots=1
+k=15 ring_all_readable=true witness_entries_before=14 target=(1,29) new_instance=16 roots_written_txg=[45, 46] persisted_roots=1
+k=16 ring_all_readable=true witness_entries_before=15 target=(1,29) new_instance=17 roots_written_txg=[46, 47] persisted_roots=1
+k=17 ring_all_readable=true witness_entries_before=16 target=(1,29) new_instance=18 roots_written_txg=[47, 48, 49] persisted_roots=1
+k=18 ring_all_readable=true witness_entries_before=17 target=(1,29) new_instance=19 roots_written_txg=[48, 49] persisted_roots=1
+k=19 ring_all_readable=true witness_entries_before=18 target=(1,29) new_instance=20 roots_written_txg=[49, 50] persisted_roots=1
+k=20 ring_all_readable=true witness_entries_before=19 target=(1,29) new_instance=21 roots_written_txg=[50, 51, 52] persisted_roots=1
+k=21 ring_all_readable=true witness_entries_before=20 target=(1,29) new_instance=22 roots_written_txg=[51, 52] persisted_roots=1
+k=22 ring_all_readable=true witness_entries_before=21 target=(1,29) new_instance=23 roots_written_txg=[52, 53] persisted_roots=1
+k=23 ring_all_readable=true witness_entries_before=22 target=(1,29) new_instance=24 roots_written_txg=[53, 54, 55] persisted_roots=1
+k=24 ring_all_readable=true witness_entries_before=23 target=(24,53) REFUSED Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 24, capacity: 23 })
+stop: Some("k=24 ring_all_readable=true witness_entries_before=23 target=(24,53) REFUSED Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 24, capacity: 23 })")
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 13.97s
+

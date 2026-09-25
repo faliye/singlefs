@@ -1,0 +1,136 @@
+## 每类：段数 / 至少一次固定点命中的段 / 至少一次用户数据被拒的段 / 挂载干跑拒绝的段
+D-raise	histories=2968	with_fixed_point_hit=1095	with_data_refusal=560	with_dry_run_refusal=0
+D-raise-mounted	histories=2968	with_fixed_point_hit=1135	with_data_refusal=639	with_dry_run_refusal=0
+H-live-data-raise	histories=3180	with_fixed_point_hit=1433	with_data_refusal=936	with_dry_run_refusal=0
+I-after-refused-raise	histories=22680	with_fixed_point_hit=9950	with_data_refusal=3907	with_dry_run_refusal=5510
+## 每类：被拒的步按种类（fixed-point / data / dry-run / other）
+D-raise	data	8514
+D-raise	fixed-point	20604
+D-raise-mounted	data	9370
+D-raise-mounted	fixed-point	20943
+D-raise-mounted	other	252
+D-raise	other	257
+H-live-data-raise	data	936
+H-live-data-raise	fixed-point	28839
+H-live-data-raise	other	1049
+I-after-refused-raise	data	25785
+I-after-refused-raise	dry-run	6660
+I-after-refused-raise	fixed-point	151737
+I-after-refused-raise	other	4910
+## 每类：固定点命中按分级（T1 式子会先拒用户写 / T2 保留池取这次的固定点量、承诺量 0 时式子放行 / T3 连挂载期承诺量一起也放行 / - 无读数）
+D-raise	-	724
+D-raise-mounted	T1	20807
+D-raise-mounted	T2	48
+D-raise-mounted	T3	88
+D-raise	T1	19712
+D-raise	T3	168
+H-live-data-raise	-	582
+H-live-data-raise	T1	27877
+H-live-data-raise	T2	280
+H-live-data-raise	T3	100
+I-after-refused-raise	-	12718
+I-after-refused-raise	T1	138833
+I-after-refused-raise	T2	24
+I-after-refused-raise	T3	162
+## 每类：固定点命中按被拒的单元
+D-raise-mounted	t2	138
+D-raise-mounted	t3	6071
+D-raise-mounted	t4	3748
+D-raise-mounted	t5	491
+D-raise-mounted	t6	4640
+D-raise-mounted	t7	721
+D-raise-mounted	t8	5134
+D-raise	t2	199
+D-raise	t3	7252
+D-raise	t4	2825
+D-raise	t5	479
+D-raise	t6	4739
+D-raise	t7	52
+D-raise	t8	5058
+H-live-data-raise	t3	12031
+H-live-data-raise	t4	4651
+H-live-data-raise	t5	4687
+H-live-data-raise	t6	2748
+H-live-data-raise	t7	2397
+H-live-data-raise	t8	2325
+I-after-refused-raise	t2	1119
+I-after-refused-raise	t3	36644
+I-after-refused-raise	t4	17891
+I-after-refused-raise	t5	10106
+I-after-refused-raise	t6	45230
+I-after-refused-raise	t7	9787
+I-after-refused-raise	t8	30960
+## 固定点命中时跑的 checker：绿 / 红
+green=26205 red=0
+## 每类第一次固定点命中最早的一段（步号最小，同步号取宽度最小）
+R	D-raise	64	k=4,s=0	4	Raise0	Raise/RaiseSeq/PlacementRefused(NoFreeSlotOnAnyDevice)	t8	fixed-point	7	9	64	53	41	0	11	11	2	0	0	5	11	5	-30	true	-	56	-	green
+R	D-raise-mounted	64	k=4,s=0	5	Raise0	Raise/RaiseSeq/PlacementRefused(NoFreeSlotOnAnyDevice)	t6	fixed-point	9	9	64	63	51	0	1	1	2	0	0	0	1	0	-50	true	4	56	T1	green
+R	H-live-data-raise	80	n=32,k=0,s=0	0	Seq32	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	80	13	1	0	67	67	2	0	0	33	67	33	2	true	8	56	T1	green
+R	I-after-refused-raise	80	p=seq32-ino26,s=0,raise_at=27,suffix=Ow	0	Seq32	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	80	13	1	0	67	67	2	0	0	33	67	33	2	true	8	56	T1	green
+## I 类：抬 F 那一步的结局 × 后缀里有没有挂载 / 回退 × 抬 F 之后有没有一次做成的发布（走出去）
+raise-applied	suffix-in-process	escaped	5580
+raise-applied	suffix-in-process	stuck	180
+raise-applied	suffix-with-mount	escaped	7440
+raise-applied	suffix-with-mount	stuck	240
+raise-refused	suffix-in-process	escaped	78
+raise-refused	suffix-in-process	stuck	3882
+raise-refused	suffix-with-mount	escaped	30
+raise-refused	suffix-with-mount	stuck	5250
+## I 类：抬 F 被拒、后缀全在进程里、却走出去了的段（逐段列出）
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Ino1	34	10	24	23	23	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise0	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise1	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise3	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise8	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise20	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1	33	10	23	22	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Ow	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Ino1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Seq1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise0	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise3	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise8	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise20	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise1000	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Ino1	34	10	24	23	23	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise0	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise1	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise3	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise8	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise20	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0	33	10	23	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Ow	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Ino1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Seq1	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise0	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise3	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise8	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise20	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise1000	34	10	24	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1	33	10	23	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Ow	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Ino1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Seq1	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise0	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise3	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise8	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+## 抬 F 被拒之前已经写出的空发布次数（txg_after − txg_before）
+D-raise	0	346
+D-raise	1	337
+D-raise	2	41
+D-raise-mounted	0	359
+D-raise-mounted	1	333
+D-raise-mounted	2	73
+H-live-data-raise	0	325
+H-live-data-raise	1	256
+H-live-data-raise	2	1
+I-after-refused-raise	0	8909
+I-after-refused-raise	1	4065
+## 固定点命中那一刻，按盘上最旧可读根回收得到而实现没收的落点（C518 那一类混杂因素）：每类命中数 / 其中漏收 > 0 的
+D-raise	fixed_point_hits=20604	with_missed_reclaim=0
+D-raise-mounted	fixed_point_hits=20943	with_missed_reclaim=0
+H-live-data-raise	fixed_point_hits=28839	with_missed_reclaim=0
+I-after-refused-raise	fixed_point_hits=151737	with_missed_reclaim=0

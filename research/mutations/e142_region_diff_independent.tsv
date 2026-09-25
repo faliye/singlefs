@@ -1,0 +1,4 @@
+M1_hex_decode_step_by_one	    (0..hexadecimal.len())\n        .step_by(2)	    (0..hexadecimal.len())\n        .step_by(1)
+M2_diff_segments_equality_flipped	        if left.get(position) != right.get(position) {	        if left.get(position) == right.get(position) {
+M3_device_region_bytes_marker_typo	        .filter(|line| line.contains("name=device_region_bytes "))	        .filter(|line| line.contains("name=device_region_bytesx "))
+M4_diff_segment_length_off_by_one	            segments.push((segment_start, position - segment_start));	            segments.push((segment_start, position - segment_start + 1));

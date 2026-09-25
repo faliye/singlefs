@@ -17,3 +17,6 @@ M16_自证余量算错	atomic - header_bytes	atomic - header_bytes / 2
 M17_槽不按原子单元数	(atomic / slot).max(1)	1
 M18_挂载判定漏掉撕裂隔离	if slots_per_atomic(slot, atomic) != 1 {	if false {
 M19_挂载判定漏掉自证溢出	if extension_point_bytes > self_witness_room(JOURNAL_HEADER_BYTES, atomic) {	if false {
+M20_头宽退回307	const JOURNAL_HEADER_BYTES: u64 = 311;	const JOURNAL_HEADER_BYTES: u64 = 307;
+M21_头宽落到根槽线上	const JOURNAL_HEADER_BYTES: u64 = 311;	const JOURNAL_HEADER_BYTES: u64 = 257;
+M22_敏感性行的128判据写成严格小于	fn fits_128(bound: u64) -> u8 {\n    u8::from(bound >= 128)\n}	fn fits_128(bound: u64) -> u8 {\n    u8::from(bound > 128)\n}

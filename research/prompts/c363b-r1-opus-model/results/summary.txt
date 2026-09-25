@@ -1,0 +1,222 @@
+## 每类：段数 / 至少一次固定点命中的段 / 至少一次用户数据被拒的段 / 挂载干跑拒绝的段
+A-mkfs-process-overwrite	histories=209	with_fixed_point_hit=75	with_data_refusal=19	with_dry_run_refusal=0
+B-mounted-overwrite	histories=209	with_fixed_point_hit=75	with_data_refusal=19	with_dry_run_refusal=0
+C-live-data-then-inodes	histories=742	with_fixed_point_hit=331	with_data_refusal=175	with_dry_run_refusal=0
+C-live-data-then-inodes-mounted	histories=742	with_fixed_point_hit=323	with_data_refusal=174	with_dry_run_refusal=0
+D-raise	histories=2968	with_fixed_point_hit=1095	with_data_refusal=560	with_dry_run_refusal=0
+D-raise-mounted	histories=2968	with_fixed_point_hit=1135	with_data_refusal=639	with_dry_run_refusal=0
+E-rollback	histories=1696	with_fixed_point_hit=528	with_data_refusal=139	with_dry_run_refusal=409
+F-repeated-sequential	histories=530	with_fixed_point_hit=97	with_data_refusal=356	with_dry_run_refusal=0
+G-remount-cycles	histories=212	with_fixed_point_hit=72	with_data_refusal=15	with_dry_run_refusal=64
+H-live-data-raise	histories=3180	with_fixed_point_hit=1433	with_data_refusal=936	with_dry_run_refusal=0
+I-after-refused-raise	histories=22680	with_fixed_point_hit=9950	with_data_refusal=3907	with_dry_run_refusal=5510
+## 每类：被拒的步按种类（fixed-point / data / dry-run / other）
+A-mkfs-process-overwrite	data	1102
+A-mkfs-process-overwrite	fixed-point	4359
+B-mounted-overwrite	data	1120
+B-mounted-overwrite	fixed-point	4431
+C-live-data-then-inodes	data	175
+C-live-data-then-inodes	fixed-point	11396
+C-live-data-then-inodes-mounted	data	174
+C-live-data-then-inodes-mounted	fixed-point	11678
+D-raise	data	8514
+D-raise	fixed-point	20604
+D-raise-mounted	data	9370
+D-raise-mounted	fixed-point	20943
+D-raise-mounted	other	252
+D-raise	other	257
+E-rollback	data	2650
+E-rollback	dry-run	409
+E-rollback	fixed-point	10010
+F-repeated-sequential	data	11370
+F-repeated-sequential	fixed-point	2805
+G-remount-cycles	data	167
+G-remount-cycles	dry-run	199
+G-remount-cycles	fixed-point	846
+H-live-data-raise	data	936
+H-live-data-raise	fixed-point	28839
+H-live-data-raise	other	1049
+I-after-refused-raise	data	25785
+I-after-refused-raise	dry-run	6660
+I-after-refused-raise	fixed-point	151737
+I-after-refused-raise	other	4910
+## 每类：固定点命中按分级（T1 式子会先拒用户写 / T2 保留池取这次的固定点量、承诺量 0 时式子放行 / T3 连挂载期承诺量一起也放行 / - 无读数）
+A-mkfs-process-overwrite	T1	4359
+B-mounted-overwrite	T1	4431
+C-live-data-then-inodes-mounted	T1	11678
+C-live-data-then-inodes	T1	11396
+D-raise	-	724
+D-raise-mounted	T1	20663
+D-raise-mounted	T2	144
+D-raise-mounted	T3	136
+D-raise	T1	19456
+D-raise	T2	208
+D-raise	T3	216
+E-rollback	T1	10010
+F-repeated-sequential	T1	2805
+G-remount-cycles	T1	846
+H-live-data-raise	-	582
+H-live-data-raise	T1	26937
+H-live-data-raise	T2	700
+H-live-data-raise	T3	620
+I-after-refused-raise	-	12718
+I-after-refused-raise	T1	138551
+I-after-refused-raise	T2	257
+I-after-refused-raise	T3	211
+## 每类：固定点命中按被拒的单元
+A-mkfs-process-overwrite	t3	1163
+A-mkfs-process-overwrite	t4	992
+A-mkfs-process-overwrite	t5	49
+A-mkfs-process-overwrite	t6	1053
+A-mkfs-process-overwrite	t7	49
+A-mkfs-process-overwrite	t8	1053
+B-mounted-overwrite	t3	1071
+B-mounted-overwrite	t4	1020
+B-mounted-overwrite	t5	150
+B-mounted-overwrite	t6	1020
+B-mounted-overwrite	t7	150
+B-mounted-overwrite	t8	1020
+C-live-data-then-inodes-mounted	t3	3645
+C-live-data-then-inodes-mounted	t4	1678
+C-live-data-then-inodes-mounted	t5	1574
+C-live-data-then-inodes-mounted	t6	1662
+C-live-data-then-inodes-mounted	t7	1236
+C-live-data-then-inodes-mounted	t8	1883
+C-live-data-then-inodes	t3	3889
+C-live-data-then-inodes	t4	1266
+C-live-data-then-inodes	t5	1570
+C-live-data-then-inodes	t6	1650
+C-live-data-then-inodes	t7	1498
+C-live-data-then-inodes	t8	1523
+D-raise-mounted	t2	138
+D-raise-mounted	t3	6071
+D-raise-mounted	t4	3748
+D-raise-mounted	t5	491
+D-raise-mounted	t6	4640
+D-raise-mounted	t7	721
+D-raise-mounted	t8	5134
+D-raise	t2	199
+D-raise	t3	7252
+D-raise	t4	2825
+D-raise	t5	479
+D-raise	t6	4739
+D-raise	t7	52
+D-raise	t8	5058
+E-rollback	t3	2492
+E-rollback	t4	1706
+E-rollback	t5	566
+E-rollback	t6	2497
+E-rollback	t7	115
+E-rollback	t8	2634
+F-repeated-sequential	t3	250
+F-repeated-sequential	t4	1617
+F-repeated-sequential	t5	68
+F-repeated-sequential	t6	242
+F-repeated-sequential	t8	628
+G-remount-cycles	t3	248
+G-remount-cycles	t4	126
+G-remount-cycles	t5	91
+G-remount-cycles	t6	158
+G-remount-cycles	t7	85
+G-remount-cycles	t8	138
+H-live-data-raise	t3	12031
+H-live-data-raise	t4	4651
+H-live-data-raise	t5	4687
+H-live-data-raise	t6	2748
+H-live-data-raise	t7	2397
+H-live-data-raise	t8	2325
+I-after-refused-raise	t2	1119
+I-after-refused-raise	t3	36644
+I-after-refused-raise	t4	17891
+I-after-refused-raise	t5	10106
+I-after-refused-raise	t6	45230
+I-after-refused-raise	t7	9787
+I-after-refused-raise	t8	30960
+## 固定点命中时跑的 checker：绿 / 红
+green=29192 red=0
+## 每类第一次固定点命中最早的一段（步号最小，同步号取宽度最小）
+R	A-mkfs-process-overwrite	66	K=72	5	Ow	PlacementRefused(NoFreeSlotOnAnyDevice)	t3	fixed-point	8	8	66	63	51	0	3	3	2	0	0	1	3	1	-50	true	8	56	T1	green
+R	B-mounted-overwrite	66	K=72	5	Ow	PlacementRefused(NoFreeSlotOnAnyDevice)	t3	fixed-point	9	9	66	63	51	0	3	3	2	0	0	1	3	1	-50	true	8	56	T1	green
+R	C-live-data-then-inodes	64	n=24	0	Seq24	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	64	13	1	0	51	51	2	0	0	25	51	25	2	true	8	56	T1	green
+R	C-live-data-then-inodes-mounted	72	n=24	1	Seq24	PlacementRefused(NoFreeSlotOnAnyDevice)	t3	fixed-point	5	5	72	23	11	0	49	49	2	0	0	24	49	24	-10	true	8	56	T1	green
+R	D-raise	64	k=4,s=0	4	Raise0	Raise/RaiseSeq/PlacementRefused(NoFreeSlotOnAnyDevice)	t8	fixed-point	7	9	64	53	41	0	11	11	2	0	0	5	11	5	-30	true	-	56	-	green
+R	D-raise-mounted	64	k=4,s=0	5	Raise0	Raise/RaiseSeq/PlacementRefused(NoFreeSlotOnAnyDevice)	t6	fixed-point	9	9	64	63	51	0	1	1	2	0	0	0	1	0	-50	true	4	56	T1	green
+R	E-rollback	72	k=4,i=0	5	Ow	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	10	10	72	67	55	0	5	5	2	0	0	2	5	2	-52	true	8	56	T1	green
+R	F-repeated-sequential	64	n=24	0	Seq24	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	64	13	1	0	51	51	2	0	0	25	51	25	2	true	8	56	T1	green
+R	G-remount-cycles	64	k=1	4	Ow	PlacementRefused(NoFreeSlotOnAnyDevice)	t6	fixed-point	10	10	64	57	45	0	7	7	2	0	0	3	7	3	-40	true	8	56	T1	green
+R	H-live-data-raise	80	n=32,k=0,s=0	0	Seq32	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	80	13	1	0	67	67	2	0	0	33	67	33	2	true	8	56	T1	green
+R	I-after-refused-raise	80	p=seq32-ino26,s=0,raise_at=27,suffix=Ow	0	Seq32	PlacementRefused(NoFreeSlotOnAnyDevice)	t4	fixed-point	3	3	80	13	1	0	67	67	2	0	0	33	67	33	2	true	8	56	T1	green
+## I 类：抬 F 那一步的结局 × 后缀里有没有挂载 / 回退 × 抬 F 之后有没有一次做成的发布（走出去）
+raise-applied	suffix-in-process	escaped	5580
+raise-applied	suffix-in-process	stuck	180
+raise-applied	suffix-with-mount	escaped	7440
+raise-applied	suffix-with-mount	stuck	240
+raise-refused	suffix-in-process	escaped	78
+raise-refused	suffix-in-process	stuck	3882
+raise-refused	suffix-with-mount	escaped	30
+raise-refused	suffix-with-mount	stuck	5250
+## I 类：抬 F 被拒、后缀全在进程里、却走出去了的段（逐段列出）
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Ino1	34	10	24	23	23	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise0	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise1	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise3	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise8	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ow+Raise20	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1	33	10	23	22	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Ow	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Ino1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Seq1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise0	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise1	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise3	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise8	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise20	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Ino1+Raise1000	34	10	24	23	23	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Ino1	34	10	24	23	23	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise0	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise1	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise3	34	10	24	23	22	0	9	32	0,1,2,3,4,5,6,7,8,32
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise8	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Seq1+Raise20	34	11	23	22	22	0	9	33	0,1,2,3,4,5,6,7,8,32,33
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0	33	10	23	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Ow	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Ino1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Seq1	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise0	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise3	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise8	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise20	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise0+Raise1000	34	10	24	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1	33	10	23	22	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Ow	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Ino1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Seq1	34	10	24	23	21	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise0	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise1	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise3	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+H	I-after-refused-raise	112	p=ow30,s=1000,raise_at=30,suffix=Raise1+Raise8	34	10	24	23	22	0	9	31	0,1,2,3,4,5,6,7,8,31
+## 抬 F 被拒之前已经写出的空发布次数（txg_after − txg_before）
+D-raise	0	346
+D-raise	1	337
+D-raise	2	41
+D-raise-mounted	0	359
+D-raise-mounted	1	333
+D-raise-mounted	2	73
+H-live-data-raise	0	325
+H-live-data-raise	1	256
+H-live-data-raise	2	1
+I-after-refused-raise	0	8909
+I-after-refused-raise	1	4065
+## 固定点命中那一刻，按盘上最旧可读根回收得到而实现没收的落点（C518 那一类混杂因素）：每类命中数 / 其中漏收 > 0 的
+A-mkfs-process-overwrite	fixed_point_hits=4359	with_missed_reclaim=0
+B-mounted-overwrite	fixed_point_hits=4431	with_missed_reclaim=0
+C-live-data-then-inodes	fixed_point_hits=11396	with_missed_reclaim=0
+C-live-data-then-inodes-mounted	fixed_point_hits=11678	with_missed_reclaim=0
+D-raise	fixed_point_hits=20604	with_missed_reclaim=0
+D-raise-mounted	fixed_point_hits=20943	with_missed_reclaim=0
+E-rollback	fixed_point_hits=10010	with_missed_reclaim=0
+F-repeated-sequential	fixed_point_hits=2805	with_missed_reclaim=0
+G-remount-cycles	fixed_point_hits=846	with_missed_reclaim=0
+H-live-data-raise	fixed_point_hits=28839	with_missed_reclaim=0
+I-after-refused-raise	fixed_point_hits=151737	with_missed_reclaim=0

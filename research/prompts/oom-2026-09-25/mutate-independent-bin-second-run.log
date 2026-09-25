@@ -1,0 +1,6 @@
+基线：全绿
+✅ [M1_hex_decode_step_by_one] 红：tests::flipping_one_hex_character_reports_exactly_that_region_and_segment,tests::comparing_a_dump_against_itself_reports_zero_differences,tests::deleting_a_line_reports_that_region_as_unmatched
+💥 [M2_diff_segments_equality_flipped] 测试进程没跑完（signal 9）——破坏被看见了，但不是断言抓到的
+✅ [M3_device_region_bytes_marker_typo] 红：tests::deleting_a_line_reports_that_region_as_unmatched,tests::flipping_one_hex_character_reports_exactly_that_region_and_segment
+✅ [M4_diff_segment_length_off_by_one] 红：tests::flipping_one_hex_character_reports_exactly_that_region_and_segment
+已还原，基线仍全绿

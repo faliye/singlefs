@@ -1,0 +1,55 @@
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-core/src/admission.rs	2026-09-24 23:55:14.650113749 +0000
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree/crates/singlefs-core/src/admission.rs	2026-09-25 04:24:25.886440112 +0000
+@@ -363,10 +363,15 @@
+         self.per_device
+             .iter()
+             .map(|terms| {
++                let deferred_term_s4_candidate_1 = if std::env::var("SONNET_S4_NO_DEFER_TERM").is_ok() {
++                    BytesOnOneDevice::ZERO
++                } else {
++                    terms.deferred
++                };
+                 let own_terms = [
+                     terms.allocated,
+                     terms.unreclaimable,
+-                    terms.deferred,
++                    deferred_term_s4_candidate_1,
+                     terms.mount_time_commitment,
+                     terms.abandoned_root_exclusive,
+                 ]
+@@ -584,7 +589,7 @@
+ ) -> AdmissionReading {
+     let checkpoint_cost =
+         checkpoint_cost_of_the_version_to_build_on(version_to_build_on, allocator);
+-    AdmissionReading::of_allocator(
++    let reading = AdmissionReading::of_allocator(
+         allocator,
+         instance_switch_reserve_on_one_device(
+             allocator.instance_rows_after_this_mounts_row_publish(),
+@@ -594,7 +599,25 @@
+             checkpoint_cost,
+             ReplicaCount::of_every_device_in_the_pool(allocator),
+         )),
+-    )
++    );
++    if std::env::var("SONNET_S4_TRACE").is_ok() {
++        eprintln!(
++            "S4TRACE rows0={} checkpoint_cost={:?}",
++            allocator.instance_rows_after_this_mounts_row_publish(),
++            checkpoint_cost
++        );
++        for terms in reading.per_device() {
++            eprintln!(
++                "S4TRACE device={:?} capacity={:?} allocated={:?} deferred={:?} mount_time_commitment={:?} abandoned_root_exclusive={:?}",
++                terms.device, terms.capacity, terms.allocated, terms.deferred, terms.mount_time_commitment, terms.abandoned_root_exclusive
++            );
++        }
++        eprintln!("S4TRACE pool_wide={:?}", reading.pool_wide());
++        for (device, available) in reading.available_on_each_device() {
++            eprintln!("S4TRACE available device={:?} value={:?}", device, available);
++        }
++    }
++    reading
+ }
+ 
+ #[cfg(test)]

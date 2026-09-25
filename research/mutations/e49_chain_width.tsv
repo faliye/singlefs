@@ -1,7 +1,12 @@
 M1_盘上占用不向上取整	record_bytes_before_rounding.div_ceil(unit)	record_bytes_before_rounding / unit
-M2_分岔扫描少一档	for items in 0..=largest_item_count {	for items in 0..=(largest_item_count / 100) {
+M2_分岔扫描少一档	for items in 0..=largest_item_count {\n        if units_on_disk(base, narrow_chain_bytes, items, unit) != units_on_disk(base, wide_chain_bytes, items, unit) {	for items in 0..=(largest_item_count / 100) {\n        if units_on_disk(base, narrow_chain_bytes, items, unit) != units_on_disk(base, wide_chain_bytes, items, unit) {
 M3_期望值不除位宽	chances / 2f64.powi(bits as i32)	chances
 M4_至少一次退化成期望	1.0 - (-expected_false_accept_count).exp()	expected_false_accept_count
 M5_盘上占用漏掉链宽	let record_bytes_before_rounding = base + chain_bytes + items * ITEM_BYTES;	let record_bytes_before_rounding = base + items * ITEM_BYTES;
 M6_够用判据放宽到全通过	fn enough(at_least_once_probability: f64) -> bool {\n    at_least_once_probability < 0.01\n}	fn enough(at_least_once_probability: f64) -> bool {\n    at_least_once_probability <= 1.0\n}
 M7_每项字节算错	const ITEM_BYTES: u64 = 56;	const ITEM_BYTES: u64 = 64;
+M8_base算成含链	JOURNAL_HEADER_BYTES - BACK_CHAIN_BYTES_TODAY	JOURNAL_HEADER_BYTES
+M9_头宽退回307	const JOURNAL_HEADER_BYTES: u64 = 311;	const JOURNAL_HEADER_BYTES: u64 = 307;
+M10_读法乙每条项数漏减链宽	(RECORD_BYTES_FIXED - base - chain_bytes) / ITEM_BYTES	(RECORD_BYTES_FIXED - base) / ITEM_BYTES
+M11_读法乙每条项数少算一字节	(RECORD_BYTES_FIXED - base - chain_bytes) / ITEM_BYTES	(RECORD_BYTES_FIXED - base - chain_bytes - 1) / ITEM_BYTES
+M12_判别力不挪门槛	divergent_count <= tolerance	divergent_count == 0

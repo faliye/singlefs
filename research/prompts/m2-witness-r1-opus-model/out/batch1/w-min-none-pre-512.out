@@ -1,0 +1,5 @@
+WMIN_EXAMPLE path=[Overwrite, Overwrite, Overwrite, RollbackTo(0, 0)] F*=[R1.2,R2.2] hit=true
+WMIN_EXAMPLE path=[Overwrite, Overwrite, Overwrite, RollbackTo(1, 1)] F*=[R1.2,R2.2] hit=true
+WMIN_EXAMPLE path=[Overwrite, Overwrite, Overwrite, RollbackTo(1, 2)] F*=[R1.2,R2.2] hit=true
+E7RESULT name=witness_minimum_fault_summary placement=None order=BeforeFirstRoot pbs=512 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) sigma_length_limit=3 nodes_with_live_abandoned_root=1702 constructed_set_hits=1702 constructed_set_misses=0 without_witness_half_hits=0 histogram_of_fault_count={2: 213, 3: 1086, 4: 58, 5: 123, 6: 160, 7: 26, 8: 20, 9: 16}
+E7RESULT name=done emitted=2

@@ -1064,6 +1064,598 @@ user=0m47.090s（real≫user，判断是重复建镜像的开销），优化后�
 时点：全部在 `research/results/` 落盘新产物**之前**发现并修（PC2 是这一段派发的第一道门槛，「复现
 不出就先查装置、不往下跑搜索」——第 2、3 条是查出来的，第 4 条是查 3 号副本 V3 停机时顺带查出来的）。
 
+**2026-09-24（产物之前，session s6）**：
+
+1. **开工重核（S1）：主工作区在这一段期间被合并成一次「里程碑二收尾」提交系列**（开工时
+   `git rev-parse HEAD` = `3b60f098e97dc4c4f3ed9c6355422b607db1c34c`，`git status --porcelain
+   crates/` 95 行；本段中途主 agent 把这批未提交改动连同别的收尾工作一起提交，`HEAD` 变成
+   `e980a219f1834c638cd2fae18b25a60525a6bd52`，`crates/*/src/**/*.rs` 的 `git diff --stat` 显示
+   `mount.rs`/`recovery.rs`/`transaction.rs`/`root_ring.rs`/`system_configuration.rs`/
+   `journal.rs`/`instance_table.rs`/`singlefs-format/lib.rs` 合计 5139 行新增、1185 行删除）。
+   逐一现查本登记依赖的每个函数与常量：`first_txg_of_new_instance`（仍是
+   `max(highest_ring_txg, highest_record_txg)+1`）、`mount_writable`/`mount_rollback` 的
+   `next_counter`（仍是环里最大计数器 + 1）、`choose_root`（仍是 `(checkpoint_txg, instance)`
+   最大者、不读实例表）、`isolate_slots_referenced_only_by_abandoned_roots`（仍只
+   `unreadable += 1; continue`，不隔离不拒绝）、`SystemRuntimeQuantities`（仍恰 3 个字段）、
+   `SYSTEM_CONFIGURATION_BYTES`/`ROOT_RECORD_BYTES`/`INSTANCE_ROW_BYTES`/`JOURNAL_RECORD_BYTES`/
+   `SLOT_BYTES`（481/457/88/4096/16384，全部不变）——**S1 不触发**，这批改动没有碰到本登记依赖的
+   任何一处读法或常量，是别处的新增（`crates/singlefs-core/src/admission.rs` 等）。装置在这份新
+   HEAD 上编译通过（`cargo build --release -p singlefs-harness --bin e158_root_choice_repair`
+   `Finished`）、既有 22 条单测全绿，坐实这批改动不影响本实验已测的任何观测面。
+2. **先做的 4 处 clippy（不是本段新写的代码，session s4/s5 遗留，派发要求先改绿）**：
+   `mod tests` 移到文件末尾（`items_after_test_module`，纯粹的代码块重排，用可校验的方式
+   完成——写脚本切出 `mod tests` 的 500 行与它后面两个函数的 174 行、交换顺序、**用
+   sha256 核对「把重排撤销之后与改前的文件逐字节相同」**，核对通过：`7a2a46dde4bceb4745dac5bfc7a
+   7245de96708496cc0f67c91e2440eb8d88df7`，与 session s5 报告记录的改前哈希一致）；
+   `judge_recovery_outcome`/`evaluate_rootback_predicate` 两处 `_ =>`/`other =>` 通配臂改成
+   穷举 `RecoveryOutcome` 的三个具名变体；`run_fixed_publication_byte_script` 两处 `shadow_
+   unrelated`（`Ok(mounted) => mounted` 在回退挂载那一处遮住了写行挂载那处同名的外层
+   `mounted`；`let mut allocator = rollback_mounted.allocator` 遮住了外层 `allocator`）改名
+   `rollback_mount_output`/`rollback_allocator`。四处改完 `cargo clippy --release
+   --all-targets --all-features` 加共用约束那批 lint 对这份 bin 清零；22 条既有单测保持全绿
+   （随后本段自己的新增单测把总数带到 28 条，见下）。**这不改变任何判据、臂定义或已有产物**——
+   四处纯属代码结构与命名，不碰任何计算逻辑。
+3. **H-C1 直接构造（岔路单第 2 行 ①，丙的具体历史，`m2-rootchoice-repair-r1-main-verification.md:50`
+   「丙……要 12 个」）**：新写 `run_direct_construction_for_the_record_scan_watermark_candidate`
+   （与甲-txg 同一段历史 n1=4，复用 `root_ring_slot_targets_for` 精确点名顶上 4 条根槽，另从
+   `evidence_items_at` 取记录类证据项里计数器最大的 4 条、两份镜像的 (设备, 偏移) 全拦，总权重
+   4×1+4×2=12）与负对照 `run_negative_control_root_slots_only_for_the_record_scan_watermark_
+   candidate`（只挡 4 条根槽，不挡记录）。**结果：直接构造 `hit=true fault_weight=12`**（与
+   K2「丙……要 12 个」一致），**负对照 `hit=false`**（证明只挡根环挡不住丙，记录扫描那一路会把
+   真实 tip 重新暴露）。这不是「构造上界」——另加了下界探针
+   `run_record_scan_watermark_lower_bound_probe`（沿用既有的
+   `search_minimum_weight_that_triggers_rootback`，只把它已有的 `subset_enumeration_cap`
+   参数从 `SUBSET_ENUMERATION_CAP`=20000（session s5 撞顶）单独调高到 60000，在同一个 n1=4
+   节点上重跑）：**`subsets_tried=22558`（< 60000，没有撞顶）、`k_min=12`**——权重 0 到 11 的
+   全部组合穷举完都没有命中，权重 12 上第一个尝试的组合（4 根槽 + 4 条记录，与直接构造用的是
+   不同的具体根槽但同样是 4 记录）就命中。**这是「恰好 12」的严格证据**（穷举下界真正走到了
+   12 且之下全空，不是撞顶推出的上界）——`.claude/rules/mutation-sampling.md`
+   「构造上界给出的数，穷举在它之下全部权重都没打中才写成『恰好 k』」这一句的条件在这里满足。
+   ⚠️ **判决 K2 原表把丙这一格同时标「攻不动（结构性：每次发布必写记录、记录先于根⇒水位单调不减）」
+   与「要 12 个」**——这两句字面上有张力（前者读作「不可能被打中」，后者给出一个具体打中所需的
+   数）；这一段的实测结果是**丙确实可以被打中**（两条独立路径：手写的直接构造与独立的穷举下界
+   都在权重 12 上给出 `hit=true`），且**恰好需要 12**，与后一句吻合、与前一句字面读法不吻合。
+   这句话该怎么读（也许"攻不动"专指"只靠压根环这一种简单攻法"）交主 agent 核对攻方腿原文判断，
+   本段不越权下结论，只如实报两条独立路径的读数。**不改判据、不改臂定义**：`search_minimum_
+   weight_that_triggers_rootback`、`evaluate_rootback_predicate`、`evidence_items_at` 一个字
+   没有改，只是新增了两个复用它们的驱动函数与一次调高探针 cap 的调用。
+4. **第八节几何敏感性（岔路单第 1 行判决格 = Q1-1a 的 N_trig）**：新增 `q1-s16`、`q1-s4`
+   两个模式，复用既有的 `run_ledger_fault_family`（本就是几何参数化的函数，未改代码）。
+   **结果：S16、S4 两点与 G0 逐字节相同**（`pairs=3942 trigger_count=798`，各分项计数
+   `q1_1a_by_aspect_severity`、`q1_1c_error_member` 都一致）——判定不翻面。判别力自证：两点
+   同值，门槛无处可挪，按 8.2 原文「两点同值时……写『两点同值，自证不适用』」记。
+5. **岔路单第 2 行 ③ 的字段表宽度算式（甲/丙、乙/丁两组，对候选 2 的两种宽度与两种表形态）**：
+   在 `run_constants_and_anchors` 里补 8 条 `section_seven_two_arithmetic`：候选 2 表形态
+   `1+16*N_w`/`1+12*N_w`（N_w=4，取自 Q3-2 已量出的最大值）算出 65/49；甲、丙都不改字段表
+   （仍 481），与候选 2 同放按「单放」公式（`512-481-W`）算：单条 16/12 余量 15/19（放得下），
+   表形态 65/49 余量 −34/−18（推过 512）；乙、丁都把字段表改成 489（同一处 8 字节字段，只是
+   取号写占位 0 还是续传），按「与乙同放」公式（`512-481-8-W`）算：表形态 65/49 余量
+   −42/−26（推过 512，与 Q3-2 已有的「候选 2 与乙同放推过 512」是同一个数）。8 条全部
+   `verdict=pass`（一条追加进 `crates/mutations.tsv` 手工验证：`1+16*4` 改成 `1+16*3` →
+   `constants_and_anchors_all_pass` 红，还原后复绿）。**这只是算术，不需要新建 5.3 表里没有的
+   臂**：甲、丙已经「与今天同一份代码」（5.3 表），乙、丁的字段表改动就是 5.3 表原文写的那
+   8 字节，数值早已由 Q2-2b/Q3-2 各自算出，这里只是把「与哪个修法同放」的四种组合摆全。
+6. **不改判据、不改臂的定义**：以上五条里唯一新增测量逻辑的是第 3 条（H-C1 直接构造 + 下界
+   探针），复用的都是已有、已被变异测过的函数；第 4、5 条是对既有函数换参数重跑或补算术检查。
+   第五、六、七节的判据、5.1–5.4 的臂定义、P331/P332 的定义一个字没有改。
+
+时点：clippy 修复与代码重排在任何新产物落盘之前完成；H-C1 与几何敏感性的产物是本段新落盘的
+（`research/results/e158-root-choice-repair-2026-09-24-{q2-1-hc1,q2-1-hc1-lower-bound,q1-s16,
+q1-s4}.out`），这四份本身没有需要「产物之前改」的修订——它们是全新测量，不是对已有产物的重跑。
+
+**2026-09-24（产物之前，session s7，岔路单第 2 行 ①②三份新副本 + 岔路单第 1 行 (b) 两个子分支）**：
+
+1. **开工重核**：`git rev-parse HEAD` 与 `git status --porcelain crates/`（只剩我自己这份 bin 与
+   `mutations.tsv`）与 session s6 收尾时一致，S1 依赖的每个函数与常量本段开工时再次现查全部相符，
+   不触发。
+2. **岔路单第 2 行 ①②：新建乙-留环、丁-留环、丁-只配置三份副本**（`research/mutations/e158_arms.tsv`
+   追加 47 行；乙-留环 15 行、丁-留环与丁-只配置各 16 行，比乙族多一个 `published_txg_to_carry_over`
+   方法 + 两处取号调用点改成续传而不是写占位 0）。三份副本 `cp -a` 自同一次快照（S4 记录：
+   `git_head=e980a219f1834c638cd2fae18b25a60525a6bd52`、`git_status_crates_lines=2`，与开工时相同）、
+   各自 `cargo build --release` 编译通过，跑 `q2-1-g0`（Φ2 穷举下界，n1∈{0,...,6}）、`q2-2a-g0`
+   （固定脚本设备一层写字节）、`q2-1-pc2`（K2 给甲/乙两条候选各自的具体构造，跑在新副本上当负对照 /
+   验证乙-留环用）三个模式（均加 `SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES=489`）。**结果**：
+   三份副本在 `q2-1-g0` 上逐字节相同——n1∈{0,1,2,3} 全部 `k_min=none_found_within_full_evidence_space`
+   （Φ2 穷举完整个可枚举证据空间，Ring+record 两类故障都没能打中），n1∈{4,5,6} 全部 `k_min=capped`
+   （撞 `SUBSET_ENUMERATION_CAP=20000`，未穷尽）。`q2-1-pc2` 的甲-check（K2 给甲的 4-根槽构造）在三
+   份副本上都 `hit=false`（负对照，正确——这三份都不是甲-txg）；**乙-check（K2 给乙的「0 故障+1 崩溃
+   点」构造）在乙-留环上 `hit=false`**（乙-留环仍保留根环读取，这次崩溃没有压低根环给出的水位）、**在
+   丁-留环、丁-只配置上也都 `hit=false`**（续传避免了取号那一步把水位归零，这正是丁的设计初衷）。
+   `q2-2a-g0`：三份副本的设备一层写字节与今天逐字节相同（`diff` 核过零差异），Δ=0——加一个 8 字节字
+   段不改变系统配置槽本来就整槽写的字节数。**四条修法的完整画像**：甲-txg k_min=4、丙（今天）
+   k_min=12（恰好，session s6 坐实）、乙-只配置「0 故障+1 崩溃点」（session s5 坐实）、乙-留环/
+   丁-留环/丁-只配置三者在本段测过的两类攻法（Φ2 穷举 + K2 给乙的具体构造）下都没有被打中——但 Φ2
+   目前只含根槽与记录两类证据、不含系统配置槽这一类（登记 5.1 定义要的第三类还没实现，「Φ2 系统配
+   置槽证据类」仍是「够判后未跑」），所以「没打中」不能读成「丁挡得住所有攻法」，只能读成「本段测过
+   的两类攻法都没打中」。**不改判据、不改臂定义**：`research/mutations/e158_arms.tsv` 追加的 47 行
+   全部是 5.3 表里已经写死的臂定义的字面实现（乙-留环 = 乙族字段/写法 + 留环公式；丁-留环 = 乙-留环
+   的字段/写法 + 取号续传；丁-只配置 = 乙-只配置的字段/写法 + 取号续传），装置侧的
+   `run_rootback_tolerance_family`/`run_fixed_publication_byte_script`/两个 PC2 驱动函数一个字没
+   有改，只是编到了三份新副本里各跑一遍。
+3. **岔路单第 1 行候选 (b) 树表指称「crates 有路」子分支**：新写 `nearest_older_readable_root_on_
+   same_instance`（同一实例上更旧的可读根，取最近的祖先）与 `tree_table_crates_has_a_path`（从这条
+   祖先出发调 `crates::recovery::replay_journal`，`verify_named_units` 两种都跑，看能不能不读目标那
+   两份物理拷贝就交回同一个 `tree_table` 指针）。**这一支给出的是指针级别（位置+校验和）的复算，不是
+   节点内容的 16 KiB 字节本身**——要拿到字节仍要照这个指针再读一次两份物理拷贝，这个限定写进了函数
+   自己的文档注释。**结果（G0，见「结果整行抄自产物」一节更新）**：`verify_named_units=true`（今天挂
+   载真用的口径）198 格里 189 格 `did_not_reach_target`、9 格 `no_older_readable_root_on_timeline`，
+   **零格**给出匹配的指针——按今天真实的验证口径，`replay_journal` 没有独立于那次被挡住的读的路径。
+   `verify_named_units=false`（只信记录自带的新根段字段、不验证任何单元）198 格里 81 格
+   `reached_target_with_matching_pointer`、108 格 `did_not_reach_target`、9 格
+   `no_older_readable_root_on_timeline`——约 43%（81/189，排除掉没有祖先可用的 9 格）的触发对能不
+   碰物理拷贝就复算出正确指针，说明 journal 记录本身携带了重建根字段所需的信息，只是 `crates/` 今天挂载
+   时用的验证口径会去碰同一个物理位置（`verify_named_units=true` 时该记录若把树表单元列进点名单元，
+   验证那一步就会撞上同一个故障）。**这两组数字合起来的读法**：候选 (b) 树表指称「crates 有路」这句
+   话，在「按今天真实验证口径」下不成立；在「只信记录字段、放弃当场验证」这个更弱的读法下，对将近一
+   半的触发对成立——这两种读法哪个才是候选 (b) 支持者原意的「有路」，交主 agent 判断。
+4. **岔路单第 1 行候选 (b) 分配记录树指称「从内容树反推占用集合」这一种操作化**：新写
+   `allocation_record_tree_reachable_placements_via_central_mapping`——不重读这一格被注入的分配记
+   录树节点本身，改走中央映射树（`root.mapping_root`，D1（数据可移动性 / 反向索引） 的逻辑到物理权
+   威索引，物理上与分配记录树节点是不同的位置，不受这一格故障影响）：读中央映射树根节点（第一版单层，
+   与 `crates::mounted_read::open_pool_for_read` 判 `CENTRAL_MAPPING_TREE_ROOT_LEVEL` 同一个前提），
+   逐条目调 `crates::records::parse_mapping_entry` 拿两条位置条目，并成落点集合。**结果**：198 个触
+   发对里 27 个 `central_mapping_unreadable`（树表 0 条那一版 `mapping_root` 恒空指针，读它是正确报
+   错，不是读成空集——这批测的是 mkfs 或首个文件之前的历史节点，正当拿不到）、**171 个 `unequal`**
+   （中央映射树给出的落点集合与孪生镜像上 `allocation_records_under_root` 的「未释放」集合逐条比对，
+   **一格都不相等**）。⚠️ **这不是候选 (b) 分配记录树指称「反推占用集合」这条思路本身的读数，是这一种
+   操作化（只走中央映射树一条内容树）的读数**：分配记录树记的是「已经写出过的每一个落点」（含结构性
+   节点：树表自己、8 棵子树各自的根与内部/叶节点、accounting 树等），中央映射树只记「当前逻辑地址映
+   射到的数据落点」（D1（数据可移动性 / 反向索引） 的定义射程），两者本来就不是同一个集合——中央映射
+   给出的应当是分配记录「未释放」集合的一个真子集（只覆盖数据单元，不覆盖各棵树自己的结构节点），
+   `unequal` 在全部 171 个可比对的对上出现，与这个结构性推断一致（未验证方向：没有单独跑一次子集判
+   定去坐实「中央映射给出的集合 ⊆ 未释放集合」，只验证了「不相等」）。要让这种操作化真正给出「反推占
+   用集合」，还要另外走 8 棵子树各自的内部/叶节点、把结构性单元也并进来——那正是 session s6 原话「要
+   新写一整套树遍历（inode / mapping 树 / extent 指针）」里除中央映射之外的部分，这一段没有做全，
+   只做出了中央映射这一段并把「不够」的地方用真实读数坐实了。
+5. **两个新函数各配一条单测**（`nearest_older_readable_root_on_same_instance_picks_the_closest_
+   ancestor_on_the_same_instance`、`allocation_record_tree_reachable_placements_via_central_
+   mapping_reflects_written_content_and_errors_on_an_empty_pointer`），逐条手工改坏验证会红（前者
+   把实例过滤条件取反、后者在交回前清空集合），还原后复绿；28 条既有单测保持不动，本段单测总数
+   28→30。变异表 `crates/mutations.tsv` 追加 2 行（对应这两条新单测），门禁 33 号核过原文各命中源
+   码一次（536 条）。
+6. **不改判据、不改臂定义**：以上四、五条新写的都是「候选 (b) 在两个指称上怎么操作化」这个问题本身
+   要求的新测量逻辑，跑前登记 5.2 表原文「① 别的位置上字节完全相同、读得出的一份单元」「② `crates/`
+   已有的路径…从一条更旧的可读根出发」与「(b) 就地重建：分配记录树…从账里取的那一份」的定义字面一个
+   字没有改，只是把「② crates 有路」与「反推占用集合」这两句此前只有交回报告里的文字描述，实现成了
+   真跑得出结果的代码。第五、六、七节的判据、5.1–5.4 的臂定义、P331/P332 的定义同样一个字没有改。
+7. **没做**：op1 第三种变体（先不注入地 `mount_writable` 再 `raise_rollback_floor`）与持续故障（op1
+   及其后两次挂载都带着）本段仍未实现，见交回报告「岔路表」。H2-R、H2c、n2=2、Φ2 系统配置槽证据类
+   本段也仍未做。
+
+时点：三份新副本的 `q2-1-g0`/`q2-2a-g0`/`q2-1-pc2` 产物、两个新 Q1-2 子分支的产物（`q1-g0` 重跑覆盖
+`research/results/e158-root-choice-repair-2026-09-24-q1-g0-today.out`，纯增量、旧的 76 行原样保留
+只多了 7 行诊断与末行计数）都是本段新落盘的；`research/mutations/e158_arms.tsv` 的 47 行、
+`crates/mutations.tsv` 的 2 行都在任何产物落盘之前写定。⚠️ **`run_ledger_fault_family` 同时被
+`q1-g0`、`q1-s16`、`q1-s4` 三个模式调用**（`main()` 里各自独立触发，不挂在 `mode == "all"` 下）：
+两个新 Q1-2 子分支的诊断行因此也会出现在 `q1-s16`/`q1-s4` 的产物里，`research/results/e158-
+root-choice-repair-2026-09-24-q1-s16.out`、`...-q1-s4.out` 两份同样按纯增量覆盖（旧 71 行原样保
+留、各多 7 行诊断，`emitted` 71→78）——这一处是跑 `replay.sh` 之前现查主 `main()` 分发表才发现的，
+不是随手漏掉。
+
+**2026-09-24（产物之前，执行员，session s8）**：
+
+1. **开工重核（S1）**：`git rev-parse HEAD` 仍是 `e980a219f1834c638cd2fae18b25a60525a6bd52`；`git
+   status --porcelain crates/` 从 session s7 收尾时的 2 行涨到 31 行——另一条并行在改的线（`impl-
+   m2-writepath`/`impl-m2-treesplit`）正在改 `mount.rs`（+313 行）、`recovery.rs`（+257 行）、
+   `checker/walk.rs`（+362 行）等文件。逐一现查本登记依赖的每个函数名（`choose_root`、`first_txg_
+   of_new_instance`、`next_counter`、`choose_system_configuration`、`write_acquired_instance`、
+   `persist_the_root_then_rotate_the_system_configuration`、`isolate_slots_referenced_only_by_
+   abandoned_roots`、`SystemRuntimeQuantities`、`check_system_configuration_slot`、
+   `root_slot_positions`/`valid_roots`）在这批并行 diff 里的命中数：全部 0（`checker/image.rs`
+   的整份 diff只是把 `IMPLEMENTED_INVARIANTS` 从 41 项改成 43 项，不碰本登记用到的任何函数）。
+   S1 不触发。
+2. **实做才发现的 S4 变体**：本段中途改了 `crates/singlefs-harness/src/bin/e158_root_choice_
+   repair.rs` 之后，把它拷进 session s7 已经建好、已经编译过的三份旧副本（`/tmp/claude-1000/
+   e158-s7/arms/*`）重新编译，**编不过**——那三份副本的 `crates/singlefs-core` 冻结在 s7 快照那一刻
+   （更早于本段开工时的并行改动），而 s8 新写的装置源码是对着**今天**（含并行改动）的
+   `crates/singlefs-core` 编译通过的；`replay_journal`（`recovery.rs`）的返回类型在这两个快照之间
+   变了（旧：裸元组 `(JournalScanReport, RootRecord)`；今天：`Result<(...), _>`），session s7 早先
+   写的 `tree_table_crates_has_a_path` 函数调用它的 `.expect(...)`，编译器报
+   `no method named 'expect' found for tuple`。**这不是 S1 表里任何一条**（`replay_journal` 不在
+   第三节的依赖清单里，是 session s7 自己新写的函数引入的依赖），登记原文没有覆盖这一格，照实记；
+   处置：不复用 s7 的旧副本，改在**今天**重新 `cp -a` 一份基准快照（`Cargo.toml`/`Cargo.lock`/
+   `.cargo`/`crates`，与 `apply_arm.py` 的 `make_copy` 同一份清单），记录
+   `git_head=e980a219...`、`git_status_crates_lines=31`、`crates_sha256_of_sha256s=fac44f8b...`
+   （`sha256sum` 逐文件排序后再整体 `sha256sum`），从这份新快照派生三份新的乙-留环/丁-留环/丁-只
+   配置副本（`research/mutations/e158_arms.tsv` 已有的 47 行原样重新套用，行数与 session s7 一致：
+   15/16/16），s7 的旧副本不再使用、不删除（留作对照，交回报告点名）。这不改判据、不改臂定义，只是
+   换了一次基准快照的时点，S4 条款本来就预见了这种情况（「crates/ 正被另一条线改」）。
+3. **Φ2 系统配置槽这一类证据补上了**：`evidence_items_at` 新增
+   `include_system_configuration_slots: bool` 参数，打开时枚举两块盘各自 2 个自证过的系统配置槽
+   （权重 1，与根槽同权重，`candidate_fault_sets_of_weight` 第一个参数泛化为 `weight_one_items`
+   接纳两类）；既有调用点（`run_rootback_tolerance_family` 默认路径、H-C1 的记录枚举）都传
+   `false`，逐字节复现之前的行为（回归测试：`cargo test` 34→35 条，见下）。`run_rootback_
+   tolerance_family` 的 n1 区间从写死的 `0..=6` 改成参数（`overwrites_before_the_rootback_probe_
+   range`），只为了能把一次挂钟预算装不下的全范围拆成两次跑（`main` 里新增 mode 的可选命令行参数
+   读区间），不改判据、不改任何一个 n1 值本身怎么算。新增 H-C2 三个函数（直接构造 + 两个负对照，
+   十三点六节）：机制假说是 `choose_system_configuration`（`recovery.rs` 第 516 行起）按
+   `reader.device_identities()` 的顺序取第一块「至少有一份自证槽」的盘的值直接当 `chosen`，后面的
+   盘只核对 `filesystem_identifier`/`device_count`，不参与「取哪块盘的值」这一步——单测
+   `faulting_the_newer_device_zero_system_configuration_slot_regresses_the_chosen_generation`
+   不依赖任何臂改法、直接对着「今天」的 `choose_system_configuration` 验证了这个假说成立。
+4. **候选 (b) 分配记录树指称「走全」**：新增
+   `allocation_record_tree_reachable_placements_via_all_structural_trees`，在 session s7 只走
+   中央映射树的基础上并入树表自己的节点、树表里 `TREE_KIND_INODE`/`TREE_KIND_EXTENT`/
+   `TREE_KIND_ACCOUNTING` 三种子树各自的根节点、中央映射树自己的节点（区别于它指向的数据单元）；
+   `TREE_KIND_ALLOCATION` 不并入（那是要验证的账本身，并入是循环论证）；`TREE_KIND_LIVELIST`/
+   `_SPARSE_SIDE_TABLE`/`_DEADLIST` 三种没有并入，跑前登记原文只点名了「树表、inode、extent、
+   记账、映射树自己的节点」五类，照原文范围做，没有扩大。单测证明这是中央映射版本的严格超集、且
+   包含树表与映射树自己的节点两个具体位置；`outcome` 分类从「相等/不等」两档扩成「相等/是超集/是
+   子集/既不是子集也不是超集/结构树读不出/pristine 读不出」六档，好让「不等」的方向可判读。
+5. **新增单测 5 条**（`evidence_items_at_includes_system_configuration_slots_only_when_asked`、
+   `system_configuration_slot_positions_uses_slot_spacing_for_the_second_slot_on_each_device`、
+   `candidate_fault_sets_of_weight_mixes_root_and_configuration_slots_by_weight`、
+   `faulting_the_newer_device_zero_system_configuration_slot_regresses_the_chosen_generation`、
+   `allocation_record_tree_reachable_placements_via_all_structural_trees_is_a_superset_of_the_
+   central_mapping_only_version`），单测总数 30→35（本段新增 5 条；30 是 session s7 收尾时的数）；
+   `crates/mutations.tsv` 追加 5 行（3 条给 Φ2 系统配置槽这一类，2 条给「走全」），逐条手工改坏、
+   `cargo test` 验证会红、还原后复绿（不是跑 `mutate.sh` 整表，那一步歸门禁 59 号）；改名
+   `candidate_fault_sets_of_weight` 的第一个参数（`root_slot_items`→`weight_one_items`）导致既有
+   一条变异（session s5 写的、检验权重公式的那条）的锚点漂移，已同步改成新变量名，门禁 33 号会核
+   这一条的新锚点命中恰好一次。
+6. **没做**：op1 第三种变体（先不注入 `mount_writable` 再 `raise_rollback_floor`）与持续故障本段仍
+   未实现；H2-R（op2=`mount_rollback`）、H2c（崩溃档）、n2=2 本段仍未做；Q2-2b（乙族字段表宽度解码
+   核对）仍未做；「走全」仍不是穷举（还差 LIVELIST/SPARSE_SIDE_TABLE/DEADLIST 三种、以及为什么
+   走全之后仍是 `subset_of_pristine` 而不是 `matches_pristine` 的根因）。见交回报告「岔路表」。
+
+时点：三份新副本改用今天重新 `cp -a` 的快照（见上第 2 条），H-C2 与 Q2-1-配置证据的产物都是本段新
+落盘的；`q1-g0`/`q1-s16`/`q1-s4` 三份产物再次按纯增量覆盖（`research/results/e158-root-choice-
+repair-2026-09-24-q1-g0-today.out` 83→85 行、`...-q1-s16.out`/`...-q1-s4.out` 78→80 行，各多 2
+行诊断）；`crates/mutations.tsv` 的 5 行、`research/mutations/e158_arms.tsv`（本段沿用 s7 已有的
+47 行、没有新增）都在任何产物落盘之前写定。
+
+**2026-09-24（产物之前，执行员，session s9）**：
+
+1. **交回途中主 agent 两次插入的修复，先于本段其余工作**：① 门禁 33 号红——本段在
+   `allocation_record_tree_reachable_placements_via_all_structural_trees` 之后插入了新函数
+   `classify_diff_pair`，把 `crates/mutations.tsv` 第 514 行原本锚定在「这个函数的收尾 `Ok(placements)}`
+   紧跟 `LedgerFaultFamilySummary` 结构体」这一处巧合（`_via_central_mapping` 与
+   `_via_all_structural_trees` 两个函数的收尾字面相同，s8 添加「走全」之前锚点唯一命中的恰好是
+   `_via_central_mapping`）挤开，锚点漂到「走全」那个函数身上、旧串不再唯一命中。改法：把锚点收窄成
+   `_via_central_mapping` 函数体内 `for location in locations { placements.insert(...); }` 后接
+   `Ok(placements)}` 这一段（对该函数唯一），用 `research/scripts/replace-once.py` 定点改这一行；
+   手工验证：改坏（插入 `placements.clear();`）→
+   `allocation_record_tree_reachable_placements_via_central_mapping_reflects_written_content_and_
+   errors_on_an_empty_pointer` 红 → 还原 → 复绿；`bash .claude/gate.d/33-mutation-tables.sh` 复跑
+   变绿（唯一剩下的红是 `research/mutations/e142_first_transaction_dry_run.tsv:23`，与本实验无关，
+   不归本段处理）。② 实十九合并（2026-09-24 16:50 UTC 前后）提醒：中央映射树条目数超过单节点叶容量
+   （`crates/singlefs-core/src/transaction.rs` 第 1334 行「中央映射树叶 294」）会长成多层，
+   `allocation_record_tree_reachable_placements_via_central_mapping` 把根节点当叶解、没检查
+   `level`——**手工验证发现这不是「会报错、不会算错」，是会静默算错**：内部条目宽约 114 字节
+   （同一行「内部 143」按 16384/143 反推），比 `MAPPING_ENTRY_BYTES`=55 宽，`parse_mapping_entry`
+   的长度检查（`bytes.len() < 55`）拦不住它，会把内部指针字节当叶条目解出一对看似合法的
+   `LocationEntry`（新写的单测手工构造一个合法但 `level=1` 的假节点覆盖真实中央映射树根，改动前会解
+   出 `{(0, 0)}` 这样一个假的落点，不是报错）。修法：函数开头显式核 `mapping_root.level != 0` 就
+   报错退出，不再把「宽度不够」当唯一的安全网。**实测 E158 这批历史不会撞上这条**：新增探针测试
+   （手工构造后删除，只留结论）显示 `overwrites_before_sigma` 从 0 到 6，中央映射树根 `entries.len()`
+   恒为 **6**、`level` 恒为 **0**——这批历史全程只写一个文件、只有一个逻辑映射 key（覆盖写在原地更新
+   同一条条目，不新增条目），6 远低于 294 的单叶容量，本段测过的范围内不需要改成整棵读多层树（那需要
+   `crates/singlefs-core::code_two_tree::read_code_two_tree`，是 `pub(crate)`，装置作为
+   `crates/singlefs-harness` 之外的调用方本来就够不到，需要 `crates/` 侧开一个公开入口才谈得上，不在
+   本实验「只读、只驱动、只观测」的射程内）——但装置不该靠这条事实免检，`level` 检查留在代码里，
+   条目数一旦真的涨过 294 会显式报错，不会像修前那样悄悄给出错误答案。新增单测
+   `allocation_record_tree_reachable_placements_via_central_mapping_rejects_a_multi_level_root`
+   （`build_index_node` 手工构造 level=1 假节点，断言必须 `Err` 且信息里点名 `level=1`）；变异表追加
+   1 行（把 `level != 0` 反转成 `level == 0`），手工验证：改坏后这条新单测与既有的
+   `allocation_record_tree_reachable_placements_via_central_mapping_reflects_written_content_and_
+   errors_on_an_empty_pointer` 都红（前者因为 level=1 的假数据被当成合法叶解出集合、`expect_err`
+   panic；后者因为 level=0 的真实叶反而被这条被反转的检查拒绝）→ 还原 → 两条都复绿。
+2. **开工重核（S1）**：`git rev-parse HEAD` 仍是 `e980a219f1834c638cd2fae18b25a60525a6bd52`（实十九
+   与本段中途的其余并行改动都是未提交的工作区改动，没有新提交）；`git status --porcelain crates/`
+   从 session s8 收尾时的 31 行涨到本段结束时的 87 行（`impl-m2-writepath`/`impl-m2-treesplit` 等并
+   行线持续在改 `mount.rs`/`recovery.rs`/`transaction.rs`/`checker/walk.rs`/`checker/image.rs`/
+   `allocator.rs`/`instance_table.rs`/`journal.rs`/`mounted_read.rs`/`write_accounting.rs` 等）。
+   逐一现查本登记依赖的每个函数与常量：`first_txg_of_new_instance`（仍是
+   `max(highest_ring_txg, highest_record_txg)+1`）、`next_counter`（`mount_writable`/
+   `mount_rollback` 两处仍是「环里最大计数器 + 1」，`git diff` 命中的那一处只是 `establish_instance`
+   里消费 `start.next_counter` 字段的既有代码行，不是计算它的那一行）、`choose_root`（仍是
+   `(checkpoint_txg, instance)` 最大者）、`isolate_slots_referenced_only_by_abandoned_roots`（仍
+   只计数不隔离不拒绝）、`SystemRuntimeQuantities`/`SYSTEM_CONFIGURATION_BYTES`/
+   `ROOT_RECORD_BYTES`/`INSTANCE_ROW_BYTES`/`JOURNAL_RECORD_BYTES`/`SLOT_BYTES`（481/457/88/
+   4096/16384，全部不变）——**S1 不触发**，`cargo build --release -p singlefs-harness --bin
+   e158_root_choice_repair` 在这份新 `HEAD`（含未提交改动）上编译通过、既有 39 条单测（含本段第 1 条
+   新增的两条）全绿。
+3. **岔路单第 1 行还差项①②（`m2-rootchoice-repair-r1-forks.md` 第 1 行）：171 格「pristine − 走全」
+   差集的内容与根因**。新增 `classify_diff_pair` 与两个聚合字段
+   （`subset_diff_pairs`/`subset_diff_pair_context`），对每一个 `all_structural_outcome ==
+   "subset_of_pristine"` 的格算出 `pristine_set.difference(mapped_set)`，逐个落点按五类结构核对
+   （分配记录树自己的节点；树表登记的 `TREE_KIND_LIVELIST`/`_SPARSE_SIDE_TABLE`/`_DEADLIST` 根；查
+   无归属再按 `AllocationRecord.span_slots` 分类）。**实测（`q1-g0`，G0/S16/S4 三个几何点逐字节相
+   同）：171 格的差集只有 2 个不同的 (设备, 槽) 对——`(0, 50176)` 与 `(1, 50176)`，各自出现在全部
+   171 格里（342 = 171×2 次出现，`q1_2_subset_diff_distinct_pairs distinct_pairs=2`）**。追出根因：
+   `crates/singlefs-format/src/lib.rs` 第 231 行 `UNIT_AREA_START_SLOT: u64 = 50176`，
+   `crates/singlefs-core/src/make_filesystem.rs` 第 44 行 `INSTANCE_TABLE_SLOT =
+   SlotNumber(UNIT_AREA_START_SLOT)`——这两个落点**就是实例表自己的物理节点**：`RootRecord` 第 23
+   行的 `instance_table: NodePointer` 是与 `tree_table`/`mapping_root` 并列的第三条独立指针，不挂
+   在树表的七条条目里，`allocation_record_tree_reachable_placements_via_all_structural_trees` 从
+   来没有读过它。补一条检查（`classify_diff_pair` 里 `root.instance_table.locations` 命中即返回
+   `instance_table_self_node_not_walked_by_the_all_structural_trees_arm`），新增单测
+   `classify_diff_pair_identifies_the_instance_table_self_node` 手工验证：改坏（判定条件从
+   `root.instance_table` 换成 `root.tree_table`）后这条单测红（判到查无归属的兜底分支而不是实例表）
+   → 还原 → 复绿；变异表追加 1 行，同一处改坏、同一条单测抓。**判决 ②「这批历史真产不产 LIVELIST /
+   SPARSE_SIDE_TABLE / DEADLIST 这三种树」的答案是「全仓今天都不产，不只是这批历史」**：现查
+   `crates/singlefs-core/src/transaction.rs` 第 3618–3661 行 `publish_admitted` 里
+   `tree_table_entries` 的构造，`TREE_KIND_LIVELIST`/`_SPARSE_SIDE_TABLE`/`_DEADLIST` 三条
+   `table_entry` 调用的 `root` 参数**恒为** `NodePointer::empty_root()`——这是**每一次发布都这样
+   写**，不是这批 H1 历史的特例，`classify_diff_pair` 里对这三类树表条目根的检查（会命中它们的
+   `entry.root.locations`，理论上恒等于 `(0,0)`）逐一核过、171 格里一次都没有命中（`livelist_
+   sparse_deadlist_root_but_always_empty` 计数恒 0，见产物）。**这不是候选 (b)「走全」这种操作化漏
+   了这三种树，是全仓今天没有任何写路径会产生它们的物理节点，候选 (b) 走全版本要覆盖的真实差距是实
+   例表，不是这三种树**。补充上下文（`subset_diff_pair_context`）：这两个落点的 `AllocationRecord.
+   generation` 恒为 0（格式时刻分配，`mark_format_time_units` 给 `Placement{slot:
+   INSTANCE_TABLE_SLOT, span: 2}` 标记，不是任何一次真实发布的 txg，与实例表在 mkfs 时一次性分配、
+   此后不再被 COW 重写的事实吻合）、`span_slots=2`（与 `INSTANCE_TABLE_SLOT` 的 `span: 2` 吻合）、
+   在全部触发对上都不被任何一条可读根**自己的**中央映射树引用（
+   `referenced_by_some_readable_roots_own_mapping=false`——实例表本来就不是数据映射，这条检查是反
+   推「这不是一份被换下的旧内容」的佐证）。**不改判据、不改臂定义**：`allocation_record_tree_
+   reachable_placements_via_all_structural_trees` 本身一个字没有改，只是新增了一层诊断，读它已经
+   交回的两个集合、算差集、分类——候选 (b) 走全这条臂在 5.2 表原文里的操作化范围（树表 + inode +
+   extent + accounting + 映射树自己）没有变。
+4. **岔路单第 1 行还差项④：持续故障与瞬时故障的 op1 起三步挂载轨迹（8.1「abandoned_roots_
+   unreadable，按 op1 起的每一次挂载」）**。新写 `mount_writable_trajectory`：与
+   `attempt_faulted_operation`（单次「试一次看结局」，每次都从 `node.pool` 重新
+   `devices_from_pool`，故障之外的写不回原池）的关键差别只有一处——这里要「op1 落盘之后接着挂」，所
+   以每一步显式把 `FaultInjectingBlockDevice::inner().image` 取出来拼回一个新的 `MemoryPool` 喂给
+   下一步；装故障、判结局的写法逐字照抄 `attempt_faulted_operation`，不引入第二套注入逻辑。
+   `persistent=true` 时每一步都用同一组 `fault_targets`（对应「持续」）；`persistent=false` 时只有
+   第一步（op1 自己）带故障，之后两步不装任何故障（对应「瞬时」）。挂到 `run_ledger_fault_positive_
+   controls`（PC1-a）里，复用 PC1-a 已经选中的同一个 (历史, 被抛弃根, 分配记录树单元, 两份都读失败)
+   构造——它已经证明会触发（`allocation_attempt` 打中），不是另挑一个未经验证的落点。**实测（`q1-g0`
+   `q1_1a_op1_trajectory`）：`persistent` 轨迹 = `[Some(1), Some(1), Some(1)]`（故障不撤，三步都继
+   续触发）；`transient` 轨迹 = `[Some(1), Some(0), Some(0)]`（故障只在 op1 那一步有效，撤掉之后两
+   步恢复成不触发）**——与跑前登记 8.1 原文「持续故障下 op1 及其后两次挂载各一个值；瞬时故障下 op1
+   一个值、后两次（不注入）各一个值」逐字吻合。新增单测
+   `mount_writable_trajectory_distinguishes_persistent_from_transient_faults`（复用 PC1-a 的选取
+   逻辑独立构造同一个落点，断言 `persistent[0]==transient[0]>0`、`persistent[1]==persistent[2]==
+   persistent[0]`、`transient[1]==transient[2]==Some(0)`）；变异表追加 1 行（故障装配条件
+   `step == 0 || persistent` 改成 `step == 0 && persistent`），手工验证：改坏后新单测第一步就断言
+   失败（`persistent[0]`≠`transient[0]`，因为瞬时模式第 0 步也不装故障了）→ 还原 → 复绿。
+5. **还没做的（岔路单第 1 行）**：op1 第三种变体（先不注入 `mount_writable` 再 `raise_rollback_
+   floor`）——现查 `raise_rollback_floor` 的签名（`&mut PoolAllocator`、`&mut TransactionOutput`、
+   `ShadowLedger`），它理论上可以接进 `SimNode.session`（`Session.allocator`/`Session.current`），
+   但要正确处理它内部推的若干次空发布分别产生的中间根（需要逐个追加进 `node.timeline`，工程量与
+   `RaisedFloor` 返回结构的核对本段没有时间做完），仍未实现；小环、`G_默认` 两个几何点仍未跑（S16/S4
+   已补，dispatch 要求的「至少一个方向相反的几何点」已满足）。这些缺口与 session s3/s7/s8 已经列出的
+   相同几项一起留在「它答不了的」。
+6. **岔路单第 2 行还差项②（`m2-rootchoice-repair-r1-forks.md` 第 2 行）：n1=2…6 的穷举撤掉计数上
+   限、改成不截断的权重档机制**。`search_minimum_weight_that_triggers_rootback` 原来的
+   `subset_enumeration_cap: u64` 参数在**权重档中途**用「已枚举子集数 ≥ 上限」停手，停下来时既不知
+   道这一档穷举完了没有，也不知道完整证据空间有多大——`k_min=capped` 三个字吞掉了这两条信息。改成
+   `weight_ceiling: Option<u64>`：**只在权重档边界（不是档中途）决定停不停**，`None` 时穷举到
+   `maximum_weight`（完整空间的顶）；`Some(w)` 时最多到权重 `w`，这一档仍然全枚举完才停。新增
+   `full_space_subset_count`（= 2^(权重一类证据项数 + 权重二类证据项数)，恒报，不管这次搜索走到哪
+   一档）与 `highest_weight_examined`（搜到的最高一档权重）两个字段，`RootbackToleranceSearchOutcome`
+   新增 `stopped_by_weight_ceiling` 布尔字段区分「因为权重上限而停」与「自然穷举完整个空间都没打
+   中」。**自动判断，不由调用方猜**：`weight_ceiling` 传 `None` 时，若 `full_space_subset_count` ≤
+   `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`（100_000，按 H-C1 下界探针实测速率 22558 个子集 real
+   2m45s≈7.3ms/个折算约 12 分钟，一次调用可接受）就穷举到完整空间的顶；超过就退到
+   `DEFAULT_WEIGHT_CEILING_WHEN_INFEASIBLE`=12（与丙的 k=12 对齐，`m2-rootchoice-repair-r1-forks.md`
+   第 2 行还差项②原文「按权重从小到大穷举到权重 12」）——调用方显式传 `Some(w)` 时这条自动判断不生
+   效。三处调用点改参数：`run_rootback_tolerance_family`（`q2-1-g0`、`q2-1-g0-configuration-
+   evidence` 两个 mode 共用）与 `run_record_scan_watermark_lower_bound_probe`（H-C1 下界探针）都从
+   `None` 起（既有调用点原来传 `SUBSET_ENUMERATION_CAP`/60000，现在都不传第二个 cap 类参数，行为由
+   自动判断决定）。新增单测
+   `search_minimum_weight_that_triggers_rootback_honors_an_explicit_weight_ceiling`（`Some(0)` 时
+   只穷举权重 0 那一档、`full_space_subset_count` 不随上限变、`subsets_tried` 不超过完整空间）；变
+   异表追加 1 行（权重档边界判定 `weight >= effective_ceiling` 改成 `weight > effective_ceiling`），
+   手工验证：改坏后传 `Some(0)` 不会在权重 0 停（多搜一档）→ 新单测红 → 还原 → 复绿。**H-C1 下界探
+   针复跑验证改动不改变已有结论**：`q2-1-hc1-lower-bound`（不传参数，`weight_ceiling=None`）在同一
+   个 n1=4 节点上给出 `k_min=12`、`subsets_tried=22558`、新增 `full_space_subset_count=32768`——与
+   session s6 用旧 cap=60000 机制跑出的数字逐项相同，只是多报了一个此前没有的「完整空间多大」。
+   **今天/丙臂 `q2-1-g0`（n1=0..6）用新机制重跑，`research/results/e158-root-choice-repair-2026-
+   09-24-q2-1-g0-today-session-s5.out`**：n1=0,1,2,3 仍是完整穷举、`rootback_probe_failures`/
+   `overwrite_failures` 与 session s5 的旧产物逐项相同（确定性核对）；**n1=4：`k_min=12`
+   （`subsets_tried=22558`，此前撞旧计数上限报 `capped`，现在完整搜到了）；n1=5：
+   `k_min=not_found_up_to_weight_ceiling`，`full_space_subset_count=131072`、
+   `highest_weight_examined=12`、`subsets_tried=65536`（恰为完整空间一半，因为按权重分档的组合数
+   在这个空间上关于权重 12 对称）——如实报告「搜到权重 12、完整空间还有一半没搜、没有命中」，不是
+   「挡得住」；n1=6：`k_min=12`（`subsets_tried=173716`）**。这一条把岔路单第 2 行①的证据从
+   「甲-txg=4、丙=12（H-C1 直接构造坐实，主搜索因撞旧上限报 capped）」升级成「甲-txg=4、丙 在
+   `q2-1-g0` 主搜索本身（不靠额外的直接构造）就能在 n1=4 与 n1=6 上独立给出 12，n1=5 的完整空间只
+   搜完一半、如实标注未截断」。
+7. **乙-留环/丁-留环/丁-只配置三份副本用新机制补齐 n1=0..6，不留成欠账**：主 agent 在本段中途明确
+   要求「这一项不能记成欠账交回……岔路 2 能不能够判，就压在这三条臂在 n1=2…6 上拿掉上限之后的穷
+   举上」。三份副本从今天（实十九落地之后）重新 `cp -a` 的快照派生（`/tmp/claude-1000/e158-s9/
+   base-snapshot`，`git_head=e980a219f1834c638cd2fae18b25a60525a6bd52`、
+   `git_status_crates_lines=55`），套用 `research/mutations/e158_arms.tsv` 已有的行（15/16/16，
+   与 s7/s8 一致），编译通过；跑 `q2-1-g0-configuration-evidence`（n1=0..6 默认区间，
+   `SINGLEFS_E158_LOCAL_SYSTEM_CONFIGURATION_BYTES=489`），三份副本各自用
+   `run_in_background` 起，不设超时。**首次尝试忘了设环境变量，触发 V3 停机**（本地默认 481 ≠
+   这三个臂改过的 489），如实记下、补上环境变量后重跑，不是绕过去。**结果（三份副本逐字节相
+   同）**：
+
+   | n1 | 完整空间 | 结局 | subsets_tried |
+   |---|---|---|---|
+   | 0 | 2048 | 完整穷举，none_found | 2048 |
+   | 1 | 8192 | 完整穷举，none_found | 8192 |
+   | 2 | 32768 | 完整穷举，none_found（此前撞旧上限报 capped） | 32768 |
+   | 3 | 131072 | 穷举到权重 12，not_found_up_to_weight_ceiling | 82598 |
+   | 4 | 524288 | 穷举到权重 12，not_found_up_to_weight_ceiling | 229720 |
+   | 5 | 2097152 | 穷举到权重 12，not_found_up_to_weight_ceiling | 582829 |
+   | 6 | 8388608 | 穷举到权重 12，not_found_up_to_weight_ceiling | 1367161 |
+
+   **读法**：n1=0..2 是完整穷举（`subsets_tried` 恰等于完整空间），n1=3..6 都在权重 12 那一档边
+   界上停手（`highest_weight_examined=12`），完整空间与穷举到的权重都如实报出，没有静默截断。
+   **按跑前登记第 777 行「全族里各模板区间…的最小者」的字面要求，这是 n1=0 到 6 全族的结果**：乙-
+   留环/丁-留环/丁-只配置在权重≤12、覆盖 H2 全族的范围内，一次都没有被今天/丙那个「4 根槽 + 4 条
+   记录」权重 12 的具体构造打中（丙在 n1=4 与 n1=6 都被同一档权重打中）；乙/丁的 k_min（如果存在）
+   现在确立为 **> 12**，与甲-txg 的 [4,4]、丙的 [12,12] 两个区间都不重叠——按第 761 行「行 2 够
+   判，除非各臂的 k_min 区间两两重叠」，**这一个切面（今天/甲-txg/丙/乙-留环/丁-留环/丁-只配置六
+   臂里的四种读法、崩溃档 0、任一种打中）现在够判**。**仍不是完整的「六臂×两档×两种」矩阵**：
+   H2-R（op2=`mount_rollback`）、H2c（崩溃档 1）、n2=2、Q2-2b 仍未做，这几项在「它答不了的」标
+   「够判后未跑」，不是本段能补的欠账。
+
+**2026-09-25（产物之前，执行员，session s10）**：
+
+1. **开工重核（S1）**：`git rev-parse HEAD` 仍是 `e980a219f1834c638cd2fae18b25a60525a6bd52`；
+   `git status --porcelain crates/` 从 session s9 收尾时的 87 行落到开工时的 84 行（另一条并行线
+   `impl-m2-writepath`/`impl-m2-treesplit` 提交了一部分、留下的还是未提交状态）。逐一现查本登记依赖
+   的每个函数与常量：`first_txg_of_new_instance`、`next_counter`、`choose_root`、
+   `isolate_slots_referenced_only_by_abandoned_roots`、`SystemRuntimeQuantities`、
+   `SYSTEM_CONFIGURATION_BYTES`/`ROOT_RECORD_BYTES`/`INSTANCE_ROW_BYTES`/`JOURNAL_RECORD_BYTES`/
+   `SLOT_BYTES`（481/457/88/4096/16384，全部不变）——**S1 不触发**。⚠️ 产物落盘前另一条并行线（主
+   agent 知会「实二六」）持续在改 `mount.rs`/`allocator.rs`/`allocation_record_tree.rs`（抬 F、挂载
+   读、分配记录树根层，见下「crates/ 快照」一条），这三个文件正是本登记依赖清单里的函数所在文件，
+   S1 的逐项现查在开工那一刻通过，不代表产物真正落盘那一刻这几个函数字面不变——两次快照的哈希差异
+   与 `git status` 行数变化记在下面，交主 agent 判要不要等 `crates/` 落定后再复跑。
+2. **op1 第三种变体实现（岔路单第 1 行，`m2-rootchoice-repair-r1-forks.md` 第 1 行 op1 那一格
+   「先不注入地 `mount_writable` 再 `raise_rollback_floor` 到 [F+1, 上限] 里每一个值」）**：新增
+   `FaultedOperationKind::MountWritableThenRaiseFloorTo(CheckpointTxg)`、`floor_targets_between`
+   （纯函数，(F, 上限] 半开区间：`current_floor` 本身不许再抬，`ceiling` 一定要能抬到）、
+   `raise_floor_targets_for`（先做一次**不注入**的 `mount_writable`，用完即弃，只为量出这一步的
+   F 与上限：`choose_system_configuration` + `instance_table_chain_of_root` + `rollback_floor_
+   ceiling`，与 `crates::mount::raise_rollback_floor` 内部用的是同一个 `rollback_floor_ceiling`）、
+   `attempt_mount_writable_then_raise_floor`（第一步不注入打开会话，受注入的一步只是
+   `raise_rollback_floor` 本身）。接进 `run_ledger_fault_family` 主循环：在
+   `for kind in &faulted_operation_kinds { ... }` 之后另加一段
+   `for &target_floor in &raise_floor_targets { ... }`，与既有两种 op1 用同一组 `fault_targets`
+   （同一个 (被抛弃根, 指称, 严重度) 组合），但**不**并入 `summary.pairs`/`trigger_count`/
+   `error_members`/`by_aspect_severity`——新增 `raise_floor_pairs`/`raise_floor_trigger_count`/
+   `raise_floor_error_members`/`raise_floor_by_aspect_severity`/`raise_floor_history_nodes_
+   without_room` 五个独立字段与三行独立输出（`q1_1a_raise_floor_trigger_summary`/`q1_1a_raise_
+   floor_by_aspect_severity`/`q1_1c_raise_floor_error_member`），依据是跑前登记 Q1-1c 原文「抬 F
+   那一处单独一行（(a) 的原文没管它）」——候选 (a) 的 A1 副本按 5.2 原文不改 `raise_rollback_
+   floor`，混进同一组计数会让 Q1-1a/b 已经坐实的读数（session s3–s9）掺进一个定义上不同的入口点。
+3. **没有把「若干次空发布各自的中间根追加进 `node.timeline`」——现查发现这一步不需要**：session s9
+   曾把这一句列为工程量没做完的理由（见上「2026-09-24……session s9」条目第 5 条）。现查
+   `attempt_faulted_operation` 整体是「试一次看结局，用完即弃」语义（与既有的 `MountRollbackTo`
+   分支同理：那个分支交回的 `mounted.output.row_publish`/`warm_up_publishes` 等中间根同样从不
+   追加进任何时间线，只读它们最终交回的 `abandoned_roots_unreadable` 字段），而
+   `RaisedFloor::abandoned_roots_unreadable` 是从盘上现读实例表 + 现行根的候选集算出来的
+   （`isolate_slots_referenced_only_by_abandoned_roots`，`crates/singlefs-core/src/mount.rs`
+   第 1027 行起，与 `mount_writable`/`mount_rollback` 那两种 op1 共用同一条计数管道），不依赖装置
+   自己的内存时间线——不追加时间线不是简化，是这一步本来就不该做（追加了反而是多余状态，没有任何
+   判据会读它）。**这不改变判据**：`floor_targets_between`/`raise_floor_targets_for`/`attempt_
+   mount_writable_then_raise_floor` 都是新写的纯只读驱动，第五、六、七节的判据、5.1–5.4 的臂定义、
+   P331/P332 的定义一个字没有改。
+4. **测试**：新增 4 条单测——`floor_targets_between_starts_strictly_above_the_current_floor`、
+   `floor_targets_between_includes_the_ceiling_itself`、`floor_targets_between_is_empty_when_
+   the_ceiling_does_not_exceed_the_current_floor`（三条纯函数边界测试）、`mount_writable_then_
+   raise_floor_reaches_the_injected_fault`（端到端：探测出的 floor 目标不注入必须成功；换成对着
+   某条被抛弃可读根的树表位置注入故障两份都读失败，结局必须与不注入时不同——证明故障真的传到了
+   `raise_rollback_floor`，不是被前面那步不注入的 `mount_writable` 悄悄吸收掉）。单测总数 39→43，
+   全绿：`cargo test --release -p singlefs-harness --bin e158_root_choice_repair` 交回
+   `test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`。`cargo clippy
+   --release -p singlefs-harness --bin e158_root_choice_repair --all-features --all-targets`
+   对这个 bin 清零（新增一条 `#[allow(clippy::enum_variant_names, ...)]`：三个变体都是「哪一种
+   挂载/抬 F 操作」，共享 `Mount` 前缀是命名准确，不是同一个词重复）。
+5. **变异**：`crates/mutations.tsv` 追加 3 行——`floor_targets_between` 下界改成不严格大于
+   （`(current_floor.0 + 1)` → `(current_floor.0)`）、上界改成不含上限本身（`..=` → `..`）、
+   `attempt_mount_writable_then_raise_floor` 传给 `raise_rollback_floor` 的目标 floor 改成远超
+   上限（`new_floor` → `CheckpointTxg(new_floor.0 + 1_000_000)`，必定撞
+   `RollbackFloorAboveCeiling`）。三条逐一手工改坏、跑点名的测试确认红、还原、复跑确认绿：
+   第一条改坏后 `floor_targets_between_starts_strictly_above_the_current_floor`
+   断言失败（`left=[CheckpointTxg(2), CheckpointTxg(3), CheckpointTxg(4)] right=[CheckpointTxg(3),
+   CheckpointTxg(4)]`）；第二条改坏后 `floor_targets_between_includes_the_ceiling_itself` 断言
+   失败（「上限本身也是一个合法目标，得到 [CheckpointTxg(3)]」）；第三条改坏后 `mount_writable_
+   then_raise_floor_reaches_the_injected_fault` 断言失败（「探测出的 floor 目标不注入任何故障应当
+   成功，得到 Some("RollbackFloorAboveCeiling")」）；三条都在还原之后用
+   `diff crates/singlefs-harness/src/bin/e158_root_choice_repair.rs <改动前的备份>` 确认逐字节
+   恢复到改动前。`bash .claude/gate.d/33-mutation-tables.sh` 复跑：`✓ 147 个实验二进制都有成形的
+   变异表，1631 条变异的原文各命中源码一次；crates/mutations.tsv 688 条的原文各命中源码一次`——
+   三条新行的锚点各命中源码一次。
+6. **crates/ 快照（主 agent 知会「实二六」正在改 `mount.rs`/`allocator.rs`/`allocation_record_
+   tree.rs`）**：重出产物之前取一次快照，`research/results/e158-root-choice-repair-2026-09-25-
+   s10-crates-sha256.out`（`snapshot_time_jst=2026-09-25 10:22:11`、`git_head=
+   e980a219f1834c638cd2fae18b25a60525a6bd52`、`git_status_crates_lines=84`、
+   `crates_sha256_of_sha256s=48dd4f273289ee6c47d84cae8704c52dd7eb1f0bebf80ca95b63b1e0bb3466ff`）。
+   重出产物中途（`replay.sh` 还没跑完时）现查同一份 `find crates -type f | sort | xargs sha256sum`
+   ——`git_status_crates_lines` 已涨到 85，以下文件的哈希与开工时那份快照不同：`mutations.tsv`
+   （不是我这段改的那几行，是另一条线也在追加）、`singlefs-core/src/allocation_record_tree.rs`、
+   `singlefs-core/src/allocator.rs`、`singlefs-core/src/mount.rs`、
+   `singlefs-harness/src/bin/e156_allocation_basis_counts.rs`、`singlefs-harness/src/bin/
+   first_transaction_on_device.rs`、`singlefs-harness/src/history.rs`、`singlefs-harness/src/
+   model_comparison.rs`、`singlefs-harness/src/model.rs`、`singlefs-harness/src/on_device_
+   modes.rs`、三份 `second_transaction_*` 测试文件与一份新增测试文件。**这不是我这一段的改动**
+   （写范围只有 e158 那一个装置与它的变异行）；`mount.rs`/`allocator.rs`/`allocation_record_
+   tree.rs` 正是 `raise_rollback_floor`/`choose_root`/分配记录树根层——**本登记依赖清单与本段
+   新写的 op1 第三种变体都要经过这几个文件**，S1 逐项现查在开工那一刻通过，不能担保产物落盘那一刻
+   同样成立。处置：不中断已经在跑的 `replay.sh`（中断重来只会把同一场竞态再赌一次，crates/ 这一刻
+   仍在动，可能一直追不上），交回前再取一次快照、三次快照逐份点名对比，把「这一轮 `research/
+   results/` 里落盘的 E158 产物是不是单一一致快照下的重跑」如实写进交回报告，续不续跑一轮干净的
+   复跑交主 agent 定。
+7. **一处不合规，如实记**：起 `bash research/scripts/replay.sh E158` 时漏用了派发的「线程上限：
+   8」——没有显式设 `REPLAY_JOBS`，脚本按 `nproc/2`（本机 32 核 ⇒ 16）取默认值，14 行全部数量
+   < 16，一度可能并发到 14 个进程。发现之后没有中断已经跑了几十分钟的进程重来（详见交回报告），
+   之后同一段落里的长命令改用显式 `REPLAY_JOBS=8`（或更低）。
+8. **doc-lint 第 497 行附近的位置指代——现查没有找到**：`bash .claude/scripts/doc-lint.sh`
+   （全仓跑一遍，非 verbose 与 `DOC_LINT_VERBOSE=1` 各跑一次）对 158 这份实验页给出 **0 处违规**；
+   第 498 行「详见 `.claude/kb/experiments/158-择根与修复四岔路.md`「2026-09-24（续，session
+   s9）」一节」指向的标题在第 759 行确实存在，是一条写明文件名与小节标题的有效引用，不是「见上文」
+   「本页」那类被判据词表抓的指代。派发点名的问题在这一刻的正文里没有找到——按 session s9 自己
+   「2026-09-24（续，session s9）」条目的说法，s9 交回前已经把「见『它答不了的』岔路 2 那一条」与
+   「详见本页」两处自指改成写死文件名与小节标题、复跑确认过 0 处；这一条大概率是主 agent 派发时看
+   到的是 s9 那两处自指还没修的中间状态，不是这一刻仍存在的问题。不强行改一处现查看不出毛病的文字，
+   如实记这一条现查结论，交主 agent 核对。
+9. **`replay.sh` 收尾**：`bash research/scripts/replay.sh E158`（14 行）跑完：**字节一致 4 ／对不
+   上 10 ／跑不了 0 ／结论断言不中 0**。字节一致的 4 行：`q2_1_pc2`、`q2_1_g0_session_s5`（H2 主族
+   的穷举下界搜索，行 2「够判」的证据链不受这一刻并行线改动影响——它走的是 `first_txg_of_new_
+   instance`/`next_counter`/根环读取，不经过 `mount.rs`/`allocator.rs` 这一刻改的那几处）、
+   `q2_1_hc1`、`q2_1_hc1_lower_bound`。对不上的 10 行里 1 行（`driver_e158_q2_1_g0`，session s4
+   遗留、driver 自己的注释早就说明它「不能再当依据引用，只留着当 bug 修前长什么样的历史对照」）本来
+   就该对不上，不新存；其余 9 行逐份现查差在哪（不是只看行数），按今天日期另存新产物、`replay.sh`
+   登记表已改指向新文件、旧文件原样留着，逐条记在 `replay.sh` 各 driver 自己的注释里（本条只摘要）：
+   - **`driver_e158`（segment1）**：`pc3` 一行从 `recover_verdict=pass recover_root=Some((1, 6))`
+     变成 `recover_verdict=fail recover_root=Some((0, 0))`——与 session s9 报告的同一处翻转方向
+     一致，重复坐实是同一条并行线的持续效应，不是新退化。
+   - **`q3_1_g0`/`q3_1_s16`/`q3_1_small_ring`**：`pairs_with_any_violation` 从 213 变成 0（`cold_
+     recover_with_fault_failed`/`mount_writable_with_fault_failed` 两点仍是 0，不是新增报错，是
+     判定本身不再违例）。**`q3_1_s4`** 除了同一项从 1355 变成 0，`cold_recover_with_fault_failed`/
+     `mount_writable_with_fault_failed` 还从 0 变成 239——同一批构造里以前「成功但违例」，现在有
+     239 个变成「调用直接报错」，是失效形态本身变了，不只是数字变化。**这一条现查可能动到岔路单第
+     3 行「候选 3 = 今天」这个前提与 F2 的触发条件**：C332 正文钉的「2 个故障就能撤销回退」在今天
+     这份 `crates/`（含另一条并行线还没提交的改动）上现在测不出来了；是要重新核对 F2、还是这一刻的
+     `crates/` 状态本就不该当「候选 3 = 今天」的代表（等那条并行线落定、提交之后再复核），交主
+     agent 判断，本段不越权下结论、不改任何判据或臂定义。
+   - **`q1_g0`/`q1_s16`/`q1_s4`**：差异分两部分——① 本段新增的 `q1_1a_raise_floor_*` 三类行（见
+     上条 2），是本轮新增的真实数据，`op1_kinds_tried` 从 14 变成 18（新增 4 个不同的
+     floor 目标标签）；G0/S16 两点的 `q1_1a_raise_floor_trigger_summary` 逐字节相同
+     （`pairs=96 trigger_count=32 history_nodes_without_room=26`），S4 不同
+     （`pairs=132 trigger_count=44 history_nodes_without_room=25`，几何变了、H1 家族的节点与候选
+     根都会变，不要求它与 G0 相同）。② 另一条并行线造成的漂移：`q1_2_tree_table_crates_has_a_path`
+     （`verify_named_units=false`）从「`did_not_reach_target=108`+`reached_target_with_matching_
+     pointer=81`」变成「`did_not_reach_target=189`」（原来能不碰物理拷贝复算出指针的 81 格现在
+     全部走不到）；`pc1_a` 的 `device_write_bytes` 从 157184 变 353792。②这一部分与①无关、与本轮
+     e158 装置改动无关，是现查到的既有漂移，方向与 session s9 报告的一致。
+   - **`q2_2a_g0`**：`AllocationRecordTreeNode` 每次发布的 `write_calls`/`written_bytes` 全面上涨
+     （例如 `write_calls=2` 变 `write_calls=10`），与 `pc1_a` 的字节变化同一根因
+     （`allocator.rs`/`allocation_record_tree.rs`），与 session s9 报告方向一致。
+   **不改判据、不改臂定义**：以上全部是「今天 crates/」的现查读数变了，不是本段任何一处装置代码或
+   判据改动的结果——本段除了 op1 第三种变体（只加不改既有代码路径）之外，`H3`/Q3-1/Q2-2a 等既有函数
+   一个字没有改。**没有做第二次确认性复跑**：新存的 9 份文件是这一次真实运行的原始输出（不是手写或
+   推算的），逐字节复跑要再等两个 `q2-1-g0` 全穷举跑一遍（约 1～2.5 小时），而 crates/ 这一刻仍可能
+   继续变，投入产出比低；这一决定连同理由记在交回报告，续不续跑一轮交主 agent 定。
+10. **crates/ 快照三次对比（交回前）**：`git status --porcelain crates/` 从重出产物之前的 84 行
+    涨到交回前的 85 行；`find crates -type f | sort | xargs sha256sum` 现查，产物重出中途（`mid`）
+    与交回前（`final`）两份哈希列表之间，只有 `crates/mutations.tsv`（另一条线在追加自己的变异行，
+    不是我这几行）与 `crates/singlefs-harness/tests/second_transaction_supplement_two_commit_
+    generated_fallback.rs`（集成测试文件，不参与 `cargo run --bin e158_root_choice_repair` 的编译
+    图）发生变化——`mount.rs`/`allocator.rs`/`allocation_record_tree.rs` 在 `mid` 到 `final` 之间
+    没有再变，说明第 6 条记录的那批漂移在产物重出的中途就已经稳定下来，不是重出过程中途才切换的
+    （降低了「同一轮产物内部互相不一致」的风险，但不能完全排除——`replay.sh` 一次派发全部 14 个
+    进程，`cargo` 的构建时机与源码变化时机谁先谁后现查不到更细的粒度）。
+
+时点：代码、单测、变异表在任何新产物落盘之前完成并验证过；产物已经落盘（`replay.sh` 完整跑完一次，
+第 9 条摘要、各 driver 自己的注释里有细节），交回前的第二次 crates/ 快照与本条一起记录。
+
+11. **收尾门禁自查（归属表登记给执行员的几个阶段）**：跑 `rustfmt --edition 2021` 单独格式化
+    `e158_root_choice_repair.rs`（只这一个文件，不跑 `cargo fmt -p singlefs-harness`——那会连带
+    格式化同一个 crate 里另一条并行线还没提交的文件）之后，`crates/mutations.tsv` 第 565 行
+    （session s9 的 `mount_writable_trajectory` 那条）锚点因为这次重排漂移——`bash .claude/
+    gate.d/33-mutation-tables.sh` 从绿变红，改法不变，只把锚点从两行（`= \n if step == 0 ||
+    persistent {`）改成 rustfmt 重排之后的一行（`= if step == 0 || persistent {`），手工验证：
+    改坏（`||`→`&&`）→`mount_writable_trajectory_distinguishes_persistent_from_transient_faults`
+    红（`left: Some(1) right: Some(0)`）→还原→复绿；33 号复跑绿（703 条）。归属表登记给执行员的
+    12 个阶段（27/33/34/40/52/69/75/80/85/86/88/96/99，共 13 个，见共用约束「门禁」一节的取法）
+    逐个跑过：**27/33/34/52/75/85/86/88/96/99 十项绿**；**40/69/80 三项红，全部现查确认与本段无
+    关**——40 号剩 7 份未点名产物（3 份 e156、4 份 e158 2026-09-23/24 旧文件，session s9 已经记过
+    「不在的不修」，本段没有再动它们，本段新增的全部 09-25 产物已点名）；69 号剩 1 处
+    （`research/prompts/m2-final-code-r3-main-verification.md:16`，`git status --short` 确认这份
+    文件不在本段写范围内、`??` 未跟踪，属另一条并行线）；80 号剩 1 处
+    （`crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs`，`git status
+    --short` 确认 `??` 未跟踪、本段两次跑 80 号之间才出现，是另一条并行线新增的文件，本段没有碰
+    过它）。
+
 ## 十三、读过的文件与跑过的命令
 
 ### 13.1　读过的文件（行号区间；grep 命中行也列）

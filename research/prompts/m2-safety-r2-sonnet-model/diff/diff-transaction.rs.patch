@@ -1,0 +1,43 @@
+--- a/crates/singlefs-core/src/transaction.rs
++++ b/crates/singlefs-core/src/transaction.rs
+@@ -24,8 +24,9 @@
+     SlotNumber, TreeIdentifier,
+ };
+ use crate::admission::{
+-    admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+-    AdmissionRefusedOnSomeDevices, BytesOnOneDevice, SpaceAdmission,
++    admission_reading_before_a_publish, admit_on_every_device_for_candidate,
++    demand_of_the_roles_on_each_device, AdmissionRefusedOnSomeDevices, BytesOnOneDevice,
++    SpaceAdmission,
+ };
+ use crate::allocation_record_tree::{
+     build_allocation_record_tree_node, children_of, nodes_holding_records,
+@@ -4568,9 +4569,27 @@
+         SpaceAdmission::SkippedByTheTestOnlySwitch => false,
+     };
+     if demand_is_judged {
+-        admit_on_every_device(
++        // S4 二轮候选 A1 / A2 / A3（只供三方论证，`admission::S4Candidate`）要看见这次发布自己换下、
++        // 将要进 defer 队列的那些块：`settled.release` 是这次发布释放判定的结果（`admit_on_every_device_for_candidate`
++        // 调用之前就已经算好、还没被 `publish_admitted` 落进分配器），一个单元两份落两块盘、每块盘各占同样的跨度
++        // （`Placement` 的文档注释、`admission::ReplicaCount::of_every_device_in_the_pool` 同一条理由），
++        // 所以每块盘的释放字节相同，都等于这次发布这一批 `Placement` 的跨度之和 × 16384。
++        let released_this_publish_slots: u64 = settled
++            .release
++            .iter()
++            .map(|placement| placement.span)
++            .sum();
++        let released_this_publish_bytes = BytesOnOneDevice::of_slots(released_this_publish_slots);
++        let released_by_this_publish_on_each_device: Vec<(DeviceIdentity, BytesOnOneDevice)> =
++            device_identities_of_the_accounting_rows
++                .iter()
++                .map(|device| (*device, released_this_publish_bytes))
++                .collect();
++        admit_on_every_device_for_candidate(
++            allocator.s4_candidate(),
+             &admission_reading_before_a_publish(allocator, previous),
+             &demand,
++            &released_by_this_publish_on_each_device,
+         )
+         .map_err(PublishError::SpaceAdmissionRefused)?;
+     }

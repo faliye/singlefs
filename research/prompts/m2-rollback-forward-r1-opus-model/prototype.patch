@@ -1,0 +1,607 @@
+--- crates/singlefs-core/src/mount.rs	2026-09-25 08:57:11.937752319 +0000
++++ crates/singlefs-core/src/mount.rs	2026-09-25 10:16:26.112252342 +0000
+@@ -515,6 +515,8 @@
+     /// 所选那一版（`effective_root` 那一版）那次发布的末条记录的 jsn（`journal_position_of_the_selected_version`）：
+     /// 取号之前逐盘核「这块盘落没落后于这一版」拿它比。
+     selected_version_journal_position: JournalSequenceNumber,
++    /// 原型（攻方腿副本）：向前发布的回退用最新那一版的实例表行（不用 R_old 那一版的），被换下的链仍是 `previous` 那一版的。
++    instance_table_rows_override: Option<Vec<InstanceRow>>,
+ }
+ 
+ /// 新实例的第一次发布的 checkpoint_txg = max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1
+@@ -1100,6 +1102,30 @@
+     new_floor: CheckpointTxg,
+     shadow_ledger: ShadowLedger,
+ ) -> Result<RaisedFloor, MountError> {
++    prototype_raise_rollback_floor(
++        parameters,
++        devices,
++        allocator,
++        current,
++        new_floor,
++        shadow_ledger,
++        false,
++    )
++}
++
++/// 原型（m2-rollback-forward-r1 攻方腿副本）：同 [`raise_rollback_floor`]，`bypass_ceiling` 为真时不判上限（B：卸载时抬 F 到最新根）。
++///
++/// # Errors
++/// 同 [`raise_rollback_floor`]。
++pub fn prototype_raise_rollback_floor<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    allocator: &mut PoolAllocator,
++    current: &mut TransactionOutput,
++    new_floor: CheckpointTxg,
++    shadow_ledger: ShadowLedger,
++    bypass_ceiling: bool,
++) -> Result<RaisedFloor, MountError> {
+     // 分配器上冻结着一次没重发的发布（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）：这一串的第一次空发布本来就会被拒，
+     // 而下面的影子账与回收在发布之前就动分配器——重发成功时分配器整个换成那次发布之后的一份，这些改动会被一起丢掉。第一道就拒，一样都不动。
+     if let Some(frozen) = allocator.frozen_publish() {
+@@ -1130,7 +1156,7 @@
+         current.root.rollback_floor,
+         &table,
+     )?;
+-    if new_floor > ceiling {
++    if new_floor > ceiling && !bypass_ceiling {
+         return Err(MountError::RollbackFloorAboveCeiling {
+             requested: new_floor,
+             ceiling,
+@@ -2073,10 +2099,15 @@
+     let instance_to_acquire = instance_generation_to_acquire(&pool);
+     // 要写的行按要取的号先列出来：实例表那一项准入按它算，取号之后写行也用这一份（号在写之前重算、不等就不写）。
+     let rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
+-    let instance_table_rewrite = instance_table_rewrite_of_the_row_publish(
++    let mut instance_table_rewrite = instance_table_rewrite_of_the_row_publish(
+         start.previous.instance_table_chain(),
+         &rows_written,
+     );
++    if let Some(rows) = &start.instance_table_rows_override {
++        let mut rows = rows.clone();
++        rows.extend_from_slice(&rows_written);
++        instance_table_rewrite.rows = rows;
++    }
+     // 空间准入（D28（挂载期承诺量） 已定项 1 的式子逐设备合取；C363 (b) 判决第四节第 2 条接进可写挂载）：可写挂载的准入要
+     // 「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），预留是式子里的挂载期承诺量——每块盘上连它与别的八项都扣完，
+     // 可用(d) ≥ 0（这一刻不另要需求：写行与暖机那一串的空间就在切换预留与 checkpoint 保留池里）。rows0 = 挂载时读到的行数加写行那次
+@@ -2455,6 +2486,108 @@
+             rows_of_the_chosen_roots_instance_table,
+             space_admission,
+             selected_version_journal_position,
++            instance_table_rows_override: None,
++        },
++    )
++}
++
++/// 原型（攻方腿副本）：同 [`mount_writable_with_space_admission`]，影子账那一臂由调用方给。
++///
++/// # Errors
++/// 同 [`mount_writable`]。
++pub fn prototype_mount_writable_with_shadow_ledger<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    space_admission: SpaceAdmission,
++    shadow_ledger: ShadowLedger,
++) -> Result<Mounted, MountError> {
++    admit_the_writable_device_count(DeviceCount(devices.len()))?;
++    let system_configuration = choose_system_configuration(&*devices)?;
++    let chosen_root =
++        choose_root(&*devices, &system_configuration).ok_or(RecoveryFailure::NoValidRoot)?;
++    let records = scan_journal(&*devices, &system_configuration);
++    let (journal, effective_root) = replay_journal(
++        &*devices,
++        &chosen_root,
++        system_configuration.immutable.sizes.journal_ring_bytes,
++        &records,
++        true,
++        rollback_high_water_of_root(&*devices, &chosen_root),
++    )?;
++    // 所选根覆盖的最后一条记录读得出就拿它当上一版的记录：同实例、同 checkpoint_txg 的记录里带「本次发布末条」标志的那一条
++    // （D23（journal 的角色与格式） 已定项 14 注 1，读法乙，用户 2026-09-24 定：「那条」按末条标志认；一次发布切成多条记录时它是那次发布的末条）。
++    // 读不出（两份都撕了，或那次发布读得出的几条都不带标志）就拿环里最大 jsn 那条顶着——本实例的第一条反向链恒 0、
++    // 事务号从 1 起，上一版的记录只有 jsn 会被用到，而 jsn 下面另算。树表 0 条的根用不到记录（只做过 mkfs 的池环里一条都没有）。
++    let own_record = records
++        .values()
++        .filter(|record| {
++            record.instance == effective_root.instance
++                && record.checkpoint_txg == effective_root.checkpoint_txg
++                && record.place_in_publish
++                    == crate::journal::JournalRecordPlaceInPublish::LastRecordOfThePublish
++        })
++        .max_by_key(|record| record.counter)
++        .or_else(|| records.values().max_by_key(|record| record.counter))
++        .cloned();
++    let selected_version_journal_position =
++        journal_position_of_the_selected_version(&effective_root, own_record.as_ref());
++    let previous = rebuild_previous_version(devices, &effective_root, own_record)?;
++    // 环里没有记录时从 1 起（D23（journal 的角色与格式） 已定项 14 第 3 条：计数器全池接着走）。
++    let next_counter = records
++        .values()
++        .map(|record| record.counter)
++        .max()
++        .unwrap_or(0)
++        + 1;
++    let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
++    let tree_identifier_watermark_of_the_ring = tree_identifier_watermark_of_the_ring(
++        devices,
++        &system_configuration,
++        &records,
++        &effective_root,
++    );
++    let rebuilt = rebuilt_allocator(
++        devices,
++        &system_configuration,
++        &previous,
++        first_txg,
++        &|_| false,
++        shadow_ledger,
++    );
++    let RebuiltAllocator {
++        allocator,
++        effective_floor,
++        abandoned_roots_unreadable,
++    } = rebuilt?;
++    let previous_row = PreviousInstanceRow {
++        instance: effective_root.instance,
++        selected_root_txg: effective_root.checkpoint_txg,
++        applied_transaction_high_water: journal.maximum_applied_transaction,
++        is_rollback: false,
++    };
++    let rows_of_the_chosen_roots_instance_table =
++        previous.instance_table_chain().records.rows.clone();
++    establish_instance(
++        parameters,
++        devices,
++        allocator,
++        InstanceStart {
++            chosen_root,
++            effective_root,
++            journal,
++            previous,
++            previous_row,
++            first_txg,
++            next_counter,
++            tree_identifier_watermark_of_the_ring,
++            effective_floor,
++            abandoned_roots_unreadable,
++            shadow_ledger: shadow_ledger,
++            system_configuration,
++            rows_of_the_chosen_roots_instance_table,
++            space_admission,
++            selected_version_journal_position,
++            instance_table_rows_override: None,
+         },
+     )
+ }
+@@ -2643,7 +2776,373 @@
+             rows_of_the_chosen_roots_instance_table: newest_table.rows,
+             space_admission,
+             selected_version_journal_position,
++            instance_table_rows_override: None,
++        },
++    )
++}
++
++/// 原型（m2-rollback-forward-r1 攻方腿副本，不是条款）：向前发布的回退各臂。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum PrototypeForwardArm {
++    /// 两半都做：最新那一版分配着而 R_old 没分配的落点在回退那次发布里释放（释放代 = 回退那次的 txg）；
++    /// R_old 分配着、最新那一版里已释放的落点改回仍分配（分配代 = R_old 那条记录的分配代）。
++    Full,
++    /// 只做释放那一半，不复活（「只释放被丢掉那几代独有的块」的字面）。
++    ReleaseOnlyNoRevive,
++    /// 释放那一半按诞生代号剪枝：只释放最新那一版里分配代 > T_old 的落点（「按诞生代号剪枝走最新的树」）；复活照做。
++    BirthPrunedRelease,
++    /// 同 `Full`，但不核「R_old 分配着的落点在最新那一版的账里仍是同一个单元」（同槽同分配代）：只靠候选集（txg ≥ F_生效）挡。
++    FullWithoutProtectionCheck,
++    /// 同 `Full`，但候选集不按实例表判「仍然有效」（删掉 (i, T) 可选 ⟺ 无行或 T ≤ Ti 那一条）。
++    FullWithoutTableValidityCheck,
++}
++
++/// 原型的计数（F4 的数在它上面量）。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct PrototypeForwardCounts {
++    /// 每块盘上释放的落点数（逐盘各算一条时的一块盘）。
++    pub released_placements: u64,
++    pub released_slots: u64,
++    /// 每块盘上复活的落点数。
++    pub revived_placements: u64,
++    pub revived_slots: u64,
++    /// 精确差集里「最新那一版分配着、R_old 没分配」而分配代 ≤ T_old 的落点数：按诞生代号剪枝会漏掉的。
++    pub birth_pruned_would_miss: u64,
++    /// 最新那一版里分配代 > T_old 的落点里，非数据单元（要读的节点）的个数：按诞生代号剪枝走树要读的节点数。
++    pub birth_pruned_nodes_read: u64,
++    /// 同上，数据单元（不读、只释放）的个数。
++    pub birth_pruned_data_units: u64,
++    /// R_old 那一版分配记录树的节点数：两棵账求差要多读的节点数（最新那一版的账挂载时已整棵读进内存）。
++    pub target_allocation_record_tree_nodes: u64,
++    /// 最新那一版分配记录树的节点数。
++    pub newest_allocation_record_tree_nodes: u64,
++    /// 最新那一版里分配代 > T_old 的落点按角色族分：某一个节点读不出时剪枝走树漏掉的是它那一族（及以下）的这些。
++    pub newest_born_after_target_by_family: BTreeMap<&'static str, u64>,
++}
++
++fn prototype_family_of(role: Option<&TransactionUnit>) -> &'static str {
++    match role {
++        Some(TransactionUnit::Data(_)) => "data",
++        Some(TransactionUnit::ExtentLowerNode(_)) => "extent_lower",
++        Some(TransactionUnit::ExtentUpperNodeBelowTheRoot(_)) => "extent_upper",
++        Some(TransactionUnit::ExtentRoot) => "extent_root",
++        Some(TransactionUnit::InodeLeafContainer(_)) => "inode_leaf",
++        Some(TransactionUnit::InodeRoot) => "inode_root",
++        Some(TransactionUnit::AllocationTreeNodeBelowTheRoot(_) | TransactionUnit::AllocationTree) => "allocation_tree",
++        Some(TransactionUnit::AccountingTreeNodeBelowTheRoot(_) | TransactionUnit::AccountingTree) => "accounting_tree",
++        Some(TransactionUnit::MappingTreeNodeBelowTheRoot(_) | TransactionUnit::MappingTree) => "mapping_tree",
++        Some(TransactionUnit::TreeTable) => "tree_table",
++        Some(TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_)) => "instance_table",
++        None => "unknown_role",
++    }
++}
++
++/// 原型的拒绝。
++#[derive(Debug)]
++pub enum PrototypeForwardError {
++    Mount(MountError),
++    /// 回退目标或最新那一版是树表 0 条的一版：原型不做。
++    VersionWithoutFile,
++    /// R_old 分配着的一个落点在最新那一版里没有记录或已被别的单元占了：R_old 已不受保护。
++    TargetUnitNotProtected { slot: SlotNumber },
++}
++
++impl From<MountError> for PrototypeForwardError {
++    fn from(error: MountError) -> Self {
++        PrototypeForwardError::Mount(error)
++    }
++}
++
++/// 原型（m2-rollback-forward-r1 攻方腿副本）：挂载时做的向前发布回退。先照可写挂载恢复（择根、施加前缀）得最新那一版 E，
++/// 再以 R_old 那一版为「上一版」发写行那次发布：树表、映射、inode / extent 树照 R_old 那一版；实例表取 E 那一版的行加这次挂载的普通行
++/// （不写回退行、不写见证）；分配器从 E 那一版的账起、按臂调整；txg、计数器、树 ID 水位同可写挂载。
++///
++/// # Errors
++/// 目标不在环里、不在候选集（按 E 的实例表判、txg ≥ F_生效、见证）、两版任一是树表 0 条、R_old 的落点已不受保护，与可写挂载的各种拒绝。
++pub fn prototype_mount_rollback_forward<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    target: RollbackTarget,
++    arm: PrototypeForwardArm,
++) -> Result<(Mounted, PrototypeForwardCounts), PrototypeForwardError> {
++    admit_the_writable_device_count(DeviceCount(devices.len()))?;
++    let system_configuration = choose_system_configuration(&*devices).map_err(MountError::from)?;
++    let chosen_root = choose_root(&*devices, &system_configuration)
++        .ok_or(MountError::from(RecoveryFailure::NoValidRoot))?;
++    let records = scan_journal(&*devices, &system_configuration);
++    let (journal, effective_root) = replay_journal(
++        &*devices,
++        &chosen_root,
++        system_configuration.immutable.sizes.journal_ring_bytes,
++        &records,
++        true,
++        rollback_high_water_of_root(&*devices, &chosen_root),
++    )
++    .map_err(MountError::from)?;
++    let own_record = records
++        .values()
++        .filter(|record| {
++            record.instance == effective_root.instance
++                && record.checkpoint_txg == effective_root.checkpoint_txg
++                && record.place_in_publish
++                    == crate::journal::JournalRecordPlaceInPublish::LastRecordOfThePublish
++        })
++        .max_by_key(|record| record.counter)
++        .or_else(|| records.values().max_by_key(|record| record.counter))
++        .cloned();
++    let newest = rebuild_previous_version(devices, &effective_root, own_record)?;
++    let roots = readable_roots(
++        &*devices,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    let target_root = roots
++        .iter()
++        .find(|root| {
++            root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg
++        })
++        .copied()
++        .ok_or(MountError::RollbackTargetNotACandidate {
++            target,
++            exclusion: RollbackCandidateExclusion::NotInRing,
++        })?;
++    let effective_floor = effective_rollback_floor(
++        &*devices,
++        &system_configuration.immutable.region_devices,
++        &system_configuration.immutable.sizes,
++        &system_configuration.immutable.filesystem_identifier,
++    );
++    if target.checkpoint_txg < effective_floor {
++        return Err(MountError::RollbackTargetNotACandidate {
++            target,
++            exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
++        }
++        .into());
++    }
++    let newest_rows = newest.instance_table_chain().records.rows.clone();
++    if (arm != PrototypeForwardArm::FullWithoutTableValidityCheck
++        && newest_rows
++            .iter()
++            .any(|row| row.instance == target.instance && target.checkpoint_txg > row.selected_root_txg))
++        || rollback_witness_of_the_pool(&*devices, &system_configuration)
++            .abandons(target.instance, target.checkpoint_txg)
++    {
++        return Err(MountError::RollbackTargetNotACandidate {
++            target,
++            exclusion: RollbackCandidateExclusion::OnAbandonedTimeline,
++        }
++        .into());
++    }
++    let target_own_record = records
++        .values()
++        .filter(|record| {
++            record.instance == target.instance && record.checkpoint_txg == target.checkpoint_txg
++        })
++        .max_by_key(|record| record.counter)
++        .or_else(|| records.values().max_by_key(|record| record.counter))
++        .cloned();
++    let selected_version_journal_position =
++        journal_position_of_the_selected_version(&target_root, target_own_record.as_ref());
++    let previous = rebuild_previous_version(devices, &target_root, target_own_record)?;
++    let (Some(newest_output), Some(target_output)) = (newest.file_version(), previous.file_version())
++    else {
++        return Err(PrototypeForwardError::VersionWithoutFile);
++    };
++    let next_counter = records
++        .values()
++        .map(|record| record.counter)
++        .max()
++        .unwrap_or(0)
++        + 1;
++    let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
++    let tree_identifier_watermark_of_the_ring = tree_identifier_watermark_of_the_ring(
++        devices,
++        &system_configuration,
++        &records,
++        &effective_root,
++    );
++    let RebuiltAllocator {
++        mut allocator,
++        effective_floor,
++        abandoned_roots_unreadable,
++    } = rebuilt_allocator(
++        devices,
++        &system_configuration,
++        &newest,
++        first_txg,
++        &|_| false,
++        ShadowLedger::On,
++    )?;
++    // 调整分配器（臂见 `PrototypeForwardArm`）。第一版两盘同槽：按第一块盘的记录认落点，释放与复活走分配器的逐盘动作。
++    let first_device = allocator.devices[0].device;
++    let target_allocated: BTreeMap<u64, (u16, CheckpointTxg)> = target_output
++        .allocation_records
++        .iter()
++        .filter(|record| record.device == first_device && !record.is_released)
++        .map(|record| (record.slot.0, (record.span_slots, record.generation)))
++        .collect();
++    let newest_records: Vec<AllocationRecord> = allocator
++        .records()
++        .iter()
++        .filter(|record| record.device == first_device)
++        .copied()
++        .collect();
++    let role_of_slot: BTreeMap<u64, TransactionUnit> = newest_output
++        .units
++        .iter()
++        .map(|unit| (unit.slot.0, unit.identity))
++        .collect();
++    let target_role_of_slot: BTreeMap<u64, TransactionUnit> = target_output
++        .units
++        .iter()
++        .map(|unit| (unit.slot.0, unit.identity))
++        .collect();
++    let mut counts = PrototypeForwardCounts {
++        target_allocation_record_tree_nodes: u64::try_from(
++            target_output.allocation_record_tree.node_set().len(),
++        )
++        .expect("节点数"),
++        newest_allocation_record_tree_nodes: u64::try_from(
++            newest_output.allocation_record_tree.node_set().len(),
++        )
++        .expect("节点数"),
++        ..PrototypeForwardCounts::default()
++    };
++    let newest_slots: BTreeSet<u64> = newest_records.iter().map(|record| record.slot.0).collect();
++    let check = arm != PrototypeForwardArm::FullWithoutProtectionCheck;
++    for slot in target_allocated.keys() {
++        if check && !newest_slots.contains(slot) {
++            return Err(PrototypeForwardError::TargetUnitNotProtected {
++                slot: SlotNumber(*slot),
++            });
++        }
++    }
++    for record in &newest_records {
++        let placement = Placement {
++            slot: record.slot,
++            span: u64::from(record.span_slots),
++        };
++        let born_after_target = record.generation > target.checkpoint_txg;
++        match (record.is_released, target_allocated.get(&record.slot.0)) {
++            (false, Some((span, generation))) => {
++                if check && (*span != record.span_slots || *generation != record.generation) {
++                    return Err(PrototypeForwardError::TargetUnitNotProtected { slot: record.slot });
++                }
++            }
++            (false, None) => {
++                if born_after_target {
++                    *counts
++                        .newest_born_after_target_by_family
++                        .entry(prototype_family_of(role_of_slot.get(&record.slot.0)))
++                        .or_insert(0) += 1;
++                    match role_of_slot.get(&record.slot.0) {
++                        Some(TransactionUnit::Data(_)) => counts.birth_pruned_data_units += 1,
++                        _ => counts.birth_pruned_nodes_read += 1,
++                    }
++                } else {
++                    counts.birth_pruned_would_miss += 1;
++                }
++                let release = match arm {
++                    PrototypeForwardArm::Full
++                    | PrototypeForwardArm::ReleaseOnlyNoRevive
++                    | PrototypeForwardArm::FullWithoutProtectionCheck
++                    | PrototypeForwardArm::FullWithoutTableValidityCheck => true,
++                    PrototypeForwardArm::BirthPrunedRelease => born_after_target,
++                };
++                if release {
++                    allocator.release(placement, first_txg);
++                    counts.released_placements += 1;
++                    counts.released_slots += placement.span;
++                }
++            }
++            (true, Some((span, generation))) => {
++                if *span != record.span_slots {
++                    if check {
++                        return Err(PrototypeForwardError::TargetUnitNotProtected { slot: record.slot });
++                    }
++                    continue;
++                }
++                if !check && allocator.prototype_is_reclaimed(record.device, record.slot) {
++                    continue;
++                }
++                // 「不复活」那一臂只复活回退那次发布要换下的 R_old 固定点单元（树表、实例表、记账树、映射树、分配记录树）：
++                // 发布路径按上一版 = R_old 释放它们，不复活就在取号之前被拒（`ReleaseTargetAlreadyReleased`）；
++                // 新根继续引用的那几样（数据单元、extent 树、inode 树）不复活，留在已释放。
++                let fixed_point = matches!(
++                    target_role_of_slot.get(&record.slot.0),
++                    Some(
++                        TransactionUnit::TreeTable
++                            | TransactionUnit::InstanceTable
++                            | TransactionUnit::InstanceTablePageAfterTheFirst(_)
++                            | TransactionUnit::AccountingTree
++                            | TransactionUnit::AccountingTreeNodeBelowTheRoot(_)
++                            | TransactionUnit::MappingTree
++                            | TransactionUnit::MappingTreeNodeBelowTheRoot(_)
++                            | TransactionUnit::AllocationTree
++                            | TransactionUnit::AllocationTreeNodeBelowTheRoot(_)
++                    ) | None
++                );
++                if arm != PrototypeForwardArm::ReleaseOnlyNoRevive || fixed_point {
++                    allocator.prototype_revive_released(placement, *generation);
++                    counts.revived_placements += 1;
++                    counts.revived_slots += placement.span;
++                }
++            }
++            (true, None) => {}
++        }
++    }
++    let previous_row = PreviousInstanceRow {
++        instance: effective_root.instance,
++        selected_root_txg: effective_root.checkpoint_txg,
++        applied_transaction_high_water: journal.maximum_applied_transaction,
++        is_rollback: false,
++    };
++    let mounted = establish_instance(
++        parameters,
++        devices,
++        allocator,
++        InstanceStart {
++            chosen_root,
++            effective_root: target_root,
++            journal,
++            previous,
++            previous_row,
++            first_txg,
++            next_counter,
++            tree_identifier_watermark_of_the_ring,
++            effective_floor,
++            abandoned_roots_unreadable,
++            shadow_ledger: ShadowLedger::On,
++            system_configuration,
++            rows_of_the_chosen_roots_instance_table: newest_rows.clone(),
++            space_admission: SpaceAdmission::JudgedByTheFormula,
++            selected_version_journal_position,
++            instance_table_rows_override: Some(newest_rows),
+         },
++    )?;
++    Ok((mounted, counts))
++}
++
++/// 原型（m2-rollback-forward-r1 攻方腿副本）：B——正常卸载时把 F 抬到现行那一版的根（不判上限），推空发布直到每块盘都有带新 F 的根。
++///
++/// # Errors
++/// 同 [`raise_rollback_floor`]（上限那一条除外）。
++pub fn prototype_unmount_raising_the_floor_to_the_newest_root<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    allocator: &mut PoolAllocator,
++    current: &mut TransactionOutput,
++) -> Result<RaisedFloor, MountError> {
++    let newest = current.root.checkpoint_txg;
++    prototype_raise_rollback_floor(
++        parameters,
++        devices,
++        allocator,
++        current,
++        newest,
++        ShadowLedger::On,
++        true,
+     )
+ }
+ 
+--- crates/singlefs-core/src/allocator.rs	2026-09-25 01:37:37.189188041 +0000
++++ crates/singlefs-core/src/allocator.rs	2026-09-25 10:14:48.062208805 +0000
+@@ -318,6 +318,17 @@
+         );
+         self.deferred_slots += span;
+     }
++    /// 原型（m2-rollback-forward-r1 攻方腿副本）：把一个已释放、还在 defer 窗口里的落点改回仍分配（向前发布的回退复活 R_old 引用、
++    /// 之后才被换下的单元）。槽本来就占着，只从 defer 挪回仍分配。
++    pub fn prototype_unmark_released(&mut self, slot: SlotNumber, span: u64) {
++        let start = Self::index(slot);
++        let end = start + usize::try_from(span).expect("跨度");
++        assert!(
++            self.allocated[start..end].iter().all(|taken| *taken),
++            "复活的跨度里有没占着的槽：R_old 引用的单元已被回收"
++        );
++        self.deferred_slots -= span;
++    }
+     /// 隔离一个只被被抛弃根引用的落点：不进已分配、不进 defer、不动空闲计数，只让分配器绕开它（用户数据落点与开放段都不落在它上面）。
+     /// 隔离位独立于分配位：一个槽在当前账里已分配、后来被释放、再被回收，隔离位照样让它发不出去——抬 F 之后候选集缩小，
+     /// 一个此前靠候选根豁免的槽会在回收之前被补隔离（`mount::raise_rollback_floor`）。同一个槽隔离两次不重复计数。
+@@ -1045,6 +1056,35 @@
+         }
+     }
+ 
++    /// 原型（m2-rollback-forward-r1 攻方腿副本）：这个落点是不是已被回收（位图空、盘上记录仍写着已释放）。
++    #[must_use]
++    pub fn prototype_is_reclaimed(&self, device: DeviceIdentity, slot: SlotNumber) -> bool {
++        self.reclaimed.contains(&(device, slot))
++    }
++
++    /// 原型（m2-rollback-forward-r1 攻方腿副本）：一个已释放的落点在每块盘上改回仍分配、分配代写回 `generation`（它罩住的单元的诞生代号，I-3.10）。
++    ///
++    /// # Panics
++    /// 某块盘上没有这条记录、或它不是已释放、或它已被回收（位图空）。
++    pub fn prototype_revive_released(&mut self, placement: Placement, generation: CheckpointTxg) {
++        for device in &mut self.devices {
++            let record = self
++                .records
++                .iter_mut()
++                .find(|record| record.device == device.device && record.slot == placement.slot)
++                .expect("复活的落点每块盘上都有记录");
++            assert!(record.is_released, "复活的落点要是已释放");
++            assert_eq!(u64::from(record.span_slots), placement.span);
++            assert!(
++                !self.reclaimed.contains(&(device.device, placement.slot)),
++                "复活的落点已被回收：R_old 引用的单元已不受保护"
++            );
++            record.is_released = false;
++            record.generation = generation;
++            device.prototype_unmark_released(placement.slot, placement.span);
++        }
++    }
++
+     /// 用户数据：见 `try_allocate_user_data`；拒绝的原因在这里丢掉，只给不看原因的调用方（测试里「一定分得到」的那几处）。
+     /// 发布路径调 `try_allocate_user_data`，按原因报（`PublishError::PlacementRefused`）。
+     pub fn allocate_user_data(&mut self, generation: CheckpointTxg) -> Option<Placement> {

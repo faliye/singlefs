@@ -1,0 +1,37 @@
+27d26
+< const T_INODE: u64 = 12;
+1654,1655c1653,1654
+<     pub states: u64,
+<     pub closed_form: u64,
+---
+>     pub states: u128,
+>     pub closed_form: u128,
+1796c1795,1800
+<     t.closed_form = closed_form_state_count(&segments);
+---
+>     // 闭式照 D13 已定项 4：1 + Σ(2^段长 − 1)。段长 ≥ 64 时 harness 的 u64 版本会溢出（第一版扫描在 GlobalRadix 上就这么 panic 的），
+>     // 这里按 u128 算，段长 < 64 时断言与 harness 的函数相等。
+>     t.closed_form = 1 + segments.iter().map(|s| (1u128 << s.len().min(127)) - 1).sum::<u128>();
+>     if segments.iter().all(|s| s.len() < 64) && t.closed_form < u128::from(u64::MAX) {
+>         assert_eq!(t.closed_form, u128::from(closed_form_state_count(&segments)));
+>     }
+1802,1803c1806,1807
+<     let mut eval = |persisted: &[bool], weight: u64, t: &mut Tally| {
+<         t.states += weight;
+---
+>     let eval = |persisted: &[bool], weight: u64, t: &mut Tally| {
+>         t.states += u128::from(weight);
+2004a2009,2014
+> /// 自己提的改法（零轮）在崩溃模型上：分配记录树节点专区（每盘单元区开头 32 槽 = 两片叶）。
+> pub fn s4_cfgs() -> Vec<Cfg> {
+>     let b = crash_cfg("S4-Absent-LookBack-even-region32");
+>     vec![Cfg { aregion: 32, ..b }]
+> }
+> 
+2059,2062d2068
+< fn enum_from() -> usize {
+<     std::env::var("KS_ENUM_FROM").ok().and_then(|s| s.parse().ok()).unwrap_or(0)
+< }
+< 
+2251a2258
+>         "s4" => s4_cfgs(),

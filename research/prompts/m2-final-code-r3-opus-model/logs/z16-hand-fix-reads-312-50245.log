@@ -1,0 +1,1 @@
+R3OPUS-HAND rollback attempt 0 to (instance 1, txg 3): to_acquire before=InstanceGeneration(3) after=InstanceGeneration(3) writes+barriers issued=0 result=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(3), publish_index: 1, warm_up_publishes_planned: 1, unit: TreeTable, refusal: NoFreeSlotOnAnyDevice }

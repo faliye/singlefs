@@ -1,0 +1,10 @@
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree/crates/singlefs-core/src/transaction.rs	2026-09-25 04:21:10.039936339 +0000
+@@ -4568,6 +4568,7 @@
+         SpaceAdmission::SkippedByTheTestOnlySwitch => false,
+     };
+     if demand_is_judged {
++        if std::env::var("SONNET_S4_TRACE").is_ok() { eprintln!("S4TRACE ==PUBLISH_CHECK=="); }
+         admit_on_every_device(
+             &admission_reading_before_a_publish(allocator, previous),
+             &demand,

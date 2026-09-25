@@ -32,7 +32,7 @@ const RECORD_BYTES: u64 = 4096;
 // 打印出去的键名还叫 `system_configuration_slot_bytes`（第 1624 行的格式串）：它是留存产物第一行的一部分，
 // 改它产物就变了，而产物是冻结的证据、只能连同重跑一起改（evidence-discipline）。下次重跑这个实验时一起改。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
-const RECORD_HEADER_BYTES: u64 = 307;
+const RECORD_HEADER_BYTES: u64 = 311;
 const NAMED_ITEM_BYTES: u64 = 56;
 const DEVICE_COUNT: u64 = 2;
 const PRIMARY_PHYSICAL_BLOCK_SIZE_BYTES: u64 = 512;
@@ -150,6 +150,13 @@ mod capacity_tests {
         assert_eq!(node_capacity(MAPPING_KEY_BYTES, internal_entry_bytes(MAPPING_KEY_BYTES)), 143, "映射内部容量");
         assert_eq!(node_capacity(TREE_TABLE_KEY_BYTES, TREE_TABLE_ENTRY_BYTES), 81, "树表容量");
         assert_eq!(NAMED_ITEMS_PER_RECORD_MAIN, 67, "一条记录装的点名项数");
+    }
+
+    /// B2：头 311 时的余数（D23 已定项 4「4096 上余 3785」，⌊3785/56⌋=67 余 33）——
+    /// 全部单测里唯一分得开 307 与 311 的一条（头 307 时余数是 37，同样是 67 项）。
+    #[test]
+    fn named_items_per_record_remainder_matches_head_311() {
+        assert_eq!(RECORD_HEADER_BYTES + NAMED_ITEMS_PER_RECORD_MAIN * NAMED_ITEM_BYTES + 33, RECORD_BYTES);
     }
 
     #[test]

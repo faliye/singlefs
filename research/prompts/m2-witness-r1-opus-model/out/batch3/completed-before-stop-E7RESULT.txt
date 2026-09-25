@@ -1,0 +1,4 @@
+E7RESULT name=witness_crash_summary placement=None order=BeforeFirstRoot pbs=512 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) prefix_depth=1 edge_stride=1 edges=142 states=9611 states_rolled_back=5251 states_rolled_back_without_new_root=0 states_not_rolled_back_but_flip_to_rolled_back_under_fault=0 minimum_fault_histogram={"1": 2982, "2": 1961, "3": 308, "n/a(not_rolled_back)": 4360}
+E7RESULT name=done emitted=2
+E7RESULT name=witness_crash_summary placement=SystemConfigurationSlot order=AfterWarmUp pbs=512 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) prefix_depth=1 edge_stride=1 edges=142 states=13523 states_rolled_back=9163 states_rolled_back_without_new_root=0 states_not_rolled_back_but_flip_to_rolled_back_under_fault=0 minimum_fault_histogram={"1": 2982, "2": 2409, "3": 1932, ">3": 1840, "n/a(not_rolled_back)": 4360}
+E7RESULT name=done emitted=2

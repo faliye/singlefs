@@ -1,0 +1,8 @@
+be9a68f52eee60d64bc3010a79c94e2438d58a44926989aa87fa771aa2382d8d  .claude/kb/checks-owed.md
+0dc0a154db8674eebb886d273f84355e07951649282bb2ff57169943f87d58c6  .claude/kb/decisions/03-空间分配.md
+90febd3498681804108f52a2d3e249588c6312ac069210eeaf257f180837ddf5  .claude/kb/decisions/08-核心索引结构.md
+10a8ce0e1c432c4647f4104f67ecdaa13b4882dc8023154afc188cbce745e988  .claude/kb/decisions/16-发布语义.md
+a88509f52805007dcbb0400291c05e480d7650f8681a9de8970c17997a5dc3a1  .claude/kb/decisions/18-块里携带什么信息.md
+6b65d2be5027dcd9cb178177276e941b9ce570af0f5f5517dbfde079b0800de0  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+4631d5b5233c91ed9e0f093a924e88b30d1159c5a21785094d90de652e8335fa  .claude/kb/decisions/23-journal的角色与格式.md
+acaadc495da1282b94e9001819bf8e64cde062e34c24795308b801eaeea9841f  .claude/kb/invariants.md

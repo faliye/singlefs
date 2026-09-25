@@ -1,0 +1,327 @@
+== a-late-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E1 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E1 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E1 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E1 6/11 ROOT0 - 1 states=1
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E1 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 9/11 ROOT1 - 2 states=1
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E2 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E2 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E2 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E2 6/11 ROOT0 - 1 states=1
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E2 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 9/11 ROOT1 - 2 states=1
+== a-post-4096
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+== a-post-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=10
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=20
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=10
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=20
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 1 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 1 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=10
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=20
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=10
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=20
+== a-pre-4096
+  minF<=2 E1 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 3/11 ROOT0 - 2 states=1
+  minF<=2 E2 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 3/11 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 0/11 states=2
+  rolled_back_without_new_root E1 1/11 states=1
+  rolled_back_without_new_root E1 2/11 states=3
+  rolled_back_without_new_root E1 3/11 states=1
+  rolled_back_without_new_root E2 0/11 states=2
+  rolled_back_without_new_root E2 1/11 states=1
+  rolled_back_without_new_root E2 2/11 states=3
+  rolled_back_without_new_root E2 3/11 states=1
+== a-pre-512
+  minF<=2 E1 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E1 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 2/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 2/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 3/11 ROOT0 - 2 states=1
+  minF<=2 E2 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC0.1 1 states=2
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC1.1 1 states=2
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E2 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 2/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 2/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 3/11 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 0/11 states=2
+  rolled_back_without_new_root E1 1/11 states=21
+  rolled_back_without_new_root E1 2/11 states=11
+  rolled_back_without_new_root E1 3/11 states=1
+  rolled_back_without_new_root E2 0/11 states=6
+  rolled_back_without_new_root E2 1/11 states=21
+  rolled_back_without_new_root E2 2/11 states=11
+  rolled_back_without_new_root E2 3/11 states=1
+== b-late-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E1 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E1 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E1 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E1 6/11 ROOT0 - 1 states=1
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E1 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 9/11 ROOT1 - 2 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E2 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E2 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E2 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E2 6/11 ROOT0 - 1 states=1
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E2 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 9/11 ROOT1 - 2 states=1
+== b-post-4096
+  minF<=2 E1 4/12 SC0.0,SC1.0,WU0.1,WU1.1 - 1 states=4
+  minF<=2 E1 4/12 SC0.0,SC1.0,WU0.1,WU1.1 - 2 states=8
+  minF<=2 E2 4/12 SC0.0,SC1.0,WU0.0,WU1.0 - 1 states=4
+  minF<=2 E2 4/12 SC0.0,SC1.0,WU0.0,WU1.0 - 2 states=8
+== b-post-512
+  minF<=2 E1 4/12 SC0.0,SC1.0,WU0.1,WU1.1 - 1 states=4
+  minF<=2 E1 4/12 SC0.0,SC1.0,WU0.1,WU1.1 - 2 states=8
+  minF<=2 E2 4/12 SC0.0,SC1.0,WU0.0,WU1.0 - 1 states=4
+  minF<=2 E2 4/12 SC0.0,SC1.0,WU0.0,WU1.0 - 2 states=8
+== b-pre-4096
+  minF<=2 E1 1/12 WU0.1,WU1.1 - 1 states=2
+  minF<=2 E1 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 3/12 REC0,REC1 - 2 states=3
+  minF<=2 E1 4/12 ROOT0 - 2 states=1
+  minF<=2 E2 1/12 WU0.0,WU1.0 - 1 states=2
+  minF<=2 E2 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 3/12 REC0,REC1 - 2 states=3
+  minF<=2 E2 4/12 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 1/12 states=2
+  rolled_back_without_new_root E1 2/12 states=1
+  rolled_back_without_new_root E1 3/12 states=3
+  rolled_back_without_new_root E1 4/12 states=1
+  rolled_back_without_new_root E2 1/12 states=2
+  rolled_back_without_new_root E2 2/12 states=1
+  rolled_back_without_new_root E2 3/12 states=3
+  rolled_back_without_new_root E2 4/12 states=1
+== b-pre-512
+  minF<=2 E1 1/12 WU0.1,WU1.1 - 1 states=2
+  minF<=2 E1 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E1 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E1 3/12 REC0,REC1 - 2 states=3
+  minF<=2 E1 3/12 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 3/12 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 4/12 ROOT0 - 2 states=1
+  minF<=2 E2 1/12 WU0.0,WU1.0 - 1 states=2
+  minF<=2 E2 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E2 2/12 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E2 3/12 REC0,REC1 - 2 states=3
+  minF<=2 E2 3/12 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 3/12 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 4/12 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 1/12 states=2
+  rolled_back_without_new_root E1 2/12 states=21
+  rolled_back_without_new_root E1 3/12 states=11
+  rolled_back_without_new_root E1 4/12 states=1
+  rolled_back_without_new_root E2 1/12 states=2
+  rolled_back_without_new_root E2 2/12 states=21
+  rolled_back_without_new_root E2 3/12 states=11
+  rolled_back_without_new_root E2 4/12 states=1
+== c-late-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E1 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E1 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E1 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E1 6/11 ROOT0 - 1 states=1
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E1 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 9/11 ROOT1 - 2 states=1
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.1 1 states=4
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.1 1 states=4
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E2 4/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E2 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E2 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E2 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E2 6/11 ROOT0 - 1 states=1
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 2 states=4
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 2 states=4
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E2 7/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E2 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 9/11 ROOT1 - 2 states=1
+== c-post-4096
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+== c-post-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 2 states=2
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 1 states=1
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 2 states=2
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=10
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=20
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=10
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=20
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC0.0 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 1 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:SC1.0 2 states=2
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=10
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=20
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=10
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=20
+== c-pre-4096
+  minF<=2 E1 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 3/11 ROOT0 - 2 states=1
+  minF<=2 E2 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 3/11 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 0/11 states=2
+  rolled_back_without_new_root E1 1/11 states=1
+  rolled_back_without_new_root E1 2/11 states=3
+  rolled_back_without_new_root E1 3/11 states=1
+  rolled_back_without_new_root E2 0/11 states=2
+  rolled_back_without_new_root E2 1/11 states=1
+  rolled_back_without_new_root E2 2/11 states=3
+  rolled_back_without_new_root E2 3/11 states=1
+== c-pre-512
+  minF<=2 E1 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E1 0/11 SC0.1,SC1.1 torn:SC0.1 1 states=2
+  minF<=2 E1 0/11 SC0.1,SC1.1 torn:SC0.1 2 states=1
+  minF<=2 E1 0/11 SC0.1,SC1.1 torn:SC1.1 1 states=2
+  minF<=2 E1 0/11 SC0.1,SC1.1 torn:SC1.1 2 states=1
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E1 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E1 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 2/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 2/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 3/11 ROOT0 - 2 states=1
+  minF<=2 E2 0/11 SC0.1,SC1.1 - 1 states=2
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC0.1 1 states=2
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC0.1 2 states=1
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC1.1 1 states=2
+  minF<=2 E2 0/11 SC0.1,SC1.1 torn:SC1.1 2 states=1
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=1
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=10
+  minF<=2 E2 1/11 UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=10
+  minF<=2 E2 2/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 2/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 2/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 3/11 ROOT0 - 2 states=1
+  rolled_back_without_new_root E1 0/11 states=8
+  rolled_back_without_new_root E1 1/11 states=21
+  rolled_back_without_new_root E1 2/11 states=11
+  rolled_back_without_new_root E1 3/11 states=1
+  rolled_back_without_new_root E2 0/11 states=8
+  rolled_back_without_new_root E2 1/11 states=21
+  rolled_back_without_new_root E2 2/11 states=11
+  rolled_back_without_new_root E2 3/11 states=1
+== none-pre-4096
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E1 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E1 6/11 ROOT0 - 1 states=1
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E1 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 9/11 ROOT1 - 2 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E2 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E2 6/11 ROOT0 - 1 states=1
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E2 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 9/11 ROOT1 - 2 states=1
+== none-pre-512
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E1 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E1 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E1 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E1 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E1 6/11 ROOT0 - 1 states=1
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E1 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E1 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E1 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E1 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E1 9/11 ROOT1 - 2 states=1
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 1 states=4
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 1 states=40
+  minF<=2 E2 4/11 SC0.0,SC1.0,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 1 states=40
+  minF<=2 E2 5/11 REC0,REC1 - 1 states=3
+  minF<=2 E2 5/11 REC0,REC1 torn:REC0 1 states=4
+  minF<=2 E2 5/11 REC0,REC1 torn:REC1 1 states=4
+  minF<=2 E2 6/11 ROOT0 - 1 states=1
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 - 2 states=4
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT0 2 states=56
+  minF<=2 E2 7/11 SC0.1,SC1.1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1,UNIT0,UNIT1 torn:UNIT1 2 states=56
+  minF<=2 E2 8/11 REC0,REC1 - 2 states=3
+  minF<=2 E2 8/11 REC0,REC1 torn:REC0 2 states=4
+  minF<=2 E2 8/11 REC0,REC1 torn:REC1 2 states=4
+  minF<=2 E2 9/11 ROOT1 - 2 states=1

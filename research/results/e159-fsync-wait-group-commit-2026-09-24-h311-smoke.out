@@ -1,0 +1,89 @@
+# E159（fsync 等待时间随并发数：组提交与 WAL 两臂）—— 记录头 307 → 311 重跑之后的冒烟与锚点存证
+# 只做到「装置与冒烟」这一段（正式计时的主网格、PC1–PC3、AA、G8、G1、G6 五轮不在这一次范围内，
+# `research/prompts/e159-r1-prereg.md`「计时段不在这一次（机器空闲时另跑）」）。
+# 这份文件不是入库的判据产物（判据钉在源码里的单测与变异表，`anchors` 产物走
+# `research/results/e159-fsync-wait-group-commit-2026-09-24-anchors.out`，两次跑逐字节相同、未换新文件）。
+# 本机口径：AMD Ryzen 9 9950X，来宾 4 vCPU / 2048M 内存（vm-bench.sh 默认）、virtio-blk。
+# 跑于 2026-09-24 23:00–23:10 JST（RECORD_HEADER_BYTES: 307 → 311 之后）。
+
+## 一、cargo test（release，55/55，含新增 named_items_per_record_remainder_matches_head_311）
+
+running 55 tests
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+## 二、mutate.sh（改常量前 14/14 全抓；改常量后 17/17 全抓，新增 M15/M16/M17）
+
+基线：全绿
+✅ [M1_甲发布去掉第二道屏障] 红：e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order
+✅ [M2_第一道屏障之后就放行] 红：e159_anchor_and_rule_tests::jia_durable_instant_is_not_earlier_than_the_root_slot_fua
+✅ [M3_WAL臂写混成甲的规划函数] 红：e159_anchor_and_rule_tests::plan_batch_for_arm_routes_each_arm_to_its_own_solver_not_a_different_one
+✅ [M4_组提交开也把批封顶为1] 红：e159_anchor_and_rule_tests::drain_batch_from_queue_collects_everything_when_group_commit_is_on
+✅ [M5_t_issue改成在收批时刻取] 红：e159_anchor_and_rule_tests::closed_loop_queueing_delay_is_counted_when_group_commit_is_off
+✅ [M6_PC1忙等挪到放行之后] 红：e159_anchor_and_rule_tests::pc1_injected_wait_lands_before_release_not_after
+✅ [M7_随机取整换成向下取整] 红：e159_anchor_and_rule_tests::round_stochastic_is_unbiased_over_many_draws
+✅ [M8_T_time常量读成50秒] 红：e159_anchor_and_rule_tests::checkpoint_time_threshold_constant_is_five_seconds
+✅ [M9_系统配置槽写之前不读] 红：e159_anchor_and_rule_tests::jia_single_fsync_batch_step_sequence_matches_crates_order,e159_anchor_and_rule_tests::system_configuration_slot_is_read_twice_before_being_written
+✅ [M10_根槽写4096字节而不是512] 红：e159_anchor_and_rule_tests::root_slot_width_is_primary_physical_block_size
+✅ [M11_J1比较从大于等于改成大于] 红：e159_anchor_and_rule_tests::classify_ratio_boundary_at_threshold_counts_as_crossed
+✅ [M12_五轮合并改成多数轮说了算] 红：e159_anchor_and_rule_tests::merge_five_rounds_four_against_one_is_unstable_not_majority
+✅ [M13_开环issued_at改取实际发出时刻] 红：e159_anchor_and_rule_tests::open_loop_issued_at_uses_scheduled_instant_not_actual
+✅ [M14_放行到醒这一段漏掉唤醒] 红：e159_anchor_and_rule_tests::release_to_wake_is_positive_when_release_precedes_return
+✅ [M15_头宽退回307] 红：capacity_tests::named_items_per_record_remainder_matches_head_311
+✅ [M16_头宽过上边界] 红：capacity_tests::capacities_match_the_preregistration_anchors,capacity_tests::named_items_per_record_remainder_matches_head_311
+✅ [M17_头宽过下边界] 红：capacity_tests::capacities_match_the_preregistration_anchors,capacity_tests::named_items_per_record_remainder_matches_head_311
+已还原，基线仍全绿
+
+## 三、真机冒烟：S3 探针（logical_block_size）—— vm-bench.sh <musl 二进制> probe-device
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+E7RESULT E159PROBE device=vda logical_block_size=512
+E7RESULT name=done emitted=2
+  ✓ 退出码 0，抓到 2 条结果（与程序声称的 2 条相符）
+
+## 四、真机冒烟：三条臂各跑一格（fallocate 预分配，VM_DISK_PREALLOCATE=1）
+
+### 甲，k=1，group-commit on，duration=3s
+# vm-bench.sh <musl 二进制> cell --arm jia --k 1 --group-commit on --warmup-seconds 0.3 --duration-seconds 3 --seed 1 --file-count 10000 --family f8a
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=jia k=1 group_commit=true samples=0 median_ns=0 p99_ns=0 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=696832
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=1361 sectors_read_diff=16 writes_completed_diff=39 reads_completed_diff=2
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+### wal_full-K10，k=2，group-commit on，duration=4s
+# vm-bench.sh <musl 二进制> cell --arm wal-full --k 2 --group-commit on --warmup-seconds 0.3 --duration-seconds 4 --seed 1 --file-count 10000 --family f8a
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=wal_full-K10 k=2 group_commit=true samples=0 median_ns=0 p99_ns=0 containment_violations=0 checkpoint_count=0 checkpoint_bytes=0 bytes_written_estimate=626688
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=1224 sectors_read_diff=0 writes_completed_diff=24 reads_completed_diff=0
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+### yi-M-K10，k=2，group-commit on，duration=6s
+# vm-bench.sh <musl 二进制> cell --arm yi-m --k 2 --group-commit on --warmup-seconds 0.3 --duration-seconds 6 --seed 1 --file-count 10000 --family f8a
+
+══ 虚机 benchmark harness ══
+  ✓ 内核 /boot/vmlinuz-6.17.0-lockdep
+  ✓ 虚机 2048M 内存 / 4 vCPU / 4096M virtio 盘
+  ✓ 盘镜像用 fallocate 预分配
+E7RESULT E159RESULT arm=yi-M-K10 k=2 group_commit=true samples=0 median_ns=0 p99_ns=0 containment_violations=0 checkpoint_count=1 checkpoint_bytes=385536 bytes_written_estimate=1016320
+E7RESULT E159BLOCKSTAT device=vda sectors_written_diff=1985 sectors_read_diff=16 writes_completed_diff=55 reads_completed_diff=2
+E7RESULT name=done emitted=3
+  ✓ 退出码 0，抓到 3 条结果（与程序声称的 3 条相符）
+
+## 五、小结（Q159.3 判据：无 panic、结果行齐、emitted= 对得上——三样都满足）
+
+三条臂与 S3 探针都跑通，退出码全部 0，`emitted=` 与实收行数逐次相符。`samples=0`（本次三条臂在测量窗口内都没有一次 fsync 落在
+warmup 之后的窗口里，与 2026-09-24 03:36 UTC 那次的 samples=5/50/37 不同）——**这一次不判这个数**：
+`research/prompts/e159-r1-prereg.md`「冒烟里的延迟、吞吐、写量读数：只报数，不判」，Q159.3 只看跑没跑通、
+探针是不是 512、结果行齐不齐，这三样这一次都满足。yi-M-K10 那格 checkpoint_count=1，checkpoint 机制仍真跑通。
+S1（记录条数 / 容量随头宽变的那几格）与 Q159.4（与 E155 第四次装置的逐函数 diff）见报告，不在这份冒烟文件里。

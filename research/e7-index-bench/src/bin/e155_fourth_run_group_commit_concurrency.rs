@@ -41,7 +41,7 @@ const RECORD_BYTES: u64 = 4096;
 /// 系统配置槽宽度。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 记录头宽度（`journal_named_items_per_record` 用它反推容量）。
-const RECORD_HEADER_BYTES: u64 = 307;
+const RECORD_HEADER_BYTES: u64 = 311;
 /// 一条点名项的宽度。
 const NAMED_ITEM_BYTES: u64 = 56;
 /// 两块盘（`D`）。
@@ -177,6 +177,13 @@ mod capacity_tests {
         assert_eq!(node_capacity(TREE_TABLE_KEY_BYTES, TREE_TABLE_ENTRY_BYTES), 81, "树表容量");
         assert_eq!(NAMED_ITEMS_PER_RECORD_MAIN, 67, "一条记录装的点名项数（A1）");
         assert_eq!(UNIT_BYTES - 105 - 29, 32634, "数据单元载荷上限");
+    }
+
+    /// B2：头 311 时的余数（D23 已定项 4「4096 上余 3785」，⌊3785/56⌋=67 余 33）——
+    /// 全部单测里唯一分得开 307 与 311 的一条（头 307 时余数是 37，同样是 67 项）。
+    #[test]
+    fn named_items_per_record_remainder_matches_head_311() {
+        assert_eq!(RECORD_HEADER_BYTES + NAMED_ITEMS_PER_RECORD_MAIN * NAMED_ITEM_BYTES + 33, RECORD_BYTES);
     }
 
     #[test]

@@ -533,7 +533,16 @@ M11 0.5638766519823789 M17 0.5 M18 0.2
 
 ## 十二、修订
 
-（留空。装置写之后、产物之前由执行员写，只许收严或补臂。）
+**2026-09-24（第二段产物之前，第一段-realweight 产物之前）**：补一个甲臂的取样点，不改判据、不改臂定义、不改阈值。
+
+依据是主 agent 派发提示原话：「用户 2026-09-24 给了 D25（目标负载优先级） 已定项 1 表里五档负载的权重：seq 60、metaheavy 10、rand 10、multistream 10、smallfile 10……照登记里甲的定义（随机小读占比 = Σ 权重 × 各档自己的占比，各档占比由 E16 与 E140 的模型算）算出这组权重下的占比，报它落在两条重开判据阈值的哪一侧」。
+
+- **补的取样点**：新增函数 `five_tier_weights_given_by_user_2026_09_24()`，把 w = (0.60, 0.10, 0.10, 0.10, 0.10)（seq、metaheavy、rand、multistream、smallfile，与 D25 已定项 1 表次序一致）代入登记第五节 5.1 已有的两组「拍的」illustrative b（M1「只有 rand 档有随机小读」、M2「小操作档都是随机小读」），产出两行 `name=weight_sample kind=real_weight_2026_09_24_illustrative_random_share`。**这不是甲的真实占比**：b（各档自己的随机小读份额）今天仍然读不到——不只是 smallfile，E16 的 `generate_operations` 只产写、完全没有读操作（`grep -c -i read` 命中 0），E140 的负载只有 `rand`/`randq`/`seq` 三档、不按 D25 的五档分（`grep` 命中，均无 metaheavy/multistream/smallfile 档），登记没有写死能从 E16/E140 算出 b 的办法，这一句在开登记之前的文件头已经载明（「岔路单第 1 行甲写『各档占比由 E16 与 E140 的模型算』，仓里做不到」），本次现查确认今天仍然如此。产物里新增一行 `name=weight_arm_true_occupancy_unavailable` 载明这一点，五个档一起缺，不是 smallfile 单独缺。
+- **单测读数依据**：`five_tier_weights_given_by_user_2026_09_24_sum_to_one_and_match_the_records_table`（五个值与合计各钉一遍）、`real_weight_arm_illustrative_random_share_positive_controls`（M1 给 10%、M2 给 30%，均落在判据 5 的「越过」侧；判据 1（读法 A）在这两点上仍等于锚点、仍未触发，与 Q13「判据 1 与占比无关」一致；另外核了一遍 D25 这组权重恰好等于 ε 参数化在 ε = 40% 时的形状——`epsilon_weights(0.4) == five_tier_weights_given_by_user_2026_09_24()` 逐档相等，两条构造路径给出同一个数组）。变异 M22（seq 档权重写错）红在这两条测试。
+- **顺带修的一处实现缺陷（不是新判据，是让代码对齐登记已经写死的定义）**：`emit_weight_instance` 打出的 `additive_upper_bound_at_*` 三个字段，是从 `additive_conclusion_from_upper_bound` 算的，那个函数只看阈值、不看 `byte_share`，对**所有**权重取样点（含既有的 ε/ω 取样表）都无条件打印同一套结论。但登记第四节丙类「带下沿以下 Σ 有上界」与第六节 Q5/Q7 都写明这条上界捷径（C5 < 0）**只在 byte_share < 1.0%（band_lower）时成立**；本次新增的两个实例 byte_share 分别是 10%、30%，都 ≥ 1.0%，这条捷径对它们不适用，直接沿用会把「不重开」错误地报给这两个点。做法：不改 `emit_weight_instance`（不动既有 ε/ω/乙/丙那些行的既有输出——已用 `diff` 核过，本轮产物前 69 行与旧 `segment1` 文件逐字节相同），只在这两个新实例后面各追加一行 `name=weight_sample_additive_conclusion`，新函数 `additive_upper_bound_shortcut_applicable(byte_share)`（`byte_share < band_lower_bound()`）判断捷径适不适用，不适用时报 `additive_conclusion=要第二段`。单测 `additive_upper_bound_shortcut_boundary` 钉边界（`band_lower_bound()` 本身算不适用，闭区间下沿已经在带内）；变异 M23（`<` 改 `<=`）红在这条测试。**这一格记账不是本轮要修的判据，只是让新取样点的输出不误导；既有 ε/ω 行的同一字段今天仍是老样子，主 agent 若认为需要统一修正，交主 agent 另定，本次不自行扩大范围。**
+- **变异**：M22、M23 两条追加进 `research/mutations/e160_random_small_read_share.tsv`；连同原 17 条，`nice -n 19 bash scripts/mutate.sh e160-random-small-read-share e7-index-bench/src/bin/e160_random_small_read_share.rs mutations/e160_random_small_read_share.tsv` 19 条全抓，`已还原，基线仍全绿`（首次跑遇到 M1、M13 各自 120 秒没跑完，`cat /proc/loadavg` 当时是 85 上下、32 核，与 `ps` 看到多个别的会话在跑 cargo/rustc 一致；`MUTATE_TIMEOUT=600` 重跑，两条都改判「红」，判定与本次改动无关：这两条变异分别落在 `declared_byte_share`、`HEADER_WITH_RESERVE_BYTES`，本次新增代码都没有调用到）。
+- **产物**：`research/results/e160-random-small-read-share-segment1-2026-09-24-realweight.out`（75 行，`emitted=75`），前 69 行与 `e160-random-small-read-share-segment1-2026-09-24.out`（70 行）逐字节相同（`diff` 核过），新增 5 行在原有 69 行数据之后、`done` 行之前。旧文件原样保留，不覆盖。`research/scripts/replay.sh` 的 E160 登记行改指向新文件，`bash research/scripts/replay.sh E160` 判「字节一致」。
+- **只许收严或补臂**：本次只新增一个甲臂的真实权重取样点与一行修正说明，两条重开判据的定义、阈值、四条合成规则、乙/丙两臂、第七节钉死的绝对值、第九节原有变异、第十一节的作废/停机条款均未改动一个字。
 
 ## 十三、读过的文件与跑过的命令
 

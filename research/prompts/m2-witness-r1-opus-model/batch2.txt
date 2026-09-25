@@ -1,0 +1,20 @@
+c pre 512 w-family 2
+c pre 4096 w-family 2
+c pre 512 w-min
+none pre 512 w-crash 1 1
+a pre 512 w-crash 1 1
+a post 512 w-crash 1 1
+a late 512 w-crash 1 1
+b pre 512 w-crash 1 1
+b post 512 w-crash 1 1
+b late 512 w-crash 1 1
+c pre 512 w-crash 1 1
+c post 512 w-crash 1 1
+c late 512 w-crash 1 1
+none pre 4096 w-crash 1 1
+a pre 4096 w-crash 1 1
+a post 4096 w-crash 1 1
+b pre 4096 w-crash 1 1
+b post 4096 w-crash 1 1
+c pre 4096 w-crash 1 1
+c post 4096 w-crash 1 1

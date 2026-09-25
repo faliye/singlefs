@@ -1,0 +1,131 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/mount.rs:10:5
+   |
+10 |     admission_reading_before_a_publish, admit_on_every_device, AdmissionRefusedOnSomeDevices,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_s4_attack.rs (/tmp/claude-1000/m2-safety-r2-opus/rerun/target/release/deps/opus_s4_attack-20fba67ba3b2373c)
+
+running 1 test
+E5 slots=240 arm=T N=4 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=A1 N=4 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=A2 N=6 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=ND N=7 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=A4 N=4 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=A3ge N=4 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/10": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/11": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/10]
+E5 slots=240 arm=A3gt N=4 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/10": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/11": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/10]
+E5 slots=240 arm=A2+A3ge N=6 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=240 arm=A2+A3gt N=6 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=240 arm=A2+A4 N=6 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=240 arm=A2+A3gt+A4 N=6 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=240 arm=A2+A3ge+A4 N=6 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=T N=4 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/10": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/11": 3, "mount=ok writable=never": 25} viol_points=0 first_viol=[] first_stuck=[cut=0/29: ok never(SpaceAdmissionRefused)]
+E5 slots=256 arm=A1 N=4 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=256 arm=A2 N=6 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=ND N=7 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/13": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@11/14": 3, "mount=ok writable=raiseF@1": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/13]
+E5 slots=256 arm=A4 N=4 delete=ok crash_points=30 tally={"mount=ok writable=never": 30} viol_points=0 first_viol=[] first_stuck=[cut=0/29: ok never(SpaceAdmissionRefused)]
+E5 slots=256 arm=A3ge N=4 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/10": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/11": 3, "mount=ok writable=now": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/10]
+E5 slots=256 arm=A3gt N=4 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/10": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/11": 3, "mount=ok writable=never": 25} viol_points=0 first_viol=[] first_stuck=[cut=0/29: ok never(SpaceAdmissionRefused)]
+E5 slots=256 arm=A2+A3ge N=6 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=A2+A3gt N=6 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=A2+A4 N=6 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=A2+A3gt+A4 N=6 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=256 arm=A2+A3ge+A4 N=6 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=T N=6 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=320 arm=A1 N=5 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/11": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/12": 3, "mount=ok writable=never": 25} viol_points=0 first_viol=[] first_stuck=[cut=0/29: ok never(SpaceAdmissionRefused)]
+E5 slots=320 arm=A2 N=8 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=ND N=9 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=A4 N=6 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=320 arm=A3ge N=6 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/12": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@3/13": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/12]
+E5 slots=320 arm=A3gt N=6 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/12": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@3/13": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/12]
+E5 slots=320 arm=A2+A3ge N=8 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=A2+A3gt N=8 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=A2+A4 N=8 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=A2+A3gt+A4 N=8 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=320 arm=A2+A3ge+A4 N=8 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=T N=7 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=384 arm=A1 N=7 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=384 arm=A2 N=10 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=ND N=11 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=A4 N=7 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=384 arm=A3ge N=7 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/13": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/14": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/13]
+E5 slots=384 arm=A3gt N=7 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/13": 27, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/14": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/13]
+E5 slots=384 arm=A2+A3ge N=10 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=A2+A3gt N=10 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=A2+A4 N=10 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=A2+A3gt+A4 N=10 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=384 arm=A2+A3ge+A4 N=10 delete=ok crash_points=30 tally={"mount=ok writable=now": 25, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=T N=8 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/14": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/15": 3, "mount=ok writable=raiseF@1": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/14]
+E5 slots=448 arm=A1 N=8 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=448 arm=A2 N=12 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=ND N=13 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=448 arm=A4 N=8 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=A3ge N=8 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/14": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/15": 3, "mount=ok writable=now": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/14]
+E5 slots=448 arm=A3gt N=8 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/14": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/15": 3, "mount=ok writable=raiseF@1": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/14]
+E5 slots=448 arm=A2+A3ge N=12 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=A2+A3gt N=12 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=A2+A4 N=12 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=A2+A3gt+A4 N=12 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=448 arm=A2+A3ge+A4 N=12 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=T N=9 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/15": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/16": 3, "mount=ok writable=raiseF@1": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/15]
+E5 slots=512 arm=A1 N=9 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=512 arm=A2 N=13 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=ND N=14 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A4 N=9 delete=ok crash_points=30 tally={"mount=ok writable=raiseF@1": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A3ge N=9 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/15": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/16": 3, "mount=ok writable=now": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/15]
+E5 slots=512 arm=A3gt N=9 delete=ok crash_points=30 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/15": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/16": 3, "mount=ok writable=raiseF@1": 25} viol_points=0 first_viol=[] first_stuck=[cut=25/29: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/15]
+E5 slots=512 arm=A2+A3ge N=13 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A2+A3gt N=13 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A2+A4 N=13 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A2+A3gt+A4 N=13 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=512 arm=A2+A3ge+A4 N=13 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=T N=11 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/17": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/18": 3, "mount=ok writable=raiseF@1": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/17]
+E5 slots=640 arm=A1 N=11 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=640 arm=A2 N=16 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=ND N=17 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A4 N=11 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A3ge N=11 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/17": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/18": 3, "mount=ok writable=now": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/17]
+E5 slots=640 arm=A3gt N=11 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/17": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/18": 3, "mount=ok writable=raiseF@1": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/17]
+E5 slots=640 arm=A2+A3ge N=16 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A2+A3gt N=16 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A2+A4 N=16 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A2+A3gt+A4 N=16 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=640 arm=A2+A3ge+A4 N=16 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=T N=13 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=768 arm=A1 N=13 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=768 arm=A2 N=19 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=ND N=20 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-none/24[\"SpaceAdmissionRefusedBeforeAcquisition\"]": 3, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/24": 2, "mount=ok writable=raiseF@1": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/24]
+E5 slots=768 arm=A4 N=13 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=768 arm=A3ge N=13 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/19": 23, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/20": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/19]
+E5 slots=768 arm=A3gt N=13 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@1/19": 23, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/20": 3} viol_points=0 first_viol=[] first_stuck=[cut=0/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@1/19]
+E5 slots=768 arm=A2+A3ge N=19 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=A2+A3gt N=19 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=A2+A4 N=19 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=A2+A3gt+A4 N=19 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=768 arm=A2+A3ge+A4 N=19 delete=ok crash_points=26 tally={"mount=ok writable=now": 21, "mount=ok writable=raiseF@1": 5} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=T N=16 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/22": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/23": 3, "mount=ok writable=raiseF@1": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/22]
+E5 slots=1024 arm=A1 N=16 delete=SpaceAdmissionRefused (删除被拒，没有崩溃点可枚举)
+E5 slots=1024 arm=A2 N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=ND N=24 delete=ok crash_points=30 tally={"mount=ok writable=now": 28, "mount=ok writable=raiseF@1": 2} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A4 N=16 delete=ok crash_points=26 tally={"mount=ok writable=raiseF@1": 26} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A3ge N=16 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/22": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/23": 3, "mount=ok writable=now": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/22]
+E5 slots=1024 arm=A3gt N=16 delete=ok crash_points=26 tally={"mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@0/22": 2, "mount=SpaceAdmissionRefusedBeforeAcquisition writable=mount-refused;rollback=rb-ok@2/23": 3, "mount=ok writable=raiseF@1": 21} viol_points=0 first_viol=[] first_stuck=[cut=21/25: SpaceAdmissionRefusedBeforeAcquisition mount-refused;rollback=rb-ok@0/22]
+E5 slots=1024 arm=A2+A3ge N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A2+A3gt N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A2+A4 N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A2+A3gt+A4 N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+E5 slots=1024 arm=A2+A3ge+A4 N=23 delete=ok crash_points=30 tally={"mount=ok writable=now": 30} viol_points=0 first_viol=[] first_stuck=[]
+test e5_crash_inside_a_delete_class_publish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 55.10s
+

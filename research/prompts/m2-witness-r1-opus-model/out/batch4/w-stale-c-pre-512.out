@@ -1,0 +1,2 @@
+E7RESULT name=witness_stale_foreign_piece placement=SectorPiece order=BeforeFirstRoot pbs=512 checks_fsid=true chosen_without_stale=Some((1, 4)) chosen_with_stale=Some((1, 4))
+E7RESULT name=done emitted=2

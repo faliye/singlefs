@@ -1,0 +1,6 @@
+be9a68f52eee60d64bc3010a79c94e2438d58a44926989aa87fa771aa2382d8d  .claude/kb/checks-owed.md
+0dc0a154db8674eebb886d273f84355e07951649282bb2ff57169943f87d58c6  .claude/kb/decisions/03-空间分配.md
+90febd3498681804108f52a2d3e249588c6312ac069210eeaf257f180837ddf5  .claude/kb/decisions/08-核心索引结构.md
+10a8ce0e1c432c4647f4104f67ecdaa13b4882dc8023154afc188cbce745e988  .claude/kb/decisions/16-发布语义.md
+eaaad654edf4f2dfd655cd6c7f11af5e0cc187f3196c64f548df27f1535e333c  .claude/kb/decisions/28-挂载期承诺量.md
+0383ed577424db71958d94949f670115e8bf5fc6865de6be952e144b481e276e  research/prompts/c355-c363-r3-main-verification.md

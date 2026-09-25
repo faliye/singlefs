@@ -27,6 +27,14 @@ E7RESULT name=section_seven_two_arithmetic item="系统配置整槽校验和偏�
 E7RESULT name=section_seven_two_arithmetic item="实例表行宽 1+4+8+8+1+66" verdict=pass computed=88 registered=88
 E7RESULT name=section_seven_two_arithmetic item="实例表一片行数 370-1" verdict=pass computed=369 registered=369
 E7RESULT name=section_seven_two_arithmetic item="今天那一臂系统配置那一类写字节 4096*2*1" verdict=pass computed=8192 registered=8192
+E7RESULT name=section_seven_two_arithmetic item="候选2表形态 1+16*N_w(N_w=4)" verdict=pass computed=65 registered=65
+E7RESULT name=section_seven_two_arithmetic item="候选2表形态 1+12*N_w(N_w=4)" verdict=pass computed=49 registered=49
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2单条16 512-481-16" verdict=pass computed=15 registered=15
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2单条12 512-481-12" verdict=pass computed=19 registered=19
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2表形态65 512-481-65" verdict=pass computed=-34 registered=-34
+E7RESULT name=section_seven_two_arithmetic item="甲/丙同放候选2表形态49 512-481-49" verdict=pass computed=-18 registered=-18
+E7RESULT name=section_seven_two_arithmetic item="乙/丁同放候选2表形态65 512-489-65" verdict=pass computed=-42 registered=-42
+E7RESULT name=section_seven_two_arithmetic item="乙/丁同放候选2表形态49 512-489-49" verdict=pass computed=-26 registered=-26
 E7RESULT name=root_ring_slot_total slots_per_region=4 verdict=pass computed=12 registered=12
 E7RESULT name=phi_three_fault_set_count slots_per_region=4 root_slots_with_a_root=12 verdict=pass computed=79 registered=79
 E7RESULT name=root_ring_slot_total slots_per_region=8 verdict=pass computed=24 registered=24
@@ -43,11 +51,11 @@ E7RESULT name=section_seven_one_anchor item="D23 已定项 14：N_switch=3" verd
 E7RESULT name=section_seven_one_anchor item="C334 判别力自证：3/3/各1" verdict=deferred checked_in_this_segment=false deferred_to=第五段_前置未满足
 E7RESULT name=section_seven_three_row item="PC2/PC1-a/PC1-b/Q1-3" verdict=deferred checked_in_this_segment=false deferred_to=第三_第四段
 E7RESULT name=s5_independent_decode_cross_check verdict=pass readable_root_count=6 readable_roots={(0, 0), (1, 1), (1, 2), (1, 3), (1, 4), (1, 5)}
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=0 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=10 subsets_tried=128 rootback_probe_failures=16 overwrite_failures=36
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=1 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=13 subsets_tried=512 rootback_probe_failures=40 overwrite_failures=72
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=2 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=16 subsets_tried=2048 rootback_probe_failures=88 overwrite_failures=144
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=3 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=19 subsets_tried=8192 rootback_probe_failures=184 overwrite_failures=288
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=4 overwrites_after_the_rootback_probe=1 k_min=capped subsets_tried=20000 rootback_probe_failures=29 overwrite_failures=153
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=5 overwrites_after_the_rootback_probe=1 k_min=capped subsets_tried=20000 rootback_probe_failures=1 overwrite_failures=6
-E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=6 overwrites_after_the_rootback_probe=1 k_min=capped subsets_tried=20000 rootback_probe_failures=0 overwrite_failures=0
-E7RESULT name=done emitted=53
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=0 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=10 full_space_subset_count=128 subsets_tried=128 rootback_probe_failures=16 overwrite_failures=36
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=1 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=13 full_space_subset_count=512 subsets_tried=512 rootback_probe_failures=40 overwrite_failures=72
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=2 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=16 full_space_subset_count=2048 subsets_tried=2048 rootback_probe_failures=88 overwrite_failures=144
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=3 overwrites_after_the_rootback_probe=1 k_min=none_found_within_full_evidence_space maximum_weight_available=19 full_space_subset_count=8192 subsets_tried=8192 rootback_probe_failures=184 overwrite_failures=288
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=4 overwrites_after_the_rootback_probe=1 k_min=12 hit_count_at_that_weight=1 first_hit_combination=["root(region=0,slot=2)", "root(region=1,slot=1)", "root(region=1,slot=2)", "root(region=2,slot=1)", "record(instance=1,counter=4)", "record(instance=1,counter=5)", "record(instance=1,counter=6)", "record(instance=1,counter=7)"] subsets_tried=22558 full_space_subset_count=32768 rootback_probe_failures=29 overwrite_failures=153
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=5 overwrites_after_the_rootback_probe=1 k_min=not_found_up_to_weight_ceiling highest_weight_examined=12 maximum_weight_available=25 full_space_subset_count=131072 subsets_tried=65536 rootback_probe_failures=9 overwrite_failures=120
+E7RESULT name=q2_1_minimum_weight geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) overwrites_before_the_rootback_probe=6 overwrites_after_the_rootback_probe=1 k_min=12 hit_count_at_that_weight=1 first_hit_combination=["root(region=0,slot=2)", "root(region=0,slot=3)", "root(region=1,slot=2)", "root(region=2,slot=2)", "record(instance=1,counter=6)", "record(instance=1,counter=7)", "record(instance=1,counter=8)", "record(instance=1,counter=9)"] subsets_tried=173716 full_space_subset_count=524288 rootback_probe_failures=10 overwrite_failures=57
+E7RESULT name=done emitted=61

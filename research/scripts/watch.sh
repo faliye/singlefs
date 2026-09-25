@@ -7,7 +7,7 @@
 #   bash research/scripts/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；
 #                                                                        找得到当前会话（CLAUDE_CODE_SESSION_ID）就同时查交回之后后台还在跑
 #   bash research/scripts/watch.sh --report                              当前会话的全部子 agent 现在是什么样，报一次就退
-#   bash research/scripts/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警写 --ack 进程:<pid>）
+#   bash research/scripts/watch.sh … --ack <agent 号>:<告警名>            看过、判定只是慢的那一条告警，这一次看门狗里不再为它叫醒（可给多次；进程告警——含「重型测试没带前缀」——写 --ack 进程:<pid>）
 #   bash research/scripts/watch.sh --dry-run …                           只打印要跑的命令，不跑
 #   bash research/scripts/watch.sh --selftest
 set -uo pipefail
@@ -21,7 +21,7 @@ die() { echo "  ✗ $1" >&2; echo "     → 怎么办：$2" >&2; exit 2; }
 
 # 配置转成选项；不认识的 key、不是整数的值都拒绝，免得一个拼错的 key 被安静地丢掉
 config_options() {
-  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes "
+  local line key value known=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens process-report-minutes process-stale-minutes process-max-minutes not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes process-rss-gibibytes "
   [[ -f "$conf" ]] || return 0
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
@@ -49,10 +49,10 @@ selftest() {
   local scratch fail=0 out checked=0
   scratch="$(mktemp -d)"
   # ① 配置里的 key 原样转成选项、agent 号逗号与空格都认
-  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\n' > "$scratch/ok.conf"
+  printf 'tool-minutes = 12\n# 注释\n\nmax-minutes=30\nleftover-background-grace-minutes=3\nprocess-rss-gibibytes=6\n' > "$scratch/ok.conf"
   out="$(WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run a0000000000000001,a0000000000000002 a0000000000000003 2>&1)"
   [[ "$out" == *"--agents a0000000000000001,a0000000000000002,a0000000000000003"* && "$out" == *"--tool-minutes 12"* && "$out" == *"--max-minutes 30"* \
-     && "$out" == *"--leftover-background-grace-minutes 3"* ]] \
+     && "$out" == *"--leftover-background-grace-minutes 3"* && "$out" == *"--process-rss-gibibytes 6"* ]] \
     || { echo "  ✗ 自检①：配置或 agent 号没转对：$out"; fail=1; }   # gate-lint:detail
   checked=$((checked + 1))
   # ② 拼错的 key 必须拒绝，不许安静丢掉
@@ -84,12 +84,17 @@ selftest() {
     echo "  ✗ 自检⑥：形态不对的 --ack 没被拒绝"; fail=1   # gate-lint:detail
   fi
   checked=$((checked + 1))
+  # ⑦ 旧的调用写法照旧：看门狗新加的两类告警（重型测试没带前缀、书记员攒下的没跟上检出）的 --ack 原样转过去，agent 号照旧跟在后面
+  out="$(WATCH_CONF="$scratch/ok.conf" bash "$0" --dry-run --ack 进程:4242 --ack a0000000000000001:书记员攒下的没跟上检出 a0000000000000001 2>&1)"
+  [[ "$out" == *"--agents a0000000000000001 "* && "$out" == *"--ack 进程:4242 --ack a0000000000000001:书记员攒下的没跟上检出"* ]] \
+    || { echo "  ✗ 自检⑦：重型测试告警（--ack 进程:<pid>）或书记员汇总告警（--ack <agent 号>:书记员攒下的没跟上检出）的确认没原样转过去：$out"; fail=1; }   # gate-lint:detail
+  checked=$((checked + 1))
   rm -rf "${scratch:?}"
   if ((fail)); then
     echo "  → 怎么办：按上面那一条改 research/scripts/watch.sh 里对应的那段"
     exit 1
   fi
-  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝（判了 $checked 条）"
+  echo "  ✓ watch.sh 自检通过：配置转选项、拼错的 key 拒绝、不像 agent 号的参数拒绝、--processes 只盯进程（找得到当前会话就带上会话目录）、--ack 原样转过去且形态不对就拒绝、重型测试与书记员汇总两类告警的 --ack 照旧转过去（判了 $checked 条）"
   exit 0
 }
 

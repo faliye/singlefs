@@ -1,0 +1,14 @@
+eb9402857f4c959fa29fa11773f0353525ab4da590d0a0ffa68a170b0c13a8ac  .claude/kb/decisions/05-快照-空间记账机制.md
+10a8ce0e1c432c4647f4104f67ecdaa13b4882dc8023154afc188cbce745e988  .claude/kb/decisions/16-发布语义.md
+8796d66925e7debcad645b86af1d4974455e74df96c753a628ecf58251a1edcb  .claude/kb/decisions/18-块里携带什么信息.md
+c0902e6ebbca14123e1729fd50ed2f5f6b165b747a21d592afc3f8e04ed99740  .claude/kb/decisions/20-承重面单元的原子性与自包含.md
+da1c963e1469fcc5a877eb9b5d469fddee2b715611fc96d3550a2b974811e568  .claude/kb/decisions/22-单元原子性怎么合成.md
+7d522b5ff84415fd90abe4e379a5c2f56a3b581b6de5400b8e48db33d14b1f23  .claude/kb/decisions/23-journal的角色与格式.md
+62a9bb7ab3be39a50b63012fbc9251253fd8e04593552a381e5f7d230fd06c01  .claude/kb/checks-owed.md
+6ec0cb9aaf2c5ee6efdc934d5fdb9427e0446a9e3655e352dea8ca9d4494c9ea  .claude/kb/experiments/158-择根与修复四岔路.md
+522bdc25098733db1a0e15d05c9ccb56ec98e9d91d15558f5b5870239e6cf3c5  crates/singlefs-core/src/recovery.rs
+5fcd17138d418327fbbf85002228ae91fd506ebdb90437ba49fc0da9c4d70ad6  crates/singlefs-core/src/mount.rs
+757a3642d0a3ce032ef21cddf074eedda9e2bf129833fbfef17cb500240ecd3a  crates/singlefs-core/src/system_configuration.rs
+aae1f6f160ddc3e338d416c6ea5efb48dc27cf1a6fe962f4a814d1cadb9e92ab  crates/singlefs-core/src/transaction.rs
+0b2205da932df718bffbbc9c06bab44f18385de4ee5f4fa589680ab14be9c3d2  crates/singlefs-harness/src/bin/e158_root_choice_repair.rs
+2026-09-24T13:17:58Z

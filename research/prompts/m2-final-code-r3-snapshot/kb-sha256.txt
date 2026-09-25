@@ -1,0 +1,8 @@
+63c11a329b8876a5a9e62cfb6e6d1ef12481ce80d4da1a7351e28352bbe58cc0  .claude/kb/decisions/08-核心索引结构.md
+a88509f52805007dcbb0400291c05e480d7650f8681a9de8970c17997a5dc3a1  .claude/kb/decisions/18-块里携带什么信息.md
+19322b0302191500d364cf0a288fc32e7a5006de889a168db3a9317086d48bc4  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+e2e2a4086aa3e4e7a61d2645f0debf8c09c74551258c52e74fc545d024caab1b  .claude/kb/decisions/03-空间分配.md
+8c550b742b66425f2db1814569eda9ed5a964bd0c853b65535081ad96786cc5a  .claude/kb/decisions/28-挂载期承诺量.md
+717732dfc1313fc1d3c5e9b90d2af33daa997b6de25c4d27acdbf16c3c5fc374  .claude/kb/invariants.md
+1d87210feae5c45826b37426be9dcb3abb9e30cbe339c5a9d01dae2a2deb39f0  .claude/kb/checks-owed.md
+2126b3daf2cb9e83e070e93eaee4c7de68a28ec455af19ef60b3f3f9d259d85b  .claude/singlefs-ai-sop/rules/rules-discipline.md

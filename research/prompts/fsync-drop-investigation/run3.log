@@ -1,0 +1,1433 @@
+warning: field `0` is never read
+   --> crates/singlefs-harness/tests/fsync_drop_investigation.rs:827:13
+    |
+827 |     Refused(String),
+    |     ------- ^^^^^^
+    |     |
+    |     field in this variant
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+help: consider changing the field to be of unit type to suppress this warning while preserving the field numbering, or remove the field
+    |
+827 -     Refused(String),
+827 +     Refused(()),
+    |
+
+warning: `singlefs-harness` (test "fsync_drop_investigation") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/fsync_drop_investigation.rs (/tmp/claude-1000/fsync-drop/target/debug/deps/fsync_drop_investigation-762a46eaccb692c0)
+
+running 6 tests
+━━ 挂载格：只把盘 0 交给 mount_writable（盘 1 缺席）
+  可写挂载：Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" })
+test mount_writable_with_only_device_zero_is_refused ... ok
+━━ UnitWrite × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822181888、整池第 62 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 3)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 5
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ 挂载格：盘 1 换成一块空盘（全 0）
+  可写挂载：成功，实例 2，所选根 (1, 5)，现行 txg 7
+  挂载之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 3 实例 2 tail 7] [世代 2 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：1 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)；施加记录 0
+    这一版 (实例 2, txg 7)：13 个单元两盘都在 9，只在盘0 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50265", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50266", "InodeRoot@50268"]，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 19 盘1 19；记账 已分配字节 盘0 Some(1032192) 盘1 Some(1032192)
+    池级 checker 判红：["I-2.1", "I-4.8", "I-7.4"]
+  覆盖写：成功 txg 8
+  覆盖写：成功 txg 9
+  写完之后：
+    系统配置 盘0：[世代 12 实例 2 tail 9] [世代 11 实例 2 tail 8] 
+    系统配置 盘1：[世代 5 实例 2 tail 9] [世代 4 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：1 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 25 盘1 25；记账 已分配字节 盘0 Some(1523712) 盘1 Some(1523712)
+    池级 checker 判红：["I-2.1", "I-4.8", "I-7.4"]
+
+thread 'mount_writable_with_a_blank_device_one_refuses_or_keeps_two_copies' (1990491) panicked at crates/singlefs-harness/tests/fsync_drop_investigation.rs:943:13:
+盘 1 是空盘：可写挂载做成了，而这一版有单元只剩一份 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50265", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50266", "InodeRoot@50268"]，写两次之后池级 checker 判红 ["I-2.1", "I-4.8", "I-7.4"]——盘 1 被当成冗余的一半接着写，它缺的那几份没人补
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test mount_writable_with_a_blank_device_one_refuses_or_keeps_two_copies ... FAILED
+━━ 挂载格：盘 1 停在第一个文件（txg 3）之后，盘 0 到了 txg 5
+  可写挂载：成功，实例 2，所选根 (1, 5)，现行 txg 7
+  挂载之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 8 实例 2 tail 7] [世代 7 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)；施加记录 0
+    这一版 (实例 2, txg 7)：13 个单元两盘都在 9，只在盘0 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50265", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50266", "InodeRoot@50268"]，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 19 盘1 19；记账 已分配字节 盘0 Some(1032192) 盘1 Some(1032192)
+    池级 checker 判红：["I-2.1", "I-4.8", "I-7.4"]
+  覆盖写：成功 txg 8
+  覆盖写：成功 txg 9
+  写完之后：
+    系统配置 盘0：[世代 12 实例 2 tail 9] [世代 11 实例 2 tail 8] 
+    系统配置 盘1：[世代 10 实例 2 tail 9] [世代 9 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 25 盘1 25；记账 已分配字节 盘0 Some(1523712) 盘1 Some(1523712)
+    池级 checker 判红：["I-2.1", "I-4.8", "I-7.4"]
+
+thread 'mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies' (1990492) panicked at crates/singlefs-harness/tests/fsync_drop_investigation.rs:943:13:
+盘 1 停在旧状态：可写挂载做成了，而这一版有单元只剩一份 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50265", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50266", "InodeRoot@50268"]，写两次之后池级 checker 判红 ["I-2.1", "I-4.8", "I-7.4"]——盘 1 被当成冗余的一半接着写，它缺的那几份没人补
+test mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies ... FAILED
+━━ UnitWrite × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822181888、整池第 62 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的写错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 7 实例 1 tail 0] [世代 6 实例 2 tail 0] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (1, 3)，施加后根 (1, 3)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 5
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 12 实例 3 tail 7] [世代 11 实例 3 tail 6] 
+    系统配置 盘1：[世代 10 实例 3 tail 7] [世代 9 实例 3 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((3, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 7))；恢复：读回文件，根 (3, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ UnitWrite × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822181888、整池第 62 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 18 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 3)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 5
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 4 次，丢掉盘 1 的普通写 49 次，下标 {67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 133, 135, 137, 139, 141, 144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 166}）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 18 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 7 实例 1 tail 0] [世代 6 实例 2 tail 0] 
+    系统配置 盘1：[世代 7 实例 1 tail 0] [世代 6 实例 2 tail 0] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (1, 3)，施加后根 (1, 3)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 5
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 12 实例 3 tail 7] [世代 11 实例 3 tail 6] 
+    系统配置 盘1：[世代 12 实例 3 tail 7] [世代 11 实例 3 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((3, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 7))；恢复：读回文件，根 (3, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 5 次，丢掉盘 1 的普通写 50 次，下标 {67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 133, 135, 137, 139, 141, 144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 166, 169}）：
+    系统配置 盘0：[世代 12 实例 3 tail 7] [世代 11 实例 3 tail 6] 
+    系统配置 盘1：[世代 12 实例 3 tail 7] [世代 11 实例 3 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((3, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 7))；恢复：读回文件，根 (3, 7)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16789504、整池第 86 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 18 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 = 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 1 次，丢掉盘 1 的普通写 13 次，下标 {67, 69, 71, 73, 75, 77, 79, 81, 83, 85, 87, 89, 91}）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  7 判别力（反事实：重发不重写丢掉的那几处，再多拿掉 12 次写）：重发那一版（txg 4）盘 1 上缺的份，丢脏页档 []，反事实 ["Data(DataUnitIndexInFile(0))@50182", "ExtentRoot@50253", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50254", "InodeRoot@50256", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 61 })@50257", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 61 })@50258", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(0), index_in_device: 0 })@50259", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(1), index_in_device: 0 })@50260", "AllocationTree@50261", "AccountingTree@50262", "MappingTree@50263", "TreeTable@50264"]；反事实下最后一版的问题 ["反事实：池级 checker 判 I-2.1 红", "反事实：池级 checker 判 I-4.8 红", "反事实：池级 checker 判 I-7.4 红"]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16789504、整池第 86 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16789504、整池第 86 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterRecords × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 20 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 4 次，丢掉盘 1 的普通写 37 次，下标 {94, 97, 99, 101, 103, 105, 107, 109, 111, 113, 115, 117, 119, 122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 147, 149, 151, 153, 155, 157, 159, 161, 163, 165, 167, 169}）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterRecords × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 20 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 7 实例 1 tail 0] [世代 6 实例 2 tail 0] 
+    系统配置 盘1：[世代 7 实例 1 tail 0] [世代 6 实例 2 tail 0] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 最后确认的一版；施加记录 1
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }, InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 3 tail 9] [世代 12 实例 3 tail 8] 
+    系统配置 盘1：[世代 13 实例 3 tail 9] [世代 12 实例 3 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 9))；恢复：读回文件，根 (3, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 5 次，丢掉盘 1 的普通写 38 次，下标 {94, 97, 99, 101, 103, 105, 107, 109, 111, 113, 115, 117, 119, 122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142, 144, 147, 149, 151, 153, 155, 157, 159, 161, 163, 165, 167, 169, 172}）：
+    系统配置 盘0：[世代 13 实例 3 tail 9] [世代 12 实例 3 tail 8] 
+    系统配置 盘1：[世代 13 实例 3 tail 9] [世代 12 实例 3 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 9))；恢复：读回文件，根 (3, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4198400、整池第 87 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4198400、整池第 87 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：成功，实例 2，所选根 (1, 3)，施加后根 (1, 4)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterRecords × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 20 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 1 次，丢掉盘 1 的普通写 1 次，下标 {94}）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  7 判别力（反事实：重发不重写丢掉的那几处，再多拿掉 1 次写）：重发那一版（txg 4）盘 1 上缺的份，丢脏页档 []，反事实 ["记录 jsn 4"]；反事实下最后一版的问题 []
+  ⇒ 这一格：没有掉盘
+━━ SystemConfigurationRotation × PersistsUntilReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 89 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 1 tail 4] [世代 8 实例 1 tail 4] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 ≠ 最后确认的一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 4)，施加后根 (1, 4)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 2 tail 9] [世代 14 实例 2 tail 8] 
+    系统配置 盘1：[世代 11 实例 2 tail 9] [世代 10 实例 2 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 9))；恢复：读回文件，根 (2, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ SystemConfigurationRotation × PersistsAcrossReopen（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 89 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的写错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 11 实例 1 tail 0] [世代 10 实例 2 tail 0] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 ≠ 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (1, 4)，施加后根 (1, 4)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(4), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 7
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 9] [世代 16 实例 3 tail 8] 
+    系统配置 盘1：[世代 11 实例 3 tail 9] [世代 10 实例 3 tail 8] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 7))
+    择根 (实例, txg) = Some((3, 9))；恢复：读回文件，根 (3, 9)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 9)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 9 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1425408) 盘1 Some(1425408)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4198400、整池第 87 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：1 条，最新 (实例, txg) = Some((1, 1))
+    择根 (实例, txg) = Some((1, 3))；恢复：读回文件，根 (1, 3)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ UnitWrite × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822214656、整池第 137 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    系统配置 盘1：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 10))；恢复：读回文件，根 (3, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ SystemConfigurationRotation × OneShot（故障前没重开；注入在实例 1 的 txg 4 那次发布，根槽在盘 1）
+  1 发布 txg 4 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 89 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    系统配置 盘1：[世代 5 实例 1 tail 3] [世代 4 实例 1 tail 2] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 1, txg 3)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 3 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(278528) 盘1 Some(278528)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(4), instance: InstanceGeneration(1) }
+  3.1 原样重发：成功，txg 4
+  重发之后：
+    系统配置 盘0：[世代 7 实例 1 tail 4] [世代 6 实例 1 tail 4] 
+    系统配置 盘1：[世代 6 实例 1 tail 4] [世代 5 实例 1 tail 3] 
+    根环 盘0：3 条，最新 (实例, txg) = Some((1, 3))
+    根环 盘1：2 条，最新 (实例, txg) = Some((1, 4))
+    择根 (实例, txg) = Some((1, 4))；恢复：读回文件，根 (1, 4)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 1, txg 4)：12 个单元两盘都在 12，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 4 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(507904) 盘1 Some(507904)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 2，所选根 (1, 6)，施加后根 (1, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 14 实例 2 tail 10] [世代 13 实例 2 tail 9] 
+    系统配置 盘1：[世代 13 实例 2 tail 10] [世代 12 实例 2 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((2, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((2, 10))
+    择根 (实例, txg) = Some((2, 10))；恢复：读回文件，根 (2, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1753088) 盘1 Some(1753088)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ UnitWrite × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822214656、整池第 137 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的写错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 11 实例 2 tail 0] [世代 10 实例 3 tail 0] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 4，所选根 (2, 6)，施加后根 (2, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(3), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 16 实例 4 tail 10] [世代 15 实例 4 tail 9] 
+    系统配置 盘1：[世代 14 实例 4 tail 10] [世代 13 实例 4 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((4, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 10))；恢复：读回文件，根 (4, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 32 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    系统配置 盘1：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 10))；恢复：读回文件，根 (3, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 4 次，丢掉盘 1 的普通写 57 次，下标 {149, 151, 153, 155, 157, 159, 161, 163, 165, 167, 169, 171, 173, 175, 177, 180, 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 204, 206, 209, 211, 213, 215, 217, 219, 221, 223, 225, 227, 229, 231, 233, 235, 238, 240, 242, 244, 246, 248, 250, 252, 254, 256, 258, 260, 262, 264}）：
+    系统配置 盘0：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    系统配置 盘1：[世代 14 实例 3 tail 10] [世代 13 实例 3 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((3, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 10))；恢复：读回文件，根 (3, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ UnitWrite × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@unit_write（盘 1、偏移 822214656、整池第 137 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 32 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 11 实例 2 tail 0] [世代 10 实例 3 tail 0] 
+    系统配置 盘1：[世代 11 实例 2 tail 0] [世代 10 实例 3 tail 0] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 4，所选根 (2, 6)，施加后根 (2, 6)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(6), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(3), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 8
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 16 实例 4 tail 10] [世代 15 实例 4 tail 9] 
+    系统配置 盘1：[世代 16 实例 4 tail 10] [世代 15 实例 4 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((4, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 10))；恢复：读回文件，根 (4, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 5 次，丢掉盘 1 的普通写 58 次，下标 {149, 151, 153, 155, 157, 159, 161, 163, 165, 167, 169, 171, 173, 175, 177, 180, 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 204, 206, 209, 211, 213, 215, 217, 219, 221, 223, 225, 227, 229, 231, 233, 235, 238, 240, 242, 244, 246, 248, 250, 252, 254, 256, 258, 260, 262, 264, 267}）：
+    系统配置 盘0：[世代 16 实例 4 tail 10] [世代 15 实例 4 tail 9] 
+    系统配置 盘1：[世代 16 实例 4 tail 10] [世代 15 实例 4 tail 9] 
+    根环 盘0：7 条，最新 (实例, txg) = Some((4, 9))
+    根环 盘1：4 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 10))；恢复：读回文件，根 (4, 10)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 10)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 10 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1654784) 盘1 Some(1654784)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16801792、整池第 165 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16801792、整池第 165 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterUnits × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 32 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 = 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 1 次，丢掉盘 1 的普通写 15 次，下标 {149, 151, 153, 155, 157, 159, 161, 163, 165, 167, 169, 171, 173, 175, 177}）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  7 判别力（反事实：重发不重写丢掉的那几处，再多拿掉 14 次写）：重发那一版（txg 7）盘 1 上缺的份，丢脏页档 []，反事实 ["Data(DataUnitIndexInFile(0))@50184", "ExtentRoot@50335", "InodeLeafContainer(InodeLeafContainerIndexInTree(0))@50336", "InodeRoot@50338", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 61 })@50339", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(0), index_in_device: 62 })@50340", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 61 })@50341", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 62 })@50342", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(0), index_in_device: 0 })@50343", "AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 1, device: DeviceIdentity(1), index_in_device: 0 })@50344", "AllocationTree@50345", "AccountingTree@50346", "MappingTree@50347", "TreeTable@50348"]；反事实下最后一版的问题 ["反事实：池级 checker 判 I-2.1 红", "反事实：池级 checker 判 I-4.8 红", "反事实：池级 checker 判 I-7.4 红"]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterRecords × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 34 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 4 次，丢掉盘 1 的普通写 43 次，下标 {180, 183, 185, 187, 189, 191, 193, 195, 197, 199, 201, 203, 205, 207, 209, 212, 214, 216, 218, 220, 222, 224, 226, 228, 230, 232, 234, 236, 238, 241, 243, 245, 247, 249, 251, 253, 255, 257, 259, 261, 263, 265, 267}）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ BarrierAfterRecords × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 34 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的屏障错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 11 实例 2 tail 0] [世代 10 实例 3 tail 0] 
+    系统配置 盘1：[世代 11 实例 2 tail 0] [世代 10 实例 3 tail 0] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 最后确认的一版；施加记录 1
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 4，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }, InstanceRow { instance: InstanceGeneration(3), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 4 tail 12] [世代 16 实例 4 tail 11] 
+    系统配置 盘1：[世代 17 实例 4 tail 12] [世代 16 实例 4 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((4, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 12))；恢复：读回文件，根 (4, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 5 次，丢掉盘 1 的普通写 44 次，下标 {180, 183, 185, 187, 189, 191, 193, 195, 197, 199, 201, 203, 205, 207, 209, 212, 214, 216, 218, 220, 222, 224, 226, 228, 230, 232, 234, 236, 238, 241, 243, 245, 247, 249, 251, 253, 255, 257, 259, 261, 263, 265, 267, 270}）：
+    系统配置 盘0：[世代 17 实例 4 tail 12] [世代 16 实例 4 tail 11] 
+    系统配置 盘1：[世代 17 实例 4 tail 12] [世代 16 实例 4 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((4, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 12))；恢复：读回文件，根 (4, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ JournalRecordWrite × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@journal_record（盘 1、偏移 16801792、整池第 165 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4202496、整池第 166 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 最后确认的一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4202496、整池第 166 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：成功，实例 3，所选根 (2, 6)，施加后根 (2, 7)，施加记录 1，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 2, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：3 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ SystemConfigurationRotation × PersistsUntilReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 168 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  卡住（进程退出前，冻结的那一版随进程丢掉）：
+    系统配置 盘0：[世代 13 实例 2 tail 7] [世代 12 实例 2 tail 7] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 ≠ 最后确认的一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 7)，施加后根 (2, 7)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 19 实例 3 tail 12] [世代 18 实例 3 tail 11] 
+    系统配置 盘1：[世代 15 实例 3 tail 12] [世代 14 实例 3 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：4 条，最新 (实例, txg) = Some((3, 10))
+    择根 (实例, txg) = Some((3, 12))；恢复：读回文件，根 (3, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+== PersistsUntilReopen：跑了 12 格，问题 0 条
+test fsync_drop_persists_until_reopen ... ok
+━━ SystemConfigurationRotation × PersistsAcrossReopen（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 168 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.2 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  3.3 原样重发：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))
+  4 重开可写挂载（故障还在）：Acquisition(AcquisitionFailed { cause: InputOutput(Custom { kind: Other, error: "注入的写错" }), rollback: RolledBack })
+  挂载失败之后：
+    系统配置 盘0：[世代 15 实例 2 tail 0] [世代 14 实例 3 tail 0] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 ≠ 最后确认的一版；施加记录 0
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 4，所选根 (2, 7)，施加后根 (2, 7)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(7), applied_transaction_high_water: 0, is_rollback: false }, InstanceRow { instance: InstanceGeneration(3), selected_root_txg: CheckpointTxg(0), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 10
+  重开之后现行的是：失败那一版（C381 那一格）
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 21 实例 4 tail 12] [世代 20 实例 4 tail 11] 
+    系统配置 盘1：[世代 15 实例 4 tail 12] [世代 14 实例 4 tail 11] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((4, 12))
+    根环 盘1：4 条，最新 (实例, txg) = Some((4, 10))
+    择根 (实例, txg) = Some((4, 12))；恢复：读回文件，根 (4, 12)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 4, txg 12)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 12 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2048000) 盘1 Some(2048000)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+== PersistsAcrossReopen：跑了 12 格，问题 0 条
+test fsync_drop_persists_across_reopen ... ok
+━━ BarrierAfterRecords × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))；打中 ["barrier_fails@-（盘 1、偏移 0、整池第 34 次barrier）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  6 同一段历史按「屏障报错丢脏页」建镜像（盘 1 屏障报错 1 次，丢掉盘 1 的普通写 1 次，下标 {180}）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  7 判别力（反事实：重发不重写丢掉的那几处，再多拿掉 1 次写）：重发那一版（txg 7）盘 1 上缺的份，丢脏页档 []，反事实 ["记录 jsn 7"]；反事实下最后一版的问题 []
+  ⇒ 这一格：没有掉盘
+━━ RootForceUnitAccess × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@root_record_fua（盘 1、偏移 4202496、整池第 166 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：2 条，最新 (实例, txg) = Some((2, 4))
+    择根 (实例, txg) = Some((2, 6))；恢复：读回文件，根 (2, 6)，读回 ≠ 上一版；施加记录 1
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+━━ SystemConfigurationRotation × OneShot（故障前重开；注入在实例 2 的 txg 7 那次发布，根槽在盘 1）
+  1 发布 txg 7 失败：BlockDevice(InputOutput(Custom { kind: Other, error: "注入的写错" }))；打中 ["write_fails@system_configuration_slot（盘 1、偏移 0、整池第 168 次write）"]
+  失败之后（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    系统配置 盘1：[世代 9 实例 2 tail 6] [世代 8 实例 2 tail 5] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 ≠ 上一版；施加记录 0
+    这一版 (实例 2, txg 6)：13 个单元两盘都在 13，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 6 盘0 true 盘1 true；根在盘0 读得出且相同 true
+    分配记录（已分配条数）盘0 13 盘1 13；记账 已分配字节 盘0 Some(802816) 盘1 Some(802816)
+    池级 checker 判红：[]
+  2 另发一次：PublishFrozenAfterAWriteFailureIsNotResentYet { checkpoint_txg: CheckpointTxg(7), instance: InstanceGeneration(2) }
+  3.1 原样重发：成功，txg 7
+  重发之后：
+    系统配置 盘0：[世代 11 实例 2 tail 7] [世代 10 实例 2 tail 7] 
+    系统配置 盘1：[世代 10 实例 2 tail 7] [世代 9 实例 2 tail 6] 
+    根环 盘0：5 条，最新 (实例, txg) = Some((2, 6))
+    根环 盘1：3 条，最新 (实例, txg) = Some((2, 7))
+    择根 (实例, txg) = Some((2, 7))；恢复：读回文件，根 (2, 7)，读回 = 重发那一版；施加记录 0
+    这一版 (实例 2, txg 7)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 7 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(1064960) 盘1 Some(1064960)
+    池级 checker 判红：[]
+  4 重开可写挂载（故障已消失）：成功，实例 3，所选根 (2, 9)，施加后根 (2, 9)，施加记录 0，写行 [InstanceRow { instance: InstanceGeneration(2), selected_root_txg: CheckpointTxg(9), applied_transaction_high_water: 0, is_rollback: false }]，现行 txg 11
+  重开之后现行的是：失败之前的那一版
+  5 重开之后再写两次、冷重开（镜像 = 已落下的全部写）：
+    系统配置 盘0：[世代 18 实例 3 tail 13] [世代 17 实例 3 tail 12] 
+    系统配置 盘1：[世代 17 实例 3 tail 13] [世代 16 实例 3 tail 12] 
+    根环 盘0：9 条，最新 (实例, txg) = Some((3, 12))
+    根环 盘1：5 条，最新 (实例, txg) = Some((3, 13))
+    择根 (实例, txg) = Some((3, 13))；恢复：读回文件，根 (3, 13)，读回 = 最后确认的一版；施加记录 0
+    这一版 (实例 3, txg 13)：15 个单元两盘都在 15，只在盘0 []，只在盘1 []，两盘都不在 []；末条记录 jsn 13 盘0 true 盘1 true；根在盘1 读得出且相同 true
+    分配记录（已分配条数）盘0 15 盘1 15；记账 已分配字节 盘0 Some(2441216) 盘1 Some(2441216)
+    池级 checker 判红：[]
+  ⇒ 这一格：没有掉盘
+== OneShot：跑了 12 格，问题 0 条
+test fsync_drop_one_shot ... ok
+
+failures:
+
+failures:
+    mount_writable_with_a_blank_device_one_refuses_or_keeps_two_copies
+    mount_writable_with_a_stale_device_one_refuses_or_keeps_two_copies
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.32s
+
+error: test failed, to rerun pass `-p singlefs-harness --test fsync_drop_investigation`
+exit=101

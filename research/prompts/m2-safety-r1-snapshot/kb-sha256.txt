@@ -1,0 +1,5 @@
+35b9e4c4ee2709fb99e6ab4f6cd2428ad5962e8f9981611aa68e6d2d483637cd  ./.claude/kb/checks-owed.md
+10a8ce0e1c432c4647f4104f67ecdaa13b4882dc8023154afc188cbce745e988  ./.claude/kb/decisions/16-发布语义.md
+a88509f52805007dcbb0400291c05e480d7650f8681a9de8970c17997a5dc3a1  ./.claude/kb/decisions/18-块里携带什么信息.md
+548da6bece362cc8abbe7993bc2aca952cf9d64b14f357bb45697c3c18c67ad2  ./.claude/kb/decisions/23-journal的角色与格式.md
+622afb7dbe39a87b4ff65560fc2db8c6d2d982075e2251807db912a177d2f30d  ./.claude/kb/decisions/28-挂载期承诺量.md

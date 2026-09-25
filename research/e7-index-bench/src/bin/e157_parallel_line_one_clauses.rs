@@ -39,7 +39,7 @@
 //!   extent 叶记录 112 = key 24 + 指针 88（D19 已定项 7/8）。
 //! - extent 树内部节点条目宽在 `crates/` 里零命中（`grep -rn 'EXTENT_INTERNAL\|extent_internal' crates/`
 //!   退出码 1）⇒ 当旋钮，110 与 136 两个取样点各报一次（登记第三节、第八·二节）。
-//! - journal 记录 4096、记录头 307、点名项 56 ⇒ 67 项/条（D23 已定项 12/17）——这两个量本段不判定，
+//! - journal 记录 4096、记录头 311、点名项 56 ⇒ 67 项/条（D23 已定项 12/17）——这两个量本段不判定，
 //!   只在 A1/B2 锚点里出现，供第二段复用。
 //!
 //! ## 它不答什么
@@ -67,7 +67,7 @@ const fn extent_node_header_bytes(key_bytes: u64) -> u64 {
 /// 上面那条公式在 `key_bytes = 24`（extent 叶 key 宽）下的值，与 B1/B5/A3 对拍：163。
 const EXTENT_NODE_HEADER_BYTES: u64 = extent_node_header_bytes(EXTENT_LEAF_KEY_BYTES);
 
-const JOURNAL_HEADER_BYTES: u64 = 307;
+const JOURNAL_HEADER_BYTES: u64 = 311;
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 const JOURNAL_RECORD_BYTES: u64 = 4096;
 /// 一条记录装多少点名项：与 A1/B2 对拍，67。本段不消费它，留给第二段。
@@ -505,6 +505,14 @@ mod tests {
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67);
         assert!(67 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES);
         assert!(JOURNAL_RECORD_BYTES < 68 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES);
+    }
+
+    /// B7：头 311 时的余数（33，D23 已定项 4「4096 上余 3785」）——全部单测里唯一分得开 307 与
+    /// 311 的一条。写成加法，不写减法：减法在变异把常量改大时会编译期溢出
+    /// （`.claude/singlefs-ai-sop/rules/test-discipline.md`「常量断言写加法，别写减法」）。
+    #[test]
+    fn named_entries_per_record_remainder_matches_head_311() {
+        assert_eq!(JOURNAL_HEADER_BYTES + JOURNAL_NAMED_ENTRIES_PER_RECORD * JOURNAL_NAMED_ENTRY_BYTES + 33, JOURNAL_RECORD_BYTES);
     }
 
     #[test]

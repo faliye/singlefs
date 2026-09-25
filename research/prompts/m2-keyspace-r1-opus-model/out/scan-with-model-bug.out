@@ -1,0 +1,16 @@
+2026-09-24T09:26:11Z
+SCAN S1-Absent-LookBack-even histories=1148 publishes=2178 refused=51 too_big=852 states=3941811669 closed_form=33415528914829953 classes=106442677 recover_fail=0 check_red=8 content_mismatch=0 root_lost=0 applied_by_record=3333 crossing_states=0 double_alloc=0 release_missing=0 fallback=16422 grew=503 shrank=489 top_split=0 units=34761 max_units=25 alloc_nodes=27786 ext_nodes=3444 leaves_by_alloc_chain=9552 max_segment_writes=50 red_reasons={"I-": 8} secs=69
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=9
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=37
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=4
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=14
+  example: CHECK_RED I-3.1：未释放的记录（盘 0 槽 22）没有单元引用; recovered txg 3; suffix=[Write(1, 4), Trunc(1, 1)]
+  example: CHECK_RED I-3.1：未释放的记录（盘 0 槽 22）没有单元引用; recovered txg 3; suffix=[Write(1, 4), Trunc(1, 1)]
+  example: CHECK_RED I-3.1：未释放的记录（盘 0 槽 64）没有单元引用; recovered txg 11; suffix=[Write(4, 4), Trunc(4, 1)]
+  example: CHECK_RED I-3.1：未释放的记录（盘 0 槽 64）没有单元引用; recovered txg 11; suffix=[Write(4, 4), Trunc(4, 1)]

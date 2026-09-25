@@ -1,0 +1,23 @@
+2026-09-24T09:29:21Z
+SCAN S1-Absent-LookBack-even histories=1148 publishes=2229 refused=0 too_big=454 states=170508268726 closed_form=3226515581285104 classes=2570129200 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=32215 max_units=25 alloc_nodes=24951 ext_nodes=3633 leaves_by_alloc_chain=6382 max_segment_writes=50 red_reasons={} secs=2498
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=55
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=436
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=414
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=1588
+SCAN S1-Full-LookBack-even histories=1148 publishes=2229 refused=0 too_big=852 states=76773152068 closed_form=12444126620989084144 classes=1190881200 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=41009 max_units=31 alloc_nodes=33745 ext_nodes=3633 leaves_by_alloc_chain=15266 max_segment_writes=62 red_reasons={} secs=1630
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=79
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=152
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=533
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=255
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=609

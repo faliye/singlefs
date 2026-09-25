@@ -1,0 +1,337 @@
+--- a/crates/singlefs-core/src/admission.rs
++++ b/crates/singlefs-core/src/admission.rs
+@@ -380,6 +380,67 @@
+             })
+             .collect()
+     }
++
++    /// S4 二轮候选（`S4Candidate`，只供三方论证）的可用(d)：`Baseline` 与今天的 `available_on_each_device` 逐字同一个算法
++    /// （两者不共用一份代码，是本腿新增的第二份实现，用来在 `each_of_the_nine_terms_is_subtracted_once_on_every_device`
++    /// 这类既有断言上核对 `Baseline` 分支与今天的产品公式逐字节相同）。
++    /// `released_by_this_operation_on_each_device` 是这次操作（发布或挂载）自己这一步要放进 defer 队列、
++    /// 还没被分配器计进 `deferred` 的那部分字节——只有 `A1` / `A2` 用它，其余候选忽略这个参数（传空切片即可）。
++    #[must_use]
++    pub fn available_on_each_device_for_candidate(
++        &self,
++        candidate: S4Candidate,
++        released_by_this_operation_on_each_device: &[(DeviceIdentity, BytesOnOneDevice)],
++    ) -> Vec<(DeviceIdentity, AvailableBytesOnOneDevice)> {
++        let pool_wide_share_of_one_device: i128 = [
++            self.pool_wide.pending_delete,
++            self.pool_wide.committed_reservation,
++            self.pool_wide.checkpoint_reserve_pool,
++        ]
++        .map(|commitment| i128::from(commitment.share_of_one_device(self.replicas).0))
++        .iter()
++        .sum();
++        self.per_device
++            .iter()
++            .map(|terms| {
++                let released_here: i128 = released_by_this_operation_on_each_device
++                    .iter()
++                    .find(|(device, _)| *device == terms.device)
++                    .map_or(0, |(_, bytes)| i128::from(bytes.0));
++                let own_terms: Vec<i128> = match candidate {
++                    S4Candidate::Baseline | S4Candidate::A3 | S4Candidate::A4 => [
++                        terms.allocated,
++                        terms.unreclaimable,
++                        terms.deferred,
++                        terms.mount_time_commitment,
++                        terms.abandoned_root_exclusive,
++                    ]
++                    .map(|term| i128::from(term.0))
++                    .to_vec(),
++                    S4Candidate::A1 => vec![
++                        i128::from(terms.allocated.0) - released_here,
++                        i128::from(terms.unreclaimable.0),
++                        i128::from(terms.deferred.0),
++                        i128::from(terms.mount_time_commitment.0),
++                        i128::from(terms.abandoned_root_exclusive.0),
++                    ],
++                    S4Candidate::A2 => vec![
++                        // 「已分配」已经含 defer（`DeviceAdmissionTerms::allocated` 的文档注释）；A2 删掉重复扣的那一项，
++                        // 不再单独扣 `terms.deferred`。
++                        i128::from(terms.allocated.0) - released_here,
++                        i128::from(terms.unreclaimable.0),
++                        i128::from(terms.mount_time_commitment.0),
++                        i128::from(terms.abandoned_root_exclusive.0),
++                    ],
++                };
++                let deducted: i128 = own_terms.iter().sum::<i128>() + pool_wide_share_of_one_device;
++                (
++                    terms.device,
++                    AvailableBytesOnOneDevice(i128::from(terms.capacity.0) - deducted),
++                )
++            })
++            .collect()
++    }
+ }
+ 
+ /// 一块盘上这次操作要新占的物理字节（式子另一边的「需求」）。怎么摊到每块盘由调用方给（C370（需求、可用与 df 没有共同单位））。
+@@ -416,6 +477,26 @@
+     reading: &AdmissionReading,
+     demand_on_each_device: &[DemandOnDevice],
+ ) -> Result<(), AdmissionRefusedOnSomeDevices> {
++    admit_on_every_device_for_candidate(S4Candidate::Baseline, reading, demand_on_each_device, &[])
++}
++
++/// S4 二轮候选版（只供三方论证；产品路径只调 `admit_on_every_device`，恒 `Baseline` + 空 `released`）：
++/// `Baseline` 与 `admit_on_every_device` 逐字同一个判法。
++/// `released_by_this_operation_on_each_device` 同 `available_on_each_device_for_candidate` 的同名参数；
++/// `A3`：这次操作的需求非全零、且每一块盘上「这次自己的释放 ≥ 这次自己的需求」时，整个不判、直接放行
++/// （`.claude/rules/fs-design.md`「释放空间这个操作本身不需要申请空间」；挂载准入需求恒 0，不触发这一条）。
++///
++/// # Errors
++/// 同 `admit_on_every_device`。
++///
++/// # Panics
++/// 同 `admit_on_every_device`。
++pub fn admit_on_every_device_for_candidate(
++    candidate: S4Candidate,
++    reading: &AdmissionReading,
++    demand_on_each_device: &[DemandOnDevice],
++    released_by_this_operation_on_each_device: &[(DeviceIdentity, BytesOnOneDevice)],
++) -> Result<(), AdmissionRefusedOnSomeDevices> {
+     let reading_devices: BTreeSet<DeviceIdentity> = reading
+         .per_device
+         .iter()
+@@ -429,8 +510,25 @@
+         demand_devices.len() == demand_on_each_device.len() && demand_devices == reading_devices,
+         "需求要逐盘写全、每块盘一条，与读数里的盘是同一组：读数 {reading_devices:?}，需求 {demand_on_each_device:?}"
+     );
++    let has_any_demand = demand_on_each_device
++        .iter()
++        .any(|demand| demand.bytes.0 > 0);
++    if candidate == S4Candidate::A3 && has_any_demand {
++        let released_of = |device: DeviceIdentity| -> u64 {
++            released_by_this_operation_on_each_device
++                .iter()
++                .find(|(candidate_device, _)| *candidate_device == device)
++                .map_or(0, |(_, bytes)| bytes.0)
++        };
++        let every_device_is_a_net_release = demand_on_each_device
++            .iter()
++            .all(|demand| released_of(demand.device) >= demand.bytes.0);
++        if every_device_is_a_net_release {
++            return Ok(());
++        }
++    }
+     let short_devices: Vec<DeviceShortOfDemand> = reading
+-        .available_on_each_device()
++        .available_on_each_device_for_candidate(candidate, released_by_this_operation_on_each_device)
+         .into_iter()
+         .filter_map(|(device, available)| {
+             let demand = demand_on_each_device
+@@ -452,6 +550,37 @@
+     }
+ }
+ 
++/// S4 二轮候选 A4（只供三方论证）：挂载准入需求恒 0，只判「挂载期承诺量本身放不放得下」——
++/// 不理会已分配、不可回收、defer 待释放、被抛弃根独占量与三项全池承诺量（`S4Candidate` 的文档注释）。
++/// 不走 `admit_on_every_device_for_candidate`：这条读法只对「需求恒 0」的挂载安全，
++/// 若被同一个开关带进发布路径（需求非零）会放行几乎一切，所以单独成一个函数，调用方（`mount::establish_instance`）
++/// 只在候选是 `A4` 时才调它，且只在挂载入口调。
++///
++/// # Errors
++/// `AdmissionRefusedOnSomeDevices`：至少一块盘「容量 − 挂载期承诺量」为负，交回不够的每一块（`demand` 字段填 0，
++/// 因为这条候选不算需求）。
++pub fn mount_admission_a4_switch_reserve_only(
++    reading: &AdmissionReading,
++) -> Result<(), AdmissionRefusedOnSomeDevices> {
++    let short_devices: Vec<DeviceShortOfDemand> = reading
++        .per_device
++        .iter()
++        .filter_map(|terms| {
++            let available = i128::from(terms.capacity.0) - i128::from(terms.mount_time_commitment.0);
++            (available < 0).then_some(DeviceShortOfDemand {
++                device: terms.device,
++                available: AvailableBytesOnOneDevice(available),
++                demand: BytesOnOneDevice(0),
++            })
++        })
++        .collect();
++    if short_devices.is_empty() {
++        Ok(())
++    } else {
++        Err(AdmissionRefusedOnSomeDevices { short_devices })
++    }
++}
++
+ /// 只供测试的开关（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：发布与可写挂载判不判空间准入。产品路径恒 `JudgedByTheFormula`。
+ /// 准入接进来之后，「准入放行而落点仍取不到、在任何写之前拒绝」那一条（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））
+ /// 在健康的历史里走不到——小盘上式子先拒。关掉准入，那一条拒绝路径（取号之前的预演取不到落点、发布取不到落点、抬 F 的空发布取不到固定点）
+@@ -473,6 +602,47 @@
+     }
+ }
+ 
++/// S4 二轮（`research/prompts/m2-safety-r2-body.md` 第 37-42 行）候选，只供三方论证量数据用，
++/// **不是产品路径的开关**：产品路径恒 `Baseline`（`SpaceAdmission::JudgedByTheFormula` 今天走的就是它）。
++///
++/// 四个候选对应正文给的代号：
++/// - `A1`：准入读数额外把这次发布自己换下、要进 defer 队列的块算进可用——不用等下一次判才看得见
++///   （第一轮候选 B；接线在 `admit_on_every_device` 的 `released_by_this_operation` 参数）。
++/// - `A2`：`A1` 再加删掉「− defer 待释放」这一项的重复扣——`DeviceAdmissionTerms::allocated` 的文档注释
++///   已经写明「它含 defer，而式子另扣一次『defer 待释放』：按读法甲 defer 扣两次」，这是 alloc-basis 岔路 2
++///   （`research/prompts/alloc-basis-forks.md` 第 10 行）「甲-T1 下删掉这一项」的同一处；E156 已量过「无运行时代价」
++///   （附录 `.claude/kb/decisions/28-挂载期承诺量.md:14-62` 依据表）。
++/// - `A3`：净释放 ≥ 新分配的发布（这次的需求整批由这次自己的释放抵掉）整个不判准入，
++///   由 checkpoint 保留池兜底（`.claude/rules/fs-design.md`「释放空间这个操作本身不需要申请空间」）；
++///   只在需求非全零时才可能触发——挂载准入需求恒 0，不受这一条影响。
++/// - `A4`：挂载准入（需求恒 0）只判「挂载期承诺量本身放不放得下」，不理会已分配、不可回收、defer 待释放、
++///   被抛弃根独占量与三项全池承诺量；不经 `available_on_each_device_for_candidate`，走专用的
++///   `mount_admission_a4_switch_reserve_only`——避免这条读法被同一个全局开关带进发布路径（发布路径的需求
++///   非零时若同样丢掉「已分配」会放行几乎一切，不是 A4 要的那句「不因已分配多而拒」）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum S4Candidate {
++    /// 今天产品路径的读法：`admission_reading_before_a_publish` + `admit_on_every_device` 原样。
++    Baseline,
++    A1,
++    A2,
++    A3,
++    A4,
++}
++
++impl S4Candidate {
++    /// 运行时报得出走的是哪一条候选（同 `SpaceAdmission::branch_name` 那条硬要求）。
++    #[must_use]
++    pub const fn branch_name(self) -> &'static str {
++        match self {
++            S4Candidate::Baseline => "s4_candidate=baseline",
++            S4Candidate::A1 => "s4_candidate=a1",
++            S4Candidate::A2 => "s4_candidate=a2",
++            S4Candidate::A3 => "s4_candidate=a3",
++            S4Candidate::A4 => "s4_candidate=a4",
++        }
++    }
++}
++
+ /// checkpoint 保留池的 ckpt_cost（D28（挂载期承诺量） 已定项 4，Σ 名单照 `research/prompts/c363b-r1-main-verification.md` 第三节 V2-2）：
+ /// Σ（分配记录树与中央映射树当前的高）+ 记账树每发布的节点数 + 1（树表每次发布重写一个单元，D16（发布语义） 已定项 9）；
+ /// 实例表链不进（它的开销归已定项 3 的切换预留）。「当前」= 这次发布要接在后面的那一版：
+@@ -846,4 +1016,126 @@
+             "已分配含 defer 里的 2 槽（读法甲）；隔离只在盘 0 上"
+         );
+     }
++
++    /// S4 二轮候选自证（`research/prompts/m2-safety-r2-body.md` 第 37-42 行）：一块盘容量 20 槽，已分配 10 槽
++    /// （其中 4 槽这次发布要换下、进 defer），需求 4 槽（新分配）。`Baseline` 把已分配的 10 槽（含未来 defer 的 4 槽，
++    /// 但这一刻还没进 `deferred` 字段——发布路径读的是释放判定之前那一刻的计数，`terms.deferred` 传 0）全部扣掉，
++    /// 可用 = 20 − 10 = 10 ≥ 4，本该放行；这一格改用来测「A1 看得见这次自己的释放」：把同一批 10 槽已分配里
++    /// 挑 4 槽标成「这次发布自己要换下」，A1 应该把它们加回可用，Baseline 不加。
++    fn one_device_reading(capacity: u64, allocated: u64) -> AdmissionReading {
++        AdmissionReading::new(
++            vec![DeviceAdmissionTerms {
++                device: DeviceIdentity(0),
++                capacity: slots(capacity),
++                allocated: slots(allocated),
++                unreclaimable: BytesOnOneDevice::ZERO,
++                deferred: BytesOnOneDevice::ZERO,
++                mount_time_commitment: BytesOnOneDevice::ZERO,
++                abandoned_root_exclusive: BytesOnOneDevice::ZERO,
++            }],
++            PoolWideCommitments::of_the_first_version(BytesSummedOverAllReplicas::ZERO),
++            ReplicaCount::new(1).expect("1 份"),
++        )
++    }
++
++    #[test]
++    fn a1_adds_back_this_operations_own_release_that_baseline_cannot_see_yet() {
++        let reading = one_device_reading(20, 10);
++        let released = [(DeviceIdentity(0), slots(4))];
++        let baseline = reading.available_on_each_device_for_candidate(S4Candidate::Baseline, &released);
++        let a1 = reading.available_on_each_device_for_candidate(S4Candidate::A1, &released);
++        assert_eq!(baseline[0].1, available_slots(10), "Baseline 看不见这次自己的释放：20 − 10");
++        assert_eq!(a1[0].1, available_slots(14), "A1 把这次自己换下的 4 槽加回可用：20 − 10 + 4");
++    }
++
++    #[test]
++    fn a2_additionally_removes_the_duplicate_deferred_deduction() {
++        // 已分配 10 槽，其中 3 槽是上一次发布就已经在 defer 队列里的（`terms.deferred` = 3，且已经计入 `allocated`，
++        // 见 `DeviceAdmissionTerms::allocated` 的文档注释「它含 defer」）。Baseline 把 10 与 3 各扣一次（双扣 3 槽）；
++        // A2 只扣一次（不再单独扣 `deferred`）。
++        let reading = AdmissionReading::new(
++            vec![DeviceAdmissionTerms {
++                device: DeviceIdentity(0),
++                capacity: slots(20),
++                allocated: slots(10),
++                unreclaimable: BytesOnOneDevice::ZERO,
++                deferred: slots(3),
++                mount_time_commitment: BytesOnOneDevice::ZERO,
++                abandoned_root_exclusive: BytesOnOneDevice::ZERO,
++            }],
++            PoolWideCommitments::of_the_first_version(BytesSummedOverAllReplicas::ZERO),
++            ReplicaCount::new(1).expect("1 份"),
++        );
++        let baseline = reading.available_on_each_device_for_candidate(S4Candidate::Baseline, &[]);
++        let a2 = reading.available_on_each_device_for_candidate(S4Candidate::A2, &[]);
++        assert_eq!(baseline[0].1, available_slots(7), "Baseline：20 − 10 − 3（3 槽双扣）");
++        assert_eq!(a2[0].1, available_slots(10), "A2：20 − 10（不再单独扣 defer）");
++    }
++
++    #[test]
++    fn a3_bypasses_admission_when_every_device_is_a_net_release_but_not_when_demand_is_zero() {
++        // 一块盘容量 10、已分配 9（几乎写满），需求 4（新分配）——Baseline / A3 在「这次自己只释放 2 槽」时都该拒绝
++        // （2 < 4，A3 的净释放豁免不成立）；把这次自己的释放改成 5（≥ 需求 4）时 A3 直接放行、不看可用是不是够。
++        let reading = one_device_reading(10, 9);
++        let demand = [DemandOnDevice {
++            device: DeviceIdentity(0),
++            bytes: slots(4),
++        }];
++        let insufficient_release = [(DeviceIdentity(0), slots(2))];
++        let net_release = [(DeviceIdentity(0), slots(5))];
++        assert!(
++            admit_on_every_device_for_candidate(S4Candidate::A3, &reading, &demand, &insufficient_release)
++                .is_err(),
++            "释放 2 槽 < 需求 4 槽：A3 的净释放豁免不成立，照常判可用（20 太小，应拒）"
++        );
++        assert_eq!(
++            admit_on_every_device_for_candidate(S4Candidate::A3, &reading, &demand, &net_release),
++            Ok(()),
++            "释放 5 槽 ≥ 需求 4 槽：A3 整个不判可用，直接放行"
++        );
++        // 需求恒 0（挂载准入的形状）时 A3 不应该被「零释放 ≥ 零需求」误触发去豁免一个本该照常判的读数——
++        // 但 `admit_on_every_device_for_candidate` 本身在需求全零时也会放行（可用一定 ≥ 0 的需求），这里只确认
++        // 「需求非零、净释放不够」那一格照常判，把 A3 的豁免条件钉在「有需求」上。
++        let zero_demand = [DemandOnDevice {
++            device: DeviceIdentity(0),
++            bytes: BytesOnOneDevice::ZERO,
++        }];
++        assert_eq!(
++            admit_on_every_device_for_candidate(S4Candidate::A3, &reading, &zero_demand, &[]),
++            Ok(()),
++            "需求恒 0：可用 ≥ 0 恒成立，与 A3 的豁免条件无关"
++        );
++    }
++
++    #[test]
++    fn a4_ignores_allocated_and_only_checks_the_mount_time_commitment_itself() {
++        // 一块盘容量 10、已分配 9（几乎写满）、挂载期承诺量 3：Baseline 式子（demand 恒 0）判 10 − 9 − 3 < 0 ⇒ 拒；
++        // A4 只判「容量 − 挂载期承诺量」= 10 − 3 = 7 ≥ 0 ⇒ 放行，不理会「已分配 9」。
++        let reading = AdmissionReading::new(
++            vec![DeviceAdmissionTerms {
++                device: DeviceIdentity(0),
++                capacity: slots(10),
++                allocated: slots(9),
++                unreclaimable: BytesOnOneDevice::ZERO,
++                deferred: BytesOnOneDevice::ZERO,
++                mount_time_commitment: slots(3),
++                abandoned_root_exclusive: BytesOnOneDevice::ZERO,
++            }],
++            PoolWideCommitments::of_the_first_version(BytesSummedOverAllReplicas::ZERO),
++            ReplicaCount::new(1).expect("1 份"),
++        );
++        let zero_demand = [DemandOnDevice {
++            device: DeviceIdentity(0),
++            bytes: BytesOnOneDevice::ZERO,
++        }];
++        assert!(
++            admit_on_every_device_for_candidate(S4Candidate::Baseline, &reading, &zero_demand, &[]).is_err(),
++            "Baseline：10 − 9 − 3 = −2 < 0，拒"
++        );
++        assert_eq!(
++            mount_admission_a4_switch_reserve_only(&reading),
++            Ok(()),
++            "A4：只判 10 − 3 = 7 ≥ 0，不理会已分配 9"
++        );
++    }
+ }

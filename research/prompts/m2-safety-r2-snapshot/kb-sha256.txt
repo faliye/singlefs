@@ -1,0 +1,7 @@
+# kb 快照 sha256 清单，只拷派发提示点名的这五份 kb 文件到 /tmp/claude-1000/m2-safety-r2/kb-snapshot/（保留相对路径，不整份拷 kb），2026-09-25 19:1x JST 拷贝。
+# 核对：拷贝后与主工作区逐文件 diff -q，五份逐字节相同（0 处不同）。
+622afb7dbe39a87b4ff65560fc2db8c6d2d982075e2251807db912a177d2f30d  .claude/kb/decisions/28-挂载期承诺量.md
+e2e2a4086aa3e4e7a61d2645f0debf8c09c74551258c52e74fc545d024caab1b  .claude/kb/decisions/03-空间分配.md
+11d4395db3e20884c54ff8241235723038b911654bbd095fe1d47c48112b0951  .claude/kb/decisions/16-发布语义.md
+e10eafc22c662fe86fb3a56d73b6b2071843e55f8893b29bb112e3b568e3fdf3  .claude/kb/decisions/18-块里携带什么信息.md
+d66ad7c3cc77b24e2376caa9456ff56a2553fa992bc508acb60808ae0f7ea243  .claude/kb/checks-owed.md

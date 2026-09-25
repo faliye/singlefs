@@ -1,0 +1,302 @@
+diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
+--- pristine/crates/singlefs-core/src/mount.rs	2026-09-25 01:54:51.710902883 +0000
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25 05:16:49.584999395 +0000
+@@ -389,6 +389,11 @@
+     space_admission: SpaceAdmission,
+ }
+ 
++/// m2-safety-r1 云端攻方副本专用开关（不设变量时与冻结副本同行为）。
++fn s_opus(name: &str) -> Option<String> {
++    std::env::var(name).ok()
++}
++
+ /// 新实例的第一次发布的 checkpoint_txg = max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1
+ /// （D23（journal 的角色与格式） 已定项 14 第 3 条）。
+ fn first_txg_of_new_instance<Device: BlockDevice>(
+@@ -1434,7 +1439,11 @@
+                 &plan,
+                 Some(output),
+                 output.tree_identifiers,
+-                ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition,
++                if s_opus("S_OPUS_S1_DRY_READS").is_some() {
++                    ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt
++                } else {
++                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition
++                },
+             )
+             .map(|(_, rehearsed)| PoolVersion::WithFile(rehearsed))
+             .map_err(refused_at(0))?
+@@ -1491,7 +1500,11 @@
+                     &plan,
+                     Some(current_file_version),
+                     current_file_version.tree_identifiers,
+-                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition,
++                    if s_opus("S_OPUS_S1_DRY_READS").is_some() {
++                        ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt
++                    } else {
++                        ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition
++                    },
+                 )
+                 .map(|(_, rehearsed)| PoolVersion::WithFile(rehearsed))
+                 .map_err(refused_at(publish_index))?
+@@ -1610,7 +1623,14 @@
+     previous_row: &PreviousInstanceRow,
+     instance_to_acquire: InstanceGeneration,
+ ) -> Vec<InstanceRow> {
+-    let first_row_instance = previous_row.instance.0.max(1);
++    let first_row_instance = if s_opus("S_OPUS_S3").as_deref() == Some("row-zero")
++        && previous_row.is_rollback
++        && previous_row.instance.0 == 0
++    {
++        0
++    } else {
++        previous_row.instance.0.max(1)
++    };
+     (first_row_instance..instance_to_acquire.0)
+         .map(|row_instance| {
+             if row_instance == previous_row.instance.0 {
+@@ -1780,13 +1800,46 @@
+             .root_ring_slots_per_region,
+     );
+     let witness = rollback_witness_of_the_pool(devices, system_configuration);
++    let mut recovered = rollback_witness_entries_recovered_from_the_instance_table(
++        rows_of_the_chosen_roots_instance_table,
++        chosen_root.instance,
++    );
++    // S3 候选乙（副本）：所选根实例表按实例排最前的是 (1, 0, 0)（非回退行）⇒ 上一次择到的是实例 0 的根，推条目 (N, 0, 0)。
++    if s_opus("S_OPUS_S3").as_deref() == Some("infer") {
++        if let Some(first) = rows_of_the_chosen_roots_instance_table
++            .iter()
++            .min_by_key(|row| row.instance)
++        {
++            if first.instance == InstanceGeneration(1)
++                && first.selected_root_txg == CheckpointTxg(0)
++                && !first.is_rollback
++            {
++                let new_instance = rows_of_the_chosen_roots_instance_table
++                    .iter()
++                    .filter(|row| row.selected_root_txg != CheckpointTxg(0))
++                    .map(|row| row.instance)
++                    .min()
++                    .unwrap_or(chosen_root.instance);
++                recovered.push(RollbackWitnessEntry {
++                    new_instance,
++                    rollback_target_instance: InstanceGeneration(0),
++                    rollback_target_txg: CheckpointTxg(0),
++                });
++            }
++        }
++    }
++    // S2 候选甲（副本）：只补 N = 所选根自己的实例那一条。
++    if s_opus("S_OPUS_S2").as_deref() == Some("narrow") {
++        recovered.retain(|entry| entry.new_instance == chosen_root.instance);
++    }
++    // 判别子自证用的对照臂（副本）：一条都不补（第三轮冻结树的样子）。
++    if s_opus("S_OPUS_S2").as_deref() == Some("none") {
++        recovered.clear();
++    }
+     let with_the_recovered_entries: BTreeSet<RollbackWitnessEntry> = witness
+         .entries()
+         .into_iter()
+-        .chain(rollback_witness_entries_recovered_from_the_instance_table(
+-            rows_of_the_chosen_roots_instance_table,
+-            chosen_root.instance,
+-        ))
++        .chain(recovered)
+         .collect();
+     let every_ring_root = every_root_ring_slot_holds_a_root(devices, system_configuration);
+     let still_needed = rollback_witness_entries_still_needed(
+@@ -1807,8 +1860,17 @@
+             },
+         )
+     };
+-    let before_the_row_publish =
+-        RollbackWitnessTable::of_entries(kept.iter().copied(), capacity).map_err(full)?;
++    let pre_written = this_rollback.filter(|entry| {
++        s_opus("S_OPUS_S3").as_deref() == Some("pre")
++            && entry.rollback_target_instance == InstanceGeneration(0)
++    });
++    let before_the_row_publish = RollbackWitnessTable::of_entries(
++        rollback_witness_entries_not_covered_by_another(
++            &kept.iter().copied().chain(pre_written).collect::<Vec<_>>(),
++        ),
++        capacity,
++    )
++    .map_err(full)?;
+     let from_the_row_publish = RollbackWitnessTable::of_entries(
+         rollback_witness_entries_not_covered_by_another(
+             &kept.into_iter().chain(this_rollback).collect::<Vec<_>>(),
+@@ -1839,10 +1901,35 @@
+     let instance_to_acquire = instance_generation_to_acquire(&pool);
+     // 要写的行按要取的号先列出来：实例表那一项准入按它算，取号之后写行也用这一份（号在写之前重算、不等就不写）。
+     let rows_written = instance_rows_to_write(&start.previous_row, instance_to_acquire);
+-    let instance_table_rewrite = instance_table_rewrite_of_the_row_publish(
++    let mut instance_table_rewrite = instance_table_rewrite_of_the_row_publish(
+         start.previous.instance_table_chain(),
+         &rows_written,
+     );
++    // S2 候选丙（副本）：删除规则 ① 在这次挂载判得出某条回退行对应的条目可删时，把那条回退行的回退位清掉（行照留），
++    // 之后按回退行补写就补不回它。这次挂载自己写的回退行不动。
++    if s_opus("S_OPUS_S2").as_deref() == Some("clearflag") {
++        if let Some(ring) = every_root_ring_slot_holds_a_root(&*pool.devices, &start.system_configuration) {
++            let snapshot = instance_table_rewrite.rows.clone();
++            let own_rows_from = snapshot.len() - rows_written.len();
++            for (index, row) in instance_table_rewrite.rows.iter_mut().enumerate() {
++                if !row.is_rollback || index >= own_rows_from {
++                    continue;
++                }
++                let new_instance = snapshot
++                    .iter()
++                    .filter(|later| later.instance > row.instance && later.selected_root_txg != CheckpointTxg(0))
++                    .map(|later| later.instance)
++                    .min()
++                    .unwrap_or(instance_to_acquire);
++                let still_needed = ring
++                    .iter()
++                    .any(|root| row.instance <= root.instance && root.instance < new_instance);
++                if !still_needed {
++                    row.is_rollback = false;
++                }
++            }
++        }
++    }
+     // 空间准入（D28（挂载期承诺量） 已定项 1 的式子逐设备合取；C363 (b) 判决第四节第 2 条接进可写挂载）：可写挂载的准入要
+     // 「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13），预留是式子里的挂载期承诺量——每块盘上连它与别的八项都扣完，
+     // 可用(d) ≥ 0（这一刻不另要需求：写行与暖机那一串的空间就在切换预留与 checkpoint 保留池里）。rows0 = 挂载时读到的行数加写行那次
+@@ -2061,7 +2148,11 @@
+                 .quarantined_after_release_checksum_mismatch
+                 .is_empty()
+         });
+-    if let (Some(planned), false) = (&placements_planned, some_copy_was_quarantined) {
++    if let (Some(planned), false, false) = (
++        &placements_planned,
++        some_copy_was_quarantined,
++        s_opus("S_OPUS_S1_DRY_PESSIMISTIC").is_some(),
++    ) {
+         assert_eq!(
+             &placements_taken, planned,
+             "取号之前在分配器的拷贝上取的落点与真发起来取的逐次相同：同一个分配器、同一串分配动作，这一串里没有一份被隔离；\
+@@ -2242,6 +2333,35 @@
+         &system_configuration.immutable.sizes,
+         &system_configuration.immutable.filesystem_identifier,
+     );
++    // S1 候选丁（副本）：目标已离环、而最新根指着的实例表里最后一条回退行就是这个目标、它之后的行全是 (i, 0, 0)
++    // （上一次同一条回退取号之后失败、写行那次已落盘）⇒ 那一次已经把池带到了目标那一版，改成回退到最新根。
++    let target = if s_opus("S_OPUS_S1_EQUIV").is_some()
++        && !roots.iter().any(|root| {
++            root.instance == target.instance && root.checkpoint_txg == target.checkpoint_txg
++        }) {
++        match instance_table_of_root(&*devices, &newest_root) {
++            Some(table)
++                if table.rows.iter().any(|row| {
++                    row.is_rollback
++                        && row.instance == target.instance
++                        && row.selected_root_txg == target.checkpoint_txg
++                }) && table
++                    .rows
++                    .iter()
++                    .filter(|row| row.instance > target.instance)
++                    .all(|row| row.selected_root_txg == CheckpointTxg(0))
++                    && newest_root.instance > target.instance =>
++            {
++                RollbackTarget {
++                    instance: newest_root.instance,
++                    checkpoint_txg: newest_root.checkpoint_txg,
++                }
++            }
++            _ => target,
++        }
++    } else {
++        target
++    };
+     let target_root = roots
+         .iter()
+         .find(|root| {
+@@ -2268,6 +2388,13 @@
+             exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
+         });
+     }
++    // S3 候选丁（副本）：不许回退到实例 0 的根（mkfs 的第 0 代根），在任何写之前拒。
++    if s_opus("S_OPUS_S3").as_deref() == Some("refuse") && target.instance == InstanceGeneration(0) {
++        return Err(MountError::RollbackTargetNotACandidate {
++            target,
++            exclusion: RollbackCandidateExclusion::OnAbandonedTimeline,
++        });
++    }
+     // 被回退见证表抛弃的根同样在被抛弃的时间线上（D23（journal 的角色与格式） 已定项 14「回退见证」）：最新根落回 R_old 时
+     // （回退实例的根都读不出）它那一版的实例表里没有回退行，只按实例表判会把被抛弃的根放回候选集。
+     if newest_table
+@@ -2325,6 +2452,28 @@
+         maximum_applied_transaction: 0,
+     };
+     let first_txg = first_txg_of_new_instance(devices, &system_configuration, &records);
++    // S1 候选乙（副本）：这次挂载要写的根（写行一次、暖机那几次）一个都不落在回退目标所在的根环槽上——撞上就把写行那次的 txg 往后推，
++    // 取号之后任一次发布失败，目标都还在环里、同一条回退可以重试。
++    let first_txg = if s_opus("S_OPUS_S1_PROTECT").is_some() {
++        let slots_per_region = system_configuration.immutable.sizes.root_ring_slots_per_region;
++        let target_slot = target_for_publish(target.checkpoint_txg, slots_per_region);
++        let all_devices: Vec<DeviceIdentity> = devices.iter().map(|(identity, _)| *identity).collect();
++        let mut candidate = first_txg;
++        loop {
++            let planned: Vec<CheckpointTxg> = std::iter::once(candidate)
++                .chain(warm_up_publish_txgs(parameters, &all_devices, candidate))
++                .collect();
++            if planned
++                .iter()
++                .all(|txg| target_for_publish(*txg, slots_per_region) != target_slot)
++            {
++                break candidate;
++            }
++            candidate = CheckpointTxg(candidate.0 + 1);
++        }
++    } else {
++        first_txg
++    };
+     // 回退到的那一版自己带的水位可以低于环里被这次回退抛弃的根带的（回退到树表 0 条的暖机根，而环里还留着带文件版本的根）：
+     // 那些根发过的号不许再发（D8（核心索引结构） 已定项 8 ②），回退行那次发布带的是环里的 max，
+     // 之后再发第一个文件版本就从它往上发（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）。
+diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
+--- pristine/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25 04:22:01.214445376 +0000
+@@ -4591,7 +4591,23 @@
+                 &settled.previous_roles_replaced,
+                 &device_identities_of_the_accounting_rows,
+             )?;
+-            Vec::new()
++            // m2-safety-r1 云端攻方副本专用（S1 候选戊，不设变量时与冻结副本同行为）：预演按最坏情况，把这次换下的每一份都当作会被隔离。
++            if std::env::var("S_OPUS_S1_DRY_PESSIMISTIC").is_ok() {
++                let mut every_copy = Vec::new();
++                for identity in mapped_roles_released_by_this_publish(previous_version, &settled.previous_roles_replaced) {
++                    for location in mapping_locations_of_a_released_unit(previous_version, identity) {
++                        every_copy.push(CopyQuarantinedAfterReleaseChecksumMismatch {
++                            unit: identity,
++                            device: location.device,
++                            placement: Placement { slot: location.slot, span: identity.span_slots() },
++                            reading: QuarantinedCopyReading::ChecksumMismatch,
++                        });
++                    }
++                }
++                every_copy
++            } else {
++                Vec::new()
++            }
+         }
+         (None, _) => Vec::new(),
+     };
+diff -ruN -x target -x 's_opus_*' pristine/crates/singlefs-harness/src/history.rs tree/crates/singlefs-harness/src/history.rs
+--- pristine/crates/singlefs-harness/src/history.rs	2026-09-25 01:49:11.921508617 +0000
++++ tree/crates/singlefs-harness/src/history.rs	2026-09-25 04:21:47.254416235 +0000
+@@ -111,7 +111,12 @@
+                 (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+             }
+             HistoryDeviceWidth::UnitAreaOf240Slots => {
+-                (UNIT_AREA_START_SLOT + NARROWEST_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
++                // m2-safety-r1 云端攻方副本专用：S_OPUS_UNIT_AREA_SLOTS 设了就用它当单元区槽数（不设时与冻结副本同行为）。
++                let slots = std::env::var("S_OPUS_UNIT_AREA_SLOTS")
++                    .ok()
++                    .and_then(|value| value.parse::<u64>().ok())
++                    .unwrap_or(NARROWEST_DEVICE_UNIT_AREA_SLOTS);
++                (UNIT_AREA_START_SLOT + slots) * SLOT_BYTES
+             }
+         }
+     }

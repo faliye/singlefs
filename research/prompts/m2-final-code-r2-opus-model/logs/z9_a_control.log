@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/r2_opus_z9.rs (/tmp/claude-1000/m2-final-code-r2-opus/target/debug/deps/r2_opus_z9-bcc08c7a2da9d615)
+
+running 1 test
+=== control sticky (1,29) then newest: mounts=40 max_witness_entries_before=Some(9) stop=None
+last: k=40 ring_all_readable=true witness_entries_before=8 target=(40,145) new_instance=41 roots_written_txg=[146, 147, 148] persisted_roots=3
+=== control newest: mounts=40 max_witness_entries_before=Some(9) stop=None
+last: k=40 ring_all_readable=true witness_entries_before=8 target=(40,145) new_instance=41 roots_written_txg=[146, 147, 148] persisted_roots=3
+test z9_a_control_without_crash_three_target_policies has been running for over 60 seconds
+=== control oldest candidate: mounts=40 max_witness_entries_before=Some(9) stop=None
+last: k=40 ring_all_readable=true witness_entries_before=8 target=(34,125) new_instance=41 roots_written_txg=[146, 147, 148] persisted_roots=3
+test z9_a_control_without_crash_three_target_policies ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 108.35s
+

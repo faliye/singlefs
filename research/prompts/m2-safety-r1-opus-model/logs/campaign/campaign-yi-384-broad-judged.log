@@ -1,0 +1,92 @@
+S1CAMPAIGN weights=Some("broad") width=UnitAreaOf384Slots admission=JudgedByTheFormula first_seed=5100000000 seeds=256 ops=40 new_findings=2 known_red=4
+种子 [5100000000, 5100000256)，每段 40 步，比重：各类操作都抽（快档、大档）；每一步之后跑池级 checker；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 256 段：跑完 244、以已知红收尾 {0: 4}、新发现 8；根环转过一圈的 189 段；最高 txg 49；一版里最多 458 条分配记录
+  操作 PublishFirstFile：Ok 169、Err 209、前提不满足没调 102
+  操作 PublishOverwrite：Ok 1713、Err 869、前提不满足没调 2351
+  操作 PublishWithoutUnits：Ok 77、Err 0、前提不满足没调 170
+  操作 CloseAndMountWritable：Ok 1049、Err 413、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 654、Err 410、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 228、Err 552、前提不满足没调 694
+  操作 ColdStartRecover：Ok 418、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 297 次、发成 227 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 1750 次、发成 1293 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 220 次、发成 0 次
+  内容长度 载荷容量：入口被调 245 次、发成 184 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 210 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 238 次、发成 178 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：552 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：13 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：210 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：116 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：484 次
+  Err 成员 PublishError::ContentExceedsDataUnit：402 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：186 次
+  Err 成员 PublishError::SpaceAdmissionRefused：490 次
+  前提不满足（没有可写会话）：2050 次
+  前提不满足（现行版本带文件）：106 次
+  前提不满足（现行版本树表 0 条）：1161 次
+  冷启动结局 FileRead：318 次
+  冷启动结局 NoFile：100 次
+  一次挂载里最多写出 19 条根；一段历史里最多挂载成功 16 次、最多试挂载 17 次
+  抬 F 回收到落点 102 次、共回收 2550 个落点；复用已释放的记录 2674 条（其中跨度变了 462 条）；已释放的记录被罩住起点 72 条、被删 72 条
+  挂载写出的发布比过分配记录 2550 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 4146 次；一个写都没发、沿用上一次结论的 6188 步
+  模型对拍 6886 步：该拒而拒 1479、区间里拒 974、该成而成 4425；比过根 6871 条、分配记录 90056 条、冷启动内容 318 次、抬 F 上限 780 次；回退到 txg = F_生效 > 0 的根做成 3 次；单元区墙按区间放行 974 次
+  I-1.1：判绿 4146 次、不适用 0 次
+  I-1.2：判绿 4146 次、不适用 0 次
+  I-1.3：判绿 4146 次、不适用 0 次
+  I-1.4：判绿 4146 次、不适用 0 次
+  I-1.6：判绿 4146 次、不适用 0 次
+  I-1.7：判绿 4146 次、不适用 0 次
+  I-1.8：判绿 4146 次、不适用 0 次
+  I-1.10：判绿 3842 次、不适用 304 次
+  I-2.1：判绿 4146 次、不适用 0 次
+  I-2.3：判绿 4146 次、不适用 0 次
+  I-2.4：判绿 4146 次、不适用 0 次
+  I-2.5：判绿 4146 次、不适用 0 次
+  I-3.1：判绿 3274 次、不适用 868 次
+  I-3.8：判绿 4146 次、不适用 0 次
+  I-3.9：判绿 3278 次、不适用 868 次
+  I-3.10：判绿 3842 次、不适用 304 次
+  I-3.11：判绿 3278 次、不适用 868 次
+  I-4.2：判绿 4146 次、不适用 0 次
+  I-4.8：判绿 4146 次、不适用 0 次
+  I-5.1：判绿 4146 次、不适用 0 次
+  I-5.2：判绿 3278 次、不适用 868 次
+  I-5.4：判绿 3278 次、不适用 868 次
+  I-7.1：判绿 4146 次、不适用 0 次
+  I-7.2：判绿 4146 次、不适用 0 次
+  I-7.3：判绿 4146 次、不适用 0 次
+  I-7.4：判绿 4146 次、不适用 0 次
+  I-7.6：判绿 4146 次、不适用 0 次
+  I-7.7：判绿 4146 次、不适用 0 次
+  I-7.8：判绿 4146 次、不适用 0 次
+  I-7.9：判绿 651 次、不适用 3495 次
+  I-7.10：判绿 4146 次、不适用 0 次
+  I-7.11：判绿 4146 次、不适用 0 次
+  I-8.6：判绿 4015 次、不适用 131 次
+  I-8.7：判绿 2938 次、不适用 1208 次
+  I-8.8：判绿 0 次、不适用 4146 次
+  I-8.9：判绿 4015 次、不适用 131 次
+  I-9.1：判绿 3278 次、不适用 868 次
+  I-9.2：判绿 3278 次、不适用 868 次
+  I-9.4：判绿 3278 次、不适用 868 次
+  I-9.6：判绿 3278 次、不适用 868 次
+  I-9.7：判绿 3278 次、不适用 868 次
+  I-9.10：判绿 3278 次、不适用 868 次
+  I-9.12：判绿 3278 次、不适用 868 次
+  I-9.13：判绿 3278 次、不适用 868 次
+  I-9.14：判绿 2984 次、不适用 1162 次
+  I-9.15：判绿 3278 次、不适用 868 次
+已知红第 0 条（增补 2 收口表第 43 行）：4 段；前几个种子 [(5100000113, Operation(20)), (5100000129, Operation(34)), (5100000184, Operation(12)), (5100000232, Operation(26))]
+新发现 ModelDisagreement { aspect: "写出的根的条数" }：第一个种子 5100000006（同签名的种子 [5100000006, 5100000108, 5100000169]），在 Operation(31)（Some(CloseAndMountRollback)）之后
+  模型对不上（写出的根的条数）：模型答 写出 2 条根：[ModelRootKey { checkpoint_txg: ModelCheckpointTxg(24), instance: ModelInstanceGeneration(9) }, ModelRootKey { checkpoint_txg: ModelCheckpointTxg(25), instance: ModelInstanceGeneration(9) }]；实现 写出 3 条根：[ModelRootKey { checkpoint_txg: ModelCheckpointTxg(26), instance: ModelInstanceGeneration(9) }, ModelRootKey { checkpoint_txg: ModelCheckpointTxg(27), instance: ModelInstanceGeneration(9) }, ModelRootKey { checkpoint_txg: ModelCheckpointTxg(28), instance: ModelInstanceGeneration(9) }]
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=5100000006 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+新发现 ModelDisagreement { aspect: "根的 (txg, 实例)" }：第一个种子 5100000142（同签名的种子 [5100000142, 5100000151, 5100000233, 5100000240, 5100000250]），在 Operation(30)（Some(CloseAndMountRollback)）之后
+  模型对不上（根的 (txg, 实例)）：模型答 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(23), instance: ModelInstanceGeneration(5) }；实现 ModelRootKey { checkpoint_txg: ModelCheckpointTxg(26), instance: ModelInstanceGeneration(5) }
+  没收缩（这一档只报种子）：SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=5100000142 跑「收缩一个种子」那条 #[ignore] 用例，或跑大档
+
+test s1_campaign ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 13.29s
+

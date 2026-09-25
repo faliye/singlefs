@@ -1,0 +1,3 @@
+thread 'z12_with_file_sweep' (665643) panicked at crates/singlefs-harness/tests/r2_opus_z12.rs:107:14:
+覆盖写: AllocationRecordsExceedOneNode { records: 876, capacity: 812 }
+Z12 without-file caps=Some("1,2,1,2") named=None mounts=7: mounts_ok=217 refused={} panics=0

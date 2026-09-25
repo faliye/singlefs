@@ -1,0 +1,513 @@
+
+running 1 test
+Z19 width=240 weights=broad first_seed=7050000000 seeds=48 histories=48 completed=47 new_findings=0 known_red=1
+Z19   refusal width=240 weights=broad MountError::RollbackFloorAboveCeiling = 126
+Z19   refusal width=240 weights=broad MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 7
+Z19   refusal width=240 weights=broad MountError::RollbackTargetNotACandidate(NotInRing) = 105
+Z19   refusal width=240 weights=broad MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 91
+Z19   refusal width=240 weights=broad MountError::SpaceAdmissionRefusedBeforeAcquisition = 623
+Z19   refusal width=240 weights=broad PublishError::ContentExceedsDataUnit = 86
+Z19   refusal width=240 weights=broad PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 32
+Z19   refusal width=240 weights=broad PublishError::SpaceAdmissionRefused = 237
+Z19   operation width=240 weights=broad PublishFirstFile applied=47 refused=47 not_applicable=145
+Z19   operation width=240 weights=broad PublishOverwrite applied=206 refused=308 not_applicable=2281
+Z19   operation width=240 weights=broad PublishWithoutUnits applied=37 refused=0 not_applicable=83
+Z19   operation width=240 weights=broad CloseAndMountWritable applied=317 refused=497 not_applicable=0
+Z19   operation width=240 weights=broad CloseAndMountRollback applied=231 refused=329 not_applicable=0
+Z19   operation width=240 weights=broad RaiseRollbackFloor applied=39 refused=126 not_applicable=744
+Z19   operation width=240 weights=broad ColdStartRecover applied=243 refused=0 not_applicable=0
+Z19   RENDER width=240 weights=broad
+种子 [7050000000, 7050000048)，每段 120 步，比重：各类操作都抽（快档、大档）；每一步之后跑池级 checker；两块单元区 240 槽的小盘（journal 环 128 MiB）
+历史 48 段：跑完 47、以已知红收尾 {0: 1}、新发现 0；根环转过一圈的 26 段；最高 txg 94；一版里最多 224 条分配记录
+  操作 PublishFirstFile：Ok 47、Err 47、前提不满足没调 145
+  操作 PublishOverwrite：Ok 206、Err 308、前提不满足没调 2281
+  操作 PublishWithoutUnits：Ok 37、Err 0、前提不满足没调 83
+  操作 CloseAndMountWritable：Ok 317、Err 497、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 231、Err 329、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 39、Err 126、前提不满足没调 744
+  操作 ColdStartRecover：Ok 243、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 65 次、发成 32 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 364 次、发成 181 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 48 次、发成 0 次
+  内容长度 载荷容量：入口被调 43 次、发成 19 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 42 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 46 次、发成 21 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：126 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：7 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：105 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：91 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：623 次
+  Err 成员 PublishError::ContentExceedsDataUnit：86 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：32 次
+  Err 成员 PublishError::SpaceAdmissionRefused：237 次
+  前提不满足（没有可写会话）：2360 次
+  前提不满足（现行版本带文件）：28 次
+  前提不满足（现行版本树表 0 条）：865 次
+  冷启动结局 FileRead：179 次
+  冷启动结局 NoFile：64 次
+  一次挂载里最多写出 12 条根；一段历史里最多挂载成功 30 次、最多试挂载 41 次
+  抬 F 回收到落点 7 次、共回收 65 个落点；复用已释放的记录 320 条（其中跨度变了 64 条）；已释放的记录被罩住起点 16 条、被删 18 条
+  挂载写出的发布比过分配记录 412 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 925 次；一个写都没发、沿用上一次结论的 4803 步
+  模型对拍 2456 步：该拒而拒 447、区间里拒 860、该成而成 1149；比过根 1888 条、分配记录 13652 条、冷启动内容 179 次、抬 F 上限 165 次；回退到 txg = F_生效 > 0 的根做成 3 次；单元区墙按区间放行 860 次
+  I-1.1：判绿 925 次、不适用 0 次
+  I-1.2：判绿 925 次、不适用 0 次
+  I-1.3：判绿 925 次、不适用 0 次
+  I-1.4：判绿 925 次、不适用 0 次
+  I-1.6：判绿 925 次、不适用 0 次
+  I-1.7：判绿 925 次、不适用 0 次
+  I-1.8：判绿 925 次、不适用 0 次
+  I-1.10：判绿 880 次、不适用 45 次
+  I-2.1：判绿 925 次、不适用 0 次
+  I-2.3：判绿 925 次、不适用 0 次
+  I-2.4：判绿 925 次、不适用 0 次
+  I-2.5：判绿 925 次、不适用 0 次
+  I-3.1：判绿 486 次、不适用 438 次
+  I-3.8：判绿 925 次、不适用 0 次
+  I-3.9：判绿 487 次、不适用 438 次
+  I-3.10：判绿 880 次、不适用 45 次
+  I-3.11：判绿 487 次、不适用 438 次
+  I-4.2：判绿 925 次、不适用 0 次
+  I-4.8：判绿 925 次、不适用 0 次
+  I-5.1：判绿 925 次、不适用 0 次
+  I-5.2：判绿 487 次、不适用 438 次
+  I-5.4：判绿 487 次、不适用 438 次
+  I-7.1：判绿 925 次、不适用 0 次
+  I-7.2：判绿 925 次、不适用 0 次
+  I-7.3：判绿 925 次、不适用 0 次
+  I-7.4：判绿 925 次、不适用 0 次
+  I-7.6：判绿 925 次、不适用 0 次
+  I-7.7：判绿 925 次、不适用 0 次
+  I-7.8：判绿 925 次、不适用 0 次
+  I-7.9：判绿 107 次、不适用 818 次
+  I-7.10：判绿 925 次、不适用 0 次
+  I-7.11：判绿 925 次、不适用 0 次
+  I-8.6：判绿 906 次、不适用 19 次
+  I-8.7：判绿 647 次、不适用 278 次
+  I-8.8：判绿 0 次、不适用 925 次
+  I-8.9：判绿 906 次、不适用 19 次
+  I-9.1：判绿 487 次、不适用 438 次
+  I-9.2：判绿 487 次、不适用 438 次
+  I-9.4：判绿 487 次、不适用 438 次
+  I-9.6：判绿 487 次、不适用 438 次
+  I-9.7：判绿 487 次、不适用 438 次
+  I-9.10：判绿 487 次、不适用 438 次
+  I-9.12：判绿 487 次、不适用 438 次
+  I-9.13：判绿 487 次、不适用 438 次
+  I-9.14：判绿 411 次、不适用 514 次
+  I-9.15：判绿 487 次、不适用 438 次
+已知红第 0 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(7050000040, Operation(39))]
+
+Z19 width=240 weights=unit_area_wall first_seed=7050001000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=240 weights=unit_area_wall MountError::RollbackFloorAboveCeiling = 32
+Z19   refusal width=240 weights=unit_area_wall MountError::RollbackTargetNotACandidate(NotInRing) = 11
+Z19   refusal width=240 weights=unit_area_wall MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 4
+Z19   refusal width=240 weights=unit_area_wall MountError::SpaceAdmissionRefusedBeforeAcquisition = 311
+Z19   refusal width=240 weights=unit_area_wall PublishError::ContentExceedsDataUnit = 122
+Z19   refusal width=240 weights=unit_area_wall PublishError::SpaceAdmissionRefused = 590
+Z19   operation width=240 weights=unit_area_wall PublishOverwrite applied=269 refused=712 not_applicable=4047
+Z19   operation width=240 weights=unit_area_wall CloseAndMountWritable applied=89 refused=293 not_applicable=0
+Z19   operation width=240 weights=unit_area_wall CloseAndMountRollback applied=30 refused=33 not_applicable=0
+Z19   operation width=240 weights=unit_area_wall RaiseRollbackFloor applied=12 refused=32 not_applicable=187
+Z19   operation width=240 weights=unit_area_wall ColdStartRecover applied=56 refused=0 not_applicable=0
+test z19_small_pool_campaigns_with_the_space_admission_judged has been running for over 60 seconds
+Z19 width=240 weights=reuse_after_raise first_seed=7050002000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=240 weights=reuse_after_raise MountError::RollbackFloorAboveCeiling = 140
+Z19   refusal width=240 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 4
+Z19   refusal width=240 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 21
+Z19   refusal width=240 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 16
+Z19   refusal width=240 weights=reuse_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 931
+Z19   refusal width=240 weights=reuse_after_raise PublishError::ContentExceedsDataUnit = 82
+Z19   refusal width=240 weights=reuse_after_raise PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 4
+Z19   refusal width=240 weights=reuse_after_raise PublishError::SpaceAdmissionRefused = 209
+Z19   operation width=240 weights=reuse_after_raise PublishFirstFile applied=8 refused=6 not_applicable=48
+Z19   operation width=240 weights=reuse_after_raise PublishOverwrite applied=188 refused=289 not_applicable=2680
+Z19   operation width=240 weights=reuse_after_raise PublishWithoutUnits applied=2 refused=0 not_applicable=46
+Z19   operation width=240 weights=reuse_after_raise CloseAndMountWritable applied=162 refused=891 not_applicable=0
+Z19   operation width=240 weights=reuse_after_raise CloseAndMountRollback applied=48 refused=81 not_applicable=0
+Z19   operation width=240 weights=reuse_after_raise RaiseRollbackFloor applied=36 refused=140 not_applicable=1076
+Z19   operation width=240 weights=reuse_after_raise ColdStartRecover applied=59 refused=0 not_applicable=0
+Z19 width=240 weights=rollback_after_raise first_seed=7050003000 seeds=48 histories=48 completed=47 new_findings=0 known_red=1
+Z19   refusal width=240 weights=rollback_after_raise MountError::RollbackFloorAboveCeiling = 103
+Z19   refusal width=240 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 2
+Z19   refusal width=240 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 126
+Z19   refusal width=240 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 143
+Z19   refusal width=240 weights=rollback_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 239
+Z19   refusal width=240 weights=rollback_after_raise PublishError::ContentExceedsDataUnit = 50
+Z19   refusal width=240 weights=rollback_after_raise PublishError::SpaceAdmissionRefused = 87
+Z19   operation width=240 weights=rollback_after_raise PublishFirstFile applied=35 refused=10 not_applicable=21
+Z19   operation width=240 weights=rollback_after_raise PublishOverwrite applied=138 refused=127 not_applicable=2056
+Z19   operation width=240 weights=rollback_after_raise PublishWithoutUnits applied=34 refused=0 not_applicable=9
+Z19   operation width=240 weights=rollback_after_raise CloseAndMountWritable applied=372 refused=66 not_applicable=0
+Z19   operation width=240 weights=rollback_after_raise CloseAndMountRollback applied=938 refused=444 not_applicable=0
+Z19   operation width=240 weights=rollback_after_raise RaiseRollbackFloor applied=49 refused=103 not_applicable=1235
+Z19   operation width=240 weights=rollback_after_raise ColdStartRecover applied=51 refused=0 not_applicable=0
+Z19   RENDER width=240 weights=rollback_after_raise
+种子 [7050003000, 7050003048)，每段 120 步，比重：偏向抬 F 之后回退（B2 那一格的取样点）；每一步之后跑池级 checker；两块单元区 240 槽的小盘（journal 环 128 MiB）
+历史 48 段：跑完 47、以已知红收尾 {0: 1}、新发现 0；根环转过一圈的 48 段；最高 txg 127；一版里最多 258 条分配记录
+  操作 PublishFirstFile：Ok 35、Err 10、前提不满足没调 21
+  操作 PublishOverwrite：Ok 138、Err 127、前提不满足没调 2056
+  操作 PublishWithoutUnits：Ok 34、Err 0、前提不满足没调 9
+  操作 CloseAndMountWritable：Ok 372、Err 66、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 938、Err 444、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 49、Err 103、前提不满足没调 1235
+  操作 ColdStartRecover：Ok 51、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 35 次、发成 22 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 171 次、发成 118 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 26 次、发成 0 次
+  内容长度 载荷容量：入口被调 24 次、发成 14 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 24 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 30 次、发成 19 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：103 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：2 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：126 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：143 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：239 次
+  Err 成员 PublishError::ContentExceedsDataUnit：50 次
+  Err 成员 PublishError::SpaceAdmissionRefused：87 次
+  前提不满足（没有可写会话）：945 次
+  前提不满足（现行版本带文件）：3 次
+  前提不满足（现行版本树表 0 条）：2373 次
+  冷启动结局 FileRead：16 次
+  冷启动结局 NoFile：35 次
+  一次挂载里最多写出 18 条根；一段历史里最多挂载成功 41 次、最多试挂载 47 次
+  抬 F 回收到落点 4 次、共回收 7 个落点；复用已释放的记录 270 条（其中跨度变了 60 条）；已释放的记录被罩住起点 28 条、被删 30 条
+  挂载写出的发布比过分配记录 232 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1614 次；一个写都没发、沿用上一次结论的 4122 步
+  模型对拍 2413 步：该拒而拒 424、区间里拒 326、该成而成 1663；比过根 4158 条、分配记录 9816 条、冷启动内容 16 次、抬 F 上限 152 次；回退到 txg = F_生效 > 0 的根做成 13 次；单元区墙按区间放行 326 次
+  I-1.1：判绿 1614 次、不适用 0 次
+  I-1.2：判绿 1614 次、不适用 0 次
+  I-1.3：判绿 1614 次、不适用 0 次
+  I-1.4：判绿 1614 次、不适用 0 次
+  I-1.6：判绿 1614 次、不适用 0 次
+  I-1.7：判绿 1614 次、不适用 0 次
+  I-1.8：判绿 1614 次、不适用 0 次
+  I-1.10：判绿 1610 次、不适用 4 次
+  I-2.1：判绿 1614 次、不适用 0 次
+  I-2.3：判绿 1614 次、不适用 0 次
+  I-2.4：判绿 1614 次、不适用 0 次
+  I-2.5：判绿 1614 次、不适用 0 次
+  I-3.1：判绿 363 次、不适用 1250 次
+  I-3.8：判绿 1614 次、不适用 0 次
+  I-3.9：判绿 364 次、不适用 1250 次
+  I-3.10：判绿 1610 次、不适用 4 次
+  I-3.11：判绿 364 次、不适用 1250 次
+  I-4.2：判绿 1614 次、不适用 0 次
+  I-4.8：判绿 1614 次、不适用 0 次
+  I-5.1：判绿 1614 次、不适用 0 次
+  I-5.2：判绿 364 次、不适用 1250 次
+  I-5.4：判绿 364 次、不适用 1250 次
+  I-7.1：判绿 1614 次、不适用 0 次
+  I-7.2：判绿 1614 次、不适用 0 次
+  I-7.3：判绿 1614 次、不适用 0 次
+  I-7.4：判绿 1614 次、不适用 0 次
+  I-7.6：判绿 1614 次、不适用 0 次
+  I-7.7：判绿 1614 次、不适用 0 次
+  I-7.8：判绿 1614 次、不适用 0 次
+  I-7.9：判绿 131 次、不适用 1483 次
+  I-7.10：判绿 1614 次、不适用 0 次
+  I-7.11：判绿 1614 次、不适用 0 次
+  I-8.6：判绿 1612 次、不适用 2 次
+  I-8.7：判绿 1134 次、不适用 480 次
+  I-8.8：判绿 0 次、不适用 1614 次
+  I-8.9：判绿 1612 次、不适用 2 次
+  I-9.1：判绿 364 次、不适用 1250 次
+  I-9.2：判绿 364 次、不适用 1250 次
+  I-9.4：判绿 364 次、不适用 1250 次
+  I-9.6：判绿 364 次、不适用 1250 次
+  I-9.7：判绿 364 次、不适用 1250 次
+  I-9.10：判绿 364 次、不适用 1250 次
+  I-9.12：判绿 364 次、不适用 1250 次
+  I-9.13：判绿 364 次、不适用 1250 次
+  I-9.14：判绿 283 次、不适用 1331 次
+  I-9.15：判绿 364 次、不适用 1250 次
+已知红第 0 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(7050003038, Operation(47))]
+
+Z19 width=256 weights=broad first_seed=7050004000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=256 weights=broad MountError::RollbackFloorAboveCeiling = 123
+Z19   refusal width=256 weights=broad MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 11
+Z19   refusal width=256 weights=broad MountError::RollbackTargetNotACandidate(NotInRing) = 122
+Z19   refusal width=256 weights=broad MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 115
+Z19   refusal width=256 weights=broad MountError::SpaceAdmissionRefusedBeforeAcquisition = 616
+Z19   refusal width=256 weights=broad PublishError::ContentExceedsDataUnit = 86
+Z19   refusal width=256 weights=broad PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 45
+Z19   refusal width=256 weights=broad PublishError::SpaceAdmissionRefused = 225
+Z19   operation width=256 weights=broad PublishFirstFile applied=58 refused=56 not_applicable=115
+Z19   operation width=256 weights=broad PublishOverwrite applied=220 refused=300 not_applicable=2416
+Z19   operation width=256 weights=broad PublishWithoutUnits applied=29 refused=0 not_applicable=79
+Z19   operation width=256 weights=broad CloseAndMountWritable applied=323 refused=488 not_applicable=0
+Z19   operation width=256 weights=broad CloseAndMountRollback applied=239 refused=376 not_applicable=0
+Z19   operation width=256 weights=broad RaiseRollbackFloor applied=46 refused=123 not_applicable=676
+Z19   operation width=256 weights=broad ColdStartRecover applied=216 refused=0 not_applicable=0
+Z19 width=256 weights=unit_area_wall first_seed=7050005000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=256 weights=unit_area_wall MountError::RollbackFloorAboveCeiling = 35
+Z19   refusal width=256 weights=unit_area_wall MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 3
+Z19   refusal width=256 weights=unit_area_wall MountError::RollbackTargetNotACandidate(NotInRing) = 6
+Z19   refusal width=256 weights=unit_area_wall MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 4
+Z19   refusal width=256 weights=unit_area_wall MountError::SpaceAdmissionRefusedBeforeAcquisition = 332
+Z19   refusal width=256 weights=unit_area_wall PublishError::ContentExceedsDataUnit = 144
+Z19   refusal width=256 weights=unit_area_wall PublishError::SpaceAdmissionRefused = 656
+Z19   operation width=256 weights=unit_area_wall PublishOverwrite applied=280 refused=800 not_applicable=3945
+Z19   operation width=256 weights=unit_area_wall CloseAndMountWritable applied=82 refused=323 not_applicable=0
+Z19   operation width=256 weights=unit_area_wall CloseAndMountRollback applied=29 refused=22 not_applicable=0
+Z19   operation width=256 weights=unit_area_wall RaiseRollbackFloor applied=23 refused=35 not_applicable=167
+Z19   operation width=256 weights=unit_area_wall ColdStartRecover applied=54 refused=0 not_applicable=0
+Z19 width=256 weights=reuse_after_raise first_seed=7050006000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=256 weights=reuse_after_raise MountError::RollbackFloorAboveCeiling = 152
+Z19   refusal width=256 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 1
+Z19   refusal width=256 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 26
+Z19   refusal width=256 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 9
+Z19   refusal width=256 weights=reuse_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 964
+Z19   refusal width=256 weights=reuse_after_raise PublishError::ContentExceedsDataUnit = 42
+Z19   refusal width=256 weights=reuse_after_raise PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 8
+Z19   refusal width=256 weights=reuse_after_raise PublishError::SpaceAdmissionRefused = 198
+Z19   operation width=256 weights=reuse_after_raise PublishFirstFile applied=8 refused=8 not_applicable=49
+Z19   operation width=256 weights=reuse_after_raise PublishOverwrite applied=206 refused=240 not_applicable=2629
+Z19   operation width=256 weights=reuse_after_raise PublishWithoutUnits applied=3 refused=0 not_applicable=50
+Z19   operation width=256 weights=reuse_after_raise CloseAndMountWritable applied=160 refused=912 not_applicable=0
+Z19   operation width=256 weights=reuse_after_raise CloseAndMountRollback applied=47 refused=88 not_applicable=0
+Z19   operation width=256 weights=reuse_after_raise RaiseRollbackFloor applied=32 refused=152 not_applicable=1110
+Z19   operation width=256 weights=reuse_after_raise ColdStartRecover applied=66 refused=0 not_applicable=0
+Z19 width=256 weights=rollback_after_raise first_seed=7050007000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=256 weights=rollback_after_raise MountError::RollbackFloorAboveCeiling = 75
+Z19   refusal width=256 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 132
+Z19   refusal width=256 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 144
+Z19   refusal width=256 weights=rollback_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 176
+Z19   refusal width=256 weights=rollback_after_raise PublishError::ContentExceedsDataUnit = 31
+Z19   refusal width=256 weights=rollback_after_raise PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 6
+Z19   refusal width=256 weights=rollback_after_raise PublishError::SpaceAdmissionRefused = 70
+Z19   operation width=256 weights=rollback_after_raise PublishFirstFile applied=37 refused=11 not_applicable=15
+Z19   operation width=256 weights=rollback_after_raise PublishOverwrite applied=110 refused=96 not_applicable=2036
+Z19   operation width=256 weights=rollback_after_raise PublishWithoutUnits applied=47 refused=0 not_applicable=23
+Z19   operation width=256 weights=rollback_after_raise CloseAndMountWritable applied=364 refused=61 not_applicable=0
+Z19   operation width=256 weights=rollback_after_raise CloseAndMountRollback applied=1071 refused=391 not_applicable=0
+Z19   operation width=256 weights=rollback_after_raise RaiseRollbackFloor applied=49 refused=75 not_applicable=1310
+Z19   operation width=256 weights=rollback_after_raise ColdStartRecover applied=64 refused=0 not_applicable=0
+Z19 width=384 weights=broad first_seed=7050008000 seeds=48 histories=48 completed=46 new_findings=0 known_red=2
+Z19   refusal width=384 weights=broad MountError::RollbackFloorAboveCeiling = 220
+Z19   refusal width=384 weights=broad MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 9
+Z19   refusal width=384 weights=broad MountError::RollbackTargetNotACandidate(NotInRing) = 126
+Z19   refusal width=384 weights=broad MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 70
+Z19   refusal width=384 weights=broad MountError::SpaceAdmissionRefusedBeforeAcquisition = 491
+Z19   refusal width=384 weights=broad PublishError::ContentExceedsDataUnit = 195
+Z19   refusal width=384 weights=broad PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 87
+Z19   refusal width=384 weights=broad PublishError::SpaceAdmissionRefused = 318
+Z19   operation width=384 weights=broad PublishFirstFile applied=47 refused=95 not_applicable=95
+Z19   operation width=384 weights=broad PublishOverwrite applied=548 refused=505 not_applicable=1714
+Z19   operation width=384 weights=broad PublishWithoutUnits applied=26 refused=0 not_applicable=81
+Z19   operation width=384 weights=broad CloseAndMountWritable applied=425 refused=392 not_applicable=0
+Z19   operation width=384 weights=broad CloseAndMountRollback applied=317 refused=304 not_applicable=0
+Z19   operation width=384 weights=broad RaiseRollbackFloor applied=133 refused=220 not_applicable=499
+Z19   operation width=384 weights=broad ColdStartRecover applied=215 refused=0 not_applicable=0
+Z19   RENDER width=384 weights=broad
+种子 [7050008000, 7050008048)，每段 120 步，比重：各类操作都抽（快档、大档）；每一步之后跑池级 checker；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 48 段：跑完 46、以已知红收尾 {0: 2}、新发现 0；根环转过一圈的 46 段；最高 txg 112；一版里最多 470 条分配记录
+  操作 PublishFirstFile：Ok 47、Err 95、前提不满足没调 95
+  操作 PublishOverwrite：Ok 548、Err 505、前提不满足没调 1714
+  操作 PublishWithoutUnits：Ok 26、Err 0、前提不满足没调 81
+  操作 CloseAndMountWritable：Ok 425、Err 392、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 317、Err 304、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 133、Err 220、前提不满足没调 499
+  操作 ColdStartRecover：Ok 215、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 119 次、发成 75 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 693 次、发成 417 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 105 次、发成 0 次
+  内容长度 载荷容量：入口被调 87 次、发成 54 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 106 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 85 次、发成 49 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：220 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：9 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：126 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：70 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：491 次
+  Err 成员 PublishError::ContentExceedsDataUnit：195 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：87 次
+  Err 成员 PublishError::SpaceAdmissionRefused：318 次
+  前提不满足（没有可写会话）：1804 次
+  前提不满足（现行版本带文件）：41 次
+  前提不满足（现行版本树表 0 条）：544 次
+  冷启动结局 FileRead：162 次
+  冷启动结局 NoFile：53 次
+  一次挂载里最多写出 17 条根；一段历史里最多挂载成功 26 次、最多试挂载 39 次
+  抬 F 回收到落点 26 次、共回收 662 个落点；复用已释放的记录 4402 条（其中跨度变了 626 条）；已释放的记录被罩住起点 226 条、被删 230 条
+  挂载写出的发布比过分配记录 1238 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 1544 次；一个写都没发、沿用上一次结论的 4120 步
+  模型对拍 3251 步：该拒而拒 707、区间里拒 809、该成而成 1735；比过根 2939 条、分配记录 39124 条、冷启动内容 162 次、抬 F 上限 353 次；回退到 txg = F_生效 > 0 的根做成 2 次；单元区墙按区间放行 809 次
+  I-1.1：判绿 1544 次、不适用 0 次
+  I-1.2：判绿 1544 次、不适用 0 次
+  I-1.3：判绿 1544 次、不适用 0 次
+  I-1.4：判绿 1544 次、不适用 0 次
+  I-1.6：判绿 1544 次、不适用 0 次
+  I-1.7：判绿 1544 次、不适用 0 次
+  I-1.8：判绿 1544 次、不适用 0 次
+  I-1.10：判绿 1491 次、不适用 53 次
+  I-2.1：判绿 1544 次、不适用 0 次
+  I-2.3：判绿 1544 次、不适用 0 次
+  I-2.4：判绿 1544 次、不适用 0 次
+  I-2.5：判绿 1544 次、不适用 0 次
+  I-3.1：判绿 1230 次、不适用 312 次
+  I-3.8：判绿 1544 次、不适用 0 次
+  I-3.9：判绿 1232 次、不适用 312 次
+  I-3.10：判绿 1491 次、不适用 53 次
+  I-3.11：判绿 1232 次、不适用 312 次
+  I-4.2：判绿 1544 次、不适用 0 次
+  I-4.8：判绿 1544 次、不适用 0 次
+  I-5.1：判绿 1544 次、不适用 0 次
+  I-5.2：判绿 1232 次、不适用 312 次
+  I-5.4：判绿 1232 次、不适用 312 次
+  I-7.1：判绿 1544 次、不适用 0 次
+  I-7.2：判绿 1544 次、不适用 0 次
+  I-7.3：判绿 1544 次、不适用 0 次
+  I-7.4：判绿 1544 次、不适用 0 次
+  I-7.6：判绿 1544 次、不适用 0 次
+  I-7.7：判绿 1544 次、不适用 0 次
+  I-7.8：判绿 1544 次、不适用 0 次
+  I-7.9：判绿 624 次、不适用 920 次
+  I-7.10：判绿 1544 次、不适用 0 次
+  I-7.11：判绿 1544 次、不适用 0 次
+  I-8.6：判绿 1520 次、不适用 24 次
+  I-8.7：判绿 1324 次、不适用 220 次
+  I-8.8：判绿 0 次、不适用 1544 次
+  I-8.9：判绿 1520 次、不适用 24 次
+  I-9.1：判绿 1232 次、不适用 312 次
+  I-9.2：判绿 1232 次、不适用 312 次
+  I-9.4：判绿 1232 次、不适用 312 次
+  I-9.6：判绿 1232 次、不适用 312 次
+  I-9.7：判绿 1232 次、不适用 312 次
+  I-9.10：判绿 1232 次、不适用 312 次
+  I-9.12：判绿 1232 次、不适用 312 次
+  I-9.13：判绿 1232 次、不适用 312 次
+  I-9.14：判绿 1161 次、不适用 383 次
+  I-9.15：判绿 1232 次、不适用 312 次
+已知红第 0 条（增补 2 收口表第 43 行）：2 段；前几个种子 [(7050008007, Operation(16)), (7050008017, Operation(78))]
+
+Z19 width=384 weights=unit_area_wall first_seed=7050009000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=384 weights=unit_area_wall MountError::RollbackFloorAboveCeiling = 32
+Z19   refusal width=384 weights=unit_area_wall MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 2
+Z19   refusal width=384 weights=unit_area_wall MountError::RollbackTargetNotACandidate(NotInRing) = 14
+Z19   refusal width=384 weights=unit_area_wall MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 3
+Z19   refusal width=384 weights=unit_area_wall MountError::SpaceAdmissionRefusedBeforeAcquisition = 355
+Z19   refusal width=384 weights=unit_area_wall PublishError::ContentExceedsDataUnit = 165
+Z19   refusal width=384 weights=unit_area_wall PublishError::SpaceAdmissionRefused = 483
+Z19   operation width=384 weights=unit_area_wall PublishOverwrite applied=561 refused=648 not_applicable=3790
+Z19   operation width=384 weights=unit_area_wall CloseAndMountWritable applied=83 refused=341 not_applicable=0
+Z19   operation width=384 weights=unit_area_wall CloseAndMountRollback applied=25 refused=33 not_applicable=0
+Z19   operation width=384 weights=unit_area_wall RaiseRollbackFloor applied=25 refused=32 not_applicable=161
+Z19   operation width=384 weights=unit_area_wall ColdStartRecover applied=61 refused=0 not_applicable=0
+Z19 width=384 weights=reuse_after_raise first_seed=7050010000 seeds=48 histories=48 completed=47 new_findings=0 known_red=1
+Z19   refusal width=384 weights=reuse_after_raise MountError::RollbackFloorAboveCeiling = 190
+Z19   refusal width=384 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 5
+Z19   refusal width=384 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 30
+Z19   refusal width=384 weights=reuse_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 8
+Z19   refusal width=384 weights=reuse_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 865
+Z19   refusal width=384 weights=reuse_after_raise PublishError::ContentExceedsDataUnit = 99
+Z19   refusal width=384 weights=reuse_after_raise PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 16
+Z19   refusal width=384 weights=reuse_after_raise PublishError::SpaceAdmissionRefused = 189
+Z19   operation width=384 weights=reuse_after_raise PublishFirstFile applied=11 refused=18 not_applicable=44
+Z19   operation width=384 weights=reuse_after_raise PublishOverwrite applied=393 refused=286 not_applicable=2363
+Z19   operation width=384 weights=reuse_after_raise PublishWithoutUnits applied=7 refused=0 not_applicable=77
+Z19   operation width=384 weights=reuse_after_raise CloseAndMountWritable applied=225 refused=834 not_applicable=0
+Z19   operation width=384 weights=reuse_after_raise CloseAndMountRollback applied=46 refused=74 not_applicable=0
+Z19   operation width=384 weights=reuse_after_raise RaiseRollbackFloor applied=84 refused=190 not_applicable=957
+Z19   operation width=384 weights=reuse_after_raise ColdStartRecover applied=46 refused=0 not_applicable=0
+Z19   RENDER width=384 weights=reuse_after_raise
+种子 [7050010000, 7050010048)，每段 120 步，比重：偏向抬 F 之后的复用（第 121 行那一类的取样点）；每一步之后跑池级 checker；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 48 段：跑完 47、以已知红收尾 {0: 1}、新发现 0；根环转过一圈的 25 段；最高 txg 100；一版里最多 548 条分配记录
+  操作 PublishFirstFile：Ok 11、Err 18、前提不满足没调 44
+  操作 PublishOverwrite：Ok 393、Err 286、前提不满足没调 2363
+  操作 PublishWithoutUnits：Ok 7、Err 0、前提不满足没调 77
+  操作 CloseAndMountWritable：Ok 225、Err 834、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 46、Err 74、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 84、Err 190、前提不满足没调 957
+  操作 ColdStartRecover：Ok 46、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 77 次、发成 52 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 411 次、发成 283 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 51 次、发成 0 次
+  内容长度 载荷容量：入口被调 72 次、发成 40 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 51 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 46 次、发成 29 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：190 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：5 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：30 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：8 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：865 次
+  Err 成员 PublishError::ContentExceedsDataUnit：99 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：16 次
+  Err 成员 PublishError::SpaceAdmissionRefused：189 次
+  前提不满足（没有可写会话）：3265 次
+  前提不满足（现行版本带文件）：18 次
+  前提不满足（现行版本树表 0 条）：158 次
+  冷启动结局 FileRead：43 次
+  冷启动结局 NoFile：3 次
+  一次挂载里最多写出 34 条根；一段历史里最多挂载成功 34 次、最多试挂载 35 次
+  抬 F 回收到落点 43 次、共回收 1018 个落点；复用已释放的记录 896 条（其中跨度变了 166 条）；已释放的记录被罩住起点 30 条、被删 30 条
+  挂载写出的发布比过分配记录 489 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 814 次；一个写都没发、沿用上一次结论的 4889 步
+  模型对拍 2252 步：该拒而拒 348、区间里拒 1054、该成而成 850；比过根 1331 条、分配记录 20220 条、冷启动内容 43 次、抬 F 上限 274 次；回退到 txg = F_生效 > 0 的根做成 1 次；单元区墙按区间放行 1054 次
+  I-1.1：判绿 814 次、不适用 0 次
+  I-1.2：判绿 814 次、不适用 0 次
+  I-1.3：判绿 814 次、不适用 0 次
+  I-1.4：判绿 814 次、不适用 0 次
+  I-1.6：判绿 814 次、不适用 0 次
+  I-1.7：判绿 814 次、不适用 0 次
+  I-1.8：判绿 814 次、不适用 0 次
+  I-1.10：判绿 792 次、不适用 22 次
+  I-2.1：判绿 814 次、不适用 0 次
+  I-2.3：判绿 814 次、不适用 0 次
+  I-2.4：判绿 814 次、不适用 0 次
+  I-2.5：判绿 814 次、不适用 0 次
+  I-3.1：判绿 729 次、不适用 84 次
+  I-3.8：判绿 814 次、不适用 0 次
+  I-3.9：判绿 730 次、不适用 84 次
+  I-3.10：判绿 792 次、不适用 22 次
+  I-3.11：判绿 730 次、不适用 84 次
+  I-4.2：判绿 814 次、不适用 0 次
+  I-4.8：判绿 814 次、不适用 0 次
+  I-5.1：判绿 814 次、不适用 0 次
+  I-5.2：判绿 730 次、不适用 84 次
+  I-5.4：判绿 730 次、不适用 84 次
+  I-7.1：判绿 814 次、不适用 0 次
+  I-7.2：判绿 814 次、不适用 0 次
+  I-7.3：判绿 814 次、不适用 0 次
+  I-7.4：判绿 814 次、不适用 0 次
+  I-7.6：判绿 814 次、不适用 0 次
+  I-7.7：判绿 814 次、不适用 0 次
+  I-7.8：判绿 814 次、不适用 0 次
+  I-7.9：判绿 246 次、不适用 568 次
+  I-7.10：判绿 814 次、不适用 0 次
+  I-7.11：判绿 814 次、不适用 0 次
+  I-8.6：判绿 804 次、不适用 10 次
+  I-8.7：判绿 658 次、不适用 156 次
+  I-8.8：判绿 0 次、不适用 814 次
+  I-8.9：判绿 804 次、不适用 10 次
+  I-9.1：判绿 730 次、不适用 84 次
+  I-9.2：判绿 730 次、不适用 84 次
+  I-9.4：判绿 730 次、不适用 84 次
+  I-9.6：判绿 730 次、不适用 84 次
+  I-9.7：判绿 730 次、不适用 84 次
+  I-9.10：判绿 730 次、不适用 84 次
+  I-9.12：判绿 730 次、不适用 84 次
+  I-9.13：判绿 730 次、不适用 84 次
+  I-9.14：判绿 681 次、不适用 133 次
+  I-9.15：判绿 730 次、不适用 84 次
+已知红第 0 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(7050010030, Operation(14))]
+
+Z19 width=384 weights=rollback_after_raise first_seed=7050011000 seeds=48 histories=48 completed=48 new_findings=0 known_red=0
+Z19   refusal width=384 weights=rollback_after_raise MountError::RollbackFloorAboveCeiling = 155
+Z19   refusal width=384 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(BelowEffectiveFloor) = 4
+Z19   refusal width=384 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(NotInRing) = 126
+Z19   refusal width=384 weights=rollback_after_raise MountError::RollbackTargetNotACandidate(OnAbandonedTimeline) = 141
+Z19   refusal width=384 weights=rollback_after_raise MountError::SpaceAdmissionRefusedBeforeAcquisition = 108
+Z19   refusal width=384 weights=rollback_after_raise PublishError::ContentExceedsDataUnit = 50
+Z19   refusal width=384 weights=rollback_after_raise PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile = 4
+Z19   refusal width=384 weights=rollback_after_raise PublishError::SpaceAdmissionRefused = 56
+Z19   operation width=384 weights=rollback_after_raise PublishFirstFile applied=26 refused=8 not_applicable=17
+Z19   operation width=384 weights=rollback_after_raise PublishOverwrite applied=204 refused=102 not_applicable=1971
+Z19   operation width=384 weights=rollback_after_raise PublishWithoutUnits applied=45 refused=0 not_applicable=28
+Z19   operation width=384 weights=rollback_after_raise CloseAndMountWritable applied=386 refused=37 not_applicable=0
+Z19   operation width=384 weights=rollback_after_raise CloseAndMountRollback applied=1076 refused=342 not_applicable=0
+Z19   operation width=384 weights=rollback_after_raise RaiseRollbackFloor applied=75 refused=155 not_applicable=1222
+Z19   operation width=384 weights=rollback_after_raise ColdStartRecover applied=66 refused=0 not_applicable=0
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 437.60s
+

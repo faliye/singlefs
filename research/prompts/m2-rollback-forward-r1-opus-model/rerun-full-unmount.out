@@ -1,0 +1,5 @@
+RBF t5a chain_txgs=[6, 7] units_written=[8, 8] writes=[(21, 279040), (21, 279040)]
+RBF crash name=unmount-b closed_form_full=327690 segment_lengths=[16, 2, 1, 18, 2, 1, 2] full=true
+RBF crash name=unmount-b writes=42 states=327690 violations=0 failed=0 first_violation=none probe_states=0 probe_bad(kill1,kill2,kill3)=[0, 0, 0] probe_first_bad=[None, None, None]
+RBF crash name=unmount-b checker_violated=["I-7.9=262151:实例 1 txg 6 那条根把回退下界 F 从 0 抬到 5，高于它之前的根算出的抬 F 上限 0：每块盘上最新的有效根 {0: 5, 1: 4}，非空有效根 [3, 4, 5]，空不空判不了的有效根 []，最旧有效根 txg 0"]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 191.97s

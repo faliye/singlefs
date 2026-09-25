@@ -1,0 +1,189 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -7,8 +7,9 @@
+     CheckpointTxg, DeviceIdentity, InstanceGeneration, JournalSequenceNumber, SlotNumber,
+ };
+ use crate::admission::{
+-    admission_reading_before_a_publish, admit_on_every_device, AdmissionRefusedOnSomeDevices,
+-    BytesOnOneDevice, DemandOnDevice, SpaceAdmission,
++    admission_reading_before_a_publish, admit_on_every_device_for_candidate,
++    mount_admission_a4_switch_reserve_only, AdmissionRefusedOnSomeDevices, BytesOnOneDevice,
++    DemandOnDevice, S4Candidate, SpaceAdmission,
+ };
+ use crate::allocation_record_tree::{
+     node_pointers_as_far_as_readable, AllocationRecordTreeGeometry,
+@@ -512,6 +513,8 @@
+     rows_of_the_chosen_roots_instance_table: Vec<InstanceRow>,
+     /// 判不判空间准入（只供测试的开关，`admission::SpaceAdmission`）：产品路径恒判。
+     space_admission: SpaceAdmission,
++    /// S4 二轮候选（只供三方论证，`admission::S4Candidate`）：产品路径恒 `Baseline`，与今天的判法逐字相同。
++    s4_candidate: S4Candidate,
+     /// 所选那一版（`effective_root` 那一版）那次发布的末条记录的 jsn（`journal_position_of_the_selected_version`）：
+     /// 取号之前逐盘核「这块盘落没落后于这一版」拿它比。
+     selected_version_journal_position: JournalSequenceNumber,
+@@ -2086,26 +2089,37 @@
+         u64::try_from(instance_table_rewrite.rows.len()).expect("实例表的行数装得进 u64"),
+     );
+     allocator.set_space_admission(start.space_admission);
++    allocator.set_s4_candidate(start.s4_candidate);
+     match start.space_admission {
+         SpaceAdmission::JudgedByTheFormula => {
+-            let no_demand_on_any_device: Vec<DemandOnDevice> = allocator
+-                .devices
+-                .iter()
+-                .map(|device_map| DemandOnDevice {
+-                    device: device_map.device,
+-                    bytes: BytesOnOneDevice::ZERO,
+-                })
+-                .collect();
+-            admit_on_every_device(
+-                &admission_reading_before_a_publish(&allocator, start.previous.file_version()),
+-                &no_demand_on_any_device,
+-            )
+-            .map_err(
+-                |refusal| MountError::SpaceAdmissionRefusedBeforeAcquisition {
+-                    instance_to_acquire,
+-                    refusal,
+-                },
+-            )?;
++            let reading =
++                admission_reading_before_a_publish(&allocator, start.previous.file_version());
++            // S4 二轮候选 A4（只供三方论证，`admission::S4Candidate`）在挂载入口单独判：需求恒 0，
++            // 走专用的 `mount_admission_a4_switch_reserve_only`（S4Candidate 的文档注释——不经共用的
++            // `admit_on_every_device_for_candidate`，避免这条读法被同一个全局开关带进发布路径）。
++            let verdict = match start.s4_candidate {
++                S4Candidate::A4 => mount_admission_a4_switch_reserve_only(&reading),
++                S4Candidate::Baseline | S4Candidate::A1 | S4Candidate::A2 | S4Candidate::A3 => {
++                    let no_demand_on_any_device: Vec<DemandOnDevice> = allocator
++                        .devices
++                        .iter()
++                        .map(|device_map| DemandOnDevice {
++                            device: device_map.device,
++                            bytes: BytesOnOneDevice::ZERO,
++                        })
++                        .collect();
++                    admit_on_every_device_for_candidate(
++                        start.s4_candidate,
++                        &reading,
++                        &no_demand_on_any_device,
++                        &[],
++                    )
++                }
++            };
++            verdict.map_err(|refusal| MountError::SpaceAdmissionRefusedBeforeAcquisition {
++                instance_to_acquire,
++                refusal,
++            })?;
+         }
+         SpaceAdmission::SkippedByTheTestOnlySwitch => {}
+     }
+@@ -2356,11 +2370,17 @@
+     parameters: &MakeFilesystemParameters,
+     devices: &mut Vec<(DeviceIdentity, Device)>,
+ ) -> Result<Mounted, MountError> {
+-    mount_writable_with_space_admission(parameters, devices, SpaceAdmission::JudgedByTheFormula)
++    mount_writable_with_space_admission_and_s4_candidate(
++        parameters,
++        devices,
++        SpaceAdmission::JudgedByTheFormula,
++        S4Candidate::Baseline,
++    )
+ }
+ 
+ /// 同 [`mount_writable`]，判不判空间准入由调用方给（只供测试的开关 `SpaceAdmission`；产品路径走 `mount_writable`，恒判）。
+-/// 开关装在交回的分配器上，这次挂载之后的发布照它判不判。
++/// 开关装在交回的分配器上，这次挂载之后的发布照它判不判。S4 二轮候选恒 `Baseline`
++/// （要给 S4 候选，调 [`mount_writable_with_space_admission_and_s4_candidate`]）。
+ ///
+ /// # Errors
+ /// 同 [`mount_writable`]；`SkippedByTheTestOnlySwitch` 时不报 `SpaceAdmissionRefusedBeforeAcquisition`。
+@@ -2369,6 +2389,24 @@
+     devices: &mut Vec<(DeviceIdentity, Device)>,
+     space_admission: SpaceAdmission,
+ ) -> Result<Mounted, MountError> {
++    mount_writable_with_space_admission_and_s4_candidate(
++        parameters,
++        devices,
++        space_admission,
++        S4Candidate::Baseline,
++    )
++}
++
++/// 同 [`mount_writable_with_space_admission`]，另外给一个 S4 二轮候选（只供三方论证，`admission::S4Candidate`）。
++///
++/// # Errors
++/// 同 [`mount_writable`]。
++pub fn mount_writable_with_space_admission_and_s4_candidate<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    space_admission: SpaceAdmission,
++    s4_candidate: S4Candidate,
++) -> Result<Mounted, MountError> {
+     admit_the_writable_device_count(DeviceCount(devices.len()))?;
+     let system_configuration = choose_system_configuration(&*devices)?;
+     let chosen_root =
+@@ -2454,6 +2492,7 @@
+             system_configuration,
+             rows_of_the_chosen_roots_instance_table,
+             space_admission,
++            s4_candidate,
+             selected_version_journal_position,
+         },
+     )
+@@ -2475,16 +2514,18 @@
+     target: RollbackTarget,
+     shadow_ledger: ShadowLedger,
+ ) -> Result<Mounted, MountError> {
+-    mount_rollback_with_space_admission(
++    mount_rollback_with_space_admission_and_s4_candidate(
+         parameters,
+         devices,
+         target,
+         shadow_ledger,
+         SpaceAdmission::JudgedByTheFormula,
++        S4Candidate::Baseline,
+     )
+ }
+ 
+ /// 同 [`mount_rollback`]，判不判空间准入由调用方给（只供测试的开关 `SpaceAdmission`，同 [`mount_writable_with_space_admission`]）。
++/// S4 二轮候选恒 `Baseline`（要给 S4 候选，调 [`mount_rollback_with_space_admission_and_s4_candidate`]）。
+ ///
+ /// # Errors
+ /// 同 [`mount_rollback`]；`SkippedByTheTestOnlySwitch` 时不报 `SpaceAdmissionRefusedBeforeAcquisition`。
+@@ -2495,6 +2536,28 @@
+     shadow_ledger: ShadowLedger,
+     space_admission: SpaceAdmission,
+ ) -> Result<Mounted, MountError> {
++    mount_rollback_with_space_admission_and_s4_candidate(
++        parameters,
++        devices,
++        target,
++        shadow_ledger,
++        space_admission,
++        S4Candidate::Baseline,
++    )
++}
++
++/// 同 [`mount_rollback_with_space_admission`]，另外给一个 S4 二轮候选（只供三方论证，`admission::S4Candidate`）。
++///
++/// # Errors
++/// 同 [`mount_rollback`]。
++pub fn mount_rollback_with_space_admission_and_s4_candidate<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &mut Vec<(DeviceIdentity, Device)>,
++    target: RollbackTarget,
++    shadow_ledger: ShadowLedger,
++    space_admission: SpaceAdmission,
++    s4_candidate: S4Candidate,
++) -> Result<Mounted, MountError> {
+     admit_the_writable_device_count(DeviceCount(devices.len()))?;
+     let system_configuration = choose_system_configuration(&*devices)?;
+     let newest_root =
+@@ -2642,6 +2705,7 @@
+             system_configuration,
+             rows_of_the_chosen_roots_instance_table: newest_table.rows,
+             space_admission,
++            s4_candidate,
+             selected_version_journal_position,
+         },
+     )

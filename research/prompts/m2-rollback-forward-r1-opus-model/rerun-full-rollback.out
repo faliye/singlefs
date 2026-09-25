@@ -1,0 +1,5 @@
+RBF t4 txgs=[6, 7] counts=PrototypeForwardCounts { released_placements: 12, released_slots: 14, revived_placements: 12, revived_slots: 14, birth_pruned_would_miss: 0, birth_pruned_nodes_read: 11, birth_pruned_data_units: 1, target_allocation_record_tree_nodes: 5, newest_allocation_record_tree_nodes: 5, newest_born_after_target_by_family: {"accounting_tree": 1, "allocation_tree": 5, "data": 1, "extent_root": 1, "inode_leaf": 1, "inode_root": 1, "mapping_tree": 1, "tree_table": 1} }
+RBF crash name=forward-rollback closed_form_full=524301 segment_lengths=[2, 18, 2, 1, 18, 2, 1, 2] full=true
+RBF crash name=forward-rollback writes=46 states=524301 violations=0 failed=0 first_violation=none probe_states=2622 probe_bad(kill1,kill2,kill3)=[0, 0, 0] probe_first_bad=[None, None, None]
+RBF crash name=forward-rollback checker_violated=["I-3.9=262151:盘 1 槽 50245 的分配记录释放代 6 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4"]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 488.10s

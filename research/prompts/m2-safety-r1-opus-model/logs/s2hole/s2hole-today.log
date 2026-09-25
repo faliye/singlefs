@@ -1,0 +1,112 @@
+S2HOLE degrade=false degraded=false N=2 M=3 k=0/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=1/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=2/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=3/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=4/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=5/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=6/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=7/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=8/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=9/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=10/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=11/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=12/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=13/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=14/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=15/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=16/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=17/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=18/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=19/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=20/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=21/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=22/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=23/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=24/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=25/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=26/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=27/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=28/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=29/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=30/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=31/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=32/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=33/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=34/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=35/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=36/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=37/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=38/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=39/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=40/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=41/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=42/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=43/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=44/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=45/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=46/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=47/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=48/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=49/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=50/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=51/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=52/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=53/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=54/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=false degraded=false N=2 M=3 k=55/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=0/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=1/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=2/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=3/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=4/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=5/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=6/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=7/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=8/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=9/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=10/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=11/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=12/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=13/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=14/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=15/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=16/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=17/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=18/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=19/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=20/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=21/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=22/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=23/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=24/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=25/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=26/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=7 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=27/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=28/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=29/55 witness_before_final=[] final_mount=Ok((2, 6)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=30/55 witness_before_final=[] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=31/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=32/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=33/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=34/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=35/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=36/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=37/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=38/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=39/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=40/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=41/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=42/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=43/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=44/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=45/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=46/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=47/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=48/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=49/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=50/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=51/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=52/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 7)) witness_after=[(2, 1, 3)] live_unreadable=8 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=53/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=54/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false
+S2HOLE degrade=true degraded=true N=2 M=3 k=55/55 witness_before_final=[(2, 1, 3)] final_mount=Ok((3, 8)) witness_after=[(2, 1, 3)] live_unreadable=9 landed=None C332_hit=false

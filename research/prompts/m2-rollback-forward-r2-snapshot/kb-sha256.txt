@@ -1,0 +1,9 @@
+# .claude/kb/ 快照 sha256 清单（只含正文第三节点名的 7 份：5 份决策 + invariants.md + checks-owed.md），取自 /tmp/claude-1000/m2-rollback-forward-r2/kb-snapshot/，2026-09-25 21:57 JST 拷贝，保持 .claude/kb/… 的相对路径。
+# 核验：cd /tmp/claude-1000/m2-rollback-forward-r2/kb-snapshot && sha256sum -c research/prompts/m2-rollback-forward-r2-snapshot/kb-sha256.txt（或把本文件拷到该目录下用相对路径核）。
+d66ad7c3cc77b24e2376caa9456ff56a2553fa992bc508acb60808ae0f7ea243  .claude/kb/checks-owed.md
+eb9402857f4c959fa29fa11773f0353525ab4da590d0a0ffa68a170b0c13a8ac  .claude/kb/decisions/05-快照-空间记账机制.md
+11d4395db3e20884c54ff8241235723038b911654bbd095fe1d47c48112b0951  .claude/kb/decisions/16-发布语义.md
+e10eafc22c662fe86fb3a56d73b6b2071843e55f8893b29bb112e3b568e3fdf3  .claude/kb/decisions/18-块里携带什么信息.md
+2df6063785dc9aaa882773fcbf1306fa57de2ea28378a536931d8a6e4d9f975f  .claude/kb/decisions/22-单元原子性怎么合成.md
+548da6bece362cc8abbe7993bc2aca952cf9d64b14f357bb45697c3c18c67ad2  .claude/kb/decisions/23-journal的角色与格式.md
+c6f8864941025638163bb0441648cb411a3768e69e6a30fc94d1ab1bd795717d  .claude/kb/invariants.md

@@ -1,0 +1,35 @@
+--- /tmp/claude-1000/m2-safety-r1/tree/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25 03:02:56.989581724 +0000
++++ /tmp/claude-1000/m2-safety-r1-sonnet/tree-s5/crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	2026-09-25 04:32:24.101379818 +0000
+@@ -1267,7 +1267,12 @@
+                 false,
+             )
+         }
+-        Err(_error) => (None, true),
++        Err(error) => {
++            if std::env::var("SONNET_S5_TRACE").is_ok() {
++                eprintln!("S5TRACE mount_writable_with_fault error={error:?}");
++            }
++            (None, true)
++        }
+     };
+     plan.disarm();
+     let recover_after_fault_removed_outcome =
+@@ -5129,6 +5134,18 @@
+     if mode == "q3-1-s4" {
+         run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &initial_overwrite_counts, 4);
+     }
++    if mode == "q3-1-s4-timing-probe" {
++        run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &[1], 1);
++    }
++    if mode == "q3-1-s4-timing-probe-2" {
++        run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &[1], 2);
++    }
++    if mode == "q3-1-s4-timing-probe-3" {
++        run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &[1], 3);
++    }
++    if mode == "q3-1-s4-timing-probe-4" {
++        run_fault_set_violation_family(&GEOMETRY_SMALLER_ROOT_RING, &[1], 4);
++    }
+ 
+     // Q1（跑前登记岔路单第 1 行，C393）：H1 家族 + Φ1 故障注入 + PC1-a/PC1-b。
+     if mode == "q1-g0" {

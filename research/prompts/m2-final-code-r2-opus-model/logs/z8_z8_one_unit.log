@@ -1,0 +1,20 @@
+
+running 1 test
+=== Z8 data_units=1 reference_ops=23
+    21  first attempt did not fail
+     4  no-resend recover: FileRead(1,3) len=16317
+    19  no-resend recover: FileRead(1,3) len=3000
+     2  no-resend recover: FileRead(1,4) len=16317
+    25  no-resend remount ok
+     1  resend second_failure=false identical_except_sysconfig=true sysconfig_bytes_identical=false
+    24  resend second_failure=false identical_except_sysconfig=true sysconfig_bytes_identical=true
+    49  resend second_failure=true identical_except_sysconfig=true sysconfig_bytes_identical=false
+   576  resend second_failure=true identical_except_sysconfig=true sysconfig_bytes_identical=true
+   342  resend-prefix recover A
+   141  resend-prefix recover B(root 3 + replayed record)
+   117  resend-prefix recover B(root 4)
+mismatches=0 []
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 14.06s
+
+z8_one_unit rc=0

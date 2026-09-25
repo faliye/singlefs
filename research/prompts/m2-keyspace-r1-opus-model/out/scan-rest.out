@@ -1,0 +1,123 @@
+2026-09-24T10:48:20Z
+SCAN S1-Absent-NoLookBack-even histories=1148 publishes=2229 refused=0 too_big=454 states=170508268726 closed_form=3226515581285104 classes=2570129200 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=32215 max_units=25 alloc_nodes=24951 ext_nodes=3633 leaves_by_alloc_chain=6382 max_segment_writes=50 red_reasons={} secs=1328
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=44
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=276
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=258
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=746
+SCAN S1-Absent-LookBack-odd histories=1148 publishes=2229 refused=0 too_big=430 states=181807682974 closed_form=533852969047024 classes=2774923582 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=179937801262 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=32169 max_units=23 alloc_nodes=24905 ext_nodes=3633 leaves_by_alloc_chain=7170 max_segment_writes=46 red_reasons={} secs=1479
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=43
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=272
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=258
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=901
+SCAN S1-Absent-NoLookBack-odd histories=1148 publishes=2229 refused=0 too_big=430 states=181807682974 closed_form=533852969047024 classes=2774923582 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=179937801262 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=32169 max_units=23 alloc_nodes=24905 ext_nodes=3633 leaves_by_alloc_chain=7170 max_segment_writes=46 red_reasons={} secs=1549
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=44
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=315
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=280
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=906
+SCAN S1-Absent-LookBack-odd-fallback histories=1148 publishes=2229 refused=0 too_big=327 states=234667031095 closed_form=448332899989744 classes=3528020250 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=234662627895 double_alloc=0 release_missing=0 fallback=30693 grew=533 shrank=491 top_split=0 units=32095 max_units=24 alloc_nodes=24831 ext_nodes=3633 leaves_by_alloc_chain=10420 max_segment_writes=48 red_reasons={} secs=1446
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=2
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=14
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=259
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=343
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=825
+SCAN S1-Absent-NoLookBack-odd-fallback histories=1148 publishes=2229 refused=0 too_big=331 states=102225066811 closed_form=965585103403504 classes=1631046424 recover_fail=0 check_red=100810463310 content_mismatch=0 root_lost=0 applied_by_record=2376 crossing_states=0 double_alloc=405 release_missing=584 fallback=26707 grew=533 shrank=491 top_split=0 units=28109 max_units=24 alloc_nodes=20845 ext_nodes=3633 leaves_by_alloc_chain=6028 max_segment_writes=48 red_reasons={"inode 容器读不出": 10064209, "数据单元槽": 100800399101} secs=706
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=1
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=1 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=11
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=2 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=74
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=3 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=82
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=3 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=537
+  example: CHECK_RED 数据单元槽 14 读不出; recovered txg 2; suffix=[Write(1, 1), Write(1, 0)]
+  example: CHECK_RED 数据单元槽 14 读不出; recovered txg 2; suffix=[Write(1, 1), Write(1, 0)]
+  example: CHECK_RED inode 容器读不出; recovered txg 2; suffix=[Create(3), Create(3)]
+  example: CHECK_RED inode 容器读不出; recovered txg 2; suffix=[Create(3), Create(3)]
+SCAN S1-Absent-NoLookBack-even-fallback histories=1148 publishes=2229 refused=0 too_big=291 states=223024089619 closed_form=373717675116784 classes=3371942772 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=30281 grew=533 shrank=491 top_split=0 units=31683 max_units=24 alloc_nodes=24419 ext_nodes=3633 leaves_by_alloc_chain=10072 max_segment_writes=48 red_reasons={} secs=1386
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=4
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=23
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=171
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=352
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=833
+SCAN S2-PerFile histories=1148 publishes=2229 refused=0 too_big=454 states=170508268726 closed_form=3226515581285104 classes=2570129200 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=0 units=32215 max_units=25 alloc_nodes=24951 ext_nodes=3633 leaves_by_alloc_chain=6382 max_segment_writes=50 red_reasons={} secs=1392
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=3
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=42
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=277
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=286
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=782
+SCAN S2-GlobalKeyed histories=1148 publishes=2229 refused=0 too_big=861 states=107962768717 closed_form=13608669393395718640 classes=1532252712 recover_fail=0 check_red=0 content_mismatch=0 root_lost=0 applied_by_record=3444 crossing_states=0 double_alloc=0 release_missing=0 fallback=0 grew=533 shrank=491 top_split=212 units=43500 max_units=30 alloc_nodes=30971 ext_nodes=8898 leaves_by_alloc_chain=10450 max_segment_writes=60 red_reasons={} secs=1083
+  prefix P1: refused_in_prefix=0 double_alloc_in_prefix=0 txg=1 files=[(1, 1)]
+  prefix P1: histories=56 secs=42
+  prefix PA: refused_in_prefix=0 double_alloc_in_prefix=0 txg=2 files=[(1, 2)]
+  prefix PA: histories=72 secs=57
+  prefix PB: refused_in_prefix=0 double_alloc_in_prefix=0 txg=6 files=[(1, 4), (2, 2)]
+  prefix PB: histories=210 secs=215
+  prefix PC: refused_in_prefix=0 double_alloc_in_prefix=0 txg=14 files=[(1, 4), (2, 2)]
+  prefix PC: histories=210 secs=501
+  prefix PD: refused_in_prefix=0 double_alloc_in_prefix=0 txg=9 files=[(1, 4), (2, 2), (3, 1), (4, 1)]
+  prefix PD: histories=600 secs=267
+thread '<unnamed>' (924215) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924222) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924220) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924212) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924205) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924207) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924225) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924200) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924203) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924204) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924221) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924214) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924219) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924227) panicked at crates/singlefs-harness/src/crash.rs:500:24:
+thread '<unnamed>' (924202) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:1682:9:
+thread '<unnamed>' (924198) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924208) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924226) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924217) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924213) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924211) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924209) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924199) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924201) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924210) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread '<unnamed>' (924218) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2097:34:
+thread 'scan_candidates' (2049998) panicked at crates/singlefs-harness/tests/keyspace_opus_model.rs:2085:9:
+a scoped thread panicked
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 10812.47s
+2026-09-24T13:48:33Z

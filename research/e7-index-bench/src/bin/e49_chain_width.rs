@@ -52,6 +52,41 @@ fn divergences(base: u64, narrow_chain_bytes: u64, wide_chain_bytes: u64, unit: 
     (divergent_item_count, first_divergent_items)
 }
 
+/// 读法乙：记录定长 `RECORD_BYTES_FIXED`（D23 已定项 12），一条装
+/// ⌊(定长 − base − 链宽) ÷ 56⌋ 项（D23 已定项 17：一个点名项 56 字节）。
+fn items_per_fixed_record(base: u64, chain_bytes: u64) -> u64 {
+    (RECORD_BYTES_FIXED - base - chain_bytes) / ITEM_BYTES
+}
+
+/// 读法乙：`items` 项要几条定长记录。`max(1, ⌈N ÷ 每条项数⌉)`——
+/// N = 0 时也要一条空发布记录（D23 已定项 19 ①）。
+fn records_needed(base: u64, chain_bytes: u64, items: u64) -> u64 {
+    let per_record = items_per_fixed_record(base, chain_bytes);
+    items.div_ceil(per_record).max(1)
+}
+
+/// 读法乙版的 `divergences`：两个链宽在给定 `base` 下，0..=`largest_item_count`
+/// 里有多少个项数上要的记录条数不同。
+fn divergences_fixed_record(base: u64, narrow_chain_bytes: u64, wide_chain_bytes: u64, largest_item_count: u64) -> (u64, Option<u64>) {
+    let mut divergent_item_count = 0u64;
+    let mut first_divergent_items = None;
+    for items in 0..=largest_item_count {
+        if records_needed(base, narrow_chain_bytes, items) != records_needed(base, wide_chain_bytes, items) {
+            divergent_item_count += 1;
+            if first_divergent_items.is_none() {
+                first_divergent_items = Some(items);
+            }
+        }
+    }
+    (divergent_item_count, first_divergent_items)
+}
+
+/// 「免费」判据：分岔数不超过门槛就算免费。原判据 2 的门槛 `tolerance = 0`；
+/// 第八节的判别力自证把门槛挪到 `d`（该格自己的分岔数），判定必须翻面（V5）。
+fn is_free(divergent_count: u64, tolerance: u64) -> bool {
+    divergent_count <= tolerance
+}
+
 /// 误接受期望次数 = 机会数 × 2⁻ⁿ。
 fn expected_false_accepts(chances: f64, bits: u32) -> f64 {
     chances / 2f64.powi(bits as i32)
@@ -80,6 +115,22 @@ const INCIDENT_CHANCES: f64 = 36_500.0; // D-事故：每天崩 10 次 × 十年
 const RINGS: [u64; 3] = [10 * 1024 * 1024, 100 * 1024 * 1024, 2 * 1024 * 1024 * 1024];
 const RECORD_ON_DISK_BYTES: [u64; 2] = [512, 4096];
 const PASSES: [(&str, f64); 2] = [("weekly", 522.0), ("daily", 3650.0)];
+
+// ── E49 重跑登记（记录头 311）：`base` 这个旋钮上的两个被判取值 ──
+// base 是「不含链」的记录头总字节（见 `units_on_disk` 文档注释）。
+
+/// 反向链宽度（今天）：D23 已定项 8「宽度 32 位」＝ 4 字节。
+const BACK_CHAIN_BYTES_TODAY: u64 = 4;
+/// 记录头总字节（今天）：D23 已定项 4「头 311 字节」。门禁 27 号把这个名字与 kb 标记绑住。
+const JOURNAL_HEADER_BYTES: u64 = 311;
+/// 改之前那一档（2026-09-14 到 2026-09-24 现行）的记录头总字节。
+const HEADER_BYTES_BEFORE: u64 = 307;
+/// 今天的 base = 今天的记录头总字节 − 反向链宽度。
+const BASE_TODAY: u64 = JOURNAL_HEADER_BYTES - BACK_CHAIN_BYTES_TODAY;
+/// 改之前那一档的 base，同一个减法。
+const BASE_BEFORE: u64 = HEADER_BYTES_BEFORE - BACK_CHAIN_BYTES_TODAY;
+/// 读法乙：记录尺寸定长（D23 已定项 12）。
+const RECORD_BYTES_FIXED: u64 = 4096;
 
 fn main() {
     let mut emitter = Emitter::new();
@@ -124,6 +175,42 @@ fn main() {
             "name=cost_summary cells={cell_count} free_2v4={free_cell_count_2_versus_4} free_4v8={free_cell_count_4_versus_8}"
         ))
     );
+
+    // ── E49 重跑登记（记录头 311）：Q49.2 / Q49.3，读法甲在两个被判 base 上 ──
+    for base in [BASE_BEFORE, BASE_TODAY] {
+        for unit in UNITS {
+            let (divergent_count_2_versus_4, first_divergent_items_2_versus_4) = divergences(base, 2, 4, unit, LARGEST_ITEM_COUNT);
+            let (divergent_count_4_versus_8, first_divergent_items_4_versus_8) = divergences(base, 4, 8, unit, LARGEST_ITEM_COUNT);
+            println!(
+                "{}",
+                emitter.emit_raw(&format!(
+                    "name=cost_current base={base} unit={unit} div_2v4={divergent_count_2_versus_4} first_2v4={} \
+                     div_4v8={divergent_count_4_versus_8} first_4v8={} cap_items={}",
+                    first_divergent_items_2_versus_4.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                    first_divergent_items_4_versus_8.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                    unit.saturating_sub(base + 8) / ITEM_BYTES,
+                ))
+            );
+        }
+    }
+
+    // ── E49 重跑登记：Q49.4，读法乙在两个被判 base 上（与原子单元无关，不带 unit=） ──
+    for base in [BASE_BEFORE, BASE_TODAY] {
+        let (divergent_count_2_versus_4, first_divergent_items_2_versus_4) = divergences_fixed_record(base, 2, 4, LARGEST_ITEM_COUNT);
+        let (divergent_count_4_versus_8, first_divergent_items_4_versus_8) = divergences_fixed_record(base, 4, 8, LARGEST_ITEM_COUNT);
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=cost_fixed_record base={base} div_2v4={divergent_count_2_versus_4} first_2v4={} \
+                 div_4v8={divergent_count_4_versus_8} first_4v8={} items_per_record_2={} items_per_record_4={} items_per_record_8={}",
+                first_divergent_items_2_versus_4.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                first_divergent_items_4_versus_8.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                items_per_fixed_record(base, 2),
+                items_per_fixed_record(base, 4),
+                items_per_fixed_record(base, 8),
+            ))
+        );
+    }
 
     // ── 收益一：D-事故 ──
     for bits in BITS {
@@ -180,6 +267,77 @@ fn main() {
         ))
     );
 
+    // ── P3：4 对 8 的阳性对照（读法甲，原实验缺的那半）──
+    let (base84_divergent_count, base84_first_divergent_items) = divergences(84, 4, 8, 512, LARGEST_ITEM_COUNT);
+    println!(
+        "{}",
+        emitter.emit_raw(&format!(
+            "name=poscontrol_base84_four_versus_eight div={base84_divergent_count} first={} expect_divergent=1",
+            base84_first_divergent_items.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into())
+        ))
+    );
+
+    // ── P4：读法乙的两个阳性对照（第七节 B7 算出的两个 base：每条项数恰好在这一对链宽之间差一）──
+    for (base, pair, narrow, wide) in [(342u64, "2v4", 2u64, 4u64), (340u64, "4v8", 4u64, 8u64)] {
+        let (divergent_count, first_divergent_items) = divergences_fixed_record(base, narrow, wide, LARGEST_ITEM_COUNT);
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=poscontrol_fixed_record base={base} pair={pair} div={divergent_count} first={} expect_divergent=1",
+                first_divergent_items.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into())
+            ))
+        );
+    }
+
+    // ── 第八节：几何敏感性，读法甲，base ∈ 296..=319（覆盖 base mod 8 的每个余数各三次）──
+    for base in 296u64..=319 {
+        for unit in UNITS {
+            let (divergent_count_2_versus_4, first_divergent_items_2_versus_4) = divergences(base, 2, 4, unit, LARGEST_ITEM_COUNT);
+            let (divergent_count_4_versus_8, first_divergent_items_4_versus_8) = divergences(base, 4, 8, unit, LARGEST_ITEM_COUNT);
+            println!(
+                "{}",
+                emitter.emit_raw(&format!(
+                    "name=base_sweep reading=甲 base={base} unit={unit} div_2v4={divergent_count_2_versus_4} first_2v4={} \
+                     div_4v8={divergent_count_4_versus_8} first_4v8={}",
+                    first_divergent_items_2_versus_4.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                    first_divergent_items_4_versus_8.map(|first_divergent_items| first_divergent_items.to_string()).unwrap_or_else(|| "NA".into()),
+                ))
+            );
+        }
+    }
+
+    // ── 第八节：几何敏感性，读法乙，base ∈ 280..=345（307 两侧最近的翻面点隔二三十字节）──
+    for base in 280u64..=345 {
+        let divergent_count_2_versus_4 = divergences_fixed_record(base, 2, 4, LARGEST_ITEM_COUNT).0;
+        let divergent_count_4_versus_8 = divergences_fixed_record(base, 4, 8, LARGEST_ITEM_COUNT).0;
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=base_sweep reading=乙 base={base} items_per_record_2={} items_per_record_4={} items_per_record_8={} \
+                 div_2v4={divergent_count_2_versus_4} div_4v8={divergent_count_4_versus_8}",
+                items_per_fixed_record(base, 2),
+                items_per_fixed_record(base, 4),
+                items_per_fixed_record(base, 8),
+            ))
+        );
+    }
+
+    // ── 第八节：反方向取样点，项数上界从 2000 换成 67（今天一条定长记录最多装的项数，D23 已定项 4）──
+    const ITEM_UPPER_BOUND_TODAY: u64 = 67;
+    for base in [BASE_BEFORE, BASE_TODAY] {
+        for unit in UNITS {
+            let divergent_count_2_versus_4 = divergences(base, 2, 4, unit, ITEM_UPPER_BOUND_TODAY).0;
+            let divergent_count_4_versus_8 = divergences(base, 4, 8, unit, ITEM_UPPER_BOUND_TODAY).0;
+            println!(
+                "{}",
+                emitter.emit_raw(&format!(
+                    "name=base_sweep_items reading=甲 max_items={ITEM_UPPER_BOUND_TODAY} base={base} unit={unit} \
+                     div_2v4={divergent_count_2_versus_4} div_4v8={divergent_count_4_versus_8}"
+                ))
+            );
+        }
+    }
+
     println!("{}", emitter.finish());
 }
 
@@ -226,9 +384,10 @@ mod tests {
         }
     }
 
-    /// **只有 base=95（今天定案后的现行值）两侧都免费**——2v4 与 4v8 同时为 0 的唯一一个。
+    /// **只有 base=95（跑这个实验那天的现行值，不是今天的）两侧都免费**——2v4 与 4v8 同时为 0 的唯一一个。
+    /// E49 重跑登记（记录头 311）：这一档 `BASES` 原样不变（Q49.1），95 早已不是今天的 base——今天是 `BASE_TODAY`（307）。
     #[test]
-    fn only_the_current_base_is_free_on_both_sides() {
+    fn only_the_base_from_that_run_is_free_on_both_sides() {
         let both_free: Vec<u64> = BASES
             .into_iter()
             .filter(|&candidate_base| {
@@ -321,5 +480,164 @@ mod tests {
         assert!((at_least_once(1e-6) - 1e-6).abs() < 1e-12);
         assert!(at_least_once(100.0) > 0.999_999);
         assert_eq!(at_least_once(0.0), 0.0);
+    }
+
+    // ═══ E49 重跑登记（记录头 311）：第七节 A1–A4、B1–B10 ═══
+
+    /// **A1 / A2**：今天的 base = 头 311 − 链 4 = 307；改之前那一档 = 307 − 4 = 303。
+    #[test]
+    fn base_today_and_base_before_are_derived_correctly() {
+        assert_eq!(JOURNAL_HEADER_BYTES, 311);
+        assert_eq!(BACK_CHAIN_BYTES_TODAY, 4);
+        assert_eq!(BASE_TODAY, 307);
+        assert_eq!(BASE_BEFORE, 303);
+    }
+
+    /// **A3**：读法乙在 base=307、链 4 上，一条记录装 67 项（4096 − 311 = 3785，⌊3785 / 56⌋ = 67）。
+    #[test]
+    fn fixed_record_capacity_at_base_today_is_sixty_seven() {
+        assert_eq!(RECORD_BYTES_FIXED - JOURNAL_HEADER_BYTES, 3785);
+        assert_eq!(items_per_fixed_record(BASE_TODAY, BACK_CHAIN_BYTES_TODAY), 67);
+    }
+
+    /// **A4 / Q49.5**：D23 已定项 8 射程「只取决于记录头总字节 mod 8」——
+    /// base ∈ 296..=319（每个余数各三次）里，同一个 `base % 8` 分组的四格判定必须一致。
+    #[test]
+    fn base_mod_eight_predicts_which_pair_diverges() {
+        let mut groups: std::collections::HashMap<u64, Vec<(u64, u64, u64, u64)>> = std::collections::HashMap::new();
+        for base in 296u64..=319 {
+            let signature = (
+                divergences(base, 2, 4, 512, LARGEST_ITEM_COUNT).0,
+                divergences(base, 4, 8, 512, LARGEST_ITEM_COUNT).0,
+                divergences(base, 2, 4, 4096, LARGEST_ITEM_COUNT).0,
+                divergences(base, 4, 8, 4096, LARGEST_ITEM_COUNT).0,
+            );
+            groups.entry(base % 8).or_default().push(signature);
+        }
+        for (remainder, signatures) in &groups {
+            let first = signatures[0];
+            assert!(signatures.iter().all(|signature| *signature == first), "base mod 8 = {remainder} 组内不一致：{signatures:?}");
+        }
+    }
+
+    /// **B1**：读法甲，base=303 四格全 0（改之前那一档，两对都免费）。
+    #[test]
+    fn base_before_is_free_on_all_four_cells() {
+        for unit in UNITS {
+            assert_eq!(divergences(BASE_BEFORE, 2, 4, unit, LARGEST_ITEM_COUNT).0, 0, "unit={unit}");
+            assert_eq!(divergences(BASE_BEFORE, 4, 8, unit, LARGEST_ITEM_COUNT).0, 0, "unit={unit}");
+        }
+    }
+
+    /// **B2**：读法甲，base=307（今天）四格——2v4 两档都免费；4v8 在 512 上 31 处（首个 31）、
+    /// 4096 上 4 处（首个 287）；`cap_items` 512 上 3、4096 上 67。
+    #[test]
+    fn base_today_diverges_on_four_versus_eight_only() {
+        assert_eq!(divergences(BASE_TODAY, 2, 4, 512, LARGEST_ITEM_COUNT), (0, None));
+        assert_eq!(divergences(BASE_TODAY, 2, 4, 4096, LARGEST_ITEM_COUNT), (0, None));
+        assert_eq!(divergences(BASE_TODAY, 4, 8, 512, LARGEST_ITEM_COUNT), (31, Some(31)));
+        assert_eq!(divergences(BASE_TODAY, 4, 8, 4096, LARGEST_ITEM_COUNT), (4, Some(287)));
+        assert_eq!(512u64.saturating_sub(BASE_TODAY + 8) / ITEM_BYTES, 3);
+        assert_eq!(4096u64.saturating_sub(BASE_TODAY + 8) / ITEM_BYTES, 67);
+    }
+
+    /// **B3**：M8 的取样点——如果 base 被算成含链（307 变成 311），四格会全部塌成 0
+    /// （这正是 M8 该被抓住的地方：B2 的 4v8 分岔在 base=311 上消失）。
+    #[test]
+    fn base_311_is_free_on_all_four_cells() {
+        for unit in UNITS {
+            assert_eq!(divergences(311, 2, 4, unit, LARGEST_ITEM_COUNT).0, 0, "unit={unit}");
+            assert_eq!(divergences(311, 4, 8, unit, LARGEST_ITEM_COUNT).0, 0, "unit={unit}");
+        }
+    }
+
+    /// **B4**：项数上界从 2000 换成 67（今天一条定长记录最多装的项数）——
+    /// base=303 四格仍全 0；base=307 只有「512 单元、4 对 8」变成 1 处，其余三格仍 0。
+    #[test]
+    fn item_upper_bound_sixty_seven_changes_only_one_cell() {
+        for unit in UNITS {
+            assert_eq!(divergences(BASE_BEFORE, 2, 4, unit, 67).0, 0, "unit={unit}");
+            assert_eq!(divergences(BASE_BEFORE, 4, 8, unit, 67).0, 0, "unit={unit}");
+        }
+        assert_eq!(divergences(BASE_TODAY, 2, 4, 512, 67).0, 0);
+        assert_eq!(divergences(BASE_TODAY, 4, 8, 512, 67).0, 1);
+        assert_eq!(divergences(BASE_TODAY, 2, 4, 4096, 67).0, 0);
+        assert_eq!(divergences(BASE_TODAY, 4, 8, 4096, 67).0, 0);
+    }
+
+    /// **B5 / P3**：4 对 8 的阳性对照——base=84、单元 512：31 处，首个 35（原实验缺的那半，2 对 4 才有阳性对照）。
+    #[test]
+    fn positive_control_base_84_four_versus_eight_diverges() {
+        assert_eq!(divergences(84, 4, 8, 512, LARGEST_ITEM_COUNT), (31, Some(35)));
+    }
+
+    /// **B6**：读法乙，base=303、307 两条都不分岔——每条项数（链 2/4/8）都是 67/67/67。
+    #[test]
+    fn fixed_record_reading_agrees_at_both_judged_bases() {
+        for base in [BASE_BEFORE, BASE_TODAY] {
+            assert_eq!(items_per_fixed_record(base, 2), 67, "base={base}");
+            assert_eq!(items_per_fixed_record(base, 4), 67, "base={base}");
+            assert_eq!(items_per_fixed_record(base, 8), 67, "base={base}");
+            assert_eq!(divergences_fixed_record(base, 2, 4, LARGEST_ITEM_COUNT), (0, None), "base={base}");
+            assert_eq!(divergences_fixed_record(base, 4, 8, LARGEST_ITEM_COUNT), (0, None), "base={base}");
+        }
+    }
+
+    /// **B7 / P4**：读法乙的两个阳性对照——base=340（4 对 8 恰好差一项，455 处、首个 67）、
+    /// base=342（2 对 4 恰好差一项，455 处、首个 67）。
+    #[test]
+    fn positive_control_fixed_record_diverges_at_these_two_bases() {
+        assert_eq!(items_per_fixed_record(340, 2), 67);
+        assert_eq!(items_per_fixed_record(340, 4), 67);
+        assert_eq!(items_per_fixed_record(340, 8), 66);
+        assert_eq!(divergences_fixed_record(340, 2, 4, LARGEST_ITEM_COUNT), (0, None));
+        assert_eq!(divergences_fixed_record(340, 4, 8, LARGEST_ITEM_COUNT), (455, Some(67)));
+
+        assert_eq!(items_per_fixed_record(342, 2), 67);
+        assert_eq!(items_per_fixed_record(342, 4), 66);
+        assert_eq!(items_per_fixed_record(342, 8), 66);
+        assert_eq!(divergences_fixed_record(342, 2, 4, LARGEST_ITEM_COUNT), (455, Some(67)));
+        assert_eq!(divergences_fixed_record(342, 4, 8, LARGEST_ITEM_COUNT), (0, None));
+    }
+
+    /// **B8**：base mod 8 分组的绝对值——余 0 与余 7 四格全 0；余 1–4 只有 4 对 8 分岔
+    /// （512 上 31、4096 上 4）；余 5–6 只有 2 对 4 分岔（同样 31 / 4）。
+    #[test]
+    fn base_mod_eight_groups_have_these_exact_values() {
+        for base in 296u64..=319 {
+            let cells = (
+                divergences(base, 2, 4, 512, LARGEST_ITEM_COUNT).0,
+                divergences(base, 4, 8, 512, LARGEST_ITEM_COUNT).0,
+                divergences(base, 2, 4, 4096, LARGEST_ITEM_COUNT).0,
+                divergences(base, 4, 8, 4096, LARGEST_ITEM_COUNT).0,
+            );
+            match base % 8 {
+                0 | 7 => assert_eq!(cells, (0, 0, 0, 0), "base={base}"),
+                1..=4 => assert_eq!(cells, (0, 31, 0, 4), "base={base}"),
+                5 | 6 => assert_eq!(cells, (31, 0, 4, 0), "base={base}"),
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    /// **B9**：读法乙，base ∈ 280..=345 里，2 对 4 只在 {285,286,341,342} 分岔，
+    /// 4 对 8 只在 {281,282,283,284,337,338,339,340} 分岔，其余全 0。
+    #[test]
+    fn fixed_record_reading_diverges_only_at_these_bases_in_280_to_345() {
+        let diverging_2_versus_4: Vec<u64> = (280u64..=345).filter(|&base| divergences_fixed_record(base, 2, 4, LARGEST_ITEM_COUNT).0 > 0).collect();
+        let diverging_4_versus_8: Vec<u64> = (280u64..=345).filter(|&base| divergences_fixed_record(base, 4, 8, LARGEST_ITEM_COUNT).0 > 0).collect();
+        assert_eq!(diverging_2_versus_4, vec![285, 286, 341, 342]);
+        assert_eq!(diverging_4_versus_8, vec![281, 282, 283, 284, 337, 338, 339, 340]);
+    }
+
+    /// **B10 / 判别力自证（V5）**：Q49.2 那一格（base=307、单元 512、4 对 8）在原判据（`tolerance=0`）下
+    /// 判「不免费」；把门槛挪到 `d`（这一格自己的分岔数，31）之后必须翻成「免费」——挪了不变就作废（V5）。
+    /// M12 攻的正是 `is_free` 里让门槛起作用的那一步。
+    #[test]
+    fn discriminative_power_self_proof_flips_the_verdict() {
+        let (divergent_count, _) = divergences(BASE_TODAY, 4, 8, 512, LARGEST_ITEM_COUNT);
+        assert_eq!(divergent_count, 31, "B10：d 必须是 31");
+        assert!(!is_free(divergent_count, 0), "原判据（tolerance=0）：不免费");
+        assert!(is_free(divergent_count, divergent_count), "挪门槛到 d 之后必须翻成免费");
     }
 }

@@ -1,0 +1,47 @@
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -17,7 +17,7 @@
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+ use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
+-use crate::admission::SpaceAdmission;
++use crate::admission::{S4Candidate, SpaceAdmission};
+ use crate::bytes::ByteWriter;
+ use crate::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
+ use crate::transaction::FrozenPublish;
+@@ -787,6 +787,9 @@
+     /// 判不判空间准入，只供测试的开关（`admission::SpaceAdmission`）。只住内存：`new` 与 `rebuild_from_records` 起步是判；
+     /// 可写挂载按调用方给的装（`mount::mount_writable_with_space_admission`）。
+     space_admission: SpaceAdmission,
++    /// S4 二轮候选（`admission::S4Candidate`），只供三方论证；产品路径恒 `Baseline`。与 `space_admission` 同一个装法：
++    /// `new` 与 `rebuild_from_records` 起步是 `Baseline`，可写挂载按调用方给的装（`mount::mount_writable_with_s4_candidate`）。
++    s4_candidate: S4Candidate,
+ }
+ 
+ impl PoolAllocator {
+@@ -807,6 +810,7 @@
+             frozen_publish: None,
+             instance_rows_after_this_mounts_row_publish: 0,
+             space_admission: SpaceAdmission::JudgedByTheFormula,
++            s4_candidate: S4Candidate::Baseline,
+         }
+     }
+ 
+@@ -821,6 +825,17 @@
+         self.space_admission
+     }
+ 
++    /// 装上 S4 二轮候选（`admission::S4Candidate`），只供三方论证；产品路径一处都不调它。
++    pub fn set_s4_candidate(&mut self, s4_candidate: S4Candidate) {
++        self.s4_candidate = s4_candidate;
++    }
++
++    /// 这会儿装着的 S4 二轮候选：运行时看得出走的是哪一条分支。
++    #[must_use]
++    pub fn s4_candidate(&self) -> S4Candidate {
++        self.s4_candidate
++    }
++
+     /// 记上这次挂载的 rows0（字段 `instance_rows_after_this_mounts_row_publish` 的注释）。可写挂载在取号之前调一次。
+     pub fn record_instance_rows_after_this_mounts_row_publish(&mut self, rows: u64) {
+         self.instance_rows_after_this_mounts_row_publish = rows;

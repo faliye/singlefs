@@ -1,0 +1,8 @@
+
+running 1 test
+test z13_leaf_absent_then_regrown_after_rollback has been running for over 60 seconds
+R3OPUS-Z13-REGROW shard=6/8 cells=232 endings={"Completed": 232} rollback={"Applied": 232}
+test z13_leaf_absent_then_regrown_after_rollback ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 205.56s
+

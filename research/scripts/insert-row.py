@@ -14,12 +14,29 @@
   --absent            插之前先确认这个正则一处都没有，用来挡重复插入（例如已经有同编号的行）
 写之前复核：读文件时记下 sha256，写之前再算一次，变了就拒绝并让人重跑——
 别人在这中间写过，读到的内容已经不是要改的那一份。
+
+写回不在原文件上就地写：同目录排他新建临时文件、fsync、照原权限位与属主、改名换上（`lib_atomic_replace.py`）；
+写前复核排在临时文件写完之后、改名换上之前。正在按偏移边跑边读这份文件的进程读的仍是旧 inode 的旧内容。
+
+退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 已有命中；3 锚点不是恰好命中一次；
+4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）。2–5 都是原文件没动、临时文件已删。
 """
 import argparse
 import hashlib
 import os
 import re
 import sys
+
+from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
+    replace_file_contents_by_rename
+
+
+class ChangedSinceRead(Exception):
+    """写前复核：读到写之间文件的 sha256 变了。"""
+
+    def __init__(self, digest_now):
+        super().__init__(digest_now)
+        self.digest_now = digest_now
 
 
 def digest(path):
@@ -46,13 +63,26 @@ def insert(path, anchor, where, line, absent, dry_run):
     if dry_run:
         print("  （干跑）会插在 %s:%d，锚点是第 %d 行" % (path, at + 1, matched[0] + 1))
         return 0
-    after = digest(path)
-    if after != before:
-        print("  ✗ 读到写之间 %s 被改过（sha256 %s → %s），没写" % (path, before[:12], after[:12]))
+
+    def verify_unchanged_since_read():
+        # 每次现算，不复用读的时候那个值；排在临时文件写完之后、改名换上之前
+        digest_now = digest(path)
+        if digest_now != before:
+            raise ChangedSinceRead(digest_now)
+
+    try:
+        notes = replace_file_contents_by_rename(path, "\n".join(lines), check_before_rename=verify_unchanged_since_read)
+    except ChangedSinceRead as changed:
+        print("  ✗ 读到写之间 %s 被改过（sha256 %s → %s），没写" % (path, before[:12], changed.digest_now[:12]))
         print("     → 怎么办：别的会话刚写过这份文件，重跑一次本命令；手里那份内容已经不是要改的那一份了。")
         return 4
-    open(path, "w", encoding="utf-8").write("\n".join(lines))
-    print("  ✓ 插在 %s:%d（锚点第 %d 行），写前复核 sha256 %s 未变" % (path, at + 1, matched[0] + 1, before[:12]))
+    except ReplaceRefused as refused:
+        print("  ✗ " + str(refused))
+        # → 怎么办：str(refused) 的第二行就是下一步（lib_atomic_replace.py 里每个 ReplaceRefused 都带着），这里不重复打印
+        return 5
+    print("  ✓ 插在 %s:%d（锚点第 %d 行），写前复核 sha256 %s 未变，改名换上新 inode" % (path, at + 1, matched[0] + 1, before[:12]))
+    for note in notes:
+        print("  ! " + note)
     return 0
 
 
@@ -102,9 +132,28 @@ def selftest():
         if "| E | 五 |" in open(path, encoding="utf-8").read():
             print("  ✗ 自检失败：复核判红了却还是写了进去")
             print("     → 这个工具自己坏了，**别再拿它改任何公共表**：复核判红之后文件仍被改，等于复核形同虚设。"
-                  "查写文件那一步是不是排在复核之前——正确次序是先算 after、比对相等、再落盘。")
+                  "查写文件那一步是不是排在复核之前——正确次序是先写临时文件、再算一次 sha256 比对相等、最后改名换上。")
             return 1
-    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝、读到写之间被改过拒绝且不写")
+        if leftover_temporary_files(work):
+            print("  ✗ 自检失败：复核判红之后还留着临时文件 %s" % leftover_temporary_files(work))
+            print("     → 查 lib_atomic_replace.py 的 replace_file_contents_by_rename：check_before_rename 抛异常时，"
+                  "except 那一段要先删临时文件再往外抛。")
+            return 1
+    # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
+    table = "| 头 | 〇 |\n" * 20 + "| A | 一 |\n\n### 已还清\n"
+    problems = problems_with_replacement_by_rename(
+        lambda target: insert(target, r"^### 已还清", "before", "| C | 三 |", None, False),
+        table, table.replace("\n### 已还清", "\n| C | 三 |\n### 已还清", 1))
+    if problems:
+        print("  ✗ 自检失败：写回的方式不对")
+        for problem in problems:
+            print("     " + problem)  # gate-lint:detail
+        print("     → 这个工具自己坏了，别再拿它改脚本：就地写会让正在边跑边读那份脚本的进程读到别的内容。"
+              "按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename。")
+        return 1
+    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝、读到写之间被改过拒绝且不写也不留临时文件；"
+          "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
+          "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0
 
 

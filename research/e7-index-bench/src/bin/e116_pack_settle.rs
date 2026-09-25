@@ -22,7 +22,7 @@
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
-//! - **D23（journal 的角色与格式）**：journal 记录头 307（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 已定项 15 新根段 188 + fsid 8 + MAC 16），登记名 JOURNAL_HEADER_BYTES。
+//! - **D23（journal 的角色与格式）**：journal 记录头 311（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 本次发布内序号 4 + 已定项 15 新根段 188 + fsid 8 + MAC 16），登记名 JOURNAL_HEADER_BYTES。
 //! - **D2 已定项 9**：第一版 2 盘恒 w = 2。
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
@@ -81,7 +81,7 @@ const W: u64 = 2; // D2 已定项 9
 const MAP_KEY: u64 = 33; // D18 已定项 3
 const LOC_ENTRY: u64 = 14; // D19 已定项 4
 const ALLOC_ENTRY: u64 = 18; // D3 已定项 7
-const JOURNAL_HEADER_BYTES: u64 = 307; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
+const JOURNAL_HEADER_BYTES: u64 = 311; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
 const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
@@ -259,6 +259,18 @@ fn main() {
             pk.blast, gain / pk.blast as f64)));
     }
 
+    // ── 第八节：头宽 `H` 这个旋钮的几何敏感性（512 档 bg_key，两个翻面点两侧各取一点）──
+    let base_key_without_journal = 113_049_600u64 + 12_288_000 + 3_702_784;
+    let saved_512 = pad.occupancy - pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).occupancy;
+    for &header_bytes in [30851u64, 30852].iter() {
+        let move_write = base_key_without_journal + N * (header_bytes + MAP_ENTRY);
+        let payback_value = move_write as f64 / saved_512 as f64;
+        println!("{}", em.emit_raw(&format!(
+            "name=header_sensitivity size=512 arm=bg_key journal=true h={header_bytes} \
+             move_write={move_write} payback={payback_value:.7} ge1={}",
+            u8::from(payback_value >= 1.0))));
+    }
+
     println!("{}", em.finish());
 }
 
@@ -335,10 +347,10 @@ mod tests {
         assert_eq!(alloc_leaves, 113);
         assert_eq!(alloc_leaves * NODE * W, 3_702_784);
         let journal_w = N * (JOURNAL_HEADER_BYTES + MAP_ENTRY);
-        assert_eq!(journal_w, 36_800_000);
+        assert_eq!(journal_w, 37_200_000);
         let l = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true);
-        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 36_800_000);
-        assert_eq!(l.move_write, 165_840_384);
+        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 37_200_000);
+        assert_eq!(l.move_write, 166_240_384);
     }
 
     /// 反向接受条款要判的那个符号：bg_key 的回本比，逐档钉住。
@@ -349,7 +361,7 @@ mod tests {
         let saved = pad.occupancy - l.occupancy;
         assert_eq!(saved, 3_220_275_200);
         let p = payback(&pad, &l);
-        assert!((p - 0.051499).abs() < 1e-6, "512 B 档回本比实测 {p}");
+        assert!((p - 0.051623).abs() < 1e-6, "512 B 档回本比实测 {p}");
         // 16 KiB 档 cap = 1 ⇒ 一点不省 ⇒ 回本比无穷
         let l16 = pack_ledger(N, 16384, SLOT_EXTRA, 0, 1, true);
         assert!(payback(&pad, &l16).is_infinite());
@@ -370,9 +382,10 @@ mod tests {
         // 第一版实测 3.127186（分配记录按落点算，一个单元记 2 条 —— 建模错）；
         // 改成 D3 已定项 7 逐字「一条记一个单元」之后 2.092080（journal 头 78 那一版）；
         // 头 78 → 95 之后 2.092608；头 95 → 277（D23 已定项 15 的新根段 182）之后 2.098260；
-        // 头 277 → 307（已定项 4 加 fsid 8 与 MAC 16、新根段 182 → 188）之后 2.099192。
+        // 头 277 → 307（已定项 4 加 fsid 8 与 MAC 16、新根段 182 → 188）之后 2.099192；
+        // 头 307 → 311（已定项 4 加本次发布内序号 4）之后 2.099316。
         // 每一版的数都逐字抄自当时那份产物的 name=payback_fill size=512 b=1 journal=true 行。
-        assert!((p - 2.099192).abs() < 1e-5, "实测 {p}");
+        assert!((p - 2.099316).abs() < 1e-5, "实测 {p}");
     }
 
     /// bg_ideal 是上界：它的回本比必须严格小于另外两条臂。
@@ -431,8 +444,8 @@ mod tests {
         assert_eq!(leaves_touched_scattered(alloc_changed, alloc_changed.div_ceil(alloc_leaf_cap()), N), 226);
         let key = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let fill_n = pack_ledger(N, 512, SLOT_EXTRA, 1, N, true).move_write;
-        assert_eq!(key, 165_840_384);
-        assert_eq!(fill_n, 169_543_168);
+        assert_eq!(key, 166_240_384);
+        assert_eq!(fill_n, 169_943_168);
     }
 
     /// 稳态占用：均匀独立死亡下，打包形态在任何 d 上都不比 pad 差。
@@ -493,12 +506,58 @@ mod tests {
         assert_eq!(l.move_read, 3_276_800_000);
     }
 
-    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 36 800 000
-    /// （每搬一个对象一条记录，头 307 + 映射条目 61 = 368 字节 × 100 000）。
+    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 37 200 000
+    /// （每搬一个对象一条记录，头 311 + 映射条目 61 = 372 字节 × 100 000）。
     #[test]
     fn journal_is_an_assumption() {
         let with = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let without = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, false).move_write;
-        assert_eq!(with, without + 36_800_000);
+        assert_eq!(with, without + 37_200_000);
+    }
+
+    /// A1：头 311 的分项和（D23 已定项 4 正文）。不从 `crates/` 引，独立钉这个和。
+    #[test]
+    fn header_bytes_equals_the_decision_23_breakdown() {
+        let ten_field_bytes = 78u64;
+        let committed_increments = 9 + 4 + 4;
+        let publish_sequence_bytes = 4u64;
+        let new_root_segment_bytes = 188u64;
+        let fsid_bytes = 8u64;
+        let mac_bytes = 16u64;
+        assert_eq!(
+            ten_field_bytes + committed_increments + publish_sequence_bytes + new_root_segment_bytes + fsid_bytes + mac_bytes,
+            JOURNAL_HEADER_BYTES
+        );
+        assert_eq!(JOURNAL_HEADER_BYTES, 311);
+    }
+
+    // ────────── 第八节：头宽 `H` 这个旋钮的几何敏感性 ──────────
+
+    /// 512 档 `bg_key` 的搬迁写，显式带头宽参数（不读全局常量），供敏感性扫描用。
+    fn bg_key_move_write_with_header(header_bytes: u64) -> u64 {
+        113_049_600 + 12_288_000 + 3_702_784 + N * (header_bytes + MAP_ENTRY)
+    }
+
+    fn payback_at_header(header_bytes: u64) -> f64 {
+        bg_key_move_write_with_header(header_bytes) as f64 / 3_220_275_200.0
+    }
+
+    /// B6：512 档 `bg_key` 回本比 = 1 的头宽 `H*` 在 30851 与 30852 两点之间翻面。
+    #[test]
+    fn header_sensitivity_flips_around_h_star() {
+        let payback_at_30851 = payback_at_header(30851);
+        let payback_at_30852 = payback_at_header(30852);
+        assert!((payback_at_30851 - 0.9999892).abs() < 1e-6, "实测 {payback_at_30851}");
+        assert!((payback_at_30852 - 1.0000202).abs() < 1e-6, "实测 {payback_at_30852}");
+        assert!(payback_at_30851 < 1.0 && payback_at_30852 >= 1.0);
+    }
+
+    /// **判别力自证**：把门槛从 1 挪到 1.0001（比 30852 那一点的回本比还高），
+    /// 30852 那一格必须从「≥ 门槛」变成「< 门槛」。
+    #[test]
+    fn header_sensitivity_threshold_has_discriminative_power() {
+        let payback_at_30852 = payback_at_header(30852);
+        assert!(payback_at_30852 >= 1.0);
+        assert!(payback_at_30852 < 1.0001);
     }
 }

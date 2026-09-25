@@ -1,0 +1,15 @@
+2026-09-24T17:01:56Z
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r1_attack.rs (target/release/deps/opus_r1_attack-89915c639d7b9cff)
+
+running 1 test
+OBS a1 instance=23250 rows=23249 records=2 named=[67, 1] ordinals=[1, 2] last_flags=[false, true] commit=[false, true] transactions=[0, 0] counters=[4, 5]
+OBS a1 checker after first mount: []
+OBS a1 second mount instance=23251 rows_written=1
+OBS a1 checker after second mount: []
+test z6_a1_row_publish_with_sixty_four_instance_table_pages_spills_and_the_copy_matches ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+rc=0
+2026-09-24T17:01:56Z

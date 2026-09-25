@@ -1,0 +1,8 @@
+
+running 1 test
+S23 seed=540096 steps=[rb#2->(1,2) badsc mount!crash@8/40 mount!crash@23/40 rb-notcand(1,3) badsc] effective=[(2, 1, 2)] witness=[(2, 1, 2)] final_mount=Ok((2, 10)) expected=Some((2, 10)) choice_ok=true C332_hit=false landed=None live_roots_made_unreadable=8 faults_before=4 checker_red=[]
+S23 summary series=1 base=540096 rollbacks=1 effective=1 C332_hits=0 wrong_final_choice=0 checker_red=0 final_mount_refused=0
+test s23_random_series_oracle ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.93s
+

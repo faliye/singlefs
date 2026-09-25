@@ -1,0 +1,21 @@
+--- a/crates/singlefs-core/src/mount.rs	2026-09-24 18:10:07.427489656 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-09-24 18:10:07.427923274 +0000
+@@ -961,6 +961,8 @@
+     } else {
+         0
+     };
++    // c363b-r1 攻方腿副本改法 Z-restore：第一次空发布就被拒（一个写都没发）时，分配器退回到抬 F 进来时的样子。
++    let allocator_before_this_raise = allocator.clone();
+     let reclaimed = allocator.reclaim_released_up_to(
+         reclaim_floor(new_floor, oldest_valid_root),
+         ReclaimedReuse::HeldUntilFloorTakesEffect,
+@@ -997,6 +999,9 @@
+         )
+         // 抬 F 的写入口是这里开的、随错一起丢掉：已经落盘的那几次各自的写与失败那一次已记的写都随错交出（增补 2 收口表第 58 行）。
+         .map_err(|cause| {
++            if publishes.is_empty() {
++                *allocator = allocator_before_this_raise.clone();
++            }
+             MountError::RaiseFloorSequencePublishFailed(publish_sequence_failed(
+                 &pool,
+                 publishes

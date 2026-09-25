@@ -1,0 +1,108 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/mount.rs:10:5
+   |
+10 |     admission_reading_before_a_publish, admit_on_every_device, AdmissionRefusedOnSomeDevices,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_s4_attack.rs (/tmp/claude-1000/m2-safety-r2-opus/rerun/target/release/deps/opus_s4_attack-20fba67ba3b2373c)
+
+running 1 test
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 mount0=ok [publish+:av[424, 424]/d6/r1/n12 mount+:av[360, 360]/d0/r0/n0] counts=Some((29, 15, 419, 0))
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step0 Seq { units: 1, extra: 0 } -> ok [publish+:av[346, 346]/d6/r12/n12] counts(alloc,def,free,iso)=Some((41, 27, 407, 0)) probe_mount=ok [mount+:av[334, 334]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step1 Seq { units: 2, extra: 0 } -> ok [publish+:av[334, 334]/d9/r12/n15] counts(alloc,def,free,iso)=Some((56, 39, 392, 0)) probe_mount=ok [mount+:av[319, 319]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step2 Seq { units: 3, extra: 0 } -> ok [publish+:av[319, 319]/d11/r15/n19] counts(alloc,def,free,iso)=Some((75, 54, 373, 0)) probe_mount=ok [mount+:av[300, 300]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step3 Seq { units: 4, extra: 0 } -> ok [publish+:av[300, 300]/d13/r19/n21] counts(alloc,def,free,iso)=Some((96, 73, 352, 0)) probe_mount=ok [mount+:av[279, 279]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step4 Seq { units: 5, extra: 0 } -> ok [publish+:av[279, 279]/d15/r21/n23] counts(alloc,def,free,iso)=Some((119, 94, 329, 0)) probe_mount=ok [mount+:av[256, 256]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step5 Seq { units: 6, extra: 0 } -> ok [publish+:av[256, 256]/d17/r23/n25] counts(alloc,def,free,iso)=Some((144, 117, 304, 0)) probe_mount=ok [mount+:av[231, 231]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step6 Empty -> ok [publish+:av[231, 231]/d6/r25/n14/EX] counts(alloc,def,free,iso)=Some((158, 142, 290, 0)) probe_mount=ok [mount+:av[217, 217]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step7 Seq { units: 1, extra: 0 } -> ok [publish+:av[217, 217]/d6/r14/n14] counts(alloc,def,free,iso)=Some((172, 156, 276, 0)) probe_mount=ok [mount+:av[203, 203]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step8 Seq { units: 2, extra: 0 } -> ok [publish+:av[203, 203]/d9/r14/n17] counts(alloc,def,free,iso)=Some((189, 170, 259, 0)) probe_mount=ok [mount+:av[186, 186]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step9 Seq { units: 3, extra: 0 } -> ok [publish+:av[186, 186]/d11/r17/n19] counts(alloc,def,free,iso)=Some((208, 187, 240, 0)) probe_mount=ok [mount+:av[167, 167]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step10 Seq { units: 4, extra: 0 } -> ok [publish+:av[167, 167]/d13/r19/n21] counts(alloc,def,free,iso)=Some((229, 206, 219, 0)) probe_mount=ok [mount+:av[146, 146]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step11 Seq { units: 5, extra: 0 } -> ok [publish+:av[146, 146]/d15/r21/n23] counts(alloc,def,free,iso)=Some((252, 227, 196, 0)) probe_mount=ok [mount+:av[123, 123]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step12 Seq { units: 6, extra: 0 } -> ok [publish+:av[123, 123]/d17/r23/n25] counts(alloc,def,free,iso)=Some((277, 250, 171, 0)) probe_mount=ok [mount+:av[98, 98]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step13 Empty -> ok [publish+:av[98, 98]/d6/r25/n14/EX] counts(alloc,def,free,iso)=Some((291, 275, 157, 0)) probe_mount=ok [mount+:av[84, 84]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step14 Seq { units: 1, extra: 0 } -> ok [publish+:av[84, 84]/d6/r14/n14] counts(alloc,def,free,iso)=Some((305, 289, 143, 0)) probe_mount=ok [mount+:av[70, 70]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step15 Seq { units: 2, extra: 0 } -> ok [publish+:av[70, 70]/d9/r14/n17] counts(alloc,def,free,iso)=Some((322, 303, 126, 0)) probe_mount=ok [mount+:av[53, 53]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step16 Seq { units: 3, extra: 0 } -> ok [publish+:av[53, 53]/d11/r17/n19] counts(alloc,def,free,iso)=Some((341, 320, 107, 0)) probe_mount=ok [mount+:av[34, 34]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step17 Seq { units: 4, extra: 0 } -> ok [publish+:av[34, 34]/d13/r19/n21] counts(alloc,def,free,iso)=Some((362, 339, 86, 0)) probe_mount=ok [mount+:av[13, 13]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step18 Seq { units: 5, extra: 0 } -> SpaceAdmissionRefused [publish-:av[13, 13]/d15/r21/n23] counts(alloc,def,free,iso)=Some((362, 339, 86, 0))
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step19 Seq { units: 6, extra: 0 } -> SpaceAdmissionRefused [publish-:av[13, 13]/d17/r21/n25] counts(alloc,def,free,iso)=Some((362, 339, 86, 0))
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step20 Empty -> ok [publish+:av[13, 13]/d6/r21/n14/EX] counts(alloc,def,free,iso)=Some((376, 360, 72, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-1, -1]/d0/r0/n0]
+E7 448 ND+A1n+A3gt c-grow6-truncate-x10 step21 Seq { units: 1, extra: 0 } -> PlacementRefused[Data] [] counts(alloc,def,free,iso)=Some((376, 360, 72, 0))
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 mount0=ok [publish+:av[424, 424]/d6/r1/n12 mount+:av[360, 360]/d0/r0/n0] counts=Some((29, 15, 419, 0))
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step0 Seq { units: 2, extra: 0 } -> ok [publish+:av[346, 346]/d9/r12/n15] counts(alloc,def,free,iso)=Some((44, 27, 404, 0)) probe_mount=ok [mount+:av[331, 331]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step1 Seq { units: 3, extra: 0 } -> ok [publish+:av[331, 331]/d11/r15/n17] counts(alloc,def,free,iso)=Some((61, 42, 387, 0)) probe_mount=ok [mount+:av[314, 314]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step2 Seq { units: 4, extra: 0 } -> ok [publish+:av[314, 314]/d13/r17/n21] counts(alloc,def,free,iso)=Some((82, 59, 366, 0)) probe_mount=ok [mount+:av[293, 293]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step3 Seq { units: 3, extra: 0 } -> ok [publish+:av[293, 293]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((101, 80, 347, 0)) probe_mount=ok [mount+:av[274, 274]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step4 Seq { units: 4, extra: 0 } -> ok [publish+:av[274, 274]/d13/r19/n21] counts(alloc,def,free,iso)=Some((122, 99, 326, 0)) probe_mount=ok [mount+:av[253, 253]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step5 Seq { units: 3, extra: 0 } -> ok [publish+:av[253, 253]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((141, 120, 307, 0)) probe_mount=ok [mount+:av[234, 234]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step6 Seq { units: 4, extra: 0 } -> ok [publish+:av[234, 234]/d13/r19/n21] counts(alloc,def,free,iso)=Some((162, 139, 286, 0)) probe_mount=ok [mount+:av[213, 213]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step7 Seq { units: 3, extra: 0 } -> ok [publish+:av[213, 213]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((181, 160, 267, 0)) probe_mount=ok [mount+:av[194, 194]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step8 Seq { units: 4, extra: 0 } -> ok [publish+:av[194, 194]/d13/r19/n21] counts(alloc,def,free,iso)=Some((202, 179, 246, 0)) probe_mount=ok [mount+:av[173, 173]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step9 Seq { units: 3, extra: 0 } -> ok [publish+:av[173, 173]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((221, 200, 227, 0)) probe_mount=ok [mount+:av[154, 154]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step10 Seq { units: 4, extra: 0 } -> ok [publish+:av[154, 154]/d13/r19/n21] counts(alloc,def,free,iso)=Some((242, 219, 206, 0)) probe_mount=ok [mount+:av[133, 133]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step11 Seq { units: 3, extra: 0 } -> ok [publish+:av[133, 133]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((261, 240, 187, 0)) probe_mount=ok [mount+:av[114, 114]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step12 Seq { units: 4, extra: 0 } -> ok [publish+:av[114, 114]/d13/r19/n21] counts(alloc,def,free,iso)=Some((282, 259, 166, 0)) probe_mount=ok [mount+:av[93, 93]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step13 Seq { units: 3, extra: 0 } -> ok [publish+:av[93, 93]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((301, 280, 147, 0)) probe_mount=ok [mount+:av[74, 74]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step14 Seq { units: 4, extra: 0 } -> ok [publish+:av[74, 74]/d13/r19/n21] counts(alloc,def,free,iso)=Some((322, 299, 126, 0)) probe_mount=ok [mount+:av[53, 53]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step15 Seq { units: 3, extra: 0 } -> ok [publish+:av[53, 53]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((341, 320, 107, 0)) probe_mount=ok [mount+:av[34, 34]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step16 Seq { units: 4, extra: 0 } -> ok [publish+:av[34, 34]/d13/r19/n21] counts(alloc,def,free,iso)=Some((362, 339, 86, 0)) probe_mount=ok [mount+:av[13, 13]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step17 Seq { units: 3, extra: 0 } -> ok [publish+:av[13, 13]/d11/r21/n19/EX] counts(alloc,def,free,iso)=Some((381, 360, 67, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-6, -6]/d0/r0/n0]
+E7 448 ND+A1n+A3gt b-shrink-rewrite-4-3 step18 Seq { units: 4, extra: 0 } -> SpaceAdmissionRefused [publish-:av[-6, -6]/d13/r19/n21] counts(alloc,def,free,iso)=Some((381, 360, 67, 0))
+E7 240 A3ge a-ow150 mount0=ok [publish+:av[216, 216]/d6/r1/n12 mount+:av[151, 151]/d0/r0/n0] counts=Some((29, 15, 211, 0))
+E7 240 A3ge a-ow150 step0 Ow(2999) -> ok [publish+:av[123, 123]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((41, 27, 199, 0)) probe_mount=ok [mount+:av[99, 99]/d0/r0/n0]
+E7 240 A3ge a-ow150 step1 Ow(2999) -> ok [publish+:av[99, 99]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((53, 39, 187, 0)) probe_mount=ok [mount+:av[75, 75]/d0/r0/n0]
+E7 240 A3ge a-ow150 step2 Ow(2999) -> ok [publish+:av[75, 75]/d6/r12/n14] counts(alloc,def,free,iso)=Some((67, 51, 173, 0)) probe_mount=ok [mount+:av[49, 49]/d0/r0/n0]
+E7 240 A3ge a-ow150 step3 Ow(2999) -> ok [publish+:av[49, 49]/d6/r14/n14/EX] counts(alloc,def,free,iso)=Some((81, 65, 159, 0)) probe_mount=ok [mount+:av[21, 21]/d0/r0/n0]
+E7 240 A3ge a-ow150 step4 Ow(2999) -> ok [publish+:av[21, 21]/d6/r14/n14/EX] counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-7, -7]/d0/r0/n0]
+E7 240 A3ge a-ow150 step5 Ow(2999) -> ok [publish+:av[-7, -7]/d6/r14/n14/EX] counts(alloc,def,free,iso)=Some((109, 93, 131, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-35, -35]/d0/r0/n0]
+E7 240 A3ge a-ow150 step6 Ow(2999) -> ok [publish+:av[-35, -35]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((121, 105, 119, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-59, -59]/d0/r0/n0]
+E7 240 A3ge a-ow150 step7 Ow(2999) -> ok [publish+:av[-59, -59]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((133, 117, 107, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-83, -83]/d0/r0/n0]
+E7 240 A3ge a-ow150 step8 Ow(2999) -> ok [publish+:av[-83, -83]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((145, 129, 95, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-107, -107]/d0/r0/n0]
+E7 240 A3ge a-ow150 step9 Ow(2999) -> ok [publish+:av[-107, -107]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((157, 141, 83, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-131, -131]/d0/r0/n0]
+E7 240 A3ge a-ow150 step10 Ow(2999) -> ok [publish+:av[-131, -131]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((169, 153, 71, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-155, -155]/d0/r0/n0]
+E7 240 A3ge a-ow150 step11 Ow(2999) -> ok [publish+:av[-155, -155]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((181, 165, 59, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-179, -179]/d0/r0/n0]
+E7 240 A3ge a-ow150 step12 Ow(2999) -> ok [publish+:av[-179, -179]/d6/r14/n14/EX] counts(alloc,def,free,iso)=Some((195, 179, 45, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-207, -207]/d0/r0/n0]
+E7 240 A3ge a-ow150 step13 Ow(2999) -> ok [publish+:av[-207, -207]/d6/r14/n14/EX] counts(alloc,def,free,iso)=Some((209, 193, 31, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-235, -235]/d0/r0/n0]
+E7 240 A3ge a-ow150 step14 Ow(2999) -> ok [publish+:av[-235, -235]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((221, 205, 19, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-259, -259]/d0/r0/n0]
+E7 240 A3ge a-ow150 step15 Ow(2999) -> ok [publish+:av[-259, -259]/d6/r12/n12/EX] counts(alloc,def,free,iso)=Some((233, 217, 7, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-283, -283]/d0/r0/n0]
+E7 240 A3ge a-ow150 step16 Ow(2999) -> PlacementRefused[AllocationTreeNodeBelowTheRoot] [] counts(alloc,def,free,iso)=Some((233, 217, 7, 0))
+E7 240 A3ge a-ow150 step17 Ow(2999) -> PlacementRefused[AllocationTreeNodeBelowTheRoot] [] counts(alloc,def,free,iso)=Some((233, 217, 7, 0))
+E7 240 A3ge a-ow150 step18 Ow(2999) -> PlacementRefused[AllocationTreeNodeBelowTheRoot] [] counts(alloc,def,free,iso)=Some((233, 217, 7, 0))
+E7 240 A1 a-ow150 mount0=ok [publish+:av[216, 216]/d6/r1/n12 mount+:av[151, 151]/d0/r0/n0] counts=Some((29, 15, 211, 0))
+E7 240 A1 a-ow150 step0 Ow(2999) -> ok [publish+:av[123, 123]/d6/r12/n12] counts(alloc,def,free,iso)=Some((41, 27, 199, 0)) probe_mount=ok [mount+:av[99, 99]/d0/r0/n0]
+E7 240 A1 a-ow150 step1 Ow(2999) -> ok [publish+:av[99, 99]/d6/r12/n12] counts(alloc,def,free,iso)=Some((53, 39, 187, 0)) probe_mount=ok [mount+:av[75, 75]/d0/r0/n0]
+E7 240 A1 a-ow150 step2 Ow(2999) -> ok [publish+:av[75, 75]/d6/r12/n14] counts(alloc,def,free,iso)=Some((67, 51, 173, 0)) probe_mount=ok [mount+:av[49, 49]/d0/r0/n0]
+E7 240 A1 a-ow150 step3 Ow(2999) -> ok [publish+:av[49, 49]/d6/r14/n14] counts(alloc,def,free,iso)=Some((81, 65, 159, 0)) probe_mount=ok [mount+:av[21, 21]/d0/r0/n0]
+E7 240 A1 a-ow150 step4 Ow(2999) -> ok [publish+:av[21, 21]/d6/r14/n14] counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) probe_mount=SpaceAdmissionRefusedBeforeAcquisition [mount-:av[-7, -7]/d0/r0/n0]
+E7 240 A1 a-ow150 step5 Ow(2999) -> SpaceAdmissionRefused [publish-:av[-7, -7]/d6/r14/n14] counts(alloc,def,free,iso)=Some((95, 79, 145, 0))
+E7 240 A1 a-ow150 step6 Ow(2999) -> SpaceAdmissionRefused [publish-:av[-7, -7]/d6/r14/n14] counts(alloc,def,free,iso)=Some((95, 79, 145, 0))
+E7 256 A2 a-ow150 mount0=ok [publish+:av[232, 232]/d6/r1/n12 mount+:av[168, 168]/d0/r0/n0] counts=Some((29, 15, 227, 0))
+E7 256 A2 a-ow150 step0 Ow(2999) -> ok [publish+:av[154, 154]/d6/r12/n12] counts(alloc,def,free,iso)=Some((41, 27, 215, 0)) probe_mount=ok [mount+:av[142, 142]/d0/r0/n0]
+E7 256 A2 a-ow150 step1 Ow(2999) -> ok [publish+:av[142, 142]/d6/r12/n12] counts(alloc,def,free,iso)=Some((53, 39, 203, 0)) probe_mount=ok [mount+:av[130, 130]/d0/r0/n0]
+E7 256 A2 a-ow150 step2 Ow(2999) -> ok [publish+:av[130, 130]/d6/r12/n14] counts(alloc,def,free,iso)=Some((67, 51, 189, 0)) probe_mount=ok [mount+:av[116, 116]/d0/r0/n0]
+E7 256 A2 a-ow150 step3 Ow(2999) -> ok [publish+:av[116, 116]/d6/r14/n14] counts(alloc,def,free,iso)=Some((81, 65, 175, 0)) probe_mount=ok [mount+:av[102, 102]/d0/r0/n0]
+E7 256 A2 a-ow150 step4 Ow(2999) -> ok [publish+:av[102, 102]/d6/r14/n14] counts(alloc,def,free,iso)=Some((95, 79, 161, 0)) probe_mount=ok [mount+:av[88, 88]/d0/r0/n0]
+E7 256 A2 a-ow150 step5 Ow(2999) -> ok [publish+:av[88, 88]/d6/r14/n14] counts(alloc,def,free,iso)=Some((109, 93, 147, 0)) probe_mount=ok [mount+:av[74, 74]/d0/r0/n0]
+E7 256 A2 a-ow150 step6 Ow(2999) -> ok [publish+:av[74, 74]/d6/r14/n14] counts(alloc,def,free,iso)=Some((123, 107, 133, 0)) probe_mount=ok [mount+:av[60, 60]/d0/r0/n0]
+E7 256 A2 a-ow150 step7 Ow(2999) -> ok [publish+:av[60, 60]/d6/r14/n14] counts(alloc,def,free,iso)=Some((137, 121, 119, 0)) probe_mount=ok [mount+:av[46, 46]/d0/r0/n0]
+E7 256 A2 a-ow150 step8 Ow(2999) -> ok [publish+:av[46, 46]/d6/r14/n14] counts(alloc,def,free,iso)=Some((151, 135, 105, 0)) probe_mount=ok [mount+:av[32, 32]/d0/r0/n0]
+E7 256 A2 a-ow150 step9 Ow(2999) -> ok [publish+:av[32, 32]/d6/r14/n14] counts(alloc,def,free,iso)=Some((165, 149, 91, 0)) probe_mount=ok [mount+:av[18, 18]/d0/r0/n0]
+E7 256 A2 a-ow150 step10 Ow(2999) -> SpaceAdmissionRefused [publish-:av[18, 18]/d6/r14/n14] counts(alloc,def,free,iso)=Some((165, 149, 91, 0))
+E7 256 A2 a-ow150 step11 Ow(2999) -> SpaceAdmissionRefused [publish-:av[18, 18]/d6/r14/n14] counts(alloc,def,free,iso)=Some((165, 149, 91, 0))
+E7 256 A2 a-ow150 step12 Ow(2999) -> SpaceAdmissionRefused [publish-:av[18, 18]/d6/r14/n14] counts(alloc,def,free,iso)=Some((165, 149, 91, 0))
+test e7_step_by_step_trace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.85s
+

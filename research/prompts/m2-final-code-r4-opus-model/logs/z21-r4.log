@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/r4_opus_z21.rs (/tmp/claude-1000/m2-final-code-r4-opus/target/debug/deps/r4_opus_z21-8a1bd8c9e74cc8b6)
+
+running 2 tests
+Z21-A m=0 crash_between_row_root_and_rotation=true witness=[] newest=(2,6) rows=[(1,0,-)] unreadable_root_txgs=[6] faults=1 -> FileRead root=(1,5) content_is_A=false content_len=2602
+Z21-A m=0 crash_between_row_root_and_rotation=false witness=[(2, 0, 0)] newest=(2,7) rows=[(1,0,-)] unreadable_root_txgs=[6, 7] faults=2 -> NoFile { root: (InstanceGeneration(0), CheckpointTxg(0)) }
+Z21-A m=1 crash_between_row_root_and_rotation=true witness=[] newest=(3,8) rows=[(1,0,-) (2,6,-)] unreadable_root_txgs=[6, 7, 8] faults=3 -> FileRead root=(1,5) content_is_A=false content_len=2602
+Z21-A m=1 crash_between_row_root_and_rotation=false witness=[(2, 0, 0)] newest=(3,10) rows=[(1,0,-) (2,7,-)] unreadable_root_txgs=[6, 7, 8, 9, 10] faults=5 -> NoFile { root: (InstanceGeneration(0), CheckpointTxg(0)) }
+Z21-A m=2 crash_between_row_root_and_rotation=true witness=[] newest=(4,10) rows=[(1,0,-) (2,6,-) (3,8,-)] unreadable_root_txgs=[6, 7, 8, 9, 10] faults=5 -> FileRead root=(1,5) content_is_A=false content_len=2602
+Z21-B writable_between=0 rollbacks=22 ring_all_readable=true witness_entries_on_disk=8 rollback_rows_in_newest_table=22 rows=22 healthy_next_mount=Ok("Ok") | corrupted_root=(16,47) ring_all_readable_after=false -> writable_mount=Ok("Ok") disk_unchanged=false
+Z21-A m=2 crash_between_row_root_and_rotation=false witness=[(2, 0, 0)] newest=(4,13) rows=[(1,0,-) (2,7,-) (3,10,-)] unreadable_root_txgs=[6, 7, 8, 9, 10, 11, 12, 13] faults=8 -> NoFile { root: (InstanceGeneration(0), CheckpointTxg(0)) }
+Z21-A m=3 crash_between_row_root_and_rotation=true witness=[] newest=(5,13) rows=[(1,0,-) (2,6,-) (3,8,-) (4,10,-)] unreadable_root_txgs=[6, 7, 8, 9, 10, 11, 12, 13] faults=8 -> FileRead root=(1,5) content_is_A=false content_len=2602
+Z21-A m=3 crash_between_row_root_and_rotation=false witness=[(2, 0, 0)] newest=(5,16) rows=[(1,0,-) (2,7,-) (3,10,-) (4,13,-)] unreadable_root_txgs=[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] faults=11 -> NoFile { root: (InstanceGeneration(0), CheckpointTxg(0)) }
+test z21_a_rollback_to_the_generation_zero_root_crashing_in_the_post_window_is_never_restored ... ok
+Z21-B writable_between=0 rollbacks=23 ring_all_readable=true witness_entries_on_disk=8 rollback_rows_in_newest_table=23 rows=23 healthy_next_mount=Ok("Ok") | corrupted_root=(17,50) ring_all_readable_after=false -> writable_mount=Ok("Ok") disk_unchanged=false
+Z21-B writable_between=0 rollbacks=24 ring_all_readable=true witness_entries_on_disk=8 rollback_rows_in_newest_table=24 rows=24 healthy_next_mount=Ok("Ok") | corrupted_root=(18,53) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 24, capacity: 23 })) disk_unchanged=true
+Z21-B writable_between=0 rollbacks=25 ring_all_readable=true witness_entries_on_disk=8 rollback_rows_in_newest_table=25 rows=25 healthy_next_mount=Ok("Ok") | corrupted_root=(19,56) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 25, capacity: 23 })) disk_unchanged=true
+Z21-B writable_between=0 rollbacks=30 ring_all_readable=true witness_entries_on_disk=8 rollback_rows_in_newest_table=30 rows=30 healthy_next_mount=Ok("Ok") | corrupted_root=(24,71) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 30, capacity: 23 })) disk_unchanged=true
+Z21-B writable_between=1 rollbacks=22 ring_all_readable=true witness_entries_on_disk=4 rollback_rows_in_newest_table=22 rows=44 healthy_next_mount=Ok("Ok") | corrupted_root=(38,113) ring_all_readable_after=false -> writable_mount=Ok("Ok") disk_unchanged=false
+test z21_b_rollback_rows_resurrect_deleted_entries_when_one_ring_slot_goes_bad has been running for over 60 seconds
+Z21-B writable_between=1 rollbacks=23 ring_all_readable=true witness_entries_on_disk=4 rollback_rows_in_newest_table=23 rows=46 healthy_next_mount=Ok("Ok") | corrupted_root=(40,119) ring_all_readable_after=false -> writable_mount=Ok("Ok") disk_unchanged=false
+Z21-B writable_between=1 rollbacks=24 ring_all_readable=true witness_entries_on_disk=4 rollback_rows_in_newest_table=24 rows=48 healthy_next_mount=Ok("Ok") | corrupted_root=(42,125) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 24, capacity: 23 })) disk_unchanged=true
+Z21-B writable_between=1 rollbacks=25 ring_all_readable=true witness_entries_on_disk=4 rollback_rows_in_newest_table=25 rows=50 healthy_next_mount=Ok("Ok") | corrupted_root=(44,131) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 25, capacity: 23 })) disk_unchanged=true
+Z21-B writable_between=1 rollbacks=30 ring_all_readable=true witness_entries_on_disk=4 rollback_rows_in_newest_table=30 rows=60 healthy_next_mount=Ok("Ok") | corrupted_root=(54,161) ring_all_readable_after=false -> writable_mount=Err(Recovery(RollbackWitnessTableFullWhoseHandlingIsUndecided { entries: 30, capacity: 23 })) disk_unchanged=true
+test z21_b_rollback_rows_resurrect_deleted_entries_when_one_ring_slot_goes_bad ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 106.17s
+

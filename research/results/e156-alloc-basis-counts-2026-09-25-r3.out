@@ -1,0 +1,1076 @@
+E7RESULT name=anchor_a1 unit_area_slots=211968
+E7RESULT name=anchor_a7 capacity=812
+E7RESULT name=anchor_a_d8 local_leaf_slots=812 local_internal_fanout=169 local_leaf_slots_matches_format_crate=true local_internal_fanout_matches_format_crate=true my_root_level=2
+E7RESULT name=s1g_mkfs_root_in_ring holds=true
+E7RESULT name=anchor_a2 ring_slots=24 mismatches=0
+E7RESULT name=anchor_a_d8_root_level my_root_level=2 real_root_level=2 matches=true
+E7RESULT name=k1_after_first_transaction txg=3 allocated_slots=17 free_slots=211951 deferred_slots=1 registered_item1_slots=17 registered_item5_slots=1 matches_registered=true
+E7RESULT name=k1_placements txg=3 units=50180:2,50240:1,50242:2,50244:1,50245:1,50246:1,50247:1,50248:1,50249:1,50250:1,50251:1,50252:1
+E7RESULT name=s1f_record_count txg=3 count=28
+E7RESULT name=legal_state family=beta0 kind=first_file txg=3 item1=17 item2=211951 item5=1 referenced=16 check_is_red=false
+E7RESULT name=beta0_mirror_vs_memory memory_holds=true mirror_check_is_red=false
+E7RESULT name=geometry ring_length=24 baseline_workload_length=144 hr_prefix_length=72 hr_tail_length=72
+E7RESULT name=s1ef_step step=1 txg=4 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=4 item1=31 item2=211937 item5=15 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=4 item1=31 item2=211937 item5=15 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=2 txg=5 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=5 item1=45 item2=211923 item5=29 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=5 item1=45 item2=211923 item5=29 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=3 txg=6 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=6 item1=59 item2=211909 item5=43 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=6 item1=59 item2=211909 item5=43 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=4 txg=7 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=7 item1=73 item2=211895 item5=57 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=7 item1=73 item2=211895 item5=57 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=5 txg=8 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=8 item1=87 item2=211881 item5=71 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=8 item1=87 item2=211881 item5=71 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=6 txg=9 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=9 item1=101 item2=211867 item5=85 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=9 item1=101 item2=211867 item5=85 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=7 txg=10 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=s1d_step txg=10 item1=115 item2=211853 item5=99 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=10 item1=115 item2=211853 item5=99 referenced=16 check_is_red=false
+E7RESULT name=s1ef_step step=8 txg=11 changed_leaves=2 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=11 item1=131 item2=211837 item5=113 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=11 item1=131 item2=211837 item5=113 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=9 txg=12 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=12 item1=147 item2=211821 item5=129 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=12 item1=147 item2=211821 item5=129 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=10 txg=13 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=13 item1=163 item2=211805 item5=145 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=13 item1=163 item2=211805 item5=145 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=11 txg=14 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=14 item1=179 item2=211789 item5=161 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=14 item1=179 item2=211789 item5=161 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=12 txg=15 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=15 item1=195 item2=211773 item5=177 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=15 item1=195 item2=211773 item5=177 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=13 txg=16 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=16 item1=211 item2=211757 item5=193 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=16 item1=211 item2=211757 item5=193 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=14 txg=17 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=17 item1=227 item2=211741 item5=209 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=17 item1=227 item2=211741 item5=209 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=15 txg=18 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=18 item1=243 item2=211725 item5=225 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=18 item1=243 item2=211725 item5=225 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=16 txg=19 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=19 item1=259 item2=211709 item5=241 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=19 item1=259 item2=211709 item5=241 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=17 txg=20 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=20 item1=275 item2=211693 item5=257 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=20 item1=275 item2=211693 item5=257 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=18 txg=21 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=21 item1=291 item2=211677 item5=273 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=21 item1=291 item2=211677 item5=273 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=19 txg=22 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=22 item1=307 item2=211661 item5=289 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=22 item1=307 item2=211661 item5=289 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=20 txg=23 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=23 item1=323 item2=211645 item5=305 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=23 item1=323 item2=211645 item5=305 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=21 txg=24 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=24 item1=339 item2=211629 item5=321 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=24 item1=339 item2=211629 item5=321 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=22 txg=25 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=25 item1=355 item2=211613 item5=337 i31_red=false i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=25 item1=355 item2=211613 item5=337 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=23 txg=26 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=26 item1=371 item2=211597 item5=353 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=26 item1=371 item2=211597 item5=353 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=24 txg=27 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=27 item1=387 item2=211581 item5=369 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=27 item1=387 item2=211581 item5=369 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=25 txg=28 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=28 item1=403 item2=211565 item5=385 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=28 item1=403 item2=211565 item5=385 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=26 txg=29 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=29 item1=419 item2=211549 item5=401 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=29 item1=419 item2=211549 item5=401 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=27 txg=30 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=30 item1=435 item2=211533 item5=417 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=30 item1=435 item2=211533 item5=417 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=28 txg=31 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=31 item1=451 item2=211517 item5=433 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=31 item1=451 item2=211517 item5=433 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=29 txg=32 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=32 item1=467 item2=211501 item5=449 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=32 item1=467 item2=211501 item5=449 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=30 txg=33 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=s1d_step txg=33 item1=483 item2=211485 item5=465 i31_red=true i52_red=false
+E7RESULT name=legal_state family=H0 kind=O txg=33 item1=483 item2=211485 item5=465 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=31 txg=34 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=34 item1=497 item2=211471 item5=479 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=32 txg=35 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=35 item1=511 item2=211457 item5=493 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=33 txg=36 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=36 item1=525 item2=211443 item5=507 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=34 txg=37 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=37 item1=539 item2=211429 item5=521 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=35 txg=38 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=38 item1=553 item2=211415 item5=535 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=36 txg=39 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=39 item1=567 item2=211401 item5=549 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=37 txg=40 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=40 item1=581 item2=211387 item5=563 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=38 txg=41 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=41 item1=595 item2=211373 item5=577 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=39 txg=42 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=42 item1=609 item2=211359 item5=591 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=40 txg=43 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=43 item1=623 item2=211345 item5=605 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=41 txg=44 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=44 item1=637 item2=211331 item5=619 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=42 txg=45 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=45 item1=651 item2=211317 item5=633 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=43 txg=46 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=46 item1=665 item2=211303 item5=647 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=44 txg=47 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=47 item1=679 item2=211289 item5=661 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=45 txg=48 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=48 item1=693 item2=211275 item5=675 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=46 txg=49 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=49 item1=707 item2=211261 item5=689 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=47 txg=50 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=50 item1=721 item2=211247 item5=703 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=48 txg=51 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=51 item1=735 item2=211233 item5=717 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=49 txg=52 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=52 item1=749 item2=211219 item5=731 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=50 txg=53 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=53 item1=763 item2=211205 item5=745 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=51 txg=54 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=54 item1=777 item2=211191 item5=759 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=52 txg=55 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=55 item1=791 item2=211177 item5=773 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=53 txg=56 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=56 item1=805 item2=211163 item5=787 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=54 txg=57 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=57 item1=819 item2=211149 item5=801 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=55 txg=58 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=58 item1=833 item2=211135 item5=815 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=56 txg=59 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=59 item1=847 item2=211121 item5=829 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=57 txg=60 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=60 item1=861 item2=211107 item5=843 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=58 txg=61 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=61 item1=875 item2=211093 item5=857 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=59 txg=62 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=62 item1=889 item2=211079 item5=871 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=60 txg=63 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=63 item1=903 item2=211065 item5=885 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=61 txg=64 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=64 item1=917 item2=211051 item5=899 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=62 txg=65 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=65 item1=931 item2=211037 item5=913 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=63 txg=66 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=66 item1=945 item2=211023 item5=927 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=64 txg=67 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=67 item1=959 item2=211009 item5=941 referenced=18 check_is_red=false
+E7RESULT name=s1ef_step step=65 txg=68 changed_leaves=2 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=68 item1=975 item2=210993 item5=955 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=66 txg=69 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=69 item1=991 item2=210977 item5=971 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=67 txg=70 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=70 item1=1007 item2=210961 item5=987 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=68 txg=71 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=71 item1=1023 item2=210945 item5=1003 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=69 txg=72 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=72 item1=1039 item2=210929 item5=1019 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=70 txg=73 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=73 item1=1055 item2=210913 item5=1035 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=71 txg=74 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=74 item1=1071 item2=210897 item5=1051 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=72 txg=75 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=75 item1=1087 item2=210881 item5=1067 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=73 txg=76 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=76 item1=1101 item2=210867 item5=1081 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=74 txg=77 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=77 item1=1115 item2=210853 item5=1095 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=75 txg=78 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=78 item1=1129 item2=210839 item5=1109 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=76 txg=79 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=79 item1=1143 item2=210825 item5=1123 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=77 txg=80 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=80 item1=1157 item2=210811 item5=1137 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=78 txg=81 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=81 item1=1171 item2=210797 item5=1151 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=79 txg=82 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=82 item1=1185 item2=210783 item5=1165 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=80 txg=83 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=83 item1=1199 item2=210769 item5=1179 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=81 txg=84 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=84 item1=1213 item2=210755 item5=1193 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=82 txg=85 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=85 item1=1227 item2=210741 item5=1207 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=83 txg=86 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=86 item1=1241 item2=210727 item5=1221 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=84 txg=87 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=87 item1=1255 item2=210713 item5=1235 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=85 txg=88 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=88 item1=1269 item2=210699 item5=1249 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=86 txg=89 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=89 item1=1283 item2=210685 item5=1263 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=87 txg=90 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=90 item1=1297 item2=210671 item5=1277 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=88 txg=91 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=91 item1=1311 item2=210657 item5=1291 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=89 txg=92 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=92 item1=1325 item2=210643 item5=1305 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=90 txg=93 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=93 item1=1339 item2=210629 item5=1319 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=91 txg=94 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=94 item1=1353 item2=210615 item5=1333 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=92 txg=95 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=95 item1=1367 item2=210601 item5=1347 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=93 txg=96 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=96 item1=1381 item2=210587 item5=1361 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=94 txg=97 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=97 item1=1395 item2=210573 item5=1375 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=95 txg=98 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=98 item1=1409 item2=210559 item5=1389 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=96 txg=99 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=99 item1=1423 item2=210545 item5=1403 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=97 txg=100 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=100 item1=1437 item2=210531 item5=1417 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=98 txg=101 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=101 item1=1451 item2=210517 item5=1431 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=99 txg=102 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=102 item1=1465 item2=210503 item5=1445 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=100 txg=103 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=103 item1=1479 item2=210489 item5=1459 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=101 txg=104 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=104 item1=1493 item2=210475 item5=1473 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=102 txg=105 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=105 item1=1507 item2=210461 item5=1487 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=103 txg=106 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=106 item1=1521 item2=210447 item5=1501 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=104 txg=107 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=107 item1=1535 item2=210433 item5=1515 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=105 txg=108 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=108 item1=1549 item2=210419 item5=1529 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=106 txg=109 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=109 item1=1563 item2=210405 item5=1543 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=107 txg=110 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=110 item1=1577 item2=210391 item5=1557 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=108 txg=111 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=111 item1=1591 item2=210377 item5=1571 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=109 txg=112 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=112 item1=1605 item2=210363 item5=1585 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=110 txg=113 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=113 item1=1619 item2=210349 item5=1599 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=111 txg=114 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=114 item1=1633 item2=210335 item5=1613 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=112 txg=115 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=115 item1=1647 item2=210321 item5=1627 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=113 txg=116 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=116 item1=1661 item2=210307 item5=1641 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=114 txg=117 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=117 item1=1675 item2=210293 item5=1655 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=115 txg=118 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=118 item1=1689 item2=210279 item5=1669 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=116 txg=119 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=119 item1=1703 item2=210265 item5=1683 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=117 txg=120 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=120 item1=1717 item2=210251 item5=1697 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=118 txg=121 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=121 item1=1731 item2=210237 item5=1711 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=119 txg=122 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=122 item1=1745 item2=210223 item5=1725 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=120 txg=123 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=123 item1=1759 item2=210209 item5=1739 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=121 txg=124 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=124 item1=1773 item2=210195 item5=1753 referenced=20 check_is_red=false
+E7RESULT name=s1ef_step step=122 txg=125 changed_leaves=2 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=125 item1=1789 item2=210179 item5=1767 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=123 txg=126 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=126 item1=1805 item2=210163 item5=1783 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=124 txg=127 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=127 item1=1821 item2=210147 item5=1799 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=125 txg=128 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=128 item1=1837 item2=210131 item5=1815 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=126 txg=129 changed_leaves=2 changed_internal=1 released_d0=16 expected_released_d0=16 record_delta=28 expected_record_delta=28 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=129 item1=1853 item2=210115 item5=1831 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=127 txg=130 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=130 item1=1867 item2=210101 item5=1845 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=128 txg=131 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=131 item1=1881 item2=210087 item5=1859 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=129 txg=132 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=132 item1=1895 item2=210073 item5=1873 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=130 txg=133 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=133 item1=1909 item2=210059 item5=1887 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=131 txg=134 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=134 item1=1923 item2=210045 item5=1901 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=132 txg=135 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=135 item1=1937 item2=210031 item5=1915 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=133 txg=136 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=136 item1=1951 item2=210017 item5=1929 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=134 txg=137 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=137 item1=1965 item2=210003 item5=1943 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=135 txg=138 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=138 item1=1979 item2=209989 item5=1957 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=136 txg=139 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=139 item1=1993 item2=209975 item5=1971 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=137 txg=140 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=140 item1=2007 item2=209961 item5=1985 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=138 txg=141 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=141 item1=2021 item2=209947 item5=1999 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=139 txg=142 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=142 item1=2035 item2=209933 item5=2013 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=140 txg=143 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=143 item1=2049 item2=209919 item5=2027 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=141 txg=144 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=144 item1=2063 item2=209905 item5=2041 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=142 txg=145 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=145 item1=2077 item2=209891 item5=2055 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=143 txg=146 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=146 item1=2091 item2=209877 item5=2069 referenced=22 check_is_red=false
+E7RESULT name=s1ef_step step=144 txg=147 changed_leaves=1 changed_internal=1 released_d0=14 expected_released_d0=14 record_delta=24 expected_record_delta=24 matches=true
+E7RESULT name=legal_state family=H0 kind=O txg=147 item1=2105 item2=209863 item5=2083 referenced=22 check_is_red=false
+E7RESULT name=baseline_workload_completed_full_length length=144
+E7RESULT name=s1ef_summary steps=144 mismatches=0 steps_by_changed_leaf_count=1:108,2:36
+E7RESULT name=beta1_h0_end txg=147 accounting_slot=52306 referenced=22
+E7RESULT name=legal_state family=HR kind=first_file txg=3 item1=17 item2=211951 item5=1 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=4 item1=31 item2=211937 item5=15 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=5 item1=45 item2=211923 item5=29 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=6 item1=59 item2=211909 item5=43 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=7 item1=73 item2=211895 item5=57 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=8 item1=87 item2=211881 item5=71 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=9 item1=101 item2=211867 item5=85 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=10 item1=115 item2=211853 item5=99 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=11 item1=131 item2=211837 item5=113 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=12 item1=147 item2=211821 item5=129 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=13 item1=163 item2=211805 item5=145 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=14 item1=179 item2=211789 item5=161 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=15 item1=195 item2=211773 item5=177 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=16 item1=211 item2=211757 item5=193 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=17 item1=227 item2=211741 item5=209 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=18 item1=243 item2=211725 item5=225 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=19 item1=259 item2=211709 item5=241 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=20 item1=275 item2=211693 item5=257 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=21 item1=291 item2=211677 item5=273 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=22 item1=307 item2=211661 item5=289 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=23 item1=323 item2=211645 item5=305 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=24 item1=339 item2=211629 item5=321 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=25 item1=355 item2=211613 item5=337 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=26 item1=371 item2=211597 item5=353 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=27 item1=387 item2=211581 item5=369 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=28 item1=403 item2=211565 item5=385 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=29 item1=419 item2=211549 item5=401 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=30 item1=435 item2=211533 item5=417 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=31 item1=451 item2=211517 item5=433 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=32 item1=467 item2=211501 item5=449 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=33 item1=483 item2=211485 item5=465 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=34 item1=497 item2=211471 item5=479 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=35 item1=511 item2=211457 item5=493 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=36 item1=525 item2=211443 item5=507 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=37 item1=539 item2=211429 item5=521 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=38 item1=553 item2=211415 item5=535 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=39 item1=567 item2=211401 item5=549 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=40 item1=581 item2=211387 item5=563 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=41 item1=595 item2=211373 item5=577 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=42 item1=609 item2=211359 item5=591 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=43 item1=623 item2=211345 item5=605 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=44 item1=637 item2=211331 item5=619 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=45 item1=651 item2=211317 item5=633 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=46 item1=665 item2=211303 item5=647 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=47 item1=679 item2=211289 item5=661 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=48 item1=693 item2=211275 item5=675 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=49 item1=707 item2=211261 item5=689 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=50 item1=721 item2=211247 item5=703 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=51 item1=735 item2=211233 item5=717 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=52 item1=749 item2=211219 item5=731 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=53 item1=763 item2=211205 item5=745 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=54 item1=777 item2=211191 item5=759 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=55 item1=791 item2=211177 item5=773 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=56 item1=805 item2=211163 item5=787 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=57 item1=819 item2=211149 item5=801 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=58 item1=833 item2=211135 item5=815 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=59 item1=847 item2=211121 item5=829 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=60 item1=861 item2=211107 item5=843 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=61 item1=875 item2=211093 item5=857 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=62 item1=889 item2=211079 item5=871 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=63 item1=903 item2=211065 item5=885 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=64 item1=917 item2=211051 item5=899 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=65 item1=931 item2=211037 item5=913 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=66 item1=945 item2=211023 item5=927 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=67 item1=959 item2=211009 item5=941 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=68 item1=975 item2=210993 item5=955 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=69 item1=991 item2=210977 item5=971 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=70 item1=1007 item2=210961 item5=987 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=71 item1=1023 item2=210945 item5=1003 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=72 item1=1039 item2=210929 item5=1019 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=73 item1=1055 item2=210913 item5=1035 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=74 item1=1071 item2=210897 item5=1051 referenced=20 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=75 item1=1087 item2=210881 item5=1067 referenced=20 check_is_red=false
+E7RESULT name=hr_rollback_target instance=1 txg=52 candidate_count=24
+E7RESULT name=legal_state family=HR kind=rollback_row txg=76 item1=18 item2=211950 item5=0 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=warmup txg=77 item1=26 item2=211942 item5=8 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=78 item1=42 item2=211926 item5=24 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=79 item1=56 item2=211912 item5=38 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=80 item1=70 item2=211898 item5=52 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=81 item1=84 item2=211884 item5=66 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=82 item1=98 item2=211870 item5=80 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=83 item1=112 item2=211856 item5=94 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=84 item1=128 item2=211840 item5=110 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=85 item1=144 item2=211824 item5=126 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=86 item1=160 item2=211808 item5=142 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=87 item1=176 item2=211792 item5=158 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=88 item1=192 item2=211776 item5=174 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=89 item1=208 item2=211760 item5=190 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=90 item1=224 item2=211744 item5=206 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=91 item1=240 item2=211728 item5=222 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=92 item1=256 item2=211712 item5=238 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=93 item1=272 item2=211696 item5=254 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=94 item1=288 item2=211680 item5=270 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=95 item1=304 item2=211664 item5=286 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=96 item1=320 item2=211648 item5=302 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=97 item1=336 item2=211632 item5=318 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=98 item1=352 item2=211616 item5=334 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=99 item1=368 item2=211600 item5=350 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=100 item1=376 item2=211592 item5=358 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=101 item1=376 item2=211592 item5=358 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=102 item1=378 item2=211590 item5=360 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=103 item1=380 item2=211588 item5=362 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=104 item1=382 item2=211586 item5=364 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=105 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=106 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=107 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=108 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=109 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=110 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=111 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=112 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=113 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=114 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=115 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=116 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=117 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=118 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=119 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=120 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=121 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=122 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=123 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=124 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=125 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=126 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=127 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=128 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=129 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=130 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=131 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=132 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=133 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=134 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=135 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=136 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=137 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=138 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=139 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=140 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=141 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=142 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=143 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=144 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=145 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=146 item1=386 item2=211582 item5=368 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=147 item1=384 item2=211584 item5=366 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=148 item1=382 item2=211586 item5=364 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HR kind=O txg=149 item1=382 item2=211586 item5=364 referenced=18 check_is_red=false
+E7RESULT name=hr_lengths requested_prefix=72 actual_prefix=72 requested_tail=72 actual_tail=72
+E7RESULT name=beta2_hr_end txg=149 instance=2 accounting_slot=50354 referenced=18
+E7RESULT name=legal_state family=HK kind=first_file txg=3 item1=17 item2=211951 item5=1 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=4 item1=31 item2=211937 item5=15 referenced=16 check_is_red=false
+E7RESULT name=r5_empty_publish_closed_form label=HK released_d0=8 expected_released_d0=8 record_delta=16 expected_record_delta=16 fixed_point_slots_one_leaf=8
+E7RESULT name=legal_state family=HK kind=E txg=5 item1=39 item2=211929 item5=23 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=W_row txg=6 item1=49 item2=211919 item5=33 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=warmup txg=7 item1=57 item2=211911 item5=41 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=8 item1=71 item2=211897 item5=55 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=9 item1=87 item2=211881 item5=69 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=10 item1=103 item2=211865 item5=85 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=11 item1=119 item2=211849 item5=101 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=raise_floor_pump txg=12 item1=72 item2=211896 item5=54 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=raise_floor_pump txg=13 item1=80 item2=211888 item5=62 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=14 item1=96 item2=211872 item5=78 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=rollback_row txg=15 item1=26 item2=211942 item5=10 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=warmup txg=16 item1=34 item2=211934 item5=18 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=17 item1=48 item2=211920 item5=32 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK kind=W_row_after_c2 txg=19 item1=74 item2=211894 item5=56 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=warmup txg=20 item1=82 item2=211886 item5=64 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK kind=O txg=21 item1=98 item2=211870 item5=80 referenced=18 check_is_red=false
+E7RESULT name=s1e_empty_publish_release slots=8
+E7RESULT name=legal_state family=HK-F0 kind=first_file txg=3 item1=16 item2=211952 item5=0 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=O txg=4 item1=16 item2=211952 item5=0 referenced=16 check_is_red=false
+E7RESULT name=r5_empty_publish_closed_form label=HK-F0 released_d0=8 expected_released_d0=8 record_delta=16 expected_record_delta=16 fixed_point_slots_one_leaf=8
+E7RESULT name=legal_state family=HK-F0 kind=E txg=5 item1=16 item2=211952 item5=0 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=W_row txg=6 item1=46 item2=211922 item5=30 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=warmup txg=7 item1=54 item2=211914 item5=38 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=O txg=8 item1=16 item2=211952 item5=0 referenced=16 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=O txg=9 item1=18 item2=211950 item5=0 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=O txg=10 item1=18 item2=211950 item5=0 referenced=18 check_is_red=false
+E7RESULT name=legal_state family=HK-F0 kind=O txg=11 item1=18 item2=211950 item5=0 referenced=18 check_is_red=false
+E7RESULT name=s9_raise_floor_refused family=HK-F0 error=RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { root: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, failure: UnitUnreadable { slot: SlotNumber(50178) } }
+E7RESULT name=beta_syn_row item1=16 item2=211952 item5=0 referenced=16
+E7RESULT name=s1c_rollback_row_counter c_counter=8 d_counter=9
+E7RESULT name=s1c_record_present instance=1 counter=4 present=true
+E7RESULT name=s1c_record_present instance=2 counter=5 present=true
+E7RESULT name=s1c_record_present instance=2 counter=8 present=true
+E7RESULT name=s1c_record_present instance=3 counter=9 present=true
+E7RESULT name=s1c_record_present instance=3 counter=10 present=true
+E7RESULT name=s1c_remount instance=4 isolated=[(0,54),(1,54)] abandoned_roots_unreadable=0
+E7RESULT name=q7b red_l1=0 total_l1=309 red_l2=0 total_l2=1 first_red=
+E7RESULT name=q7d1_by_kind kind=O min=14 max=16 count=288
+E7RESULT name=q7d1_by_kind kind=E min=8 max=8 count=1
+E7RESULT name=q7d2_min_item5 min_item5=0 family=HR kind=rollback_row txg=76
+E7RESULT name=q7d3_pc_reachable hk_forced_to_zero_smallest_item5_item5=0 beta_syn_item5=0 holds=true
+E7RESULT name=basis_snapshot label=beta0_k1 item1=17 item5=1 referenced=16 reachable=true
+E7RESULT name=q7a basis=beta0_k1 defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=beta0_k1 defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=beta0_k1 defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta0_k1 k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=beta0_k1 k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=beta0_k1 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta0_k1 check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta0_k1 check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=beta1_h0 item1=2105 item5=2083 referenced=22 reachable=true
+E7RESULT name=q7a basis=beta1_h0 defer_delta=1 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7a basis=beta1_h0 defer_delta=-1 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7a basis=beta1_h0 defer_delta=8 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta1_h0 k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=beta1_h0 k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=beta1_h0 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta1_h0 check_is_red=false i31_red=true i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta1_h0 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=basis_snapshot label=beta2_hr item1=382 item5=364 referenced=18 reachable=true
+E7RESULT name=q7a basis=beta2_hr defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=beta2_hr defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=beta2_hr defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta2_hr k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=beta2_hr k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=beta2_hr check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta2_hr check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta2_hr check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=HK_w item1=57 item5=41 referenced=16 reachable=true
+E7RESULT name=q7a basis=HK_w defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_w defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_w defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=HK_w k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=HK_w k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=HK_w check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=HK_w check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=HK_w check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=HK_r item1=34 item5=18 referenced=16 reachable=true
+E7RESULT name=q7a basis=HK_r defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_r defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_r defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=HK_r k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=HK_r k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=HK_r check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=HK_r check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=HK_r check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=HK_f item1=80 item5=62 referenced=18 reachable=true
+E7RESULT name=q7a basis=HK_f defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_f defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_f defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=HK_f k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=HK_f k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=HK_f check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=HK_f check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=HK_f check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=HK_l2 item1=82 item5=64 referenced=18 reachable=true
+E7RESULT name=q7a basis=HK_l2 defer_delta=1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_l2 defer_delta=-1 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7a basis=HK_l2 defer_delta=8 base_check_is_red=false base_i31_red=false base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=false corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=HK_l2 k=1 real_check_is_red=true without_subtracting_defer_is_red=true flips_red_to_green=false
+E7RESULT name=q7c2_threshold_at_least basis=HK_l2 k=-1 real_check_is_red=true at_least_holds=true flips_red_to_green=true
+E7RESULT name=pc_check_bk1 basis=HK_l2 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=HK_l2 check_is_red=false i31_red=false i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=HK_l2 check_is_red=true i31_red=false i52_red=false
+E7RESULT name=basis_snapshot label=beta_syn item1=16 item5=0 referenced=16 reachable=false
+E7RESULT name=q7a basis=beta_syn defer_delta=1 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7a basis=beta_syn defer_delta=-1 not_applicable=true reason=deferred_underflow
+E7RESULT name=q7a basis=beta_syn defer_delta=8 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta_syn k=1 real_check_is_red=true without_subtracting_defer_is_red=false flips_red_to_green=true
+E7RESULT name=q7c2_threshold_at_least basis=beta_syn k=-1 not_applicable=true reason=deferred_is_zero_cannot_subtract_one
+E7RESULT name=pc_check_bk1 basis=beta_syn check_is_red=true i31_red=false i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta_syn check_is_red=false i31_red=true i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta_syn check_is_red=true i31_red=true i52_red=false
+E7RESULT name=basis_snapshot label=beta_F0 item1=16 item5=0 referenced=16 reachable=false
+E7RESULT name=q7a basis=beta_F0 defer_delta=1 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7a basis=beta_F0 defer_delta=-1 not_applicable=true reason=deferred_underflow
+E7RESULT name=q7a basis=beta_F0 defer_delta=8 base_check_is_red=false base_i31_red=true base_i52_red=false corrupted_check_is_red=true corrupted_i31_red=true corrupted_i52_red=false
+E7RESULT name=q7c1_not_subtracting_defer basis=beta_F0 k=1 real_check_is_red=true without_subtracting_defer_is_red=false flips_red_to_green=true
+E7RESULT name=q7c2_threshold_at_least basis=beta_F0 k=-1 not_applicable=true reason=deferred_is_zero_cannot_subtract_one
+E7RESULT name=pc_check_bk1 basis=beta_F0 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=pc_check_bk2 basis=beta_F0 check_is_red=false i31_red=true i52_red=true
+E7RESULT name=pc_check_bk3_is_bd_plus_one basis=beta_F0 check_is_red=true i31_red=true i52_red=false
+E7RESULT name=q7a_summary all_red_count=18 q7c1_flip_seen=true q7c2_flip_seen=true
+E7RESULT name=q7f_count count=7
+E7RESULT name=q7e beta_forced_to_zero_flip1=true beta_forced_to_zero_flip2=false beta_syn_flip1=true beta_syn_flip2=false beta_forced_to_zero_i31_red=true beta_forced_to_zero_i52_red=false beta_syn_i31_red=true beta_syn_i52_red=false
+E7RESULT name=integrity families=3 legal_state_rows=310 hk_forced_to_zero_rows=9 basis_count=9
+E7RESULT name=k9_precondition non_empty_valid_root_count=9 threshold=4 holds=true valid_root_count=14 known_non_empty_txgs_defined=9
+E7RESULT name=v13_hf_prefix_identical holds=true
+E7RESULT name=q3a_d_rel_g7 release_generation=13 dispensable_txg=16 d_rel_non_empty=0 d_rel_all=2 pump_publishes=3
+E7RESULT name=q3b_d_rel_f_kou release_generation=13 dispensable_txg=16 d_rel_non_empty=0 d_rel_all=2 pump_publishes=3
+E7RESULT name=q3c_diff max_diff=0 threshold=3 verdict=difference_not_large
+E7RESULT name=k9_newest_batch_d_rel_non_empty g7=0 f_kou=0 expected=3 note=see_p21e_prediction
+E7RESULT name=q3d_d_acct_d_alloc d_acct_f_kou=0 d_alloc_f_kou=2 d_acct_g7=2 d_alloc_g7=2 method=derived_from_documented_call_order_not_per_push_measured
+E7RESULT name=x8a_prefix pool=hx overwrite_count=1 stop_reason=SpaceAdmissionRefused(AdmissionRefusedOnSomeDevices { short_devices: [DeviceShortOfDemand { device: DeviceIdentity(0), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(98304) }, DeviceShortOfDemand { device: DeviceIdentity(1), available: AvailableBytesOnOneDevice(-212992), demand: BytesOnOneDevice(98304) }] }) allocated=41 free=87 deferred=27
+E7RESULT name=r7_hy_condition pool=hx open_segment_free_slots=0 fixed_point_slots=8 threshold=8 holds=false
+E7RESULT name=x8a_held_measure pool=hx ceiling=0 reclaimed_and_held_records=0 reclaimed_and_held_span=0 allocated_after_hold=41 free_after_hold=87 deferred_after_hold=27 lowest_empty_segment_after_hold=none
+E7RESULT name=q3e_f_kou pool=hx first_push_result=succeeded release_reclaim_holds_reached=true
+E7RESULT name=q3e_f_kou_four_more pool=hx results=not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded
+E7RESULT name=q3e_f_kou_remount pool=hx result=remount_failed:Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录树节点的层级不是它的位置规定的那一层" })
+E7RESULT name=q3e_g7 pool=hx first_push_result=succeeded release_reclaim_holds_reached=not_applicable_g7_never_holds
+E7RESULT name=q3e_g7_four_more pool=hx results=not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded
+E7RESULT name=q3e_g7_remount pool=hx result=remount_failed:Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录树节点的层级不是它的位置规定的那一层" })
+E7RESULT name=q3e_x8a pool=hx status=done f_kou_stuck=false reconstructed_raise_stuck=false both_stuck_at_same_step=true note=see_x8a_held_measure_and_f_kou_g7_lines
+E7RESULT name=r7_hy_cap chosen_cap=0
+E7RESULT name=x8a_prefix pool=hy overwrite_count=0 stop_reason=stopped_at_cap_0_by_request allocated=29 free=99 deferred=15
+E7RESULT name=r7_hy_condition pool=hy open_segment_free_slots=0 fixed_point_slots=8 threshold=8 holds=false
+E7RESULT name=x8a_held_measure pool=hy ceiling=0 reclaimed_and_held_records=0 reclaimed_and_held_span=0 allocated_after_hold=29 free_after_hold=99 deferred_after_hold=15 lowest_empty_segment_after_hold=none
+E7RESULT name=q3e_f_kou pool=hy first_push_result=succeeded release_reclaim_holds_reached=true
+E7RESULT name=q3e_f_kou_four_more pool=hy results=not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded
+E7RESULT name=q3e_f_kou_remount pool=hy result=remount_failed:Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录树节点的层级不是它的位置规定的那一层" })
+E7RESULT name=q3e_g7 pool=hy first_push_result=succeeded release_reclaim_holds_reached=not_applicable_g7_never_holds
+E7RESULT name=q3e_g7_four_more pool=hy results=not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded,not_applicable_raise_succeeded
+E7RESULT name=q3e_g7_remount pool=hy result=remount_failed:Recovery(InvariantViolated { invariant: "I-1.1", detail: "分配记录树节点的层级不是它的位置规定的那一层" })
+E7RESULT name=q3e_x8a pool=hy status=done f_kou_stuck=false reconstructed_raise_stuck=false both_stuck_at_same_step=true note=see_x8a_held_measure_and_f_kou_g7_lines
+E7RESULT name=anchor_k8 configured=4 local=4 holds=true
+E7RESULT name=q1_delta_debug s=8 holes=0 matched_to_holes=0 deferred=346 q1b_blocked_span=346 unblocked_span=0 blocked_record_count=303 unblocked_record_count=0 total_released_record_count=303 ledger_miss_span_sum=0 stale_reclaimed_record_count=37 stale_reclaimed_span_sum=43 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=8 holes=0 matched_to_holes=0 txg=29 allocated=364 deferred=346 referenced=18 q1a_t1_over_withheld=346 q1b_g12_over_withheld=346 delta=0 h_missing=0
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50184 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50186 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50188 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50190 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50192 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50194 span=2 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50196 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50265 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50266 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50268 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50269 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50270 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50271 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50272 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50273 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50274 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50275 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50276 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50277 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50278 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50280 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50281 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50282 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50283 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50284 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50285 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50286 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50287 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50288 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50289 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50290 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50292 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50293 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50294 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50295 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50296 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50297 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50298 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50299 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50300 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50301 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50302 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50304 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50305 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50306 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50307 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50308 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50309 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50310 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50311 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50312 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50313 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50314 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50316 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50317 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50318 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50319 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50320 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50321 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50322 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50323 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50324 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50325 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50326 span=2 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50328 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50329 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50330 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50331 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50332 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50333 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50334 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50335 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50336 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50337 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50338 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50340 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50341 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50342 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50343 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50344 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50345 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50346 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50347 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50348 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50349 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_record s=8 holes=1 matched_to_holes=0 slot=50350 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=35
+E7RESULT name=q1_delta_debug s=8 holes=1 matched_to_holes=0 deferred=448 q1b_blocked_span=348 unblocked_span=100 blocked_record_count=308 unblocked_record_count=86 total_released_record_count=394 ledger_miss_span_sum=0 stale_reclaimed_record_count=11 stale_reclaimed_span_sum=12 deferred_minus_q1b=100 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=8 holes=1 matched_to_holes=0 txg=35 allocated=466 deferred=448 referenced=18 q1a_t1_over_withheld=448 q1b_g12_over_withheld=348 delta=100 h_missing=8
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50184 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50186 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50188 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50190 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50192 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50196 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50198 span=2 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50200 span=2 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50202 span=2 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50204 span=2 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50206 span=2 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50208 span=2 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50265 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50266 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50268 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50269 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50270 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50271 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50272 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50273 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50274 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50275 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50276 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50277 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50278 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50280 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50281 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50282 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50283 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50284 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50285 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50286 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50287 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50288 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50289 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50290 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50292 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50293 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50294 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50295 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50296 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50297 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50298 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50299 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50300 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50301 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50302 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50304 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50305 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50306 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50307 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50308 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50309 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50310 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50311 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50312 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50313 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50314 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50316 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50317 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50318 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50319 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50320 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50321 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50322 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50323 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50324 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50337 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50338 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50340 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50341 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50342 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50343 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50344 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50345 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50346 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50347 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50348 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50349 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50350 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50351 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50352 span=2 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50354 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50355 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50356 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50357 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50358 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50359 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50360 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50361 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50362 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50363 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50364 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50365 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50366 span=2 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50368 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50369 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50370 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50371 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50372 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50373 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50374 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50375 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50376 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50377 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50378 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50379 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50380 span=2 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50382 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50383 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50384 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50385 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50386 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50387 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50388 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50389 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50390 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50391 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50392 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50393 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50394 span=2 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50396 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50397 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50398 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50399 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50400 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50401 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50402 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50403 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50404 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50405 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50406 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50407 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50408 span=2 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50410 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50411 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50412 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50413 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50414 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50415 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50416 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50417 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50418 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50419 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50420 span=1 allocation_generation=16 ledger_hit=true release_generation=17 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50421 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50422 span=2 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50424 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50425 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50426 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50427 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50428 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50429 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50430 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50431 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50432 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50433 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_record s=8 holes=2 matched_to_holes=0 slot=50434 span=1 allocation_generation=17 ledger_hit=true release_generation=18 oldest_ring_txg=4 newest_ring_txg=41
+E7RESULT name=q1_delta_debug s=8 holes=2 matched_to_holes=0 deferred=522 q1b_blocked_span=340 unblocked_span=182 blocked_record_count=303 unblocked_record_count=158 total_released_record_count=461 ledger_miss_span_sum=0 stale_reclaimed_record_count=11 stale_reclaimed_span_sum=12 deferred_minus_q1b=182 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=8 holes=2 matched_to_holes=0 txg=41 allocated=540 deferred=522 referenced=18 q1a_t1_over_withheld=522 q1b_g12_over_withheld=340 delta=182 h_missing=14
+E7RESULT name=q1_delta_debug s=4 holes=0 matched_to_holes=0 deferred=154 q1b_blocked_span=154 unblocked_span=0 blocked_record_count=135 unblocked_record_count=0 total_released_record_count=135 ledger_miss_span_sum=0 stale_reclaimed_record_count=37 stale_reclaimed_span_sum=43 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=4 holes=0 matched_to_holes=0 txg=17 allocated=172 deferred=154 referenced=18 q1a_t1_over_withheld=154 q1b_g12_over_withheld=154 delta=0 h_missing=0
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50184 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50186 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50188 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50190 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50192 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50194 span=2 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50196 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50265 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50266 span=2 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50268 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50269 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50270 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50271 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50272 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50273 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50274 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50275 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50276 span=1 allocation_generation=5 ledger_hit=true release_generation=6 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50277 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50278 span=2 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50280 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50281 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50282 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50283 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50284 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50285 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50286 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50287 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50288 span=1 allocation_generation=6 ledger_hit=true release_generation=7 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50289 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50290 span=2 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50292 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50293 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50294 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50295 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50296 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50297 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50298 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50299 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50300 span=1 allocation_generation=7 ledger_hit=true release_generation=8 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50301 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50302 span=2 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50304 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50305 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50306 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50307 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50308 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50309 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50310 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50311 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50312 span=1 allocation_generation=8 ledger_hit=true release_generation=9 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50313 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50314 span=2 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50316 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50317 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50318 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50319 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50320 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50321 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50322 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50323 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50324 span=1 allocation_generation=9 ledger_hit=true release_generation=10 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50325 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50326 span=2 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50328 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50329 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50330 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50331 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50332 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50333 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50334 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50335 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50336 span=1 allocation_generation=10 ledger_hit=true release_generation=11 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50337 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50338 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50340 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50341 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50342 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50343 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50344 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50345 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50346 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50347 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50348 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50349 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_record s=4 holes=1 matched_to_holes=0 slot=50350 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=4 newest_ring_txg=23
+E7RESULT name=q1_delta_debug s=4 holes=1 matched_to_holes=0 deferred=256 q1b_blocked_span=156 unblocked_span=100 blocked_record_count=140 unblocked_record_count=86 total_released_record_count=226 ledger_miss_span_sum=0 stale_reclaimed_record_count=11 stale_reclaimed_span_sum=12 deferred_minus_q1b=100 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=4 holes=1 matched_to_holes=0 txg=23 allocated=274 deferred=256 referenced=18 q1a_t1_over_withheld=256 q1b_g12_over_withheld=156 delta=100 h_missing=8
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50196 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50198 span=2 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50200 span=2 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50202 span=2 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50204 span=2 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50337 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50338 span=2 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50340 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50341 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50342 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50343 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50344 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50345 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50346 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50347 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50348 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50349 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50350 span=1 allocation_generation=11 ledger_hit=true release_generation=12 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50351 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50352 span=2 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50354 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50355 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50356 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50357 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50358 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50359 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50360 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50361 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50362 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50363 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50364 span=1 allocation_generation=12 ledger_hit=true release_generation=13 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50365 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50366 span=2 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50368 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50369 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50370 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50371 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50372 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50373 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50374 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50375 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50376 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50377 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50378 span=1 allocation_generation=13 ledger_hit=true release_generation=14 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50379 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50380 span=2 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50382 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50383 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50384 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50385 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50386 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50387 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50388 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50389 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50390 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50391 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50392 span=1 allocation_generation=14 ledger_hit=true release_generation=15 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50393 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50394 span=2 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50396 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50397 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50398 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50399 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50400 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50401 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50402 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50403 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50404 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50405 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_record s=4 holes=2 matched_to_holes=0 slot=50406 span=1 allocation_generation=15 ledger_hit=true release_generation=16 oldest_ring_txg=10 newest_ring_txg=29
+E7RESULT name=q1_delta_debug s=4 holes=2 matched_to_holes=0 deferred=246 q1b_blocked_span=166 unblocked_span=80 blocked_record_count=151 unblocked_record_count=70 total_released_record_count=221 ledger_miss_span_sum=0 stale_reclaimed_record_count=83 stale_reclaimed_span_sum=96 deferred_minus_q1b=80 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=4 holes=2 matched_to_holes=0 txg=29 allocated=264 deferred=246 referenced=18 q1a_t1_over_withheld=246 q1b_g12_over_withheld=166 delta=80 h_missing=8
+E7RESULT name=q1d_adjacent_diff s=8 holes_from=0 holes_to=1 q1a_from=346 q1a_to=448 q1b_from=346 q1b_to=348 delta_from=0 delta_to=100 diff=100 h_missing_from=0 h_missing_to=8
+E7RESULT name=q1d_adjacent_diff s=8 holes_from=1 holes_to=2 q1a_from=448 q1a_to=522 q1b_from=348 q1b_to=340 delta_from=100 delta_to=182 diff=82 h_missing_from=8 h_missing_to=14
+E7RESULT name=q1d_first_crossing s=8 threshold_2_slots=holes=1 txg=35 delta=100 threshold_1_slot=holes=1 txg=35 delta=100
+E7RESULT name=q1d_monotonic s=8 holds=true
+E7RESULT name=q1d_adjacent_diff s=4 holes_from=0 holes_to=1 q1a_from=154 q1a_to=256 q1b_from=154 q1b_to=156 delta_from=0 delta_to=100 diff=100 h_missing_from=0 h_missing_to=8
+E7RESULT name=q1d_adjacent_diff s=4 holes_from=1 holes_to=2 q1a_from=256 q1a_to=246 q1b_from=156 q1b_to=166 delta_from=100 delta_to=80 diff=-20 h_missing_from=8 h_missing_to=8
+E7RESULT name=q1d_first_crossing s=4 threshold_2_slots=holes=1 txg=23 delta=100 threshold_1_slot=holes=1 txg=23 delta=100
+E7RESULT name=q1d_monotonic s=4 holds=false
+E7RESULT name=q1_geometry_sensitivity_s crossing_two_slots_by_slots_per_region=s8=true,s4=true stable=true
+E7RESULT name=q1_delta_debug s=8 holes=0 matched_to_holes=1 deferred=356 q1b_blocked_span=356 unblocked_span=0 blocked_record_count=313 unblocked_record_count=0 total_released_record_count=313 ledger_miss_span_sum=0 stale_reclaimed_record_count=94 stale_reclaimed_span_sum=110 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=8 holes=0 matched_to_holes=1 txg=35 allocated=374 deferred=356 referenced=18 q1a_t1_over_withheld=356 q1b_g12_over_withheld=356 delta=0 h_missing=0
+E7RESULT name=q1_delta_debug s=8 holes=0 matched_to_holes=2 deferred=344 q1b_blocked_span=344 unblocked_span=0 blocked_record_count=301 unblocked_record_count=0 total_released_record_count=301 ledger_miss_span_sum=0 stale_reclaimed_record_count=178 stale_reclaimed_span_sum=206 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=8 holes=0 matched_to_holes=2 txg=41 allocated=362 deferred=344 referenced=18 q1a_t1_over_withheld=344 q1b_g12_over_withheld=344 delta=0 h_missing=0
+E7RESULT name=q1_delta_debug s=4 holes=0 matched_to_holes=1 deferred=164 q1b_blocked_span=164 unblocked_span=0 blocked_record_count=145 unblocked_record_count=0 total_released_record_count=145 ledger_miss_span_sum=0 stale_reclaimed_record_count=94 stale_reclaimed_span_sum=110 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=4 holes=0 matched_to_holes=1 txg=23 allocated=182 deferred=164 referenced=18 q1a_t1_over_withheld=164 q1b_g12_over_withheld=164 delta=0 h_missing=0
+E7RESULT name=q1_delta_debug s=4 holes=0 matched_to_holes=2 deferred=164 q1b_blocked_span=164 unblocked_span=0 blocked_record_count=145 unblocked_record_count=0 total_released_record_count=145 ledger_miss_span_sum=0 stale_reclaimed_record_count=178 stale_reclaimed_span_sum=206 deferred_minus_q1b=0 unblocked_minus_deferred_minus_q1b=0
+E7RESULT name=q1_hh s=4 holes=0 matched_to_holes=2 txg=29 allocated=182 deferred=164 referenced=18 q1a_t1_over_withheld=164 q1b_g12_over_withheld=164 delta=0 h_missing=0
+E7RESULT name=q1_step_matched_diff s=8 k=1 txg=35 delta_k=100 delta_0_matched=0 diff=100 h_missing_k=8 h_missing_0_matched=0
+E7RESULT name=q1_step_matched_diff s=8 k=2 txg=41 delta_k=182 delta_0_matched=0 diff=182 h_missing_k=14 h_missing_0_matched=0
+E7RESULT name=q1_step_matched_diff s=4 k=1 txg=23 delta_k=100 delta_0_matched=0 diff=100 h_missing_k=8 h_missing_0_matched=0
+E7RESULT name=q1_step_matched_diff s=4 k=2 txg=29 delta_k=80 delta_0_matched=0 diff=80 h_missing_k=8 h_missing_0_matched=0
+E7RESULT name=integrity_r2_segments hf_cells=1 hh_cells=6 hh_holes_sampled=s8h0,s8h1,s8h2,s4h0,s4h1,s4h2 matched_cells=4 matched_sampled=s8m1,s8m2,s4m1,s4m2
+E7RESULT name=done emitted=1076

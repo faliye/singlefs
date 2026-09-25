@@ -170,12 +170,12 @@ fn maximum_extension_point_bytes_keeping_one_pointer_in_node(node: u64) -> u64 {
 // ── 自证单元那一档（D20 推论三：根槽、journal 记录头）──
 // 它们没有带校验和的父指针，原子宽度**等于运行时探测到的 `physical_block_size`**。
 // ⇒ 扩展点在这一档的余量由**原子宽度**夹，不由「省不省」夹。
-const JOURNAL_HEADER_BYTES: u64 = 307; // D23 已定项 4：头 307 字节 = 十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 已定项 15 新根段 188 + fsid 8 + MAC 16
+const JOURNAL_HEADER_BYTES: u64 = 311; // D23 已定项 4：头 311 字节 = 十个字段 78 + 三笔已定增量 17 + 本次发布内序号 4 + 已定项 15 新根段 188 + fsid 8 + MAC 16
 const ROOT_SLOT_CANDIDATE: u64 = 256; // D22 已定项 2 的候选槽宽
 
 /// 一个自证单元的头部落进一个原子单元之后，还剩多少字节。
-/// D23 已定项 4 逐字：「头是 307 字节（……），占 512 扇区的 60%，其后还余 205 字节（装得下 3 个点名项，
-/// 每项 56 字节）；4096 上余 3789（67 个点名项）」。
+/// D23 已定项 4 逐字：「登记值就是 311（JOURNAL_HEADER_BYTES）……311 占 512 扇区的 61%，其后还余
+/// 201 字节（装得下 3 个点名项，每项 56 字节）；4096 上余 3785（67 个点名项，⌊(4096 − 311) ÷ 56⌋ = ⌊3785 / 56⌋）」。
 fn self_witness_room(header_bytes: u64, atomic: u64) -> u64 {
     atomic - header_bytes
 }
@@ -204,6 +204,52 @@ fn mount_verdict(extension_point_bytes: u64, unit: u64, node: u64, slot: u64, at
         return "reject_self_witness_overflow"; // 自证单元的头顶不住一个原子宽度
     }
     "ok"
+}
+
+// ── 第八节：头宽 `H` 这个旋钮的几何敏感性（只在敏感性取样点上读一个参数化的 `H`，
+// 不读全局常量 `JOURNAL_HEADER_BYTES`；`mutation-sampling.md` 第六类）──
+
+/// 512 档余量，参数化版本。
+fn header_sensitivity_room512(header_bytes: u64) -> u64 {
+    512 - header_bytes
+}
+
+/// 512 档自证上界，参数化版本：`min(余量, 根槽候选 − 1)`。
+fn header_sensitivity_bound512(header_bytes: u64) -> u64 {
+    header_sensitivity_room512(header_bytes).min(ROOT_SLOT_CANDIDATE - 1)
+}
+
+/// 哪一侧夹住了 512 档的自证上界。
+fn header_sensitivity_binding(header_bytes: u64) -> &'static str {
+    let room = header_sensitivity_room512(header_bytes);
+    if room > ROOT_SLOT_CANDIDATE - 1 {
+        "root_slot"
+    } else if room == ROOT_SLOT_CANDIDATE - 1 {
+        "tie"
+    } else {
+        "journal"
+    }
+}
+
+/// `bound` 放不放得下 `lower_bound_bytes`。
+fn fits(bound: u64, lower_bound_bytes: u64) -> u8 {
+    u8::from(bound >= lower_bound_bytes)
+}
+
+/// `bound` 放不放得下 D21 举例的 128。**专用函数**，不借用 `fits`：
+/// 变异 M22 要单独改这一个判据、不连带改 `fits_lb9` / `fits_lb13`。
+fn fits_128(bound: u64) -> u8 {
+    u8::from(bound >= 128)
+}
+
+/// 自证单元档在给定 `(extension_point_bytes, header_bytes, atomic)` 上溢不溢出——
+/// 只算 `mount_verdict` 最后一条分支，不走前三条（那三条不读 `H`）。
+fn self_witness_overflow_verdict(extension_point_bytes: u64, header_bytes: u64, atomic: u64) -> &'static str {
+    if extension_point_bytes > self_witness_room(header_bytes, atomic) {
+        "overflow"
+    } else {
+        "ok"
+    }
 }
 
 /// `LENGTH_FIELD_BYTES` 个字节按**字节**计量时表达得了的最大范围。
@@ -397,6 +443,35 @@ fn main() {
         }
     }
 
+    // ── 第八节：头宽 `H` 这个旋钮的几何敏感性，翻面点两侧各取一点 ──
+    for header_bytes_sample in [256u64, 257, 258, 307, 311, 384, 385, 499, 500, 503, 504] {
+        let room512 = header_sensitivity_room512(header_bytes_sample);
+        let bound = header_sensitivity_bound512(header_bytes_sample);
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=header_sensitivity_512 h={header_bytes_sample} room512={room512} bound={bound} binding={} \
+                 fits_lb9={} fits_lb13={} fits_128={} self_witness_n128={}",
+                header_sensitivity_binding(header_bytes_sample),
+                fits(bound, 9),
+                fits(bound, 13),
+                fits_128(bound),
+                self_witness_overflow_verdict(128, header_bytes_sample, 512),
+            ))
+        );
+    }
+    for header_bytes_sample in [307u64, 311, 3584, 3585, 3968, 3969] {
+        let room4096 = 4096 - header_bytes_sample;
+        println!(
+            "{}",
+            emitter.emit_raw(&format!(
+                "name=header_sensitivity_4096 h={header_bytes_sample} room4096={room4096} self_witness_n128={} self_witness_n512={}",
+                self_witness_overflow_verdict(128, header_bytes_sample, 4096),
+                self_witness_overflow_verdict(512, header_bytes_sample, 4096),
+            ))
+        );
+    }
+
     // ── 阳性对照：四个单元档、四个节点档各跑一次，不是只跑第一档 ──
     for unit_bytes in UNITS {
         let extension_point_bytes = unit_bytes / 2;
@@ -516,11 +591,35 @@ mod tests {
     }
 
     /// **自证单元那一档的余量由原子宽度夹**，绝对值钉在 D23 逐字写下的那个数上：
-    /// 307 字节头落进 512 扇区之后余 205。
+    /// 311 字节头落进 512 扇区之后余 201；4096 上余 3785。
     #[test]
     fn self_witness_room_matches_the_decision_23_number() {
-        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512), 205);
-        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096), 3789);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512), 201);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096), 3785);
+    }
+
+    /// A3：余量装得下几个点名项（D23 已定项 4「装得下 3 个点名项……67 个点名项」）。
+    #[test]
+    fn self_witness_room_holds_the_decision_23_item_counts() {
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 512) / 56, 3);
+        assert_eq!(self_witness_room(JOURNAL_HEADER_BYTES, 4096) / 56, 67);
+    }
+
+    /// A4：头 311 的分项和（D23 已定项 4 正文）。不从 `crates/` 引，独立钉这个和，
+    /// 免得两边各自算错却因为都读同一个数而看不出来（`mutation-sampling.md` 第五类）。
+    #[test]
+    fn header_bytes_equals_the_decision_23_breakdown() {
+        let ten_field_bytes = 78u64;
+        let committed_increments = 9 + 4 + 4; // 事务号+提交标记 9、反向链 4、载荷校验和 4
+        let publish_sequence_bytes = 4u64;
+        let new_root_segment_bytes = 188u64;
+        let fsid_bytes = 8u64;
+        let mac_bytes = 16u64;
+        assert_eq!(
+            ten_field_bytes + committed_increments + publish_sequence_bytes + new_root_segment_bytes + fsid_bytes + mac_bytes,
+            JOURNAL_HEADER_BYTES
+        );
+        assert_eq!(JOURNAL_HEADER_BYTES, 311);
     }
 
     /// **撕裂隔离**：E34 主张一——槽宽 256、原子宽度 512 ⇒ 一个原子单元里挤 2 个槽。
@@ -532,14 +631,14 @@ mod tests {
         assert_eq!(slots_per_atomic(256, 4096), 16);
     }
 
-    /// **若自证单元也带扩展点，上界是 205，不是 864。**
-    /// 独立算术：min(512 − 307, 256 − 1) = min(205, 255) = 205。
-    /// 夹住这一档的是 journal 记录头那一侧（205 < 255），不是根槽的 256 − 1。
+    /// **若自证单元也带扩展点，上界是 201，不是 864。**
+    /// 独立算术：min(512 − 311, 256 − 1) = min(201, 255) = 201。
+    /// 夹住这一档的是 journal 记录头那一侧（201 < 255），不是根槽的 256 − 1。
     #[test]
-    fn the_self_witness_bound_is_205_not_864() {
+    fn the_self_witness_bound_is_201_not_864() {
         let bound = self_witness_room(JOURNAL_HEADER_BYTES, 512).min(ROOT_SLOT_CANDIDATE - 1);
-        assert_eq!(bound, 205);
-        assert!(bound < 864); // 比索引节点那条紧 4.2 倍（864 ÷ 205）
+        assert_eq!(bound, 201);
+        assert!(bound < 864); // 比索引节点那条紧 4.3 倍（864 ÷ 201）
     }
 
     /// **挂载时判定是可移植性的分水岭**：同一份声明（槽宽 512）在 512 字节原子宽度的设备上
@@ -626,6 +725,47 @@ mod tests {
                 fanout(node_bytes, 0, Carrier::DataOnly)
             );
         }
+    }
+
+    // ────────── 第八节：几何敏感性，B4 逐对核对独立算术 ──────────
+
+    /// B4：每一对翻面点两侧的判定必须不同（第十三节命令二的独立算术）。
+    #[test]
+    fn header_sensitivity_pairs_match_independent_arithmetic() {
+        assert_eq!(header_sensitivity_binding(256), "root_slot");
+        assert_eq!(header_sensitivity_binding(257), "tie");
+        assert_eq!(header_sensitivity_binding(258), "journal");
+        let bound_at_503 = header_sensitivity_bound512(503);
+        let bound_at_504 = header_sensitivity_bound512(504);
+        assert_eq!((fits(bound_at_503, 9), fits(bound_at_504, 9)), (1, 0));
+        let bound_at_499 = header_sensitivity_bound512(499);
+        let bound_at_500 = header_sensitivity_bound512(500);
+        assert_eq!((fits(bound_at_499, 13), fits(bound_at_500, 13)), (1, 0));
+        let bound_at_384 = header_sensitivity_bound512(384);
+        let bound_at_385 = header_sensitivity_bound512(385);
+        assert_eq!((fits_128(bound_at_384), fits_128(bound_at_385)), (1, 0));
+        assert_eq!(
+            (self_witness_overflow_verdict(128, 384, 512), self_witness_overflow_verdict(128, 385, 512)),
+            ("ok", "overflow")
+        );
+        assert_eq!(
+            (self_witness_overflow_verdict(512, 3584, 4096), self_witness_overflow_verdict(512, 3585, 4096)),
+            ("ok", "overflow")
+        );
+        assert_eq!(
+            (self_witness_overflow_verdict(128, 3968, 4096), self_witness_overflow_verdict(128, 3969, 4096)),
+            ("ok", "overflow")
+        );
+    }
+
+    /// **判别力自证**：把 `fits_128` 的门槛从 128 挪到 129，384/385 那一对必须从
+    /// `(1, 0)` 变成 `(0, 0)`——挪了不变就是这一格没有判别力（V3）。
+    #[test]
+    fn header_sensitivity_fits_128_pair_loses_its_one_when_threshold_moves() {
+        let bound_at_384 = header_sensitivity_bound512(384);
+        let bound_at_385 = header_sensitivity_bound512(385);
+        assert_eq!((fits(bound_at_384, 128), fits(bound_at_385, 128)), (1, 0));
+        assert_eq!((fits(bound_at_384, 129), fits(bound_at_385, 129)), (0, 0));
     }
 
     // ────────── 阳性对照：每一条臂都跑，不是只跑第一条 ──────────

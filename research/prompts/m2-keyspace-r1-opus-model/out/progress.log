@@ -1,0 +1,9 @@
+2026-09-24T08:57:46Z killed own obsolete selftest pid 1362709 (pre-aflat code, full enumeration of 3-level alloc tree too slow)
+2026-09-24T09:16:51Z killed own selftest pid 1366423 (full 2^24 enumeration per segment too slow; selftest redesigned to single-publish suffix)
+2026-09-24T09:24:58Z killed own scan pid 1383966 (ENUM_FROM=0, max_groups 14: first config not done after 16 min; restarting with single-op suffixes fully enumerated + two-op suffixes enumerating the last publish)
+2026-09-24T09:25:21Z killed own selftest pid 1384221 (full enumeration on PB prefix > 20 min; selftest moved to P1 prefix)
+2026-09-24T09:28:38Z killed own scan pid 1389463 (model bug: truncate by >=2 levels leaks the position-0 spine; checker caught it as I-3.1)
+2026-09-24T10:22:44Z started parallel S2 scan (bin-scan3, same source as scan.out) into out/scan-s2.out; main scan.out will be stopped after its 8 S1 lines
+2026-09-24T10:48:20Z resumed session: scan.out had 2/8 S1 lines (no end date), scan-s2.out empty; starting one scan for remaining 10 configs into out/scan-rest.out with bin-scan3, 30 threads
+2026-09-24T12:53:59Z coordinator: thread cap 4; scan-rest (30 threads) left running per instruction; later runs via research/scripts/capped.sh 4
+2026-09-24T13:49:52Z scan-rest.out: S2-GlobalRadix panicked (closed_form u64 overflow, segment >=64 writes; Tally.closed_form sum overflow). Fixed to u128 (bin-final2); rerunning GlobalRadix + GlobalRadixInline with capped 4 into out/scan-radix.out

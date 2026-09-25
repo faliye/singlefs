@@ -1,0 +1,196 @@
+E7RESULT name=config item_bytes=56 max_items=2000 incident_chances=36500
+E7RESULT name=cost base=78 unit=512 div_2v4=31 first_2v4=26 div_4v8=0 first_4v8=NA cap_items=7
+E7RESULT name=cost base=78 unit=4096 div_2v4=4 first_2v4=218 div_4v8=0 first_4v8=NA cap_items=71
+E7RESULT name=cost base=84 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=35 cap_items=7
+E7RESULT name=cost base=84 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=291 cap_items=71
+E7RESULT name=cost base=86 unit=512 div_2v4=31 first_2v4=35 div_4v8=0 first_4v8=NA cap_items=7
+E7RESULT name=cost base=86 unit=4096 div_2v4=4 first_2v4=291 div_4v8=0 first_4v8=NA cap_items=71
+E7RESULT name=cost base=93 unit=512 div_2v4=31 first_2v4=44 div_4v8=0 first_4v8=NA cap_items=7
+E7RESULT name=cost base=93 unit=4096 div_2v4=4 first_2v4=364 div_4v8=0 first_4v8=NA cap_items=71
+E7RESULT name=cost base=95 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA cap_items=7
+E7RESULT name=cost base=95 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA cap_items=71
+E7RESULT name=cost base=99 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=53 cap_items=7
+E7RESULT name=cost base=99 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=437 cap_items=71
+E7RESULT name=cost_summary cells=12 free_2v4=6 free_4v8=8
+E7RESULT name=cost_current base=303 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA cap_items=3
+E7RESULT name=cost_current base=303 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA cap_items=67
+E7RESULT name=cost_current base=307 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=31 cap_items=3
+E7RESULT name=cost_current base=307 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=287 cap_items=67
+E7RESULT name=cost_fixed_record base=303 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA items_per_record_2=67 items_per_record_4=67 items_per_record_8=67
+E7RESULT name=cost_fixed_record base=307 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA items_per_record_2=67 items_per_record_4=67 items_per_record_8=67
+E7RESULT name=risk_incident bits=8 chances=36500 expected=1.425781e2 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_incident bits=16 chances=36500 expected=5.569458e-1 at_least_once=4.270437e-1 enough=0
+E7RESULT name=risk_incident bits=32 chances=36500 expected=8.498318e-6 at_least_once=8.498282e-6 enough=1
+E7RESULT name=risk_incident bits=64 chances=36500 expected=1.978669e-15 at_least_once=1.998401e-15 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=weekly pairs_per_pass=20480 chances=1.069056e7 bits=8 expected=4.176000e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=weekly pairs_per_pass=20480 chances=1.069056e7 bits=16 expected=1.631250e2 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=weekly pairs_per_pass=20480 chances=1.069056e7 bits=32 expected=2.489090e-3 at_least_once=2.485995e-3 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=weekly pairs_per_pass=20480 chances=1.069056e7 bits=64 expected=5.795364e-13 at_least_once=5.795364e-13 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=daily pairs_per_pass=20480 chances=7.475200e7 bits=8 expected=2.920000e5 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=daily pairs_per_pass=20480 chances=7.475200e7 bits=16 expected=1.140625e3 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=daily pairs_per_pass=20480 chances=7.475200e7 bits=32 expected=1.740456e-2 at_least_once=1.725397e-2 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=512 freq=daily pairs_per_pass=20480 chances=7.475200e7 bits=64 expected=4.052314e-12 at_least_once=4.052314e-12 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=weekly pairs_per_pass=2560 chances=1.336320e6 bits=8 expected=5.220000e3 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=weekly pairs_per_pass=2560 chances=1.336320e6 bits=16 expected=2.039062e1 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=weekly pairs_per_pass=2560 chances=1.336320e6 bits=32 expected=3.111362e-4 at_least_once=3.110878e-4 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=weekly pairs_per_pass=2560 chances=1.336320e6 bits=64 expected=7.244205e-14 at_least_once=7.238654e-14 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=daily pairs_per_pass=2560 chances=9.344000e6 bits=8 expected=3.650000e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=daily pairs_per_pass=2560 chances=9.344000e6 bits=16 expected=1.425781e2 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=daily pairs_per_pass=2560 chances=9.344000e6 bits=32 expected=2.175570e-3 at_least_once=2.173205e-3 enough=1
+E7RESULT name=risk_traversal ring=10485760 rec_on_disk=4096 freq=daily pairs_per_pass=2560 chances=9.344000e6 bits=64 expected=5.065393e-13 at_least_once=5.064837e-13 enough=1
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=weekly pairs_per_pass=204800 chances=1.069056e8 bits=8 expected=4.176000e5 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=weekly pairs_per_pass=204800 chances=1.069056e8 bits=16 expected=1.631250e3 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=weekly pairs_per_pass=204800 chances=1.069056e8 bits=32 expected=2.489090e-2 at_least_once=2.458368e-2 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=weekly pairs_per_pass=204800 chances=1.069056e8 bits=64 expected=5.795364e-12 at_least_once=5.795364e-12 enough=1
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=daily pairs_per_pass=204800 chances=7.475200e8 bits=8 expected=2.920000e6 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=daily pairs_per_pass=204800 chances=7.475200e8 bits=16 expected=1.140625e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=daily pairs_per_pass=204800 chances=7.475200e8 bits=32 expected=1.740456e-1 at_least_once=1.597414e-1 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=512 freq=daily pairs_per_pass=204800 chances=7.475200e8 bits=64 expected=4.052314e-11 at_least_once=4.052314e-11 enough=1
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=weekly pairs_per_pass=25600 chances=1.336320e7 bits=8 expected=5.220000e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=weekly pairs_per_pass=25600 chances=1.336320e7 bits=16 expected=2.039062e2 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=weekly pairs_per_pass=25600 chances=1.336320e7 bits=32 expected=3.111362e-3 at_least_once=3.106527e-3 enough=1
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=weekly pairs_per_pass=25600 chances=1.336320e7 bits=64 expected=7.244205e-13 at_least_once=7.244205e-13 enough=1
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=daily pairs_per_pass=25600 chances=9.344000e7 bits=8 expected=3.650000e5 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=daily pairs_per_pass=25600 chances=9.344000e7 bits=16 expected=1.425781e3 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=daily pairs_per_pass=25600 chances=9.344000e7 bits=32 expected=2.175570e-2 at_least_once=2.152075e-2 enough=0
+E7RESULT name=risk_traversal ring=104857600 rec_on_disk=4096 freq=daily pairs_per_pass=25600 chances=9.344000e7 bits=64 expected=5.065393e-12 at_least_once=5.065393e-12 enough=1
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=weekly pairs_per_pass=4194304 chances=2.189427e9 bits=8 expected=8.552448e6 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=weekly pairs_per_pass=4194304 chances=2.189427e9 bits=16 expected=3.340800e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=weekly pairs_per_pass=4194304 chances=2.189427e9 bits=32 expected=5.097656e-1 at_least_once=3.993637e-1 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=weekly pairs_per_pass=4194304 chances=2.189427e9 bits=64 expected=1.186891e-10 at_least_once=1.186891e-10 enough=1
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=daily pairs_per_pass=4194304 chances=1.530921e10 bits=8 expected=5.980160e7 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=daily pairs_per_pass=4194304 chances=1.530921e10 bits=16 expected=2.336000e5 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=daily pairs_per_pass=4194304 chances=1.530921e10 bits=32 expected=3.564453e0 at_least_once=9.716875e-1 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=512 freq=daily pairs_per_pass=4194304 chances=1.530921e10 bits=64 expected=8.299139e-10 at_least_once=8.299139e-10 enough=1
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=weekly pairs_per_pass=524288 chances=2.736783e8 bits=8 expected=1.069056e6 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=weekly pairs_per_pass=524288 chances=2.736783e8 bits=16 expected=4.176000e3 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=weekly pairs_per_pass=524288 chances=2.736783e8 bits=32 expected=6.372070e-2 at_least_once=6.173298e-2 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=weekly pairs_per_pass=524288 chances=2.736783e8 bits=64 expected=1.483613e-11 at_least_once=1.483613e-11 enough=1
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=daily pairs_per_pass=524288 chances=1.913651e9 bits=8 expected=7.475200e6 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=daily pairs_per_pass=524288 chances=1.913651e9 bits=16 expected=2.920000e4 at_least_once=1.000000e0 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=daily pairs_per_pass=524288 chances=1.913651e9 bits=32 expected=4.455566e-1 at_least_once=3.595323e-1 enough=0
+E7RESULT name=risk_traversal ring=2147483648 rec_on_disk=4096 freq=daily pairs_per_pass=524288 chances=1.913651e9 bits=64 expected=1.037392e-10 at_least_once=1.037392e-10 enough=1
+E7RESULT name=poscontrol_8bit_incident at_least_once=1.000000 expect_near_one=1
+E7RESULT name=poscontrol_base93_diverges div=31 first=44 expect_first=44
+E7RESULT name=poscontrol_base84_four_versus_eight div=31 first=35 expect_divergent=1
+E7RESULT name=poscontrol_fixed_record base=342 pair=2v4 div=455 first=67 expect_divergent=1
+E7RESULT name=poscontrol_fixed_record base=340 pair=4v8 div=455 first=67 expect_divergent=1
+E7RESULT name=base_sweep reading=甲 base=296 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=296 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=297 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=22
+E7RESULT name=base_sweep reading=甲 base=297 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=214
+E7RESULT name=base_sweep reading=甲 base=298 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=22
+E7RESULT name=base_sweep reading=甲 base=298 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=214
+E7RESULT name=base_sweep reading=甲 base=299 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=22
+E7RESULT name=base_sweep reading=甲 base=299 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=214
+E7RESULT name=base_sweep reading=甲 base=300 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=22
+E7RESULT name=base_sweep reading=甲 base=300 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=214
+E7RESULT name=base_sweep reading=甲 base=301 unit=512 div_2v4=31 first_2v4=22 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=301 unit=4096 div_2v4=4 first_2v4=214 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=302 unit=512 div_2v4=31 first_2v4=22 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=302 unit=4096 div_2v4=4 first_2v4=214 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=303 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=303 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=304 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=304 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=305 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=31
+E7RESULT name=base_sweep reading=甲 base=305 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=287
+E7RESULT name=base_sweep reading=甲 base=306 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=31
+E7RESULT name=base_sweep reading=甲 base=306 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=287
+E7RESULT name=base_sweep reading=甲 base=307 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=31
+E7RESULT name=base_sweep reading=甲 base=307 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=287
+E7RESULT name=base_sweep reading=甲 base=308 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=31
+E7RESULT name=base_sweep reading=甲 base=308 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=287
+E7RESULT name=base_sweep reading=甲 base=309 unit=512 div_2v4=31 first_2v4=31 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=309 unit=4096 div_2v4=4 first_2v4=287 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=310 unit=512 div_2v4=31 first_2v4=31 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=310 unit=4096 div_2v4=4 first_2v4=287 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=311 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=311 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=312 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=312 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=313 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=40
+E7RESULT name=base_sweep reading=甲 base=313 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=360
+E7RESULT name=base_sweep reading=甲 base=314 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=40
+E7RESULT name=base_sweep reading=甲 base=314 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=360
+E7RESULT name=base_sweep reading=甲 base=315 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=40
+E7RESULT name=base_sweep reading=甲 base=315 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=360
+E7RESULT name=base_sweep reading=甲 base=316 unit=512 div_2v4=0 first_2v4=NA div_4v8=31 first_4v8=40
+E7RESULT name=base_sweep reading=甲 base=316 unit=4096 div_2v4=0 first_2v4=NA div_4v8=4 first_4v8=360
+E7RESULT name=base_sweep reading=甲 base=317 unit=512 div_2v4=31 first_2v4=40 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=317 unit=4096 div_2v4=4 first_2v4=360 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=318 unit=512 div_2v4=31 first_2v4=40 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=318 unit=4096 div_2v4=4 first_2v4=360 div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=319 unit=512 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=甲 base=319 unit=4096 div_2v4=0 first_2v4=NA div_4v8=0 first_4v8=NA
+E7RESULT name=base_sweep reading=乙 base=280 items_per_record_2=68 items_per_record_4=68 items_per_record_8=68 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=281 items_per_record_2=68 items_per_record_4=68 items_per_record_8=67 div_2v4=0 div_4v8=435
+E7RESULT name=base_sweep reading=乙 base=282 items_per_record_2=68 items_per_record_4=68 items_per_record_8=67 div_2v4=0 div_4v8=435
+E7RESULT name=base_sweep reading=乙 base=283 items_per_record_2=68 items_per_record_4=68 items_per_record_8=67 div_2v4=0 div_4v8=435
+E7RESULT name=base_sweep reading=乙 base=284 items_per_record_2=68 items_per_record_4=68 items_per_record_8=67 div_2v4=0 div_4v8=435
+E7RESULT name=base_sweep reading=乙 base=285 items_per_record_2=68 items_per_record_4=67 items_per_record_8=67 div_2v4=435 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=286 items_per_record_2=68 items_per_record_4=67 items_per_record_8=67 div_2v4=435 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=287 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=288 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=289 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=290 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=291 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=292 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=293 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=294 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=295 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=296 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=297 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=298 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=299 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=300 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=301 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=302 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=303 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=304 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=305 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=306 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=307 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=308 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=309 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=310 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=311 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=312 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=313 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=314 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=315 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=316 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=317 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=318 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=319 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=320 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=321 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=322 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=323 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=324 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=325 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=326 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=327 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=328 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=329 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=330 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=331 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=332 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=333 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=334 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=335 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=336 items_per_record_2=67 items_per_record_4=67 items_per_record_8=67 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=337 items_per_record_2=67 items_per_record_4=67 items_per_record_8=66 div_2v4=0 div_4v8=455
+E7RESULT name=base_sweep reading=乙 base=338 items_per_record_2=67 items_per_record_4=67 items_per_record_8=66 div_2v4=0 div_4v8=455
+E7RESULT name=base_sweep reading=乙 base=339 items_per_record_2=67 items_per_record_4=67 items_per_record_8=66 div_2v4=0 div_4v8=455
+E7RESULT name=base_sweep reading=乙 base=340 items_per_record_2=67 items_per_record_4=67 items_per_record_8=66 div_2v4=0 div_4v8=455
+E7RESULT name=base_sweep reading=乙 base=341 items_per_record_2=67 items_per_record_4=66 items_per_record_8=66 div_2v4=455 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=342 items_per_record_2=67 items_per_record_4=66 items_per_record_8=66 div_2v4=455 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=343 items_per_record_2=66 items_per_record_4=66 items_per_record_8=66 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=344 items_per_record_2=66 items_per_record_4=66 items_per_record_8=66 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep reading=乙 base=345 items_per_record_2=66 items_per_record_4=66 items_per_record_8=66 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep_items reading=甲 max_items=67 base=303 unit=512 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep_items reading=甲 max_items=67 base=303 unit=4096 div_2v4=0 div_4v8=0
+E7RESULT name=base_sweep_items reading=甲 max_items=67 base=307 unit=512 div_2v4=0 div_4v8=1
+E7RESULT name=base_sweep_items reading=甲 max_items=67 base=307 unit=4096 div_2v4=0 div_4v8=0
+E7RESULT name=done emitted=196

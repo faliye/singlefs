@@ -1,0 +1,50 @@
+2026-09-24T17:09:31Z
+warning: unused imports: `CheckpointTxg` and `InstanceGeneration`
+   --> crates/singlefs-harness/tests/opus_r1_attack.rs:386:30
+    |
+386 | use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
+    |                              ^^^^^^^^^^^^^                       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r1_attack") generated 1 warning (run `cargo fix --test "opus_r1_attack" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r1_attack.rs (/tmp/claude-1000/m2-final-code-r1-opus/target2/release/deps/opus_r1_attack-89915c639d7b9cff)
+
+running 1 test
+OBS a5 pages=66: mount#0 ok instance=23987 rows_written=23986 allocation_records=138 released=2
+OBS a5 pages=66: mount#1 ok instance=23988 rows_written=1 allocation_records=272 released=136
+OBS a5 pages=66: mount#2 ok instance=23989 rows_written=1 allocation_records=406 released=270
+OBS a5 pages=66: mount#3 ok instance=23990 rows_written=1 allocation_records=540 released=404
+OBS a5 pages=66: mount#4 ok instance=23991 rows_written=1 allocation_records=674 released=538
+OBS a5 pages=66: mount#5 ok instance=23992 rows_written=1 allocation_records=808 released=672
+OBS a5 pages=66: mount#6 err (next instance before 23993 after 23994) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#7 err (next instance before 23994 after 23995) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#8 err (next instance before 23995 after 23996) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#9 err (next instance before 23996 after 23997) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#10 err (next instance before 23997 after 23998) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#11 err (next instance before 23998 after 23999) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#12 err (next instance before 23999 after 24000) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#13 err (next instance before 24000 after 24001) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#14 err (next instance before 24001 after 24002) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#15 err (next instance before 24002 after 24003) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#16 err (next instance before 24003 after 24004) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#17 err (next instance before 24004 after 24005) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#18 err (next instance before 24005 after 24006) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#19 err (next instance before 24006 after 24007) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#20 err (next instance before 24007 after 24008) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#21 err (next instance before 24008 after 24009) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#22 err (next instance before 24009 after 24010) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#23 err (next instance before 24010 after 24011) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#24 err (next instance before 24011 after 24012) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#25 err (next instance before 24012 after 24013) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#26 err (next instance before 24013 after 24014) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#27 err (next instance before 24014 after 24015) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#28 err (next instance before 24015 after 24016) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+OBS a5 pages=66: mount#29 err (next instance before 24016 after 24017) "Publish(PublishSequenceFailed { cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 }, writes_of_persisted_publishes: [], writes_of_failed_publishes: [] })"
+test z4_a5_without_file_row_publish_allocation_record_admission_after_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 3.01s
+
+rc=0
+2026-09-24T17:09:34Z

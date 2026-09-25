@@ -1,0 +1,126 @@
+## ding
+### skip-persistent
+   145  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   485  control | ok | ring=false
+    36  control | ok | ring=true
+   224  persistent | AFTER:PlacementRefused | ring=false | retry_faulted=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=none
+   488  persistent | ok | ring=false | retry_faulted=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  3448  persistent | ok | ring=false | retry_faulted=ok | retry_cleared=ok | writable_cleared=ok | probe=-
+### skip-transient
+   145  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   485  control | ok | ring=false
+    36  control | ok | ring=true
+   224  transient | k=1 | AFTER:PlacementRefused | ring=false | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=none
+   488  transient | k=1 | ok | ring=false | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  3448  transient | k=1 | ok | ring=false | retry_cleared=ok | probe=-
+   604  transient | k=2 | ok | ring=false | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  3556  transient | k=2 | ok | ring=false | retry_cleared=ok | probe=-
+   604  transient | k=3 | ok | ring=false | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  3556  transient | k=3 | ok | ring=false | retry_cleared=ok | probe=-
+### judged-persistent
+   665  control | ok | ring=true
+### s1w-ding-4g-*.tsv
+     4  4g-barrier | AFTER:BlockDevice | burned=true | ring=false | retry=ok | writable=ok | probe=none
+    16  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    12  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     8  4g-barrier | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     2  4g-barrier | control | ok | ring=false
+     2  4g-barrier | control | ok | ring=true
+    60  4g-barrier | ok | burned=true | ring=false | retry=ok | writable=ok | probe=-
+    60  4g-barrier | ok | burned=true | ring=true | retry=ok | writable=ok | probe=-
+     1  4g-write | AFTER:BlockDevice | burned=true | ring=false | retry=ok | writable=ok | probe=ABANDONED
+    12  4g-write | AFTER:BlockDevice | burned=true | ring=false | retry=ok | writable=ok | probe=none
+     3  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=ABANDONED
+   100  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    36  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     4  4g-write | Acquisition | burned=false | ring=true | retry=ok | writable=ok | probe=-
+     4  4g-write | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     2  4g-write | control | ok | ring=false
+     2  4g-write | control | ok | ring=true
+### s1w-ding-312skip-*.tsv
+     4  312skip-barrier | AFTER:BlockDevice | burned=true | ring=false | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=none
+     2  312skip-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=noeffect
+     2  312skip-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     2  312skip-barrier | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     1  312skip-barrier | control | ok | ring=false
+    30  312skip-barrier | ok | burned=true | ring=false | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+     1  312skip-write | AFTER:BlockDevice | burned=true | ring=false | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=ABANDONED
+    16  312skip-write | AFTER:BlockDevice | burned=true | ring=false | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=none
+     2  312skip-write | AFTER:BlockDevice | burned=true | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=noeffect
+    19  312skip-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     1  312skip-write | Acquisition | burned=false | ring=true | retry=ok | writable=ok | probe=-
+     1  312skip-write | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     1  312skip-write | control | ok | ring=false
+## wu
+### skip-persistent
+   217  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   413  control | ok | ring=false
+    36  control | ok | ring=true
+    15  persistent | ok | ring=false | retry_faulted=notcand:NotInRing | retry_cleared=notcand:NotInRing | writable_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  3117  persistent | ok | ring=false | retry_faulted=notcand:NotInRing | retry_cleared=notcand:NotInRing | writable_cleared=ok | probe=-
+### skip-transient
+   217  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   413  control | ok | ring=false
+    36  control | ok | ring=true
+  3132  transient | k=1 | ok | ring=false | retry_cleared=notcand:NotInRing | probe=-
+  3132  transient | k=2 | ok | ring=false | retry_cleared=notcand:NotInRing | probe=-
+  3132  transient | k=3 | ok | ring=false | retry_cleared=notcand:NotInRing | probe=-
+### judged-persistent
+   666  control | ok | ring=true
+### s1w-wu-4g-*.tsv
+     4  4g-barrier | AFTER:BlockDevice | burned=true | ring=false | retry=notcand:NotInRing | writable=ok | probe=none
+    16  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    12  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     8  4g-barrier | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     2  4g-barrier | control | ok | ring=false
+     2  4g-barrier | control | ok | ring=true
+    60  4g-barrier | ok | burned=true | ring=false | retry=notcand:NotInRing | writable=ok | probe=-
+    60  4g-barrier | ok | burned=true | ring=true | retry=ok | writable=ok | probe=-
+     1  4g-write | AFTER:BlockDevice | burned=true | ring=false | retry=notcand:NotInRing | writable=ok | probe=ABANDONED
+    12  4g-write | AFTER:BlockDevice | burned=true | ring=false | retry=notcand:NotInRing | writable=ok | probe=none
+     3  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=ABANDONED
+   100  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    36  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     4  4g-write | Acquisition | burned=false | ring=true | retry=ok | writable=ok | probe=-
+     4  4g-write | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     2  4g-write | control | ok | ring=false
+     2  4g-write | control | ok | ring=true
+### s1w-wu-312skip-*.tsv
+    40  312skip-barrier | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | burned=false | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=ok | probe=-
+     1  312skip-barrier | control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+    40  312skip-write | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | burned=false | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=ok | probe=-
+     1  312skip-write | control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+## yiwu
+### skip-persistent
+   160  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   506  control | ok | ring=true
+    15  persistent | ok | ring=true | retry_faulted=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  4536  persistent | ok | ring=true | retry_faulted=ok | retry_cleared=ok | writable_cleared=ok | probe=-
+### skip-transient
+   160  control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+   506  control | ok | ring=true
+    15  transient | k=1 | ok | ring=true | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  4536  transient | k=1 | ok | ring=true | retry_cleared=ok | probe=-
+    15  transient | k=2 | ok | ring=true | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  4536  transient | k=2 | ok | ring=true | retry_cleared=ok | probe=-
+    15  transient | k=3 | ok | ring=true | retry_cleared=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | probe=-
+  4536  transient | k=3 | ok | ring=true | retry_cleared=ok | probe=-
+### judged-persistent
+   666  control | ok | ring=true
+### s1w-yiwu-4g-*.tsv
+    16  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    20  4g-barrier | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     8  4g-barrier | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     4  4g-barrier | control | ok | ring=true
+   116  4g-barrier | ok | burned=true | ring=true | retry=ok | writable=ok | probe=-
+     4  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=ABANDONED
+   100  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+    48  4g-write | AFTER:BlockDevice | burned=true | ring=true | retry=ok | writable=ok | probe=target
+     4  4g-write | Acquisition | burned=false | ring=true | retry=ok | writable=ok | probe=-
+     4  4g-write | Acquisition | burned=true | ring=true | retry=ok | writable=ok | probe=noeffect
+     4  4g-write | control | ok | ring=true
+### s1w-yiwu-312skip-*.tsv
+    40  312skip-barrier | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | burned=false | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=ok | probe=-
+     1  312skip-barrier | control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true
+    40  312skip-write | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | burned=false | ring=true | retry=PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | writable=ok | probe=-
+     1  312skip-write | control | PlacementRefusedBeforeAcquisitionMountAdmissionUndecided | ring=true

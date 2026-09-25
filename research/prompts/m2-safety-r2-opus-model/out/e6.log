@@ -1,0 +1,33 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/mount.rs:10:5
+   |
+10 |     admission_reading_before_a_publish, admit_on_every_device, AdmissionRefusedOnSomeDevices,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_s4_attack.rs (/tmp/claude-1000/m2-safety-r2-opus/rerun/target/release/deps/opus_s4_attack-20fba67ba3b2373c)
+
+running 1 test
+E6 slots=384 formula=T error_histogram(slots->count)={6: 2, 8: 8} detail=[step0:pre267 d6 r12 n12 post243 err6 step1:pre243 d6 r12 n12 post219 err6 step2:pre219 d6 r12 n14 post193 err8 step10:SpaceAdmissionRefused]
+E6 slots=384 formula=ND error_histogram(slots->count)={-7: 1, -6: 19, -4: 1} detail=[step0:pre282 d6 r12 n12 post270 err-6 step1:pre270 d6 r12 n12 post258 err-6 step2:pre258 d6 r12 n14 post244 err-4 step21:SpaceAdmissionRefused]
+E6 slots=512 formula=T error_histogram(slots->count)={6: 2, 8: 13} detail=[step0:pre395 d6 r12 n12 post371 err6 step1:pre371 d6 r12 n12 post347 err6 step2:pre347 d6 r12 n14 post321 err8 step15:SpaceAdmissionRefused]
+E6 slots=512 formula=ND error_histogram(slots->count)={-20: 30, -18: 7, -14: 1, -12: 1, -7: 1, -6: 19, -4: 1} detail=[step0:pre410 d6 r12 n12 post398 err-6 step1:pre398 d6 r12 n12 post386 err-6 step2:pre386 d6 r12 n14 post372 err-4 step21:pre121 d6 r14 n14 post115 err-14 step22:pre115 d6 r14 n14 post107 err-12 step23:pre107 d6 r14 n14 post105 err-18 step24:pre105 d6 r14 n14 post103 err-18 step25:pre103 d6 r14 n14 post101 err-18 step26:pre101 d6 r14 n14 post101 err-20]
+E6 slots=768 formula=T error_histogram(slots->count)={-22: 4, -20: 26, -16: 7, -8: 1, -4: 1, 6: 3, 8: 18} detail=[step0:pre651 d6 r12 n12 post627 err6 step1:pre627 d6 r12 n12 post603 err6 step2:pre603 d6 r12 n14 post577 err8 step21:pre75 d6 r14 n14 post63 err-8 step22:pre63 d6 r14 n14 post47 err-4 step23:pre47 d6 r14 n14 post43 err-16 step24:pre43 d6 r14 n14 post39 err-16 step25:pre39 d6 r14 n14 post35 err-16 step26:pre35 d6 r14 n14 post35 err-20]
+E6 slots=768 formula=ND error_histogram(slots->count)={-20: 30, -18: 7, -14: 1, -12: 1, -7: 1, -6: 19, -4: 1} detail=[step0:pre666 d6 r12 n12 post654 err-6 step1:pre654 d6 r12 n12 post642 err-6 step2:pre642 d6 r12 n14 post628 err-4 step21:pre377 d6 r14 n14 post371 err-14 step22:pre371 d6 r14 n14 post363 err-12 step23:pre363 d6 r14 n14 post361 err-18 step24:pre361 d6 r14 n14 post359 err-18 step25:pre359 d6 r14 n14 post357 err-18 step26:pre357 d6 r14 n14 post357 err-20]
+E6 slots=1024 formula=T error_histogram(slots->count)={-22: 4, -20: 26, -16: 7, -8: 1, -4: 1, 6: 3, 8: 18} detail=[step0:pre907 d6 r12 n12 post883 err6 step1:pre883 d6 r12 n12 post859 err6 step2:pre859 d6 r12 n14 post833 err8 step21:pre331 d6 r14 n14 post319 err-8 step22:pre319 d6 r14 n14 post303 err-4 step23:pre303 d6 r14 n14 post299 err-16 step24:pre299 d6 r14 n14 post295 err-16 step25:pre295 d6 r14 n14 post291 err-16 step26:pre291 d6 r14 n14 post291 err-20]
+E6 slots=1024 formula=ND error_histogram(slots->count)={-20: 30, -18: 7, -14: 1, -12: 1, -7: 1, -6: 19, -4: 1} detail=[step0:pre922 d6 r12 n12 post910 err-6 step1:pre910 d6 r12 n12 post898 err-6 step2:pre898 d6 r12 n14 post884 err-4 step21:pre633 d6 r14 n14 post627 err-14 step22:pre627 d6 r14 n14 post619 err-12 step23:pre619 d6 r14 n14 post617 err-18 step24:pre617 d6 r14 n14 post615 err-18 step25:pre615 d6 r14 n14 post613 err-18 step26:pre613 d6 r14 n14 post613 err-20]
+E6 slots=2048 formula=T error_histogram(slots->count)={-22: 4, -20: 26, -16: 7, -8: 1, -4: 1, 6: 3, 8: 18} detail=[step0:pre1931 d6 r12 n12 post1907 err6 step1:pre1907 d6 r12 n12 post1883 err6 step2:pre1883 d6 r12 n14 post1857 err8 step21:pre1355 d6 r14 n14 post1343 err-8 step22:pre1343 d6 r14 n14 post1327 err-4 step23:pre1327 d6 r14 n14 post1323 err-16 step24:pre1323 d6 r14 n14 post1319 err-16 step25:pre1319 d6 r14 n14 post1315 err-16 step26:pre1315 d6 r14 n14 post1315 err-20]
+E6 slots=2048 formula=ND error_histogram(slots->count)={-20: 30, -18: 7, -14: 1, -12: 1, -7: 1, -6: 19, -4: 1} detail=[step0:pre1946 d6 r12 n12 post1934 err-6 step1:pre1934 d6 r12 n12 post1922 err-6 step2:pre1922 d6 r12 n14 post1908 err-4 step21:pre1657 d6 r14 n14 post1651 err-14 step22:pre1651 d6 r14 n14 post1643 err-12 step23:pre1643 d6 r14 n14 post1641 err-18 step24:pre1641 d6 r14 n14 post1639 err-18 step25:pre1639 d6 r14 n14 post1637 err-18 step26:pre1637 d6 r14 n14 post1637 err-20]
+test e6_a1_prediction_against_the_next_reading ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.08s
+

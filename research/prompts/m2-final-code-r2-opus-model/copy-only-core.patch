@@ -1,0 +1,140 @@
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-24 18:48:58.241518146 +0000
++++ singlefs-core/src/mount.rs	2026-09-24 20:43:35.685297592 +0000
+@@ -1728,8 +1728,82 @@
+             .root_ring_slots_per_region,
+     );
+     let witness = rollback_witness_of_the_pool(devices, system_configuration);
++    // r2 opus 副本上的试改（只在副本上）：SINGLEFS_R2_OPUS_WITNESS_REPAIR=1 时，从所选根的实例表里的回退行补回缺的见证条目。
++    let witness = if std::env::var("SINGLEFS_R2_OPUS_WITNESS_REPAIR").as_deref() == Ok("1") {
++        let reader = R2OpusSliceReader(devices);
++        let mut entries = witness.entries();
++        if let Some(root) = choose_root(&reader, system_configuration) {
++            if let Some(table) = crate::recovery::instance_table_of_root(&reader, &root) {
++                for row in table.rows.iter().filter(|row| row.is_rollback) {
++                    let new_instance = table
++                        .rows
++                        .iter()
++                        .map(|other| other.instance)
++                        .filter(|instance| *instance > row.instance)
++                        .min()
++                        .unwrap_or(root.instance);
++                    entries.push(RollbackWitnessEntry {
++                        new_instance,
++                        rollback_target_instance: row.instance,
++                        rollback_target_txg: row.selected_root_txg,
++                    });
++                }
++            }
++        }
++        let table = RollbackWitnessTable::of_entries(entries, 47).expect("r2 opus 试改：47 条之内");
++        RollbackWitness::of_tables([&table])
++    } else {
++        witness
++    };
+     let every_ring_root = every_root_ring_slot_holds_a_root(devices, system_configuration);
+     let kept = rollback_witness_entries_still_needed(&witness, every_ring_root.as_deref());
++    // r2 opus 副本上的试改（只在副本上）：SINGLEFS_R2_OPUS_WITNESS_RULE = dominance / abandons。
++    let kept = match std::env::var("SINGLEFS_R2_OPUS_WITNESS_RULE").as_deref() {
++        Ok("dominance") => kept
++            .iter()
++            .copied()
++            .filter(|entry| {
++                !kept.iter().any(|other| {
++                    other != entry
++                        && other.new_instance >= entry.new_instance
++                        && (other.rollback_target_instance, other.rollback_target_txg)
++                            <= (entry.rollback_target_instance, entry.rollback_target_txg)
++                })
++            })
++            .collect(),
++        Ok("abandons") | Ok("both") => match every_ring_root.as_deref() {
++            None => kept,
++            Some(roots) => {
++                let records = scan_journal(&R2OpusSliceReader(devices), system_configuration);
++                kept.into_iter()
++                    .filter(|entry| {
++                        roots
++                            .iter()
++                            .any(|root| entry.abandons(root.instance, root.checkpoint_txg))
++                            || records
++                                .values()
++                                .any(|record| entry.abandons(record.instance, record.checkpoint_txg))
++                    })
++                    .collect()
++            }
++        },
++        _ => kept,
++    };
++    let kept: Vec<RollbackWitnessEntry> = if std::env::var("SINGLEFS_R2_OPUS_WITNESS_RULE").as_deref() == Ok("both") {
++        kept.iter()
++            .copied()
++            .filter(|entry| {
++                !kept.iter().any(|other| {
++                    other != entry
++                        && other.new_instance >= entry.new_instance
++                        && (other.rollback_target_instance, other.rollback_target_txg)
++                            <= (entry.rollback_target_instance, entry.rollback_target_txg)
++                })
++            })
++            .collect()
++    } else {
++        kept
++    };
+     let this_rollback = previous_row.is_rollback.then_some(RollbackWitnessEntry {
+         new_instance: instance_to_acquire,
+         rollback_target_instance: previous_row.instance,
+@@ -2311,3 +2385,12 @@
+         assert_eq!(reclaim_floor(CheckpointTxg(11), None), CheckpointTxg(11));
+     }
+ }
++
++/// r2 opus 副本上的试改用：把切片包成一个有大小的读者。
++struct R2OpusSliceReader<'a, T: ?Sized>(&'a T);
++impl<T: crate::recovery::PoolReader + ?Sized> crate::recovery::PoolReader for R2OpusSliceReader<'_, T> {
++    fn device_identities(&self) -> Vec<DeviceIdentity> { self.0.device_identities() }
++    fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> { self.0.device_size_in_bytes(device) }
++    fn read(&self, device: DeviceIdentity, offset: crate::address::DeviceOffsetInBytes, length: usize) -> Option<Vec<u8>> { self.0.read(device, offset, length) }
++    fn journal_record_offsets_hint(&self, device: DeviceIdentity, ring_start: crate::address::DeviceOffsetInBytes, ring_bytes: u64) -> Option<Vec<crate::address::DeviceOffsetInBytes>> { self.0.journal_record_offsets_hint(device, ring_start, ring_bytes) }
++}
+--- /tmp/claude-1000/m2-final-code-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 18:48:58.241580116 +0000
++++ singlefs-core/src/transaction.rs	2026-09-24 20:21:31.595028559 +0000
+@@ -191,9 +191,8 @@
+             has_writes_since_barrier: true,
+             writes_by_structure_kind: WritesByStructureKind::NOTHING_WRITTEN,
+             writes_of_failed_publishes: Vec::new(),
+-            code_two_tree_node_capacities: CodeTwoTreeNodeCapacities::FromTheNodeFormat,
+-            journal_record_named_entry_capacity:
+-                JournalRecordNamedEntryCapacity::FromTheRecordFormat,
++            code_two_tree_node_capacities: r2_opus_capacities_from_the_environment(),
++            journal_record_named_entry_capacity: r2_opus_named_from_the_environment(),
+             rollback_witness_to_write: None,
+         }
+     }
+@@ -6149,3 +6148,27 @@
+         );
+     }
+ }
++
++/// r2 opus 副本上的试改（只在副本上）：SINGLEFS_R2_OPUS_CAPS="记账叶,记账内,映射叶,映射内" 让每个新开的写入口（含挂载里那个）用压小的容量。
++fn r2_opus_capacities_from_the_environment() -> CodeTwoTreeNodeCapacities {
++    match std::env::var("SINGLEFS_R2_OPUS_CAPS") {
++        Ok(text) => {
++            let v: Vec<usize> = text.split(',').map(|x| x.trim().parse().expect("数")).collect();
++            CodeTwoTreeNodeCapacities::CappedForTests {
++                accounting: CodeTwoTreeNodeCapacity { leaf_entries: v[0], internal_entries: v[1] },
++                central_mapping: CodeTwoTreeNodeCapacity { leaf_entries: v[2], internal_entries: v[3] },
++            }
++        }
++        Err(_) => CodeTwoTreeNodeCapacities::FromTheNodeFormat,
++    }
++}
++
++/// r2 opus 副本上的试改：SINGLEFS_R2_OPUS_NAMED=n 让每个新开的写入口一条记录只装 n 个点名项。
++fn r2_opus_named_from_the_environment() -> JournalRecordNamedEntryCapacity {
++    match std::env::var("SINGLEFS_R2_OPUS_NAMED") {
++        Ok(text) => JournalRecordNamedEntryCapacity::CappedForTests {
++            named_entries_per_record: text.trim().parse().expect("数"),
++        },
++        Err(_) => JournalRecordNamedEntryCapacity::FromTheRecordFormat,
++    }
++}

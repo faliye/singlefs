@@ -1,0 +1,275 @@
+--- m2-safety-r2/tree/crates/singlefs-core/src/admission.rs	2026-09-25 10:02:06.368338888 +0000
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/admission.rs	2026-09-25 10:39:34.551238165 +0000
+@@ -597,6 +597,131 @@
+     )
+ }
+ 
++
++// ======================= OPUS S4 ATTACK ARMS (draft copy only, m2-safety-r2 opus leg) =======================
++/// 这一轮攻方腿自己实现的 A1–A4（只在草稿副本里）。线程局部：每个工作线程各设各的。
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub struct OpusArms {
++    /// A1：发布准入把这次发布自己换下、要进 defer 的槽算进需求。
++    pub a1_count_own_release: bool,
++    /// A2 的另一半：式子里删掉「− defer 待释放」（发布与挂载同一个函数，两处一起删）。
++    pub drop_defer_term: bool,
++    /// A3：删除类发布豁免准入。
++    pub a3: Option<A3Rule>,
++    /// A4：挂载准入只判「空闲够不够这次挂载自己的写」。
++    pub a4_mount_own_writes_only: bool,
++    /// 攻方腿自己的零轮改法：需求换成「这次新写的全部槽」（普通分配 + 固定点元数据），A1 那一半另加不加换下的槽照 `a1_count_own_release`。
++    pub charge_all_new_writes: bool,
++}
++
++/// A3 的「删除类」怎么认。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum A3Rule {
++    /// 这次换下的槽 ≥ 这次新写的全部槽（普通分配 + 固定点元数据），逐盘。
++    ReleasedAtLeastAllNew,
++    /// 严格大于。
++    ReleasedMoreThanAllNew,
++    /// 这次换下的槽 ≥ 这次的普通分配（需求），逐盘。
++    ReleasedAtLeastDemand,
++}
++
++/// 一次准入判定的痕迹（给驱动读）。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct OpusTrace {
++    pub path: &'static str,
++    pub available_slots: Vec<i128>,
++    pub demand_slots: u64,
++    pub released_slots: u64,
++    pub all_new_slots: u64,
++    pub exempted: bool,
++    pub admitted: bool,
++}
++
++thread_local! {
++    static OPUS_ARMS: std::cell::Cell<OpusArms> = std::cell::Cell::new(OpusArms::default());
++    static OPUS_TRACES: std::cell::RefCell<Vec<OpusTrace>> = const { std::cell::RefCell::new(Vec::new()) };
++}
++
++pub fn set_opus_arms(arms: OpusArms) {
++    OPUS_ARMS.with(|cell| cell.set(arms));
++}
++#[must_use]
++pub fn opus_arms() -> OpusArms {
++    OPUS_ARMS.with(std::cell::Cell::get)
++}
++pub fn opus_push_trace(trace: OpusTrace) {
++    OPUS_TRACES.with(|traces| traces.borrow_mut().push(trace));
++}
++#[must_use]
++pub fn opus_take_traces() -> Vec<OpusTrace> {
++    OPUS_TRACES.with(|traces| std::mem::take(&mut *traces.borrow_mut()))
++}
++
++/// 读数里「defer 待释放」置 0（A2 删掉那一项）。
++#[must_use]
++pub fn opus_reading_without_defer(reading: &AdmissionReading) -> AdmissionReading {
++    AdmissionReading::new(
++        reading
++            .per_device()
++            .iter()
++            .map(|terms| DeviceAdmissionTerms {
++                deferred: BytesOnOneDevice::ZERO,
++                ..*terms
++            })
++            .collect(),
++        reading.pool_wide(),
++        reading.replicas(),
++    )
++}
++
++/// 按这一线程的臂取读数：A2 删 defer 那一项。
++#[must_use]
++pub fn opus_admission_reading_before_a_publish(
++    allocator: &PoolAllocator,
++    version_to_build_on: Option<&TransactionOutput>,
++) -> AdmissionReading {
++    let reading = admission_reading_before_a_publish(allocator, version_to_build_on);
++    if opus_arms().drop_defer_term {
++        opus_reading_without_defer(&reading)
++    } else {
++        reading
++    }
++}
++
++/// A4 的挂载判：每块盘 容量 − 已分配 − 不可回收 − 被抛弃根独占量 − 一次切换的最坏量（链重写 + R × c_max）
++/// − checkpoint 保留池 ÷ 副本数 ≥ 0。「已分配」按读法甲本来就含 defer，不另扣。交回逐盘可用（字节）。
++#[must_use]
++pub fn opus_a4_mount_available(
++    allocator: &PoolAllocator,
++    version_to_build_on: Option<&TransactionOutput>,
++) -> Vec<(DeviceIdentity, AvailableBytesOnOneDevice)> {
++    let checkpoint_cost = checkpoint_cost_of_the_version_to_build_on(version_to_build_on, allocator);
++    let replicas = ReplicaCount::of_every_device_in_the_pool(allocator);
++    let all_switches = instance_switch_reserve_on_one_device(
++        allocator.instance_rows_after_this_mounts_row_publish(),
++        checkpoint_cost,
++    );
++    let one_switch = all_switches.0 / (INSTANCE_SWITCHES_ALLOWED_PER_MOUNT + 1);
++    let reserve_share = checkpoint_reserve_pool(checkpoint_cost, replicas)
++        .share_of_one_device(replicas)
++        .0;
++    allocator
++        .devices
++        .iter()
++        .map(|device_map| {
++            let free = i128::from(device_map.unit_area_slots() * SLOT_BYTES)
++                - i128::from(device_map.allocated_slots() * SLOT_BYTES)
++                - i128::from(UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED.0)
++                - i128::from(device_map.isolated_slots() * SLOT_BYTES);
++            (
++                device_map.device,
++                AvailableBytesOnOneDevice(free - i128::from(one_switch) - i128::from(reserve_share)),
++            )
++        })
++        .collect()
++}
++// ======================= END OPUS S4 ATTACK ARMS =======================
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+--- m2-safety-r2/tree/crates/singlefs-core/src/transaction.rs	2026-09-25 10:02:06.368630007 +0000
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/transaction.rs	2026-09-25 10:39:34.878984986 +0000
+@@ -4568,11 +4568,73 @@
+         SpaceAdmission::SkippedByTheTestOnlySwitch => false,
+     };
+     if demand_is_judged {
+-        admit_on_every_device(
+-            &admission_reading_before_a_publish(allocator, previous),
+-            &demand,
+-        )
+-        .map_err(PublishError::SpaceAdmissionRefused)?;
++        // OPUS S4 ATTACK ARMS（草稿副本）：A1 把这次换下的槽加进需求；A2 删 defer 那一项；A3 删除类发布豁免。
++        let arms = crate::admission::opus_arms();
++        let released_slots: u64 = settled.release.iter().map(|placement| placement.span).sum();
++        let all_new_slots: u64 = settled
++            .resolved
++            .rewritten_roles
++            .iter()
++            .map(|role| role.span_slots())
++            .sum();
++        let demand_slots: u64 = settled
++            .resolved
++            .rewritten_roles
++            .iter()
++            .filter(|role| {
++                crate::admission::space_budget_of_role(**role)
++                    == crate::admission::SpaceBudgetOfARole::Demand
++            })
++            .map(|role| role.span_slots())
++            .sum();
++        let exempted = match arms.a3 {
++            None => false,
++            Some(crate::admission::A3Rule::ReleasedAtLeastAllNew) => released_slots >= all_new_slots,
++            Some(crate::admission::A3Rule::ReleasedMoreThanAllNew) => released_slots > all_new_slots,
++            Some(crate::admission::A3Rule::ReleasedAtLeastDemand) => released_slots >= demand_slots,
++        };
++        let demand: Vec<crate::admission::DemandOnDevice> = if arms.charge_all_new_writes {
++            demand
++                .iter()
++                .map(|on_device| crate::admission::DemandOnDevice {
++                    device: on_device.device,
++                    bytes: BytesOnOneDevice::of_slots(all_new_slots),
++                })
++                .collect()
++        } else {
++            demand
++        };
++        let judged_demand: Vec<crate::admission::DemandOnDevice> = if arms.a1_count_own_release {
++            demand
++                .iter()
++                .map(|on_device| crate::admission::DemandOnDevice {
++                    device: on_device.device,
++                    bytes: BytesOnOneDevice(
++                        on_device.bytes.0 + BytesOnOneDevice::of_slots(released_slots).0,
++                    ),
++                })
++                .collect()
++        } else {
++            demand.clone()
++        };
++        let reading = crate::admission::opus_admission_reading_before_a_publish(allocator, previous);
++        let verdict = admit_on_every_device(&reading, &judged_demand);
++        crate::admission::opus_push_trace(crate::admission::OpusTrace {
++            path: "publish",
++            available_slots: reading
++                .available_on_each_device()
++                .iter()
++                .map(|(_, available)| available.0 / i128::from(singlefs_format::SLOT_BYTES))
++                .collect(),
++            demand_slots,
++            released_slots,
++            all_new_slots,
++            exempted,
++            admitted: exempted || verdict.is_ok(),
++        });
++        if !exempted {
++            verdict.map_err(PublishError::SpaceAdmissionRefused)?;
++        }
+     }
+     // 经映射核到的那几个单元，释放之前再按位置项读盘核一次校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）：只读，
+     // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。
+--- m2-safety-r2/tree/crates/singlefs-core/src/mount.rs	2026-09-25 10:02:06.368497388 +0000
++++ m2-safety-r2-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25 10:25:38.944383641 +0000
+@@ -2096,11 +2096,52 @@
+                     bytes: BytesOnOneDevice::ZERO,
+                 })
+                 .collect();
+-            admit_on_every_device(
+-                &admission_reading_before_a_publish(&allocator, start.previous.file_version()),
+-                &no_demand_on_any_device,
+-            )
+-            .map_err(
++            // OPUS S4 ATTACK ARMS（草稿副本）：A4 换成「空闲够这次挂载自己的写」；否则按臂取读数（A2 删 defer 那一项）。
++            let arms = crate::admission::opus_arms();
++            let reading = crate::admission::opus_admission_reading_before_a_publish(
++                &allocator,
++                start.previous.file_version(),
++            );
++            let verdict = if arms.a4_mount_own_writes_only {
++                let short: Vec<crate::admission::DeviceShortOfDemand> =
++                    crate::admission::opus_a4_mount_available(&allocator, start.previous.file_version())
++                        .into_iter()
++                        .filter(|(_, available)| available.0 < 0)
++                        .map(|(device, available)| crate::admission::DeviceShortOfDemand {
++                            device,
++                            available,
++                            demand: BytesOnOneDevice::ZERO,
++                        })
++                        .collect();
++                if short.is_empty() {
++                    Ok(())
++                } else {
++                    Err(AdmissionRefusedOnSomeDevices { short_devices: short })
++                }
++            } else {
++                admit_on_every_device(&reading, &no_demand_on_any_device)
++            };
++            crate::admission::opus_push_trace(crate::admission::OpusTrace {
++                path: if arms.a4_mount_own_writes_only { "mount-a4" } else { "mount" },
++                available_slots: if arms.a4_mount_own_writes_only {
++                    crate::admission::opus_a4_mount_available(&allocator, start.previous.file_version())
++                        .iter()
++                        .map(|(_, available)| available.0 / i128::from(singlefs_format::SLOT_BYTES))
++                        .collect()
++                } else {
++                    reading
++                        .available_on_each_device()
++                        .iter()
++                        .map(|(_, available)| available.0 / i128::from(singlefs_format::SLOT_BYTES))
++                        .collect()
++                },
++                demand_slots: 0,
++                released_slots: 0,
++                all_new_slots: 0,
++                exempted: false,
++                admitted: verdict.is_ok(),
++            });
++            verdict.map_err(
+                 |refusal| MountError::SpaceAdmissionRefusedBeforeAcquisition {
+                     instance_to_acquire,
+                     refusal,

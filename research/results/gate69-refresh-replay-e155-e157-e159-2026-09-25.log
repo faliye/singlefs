@@ -1,0 +1,13 @@
+实验 二进制                判定     说明
+-------------------------------------------------------------------------
+E155  e155-fsync-write-volume  字节一致 e155-fsync-write-volume-2026-09-24-rename.out
+E155R2 e155-second-run-fsync-write-volume 字节一致 e155-second-run-fsync-write-volume-2026-09-24-rename.out
+E155R3 e155-third-run-release-cascade 字节一致 e155-third-run-release-cascade-2026-09-20-stage1.out
+E155R4 e155-fourth-run-group-commit-concurrency 字节一致 e155-fourth-run-group-commit-concurrency-2026-09-21.out
+E157  e157-parallel-line-one-clauses 字节一致 e157-parallel-line-one-clauses-2026-09-22.out
+E159  e159-fsync-wait-group-commit 字节一致 e159-fsync-wait-group-commit-2026-09-24-anchors.out
+-------------------------------------------------------------------------
+结论区间断言（计时实验复跑不出同样的字节，靠这些把 kb 里的数钉住）：
+-------------------------------------------------------------------------
+字节一致 6 ／ 仅计时不同 0 ／ 对不上 0 ／ 跑不了 0 ／ 结论断言不中 0 ／ 产物已归档 0
+本轮输出：/tmp/claude-1000/gate69-refresh/replay-out

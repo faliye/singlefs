@@ -1,0 +1,6 @@
+4d7a13632298cfce3d4e1852777dd666e2ca75ad3142573601fc3ca3974d00d4  ./.claude/kb/checks-owed.md
+e2e2a4086aa3e4e7a61d2645f0debf8c09c74551258c52e74fc545d024caab1b  ./.claude/kb/decisions/03-空间分配.md
+0cb5c1e6820a254e39d6b529269fa70fbae1ac6905a436ca56bc8aa916841ce7  ./.claude/kb/decisions/19-块指针的结构与宽度预算.md
+548da6bece362cc8abbe7993bc2aca952cf9d64b14f357bb45697c3c18c67ad2  ./.claude/kb/decisions/23-journal的角色与格式.md
+622afb7dbe39a87b4ff65560fc2db8c6d2d982075e2251807db912a177d2f30d  ./.claude/kb/decisions/28-挂载期承诺量.md
+2126b3daf2cb9e83e070e93eaee4c7de68a28ec455af19ef60b3f3f9d259d85b  ./.claude/singlefs-ai-sop/rules/rules-discipline.md

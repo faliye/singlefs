@@ -1,0 +1,987 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 30.2 GiB，这一条要 10.0 GiB（峰值表里没有这条，按它的上限 10G 算），总上限 40.1 GiB；账上在跑 2 条
+run-with-memory-cap: 排了 25 秒，起跑（singlefs-memory-cap-2838768-2089421767）
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-safety-r2-opus/rerun/tree/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-safety-r2-opus/rerun/tree/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-safety-r2-opus/rerun/tree/crates/singlefs-checker)
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/mount.rs:10:5
+   |
+10 |     admission_reading_before_a_publish, admit_on_every_device, AdmissionRefusedOnSomeDevices,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-safety-r2-opus/rerun/tree/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 2 warnings (run `cargo fix --lib -p singlefs-core` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 12.65s
+     Running tests/opus_s4_attack.rs (/tmp/claude-1000/m2-safety-r2-opus/rerun/target/release/deps/opus_s4_attack-20fba67ba3b2373c)
+
+running 1 test
+E1 slots=240 arm=T first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) last_ok=[publish+:av[21, 21]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=240 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=T suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=T suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=A1 first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) last_ok=[publish+:av[21, 21]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=240 arm=A1 A1-probe let_through=SpaceAdmissionRefused then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=240 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1 suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A1 suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=A2 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((157, 141, 83, 0)) last_ok=[publish+:av[22, 22]/d6/r12/n12] refused=[publish-:av[10, 10]/d6/r12/n12]
+E1 slots=240 arm=A2 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=240 arm=A2 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=A2 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=ND first_mount=ok admitted=11 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((169, 153, 71, 0)) last_ok=[publish+:av[10, 10]/d6/r12/n12] refused=[publish-:av[-2, -2]/d6/r12/n12]
+E1 slots=240 arm=ND suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[raiseF,ow] -> ["ok(F=13,reclaimed=100)", "ok"] violations=0
+E1 slots=240 arm=ND suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=13,reclaimed=100)", "ok"] violations=0
+E1 slots=240 arm=ND suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=240 arm=A4 first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) last_ok=[publish+:av[21, 21]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=240 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=7,reclaimed=34)", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 145, 0)) last_ok=[publish+:av[21, 21]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=240 arm=A1+A4 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=240 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=240 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=7,reclaimed=34)", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((157, 141, 83, 0)) last_ok=[publish+:av[22, 22]/d6/r12/n12] refused=[publish-:av[10, 10]/d6/r12/n12]
+E1 slots=240 arm=A2+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=240 arm=A2+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "PlacementRefused[AllocationTreeNodeBelowTheRoot]"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=90)", "ok"] violations=0
+E1 slots=240 arm=ND+A4 first_mount=ok admitted=11 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((169, 153, 71, 0)) last_ok=[publish+:av[10, 10]/d6/r12/n12] refused=[publish-:av[-2, -2]/d6/r12/n12]
+E1 slots=240 arm=ND+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=13,reclaimed=100)", "ok"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=13,reclaimed=100)", "ok"] violations=0
+E1 slots=240 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=13,reclaimed=100)", "ok"] violations=0
+E1 slots=256 arm=T first_mount=ok admitted=6 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((109, 93, 147, 0)) last_ok=[publish+:av[9, 9]/d6/r14/n14] refused=[publish-:av[-19, -19]/d6/r14/n14]
+E1 slots=256 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=T suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[raiseF,ow] -> ["ok(F=8,reclaimed=44)", "ok"] violations=0
+E1 slots=256 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=8,reclaimed=44)", "ok"] violations=0
+E1 slots=256 arm=T suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=256 arm=A1 first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 161, 0)) last_ok=[publish+:av[37, 37]/d6/r14/n14] refused=[publish-:av[9, 9]/d6/r14/n14]
+E1 slots=256 arm=A1 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=256 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A1 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A1 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A1 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A1 suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=256 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=256 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=7,reclaimed=34)", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 91, 0)) last_ok=[publish+:av[32, 32]/d6/r14/n14] refused=[publish-:av[18, 18]/d6/r14/n14]
+E1 slots=256 arm=A2 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=256 arm=A2 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A2 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=A2 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=ND first_mount=ok admitted=11 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((179, 163, 77, 0)) last_ok=[publish+:av[18, 18]/d6/r14/n14] refused=[publish-:av[4, 4]/d6/r12/n12]
+E1 slots=256 arm=ND suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND suffix=[raiseF,ow] -> ["ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=256 arm=ND suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=256 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=256 arm=A4 first_mount=ok admitted=6 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((109, 93, 147, 0)) last_ok=[publish+:av[9, 9]/d6/r14/n14] refused=[publish-:av[-19, -19]/d6/r14/n14]
+E1 slots=256 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[raiseF,ow] -> ["ok(F=8,reclaimed=44)", "ok"] violations=0
+E1 slots=256 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=8,reclaimed=44)", "ok"] violations=0
+E1 slots=256 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=8,reclaimed=44)", "ok"] violations=0
+E1 slots=256 arm=A1+A4 first_mount=ok admitted=5 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((95, 79, 161, 0)) last_ok=[publish+:av[37, 37]/d6/r14/n14] refused=[publish-:av[9, 9]/d6/r14/n14]
+E1 slots=256 arm=A1+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=256 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=7,reclaimed=34)", "ok"] violations=0
+E1 slots=256 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=7,reclaimed=34)", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 91, 0)) last_ok=[publish+:av[32, 32]/d6/r14/n14] refused=[publish-:av[18, 18]/d6/r14/n14]
+E1 slots=256 arm=A2+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=256 arm=A2+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=256 arm=ND+A4 first_mount=ok admitted=11 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((179, 163, 77, 0)) last_ok=[publish+:av[18, 18]/d6/r14/n14] refused=[publish-:av[4, 4]/d6/r12/n12]
+E1 slots=256 arm=ND+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=256 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=13,reclaimed=104)", "ok"] violations=0
+E1 slots=320 arm=T first_mount=ok admitted=8 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((137, 121, 183, 0)) last_ok=[publish+:av[17, 17]/d6/r14/n14] refused=[publish-:av[-11, -11]/d6/r14/n14]
+E1 slots=320 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=T suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[raiseF,ow] -> ["ok(F=10,reclaimed=68)", "ok"] violations=0
+E1 slots=320 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=10,reclaimed=68)", "ok"] violations=0
+E1 slots=320 arm=T suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=320 arm=A1 first_mount=ok admitted=7 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((123, 107, 197, 0)) last_ok=[publish+:av[45, 45]/d6/r14/n14] refused=[publish-:av[17, 17]/d6/r14/n14]
+E1 slots=320 arm=A1 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=320 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A1 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A1 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A1 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A1 suffix=[raiseF,ow] -> ["ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A2 first_mount=ok admitted=15 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((235, 219, 85, 0)) last_ok=[publish+:av[26, 26]/d6/r14/n14] refused=[publish-:av[12, 12]/d6/r14/n14]
+E1 slots=320 arm=A2 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=320 arm=A2 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A2 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A2 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A2 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=A2 suffix=[raiseF,ow] -> ["ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=A2 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=ND first_mount=ok admitted=16 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((249, 233, 71, 0)) last_ok=[publish+:av[12, 12]/d6/r14/n14] refused=[publish-:av[-2, -2]/d6/r14/n14]
+E1 slots=320 arm=ND suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[raiseF,ow] -> ["ok(F=18,reclaimed=164)", "ok"] violations=0
+E1 slots=320 arm=ND suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=320 arm=ND suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=18,reclaimed=164)", "ok"] violations=0
+E1 slots=320 arm=ND suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=320 arm=A4 first_mount=ok admitted=8 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((137, 121, 183, 0)) last_ok=[publish+:av[17, 17]/d6/r14/n14] refused=[publish-:av[-11, -11]/d6/r14/n14]
+E1 slots=320 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[raiseF,ow] -> ["ok(F=10,reclaimed=68)", "ok"] violations=0
+E1 slots=320 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=10,reclaimed=68)", "ok"] violations=0
+E1 slots=320 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=10,reclaimed=68)", "ok"] violations=0
+E1 slots=320 arm=A1+A4 first_mount=ok admitted=7 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((123, 107, 197, 0)) last_ok=[publish+:av[45, 45]/d6/r14/n14] refused=[publish-:av[17, 17]/d6/r14/n14]
+E1 slots=320 arm=A1+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=320 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=9,reclaimed=56)", "ok"] violations=0
+E1 slots=320 arm=A2+A4 first_mount=ok admitted=15 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((235, 219, 85, 0)) last_ok=[publish+:av[26, 26]/d6/r14/n14] refused=[publish-:av[12, 12]/d6/r14/n14]
+E1 slots=320 arm=A2+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=320 arm=A2+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=320 arm=ND+A4 first_mount=ok admitted=16 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((249, 233, 71, 0)) last_ok=[publish+:av[12, 12]/d6/r14/n14] refused=[publish-:av[-2, -2]/d6/r14/n14]
+E1 slots=320 arm=ND+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=18,reclaimed=164)", "ok"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=18,reclaimed=164)", "ok"] violations=0
+E1 slots=320 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=18,reclaimed=164)", "ok"] violations=0
+E1 slots=384 arm=T first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 219, 0)) last_ok=[publish+:av[25, 25]/d6/r14/n14] refused=[publish-:av[-3, -3]/d6/r14/n14]
+E1 slots=384 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=T suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=T suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=A1 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 219, 0)) last_ok=[publish+:av[25, 25]/d6/r14/n14] refused=[publish-:av[-3, -3]/d6/r14/n14]
+E1 slots=384 arm=A1 A1-probe let_through=SpaceAdmissionRefused then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=384 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1 suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A1 suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=A2 first_mount=ok admitted=20 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((305, 289, 79, 0)) last_ok=[publish+:av[20, 20]/d6/r14/n14] refused=[publish-:av[6, 6]/d6/r14/n14]
+E1 slots=384 arm=A2 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=384 arm=A2 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A2 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A2 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A2 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=A2 suffix=[raiseF,ow] -> ["ok(F=22,reclaimed=212)", "ok"] violations=0
+E1 slots=384 arm=A2 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=22,reclaimed=212)", "ok"] violations=0
+E1 slots=384 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=22,reclaimed=198)", "ok"] violations=0
+E1 slots=384 arm=ND first_mount=ok admitted=21 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((318, 302, 66, 0)) last_ok=[publish+:av[6, 6]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=384 arm=ND suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[raiseF,ow] -> ["ok(F=23,reclaimed=223)", "ok"] violations=0
+E1 slots=384 arm=ND suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=384 arm=ND suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=23,reclaimed=223)", "ok"] violations=0
+E1 slots=384 arm=ND suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=384 arm=A4 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 219, 0)) last_ok=[publish+:av[25, 25]/d6/r14/n14] refused=[publish-:av[-3, -3]/d6/r14/n14]
+E1 slots=384 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A1+A4 first_mount=ok admitted=10 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((165, 149, 219, 0)) last_ok=[publish+:av[25, 25]/d6/r14/n14] refused=[publish-:av[-3, -3]/d6/r14/n14]
+E1 slots=384 arm=A1+A4 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=384 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=12,reclaimed=92)", "ok"] violations=0
+E1 slots=384 arm=A2+A4 first_mount=ok admitted=20 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((305, 289, 79, 0)) last_ok=[publish+:av[20, 20]/d6/r14/n14] refused=[publish-:av[6, 6]/d6/r14/n14]
+E1 slots=384 arm=A2+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=384 arm=A2+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=22,reclaimed=212)", "ok"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=22,reclaimed=212)", "ok"] violations=0
+E1 slots=384 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=22,reclaimed=198)", "ok"] violations=0
+E1 slots=384 arm=ND+A4 first_mount=ok admitted=21 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((318, 302, 66, 0)) last_ok=[publish+:av[6, 6]/d6/r14/n14] refused=[publish-:av[-7, -7]/d6/r14/n14]
+E1 slots=384 arm=ND+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=23,reclaimed=223)", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=23,reclaimed=223)", "ok"] violations=0
+E1 slots=384 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=23,reclaimed=210)", "ok"] violations=0
+E1 slots=448 arm=T first_mount=ok admitted=12 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((193, 177, 255, 0)) last_ok=[publish+:av[33, 33]/d6/r14/n14] refused=[publish-:av[5, 5]/d6/r14/n14]
+E1 slots=448 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=T suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=T suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=T suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=T suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=T suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=T suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=T suffix=[raiseF,ow] -> ["ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=T suffix=[remount,raiseF,ow] -> ["ok", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1 first_mount=ok admitted=12 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((193, 177, 255, 0)) last_ok=[publish+:av[33, 33]/d6/r14/n14] refused=[publish-:av[5, 5]/d6/r14/n14]
+E1 slots=448 arm=A1 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=448 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=A1 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=A1 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=A1 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=448 arm=A1 suffix=[raiseF,ow] -> ["ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A2 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((332, 316, 116, 0)) last_ok=[publish+:av[41, 41]/d6/r12/n12] refused=[]
+E1 slots=448 arm=A2 suffix=[ow] -> ["ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=238)", "ok"] violations=0
+E1 slots=448 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=448 arm=ND first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((332, 316, 116, 0)) last_ok=[publish+:av[41, 41]/d6/r12/n12] refused=[]
+E1 slots=448 arm=ND suffix=[ow] -> ["ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=238)", "ok"] violations=0
+E1 slots=448 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=448 arm=A4 first_mount=ok admitted=12 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((193, 177, 255, 0)) last_ok=[publish+:av[33, 33]/d6/r14/n14] refused=[publish-:av[5, 5]/d6/r14/n14]
+E1 slots=448 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A4 suffix=[raiseF,ow] -> ["ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1+A4 first_mount=ok admitted=12 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((193, 177, 255, 0)) last_ok=[publish+:av[33, 33]/d6/r14/n14] refused=[publish-:av[5, 5]/d6/r14/n14]
+E1 slots=448 arm=A1+A4 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=448 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=14,reclaimed=116)", "ok"] violations=0
+E1 slots=448 arm=A2+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((332, 316, 116, 0)) last_ok=[publish+:av[41, 41]/d6/r12/n12] refused=[]
+E1 slots=448 arm=A2+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=238)", "ok"] violations=0
+E1 slots=448 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=448 arm=ND+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((332, 316, 116, 0)) last_ok=[publish+:av[41, 41]/d6/r12/n12] refused=[]
+E1 slots=448 arm=ND+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=238)", "ok"] violations=0
+E1 slots=448 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=512 arm=T first_mount=ok admitted=15 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((235, 219, 277, 0)) last_ok=[publish+:av[13, 13]/d6/r14/n14] refused=[publish-:av[-15, -15]/d6/r14/n14]
+E1 slots=512 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=T suffix=[remount,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[remount,ow,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[remount x2,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[remount x4,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[remount x6,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[remount x8,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[raiseF,ow] -> ["ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=512 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=512 arm=T suffix=[remount,raiseF,ow] -> ["SpaceAdmissionRefusedBeforeAcquisition", "no-session", "no-session"] violations=0
+E1 slots=512 arm=A1 first_mount=ok admitted=14 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((221, 205, 291, 0)) last_ok=[publish+:av[41, 41]/d6/r14/n14] refused=[publish-:av[13, 13]/d6/r14/n14]
+E1 slots=512 arm=A1 A1-probe let_through=ok then remount=SpaceAdmissionRefusedBeforeAcquisition then ow=no-session violations=0
+E1 slots=512 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=A1 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=A1 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=A1 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=512 arm=A1 suffix=[raiseF,ow] -> ["ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A2 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 174, 0)) last_ok=[publish+:av[103, 103]/d6/r14/n14] refused=[]
+E1 slots=512 arm=A2 suffix=[ow] -> ["ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=512 arm=ND first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 174, 0)) last_ok=[publish+:av[103, 103]/d6/r14/n14] refused=[]
+E1 slots=512 arm=ND suffix=[ow] -> ["ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=512 arm=A4 first_mount=ok admitted=15 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((235, 219, 277, 0)) last_ok=[publish+:av[13, 13]/d6/r14/n14] refused=[publish-:av[-15, -15]/d6/r14/n14]
+E1 slots=512 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A4 suffix=[raiseF,ow] -> ["ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=512 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=512 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=17,reclaimed=152)", "ok"] violations=0
+E1 slots=512 arm=A1+A4 first_mount=ok admitted=14 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((221, 205, 291, 0)) last_ok=[publish+:av[41, 41]/d6/r14/n14] refused=[publish-:av[13, 13]/d6/r14/n14]
+E1 slots=512 arm=A1+A4 A1-probe let_through=ok then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=512 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=16,reclaimed=140)", "ok"] violations=0
+E1 slots=512 arm=A2+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 174, 0)) last_ok=[publish+:av[103, 103]/d6/r14/n14] refused=[]
+E1 slots=512 arm=A2+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=512 arm=ND+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 174, 0)) last_ok=[publish+:av[103, 103]/d6/r14/n14] refused=[]
+E1 slots=512 arm=ND+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=512 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=640 arm=T first_mount=ok admitted=19 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((291, 275, 349, 0)) last_ok=[publish+:av[29, 29]/d6/r14/n14] refused=[publish-:av[1, 1]/d6/r14/n14]
+E1 slots=640 arm=T suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=T suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=T suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=T suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=T suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=T suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=T suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=T suffix=[raiseF,ow] -> ["ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=T suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=T suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=T suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=T suffix=[remount,raiseF,ow] -> ["ok", "ok(F=21,reclaimed=199)", "ok"] violations=0
+E1 slots=640 arm=A1 first_mount=ok admitted=19 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((291, 275, 349, 0)) last_ok=[publish+:av[29, 29]/d6/r14/n14] refused=[publish-:av[1, 1]/d6/r14/n14]
+E1 slots=640 arm=A1 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=640 arm=A1 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1 suffix=[remount x2,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=A1 suffix=[remount x4,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=A1 suffix=[remount x6,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=A1 suffix=[remount x8,ow] -> ["ok", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "SpaceAdmissionRefusedBeforeAcquisition", "no-session"] violations=0
+E1 slots=640 arm=A1 suffix=[raiseF,ow] -> ["ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A1 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=21,reclaimed=199)", "ok"] violations=0
+E1 slots=640 arm=A2 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 302, 0)) last_ok=[publish+:av[231, 231]/d6/r14/n14] refused=[]
+E1 slots=640 arm=A2 suffix=[ow] -> ["ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=640 arm=ND first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 302, 0)) last_ok=[publish+:av[231, 231]/d6/r14/n14] refused=[]
+E1 slots=640 arm=ND suffix=[ow] -> ["ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=640 arm=A4 first_mount=ok admitted=19 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((291, 275, 349, 0)) last_ok=[publish+:av[29, 29]/d6/r14/n14] refused=[publish-:av[1, 1]/d6/r14/n14]
+E1 slots=640 arm=A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A4 suffix=[raiseF,ow] -> ["ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=21,reclaimed=199)", "ok"] violations=0
+E1 slots=640 arm=A1+A4 first_mount=ok admitted=19 refusal=SpaceAdmissionRefused counts(alloc,def,free,iso)=Some((291, 275, 349, 0)) last_ok=[publish+:av[29, 29]/d6/r14/n14] refused=[publish-:av[1, 1]/d6/r14/n14]
+E1 slots=640 arm=A1+A4 A1-probe let_through=SpaceAdmissionRefused then remount=ok then ow=SpaceAdmissionRefused violations=0
+E1 slots=640 arm=A1+A4 suffix=[ow] -> ["SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount,ow] -> ["ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[empty,ow] -> ["SpaceAdmissionRefused", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[empty,remount,ow] -> ["SpaceAdmissionRefused", "ok", "SpaceAdmissionRefused"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["SpaceAdmissionRefused", "ok(F=21,reclaimed=200)", "ok"] violations=0
+E1 slots=640 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=21,reclaimed=199)", "ok"] violations=0
+E1 slots=640 arm=A2+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 302, 0)) last_ok=[publish+:av[231, 231]/d6/r14/n14] refused=[]
+E1 slots=640 arm=A2+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=640 arm=ND+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 302, 0)) last_ok=[publish+:av[231, 231]/d6/r14/n14] refused=[]
+E1 slots=640 arm=ND+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=640 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=T first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[39, 39]/d6/r14/n14] refused=[]
+E1 slots=768 arm=T suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=T suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=T suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=T suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=T suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=A1 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[39, 39]/d6/r14/n14] refused=[]
+E1 slots=768 arm=A1 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=A2 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[359, 359]/d6/r14/n14] refused=[]
+E1 slots=768 arm=A2 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=ND first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[359, 359]/d6/r14/n14] refused=[]
+E1 slots=768 arm=ND suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[39, 39]/d6/r14/n14] refused=[]
+E1 slots=768 arm=A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=A1+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[39, 39]/d6/r14/n14] refused=[]
+E1 slots=768 arm=A1+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=A2+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[359, 359]/d6/r14/n14] refused=[]
+E1 slots=768 arm=A2+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=768 arm=ND+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 430, 0)) last_ok=[publish+:av[359, 359]/d6/r14/n14] refused=[]
+E1 slots=768 arm=ND+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=768 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=T first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[295, 295]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=T suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=T suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=A1 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[295, 295]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=A1 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A1 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=A2 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[615, 615]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=A2 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A2 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=ND first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[615, 615]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=ND suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=ND suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[295, 295]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[295, 295]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=A1+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A1+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[615, 615]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=A2+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=A2+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 first_mount=ok admitted=120 refusal=- counts(alloc,def,free,iso)=Some((338, 322, 686, 0)) last_ok=[publish+:av[615, 615]/d6/r14/n14] refused=[]
+E1 slots=1024 arm=ND+A4 suffix=[ow] -> ["ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount,ow,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount x2,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount x4,ow] -> ["ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount x6,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount x8,ow] -> ["ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[raiseF,ow] -> ["ok(F=122,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[empty,ow] -> ["ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[empty,remount,ow] -> ["ok", "ok", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[empty,raiseF,ow] -> ["ok", "ok(F=123,reclaimed=240)", "ok"] violations=0
+E1 slots=1024 arm=ND+A4 suffix=[remount,raiseF,ow] -> ["ok", "ok(F=122,reclaimed=216)", "ok"] violations=0
+test e1_overwrite_until_refused_then_sweep_user_suffixes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 16.52s
+

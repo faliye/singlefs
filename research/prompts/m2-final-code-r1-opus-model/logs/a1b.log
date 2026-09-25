@@ -1,0 +1,19 @@
+2026-09-24T17:02:35Z
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.37s
+     Running tests/opus_r1_attack.rs (target/release/deps/opus_r1_attack-89915c639d7b9cff)
+
+running 1 test
+OBS a1b second mount instance=23251 operations=163
+OBS a1b prefix outcome [1 states, first Some(0), last Some(0)]: recover root=Some((InstanceGeneration(23250), CheckpointTxg(5))) applied=0 | mount ok instance=23251 rows=1 violated=[]
+OBS a1b prefix outcome [145 states, first Some(1), last Some(145)]: recover root=Some((InstanceGeneration(23250), CheckpointTxg(5))) applied=0 | mount ok instance=23252 rows=2 violated=[]
+OBS a1b prefix outcome [12 states, first Some(146), last Some(157)]: recover root=Some((InstanceGeneration(23251), CheckpointTxg(6))) applied=0 | mount ok instance=23252 rows=1 violated=[]
+OBS a1b prefix outcome [3 states, first Some(161), last Some(163)]: recover root=Some((InstanceGeneration(23251), CheckpointTxg(7))) applied=0 | mount ok instance=23252 rows=1 violated=[]
+OBS a1b prefix outcome [3 states, first Some(158), last Some(160)]: recover root=Some((InstanceGeneration(23251), CheckpointTxg(7))) applied=1 | mount ok instance=23252 rows=1 violated=[]
+OBS a1b row publish record writes at [140, 141, 142, 143]
+OBS a1b subset outcome masks [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]: recover root=Some((InstanceGeneration(23250), CheckpointTxg(5))) applied=0 | mount ok instance=23252 rows=2 violated=[]
+test z1_a1b_crash_sweep_over_a_spilled_row_publish ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 23.26s
+
+rc=0
+2026-09-24T17:03:00Z

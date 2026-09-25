@@ -1,0 +1,10 @@
+--- a/crates/singlefs-harness/src/fault_injection.rs
++++ b/crates/singlefs-harness/src/fault_injection.rs
+@@ -1783,6 +1783,7 @@
+         per_step_checker: PerStepChecker::Skipped,
+         device_width: execution.device_width,
+         space_admission: execution.space_admission,
++        s4_candidate: execution.s4_candidate,
+     };
+     let measurement_plan = SharedFaultPlan::unarmed(geometry);
+     let measurement_stream = SharedStream::new();

@@ -15,3 +15,5 @@ M14_页到单元按整单元除	spans_two_units_given_payload(NET_PAYLOAD_BYTES,
 M17_丙把随机作业的读量取成声明的文件大小	random_reads_per_second * RationalNumber::from_integer(PAGE_BYTES as i128) * RationalNumber::from_integer(RANDOM_JOB_RUNTIME_SECONDS)	RationalNumber::from_integer(DECLARED_SEQUENTIAL_FILE_BYTES)
 M18_甲不按权重直接取b的平均	accumulator + weights[tier_index] * random_shares_within_tier[tier_index]	accumulator + random_shares_within_tier[tier_index] / RationalNumber::from_integer(5)
 M21_读法A的倍数里混进占比	read_form_a_multiplier_over_distribution(size_distribution) // M21 目标	read_form_a_multiplier_over_distribution(size_distribution) * (RationalNumber::one() - byte_share) + byte_share // M21 目标
+M22_D25真实权重seq档写错	RationalNumber::new(60, 100), // seq	RationalNumber::new(65, 100), // seq
+M23_相加上界捷径边界写错	byte_share < band_lower_bound() // M23 目标：把 < 改成 <=，band_lower_bound 本身那一点就会误判成适用	byte_share <= band_lower_bound() // M23 目标：把 < 改成 <=，band_lower_bound 本身那一点就会误判成适用

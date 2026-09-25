@@ -13,3 +13,6 @@ M10_一条记录容量改成71	const NAMED_ITEMS_PER_RECORD_MAIN: u64 = (RECORD_
 M17_Q3_1不计头H	let rounded = ((header as f64 + conditions_per_node * entry_width as f64) / pbs as f64).ceil() * pbs as f64;	let rounded = ((conditions_per_node * entry_width as f64) / pbs as f64).ceil() * pbs as f64;
 M18_Q4_1不计单元头134	let fsync_data_unit_count = shape.family.data_units_per_fsync();\n    let rounded = (DATA_UNIT_HEADER_AND_TRAILER_BYTES + content_bytes).div_ceil(pbs) * pbs;	let fsync_data_unit_count = shape.family.data_units_per_fsync();\n    let rounded = content_bytes.div_ceil(pbs) * pbs;
 M22_Q5_3用32768当一层的宽	let bytes_per_layer_growth_ratio = (tree_bytes_at_threshold as f64 - tree_bytes_before_threshold as f64) / (NODE_BYTES as f64 * DEVICE_COUNT as f64);\n        // P=144→145 只多一个脏节点	let bytes_per_layer_growth_ratio = (tree_bytes_at_threshold as f64 - tree_bytes_before_threshold as f64) / (UNIT_BYTES as f64 * DEVICE_COUNT as f64);\n        // P=144→145 只多一个脏节点
+M23_头宽退回307	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 307;
+M24_头宽过上边界	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 345;
+M25_头宽过下边界	const RECORD_HEADER_BYTES: u64 = 311;	const RECORD_HEADER_BYTES: u64 = 288;

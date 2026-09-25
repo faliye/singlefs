@@ -1,0 +1,24 @@
+violations 0
+cell = N(近满时放行的最大单元数):删后重写成功前的用户步数(0=立刻；X=8步内没成)；D!=截断这一次发布本身被准入拒
+arm | filler | 240 | 256 | 320 | 384 | 448 | 512 | 640 | 768 | 1024
+A1x | inode | N3:X | N4:D!X | N5:D!X | N6:X | N8:D!X | N9:D!X | N11:D!X | N12:X | N16:D!X
+A1x | remount | N3:X | N4:D!X | N5:D!X | N6:X | N8:D!X | N9:D!X | N11:D!X | N12:X | N16:D!X
+A1x | raiseF | N3:X | N4:D!1 | N5:D!1 | N6:1 | N8:D!1 | N9:D!1 | N11:D!1 | N12:1 | N16:D!1
+A1x | inode+raiseF | N3:X | N4:D!1 | N5:D!1 | N6:1 | N8:D!1 | N9:D!1 | N11:D!1 | N12:1 | N16:D!1
+A1x | ow1+raiseF | N3:X | N4:D!1 | N5:D!1 | N6:1 | N8:D!1 | N9:D!1 | N11:D!1 | N12:1 | N16:D!1
+ND+A1n | inode | N7:D!X | N7:D!X | N9:X | N11:X | N13:D!X | N14:X | N17:X | N20:D!X | N24:2
+ND+A1n | remount | N7:D!X | N7:D!X | N9:X | N11:X | N13:D!X | N14:X | N17:X | N20:D!X | N24:1
+ND+A1n | raiseF | N7:D!1 | N7:D!1 | N9:1 | N11:1 | N13:D!1 | N14:1 | N17:1 | N20:D!1 | N24:1
+ND+A1n | inode+raiseF | N7:D!1 | N7:D!1 | N9:1 | N11:1 | N13:D!1 | N14:1 | N17:1 | N20:D!1 | N24:1
+ND+A1n | ow1+raiseF | N7:D!1 | N7:D!1 | N9:1 | N11:1 | N13:D!1 | N14:1 | N17:1 | N20:D!1 | N24:1
+ND+A1n+A3gt | inode | N7:X | N7:X | N9:X | N11:X | N13:X | N14:X | N17:X | N20:X | N24:2
+ND+A1n+A3gt | remount | N7:X | N7:X | N9:X | N11:X | N13:X | N14:X | N17:X | N20:X | N24:1
+ND+A1n+A3gt | raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+ND+A1n+A3gt | inode+raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+ND+A1n+A3gt | ow1+raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+ND+A1n+A3gt+A4 | inode | N7:X | N7:X | N9:X | N11:X | N13:X | N14:X | N17:X | N20:X | N24:2
+ND+A1n+A3gt+A4 | remount | N7:X | N7:X | N9:X | N11:X | N13:X | N14:6 | N17:4 | N20:4 | N24:1
+ND+A1n+A3gt+A4 | raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+ND+A1n+A3gt+A4 | inode+raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+ND+A1n+A3gt+A4 | ow1+raiseF | N7:1 | N7:1 | N9:1 | N11:1 | N13:1 | N14:1 | N17:1 | N20:1 | N24:1
+截断（删）被放行的格数（每臂 9 个盘宽）: {'A1x': '3/9', 'ND+A1n': '5/9', 'ND+A1n+A3gt': '9/9', 'ND+A1n+A3gt+A4': '9/9'}

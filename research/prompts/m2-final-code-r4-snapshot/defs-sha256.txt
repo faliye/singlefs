@@ -1,0 +1,5 @@
+e459af63edf10a46279c016a61c3c2636cc125aeb5bafa386a15f27903304905  defs/.claude/agent-common.md
+0ff8efb9fb593f17207a6a2a9b35333beee91824bfd065e9a84c99b8f8614ab6  defs/.claude/gate.d/55-qemu-first-transaction.sh
+30afff8237ef070a6024fd6b0da5460dad0b3fff8f5ce65dad0929cf11ad25e9  defs/.claude/gate.d/74-model-differential.sh
+88100fa5dc592d9f2efdd9169dfab4934dbabf72b3b161a133262c0e39fd5624  defs/.claude/hooks/bash-command-detector.sh
+cb89635efb4a13cc7344d9ffd27fc37dc08c61b2292f96b5f9e98a07e19796b9  defs/.claude/main-agent.md

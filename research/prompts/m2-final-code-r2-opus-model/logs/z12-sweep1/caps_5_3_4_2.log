@@ -1,0 +1,2 @@
+Z12 without-file caps=Some("5,3,4,2") named=None mounts=7: mounts_ok=217 refused={} panics=0
+Z12 with-file caps=Some("5,3,4,2") named=None rounds=7 inodes_every=2: mounts_ok=115 refused={"RowPublishAdmissionRefusedBeforeAcquisition/instance_to_acquire: InstanceGeneration": 6, "WarmUpAdmissionRefusedBeforeAcquisition/instance_to_acquire: InstanceGeneration": 45, "main-line:RowPublishAdmissionRefusedBeforeAcquisition/instance_to_acquire: InstanceGeneration": 1} panics=0

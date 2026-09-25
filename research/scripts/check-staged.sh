@@ -116,7 +116,8 @@ selftest() {
   local out_red_mixed rc_red_mixed
   out_red_mixed="$(run_isolated "$repo" 20 40 2>&1)"; rc_red_mixed=$?
   # 跑到一半被打断：一个睡 20 秒的阶段，worktree 建起来之后给整组发 INT（Ctrl-C 的形态）；
-  # 打断之后仓里只许剩主工作区那一个登记。开 job control（set -m）是为了让后台那一组收得到 INT。
+  # 打断之后仓里只许剩主工作区那一个登记。开 job control（set -m）：后台那一条自成一个进程组、任务号 %1，
+  # `kill -INT %1` 按任务号把 INT 发给那一组，不按负进程号发（门禁 73 号的进程安全：终止只许点名一个任务号或进程号）。
   printf '#!/usr/bin/env bash\n# gate-stage: selftest-slow\nsleep 20\n' > "$repo/.claude/gate.d/30-slow.sh"
   git -C "$repo" add .claude/gate.d/30-slow.sh
   local registered_after_interrupt leftover
@@ -128,7 +129,7 @@ selftest() {
       [[ "$(git -C "$repo" worktree list --porcelain | grep -c '^worktree ')" -ge 2 ]] && break
       sleep 0.1
     done
-    kill -INT -- -"$job" 2>/dev/null; wait "$job" 2>/dev/null
+    kill -INT %1 2>/dev/null; wait "$job" 2>/dev/null
     git -C "$repo" worktree list --porcelain | grep -c '^worktree '
   )"
   while IFS= read -r leftover; do [[ -n "$leftover" ]] && rm -rf "${leftover:?}"; done \

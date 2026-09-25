@@ -1,0 +1,5 @@
+67b9143fcf20be1d9b58db1697021b49b227e5ca6309f4bfb511fdc52a81ffad  defs/.claude/agent-common.md
+cbca0dd246e8f9a82568a539298c91035e46c54c1fdd4dda7850f8a77f70437f  defs/.claude/agents/crash-verifier.md
+432184ec96140b08062dd589f4e5dfcdbd687b7a4153b16597af73dac545523f  defs/.claude/hooks/bash-command-detector.sh
+6bb8187dc01ee56d85960822f87fcf62de627b342edcb1ef79a0919c44a53b05  defs/.claude/main-agent.md
+c71b88cd75bc091a2574b78ea8dfad9cea81b2e7095bd999f03499e74dbb5370  defs/.claude/rules/implementation-workflow.md

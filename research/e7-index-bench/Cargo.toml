@@ -444,3 +444,7 @@ path = "src/bin/e160_random_small_read_share.rs"
 [[bin]]
 name = "e159-fsync-wait-group-commit"
 path = "src/bin/e159_fsync_wait_group_commit.rs"
+
+[[bin]]
+name = "e142-region-diff-independent"
+path = "src/bin/e142_region_diff_independent.rs"

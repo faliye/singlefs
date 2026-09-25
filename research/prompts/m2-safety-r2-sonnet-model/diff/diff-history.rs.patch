@@ -1,0 +1,111 @@
+--- a/crates/singlefs-harness/src/history.rs
++++ b/crates/singlefs-harness/src/history.rs
+@@ -25,7 +25,7 @@
+ };
+ use singlefs_checker::walk::{allocation_record_count_under_root, check_pool_image};
+ use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+-use singlefs_core::admission::SpaceAdmission;
++use singlefs_core::admission::{S4Candidate, SpaceAdmission};
+ use singlefs_core::allocator::{AllocationRecord, PlacementRefusal, PoolAllocator};
+ use singlefs_core::block_device::{BlockDeviceError, PhysicalBlockSizeInBytes};
+ use singlefs_core::journal::back_chain_of;
+@@ -33,7 +33,8 @@
+     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
+ };
+ use singlefs_core::mount::{
+-    mount_rollback_with_space_admission, mount_writable_with_space_admission, raise_rollback_floor,
++    mount_rollback_with_space_admission_and_s4_candidate,
++    mount_writable_with_space_admission_and_s4_candidate, raise_rollback_floor,
+     MountError, RollbackTarget, ShadowLedger,
+ };
+ use singlefs_core::recovery::{
+@@ -725,6 +726,9 @@
+     device_width: HistoryDeviceWidth,
+     /// 判不判空间准入（只供测试的开关，`singlefs_core::admission::SpaceAdmission`）：起点那条会话装在分配器上，挂载照它传。
+     space_admission: SpaceAdmission,
++    /// S4 二轮候选（只供三方论证，`singlefs_core::admission::S4Candidate`）：同 `space_admission` 一样，起点那条会话
++    /// 装在分配器上，挂载照它传。
++    s4_candidate: S4Candidate,
+     devices: Vec<(DeviceIdentity, HistoryDevice)>,
+     session: Option<WritableSession>,
+     successful_mounts: usize,
+@@ -850,6 +854,7 @@
+         starting_point: HistoryStartingPoint,
+         device_width: HistoryDeviceWidth,
+         space_admission: SpaceAdmission,
++        s4_candidate: S4Candidate,
+         stream: &SharedStream,
+         fault_plan: &SharedFaultPlan,
+     ) -> Result<(Self, Option<ModelVerdict>), StartingPointFailure> {
+@@ -900,6 +905,7 @@
+                 let mut allocator =
+                     allocator_after_make_filesystem(&parameters, &devices, &genesis);
+                 allocator.set_space_admission(space_admission);
++                allocator.set_s4_candidate(s4_candidate);
+                 let content = first_file_content();
+                 let started = acquire_warm_up_and_publish_the_first_file(
+                     &parameters,
+@@ -940,6 +946,7 @@
+             Self {
+                 device_width,
+                 space_admission,
++                s4_candidate,
+                 devices,
+                 session,
+                 successful_mounts: 0,
+@@ -2556,8 +2563,12 @@
+     let image_before_mount = pool.image();
+     let answer = pool.model.answer_mount_writable();
+     let stream_length_before = pool.stream.operation_count();
+-    let mounted =
+-        mount_writable_with_space_admission(parameters, &mut pool.devices, pool.space_admission);
++    let mounted = mount_writable_with_space_admission_and_s4_candidate(
++        parameters,
++        &mut pool.devices,
++        pool.space_admission,
++        pool.s4_candidate,
++    );
+     settle_mount(
+         pool,
+         mounted,
+@@ -2612,12 +2623,13 @@
+         .model
+         .answer_mount_rollback(model_root_key(target.instance, target.checkpoint_txg));
+     let stream_length_before = pool.stream.operation_count();
+-    let mounted = mount_rollback_with_space_admission(
++    let mounted = mount_rollback_with_space_admission_and_s4_candidate(
+         parameters,
+         &mut pool.devices,
+         target,
+         ShadowLedger::On,
+         pool.space_admission,
++        pool.s4_candidate,
+     );
+     settle_mount(
+         pool,
+@@ -2864,6 +2876,9 @@
+     /// 判不判空间准入（只供测试的开关，`singlefs_core::admission::SpaceAdmission`）。取样点里要测「准入放行而落点取不到」那条兜底拒绝的
+     /// （小盘上式子先拒，走不到落点那一道）装 `SkippedByTheTestOnlySwitch`；别的一律判。
+     pub space_admission: SpaceAdmission,
++    /// S4 二轮候选（只供三方论证，`singlefs_core::admission::S4Candidate`）：产品路径与既有的全部取样点恒 `Baseline`，
++    /// 与今天的判法逐字相同；本轮 `research/prompts/m2-safety-r2-sonnet-model/` 下的候选对拍测试才装别的候选。
++    pub s4_candidate: S4Candidate,
+ }
+ 
+ impl HistoryExecution {
+@@ -2872,6 +2887,7 @@
+         per_step_checker: PerStepChecker::Run,
+         device_width: HistoryDeviceWidth::FourGibibytes,
+         space_admission: SpaceAdmission::JudgedByTheFormula,
++        s4_candidate: S4Candidate::Baseline,
+     };
+ 
+     /// 报告里的名字。
+@@ -2956,6 +2972,7 @@
+             history.starting_point,
+             execution.device_width,
+             execution.space_admission,
++            execution.s4_candidate,
+             stream,
+             fault_plan,
+         );

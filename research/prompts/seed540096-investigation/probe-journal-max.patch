@@ -1,0 +1,51 @@
+--- /tmp/claude-1000/seed540096/main/crates/singlefs-core/src/transaction.rs	2026-09-25 07:52:13.603998783 +0000
++++ crates/singlefs-core/src/transaction.rs	2026-09-25 08:06:29.442036605 +0000
+@@ -520,14 +520,48 @@
+         &pool.parameters.filesystem_identifier,
+     )
+     .unwrap_or(MKFS_INSTANCE_GENERATION);
++    // seed540096 探针（只在草稿副本里）：取号式子多读一路 journal 环里自证过的记录的实例代号，看 I-8.6 红消不消。
++    let highest_journal = seed540096_probe_highest_journal_instance(pool);
+     InstanceGeneration(
+         highest_system_configuration_instance(pool)
+             .max(highest_root)
++            .max(highest_journal)
+             .0
+             + 1,
+     )
+ }
+ 
++fn seed540096_probe_highest_journal_instance<Device: BlockDevice>(
++    pool: &PoolWriter<'_, Device>,
++) -> InstanceGeneration {
++    use crate::recovery::PoolReader;
++    let reader: &[(DeviceIdentity, Device)] = &*pool.devices;
++    let expected_filesystem_identifier =
++        crate::unit::unit_filesystem_identifier(&pool.parameters.filesystem_identifier);
++    let ring_start = DeviceOffsetInBytes(
++        singlefs_format::JOURNAL_RING_START_SLOT * singlefs_format::SLOT_BYTES,
++    );
++    let ring_bytes = pool.parameters.geometry.journal_ring_bytes;
++    let record_bytes = usize::try_from(singlefs_format::JOURNAL_RECORD_BYTES).expect("4096");
++    let mut highest = MKFS_INSTANCE_GENERATION;
++    for device in reader.device_identities() {
++        for record_index in 0..ring_bytes / singlefs_format::JOURNAL_RECORD_BYTES {
++            let offset = DeviceOffsetInBytes(
++                ring_start.0 + record_index * singlefs_format::JOURNAL_RECORD_BYTES,
++            );
++            let Some(bytes) = reader.read(device, offset, record_bytes) else {
++                continue;
++            };
++            if let Some(record) =
++                crate::journal::JournalRecord::parse(&bytes, expected_filesystem_identifier)
++            {
++                highest = highest.max(record.instance);
++            }
++        }
++    }
++    highest
++}
++
+ /// 取号（D23（journal 的角色与格式） 已定项 16、D18（块里携带什么信息） 已定项 11；2026-09-14 用户定案，
+ /// C322（取号那一步的屏障怎么放没有条款） 三轮三方）：新号 = max(每块盘两槽里全部自证过的槽的实例代号, 根环里全部根记录的
+ /// 实例代号) + 1；逐盘写一次系统配置槽（世代号逐盘 +1）；两写之后一道屏障，屏障完成才把新号交出去，于是本实例的第一个

@@ -1,0 +1,89 @@
+diff -ru m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs m2-final-code-r3-opus/tree/crates/singlefs-core/src/mount.rs
+--- m2-final-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-09-24 21:35:39.449983013 +0000
++++ m2-final-code-r3-opus/tree/crates/singlefs-core/src/mount.rs	2026-09-25 00:05:50.863527626 +0000
+@@ -1253,7 +1253,12 @@
+                 &plan,
+                 Some(output),
+                 output.tree_identifiers,
+-                ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition,
++                if std::env::var("SINGLEFS_R3_OPUS_DRY_RUN_READS").is_ok() {
++                    // r3 opus 副本上的试改（只在副本上）：预演也做释放前读盘核。
++                    ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt
++                } else {
++                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition
++                },
+             )
+             .map(|(_, rehearsed)| PoolVersion::WithFile(rehearsed))
+             .map_err(refused_at(0))?
+@@ -1310,7 +1315,12 @@
+                     &plan,
+                     Some(current_file_version),
+                     current_file_version.tree_identifiers,
+-                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition,
++                    if std::env::var("SINGLEFS_R3_OPUS_DRY_RUN_READS").is_ok() {
++                    // r3 opus 副本上的试改（只在副本上）：预演也做释放前读盘核。
++                    ReleaseChecksumCheck::ReadEveryReplacedCopyBeforeReleasingIt
++                } else {
++                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition
++                },
+                 )
+                 .map(|(_, rehearsed)| PoolVersion::WithFile(rehearsed))
+                 .map_err(refused_at(publish_index))?
+@@ -1760,6 +1770,38 @@
+                 .quarantined_after_release_checksum_mismatch
+                 .is_empty()
+         });
++    // r3 opus 副本专用：SINGLEFS_R3_OPUS_REPORT 设了就把预演与真发逐次比一遍（含被隔离那一格），打一行到 stderr；不改行为。
++    if std::env::var("SINGLEFS_R3_OPUS_REPORT").is_ok() {
++        if let Some(planned) = &placements_planned {
++            let differing: Vec<(usize, usize)> = planned
++                .iter()
++                .zip(&placements_taken)
++                .enumerate()
++                .filter(|(_, (p, t))| p != t)
++                .map(|(i, (p, _))| (i, p.len()))
++                .collect();
++            eprintln!(
++                "R3OPUS-DRYRUN quarantined={} same={} publishes_planned={} publishes_taken={} differing={:?} planned={:?} taken={:?}",
++                some_copy_was_quarantined,
++                &placements_taken == planned,
++                planned.len(),
++                placements_taken.len(),
++                differing,
++                planned.iter().map(|p| p.iter().map(|(_, s)| s.0).collect::<Vec<_>>()).collect::<Vec<_>>(),
++                placements_taken.iter().map(|p| p.iter().map(|(_, s)| s.0).collect::<Vec<_>>()).collect::<Vec<_>>(),
++            );
++            eprintln!(
++                "R3OPUS-RELEASED {:?}",
++                std::iter::once(&row_publish)
++                    .chain(&warm_up_publishes)
++                    .map(|version| version
++                        .file_version()
++                        .map(|output| output.released.iter().map(|placement| placement.slot.0).collect::<Vec<_>>())
++                        .unwrap_or_default())
++                    .collect::<Vec<_>>()
++            );
++        }
++    }
+     if let (Some(planned), false) = (&placements_planned, some_copy_was_quarantined) {
+         assert_eq!(
+             &placements_taken, planned,
+diff -ru m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs m2-final-code-r3-opus/tree/crates/singlefs-harness/src/history.rs
+--- m2-final-code-r3/tree/crates/singlefs-harness/src/history.rs	2026-09-24 20:56:53.151716323 +0000
++++ m2-final-code-r3-opus/tree/crates/singlefs-harness/src/history.rs	2026-09-24 23:48:13.268743836 +0000
+@@ -109,7 +109,12 @@
+                 (UNIT_AREA_START_SLOT + SMALLER_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
+             }
+             HistoryDeviceWidth::UnitAreaOf240Slots => {
+-                (UNIT_AREA_START_SLOT + NARROWEST_DEVICE_UNIT_AREA_SLOTS) * SLOT_BYTES
++                // r3 opus 副本专用：SINGLEFS_R3_OPUS_UNIT_AREA_SLOTS 设了就用它当单元区槽数（不设时与冻结副本同行为）。
++                let slots = std::env::var("SINGLEFS_R3_OPUS_UNIT_AREA_SLOTS")
++                    .ok()
++                    .and_then(|value| value.parse::<u64>().ok())
++                    .unwrap_or(NARROWEST_DEVICE_UNIT_AREA_SLOTS);
++                (UNIT_AREA_START_SLOT + slots) * SLOT_BYTES
+             }
+         }
+     }
+Only in m2-final-code-r3-opus/tree/crates/singlefs-harness/tests: r3_opus_z13.rs
+Only in m2-final-code-r3-opus/tree/crates/singlefs-harness/tests: r3_opus_z16.rs

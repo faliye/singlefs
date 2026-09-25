@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.00s
+     Running tests/s4_r2_width384_a4_supplement.rs (target/debug/deps/s4_r2_width384_a4_supplement-846546acbcf1c78e)
+
+running 1 test
+S4R2-B width=384 candidate=a4 first_mount=Applied overwrites_admitted_in_one_session=10 next_step=Some("PublishError::SpaceAdmissionRefused")
+S4R2-B width=384 candidate=a4 k=0 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=4
+S4R2-B width=384 candidate=a4 k=1 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=5
+S4R2-B width=384 candidate=a4 k=2 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=6
+S4R2-B width=384 candidate=a4 k=3 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=7
+S4R2-B width=384 candidate=a4 k=4 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=8
+S4R2-B width=384 candidate=a4 k=5 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=9
+S4R2-B width=384 candidate=a4 k=6 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=10
+S4R2-B width=384 candidate=a4 k=7 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=11
+S4R2-B width=384 candidate=a4 k=8 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=12
+S4R2-B width=384 candidate=a4 k=9 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=13
+S4R2-B width=384 candidate=a4 k=10 session_all_admitted=true next_writable_mount=Applied again=Applied ending=Completed checker_runs=14
+test s4_r2_b_width384_a4_supplement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.41s
+

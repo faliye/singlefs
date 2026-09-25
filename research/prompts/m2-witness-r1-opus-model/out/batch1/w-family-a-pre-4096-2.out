@@ -1,0 +1,6 @@
+E7RESULT name=witness_family_summary placement=SystemConfigurationSlot order=BeforeFirstRoot pbs=4096 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) max_weight=2 nodes_visited=1822 pairs=283947 pairs_with_any_violation=0 cold_recover_with_fault_failed=0 mount_writable_with_fault_failed=0 skipped_by_the_reduction_rule=251085
+E7RESULT name=witness_family_by_weight placement=SystemConfigurationSlot order=BeforeFirstRoot pbs=4096 weight=0 pairs=1822 violations=0
+E7RESULT name=witness_family_by_weight placement=SystemConfigurationSlot order=BeforeFirstRoot pbs=4096 weight=1 pairs=31040 violations=0
+E7RESULT name=witness_family_by_weight placement=SystemConfigurationSlot order=BeforeFirstRoot pbs=4096 weight=2 pairs=251085 violations=0
+E7RESULT name=witness_family_by_checkpoint placement=SystemConfigurationSlot order=BeforeFirstRoot pbs=4096 a_V1=0 a_V2=0 b_V1=0 b_V2=0 c_V1=0 c_V2=0
+E7RESULT name=done emitted=6

@@ -1,0 +1,41 @@
+S1W	FourGibibytes	30	target=(15, 2)	control	ok#3	target_in_ring=true
+S1W	FourGibibytes	30	barrier	k=1	Acquisition	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=2	Acquisition	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=3	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=4	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=5	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=6	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=noeffect:Some((2, 35)):unreadable=0
+S1W	FourGibibytes	30	barrier	k=7	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 15)):unreadable=1
+S1W	FourGibibytes	30	barrier	k=8	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 15)):unreadable=1
+S1W	FourGibibytes	30	barrier	k=9	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 15)):unreadable=1
+S1W	FourGibibytes	30	barrier	k=10	AFTER:BlockDevice(InputOutput(Custom { kind: Other, error: "注入的屏障错" }))	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=target:Some((2, 15)):unreadable=1
+S1W	FourGibibytes	30	barrier	k=11	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=12	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=13	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=14	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=15	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=16	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=17	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=18	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=19	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=20	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=21	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=22	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=23	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=24	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=25	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=26	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=27	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=28	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=29	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=30	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=31	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=32	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=33	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=34	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=35	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=36	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=37	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=38	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=39	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-
+S1W	FourGibibytes	30	barrier	k=40	ok#3	burned=true	target_in_ring=true	retry=ok#4	writable=ok#4	probe=-

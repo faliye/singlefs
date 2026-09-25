@@ -1,0 +1,33 @@
+--- tree/crates/singlefs-core/src/mount.rs	2026-09-24 16:15:19.532769843 +0000
++++ tree-fix/crates/singlefs-core/src/mount.rs	2026-09-24 17:14:27.679909077 +0000
+@@ -1171,6 +1171,19 @@
+                 },
+             )?;
+     }
++    // 改法 Fx（攻方腿副本上的试改）：树表 0 条那一臂写行那次发布同样建一片分配记录树节点（C512），它的条数准入也在取号之前判。
++    if let PreviousVersion::WithoutFile { .. } = &start.previous {
++        if rows_to_write > 0 {
++            crate::transaction::version_without_file_row_publish_admission(
++                allocator,
++                instance_table_rewrite.pages_after_this_publish(),
++            )
++            .map_err(|cause| MountError::RowPublishAdmissionRefusedBeforeAcquisition {
++                instance_to_acquire,
++                cause,
++            })?;
++        }
++    }
+     if let PreviousVersion::WithFile { output, .. } = &start.previous {
+         let shapes: Vec<PublishShape> =
+             std::iter::once(PublishShape::row_publish_rewriting_instance_table_pages(
+--- tree/crates/singlefs-core/src/transaction.rs	2026-09-24 16:15:19.532814592 +0000
++++ tree-fix/crates/singlefs-core/src/transaction.rs	2026-09-24 17:14:27.679279950 +0000
+@@ -791,7 +791,7 @@
+ ///
+ /// # Errors
+ /// `AllocationRecordsExceedOneNode`。
+-fn version_without_file_row_publish_admission(
++pub(crate) fn version_without_file_row_publish_admission(
+     allocator: &PoolAllocator,
+     instance_table_pages_after_this_publish: usize,
+ ) -> Result<(), PublishError> {

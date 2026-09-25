@@ -1,0 +1,30 @@
+2026-09-24T17:14:27Z
+warning: unused imports: `CheckpointTxg` and `InstanceGeneration`
+   --> crates/singlefs-harness/tests/opus_r1_attack.rs:386:30
+    |
+386 | use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
+    |                              ^^^^^^^^^^^^^                       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r1_attack") generated 1 warning (run `cargo fix --test "opus_r1_attack" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 30.34s
+     Running tests/opus_r1_attack.rs (/tmp/claude-1000/m2-final-code-r1-opus/target3/release/deps/opus_r1_attack-89915c639d7b9cff)
+
+running 1 test
+OBS a5 pages=66: mount#0 ok instance=23987 rows_written=23986 allocation_records=138 released=2
+OBS a5 pages=66: mount#1 ok instance=23988 rows_written=1 allocation_records=272 released=136
+OBS a5 pages=66: mount#2 ok instance=23989 rows_written=1 allocation_records=406 released=270
+OBS a5 pages=66: mount#3 ok instance=23990 rows_written=1 allocation_records=540 released=404
+OBS a5 pages=66: mount#4 ok instance=23991 rows_written=1 allocation_records=674 released=538
+OBS a5 pages=66: mount#5 ok instance=23992 rows_written=1 allocation_records=808 released=672
+OBS a5 pages=66: mount#6 err (next instance before 23993 after 23993) "RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(23993), cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 } }"
+OBS a5 pages=66: mount#7 err (next instance before 23993 after 23993) "RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(23993), cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 } }"
+OBS a5 pages=66: mount#8 err (next instance before 23993 after 23993) "RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(23993), cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 } }"
+OBS a5 pages=66: mount#9 err (next instance before 23993 after 23993) "RowPublishAdmissionRefusedBeforeAcquisition { instance_to_acquire: InstanceGeneration(23993), cause: AllocationRecordsExceedOneNode { records: 942, capacity: 812 } }"
+test z4_a5_without_file_row_publish_allocation_record_admission_after_acquisition ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.45s
+
+rc=0
+2026-09-24T17:14:59Z

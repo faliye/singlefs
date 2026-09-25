@@ -1,0 +1,63 @@
+diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/admission.rs tree/crates/singlefs-core/src/admission.rs
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/admission.rs	2026-09-24 23:55:14.650113749 +0000
++++ tree/crates/singlefs-core/src/admission.rs	2026-09-25 03:09:53.178568544 +0000
+@@ -363,10 +363,16 @@
+         self.per_device
+             .iter()
+             .map(|terms| {
++                // 副本专用开关（m2-final-code-r4 云端攻方 Z19，alloc-basis 岔路单第 2 行那一臂「删掉 − defer 待释放」）：不设变量时与冻结副本同行为。
++                let deferred_term = if std::env::var("R4_OPUS_ADMISSION").as_deref() == Ok("no-defer-term") {
++                    BytesOnOneDevice::ZERO
++                } else {
++                    terms.deferred
++                };
+                 let own_terms = [
+                     terms.allocated,
+                     terms.unreclaimable,
+-                    terms.deferred,
++                    deferred_term,
+                     terms.mount_time_commitment,
+                     terms.abandoned_root_exclusive,
+                 ]
+diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/mount.rs tree/crates/singlefs-core/src/mount.rs
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/mount.rs	2026-09-24 23:55:14.671113097 +0000
++++ tree/crates/singlefs-core/src/mount.rs	2026-09-25 01:56:47.336952218 +0000
+@@ -1640,10 +1640,19 @@
+     let with_the_recovered_entries: BTreeSet<RollbackWitnessEntry> = witness
+         .entries()
+         .into_iter()
+-        .chain(rollback_witness_entries_recovered_from_the_instance_table(
+-            rows_of_the_chosen_roots_instance_table,
+-            chosen_root.instance,
+-        ))
++        .chain(
++            rollback_witness_entries_recovered_from_the_instance_table(
++                rows_of_the_chosen_roots_instance_table,
++                chosen_root.instance,
++            )
++            .into_iter()
++            // 副本专用开关（m2-final-code-r4 云端攻方 Z21 的改法试量）：只补「N = 所选根自己的实例」那一条——之后的每一次挂载都在取号那两次写里
++            // 带过它，别的回退行对应的条目早已落过盘，盘上没有就是删除规则删的。不设变量时与冻结副本同行为。
++            .filter(|entry| {
++                std::env::var("R4_OPUS_RESTORE").as_deref() != Ok("chosen-instance-only")
++                    || entry.new_instance == chosen_root.instance
++            }),
++        )
+         .collect();
+     let every_ring_root = every_root_ring_slot_holds_a_root(devices, system_configuration);
+     let still_needed = rollback_witness_entries_still_needed(
+diff -ruN -x target -x 'r4_opus_*' /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/transaction.rs tree/crates/singlefs-core/src/transaction.rs
+--- /tmp/claude-1000/m2-final-code-r4/tree/crates/singlefs-core/src/transaction.rs	2026-09-24 23:55:14.709111916 +0000
++++ tree/crates/singlefs-core/src/transaction.rs	2026-09-25 01:52:54.042167482 +0000
+@@ -564,6 +564,11 @@
+     expected: InstanceGeneration,
+ ) -> Result<InstanceGeneration, ExpectedInstanceAcquisitionFailed> {
+     let recomputed = instance_generation_to_acquire(pool);
++    // 副本专用变异开关（m2-final-code-r4 云端攻方 Z22）：不设变量时与冻结副本同行为。
++    if std::env::var("R4_OPUS_MUTATION").as_deref() == Ok("skip-recompute") {
++        return write_acquired_instance(pool, expected)
++            .map_err(ExpectedInstanceAcquisitionFailed::Acquisition);
++    }
+     if recomputed != expected {
+         return Err(
+             ExpectedInstanceAcquisitionFailed::InstanceGenerationChangedBeforeWrite {

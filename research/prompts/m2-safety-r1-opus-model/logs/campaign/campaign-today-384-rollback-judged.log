@@ -1,0 +1,86 @@
+S1CAMPAIGN weights=Some("rollback") width=UnitAreaOf384Slots admission=JudgedByTheFormula first_seed=5100000000 seeds=256 ops=40 new_findings=0 known_red=2
+种子 [5100000000, 5100000256)，每段 40 步，比重：偏向抬 F 之后回退（B2 那一格的取样点）；每一步之后跑池级 checker；两块单元区 384 槽的小盘（journal 环 128 MiB）
+历史 256 段：跑完 254、以已知红收尾 {0: 2}、新发现 0；根环转过一圈的 246 段；最高 txg 61；一版里最多 362 条分配记录
+  操作 PublishFirstFile：Ok 99、Err 31、前提不满足没调 15
+  操作 PublishOverwrite：Ok 673、Err 114、前提不满足没调 3193
+  操作 PublishWithoutUnits：Ok 60、Err 0、前提不满足没调 40
+  操作 CloseAndMountWritable：Ok 741、Err 18、前提不满足没调 0
+  操作 CloseAndMountRollback：Ok 1966、Err 649、前提不满足没调 0
+  操作 RaiseRollbackFloor：Ok 119、Err 374、前提不满足没调 2001
+  操作 ColdStartRecover：Ok 113、Err 0、前提不满足没调 0
+  内容长度 0 字节：入口被调 93 次、发成 91 次
+  内容长度 [1, 载荷容量 − 2]：入口被调 562 次、发成 541 次
+  内容长度 数据单元整宽 32768（装不下）：入口被调 54 次、发成 0 次
+  内容长度 载荷容量：入口被调 82 次、发成 79 次
+  内容长度 载荷容量 + 1（装不下）：入口被调 59 次、发成 0 次
+  内容长度 载荷容量 − 1：入口被调 67 次、发成 61 次
+  Err 成员 MountError::RollbackFloorAboveCeiling：374 次
+  Err 成员 MountError::RollbackTargetNotACandidate(BelowEffectiveFloor)：6 次
+  Err 成员 MountError::RollbackTargetNotACandidate(NotInRing)：241 次
+  Err 成员 MountError::RollbackTargetNotACandidate(OnAbandonedTimeline)：388 次
+  Err 成员 MountError::SpaceAdmissionRefusedBeforeAcquisition：32 次
+  Err 成员 PublishError::ContentExceedsDataUnit：110 次
+  Err 成员 PublishError::FirstFileVersionOnAVersionThatAlreadyHasAFile：20 次
+  Err 成员 PublishError::SpaceAdmissionRefused：15 次
+  前提不满足（没有可写会话）：1142 次
+  前提不满足（现行版本带文件）：21 次
+  前提不满足（现行版本树表 0 条）：4086 次
+  冷启动结局 FileRead：20 次
+  冷启动结局 NoFile：93 次
+  一次挂载里最多写出 15 条根；一段历史里最多挂载成功 20 次、最多试挂载 21 次
+  抬 F 回收到落点 27 次、共回收 431 个落点；复用已释放的记录 738 条（其中跨度变了 154 条）；已释放的记录被罩住起点 40 条、被删 44 条
+  挂载写出的发布比过分配记录 900 次；挂载之前生效根的分配记录读不出、没比的挂载 0 次
+  checker 跑了 3914 次；一个写都没发、沿用上一次结论的 6548 步
+  模型对拍 5186 步：该拒而拒 1139、区间里拒 47、该成而成 4000；比过根 8847 条、分配记录 37732 条、冷启动内容 20 次、抬 F 上限 493 次；回退到 txg = F_生效 > 0 的根做成 47 次；单元区墙按区间放行 47 次
+  I-1.1：判绿 3914 次、不适用 0 次
+  I-1.2：判绿 3914 次、不适用 0 次
+  I-1.3：判绿 3914 次、不适用 0 次
+  I-1.4：判绿 3914 次、不适用 0 次
+  I-1.6：判绿 3914 次、不适用 0 次
+  I-1.7：判绿 3914 次、不适用 0 次
+  I-1.8：判绿 3914 次、不适用 0 次
+  I-1.10：判绿 3860 次、不适用 54 次
+  I-2.1：判绿 3914 次、不适用 0 次
+  I-2.3：判绿 3914 次、不适用 0 次
+  I-2.4：判绿 3914 次、不适用 0 次
+  I-2.5：判绿 3914 次、不适用 0 次
+  I-3.1：判绿 1493 次、不适用 2419 次
+  I-3.8：判绿 3914 次、不适用 0 次
+  I-3.9：判绿 1495 次、不适用 2419 次
+  I-3.10：判绿 3860 次、不适用 54 次
+  I-3.11：判绿 1495 次、不适用 2419 次
+  I-4.2：判绿 3914 次、不适用 0 次
+  I-4.8：判绿 3914 次、不适用 0 次
+  I-5.1：判绿 3914 次、不适用 0 次
+  I-5.2：判绿 1495 次、不适用 2419 次
+  I-5.4：判绿 1495 次、不适用 2419 次
+  I-7.1：判绿 3914 次、不适用 0 次
+  I-7.2：判绿 3914 次、不适用 0 次
+  I-7.3：判绿 3914 次、不适用 0 次
+  I-7.4：判绿 3914 次、不适用 0 次
+  I-7.6：判绿 3914 次、不适用 0 次
+  I-7.7：判绿 3914 次、不适用 0 次
+  I-7.8：判绿 3914 次、不适用 0 次
+  I-7.9：判绿 305 次、不适用 3609 次
+  I-7.10：判绿 3914 次、不适用 0 次
+  I-7.11：判绿 3914 次、不适用 0 次
+  I-8.6：判绿 3887 次、不适用 27 次
+  I-8.7：判绿 2227 次、不适用 1687 次
+  I-8.8：判绿 0 次、不适用 3914 次
+  I-8.9：判绿 3887 次、不适用 27 次
+  I-9.1：判绿 1495 次、不适用 2419 次
+  I-9.2：判绿 1495 次、不适用 2419 次
+  I-9.4：判绿 1495 次、不适用 2419 次
+  I-9.6：判绿 1495 次、不适用 2419 次
+  I-9.7：判绿 1495 次、不适用 2419 次
+  I-9.10：判绿 1495 次、不适用 2419 次
+  I-9.12：判绿 1495 次、不适用 2419 次
+  I-9.13：判绿 1495 次、不适用 2419 次
+  I-9.14：判绿 1167 次、不适用 2747 次
+  I-9.15：判绿 1495 次、不适用 2419 次
+已知红第 0 条（增补 2 收口表第 43 行）：2 段；前几个种子 [(5100000089, Operation(27)), (5100000212, Operation(17))]
+
+test s1_campaign ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 7.76s
+

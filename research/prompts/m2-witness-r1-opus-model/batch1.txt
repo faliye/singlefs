@@ -1,0 +1,12 @@
+none pre 512 w-family 2
+a pre 512 w-family 2
+b pre 512 w-family 2
+c pre 512 w-family 2
+none pre 4096 w-family 2
+a pre 4096 w-family 2
+b pre 4096 w-family 2
+c pre 4096 w-family 2
+none pre 512 w-min
+a pre 512 w-min
+b pre 512 w-min
+c pre 512 w-min
