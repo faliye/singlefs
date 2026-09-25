@@ -16,7 +16,13 @@
 # 所以每个分片各给一份源码副本与一个编译目录。分片按 crate 切：改 singlefs-core 要重编译它自己加全部下游，
 # 改 singlefs-harness 只重编译它自己，同一分片里连着改同一个 crate，增量编译的命中率才稳。
 #
-# 工作进程数取 GATE_MUTATION_WORKERS，没设就按核数算（每个给 4 核，最多 8 个）；设成 1 就是原来的串行跑法。
+# 工作进程数取下面两项的最小值、至少 1（worker_count_for）；实际开几个、各项给几个、卡在哪一项，打在 stderr 的头一行（stdout 要与进程数无关，见下一段）：
+#   ① 核数的一半、至多 16；设了 GATE_MUTATION_WORKERS 就用它顶掉 ①（设成 1 就是原来的串行跑法）；
+#   ② 表里的条数。
+#   内存不在这里收：每条经 research/scripts/run-with-memory-cap.sh 跑，它起跑之前先判整机放不放得下（slice 已占的加这一条要的，不超过 slice 的总上限才起），
+#   放不下的在它那里排队，几条合起来撞顶也只在 slice 里杀（records/2026-09-16-subagent拆分提案.md 第四十节第 30 行）。按可用内存收进程数只看得见开跑那一刻，
+#   看不见别的重活同时来抢，治标不治本（用户 2026-09-25 定）。这一道自己在包装之外的进程（Python 父进程与工作进程、包装的 bash）不在 slice 里，
+#   从包装的余量里出：2026-09-25 量进程池工作进程每个约 12 MiB、父进程约 15 MiB。
 # 活是**动态领的**（谁先跑完谁再领下一条），不按条数预先切片：`singlefs-harness` 那几条点名的是几十秒的重测试，
 # 等分之下拿到它们的那一片会独自拖住整道（实测：7 片跑完、最后 1 片又跑了 4 分钟）。
 # ⚠️ **输出与进程数无关**：判定行按变异表的行号排序再打印到 stdout，GATE_MUTATION_WORKERS=1 与 =8 的 stdout 要逐字相同，
@@ -25,6 +31,34 @@
 #
 # 编译产物放 ${GATE_MUTATION_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-crates-mutation-target}（跨轮复用，第一次要整编一遍）；
 # 分片各自的编译目录是它加 -w<片号>，第一次从它拷一份种子，省掉每片各冷编译一遍。
+#
+# 每条变异的 cargo test 放进内存上限里跑（research/scripts/run-with-memory-cap.sh：systemd 的临时 scope，MemoryMax=<上限>、MemorySwapMax=0），
+# 撞上限只杀这一条的进程，不把整机拖进 OOM（2026-09-25 一条无界分配的变异两次把整机拖进 OOM，records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
+#   上限从三处取，先到先用：变异表里单起一行「# 每条变异的内存上限：<上限>」（判别力样本用它把上限压到 512M）、GATE_MUTATION_MEMORY_MAX、默认 4G。
+#   默认 4G 的依据：本机 60 GiB 内存，本地模型服务（vllm 与 ray）连同会话常驻约 12 GiB（2026-09-25 `free -g` 的 used 列是 12），
+#   同时可能有 3 件重活 ⇒ 每件 16 GiB；这一道同时开好几个工作进程，4G 给正常的编译与测试留余量。2026-09-25 量过编译那一半：
+#   HEAD 的四个 crate 全部测试目标在 4G 上限、2 个并行编译下从零编得过，匿名内存峰值 0.60 GiB（每 0.2 秒取一次样）；点名的测试跑起来要多少没量，
+#   包装的峰值表（research/scripts/memory-peaks.tsv）跑过一遍之后按条记着。换机器要重算（这些数只在本机成立）。
+#   几条同时跑合起来放不放得下由包装排队判、slice 的总上限兜底，这里不按内存收进程数。
+#   撞了这一条自己的上限（包装退 250）记「内存撞顶」：这条破坏让被测代码无界分配，点名的测试没来得及红，不算抓到也不算没红，单列一栏、整道判红。
+#   被总上限挤掉（包装退 254：整个 slice 满了、内核在 slice 里挑了这一条杀）记「被总上限挤掉」，排队等满包装的等待上限还放不下（包装退 252）记「排不上没跑」：
+#   两栏都不是这条变异的结论，单列、整道判红，出路是重跑。
+#   带上限的 scope 或 slice 的总上限起不来、设不上（没有用户级 systemd、D-Bus 连不上）就整道判红，一条都不跑，不退回无上限去跑。
+#
+# 每条变异的 cargo test 限时（交给包装：RUN_WITH_MEMORY_CAP_TIME_LIMIT，给 scope 设 RuntimeMaxSec，从起跑算、不算排队的时间；限时里含这一条要做的重编译）：
+#   秒数从三处取，先到先用：变异表里单起一行「# 每条变异的超时秒数：<秒>」（判别力样本用它压到 20 秒）、GATE_MUTATION_TIMEOUT、默认 1800。
+#   到点 systemd 给 scope 里每个进程（cargo 与测试进程）发 TERM，TIMEOUT_KILL_GRACE_SECONDS 秒还不退再发 KILL，包装按 scope 的 Result=timeout 退 253。
+#   不在包装外面套 timeout：排队的时间会算进限时里，排得久的变异会被误判成超时。
+#   超过限时记「超时」：这条破坏让被测代码不终止了，或者点名的测试在并发下就要跑这么久。不算抓到、不算没红，与「内存撞顶」「没红」「无效」分开单列一栏、各自计数，整道判红。
+#   默认 1800 秒的依据：点名随机历史测试的变异在 16 个工作进程并发时，一条卡在那个测试文件上超过 6–8 分钟（没记到跑完的挂钟），串行单次 1.5–3 分钟
+#   （.claude/kb/checks-owed.md 的 C457（被测试自己的线程池与外层进程池叠加超订阅），2026-09-21 在副本上量的）；四个 crate 的全部测试目标在 4G 上限、
+#   2 个并行编译下冷编译 23–25 秒（2026-09-25 量）。1800 秒约是 8 分钟的 4 倍，给没量到的尾巴留余地；代价是一条真挂死的变异让一个工作进程多占 30 分钟。
+#   这些数只在本机成立，换机器要重算。
+#
+# 判别力：fixtures/59-crates-mutation-replay.sh/red 的变异表把上限压到 512M、限时压到 20 秒：加一条把 1 MiB 的缓冲改成 1536 MiB 的变异，必须报「内存撞顶」；
+#   加一条把步长 1 改成 0、循环永远走不到上界的变异，必须报「超时」；计数行里没红、无效、内存撞顶、超时各数各的。
+# green 同样压到 512M，留着一行撤掉了的「# 给整机留的内存余量：1T」：头一行必须报开 2 个（两条、核数的一半多于 2）、卡在「表里的条数」那一项，
+#   不许再按内存收进程数（按内存收的那一版在这份样本上只开 1 个）；两条正常变异必须照旧红在点名的测试上。
 #
 #   bash .claude/gate.d/59-crates-mutation-replay.sh [项目根]
 set -uo pipefail
@@ -54,6 +88,9 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 export GATE_MUTATION_TARGET_DIR="${GATE_MUTATION_TARGET_DIR:-${TMPDIR:-/tmp}/singlefs-crates-mutation-target}"
+# 带内存上限跑一条命令的包装在这份阶段所在的仓里（样本仓里没有 research/）
+GATE_MUTATION_MEMORY_CAP_RUNNER="$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/run-with-memory-cap.sh"
+export GATE_MUTATION_MEMORY_CAP_RUNNER
 python3 - "$ROOT" "$TABLE" <<'PY'
 import atexit
 import concurrent.futures
@@ -65,8 +102,20 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 root, table = sys.argv[1], sys.argv[2]
+memory_cap_runner = os.environ["GATE_MUTATION_MEMORY_CAP_RUNNER"]
+MEMORY_CAP_HIT_EXIT = 250            # run-with-memory-cap.sh：撞了这一条自己的上限（scope 的 Result 是 oom-kill、自己的 oom 计数不为 0）
+MEMORY_CAP_UNAVAILABLE_EXIT = 251    # run-with-memory-cap.sh：带上限的 scope 或 slice 的总上限起不来
+MEMORY_ADMISSION_REFUSED_EXIT = 252  # run-with-memory-cap.sh：排队等满还放不下，命令没跑
+TIME_LIMIT_HIT_EXIT = 253            # run-with-memory-cap.sh：超过 RUN_WITH_MEMORY_CAP_TIME_LIMIT（scope 的 Result 是 timeout）
+SLICE_TOTAL_HIT_EXIT = 254           # run-with-memory-cap.sh：被 slice 的总上限挤掉（整个 slice 满了，内核挑了这一条杀）
+DEFAULT_MEMORY_MAX_PER_MUTATION = "4G"   # 依据见文件头
+MEMORY_MAX_DIRECTIVE = re.compile(r"^#\s*每条变异的内存上限[：:]\s*(\S+)\s*$")
+DEFAULT_TIMEOUT_SECONDS_PER_MUTATION = "1800"   # 依据见文件头
+TIMEOUT_DIRECTIVE = re.compile(r"^#\s*每条变异的超时秒数[：:]\s*(\S+)\s*$")
+TIMEOUT_KILL_GRACE_SECONDS = 30          # 到点发 TERM 之后再等这么久，还不退就发 KILL（交给包装的 RUN_WITH_MEMORY_CAP_KILL_GRACE）
 
 
 def unescape(text):
@@ -74,9 +123,17 @@ def unescape(text):
 
 
 rows = []
+memory_max_from_table = None
+timeout_seconds_from_table = None
 with open(os.path.join(root, table), encoding="utf-8") as handle:
     for line_number, line in enumerate(handle, 1):
         line = line.rstrip("\n")
+        directive = MEMORY_MAX_DIRECTIVE.match(line)
+        if directive:
+            memory_max_from_table = directive.group(1)
+        directive = TIMEOUT_DIRECTIVE.match(line)
+        if directive:
+            timeout_seconds_from_table = directive.group(1)
         if not line or line.startswith("#"):
             continue
         fields = line.split("\t")
@@ -89,6 +146,17 @@ if not rows:
     print(f"  ✗ {table} 里一条成形的变异都没有")
     print("     → 怎么办：至少一条：三方打中之后的每一处改法，留一条「改回去它就红」的变异。")
     sys.exit(1)
+memory_max = memory_max_from_table or os.environ.get("GATE_MUTATION_MEMORY_MAX", "").strip() or DEFAULT_MEMORY_MAX_PER_MUTATION
+if not re.fullmatch(r"[1-9][0-9]*[KMGT]?", memory_max):
+    print(f"  ✗ 每条变异的内存上限写成了「{memory_max}」，不是 systemd 的写法")
+    print("     → 怎么办：写成 正整数[K|M|G|T]，例 4G、512M（表头那一行「# 每条变异的内存上限：…」或 GATE_MUTATION_MEMORY_MAX）。")
+    sys.exit(1)
+timeout_seconds_text = timeout_seconds_from_table or os.environ.get("GATE_MUTATION_TIMEOUT", "").strip() or DEFAULT_TIMEOUT_SECONDS_PER_MUTATION
+if not re.fullmatch(r"[1-9][0-9]*", timeout_seconds_text):
+    print(f"  ✗ 每条变异的限时写成了「{timeout_seconds_text}」，不是正整数秒")
+    print("     → 怎么办：写成正整数秒，例 1800（表头那一行「# 每条变异的超时秒数：…」或 GATE_MUTATION_TIMEOUT）。")
+    sys.exit(1)
+timeout_seconds = int(timeout_seconds_text)
 stale = []
 for line_number, name, path, old, new, _args, _expected in rows:
     full = os.path.join(root, path)
@@ -138,6 +206,15 @@ if rows_outside_shard_copy:
           "或者把这条变异改到拷贝范围之内的文件上；这一轮一个工作进程都没起。")
     sys.exit(1)
 
+# 派活之前先试一次带上限的 scope 起不起得来：起不来就一条都不跑，不退回无上限
+memory_cap_check = subprocess.run(["bash", memory_cap_runner, "--check", memory_max], capture_output=True, text=True)
+if memory_cap_check.returncode != 0:
+    print(f"  ✗ 带内存上限（每条 {memory_max}）的 systemd scope 起不来（{memory_cap_runner} --check 退 {memory_cap_check.returncode}），一条变异都没跑：")
+    for detail_line in (memory_cap_check.stdout + memory_cap_check.stderr).splitlines():
+        print(f"      {detail_line}")   # gate-lint:detail
+    print("     → 怎么办：照上面那几行修用户级 systemd / D-Bus（systemctl --user status）再跑这一道；不许拿掉上限去跑，无界分配的变异会把整机拖进 OOM。")
+    sys.exit(1)
+
 
 def crate_of(path):
     """`crates/<crate 名>/…` 里的 crate 名：分片按它切，同一片里连着改同一个 crate，增量编译才稳。"""
@@ -145,35 +222,31 @@ def crate_of(path):
     return parts[1] if len(parts) > 2 and parts[0] == "crates" else path
 
 
-def available_memory_in_gibibytes():
-    """还能用多少内存；读不到就当 0，交给调用方退回按核数算。"""
-    try:
-        with open("/proc/meminfo", encoding="utf-8") as handle:
-            for line in handle:
-                if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) / (1024 * 1024)
-    except (OSError, ValueError, IndexError):
-        pass
-    return 0.0
-
-
 def worker_count_for(row_count):
-    """开几个工作进程：核数与可用内存两道护栏，`GATE_MUTATION_WORKERS` 压过它们。
+    """开几个工作进程，连同头一行要报的话（各项给几个、卡在哪一项）。两项的意思与依据见文件头「工作进程数取下面两项的最小值」那一段。
 
     一条变异的挂钟 = 重编译那几个 crate + 跑点名的那个测试，而**测试那一段是单线程的**。
     实测 8 个进程、不限 cargo 的编译并行度时，峰值才 16 个 rustc——编译的并行度本来就用不满
     （依赖链是串的），多出来的核闲着。所以开得比「核数 ÷ 4」多，再用 GATE_MUTATION_CARGO_JOBS
     把每个 cargo 的编译并行度收住，让总并行度落回核数。
-    每个进程按 1.5 GiB 估（cargo 加它起的 rustc），内存不够时宁可少开。
+    内存不在这里收（文件头那一段）：每条经 run-with-memory-cap.sh 排队，放不下的在它那里等。
     """
+    bounds = []   # (这一项叫什么, 给几个, 头一行里怎么说)
     requested = os.environ.get("GATE_MUTATION_WORKERS", "").strip()
     if requested:
-        return max(1, min(int(requested), row_count))
-    processor_count = os.cpu_count() or 4
-    by_processor = max(1, min(16, processor_count // 2))
-    available = available_memory_in_gibibytes()
-    by_memory = max(1, int(available / 1.5)) if available else by_processor
-    return max(1, min(by_processor, by_memory, row_count))
+        bounds.append(("GATE_MUTATION_WORKERS", int(requested), f"GATE_MUTATION_WORKERS 给 {int(requested)} 个"))
+    else:
+        processor_count = os.cpu_count() or 4
+        by_processor = max(1, min(16, processor_count // 2))
+        bounds.append(("核数", by_processor, f"核数 {processor_count} 的一半、至多 16，给 {by_processor} 个"))
+    bounds.append(("表里的条数", row_count, f"表里 {row_count} 条"))
+    smallest = min(count for _name, count, _text in bounds)
+    binding = "、".join(f"「{name}」" for name, count, _text in bounds if count == smallest)
+    floor_note = "（那一项不足 1，按 1 个开）" if smallest < 1 else ""
+    worker_count = max(1, smallest)
+    head_line = (f"  … 这一轮开 {worker_count} 个工作进程（各项取最小、至少 1）：{'；'.join(text for _name, _count, text in bounds)}。"
+                 f"卡在{binding}这一项{floor_note}；内存不按进程数收：每条经 run-with-memory-cap.sh 排队，放不下的等（slice 的总上限兜底）")
+    return worker_count, head_line
 
 
 def rows_grouped_by_crate(all_rows):
@@ -242,17 +315,30 @@ def judge_one(work, environment, row):
     pristine = open(full, encoding="utf-8").read()
     assert pristine.count(old) == 1, (path, name)
     open(full, "w", encoding="utf-8").write(pristine.replace(old, new))
+    # 限时交给包装（RuntimeMaxSec，从起跑算，不算排队）：不在外面套 timeout，排队的时间不算进限时
+    run_environment = dict(environment, RUN_WITH_MEMORY_CAP_TIME_LIMIT=str(timeout_seconds), RUN_WITH_MEMORY_CAP_KILL_GRACE=str(TIMEOUT_KILL_GRACE_SECONDS))
     try:
-        run = subprocess.run(["cargo", "test", "--offline"] + args.split(),
-                             cwd=work, env=environment, capture_output=True, text=True)
+        run = subprocess.run(["bash", memory_cap_runner, memory_max, "cargo", "test", "--offline"] + args.split(),
+                             cwd=work, env=run_environment, capture_output=True, text=True)
     finally:
         open(full, "w", encoding="utf-8").write(pristine)
     output = run.stdout + run.stderr
+    tail = "\n".join(output.splitlines()[-8:])
+    # 包装报的几种结局先判：被停、被杀的测试二进制可能已经打出了半截输出，不许拿它判抓到或没红
+    if run.returncode == TIME_LIMIT_HIT_EXIT:
+        return line_number, "timeout", f"{table}:{line_number} {name}：{timeout_seconds} 秒没跑完（超时），点名的测试 {expected} 没来得及红\n{tail}"
+    if run.returncode == MEMORY_CAP_HIT_EXIT:
+        return line_number, "memory", f"{table}:{line_number} {name}：撞了内存上限 {memory_max}（内存撞顶），点名的测试 {expected} 没来得及红\n{tail}"
+    if run.returncode == SLICE_TOTAL_HIT_EXIT:
+        return line_number, "squeezed", f"{table}:{line_number} {name}：被 slice 的总上限挤掉（整个 slice 满了，内核挑了这一条杀），这一条的结果不算数\n{tail}"
+    if run.returncode == MEMORY_ADMISSION_REFUSED_EXIT:
+        return line_number, "refused", f"{table}:{line_number} {name}：内存不够排不上（包装等满了等待上限），这一条没跑\n{tail}"
+    if run.returncode == MEMORY_CAP_UNAVAILABLE_EXIT:
+        return line_number, "unavailable", f"{table}:{line_number} {name}：带内存上限的 scope 起不来，这一条没跑\n{tail}"
     red_pattern = re.compile(r"^test (\S+::)?" + re.escape(expected) + r" \.\.\. FAILED$", re.M)
     ran_pattern = re.compile(r"^test (\S+::)?" + re.escape(expected) + r" \.\.\. ", re.M)
     if run.returncode != 0 and red_pattern.search(output):
         return line_number, "caught", f"  ✓ {name}：{expected} 红了"
-    tail = "\n".join(output.splitlines()[-8:])
     if ran_pattern.search(output):
         return line_number, "failure", f"{table}:{line_number} {name}：{expected} 没红（退出码 {run.returncode}）\n{tail}"
     if re.search(r"^error(\[E\d+\])?: ", output, re.M) or "could not compile" in output:
@@ -264,7 +350,9 @@ def judge_one(work, environment, row):
 
 
 ordered_rows = rows_grouped_by_crate(rows)
-worker_count = worker_count_for(len(rows))
+worker_count, worker_count_head_line = worker_count_for(len(rows))
+# 实际开几个、各项给几个、卡在哪一项打在头一行，走 stderr：stdout 要与进程数无关（文件头）
+print(worker_count_head_line, file=sys.stderr, flush=True)
 # 每个 cargo 的编译并行度：进程数 × 它 ≈ 核数，免得 N 个 cargo 各自按核数开 rustc、互相抢
 cargo_jobs = os.environ.get("GATE_MUTATION_CARGO_JOBS", "").strip() \
     or str(max(1, (os.cpu_count() or 4) // worker_count))
@@ -307,26 +395,65 @@ if len(judgements) != len(rows):
 judgements.sort(key=lambda judgement: judgement[0])
 invalid = [text for _, verdict, text in judgements if verdict == "invalid"]
 failures = [text for _, verdict, text in judgements if verdict == "failure"]
-for _, verdict, text in judgements:
-    if verdict == "caught":
-        print(text)
+memory_hits = [text for _, verdict, text in judgements if verdict == "memory"]
+timeouts = [text for _, verdict, text in judgements if verdict == "timeout"]
+unavailable = [text for _, verdict, text in judgements if verdict == "unavailable"]
+squeezed = [text for _, verdict, text in judgements if verdict == "squeezed"]
+refused = [text for _, verdict, text in judgements if verdict == "refused"]
+caught = [text for _, verdict, text in judgements if verdict == "caught"]
+for text in caught:
+    print(text)
+# 各栏各数各的：超时、内存撞顶、被总上限挤掉、排不上既不算抓到也不算没红，与无效一样单列；这一行与进程数无关，进 stdout
+print(f"  计数：抓到 {len(caught)} 条、没红 {len(failures)} 条、无效 {len(invalid)} 条、内存撞顶 {len(memory_hits)} 条、超时 {len(timeouts)} 条、"
+      f"被总上限挤掉 {len(squeezed)} 条、排不上没跑 {len(refused)} 条、scope 起不来没跑 {len(unavailable)} 条（共 {len(rows)} 条）")
 if invalid:
-    print("  ✗ 有变异无效（替换文写进源码之后编不过，那条行为今天零变异覆盖）：")
+    print(f"  ✗ 有变异无效（无效 {len(invalid)} 条；替换文写进源码之后编不过，那条行为今天零变异覆盖）：")
     for item in invalid:
         print(f"      {item}")   # gate-lint:detail
     print("     → 怎么办：改这一行替换文，不是去补用例。先看反斜杠——表里只有 \\n 会被还原成换行，\\& \\\" 这类原样写进源码就编不过；")
     print("       别的编译错就在副本里把替换后的那一行 cargo check 一遍，改成编得过、而且真会改行为的写法（.claude/rules/mutation-sampling.md 第八类）。")
 if failures:
-    print("  ✗ 有变异没红：")
+    print(f"  ✗ 有变异没红（没红 {len(failures)} 条）：")
     for item in failures:
         print(f"      {item}")   # gate-lint:detail
     print("     → 怎么办：没红 = 那处改法没有任何测试守着：先造一条会红的用例再改代码（show-me-test.md）；「没跑到」多半是 cargo test 参数选错了范围。")
-if invalid or failures:
+if memory_hits:
+    print(f"  ✗ 有变异撞了内存上限（内存撞顶 {len(memory_hits)} 条，每条上限 {memory_max}）：")
+    for item in memory_hits:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：撞顶 = 这条破坏让被测代码无界分配，点名的测试没来得及红——不算抓到，也不是没红。换一处改法让它红在点名的测试上，")
+    print("       或者给被测代码加一道先红的界（循环步数上限、分配量的断言）；正常的测试确实要这么多内存，才调大上限（表头「# 每条变异的内存上限：…」或 GATE_MUTATION_MEMORY_MAX）。")
+if timeouts:
+    print(f"  ✗ 有变异超时（超时 {len(timeouts)} 条，每条限 {timeout_seconds} 秒）：")
+    for item in timeouts:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：超时 = 这条破坏让被测代码不终止了，或者点名的测试在并发下就要跑这么久——不算抓到，也不是没红。先在副本里只改坏这一处、")
+    print("       不限时单跑它那一行的 cargo test 参数，看它结束不结束：不结束就换一处改法让它红在点名的测试上，或者给被测代码加一道先红的界（循环步数上限）；")
+    print("       结束得了就调大限时（表头「# 每条变异的超时秒数：…」或 GATE_MUTATION_TIMEOUT），别把它记成抓到。")
+if squeezed:
+    print(f"  ✗ 有变异被 slice 的总上限挤掉（被总上限挤掉 {len(squeezed)} 条；这几条没撞各自的上限 {memory_max}，是 slice 里合起来满了）：")
+    for item in squeezed:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：这几条的结果不算数，整道重跑；常这样说明包装的峰值表记少了（同时跑的几条实际占的比表里记的多），")
+    print("       跑的时候 bash research/scripts/run-with-memory-cap.sh --status 看 slice 里是谁在占，别拿掉包装去跑。")
+if refused:
+    print(f"  ✗ 有变异排不上没跑（排不上没跑 {len(refused)} 条；包装等满了等待上限，slice 还是放不下）：")
+    for item in refused:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，等那几件重活跑完再整道重跑；")
+    print("       别拿掉包装去跑——排不上说明此刻整机放不下。")
+if unavailable:
+    print(f"  ✗ 跑到一半带内存上限的 scope 起不来了（{len(unavailable)} 条没跑）：")
+    for item in unavailable:
+        print(f"      {item}")   # gate-lint:detail
+    print("     → 怎么办：修好用户级 systemd / D-Bus（systemctl --user status）整道重跑；不许拿掉上限去跑。")
+if invalid or failures or memory_hits or timeouts or squeezed or refused or unavailable:
     sys.exit(1)
 # ⚠️ 进程数与 cargo 编译并行度**不写进 stdout**：它们是两次跑唯一不同的输入，写进成功行就让
 # 「GATE_MUTATION_WORKERS=1 与 =16 的 stdout 逐字相同」这句话当场为假（独立复核实测：191 行判定行逐字相同，
-# 只有这一行收尾不同）。要看用了几个进程，看 stderr 上的进度行。
-print(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次；"
+# 只有这一行收尾不同）。要看用了几个进程、为什么，看 stderr 的头一行。
+print(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次；每条在内存上限 {memory_max} 里跑、内存撞顶 0 条，"
+      f"每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 {timeout_seconds} 秒、超时 0 条；"
       f"工作进程动态领活——谁先跑完谁再领下一条，不按条数预先切片；输出按表的行号排序、与进程数无关）")
-print(f"  … 这一轮 {worker_count} 个工作进程，每个 cargo 编译并行度 {cargo_jobs}", file=sys.stderr)
+print(f"  … 这一轮 {worker_count} 个工作进程，每个 cargo 编译并行度 {cargo_jobs}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒", file=sys.stderr)
 PY

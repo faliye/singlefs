@@ -1,4 +1,4 @@
-# 实现改动的流程：写代码 → 三方对抗 → checker，提交前跑 herd7 与 QEMU
+# 实现改动的流程：写代码 → 三方对抗 → checker，重型测试只在提交时跑
 
 **这是 singlefs 的项目本地规则**，不在共享 SOP 里：它压在本机的三方论证（`.claude/rules/three-way-inference.md`）与
 本工程接管的 herd7 / QEMU 装置上，别的项目没有这两样。共享规则在 `.claude/singlefs-ai-sop/rules/`。
@@ -43,7 +43,19 @@
 
 ⚠️ **不许拿「我只改了文档」当理由。** 「我只动了一条」是需要被证明的断言，不是事实（`.claude/rules/fs-design.md`「门禁的范围必须可判定」）。
 
-## 提交前必跑 herd7 与 QEMU
+## 重型测试只在提交时跑
+
+**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+
+| 场合 | 跑不跑 |
+|---|---|
+| 每次提交代码 | **必须跑**：主 agent 在提交流程里后台起（命令带 `SINGLEFS_HEAVY_TESTS=commit`），看门狗盯；git 的 pre-commit hook 照旧跑整轮门禁 |
+| 用户当场要求，或任务确实要跑 | 任务确实要跑时主 agent 先弹窗问用户，用户同意了才跑；命令带 `SINGLEFS_HEAVY_TESTS=user-request` |
+| 其余任何时候 | 不跑 |
+| 崩溃验证员、门禁分诊员 | 各跑各的那一部分，只在提交时或用户要求时（命令带 `SINGLEFS_HEAVY_TESTS=commit` 或 `=user-request`）：崩溃验证员跑 54、55、57、59 号那几道；门禁分诊员跑门禁其余阶段并分诊，54、55、57、59 靠「输入没变就复用上一次全绿判定」不重跑。谁都不把整轮全量从头跑一遍 |
+| 其余子 agent | **一律不跑**，只跑自己动到的测试二进制与 fmt / clippy / build |
+
+由 `.claude/hooks/heavy-test-guard.sh`（Bash 的 PreToolUse）在执行前拒绝：其余子 agent 跑上面任何一样拒绝；崩溃验证员、门禁分诊员跑自己那一部分之外的、或不带那个环境变量前缀的拒绝；主 agent 不带那个前缀也拒绝。派发提示要子 agent 跑重型测试的，由 `.claude/hooks/runner-dispatch-guard.sh` 拒绝。
 
 herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样本、模板与规则段落都不在 SOP 里，怎么测、怎么验、接不接进门禁由本工程自己定。两样都是本工程自己的阶段：
 
@@ -52,7 +64,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 | herd7 / LKMM | `.claude/gate.d/57-lkmm.sh`（逻辑在 `.claude/scripts/lkmm.sh`） | `litmus/` 下每条 Never 有对照组、绑到代码，herd7 判定与声明相符；缺 herd7 直接红，不静默跳过 |
 | QEMU 真设备 | `.claude/gate.d/55-qemu-first-transaction.sh` | 两块 virtio 盘上跑固定负载，设备侧录制与程序录制流逐项比 |
 
-两道都在 `gate.sh` 里，提交前跑全量门禁就把它们带上了；单跑一道不算跑过门禁。
+两道都在 `gate.sh` 里，提交时跑整轮门禁就把它们带上了；单跑一道不算跑过门禁。
 `--staged` 那条路（几个会话共写一个仓时）同样跑它们。
 
 ## 测试与崩溃检测优先多线程

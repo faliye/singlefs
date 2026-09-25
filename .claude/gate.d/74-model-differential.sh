@@ -3,12 +3,13 @@
 # gate-covers: 模型对拍
 #
 # 被测的是 `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs` 那五段：快档、偏向抬 F 之后复用的取样点、
-# 偏向抬 F 之后回退的取样点、逼近分配记录墙的取样点、小盘上逼近单元区墙的取样点（后两段每一步之后也跑池级 checker，已知红第 0 条那一形只记不停）。每段的报告里有一行「模型对拍 N 步：…」（`crates/singlefs-harness/src/history.rs` 的报告渲染），
+# 偏向抬 F 之后回退的取样点、越过原分配记录墙的取样点、小盘上逼近单元区墙的取样点（后两段每一步之后也跑池级 checker，已知红第 0 条那一形只记不停）。每段的报告里有一行「模型对拍 N 步：…」（`crates/singlefs-harness/src/history.rs` 的报告渲染），
 # 模型模块 `crates/singlefs-harness/src/model.rs` 只用 `singlefs_format` 的常量（D13（验证路线） 已定项 5）。
-# 这里在 release 下单跑那一个测试二进制，要求五段都打出「模型对拍」那一行、步数都大于 0——测试绿而模型一步没判，等于没对拍。
+# 这里在 release 下单跑那一个测试二进制，要求六段都打出「模型对拍」那一行、步数都大于 0——测试绿而模型一步没判，等于没对拍。
 # 判别力：模型对拍自己会不会红，由 `crates/mutations.tsv` 第 146–178 行（门禁 59 号）证明；这个阶段只判「跑了、判过、没报对不上」。
 # 样本：被判目录里没有 Cargo.toml 而有 `model-differential-cargo-output.log` 时，不跑 cargo，只判那份录好的输出
 # （`.claude/gate.d/fixtures/74-model-differential.sh/` 的红绿样本走这一支）。
+# gate-overlap:copy-kept 59-crates-mutation-replay.sh 两边开头那 8 行（取仓根、问 research/scripts/stage-must-run.sh 能不能复用上一次整轮全绿的判定、能复用就退 77）逐字相同；59 号是提交时才执行的重型阶段，改了它的实现，提交之前没有办法证明没改坏，所以两边各留一份，不抽成共用
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$ROOT" 2>/dev/null || exit 2
@@ -35,7 +36,7 @@ if [[ "$scope_rc" != 0 ]]; then
 fi
 
 TEST_BINARY="second_transaction_supplement_three_random_history"
-SECTIONS=("随机历史快档" "随机历史：偏向抬 F 之后复用的取样点" "随机历史：偏向抬 F 之后回退的取样点" "随机历史：逼近分配记录墙的取样点" "随机历史：小盘上逼近单元区墙的取样点")
+SECTIONS=("随机历史快档" "随机历史：偏向抬 F 之后复用的取样点" "随机历史：偏向抬 F 之后回退的取样点" "随机历史：越过原分配记录墙的取样点" "随机历史：小盘上逼近单元区墙的取样点" "随机历史：小盘上逼近单元区墙的取样点（空间准入判着）")
 
 log="$(mktemp)"
 if [[ -f Cargo.toml && -d crates/singlefs-harness ]]; then

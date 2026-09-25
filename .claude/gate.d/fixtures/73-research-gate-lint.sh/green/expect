@@ -1,2 +1,4 @@
 exit=0
-want=门禁自检通过：2 个脚本
+want=门禁自检通过：3 个脚本
+want=进程安全：查了 3 个脚本（.sh 3 个、.py 0 个）
+want=own-scope 标注放行 1 处（research/scripts/stop-own.sh:9）

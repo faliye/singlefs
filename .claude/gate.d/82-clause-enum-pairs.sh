@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # gate-stage: 条文列出来的封闭集合，与代码里兑现它的那个枚举逐个成员对上
+# gate-similar: 67-milestone-closeout-owed.sh 它判里程碑收口表收全开着的欠账号、行号只许顺序号，只读 kb；这一道拿登记表把决策分项正文里的名字与 crates 源码里 Rust 枚举的变体逐个配对，任一边多一个或少一个都红
+# gate-similar: 81-audit-contradictions.sh 它判总审核记录第五节每行有去向，只读 records/ 与 kb；这一道要读 crates 源码里的枚举，判条文与代码的集合对不对得上
+# gate-similar: 79-tree-table-reserve.sh 它对决策正文里的认购表求和、比预留；这一道不做算术，判登记表里每一对（分项里的名字、枚举变体）两头都在，枚举里没登记的变体也红
+# gate-similar: 53-format-const-placeholders.sh 它判格式常量文件里的 placeholder 注释指得到分项或欠账，方向是代码到 kb 的单向；这一道对封闭集合双向逐个成员比，枚举多一个成员与表多一行都红
+# gate-similar: 93-feature-bits.sh 它判 feature bit 位号在记账表与 D15 登记表之间逐行一致、代码常量的位在记账表里，对象是位号；这一道对象是条文列举的封闭集合与 Rust 枚举变体，按 82-clause-enum-pairs.tsv 配对
+# gate-similar: 27-format-constants.sh 它判 kb 里 format-const 标记的数值与源码常量相等、旧值不再出现，对象是数值；这一道对象是枚举变体的名字集合，不看数值
 #
 # 2026-09-23 一天里查出四例「条文与实现说反话」，其中三例形状相同：条文逐个列了一个集合，
 # 而代码里那个枚举比它多一个或少一个成员，没有任何东西会红。门禁 27 号只管登记过的格式常量、

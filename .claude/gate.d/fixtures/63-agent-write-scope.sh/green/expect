@@ -1,2 +1,4 @@
 exit=0
 want=1 个有 Write 或 Edit 的定义、2 条路径模式
+want=只在 lib_shell_words.py 里定义（查了 .claude/hooks/ 下另外 4 个文件）
+want=只在 lib_heavy_tests.py 里定义（查了 .claude/hooks/ 下另外 4 个文件；selftest、load_sibling_module 不算

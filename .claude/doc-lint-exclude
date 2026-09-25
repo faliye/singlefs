@@ -10,7 +10,6 @@ research/prompts/  # 当时原样发给模型的提示，与 research/results/ �
 .claude/gate.d/fixtures/79-tree-table-reserve.sh/  # 门禁阶段「树表条目预留的认购表」的判别力样本：造了带登记标题的 D8 样本决策与 C271 / C272 / C144 样本欠账行，扫它只会报登记冲突
 .claude/gate.d/fixtures/81-audit-contradictions.sh/  # 门禁阶段「总审核第五节每行都有去向」的判别力样本：造的总审核记录与欠账表，与真表同号不同名，扫它只会报登记冲突
 .claude/gate.d/fixtures/82-clause-enum-pairs.sh/  # 门禁阶段「条文列的集合与代码里的枚举对得上」的判别力样本：造了带登记标题的 D99 样本决策，扫它只会报登记冲突
-.claude/gate.d/fixtures/83-closeout-row-numbers.sh/  # 门禁阶段「收口表行号只许顺序号」的判别力样本：造的里程碑收口表，与真表同号不同名
 .claude/gate.d/fixtures/16-freeze-layer-membership.sh/  # 门禁阶段「冻结层归属登记表」的判别力样本：造了带登记标题的 D15 / D18 / D21 / D8 / D19 / D2 样本决策与一份样本登记表，扫它只会报登记冲突
 .claude/gate.d/fixtures/40-results-cited.sh/  # 门禁阶段「实验产物有没有写回」的判别力样本：造了带登记标题的 E98 样本实验页，与真表同号不同名，扫它只会报登记冲突
 .claude/gate.d/fixtures/52-segment-registry.sh/  # 门禁阶段「段序列登记表与 E142 产物逐字比对」的判别力样本：合成的最小 layout 表只有「八、」一节，没有历史节，扫它只会报 kb 形状

@@ -32,7 +32,9 @@ for runner in "bash research/scripts/ask-local-selftest.sh" "python3 research/sc
               "bash research/scripts/verify-citations.sh --selftest" \
               "python3 research/scripts/agent-handover.py --selftest" "python3 research/scripts/decision-slim-check.py --selftest" \
               "python3 research/scripts/pdf-text.py --selftest" "python3 research/scripts/rules-sweep-audit.py --selftest" \
-              "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest" "bash research/scripts/gate-staged.sh --selftest"; do
+              "bash research/scripts/stage-must-run.sh --selftest" "bash research/scripts/changed-paths.sh --selftest" "bash research/scripts/gate-staged.sh --selftest" \
+              "bash research/scripts/capped.sh --selftest" \
+              "bash research/scripts/run-with-memory-cap.sh --selftest" "bash research/scripts/mutate.sh --selftest"; do
   checked=$((checked + 1))
   output="$($runner 2>&1)"; rc=$?
   if [[ $rc -ne 0 ]]; then

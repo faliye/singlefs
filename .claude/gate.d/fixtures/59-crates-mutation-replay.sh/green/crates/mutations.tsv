@@ -1,1 +1,5 @@
+# 每条变异的内存上限：512M
+# 下一行是撤掉了的余量写法：59 号不再按内存收工作进程数（内存由 research/scripts/run-with-memory-cap.sh 排队管），写着也照开 min(核数的一半、条数) 个
+# 给整机留的内存余量：1T
 add-becomes-sub	crates/tiny/src/lib.rs	left + right	left - right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+add-becomes-multiply	crates/tiny/src/lib.rs	left + right	left * right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five

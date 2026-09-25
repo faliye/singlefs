@@ -11,86 +11,30 @@
 #
 # 触发文件的清单不在这里，在 .claude/gate.d/knowledge-sync-triggers.tsv，68 号与 11 号都读那一份。
 
-.claude/gate.d/59-crates-mutation-replay.sh	# 接上「这一道读的输入变没变」的复用判据（现在每趟跑满，这一批暂存区里 crates/ 一个路径都没有）
-.claude/gate.d/54-layer0-replay.sh	# 判据从「碰没碰 crates/ 目录」换成「这一道读的那几条路径变没变」，且不再看工作区
-.claude/gate.d/55-qemu-first-transaction.sh	# 同 54 号
-.claude/gate.d/74-model-differential.sh	# 同 54 号
-.claude/gate.d/87-replay.sh	# 同 54 号
-.claude/gate.d/stage-inputs.tsv	# 新建：每道阶段读哪几条路径，唯一登记位；清单自己要进比对，少写一条就等于那条输入永远不让它重跑
-research/scripts/gate-staged.sh	# 新建：算暂存树 → 跑 gate.sh --staged → 退出码 0 才前移 refs/sop/staged-green；共享 gate.sh 在上游、本仓的 gate.sh 只是转发，前移只能放在外壳里
-research/scripts/stage-must-run.sh	# 新建：复用判据本身——这一道读的那几条路径，在 refs/sop/staged-green 那棵树与这次的暂存树之间 git 说变没变；五道阶段都调它
-research/scripts/stage-must-run-selftest.sh	# 新建：复用判据的自证，九格；门禁 47 号跑每个 --selftest，它得有一份
-research/scripts/change-touches-crates.sh	# 旧判据（碰没碰目录）由新判据取代，它的射程与出路要跟着改
 .claude/rules/implementation-workflow.md	# 阶段同步判「要改」：第 37 行把「说清一道阶段读什么」全压在手工现查上，现在有登记表与脚本自动比对了
 .claude/agent-common.md	# 第 4 行指错门禁号：「71 号」改指上游「规则纪律（项目本地）」阶段（三方 gate-fix-forks 第三轮判决）
-.claude/gate.d/10-kb-rot.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/11-batch-scope.sh	# 门禁审计：取改动范围改用共用脚本、取不到就判红（三方 gate-fix-forks）
 .claude/gate.d/12-no-prime-marks.sh	# 新立：全仓禁止撇号类字符当角标（用户 2026-09-24 指示「全仓禁止」）
-.claude/gate.d/15-research-build.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/20-kb-shape.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/21-decision-items-sync.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/22-item-ref-status.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/24-status-redundancy.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/27-format-constants.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/28-cross-decision-status.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/29-settled-item-self-open.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/30-decision-history.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/31-blocking-verdict.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/32-first-txn-fields.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/33-mutation-tables.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/35-user-verdict-owed.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/39-field-table-sum.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/40-results-cited.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/44-settled-ref-says-open.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
 .claude/gate.d/47-research-script-selftests.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/48-history-month-file.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/49-history-brief.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/50-rules-manifest.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/51-admission-terms-covered.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/52-segment-registry.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/53-format-const-placeholders.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/56-crates-adversarial-review.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/60-stale-open-items.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/61-settled-same-file.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/62-stage-owners.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
 .claude/gate.d/63-agent-write-scope.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
 .claude/gate.d/64-change-range-single-source.sh	# 新立：改动范围只许一份取法（三方 gate-fix-forks 第二、三轮判决）
-.claude/gate.d/66-abandoned-rounds.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/67-milestone-closeout-owed.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/68-knowledge-sync.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/69-evidence-in-repo.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/70-citations.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/72-agent-def-adversarial-review.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/73-research-gate-lint.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/75-decision-experiment-links.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/77-test-environment.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/80-absolute-assertions.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/83-closeout-row-numbers.sh	# 门禁审计的修正，另有角标改名（变体起新名字）
-.claude/gate.d/88-quoted-result-lines.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/90-term-renames.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/92-layout-checker-sync.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/93-feature-bits.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/95-fixture-claims.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/96-experiment-source-discipline.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/97-invariant-field-anchors.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/98-kb-registry.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/99-multipath-registry.sh	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-format-const.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-history-brief.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-index-vs-body.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-item-ref-status.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-manifest.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-open-item-review.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/lib-owed.py	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/multipath-registry-lag.tsv	# 门禁审计：判别力、退出码与改动范围取法的修正（三方 gate-fix-forks 第一至三轮）
-.claude/gate.d/stage-owners.tsv	# 登记新立的 12、64 号归谁跑
-.claude/hooks/kb-scribe-followup.sh	# 新立：书记员写入之后核相关记录跟没跟上（用户要的 hook）；只读命令误认的修正
-.claude/hooks/kb-scribe-followups.tsv	# 上一行那个 hook 的登记表：写了哪类文件要跑哪几道阶段
-.claude/rules/path-moves.md	# 新立「变体起新名字，不用角标」一节（用户 2026-09-24 指示）
-.claude/settings.json	# 注册书记员写入后的核对 hook
 crates/singlefs-core/src/mount.rs	# 角标改名：变体起新名字，不用撇号（用户 2026-09-24 指示）
-crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs	# 角标改名：变体起新名字，不用撇号（用户 2026-09-24 指示）
-crates/singlefs-harness/src/model.rs	# 角标改名：变体起新名字，不用撇号（用户 2026-09-24 指示）
 research/scripts/changed-paths.sh	# 新立：门禁阶段取改动范围的共用脚本（三方 gate-fix-forks）
-research/scripts/fixtures/stale-candidates-benchmark-facts.tsv	# 角标改名：变体起新名字，不用撇号（用户 2026-09-24 指示）
 research/scripts/replay.sh	# E153、E154、E155、E155R2 四行改指角标改名后复跑的新产物（与旧产物只差改名）；这一文件别的行归另一个会话
+.claude/agents/implementation-writer.md	# 实现员验证负载写死（用户 2026-09-24：只跑自己动到的测试、层 0 全量每次提交跑一次）
+.claude/gate.d/lib-prime-marks.py	# 撇号类角标字符集抽成一处，12 号与写入闸共读
+.claude/hooks/bash-command-detector.sh	# 拦看门狗前台起法（提案记录第四十节第 5 行）
+.claude/hooks/heavy-test-guard.sh	# 新立：重型测试只在提交时跑、子 agent 不许跑（用户 2026-09-24）
+.claude/hooks/write-guard.sh	# 写入那一刻拒撇号类角标（用户 2026-09-24）
+CLAUDE.md	# checker 判的不变量条数 40 → 43
+crates/singlefs-checker/src/image.rs	# 实十四：I-7.9、I-9.15 进已实现清单
+crates/singlefs-checker/src/walk.rs	# 实十四：I-7.9、I-9.15 checker 判定
+crates/singlefs-core/src/recovery.rs	# 实十四：重建经映射回退、N2
+crates/singlefs-harness/src/bin/e158_root_choice_repair.rs	# E158 第六、七段装置
+crates/singlefs-harness/src/bin/first_transaction_on_device.rs	# 实十八：抬 F 失败账的设备侧判相等
+crates/singlefs-harness/src/fault_injection.rs	# 实十八：第 208 行变异的敏感取样点
+crates/singlefs-harness/src/history.rs	# 实十八：取号前准入的新错误成员
+crates/singlefs-harness/src/model_comparison.rs	# 实十八：取号前准入的新错误成员
+research/scripts/agent-watch.py	# 看门狗：管道尾不误报、每跨一个整小时报一次询问
+research/scripts/capped.sh	# 新立：线程上限包装脚本（用户 2026-09-24）
+research/scripts/watch.conf	# 看门狗新键 ask-every-minutes
+research/scripts/watch.sh	# 看门狗配置白名单加新键

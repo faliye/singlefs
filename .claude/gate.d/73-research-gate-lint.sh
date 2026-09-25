@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: research/scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢
+# gate-stage: research/scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢；连同 .claude/gate.d/，终止进程只许点名一个
 #
 # 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint（.claude/singlefs-ai-sop/scripts/gate.sh 第 211–212 行），
 # 研究脚本与 hook 不在射程里。2026-09-18 单跑整仓 gate-lint 红 90 处，84 处在这两个目录，没有任何一笔账记着（C382（研究脚本与 hook 的拒绝不在门禁自检的射程里））。
@@ -11,6 +11,11 @@
 # 判别力：fixtures/73-research-gate-lint.sh/red 放一个只带一句话的 die 和一个靠子 shell 赋值往外带值的函数，两样都必须报出来；
 # 它的 .claude/scripts/ 里再放一个不带出路的拒绝和一处 pkill -f，只有这个目录进了射程才报得出来。
 # green 带上第二个参数、不靠子 shell 带值，必须判绿；它的 .claude/scripts/ 里放一个干净的包装，成功行的脚本数要把它数进去。
+# 进程安全（终止只许点名一个自己起的进程号或任务号）：判定只有一份，在 .claude/hooks/bash-command-detector.sh（拒绝 ⑥），这里经它的 --scan-scripts 扫脚本，
+# 射程比上面两个 lint 多一个 .claude/gate.d/（它的样本目录不扫）。用户 2026-09-25 定的规矩与写法见那个 hook 的文件头 ⑥。
+# 判别力：red 的 research/scripts/stop-processes.sh（自己任务的进程组、循环里 kill、systemctl 带通配）、research/scripts/stop.py（循环 os.kill、os.killpg）
+# 与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标；只有 .claude/gate.d/ 进了射程才报得出来）逐处按行号报；
+# green 的 research/scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 LINT="$(cd "$(dirname "$0")/../.." && pwd)/.claude/singlefs-ai-sop/scripts/gate-lint.sh"
@@ -44,6 +49,19 @@ if [[ -f "$MODES" ]] && ((${#MODE_TARGETS[@]})); then
     echo "     → 怎么办：用 git update-index --chmod=+x <路径>（或 -x）改暂存区里的模式，让它与工作区一致"
     failed=1
   fi
+fi
+# 进程安全：同一份判定（bash-command-detector.sh --scan-scripts），连 .claude/gate.d/ 一起扫；待改清单是被判仓的 .claude/process-safety-pending
+DETECTOR="$(cd "$(dirname "$0")/../hooks" && pwd)/bash-command-detector.sh"
+SAFETY_TARGETS=("${TARGETS[@]}")
+[[ -d "$ROOT/.claude/gate.d" ]] && SAFETY_TARGETS+=("$ROOT/.claude/gate.d")
+if [[ ! -f "$DETECTOR" ]]; then
+  echo "  ✗ 找不到 $DETECTOR，终止进程的写法这一项没扫"
+  echo "     → 怎么办：恢复 .claude/hooks/bash-command-detector.sh（判定只有那一份，门禁与执行前的钩子共用），再跑本阶段"
+  failed=1
+elif ! bash "$DETECTOR" --scan-scripts "$ROOT" "${SAFETY_TARGETS[@]}"; then
+  echo "  ✗ research/scripts/、.claude/hooks/、.claude/scripts/ 或 .claude/gate.d/ 里有打得到别人进程的终止写法（上面逐处列出）"
+  echo "     → 怎么办：照上面那句「怎么办」改；规矩是「后面的脚本不能终止前面的脚本」「不能动 ssh」「终止要按照任务号终止 禁止终止所有」，写法见 .claude/hooks/bash-command-detector.sh 文件头 ⑥"
+  failed=1
 fi
 # shell-lint 一次只扫一个目录（SHELL_LINT_DIR），逐个目录跑
 for directory in "${TARGETS[@]}"; do

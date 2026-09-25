@@ -7,18 +7,27 @@
 # 没扫的：二进制文件（前 8 KiB 里有 NUL 的）与上游副本 .claude/singlefs-ai-sop/（只能在上游改），成功行报出份数与这两类各几份。
 # 管不到的：ASCII 单引号当角标（`S1'`、`丙'`）——它与代码里的引号、带引号的词分不开，机器判不了，靠写的人与 review。
 # 怎么起新名字见 .claude/rules/path-moves.md「变体起新名字，不用角标」。
-# 本阶段自己的源码里这几个字符写成转义，不出现字面。
+# 字符集在同目录的 lib-prime-marks.py（写成转义，不出现字面），.claude/hooks/write-guard.sh 在写入那一刻拒绝时读同一份，不各抄一份。
 # 样本：fixtures/12-no-prime-marks.sh/red 放一份带「K9」加一撇的 md 与一份带「G5」加两撇的 rs，逐处点名判红；green 只有正常写法，判绿。
 #
 #   bash .claude/gate.d/12-no-prime-marks.sh [项目根]
 set -uo pipefail
 ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
+LIBRARY="$(cd "$(dirname "$0")" && pwd)/lib-prime-marks.py"
 cd "$ROOT" 2>/dev/null || exit 2
-python3 - <<'PY'
-import os, subprocess, sys
+python3 - "$LIBRARY" <<'PY'
+import importlib.util, os, subprocess, sys
 
-PRIME_MARKS = '\u2032\u2033\u2034\u02b9\u02ba'
-MARKS_SHOWN = ' '.join(PRIME_MARKS)
+try:
+    spec = importlib.util.spec_from_file_location('lib_prime_marks', sys.argv[1])
+    prime_marks_library = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(prime_marks_library)
+except OSError as error:
+    print(f'  ✗ 读不到共用字符集 {sys.argv[1]}：{error}')
+    print('     → 怎么办：撇号类字符只在那一份里定义（.claude/hooks/write-guard.sh 读同一份），从 git 恢复它，别在阶段里再抄一份。')
+    sys.exit(1)
+PRIME_MARKS = prime_marks_library.PRIME_MARKS
+MARKS_SHOWN = prime_marks_library.MARKS_SHOWN
 UPSTREAM_COPY = '.claude/singlefs-ai-sop/'
 
 listed = subprocess.run(['git', '-c', 'core.quotepath=false', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],

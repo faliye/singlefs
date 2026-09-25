@@ -10,6 +10,9 @@ target/
 # 只有构建产物除外，它由上面那条 `target/` 兜住（research/target 有 315 MB）。
 /research/target/
 
+# run-with-memory-cap.sh 的峰值表：数只在本机成立，门禁 59 号跑的时候每条都写它（跟踪着会让 gate.sh 的工作区指纹开跑与收尾对不上）
+/research/scripts/memory-peaks.tsv
+
 .env
 
 # 本机个人权限规则（含本机路径），不进仓

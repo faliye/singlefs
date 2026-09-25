@@ -217,7 +217,7 @@ test reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_r
 已知红第 1 条（增补 2 收口表第 43 行）：1 段；前几个种子 [(80, Operation(21))]
 用时 7.9 秒
 test random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation ... ok
-── 随机历史：逼近分配记录墙的取样点 ──
+── 随机历史：越过原分配记录墙的取样点 ──
 种子 [0, 32)，每段 150 步，比重：逼近分配记录墙（812 条那一格的取样点）；每一步之后跑池级 checker，已知红第 0 条那一形只记不停；两块 4 GiB 的盘
 历史 32 段：跑完 32、以已知红收尾 {}、新发现 0；根环转过一圈的 32 段；最高 txg 176
   操作 PublishFirstFile：Ok 0、Err 0、前提不满足没调 0

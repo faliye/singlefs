@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gate-stage: 里程碑收口表收全了文件里点名、还开着的欠账号
+# gate-stage: 里程碑收口表收全了文件里点名、还开着的欠账号，行号只许是顺序号
 #
 # 实测（2026-09-17 核出）：.claude/kb/milestone/02-second-txn.md「增补 2」的收口表立表时 13 行，
 # 同一文件别处点名、.claude/kb/checks-owed.md 里还开着的 C 编号（C374、C329、C330、C331、C287 等）表里一个字没提，
@@ -13,12 +13,18 @@
 #      要么在表后（表结束到下一个标题之前）有一行显式豁免，形态：`- 不收口 C<编号>（简称）：为什么不收`。
 #   任一个开着的编号两处都没有 ⇒ 红。豁免行写坏（没有编号、冒号后面是空的）、同一个编号既豁免又进了表、
 #   标记后面不是表、一份文件两处标记 ⇒ 也红。
+#   ④ 收口表每一行的首列（表头 `#` 与分隔行除外）要么是纯十进制数字，要么是圆圈号 `①`–`⑳`
+#      （那一档是这张表早先给「被打回的项」留的）；带撇号（U+2032、U+2033、ASCII 单引号）或紧跟字母的 ⇒ 红，指名那一行。
+#      用户 2026-09-23 定：行号全改成顺序号，以后禁止后缀。当天现查，加撇号的那几行与它们的基号毫不相干，
+#      撇号的实际含义是「这个号被占了」，读的人却当成从属关系，「跟第 N 行一起判」就指到一件不相干的事上；字母后缀同病。
+#      全仓的 U+2032、U+2033 另由 12 号判；这一条多管的是 ASCII 单引号、字母与其余一切非顺序号的写法，只在收口表首列。
 #
 # 不判的：没有标记的里程碑文件，成功行逐个列出（现算）；一份带标记的文件都没有 ⇒ 退 77，不记通过。
 # ⚠️ 管不到的：表里那一行写的去向对不对、豁免的理由站不站得住（靠人）；编号只按字面 C<数字> 认，
 # 写成「C 374」或只写简称的引用它看不见；已还清的编号、checks-owed.md 里没有的编号一律不管。
 # 判别力：fixtures/67-milestone-closeout-owed.sh/red 放一个漏收的开着编号、一个既豁免又进表的编号、一行空理由的豁免、
-# 一份标记后面没有表的文件，必须判红；green 放表里一个、豁免一个、已还清一个与一份不带标记的文件，必须判绿并报对数。
+# 一份标记后面没有表的文件、一行字母后缀与一行 ASCII 单引号后缀的行号，必须判红；green 放表里一个、豁免一个、已还清一个、
+# 一份不带标记的文件，收口表里一个圆圈号、一个一位数与一个两位数的行号，必须判绿并报对数。
 #
 #   bash .claude/gate.d/67-milestone-closeout-owed.sh [项目根]
 set -uo pipefail
@@ -38,6 +44,7 @@ marker = "<!-- milestone:closeout-table -->"
 owed_number = re.compile(r"(?<![A-Za-z0-9_])(C[0-9]+)(?![0-9])")
 exemption_start = re.compile(r"^- 不收口 ")
 exemption_form = re.compile(r"^- 不收口 (?P<number>C[0-9]+)(?:（.*?）)?：(?P<reason>.*\S.*)$")
+circled_row_numbers = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳"
 
 milestone_files = sorted(glob.glob(os.path.join(milestone_dir, "*.md")))
 if not milestone_files:
@@ -92,8 +99,21 @@ for path, lines in marked_files:
     table_start = index
     while index < len(lines) and lines[index].lstrip().startswith("|"):
         index += 1
-    table_text = "\n".join(lines[table_start:index])
+    table_end = index
+    table_text = "\n".join(lines[table_start:table_end])
     numbers_in_table = set(owed_number.findall(table_text))
+
+    # ④ 行号：表头 `#` 与分隔行之外，每一行的首列只许是顺序号或圆圈号。
+    suffixed_row_numbers = []
+    judged_row_count = 0
+    for row_index in range(table_start, table_end):
+        first_cell = lines[row_index].split("|")[1].strip()
+        if not first_cell or first_cell.startswith("-") or first_cell == "#":
+            continue
+        judged_row_count += 1
+        if first_cell.isdecimal() or (len(first_cell) == 1 and first_cell in circled_row_numbers):
+            continue
+        suffixed_row_numbers.append(f"第 {row_index + 1} 行：行号写成「{first_cell}」")
 
     exempted_numbers = {}
     malformed_exemptions = []
@@ -134,7 +154,14 @@ for path, lines in marked_files:
             print(f"     {number}（{open_owed_names[number]}）：第 {first_line_by_number[number]} 行起出现")  # gate-lint:detail
         print("     → 怎么办：在收口表里给它一行（或并进已有的一行，写清性质与去向），")
         print("               或在表后加一行「- 不收口 C<编号>（简称）：为什么不收」；它其实已经还了，就先把 checks-owed.md 那一行挪进「### 已还清」。")
-    per_file_counts.append(f"{name}：全文点名 {len(first_line_by_number)} 个 C 编号，其中还开着 {len(open_numbers)} 个：表里 {len([number for number in open_numbers if number in numbers_in_table])} 个、豁免 {len([number for number in open_numbers if number in exempted_numbers and number not in numbers_in_table])} 个")
+    if suffixed_row_numbers:
+        failed = True
+        print(f"  ✗ {path} 收口表的行号带了后缀（撇号或字母），行号只许是顺序号或圆圈号：")  # gate-lint:summary
+        for entry in suffixed_row_numbers:
+            print(f"     {entry}")  # gate-lint:detail
+        print("     → 怎么办：改成一个没被占用的顺序号（接着表里最大的那个往下取），不要在旧号上加撇号或字母——后缀会让读的人以为这一行从属于那个基号。")
+        print("               ⚠️ 改号要连全仓引用一起改（「第 N 行」「跟第 N 行」这类），照 .claude/rules/path-moves.md「怎么做」那六步办。")
+    per_file_counts.append(f"{name}：全文点名 {len(first_line_by_number)} 个 C 编号，其中还开着 {len(open_numbers)} 个：表里 {len([number for number in open_numbers if number in numbers_in_table])} 个、豁免 {len([number for number in open_numbers if number in exempted_numbers and number not in numbers_in_table])} 个；收口表 {judged_row_count} 行的行号都是顺序号或圆圈号")
 
 if failed:
     sys.exit(1)

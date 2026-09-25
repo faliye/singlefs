@@ -1,0 +1,4 @@
+# 进程安全（门禁 73 号、.claude/hooks/bash-command-detector.sh --scan-scripts）还没改完的脚本：一行一个相对仓根的路径，# 后写为什么。
+# 这里的文件不判红，门禁成功行逐个列名；改好一个删一行，只减不增。指向不存在的、一处都没排到的判红。
+research/scripts/mutate.sh  # 收尾 cleanup 按自己 $! 记下的工作进程号在 for 循环里逐个 kill -TERM；mutate.sh 另有 agent 在改成并行，这一轮不碰，改法交它（按任务号，或整批放进一个自己开的 scope 停那一个 scope）
+research/scripts/agent-watch.py  # 看门狗自检收尾在 for 循环里逐个 os.kill 自己起的子树；文件里有别的会话没提交的改动，这一轮不碰

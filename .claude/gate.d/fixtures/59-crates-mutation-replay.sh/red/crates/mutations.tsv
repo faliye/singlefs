@@ -1,2 +1,6 @@
+# 每条变异的内存上限：512M
+# 每条变异的超时秒数：20
 comment-only	crates/tiny/src/lib.rs	// 门禁 59 号的判别力样本	// 变异只动注释	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
 compile-error	crates/tiny/src/lib.rs	    left + right	    left + missing_identifier	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+memory-hog	crates/tiny/src/lib.rs	buffer_of(1)	buffer_of(1536)	-p tiny --lib -- buffer_is_one_mebibyte	buffer_is_one_mebibyte
+endless-walk	crates/tiny/src/lib.rs	position += 1	position += 0	-p tiny --lib -- walking_to_ten_ends_at_ten	walking_to_ten_ends_at_ten

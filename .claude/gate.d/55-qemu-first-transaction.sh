@@ -1,22 +1,23 @@
 #!/usr/bin/env bash
-# gate-stage: QEMU 真设备上的第一个事务、发布 B 与第二个实例（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
+# gate-stage: QEMU 真设备上的第一个事务、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
 # 不声明 gate-covers：共享清单 2026-09-16 起没有「QEMU 真实负载」这一项（QEMU 移交给本工程），而「最终判据」要的是真实负载 + 崩溃注入 + checker 全绿，
 # 这一道今天只有真实负载与设备侧录制、没有崩溃注入，不冒充覆盖它。
 #
 # C6（块层语义假设写错）要的：「程序以为发了什么」与「盘上实际收到了什么」由两条不共享代码的路比。
 #   程序那一条 = 被测程序自己的录制器（宿主上同参数重跑，同字节）；
 #   盘那一条   = QEMU 的 blklogwrites 过滤节点在来宾之外按 dm-log-writes 格式记下的每个写（带数据）与每个 FLUSH。
-# 五次虚机跑（并行）：
+# 六次虚机跑（并行）：
 #   direct                          O_DIRECT 真写路：设备侧日志逐项等于程序的录制流（末尾至多一个关机 FLUSH），
 #                                   来宾块层的 FLUSH 数 = 屏障 + FUA 写数，冷重开读回文件，段序列与 E142 产物逐字相同，宿主从盘镜像再读回一次
 #   skip-first-transaction-barrier  盘 0 漏掉「单元 → journal 记录」那道屏障：设备侧比对必须判红，且红在盘 0
 #   page-cache                      读写走页缓存（阳性对照）：回写合并 / 重排写，设备侧比对必须判红
 #   second-transaction              第一个事务之后同一个进程里覆盖写一次（发布 B，里程碑「第二个事务」步 1）：冷重开择 (1, 4) 读回第二版
 #   second-instance                 发布 B 之后同一对盘冷重开、可写挂载（取号 → 写行 txg 5 → 暖机 txg 6、7）再发布 C（步 3）：冷重开择 (2, 8) 读回第三版
+#   raise-rollback-floor            second-instance 那条路走完，同一次挂载里再发布 D（txg 9，第四版），把 F 抬到上限 3、推两次空发布 txg 10、11
+#                                   （增补 2 收口表第 58 行）：冷重开择 (2, 11) 读回第四版
 #
-# ⚠️ 后两个模式的设备侧比对只核得到第一个事务那一段前缀：`first_transaction_device_log_check` 在宿主上只重跑第一个事务，
-# 发布 B / 可写挂载 / 发布 C 的写它算不出来。所以这两档判的是「第一个事务那段逐项对得上（divergence 的 program 侧为 None，
-# 说明前缀整段相等），而且盘上确实多收到了写」——B / 挂载 / C 的逐项比对还欠着，账在 C455 与里程碑「第二个事务」增补 2 收口表第 30 行。
+# 设备侧比对每一档都逐项比到这一档最后那次发布：`first_transaction_device_log_check` 的第一个参数是模式，宿主照模式重跑
+# 发布 B / 可写挂载与发布 C / 发布 D 与抬 F（`name=host_rerun` 行列出重跑了哪几段）。所以后三档照 direct 判：退出码 0、两块盘都没有分歧。
 #
 # 判别力样本 fixtures/55-qemu-first-transaction.sh/{red,green}（89 号跑）拿预录输出喂：样本目录里放一个 `.qemu-prerecorded` 标记文件，再按 `<模式>/out.txt`、`vm-exit`、
 # `check.txt`、`check-exit` 摆好某一轮真跑留下来的原样输出，本阶段就不起虚机、不编译，只拿同一段判定代码判它们
@@ -28,24 +29,26 @@ cd "$ROOT" 2>/dev/null || exit 2
 
 fail() { echo "  ✗ $1"; echo "     → 怎么办：$2"; exit 1; }
 
-MODES=(direct skip-first-transaction-barrier page-cache second-transaction second-instance)
+MODES=(direct skip-first-transaction-barrier page-cache second-transaction second-instance raise-rollback-floor)
 
 # 冷重开之后应当择到的根。前三个模式停在第一个事务（实例 1、txg 3）；发布 B 走到 txg 4；
-# 第二个实例再走一遍「取号 → 写行 → 暖机 ×2 → 发布 C」，落在实例 2 的 txg 8。
+# 第二个实例再走一遍「取号 → 写行 → 暖机 ×2 → 发布 C」，落在实例 2 的 txg 8；
+# 抬 F 那一档接着发布 D（txg 9）、抬 F 推两次空发布（txg 10、11），落在实例 2 的 txg 11。
 cold_root_of() {
   case "$1" in
     direct|skip-first-transaction-barrier|page-cache) printf '1:3' ;;
     second-transaction)                               printf '1:4' ;;
     second-instance)                                  printf '2:8' ;;
+    raise-rollback-floor)                             printf '2:11' ;;
     *)                                                printf '' ;;
   esac
 }
 
-# 这个模式的输出里必须逐条出现的行，一行一条基本正则。五个模式共有的那几条（段序列、事务计数、
-# 冷重开、块层 FLUSH 数）在判定循环里另查，这里只列各模式独有的——没有这几条，新加的两档就等于没跑。
+# 这个模式的输出里必须逐条出现的行，一行一条基本正则。六个模式共有的那几条（段序列、事务计数、
+# 冷重开、块层 FLUSH 数）在判定循环里另查，这里只列各模式独有的——没有这几条，后加的三档就等于没跑。
 required_lines_of() {
   case "$1" in
-    second-transaction|second-instance)
+    second-transaction|second-instance|raise-rollback-floor)
       cat <<'PATTERNS'
 name=second_transaction root_txg=4 transaction=2 released=
 name=second_transaction .*segments=16+2+1+2 closed_form=
@@ -56,7 +59,7 @@ PATTERNS
     *) : ;;
   esac
   case "$1" in
-    second-instance)
+    second-instance|raise-rollback-floor)
       cat <<'PATTERNS'
 name=writable_mount instance=2 chosen_root=1:4 rows_written=1 row_publish_root=2:5 warm_up_txgs=6,7 nanoseconds=
 name=publish_writes publish=instance_row txg=5 write_calls=
@@ -71,6 +74,23 @@ PATTERNS
       ;;
     *) : ;;
   esac
+  case "$1" in
+    raise-rollback-floor)
+      cat <<'PATTERNS'
+name=fourth_transaction root_txg=9 transaction=2 released=
+name=fourth_transaction .*segments=16+2+1+2 closed_form=
+name=publish_writes publish=fourth_transaction txg=9 write_calls=
+name=publish_writes_against_device window=fourth_transaction publishes=1 .*matches=true
+name=raise_rollback_floor floor_before=0 requested_floor=3 ceiling=3 publishes=2 root_txgs=10,11 
+name=recover_cold_rollback_floor chosen_root=2:11 rollback_floor_on_disk=3$
+name=raise_rollback_floor .*segments=8+2+1+10+2+1+2 closed_form=
+name=publish_writes publish=raise_rollback_floor txg=10 write_calls=
+name=publish_writes publish=raise_rollback_floor txg=11 write_calls=
+name=publish_writes_against_device window=raise_rollback_floor publishes=2 .*matches=true
+PATTERNS
+      ;;
+    *) : ;;
+  esac
 }
 
 # 这个模式的输出里不许出现的行：模式参数真的换掉了负载，而不是每一档都跑同一条路。
@@ -78,10 +98,23 @@ PATTERNS
 forbidden_lines_of() {
   case "$1" in
     direct|skip-first-transaction-barrier|page-cache)
-      printf '%s\n' 'name=second_transaction ' 'name=writable_mount ' 'name=third_transaction ' ;;
+      printf '%s\n' 'name=second_transaction ' 'name=writable_mount ' 'name=third_transaction ' 'name=fourth_transaction ' 'name=raise_rollback_floor ' ;;
     second-transaction)
-      printf '%s\n' 'name=writable_mount ' 'name=third_transaction ' ;;
+      printf '%s\n' 'name=writable_mount ' 'name=third_transaction ' 'name=fourth_transaction ' 'name=raise_rollback_floor ' ;;
+    second-instance)
+      printf '%s\n' 'name=fourth_transaction ' 'name=raise_rollback_floor ' ;;
     *) : ;;
+  esac
+}
+
+# 宿主检查照这个模式重跑的段（它的 `name=host_rerun` 行里 windows= 那一串，段名与 first_transaction_device_log_check.rs
+# 的 ProgramWindow::name 相同）：第一个事务之后那几次发布的写有没有进逐项比对，以这一行为准。只登记第一个事务之后还有发布的三档。
+host_rerun_windows_of() {
+  case "$1" in
+    second-transaction)   printf 'mkfs,instance_acquisition,warm_up,first_transaction,second_transaction' ;;
+    second-instance)      printf 'mkfs,instance_acquisition,warm_up,first_transaction,second_transaction,reopen_and_writable_mount,third_transaction' ;;
+    raise-rollback-floor) printf 'mkfs,instance_acquisition,warm_up,first_transaction,second_transaction,reopen_and_writable_mount,third_transaction,fourth_transaction,raise_rollback_floor' ;;
+    *)                    printf '' ;;
   esac
 }
 
@@ -180,7 +213,7 @@ for mode in "${MODES[@]}"; do
   grep -aq "name=recover_cold outcome=file_read root=$cold_root content_matches=true" "$out" \
     || fail "虚机跑 $mode 冷重开之后没按 ($cold_root) 读回文件" "看 $mode 的 name=recover_cold 行与来宾的 stderr（vm-bench.sh 保留现场用 VM_KEEP=1）；根对不上先查这一档该走到哪一次发布。"
   checks=$((checks + 1))
-  grep -aq "name=transaction policy_mismatches=0 key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN" "$out" \
+  grep -aq "name=transaction key_order_mismatches=0 root_txg=3 back_chain=$EXPECTED_BACK_CHAIN" "$out" \
     || fail "虚机跑 $mode 的第一个事务计数或反向链与产物不符" "产物 name=root_record 行的 back_chain 是 $EXPECTED_BACK_CHAIN；两个运行时计数要是 0。"
   checks=$((checks + 1))
   while IFS= read -r pattern; do
@@ -209,14 +242,13 @@ for mode in "${MODES[@]}"; do
     minimum="$(sed -n 's/.*minimum_io=\([0-9]*\).*/\1/p' <<<"$geometry")"
     disks=()
     [[ "$mode" == direct ]] && disks=("$work/$mode/disk0.img" "$work/$mode/disk1.img")
-    "$CHECK" "$work/$mode/log0.img" "$work/$mode/log1.img" "$bytes" "$physical" "$minimum" "${disks[@]}" >"$work/$mode/check.txt" 2>&1
+    "$CHECK" "$mode" "$work/$mode/log0.img" "$work/$mode/log1.img" "$bytes" "$physical" "$minimum" "${disks[@]}" >"$work/$mode/check.txt" 2>&1
     echo "$?" >"$work/$mode/check-exit"
   fi
 done
 
 verdict() { cat "$work/$1/check-exit"; }
 judged_device_logs=0
-prefix_only=()
 for mode in "${MODES[@]}"; do
   case "$mode" in
     direct)
@@ -239,28 +271,24 @@ for mode in "${MODES[@]}"; do
              fail "对照 page-cache 没有判红：走页缓存的回写与 O_DIRECT 的逐个写在这道比对里分不出来" "比对失去判别力；看设备侧日志里写的条数与长度。"; }
       checks=$((checks + 1))
       ;;
-    second-transaction|second-instance)
-      # 宿主那一侧只重跑得了第一个事务，所以这两档必然判红。要判的是**红在哪**：
-      # divergence 的 program 侧为 None，说明程序那条录制流整段是设备侧日志的前缀（第一个事务那段逐项相等），
-      # 分歧只出在「盘上还多收到了后面那几次发布的写」。红在别处（program=Some(...)）就是第一个事务那段本身对不上。
-      [[ "$(verdict "$mode")" == 1 ]] \
-        || { sed 's/^/        /' "$work/$mode/check.txt"
-             fail "$mode：设备侧比对没有判红，而宿主只重跑得了第一个事务" "盘上本该多出发布 B（以及第二个实例的挂载与发布 C）的写；判绿说明那些写根本没到盘上，或者比对把多出来的事件吞了。"; }
+    second-transaction|second-instance|raise-rollback-floor)
+      # 宿主检查照模式重跑到这一档最后那次发布，这几段与第一个事务一样逐项比，照 direct 判：退出码 0、两块盘都没有分歧，
+      # 且 `name=host_rerun` 列出的段就是这一档该跑的那几段（少一段，那一段的写就没进比对）。
+      [[ "$(verdict "$mode")" == 0 ]] || { sed 's/^/        /' "$work/$mode/check.txt"
+        fail "$mode：设备侧日志与程序的录制流对不上" "上面 divergence_window= 指着第一处不一致落在哪一段、divergence= 指着下标与两侧各是什么，先判是写路的错还是比对口径的错；退出码 2 是用法错或宿主重跑失败，看 check.txt 末尾那句。"; }
       checks=$((checks + 1))
       for device in 0 1; do
-        device_line="$(grep -a "name=device_log device=$device " "$work/$mode/check.txt" | head -1)"
-        [[ -n "$device_line" ]] || fail "$mode：check.txt 里没有盘 $device 的 name=device_log 行" "看 $work/$mode/check.txt；两块盘各要有一行。"
-        grep -q 'divergence=at=[0-9][0-9]*program=Nonedevice=Some(Write' <<<"$device_line" \
-          || { echo "        $device_line"
-               fail "$mode 盘 $device：第一个事务那段不是设备侧日志的前缀" "divergence 的 program 侧不是 None，说明分歧落在第一个事务里面，不是后面多出来的发布；先按 direct 那一档查写路。"; }
-        expected_writes="$(sed -n 's/.* expected_writes=\([0-9]*\) .*/\1/p' <<<"$device_line")"
-        observed_writes="$(sed -n 's/.* observed_writes=\([0-9]*\) .*/\1/p' <<<"$device_line")"
-        [[ "$expected_writes" =~ ^[0-9]+$ && "$observed_writes" =~ ^[0-9]+$ && "$observed_writes" -gt "$expected_writes" ]] \
-          || { echo "        $device_line"
-               fail "$mode 盘 $device：盘上收到的写（$observed_writes）没有多于第一个事务那段（$expected_writes）" "这一档该在第一个事务之后再发布一次；盘上没多收到写就是那次发布压根没落到这块盘上。"; }
-        checks=$((checks + 2))
+        grep -q "name=device_log device=$device .* divergence_window=none divergence=none" "$work/$mode/check.txt" \
+          || { sed 's/^/        /' "$work/$mode/check.txt"
+               fail "$mode 盘 $device：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行" "退出码与结果行对不上，先查 crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs 的 main 与 compare_one_device。"; }
+        checks=$((checks + 1))
       done
-      prefix_only+=("$mode")
+      host_rerun_windows="$(host_rerun_windows_of "$mode")"
+      [[ -n "$host_rerun_windows" ]] || fail "模式 $mode 没有登记宿主检查该重跑的段" "在 host_rerun_windows_of 里给它补一行；不补，宿主少重跑一段也看不出来。"
+      grep -q "name=host_rerun mode=$mode windows=$host_rerun_windows operations_by_window=" "$work/$mode/check.txt" \
+        || { sed 's/^/        /' "$work/$mode/check.txt"
+             fail "$mode：宿主检查重跑的段不是 $host_rerun_windows" "看 check.txt 的 name=host_rerun 行；段名单对不上，先查送给 first_transaction_device_log_check 的第一个参数是不是 $mode。"; }
+      checks=$((checks + 1))
       ;;
     *) fail "模式 $mode 没有登记设备侧日志的判据" "在这个 case 里给它补一支；不补就等于这一档的设备侧比对一个字都不判。" ;;
   esac
@@ -268,11 +296,11 @@ for mode in "${MODES[@]}"; do
 done
 
 [[ "$judged_device_logs" == "${#MODES[@]}" ]] || fail "判了 $judged_device_logs 档设备侧日志，而这一轮跑了 ${#MODES[@]} 档" "两个数对不上就有一档被整个跳过；看上面那个 for 循环。"
-uncovered="发布 B / 可写挂载 / 发布 C 的设备侧逐项比对（宿主 first_transaction_device_log_check 只重跑第一个事务）：${prefix_only[*]:-无}；崩溃注入：五档都没有"
+uncovered="崩溃注入：${#MODES[@]} 档都没有"
 if ((prerecorded)); then
   echo "  ✓ 预录档（.qemu-prerecorded，没起虚机）：判了 ${#MODES[@]} 档 ${MODES[*]}、$checks 项检查全过；样本里没摆的 ${#missing[@]} 档：${missing[*]:-无}"
   echo "     → 这一档不算真跑过 QEMU：真跑要在仓顶层不带 .qemu-prerecorded 跑一遍本阶段。"
   exit 3
 fi
-echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；direct 设备侧逐项对得上、两个对照都红在该红的地方，发布 B 与第二个实例两档核到第一个事务那段前缀且盘上确实多收到了写"
+echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；direct、second-transaction、second-instance、raise-rollback-floor 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），两个对照都红在该红的地方"
 echo "     ! 这一道没罩到：$uncovered"

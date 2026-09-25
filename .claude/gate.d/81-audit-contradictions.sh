@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # gate-stage: 最近一次总审核登记的文档级矛盾，每一行都要有去向
+# gate-similar: 79-tree-table-reserve.sh 它对决策正文里的认购表求和、比预留，读 decisions/；这一道读 records/ 最近一次总审核第五节，判每行处置列有去向，没有算术
+# gate-similar: 67-milestone-closeout-owed.sh 它判里程碑文件点名的开着欠账号都进了收口表或豁免，对象是里程碑文件；这一道的对象是总审核记录第五节的矛盾行，要求处置列写「已改」并带能在点名的 kb 文件里找到的引文，或点名一个开着的欠账号
+# gate-similar: 82-clause-enum-pairs.sh 它判条文列的集合与 Rust 枚举逐个成员对上，输入是登记表与 crates 源码；这一道输入是总审核记录与 kb 正文，判的是矛盾行有没有去向
+# gate-similar: 99-multipath-registry.sh 它判实验页「路径与结论登记」表的形状、源码落点与共用项，对象是实验页；这一道对象是总审核第五节，红在处置列既不是核得动的「已改」、也不指开着的欠账
+# gate-similar: 88-quoted-result-lines.sh 它判 kb 正文里整行抄的 E7RESULT 产物行在 research/results/ 里逐字找得到，方向是 kb 到产物；这一道判总审核处置列里「」引的原文在点名的 kb 文件今天的正文里找得到，方向是记录到 kb，另外要判欠账号还开着
 #
 # `records/` 里的总审核记录第五节登记文档级矛盾。这些矛盾**在 kb 里一个落点都没有**，
 # 只活在那份记录里：没有任何检查会在它们腐化时变红，而其中几条按记录自陈会误导实现者

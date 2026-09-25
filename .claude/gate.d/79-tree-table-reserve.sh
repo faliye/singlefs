@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # gate-stage: 树表条目预留字节的认购合计（认购不许超过预留，每条要指得到一个编号）
+# gate-similar: 67-milestone-closeout-owed.sh 它判里程碑收口表收全了开着的欠账号、行号只许顺序号，读 .claude/kb/milestone/ 的收口表；这一道读决策正文里 gate:tree-table-reserve 标记下的认购表，红在宽度之和超过 total
+# gate-similar: 37-decision-summary-width.sh 它判 decisions.md 索引表结论列的字数不超上限，逐格数字数；这一道对一张认购表的宽度列求和、与标记里的预留比大小，还要每行出处带编号
+# gate-similar: 53-format-const-placeholders.sh 它判 crates/singlefs-format 源码里的 // placeholder: 行指得到分项或欠账；这一道的对象是决策正文里的认购表，编号核对只是三条里的一条，主判据是求和不超预留
+# gate-similar: 81-audit-contradictions.sh 它判 records/ 里总审核第五节每行有去向（已改带引文，或点名开着的欠账号），读的是记录；这一道读决策正文的认购表，判的是算术
+# gate-similar: 39-field-table-sum.sh 它只认表头「字段 | 宽」的字段表，判之和等于表后合计与 format-const 标记（等式）；认购表的表头是「认购者 | 住哪条条目 | 宽度 | 出处」它不认，这一道判之和不超过预留（不等式），且每行出处要带编号
+# gate-similar: 10-kb-rot.sh 它判 kb 全文引用的 E / D 号都有定义，不看表的列；这一道只对认购表逐行要求出处至少带一个编号、C 号在欠账表有登记行，并对宽度列求和
 #
 # C338（树表条目预留没有余量）欠的那一半：认购表立成正文之后，要有一道算和的检查。
 # 2026-09-22 立表时当场抓到一处：正文列的是 8 + 8 + 8 + 16 + 8 = 48，而它自己写「共 56」——
