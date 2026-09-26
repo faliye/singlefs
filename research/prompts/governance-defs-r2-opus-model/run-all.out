@@ -1,0 +1,213 @@
+### 钩子（Bash）
+== g1-main-54-full-three-lines agent=- run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-main-54-full-three-lines agent=- run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-54-direct agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
+== g1-triage-54-direct agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
+== g1-triage-87 agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-87 agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-full agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-full agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged-logged agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged-logged agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged-noprefix agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：research/scripts/gate-staged.sh（跑 gate.sh --staged）（整轮门禁）：gate-triage 跑「整轮门禁」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+== g1-triage-gate-staged-noprefix agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：research/scripts/gate-staged.sh（跑 gate.sh --staged）（整轮门禁）：gate-triage 跑「整轮门禁」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+== g1-triage-gate-staged-request agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged-request agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged agent=gate-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g1-triage-gate-staged agent=gate-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-55-qemu-first-transaction-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-55-qemu-first-transaction-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-55-qemu-first-transaction agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-55-qemu-first-transaction agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-57-lkmm-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-57-lkmm-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-57-lkmm agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-57-lkmm agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-59-crates-mutation-replay-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-59-crates-mutation-replay-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-59-crates-mutation-replay agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-59-crates-mutation-replay agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-74-model-differential agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-74-model-differential agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-77-test-environment agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-77-test-environment agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-94-checker-implementation-disjoint agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-94-checker-implementation-disjoint agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-diff-quiet agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-diff-quiet agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-ls-others agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== g2-verifier-ls-others agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+### 派发闸
+crash-verifier--main-agent-row-copied	rc=0	
+crash-verifier--with-diff-check	rc=0	
+gate-triage--main-agent-row-copied	rc=2	✗ 派 gate-triage 的提示要它跑「层 0」：「要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑」
+gate-triage--minimal	rc=0	
+gate-triage--only-57-clause	rc=2	✗ 派 gate-triage 的提示要它跑「herd7」：「57 号没有复用、每次现跑」
+gate-triage--pre-change-row-copied	rc=2	✗ 派 gate-triage 的提示要它跑「层 0」：「gate-triage 带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged 并分诊（gate.sh 里 54 号跑快档并核全绿标记，55、59 照 stage-inputs.tsv 复用上一次全」
+### G1 三行命令的退出码（今天的写法）
+green	这一次 Bash 调用的退出码：0	输出：stub-full 在 /tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/defs-r2-opus/run-all-1/tmp.SM5RbrWFtw/tree 上跑，退 0 	剩下的 worktree 数（含主树）：1
+red	这一次 Bash 调用的退出码：0	输出：stub-full 在 /tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/defs-r2-opus/run-all-1/tmp.V5ZdrnNsAk/tree 上跑，退 1 	剩下的 worktree 数（含主树）：1
+memory-cap-250	这一次 Bash 调用的退出码：0	输出：stub-memory-cap：退 250，命令一行都没跑或被杀 	剩下的 worktree 数（含主树）：1
+scope-unavailable-251	这一次 Bash 调用的退出码：0	输出：stub-memory-cap：退 251，命令一行都没跑或被杀 	剩下的 worktree 数（含主树）：1
+### G1 三行命令的退出码（攻方提的写法）
+green	改后那一次调用的退出码：0	剩下的临时目录：0	剩下的 worktree 数（含主树）：1
+red	改后那一次调用的退出码：1	剩下的临时目录：0	剩下的 worktree 数（含主树）：1
+memory-cap-250	改后那一次调用的退出码：250	剩下的临时目录：0	剩下的 worktree 数（含主树）：1
+scope-unavailable-251	改后那一次调用的退出码：251	剩下的临时目录：0	剩下的 worktree 数（含主树）：1
+### G2 核对命令在几段历史上
+定义里的核对命令：git diff --quiet -- crates Cargo.toml Cargo.lock litmus research/scripts research/results
+S1 这一批暂存了 crates/；别的会话的执行员往 research/scripts/replay.sh 追加了一行、没暂存
+  定义那条命令退 1（三道都停下报告）
+  55 号自己读的路径上工作区与暂存区：不同
+  57 号自己读的路径上工作区与暂存区：同
+  59 号自己读的路径上工作区与暂存区：同
+  未跟踪（定义要求原样列进报告、不停）：
+S2 这一批暂存了 .claude/scripts/lkmm.sh；工作区里那一份又被改了、没暂存
+  定义那条命令退 0（三道都照跑）
+  55 号自己读的路径上工作区与暂存区：同
+  57 号自己读的路径上工作区与暂存区：不同
+  59 号自己读的路径上工作区与暂存区：同
+  未跟踪（定义要求原样列进报告、不停）：
+S3 这一批暂存了 59 号脚本；工作区那一份不同
+  定义那条命令退 0（三道都照跑）
+  55 号自己读的路径上工作区与暂存区：同
+  57 号自己读的路径上工作区与暂存区：同
+  59 号自己读的路径上工作区与暂存区：不同
+  未跟踪（定义要求原样列进报告、不停）：
+S4 这一批暂存了 crates/；别的会话在 crates/singlefs-harness/tests/ 下新建了一个没跟踪的测试文件
+  定义那条命令退 0（三道都照跑）
+  55 号自己读的路径上工作区与暂存区：同
+  57 号自己读的路径上工作区与暂存区：同
+  59 号自己读的路径上工作区与暂存区：同
+  未跟踪（定义要求原样列进报告、不停）：crates/singlefs-harness/tests/wip_from_other_session.rs 
+### G2 放开别的会话改哪一个文件
+六条路径下已跟踪文件 324 个
+  不是 55 号输入（stage-inputs.tsv 那一行）的：6
+  不是 57 号输入（litmus/、crates/）的：189
+  不是 59 号输入（stage-inputs.tsv 那一行）的：192
+  三道都不读、改了照样让三道全停的：0
+59 号拷进每一片的：crates Cargo.toml Cargo.lock litmus research/results research/scripts/run-with-memory-cap.sh
+六条路径下已跟踪文件 324 个，不在 59 号这一宽口径里的：63
+### G2 cargo 认不认未跟踪文件
+singlefs-harness ['bin'] e999_other_session_wip
+singlefs-harness ['test'] wip_from_other_session
+crates/mutations.tsv 里 cargo 参数带 -p singlefs-harness 的行：631（非注释非空行共 724）
+### G3 同一份输出在 59 号与 mutate.sh 两边判成什么
+compile-error.txt	59 号：invalid（整道判红：是）	crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）	mutate.sh：invalid（判整轮失败：否）
+crash-after-named-test-passed.txt	59 号：failure（整道判红：是）	crates/mutations.tsv:7 合成变异：inode_and_extent_lookups_from_th	mutate.sh：crashed（判整轮失败：否）
+crash-before-named-test.txt	59 号：invalid（整道判红：是）	crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）	mutate.sh：crashed（判整轮失败：否）
+named-test-failed.txt	59 号：caught（整道判红：否）	  ✓ 合成变异：inode_and_extent_lookups_from_the_root_read_the_fir	mutate.sh：caught（判整轮失败：否）

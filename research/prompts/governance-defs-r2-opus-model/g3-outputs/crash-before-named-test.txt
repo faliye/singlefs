@@ -1,0 +1,12 @@
+   Compiling singlefs-harness v0.1.0 (/work/crates/singlefs-harness)
+    Finished `release` profile [optimized] target(s) in 41.20s
+     Running tests/first_transaction_step_five_publish.rs (target/release/deps/first_transaction_step_five_publish-0123456789abcdef)
+
+running 1 test
+
+thread 'inode_and_extent_lookups_from_the_root_read_the_first_file_back' has overflowed its stack
+fatal runtime error: stack overflow
+error: test failed, to rerun pass `-p singlefs-harness --test first_transaction_step_five_publish`
+
+Caused by:
+  process didn't exit successfully: `/work/target/release/deps/first_transaction_step_five_publish-0123456789abcdef inode_and_extent_lookups` (signal: 6, SIGABRT: process abort signal)

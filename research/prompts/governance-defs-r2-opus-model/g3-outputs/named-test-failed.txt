@@ -1,0 +1,13 @@
+     Running tests/first_transaction_step_five_publish.rs (target/release/deps/first_transaction_step_five_publish-0123456789abcdef)
+
+running 1 test
+test inode_and_extent_lookups_from_the_root_read_the_first_file_back ... FAILED
+
+failures:
+
+failures:
+    inode_and_extent_lookups_from_the_root_read_the_first_file_back
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p singlefs-harness --test first_transaction_step_five_publish`

@@ -1,0 +1,1 @@
+{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/gate-staged.sh; echo "exit=$?"; } > /tmp/claude-0/defs-r2-opus-draft/gate-staged.log 2>&1

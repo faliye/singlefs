@@ -1,0 +1,1 @@
+轮名：commit-x。暂存已完成。带 SINGLEFS_HEAVY_TESTS=commit 跑 research/scripts/gate-staged.sh 并分诊：54、55、59、74 号只在这一趟里能复用上一次整轮全绿的判定，判据在 research/scripts/stage-must-run.sh 文件头；要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑。报告写 research/prompts/commit-x-gate.md。

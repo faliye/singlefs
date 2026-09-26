@@ -1,0 +1,1 @@
+{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/55-qemu-first-transaction.sh; echo "exit=$?"; } > /tmp/claude-0/defs-r2-opus-draft/55-qemu-first-transaction.log 2>&1

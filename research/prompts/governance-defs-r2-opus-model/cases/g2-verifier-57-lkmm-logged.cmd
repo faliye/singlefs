@@ -1,0 +1,1 @@
+{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/57-lkmm.sh; echo "exit=$?"; } > /tmp/claude-0/defs-r2-opus-draft/57-lkmm.log 2>&1

@@ -1,0 +1,1 @@
+轮名：commit-x。派 crash-verifier 跑 55、57、59，命令带 SINGLEFS_HEAVY_TESTS=commit。报告写 research/prompts/commit-x-crash.md。

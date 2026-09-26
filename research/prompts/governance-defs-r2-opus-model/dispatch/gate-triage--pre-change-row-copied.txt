@@ -1,0 +1,1 @@
+轮名：commit-x。暂存已完成。gate-triage 带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged 并分诊（gate.sh 里 54 号跑快档并核全绿标记，55、59 照 stage-inputs.tsv 复用上一次全绿判定，57 号没有复用、每次现跑）。报告写 research/prompts/commit-x-gate.md。

@@ -1,0 +1,1 @@
+SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/gate-staged.sh

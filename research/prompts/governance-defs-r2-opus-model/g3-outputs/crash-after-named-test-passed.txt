@@ -1,0 +1,9 @@
+running 2 tests
+test inode_and_extent_lookups_from_the_root_read_the_first_file_back ... ok
+
+thread 'inode_and_extent_lookups_second' has overflowed its stack
+fatal runtime error: stack overflow
+error: test failed, to rerun pass `-p singlefs-harness --test first_transaction_step_five_publish`
+
+Caused by:
+  process didn't exit successfully: `/work/target/release/deps/first_transaction_step_five_publish-0123456789abcdef inode_and_extent_lookups` (signal: 6, SIGABRT: process abort signal)

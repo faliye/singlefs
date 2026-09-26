@@ -1,0 +1,1 @@
+SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/55-qemu-first-transaction.sh

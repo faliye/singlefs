@@ -1,0 +1,1 @@
+nice -n 19 bash research/scripts/gate-staged.sh
