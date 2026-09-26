@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 D="$(mktemp -d)"; trap 'rm -rf "${D:?}"' EXIT
 # 被测脚本可换：自证这份自检会红时，指向一份改回旧写法的副本（ASK_LOCAL_SCRIPT=副本路径）。
 # 副本要放在与 research/scripts 同构的位置：它按自己所在目录找两个检测器，oov-check.py 又按 ../data/en-words.txt 找词表，
-# 缺了哪样，红的就是「检测器找不到」而不是被改的那一支
+# 缺了哪样，红的就是「检测器找不到」（缺检测器本身）或「没跑成（退出码 2）」（缺词表），而不是被改的那一支
 ASK_LOCAL="${ASK_LOCAL_SCRIPT:-research/scripts/ask-local.sh}"
 # 网关的 key 在测试缝 ASK_LOCAL_FAKE_TEXT 之前就要取；自带一份假的，自证不依赖本机的 ~/code/ai-center
 mkdir -p "$D/center"; printf 'AI_CENTER_KEY_VSCODE_CHAT=selftest\n' > "$D/center/.env.tenants"

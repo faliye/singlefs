@@ -11,7 +11,7 @@
   ② 反引号里的仓内路径：反引号里按空白切开的每个词（命令里的脚本路径也算），ASCII 写成、中间带 `/`、
      而且第一段在解析基准下现存、或末段带常见的文件扩展名（`origin/master`、`text/plain` 两样都不满足，不算仓内路径）。
      解析基准：仓根、所在文件的目录、`.claude/`、`.claude/kb/`，外加同一个反引号里 `cd 目录` 之后的那个目录；一处在就算指得到。
-     跳过：被 .gitignore 挡着的（规范副本、构建目录）、`../` `/` `~` 起头的、`refs/` 起头的 git 引用、带占位（`<` `*` `{`）的。
+     跳过（计数报在末行）：被 .gitignore 挡着的（规范副本、构建目录）、`../` `/` `~` `http` 起头的、`refs/` 起头的 git 引用、带占位（`<` `*` `{`）的。
      已归档的写裸文件名（`.claude/agent-common.md`「找不到历史实验的数据」那一条），不带目录，不在射程里。
   ③ `文件「小节」`：文件在仓里、而「小节」里的字（去掉空白、反引号、星号、「」之后）在那份文件的全文里一处都找不到。
      判的是「全文任意位置出现」，不只看标题：定义常点正文里的一句；小节改了名而原名的字还散在正文里时抓不到。
@@ -20,8 +20,9 @@
 判不到、逐条列进「没判的」（不算红）：③ 里文件解析不到的（多半是只写了文件名、住在四个基准之外）；
 ② 里不全是路径字符（非 ASCII、引号、`$` 这类）、中间带 `/`、又指不到的记号（悬空的中文文件名路径与 `NN-简称.md` 这类占位分不开；指得到的照常算判过）。
 
-输出：每处红一行「文件:行: 说明」；「没判的」逐条一行；末行「扫 N 份治理文档：门禁号 A 处、路径 B 处、小节 C 处；没判 D 处；跳过 E 处（被 .gitignore 挡着 F、不像仓内路径 G）」。
-退出码：0 全指得到；1 有指不到的；3 一份治理文档都没扫到（没有对象，不许当通过）。python 自己出错退别的码（打不开脚本是 2），调用方当「没跑成」。
+输出：每处红一行「文件:行: 说明」；「没判的」逐条一行；末行「扫 N 份治理文档：门禁号 A 处、路径 B 处、小节 C 处；没判 D 处；跳过 E 处（被 .gitignore 挡着 F、不像仓内路径 G、仓外或带占位 H）」。
+退出码：0 全指得到；1 有指不到的；3 一份治理文档都没扫到（没有对象，不许当通过）；4 本脚本自己出错（读不了某份文件这类，打出 traceback）；
+python 起不来时退 2（打不开脚本）。调用方把 0、1、3 之外的都当「没跑成」。
 """
 import glob
 import os
@@ -80,15 +81,19 @@ def looks_like_repo_path(path, carrier, changed_directories):
     return bool(FILE_EXTENSION.search(path.rstrip("/")))
 
 
+OUTSIDE_TOKEN = "outside"
+
+
 def path_token(token):
-    """反引号里的一个词若形如一条仓内路径，返回去掉 `:行号`、`@标题`、`~正则` 之后的路径，否则 None。"""
+    """反引号里的一个词若形如一条仓内路径，返回去掉 `:行号`、`@标题`、`~正则` 之后的路径；
+    中间不带 `/` 的返回 None（不是路径，不计数）；起头在仓外或带占位的返回 OUTSIDE_TOKEN（计进跳过）。"""
     path = re.split(r"[:@~]", token, maxsplit=1)[0]
     if "/" not in path.rstrip("/"):
         return None
     if path.startswith(("../", "/", "~", "refs/", "http")):
-        return None
+        return OUTSIDE_TOKEN
     if any(mark in path for mark in "<*{"):
-        return None
+        return OUTSIDE_TOKEN
     return path
 
 
@@ -101,7 +106,7 @@ def main():
     gates = existing_gate_numbers()
     problems, unjudged = [], []
     counts = {"gate": 0, "path": 0, "section": 0}
-    skipped = {"ignored": 0, "not_repo_path": 0}
+    skipped = {"ignored": 0, "not_repo_path": 0, "outside": 0}
     for carrier in carriers:
         with open(carrier, encoding="utf-8") as handle:
             lines = handle.read().split("\n")
@@ -120,6 +125,9 @@ def main():
                 for word in words:
                     path = path_token(word)
                     if path is None:
+                        continue
+                    if path is OUTSIDE_TOKEN:
+                        skipped["outside"] += 1
                         continue
                     if not REPO_PATH.match(path):
                         # 非 ASCII 的记号：指得到就算判过；指不到的与 `NN-简称.md` 这类占位分不开，列进没判的
@@ -154,9 +162,17 @@ def main():
         print("     → 怎么办：门禁号改成现存的号或共享 gate.sh 里那一道的名字；路径改成现存的，已归档的写裸文件名；小节按那份文件今天的标题改。")
     for item in unjudged:
         print(f"  没判的：{item}")
-    print(f"  扫 {len(carriers)} 份治理文档：门禁号 {counts['gate']} 处、路径 {counts['path']} 处、小节 {counts['section']} 处；没判 {len(unjudged)} 处；跳过 {skipped['ignored'] + skipped['not_repo_path']} 处（被 .gitignore 挡着 {skipped['ignored']}、不像仓内路径 {skipped['not_repo_path']}）")
+    print(f"  扫 {len(carriers)} 份治理文档：门禁号 {counts['gate']} 处、路径 {counts['path']} 处、小节 {counts['section']} 处；没判 {len(unjudged)} 处；跳过 {sum(skipped.values())} 处（被 .gitignore 挡着 {skipped['ignored']}、不像仓内路径 {skipped['not_repo_path']}、仓外或带占位 {skipped['outside']}）")
     return 1 if problems else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        exit_code = main()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print("  ✗ lib-governance-refs.py 自己出错（上面是 traceback）——这一段没判完")
+        print("     → 怎么办：按 traceback 修本脚本或那份读不了的文件；没判完就是没判，不许当成判过了。")
+        exit_code = 4
+    sys.exit(exit_code)

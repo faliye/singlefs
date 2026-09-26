@@ -566,7 +566,7 @@ def selftest(hook_dir):
             case("重型:否定句「别跑」", "implementation-writer", "别跑 `cargo test --all`。", 0),
             case("重型:否定句「禁止」", "implementation-writer", "禁止跑 check.sh。", 0),
             case("重型:否定句「不用」", "implementation-writer", "层 0 全量不用跑，提交时统一跑。", 0),
-            case("重型:只提到、没要它跑", "implementation-writer", "层 0 归 crash-verifier；check.sh 那一套 lint 下的 clippy 要过。", 0),
+            case("重型:只提到、没要它跑", "implementation-writer", "层 0 全量归主 agent；check.sh 那一套 lint 下的 clippy 要过。", 0),
             case("重型:--all-targets 不是 --all", "implementation-writer", "跑 `cargo build --offline --all-targets`。", 0),
             case("重型:轻阶段谁都能跑", "experiment-runner", first + "这一段回答的岔路：岔路 1\n跑完再跑 bash .claude/gate.d/12-no-prime-marks.sh。\n", 0),
             case("重型:崩溃验证员跑自己那几道", "crash-verifier", "提交流程里跑 55 号 QEMU、57 号 herd7、59 号变异整表，命令带 SINGLEFS_HEAVY_TESTS=commit。", 0),
