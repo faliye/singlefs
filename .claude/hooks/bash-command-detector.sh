@@ -10,9 +10,9 @@
 # 只负责检出问题，交给主 agent 去判断；子 agent 与脚本结不结束由主 agent 定。
 #
 # 检出两种，写进检出记录（默认 /tmp/claude-1000/agent-hook-detections.jsonl，环境变量 AGENT_HOOK_DETECTIONS 可改），每条一行 JSON：
-#   ① 没有 `timeout` 的 `until` / `while` 等待循环（里面有 `sleep`）：等的条件不成立时会一直等（前台的在执行前拒绝，见「拒绝六种」②，拒了不再记）；
+#   ① 没有 `timeout` 的 `until` / `while` 等待循环（里面有 `sleep`）：等的条件不成立时会一直等（前台的在执行前拒绝，见「拒绝七种」②，拒了不再记）；
 #   ② `run_in_background` 起的命令里又自己放后台：外层 shell 当场退出（下面列的形态里，命令位置上的 disown、coproc、setsid -f、nohup … &、
-#      tmux / screen 的分离模式、systemd-run 在执行前拒绝，见「拒绝六种」③；单独的 `&` 而之后同一层没有 `wait` 的在执行前拒绝，见「拒绝六种」④；
+#      tmux / screen 的分离模式、systemd-run 在执行前拒绝，见「拒绝七种」③；单独的 `&` 而之后同一层没有 `wait` 的在执行前拒绝，见「拒绝七种」④；
 #      拒了不再记。这里剩下的只记：起了几个 `&`、之后的 `wait "$pid"` 只等了其中一个，与 `start-stop-daemon -b`），
 #      harness 的完成通知当场发出，真正在跑的东西跑完不再叫醒谁（2026-09-18 一个门禁分诊员这样起门禁与三个缓存计时器，
 #      records/2026-09-16-subagent拆分提案.md 第三十三节）。认的形态：`disown`、`coproc`、`setsid -f/--fork`、同一行带单独 `&` 的 `nohup`、

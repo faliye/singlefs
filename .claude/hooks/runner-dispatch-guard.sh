@@ -37,7 +37,9 @@
 #   `.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，提示里要它跑不拦。
 #   crash-verifier 放行层 0、QEMU、herd7、crates 变异整表那几句，gate-triage 放行整轮门禁与全部实验复跑那几句（它们各自那一份，执行时还要带
 #   SINGLEFS_HEAVY_TESTS=commit / user-request，由 heavy-test-guard.sh 判）；其余一律拒。
-#   会误拒：名字在前、动词在后、中间没有 TOPIC_GAP_BREAK 的说明句（「54 号在提交时跑全量」「54 号跑全量要四十分钟」），改写成「只在……才跑」或用「」括起来。
+#   会误拒：名字在前、动词在后、中间没有 TOPIC_GAP_BREAK 的说明句（「54 号在提交时跑全量」「54 号跑全量要四十分钟」），改写成「只在……才跑」或用「」括起来；
+#   否定词在括号外、重型阶段的名字在括号里的（「不跑重型测试（check.sh、`cargo test --workspace`）」）：按 ③ 括号里单独成分句，否定词不在那个分句里，照拒；
+#   否定词与名字写进同一个分句（「不跑 check.sh、`cargo test --workspace`」），或只指清单出处不列名字。
 #   会漏：同一分句里另有否定词的指令（「不改代码直接跑 54 号」）、宾语是代词的（「跑它」）、名字离动词太远的、没有动词的清单行（「验证负载：……层 0 各流快档」）；
 #   这些执行时 heavy-test-guard.sh 照拒。
 #
@@ -436,7 +438,7 @@ def decide(hook_input, project_root):
                    "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑；"
                    "子 agent 只跑自己动到的测试二进制、fmt / clippy / build 与 54、55、57、59、87 之外的门禁阶段；crash-verifier 只跑 54、55、57、59 号那几道，"
                    "gate-triage 只跑 gate.sh 整轮与 87 号（执行时 .claude/hooks/heavy-test-guard.sh 也拒）。\n"
-                   "→ 怎么办：真要它跑就删掉这一句；不是要它跑的，写成否定句（「不跑层 0」），转述别人的原话用「」括起来；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；"
+                   "→ 怎么办：真要它跑就删掉这一句；不是要它跑的，写成否定句（「不跑层 0」），否定词与名字放在同一个分句里（名字别放进否定词后面的全角括号，括号里单独成分句），转述别人的原话用「」括起来；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；"
                    "提交之外任务确实要跑，先弹窗问用户，用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
     snapshot_code, snapshot_message = snapshot_conflict_verdict(subagent_type, prompt, project_root)
     if snapshot_code:
