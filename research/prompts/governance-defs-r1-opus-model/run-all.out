@@ -1,0 +1,138 @@
+# probes
+## G1 主 agent 的层 0 全量命令（main-agent.md:59）
+exit=0 agent=- hook=heavy-test-guard.sh
+  cmd: SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree
+exit=2 agent=- hook=heavy-test-guard.sh
+  cmd: bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree
+  | ✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  | → 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时跑一次、或用户要求时跑；子 agent 一律不跑，只跑自己动到的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）与 fmt / clippy / build；主 agent 在提交流程里跑要带 `SINGLEFS_HEAVY_TESTS=commit`，用户要求时带 `SINGLEFS_HEAVY_TESTS=user-request`。
+exit=0 agent=crash-verifier hook=heavy-test-guard.sh
+  cmd: SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/54-layer0-replay.sh
+exit=0 agent=gate-triage hook=heavy-test-guard.sh
+  cmd: SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged
+## G2 子 agent 经内存包装（agent-common.md:46）
+exit=0 agent=implementation-writer hook=heavy-test-guard.sh
+  cmd: bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-core --test core_contract
+exit=0 agent=three-way-attack hook=heavy-test-guard.sh
+  cmd: bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-core --test core_contract
+exit=0 agent=three-way-attack hook=heavy-test-guard.sh
+  cmd: bash scripts/run-with-memory-cap.sh 4G cargo run --release --bin e7-foo
+exit=2 agent=implementation-writer hook=heavy-test-guard.sh
+  cmd: cargo test -p singlefs-core --test core_contract
+  | ✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
+  | → 规矩：子 agent 跑编译出来的代码（cargo test / cargo run / cargo bench、直接执行 cargo 编出来的二进制）要经内存包装跑：`bash research/scripts/run-with-memory-cap.sh <上限> <命令>`（上限例 4G）——它先判整机放不放得下、放不下就排队，撞了上限只杀这一条，不把整机拖进 OOM；写在脚本里的，整条脚本经它跑：`bash research/scripts/run-with-memory-cap.sh <上限> bash <脚本>`。只编不跑的（cargo build / clippy、cargo test --no-run）不用经它；要限时设 RUN_WITH_MEMORY_CAP_TIME_LIMIT=<秒>，别在包装外面套 timeout（排队的时间也会算进去）。
+exit=0 agent=implementation-writer hook=heavy-test-guard.sh
+  cmd: nice -n 19 bash .claude/gate.d/74-model-differential.sh
+exit=2 agent=implementation-writer hook=heavy-test-guard.sh
+  cmd: cargo test --release -p singlefs-harness --test model_differential -- --nocapture
+  | ✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
+  | → 规矩：子 agent 跑编译出来的代码（cargo test / cargo run / cargo bench、直接执行 cargo 编出来的二进制）要经内存包装跑：`bash research/scripts/run-with-memory-cap.sh <上限> <命令>`（上限例 4G）——它先判整机放不放得下、放不下就排队，撞了上限只杀这一条，不把整机拖进 OOM；写在脚本里的，整条脚本经它跑：`bash research/scripts/run-with-memory-cap.sh <上限> bash <脚本>`。只编不跑的（cargo build / clippy、cargo test --no-run）不用经它；要限时设 RUN_WITH_MEMORY_CAP_TIME_LIMIT=<秒>，别在包装外面套 timeout（排队的时间也会算进去）。
+## G2 实验执行员第 5 步（experiment-runner.md:32）
+exit=2 agent=experiment-runner hook=heavy-test-guard.sh
+  cmd: bash research/scripts/replay.sh E158
+  | ✗ 不经内存包装跑编译出来的代码被拒：脚本 /home/user/singlefs/research/scripts/replay.sh:383 里的 直接执行 cargo 编出来的二进制 ./target/release/e9-keylayout（experiment-runner 不经 run-with-memory-cap.sh）
+  |   另有：脚本 /home/user/singlefs/research/scripts/replay.sh:414 里的 cargo run（experiment-runner 不经 run-with-memory-cap.sh）
+  |   另有：脚本 /home/user/singlefs/research/scripts/replay.sh:415 里的 直接执行 cargo 编出来的二进制 ./target/release/e142-first-txn-dry-run（experiment-runner 不经 run-with-memory-cap.sh）
+  |   另有：脚本 /home/user/singlefs/research/scripts/replay.sh:456 里的 cargo run（experiment-runner 不经 run-with-memory-cap.sh）
+exit=0 agent=experiment-runner hook=heavy-test-guard.sh
+  cmd: bash research/scripts/run-with-memory-cap.sh 4G bash research/scripts/replay.sh E158
+## G3 本地腿第 3、4 步（three-way-local-attack.md:27-28），run_in_background
+exit=0 agent=three-way-local-attack hook=bash-command-detector.sh
+  cmd: bash research/scripts/ask-local.sh research/prompts/rX-local-attack.md > research/prompts/rX-local-attack-output-s1.md
+exit=0 agent=three-way-local-attack hook=bash-command-detector.sh
+  cmd: set -o noclobber; bash research/scripts/ask-local.sh research/prompts/rX-local-attack.md > research/prompts/rX-local-attack-output-s1.md
+exit=0 agent=three-way-local-attack hook=bash-command-detector.sh
+  cmd: bash research/scripts/ask-local.sh research/prompts/rX-local-attack.md >| research/prompts/rX-local-attack-output-s1.md
+## G6 & 与 wait（agent-common.md:55）
+exit=0 agent=implementation-writer hook=bash-command-detector.sh
+  cmd: sleep 1 & first=$!; sleep 2 & second=$!; wait "$first"; a=$?; wait "$second"; b=$?; echo $a $b
+exit=0 agent=implementation-writer hook=bash-command-detector.sh
+  cmd: sleep 1 & sleep 2 & wait
+exit=2 agent=implementation-writer hook=bash-command-detector.sh
+  cmd: sleep 1 &
+  |   ✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：sleep 1）：外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何人
+  |      → 怎么办：长活直接放 run_in_background，命令里只写那条活本身，不加 `&`（几条活要并行就在同一条命令里 `a & b & wait`，用 `wait` 等齐）；已经在跑、pid 已知的，另起一条 run_in_background 等它：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。这一道只拒这种写法，不停你在跑的任何东西
+# run-with-memory-cap --check 4G
+  ✗ 带内存上限的 scope 起不来：slice singlefs-heavy.slice 的总上限设不上：总上限算不出来：/proc/meminfo 的 MemTotal 读不到，或整机内存减余量 20G 已不剩（RUN_WITH_MEMORY_CAP_SLICE_TOTAL=没设）；命令一行都没跑
+  → 怎么办：照上面那句修（systemctl --user status、cat /sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.subtree_control 里要有 memory）；修好之前别跑这一步，不许退回无总上限去跑
+exit=251
+# g1
+C0 对照：主工作区与暂存区一致 full=9bfbc9fc24ccc662 files=4 | cv=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C1 别的会话改了已跟踪文件、未暂存 full=9bfbc9fc24ccc662 files=4 | cv=ae18243e4b64448f files=4 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C2 别的会话新建未跟踪文件 full=9bfbc9fc24ccc662 files=4 | cv=5ebea91ecb67397e files=5 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C3 自己一处改动漏暂存（Cargo.lock） full=9bfbc9fc24ccc662 files=4 | cv=3da9b1db50a16888 files=4 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C4 删了已跟踪文件、删除未暂存 full=9bfbc9fc24ccc662 files=4 | cv=efbd46b77af695f8 files=3 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C5 被忽略的文件（crates/target/） full=9bfbc9fc24ccc662 files=4 | cv=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C6 暂存之后又改了已暂存的文件 full=9bfbc9fc24ccc662 files=4 | cv=ad0f9c852b98fbad files=4 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+C7 主工作区的 54 号有未暂存改动 full=9bfbc9fc24ccc662 files=4 | cv=4c8c22d3be65bc08 files=4 → 找不到那一格(红) | staged=9bfbc9fc24ccc662 files=4 → 找得到那一格(绿)
+# g3
+clean1 的 sha256 前 16 位：81507b49f13c5ed3；clean2：bf1683f0826e129e
+H0 第一次调用，s1 新号（第 3 步字面写法）
+  命令：ASK_LOCAL_FAKE_TEXT=/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/leg-opus/g3.q3lX/clean1.txt bash /home/user/singlefs/research/scripts/ask-local.sh prompts/rX-local-attack.md > prompts/rX-local-attack-output-s1.md
+  退出码=0；s1=81507b49f13c5ed3；stderr 首行：
+H1 s1 已是一份干净样本，再用第 3 步字面写法落进 s1
+  命令：ASK_LOCAL_FAKE_TEXT=/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/leg-opus/g3.q3lX/clean2.txt bash /home/user/singlefs/research/scripts/ask-local.sh prompts/rX-local-attack.md > prompts/rX-local-attack-output-s1.md
+  退出码=0；s1=bf1683f0826e129e；stderr 首行：
+H2 同上，但照共用约束「新建文件一律排他」加 noclobber
+  命令：set -o noclobber; ASK_LOCAL_FAKE_TEXT=/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/leg-opus/g3.q3lX/clean1.txt bash /home/user/singlefs/research/scripts/ask-local.sh prompts/rX-local-attack.md > prompts/rX-local-attack-output-s1.md
+  退出码=1；s1=bf1683f0826e129e；stderr 首行：bash: line 1: prompts/rX-local-attack-output-s1.md: cannot overwrite existing file
+H3 判红留下的空 s2，不加 >|、直接 >（第 4 步说 > 写不进）
+  命令：ASK_LOCAL_FAKE_TEXT=/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/leg-opus/g3.q3lX/clean2.txt bash /home/user/singlefs/research/scripts/ask-local.sh prompts/rX-local-attack.md > prompts/rX-local-attack-output-s2.md
+  退出码=0；s1=bf1683f0826e129e；stderr 首行：
+  s2 此刻大小：72 字节
+H4 检测器找不到（退出码 6 那一支）
+  命令：ASK_LOCAL_FAKE_TEXT=/tmp/claude-0/-home-user-singlefs/77b4b1be-00af-5f85-8659-f6e6d51fb840/scratchpad/leg-opus/g3.q3lX/clean1.txt bash nochecker/ask-local.sh prompts/rX-local-attack.md > prompts/rX-local-attack-output-s3.md
+  退出码=6；s1=bf1683f0826e129e；stderr 首行：ask-local: 找不到 nochecker/corruption-check.py —— **没做**字词损坏检查，不是通过了
+  s3 大小：0 字节；作废副本：1 份
+# g5
+mutate.sh 退出码=1；输出 9 行，其中标记行：
+✅ [e999_drop_bound_check] 红：tests::adds
+✅ [e999_flip_comparison] 红：tests::adds
+❌ [e999_touch_comment] 一个测试都没红 —— 这条破坏没有被任何检查看见
+⏭  [e999_break_syntax] 变异导致编译失败，本条无效（不计入盲区，也不算命中）
+💥 [e999_endless_loop] 测试进程没跑完（signal 9）——破坏被看见了，但不是断言抓到的
+收尾两行：
+计数：内存撞顶 0 条（上限 16G）、超时 0 条
+已还原，基线仍全绿
+── 照定义字面数（grep -cF）──
+✅ [抓到] → 0
+⏭  [无效] → 0
+❌ [没红] → 0
+── 按行首符号数（grep -c '^符号'）──
+✅ → 2
+⏭ → 1
+❌ → 1
+💥 → 1
+⚠️ → 0
+⏱ → 0
+🧱 → 0
+变异表条数：5
+# g6
+crates/mutations.tsv 第 463 行：变异名「P6 后一半：空发布记录的本次发布内序号写成 2」，文件 crates/singlefs-core/src/transaction.rs
+翻状态之前锚点命中次数：1
+  crates/singlefs-checker/src/lib.rs：改写 3 处
+  crates/singlefs-checker/src/walk.rs：改写 7 处
+  crates/singlefs-core/src/journal.rs：改写 16 处
+  crates/singlefs-core/src/recovery.rs：改写 5 处
+  crates/singlefs-core/src/transaction.rs：改写 3 处
+  crates/singlefs-format/src/lib.rs：改写 2 处
+  crates/singlefs-harness/tests/checker_known_bad_images.rs：改写 5 处
+  crates/singlefs-harness/tests/first_transaction_step_five_publish.rs：改写 3 处
+  crates/singlefs-harness/tests/second_transaction_parallel_line_one_last_record_flag.rs：改写 5 处
+  crates/singlefs-harness/tests/second_transaction_parallel_line_one_multi_unit_file.rs：改写 2 处
+  crates/singlefs-harness/tests/second_transaction_parallel_line_three_many_inodes.rs：改写 1 处
+  crates/singlefs-harness/tests/second_transaction_step_three_formatted_pool.rs：改写 1 处
+  crates/singlefs-harness/tests/second_transaction_supplement_two_multi_record_transaction_zero_publishes.rs：改写 3 处
+✓ D23（journal 的角色与格式） 第 4 条是未定：改写 282 处、67 个文件；要人看的句子 0 处
+relabel 退出码 0
+翻状态之后锚点命中次数：0
+── 副本里跑 33 号（末 6 行）──
+  → 怎么办：缺表的写 research/mutations/<bin名>.tsv（每行：变异名<TAB>原文<TAB>替换文）；
+    锚点对不上的把「原文」改成今天源码里逐字存在、且只出现一次的那一段，
+    改完跑 bash research/scripts/mutate.sh <bin> <源文件> <表> 证明每条都被抓，再来。
+  ✗ crates/mutations.tsv 这些行的「原文」在源码里不是恰好命中一次（门禁 59 号预扫会整张表退出，一条都不跑）：
+      crates/mutations.tsv:463 P6 后一半：空发布记录的本次发布内序号写成 2：原文在 crates/singlefs-core/src/transaction.rs 里命中 0 次
+    → crates 这张表：把原文改到今天源码里逐字存在、只出现一次的那一段（原文里的换行写成 \n），改完单跑那几行证明点名的测试红。
+33 号退出码=1
+# cite
+53

@@ -1,0 +1,53 @@
+.claude/agents/crash-verifier.md	54 号只跑快档（不带 `--full`，快档加核全绿标记）
+.claude/main-agent.md	派 `crash-verifier` 跑 54 号快档与 55、57、59
+.claude/rules/implementation-workflow.md	崩溃验证员跑 54 号快档与 55、57、59 号
+.claude/gate.d/54-layer0-replay.sh	# 主工作区里跑的 --full 读的是工作区
+.claude/gate.d/54-layer0-replay.sh	ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
+.claude/gate.d/54-layer0-replay.sh	git -C "$ROOT" ls-files -z --cached --others --exclude-standard
+.claude/gate.d/54-layer0-replay.sh	write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest
+.claude/gate.d/54-layer0-replay.sh	if [[ ! -f "$full_green_marker_path" ]]; then
+.claude/gate.d/stage-owners.tsv	54-layer0-replay.sh
+.claude/agents/mutation-triage.md	照每条的 `✅ [抓到]`
+research/scripts/mutate.sh	record_verdict "$row_index" caught 0 "✅ [$name] 红：$red" ""
+research/scripts/mutate.sh	record_verdict "$row_index" notred 1 "❌ [$name]
+research/scripts/mutate.sh	record_verdict "$row_index" invalid 0 "⏭  [$name]
+research/scripts/mutate.sh	record_verdict "$row_index" crashed 0 "💥 [$name]
+research/scripts/mutate.sh	record_verdict "$row_index" nameblind 1 "⚠️  [$name]
+research/scripts/mutate.sh	echo "计数：内存撞顶 $memory_hit_count 条（上限 $MEMORY_MAX）、超时 $timeout_count 条"
+research/scripts/mutate.sh	for wanted in "✅ [抓到] 红：tests::adds"
+.claude/agents/experiment-runner.md	跑一次 `bash research/scripts/replay.sh E<号>` 确认逐字节一致
+research/scripts/replay.sh	./target/release/e9-keylayout "$REPLAY_DEV"
+research/scripts/replay.sh	(cd .. && cargo run -q -p singlefs-harness --bin e142_first_transaction_write_dump)
+.claude/hooks/heavy-test-guard.sh	# 另一道，与重型不重型无关：子 agent 跑编译出来的代码
+.claude/agent-common.md	退出码 250 是撞了这一条的上限
+research/scripts/run-with-memory-cap.sh	#   251    slice 的总上限设不上
+research/scripts/run-with-memory-cap.sh	#   254    被总上限挤掉
+.claude/agents/three-way-attack.md	副本与自己的模型可以编译、跑
+.claude/agents/three-way-local-attack.md	用 Bash 的 `run_in_background` 起
+.claude/agents/three-way-local-attack.md	先确认它大小为 0，再用 `>|`
+.claude/agent-common.md	- tools 只有 Read / Bash 的：新建文件一律排他
+.claude/agents/three-way-verifier.md	先拿快照清单 `sha256sum -c` 核那个文件
+.claude/agents/three-way-verifier.md	- 腿开工那一刻的快照路径：`sha256sum` 清单
+.claude/agents/kb-scribe.md	改写了 `crates/**/*.rs` 的（实现的地盘，要走代码轮）
+.claude/main-agent.md	33 号红（变异表锚点腐化）→ `experiment-runner` 只修锚点
+.claude/agents/experiment-runner.md	变异表改追加进 `crates/mutations.tsv` 末尾
+.claude/gate.d/lib-item-ref-status.py	'research/**/*.rs', 'crates/**/*.rs', '.claude/rules/*.md')], [])))
+.claude/agent-common.md	不带参数的 `wait` 恒返回 0
+.claude/hooks/bash-command-detector.sh	几条活要并行就在同一条命令里 `a & b & wait`
+.claude/rules/three-way-inference.md	主 agent 用同一份提示再派一条同立场腿，报告带 `-s2` 后缀
+.claude/main-agent.md	主 agent 用同一份提示再派一条同立场腿；三轮之后停
+.claude/gate.d/stage-inputs.tsv	54-layer0-replay.sh
+.claude/singlefs-ai-sop/scripts/gate.sh	git -C "$ROOT" update-ref refs/sop/gate-ok "$START_HEAD"
+.claude/singlefs-ai-sop/scripts/gate.sh	< <(find "$GATE_D" -maxdepth 1 -name '*.sh' -type f | sort)
+research/scripts/watch.sh	#   bash research/scripts/watch.sh --processes
+.claude/gate.d/74-model-differential.sh	echo "     → 怎么办：单跑看细节：cargo test --release
+.claude/gate.d/15-research-build.sh	out="$(cd "$R" && cargo test --release 2>&1)"
+crates/mutations.tsv	# crates 的变异表：每行六段
+.claude/hooks/lib_heavy_tests.py	MEMORY_CAP_WRAPPER
+.claude/hooks/lib_shell_words.py	MEMORY_CAP_WRAPPER = "run-with-memory-cap.sh"
+.claude/hooks/bash-command-detector.sh	# ⑦ 在同一个 inode 上改一个已经存在的脚本
+.claude/gate.d/54-layer0-replay.sh	stage_script_hash="$(sha256sum < "$layer0_stage_script_path" | cut -d' ' -f1)" || return 1
+.claude/gate.d/54-layer0-replay.sh	toolchain_versions="$(cd "$ROOT" && cargo -V && rustc -V)" || return 1
+research/scripts/ask-local.sh	VERDICT="$(python3 "$CHECK" "$TXT" "$1" 2>&1)"; crc=$?
+research/scripts/oov-check.py	print("     生词: " + ' '.join(dict.fromkeys(oov))[:300])
+.claude/agents/implementation-writer.md	其余行照样追加进 `crates/mutations.tsv` 末尾
