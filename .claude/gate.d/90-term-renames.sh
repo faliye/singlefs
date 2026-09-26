@@ -19,6 +19,6 @@ echo "               产物分两类，别一把梭：**跑得出来的**（装�
 echo "               换完跑 cargo test --workspace 与 bash research/scripts/replay.sh，同一份源码要仍然吐出逐字节相同的产物——"
 echo "               那是重新生成，不是改证据；**跑不出来的**（已归档、要虚机或真设备、别人的产物）一个字节都不许动，"
 echo "               连同引它的正文整段留旧名（evidence-discipline「原样保存的证据不许事后改」）。"
-echo "               确实该留旧名的（别家术语、冻结证据目录、历史类文件、引文块、对照表自己），"
+echo "               确实该留旧名的（别家术语、冻结证据目录、历史类文件里换了就成假话的那一句、引文块、对照表自己），逐文件"
 echo "               登记进 .claude/term-rename-exempt 并写明为什么。"
 exit 1

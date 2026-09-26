@@ -43,7 +43,7 @@ echo
 echo "── 3. 文件内自指链接 ──"
 # 扫 kb 下每一份 .md：链接目标（去掉 #锚点）按这份文件自己的目录解析之后就是它自己，判红。
 # 历史类文件（`*-history.md`、`decisions-history/` 下的月份文件）整份跳过：它们逐字记着当时的原文，
-# 里面抄录的链接改了就成假话（`.claude/rules/path-moves.md`「历史类文件保留旧名」同一条判据）。
+# 里面抄录的链接改了就成假话（判据同 `.claude/rules/path-moves.md`「改一个全仓术语：正文之外还有五处会红」里「历史类文件同样换名」那一段：换了就成假话的那一句留原样）。
 self_link_report=$(python3 - "$KB" <<'PY'
 import os, re, sys, glob
 kb = sys.argv[1]

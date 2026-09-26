@@ -223,7 +223,7 @@ for decision, info in sorted(decisions.items()):
         continue
     where = info['path']
     # 半定 / 待定的决策，20 号要标题里写明未定几项（`—— 半定（一项未定）`），只许这一种括注
-    if not re.match(r'^## D\d+ \S.*? —— (已定|半定|待定)(（[0-9一二三四五六七八九十]+[项条]未定）)?\s*$', info['title']):
+    if not re.match(r'^## D\d+ \S.*? —— (已定|半定|待定)(（[0-9一二两三四五六七八九十]+[项条]未定）)?\s*$', info['title']):
         bad('瘦身形态', f'{where}：首行写成「## D{decision} 简称 —— 状态」，状态后面除了半定 / 待定要写的「（N 项未定）」不带别的括注——「{info["title"][:40]}」')
     for (kind, item_number), heading, labels, cited, basis_text in info['shapes']:
         if DATE.search(heading):

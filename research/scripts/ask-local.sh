@@ -7,6 +7,10 @@
 # 上游是 ~/code/ai-center 的 OpenAI 兼容网关（:8200，前置 vLLM）。
 # 不传 max_tokens / thinking_token_budget —— 网关按两本账补值并按形状学习，
 # 传一个偏小的值等于把自己按死在那个值上（ai-center kb/token-budget.md）。
+#
+# 退出码：0 过了字词损坏闸，正文在 stdout；2 取不到网关的 key 或提示为空；3 请求失败、响应不是 JSON、网关报错或没有 choices；
+#   4 正文为空；5 判为字词损坏（没设 ASK_LOCAL_ALLOW_CORRUPT=1 时）；6 损坏检测器没跑成或找不到，这一份没验过。
+#   5 与 6 都不打正文、把正文留成 -output-void<n>.md。
 set -uo pipefail
 
 CENTER="${AI_CENTER_DIR:-$HOME/code/ai-center}"
@@ -83,6 +87,8 @@ save_void() {
 #   corruption-check.py  复读（多吐了）+ 成对标记落单（整段掉了）+ 实词自复读（`resetting resetting`）
 #   oov-check.py         拼接（两个词粘死：`configurationing` `batchinggroup`）
 # 实测：一轮含 `batchinggroup`×2 的输出被前者判绿并当作干净证据用进了 D23 轴二论证。
+# 这两个标记只在这一次运行里设：调用方环境里带进来的同名变量不算数
+UNCHECKED=""; VOID_SAVED=""
 for CHECK in "$(dirname "$0")/corruption-check.py" "$(dirname "$0")/oov-check.py"; do
 if [[ -x "$CHECK" || -f "$CHECK" ]]; then
   VERDICT="$(python3 "$CHECK" "$TXT" "$1" 2>&1)"; crc=$?
@@ -111,7 +117,7 @@ fi
 done
 
 # 没验过的一份不打正文、退 6：退 0 的话，只看退出码的调用方（本地腿定义「退出码 0 的每次调用占一个号」）会把它当成过了闸。
-# 正文照样留成作废副本，证据不丢；6 不与判红的 5、网关的 2 / 3 / 4 混用。
+# 正文照样留成作废副本，证据不丢；6 不与判红的 5、取不到 key 或提示为空的 2、请求失败的 3、正文为空的 4 混用。
 if [[ -n "${UNCHECKED:-}" ]]; then
   save_void
   echo "ask-local: 这一份没过完字词损坏检查，按没验过处理：退出 6，不打正文" >&2

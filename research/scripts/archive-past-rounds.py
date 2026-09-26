@@ -259,7 +259,7 @@ def run(root, apply_changes):
         for entry in stale:                                        # gate-lint:detail
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
-    print("     → 下一步：跑共享 gate.sh（「链接指向」阶段）确认没有指空的链接，再跑一次本脚本 --check 判绿。")
+    print("     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 0
 
 

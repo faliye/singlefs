@@ -35,7 +35,7 @@
 #   重型阶段的名字：层 0（层 0 / 0 层 / layer0 / 54 号）、QEMU（qemu / vm-bench / 55 号）、herd7（herd7 / lkmm / 57 号）、crates 变异整表
 #   （crates/mutations.tsv / 变异整表 / 59 号）、全量测试（check.sh / 全量测试）、整轮门禁（gate.sh / gate-staged.sh / 整轮门禁）、全部实验复跑（87 号）、E152 装置。
 #   `.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，提示里要它跑不拦。
-#   crash-verifier 放行层 0、QEMU、herd7、crates 变异整表那几句，gate-triage 放行整轮门禁与全部实验复跑那几句（它们各自那一份，执行时还要带
+#   crash-verifier 放行 QEMU、herd7、crates 变异整表那几句（层 0 不归它：快档在整轮门禁里，全量由主 agent 跑），gate-triage 放行整轮门禁与全部实验复跑那几句（它们各自那一份，执行时还要带
 #   SINGLEFS_HEAVY_TESTS=commit / user-request，由 heavy-test-guard.sh 判）；其余一律拒。
 #   会误拒：名字在前、动词在后、中间没有 TOPIC_GAP_BREAK 的说明句（「54 号在提交时跑全量」「54 号跑全量要四十分钟」），改写成「只在……才跑」或用「」括起来；
 #   否定词在括号外、重型阶段的名字在括号里的（「不跑重型测试（check.sh、`cargo test --workspace`）」）：按 ③ 括号里单独成分句，否定词不在那个分句里，照拒；
@@ -136,7 +136,7 @@ HEAVY_TEST_NAMES = [
 ]
 FULL_TEST_COMMAND = re.compile(r"cargo\s+test\b[^\n]*?--(?:all|workspace)(?![\w-])")
 DISPATCH_HEAVY_OWN_SHARE = {
-    "crash-verifier": {"层 0", "QEMU", "herd7", "crates 变异整表"},
+    "crash-verifier": {"QEMU", "herd7", "crates 变异整表"},
     "gate-triage": {"整轮门禁", "全部实验复跑"},
 }
 
@@ -436,7 +436,7 @@ def decide(hook_input, project_root):
                    "→ 判法：句子里「跑 / 执行 / 复跑 / 重跑 / 运行 / bash / 起」的宾语是重型阶段，或写了「`cargo test --all`」这种命令字面；"
                    "否定句、引号里的、「……说，」「报告里写」「原句」之后的转述、重型阶段只是同句另一个名词的，都不拦（判法细节在这个 hook 的文件头）。\n"
                    "→ 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时、或用户要求时跑；"
-                   "子 agent 只跑自己动到的测试二进制、fmt / clippy / build 与 54、55、57、59、87 之外的门禁阶段；crash-verifier 只跑 54、55、57、59 号那几道，"
+                   "子 agent 只跑自己动到的测试二进制、fmt / clippy / build 与 54、55、57、59、87 之外的门禁阶段；crash-verifier 只跑 55、57、59 号那几道，"
                    "gate-triage 只跑 gate.sh 整轮与 87 号（执行时 .claude/hooks/heavy-test-guard.sh 也拒）。\n"
                    "→ 怎么办：真要它跑就删掉这一句；不是要它跑的，写成否定句（「不跑层 0」），否定词与名字放在同一个分句里（名字别放进否定词后面的全角括号，括号里单独成分句），转述别人的原话用「」括起来；提交时的重阶段派 crash-verifier、整轮门禁派 gate-triage；"
                    "提交之外任务确实要跑，先弹窗问用户，用户同意了由主 agent 带 SINGLEFS_HEAVY_TESTS=user-request 跑。")
@@ -569,7 +569,8 @@ def selftest(hook_dir):
             case("重型:只提到、没要它跑", "implementation-writer", "层 0 归 crash-verifier；check.sh 那一套 lint 下的 clippy 要过。", 0),
             case("重型:--all-targets 不是 --all", "implementation-writer", "跑 `cargo build --offline --all-targets`。", 0),
             case("重型:轻阶段谁都能跑", "experiment-runner", first + "这一段回答的岔路：岔路 1\n跑完再跑 bash .claude/gate.d/12-no-prime-marks.sh。\n", 0),
-            case("重型:崩溃验证员跑自己那几道", "crash-verifier", "提交流程里跑 54 号 --full、55 号 QEMU、57 号 herd7、59 号变异整表，命令带 SINGLEFS_HEAVY_TESTS=commit。", 0),
+            case("重型:崩溃验证员跑自己那几道", "crash-verifier", "提交流程里跑 55 号 QEMU、57 号 herd7、59 号变异整表，命令带 SINGLEFS_HEAVY_TESTS=commit。", 0),
+            case("重型:崩溃验证员跑层 0 不归它", "crash-verifier", "提交流程里跑 54 号 --full，命令带 SINGLEFS_HEAVY_TESTS=commit。", 2),
             case("重型:门禁分诊跑整轮", "gate-triage", "带 SINGLEFS_HEAVY_TESTS=commit 跑 gate.sh --staged。", 0),
             # 收窄：只在动词的宾语就是重型阶段时才拦。2026-09-25 被误拦的原句逐字，都该放行
             case("收窄:原句一「只在提交时才执行的」是定语", "general-purpose",

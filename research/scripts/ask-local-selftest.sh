@@ -7,7 +7,9 @@
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 D="$(mktemp -d)"; trap 'rm -rf "${D:?}"' EXIT
-# 被测脚本可换：自证这份自检会红时，指向一份改回旧写法的副本（ASK_LOCAL_SCRIPT=副本路径）
+# 被测脚本可换：自证这份自检会红时，指向一份改回旧写法的副本（ASK_LOCAL_SCRIPT=副本路径）。
+# 副本要放在与 research/scripts 同构的位置：它按自己所在目录找两个检测器，oov-check.py 又按 ../data/en-words.txt 找词表，
+# 缺了哪样，红的就是「检测器找不到」而不是被改的那一支
 ASK_LOCAL="${ASK_LOCAL_SCRIPT:-research/scripts/ask-local.sh}"
 # 网关的 key 在测试缝 ASK_LOCAL_FAKE_TEXT 之前就要取；自带一份假的，自证不依赖本机的 ~/code/ai-center
 mkdir -p "$D/center"; printf 'AI_CENTER_KEY_VSCODE_CHAT=selftest\n' > "$D/center/.env.tenants"
@@ -41,7 +43,8 @@ import sys
 open(sys.argv[1],"w").write('The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. ')
 PYEOF
 printf 'ask-local selftest prompt two.\n' > "$D/case2-prompt.md"
-ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$ASK_LOCAL" "$D/case2-prompt.md" >"$D/o2" 2>"$D/e2"
+# 调用方环境里带着同名标记（UNCHECKED=1）也不许影响判定：这一格同时证「运行前清零」那一行有用
+UNCHECKED=1 ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$ASK_LOCAL" "$D/case2-prompt.md" >"$D/o2" 2>"$D/e2"
 rc=$?
 [[ $rc -eq 0 ]] || { say ✗ "干净正文被判红（退出码 $rc，应为 0）"; fail=1; }
 python3 -c 'import sys; sys.exit(0 if open(sys.argv[1]).read() == open(sys.argv[2]).read().strip() + "\n" else 1)' "$D/o2" "$D/clean.txt" \

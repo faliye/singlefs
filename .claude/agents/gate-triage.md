@@ -23,13 +23,13 @@ omitClaudeMd: true
 ## 做什么
 
 1. 开跑前照共用约束「不做」一节看负载；另有别的 `gate.sh` 在跑就等它结束。
-2. 只在提交时（或主 agent 转达用户要求时）跑：暂存过的跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged`（用户要求时 `=user-request`）；主 agent 明写全量的跑不带参数（前缀照带）。54、55、57、59 这几道重阶段在 `gate.sh` 里各走各的：54 号跑快档并核全绿标记，55、59 照 `.claude/gate.d/stage-inputs.tsv` 复用上一次全绿判定，57 号没有复用、每次现跑；你不直接调它们，也不跑全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。登记给你的其余阶段已在 `gate.sh` 整轮里跑过，不再单跑；主 agent 点名要单跑某一道时才单跑，轻阶段不带前缀，87 号照带。超过 Bash 单次上限时后台跑、结束后读输出。
+2. 只在提交时（或主 agent 转达用户要求时）跑：暂存过的跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/gate-staged.sh`（用户要求时 `=user-request`；它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）；主 agent 明写全量的跑 `bash .claude/scripts/gate.sh` 不带参数（前缀照带）。54、55、57、59 这几道重阶段在整轮里各走各的：54、55、59（还有 74）号只在 `gate-staged.sh` 那一趟里能复用上一次整轮全绿的判定（判据在 `research/scripts/stage-must-run.sh` 文件头），要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑；你不直接调它们，也不跑全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。登记给你的其余阶段已在 `gate.sh` 整轮里跑过，不再单跑；主 agent 点名要单跑某一道时才单跑，轻阶段不带前缀，87 号照带。超过 Bash 单次上限时后台跑、结束后读输出。
 3. 每个红阶段：抄门禁给的「✗」行与紧跟的「→」下一步原样；看它点名的文件与行在不在暂存区 diff 的块里（`git diff --cached -U0 -- <文件>`）。在块里 ⇒「这一轮」；文件在但行不在块里、或文件不在暂存区 ⇒「不是这一轮」；红句说的是「这一批输入」本身的（54 号的「没有这批输入的全绿标记」「那一格的哈希不同」这类）不按它点名的标记路径判：这一轮的改动（`git diff --cached --name-only`；跑全量工作区时是主 agent 给的文件清单）碰了 `.claude/gate.d/stage-inputs.tsv` 里那一道那一行登记的路径 ⇒「这一轮」，下一步原样抄 54 号出路里的三行命令，一条都没碰 ⇒「不是这一轮」；工具没装、网关不通、`cargo` 不在 ⇒「环境」，用 `bash .claude/scripts/env.sh` 的对应行佐证；别的会话同时在跑同一个重阶段、进程被外部信号杀掉（输出里一行裸的 `Terminated`）⇒「并发」，贴开跑时与出事前后 `ps` 看到的同名进程。红阶段没有「✗」与「→」可抄的（被杀、崩溃），抄它最后 20 行输出，判「分不清」或「并发」，写明没有下一步可抄。分不清的写「分不清」与原因。
 4. 原样抄未实现清单与「由项目本地阶段覆盖」清单。别的会话同时在改仓、跑全量工作区时「工作区跑的过程中没变」那一条红了：照抄开跑、收尾两个指纹，判「不是这一轮」。`gate.sh` 不打印单个阶段的耗时，取不到的不估。
 
 ## 写范围
 
-- 报告文件、草稿目录。门禁自己的 git 写（共享 `gate.sh` 不带 `--staged` 全绿时 `update-ref refs/sop/gate-ok`（带 `--staged` 时不写）、`--staged` 时的临时 worktree）是门禁本身的行为，允许；你自己不做任何 git 写。
+- 报告文件、草稿目录。门禁自己的 git 写（共享 `gate.sh` 不带 `--staged` 全绿时 `update-ref refs/sop/gate-ok`（带 `--staged` 时不写）、`--staged` 时的临时 worktree、`gate-staged.sh` 整轮全绿时 `update-ref refs/sop/staged-green`）是门禁本身的行为，允许；你自己不做任何 git 写。
 
 ## 产出
 
