@@ -345,7 +345,7 @@ def judge_one(work, environment, row):
         # 替换文写进源码之后编不过：既不算被抓也不算没红，是一条无效变异，
         # 它要证明的那个行为今天零变异覆盖（.claude/rules/mutation-sampling.md 第八类）。
         # 报成「没红」会把排查指向「去补一条用例」，而要改的是这一行替换文。
-        return line_number, "invalid", f"{table}:{line_number} {name}：替换文写进源码之后编不过（退出码 {run.returncode}）\n{tail}"
+        return line_number, "invalid", f"{table}:{line_number} {name}：点名的测试 {expected} 一行都没出现，输出里有 error 行（替换文编不过，或测试进程在跑到它之前被杀，或名字认不出；退出码 {run.returncode}）\n{tail}"
     return line_number, "failure", f"{table}:{line_number} {name}：点名的测试 {expected} 没跑到（退出码 {run.returncode}）\n{tail}"
 
 
@@ -410,7 +410,8 @@ if invalid:
     print(f"  ✗ 有变异无效（无效 {len(invalid)} 条；替换文写进源码之后编不过，那条行为今天零变异覆盖）：")
     for item in invalid:
         print(f"      {item}")   # gate-lint:detail
-    print("     → 怎么办：改这一行替换文，不是去补用例。先看反斜杠——表里只有 \\n 会被还原成换行，\\& \\\" 这类原样写进源码就编不过；")
+    print("     → 怎么办：先看尾巴分来源，不是去补用例。有 process didn't exit successfully 与信号的，是测试进程被杀，先查是谁杀的；点名的名字里带 $ 这类字符的，改那一行的测试名；其余是替换文编不过——")
+    print("       先看反斜杠：表里只有 \\n 会被还原成换行，\\& \\\" 这类原样写进源码就编不过；")
     print("       别的编译错就在副本里把替换后的那一行 cargo check 一遍，改成编得过、而且真会改行为的写法（.claude/rules/mutation-sampling.md 第八类）。")
 if failures:
     print(f"  ✗ 有变异没红（没红 {len(failures)} 条）：")

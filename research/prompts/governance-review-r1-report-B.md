@@ -58,7 +58,7 @@
 
 - 没跑重型测试，也没跑 gate.sh 整轮；第 1、2 条里「55、59 在同一次提交里跑两遍」是按脚本逻辑推的，没有真跑一趟提交流程量过。
 - 没核 `.claude/main-agent.md`、`.claude/agent-common.md`、`.claude/rules/*.md` 本身的改动（不在我负责的范围），只在与定义说同一件事时引用它们；第 1、3、11 条顺带点到的那几处留给负责那些文件的审查员。
-- 12 号现跑红在 `research/prompts/m2-lastflag-implementer-report.md:130`（角标 P′），不在我负责的文件里，没判归属。
+- 12 号现跑红在 `research/prompts/m2-lastflag-implementer-report.md:130`（P 带一撇的角标写法），不在我负责的文件里，没判归属。
 - 没核 `oov-check.py`、`corruption-check.py` 判得对不对，只核了参数与输出形态；没有真调本地模型（网关不在）。
 - 没核 `write-guard.sh` 对相对路径以外写法的判定、`kb-scribe-followup.sh` 真跑一次写入后的回传（只读了文件头与表）。
 - 本草稿目录里 `diffs/`、`probe/`、`tmp.*` 不是我建的，没碰。
