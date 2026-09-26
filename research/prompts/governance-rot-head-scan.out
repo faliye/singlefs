@@ -1,0 +1,11 @@
+  ✗ .claude/agent-common.md:48: `scripts/proc.py stop <pid>` 里的 scripts/proc.py 在仓里不存在
+  ✗ .claude/agents/experiment-runner.md:32: 「65 号」在门禁目录里没有 65-*.sh
+  ✗ .claude/agents/sweep.md:31: `research/scripts/rewrite-moved-paths.py` 里的 research/scripts/rewrite-moved-paths.py 在仓里不存在
+  ✗ .claude/agents/three-way-attack.md:15: .claude/rules/three-way-inference.md「多轮：一次打穿不算数，三轮里多数打穿才算（2026-09-06 用户明令）」在那份文件里一处都找不到
+  ✗ .claude/agents/three-way-defense.md:15: .claude/rules/three-way-inference.md「多轮：一次打穿不算数，三轮里多数打穿才算（2026-09-06 用户明令）」在那份文件里一处都找不到
+  ✗ .claude/agents/three-way-materials.md:20: `research/prompts/_m2-code-r1-diff.md` 里的 research/prompts/_m2-code-r1-diff.md 在仓里不存在
+  ✗ .claude/agents/three-way-materials.md:28: `research/prompts/_m2-code-r1-diff.md` 里的 research/prompts/_m2-code-r1-diff.md 在仓里不存在
+  ✗ .claude/rules/path-moves.md:31: 「23 号」在门禁目录里没有 23-*.sh
+  ✗ .claude/rules/three-way-inference.md:112: .claude/singlefs-ai-sop/rules/show-me-test.md「没实现的要明说」在那份文件里一处都找不到
+  ✗ .claude/rules/three-way-inference.md:125: `research/prompts/c143-r3-main-checks/` 里的 research/prompts/c143-r3-main-checks/ 在仓里不存在
+  扫 29 份治理文档：门禁号 89 处、路径 260 处、小节 74 处

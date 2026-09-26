@@ -17,7 +17,7 @@
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
         `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
-     不留一个指空的路径——门禁 23 号判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
+     不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
 import os
 import re
@@ -259,7 +259,7 @@ def run(root, apply_changes):
         for entry in stale:                                        # gate-lint:detail
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
-    print("     → 下一步：跑门禁 23 号（文档指向）确认没有指空的链接，再跑一次本脚本 --check 判绿。")
+    print("     → 下一步：跑共享 gate.sh（「链接指向」阶段）确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 0
 
 

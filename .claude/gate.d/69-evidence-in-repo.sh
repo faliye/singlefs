@@ -240,7 +240,7 @@ if outside_citations:
     for entry in outside_citations:
         print(f"     {entry}")  # gate-lint:detail
     print(f"     → 怎么办：把 /tmp 下那份东西拷进仓里该在的位置（报告、提示与判决进 {prompts_dir}/，跑出来的数进 {results_dir}/），")
-    print("               引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径（path-moves.tsv 只收从仓库根写的路径，/tmp 登记不进去）。")
+    print("               引用改成指那一份：在引用它的文件里把 /tmp 路径逐处换成仓内路径。")
     print("               原件已经没了，就写明它没了、把还核得动的那部分落进仓里；只是在说做法（草稿放在哪），把句子里的依据词去掉。")
 if failed:
     sys.exit(1)

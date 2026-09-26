@@ -12,7 +12,7 @@ omitClaudeMd: true
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 假设主 agent 的倾向是错的，造可达的历史、输入或操作序列去打穿它。
-开工先读：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「判决由主 agent 做，不由投票做」「多轮：一次打穿不算数，三轮里多数打穿才算（2026-09-06 用户明令）」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「判据自己也会写错：打中之后先判是哪一种」。
+开工先读：`.claude/rules/three-way-inference.md`「各条腿必须互不重复」「判决由主 agent 做，不由投票做」「多轮：一次打穿不算数，三轮里多数打穿才算」；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「判据自己也会写错：打中之后先判是哪一种」。
 
 ## 输入（主 agent 必须给）
 

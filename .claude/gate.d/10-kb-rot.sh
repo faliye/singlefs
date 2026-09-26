@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# gate-stage: kb 腐化（1–2 实验号与决策号的引用都有定义；3 不变量声明条数与表对得上、欠账表数得出条数）
+# gate-stage: kb 腐化（1–2 实验号与决策号的引用都有定义；3 不变量声明条数与表对得上、欠账表数得出条数；4 治理文档里的门禁号、路径与「小节」指得到）
+# gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 1–2 段同是「引用了不存在的东西」，并在这里
 #
 # kb 腐化审计：查「一处改了、引用它的地方没跟着改」。
 #
@@ -9,9 +10,11 @@
 # 这类腐化对模型比对人更危险——检索会把陈旧的那一条**单独**端出来，
 # 既没有上下文也没有对照（singlefs-ai-sop/rules/kb-discipline.md 第 7 条）。
 #
-# 三段，都是机械可判的：
+# 四段，都是机械可判的：
 #   1–2. 引用了不存在的实验号 / 决策号（doc-lint 已覆盖一部分，这里补实验号）
 #   3. 正文写死的条数与实际条数对不上；欠账表数不出条数
+#   4. 治理文档（CLAUDE.md、main-agent、agent-common、agents、rules、skills）里「门禁 N 号」没有对应阶段、
+#      反引号里的仓内路径不存在、`文件「小节」` 在那份文件里找不到——判据与够不着的写法在 lib-governance-refs.py 文件头
 # 实验与决策之间的两件事不在这里判，都归门禁 75 号（三方判决 gate-fix-forks-r1、r2 的 T1）：
 #   「实验改成已跑、引用它的决策有没有同批回看」归 ⑤——表里改过一行不够，正文引了它的每条决策都要回看；
 #   「已跑的实验有没有对应的决策」归 ⑨——表里至少一行支撑、推翻或备料，标题写了作废或退役的不判。
@@ -159,6 +162,21 @@ PY_OWED
   else
     ok "欠检查 $chk_actual 条、已还清 $chk_done 条（checks-owed.md）"
   fi
+fi
+
+echo "── 4. 治理文档里的指向 ──"
+governance_rc=0
+python3 "$(cd "$(dirname "$0")" && pwd)/lib-governance-refs.py" || governance_rc=$?
+if [[ $governance_rc -eq 0 ]]; then
+  ok "治理文档里的门禁号、路径与「小节」都指得到"
+elif [[ $governance_rc -eq 2 ]]; then
+  bad "一份治理文档都没扫到——这一段没有对象可判"
+  howto "确认门禁是在仓库根上跑的；治理文档搬了家的话，改 lib-governance-refs.py 的 CARRIER_PATTERNS。"
+else
+  bad "治理文档里有指不到的指向（上面逐条列出）"
+  howto "门禁号：阶段被删或收归上游的，改成共享 gate.sh 里那一道的名字（「链接指向」这类）或现存的号；" \
+        "路径：搬了家的改成新路径，已删的改指现存的做法，已归档的写裸文件名并指到取法（.claude/agent-common.md「找不到历史实验的数据」那一条）；" \
+        "小节：按那份文件今天的标题改。改 agent 定义与共用约束照走门禁 72 号那一条。"
 fi
 
 echo
