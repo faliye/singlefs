@@ -1,0 +1,200 @@
+#### g1-judge.py
+case	59 号判档	定义第 5 步对「测试进程没跑完」预言的判档	分诊员照定义读「无效」	真实发生的
+compile-error	invalid	（进程跑完了，不适用）	替换文编不过（第八类）	替换文编不过
+    59 号打给分诊员的那条：crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）
+named-test-failed	caught	（进程跑完了，不适用）	—	点名测试红了（抓到）
+named-test-failed-dollar-row	invalid	（进程跑完了，不适用）	替换文编不过（第八类）	点名测试红了（抓到），表里测试名尾巴带 $
+    59 号打给分诊员的那条：crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）
+other-test-failed-named-absent	invalid	（进程跑完了，不适用）	替换文编不过（第八类）	别的测试红了，点名的那个名字在输出里不存在（测试改过名）
+    59 号打给分诊员的那条：crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）
+crash-after-named-test-passed	failure	invalid	—	点名测试跑完没红，之后测试进程被信号杀  <- 定义预言与 59 号不符
+crash-before-named-test	invalid	invalid	进程被杀	点名测试没跑完，测试进程被信号杀
+    59 号打给分诊员的那条：crates/mutations.tsv:7 合成变异：替换文写进源码之后编不过（退出码 101）
+named-test-not-run	failure	（进程跑完了，不适用）	—	点名测试没跑到
+
+crates/mutations.tsv 里第 6 列（必须红的测试名）带正则元字符的行：
+  crates/mutations.tsv:202	referenced_slots_counts_the_carried_instance_table_before_its_first_rewrite$	源文件里有 fn referenced_slots_counts_the_carried_instance_table_before_its_first_rewrite：是	59 号的 red_pattern 认不认「test tests::referenced_slots_counts_the_carried_instance_table_before_its_first_rewrite ... FAILED」：不认
+  crates/mutations.tsv:297	first_transaction_self_release_is_one_slot$	源文件里有 fn first_transaction_self_release_is_one_slot：是	59 号的 red_pattern 认不认「test tests::first_transaction_self_release_is_one_slot ... FAILED」：不认
+  crates/mutations.tsv:298	red_check_reads_the_corrupted_mirror_not_the_live_allocator$	源文件里有 fn red_check_reads_the_corrupted_mirror_not_the_live_allocator：是	59 号的 red_pattern 认不认「test tests::red_check_reads_the_corrupted_mirror_not_the_live_allocator ... FAILED」：不认
+  crates/mutations.tsv:684	pc_closed_form_matches_the_registered_anchor_r3c$	源文件里有 fn pc_closed_form_matches_the_registered_anchor_r3c：是	59 号的 red_pattern 认不认「test tests::pc_closed_form_matches_the_registered_anchor_r3c ... FAILED」：不认
+  crates/mutations.tsv:685	pc_closed_form_matches_the_registered_anchor_r3c$	源文件里有 fn pc_closed_form_matches_the_registered_anchor_r3c：是	59 号的 red_pattern 认不认「test tests::pc_closed_form_matches_the_registered_anchor_r3c ... FAILED」：不认
+  crates/mutations.tsv:686	pc_closed_form_third_group_counts_released_and_allocated_records$	源文件里有 fn pc_closed_form_third_group_counts_released_and_allocated_records：是	59 号的 red_pattern 认不认「test tests::pc_closed_form_third_group_counts_released_and_allocated_records ... FAILED」：不认
+  crates/mutations.tsv:687	overwrite_steps_match_the_closed_form_and_cross_a_second_leaf$	源文件里有 fn overwrite_steps_match_the_closed_form_and_cross_a_second_leaf：是	59 号的 red_pattern 认不认「test tests::overwrite_steps_match_the_closed_form_and_cross_a_second_leaf ... FAILED」：不认
+  crates/mutations.tsv:688	accounting_after_first_transaction_matches_the_registered_anchor$	源文件里有 fn accounting_after_first_transaction_matches_the_registered_anchor：是	59 号的 red_pattern 认不认「test tests::accounting_after_first_transaction_matches_the_registered_anchor ... FAILED」：不认
+  crates/mutations.tsv:689	rollback_isolation_scenario_matches_the_new_layout$	源文件里有 fn rollback_isolation_scenario_matches_the_new_layout：是	59 号的 red_pattern 认不认「test tests::rollback_isolation_scenario_matches_the_new_layout ... FAILED」：不认
+  crates/mutations.tsv:693	hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test$	源文件里有 fn hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test：是	59 号的 red_pattern 认不认「test tests::hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test ... FAILED」：不认
+  crates/mutations.tsv:694	hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test$	源文件里有 fn hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test：是	59 号的 red_pattern 认不认「test tests::hr_rollback_row_basis_has_zero_deferred_and_flips_the_q7c1_self_test ... FAILED」：不认
+  共 11 行 / 表里成形的 724 行
+rc=0
+#### g2-untracked.sh
+== U1 实现员在别的会话里起草一条新 litmus：别的会话留下未跟踪的 litmus/wip-fsync-order.litmus
+  55-qemu-first-transaction.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：照跑
+  57-lkmm.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：停
+  59-crates-mutation-replay.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：照跑
+== U2 别的会话调 57 号判别力时在仓根放了标记：别的会话留下未跟踪的 .lkmm-static-only
+  55-qemu-first-transaction.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：照跑
+  57-lkmm.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：照跑
+  59-crates-mutation-replay.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：照跑
+== U3 别的会话新建一个测试文件（该停）：别的会话留下未跟踪的 crates/singlefs-harness/tests/wip.rs
+  55-qemu-first-transaction.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：停
+  57-lkmm.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：停
+  59-crates-mutation-replay.sh	git diff 退 0	改后未跟踪那条：停	改前（按这道自己的输入）：停
+== 今天的仓里谁读 litmus/ 下的文件
+  55 号脚本里 litmus 出现次数：0
+  crates/ 里在运行时读 litmus 的测试文件：crates/singlefs-harness/tests/publish_order_matches_litmus.rs 
+  crates/mutations.tsv 里跑这个测试文件的行数：0
+  那个测试读哪几个 litmus："first-txn-root-implies-units.litmus" "first-txn-journal-implies-units.litmus" "first-txn-root-implies-units-nofence.litmus" "first-txn-journal-implies-units-nofence.litmus" 
+  57 号读仓根标记：18:[[ -f "$ROOT/.lkmm-static-only" ]] && static_only=(--static-only)
+rc=0
+#### g3-git-blind.sh
+腿引的是第 10 行；现在第 10 行是什么、那两条现查各出什么（核查员第 2 步 / 输入一节第 21 行的判法：没改过记 ✗）
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「rule line 9」
+research/scripts/memory-peaks.tsv	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+research/scripts/memory-peaks.tsv	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「peak 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:15:00Z	git log=[2b38302 ]	git status=[]	改过 ⇒ 分不清	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/tracked-changed-late.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行已变成「tracked line 9」
+.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:15:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+.claude/hooks/bash-command-detector.sh	T=2026-09-26T15:30:00Z	git log=[]	git status=[]	没改过 ⇒ 对不上记 ✗	真相：第 10 行没动
+看得见被忽略文件的两种现查（推的改法，不是定义里的）：
+.claude/singlefs-ai-sop/rules/evidence-discipline.md	git status --short --ignored=[!! .claude/singlefs-ai-sop/]	git check-ignore=[.claude/singlefs-ai-sop/rules/evidence-discipline.md]
+research/scripts/memory-peaks.tsv	git status --short --ignored=[!! research/scripts/memory-peaks.tsv]	git check-ignore=[research/scripts/memory-peaks.tsv]
+rc=0
+#### g3-who-records-time.sh
+.claude/main-agent.md	「派腿的时刻」0 处	「腿开工时刻」0 处
+.claude/rules/three-way-inference.md	「派腿的时刻」0 处	「腿开工时刻」0 处
+.claude/rules/implementation-workflow.md	「派腿的时刻」1 处	「腿开工时刻」0 处
+.claude/agents/three-way-verifier.md	「派腿的时刻」0 处	「腿开工时刻」3 处
+.claude/agents/three-way-materials.md	「派腿的时刻」0 处	「腿开工时刻」0 处
+要求记时刻的那一节的标题：
+24:## 代码轮派腿之前记一份开工快照
+这一轮（governance-defs-r3）的快照目录里有什么：
+sha256sums.txt
+上一轮核查员用的开工时刻、攻方腿自记的开工时刻、正推腿报告的提交时刻：
+腿开工时刻 2026-09-26T15:30:00Z 前后
+开工 2026-09-26 15:15 UTC
+107b79f 2026-09-26T15:30:07+00:00 三方 governance-defs-r2：云端正推腿报告
+rc=0
+#### g4-driver-name.sh
+今天 replay.sh 里 @driver 登记行按实验号数：
+     14 E158
+      1 E9
+      1 E156
+      1 E142
+今天 replay.sh 里名字不是恰好 driver_e<号> 的驱动函数：13 个（例：driver_e158_q3_1_g0() driver_e158_q3_1_s16() ）
+今天 .claude/gate.d/ 与 .claude/hooks/ 里提到 driver_ 的文件：0 个；replay.sh 里查函数重名（declare -F / type -t）的行：0
+E900 @driver_e900 期望比 e900-first.out，实际跑出：second-mode output
+E900 @driver_e900 期望比 e900-second-mode.out，实际跑出：second-mode output
+rc=0
+#### g5-exit-two.sh
+包装不给参数：退 2
+包装文件头与传出那一行：
+18:#   0–249  那条命令自己的退出码（cargo 只退 0、101、126、127 与 128 + 信号号，碰不到 250–254）；
+27:#   2      用法错（上限、余量、总上限不是 正整数[KMGT] 的写法，没给命令）。
+132:exit "$command_exit"'
+执行员第 5 步经包装跑的 replay.sh 自己退 2 的地方：
+602:    exit 2
+616:  exit 2
+619:cargo build --release --manifest-path e7-index-bench/Cargo.toml >/dev/null 2>&1 || { echo "replay: 构建失败" >&2; exit 2; }
+共用约束那一句：
+46:2 是包装的用法写错，改写法再跑
+rc=0
+#### run-hooks.sh
+== crash-verifier--check-57 agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--check-57 agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--check-59 agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--check-59 agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--inputs-59 agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--inputs-59 agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-55-qemu-first-transaction-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-55-qemu-first-transaction-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-57-lkmm-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-57-lkmm-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-59-crates-mutation-replay-logged agent=crash-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== crash-verifier--run-59-crates-mutation-replay-logged agent=crash-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== experiment-runner--replay-one agent=experiment-runner run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== experiment-runner--replay-one agent=experiment-runner run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== implementation-writer--cargo-bench-bare agent=implementation-writer run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 不经内存包装跑编译出来的代码被拒：cargo bench（implementation-writer 不经 run-with-memory-cap.sh）
+== implementation-writer--cargo-bench-bare agent=implementation-writer run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 不经内存包装跑编译出来的代码被拒：cargo bench（implementation-writer 不经 run-with-memory-cap.sh）
+== implementation-writer--cargo-bench-wrapped agent=implementation-writer run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== implementation-writer--cargo-bench-wrapped agent=implementation-writer run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== implementation-writer--cargo-test-bare agent=implementation-writer run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
+== implementation-writer--cargo-test-bare agent=implementation-writer run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=2	✗ 不经内存包装跑编译出来的代码被拒：cargo test（implementation-writer 不经 run-with-memory-cap.sh）
+== mutation-triage--read-59-log agent=mutation-triage run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== mutation-triage--read-59-log agent=mutation-triage run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== three-way-verifier--changed-since agent=three-way-verifier run_in_background=0
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+== three-way-verifier--changed-since agent=three-way-verifier run_in_background=1
+pattern-process-guard.sh	rc=0	
+bash-command-detector.sh	rc=0	
+heavy-test-guard.sh	rc=0	
+检出记录条数：4
+rc=0

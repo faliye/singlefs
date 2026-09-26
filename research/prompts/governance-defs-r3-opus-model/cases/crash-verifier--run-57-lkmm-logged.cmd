@@ -1,0 +1,1 @@
+date -u; git rev-parse HEAD; git diff HEAD -- crates litmus | sha256sum; git ls-files --others --exclude-standard -z -- crates litmus | xargs -0 -r sha256sum | sha256sum; { SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/57-lkmm.sh; echo "exit=$?"; } > /tmp/claude-1000/crash-verifier-r3/57-lkmm.log 2>&1; date -u

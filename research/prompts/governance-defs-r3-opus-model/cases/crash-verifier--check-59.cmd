@@ -1,0 +1,1 @@
+git diff --quiet -- crates/ Cargo.toml Cargo.lock research/scripts/run-with-memory-cap.sh .claude/gate.d/59-crates-mutation-replay.sh; echo "diff=$?"; git ls-files --others --exclude-standard -- crates litmus .lkmm-static-only
