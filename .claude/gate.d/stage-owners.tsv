@@ -34,7 +34,7 @@
 51-admission-terms-covered.sh	kb-scribe	准入不等式各项有人维护
 52-segment-registry.sh	kb-scribe,experiment-runner	字节表段序列登记与 E142 产物两边
 53-format-const-placeholders.sh	implementation-writer,kb-scribe	crates 常量文件的占位与 kb 分项两边
-54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放
+54-layer0-replay.sh	gate-triage	层 0 崩溃点重放（快档在 gate.sh --staged 里跑；全量由主 agent 在 HEAD + 暂存区的 worktree 里跑）
 55-qemu-first-transaction.sh	crash-verifier	QEMU 真设备
 56-crates-adversarial-review.sh	gate-triage	判决文件由主 agent 写，提交前核点名
 57-lkmm.sh	crash-verifier	herd7 内存序

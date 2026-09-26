@@ -34,7 +34,7 @@ omitClaudeMd: true
 
 ## 写范围
 
-- 报告文件、模型目录、草稿目录。除此之外不写。要改代码试的，把仓拷到草稿目录（`rsync -a --exclude target --exclude .git`），只在副本上改、副本上的数注明是副本。
+- 报告文件、模型目录、草稿目录。除此之外不写。要改代码试的，把仓拷到草稿目录（`rsync -a --exclude target --exclude .git`），只在副本上改；副本与自己的模型可以编译、跑（`cargo test -p <crate> --test <目标>`、`cargo run`，经内存包装、照共用约束看负载与线程上限；重型测试照样不跑），副本上的数注明是副本。
 
 ## 产出
 

@@ -2363,7 +2363,7 @@ def main():
                   "完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿", file=sys.stderr)
             print("     → 怎么办：要等的活用 Bash 的 run_in_background: true 起，命令里只写那条活本身（不加 `disown`、`coproc`、`setsid -f`、"
                   "`nohup … &`、`tmux` / `screen` 的分离模式、`systemd-run`），然后结束本轮，等它的完成通知再接着做；"
-                  "几条活要并行就在同一条命令里 `a & b & wait`，用不带参数的 `wait` 等齐", file=sys.stderr)
+                  "几条活要并行就在同一条命令里 `{ a; echo $? > a.rc; } & { b; echo $? > b.rc; } & wait`，用不带参数的 `wait` 等齐、退出码逐个读 .rc 文件", file=sys.stderr)
             return 2
         try:
             jobs = unwaited_ampersand_refusal(tool_input.get("command") or "", tool_input.get("run_in_background"))
@@ -2374,7 +2374,7 @@ def main():
             print(f"  ✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：{'；'.join(jobs)}）："
                   "外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何人", file=sys.stderr)
             print("     → 怎么办：长活直接放 run_in_background，命令里只写那条活本身，不加 `&`"
-                  "（几条活要并行就在同一条命令里 `a & b & wait`，用 `wait` 等齐）；"
+                  "（几条活要并行就在同一条命令里 `{ a; echo $? > a.rc; } & { b; echo $? > b.rc; } & wait`，用 `wait` 等齐、退出码逐个读 .rc 文件）；"
                   "已经在跑、pid 已知的，另起一条 run_in_background 等它：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。"
                   "这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2
