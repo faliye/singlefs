@@ -24,7 +24,8 @@ sys.argv[1]
 open(sys.argv[1],"w").write('The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. The resetting resetting of the batch is fine. The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. ')
 PYEOF
 printf 'ask-local selftest prompt, plain english, no emphasis.\n' > "$D/case1-prompt.md"
-ASK_LOCAL_FAKE_TEXT="$D/corrupt.txt" bash "$ASK_LOCAL" "$D/case1-prompt.md" >"$D/o1" 2>"$D/e1"
+# 调用方环境里带着 VOID_SAVED=1 也要照样留 void：这一格证「运行前清零」那一行里 VOID_SAVED 那一半
+VOID_SAVED=1 ASK_LOCAL_FAKE_TEXT="$D/corrupt.txt" bash "$ASK_LOCAL" "$D/case1-prompt.md" >"$D/o1" 2>"$D/e1"
 rc=$?
 [[ $rc -eq 5 ]] || { say ✗ "损坏正文没判红（退出码 $rc，应为 5）"; fail=1; }
 # 判红那一轮 stdout 必须是空的：此前正文先打到 stdout 再过闸，调用方的重定向文件里就落了一份作废输出，
@@ -43,7 +44,7 @@ import sys
 open(sys.argv[1],"w").write('The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. The allocation table is written once per checkpoint and read again on mount. Each unit carries a header that names the tree, the object and the offset. The scan path walks the device in fixed steps and claims every unit whose magic matches and whose header checksum verifies. A unit that fails either test is skipped and reported to the caller as a bad block. The rebuild path runs only when the index trees are gone, and it accepts a unit only after the tag over the ciphertext verifies. Replicas of one extent hold the same ciphertext, so the payload checksum of two replicas is equal whenever the two units carry the same data. ')
 PYEOF
 printf 'ask-local selftest prompt two.\n' > "$D/case2-prompt.md"
-# 调用方环境里带着同名标记（UNCHECKED=1）也不许影响判定：这一格同时证「运行前清零」那一行有用
+# 调用方环境里带着同名标记（UNCHECKED=1）也不许影响判定：这一格证「运行前清零」那一行里 UNCHECKED 那一半
 UNCHECKED=1 ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$ASK_LOCAL" "$D/case2-prompt.md" >"$D/o2" 2>"$D/e2"
 rc=$?
 [[ $rc -eq 0 ]] || { say ✗ "干净正文被判红（退出码 $rc，应为 0）"; fail=1; }

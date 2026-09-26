@@ -22,11 +22,12 @@
 # 每段的成功行都报检查了多少项；本该有对象却一个都没扫到的，判红
 # （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
 #
-# 判别力：fixtures/10-kb-rot.sh/red 必须判红（悬空的实验号、invariants.md 丢了登记标记、欠账表一行都数不出）；
+# 判别力：fixtures/10-kb-rot.sh/red 必须判红（悬空的实验号、invariants.md 丢了登记标记、欠账表一行都数不出、第 4 段的悬空门禁号、路径与小节）；
 # green 必须判绿。
 set -uo pipefail
-# 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。
-cd "${1:-$(dirname "$0")/../..}" || exit 2
+# 门禁调用时把项目根作为 $1 传进来；单独跑时从脚本位置推。共用库按脚本自己的目录找，在 cd 之前取成绝对路径。
+GATE_DIRECTORY="$(cd "$(dirname "$0")" && pwd)"
+cd "${1:-$GATE_DIRECTORY/../..}" || exit 2
 KB=.claude/kb
 fail=0
 say() { printf '  %s\n' "$*"; }
@@ -141,7 +142,7 @@ if [[ ! -f "$KB/checks-owed.md" ]]; then
 else
   # 开着与已还清的切法用共用读法 lib-owed.py（67、92、96 号同一份），不在这里再抄一份 awk
   chk_counts=""
-  if chk_counts=$(python3 - "$(cd "$(dirname "$0")" && pwd)/lib-owed.py" "$KB/checks-owed.md" <<'PY_OWED'
+  if chk_counts=$(python3 - "$GATE_DIRECTORY/lib-owed.py" "$KB/checks-owed.md" <<'PY_OWED'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("lib_owed", sys.argv[1])
 lib_owed = importlib.util.module_from_spec(spec); spec.loader.exec_module(lib_owed)
@@ -166,12 +167,15 @@ fi
 
 echo "── 4. 治理文档里的指向 ──"
 governance_rc=0
-python3 "$(cd "$(dirname "$0")" && pwd)/lib-governance-refs.py" || governance_rc=$?
+python3 "$GATE_DIRECTORY/lib-governance-refs.py" || governance_rc=$?
 if [[ $governance_rc -eq 0 ]]; then
   ok "治理文档里的门禁号、路径与「小节」都指得到"
-elif [[ $governance_rc -eq 2 ]]; then
+elif [[ $governance_rc -eq 3 ]]; then
   bad "一份治理文档都没扫到——这一段没有对象可判"
   howto "确认门禁是在仓库根上跑的；治理文档搬了家的话，改 lib-governance-refs.py 的 CARRIER_PATTERNS。"
+elif [[ $governance_rc -ne 1 ]]; then
+  bad "lib-governance-refs.py 没跑成（退出码 $governance_rc）——这一段没判"
+  howto "单独跑 python3 $GATE_DIRECTORY/lib-governance-refs.py 看它报什么错；没跑成就是没判，不许当成判过了。"
 else
   bad "治理文档里有指不到的指向（上面逐条列出）"
   howto "门禁号：阶段被删或收归上游的，改成共享 gate.sh 里那一道的名字（「链接指向」这类）或现存的号；" \

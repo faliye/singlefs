@@ -10,7 +10,8 @@
 #
 # 退出码：0 过了字词损坏闸，正文在 stdout；2 取不到网关的 key 或提示为空；3 请求失败、响应不是 JSON、网关报错或没有 choices；
 #   4 正文为空；5 判为字词损坏（没设 ASK_LOCAL_ALLOW_CORRUPT=1 时）；6 损坏检测器没跑成或找不到，这一份没验过。
-#   5 与 6 都不打正文、把正文留成 -output-void<n>.md。
+#   5 与 6 都不打正文、把正文留成 -output-void<n>.md；设了 ASK_LOCAL_ALLOW_CORRUPT=1 时判红也退 0、打正文，照样留 void。
+#   内嵌的 python 自己出错时退 1（不在上面几种里，当没跑成）。
 set -uo pipefail
 
 CENTER="${AI_CENTER_DIR:-$HOME/code/ai-center}"

@@ -5,7 +5,8 @@
 .claude/rules/*.md、.claude/skills/*/SKILL.md。三类指向：
 
   ① 门禁号：「门禁 65 号」「54、55、57、59 号」这类两位数加「号」，门禁目录里要有 <号>-*.sh。
-     前面紧挨「第」「月」「日」（可隔空白）的不算门禁号（「第 13 号」「9 月 23 号」）。
+     「、」或「/」连着的每个号都判（「20 / 21 号」判 20 与 21）；前面紧挨「第」「月」「日」（可隔空白）的不算门禁号（「第 13 号」「9 月 23 号」），
+     紧挨「-」「–」的也不算（「2026-09-26 号」；「54–59 号」这种区间写法不判，要判就逐个写出来）。
      门禁目录取本文件所在的目录，不取被扫的仓根：样本目录里没有门禁脚本。
   ② 反引号里的仓内路径：反引号里按空白切开的每个词（命令里的脚本路径也算），ASCII 写成、中间带 `/`、
      而且第一段在解析基准下现存、或末段带常见的文件扩展名（`origin/master`、`text/plain` 两样都不满足，不算仓内路径）。
@@ -14,12 +15,13 @@
      已归档的写裸文件名（`.claude/agent-common.md`「找不到历史实验的数据」那一条），不带目录，不在射程里。
   ③ `文件「小节」`：文件在仓里、而「小节」里的字（去掉空白、反引号、星号、「」之后）在那份文件的全文里一处都找不到。
      判的是「全文任意位置出现」，不只看标题：定义常点正文里的一句；小节改了名而原名的字还散在正文里时抓不到。
+     小节名里嵌套「」的（「「无效」那一栏」），只核到第一个」之前那一截。
 
 判不到、逐条列进「没判的」（不算红）：③ 里文件解析不到的（多半是只写了文件名、住在四个基准之外）；
-② 里带非 ASCII 字符、中间带 `/`、又指不到的记号（悬空的中文文件名路径与 `NN-简称.md` 这类占位分不开；指得到的照常算判过）。
+② 里不全是路径字符（非 ASCII、引号、`$` 这类）、中间带 `/`、又指不到的记号（悬空的中文文件名路径与 `NN-简称.md` 这类占位分不开；指得到的照常算判过）。
 
-输出：每处红一行「文件:行: 说明」；「没判的」逐条一行；末行「扫 N 份治理文档：门禁号 A 处、路径 B 处、小节 C 处；没判 D 处」。
-退出码：0 全指得到；1 有指不到的；2 一份治理文档都没扫到（没有对象，不许当通过）。
+输出：每处红一行「文件:行: 说明」；「没判的」逐条一行；末行「扫 N 份治理文档：门禁号 A 处、路径 B 处、小节 C 处；没判 D 处；跳过 E 处（被 .gitignore 挡着 F、不像仓内路径 G）」。
+退出码：0 全指得到；1 有指不到的；3 一份治理文档都没扫到（没有对象，不许当通过）。python 自己出错退别的码（打不开脚本是 2），调用方当「没跑成」。
 """
 import glob
 import os
@@ -30,7 +32,7 @@ import sys
 GATE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 CARRIER_PATTERNS = ["CLAUDE.md", ".claude/main-agent.md", ".claude/agent-common.md",
                     ".claude/agents/*.md", ".claude/rules/*.md", ".claude/skills/*/SKILL.md"]
-GATE_NUMBER = re.compile(r"(?<![0-9A-Za-z.])((?:[0-9]{2}\s*、\s*)*[0-9]{2})\s*号")
+GATE_NUMBER = re.compile(r"(?<![0-9A-Za-z.\-–])((?:[0-9]{2}\s*[、/]\s*)*[0-9]{2})\s*号")
 NOT_A_GATE_BEFORE = re.compile(r"(第|月|日)\s*$")
 BACKTICK = re.compile(r"`([^`\n]+)`")
 REPO_PATH = re.compile(r"^[A-Za-z0-9_.\-/]+$")
@@ -95,10 +97,11 @@ def main():
     if not carriers:
         print("  ✗ 一份治理文档都没扫到（CLAUDE.md、.claude/main-agent.md、.claude/agent-common.md、agents、rules、skills）")
         print("     → 怎么办：在仓库根上跑；治理文档搬了家的话，改本文件的 CARRIER_PATTERNS。")
-        return 2
+        return 3
     gates = existing_gate_numbers()
     problems, unjudged = [], []
     counts = {"gate": 0, "path": 0, "section": 0}
+    skipped = {"ignored": 0, "not_repo_path": 0}
     for carrier in carriers:
         with open(carrier, encoding="utf-8") as handle:
             lines = handle.read().split("\n")
@@ -106,7 +109,7 @@ def main():
             for match in GATE_NUMBER.finditer(line):
                 if NOT_A_GATE_BEFORE.search(line[:match.start()]):
                     continue
-                for gate in re.split(r"\s*、\s*", match.group(1)):
+                for gate in re.split(r"\s*[、/]\s*", match.group(1)):
                     counts["gate"] += 1
                     if int(gate) not in gates:
                         problems.append(f"{carrier}:{number}: 「{gate} 号」在门禁目录里没有 {gate}-*.sh")
@@ -123,9 +126,13 @@ def main():
                         if resolve(path, carrier, changed_directories) is not None:
                             counts["path"] += 1
                         else:
-                            unjudged.append(f"{carrier}:{number}: `{word}` 带非 ASCII 字符、指不到，分不清是占位还是悬空，路径没判")
+                            unjudged.append(f"{carrier}:{number}: `{word}` 不全是路径字符（非 ASCII、引号、`$` 这类）、指不到，分不清是占位还是悬空，路径没判")
                         continue
-                    if not looks_like_repo_path(path, carrier, changed_directories) or ignored_by_git(path):
+                    if not looks_like_repo_path(path, carrier, changed_directories):
+                        skipped["not_repo_path"] += 1
+                        continue
+                    if ignored_by_git(path):
+                        skipped["ignored"] += 1
                         continue
                     counts["path"] += 1
                     if resolve(path, carrier, changed_directories) is None:
@@ -147,7 +154,7 @@ def main():
         print("     → 怎么办：门禁号改成现存的号或共享 gate.sh 里那一道的名字；路径改成现存的，已归档的写裸文件名；小节按那份文件今天的标题改。")
     for item in unjudged:
         print(f"  没判的：{item}")
-    print(f"  扫 {len(carriers)} 份治理文档：门禁号 {counts['gate']} 处、路径 {counts['path']} 处、小节 {counts['section']} 处；没判 {len(unjudged)} 处")
+    print(f"  扫 {len(carriers)} 份治理文档：门禁号 {counts['gate']} 处、路径 {counts['path']} 处、小节 {counts['section']} 处；没判 {len(unjudged)} 处；跳过 {skipped['ignored'] + skipped['not_repo_path']} 处（被 .gitignore 挡着 {skipped['ignored']}、不像仓内路径 {skipped['not_repo_path']}）")
     return 1 if problems else 0
 
 
