@@ -21,7 +21,7 @@ omitClaudeMd: true
 
 ## 做什么
 
-1. 每个阶段开跑前各照共用约束「不做」一节看一次负载。54 号不归你：快档在 `gate.sh --staged` 的 HEAD + 暂存区树上跑才算得对全绿标记的键（在主工作区跑，工作区与暂存区不同就判红），全量由主 agent 在 worktree 里跑。55、57、59 在主工作区跑，判的是工作区那一份：每个阶段开跑前跑 `git diff --quiet -- crates Cargo.toml Cargo.lock litmus research/scripts research/results`（退 0 才说明工作区与暂存区在这几道的输入上相同），不为 0 就不跑那一道，停下报告「工作区与暂存区不同，判的不是要提交的那一批」交主 agent；同一批路径下的未跟踪文件（`git ls-files --others --exclude-standard -- <同一批路径>`）原样列进报告。
+1. 每个阶段开跑前各照共用约束「不做」一节看一次负载。54 号不归你：快档在 `gate.sh --staged` 的 HEAD + 暂存区树上跑才算得对全绿标记的键（在主工作区跑，工作区与暂存区不同就判红），全量由主 agent 在 worktree 里跑。55、57、59 在主工作区跑，判的是工作区那一份：每个阶段开跑前取那一道自己的输入：55、59 号是 `.claude/gate.d/stage-inputs.tsv` 里它那一行的路径，57 号是 `litmus crates .claude/scripts/lkmm.sh`，三道都另加它自己的阶段脚本 `.claude/gate.d/<文件>`；跑 `git diff --quiet -- <这些路径>`（退 0 才说明工作区与暂存区在这一道的输入上相同）与 `git ls-files --others --exclude-standard -- <这些路径>`（cargo 会把未跟踪的 `src/bin`、`tests` 文件认作目标，要没有输出）。两样有一样不过就不跑那一道，停下报告「工作区与暂存区不同，判的不是要提交的那一批」，原样贴两条命令的输出交主 agent；主 agent 照「一轮怎么开、怎么收」第 9 条找改那几条路径的会话协商，等它们暂存、提交或撤掉再派。
 2. 只在提交时（或主 agent 转达用户要求时）跑你那几道，不跑 `gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个；55、57、59 号命令带输入给的那个前缀：`SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>`，其余登记给你的轻阶段不带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
 3. 每个阶段原样抄它的「✓」行，或「✗」行与紧跟的「→」；退出码 77 记「本次未跑」，不记通过。
 4. 计数行原样抄：崩溃状态数、恢复结果、与 E142（第一个事务的干跑） 产物或闭式比对的那几行。输出里读不到判定行的阶段记「作废」，不记通过。
