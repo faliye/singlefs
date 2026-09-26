@@ -9,6 +9,9 @@ cd "$(dirname "$0")/../.."
 D="$(mktemp -d)"; trap 'rm -rf "${D:?}"' EXIT
 # 被测脚本可换：自证这份自检会红时，指向一份改回旧写法的副本（ASK_LOCAL_SCRIPT=副本路径）
 ASK_LOCAL="${ASK_LOCAL_SCRIPT:-research/scripts/ask-local.sh}"
+# 网关的 key 在测试缝 ASK_LOCAL_FAKE_TEXT 之前就要取；自带一份假的，自证不依赖本机的 ~/code/ai-center
+mkdir -p "$D/center"; printf 'AI_CENTER_KEY_VSCODE_CHAT=selftest\n' > "$D/center/.env.tenants"
+export AI_CENTER_DIR="$D/center"
 fail=0
 say() { printf '  %s %s\n' "$1" "$2"; }
 
@@ -45,11 +48,28 @@ python3 -c 'import sys; sys.exit(0 if open(sys.argv[1]).read() == open(sys.argv[
   || { say ✗ "干净正文通过了闸，stdout 却不等于正文（加末尾换行）"; fail=1; }
 [[ ! -e "$D/case2-output-void1.md" ]] || { say ✗ "干净轮也留了 void 文件"; fail=1; }
 
+# ④ 检测器没跑成（崩了退 2）或找不到 ⇒ 必须退 6、stdout 为空、正文留成作废副本：退 0 会被只看退出码的调用方当成过了闸
+# 强制进入不加测试缝：把被测脚本拷进临时目录，旁边放退 2 的假检测器，或什么都不放（检测器按脚本所在目录找）
+mkdir -p "$D/broken" "$D/missing"
+cp "$ASK_LOCAL" "$D/broken/ask-local.sh"; cp "$ASK_LOCAL" "$D/missing/ask-local.sh"
+for checker in corruption-check.py oov-check.py; do printf 'import sys\nsys.exit(2)\n' > "$D/broken/$checker"; done
+case_count=2; assertion_count=5   # ①② 两个用例、5 条断言；下面每个变体加 1 个用例、3 条断言
+for variant in broken missing; do
+  case_count=$((case_count + 1)); assertion_count=$((assertion_count + 3))
+  if [[ $variant == broken ]]; then label="崩了"; else label="找不到"; fi
+  printf 'ask-local selftest prompt %s.\n' "$variant" > "$D/case-$variant-prompt.md"
+  ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$D/$variant/ask-local.sh" "$D/case-$variant-prompt.md" >"$D/o-$variant" 2>"$D/e-$variant"
+  rc=$?
+  [[ $rc -eq 6 ]] || { say ✗ "检测器${label}时应退 6，实际 $rc——没验过的一份会被当成过了闸"; fail=1; }
+  [[ ! -s "$D/o-$variant" ]] || { say ✗ "检测器${label}时 stdout 却有正文——没验过的输出会顶着合法名字落盘"; fail=1; }
+  [[ -f "$D/case-$variant-output-void1.md" ]] || { say ✗ "检测器${label}时没留下作废副本"; fail=1; }
+done
+
 # ③ 判别力：两个用例走的是同一条路径，只有正文不同 —— 若①②同判，说明闸没在看
 if [[ $fail -eq 0 ]]; then
-  say ✓ "ask-local 判红分支自检通过（2 个用例、5 条断言：损坏留证退 5 且 stdout 为空、干净不留证退 0 且 stdout 等于正文）"
+  say ✓ "ask-local 判红分支自检通过（${case_count} 个用例、${assertion_count} 条断言：损坏留证退 5 且 stdout 为空、干净不留证退 0 且 stdout 等于正文、检测器崩了与找不到各退 6 且 stdout 为空并留证）"
   exit 0
 fi
-echo "  → 怎么办：看上面哪个用例失败。判红分支的落点在 ask-local.sh 的 save_void，"
+echo "  → 怎么办：看上面哪个用例失败。判红分支的落点在 ask-local.sh 的 save_void，没验过那一支在 UNCHECKED 那一段，"
 echo "    测试缝是 ASK_LOCAL_FAKE_TEXT（指向一份现成正文时跳过网关）。"
 exit 1

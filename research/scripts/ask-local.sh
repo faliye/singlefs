@@ -80,7 +80,7 @@ save_void() {
 # **这条以前只是规则里的一句提醒，提醒句拦不住手敲命令**——做成会拒绝的检查才拦得住
 # （singlefs-ai-sop/rules/show-me-test.md）。
 # ⚠️ **两个检测器，查的是不同的损坏类**，缺一个就有一整类漏过去：
-#   corruption-check.py  复读（多吐了）+ 成对标记落单（整段掉了）
+#   corruption-check.py  复读（多吐了）+ 成对标记落单（整段掉了）+ 实词自复读（`resetting resetting`）
 #   oov-check.py         拼接（两个词粘死：`configurationing` `batchinggroup`）
 # 实测：一轮含 `batchinggroup`×2 的输出被前者判绿并当作干净证据用进了 D23 轴二论证。
 for CHECK in "$(dirname "$0")/corruption-check.py" "$(dirname "$0")/oov-check.py"; do
@@ -101,12 +101,23 @@ if [[ -x "$CHECK" || -f "$CHECK" ]]; then
       # 而修好它的人只会去调提示词 —— 报「没做」才指得出真正的下一步。
       echo "ask-local: 字词损坏检查**没跑成**（退出码 $crc），不是通过也不是判红" >&2
       echo "$VERDICT" >&2
+      UNCHECKED=1
       ;;
   esac
 else
   echo "ask-local: 找不到 $CHECK —— **没做**字词损坏检查，不是通过了" >&2
+  UNCHECKED=1
 fi
 done
+
+# 没验过的一份不打正文、退 6：退 0 的话，只看退出码的调用方（本地腿定义「退出码 0 的每次调用占一个号」）会把它当成过了闸。
+# 正文照样留成作废副本，证据不丢；6 不与判红的 5、网关的 2 / 3 / 4 混用。
+if [[ -n "${UNCHECKED:-}" ]]; then
+  save_void
+  echo "ask-local: 这一份没过完字词损坏检查，按没验过处理：退出 6，不打正文" >&2
+  echo "下一步：照上面那几行修好检测器（缺文件就补上，崩了就看它自己的报错）再重跑这一轮；这不是判红，也不是通过" >&2
+  exit 6
+fi
 
 # 正文放到最后才打：此前 python 里先 print 再跑损坏闸，判红那一轮的正文已经进了调用方的重定向文件，
 # 一份作废输出顶着 `-output-s1.md` 这种合法名字落了盘（2026-09-12 实测，与 void 副本只差一个换行）。
