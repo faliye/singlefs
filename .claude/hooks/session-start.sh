@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # hook-events: SessionStart
 # gate-similar: 无 查过 .claude/settings.json 里 SessionStart 上的注册（只有本文件：上下文压缩之后的对齐提示原是单独一份 after-compact.sh，挂同一个事件、读同一份 hook 输入、写同一个标准输出，已并进来）与 gate-overlap.py --list 列出的另外 9 个钩子（挂 PreToolUse、PostToolUse、Stop、SubagentStop，判的都是一条工具调用或收工）
 # SessionStart hook：会话开始时往上下文里补两样东西，按 hook 输入的 source 分，只报、不改任何东西。
@@ -13,11 +15,14 @@
 # SessionStart 的标准输出会进新上下文，所以在这里补。matcher 写 startup|resume|compact，三种注册在同一条上。
 #
 #   session-start.sh             # 从 stdin 读 hook 的 JSON，往标准输出写提示，退出码恒 0
-#   session-start.sh --selftest  # 喂假 JSON 与假 journalctl 走一遍；弄坏开关见 selftest() 末尾的出路，设着时自检必须判红
+#   session-start.sh --selftest  # 喂假 JSON 与假 journalctl 走一遍；弄坏开关见 selftest_in() 末尾的出路，设着时自检必须判红；
+#                                # 自证的临时目录由 lib_selftest_scratch.py 建、判通过判红抛异常三格，SESSION_START_BREAK=keepscratch 时那三格必须判红
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import json, os, re, shutil, subprocess, sys, tempfile
+import importlib.util, json, os, re, shutil, subprocess, sys
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -185,9 +190,25 @@ def write_fake_journalctl(directory, recent_output, probe_output, stderr_text=""
 
 
 def selftest(hook_dir):
+    """主体在 selftest_in；临时目录由共用库建（通过、判红、抛异常都删），那三格也由它判。"""
+    library_path = os.path.join(hook_dir, "lib_selftest_scratch.py")
+    try:
+        library_specification = importlib.util.spec_from_file_location("lib_selftest_scratch", library_path)
+        scratch = importlib.util.module_from_spec(library_specification)
+        library_specification.loader.exec_module(scratch)
+    except Exception as error:   # 文件不在、语法错、导入时抛的都算读不到
+        print(f"  ✗ 自检：session-start 读不到共用的临时目录库 {library_path}（{error!r}）")
+        print("    → 怎么办：恢复 .claude/hooks/lib_selftest_scratch.py，再跑 session-start.sh --selftest")
+        return 1
+    exit_code, problems = scratch.run_with_scratch(
+        lambda work: selftest_in(hook_dir, work), "session-start-selftest-", BROKEN_JUDGEMENT == "keepscratch",
+        "SESSION_START_SELFTEST_ROLE", ["bash", os.path.join(hook_dir, "session-start.sh"), "--selftest"])
+    return scratch.merged_exit_code(exit_code, problems, ".claude/hooks/session-start.sh 的 selftest()", "SESSION_START_BREAK=keepscratch")
+
+
+def selftest_in(hook_dir, work):
     script = os.path.join(hook_dir, "session-start.sh")
     project_root = os.path.dirname(os.path.dirname(hook_dir))
-    work = tempfile.mkdtemp(prefix="session-start-selftest-")
     failures, checked = [], 0
 
     def run_hook(source, journal_directory=None, path_without_journalctl=False):
@@ -252,7 +273,6 @@ def selftest(hook_dir):
     expect("journalctl 出错", run_hook("startup", failing), ["没查成", "journalctl 退出码 1"], ["内核没有因为内存不够杀过进程"])
     expect("没有 journalctl", run_hook("startup", path_without_journalctl=True), ["没查成", "没有 journalctl"], ["内核没有因为内存不够杀过进程"])
     expect("clear 不报", run_hook("clear", journal), [], ["Killed process", "内存不够", "上下文刚压缩过"])
-    shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:

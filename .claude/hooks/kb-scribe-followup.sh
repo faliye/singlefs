@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # PostToolUse hook（Write、Edit、Bash）：书记官（项目 subagent kb-scribe）每次写入成功之后，核这次写入的更新点与相关记录跟没跟上。
 #
 # 写了哪类文件、要跟上哪些相关记录、用哪几道门禁阶段核，登记在同目录的 kb-scribe-followups.tsv（唯一登记位）。
@@ -17,6 +19,8 @@
 #   kb-scribe-followup.sh --selftest  # 在临时仓里走一遍；KB_SCRIBE_FOLLOWUP_BREAK=skip-stages 时自检必须判红
 #   KB_SCRIBE_FOLLOWUP_AGENT=<别的 agent 名>  只供实测：把「认哪个 agent 为书记官」换掉，不动 kb 就能验证反馈真的送到了子 agent
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
 import json, os, re, subprocess, sys, tempfile, time

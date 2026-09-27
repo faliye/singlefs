@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # PreToolUse hook（Write、Edit）：写文件之前的三道判定，合在一个 hook 里；拒绝的同时把它记进检出记录，交主 agent 看。
 #
 # 一、整份覆盖未跟踪文件（只管 Write）：仓里已存在、又没进 git 的文件，拒绝用 Write 整份覆盖。
@@ -24,6 +26,8 @@
 #   write-guard.sh             # 从 stdin 读 hook 的 JSON
 #   write-guard.sh --selftest  # 走一遍三道判定的放行与拒绝；WRITE_GUARD_DISABLE_OVERWRITE=1 或 WRITE_GUARD_DISABLE_SCOPE=1 时自检必须判红
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
 # 写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行——2026-09-17 写范围闸实测撞到的。
@@ -186,8 +190,29 @@ def record_detection(hook_input, finding, detections_path):
     except OSError:
         pass
 
+def selftest_base_directory(table_path):
+    """自检的现场放在哪。不能落进写范围表里任何一条仓外绝对路径模式（落进去，「越界」那几例会被那条模式放行），
+    也不能落在某个 git 仓里（「仓外文件」那一例要真在仓外）。TMPDIR 指到哪都不影响判定：依次试几处，取第一处两条都满足的。"""
+    absolute_patterns = [glob_to_regex(pattern) for patterns in load_scopes(table_path).values()
+                         for pattern in patterns if pattern.startswith("/")]
+    for candidate in (tempfile.gettempdir(), "/tmp", "/var/tmp", "/dev/shm"):
+        if not os.path.isdir(candidate) or not os.access(candidate, os.W_OK):
+            continue
+        probe = os.path.join(candidate, "write-guard-selftest-probe", "crates", "a.rs")
+        if any(pattern.match(os.path.normpath(probe)) for pattern in absolute_patterns):
+            continue
+        if subprocess.run(["git", "-C", candidate, "rev-parse", "--show-toplevel"], capture_output=True, text=True).returncode == 0:
+            continue
+        return candidate
+    return None
+
 def selftest(hook_dir):
-    work = tempfile.mkdtemp()
+    base = selftest_base_directory(os.path.join(hook_dir, "agent-write-scope.tsv"))
+    if base is None:
+        print("  ✗ 自检找不到一处能放现场的临时目录：TMPDIR、/tmp、/var/tmp、/dev/shm 要么落进写范围表的仓外模式、要么在 git 仓里、要么写不进去")
+        print("    → 怎么办：给一个不在 git 仓里、也不在 agent-write-scope.tsv 任何一条绝对路径模式底下的可写目录当 TMPDIR 再跑")
+        return 1
+    work = tempfile.mkdtemp(dir=base)
     cases = []
     library = prime_marks_library_path(hook_dir)
     try:
@@ -203,7 +228,7 @@ def selftest(hook_dir):
         subprocess.run(["git", "-C", work, "commit", "-qm", "t"], check=True)
         open(os.path.join(work, "untracked.md"), "w").write("b\n")
         open(os.path.join(work, ".claude", "kb", "untracked-kb.md"), "w").write("c\n")
-        outside = tempfile.NamedTemporaryFile(delete=False)
+        outside = tempfile.NamedTemporaryFile(delete=False, dir=base)
         outside.close()
         table = os.path.join(work, "scope.tsv")
         shutil.copyfile(os.path.join(hook_dir, "agent-write-scope.tsv"), table)

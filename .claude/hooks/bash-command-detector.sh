@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # PreToolUse hook（Bash）：检出可能出问题的命令，记下来交给主 agent 判断；起看门狗的错误写法、前台没超时的等待循环、把活放出追踪的写法、run_in_background 里后面没有 wait 的单独 `&`、整份覆盖 `research/results/` 下未跟踪产物的写法、打得到别人进程的终止写法与在同一个 inode 上改已有脚本的写法在执行前拒绝，其余只记不拦，不停任何在跑的命令与脚本。
+# hook-events: PreToolUse:Bash
+# gate-similar: heavy-test-guard.sh 同挂 PreToolUse[Bash]、按同一个切词模块认命令位置，但它只判重型测试与内存包装；这里判等待循环、放出追踪、单独的 &、覆盖产物、终止进程、同 inode 改脚本、就地改仓内文件，判据没有一条相同
+# gate-similar: write-guard.sh 管 Write / Edit 的写范围；这里 ⑧ 管有 Edit 的子 agent 绕到 Bash 里写仓内文件，两边判的工具不同
+# gate-similar: pattern-process-guard.sh（上游）同挂 Bash、拒按模式找进程；这里不判那一类
 #
 # 按模式找进程（`pgrep -f`、`pkill -f`、`killall`）不在这里判：上游 SOP 的 `.claude/singlefs-ai-sop/scripts/claude-hooks/pattern-process-guard.sh`
 # 在执行前拒绝（`.claude/settings.json` 里与本 hook 注册在同一条 Bash matcher 下），判据与 shell-lint 的 S2、S3 同一份、只认命令位置。
@@ -43,7 +49,11 @@
 #   （剥掉 nice / timeout 这类前缀之后命令词是 sleep），外面又没有 `timeout`。2026-09-25 代码三方攻方腿在前台跑
 #   `until grep -q '^rc=' <日志>; do sleep 10; done`，主 agent 发去的纠正消息要等它下一次调用工具才送得到，它却卡在这一次调用里，
 #   只好按 pid 从外面停掉那个循环（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 20 行）：只记检出叫得醒主 agent，叫不醒卡住的那一个。
-#   主 agent 与子 agent 都拒；run_in_background 里的等待循环照旧只记检出（①）。
+#   主 agent 与子 agent 都拒；run_in_background 里的等待循环照旧只记检出（①），只有条件或循环体里点名了本会话后台任务输出文件
+#   （`tasks/<id>.output`）的例外：等自己起的后台任务要结束本轮等完成通知，这种轮询前台、run_in_background 一样拒，外面套了 timeout 也拒。
+# ⑧ 有 Edit 工具的项目子 agent（`.claude/agents/<agent_type>.md` 的 tools 里有 Edit）在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下），
+#   或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、Path(<仓内路径字面量>).write_text( / .write_bytes(。写范围闸只看 Write / Edit，这样写它看不见；
+#   草稿目录照写，定义点名的脚本（replace-once.py 这类）不在这一条里。路径放在变量里的认不出。
 #   「外面有 timeout」按包装的层次认：`timeout N bash -c '…'`、`capped.sh N timeout N bash -c '…'`、`timeout N bash <<EOF` 喂进去的正文里的循环算有；
 #   只在循环条件或循环体里的 timeout（`until timeout 5 grep …; do sleep 10; done`）不算，循环照样能一直转下去。
 #   只认命令位置（按 shell 的规矩切词），引号里当数据写的、写进文件的 heredoc 正文、注释里的循环不拒；
@@ -70,7 +80,8 @@
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法。
 # ⑤ 命令位置上会整份覆盖 `research/results/` 下一个已存在、又没进 git（`git ls-files --error-unmatch` 失败）的文件：重定向 `>`、`>|`、`&>`、`>& 文件`
 #   （前面带 fd 号的 `2>` 一样截断，一样算）、不带 `-a` / `--append` 的 `tee` 写的每个文件、`cp` / `mv` / `install` 的目标（`-t 目录`、或目标是已有目录、
-#   以 `/` 结尾的，写的是 目录/源的文件名，源里的通配按这一刻的文件展开）。2026-09-25 E158 第九段执行员用 `cp` 把 s8 同名的三份未跟踪产物整份覆盖，
+#   以 `/` 结尾的，写的是 目录/源的文件名，源里的通配按这一刻的文件展开）、`dd of=`（带不带 `conv=notrunc` 都算）与 `truncate` 的文件（2026-09-25 并进来：
+#   与 ⑦ 认的是同一段 `overwrite_steps` / `follow_simple_command`，不重复判定）。2026-09-25 E158 第九段执行员用 `cp` 把 s8 同名的三份未跟踪产物整份覆盖，
 #   旧字节找不回（records/2026-09-16-subagent拆分提案.md 第四十节那张表第 24 行）；write-guard.sh 只拦 Write / Edit 工具，拦不到 shell。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。
 #   放行：`>>`、`&>>`、`tee -a` 追加；目标不存在（新文件名）；目标已进 git（`git add` 过就算，git 兜得住）；目标不在仓库根的 `research/results/` 下；
@@ -83,7 +94,7 @@
 #   每一层（`bash -c '…'`、喂给 shell 的 heredoc 正文、命令替换与进程替换）都判，nice / timeout / env / sudo 这类前缀、`capped.sh N` 与 `bash 包装脚本` 剥开往里找；
 #   引号里当数据写的、写进文件的 heredoc 正文、注释里的不拒。
 #   判不到的：变量里拼出来的命令、eval、`bash x.sh` 起的脚本文件里的写法、xargs 与 `find -exec` 起的 cp、`cp -r` 整目录拷进已有目录时里面逐个文件、
-#   `dd of=`、`sed -i`、`sort -o`、`rsync`、`ln -f` 与 python 里 `open(…, 'w')` 这类别的写法；圆括号子 shell 里的 cd 当成对后面的命令也生效；
+#   `sed -i`、`sort -o`、`rsync`、`ln -f` 与 python 里 `open(…, 'w')` 这类别的写法；圆括号子 shell 里的 cd 当成对后面的命令也生效；
 #   不看 hook 输入里的 cwd（没有 cd 的相对路径一律按仓库根解析）。
 # ⑥ 终止进程只许点名一个自己起的进程号或任务号，一次一个。用户 2026-09-25 JST 21:0x–21:1x 原话：「后面的脚本不能终止前面的脚本 这是核心」
 #   「另外不能动ssh 这是基本的」「终止要按照任务号 终止 禁止终止所有」。起因：2026-09-25 UTC 11:12 一个子 agent 跑 run-with-memory-cap.sh 的弄坏开关自证，
@@ -118,7 +129,8 @@
 #   （records/2026-09-16-subagent拆分提案.md 第四十节那张表第 32 行）；两个工具改成改名换上之后，用户 2026-09-25 JST 22:1x 要给手敲的就地写也加闸。
 #   前台、run_in_background 一样拒，主 agent 与子 agent 都拒。拒的写法（每一种都实测过：改之前打开文件的读者接着读到新内容）：
 #   重定向 `>`、`>|`、`&>`、`>& 文件`（带 fd 号的 `2>` 一样）、`cat > 旧`；不带 `-a` / `--append` 的 `tee`；`cp` 的目标（`-f`、`-u`、`-a` 一样，写进已有目录的按 目录/源的文件名算）；
-#   `dd of=`（带不带 `conv=notrunc` 都算）；`truncate` 的文件；喂给 python 的代码（`python3 -c` 与喂给它的 heredoc）里 `open(旧, 带 w 或 r+ 的模式)`（io / codecs 的 open 一样）、
+#   `dd of=`（带不带 `conv=notrunc` 都算）；`truncate` 的文件（这两种 2026-09-25 起 ⑤ 判整份覆盖 `research/results/` 时也认，同一段 `overwrite_steps` 生成，
+#   不重复判定）；喂给 python 的代码（`python3 -c` 与喂给它的 heredoc）里 `open(旧, 带 w 或 r+ 的模式)`（io / codecs 的 open 一样）、
 #   `Path(旧).open(同上)`、`Path(旧).write_text` / `write_bytes`、`shutil.copyfile` / `copy` / `copy2` 的目标。
 #   放行：`>>`、`&>>`、`tee -a`、python 的 `'a'` 追加（不动已经读过的偏移之前的字节）；目标不存在（新建）；目标不是脚本；目标在仓外又不在 /tmp/claude-1000/ 下；
 #   换 inode 的写法：`mv`、`install`、`cp --remove-destination`、`cp -l` / `-s`、`cp -n` / `-b` / `--update=none`、`os.replace`；
@@ -142,11 +154,16 @@
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_FOREGROUND_WAIT_LOOP=1（前台没超时的等待循环也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_DETACHING=1（把活放出追踪的写法也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_UNWAITED_AMPERSAND=1（run_in_background 里后面没有 wait 的单独 & 也放行）或
+#                                        # BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT=1（run_in_background 里轮询 tasks/*.output 也放行）或
+#                                        # BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT=1（有 Edit 的子 agent 在 Bash 里就地改仓内文件也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_RESULTS_OVERWRITE=1（整份覆盖 research/results/ 下未跟踪产物也放行、也不记检出）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_PROCESS_SIGNALS=1（⑥ 终止进程的写法也放行）或
 #                                        # BASH_COMMAND_DETECTOR_ALLOW_SCRIPT_IN_PLACE_WRITE=1（⑦ 在同一个 inode 上改已有脚本也放行）或
+#                                        # BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH=1（自证的临时目录走回 mkdtemp 不删；通过、判红、抛异常三格由 lib_selftest_scratch.py 判）或
 #                                        # BASH_COMMAND_DETECTOR_REFUSE_EVERY_WAIT_LOOP=1（外层 timeout 与 run_in_background 都不算，等待循环一律拒）时自检必须判红
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 agent-write-scope.sh 同一个坑）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
@@ -352,8 +369,8 @@ def shell_layers(text, under_timeout=False, honor_timeout=True, depth=0):
             layers += shell_layers(code, under_timeout or (has_timeout and honor_timeout), honor_timeout, depth + 1)
     return layers
 
-def wait_loops_in(commands):
-    """一层里的 until / while 循环，条件或循环体里有 sleep 的，交回每个循环开头那条简单命令。"""
+def wait_loops_in(commands, loop_filter=None):
+    """一层里的 until / while 循环，条件或循环体里有 sleep 的（给了 loop_filter 的还要它对整个循环的简单命令判真），交回每个循环开头那条简单命令。"""
     found, index = [], 0
     while index < len(commands):
         if not loop_keyword_changes(commands[index])[2]:
@@ -364,7 +381,7 @@ def wait_loops_in(commands):
             opened, closed, _ = loop_keyword_changes(commands[end])
             level += opened - closed
             end += 1
-        if any(is_sleep_command(words) for words in commands[index:end] if words):
+        if any(is_sleep_command(words) for words in commands[index:end] if words) and (loop_filter is None or loop_filter(commands[index:end])):
             found.append(" ".join(commands[index])[:120])
             index = end
         else:
@@ -429,6 +446,56 @@ def detaching_refusal(command):
         return []
     return detaching_forms(command)
 
+# ⑧ 有 Edit 工具的项目子 agent 在 Bash 里就地改仓内文件：命令位置上的 `sed -i`（目标不在 /tmp/ 下），或 python 代码里 open(<仓内路径字面量>, 'w' / 'a' / 'x')、
+#   Path(<仓内路径字面量>).write_text( / .write_bytes(。仓内路径字面量：crates/、.claude/、research/、records/、litmus/、briefs/ 起头的，或仓根起的绝对路径。
+#   认不出：路径放在变量里的、经脚本文件间接写的（replace-once.py、insert-row.py 这类定义点名的脚本本来就放行）。
+REPOSITORY_PATH_PREFIX = r"(?:\./)?(?:crates|\.claude|research|records|litmus|briefs)/"
+PYTHON_REPOSITORY_WRITE = re.compile(r"""open\(\s*f?['"](?P<open>(?:{root})?""" + REPOSITORY_PATH_PREFIX + r"""[^'"]*)['"]\s*,\s*['"][wax]b?\+?['"]"""
+                                     r"""|Path\(\s*f?['"](?P<path>(?:{root})?""" + REPOSITORY_PATH_PREFIX + r"""[^'"]*)['"]\s*\)\s*\.write_(?:text|bytes)\(""")
+
+def agent_has_edit_tool(repository_root, agent_type):
+    try:
+        head = open(os.path.join(repository_root, ".claude", "agents", f"{agent_type}.md"), encoding="utf-8").read().split("\n---", 1)[0]
+    except OSError:
+        return False
+    tools_line = next((line for line in head.splitlines() if line.startswith("tools:")), "")
+    return "Edit" in {tool.strip() for tool in tools_line[len("tools:"):].split(",")}
+
+def sed_in_place_targets(arguments):
+    """sed 的参数里带 -i / --in-place 时交回它要改的文件（不在 /tmp/ 下的）；不带交 []。"""
+    if not any(argument == "-i" or re.match(r"^-[a-zA-Z]*i", argument) or argument.startswith("--in-place") for argument in arguments):
+        return []
+    has_script_option = any(argument in ("-e", "-f") or argument.startswith(("--expression", "--file")) for argument in arguments)
+    operands = [argument for argument in arguments if not argument.startswith("-")]
+    files = operands if has_script_option else operands[1:]
+    return [path for path in files if not path.startswith("/tmp/")]
+
+def repository_in_place_edit_refusal(command, agent_type, repository_root):
+    if (not agent_type or os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
+            or os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_REPOSITORY_IN_PLACE_EDIT") == "1"
+            or not agent_has_edit_tool(repository_root, agent_type)):
+        return []
+    found = []
+    for layer in shell_layers(command):
+        for words in layer.commands:
+            for _, _, name, arguments in wrapped_commands(words):
+                if name == "sed":
+                    found += [f"sed -i {path}" for path in sed_in_place_targets(arguments)]
+    pattern = re.compile(PYTHON_REPOSITORY_WRITE.pattern.replace("{root}", re.escape(repository_root.rstrip("/") + "/")))
+    for match in pattern.finditer(command):
+        found.append(f"python 写 {match.group('open') or match.group('path')}")
+    return list(dict.fromkeys(found))
+
+# run_in_background 里等本会话后台任务输出文件（<会话目录>/tasks/<id>.output）的循环：等自己起的后台任务要结束本轮等完成通知，不写轮询
+TASK_OUTPUT_PATH = re.compile(r"(?:^|/)tasks/[^/\s]+\.output\b")
+
+def waits_on_task_output(loop_commands):
+    return any(TASK_OUTPUT_PATH.search(word) for words in loop_commands for word in words if words)
+
+def background_task_output_wait_loops(text):
+    """命令位置上的等待循环、条件或循环体里点名了 tasks/<id>.output 的，外面有没有 timeout 都算。"""
+    return [loop for layer in shell_layers(text, honor_timeout=False) for loop in wait_loops_in(layer.commands, waits_on_task_output)]
+
 def wait_loop_refusal(command, run_in_background):
     """前台（run_in_background 不是 true）的命令里有没超时的等待循环，就交回认出的循环（每个循环开头那条简单命令）；否则交 []。"""
     if (os.environ.get("BASH_COMMAND_DETECTOR_DISABLE_CHECK") == "1"
@@ -436,7 +503,9 @@ def wait_loop_refusal(command, run_in_background):
         return []
     refuse_every = os.environ.get("BASH_COMMAND_DETECTOR_REFUSE_EVERY_WAIT_LOOP") == "1"
     if run_in_background is True and not refuse_every:
-        return []
+        if os.environ.get("BASH_COMMAND_DETECTOR_ALLOW_BACKGROUND_TASK_OUTPUT_WAIT") == "1":
+            return []
+        return background_task_output_wait_loops(command)
     return unbounded_wait_loops(command, honor_timeout=not refuse_every)
 
 # run_in_background 里后面没有 wait 的单独 &：逐层按记号找以单独的 & 收尾的作业，看之后同一层、同一对圆括号里有没有 wait
@@ -517,10 +586,9 @@ COPY_LONG_OPTIONS_WITH_VALUE = {"--target-directory", "--suffix", "--no-preserve
 GIT_GLOBAL_OPTIONS_WITH_VALUE = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
 GIT_ADD_OPTIONS_THAT_DO_NOT_KEEP_BYTES = {"-n", "--dry-run", "-u", "--update", "-N", "--intent-to-add", "-p", "--patch", "-i", "--interactive", "-e", "--edit", "--refresh"}
 RESULTS_PRESERVING_KINDS = {"git add", "mv"}   # rm 掉的旧字节没留住，⑤ 不认
-IN_PLACE_ONLY_FORMS = {"dd", "truncate"}       # 只给 ⑦ 认的写法；⑤ 的射程不含它们（文件头 ⑤「判不到」里列着），要不要并进 ⑤ 另定
 
 class OverwriteCandidate(NamedTuple):
-    form: str                            # 认出的写法：>、>|、&>、>&、tee、cp、mv、install；⑦ 另认 dd、truncate（⑤ 不判这两种）
+    form: str                            # 认出的写法：>、>|、&>、>&、tee、cp、mv、install、dd、truncate；⑤ 与 ⑦ 共用同一份（PythonCode 另判，只给 ⑦ 用）
     target: str                          # 目标词（这条命令里前面赋过值的变量已代入）
     directory: str | None                # 那一刻的当前目录；cd 算不出来是 None，按仓库根解析
     sources: tuple = ()                  # cp / mv / install 的源
@@ -687,7 +755,7 @@ def truncate_files(arguments):
     return files
 
 def follow_simple_command(words, directory, variables, steps, depth, heredoc_bodies=()):
-    """一条简单命令：会整份覆盖文件的写法（tee、cp、mv、install；⑦ 另认 dd、truncate 与喂给 python 的代码）与让旧字节留住的一步
+    """一条简单命令：会整份覆盖文件的写法（tee、cp、mv、install、dd、truncate；⑦ 另认喂给 python 的代码）与让旧字节留住的一步
     （git add、mv 挪走源；⑦ 另认 rm）追加进 steps；跟着 cd / pushd 换目录，跟着独立的赋值与 export 记变量（改 variables）；
     bash -c 的那段代码按这一刻的目录与变量递归进去。heredoc_bodies 是喂给这一条的、被当数据剥掉的 heredoc 正文。交回这条之后的当前目录。"""
     skipped = shell_words.skip_prefixes(words)
@@ -776,7 +844,7 @@ def command_pieces(tokens):
 
 def overwrite_steps(text, directory, variables=None, depth=0):
     """整条命令每一层（顶层、bash -c 的代码、喂给 shell 的 heredoc 正文、命令替换与进程替换）命令位置上，会整份覆盖文件的写法
-    （OverwriteCandidate：重定向、tee、cp、mv、install）与让旧字节留住的一步（PreservingStep），按执行的先后交回。
+    （OverwriteCandidate：重定向、tee、cp、mv、install、dd、truncate）与让旧字节留住的一步（PreservingStep），按执行的先后交回。
     喂给 shell 的 heredoc 正文留在原位按行切（共用模块的 strip_data_heredocs 只剥喂给别的命令的）；directory 是开头的当前目录。"""
     if depth > shell_words.MAXIMUM_NESTING:
         return []
@@ -909,7 +977,7 @@ def results_overwrite_verdict(command, repository_root):
             if step.kind in RESULTS_PRESERVING_KINDS:
                 preserved += preserved_paths(step, base)
             continue
-        if isinstance(step, PythonCode) or step.form in IN_PLACE_ONLY_FORMS:
+        if isinstance(step, PythonCode):
             continue
         for word in destination_words(step, base):
             exact, matches = resolve_destination(word, base, repository_root)
@@ -1594,7 +1662,24 @@ def selftest(hook_dir):
         print(f"  ✗ 自检：读不到共用切词模块 {shell_words_library_path(hook_dir)}（{shell_words_error!r}）")
         print("    → 怎么办：恢复 .claude/hooks/lib_shell_words.py（切词与认命令位置只有那一份，别在 hook 里再抄一份），再跑 --selftest")
         return 1
-    work = tempfile.mkdtemp(prefix="bash-command-detector-")
+    # 临时目录由共用库建（通过、判红、抛异常都删），那三格也由它判；主体在 selftest_in
+    scratch_library_path = os.path.join(hook_dir, "lib_selftest_scratch.py")
+    try:
+        scratch_specification = importlib.util.spec_from_file_location("lib_selftest_scratch", scratch_library_path)
+        scratch = importlib.util.module_from_spec(scratch_specification)
+        scratch_specification.loader.exec_module(scratch)
+    except Exception as error:   # 文件不在、语法错、导入时抛的都算读不到
+        print(f"  ✗ 自检：bash-command-detector 读不到共用的临时目录库 {scratch_library_path}（{error!r}）")
+        print("    → 怎么办：恢复 .claude/hooks/lib_selftest_scratch.py（自证临时目录的建法与三格探查只有那一份），再跑 --selftest")
+        return 1
+    exit_code, problems = scratch.run_with_scratch(
+        lambda work: selftest_in(hook_dir, work), "bash-command-detector-",
+        os.environ.get("BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH") == "1", "BASH_COMMAND_DETECTOR_SELFTEST_ROLE",
+        ["bash", os.path.join(hook_dir, "bash-command-detector.sh"), "--selftest"])
+    return scratch.merged_exit_code(exit_code, problems, ".claude/hooks/bash-command-detector.sh 的 selftest()",
+                                    "BASH_COMMAND_DETECTOR_KEEP_SELFTEST_SCRATCH=1")
+
+def selftest_in(hook_dir, work):
     detections = os.path.join(work, "detections.jsonl")
     cases = [
         ("普通命令", "cargo test --release", 0),
@@ -1675,6 +1760,9 @@ def selftest(hook_dir):
         ("前台 until … sleep 没超时", "until grep -q x f; do sleep 10; done", False, 1),
         ("同一条套上 timeout 60", "timeout 60 bash -c 'until grep -q x f; do sleep 10; done'", False, 0),
         ("同一条走 run_in_background", "until grep -q x f; do sleep 10; done", True, 0),
+        ("run_in_background 里轮询后台任务的输出文件", "until [ -s /tmp/claude-1000/-home-x/abc/tasks/b1x2.output ]; do sleep 20; done; tail -5 /tmp/claude-1000/-home-x/abc/tasks/b1x2.output", True, 1),
+        ("run_in_background 里轮询后台任务输出、外面套了 timeout 也拒", "timeout 600 bash -c 'until grep -q done tasks/b9.output; do sleep 5; done'", True, 1),
+        ("run_in_background 里读一次后台任务输出、不轮询", "tail -5 /tmp/x/tasks/b1.output", True, 0),
         ("前台按 pid 轮询的 while kill -0", 'while kill -0 "$pid" 2>/dev/null; do sleep 20; done; tail -3 log', False, 1),
         ("前台 timeout 只在循环条件里", "until timeout 5 grep -q x f; do sleep 10; done", False, 1),
         ("前台多行写的 while true", "while true\ndo\n  grep -q x f && break\n  sleep 5\ndone", False, 1),
@@ -1700,6 +1788,27 @@ def selftest(hook_dir):
     ]
     for label, command, background, want in wait_loop_cases:
         results.append((f"等待循环:{label}", want, 1 if wait_loop_refusal(command, background) else 0))
+    # ⑧ 有 Edit 工具的项目子 agent 在 Bash 里就地改仓内文件：(说明, agent 类型, 命令, 该不该拒)
+    edit_repository = tempfile.mkdtemp()
+    try:
+        os.makedirs(os.path.join(edit_repository, ".claude", "agents"))
+        open(os.path.join(edit_repository, ".claude", "agents", "experiment-runner.md"), "w").write("---\ntools: Read, Edit, Write, Bash\n---\n")
+        open(os.path.join(edit_repository, ".claude", "agents", "sweep.md"), "w").write("---\ntools: Read, Bash\n---\n")
+        repository_edit_cases = [
+            ("执行员 sed -i 改仓内源文件", "experiment-runner", "sed -i 's/a/b/' research/e7-index-bench/src/bin/e1.rs", 1),
+            ("执行员 python open(仓内路径, 'w')", "experiment-runner", "python3 -c \"open('crates/x/src/lib.rs', 'w').write('x')\"", 1),
+            ("执行员 python Path(仓内绝对路径).write_text", "experiment-runner",
+             f"python3 - <<'EOF'\nfrom pathlib import Path\nPath('{edit_repository}/.claude/kb/x.md').write_text('y')\nEOF", 1),
+            ("执行员 sed -i 改草稿目录", "experiment-runner", "sed -i 's/a/b/' /tmp/claude-1000/e/notes.md", 0),
+            ("执行员 python 写草稿目录", "experiment-runner", "python3 -c \"open('/tmp/claude-1000/e/x.txt', 'w').write('x')\"", 0),
+            ("执行员 python 只读仓内文件", "experiment-runner", "python3 -c \"print(open('crates/x/src/lib.rs').read())\"", 0),
+            ("没有 Edit 的回扫员不判", "sweep", "sed -i 's/a/b/' research/x.md", 0),
+            ("主 agent 不判", None, "sed -i 's/a/b/' research/x.md", 0),
+        ]
+        for label, agent, command, want in repository_edit_cases:
+            results.append((f"就地改仓内文件:{label}", want, 1 if repository_in_place_edit_refusal(command, agent, edit_repository) else 0))
+    finally:
+        shutil.rmtree(edit_repository, ignore_errors=True)
     # 把活放出追踪的写法：(说明, 命令, 该不该拒绝)；前台、run_in_background 一样拒，detaching_refusal 不看 run_in_background
     detaching_cases = [
         ("现场：& disown 之后又 & wait", "nice -n 19 bash long.sh > long.log 2>&1 & disown 2>/dev/null || true & wait", 1),
@@ -1995,6 +2104,16 @@ def selftest(hook_dir):
         ("整个循环重定向", "for arm in a b; do python3 x.py $arm; done > research/results/untracked.out", 1),
         ("sudo 包着的 tee", "echo x | sudo tee research/results/untracked.out", 1),
         ("git add 的是另一份，这一份照拒", "git add research/results/tracked.out && python3 x.py > research/results/untracked.out", 1),
+        ("dd of= 覆盖未跟踪的产物", "dd if=/tmp/new.out of=research/results/untracked.out", 1),
+        ("dd conv=notrunc 覆盖未跟踪的产物", "dd if=/tmp/new.out of=research/results/untracked.out conv=notrunc", 1),
+        ("truncate -s 0 覆盖未跟踪的产物", "truncate -s 0 research/results/untracked.out", 1),
+        ("truncate 选项连写覆盖未跟踪产物", "truncate -cs 0 research/results/sub/deep.out", 1),
+        ("dd of= 写已跟踪的文件（git 兜得住）", "dd if=/tmp/new.out of=research/results/tracked.out", 0),
+        ("truncate 写已跟踪的文件（git 兜得住）", "truncate -s 0 research/results/tracked.out", 0),
+        ("dd of= 写新文件名", "dd if=/tmp/new.out of=research/results/untracked-2026-09-25.out", 0),
+        ("dd of= 目标在 research/results/ 外", "dd if=/tmp/new.out of=scratch.log", 0),
+        ("同一条命令里先 git add 再 dd 覆盖", "git add research/results/untracked.out && dd if=/tmp/new.out of=research/results/untracked.out", 0),
+        ("引号里当数据写的 dd", "echo 'dd if=/tmp/new.out of=research/results/untracked.out'", 0),
         (">> 追加", "python3 x.py >> research/results/untracked.out", 0),
         ("&>> 追加", "cargo test &>> research/results/untracked.out", 0),
         ("写新文件名", "python3 x.py > research/results/untracked-2026-09-25.out", 0),
@@ -2127,9 +2246,11 @@ def selftest(hook_dir):
         results.append((f"就地改脚本:{label}", want, 1 if script_in_place_refusal(command, repository, scratch_root) else 0))
     results.append(("就地改脚本:拒绝时报出写法与相对仓库根的路径", 1,
                     int(script_in_place_refusal(f"cp /tmp/new.sh {running}", repository, scratch_root) == [f"cp {running}"])))
-    results.append(("就地改脚本:⑤ 不认 dd、truncate、rm 与 python 的写法（覆盖未跟踪产物照旧只看 ⑤ 那几种）", 0,
-                    int(bool(results_overwrite_refusal("dd if=x of=research/results/untracked.out; truncate -s 0 research/results/untracked.out; "
-                                                       "python3 -c \"open('research/results/untracked.out', 'w')\"", repository)[0])) if git_ready else 0))
+    results.append(("就地改脚本:⑤ 现在认 dd、truncate 覆盖未跟踪产物（与 ⑦ 共用同一段 overwrite_steps，不抄第二份）", 1,
+                    int(bool(results_overwrite_refusal("dd if=x of=research/results/untracked.out; truncate -s 0 research/results/untracked.out",
+                                                       repository)[0])) if git_ready else 1))
+    results.append(("就地改脚本:⑤ 仍不认 python 的写法（覆盖未跟踪产物；rm 另见下一条，那条测的是 PreservingStep 不是 form）", 0,
+                    int(bool(results_overwrite_refusal("python3 -c \"open('research/results/untracked.out', 'w')\"", repository)[0])) if git_ready else 0))
     results.append(("就地改脚本:rm 掉再写未跟踪产物，⑤ 照拒（rm 没留住旧字节）", 1,
                     int(bool(results_overwrite_refusal("rm research/results/untracked.out && echo x > research/results/untracked.out", repository)[0])) if git_ready else 1))
     # 走真实入口：把 hook 与共用切词模块拷进临时仓的 .claude/hooks/，仓库根取它往上两级
@@ -2265,7 +2386,6 @@ def selftest(hook_dir):
     results.append(("stdin:读不到共用切词模块照常放行（退出码 0）", 0, without_library.returncode))
     results.append(("stdin:读不到共用切词模块时 stderr 点名它、记一条检出", 1,
                     int("lib_shell_words.py" in without_library.stderr and recorded_after == after + 1)))
-    subprocess.run(["rm", "-rf", work])
     failures = [item for item in results if item[1] != item[2]]
     for label, want, got in failures:
         print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
@@ -2274,7 +2394,7 @@ def selftest(hook_dir):
               "unwaited_ampersand_refusal() / unwaited_background_jobs() / jobs_with_endings()、"
               "results_overwrite_refusal() / results_overwrite_verdict() / overwrite_steps() / follow_simple_command() / destination_words() 与共用的 lib_shell_words.py；"
               "「覆盖产物:临时 git 仓建得起来」红的是本机的 git 起不来，先看 git init 能不能跑；"
-              "BASH_COMMAND_DETECTOR_DISABLE_CHECK、_DISABLE_SELF_BACKGROUND、_KEEP_HEREDOC_BODIES、_ALLOW_WATCHDOG_MISUSE、"
+              "BASH_COMMAND_DETECTOR_DISABLE_CHECK、_DISABLE_SELF_BACKGROUND、_KEEP_HEREDOC_BODIES、_KEEP_SELFTEST_SCRATCH、_ALLOW_WATCHDOG_MISUSE、"
               "_ALLOW_FOREGROUND_WAIT_LOOP、_REFUSE_EVERY_WAIT_LOOP、_ALLOW_DETACHING、_ALLOW_UNWAITED_AMPERSAND、_ALLOW_RESULTS_OVERWRITE、_ALLOW_PROCESS_SIGNALS "
               "或 _ALLOW_SCRIPT_IN_PLACE_WRITE 设着的话这里本来就该红；"
               "「终止进程:」「扫脚本:」红的看 process_signal_refusal() / termination_findings() / call_findings() / scan_scripts()；"
@@ -2288,7 +2408,8 @@ def selftest(hook_dir):
                "run_in_background 里以单独的 & 收尾、之后同一层同一对圆括号里没有 wait 的拒绝（结尾 &、& 后接 echo $!、capped.sh 包着的、"
                "子 shell、命令替换、bash -c 与喂给 shell 的 heredoc 里的，wait -n 与按 pid 轮询不算 wait），之后用 wait / wait \"$pid\" 等的、"
                "&&、2>&1、|&、&>、当数据写的与前台的放行；在临时 git 仓里，整份覆盖 research/results/ 下已存在又没进 git 的文件拒绝（>、>|、&>、2>、>& 文件、"
-               "不带 -a 的 tee、cp / mv / install 的目标与 -t、写进已有目录，bash -c、heredoc、命令替换、进程替换、整组重定向里的，cd 跟着算、cd 算不出来按仓库根、"
+               "不带 -a 的 tee、cp / mv / install 的目标与 -t、写进已有目录、dd of=（带不带 conv=notrunc 都算）、truncate 的文件（与 ⑦ 共用同一段 overwrite_steps），"
+               "bash -c、heredoc、命令替换、进程替换、整组重定向里的，cd 跟着算、cd 算不出来按仓库根、"
                "前面赋过值的变量代入），>>、&>>、tee -a、新文件名、已跟踪、仓外与 research/results/ 外、2>&1、cp -n / --backup、install -d、同一条命令里先 git add 或 mv 挪走的、"
                "当数据写的放行；目标算不出而对得上未跟踪产物的、git 判不了的只记检出；"
                "终止进程：kill 负进程号、0、$PPID、一次几个目标、命令替换与整批展开、循环里逐个 kill 或 proc.py stop、xargs / find -exec 喂给 kill、pkill、killall、fuser -k、"
@@ -2301,7 +2422,7 @@ def selftest(hook_dir):
                "dd of=、truncate、python 的 open(…, 'w' / 'r+' / mode='wb')、Path.open('w')、write_text、write_bytes、shutil.copyfile / copy 写的拒绝"
                "（bash -c、heredoc、命令替换、cd 与变量跟着算，python 的只赋过一次的名字、Path / 、os.path.join 算得出），"
                ">>、&>>、tee -a、python 'a' / 'x' / 读、新文件名、临时文件再 mv、mv、install、cp --remove-destination / -l / -n / -b、sed -i、先 rm 或挪走再写、"
-               "os.replace、非脚本文件、仓外与 scratch 根外、当数据写的与算不出的放行，⑤ 不认这几种新写法")
+               "os.replace、非脚本文件、仓外与 scratch 根外、当数据写的与算不出的放行；dd、truncate 现在 ⑤ 也认（同一段 overwrite_steps），⑤ 仍不认 python 的写法")
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：{summary}")
     return 0
 
@@ -2363,7 +2484,9 @@ def main():
                   "完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿", file=sys.stderr)
             print("     → 怎么办：要等的活用 Bash 的 run_in_background: true 起，命令里只写那条活本身（不加 `disown`、`coproc`、`setsid -f`、"
                   "`nohup … &`、`tmux` / `screen` 的分离模式、`systemd-run`），然后结束本轮，等它的完成通知再接着做；"
-                  "几条活要并行就在同一条命令里 `{ a; echo $? > a.rc; } & { b; echo $? > b.rc; } & wait`，用不带参数的 `wait` 等齐、退出码逐个读 .rc 文件", file=sys.stderr)
+                  "几条活要并行就在同一条命令里每件把退出码写进自己的文件（`{ <命令>; echo \"$?\" > <草稿目录>/b<批号>-<件号>.rc; } &`，"
+                  "每批开跑前先删掉这一批的 .rc），最后单独一个不带参数的 `wait` 等齐，数一遍 .rc 与派出去的件数对不上整批作废，"
+                  "对得上再按派活的次序逐个读（共用约束 .claude/agent-common.md「执行前拒绝的写法」那一条的 ④）", file=sys.stderr)
             return 2
         try:
             jobs = unwaited_ampersand_refusal(tool_input.get("command") or "", tool_input.get("run_in_background"))
@@ -2374,7 +2497,10 @@ def main():
             print(f"  ✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：{'；'.join(jobs)}）："
                   "外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何人", file=sys.stderr)
             print("     → 怎么办：长活直接放 run_in_background，命令里只写那条活本身，不加 `&`"
-                  "（几条活要并行就在同一条命令里 `{ a; echo $? > a.rc; } & { b; echo $? > b.rc; } & wait`，用 `wait` 等齐、退出码逐个读 .rc 文件）；"
+                  "；几条活要并行，就每件把退出码写进自己的文件（`{ <命令>; echo \"$?\" > <草稿目录>/b<批号>-<件号>.rc; } &`，"
+                  "每批开跑前先删掉这一批的 .rc），最后单独一个不带参数的 `wait` 等齐，数一遍 .rc 与派出去的件数对不上整批作废，"
+                  "对得上再按派活的次序逐个读；不用 `wait \"$pid\"` 收，也不写 `a & b & wait`：它吞掉每件的退出码"
+                  "（共用约束 .claude/agent-common.md「执行前拒绝的写法」那一条的 ④）；"
                   "已经在跑、pid 已知的，另起一条 run_in_background 等它：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。"
                   "这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2
@@ -2383,6 +2509,12 @@ def main():
         except Exception as error:
             print(f"  ! bash-command-detector.sh 没判成前台的等待循环（{error!r}），这条命令照常执行", file=sys.stderr)
             loops = []
+        if loops and tool_input.get("run_in_background") is True:
+            print(f"  ✗ run_in_background 里轮询后台任务的输出文件（认出的循环：{'；'.join(loops)}）：等自己起的后台任务不写轮询", file=sys.stderr)
+            print("     → 怎么办：结束本轮，等那个后台任务的完成通知再接着做（共用约束 .claude/agent-common.md「长活可以等」）；"
+                  "等的是别人起的进程，按进程号等：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。"
+                  "这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
+            return 2
         if loops:
             print(f"  ✗ 前台的等待循环没有超时（认出的循环：{'；'.join(loops)}）：等的条件不成立就一直不返回，"
                   "这一次调用卡在这里期间，发给你的消息也送不到", file=sys.stderr)
@@ -2414,6 +2546,17 @@ def main():
             print("     → 怎么办：写到同目录临时文件再 `mv` 换上（`mv` 换 inode，正在跑它的进程读的还是旧内容），"
                   "或者用 `research/scripts/replace-once.py` / `insert-row.py` 定点改。追加（`>>`、`tee -a`）与新建不拦；"
                   "Edit / Write 工具本来就换 inode。这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
+            return 2
+        try:
+            repository_edits = repository_in_place_edit_refusal(tool_input.get("command") or "", hook_input.get("agent_type"), repository_root_of(hook_dir))
+        except Exception as error:
+            print(f"  ! bash-command-detector.sh 没判成 Bash 里就地改仓内文件的写法（{error!r}），这条命令照常执行", file=sys.stderr)
+            repository_edits = []
+        if repository_edits:
+            print(f"  ✗ {hook_input.get('agent_type')} 有 Edit 工具，却在 Bash 里就地改仓内文件（认出的写法与目标：{'；'.join(repository_edits)}）："
+                  "写范围闸只看 Write / Edit，这样写它看不见", file=sys.stderr)
+            print("     → 怎么办：仓内文件用 Edit 改（旧串在文件里恰好命中一次），或用定义点名的脚本（replace-once.py、insert-row.py 这类）；"
+                  "草稿目录（/tmp/claude-<uid>/）里随便写。这一道只拒这种写法，不停你在跑的任何东西", file=sys.stderr)
             return 2
     if reasons:
         print(f"  ✗ 看门狗起法不对（{'；'.join(reasons)}；认出的调用：{'、'.join(calls)}）：这样起的看门狗叫不醒主 agent，等于没盯", file=sys.stderr)

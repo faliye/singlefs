@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
+# admission: always Claude Code 每一次触发都要现判这一次调用，上一次的结论不替这一次作保
+# run-condition: command python3
 # PreToolUse hook（AskUserQuestion）：弹窗问句里把推出来的话写成事实的，执行前拒绝（退出 2，stderr 写是哪一句与出路）。
 # hook-events: PreToolUse
-# gate-similar: runner-dispatch-guard.sh 同样在 PreToolUse 上逐句判一段给人看的中文、引号里的片段换成占位不判；但它挂 Agent|Task、判派发提示有没有点名岔路与有没有要子 agent 跑重型测试（动词加宾语），这里挂 AskUserQuestion、判断言词加出处，两边的句子判据没有一条相同。引号遮掉那一步两边各一份、写法不同（它逐字符用栈、不遮反引号，这里先遮反引号再按成对的引号反复替换）；抽成共用模块要改 runner-dispatch-guard.sh，这一次不碰别的钩子，交主 agent 定要不要抽
+# gate-similar: runner-dispatch-guard.sh 同样在 PreToolUse 上逐句判一段给人看的中文、引号里的片段换成占位不判；但它挂 Agent|Task、判派发提示里有没有点名岔路、「重型测试：不跑」一行、定义要的输入这类固定标签行，这里挂 AskUserQuestion、判断言词加出处，两边的句子判据没有一条相同。引号遮掉那一步两边各一份、写法不同（它逐字符用栈、不遮反引号，这里先遮反引号再按成对的引号反复替换）；抽成共用模块要改 runner-dispatch-guard.sh，这一次不碰别的钩子，交主 agent 定要不要抽
 # gate-similar: write-guard.sh 同样在执行前按字面拒一类写法（撇号类角标），但挂 Write|Edit、判的是落进文件的字与写哪个文件；弹窗问句不落盘，它看不见，并进去要让它多认一个工具、多一套与写文件无关的判据
 # gate-similar: continuation-guard.sh 挂 PreToolUse[SendMessage]，判收件的子 agent 在会话记录里交回过没有、被中断过没有；这里判弹窗里的句子，两边的对象与输入没有交集
 # gate-overlap:copy-kept continuation-guard.sh main() 那十行是钩子入口（认 --selftest、从 stdin 读 hook 的 JSON、读不出就放行、拒绝时把说明写进 stderr），不带判据；抽成共用模块要同时改 continuation-guard.sh 与 runner-dispatch-guard.sh，这一次的任务不许碰别的钩子，交主 agent 定要不要抽
@@ -19,7 +21,8 @@
 #   ② 句子里有「推的」「没量过」「推测」「估计」「粗估」之一的放行。
 #   ③ 句子里有出处的放行，出处是下面任一样（在原句上找，引号与反引号里的也算）：
 #      反引号里的路径（带 / 的，或带登记过的扩展名 PATH_EXTENSIONS 的文件名）或命令（全 ASCII、至少两段，第一段是小写命令名、
-#      ./ 开头的路径或 VAR= 赋值）；文件:行号（文件带 / 或带登记过的扩展名，冒号全角半角都认）；research/results/ 下的文件名；
+#      ./ 开头的路径或 VAR= 赋值）；文件:行号（冒号全角半角都认；文件带 / 的，/ 前面紧挨着的那个字要是 ASCII，最后一个 / 之后要么全是 ASCII，
+#      要么以登记过的扩展名收尾、名字里可以有汉字这类非 ASCII 的字；不带 / 的要以登记过的扩展名收尾）；research/results/ 下的文件名；
 #      name= 开头的产物行；「实测」「量过」「产物」「输出」前后 MEASUREMENT_WINDOW 个字以内带着一个数或路径，
 #      而且那个数或路径与这个词之间没有隔着断言词（「输出一定为 0」里 0 与「输出」之间隔着「一定」，不算）。
 #   ①有、②③都没有的句子逐句列出，退出 2；一句都没有就放行。stdin 读不出 JSON、questions 不是列表的放行。
@@ -29,6 +32,8 @@
 #   ask-user-claim-guard.sh             # 从 stdin 读 hook 的 JSON
 #   ask-user-claim-guard.sh --selftest  # 走一遍必拒与必放的句子，另有三例走真实的 stdin 入口
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行）。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
@@ -45,14 +50,17 @@ PLACEHOLDER = "□"
 PATH_EXTENSIONS = ("rs", "md", "sh", "py", "tsv", "csv", "out", "txt", "log", "json", "jsonl", "toml", "yaml", "yml",
                    "conf", "litmus", "cat", "diff", "patch", "lock", "img")
 ASCII_PATH_CHARACTER = r"[A-Za-z0-9_.-]"
+# 文件名里的字：ASCII 之外还认汉字这类非 ASCII 的字（\w 在 str 上认 Unicode 字母与数字，不认，。：（）「」这类标点）；目录名只认 ASCII。
+# 带汉字的文件名只在以登记过的扩展名收尾时才算（FILE_AND_LINE）：「O3/O8两格：2」这类「/ 后面是汉字跟冒号与数」的不是文件:行号
+FILE_NAME_CHARACTER = r"[\w.-]"
 EXTENSION_ALTERNATION = "|".join(PATH_EXTENSIONS)
 # 路径：带一个 /，或以登记过的扩展名收尾的文件名
 PATH_LIKE = re.compile(
     rf"{ASCII_PATH_CHARACTER}*[A-Za-z0-9_-]/{ASCII_PATH_CHARACTER}+"
     rf"|(?<![A-Za-z0-9_.-])[A-Za-z0-9_-]{ASCII_PATH_CHARACTER}*\.(?:{EXTENSION_ALTERNATION})(?![A-Za-z0-9])")
 FILE_AND_LINE = re.compile(
-    rf"(?:{ASCII_PATH_CHARACTER}*[A-Za-z0-9_-]/{ASCII_PATH_CHARACTER}+"
-    rf"|[A-Za-z0-9_-]{ASCII_PATH_CHARACTER}*\.(?:{EXTENSION_ALTERNATION}))[:：]\d+")
+    rf"(?:{ASCII_PATH_CHARACTER}*[A-Za-z0-9_-]/(?:{ASCII_PATH_CHARACTER}+|{FILE_NAME_CHARACTER}*\.(?:{EXTENSION_ALTERNATION}))"
+    rf"|[\w-]{FILE_NAME_CHARACTER}*\.(?:{EXTENSION_ALTERNATION}))[:：]\d+")
 RESULTS_FILE = re.compile(rf"research/results/{ASCII_PATH_CHARACTER}*[A-Za-z0-9_-]")
 PRODUCT_LINE = re.compile(r"(?<![A-Za-z0-9_])name=[^\s`'\"]")
 CODE_SPAN = re.compile(r"`[^`\n]*`")
@@ -164,6 +172,7 @@ def decide(hook_input):
 def selftest(hook_dir):
     original = "可达状态里 defer 一项不可能为 0……重新搭环境也造不出来"
     one_sourced_one_not = "实测 `research/results/e156-r3.out:12` 这一格 defer=0。重新搭环境也造不出别的值"
+    chinese_file_name_sourced = "records/2026-09-16-subagent拆分提案.md:951 写着静态分支一定要走定义三方"
     # (说明, tool_input, 应当被拒的句子——空列表就是应当放行)
     cases = [
         ("必拒：原话那句", {"questions": [{"question": original, "options": [{"label": "采纳", "description": "自证用造的基底"}]}]}, [original]),
@@ -189,6 +198,27 @@ def selftest(hook_dir):
         ("必放：反引号里的路径", {"questions": [{"question": "回收写在 `crates/core/src/mount.rs` 的挂载路径里，defer 一定会被清掉", "options": []}]}, []),
         ("必放：不在反引号里的文件:行号", {"questions": [{"question": "见 transaction.rs：120，回收一定排在提交之后", "options": []}]}, []),
         ("必放：research/results/ 下的文件名", {"questions": [{"question": "research/results/e156-r3.out 那一格必然是 0", "options": []}]}, []),
+        ("必放：不在反引号里、文件名是中文的文件:行号", {"questions": [{"question": chinese_file_name_sourced, "options": []}]}, []),
+        ("必放：多层目录下中文文件名的文件:行号", {"questions": [{"question": ".claude/kb/decisions/08-核心索引结构.md:40 写着这一格一定不变", "options": []}]}, []),
+        ("必放：不带 / 的中文文件名，全角冒号行号", {"questions": [{"question": "见 08-核心索引结构.md：40，这一格一定不变", "options": []}]}, []),
+        ("必拒：中文文件名没带行号", {"questions": [{"question": "records/2026-09-16-subagent拆分提案.md 里写着静态分支一定要走定义三方", "options": []}]},
+         ["records/2026-09-16-subagent拆分提案.md 里写着静态分支一定要走定义三方"]),
+        ("必拒：中文词后面跟冒号与数不是文件:行号", {"questions": [{"question": "拆分提案第四十节：40 行写着它一定要走三方", "options": []}]},
+         ["拆分提案第四十节：40 行写着它一定要走三方"]),
+        ("必拒：斜杠分开的中文词跟冒号与数不是文件:行号", {"questions": [{"question": "抓到/无效/没红：40/0/0，这张表一定全抓了", "options": []}]},
+         ["抓到/无效/没红：40/0/0，这张表一定全抓了"]),
+        ("必拒：/ 后面是不带扩展名的中文，跟冒号与数（O3/O8两格：2）", {"questions": [{"question": "O3/O8两格：2 格一定该升成打中", "options": []}]},
+         ["O3/O8两格：2 格一定该升成打中"]),
+        ("必拒：/ 后面是数字跟汉字（54/55号：2）", {"questions": [{"question": "54/55号：2 道一定要带前缀", "options": []}]},
+         ["54/55号：2 道一定要带前缀"]),
+        ("必拒：/ 后面是编号跟汉字（F1/F4两条：2）", {"questions": [{"question": "F1/F4两条：2 处一定都要改", "options": []}]},
+         ["F1/F4两条：2 处一定都要改"]),
+        ("必拒：/ 后面是汉字串（E142/第十六次跑：3）", {"questions": [{"question": "E142/第十六次跑：3 个字段一定是 0", "options": []}]},
+         ["E142/第十六次跑：3 个字段一定是 0"]),
+        ("必拒：ASCII 路径后面紧跟汉字（research/prompts下的判决：3）", {"questions": [{"question": "research/prompts下的判决：3 条一定都对", "options": []}]},
+         ["research/prompts下的判决：3 条一定都对"]),
+        ("必拒：/ 前面是汉字夹数、后面是汉字（抓到40/无效：0）", {"questions": [{"question": "抓到40/无效：0，这张表一定全抓了", "options": []}]},
+         ["抓到40/无效：0，这张表一定全抓了"]),
         ("必放：没有 questions", {}, []),
     ]
     results = []
@@ -199,7 +229,8 @@ def selftest(hook_dir):
     for label, tool_input, want_code, want_in_stderr in (
             ("stdin：原话那句拒绝", cases[0][1], 2, "重新搭环境也造不出来"),
             ("stdin：两句里拒没出处的那句", cases[3][1], 2, "重新搭环境也造不出别的值"),
-            ("stdin：带出处的放行", cases[7][1], 0, "")):
+            ("stdin：带出处的放行", cases[7][1], 0, ""),
+            ("stdin：中文文件名的文件:行号放行", {"questions": [{"question": chinese_file_name_sourced, "options": []}]}, 0, "")):
         completed = subprocess.run(["bash", script], input=json.dumps({"tool_name": "AskUserQuestion", "tool_input": tool_input}),
                                    capture_output=True, text=True)
         stderr_ok = want_in_stderr in completed.stderr if want_in_stderr else completed.stderr == ""
@@ -211,8 +242,8 @@ def selftest(hook_dir):
         print("    → 看 sentences_of() / without_code_and_quotations() / assertion_spans() / has_provenance() 的判法与 stdin 入口，改完再跑 --selftest")
         return 1
     print(f"  ✓ 自检通过（查了 {len(results)} 种）：带断言词、同一句里没有出处也没写「推的」的句子拒绝，只拒没出处的那一句；"
-          "出处（反引号里的路径或命令、文件:行号、research/results/ 下的文件、name= 产物行、实测带数）、「推的，没量过」、"
-          "反引号与「」里的断言词、「不一定」放行；三例走真实的 stdin 入口")
+          "出处（反引号里的路径或命令、文件:行号（带扩展名的中文文件名也认）、research/results/ 下的文件、name= 产物行、实测带数）、「推的，没量过」、"
+          "反引号与「」里的断言词、「不一定」放行；中文文件名没带行号、中文词后面跟冒号与数、/ 后面是不带扩展名的汉字跟冒号与数的照拒；四例走真实的 stdin 入口")
     return 0
 
 def main():
