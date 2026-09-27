@@ -17,7 +17,7 @@ required-inputs: 草稿目录, 报告, research/mutations/|crates/mutations.tsv
 ## 输入（主 agent 必须给）
 
 - 不接没有表的广谱变异活动（cargo-mutants 这类几千条的扫描）：那是实验，走 experiment-designer 登记；派发闸在提示里没有变异表路径时拒派。
-- 变异表：`research/mutations/<名>.tsv`（配 bin 名与源文件）或 `crates/mutations.tsv` 里的条目名。bin 名以 `research/e7-index-bench/Cargo.toml` 里 `[[bin]]` 的 `name` 为准（多是连字符，源文件名是下划线）；主 agent 给的对不上、`mutate.sh` 退出码 6 时，照它报的改法改，报告里写明。
+- 变异表：`research/mutations/<名>.tsv`（配 bin 名与源文件）或 `crates/mutations.tsv` 里的条目名。bin 名以 `research/e7-index-bench/Cargo.toml` 里 `[[bin]]` 的 `name` 为准（多是连字符，源文件名是下划线）；没登记 `[[bin]]` 的，bin 名就是源文件名去掉 `.rs`；主 agent 给的对不上、`mutate.sh` 退出码 6 时，照它报的改法改，报告里写明。
 - 给的是 `crates/mutations.tsv` 里的条目时：崩溃验证员跑的那一次门禁 59 号的输出路径（第 3 步从里面取条目）。
 - 改动前的三个数（有就给）。
 - 分 `crates/mutations.tsv` 里的条目时：提交时那一次门禁 59 号的输出路径，即崩溃验证员报告里 59 号那一行的日志路径（缺它不开工）。

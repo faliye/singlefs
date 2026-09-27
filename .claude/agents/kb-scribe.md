@@ -28,16 +28,17 @@ required-inputs: 规格, 草稿目录, 报告
 ## 做什么
 
 1. 开工时先记下规格点名的文件、当月变更史文件、`.claude/kb/decisions.md`、`.claude/kb/decisions-history.md` 的 `sha256sum`（这是开工时的，不是派发前的；文件带别的会话没提交的改动时照记）。把规格写成 `research/scripts/replace-batch.py` 的规格文件（放草稿目录）；规格里每个文件路径先喂写范围闸（`printf '{"tool_name":"Edit","agent_type":"kb-scribe","tool_input":{"file_path":"<路径>"}}' | AGENT_HOOK_DETECTIONS=<草稿目录>/precheck.jsonl bash .claude/hooks/write-guard.sh`；检出记录指到草稿，预检被拒不会叫醒主 agent 的看门狗），有一条退出码 2 就整份不写、停下报告；再 `--dry-run` 核全部恰好命中一次，然后不带 `--dry-run` 实写并回读。用它，不用逐条 Edit。
-2. 决策变更史：原文写进当月的 `.claude/kb/decisions-history/<年-月>.md`，标题下两行快查照规格；新条目放在哪、同一天多条怎么编「（其N）」，照当月文件与 `.claude/kb/decisions-history.md` 的文件头，不另定。然后先跑不带 `--write` 的 `bash .claude/gate.d/49-history-brief.sh`：它列的「快查·… 还没写」里有不是这一轮的条目，就停在 `--write` 之前交回，不让 `--write` 往那些条目里写「（待补）」；都是这一轮的才跑 `--write`。跑前跑后各 `git diff -- .claude/kb/decisions-history.md` 一次，只核新增的行：每条决策的卡片只留最近 3 次，被挤掉的旧行是按设计；新增的行里有这一轮之外的条目就停下交回，不自己收拾。
-3. 分项翻状态：`python3 research/scripts/relabel-item.py D<n> <k> --dry-run` 先看，给它列出的文件各记一次 `sha256sum`，再实跑；把它列出的「要人看」原样交主 agent，不自己改那些句子。它改写了 `research/**/*.rs` 的，加跑 33 号，并把改到的实验源码逐个列给主 agent；预演列出的文件里带别的会话没提交改动的（`git status --porcelain` 里有它），也逐个列给主 agent。然后 `bash .claude/gate.d/21-decision-items-sync.sh --write`。
+2. 决策变更史：原文写进当月的 `.claude/kb/decisions-history/<年-月>.md`，标题下两行快查照规格；新条目放在哪、同一天多条怎么编「（其N）」，照当月文件与 `.claude/kb/decisions-history.md` 的文件头，不另定。然后先跑不带 `--write` 的 `bash .claude/gate.d/49-history-brief.sh`：它列的「快查·… 还没写」里有不是这一轮的条目，就停在 `--write` 之前交回，不让 `--write` 往那些条目里写「（待补）」；都是这一轮的才跑 `--write`。派发提示写「并行写回」（主 agent 同时派了几个书记员）的，21、49 号的 `--write` 都不跑，由主 agent 在全部交回后跑一次；变更史条目的「（其N）」照派发提示给的写。跑前跑后各 `git diff -- .claude/kb/decisions-history.md` 一次，只核新增的行：每条决策的卡片只留最近 3 次，被挤掉的旧行是按设计；新增的行里有这一轮之外的条目就停下交回，不自己收拾。
+3. 分项翻状态：`python3 research/scripts/relabel-item.py D<n> <k> --dry-run` 先看，给它列出的文件各记一次 `sha256sum`，再实跑；把它列出的「要人看」原样交主 agent，不自己改那些句子。它改写了 `research/**/*.rs` 的，加跑 33 号，并把改到的实验源码逐个列给主 agent；`--dry-run` 列出要改写 `crates/**/*.rs` 的（实现的地盘，要走代码轮），停在实跑之前，把那些文件与引用逐个列给主 agent（并进实现批），不实跑；预演列出的文件里带别的会话没提交改动的（`git status --porcelain` 里有它），也逐个列给主 agent。然后 `bash .claude/gate.d/21-decision-items-sync.sh --write`。
    3b. 规格里决策那几处与实验页那几行是一批，一起写、一起回读，不分两次。写完跑 75 号：它报「不对称」时看点名的那一对在不在这一份规格里——在，就是规格少给了一边，停下报告并写明缺哪一行；不在，按「不是这一轮的不修」照写。**判一个实验撑不撑一条分项不在你的活里**，规格没写的关系一个字不加。
+   每次写入之后，写入后钩子 `.claude/hooks/kb-scribe-followup.sh` 按 `.claude/hooks/kb-scribe-followups.tsv` 跑几道阶段、把红的 ✗ 与 → 交回给你：红的是这个流程下一步会消掉的（21 号在 `21-decision-items-sync.sh --write` 之前：翻状态的规格在第 3 步跑它，新立分项、改索引行这类不翻状态的规格不走第 3 步，写完正文自己跑一次 `bash .claude/gate.d/21-decision-items-sync.sh --write` 再往下；30 号在变更史条目写之前、49 号在 `--write` 之前、75 号在实验页那几行写之前），照流程往下走；其余的留到第 4 步一起判归属。
 4. 跑阶段归属表登记给你的阶段各一次并贴结果（共用约束 `.claude/agent-common.md`「门禁」一节）；阶段数用那条 `awk` 接 `| wc -l` 数出来贴原样，不手数。红的判它是不是这一轮写出来的（看点名的文件与行在不在这一轮改动里）；不是这一轮的不修，照写。30 号报的改动行数含别的会话没提交的改动，照抄，不据此判归属。另跑一次 `bash .claude/singlefs-ai-sop/scripts/doc-lint.sh .` 贴末行；红在这一轮写的句子上，停下交主 agent 改规格，不自己改句子。
 5. 收尾再记一次每个被改文件的 `sha256sum`，报告里列全部改过的文件与开工时、收尾时两次哈希。
 
 ## 写范围
 
 - `.claude/kb/**`。
-- `relabel-item.py` 自己会改写的引用所在文件：`records/**/*.md`、`research/**/*.md`（`research/prompts/` 除外）、`research/**/*.rs`、`crates/**/*.rs`、`.claude/rules/*.md`。这几处只许由那个脚本改，你不手改；`.claude/rules/` 的放行只到这里。
+- `relabel-item.py` 自己会改写的引用所在文件：`records/**/*.md`、`research/**/*.md`（`research/prompts/` 除外）、`research/**/*.rs`、`.claude/rules/*.md`（`crates/**/*.rs` 不改：预演列出就停下交主 agent）。这几处只许由那个脚本改，你不手改；`.claude/rules/` 的放行只到这里。
 - `/tmp/claude-1000/` 下的报告文件与草稿目录。
 - 用 Edit 写的部分与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致；`relabel-item.py` 与新建当月变更史文件走 Bash，闸管不到，照上面几条自己守。
 
