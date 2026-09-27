@@ -141,7 +141,7 @@ fn newest_root_floor(pool: &BuiltPool) -> CheckpointTxg {
 /// A 的数据落点 50180（D 复活、txg 10 那次覆盖写换下，释放代 10）在回收的里面；E 的数据单元落 50176、它的分配记录改写成代 17、未释放；
 /// 后释放的（代 12–14）仍占着；冷启动读回 E；根记录 F = 11；checker 全绿（A、B 的根在 F 之下、不在候选集）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it(
 ) {
     let mut pool = build_through_rollback("step-five-reuse");
@@ -275,7 +275,7 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
 /// 链上 txg 16 的记录照样施加（同实例），回收与根槽都好时一样多，每块盘 defer 里剩 92 个槽。按改之前「各盘所带 F 最大值的最小值」只读根，
 /// 盘 1 上最大的是 0，F_生效 回到 0、一个都不回收（向前回退之后这一臂剩多少没重量；旧形态下是 125）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_one_device_lost_its_root_carrying_it(
 ) {
     floor_carried_by_the_system_configuration_takes_effect_on_remount(
@@ -287,7 +287,7 @@ fn floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_o
 
 /// 同一条脚本、两块盘的载体根都好：所选根是 txg 16，F_生效 与回收同上。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn floor_carried_by_the_system_configuration_takes_effect_on_remount_with_both_carrier_roots_intact(
 ) {
     floor_carried_by_the_system_configuration_takes_effect_on_remount(
@@ -355,7 +355,7 @@ fn floor_carried_by_the_system_configuration_takes_effect_on_remount(
 /// 上限：第 4 个不同状态是 11（按新到旧 14、13、12、11；D 与 A 是同一个状态）⇒ 抬到 12 被拒；
 /// 抬到 11 之后上限仍是 11，再抬 12 仍被拒。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused() {
     let mut pool = build_through_rollback("step-five-ceiling");
     five_overwrites_after_the_rollback(&mut pool);
@@ -382,7 +382,7 @@ fn raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused() {
 /// 把 txg 14 那次覆盖写的记录在两块盘上都改坏（根槽与单元不动），不同的状态仍是 14、13、12、11，上限仍是 11，抬到 12 被拒；
 /// 按「环里有它自己那条记录且事务号非 0」认的话 txg 14 成了空根，第 4 个不同状态掉到 10，上限掉到 10。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling() {
     let mut pool = build_through_rollback("step-five-ceiling-torn-record");
     let overwrites = five_overwrites_after_the_rollback(&mut pool);
@@ -433,7 +433,7 @@ fn torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_c
 /// checker 那一侧同一条规则：把入口骗过（告诉入口今天的 F 是 9，入口按 txg ≥ 9 的根算，不同状态只剩 12、11、10 三个，上限落到最旧的有效根 9）
 /// 抬到 9，镜像上 I-7.9（回退下界 F 不高于抬 F 的上限） 按抬之前的 F（0）去重算出上限 8，只红它；checker 不去重的话上限 9、判成立。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker(
 ) {
     let build = |tag: &str| {
@@ -536,7 +536,7 @@ struct AllocatorState {
 /// 把有效根 txg 12 的树表两盘都改坏，抬 F 到 11 ⇒ 返回 `RollbackFloorCeilingNeedsUnreadableValidRootTreeTable`（点名 (2, 12)）；
 /// 分配器、现行那一版、录制流都不变（没回收、没发布）。按「读不出算空」猜的话 txg 12、13 都与前一条不同，上限照样是 11、抬 F 成功。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable() {
     let mut pool = build_through_rollback("step-five-ceiling-unreadable-valid-root");
     let overwrites = five_overwrites_after_the_rollback(&mut pool);
@@ -596,7 +596,7 @@ fn raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable() {
 /// 必红（C22（刚释放的块立即重分配）、复用窗口置 0）：不抬 F、直接把释放代 ≤ 11 的落点回收，E 落回 mkfs 实例表那 2 槽 50176——
 /// F = 0 时 A（txg 3）还是候选、它的根指着那片实例表；checker 走 A 时那片实例表的校验和对不上 ⇒ I-2.1 红。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red(
 ) {
     let mut pool = build_through_rollback("step-five-window-zero");
@@ -639,7 +639,7 @@ fn reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_ref
 /// （txg 16）改坏，F_生效 仍是 11（盘 0 的 txg 15 与两块盘系统配置里都带 11），txg 9 的根 D 在 F 之下、不是候选，挂着的时候回退在任何写之前
 /// 拒成 `BelowEffectiveFloor`、盘上逐字节不变、分配器与现行版本不动。改之前按「各盘所带 F 最大值的最小值」只读根，F_生效 回到 0、D 退得到。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_roots_below_it_out_of_the_rollback_candidates(
 ) {
     let mut pool = build_through_rollback("step-five-candidate-floor");
@@ -704,7 +704,7 @@ fn floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_
 /// 它们的单元已被盖）。历史照那条腿的：A、B、重开取号 2、六次覆盖写（txg 8–13，开放段用满）、抬 F 到 8——两次空发布的落点一个都不在
 /// 这次回收的槽上。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect() {
     let mut pool = build_pool("step-five-hold-until-effective");
     overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
@@ -848,7 +848,7 @@ fn raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refu
 /// （`common::abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`：C 的根槽与数据单元暂时读不出，恢复落到 (2, 7)，
 /// 实例 3 写行与暖机 txg 9、10，再把 C 写回）；实例 3 覆盖写四次（txg 11–14），把 C 的树表两盘都改坏，抬 F 到 11 报 1 条读不出的被抛弃根。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable() {
     let mut pool = build_pool("step-five-raise-counts-unreadable");
     overwrite_in_process(&mut pool, &content_of(4100, 3), InstanceGeneration(1));
@@ -951,7 +951,7 @@ fn pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(tag: &s
 /// 归到第 1 条（收口表第 43 行）。对照：同一段历史 F 抬到 6（写行那次的根）或 7（暖机），回收到释放代 6，checker 全绿。
 /// 修法没定（收口表第 43 行「要三方」），这里只钉今天的结局。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_in_the_known_red_form_of_closeout_row_43(
 ) {
     let mut pool =
@@ -1032,7 +1032,7 @@ fn raising_the_floor_into_the_txg_of_the_root_abandoned_by_crash_recovery_ends_i
 /// 与实例 2 的 C 用过的 1 重号。回退那次发布 D 的记录也写 0（它不施加也不删除任何记录，实现取 0，条款没写，见实三报告）。重号之后同一实例的两个版本写序逐字节相同（写序存事务号低 48 位），
 /// I-1.8（归并后版本全序） 判不开它们，而实例表行的 W 能当精确前缀也正是靠「记录按事务号顺序追加」这条纪律。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor(
 ) {
     let mut pool = build_through_rollback("txn-number-per-instance");

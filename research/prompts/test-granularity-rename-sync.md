@@ -1,0 +1,37 @@
+<!-- knowledge-sync -->
+# 用例粒度与按内容起名 阶段同步
+
+触发文件：.claude/agents/crash-verifier.md、.claude/agents/implementation-writer.md、.claude/agents/kb-scribe.md、.claude/gate.d/14-test-granularity.sh、.claude/gate.d/19-verdict-names-local-samples.sh、.claude/gate.d/31-blocking-verdict.sh、.claude/gate.d/32-new-pool-file-creation-fields.sh、.claude/gate.d/33-mutation-tables.sh、.claude/gate.d/38-field-table-projection.sh、.claude/gate.d/42-new-pool-file-creation-trio.sh、.claude/gate.d/52-segment-registry.sh、.claude/gate.d/53-format-const-placeholders.sh、.claude/gate.d/54-layer0-replay.sh、.claude/gate.d/55-qemu-device-streams.sh、.claude/gate.d/59-crates-mutation-replay.sh、.claude/gate.d/60-stale-open-items.sh、.claude/gate.d/61-settled-same-file.sh、.claude/gate.d/62-stage-owners.sh、.claude/gate.d/66-abandoned-rounds.sh、.claude/gate.d/69-evidence-in-repo.sh、.claude/gate.d/74-model-differential.sh、.claude/gate.d/75-decision-experiment-links.sh、.claude/gate.d/76-overwrite-release-rollback-reuse-hooks.sh、.claude/gate.d/80-absolute-assertions.sh、.claude/gate.d/85-repro-command.sh、.claude/gate.d/86-experiment-orphans.sh、.claude/gate.d/89-closeout-row27-preconditions.sh、.claude/gate.d/stage-inputs.tsv、.claude/gate.d/stage-owners.tsv、.claude/hooks/agent-write-scope.tsv、.claude/hooks/heavy-test-guard.sh、.claude/hooks/kb-scribe-followups.tsv、.claude/hooks/lib_heavy_tests.py、.claude/hooks/runner-dispatch-guard.sh、CLAUDE.md、.claude/rules/format-evolution.md、.claude/rules/implementation-workflow.md、.claude/rules/verification.md、crates/singlefs-checker/src/walk.rs、crates/singlefs-checker-tier/src/bad_disk_input.rs、crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs、crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs、crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs、crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs、crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs、crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs、crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs、crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs、crates/singlefs-checker-tier/src/crash_injection.rs、crates/singlefs-checker-tier/src/crash.rs、crates/singlefs-checker-tier/src/on_device_modes.rs、crates/singlefs-core/src/address.rs、crates/singlefs-core/src/admission.rs、crates/singlefs-core/src/allocator.rs、crates/singlefs-core/src/inode_tree.rs、crates/singlefs-core/src/journal.rs、crates/singlefs-core/src/make_filesystem.rs、crates/singlefs-core/src/mounted_read.rs、crates/singlefs-core/src/mount.rs、crates/singlefs-core/src/records.rs、crates/singlefs-core/src/recovery.rs、crates/singlefs-core/src/root_ring.rs、crates/singlefs-core/src/transaction.rs、crates/singlefs-core/src/write_accounting.rs、crates/singlefs-core/src/write_request_split.rs、crates/singlefs-format/src/lib.rs、crates/singlefs-harness/src/fault_injection.rs、crates/singlefs-harness/src/hexadecimal.rs、crates/singlefs-harness/src/history.rs、crates/singlefs-harness/src/lib.rs、crates/singlefs-harness/src/memory_pool.rs、crates/singlefs-harness/src/model_comparison.rs、crates/singlefs-harness/src/model.rs、crates/singlefs-harness/src/new_pool_file_creation_regions.rs、crates/singlefs-harness/src/read_tally.rs、crates/singlefs-harness/src/scenario.rs、crates/singlefs-harness/src/segments.rs、crates/singlefs-harness/src/sha256.rs、research/scripts/admission.py、research/scripts/agent-watch.py、research/scripts/check-segment-registry.py、research/scripts/crash-case-check.py、research/scripts/e152-run.sh、research/scripts/e152-stage-root.sh、research/scripts/e152-tables.py、research/scripts/fixtures/stale-candidates-benchmark-facts.tsv、research/scripts/harness-test-timing.py、research/scripts/replay.sh、research/scripts/stale-candidates.py
+
+做成的事（2026-09-27，会话 singlefs-8b，主 agent 自己做、不派人）：harness 用例一条一个场景（拆了 8 条）、重档由单线程耗时表定（`research/scripts/harness-test-timing.py`）、复测只跑红的（`research/scripts/rerun-failed-tests.py`）；自己逐个造崩溃状态的用例搬进 checker 档、checker 档测试文件声明模块；新立门禁 14 号，33、62 号加判据，33、60、61、85、86 号认根目录参数，重型测试闸认 `--no-run`；测试文件、装置、模块、门禁与里程碑中文名按内容改名（`.claude/kb/term-renames.md`，90 号盯），`.claude/kb/milestone/`、`layout/` 的文档名照旧。
+
+## 搜索
+
+回扫按旧说法搜（research/ 按用户定不细看；research/prompts 冻结）：
+
+- 旧名：`research/scripts/sweep-term.py --check` 按 `.claude/kb/term-renames.md` 35 条全仓搜 → 0 处（豁免登记在 `.claude/term-rename-exempt`，各有理由）
+- 61 份测试文件的旧名按整词全仓搜 → 794 处改完，复搜 0
+- 「重档靠人手标 ignore」：`grep -rnE '标 ?#\[ignore|重的标|60 秒'` 在 `.claude/`、`CLAUDE.md`、`README.md`、kb → 3 处现状句要改（见命中处置），其余是说全量用例标 ignore、与重档无关
+- 「崩溃枚举用例只认直接调 enumerate_layer0」：`grep -rn 'enumerate_layer0' .claude/agents .claude/rules` → 实现员定义第 7a 条要补自扫崩溃点的写法
+- 「33、60、61、85、86 号只看当前目录」：62 号第 ⑤ 条现判 79 个阶段都认根目录参数
+
+## 命中处置
+
+| 载体 | 原句 | 处置 |
+|---|---|---|
+| .claude/rules/verification.md:84 | 它们管不到的：harness 里一条重用例该不该标 `#[ignore]` | 改了：改成「耗时表是不是最近量的」，重档现在由耗时表判 |
+| .claude/kb/decisions/13-验证路线.md:318 | 包内再分轻重，重的标 `#[ignore]` | 改了：写明由单线程耗时表定、14 号核，一条用例一个场景、按测什么起名；变更史其二十三 |
+| .claude/agents/implementation-writer.md:42 | 测试函数直接调 `enumerate_layer0` 一族做全量枚举 | 改了：补自己逐个造崩溃状态的三种写法 |
+| .claude/agents/implementation-writer.md:16 | 开工先读：……`.claude/rules/fs-design.md`。 | 补了：加 `.claude/rules/verification.md` 三节 |
+| .claude/rules/verification.md:18 | 不带里程碑、步号……（全仓替换把反例也换成了新名） | 改了：反例改写成不带旧名的形态 |
+
+## 原始证据
+
+| 材料 | 路径 | 行数 |
+|---|---|---|
+| 提交之后在 HEAD 干净树上跑的 g14 | research/prompts/test-granularity-rename-evidence/head-bc57af7a-g14.log | 6 |
+| 提交之后在 HEAD 干净树上跑的 g56 | research/prompts/test-granularity-rename-evidence/head-bc57af7a-g56.log | 44 |
+| 提交之后在 HEAD 干净树上跑的 g68 | research/prompts/test-granularity-rename-evidence/head-bc57af7a-g68.log | 92 |
+| 提交之后在 HEAD 干净树上跑的 g72 | research/prompts/test-granularity-rename-evidence/head-bc57af7a-g72.log | 6 |
+| 提交之后在 HEAD 干净树上跑的 stagesel | research/prompts/test-granularity-rename-evidence/head-bc57af7a-stagesel.log | 170 |
+| 提交之后在 HEAD 干净树上跑的 naming | research/prompts/test-granularity-rename-evidence/head-bc57af7a-naming.log | 342 |

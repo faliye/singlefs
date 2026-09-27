@@ -348,9 +348,9 @@
 
 **改前**：第四次跑（2026-09-17）之后装置改动（读子进程输出先读到 EOF 再转打）只跑过一轮冒烟跑，没有正式跑；`.claude/kb/vm-harness.md` 只记了「转打阻塞导致积压」这一个来源。
 
-**改后**：重跑登记 `e152-r5-prereg.md`（不占新号）只重跑 singlefs 一臂，5 轮一次过，产物 `e152-file-system-benchmark-file-overwrite-relay-timing-2026-09-19.out`（142 行）。发现装置改动之后仍有第二个截断来源：5 轮里 3 轮的 `singlefs_timing` 行被虚机关机时内核打印的 `reboot: Power down` 从中间截断，`file_overwrite_outer_contains_inner` 与 `file_overwrite_inner_nanoseconds` 两个字段落在截断点之后、读不到；用独立复算（同一轮 `inner=file_overwrite` 行的到达时刻与自报纳秒相减）核实这 3 轮物理上包含关系仍然成立，只是那一个字段读不到。按登记口径，Q1（外层包不包住里层）走「过半不确定」路径够判、外层「覆盖写、释放、回退与复用 ms」整格不报；Q2（子进程自己计的覆盖写、释放、回退与复用挂钟中位与离散）因收进轮数只有 2（<5）判「不够判」；Q3（发布 B 写数与段序列）够判，5 轮与第三、四次正式跑逐字相同，但登记引的锚点「操作数 21」与实现「操作数 23」的既有差异（`.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 已有过解释，非本轮回归）再次确认；Q4（第一段几行跨度 ≤ 1 ms）够判，5 轮全部满足（78 121–86 810 ns）。另跑两项：P1（对第三、四次正式跑的 10 轮旧产物复算）确认判定有牙（外层不包住里层 9/10 轮、跨度超 1 ms 8/10 轮，均复现已记的数）；P2（把转打放回读循环的阳性对照）因登记对 `research/scripts/vm-bench.sh` 抓取方式的假设（「行首不是 E7RESULT 就不收」）与实现不符（该脚本 `grep -ao 'E7RESULT .*'` 不锚定行首）而 0/6 次尝试成功，产物全部作废；G1（`VM_CPUS=1` 单 vCPU 几何，3 轮）确认不稳定，3 轮里 2 轮包含关系仍为 false，第一段跨度仍全部 ≤ 1 ms。
+**改后**：重跑登记 `e152-r5-prereg.md`（不占新号）只重跑 singlefs 一臂，5 轮一次过，产物 `e152-file-system-benchmark-second-transaction-relay-timing-2026-09-19.out`（142 行）。发现装置改动之后仍有第二个截断来源：5 轮里 3 轮的 `singlefs_timing` 行被虚机关机时内核打印的 `reboot: Power down` 从中间截断，`file_overwrite_outer_contains_inner` 与 `file_overwrite_inner_nanoseconds` 两个字段落在截断点之后、读不到；用独立复算（同一轮 `inner=file_overwrite` 行的到达时刻与自报纳秒相减）核实这 3 轮物理上包含关系仍然成立，只是那一个字段读不到。按登记口径，Q1（外层包不包住里层）走「过半不确定」路径够判、外层「覆盖写、释放、回退与复用 ms」整格不报；Q2（子进程自己计的覆盖写、释放、回退与复用挂钟中位与离散）因收进轮数只有 2（<5）判「不够判」；Q3（发布 B 写数与段序列）够判，5 轮与第三、四次正式跑逐字相同，但登记引的锚点「操作数 21」与实现「操作数 23」的既有差异（`.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 已有过解释，非本轮回归）再次确认；Q4（第一段几行跨度 ≤ 1 ms）够判，5 轮全部满足（78 121–86 810 ns）。另跑两项：P1（对第三、四次正式跑的 10 轮旧产物复算）确认判定有牙（外层不包住里层 9/10 轮、跨度超 1 ms 8/10 轮，均复现已记的数）；P2（把转打放回读循环的阳性对照）因登记对 `research/scripts/vm-bench.sh` 抓取方式的假设（「行首不是 E7RESULT 就不收」）与实现不符（该脚本 `grep -ao 'E7RESULT .*'` 不锚定行首）而 0/6 次尝试成功，产物全部作废；G1（`VM_CPUS=1` 单 vCPU 几何，3 轮）确认不稳定，3 轮里 2 轮包含关系仍为 false，第一段跨度仍全部 ≤ 1 ms。
 
-**依据**：产物 `e152-file-system-benchmark-file-overwrite-relay-timing-2026-09-19.out`、`…-relay-in-loop-control-2026-09-19.out`（P2，全部作废）、`…-relay-timing-vcpu1-2026-09-19.out`（G1）；跑前重跑登记 `e152-r5-prereg.md`、问题单 `e152-r5-questions.md`；正文 [152-按里程碑对比六家文件系统的文件性能.md](experiments/152-按里程碑对比六家文件系统的文件性能.md)「第五次正式跑」一节。
+**依据**：产物 `e152-file-system-benchmark-second-transaction-relay-timing-2026-09-19.out`、`…-relay-in-loop-control-2026-09-19.out`（P2，全部作废）、`…-relay-timing-vcpu1-2026-09-19.out`（G1）；跑前重跑登记 `e152-r5-prereg.md`、问题单 `e152-r5-questions.md`；正文 [152-按里程碑对比六家文件系统的文件性能.md](experiments/152-按里程碑对比六家文件系统的文件性能.md)「第五次正式跑」一节。
 
 ### 2026-09-18（其三）：E132（livelist 载体·按真实树数与内部扇出重算） 的实验索引行跟上 2026-09-16 的重跑
 
@@ -380,8 +380,8 @@
 - E152（按里程碑对比六家文件系统的文件性能） 第三、第四次跑补对比结论：改前两次跑只有整行抄录，结论只在 `research/perf-by-milestone.md` 第三·二节、拿六家第一次写的数比、写请求两边口径不同、挂钟取汇总行的 5.08 / 5.53 ms；改后实验页加「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节：与镜像六家每次平均比的七家排位（写字节、块层写请求、挂钟三项垫底，FLUSH 居中，冷挂载最慢）、发布 B 字节按单元拆开（元数据单元 76.1%、数据单元 19.0%、固定点 4.9%）、两处口径问题——汇总行里覆盖写、释放、回退与复用的挂钟是外层按输出行到达时刻切的、混进打印积压（10 轮 9 轮小于二进制自己计的发布 B 纳秒，第一段「两群」也是它），改取二进制自己计的中位 6.14 / 6.63 ms；写请求改用块层记法 26（块层 = 写调用 + 屏障 + FUA，四组逐盘读数对上）。装置没改，下一次正式跑之前要改成二进制自己报三段挂钟。依据：用户 2026-09-17 指出 E152（按里程碑对比六家文件系统的文件性能） 的核心是对比与找差距。
 - E154（两道闸串-重判与回收时点的代价） 第四段：改前 30 单测缺（当时 23）、H5-k-位与 H6 已实现、H4a/H4b 与 H8 未做；改后补 H8（主 agent 指定的 H5 变体，注入点从「删后写回」那次准入改到填满阶段自己为抬 F 推的空发布，`LazyFailureInjector` 在第一次真的自推空发布时现算 `window_start`）与 H4a/H4b（推空发布之中崩溃再重开，`crash_and_reopen` 复用既有 `perform_instance_switch`）；30 单测 / 14 条变异全抓。头号结果：H8 上真实基线（串重判×G7）退化格数从 H5 的 210/288（止）降到 0/288（止）、0/288（满）；H4a 与 H4b 在本模型里产生逐字节相同的 RUN 行（`attempt_publish` 的原子性粒度决定的等价，已用单测钉死）。产物自查发现一个既有问题（不是本段引入，第二段产物就有）：真实基线在 H5／H6／H4a／H4b 上都有行触发 F5（回收时点不安全，发出候选根还引用的槽），此前的报告与实验页都没提到，判它对不对要走三方。停机条款 S1 本段开工时没做，产物跑完之后才现查——`mount.rs`／`transaction.rs` 相对第二段记的基线哈希已变（另一会话仍在改 `crates/`），S2（六项装置-实现对应今天是否仍成立）本段没有重新核对，按派发提示「对不上停下报告」交主 agent。H3a/H3b、ROW 明细、Q4 精确分量仍未实现。依据：产物 `e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17-stage4.out`（37346 行），跑前登记「十二」第四段，正文 [154-两道闸串-重判与回收时点的代价.md](experiments/154-两道闸串-重判与回收时点的代价.md)。
 - E153（账本形态与环上有洞的代价） 第五段续做：改前第四段已跑 26 单测 / 22 条变异、12 个族标签 × 12 格的 Q1–Q6/Q9a/Q9b(峰值/均值/末值)/Q11–Q13，Q7/Q8/Q10/Q6b 一条未算，崩溃支线（L2/L3）与坏镜像矩阵完全没建；改后补齐 Q7（G27 在合法状态上判红的状态数，逐盘「记账第 1 项 − 第 5 项 == 最新根走读引用」）、Q10（G12×G28「不另读候选根的树」这条区间推法与真实走读并集的独立核对）、Q6b（D28（挂载期承诺量） 已定项 1 第九项上界的两种读法与影子账隔离槽数的比较）三个完整实现，与 Q8 坏镜像矩阵的 B1a/B1b/B2/Bk1/Bk2 五种（β1=H1 末态、β2=H4dNm2 回退后第 S 次工作负载之后两个基底，B3a/B3b/B4a/B4b/B4c 五种仍未建，各自需要「重跑历史禁用回收」与「强制落点碰撞」两种新机制）；40 单测 / 31 条变异全抓（新增 20 单测 / 10 变异，均先证明会红）。四条新发现：Q7 在全部 720 个已跑 (族,格,臂) 行上都是 0（G27 在合法状态上零误报）；Q8 已跑的五种坏镜像在 72 个可判别的 (基底,几何,臂) 组合上与登记 P5 的预期逐条相符、零例外；Q6b 的两种读法在含回退的四族、全部 360 个非零采样上都被隔离槽数超过、且上界从未算成负数（按登记 F4「条款可能错，交主 agent」记下，不改影子账定义去凑）；Q10 在已跑的全部历史上是 0（与第四段查到的 G12 主谓词分歧是两件不同的事，见正文「做了什么」第 8 条）。过程中发现并核回一处命名纪律返工：改 Rust 标识符满足 `naming-lint.sh` 时，全文本替换误伤了既有产物字段标签 `q3_i52_red_states`（曾被错改成 `q3_free_statistic_mismatch_states`），已核回原样。依据：产物 `e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out`（2487 行），跑前登记「第十二节第五段」，正文 [153-账本形态与环上有洞的代价.md](experiments/153-账本形态与环上有洞的代价.md)。崩溃支线（L2/L3）与 Q8 剩余五种坏镜像仍未实现，交主 agent 定是否需要补跑。
-- E152（按里程碑对比六家文件系统的文件性能） 第四次正式跑：改前第三次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条）；改后里程碑收尾时用户要求再跑 singlefs 一臂（跑前登记第十三节），5 轮一次过、判据全中，写数与段序列与第三次逐字相同，挂钟两次并列不比快慢（覆盖写、释放、回退与复用中位 5.53 ms、离散 259%）。依据：产物 `e152-file-system-benchmark-file-overwrite-final-2026-09-17.out`；`research/perf-by-milestone.md` 第三·二节「收尾时再跑一次」。
-- E152（按里程碑对比六家文件系统的文件性能） 第三次正式跑：改前只有 2026-09-15 的两次（六家与 singlefs 新池新建文件）；改后里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂（`file-overwrite` 模式，跑前登记第十二节写死判据：B 的段序列 16+2+1+2、两盘合计 21 次写 / 344 576 字节 / 4 屏障 / 1 FUA、冷恢复读回第二版），5 轮一次过、判据全中，覆盖写、释放、回退与复用挂钟 5.08 ms（离散 186%，照报）。依据：产物 `e152-file-system-benchmark-file-overwrite-2026-09-17.out`；结论写在 `research/perf-by-milestone.md` 第三·二节。
+- E152（按里程碑对比六家文件系统的文件性能） 第四次正式跑：改前第三次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条）；改后里程碑收尾时用户要求再跑 singlefs 一臂（跑前登记第十三节），5 轮一次过、判据全中，写数与段序列与第三次逐字相同，挂钟两次并列不比快慢（覆盖写、释放、回退与复用中位 5.53 ms、离散 259%）。依据：产物 `e152-file-system-benchmark-second-transaction-final-2026-09-17.out`；`research/perf-by-milestone.md` 第三·二节「收尾时再跑一次」。
+- E152（按里程碑对比六家文件系统的文件性能） 第三次正式跑：改前只有 2026-09-15 的两次（六家与 singlefs 新池新建文件）；改后里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂（`file-overwrite` 模式，跑前登记第十二节写死判据：B 的段序列 16+2+1+2、两盘合计 21 次写 / 344 576 字节 / 4 屏障 / 1 FUA、冷恢复读回第二版），5 轮一次过、判据全中，覆盖写、释放、回退与复用挂钟 5.08 ms（离散 186%，照报）。依据：产物 `e152-file-system-benchmark-second-transaction-2026-09-17.out`；结论写在 `research/perf-by-milestone.md` 第三·二节。
 - 新增 E154（两道闸串-重判与回收时点的代价） 并跑完（未完全按登记规模）：登记要求 12 种历史（H1–H6，共 24 条臂 × 48 格几何），这一轮只实现了 H1，其余 11 种（H2 由 n=1 取样点覆盖，H3a/H3b/H4a/H4b/H5-k-位/H6 未实现）；16 单测 / 7 条变异全抓。真实基线（串-重判 × G7）P-止 下 44/48 格「达标」、P-满 下 0/48 达标（24 越界 + 24 卡死）；Q6（候选根还引用的槽）在全部 1152 次跑里恒为 0；PC1/PC2/PC4/PC5 四条阳性对照均有齿。执行阶段发现并修了两个实现 bug（新分配的槽未标记 `Allocated`；PC5 下失败传播用 `.expect()` 会 panic，改成交回调用方按卡死处理）。依据：产物 `e154-two-gates-serial-rejudge-and-reclaim-timing-2026-09-17.out`，跑前登记 `e154-preregistration.md`，正文 [154-两道闸串-重判与回收时点的代价.md](experiments/154-两道闸串-重判与回收时点的代价.md)。是否需要补跑剩余 11 种历史交主 agent 定。
 - 新增 E153（账本形态与环上有洞的代价） 并跑完（未完全按登记规模）：登记要求 9 族历史 × 12 几何格 × 5 臂的完整 Q1–Q13 扫描、崩溃支线（c1/c2 × 2N 后缀）、坏镜像矩阵，这一轮只把跑前登记第七、九节钉绝对值的锚点（K 类五条、A 类七条、U 类四条）现算并钉住，16 单测 / 13 条变异全抓；H1（连续覆盖写）、H4（单次回退）、H6（单次抬 F）三族历史的记账三项、落点几何、暖机与抬 F 发布数与登记独立算出的数逐项相符，H2/H3/H5/H7 共 6 族历史与 Q1–Q13、崩溃支线、坏镜像一个都没跑。执行阶段发现并修了两处让记账门槛系统性偏差一代的实现 bug（回收步该用「环」还是「记账环」两个不同环；跨度 2 记录只摘掉起点槽、第二个槽永远回收不掉）。依据：产物 `e153-ledger-shape-and-ring-holes-2026-09-17.out`，跑前登记 `e153-preregistration.md`，正文 [153-账本形态与环上有洞的代价.md](experiments/153-账本形态与环上有洞的代价.md)。是否需要补跑 Q1–Q13、崩溃支线、坏镜像与剩余历史族交主 agent 定。
 - E153（账本形态与环上有洞的代价） 第四段续做：改前第三段已跑 21 单测 / 18 条变异、11 个族标签（H1/H2/H3φ×3/H3²/H4×2/H5早/H5晚/H6）× 12 格的 Q1–Q6/Q9b(仅末值)/Q11–Q13，且第三段产物里 H5早/H5晚 24 行 q_family 全部只有 `q13_no_candidate=true`（未查明原因）；改后查清 H5早/H5晚的根因是历史驱动函数借用 H4 前缀时把 H4 自己的尾段工作负载也借了进去，导致第二次回退的目标早被轮转出环，修复后两族在全部 12 格都产出完整 5 臂数据；新增 H7 族（第 12 个族标签）；把 Q9a/Q9b 从末值扩成峰值/均值/末值轨迹；用逐槽核对查清第三段发现①（G12 在含回退的族上让 I-3.1（已分配统计对得上） 判红）的根因——G12 的谓词把「保护被抛弃根引用」的职责直接吸收进记账第 1 项，与 I-3.1（已分配统计对得上） 只数候选集引用的定义架构不对齐，叠加区间近似本身的假阳性（一个已被替换的槽仍被区间判占着）；两个原因都不修 G12 的定义，按登记只记「输」。26 单测 / 22 条变异全抓。依据：产物 `e153-ledger-shape-and-ring-holes-2026-09-17-stage4.out`，跑前登记「第十二节第四段」，正文 [153-账本形态与环上有洞的代价.md](experiments/153-账本形态与环上有洞的代价.md)。崩溃支线、Q7/Q8/Q10（G27 与坏镜像矩阵）仍未实现，交主 agent 定是否需要补跑。
@@ -389,7 +389,7 @@
 ### 2026-09-16（其四）：E142（新池新建文件的干跑） 第九次跑——恢复的前缀规则补上「不跨实例边界」，层 0 的 verification_ran 9 → 6
 
 - **改前**：装置与 `crates/singlefs-core` 的恢复都把水位之上的记录不分实例地接成前缀：所选根是 mkfs 的第 0 代根（实例 0）时，暖机 jsn 1（实例 1）被施加上去，层 0 第一条流 `verification_ran=9`。
-- **改后**：只有所选根自己那个实例的记录是候选，链从所选根覆盖的最后一条之后接（D23（journal 的角色与格式） 已定项 14 第 1 条逐字「链从所选根覆盖的最后一条记录之后接，下一条的实例代号与所选根不同即停」）；`verification_ran=6`，文件读回 7、journal 承重 3、违例 0 都不变。产物 `e142-new-pool-file-creation-dry-run-2026-09-16-instance-boundary.out`（93 行，与第八次跑只差 `name=layer0` 一行），变异表加 M67，`replay.sh` 指向新产物。
+- **改后**：只有所选根自己那个实例的记录是候选，链从所选根覆盖的最后一条之后接（D23（journal 的角色与格式） 已定项 14 第 1 条逐字「链从所选根覆盖的最后一条记录之后接，下一条的实例代号与所选根不同即停」）；`verification_ran=6`，文件读回 7、journal 承重 3、违例 0 都不变。产物 `e142-first-txn-dry-run-2026-09-16-instance-boundary.out`（93 行，与第八次跑只差 `name=layer0` 一行），变异表加 M67，`replay.sh` 指向新产物。
 - **依据**：里程碑「覆盖写、释放、回退与复用」步 3 开工，两个实例一进来这条就承重；`crates/` 那一侧同一天同样改（`recovery.rs` 的 `replay_journal`），门禁 54 号第一条流的计数与新产物逐字比对。
 
 ### 2026-09-16（其三）：E139（按盘回退下界的收严形态） 与 E144（头校验和算法的代价与判别力） 正文里整行抄的产物行按留存产物改回
@@ -406,8 +406,8 @@
 
 ### 2026-09-16（其一）：三份装置跟上树表条目 148 → 200——E142（新池新建文件的干跑） 第八次跑，E145（码 2 自描述头与映射树 key 宽的代价） 与 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 各换产物
 
-- **改前**：三份装置的 `TREE_TABLE_ENTRY_BYTES` 都是 148，产物是 `e142-new-pool-file-creation-dry-run-2026-09-14-round2-slot4096.out`、`e145-self-describing-node-header-2026-09-14-round2.out`、`e146-livelist-entry-width-2026-09-14-round2.out`；E146（livelist 条目按映射 key 定身份之后的宽度与代价） 的 `TREE_TABLE_ENTRIES_PER_UNIT` 停在 112（2026-09-14 kb 把每层棵数改成 109 时这一份没跟，它不是登记过的 format-const，门禁 27 号看不见）。
-- **改后**：三份常量都是 200。E142（新池新建文件的干跑） 第八次跑产物 `e142-new-pool-file-creation-dry-run-2026-09-16-tree-table-200.out`（93 行，末行 `emitted=93`），93 行里 **3 行**变：`name=width` 的 `tree_table_entry` 148 → 200、`name=root_record` 的 `back_chain` 3984932094 → 628216162、`name=back_chain` 的 chains 第 2 / 3 项 1195436654 / 3984932094 → 1134114971 / 628216162；段序列五行、层 0 的 262165 个状态与零违例逐字未变。E145（码 2 自描述头与映射树 key 宽的代价） 产物 `e145-self-describing-node-header-2026-09-16-tree-table-200.out`（57 行），3 行 `name=mapping` 的 `tree_table_bytes` 148 / 296 / 148 → 200 / 400 / 200。E146（livelist 条目按映射 key 定身份之后的宽度与代价） 产物 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行），6 行变：`name=config` 的 `tree_table_entry` 与 5 行 `name=new_pool_file_creation` 的 `day1_null_root_bytes` / `day1_root_required_bytes`（148 / 16641 → 200 / 16693，两棵树那臂 296 / 33282 → 400 / 33386）；`TREE_TABLE_ENTRIES_PER_UNIT` 一并改成 81 并在注释里写明它随条目宽变；这一改让 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 变异表里「树表第一版条目数改 112」那一条从被抓变成「变异导致编译失败、本条无效」——断言写的是 `!fits(每单元容量 − 第一版条目数 + 1)`，容量从 112 变 81 之后这个减法在常量求值期溢出，12 条全抓悄悄变成 11 条；断言改用 `saturating_sub` 之后那一条重新被抓，重跑确认 12 条全抓、0 条无效。E142（新池新建文件的干跑） 的变异表两条跟着改：`M43` 的原串与变异值 148 / 145 → 200 / 197（名字随之从 `M43_tree_table_entry_145` 改成 `M43_tree_table_entry_197`），`M63` 的锚点按预留宽从 24 改成 76。
+- **改前**：三份装置的 `TREE_TABLE_ENTRY_BYTES` 都是 148，产物是 `e142-first-txn-dry-run-2026-09-14-round2-slot4096.out`、`e145-self-describing-node-header-2026-09-14-round2.out`、`e146-livelist-entry-width-2026-09-14-round2.out`；E146（livelist 条目按映射 key 定身份之后的宽度与代价） 的 `TREE_TABLE_ENTRIES_PER_UNIT` 停在 112（2026-09-14 kb 把每层棵数改成 109 时这一份没跟，它不是登记过的 format-const，门禁 27 号看不见）。
+- **改后**：三份常量都是 200。E142（新池新建文件的干跑） 第八次跑产物 `e142-first-txn-dry-run-2026-09-16-tree-table-200.out`（93 行，末行 `emitted=93`），93 行里 **3 行**变：`name=width` 的 `tree_table_entry` 148 → 200、`name=root_record` 的 `back_chain` 3984932094 → 628216162、`name=back_chain` 的 chains 第 2 / 3 项 1195436654 / 3984932094 → 1134114971 / 628216162；段序列五行、层 0 的 262165 个状态与零违例逐字未变。E145（码 2 自描述头与映射树 key 宽的代价） 产物 `e145-self-describing-node-header-2026-09-16-tree-table-200.out`（57 行），3 行 `name=mapping` 的 `tree_table_bytes` 148 / 296 / 148 → 200 / 400 / 200。E146（livelist 条目按映射 key 定身份之后的宽度与代价） 产物 `e146-livelist-entry-width-2026-09-16-tree-table-200.out`（130 行），6 行变：`name=config` 的 `tree_table_entry` 与 5 行 `name=new_pool_file_creation` 的 `day1_null_root_bytes` / `day1_root_required_bytes`（148 / 16641 → 200 / 16693，两棵树那臂 296 / 33282 → 400 / 33386）；`TREE_TABLE_ENTRIES_PER_UNIT` 一并改成 81 并在注释里写明它随条目宽变；这一改让 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 变异表里「树表第一版条目数改 112」那一条从被抓变成「变异导致编译失败、本条无效」——断言写的是 `!fits(每单元容量 − 第一版条目数 + 1)`，容量从 112 变 81 之后这个减法在常量求值期溢出，12 条全抓悄悄变成 11 条；断言改用 `saturating_sub` 之后那一条重新被抓，重跑确认 12 条全抓、0 条无效。E142（新池新建文件的干跑） 的变异表两条跟着改：`M43` 的原串与变异值 148 / 145 → 200 / 197（名字随之从 `M43_tree_table_entry_145` 改成 `M43_tree_table_entry_197`），`M63` 的锚点按预留宽从 24 改成 76。
 - **依据**：用户 2026-09-16 定案把树表条目加宽（decisions-history 2026-09-16（其九））；三份产物各自过完整性闸（末行 `emitted=N` 与行数相等：93 / 57 / 130）。**跨装置那一格自己对上了**：E142（新池新建文件的干跑） 新产物的 `back_chain=628216162` 与 `crates/singlefs-harness` 的实现独立算出的值逐字相同——`new_pool_file_creation_publish.rs` 那条断言先按旧值判红、换成新值之后与产物两边相等，不是改断言迁就实现。
 
 ### 2026-09-15（其三）：E152（按里程碑对比六家文件系统的文件性能） 第二次正式跑——六家也跑两盘镜像
@@ -436,8 +436,8 @@
 
 ### 2026-09-14（其二）：E142（新池新建文件的干跑） 第七次跑——按当日 18 问的定案改装置重跑，系统配置槽宽收尾时改 4096
 
-- **改前**：第六次跑（产物 `e142-new-pool-file-creation-dry-run-2026-09-13-settled6.out`）：指针 85 / 83、根记录 333、journal 记录头 277、树表 6 条 145、系统配置 452 / 槽 512、镜像 1 GiB、记账 8 行、t3 先于 t2。
-- **改后**：产物 `e142-new-pool-file-creation-dry-run-2026-09-14-round2-slot4096.out`（93 行）：指针 88 / 86、根记录 371、journal 记录头 307、树表 7 条 148、系统配置 481 / 槽 4096、镜像 4 GiB（单元区 211968 槽）、记账 15 行、bump 次序按树 ID 升序（t2 50240、t3 50242–50243 … t8 50248，runs 每盘 4）；`name=width` 28 行 expected == actual，`name=segments` 五行与第六次跑逐字相同，层 0 262165 个状态零违例；25 单测；新记 G24 / G25 两笔账。
+- **改前**：第六次跑（产物 `e142-first-txn-dry-run-2026-09-13-settled6.out`）：指针 85 / 83、根记录 333、journal 记录头 277、树表 6 条 145、系统配置 452 / 槽 512、镜像 1 GiB、记账 8 行、t3 先于 t2。
+- **改后**：产物 `e142-first-txn-dry-run-2026-09-14-round2-slot4096.out`（93 行）：指针 88 / 86、根记录 371、journal 记录头 307、树表 7 条 148、系统配置 481 / 槽 4096、镜像 4 GiB（单元区 211968 槽）、记账 15 行、bump 次序按树 ID 升序（t2 50240、t3 50242–50243 … t8 50248，runs 每盘 4）；`name=width` 28 行 expected == actual，`name=segments` 五行与第六次跑逐字相同，层 0 262165 个状态零违例；25 单测；新记 G24 / G25 两笔账。
 - **依据**：用户 2026-09-14 弹窗定案 18 问（记录第十一节）与系统配置槽宽三方第一轮的主 agent 判决（`research/prompts/d22-slotwidth-r1-main-verification.md`，预想、待收尾弹窗）。
 
 ### 2026-09-14（其一）：五份装置跟上 2026-09-14 用户定案的三个格式常量——journal 记录头 307、inode 内部条目 120、树表条目 148
@@ -479,7 +479,7 @@
 ### 2026-09-13（其二十三）：E142（新池新建文件的干跑） 第五次跑——录制器的步骤种类做成封闭枚举，`name=segments` 行带每段种类多重集（C316（提交步骤的登记位有四处且互不相同） 第 ② 半）
 
 - **改前**：录制器里步骤种类是自由文本标签 `WriteRequest.label`，FUA 由调用点各传布尔，`name=segments` 四行只有段序列与闭式；20 条变异；replay 行指第四次产物 `-warmup.out`。
-- **改后**：`StepKind`（`unit_write` / `journal_record` / `root_record_fua` / `system_configuration_slot`）+ `RecordedStepKind::Barrier`，`TransactionUnit` 枚举替掉按字符串 match 的两处 `_ => panic!`；`segment_step_kinds()` 按与 `split_into_segments` 同一条边界规则分组并断言每段写数相等；四行 `name=segments` 各多 `kinds=` 字段，单测把四条路径的种类多重集钉成绝对值；第五次产物 `e142-new-pool-file-creation-dry-run-2026-09-13-kinds.out`（72 行，只有那四行与第四次不同），replay 行改指它；21 条变异全抓，新加的第 21 条变异（把系统配置槽写录成单元写：段边界与状态数一个都不变）只被 `registered_segment_sequences_match_every_recorded_path` 抓到。
+- **改后**：`StepKind`（`unit_write` / `journal_record` / `root_record_fua` / `system_configuration_slot`）+ `RecordedStepKind::Barrier`，`TransactionUnit` 枚举替掉按字符串 match 的两处 `_ => panic!`；`segment_step_kinds()` 按与 `split_into_segments` 同一条边界规则分组并断言每段写数相等；四行 `name=segments` 各多 `kinds=` 字段，单测把四条路径的种类多重集钉成绝对值；第五次产物 `e142-first-txn-dry-run-2026-09-13-kinds.out`（72 行，只有那四行与第四次不同），replay 行改指它；21 条变异全抓，新加的第 21 条变异（把系统配置槽写录成单元写：段边界与状态数一个都不变）只被 `registered_segment_sequences_match_every_recorded_path` 抓到。
 - **依据**：用户 2026-09-13 定向做 C316（提交步骤的登记位有四处且互不相同） 两半；D17（实现分层与第三方管道） 已定项 2。
 
 ### 2026-09-13（其二十二）：E151（用户数据落点的到达序与容器臂） 第三次跑——打包巡回预算扫 64 / 256 / 1024，runs 倍数敏感、全空段不敏感
@@ -502,8 +502,8 @@
 
 ### 2026-09-13（其十九）：E142（新池新建文件的干跑） 第四次跑——暖机落字节，新池新建文件 txg 3，层 0 吃 mkfs 之后全部操作 262162 个状态零违例
 
-- **改前**：产物 `e142-new-pool-file-creation-dry-run-2026-09-13-featurebit.out`：新池新建文件 txg 1、jsn 1，层 0 只枚举事务的 21 条写 65543 个状态；G17 开着。
-- **改后**：产物 `e142-new-pool-file-creation-dry-run-2026-09-13-warmup.out`（68 行）：`name=warm_up publishes=2 writes=10 barriers=4 fua=2 new_pool_file_creation_txg=3`，`recover_full root=1:3 valid_records=3`，`layer0 segments=2+1+2+2+1+18+2+1+2 states=262162 violations=0`，`layer0_fua_not_boundary closed_form=524311`；G17 已收口、新记 G19；19 单测、19 条变异全抓；复跑登记指向新产物。
+- **改前**：产物 `e142-first-txn-dry-run-2026-09-13-featurebit.out`：新池新建文件 txg 1、jsn 1，层 0 只枚举事务的 21 条写 65543 个状态；G17 开着。
+- **改后**：产物 `e142-first-txn-dry-run-2026-09-13-warmup.out`（68 行）：`name=warm_up publishes=2 writes=10 barriers=4 fua=2 new_pool_file_creation_txg=3`，`recover_full root=1:3 valid_records=3`，`layer0 segments=2+1+2+2+1+18+2+1+2 states=262162 violations=0`，`layer0_fua_not_boundary closed_form=524311`；G17 已收口、新记 G19；19 单测、19 条变异全抓；复跑登记指向新产物。
 - **依据**：D16（发布语义） 已定项 8 用户定案、C314（回退可以复用被抛弃的根引用的单元） 用户取影子账（条款已写）；D13（验证路线） 已定项 4 的 FUA 段边界与 D16（发布语义） 已定项 7 的系统配置归属同日定案。
 
 ### 2026-09-13（其十八）：E127（分裂合并之下组身份要不要存） 第二次跑——两族 knob 补成同一组节点宽，key 区间分组六格全胜
@@ -532,14 +532,14 @@
 
 ### 2026-09-13（其十四）：E142（新池新建文件的干跑） 按 D15（格式冻结政策） 已定项 4 第三次跑——incompat 位 0 置 1、解析器「不认识不许挂」，判决不变
 
-- **改前**：产物 `e142-new-pool-file-creation-dry-run-2026-09-13-settled.out` 的系统配置 feature bits 全 0，解析器跳过那 96 字节；空白 G12 开着。
-- **改后**：产物 `e142-new-pool-file-creation-dry-run-2026-09-13-featurebit.out`（66 行）：mkfs 起 incompat 位 0 置 1，解析器遇到未登记的 incompat 位或位 0 没置就拒绝，compat_ro / compat 不看；多一行 `name=feature_bits incompat_byte0=0x01 … refuses_unknown_incompat=true refuses_missing_layout_bit=true`，G12 改成已收口，判决行逐字不变；17 单测、18 条变异全抓；复跑登记改指新产物。
+- **改前**：产物 `e142-first-txn-dry-run-2026-09-13-settled.out` 的系统配置 feature bits 全 0，解析器跳过那 96 字节；空白 G12 开着。
+- **改后**：产物 `e142-first-txn-dry-run-2026-09-13-featurebit.out`（66 行）：mkfs 起 incompat 位 0 置 1，解析器遇到未登记的 incompat 位或位 0 没置就拒绝，compat_ro / compat 不看；多一行 `name=feature_bits incompat_byte0=0x01 … refuses_unknown_incompat=true refuses_missing_layout_bit=true`，G12 改成已收口，判决行逐字不变；17 单测、18 条变异全抓；复跑登记改指新产物。
 - **依据**：用户 2026-09-13 定案 D15（格式冻结政策） 已定项 4；C312（第一条布局线的 incompat 位没赋值） 前置已还。
 
 ### 2026-09-13（其十三）：E142（新池新建文件的干跑） 按用户定案重跑——系统配置 495、树表第 1 版 7 条、树 ID 水位 8，判决不变
 
-- **改前**：产物 `e142-new-pool-file-creation-dry-run-2026-09-13.out` 按定案前的字节表：系统配置 413、树表 5 条、水位 6。
-- **改后**：D22（单元原子性怎么合成） 已定项 9、D6（快照实现模型） 已定项 2、D5（快照 / 空间记账机制） 已定项 6 定案后重跑成 `e142-new-pool-file-creation-dry-run-2026-09-13-settled.out`：只有 `structure=system_configuration` 与 `root_record` 两行变，写清单 21 条、层 0 65543 态零违规不变；恢复路径对根指针为零的树表条目跳过读根；`replay.sh` 改指新产物，旧产物留档。
+- **改前**：产物 `e142-first-txn-dry-run-2026-09-13.out` 按定案前的字节表：系统配置 413、树表 5 条、水位 6。
+- **改后**：D22（单元原子性怎么合成） 已定项 9、D6（快照实现模型） 已定项 2、D5（快照 / 空间记账机制） 已定项 6 定案后重跑成 `e142-first-txn-dry-run-2026-09-13-settled.out`：只有 `structure=system_configuration` 与 `root_record` 两行变，写清单 21 条、层 0 65543 态零违规不变；恢复路径对根指针为零的树表条目跳过读根；`replay.sh` 改指新产物，旧产物留档。
 - **依据**：用户 2026-09-13 定案；16 单测、16 条变异重跑。
 
 
@@ -611,7 +611,7 @@
 
 - **改前**：[layout/01-first-txn.md](layout/01-first-txn.md) 那张字节表从没被写成过字节；里程碑步 0 到步 7 的验收没有一条被跑过；journal 在新池新建文件里承不承重、层 0 有几个状态、oracle 分不分得出「根在而单元不在」，都只是推的。
 - **改后**：E142（新池新建文件的干跑） 跑完：16 个结构宽度与字节表逐格相等；事务 21 条写、2 道屏障、1 道 FUA；冷启动读回逐字节相同；层 0 主臂 65543 个状态零违例（根槽持久的只有 4 个）；一块盘不放屏障的对照 2048 个状态违例恰 1020；忽略 journal 与查 journal 的恢复在 65543 个状态上零差异；八个探针与里程碑步 6 验收相符；18 行 `gap` 里最硬的三条是码 2 头在扫描期解不开、映射树两种 key 宽、D16（发布语义） 的事务切分纪律与 D23（journal 的角色与格式） 已定项 12 对同一负载算出的记录数差 8 倍。
-- **依据**：跑前登记 `e142-preregistration.md`（02:34 JST，装置之前）；产物 `e142-new-pool-file-creation-dry-run-2026-09-13.out`；16 单测、16 条变异全抓；连带改字节表四处算式、里程碑两句验收，新立 C305（kb 里的内联算式没人加） 到 C313（FUA 写算不算崩溃段的边界）。
+- **依据**：跑前登记 `e142-preregistration.md`（02:34 JST，装置之前）；产物 `e142-first-txn-dry-run-2026-09-13.out`；16 单测、16 条变异全抓；连带改字节表四处算式、里程碑两句验收，新立 C305（kb 里的内联算式没人加） 到 C313（FUA 写算不算崩溃段的边界）。
 
 ### 2026-09-13（其一）：E141（切换预留的挂载准入自证） 行宽常量改名、E79（根记录的容量） 标注 243 作废、E100（系统配置的三段几何） 与 E112（旧写者遇到不认识的树） 改写引 D15（格式冻结政策） 已定项 2 的那一格，几个实验的引用改指现行分项
 

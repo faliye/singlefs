@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # admission: always 量的是此刻工作区里的 harness 档用例、判的是此刻的标记与表，上一次的结论不替这一次作保
 # run-condition: command cargo git
-"""harness 档用例的单条耗时：量、按门槛标重档、核标记与表对得上。重档由量出来的数定，不由整份全量日志里 libtest 的
+"""harness 档用例的单条耗时：量、按门槛标耗时用例、核标记与表对得上。耗时用例由量出来的数定，不由整份全量日志里 libtest 的
 「has been running for over 60 seconds」定——那句话在十几个测试目标同时抢核时报的是排队，不是用例本身慢。
 
 用法：
   harness-test-timing.py measure [--jobs N] [--memory 8G] [--targets 目标,…]   # 量，写 crates/singlefs-harness/test-timing.tsv
-  harness-test-timing.py apply                                               # 按表给过门槛的标重档、没过的摘掉
+  harness-test-timing.py apply                                               # 按表给过门槛的标耗时用例、没过的摘掉
   harness-test-timing.py check [项目根]                                       # 标记与表对不对得上（门禁用），退 0 / 1
   harness-test-timing.py --selftest                                           # HARNESS_TEST_TIMING_BREAK=<项> 时必须判红
 量法：每个测试目标（tests/<名>.rs 与库）单线程跑一遍（--include-ignored --test-threads=1，libtest 的 --report-time 报单条耗时，
 要 RUSTC_BOOTSTRAP=1），目标之间并行、默认 nproc ÷ 4 个，编译目录默认 target/harness-timing（不占日常编译目录的锁），各经 research/scripts/run-with-memory-cap.sh；只量 singlefs-harness，
 checker 档的用例归提交时的 54 号，这里不起。每个目标报的计时条数要等于它 test result 行的 passed + failed，对不上整次作废、不写表。
-门槛：单线程 debug 下 HEAVY_THRESHOLD_SECONDS 秒及以上是重档，标 #[ignore = "harness 重档：…"]；以下的不标。
-核法：带「harness 重档」标记的用例，表里要有它、耗时过门槛；表里过门槛的用例要带标记。表里没有的用例报「没量过」、不判红（新写的用例量过再说）。
+门槛：单线程 debug 下 HEAVY_THRESHOLD_SECONDS 秒及以上是耗时用例，标 #[ignore = "harness 耗时用例：…"]；以下的不标。
+核法：带「harness 耗时用例」标记的用例，表里要有它、耗时过门槛；表里过门槛的用例要带标记。表里没有的用例报「没量过」、不判红（新写的用例量过再说）。
 """
 import concurrent.futures
 import glob
@@ -32,7 +32,7 @@ HEAVY_THRESHOLD_SECONDS = 60.0
 PACKAGE = "singlefs-harness"
 PACKAGE_DIRECTORY = os.path.join("crates", PACKAGE)
 TABLE = os.path.join(PACKAGE_DIRECTORY, "test-timing.tsv")
-HEAVY_MARK_PREFIX = '#[ignore = "harness 重档：'
+HEAVY_MARK_PREFIX = '#[ignore = "harness 耗时用例：'
 TIMED_LINE = re.compile(r"^test (\S+) \.\.\. (ok|FAILED) <([0-9.]+)s>")
 RESULT_LINE = re.compile(r"^test result: \w+\. (\d+) passed; (\d+) failed;")
 FUNCTION = re.compile(r"((?:[ \t]*#\[[^\n]*\n|[ \t]*//[^\n]*\n)*)([ \t]*)(?:pub\s+)?fn\s+(\w+)\s*\(")
@@ -139,7 +139,7 @@ def read_table(root):
 
 
 def marked_functions(root):
-    """[(目标名, 函数名, 文件, 带不带重档标记)]：tests/<目标>.rs 顶层与库里的每个 #[test] 函数。"""
+    """[(目标名, 函数名, 文件, 带不带耗时用例标记)]：tests/<目标>.rs 顶层与库里的每个 #[test] 函数。"""
     found = []
     for target, _selector, source in targets_of(root):
         paths = [source] if source.endswith(".rs") else sorted(glob.glob(os.path.join(source, "**", "*.rs"), recursive=True))
@@ -155,7 +155,7 @@ def marked_functions(root):
 def check(root):
     table = read_table(root)
     if table is None:
-        print(f"  ✗ 没有 {TABLE}：重档标记没有量出来的数撑着")
+        print(f"  ✗ 没有 {TABLE}：耗时用例标记没有量出来的数撑着")
         print("     → 怎么办：跑 python3 research/scripts/harness-test-timing.py measure 再 apply，表与标记一起提交。")
         return 1
     marked_without_measure, marked_below, unmarked_above, unmeasured = [], [], [], []
@@ -168,9 +168,9 @@ def check(root):
         elif not is_marked and seconds >= HEAVY_THRESHOLD_SECONDS:
             unmarked_above.append(f"{os.path.relpath(path, root)} {function}：{seconds:.1f} 秒")
     failed = False
-    for title, entries in (("标了 harness 重档、表里却没量过它", marked_without_measure),
-                           (f"标了 harness 重档、量出来不到 {HEAVY_THRESHOLD_SECONDS:.0f} 秒", marked_below),
-                           (f"量出来过了 {HEAVY_THRESHOLD_SECONDS:.0f} 秒、却没标 harness 重档", unmarked_above)):
+    for title, entries in (("标了 harness 耗时用例、表里却没量过它", marked_without_measure),
+                           (f"标了 harness 耗时用例、量出来不到 {HEAVY_THRESHOLD_SECONDS:.0f} 秒", marked_below),
+                           (f"量出来过了 {HEAVY_THRESHOLD_SECONDS:.0f} 秒、却没标 harness 耗时用例", unmarked_above)):
         if entries:
             failed = True
             print(f"  ✗ {len(entries)} 条用例{title}：")  # gate-lint:summary
@@ -181,7 +181,7 @@ def check(root):
         return 1
     total = len(marked_functions(root))
     heavy = sum(1 for seconds in table.values() if seconds >= HEAVY_THRESHOLD_SECONDS)
-    print(f"  ✓ harness 档 {total} 条用例：标重档的 {heavy} 条都量过、都过 {HEAVY_THRESHOLD_SECONDS:.0f} 秒；"
+    print(f"  ✓ harness 档 {total} 条用例：标耗时用例的 {heavy} 条都量过、都过 {HEAVY_THRESHOLD_SECONDS:.0f} 秒；"
           f"没量过的 {len(unmeasured)} 条（新写的用例量过再判）")
     return 0
 
@@ -216,7 +216,7 @@ def apply():
         open(temporary, "w", encoding="utf-8").write(text)
         os.chmod(temporary, os.stat(path).st_mode)
         os.replace(temporary, path)
-    print(f"  ✓ 按 {TABLE} 改了 {changed} 条用例的重档标记（门槛 {HEAVY_THRESHOLD_SECONDS:.0f} 秒）")
+    print(f"  ✓ 按 {TABLE} 改了 {changed} 条用例的耗时用例标记（门槛 {HEAVY_THRESHOLD_SECONDS:.0f} 秒）")
     return 0
 
 
@@ -242,10 +242,10 @@ def selftest():
             failures.append("标记与表一致时 check 应当退 0")
         open(test_file, "w").write("#[test]\n" + heavy_attribute(3.0) + "\nfn fast_case() {}\n\n#[test]\nfn slow_case() {}\n")
         if check(root) != 1:
-            failures.append("快用例标了重档、慢用例没标时 check 应当退 1")
+            failures.append("快用例标了耗时用例、慢用例没标时 check 应当退 1")
         open(test_file, "w").write("#[test]\n" + heavy_attribute(3.0) + "\nfn fast_case() {}\n\n#[test]\n" + heavy_attribute(75.0) + "\nfn slow_case() {}\n")
         if check(root) != 1:
-            failures.append("只有快用例错标重档时 check 也应当退 1")
+            failures.append("只有快用例错标耗时用例时 check 也应当退 1")
     if failures:
         for failure in failures:
             print(f"  ✗ harness-test-timing 自检：{failure}")  # gate-lint:detail

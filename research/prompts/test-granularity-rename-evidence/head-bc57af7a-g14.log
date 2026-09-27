@@ -1,0 +1,6 @@
+  ✓ harness 档 591 条用例都是一条一个场景；checker 档 25 份测试文件都声明了测哪几个模块、与导入对得上
+  ✓ 崩溃枚举用例都住在 singlefs-checker-tier 包里、标了 #[ignore] 的都登记了（查了 58 条；按测试函数直接调 enumerate_layer0 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；经 tests/<子目录>/ 里的共用函数间接调的、宏展开出来的认不出）
+  ✗ 没有 crates/singlefs-harness/test-timing.tsv：重档标记没有量出来的数撑着
+     → 怎么办：跑 python3 research/scripts/harness-test-timing.py measure 再 apply，表与标记一起提交。
+  ✗ 用例的归属与粒度：crash-case-check 退 0、harness-test-timing check 退 1（逐处列在上面）
+     → 怎么办：照上面各自那一句出路改；两份脚本的判据写在各自文件头，规则在 .claude/rules/verification.md「harness 档里再分轻重」与「崩溃枚举用例住哪、怎么登记」。

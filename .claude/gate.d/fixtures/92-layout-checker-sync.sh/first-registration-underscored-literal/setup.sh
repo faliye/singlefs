@@ -4,6 +4,7 @@
 # 这正是真仓 5 个常量里 JOURNAL_RING_DEFAULT_BYTES、ROOT_RING_CHUNK_BYTES 会撞上的那种写法。
 set -euo pipefail
 git init -q .
+mkdir -p format/src checker/src   # git 不收空目录：干净的检出里没有这两个目录，不建的话下面的 printf 写不进去
 git config user.email selftest@example.invalid
 git config user.name selftest
 printf '//! 样本格式常量模块。\npub const SAMPLE_RING_BYTES: u64 = 805_306_368;\n' > format/src/lib.rs

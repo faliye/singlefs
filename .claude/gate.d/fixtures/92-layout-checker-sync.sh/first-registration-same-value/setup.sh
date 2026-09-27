@@ -3,6 +3,7 @@
 # 挂上 format-const 标记（补写一条早就成立的事实），checker 没被碰,也不该被要求跟。
 set -euo pipefail
 git init -q .
+mkdir -p format/src checker/src   # git 不收空目录：干净的检出里没有这两个目录，不建的话下面的 printf 写不进去
 git config user.email selftest@example.invalid
 git config user.name selftest
 printf '//! 样本格式常量模块。\npub const SAMPLE_UNIT_BYTES: u64 = 16384;\n' > format/src/lib.rs

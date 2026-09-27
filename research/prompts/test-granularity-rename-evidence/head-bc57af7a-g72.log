@@ -1,0 +1,6 @@
+  ✗ 改过的定义与共用约束里 3 份没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+      .claude/agents/crash-verifier.md
+      .claude/agents/implementation-writer.md
+      .claude/agents/kb-scribe.md
+     → 怎么办：走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，
+               正文里按路径点名改过的每一份定义（打中的写回定义再改一轮）；点名写进新的判决，不往旧判决里补。

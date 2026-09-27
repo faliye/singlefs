@@ -99,7 +99,7 @@ fn fast_tier_campaign(worker_threads: FaultInjectionWorkerThreads) -> FaultInjec
 /// 照规则隔离那一对好槽——那是「两次都对不上才隔离」认下的形态，不是新发现；随机注入不摆这一形（一次注入只坏一次调用），
 /// 它的样子钉在 `release_checksum_quarantine.rs` 的用例 13。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn fault_injection_fast_tier_returns_errors_instead_of_panicking() {
     let started = std::time::Instant::now();
     let report = run_fault_injection_campaign(&fast_tier_campaign(
@@ -278,7 +278,7 @@ fn fault_injection_large_tier_from_the_environment() {
 /// 整池第 620 次写调用、`step_index` 25 那一步覆盖写 33 次写里的第 31 次，即这次发布的根槽写）落在覆盖写上，之后池级 checker 只判红 I-3.1。
 /// 它要被白名单豁免、记进说谎那一格，不算新发现（这一格为什么只剩 I-3.1，没有逐字节追过）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_invariant_is_excused_as_what_the_lying_device_may_leave(
 ) {
     let report = run_fault_injection_campaign(&FaultInjectionCampaign {
@@ -309,7 +309,7 @@ fn swallowed_write_after_which_the_checker_flags_only_the_allocated_statistic_in
 
 /// 一段写死的历史上把注入点摆满：同一段历史注入 12 次，逐次判「返回错误而不是 panic」。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {
     let history = generate_history_with_weights(
         HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
@@ -337,7 +337,7 @@ fn one_fixed_history_injects_twelve_faults_and_none_of_them_panics() {
 /// 摆注入点的候选从第 0 段起算，起点段摆得到：`draw_faults` 的 `(0..marks.len())` 改回 `(1..marks.len())`，
 /// 起点段的注入点恒为 0，这里必红（判决第二节改法二钉的那一格；`crates/mutations.tsv` 同名的那一条）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_drawn_injection_points_reach_the_starting_segment() {
     let history = generate_history_with_weights(
         HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE),
@@ -536,7 +536,7 @@ fn the_pool_checker_runs_on_a_starting_point_failure_only_when_make_filesystem_f
 /// 线程数换了，报告逐字相同：计数按片的次序相加、新发现按种子从小到大留第一个
 /// （`implementation-workflow.md`「测试与崩溃检测优先多线程」的「合并要确定」）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_report_is_the_same_text_with_one_worker_thread_and_with_four() {
     let campaign = |threads| FaultInjectionCampaign {
         seed_count: 6,

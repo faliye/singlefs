@@ -1,4 +1,4 @@
 # 变异名	文件	原文	替换文	cargo test 参数	必须红的测试名
 M_分配代取发布代	crates/demo/src/lib.rs	    transaction_generation\n}	    transaction_generation - 1\n}	-p demo	published_generation_is_the_transaction_generation
-M_点名重档带了开关	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --test heavy -- --include-ignored slow_heavy	slow_heavy_case
+M_点名耗时用例带了开关	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --test heavy -- --include-ignored slow_heavy	slow_heavy_case
 M_库里筛选词对得上	crates/demo/src/lib.rs	assert_eq!(super::published_generation(1), 1);	assert_eq!(super::published_generation(1), 2);	-p demo --lib -- tests::lib_case	lib_case

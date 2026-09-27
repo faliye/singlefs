@@ -1040,7 +1040,7 @@ fn fsync_drop_persists_until_reopen() {
 }
 
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn fsync_drop_persists_across_reopen() {
     run_matrix(FaultDuration::PersistsAcrossReopen);
 }

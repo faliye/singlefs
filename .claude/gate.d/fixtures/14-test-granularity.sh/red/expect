@@ -1,7 +1,7 @@
 exit=1
 want=several_sizes：循环里每一轮新建一个池
 want=crates/singlefs-checker-tier/tests/b.rs：第一行没有「//! checker 档模块：…」（它导入的是 crash）
-want=1 条用例标了 harness 重档、量出来不到 60 秒
+want=1 条用例标了 harness 耗时用例、量出来不到 60 秒
 want=crates/singlefs-harness/tests/a.rs fast_case：0.3 秒
 want=用例的归属与粒度：crash-case-check 退 1、harness-test-timing check 退 1
 want=second_transaction_step_one_sample.rs：文件名按里程碑

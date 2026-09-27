@@ -18,11 +18,11 @@
 测试文件按它测什么起名：领域在前、场景在后（`rollback_by_a_forward_publish`、`crash_enumeration_fixed_script_stream`），checker 档的以模块起头（`crash_enumeration_`、`crash_points_`、`crash_injection_`、`bad_disk_input_`、`record_checker_`）；不带里程碑、步号、增补号、并行线号、欠账号（以里程碑序数起头的、`*_step_four_*`、`*_supplement_two_*`、`*_c519_*`），来历写进文件头的文档注释。`research/scripts/crash-case-check.py` 判，门禁 14 号在真仓上跑。
 不许用的叫法：「checker 包」（分不清是池级 checker 还是 checker 档）、「放量用例」「验证档」（说 checker 档）。
 
-## harness 档里再分轻重
+## harness 档里再分轻用例与耗时用例
 
 - 轻：每次改完跑，`cargo test -p singlefs-harness` 不带 `--ignored` 跑到的全部。
-- 复测只跑上一趟红的用例：`python3 research/scripts/rerun-failed-tests.py <上一趟的日志> -p <包>` 按测试目标打印只跑它们的命令，经 Bash 起（加内存包装）；上一趟之后代码又改过、或上一趟日志不全（脚本判红）时才整份重跑。
-- 重：单线程 debug 下单条跑到 60 秒及以上的用例，标 `#[ignore = "harness 重档：…"]`；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。轻重由量出来的数定，不由整份全量日志里 libtest 的「has been running for over 60 seconds」定：`python3 research/scripts/harness-test-timing.py measure`（只量变了的目标加 `--targets`）把单条耗时写进 `crates/singlefs-harness/test-timing.tsv`，再 `apply` 按表统一标上或摘掉，表与标记一起提交；不手标、不手摘。门禁 14 号判标记与表对得上。
+- 红了只重跑红的那几条，不整份重跑，轻用例与耗时用例一样：`python3 research/scripts/rerun-failed-tests.py <上一趟的日志> -p <包>` 按测试目标打印只跑那几条的命令（一律带 `--include-ignored`，红的是耗时用例也跑得到），经 Bash 起、加内存包装；修完代码也只重跑红的那几条；整份重跑只在上一趟的日志不全时（脚本判红、一条命令都不打），完整的一遍归提交时的整轮门禁。
+- 耗时用例：单线程 debug 下单条跑到 60 秒及以上的用例，标 `#[ignore = "harness 耗时用例：…"]`；要跑随时跑，一律经 `research/scripts/run-with-memory-cap.sh`，线程数按派发提示的上限。轻重由量出来的数定，不由整份全量日志里 libtest 的「has been running for over 60 seconds」定：`python3 research/scripts/harness-test-timing.py measure`（只量变了的目标加 `--targets`）把单条耗时写进 harness 档包根下的耗时表 test-timing.tsv（第一次量完才有这份文件），再 `apply` 按表统一标上或摘掉，表与标记一起提交；不手标、不手摘。门禁 14 号判标记与表对得上。
 - 调全量崩溃枚举函数（`enumerate_layer0` 一族，快档 `quick_tier` 那几个除外）或自己逐个造崩溃状态（名字带 `every_crash`；循环里对录制操作取到循环变量为止的前缀去 `apply`、或造 `CrashImage`），直接这样做或经同一文件里的函数这样做的测试不是 harness 档的重，它是 checker 档，写进 `crates/singlefs-checker-tier/tests/`；`research/scripts/crash-case-check.py` 判这一条，写在别的包里判红。
 - 一条用例一个场景：按参数循环、每一轮新建一个池（`build_pool`、`build_through_*`、`format_pool`、`MemoryPool::with_devices`）的，拆成一个带参数的函数加每个取值一条 `#[test]`，红了只重跑那一条；确是一个场景的（同一个池上按次序做几轮）在用例上面写一行 `// harness-test-granularity:one-scenario <理由>`。`research/scripts/crash-case-check.py` 判，门禁 14 号在真仓上跑它。
 
@@ -76,7 +76,7 @@
 | 崩溃枚举用例住在 checker 档、标了 `#[ignore]` 的登记了 `crash-case:` | `research/scripts/crash-case-check.py`（47 号跑它的自证） |
 | 函数名与类型名不只由空泛词拼成 | 13 号，词表 `.claude/naming-vague-words`、还没改完的文件 `.claude/naming-vague-exclude` |
 | 池级 checker 库不依赖实现；harness 档不依赖 checker 档 | 94 号 |
-| 用例住对档、一条一个场景、测试文件不按里程碑起名、checker 档测试文件声明模块、harness 重档标记与耗时表对得上 | 14 号（跑 `research/scripts/crash-case-check.py` 与 `research/scripts/harness-test-timing.py check`） |
+| 用例住对档、一条一个场景、测试文件不按里程碑起名、checker 档测试文件声明模块、harness 耗时用例标记与耗时表对得上 | 14 号（跑 `research/scripts/crash-case-check.py` 与 `research/scripts/harness-test-timing.py check`） |
 | 变异行点名的测试跑得到：标了 `#[ignore]` 的带 `--include-ignored`、`--` 之后的筛选词筛得到点名的测试 | 33 号 |
 | 每道阶段认第一个参数当项目根 | 62 号 |
 | 谁在什么时候跑得了 checker 档 | `.claude/hooks/heavy-test-guard.sh`，判定在 `lib_heavy_tests.py`：跑到 checker 档包 `singlefs-checker-tier` 的测试（库单测、集成测试、装置二进制的内联测试）、55 / 57 / 59 / 87 号、QEMU、herd7、`crates/mutations.tsv` 整表、全量 `cargo test`、整轮门禁、E152 装置算重型 |

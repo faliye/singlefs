@@ -83,7 +83,8 @@ def failed_tests_by_target(log_text):
 
 
 def command_lines(commands, package):
-    return [shlex.join(["cargo", "test", "-p", package, *selector, "--", "--exact", *names]) for selector, names in commands]
+    # 一律带 --include-ignored：红的若是标了 #[ignore] 的耗时用例，不带它 libtest 会把点名的那几条直接跳过，看着跑了、其实一条没跑
+    return [shlex.join(["cargo", "test", "-p", package, *selector, "--", "--include-ignored", "--exact", *names]) for selector, names in commands]
 
 
 def run(log_path, package):
@@ -121,8 +122,8 @@ def selftest():
     failures = []
     commands, problems = failed_tests_by_target(sample)
     lines = command_lines(commands, "sample")
-    expected = ["cargo test -p sample --test alpha -- --exact alpha_two",
-                "cargo test -p sample --lib -- --exact module::inner_case module::other_case"]
+    expected = ["cargo test -p sample --test alpha -- --include-ignored --exact alpha_two",
+                "cargo test -p sample --lib -- --include-ignored --exact module::inner_case module::other_case"]
     if problems or lines != expected:
         failures.append(f"按段取失败用例：期望 {expected}，实际 {lines}，问题 {problems}")
     truncated = sample.rsplit("\n", 1)[0]

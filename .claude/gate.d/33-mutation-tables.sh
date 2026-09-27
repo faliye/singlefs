@@ -194,7 +194,7 @@ for line_number, line in enumerate(open("crates/mutations.tsv", encoding="utf-8"
     hits = source.count(original)
     if hits != 1:
         print("CRATES_BAD", line_number, name, f"原文在 {path} 里命中 {hits} 次", sep="\t")
-    # 点名的测试标了 #[ignore]（harness 重档、checker 档的全量），cargo test 参数里却没有 --include-ignored / --ignored：
+    # 点名的测试标了 #[ignore]（harness 耗时用例、checker 档的全量），cargo test 参数里却没有 --include-ignored / --ignored：
     # 59 号与 prove-red.sh 照这一行跑，点名的测试被 libtest 跳过，这条变异永远报「没红」，而它守的那一格其实没人看。
     arguments = fields[4].split()
     package = arguments[arguments.index("-p") + 1] if "-p" in arguments[:-1] else None

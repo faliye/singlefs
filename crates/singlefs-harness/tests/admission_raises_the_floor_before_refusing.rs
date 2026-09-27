@@ -498,7 +498,7 @@ fn writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_befo
 /// 每一次覆盖写做成之后，在盘面的拷贝上只崩了再挂，取号之前就够（一次都不用推）。
 /// 判别力：发布路径的切换预留照旧按这次挂载的 366 行算时，会话放行得更靠满，有一次覆盖写之后崩了再挂取号之前不够。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a_crash_remount_is_admitted_before_acquisition(
 ) {
     let mut pool = start_plain(HistoryDeviceWidth::UnitAreaOf384Slots);

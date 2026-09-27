@@ -1124,7 +1124,7 @@ mod tests {
     /// 四段带挂载的短历史跑下来一条新发现都没有，四样计数都大于 0——胶水从实现的输出里解出了内容与实例表，
     /// 树表 0 条的那几版比过重写的角色集合。
     #[test]
-    #[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+    #[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
     fn every_published_version_is_compared_by_content_instance_table_and_every_role_both_ways() {
         use crate::history::{
             execute_history_with, generate_history, HistoryDeviceWidth, HistoryEnding,

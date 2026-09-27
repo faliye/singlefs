@@ -264,7 +264,7 @@ fn assert_the_model_judged_every_kind_of_answer(tally: &HistoryTally) {
 /// 照记、那段到此为止，清单外的一条都不许有（有就按签名归类、报出种子与失败在哪一步；收缩交给「收缩一个种子」那条 `#[ignore]` 用例，
 /// debug 下收缩一类要两分多钟）。计数照打，并核各条路径真的跑到了。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_operation() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
@@ -294,7 +294,7 @@ fn random_histories_fast_tier_end_only_in_known_red_forms_and_exercise_every_ope
 /// 先判清单外的失败（变异下红在这一条），再核这一路真的跑到了：罩住别的已释放记录的起点、复用时跨度变了、抬 F 回收到落点——
 /// 这几个数不看罩住的那条删没删，变异下照样成立，门禁 59 号看到的红只会是分类判出来的。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red_forms() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
@@ -332,7 +332,7 @@ fn reuse_heavy_random_histories_cover_released_records_and_end_only_in_known_red
 /// 回退落到 F 那条根上一次都没有。先判清单外的失败（模型对不上也在其内），再核这一格真的跑到了：回退到 txg = F_生效 > 0 的根做成过——
 /// 这个数只在做成时加，变异下被拒、判红的是分类，不是这条计数。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_red_forms() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
@@ -370,7 +370,7 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
 /// 先判没有新发现（checker 的判红、模型对不上、执行器判出的、panic 都算），再核这一路真的跑到了：checker 真的跑过、有一段历史的某一版
 /// 分配记录多于 812 条（多叶的树真的写过、读过、判过）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_former_one_node_wall(
 ) {
     let started = std::time::Instant::now();
@@ -413,7 +413,7 @@ fn allocation_record_sampling_with_the_checker_goes_past_the_812_records_of_the_
 /// （准入判着的那一档见 `unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval`）；
 /// 这一档测的是准入放行之后落点仍取不到时那一条兜底拒绝（D3（空间分配） 已定项 5；C545（空间准入罩不住分裂与聚簇段层））。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device() {
     let started = std::time::Instant::now();
     let report = run_history_campaign(
@@ -474,7 +474,7 @@ fn unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_e
 /// 先判没有新发现，再核这一路真的跑到了：覆盖写经会话推过抬 F 再发成、可写挂载写行之后推过抬 F、推的每一串模型都比过上限；
 /// 落点那一道一次都没走到（式子先拒）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn unit_area_wall_sampling_on_small_devices_with_the_space_admission_judged_is_refused_by_the_formula_inside_the_model_interval(
 ) {
     let started = std::time::Instant::now();
@@ -751,7 +751,7 @@ fn writable_mount_whose_own_publishes_find_no_placement_is_refused_before_acquis
 /// 空间准入关掉（只供测试的开关 `SpaceAdmission::SkippedByTheTestOnlySwitch`）：判着准入时 384 槽的盘上挂载之后第 11 次覆盖写就被式子拒，
 /// 根环凑不满。旧形态（挂载时回退）下这一格护的是「取号之前的预演连写行换下的落点一起释放」；向前回退不取号、不预演，那一半不再有对象。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_overwriting_again_all_succeed(
 ) {
     let history = GeneratedHistory {
@@ -822,7 +822,7 @@ fn wall_prefix(mounts: usize) -> impl Iterator<Item = HistoryOperation> {
 /// 镜像上按 checker 的解析数的分配记录条数越过 812；每一步之后跑池级 checker、模型逐步比（跑完即都对得上）。
 /// 一段历史每一步接着上一步的盘面，次序本身就是被测对象，不切片并行。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all_succeed() {
     let history = GeneratedHistory {
         seed: HistorySeed(0),
@@ -1002,7 +1002,7 @@ fn rolling_back_to_the_root_at_the_effective_floor_is_accepted_and_reads_back_th
 /// 按谓词回收、记账按回收之后的数写——修之前它没回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
 /// 现在每一步之后 checker 都跑、都不红：起点、挂载、25 次覆盖写之后各一次。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_checker_green_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
@@ -1030,7 +1030,7 @@ fn turning_the_root_ring_with_overwrites_in_one_mount_runs_to_the_end_with_the_c
 /// 不装那张表时它不回收、记账仍算已分配，checker 在这一步判 I-3.1 红（记账比遍历多 16384 字节）。
 /// 装了表，每一步之后 checker 都跑、都不红：起点与 25 次覆盖写之后各一次。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_the_end_with_the_checker_green_after_every_step(
 ) {
     let overwrite = HistoryOperation::PublishOverwrite(ContentChoice {
@@ -1195,7 +1195,7 @@ fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
 /// 今天红在抬 F 之前：那次崩溃恢复看不见 C、把 C 引用的单元又发出去，池级 checker 的 I-7.4 红——乙罩不到的那一格
 /// （`research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），不是乙的拒；那一格修掉之前这条红着。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_then_raising_the_floor_into_its_txg_ends_in_the_known_red_form_of_closeout_row_43(
 ) {
     let (mut pool, abandoned) =
@@ -1264,7 +1264,7 @@ fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnes
 /// （两盘的系统配置槽、根环里读得出的根、录制流步数），胶水把这个成员映射成模型的「回退目标在被抛弃的时间线上」
 /// （随机历史里模型对这一格要求拒的就是这一条）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn rolling_back_to_a_root_crash_recovery_abandoned_without_a_system_configuration_witness_is_refused_on_the_abandoned_timeline(
 ) {
     let (mut pool, abandoned) = pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version(
@@ -1450,7 +1450,7 @@ fn an_allocated_statistic_over_count_after_raising_the_floor_without_a_rollback_
 /// 可写挂载、覆盖写、抬 F（到 0）、覆盖写四次、抬 F 到 6（回收 18 个落点）、再可写挂载——最后这次挂载的写行与暖机复用改写了已回收的记录。
 /// 今天的代码上这段跑完；最后一步的挂载逐次比了两次带文件的发布、复用改写 14 条。形态 a / b 下最后一步是执行器判出的失败，本用例红。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_generations_checked(
 ) {
     let empty = ContentChoice {
@@ -1505,7 +1505,7 @@ fn row_and_warm_up_publishes_that_reuse_reclaimed_records_have_their_allocation_
 
 /// 同一个种子跑两次，每一步的结局、收尾、计数逐项相同，每一步之后的整份镜像逐字节相同（随机源手写、写入时间是参数）。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_same_seed_runs_to_the_same_outcomes_and_the_same_bytes_twice() {
     let history = generate_history(HistorySeed(7), 24);
     let run_keeping_every_image = || {
@@ -1599,7 +1599,7 @@ fn seed_4000000045_raising_the_floor_on_narrow_devices_is_refused_before_any_wri
 }
 
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn seed_4000000204_raising_the_floor_on_narrow_devices_is_refused_before_any_write_instead_of_leaving_the_new_floor_on_one_device(
 ) {
     the_raise_refused_part_way_by_the_rehearsal_writes_nothing_and_the_history_runs_to_the_end(

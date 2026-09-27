@@ -3,7 +3,7 @@
 **这份文件做什么**：拿 singlefs 与六家现役文件系统（XFS、ext4、F2FS、Bcachefs、Btrfs、OpenZFS）在同一台虚机、同一组负载下比文件性能，
 每个里程碑一节，写 singlefs 在那个里程碑上能跑哪几维、和六家差多少、跑不了的维还缺什么能力。给人从头读；六家的数是基线，singlefs 那一列随里程碑往下长。
 
-**数从哪来**：全部来自 E152（按里程碑对比六家文件系统的文件性能） 的四次正式跑：单盘 `research/results/e152-file-system-benchmark-2026-09-15.out`、两盘镜像 `research/results/e152-file-system-benchmark-mirror-2026-09-15.out`、里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂的 `research/results/e152-file-system-benchmark-file-overwrite-2026-09-17.out` 与收尾时再跑的 `research/results/e152-file-system-benchmark-file-overwrite-final-2026-09-17.out`；
+**数从哪来**：全部来自 E152（按里程碑对比六家文件系统的文件性能） 的四次正式跑：单盘 `research/results/e152-file-system-benchmark-2026-09-15.out`、两盘镜像 `research/results/e152-file-system-benchmark-mirror-2026-09-15.out`、里程碑「覆盖写、释放、回退与复用」上只重跑 singlefs 一臂的 `research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out` 与收尾时再跑的 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`；
 第二节与第二·二节的表由 `python3 research/scripts/e152-tables.py <产物>` 从产物生成，不手抄。
 实验的口径与复跑命令在 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`，跑前登记（含正式跑之前的六次修订与四次冒烟跑）在 `research/prompts/e152-preregistration.md`。
 
@@ -371,7 +371,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ## 三·二、里程碑「覆盖写、释放、回退与复用」（2026-09-17，步 7 的重跑）
 
-只重跑 singlefs 那一臂（`E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh research/results/e152-file-system-benchmark-file-overwrite-2026-09-17.out`，5 轮，宿主 1 分钟负载 1.28–1.69，跑前登记第十二节），六家的基线不重跑（内核、测试台、负载都没变，第二节与第二·二节照旧）。
+只重跑 singlefs 那一臂（`E152_CONFIGURATIONS=singlefs bash research/scripts/e152-run.sh research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`，5 轮，宿主 1 分钟负载 1.28–1.69，跑前登记第十二节），六家的基线不重跑（内核、测试台、负载都没变，第二节与第二·二节照旧）。
 这个里程碑上 singlefs 多了「同一个进程里再发布一次」：真设备二进制的 `file-overwrite` 模式在新池新建文件之后再覆盖写一次（4100 字节的第二版，发布 B），冷重开读回第二版。挂钟从两段切成三段，覆盖写、释放、回退与复用那一段才是稳态的每次代价。
 
 ### singlefs 今天能跑哪几维
@@ -383,7 +383,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 | 格式化与可用容量 | 写量与容量能算，挂钟拆不出来 | 真设备整环写 0 还没做 |
 | 大文件顺序读写、4K 随机读写、元数据 | 不能 | 与第三节相同：一个文件一个数据单元、没有按偏移读的接口、没有目录 |
 
-### 表（`python3 research/scripts/e152-tables.py research/results/e152-file-system-benchmark-file-overwrite-2026-09-17.out`）
+### 表（`python3 research/scripts/e152-tables.py research/results/e152-file-system-benchmark-second-transaction-2026-09-17.out`）
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -442,7 +442,7 @@ E7RESULT name=segments path=transaction operations=23 segments=16+2+1+2 closed_f
 
 ### 收尾时再跑一次（2026-09-17 15:39 JST，跑前登记第十三节）
 
-里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-file-overwrite-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 54 号的层 0 全量同时在跑，`nice -n 19`，照跑照记）。
+里程碑收尾时用户要求再跑一轮。上一次跑之后 `crates/` 改了四处（抬 F 回收的槽扣住到生效、提交内生块的 bump 游标绕开隔离位与扣住位、抬 F 接住读不出计数、checker 多判两条），真设备二进制的负载与判据不变。产物 `research/results/e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，5 轮一次过，宿主 1 分钟负载 2.27–2.45（门禁 54 号的层 0 全量同时在跑，`nice -n 19`，照跑照记）。
 
 | 配置 | mkfs + 取号 + 暖机 + 新池新建文件 ms | 覆盖写、释放、回退与复用（覆盖写 B）ms | 冷恢复 ms | 两盘读字节 | 两盘读请求 | B 两盘写请求 | B 两盘写字节 | B 两盘屏障 | B 两盘 FUA 写 |
 |---|---|---|---|---|---|---|---|---|---|

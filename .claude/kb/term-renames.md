@@ -38,6 +38,7 @@
 | sb_ | system_configuration_ | 词边界 | 缩写前缀（`sb_mac`） |
 | _sb | _system_configuration | 词边界 | 缩写后缀（`tail_sb`） |
 | sb | system_configuration | 词边界 | 裸缩写。`sb` 本是为 superblock 设的，概念没了缩写也去掉，同日从 SOP 的缩写表里删行 |
+| harness 重档 | harness 耗时用例 | 整串 | harness 档里单线程跑满 60 秒的用例；「重档」与「重型测试」只差一个字、指的却是两件事，改名分开 |
 | 里程碑三（名字待定） | 里程碑「崩溃验证重做」 | 整串 | 里程碑名 |
 | 第二个事务 | 覆盖写、释放、回退与复用 | 整串 | 里程碑名，也是那条写流的称呼 |
 | 第一个事务 | 新池新建文件 | 整串 | 里程碑名，也是那条写流的称呼 |

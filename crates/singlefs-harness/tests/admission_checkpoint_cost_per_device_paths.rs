@@ -1071,7 +1071,7 @@ fn empty_publish_plan_after(current: &TransactionOutput) -> PublishPlan<'static>
 /// 抽签与探针逐位相同：两块 4 GiB 那一段（默认环，单元区起点仍是 50176）K0 下重放出来的就是探针量过的那一段（第 132 步的数与报告第二节那一行相同）。
 /// 判别力：分配记录树那一项退回每块盘两条叶路径（K0）时，两段历史都少扣，红在最后一条断言。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn empty_publishes_of_the_histories_where_one_device_rewrites_more_than_two_leaves_fit_in_the_whole_tree_checkpoint_cost(
 ) {
     let histories = [

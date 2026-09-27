@@ -13,7 +13,7 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 派发提示写「交补丁」的在草稿目录的副本里改、交补丁目录（「产出」一节），不碰主工作区；没写的在主工作区改。主 agent 同时派几个实现员时一律交补丁。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步；第 2 步三方对抗与第 3 步 checker 由主 agent 另派。
-开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「harness 档里再分轻重」「崩溃枚举用例住哪、怎么登记」（测试文件按测什么起名、一条用例一个场景、checker 档测试文件第一行声明模块、重档由 `research/scripts/harness-test-timing.py` 按耗时表标，不手标）。
+开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「harness 档里再分轻用例与耗时用例」「崩溃枚举用例住哪、怎么登记」（测试文件按测什么起名、一条用例一个场景、checker 档测试文件第一行声明模块、耗时用例由 `research/scripts/harness-test-timing.py` 按耗时表标，不手标）。
 
 ## 输入（主 agent 必须给）
 
@@ -28,6 +28,7 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 
 1. 开跑前照共用约束「不做」一节看负载。
    1b. 第 3 步的证红、第 4 步动到的测试二进制（副本里跑的也算）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑；`cargo fmt --check`、`cargo clippy`、`cargo build` 不经它。登记给你的 74 号在阶段里面经包装，照跑，外面不再包一层。
+   1c. 动到的测试二进制跑红了，修完只重跑红的那几条：`python3 research/scripts/rerun-failed-tests.py <那一趟的日志> -p <包>` 打印命令（带 `--include-ignored`，耗时用例也跑得到），经内存包装起；不整份重跑（`.claude/rules/verification.md`「harness 档里再分轻用例与耗时用例」）。
 2. 读条款与代码，写实现与测试。名字、分支、类型、错误照 `code-discipline.md`：不缩写、不写 `_ =>`、newtype、`expect` 写清依赖哪条不变量。
 3. 每条新测试证明会红：在草稿目录的仓副本里（`rsync -a --exclude target --exclude .git`）改坏被测代码一处，跑那条测试所在的整个测试二进制看它红（经内存包装，共用约束「不做」一节），记「改坏哪一行 → 哪条断言红」与同时红了哪些测试；每份副本用它自己的 target（不把 `CARGO_TARGET_DIR` 指到几份副本共用的目录）；改坏的副本要还原时，从原件拷回之后对被改的文件 `touch`，或删掉这份副本重拷，不用 `rsync -a` 拷回了事；先跑一份不改动的副本：已经红的测试记成基线红集，变异证明只看基线红集之外的测试，你要证明的那条在基线红集里就停下交回；被测代码里有 `debug_assert` 的，debug 下先红的可能是它，照实记红在哪一条，要测试断言自己红就在 `--release` 下再跑一次。`crates/mutations.tsv` 在的话（门禁 59 号），每条再加一行变异，原文在文件里恰好命中一次。
    3a. 证红一律用 `bash research/scripts/prove-red.sh --copy <副本> [--memory <上限>] <crate> <变异名…>`：先把变异行写进 `crates/mutations.tsv`（参数带 `-p <crate>` 与 `--lib` / `--test <目标>` / `--bin <名>` 之一），它逐条施加、经内存包装跑、判红、还原；不挑目标的行它整次拒，目标带 layer0 的跳过并列出。不自己写证红脚本。

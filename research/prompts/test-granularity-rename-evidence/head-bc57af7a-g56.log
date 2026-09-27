@@ -1,0 +1,44 @@
+  ✗ crates 改动里 40 个文件没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没按路径提到它；被改过的旧判决不算）：
+      crates/singlefs-checker/src/walk.rs
+      crates/singlefs-checker-tier/src/bad_disk_input.rs
+      crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs
+      crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs
+      crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
+      crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+      crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
+      crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs
+      crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+      crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs
+      crates/singlefs-checker-tier/src/crash_injection.rs
+      crates/singlefs-checker-tier/src/crash.rs
+      crates/singlefs-checker-tier/src/on_device_modes.rs
+      crates/singlefs-core/src/address.rs
+      crates/singlefs-core/src/admission.rs
+      crates/singlefs-core/src/allocator.rs
+      crates/singlefs-core/src/inode_tree.rs
+      crates/singlefs-core/src/journal.rs
+      crates/singlefs-core/src/make_filesystem.rs
+      crates/singlefs-core/src/mounted_read.rs
+      crates/singlefs-core/src/mount.rs
+      crates/singlefs-core/src/records.rs
+      crates/singlefs-core/src/recovery.rs
+      crates/singlefs-core/src/root_ring.rs
+      crates/singlefs-core/src/transaction.rs
+      crates/singlefs-core/src/write_accounting.rs
+      crates/singlefs-core/src/write_request_split.rs
+      crates/singlefs-format/src/lib.rs
+      crates/singlefs-harness/src/fault_injection.rs
+      crates/singlefs-harness/src/hexadecimal.rs
+      crates/singlefs-harness/src/history.rs
+      crates/singlefs-harness/src/lib.rs
+      crates/singlefs-harness/src/memory_pool.rs
+      crates/singlefs-harness/src/model_comparison.rs
+      crates/singlefs-harness/src/model.rs
+      crates/singlefs-harness/src/new_pool_file_creation_regions.rs
+      crates/singlefs-harness/src/read_tally.rs
+      crates/singlefs-harness/src/scenario.rs
+      crates/singlefs-harness/src/segments.rs
+      crates/singlefs-harness/src/sha256.rs
+     → 怎么办：写代码之后、提交之前走一轮三方（.claude/rules/three-way-inference.md）：材料带上 diff，正推 / 反推 / 找反例三条腿各攻一遍，
+               主 agent 的判决写进 research/prompts/<题>-r<n>-main-verification.md，逐个按路径点名改过的 crates 文件（打中的写回代码再改一轮）；
+               点名写进新的判决，不往旧判决里补。

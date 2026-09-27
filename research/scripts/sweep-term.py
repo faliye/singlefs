@@ -14,6 +14,10 @@
 豁免写在项目根的 `.claude/term-rename-exempt`，一行一条、`#` 后写为什么；指向不存在的路径判红
 （不起作用的豁免项会让人以为那批文件已经被绕开了，判据与 `.claude/doc-lint-exclude` 同）。
 
+已归档产物的文件名不换也不报：一个文件名形态的串（`名字.out` / `.log` / `.txt` / `.tsv` / `.json` / `.csv`），
+版本库历史里 `research/results/` 下出现过、今天树里没有，它就是一份已归档产物的名字，产物改不了名，
+引它的那一处留旧名 40 号才在历史里找得到（`.claude/rules/path-moves.md`「留存产物分两类」）。按串判，不整份豁免。
+
 --apply 的写回不在原文件上就地写：每份文件同目录排他新建临时文件、fsync、照原权限位与属主、改名换上
 （`lib_atomic_replace.py`）。扫全仓会扫到 .sh 与 .py，正在按偏移边跑边读它的进程读的仍是旧 inode 的旧内容。
 一份被拒（多个硬链接、当前用户只读、建不了临时文件、写或改名失败）就跳过它、接着换别的，最后逐份列出。
@@ -34,6 +38,9 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 SKIP_DIRS = {".git", "target", "node_modules"}
+RESULTS_DIRECTORY = "research/results"
+PRODUCT_FILE_NAME_PATTERN = re.compile(r"[A-Za-z0-9_.-]+\.(?:out|log|txt|tsv|json|csv)\b")
+ARCHIVED_PLACEHOLDER_PATTERN = re.compile("\x00archived(\\d+)\x00")
 EXEMPT_FILE = ".claude/term-rename-exempt"
 RENAMES_PATH = ".claude/kb/term-renames.md"
 TABLE_MARK = "<!-- term-renames:table -->"
@@ -133,6 +140,37 @@ def exempt(relative, entries):
     return False
 
 
+def archived_product_file_names(root):
+    """历史里 research/results/ 下出现过、今天树里没有的文件名。不在 git 仓里（或 git 失败）时是空集：一个都不保护。"""
+    import subprocess
+    try:
+        listing = subprocess.run(["git", "-C", root, "-c", "core.quotePath=false", "log", "--all", "--format=", "--name-only", "--", RESULTS_DIRECTORY],
+                                 capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return set()
+    in_history = {os.path.basename(line) for line in listing.splitlines() if line.strip()}
+    results_directory = os.path.join(root, RESULTS_DIRECTORY)
+    in_tree = set(os.listdir(results_directory)) if os.path.isdir(results_directory) else set()
+    return in_history - in_tree
+
+
+def mask_archived_product_names(text, archived_names):
+    """把已归档产物的名字换成占位符，替换与计数都看不见它们；返回 (换过的文本, 被换下来的原串)。"""
+    if os.environ.get("SWEEP_TERM_BREAK") == "archived-names-unprotected":
+        return text, []
+    masked = []
+    def to_placeholder(match):
+        if match.group(0) not in archived_names:
+            return match.group(0)
+        masked.append(match.group(0))
+        return "\x00archived%d\x00" % (len(masked) - 1)
+    return PRODUCT_FILE_NAME_PATTERN.sub(to_placeholder, text), masked
+
+
+def restore_archived_product_names(text, masked):
+    return ARCHIVED_PLACEHOLDER_PATTERN.sub(lambda match: masked[int(match.group(1))], text)
+
+
 def walk(root, entries):
     for base, dirs, names in os.walk(root):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
@@ -149,6 +187,7 @@ def sweep(root, apply_changes, defer=()):
     entries = list(entries) + list(defer)
     pairs = load_renames(root)
     replacements, detect = compile_rules(pairs)
+    archived_names = archived_product_file_names(root)
     files, occurrences, scanned = 0, 0, 0
     worst = []
     refused = []
@@ -158,12 +197,14 @@ def sweep(root, apply_changes, defer=()):
         except (UnicodeDecodeError, OSError):
             continue
         scanned += 1
+        text, masked = mask_archived_product_names(text, archived_names)
         count = len(detect.findall(text))
         if not count:
             continue
         if apply_changes:
             for pattern, new in replacements:
                 text = pattern.sub(new, text)
+            text = restore_archived_product_names(text, masked)
             try:
                 notes = replace_file_contents_by_rename(os.path.join(root, relative), text)
             except ReplaceRefused as refusal:
@@ -244,6 +285,30 @@ def selftest():
             print("  ✗ 自检失败：豁免目录里的旧名被换掉了")
             print("     → 怎么办：看 exempt() 的目录前缀判法。")
             return 1
+        # 已归档产物的名字：历史里有、树里没有的那份不换不报；树里还在的那份照换
+        import subprocess
+        git_environment = dict(os.environ, GIT_AUTHOR_NAME="selftest", GIT_AUTHOR_EMAIL="selftest@example.invalid",
+                               GIT_COMMITTER_NAME="selftest", GIT_COMMITTER_EMAIL="selftest@example.invalid")
+        results = os.path.join(work, "research", "results")
+        os.makedirs(results)
+        for name in ("e1-superblock-run.out", "e1-superblock-live.out"):
+            open(os.path.join(results, name), "w", encoding="utf-8").write("产物\n")
+        subprocess.run(["git", "-C", work, "init", "-q"], check=True)
+        subprocess.run(["git", "-C", work, "add", "-A"], check=True, env=git_environment)
+        subprocess.run(["git", "-C", work, "commit", "-q", "-m", "产物"], check=True, env=git_environment)
+        os.remove(os.path.join(results, "e1-superblock-run.out"))
+        open(os.path.join(work, "cites.md"), "w", encoding="utf-8").write(
+            "E1 的产物 e1-superblock-run.out 已归档\n另一份 e1-superblock-live.out 还在树里\n")
+        if sweep(work, False) != 1:
+            print("  ✗ 自检失败：树里还在的产物 e1-superblock-live.out 带旧名，--check 没判红")
+            print("     → 怎么办：看 mask_archived_product_names：只该保护树里没有的那些。")
+            return 1
+        sweep(work, True)
+        cites = open(os.path.join(work, "cites.md"), encoding="utf-8").read()
+        if "e1-superblock-run.out" not in cites or "e1-superblock-live.out" in cites or sweep(work, False) != 0:
+            print("  ✗ 自检失败：已归档产物的名字被换掉了，或换完仍判红")
+            print("     → 怎么办：看 archived_product_file_names 与 mask / restore 那一对。")
+            return 1
         open(os.path.join(work, ".claude", "term-rename-exempt"), "w", encoding="utf-8").write("nowhere/  # 指不到\n")
         code = None
         try:
@@ -265,7 +330,7 @@ def selftest():
         print("     → 怎么办：按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename，"
               "以及 sweep() 里 --apply 那一段是不是还有就地写。")
         return 1
-    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、豁免指不到文件判红；--apply 换上的是新 inode、权限位不变、"
+    print("  ✓ 自检：带旧名判红、换完判绿、豁免目录不被换、已归档产物的名字不换不报而树里还在的照换、豁免指不到文件判红；--apply 换上的是新 inode、权限位不变、"
           "改之前打开文件的读者接着读到旧内容、fsync 在改名之前、经符号链接改的是它指向的文件、"
           "有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0

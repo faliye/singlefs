@@ -184,7 +184,7 @@ fn instance_to_acquire_now(devices: &mut Devices) -> InstanceGeneration {
 /// （D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1）十二次都做成：每次取到的号是挂载之前算的那一个；最后那一版的分配记录多于 812 条、
 /// 每块盘上装着记录的叶不止一片；池级 checker 全绿。
 #[test]
-#[ignore = "harness 重档：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+#[ignore = "harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_keep_mounting_writable_past_812_allocation_records(
 ) {
     let stream = SharedStream::new();

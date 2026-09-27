@@ -2,6 +2,6 @@
 M_锚点腐化	crates/demo/src/lib.rs	    transaction_txg\n}	    transaction_txg - 1\n}	-p demo	published_generation_is_the_transaction_generation
 M_转义写进源码	crates/demo/src/lib.rs	    transaction_generation\n}	    published_generation(\&transaction_generation)\n}	-p demo	published_generation_is_the_transaction_generation
 M_文件列是目录	crates/demo/src	    transaction_generation\n}	    transaction_generation + 1\n}	-p demo	published_generation_is_the_transaction_generation
-M_点名重档没带开关	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --test heavy	slow_heavy_case
+M_点名耗时用例没带开关	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_renamed(	-p demo --test heavy	slow_heavy_case
 M_筛选词对不上	crates/demo/src/lib.rs	pub fn published_generation(	pub fn published_generation_changed(	-p demo --test heavy -- --include-ignored some_other_case	slow_heavy_case
 M_库里筛选词对不上	crates/demo/src/lib.rs	assert_eq!(super::published_generation(1), 1);	assert_eq!(super::published_generation(1), 2);	-p demo --lib -- other_module	lib_case
