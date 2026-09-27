@@ -1,0 +1,300 @@
+[
+ {
+  "id": "B3",
+  "hook": "detector",
+  "command": "nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1 & p1=$!; nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/b.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.log 2>&1 & p2=$!; wait \"$p1\"; echo \"a=$?\"; wait \"$p2\"; echo \"b=$?\"",
+  "agent": "three-way-attack",
+  "rib": true
+ },
+ {
+  "id": "B4",
+  "hook": "detector",
+  "command": "nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1 & p1=$!; nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/b.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.log 2>&1 & p2=$!; wait \"$p1\"; echo \"a=$?\"",
+  "agent": "three-way-attack",
+  "rib": true
+ },
+ {
+  "id": "B5",
+  "hook": "detector",
+  "command": "nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1 & nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/b.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.log 2>&1 & wait",
+  "agent": "three-way-attack",
+  "rib": true
+ },
+ {
+  "id": "B1",
+  "hook": "detector",
+  "command": "until [ -f /tmp/claude-1000/defs-m2-closeout-r1-opus/done ]; do sleep 30; done",
+  "agent": "three-way-attack",
+  "rib": true
+ },
+ {
+  "id": "B2",
+  "hook": "detector",
+  "command": "until [ -f /tmp/claude-1000/defs-m2-closeout-r1-opus/done ]; do sleep 30; done",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "B6",
+  "hook": "detector",
+  "command": "rm -f research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out; bash research/scripts/replay.sh E142 > research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "B7",
+  "hook": "detector",
+  "command": "rm -f research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "B8",
+  "hook": "detector",
+  "command": "mv research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out /tmp/claude-1000/defs-m2-closeout-r1-opus/moved.out",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "B8b",
+  "hook": "detector",
+  "command": "mv /tmp/claude-1000/defs-m2-closeout-r1-opus/new.out research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "B10",
+  "hook": "detector",
+  "command": "python3 .claude/singlefs-ai-sop/scripts/proc.py stop 999999",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H1",
+  "hook": "heavy",
+  "command": "command -v herd7; ls -l /dev/kvm; command -v qemu-system-x86_64",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H2",
+  "hook": "heavy",
+  "command": "herd7 -version",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H2b",
+  "hook": "heavy",
+  "command": "herd7 -version",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H3",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/fetch-deps.sh --check",
+  "agent": "gate-triage"
+ },
+ {
+  "id": "H3b",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/fetch-deps.sh --check",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H3c",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/fetch-deps.sh --check"
+ },
+ {
+  "id": "H5",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/lkmm.sh --static-only",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H6",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/lkmm.sh --herd7-version",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H6b",
+  "hook": "heavy",
+  "command": "bash .claude/scripts/lkmm.sh --herd7-version",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H7",
+  "hook": "heavy",
+  "command": "bash .claude/gate.d/55-qemu-first-transaction.sh .claude/gate.d/fixtures/55-qemu-first-transaction.sh/green",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H8",
+  "hook": "heavy",
+  "command": "bash .claude/gate.d/57-lkmm.sh .claude/gate.d/fixtures/57-lkmm.sh/green",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H9",
+  "hook": "heavy",
+  "command": "bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh /home/fy5090/code/singlefs/.claude/gate.d",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H9b",
+  "hook": "heavy",
+  "command": "bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "H10",
+  "hook": "heavy",
+  "command": "SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/55-qemu-first-transaction.sh",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H33",
+  "hook": "heavy",
+  "command": "rm -f .claude/gate.d/fixtures/55-qemu-first-transaction.sh/green/.qemu-prerecorded; bash .claude/gate.d/55-qemu-first-transaction.sh .claude/gate.d/fixtures/55-qemu-first-transaction.sh/green",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H34",
+  "hook": "heavy",
+  "command": "for d in .claude/gate.d/fixtures/57-lkmm.sh/*/; do bash .claude/gate.d/57-lkmm.sh \"$d\"; done",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H11",
+  "hook": "heavy",
+  "command": "nice -n 19 bash research/scripts/replay.sh E142",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "H12",
+  "hook": "heavy",
+  "command": "cd research && nice -n 19 bash scripts/mutate.sh e142-first-txn-dry-run e7-index-bench/src/bin/e142_first_transaction_dry_run.rs mutations/e142_first_transaction_dry_run.tsv",
+  "agent": "experiment-runner"
+ },
+ {
+  "id": "H13",
+  "hook": "heavy",
+  "command": "cd research && nice -n 19 bash scripts/mutate.sh e142-first-txn-dry-run e7-index-bench/src/bin/e142_first_transaction_dry_run.rs mutations/e142_first_transaction_dry_run.tsv",
+  "agent": "mutation-triage"
+ },
+ {
+  "id": "H14",
+  "hook": "heavy",
+  "command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo build --offline -p singlefs-harness --tests",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H15",
+  "hook": "heavy",
+  "command": "bash research/scripts/run-with-memory-cap.sh 8G bash research/scripts/capped.sh 4 cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_random_history",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H16",
+  "hook": "heavy",
+  "command": "bash research/scripts/capped.sh 4 bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_random_history",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H17",
+  "hook": "heavy",
+  "command": "RUN_WITH_MEMORY_CAP_TIME_LIMIT=600 bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_random_history",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H18",
+  "hook": "heavy",
+  "command": "timeout 600 bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test second_transaction_supplement_three_random_history",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H19",
+  "hook": "heavy",
+  "command": "bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test second_transaction_step_zero_layer0",
+  "agent": "three-way-attack"
+ },
+ {
+  "id": "H20",
+  "hook": "heavy",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash /tmp/claude-1000/wt/.claude/gate.d/54-layer0-replay.sh --full /tmp/claude-1000/wt",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H27",
+  "hook": "heavy",
+  "command": "{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/55-qemu-first-transaction.sh; echo \"exit=$?\"; } > /tmp/claude-1000/defs-m2-closeout-r1-opus/55.log 2>&1",
+  "agent": "crash-verifier",
+  "rib": true
+ },
+ {
+  "id": "H21",
+  "hook": "heavy",
+  "command": "nice -n 19 bash .claude/gate.d/74-model-differential.sh",
+  "agent": "crash-verifier"
+ },
+ {
+  "id": "H22",
+  "hook": "heavy",
+  "command": "nice -n 19 bash .claude/gate.d/74-model-differential.sh",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H23",
+  "hook": "heavy",
+  "command": "cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H24",
+  "hook": "heavy",
+  "command": "cargo test"
+ },
+ {
+  "id": "H24b",
+  "hook": "heavy",
+  "command": "cargo test --offline -p singlefs-core --lib"
+ },
+ {
+  "id": "H26",
+  "hook": "heavy",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/scripts/gate.sh --staged",
+  "agent": "gate-triage"
+ },
+ {
+  "id": "H29",
+  "hook": "heavy",
+  "command": "cd /tmp/claude-1000/impl-x/copy && nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test -p singlefs-core --lib",
+  "agent": "implementation-writer"
+ },
+ {
+  "id": "H30",
+  "hook": "heavy",
+  "command": "nice -n 19 bash .claude/gate.d/15-research-build.sh",
+  "agent": "gate-triage"
+ },
+ {
+  "id": "H31",
+  "hook": "heavy",
+  "command": "cd research && cargo test --release",
+  "agent": "gate-triage"
+ },
+ {
+  "id": "A1",
+  "hook": "ask",
+  "command": "records/2026-09-16-subagent拆分提案.md:951 写着静态分支一定要走定义三方"
+ },
+ {
+  "id": "A2",
+  "hook": "ask",
+  "command": "`records/2026-09-16-subagent拆分提案.md:951` 写着静态分支一定要走定义三方"
+ },
+ {
+  "id": "A3",
+  "hook": "ask",
+  "command": ".claude/kb/decisions/08-核心索引结构.md:40 写着这一格一定不变"
+ },
+ {
+  "id": "A4",
+  "hook": "ask",
+  "command": "E142 第十六次跑的阳性对照一定对得上（推的，没量过）"
+ }
+]

@@ -1,0 +1,8 @@
+55ea37902de0bdc829b2e75d70f047bd23fb5140e00d7e663761731c21e82645  ./diff/diff-admission.rs.patch
+89516d46c8cbebdd59521abae2786093adb99e2f4259e7e9450ba2dad2d29f2a  ./diff/diff-allocator.rs.patch
+ba3d1090bd0095cafbf196db03817e1c6630b3c50ee07f342eb4c4fa3dc314d4  ./diff/diff-mount.rs.patch
+2acb899feaf7c04b08a1e63da45e63a011b76eb6cb0828ac08066c78a1a95147  ./diff/diff-transaction.rs.patch
+3c4375299678a93abb86b93b2eab7042f9d7828bacb35ba7690106ba6fc677fc  ./rerun-output.log
+cc1fe0827691d6d3c34d72f81daefb1fd90efa9ff25726206049dca57c020fd0  ./rerun.sh
+03283b00e66f4b6a3c6d463a3301c4366a9966a9d8ddc32b832c97c8c41d9b14  ./tests/m2_safety_r3_defense_a1_a3_a4_c283.rs
+6561a2377dcea5459241b36177ed09e3c3537658ce5b44e0f38caa944aded82a  ./tests/r3_defense_common/mod.rs

@@ -1,0 +1,36 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-safety-r3-opus/tree/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.86s
+     Running tests/opus_r3_p3_attack.rs (/tmp/claude-1000/m2-safety-r3-opus/target/release/deps/opus_r3_p3_attack-b85a0c2313d795ef)
+
+running 1 test
+E5a slots=240 arm=P1 script=a-ow150 step=5 op=Ow(2999) outcome=ok(e3,raises1) writes=86 segments=[2, 16, 2, 1, 14, 2, 1, 14, 2, 1, 26, 2, 1, 2] states=67207187 (只数)
+E5a slots=240 arm=P1 script=c-grow6-truncate-x10 step=4 op=Seq { units: 5, extra: 0 } outcome=ok(e2,raises1) writes=87 segments=[2, 16, 2, 1, 14, 2, 1, 36, 10, 1, 2] states=68719559692 (只数)
+E5b slots=240 arm=P1 N=5 grow_stop=SAR;F-at-ceiling(e2) op=Empty outcome=SAR;F-at-ceiling(e0)(e0,raises0) writes=0 segments=[] states=1 (只数)
+E5a slots=240 arm=P3 script=a-ow150 step=10 op=Ow(2999) outcome=ok(e2,raises1) writes=61 segments=[2, 12, 2, 1, 14, 2, 1, 22, 2, 1, 2] states=4214800 (只数)
+E5a slots=240 arm=P3 script=c-grow6-truncate-x10 step=8 op=Seq { units: 2, extra: 0 } outcome=ok(e3,raises1) writes=84 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 26, 4, 1, 2] states=67145759 (只数)
+E5b slots=240 arm=P3 N=9 grow_stop=SAR;F-at-ceiling(e3) op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=240 arm=P3pl script=a-ow150 step=10 op=Ow(2999) outcome=ok(e2,raises1) writes=61 segments=[2, 12, 2, 1, 14, 2, 1, 22, 2, 1, 2] states=4214800 (只数)
+E5a slots=240 arm=P3pl script=c-grow6-truncate-x10 step=8 op=Seq { units: 2, extra: 0 } outcome=ok(e3,raises1) writes=84 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 26, 4, 1, 2] states=67145759 (只数)
+E5b slots=240 arm=P3pl N=9 grow_stop=SAR;F-at-ceiling(e3) op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=384 arm=P1 script=a-ow150 step=10 op=Ow(2999) outcome=ok(e2,raises1) writes=65 segments=[2, 12, 2, 1, 14, 2, 1, 26, 2, 1, 2] states=67129360 (只数)
+E5a slots=384 arm=P1 script=c-grow6-truncate-x10 step=8 op=Seq { units: 2, extra: 0 } outcome=ok(e3,raises1) writes=88 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 30, 4, 1, 2] states=1073778719 (只数)
+E5b slots=384 arm=P1 N=10 grow_stop=SAR;F-at-ceiling(e2) op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=384 arm=P3 script=a-ow150 step=20 op=Ow(2999) outcome=ok(e3,raises1) writes=90 segments=[2, 16, 2, 1, 18, 2, 1, 14, 2, 1, 26, 2, 1, 2] states=67452947 (只数)
+E5a slots=384 arm=P3 script=c-grow6-truncate-x10 step=15 op=Seq { units: 2, extra: 0 } outcome=ok(e2,raises1) writes=71 segments=[2, 12, 2, 1, 14, 2, 1, 30, 4, 1, 2] states=1073762332 (只数)
+E5b slots=384 arm=P3 N=14 grow_stop=PlacementRefused[Data] op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=384 arm=P3pl script=a-ow150 step=20 op=Ow(2999) outcome=ok(e3,raises1) writes=90 segments=[2, 16, 2, 1, 18, 2, 1, 14, 2, 1, 26, 2, 1, 2] states=67452947 (只数)
+E5a slots=384 arm=P3pl script=c-grow6-truncate-x10 step=15 op=Seq { units: 2, extra: 0 } outcome=ok(e2,raises1) writes=71 segments=[2, 12, 2, 1, 14, 2, 1, 30, 4, 1, 2] states=1073762332 (只数)
+E5b slots=384 arm=P3pl N=21 grow_stop=PlacementRefused;F-at-ceiling(e2) op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=768 arm=P1 script=a-ow150 没有一步在准入里推空发布
+E5a slots=768 arm=P1 script=c-grow6-truncate-x10 step=18 op=Seq { units: 5, extra: 0 } outcome=ok(e2,raises1) writes=83 segments=[2, 12, 2, 1, 14, 2, 1, 36, 10, 1, 2] states=68719498252 (只数)
+E5b slots=768 arm=P1 N=33 grow_stop=SAR;F-at-ceiling(e2) op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+E5a slots=768 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=768 arm=P3 script=c-grow6-truncate-x10 没有一步在准入里推空发布
+E5b slots=768 arm=P3 N=20 grow_stop=PlacementRefused[Data] op=Empty outcome=ok(e3,raises1) writes=82 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 26, 2, 1, 2] states=67145747 (只数)
+E5a slots=768 arm=P3pl script=a-ow150 没有一步在准入里推空发布
+E5a slots=768 arm=P3pl script=c-grow6-truncate-x10 没有一步在准入里推空发布
+E5b slots=768 arm=P3pl N=40 grow_stop=- op=Empty outcome=ok(e0,raises0) writes=29 segments=[24, 2, 1, 2] states=16777223 (只数)
+test e5_crash_inside_the_admission_chain_and_the_delete ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 2.70s
+

@@ -1,0 +1,127 @@
+== 1. G2/G5/G7 改后字面：grep -nF 逐句核（命中即证明这句确实在文件里、行号现取） ==
+31:4. 跑产物进 `research/results/`。那里已有的产物一个都不删、不挪、不覆盖（共用约束「执行前拒绝的写法」那一条的 ⑤）：这一次的输出写一个新文件名（带今天的日期或 `rN`，写之前 `ls` 确认没有同名的），跑完按这个新文件名认本轮才有的完成标记。这一次的新文件也不删：重跑已有实验时，第 5 步把 `research/scripts/replay.sh` 里这个实验的登记行改指新文件，旧的留着；拿新文件与已有的那份比，逐字节一致的在报告里写明，对不上的在实验页两份都点名、写明对不上，交主 agent 定哪份承重。生成产物用的二进制编在 `research/target/` 下，用最后一次源码改动编出来；生成产物与第 5 步跑 `replay.sh` 时都不设 `CARGO_TARGET_DIR`；草稿目录里的 target 只拿来迭代。
+33:4c. 交回之前逐行读判决行：`grep -n 'name=verdict' <产物>` 列出这一次每份产物里的全部判决行（输出不截断），在报告里逐个点名其中表示「没过」的字段：取值是布尔 `false` 的；取值是 `not_run` 的；取值是大于 0 的整数、而名字表示违例、不匹配、歧义、失败的计数（例 `layer0_violations`、`width_mismatches`、`today_ambiguous`）。取值是布尔 `true` 的、取值是 `zero` 的（例 `control_violations_ok=true`、`layer0_violations=zero`）与名字不表示「没过」的计数（例 `journal_differing_states`）不点名；拿不准的点名，写「拿不准」。每个点名写：产物文件与行号、字段名、取值、为什么是这个值、是不是登记预期内的；一个都没有，也写一句「判决行 N 条，没有 false / not_run 字段，违例、不匹配、歧义、失败类的整数计数都是 0」。
+35:6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节），读实验页或实验索引的那几道除外（27、34、40、69、75、84、85、86、88、99 号）：它们放到第 7 步写完实验页之后跑；这一次不写实验页的，在这一步最后跑，红了照写，产物照第 4 步一个不删（86 号出路里「把 research 下那些文件删掉」那一句不照做，写进报告交主 agent）。其中要编译或复跑整张表的，开跑前照共用约束看负载。15 号（编整个 research 工作区）与 87 号（复跑全部已入库实验）不归你，收尾由 `gate-triage` 统一跑；你只跑第 5 步自己那一个实验的 `replay.sh`。
+35:6. 跑阶段归属表登记给你的阶段（共用约束 `.claude/agent-common.md`「门禁」一节），读实验页或实验索引的那几道除外（27、34、40、69、75、84、85、86、88、99 号）：它们放到第 7 步写完实验页之后跑；这一次不写实验页的，在这一步最后跑，红了照写，产物照第 4 步一个不删（86 号出路里「把 research 下那些文件删掉」那一句不照做，写进报告交主 agent）。其中要编译或复跑整张表的，开跑前照共用约束看负载。15 号（编整个 research 工作区）与 87 号（复跑全部已入库实验）不归你，收尾由 `gate-triage` 统一跑；你只跑第 5 步自己那一个实验的 `replay.sh`。
+
+== 2. r2 判决第三节 G2/G5/G7 原文行号 ==
+32:- **G2** 撤回 F7 的「逐字节一致就删新文件」：执行员不删任何产物；这一次的输出写新文件名，`research/scripts/replay.sh` 的登记行改指新文件，旧的留着。
+35:- **G5** 执行员第 4c 步：点名的对象是判决行里表示「没过」的字段——布尔值为 false、取值为 `not_run`、以及数值计数里名字表示违例、不匹配、歧义、失败且值大于 0 的；布尔值为 true、取值为 `zero`、以及名字不表示「没过」的计数（例如 `journal_differing_states`）不点名。拿不准的点名并写「拿不准」。
+37:- **G7** 执行员：登记给它的阶段里凡是读实验页的（84、40、86 号）都挪到第 7 步写完实验页之后跑；这一次不写实验页的在第 6 步最后跑，红了照写。
+
+== 3. 登记给 experiment-runner 的阶段（stage-owners.tsv 现算） ==
+27-format-constants.sh
+33-mutation-tables.sh
+34-experiment-index-sync.sh
+40-results-cited.sh
+52-segment-registry.sh
+69-evidence-in-repo.sh
+75-decision-experiment-links.sh
+80-absolute-assertions.sh
+84-verdict-false-named.sh
+85-repro-command.sh
+86-experiment-orphans.sh
+88-quoted-result-lines.sh
+96-experiment-source-discipline.sh
+99-multipath-registry.sh
+
+== 4. 十四道逐道 grep 'kb/experiments|experiments\.md|\.claude/kb|KB=|kb_dir'（复现 report.md 的现查） ==
+--- 27-format-constants.sh ---
+39:[[ -d .claude/kb ]] || { echo "  ! 找不到 kb，本阶段跳过"; exit 77; }
+56:kb_all = sorted(glob.glob('.claude/kb/**/*.md', recursive=True))
+--- 33-mutation-tables.sh ---
+(零命中)
+--- 34-experiment-index-sync.sh ---
+4:# `experiments.md` 的索引表是检索这批实验的入口，而编号的登记位在各正文的
+30:IDX=.claude/kb/experiments.md
+31:EXP=.claude/kb/experiments
+65:    bad.append(f"E{n} 有正文（{bodies[n][0]}）却不在 experiments.md 的索引表里")
+100:    print("    .claude/kb/experiments-history.md 里按「改前 / 改后 / 依据」记一条。")
+101:    print("    正文有而索引无的那一类：把它登记进 experiments.md 的索引表（编号、状态、一句话结论、正文链接）。")
+--- 40-results-cited.sh ---
+4:# 判据：`research/results/` 里的实验产物，必须在 `kb/experiments.md` 里被点名。
+8:# 跑了三轮、原始输出 22 KB 落了盘，而 experiments.md 里那一节还是两点对比，
+15:# ⚠️ 2026-08-29 起实验正文拆到 `kb/experiments/` 下，索引只剩导航表。
+17:EXP_DIR=.claude/kb/experiments
+21:cat .claude/kb/experiments.md "$EXP_DIR"/*.md > "$EXP_ALL" 2>/dev/null
+38:  echo "  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核："
+40:  echo "     → 怎么办：把结论写进 experiments.md 对应实验的正文，"
+44:  echo "  ✓ $RES 下的实验产物全部被 experiments.md 点名（$(find "$RES" -maxdepth 1 -name '*.out'|wc -l) 个文件）"
+97:  if gate_added_lines "$BASE" .claude/kb/experiments.md "$EXP_DIR" > "$added_lines"; then
+--- 52-segment-registry.sh ---
+5:#   .claude/kb/layout/01-first-txn.md 「八、根槽写路径的段序列登记表」里每一行的段序列数字串
+--- 69-evidence-in-repo.sh ---
+23:#   装置改了、产物旧时改查它的实验页（.claude/kb/experiments/<号>-*.md）写没写「没有正式跑」或「未正式跑」，写了就在成功行列名，没写 ⇒ 红。
+28:#   判的文件是：.claude/kb/ 下全部 .md；research/prompts/ 下这一轮**新写**的 .md（新增或未跟踪）。
+99:kb_dir = ".claude/kb"
+119:    directory = os.path.join(kb_dir, "experiments")
+220:if os.path.isdir(kb_dir):
+221:    for directory, _subdirectories, file_names in os.walk(kb_dir):
+250:    print(f"  ! 这次改动没碰实验装置与变异表（基准 {base}），{kb_dir} 与 {prompts_dir} 下也没有要扫的 .md，本阶段无对象可判")
+--- 75-decision-experiment-links.sh ---
+40:if [[ ! -d .claude/kb/experiments || ! -d .claude/kb/decisions ]]; then
+41:  echo "  ✗ 找不到 .claude/kb/experiments 或 .claude/kb/decisions"
+401:        found = git('grep', '-h', '-m1', '-E', f'^## E{number} ', base, '--', '.claude/kb/experiments/')
+--- 80-absolute-assertions.sh ---
+(零命中)
+--- 84-verdict-false-named.sh ---
+10:# 实验号 → 实验页：`.claude/kb/experiments/<去掉前导 E 的号>-*.md`（登记表第 1 列去掉前导 `E`，
+13:# 「点名」怎么认（现查过 kb/experiments/*.md 里已有的写法定的）：字段名与字面 `false` 出现在
+29:# 第 683 行 `control_violations_ok=false`，`.claude/kb/experiments/142-第一个事务的干跑.md` 没有点名。
+31:# gate-similar: 40-results-cited.sh 判产物文件本身有没有被 experiments.md 点名，不看产物内部判决
+73:EXP_DIR = '.claude/kb/experiments'
+--- 85-repro-command.sh ---
+14:EXP_DIR=.claude/kb/experiments
+--- 86-experiment-orphans.sh ---
+5:# `kb/experiments/` 里就必须有对应编号的正文文件。没有 = 干了活但没入库，
+13:EXP_DIR=.claude/kb/experiments
+24:  echo "  ✗ research 里有这些实验号的东西，kb/experiments/ 里却没有正文："
+30:  echo "  → 怎么办：给它建正文（测什么 / 判据 / 失败条款 / 口径 / 复跑命令），并登记进 experiments.md 的索引表；"
+--- 88-quoted-result-lines.sh ---
+28:[[ -d .claude/kb ]] || { echo "  ! 找不到 .claude/kb，本阶段无对象可判"; exit 77; }
+41:  if gate_added_lines "$base" .claude/kb ':(glob)research/**/*.md' > "$ADDED_LINES"; then
+54:kb = sorted(f for f in glob.glob('.claude/kb/**/*.md', recursive=True)
+--- 96-experiment-source-discipline.sh ---
+18:# 两条的原文与实测在 `.claude/kb/checks-owed.md` 欠着那张表的 C59、C60 两行。
+70:OWED_PATH = ".claude/kb/checks-owed.md"
+--- 99-multipath-registry.sh ---
+15:#      `.claude/kb/experiments/<编号>-….md` 且文件在仓里现存；那一页确实还没有登记节——补上了就判过期，删行；
+33:EXPERIMENTS=.claude/kb/experiments
+51:LAG_PAGE = re.compile(r'\.claude/kb/experiments/(?P<number>[0-9]+)-[^/]+\.md')
+109:            lag_problems.append(f"{where}：路径不是 .claude/kb/experiments/<编号>-….md 的形状：{page}")
+145:    print("     → 怎么办：路径抄错了就照 .claude/kb/experiments/ 里现存的文件名改；那一页已经补了登记节，就删掉这一行——")
+
+== 5. G2 与 40 号 *.r[0-9].out 跳过规则交叉：40 号的 case 分支原文 ==
+33:  case "$b" in *local*|*.r[0-9].out|*.round*|confirm*) continue;; esac
+
+== 6. 今天全部判决行（name=verdict），供 G5 逐格分类核对 ==
+26
+research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+research/results/e142-first-txn-dry-run-2026-09-22-mkfs-zero-fill-resync.out:283:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+research/results/e142-first-txn-dry-run-2026-09-23-decisions-catchup.out:283:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+research/results/e142-first-txn-dry-run-2026-09-25-header311-last-flag-arm-o.out:336:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+research/results/e142-first-txn-dry-run-2026-09-25-header311-last-flag.out:383:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=true layer0_violations=0 control_states_ok=true control_violations_ok=true journal_differing_states=3
+research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out:667:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-comparison.out:667:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-q142-1v-combined.out:921:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r16-arm-n15.out:634:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r16-combined.out:683:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r16-main.out:683:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r17-arm-n16.out:683:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=false journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608:E7RESULT name=verdict_layer0 layer0_states_ok=true layer0_violations=zero root_persisted_ok=true file_read_ok=true file_read_wrong_content_zero=true journal_differing_states=3 journal_reading=j_jia main_outcome_matrix_ok=true
+research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r17-main.out:708:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-25-r17-s2prep-reverify.out:708:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-26-r18-arm-n17.out:677:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run
+research/results/e142-first-txn-dry-run-2026-09-26-r18-main-2.out:714:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+research/results/e142-first-txn-dry-run-2026-09-26-r18-main.out:714:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+research/results/e142-r18-controls-2026-09-26.out:220:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=false r18_g9_ok=true
+research/results/e142-r18-controls-2026-09-26.out:222:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=false r18_g9_ok=true
+research/results/e142-r18-controls-2026-09-26.out:224:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=false
+research/results/e142-r18-controls-2026-09-26.out:226:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=false
+research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56:E7RESULT name=verdict trees_with_height_difference=0 today_resolves_registered=1000 today_resolves_unregistered=0 today_ambiguous=0 self_describing_resolves_all=true
+research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129:E7RESULT name=verdict pad_entry_bytes=35 legacy_entry_bytes=24 pad_leaf_fanout=463 legacy_leaf_fanout=676 grid_cells=21 cells_where_pad_taller_than_legacy=2 prepaid_pad=35 prepaid_legacy=24
+research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13:E7RESULT name=verdict layout_total=413 variants=6 variants_fitting_512=6 e115_e124_cells_superseded=true
+
+== 7. 86 号出路文本里的『删掉』一句 ==
+31:  echo "    若那轮的结论不打算入库，就把 research 下那些文件删掉——留着等于留一份没人能复核的证据。"

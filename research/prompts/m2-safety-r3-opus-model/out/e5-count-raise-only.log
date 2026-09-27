@@ -1,0 +1,71 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_p3_attack.rs (/tmp/claude-1000/m2-safety-r3-opus/target/release/deps/opus_r3_p3_attack-b85a0c2313d795ef)
+
+running 1 test
+E5a slots=240 arm=P1 script=a-ow150 step=5 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=7)(e3,raises1) writes=57 segments=[2, 16, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=98320 (只数)
+E5a slots=240 arm=P1 script=c-grow6-truncate-x10 step=4 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=6)(e2,raises1) writes=40 segments=[2, 16, 2, 1, 14, 2, 1, 2] states=81933 (只数)
+
+E5a slots=240 arm=P3 script=a-ow150 step=10 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=12)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=240 arm=P3 script=c-grow6-truncate-x10 step=8 (只录抬 F 那一串) op=Seq { units: 2, extra: 0 } outcome=raised(F=10)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+
+E5a slots=256 arm=P1 script=a-ow150 step=6 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=8)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=256 arm=P1 script=c-grow6-truncate-x10 step=4 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=6)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=256 arm=P3 script=a-ow150 step=11 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=13)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+E5a slots=256 arm=P3 script=c-grow6-truncate-x10 step=8 (只录抬 F 那一串) op=Seq { units: 2, extra: 0 } outcome=raised(F=10)(e3,raises1) writes=61 segments=[2, 12, 2, 1, 18, 2, 1, 18, 2, 1, 2] states=528400 (只数)
+
+E5a slots=320 arm=P1 script=a-ow150 step=8 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=10)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+E5a slots=320 arm=P1 script=c-grow6-truncate-x10 step=6 (只录抬 F 那一串) op=Empty outcome=raised(F=8)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=320 arm=P3 script=a-ow150 step=15 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=17)(e2,raises1) writes=44 segments=[2, 16, 2, 1, 18, 2, 1, 2] states=327693 (只数)
+E5a slots=320 arm=P3 script=c-grow6-truncate-x10 step=11 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=13)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+
+E5a slots=384 arm=P1 script=a-ow150 step=10 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=12)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=384 arm=P1 script=c-grow6-truncate-x10 step=8 (只录抬 F 那一串) op=Seq { units: 2, extra: 0 } outcome=raised(F=10)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+
+E5a slots=384 arm=P3 script=a-ow150 step=20 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=22)(e3,raises1) writes=61 segments=[2, 16, 2, 1, 18, 2, 1, 14, 2, 1, 2] states=344080 (只数)
+E5a slots=384 arm=P3 script=c-grow6-truncate-x10 step=15 (只录抬 F 那一串) op=Seq { units: 2, extra: 0 } outcome=raised(F=17)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=448 arm=P1 script=a-ow150 step=12 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=14)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=448 arm=P1 script=c-grow6-truncate-x10 step=10 (只录抬 F 那一串) op=Seq { units: 4, extra: 0 } outcome=raised(F=12)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=448 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=448 arm=P3 script=c-grow6-truncate-x10 step=18 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=20)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=512 arm=P1 script=a-ow150 step=15 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=17)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=512 arm=P1 script=c-grow6-truncate-x10 step=11 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=13)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+
+E5a slots=512 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=512 arm=P3 script=c-grow6-truncate-x10 step=22 (只录抬 F 那一串) op=Seq { units: 2, extra: 0 } outcome=raised(F=24)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=640 arm=P1 script=a-ow150 step=19 (只录抬 F 那一串) op=Ow(2999) outcome=raised(F=21)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+E5a slots=640 arm=P1 script=c-grow6-truncate-x10 step=14 (只录抬 F 那一串) op=Seq { units: 1, extra: 0 } outcome=raised(F=16)(e3,raises1) writes=53 segments=[2, 12, 2, 1, 14, 2, 1, 14, 2, 1, 2] states=36880 (只数)
+
+E5a slots=640 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=640 arm=P3 script=c-grow6-truncate-x10 没有一步在准入里推空发布
+
+E5a slots=768 arm=P1 script=a-ow150 没有一步在准入里推空发布
+E5a slots=768 arm=P1 script=c-grow6-truncate-x10 step=18 (只录抬 F 那一串) op=Seq { units: 5, extra: 0 } outcome=raised(F=20)(e2,raises1) writes=36 segments=[2, 12, 2, 1, 14, 2, 1, 2] states=20493 (只数)
+
+E5a slots=768 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=768 arm=P3 script=c-grow6-truncate-x10 没有一步在准入里推空发布
+
+E5a slots=1024 arm=P1 script=a-ow150 没有一步在准入里推空发布
+E5a slots=1024 arm=P1 script=c-grow6-truncate-x10 没有一步在准入里推空发布
+
+E5a slots=1024 arm=P3 script=a-ow150 没有一步在准入里推空发布
+E5a slots=1024 arm=P3 script=c-grow6-truncate-x10 没有一步在准入里推空发布
+
+test e5_crash_inside_the_admission_chain_and_the_delete ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 5.98s
+

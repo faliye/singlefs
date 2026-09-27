@@ -1,0 +1,1630 @@
+--- a/.claude/gate.d/54-layer0-replay.sh
++++ b/.claude/gate.d/54-layer0-replay.sh
+@@ -9,16 +9,19 @@
+ #   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
+ #     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
+ #     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
+-#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加判它的 54 号、准入模块 admission.py、
+-#     工具链、构建环境与这条用例的登记行）；那一格全绿标记在、作数就复用，不跑；不在才跑 `cargo test --release -p <包> --test <测试目标> -- --include-ignored
+-#     --exact <用例函数> --nocapture`，按登记行第三列判日志（crash-case-judge），开跑与跑完各算一次指纹，相同才写那一格（crash-case-record）。
++#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加准入模块 admission.py 里崩溃枚举用例的判法摘要、
++#     工具链、构建环境与这条用例的登记行；这一份 54 号不进指纹）；那一格全绿标记在、作数就复用，不跑；不在才照 admission.py crash-case-command
++#     交出的命令与环境跑（`cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture`，续跑的变量与线程数也由它定，
++#     那一段在判法摘要里），按登记行第三列判日志（crash-case-judge），开跑与跑完各算一次指纹，相同才写那一格（crash-case-record）。
+ #     全绿标记在 git common-dir：`singlefs-crash-case-green.<用例名>.<输入指纹>`，不进工作树，各 worktree 读写同一组；别的格不动。
+ #     一条判红删它这批输入那一格（先绿后红，前一趟那一格不再作数），接着跑下一条；「跑的过程中输入变了」那一支判红不删：它说不出开跑那一批的好坏。
+ #     两趟 --full 同时跑同一条用例、同一个指纹时这里不加锁：后跑完的那一趟判红会删掉先跑完的那一趟刚写的绿标记，只会假红、不会假绿
+ #     （崩溃验证员的定义里「另有 --full 在跑时不起」挡着这一种）。
+-#     断点续跑：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>（不随 worktree 删掉）、
+-#     SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
++#     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
++#     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
+ #     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
++#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
++#     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
+ #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+ #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
+ #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
+@@ -35,7 +38,10 @@
+ # 用例的判别力在用例自己：对着产物与闭式的计数断言，oracle 的判别力由同文件的靶向阳性对照证明。
+ #
+ # 多线程（增补 2 收口表第 41 行；2026-09-18 用户定：测试与崩溃检测优先多线程）：crash.rs 按状态序号区间切片、多线程跑，
+-# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——没设就取本机核数（nproc）。每跑完一片，用例打一行 `LAYER0_PROGRESS`，这里边跑边转到本阶段的输出里。
++# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——调用方没设就取本机核数（nproc），取法在 admission.py 的 crash_case_worker_threads。
++# 每跑完一片，用例打一行 `LAYER0_PROGRESS`，这里边跑边转到本阶段的输出里。
++# 全绿标记里线程分两格记：configured_worker_threads= 是配的（SINGLEFS_LAYER0_THREADS 与它怎么来的、本机几核），started_worker_threads= 是
++# 登记了 threads= 的用例从 LAYER0_PARALLEL_FINISHED 读到的起了几个；没登记 threads= 的记「读不到」。
+ # 登记了 threads=<前缀> 的用例：按那一行计数的状态数找 `LAYER0_PARALLEL_FINISHED`，这一趟真跑了至少两片、却只起了 1 个工作线程、本机多于 1 核、
+ # SINGLEFS_LAYER0_THREADS 没显式设成 1，判红（多半是线程数没传进去）；全部片从进度文件读回（起 0 个线程）、只剩 1 片要跑（最多起 1 个）都不判红。
+ #
+@@ -92,8 +98,9 @@
+ # 一问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
+ # 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
+ # 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
+-# 二问这次改动碰没碰登记给本阶段的那几条路径，再加登记表本身、跑的这一份 54 号与准入模块：这三样都进每条崩溃枚举用例的指纹，
+-# 只改它们的改动（新登记一条用例、改一条的第三列、改判法）同样要核标记，不能在这一问被摘掉。
++# 二问这次改动碰没碰登记给本阶段的那几条路径，再加登记表本身、跑的这一份 54 号与准入模块：登记行与准入模块的判法摘要进每条崩溃枚举用例的指纹，
++# 54 号定着流程的次序，只改它们的改动（新登记一条用例、改一条的第三列、改判法、改流程）同样要核标记，不能在这一问被摘掉；
++# 核下来标记照样作数（只改了准入模块判法之外的部分、只改了 54 号）就判绿。
+ # 这是 C8（范围判定）的粗粒度前身：它只摘得掉「零行输入的改动」，摘不出别的，C8 照旧欠着。
+ # 两问之前先核登记的每一条路径 git 至少列得出一个文件：写错的路径两问都拿它答「没碰」，这一道就一直退 77、一次都不跑。
+ if [[ "$layer0_tier" == quick ]]; then
+@@ -108,21 +115,13 @@
+     echo "                在项目根跑 git ls-files -co --exclude-standard -- <那一条>，改到列得出文件为止。全部列不出时先看这里是不是 git 工作树。"
+     exit 1
+   fi
+-  reuse_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "$ROOT" "$(basename "$0")")"
+-  reuse_rc=$?
+-  if [[ "$reuse_rc" != 0 ]]; then
+-    echo "  ! 本阶段跳过（复用上一次整轮全绿的判定）：$reuse_reason"
+-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
+-    exit 77
+-  fi
++  source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
++  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
++    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
+   layer0_judge_paths=(.claude/gate.d/stage-inputs.tsv "$(realpath -m --relative-to="$ROOT" "$layer0_stage_script_path")" "$(realpath -m --relative-to="$ROOT" "$layer0_admission_module")")
+-  scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}")"
+-  scope_rc=$?
+-  if [[ "$scope_rc" != 0 ]]; then
+-    echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
+-    echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 research/scripts/change-touches-crates.sh。"
+-    exit 77
+-  fi
++  stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "这次改动没碰它判的东西" \
++    "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，加 ${layer0_judge_paths[*]}，判据见 research/scripts/change-touches-crates.sh。" \
++    -- "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}"
+ fi
+ [[ -f Cargo.toml && -d crates/singlefs-harness ]] || { echo "  ! 没有 crates/singlefs-harness，本阶段跳过（步 0 之前没有装置）"; exit 77; }
+ # 前提（cargo、rustc）登记在 stage-inputs.tsv 本阶段那一行第三列，经准入模块判，没齐判红（不退 77）
+@@ -138,17 +137,6 @@
+ layer0_scratch_directory="$(mktemp -d)"
+ trap 'rm -rf -- "${layer0_scratch_directory:?}"' EXIT
+ 
+-machine_cores="$(nproc)"
+-if [[ -n "${SINGLEFS_LAYER0_THREADS:-}" ]]; then
+-  threads_origin="显式设的"
+-  threads_origin_word="explicit"
+-else
+-  SINGLEFS_LAYER0_THREADS="$machine_cores"
+-  threads_origin="没设，取本机核数"
+-  threads_origin_word="default"
+-fi
+-export SINGLEFS_LAYER0_THREADS
+-
+ # 登记的崩溃枚举用例，一条一行「键、包、测试目标、用例函数」（制表符分隔），照登记表的次序；登记有错判红。
+ if ! crash_case_listing="$(python3 "$layer0_admission_module" crash-cases "$ROOT")"; then
+   printf '%s\n' "$crash_case_listing" | sed 's/^/       /'
+@@ -170,8 +158,7 @@
+ write_crash_case_manifest() {
+   local manifest_summary
+   if ! manifest_summary="$(python3 "$layer0_admission_module" crash-case-manifest "$ROOT" "$1" "$2" \
+-      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" \
+-      --extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module" --toolchain --build-environment)"; then
++      --judging-digest --toolchain --build-environment)"; then
+     case_manifest_problem="$manifest_summary"
+     return 1
+   fi
+@@ -200,15 +187,39 @@
+   return "${PIPESTATUS[0]}"
+ }
+ 
+-# run_crash_case <包> <测试目标> <用例函数> <日志> <输入指纹>：--full 跑一条崩溃枚举用例，带续跑的三个环境变量；
+-# cargo 的整段输出进日志，`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
++# read_crash_case_command <键> <输入指纹>：准入模块 crash-case-command 交出的这一条的命令与环境（以 NUL 分隔）读进 case_machine_cores、
++# case_threads、case_threads_origin、case_progress_directory 与数组 case_command。交不出、写法不对返回 1，原因放进 case_command_problem。
++read_crash_case_command() {
++  local command_file="$layer0_scratch_directory/command.${1#crash-case:}" command_output
++  local -a start_over_option=()
++  if [[ "$layer0_start_over" == 1 ]]; then start_over_option=(--start-over); fi
++  if ! python3 "$layer0_admission_module" crash-case-command "$ROOT" "$1" "$2" "${start_over_option[@]}" > "$command_file"; then
++    case_command_problem="$(tr '\0' ' ' < "$command_file")"
++    return 1
++  fi
++  local -a command_words=()
++  mapfile -d '' -t command_words < "$command_file"
++  if (( ${#command_words[@]} < 5 )) || [[ ! "${command_words[0]}" =~ ^[1-9][0-9]*$ || ! "${command_words[1]}" =~ ^[1-9][0-9]*$ \
++      || ! "${command_words[2]}" =~ ^(explicit|default)$ ]]; then
++    command_output="$(tr '\0' ' ' < "$command_file")"
++    case_command_problem="准入模块交的不是「核数、线程数、explicit|default、进度目录、命令…」：${command_output}"
++    return 1
++  fi
++  case_machine_cores="${command_words[0]}"
++  case_threads="${command_words[1]}"
++  case_threads_origin="${command_words[2]}"
++  case_progress_directory="${command_words[3]}"
++  case_command=("${command_words[@]:4}")
++  return 0
++}
++
++# run_crash_case <日志> <命令的词…>：--full 照准入模块交的命令跑一条崩溃枚举用例；
++# 整段输出进日志，`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
+ run_crash_case() {
+-  local -a progress_settings=(SINGLEFS_LAYER0_PROGRESS_DIRECTORY="$layer0_progress_root/$5" SINGLEFS_LAYER0_INPUT_FINGERPRINT="$5")
+-  local -a start_over_setting=(-u SINGLEFS_LAYER0_START_OVER)
+-  if [[ "$layer0_start_over" == 1 ]]; then start_over_setting=(SINGLEFS_LAYER0_START_OVER=1); fi
+-  env "${start_over_setting[@]}" "${progress_settings[@]}" \
+-    cargo test --release -p "$1" --test "$2" -- --include-ignored --exact "$3" --nocapture 2>&1 \
+-    | tee "$4" \
++  local log_file="$1"
++  shift
++  "$@" 2>&1 \
++    | tee "$log_file" \
+     | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
+     | sed -u 's/^/    /'
+   return "${PIPESTATUS[0]}"
+@@ -328,7 +339,7 @@
+   if ! write_crash_case_manifest "$case_key" "$manifest_at_start"; then
+     echo "  ✗ $case_key：算不出这批输入的指纹：$case_manifest_problem"
+     echo "     → 怎么办：在项目根跑 git ls-files -co --exclude-standard -- ${layer0_input_paths_text} 看列不列得出文件，再跑 cargo -V && rustc -V；"
+-    echo "                单跑 python3 research/scripts/admission.py crash-case-manifest <根> $case_key <清单文件> --toolchain --build-environment 看它报什么。"
++    echo "                单跑 python3 research/scripts/admission.py crash-case-manifest <根> $case_key <清单文件> --judging-digest --toolchain --build-environment 看它报什么。"
+     red_cases+=("$case_key")
+     continue
+   fi
+@@ -341,11 +352,21 @@
+     reused_cases+=("$case_key")
+     continue
+   fi
++  if ! read_crash_case_command "$case_key" "$fingerprint_at_start"; then
++    echo "  ✗ $case_key：准入模块交不出起用例的命令：$case_command_problem"
++    echo "     → 怎么办：单跑 python3 research/scripts/admission.py crash-case-command <根> $case_key <指纹> 看它报什么（取不到 git common-dir、"
++    echo "                nproc 起不来、SINGLEFS_LAYER0_THREADS 不是正整数都在这里报）；修好之后重跑 --full。"
++    red_cases+=("$case_key")
++    continue
++  fi
+   case_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+   case_log="$layer0_scratch_directory/log.$case_label"
+-  echo "  · $case_key 开跑（${case_started_utc}；cargo test --release -p $case_package --test $case_target -- --include-ignored --exact $case_function；这批输入的指纹 ${fingerprint_at_start:0:16}…，${file_count_at_start} 个文件，减去用例读不到的 ${excluded_count_at_start} 个）："
++  case_threads_origin_text="没设，取本机核数"
++  if [[ "$case_threads_origin" == explicit ]]; then case_threads_origin_text="显式设的"; fi
++  case_threads_note="SINGLEFS_LAYER0_THREADS=${case_threads}（${case_threads_origin_text}），本机 ${case_machine_cores} 核"
++  echo "  · $case_key 开跑（${case_started_utc}；${case_command[*]}；${case_threads_note}；这批输入的指纹 ${fingerprint_at_start:0:16}…，${file_count_at_start} 个文件，减去用例读不到的 ${excluded_count_at_start} 个）："
+   sed 's/^/      /' <<< "$marker_check_output"
+-  if ! run_crash_case "$case_package" "$case_target" "$case_function" "$case_log" "$fingerprint_at_start"; then
++  if ! run_crash_case "$case_log" "${case_command[@]}"; then
+     tail -40 "$case_log"
+     delete_crash_case_marker "$case_key" "$fingerprint_at_start"
+     echo "  ✗ $case_key 判红：cargo test 退非 0（上面是它的尾部）"
+@@ -356,7 +377,7 @@
+   fi
+   judged_lines_file="$layer0_scratch_directory/judged.$case_label"
+   if ! judge_output="$(python3 "$layer0_admission_module" crash-case-judge "$ROOT" "$case_key" "$case_log" "$judged_lines_file" \
+-      --machine-cores "$machine_cores" --threads "$SINGLEFS_LAYER0_THREADS" --threads-origin "$threads_origin_word")"; then
++      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+     delete_crash_case_marker "$case_key" "$fingerprint_at_start"
+     printf '%s\n' "$judge_output" | sed 's/^/       /'
+     echo "  ✗ $case_key 的用例跑过了，日志却判不绿（上面逐条列出）"
+@@ -381,15 +402,16 @@
+     red_cases+=("$case_key")
+     continue
+   fi
+-  threads_text="${judge_output//$'\n'/；}${judge_output:+；}SINGLEFS_LAYER0_THREADS=${SINGLEFS_LAYER0_THREADS}（${threads_origin}），本机 ${machine_cores} 核"
++  threads_text="${judge_output//$'\n'/；}${judge_output:+；}${case_threads_note}"
+   if ! record_output="$(python3 "$layer0_admission_module" crash-case-record "$ROOT" "$case_key" "$fingerprint_at_start" "$manifest_at_start" "$judged_lines_file" \
+-      --files "$file_count_at_start" --excluded "$excluded_count_at_start" --started "$case_started_utc" --judged-root "$ROOT" --threads-text "$threads_text")"; then
++      --files "$file_count_at_start" --excluded "$excluded_count_at_start" --started "$case_started_utc" --judged-root "$ROOT" \
++      --machine-cores "$case_machine_cores" --threads "$case_threads" --threads-origin "$case_threads_origin")"; then
+     echo "  ✗ $case_key 判绿，全绿标记却没写成：$record_output"
+     echo "     → 怎么办：看 $git_common_directory 可不可写、盘满没满，修好之后重跑 --full（没有标记，整轮门禁的快档会一直红）。"
+     red_cases+=("$case_key")
+     continue
+   fi
+-  rmdir -- "$layer0_progress_root/$fingerprint_at_start" 2>/dev/null
++  rmdir -- "$case_progress_directory" 2>/dev/null
+   echo "  ✓ $case_key 判绿（${threads_text}）：全绿标记写进 ${record_output}，记下的行原样："
+   sed 's/^/      /' "$judged_lines_file"
+   green_cases+=("$case_key")
+--- a/research/scripts/admission.py
++++ b/research/scripts/admission.py
+@@ -20,7 +20,9 @@
+   崩溃枚举用例行（键是 crash-case:<名>，门禁 54 号逐条按复用判定跑、逐条记全绿标记）：路径写整个 crates/ 与 Cargo 清单、锁，
+     不按用例手列；算输入时自动减去用例读不到的文件（见「崩溃枚举用例」一节）。第三列认四种：
+       test=<包>:<测试目标>:<用例函数>     恰好一条：跑的是 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数>；
+-                                         用例函数要标 #[ignore]（不带 --ignored 的 cargo test 不跑它，重型测试闸按这一条认它）
++                                         用例函数的每一处定义都要标 #[ignore]（不带 --ignored 的 cargo test 不跑它，重型测试闸按这一条认它）：
++                                         同名的每一处 fn <用例函数>( 都算（cfg 二选一的、子模块里同名的也算），有一处没标就算没标；
++                                         # 与 [ 之间许空白；找不到字面的定义（宏生成的用例）判错
+       count-line=<前缀>                  日志里以「<前缀> 」开头的行恰好一行，原样记进全绿标记
+       exhaustive=<前缀>                  那一行带 exhaustive=true（前缀要先登记成 count-line=）
+       threads=<前缀>                     按那一行的 states= 找 LAYER0_PARALLEL_FINISHED 行判工作线程（前缀要先登记成 count-line=）
+@@ -34,7 +36,8 @@
+   runner、wrapper 与编译器指的可执行文件另进一行：环境变量 CARGO_TARGET_*_RUNNER、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、
+   CARGO_BUILD_RUSTC_WRAPPER、CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER，与上面那几份配置文件里的 target.<三元组或 cfg>.runner、
+   build.rustc-wrapper、build.rustc-workspace-wrapper，指的那个程序按内容进（值的首词是程序；带斜杠的相对路径，环境变量从仓根起、
+-  配置文件从 .cargo 所在的那一层起；不带斜杠的在 PATH 里找；找不到的进「找不到」一句）；CARGO_BUILD_RUSTC 与配置文件里的 build.rustc
++  配置文件从 .cargo 所在的那一层起；不带斜杠的在 PATH 里找；找不到的进「找不到」一句）；首词之后指到现存文件的参数（绝对路径，或从同一层起的
++  相对路径）接着按内容进（`runner = "bash tools/r.sh"` 这一类，定行为的是参数里的脚本）；CARGO_BUILD_RUSTC 与配置文件里的 build.rustc
+   进它的 `-V`（与 RUSTC 同一种）。登记路径下指向目录的符号链接按链接指向的目录里的文件计入。
+ 
+ 准入条件分三类，这里管前两类：
+@@ -61,16 +64,27 @@
+   keys <根>                      列出登记表里的实验键，一行一个
+   crash-cases <根>               核登记的崩溃枚举用例（第三列的写法、包与测试目标在不在、用例函数在不在、它标没标 #[ignore]），每条打一行
+                                  「<键><制表符><包><制表符><测试目标><制表符><用例函数>」；登记有错退 2，原因打在 stdout（不带 ✗，阶段自己打 ✗ 与出路）
+-  crash-case-manifest <根> <键> <清单文件> [--extra-file <名字> <文件>]... [--toolchain] [--build-environment]
++  crash-case-manifest <根> <键> <清单文件> [--extra-file <名字> <文件>]... [--judging-digest] [--toolchain] [--build-environment]
+                                  这条用例的输入清单：登记路径下的文件减去别的测试目标独占的测试文件，末尾按参数次序加名字行，
+-                                 最后一行是这条用例的登记行（键、路径与第三列）；stdout 打「<指纹> <文件数> <减去的文件数>」
++                                 最后一行是这条用例的登记行（键、路径与第三列）；stdout 打「<指纹> <文件数> <减去的文件数>」。
++                                 --judging-digest 加一行判法摘要：这一份准入模块按 ast 从判法入口（CRASH_CASE_JUDGING_ENTRIES，连同分派表 COMMANDS 里
++                                 CRASH_CASE_JUDGING_SUBCOMMANDS 那几项指的函数）顺着引用的模块级名字求闭包，闭包里每个定义的原文按名字排好，
++                                 加分派表那几项、main 与 `if __name__` 那一段；判法之外的部分改了摘要不变（门禁 54 号给它，不再给整份模块与 54 号）
++  crash-case-command <根> <键> <输入指纹> [--start-over]
++                                 --full 跑这一条的命令与环境（54 号原样执行）：stdout 以 NUL 分隔，本机核数、线程数、explicit|default、续跑的进度目录，
++                                 其后是整条命令（env 设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY、SINGLEFS_LAYER0_INPUT_FINGERPRINT、SINGLEFS_LAYER0_THREADS，
++                                 --start-over 时设 SINGLEFS_LAYER0_START_OVER=1、不然清掉它，再起 cargo test --release …）；线程数：调用方设了
++                                 SINGLEFS_LAYER0_THREADS 用它（explicit），没设取 nproc（default）。交不出退 2，原因打在 stdout
+   crash-case-marker-check <根> <键> <指纹> <清单文件>
+                                  这批输入那一格全绿标记在不在、作不作数：退 0 作数（stdout 第一行「ok <标记路径> <跑完的时刻>」，
+                                  其后是标记里的计数行）；退 1 不作数（stdout 是原因，没有那一格时再比最近写的一格与这一次的清单）
+   crash-case-judge <根> <键> <日志> <记录行文件> --machine-cores <核数> --threads <线程数> --threads-origin explicit|default
+                                  判 --full 跑那一条的日志：退 0 判绿（记进标记的行写进记录行文件，stdout 是线程那一句）；退 1 判红（stdout 逐条原因）
+-  crash-case-record <根> <键> <指纹> <清单文件> <记录行文件> --files <数> --excluded <数> --started <时刻> --judged-root <路径> --threads-text <一句>
+-                                 判绿之后写那一格全绿标记（同目录临时文件写完再改名换上）；stdout 打标记路径
++  crash-case-record <根> <键> <指纹> <清单文件> <记录行文件> --files <数> --excluded <数> --started <时刻> --judged-root <路径>
++                    --machine-cores <核数> --threads <线程数> --threads-origin explicit|default
++                                 判绿之后写那一格全绿标记（同目录临时文件写完再改名换上）；stdout 打标记路径。线程分两格记：
++                                 configured_worker_threads= 是配的（线程数、显式设的还是取本机核数、本机几核），started_worker_threads= 是
++                                 crash-case-judge 记下的起了几个（登记了 threads= 的取 LAYER0_PARALLEL_FINISHED，没登记的写读不到）
+   crash-case-marker-path <根> <键> <指纹>
+                                  那一格全绿标记的路径（判红时阶段删它）
+   gate-preconditions <阶段所在的仓根> <阶段文件名>
+@@ -88,20 +102,33 @@
+ raise-in-gate-reuse（门禁复用判定里抛异常，stage-must-run.sh 必须按要跑处理）、skip-gate-preconditions（门禁的前提不判）、
+ ignore-gate-environment（门禁复用判定不比环境）、skip-build-environment（构建环境不进指纹）、ignore-linked-directories（指向目录的
+ 符号链接照旧滤掉）、exclude-mentioned-test-targets（别的测试目标被代码点了名也减掉）、threads-by-worker-count（照旧只看
+-worker_threads=1 判「只用了一个线程」，不看这一趟跑了几片）。
++worker_threads=1 判「只用了一个线程」，不看这一趟跑了几片）、first-definition-only（用例函数只看第一处定义）、
++ignore-attribute-without-space（`# [ignore]` 不认）、concat-include-only（只认不带路径前缀的 include!(concat!(…))）、
++computed-include-subtracts-non-test-files（有算出来的 include 时照样减 mutations.tsv 与 src/bin/）、runner-program-only（runner / wrapper
++只按首词的程序进指纹）、whole-module-in-judging-digest（判法摘要换回整份准入模块）、judging-digest-without-dispatch（分派表那几项不进摘要）、
++single-worker-threads-field（标记里线程只记一格 worker_threads=）。
+ 
+ 管不到的：跑的是不是按今天的源码编出来的二进制（指纹按源码算，跑的是 target/ 里的旧二进制时两边对不上，
+ replay.sh 与 cargo run 开跑前都会重编）；登记的路径少写了一条（那条输入变了不会放行，要靠强制开关，登记行本身进指纹，
+ 补登记之后自然放行）；产物头的指纹行是不是真由那一趟写的（由装置入口调本模块写，拷来的产物照样带着）。
+ 崩溃枚举用例减去的文件认不出的：用拼出来的名字在运行期读别的测试文件（名字不以整词出现在任何代码里）、构建脚本（build.rs 与 package.build
+-指的那一份）之外的构建期代码按目录读 tests/、编译期拼出来的名字（include!(concat!(…)) 这一类）指到别的包的测试文件；这几种会让那份文件
+-被减掉而它其实被读了。认得出形状、认不出读的是哪一份的两种按宽处理：包里有 include! / include_str! / include_bytes! 套 concat! 的，
+-这个包的测试文件一份都不减；任何一个包的构建脚本（注释去掉之后）出现整词 tests 的，哪个包的测试文件都不减。
++指的那一份）之外的构建期代码按目录读 tests/（构建脚本 `mod` 进来的文件也算在这一类）、编译期算出来的名字（include!(concat!(…)) 这一类）
++指到别的包的测试文件；这几种会让那份文件被减掉而它其实被读了。认得出形状、认不出读的是哪一份的两种按宽处理：包里有 include! / include_str! /
++include_bytes! 的参数不以字符串字面量开头（套 concat!、env!、option_env! 或别的宏，宏名前带不带 ::core:: / std:: 都算）的，这个包的测试文件
++一份都不减，任何一份 .rs 里有这种 include 的，crates/mutations.tsv 与 src/bin/ 下的也一份都不减；任何一个包的构建脚本（注释去掉之后）
++出现整词 tests 的，哪个包的测试文件都不减。
++runner / wrapper 指的程序与参数里的脚本按内容进指纹，它们再 source、再读的文件不进（不跑它就不知道它读什么）：runner 脚本 source 的那一份改了，
++指纹不变、旧标记照样作数。判法摘要看不见的：靠 ast 里的静态引用求闭包，getattr、字符串拼出来的函数名、exec 这一类引到的定义不进；
++Python 自身（解释器、标准库）升级不进。54 号不进指纹：它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记），
++改了它旧标记照样作数，由 --selftest 的「54 号」那几格核，快档的范围那一问照样把它算进去。
++用例函数标没标 #[ignore] 按同名的每一处 fn <名>( 判：同一个测试目标里别的模块有同名、合法不标 ignore 的快用例时误判没标（多拒、自查判错，
++方向是多跑一步，接受）。
+ 减得少的（改了照样让用例重跑）：几个测试目标共用的测试模块（tests/common_*/ 这一类）要顺着模块图才减得准，这里不走模块图；
+ 包里有构建脚本、[[test]]、autotests 时整包不减。登记的四条里第二条流全量约 2.3 天（推的），这几种改动都会让它重跑。
+ 减掉之后仍可能让用例红的：src/bin/ 下的文件编不过时 cargo test 也编不过（集成测试要先编本包的 bin），这一种交给构建与 clippy 那几道，
+ 不靠崩溃枚举用例的标记。linker（配置文件里的 target.*.linker、环境变量 CARGO_TARGET_*_LINKER）指的程序不按内容进。
+ """
++import ast
+ import glob
+ import hashlib
+ import os
+@@ -149,13 +176,32 @@
+ LAYER0_PARALLEL_FINISHED_PREFIX = "LAYER0_PARALLEL_FINISHED "
+ PASSED_ONE_TEST_FORM = re.compile(r"^test result: ok\. 1 passed; 0 failed; ")
+ MARKER_DIFFERENCES_LISTED_AT_MOST = 20
+-# 用例函数要标的属性：#[ignore] 或 #[ignore = "…"]（cfg_attr 里的条件 ignore 不算：条件不成立时不带 --ignored 照样跑它）
+-IGNORE_ATTRIBUTE_FORM = re.compile(r"^#\[\s*ignore\s*(?:\]|=)")
++POSITIVE_INTEGER_FORM = re.compile(r"[1-9][0-9]*")
++# --full 起用例时设的环境变量与续跑的进度目录（crash_case_launch）
++LAYER0_THREADS_VARIABLE = "SINGLEFS_LAYER0_THREADS"
++LAYER0_START_OVER_VARIABLE = "SINGLEFS_LAYER0_START_OVER"
++LAYER0_PROGRESS_DIRECTORY_NAME = "singlefs-layer0-progress"
++# 判法摘要（crash_case_judging_digest_text）：崩溃枚举用例「日志判不判绿、标记作不作数、登记行怎么读、起用例的命令与环境」从这几个入口起求闭包
++CRASH_CASE_JUDGING_ENTRIES = ("judge_crash_case_log", "judge_worker_threads", "crash_case_marker_problems", "read_crash_case_marker",
++                              "check_crash_case_marker", "write_crash_case_marker", "crash_case_marker_path", "parse_crash_case",
++                              "crash_case_of_key", "crash_cases_of", "crash_case_launch", "started_worker_threads_text",
++                              "configured_worker_threads_text")
++# 分派表 COMMANDS 里这几项子命令：「子命令 → 函数」进摘要，函数也当入口（有人把 crash-case-judge 指到别的函数，摘要跟着变）
++CRASH_CASE_JUDGING_SUBCOMMANDS = ("crash-case-command", "crash-case-judge", "crash-case-record", "crash-case-marker-check", "crash-case-marker-path")
++# 原文进摘要、不顺着它的引用往下走的定义：main 引自证，顺下去自证就进来了
++CRASH_CASE_JUDGING_LEAVES = ("main",)
++CRASH_CASE_JUDGING_DIGEST_NAME = "<判法摘要：admission.py 里崩溃枚举用例的判法与起用例的命令>"
++# 用例函数要标的属性：#[ignore] 或 #[ignore = "…"]，# 与 [ 之间许空白（rustc 认 `# [ignore]`）；cfg_attr 里的条件 ignore 不算：条件不成立时不带 --ignored 照样跑它
++IGNORE_ATTRIBUTE_FORM = re.compile(r"^#\s*\[\s*ignore\s*(?:\]|=)")
++IGNORE_ATTRIBUTE_FORM_WITHOUT_SPACE = re.compile(r"^#\[\s*ignore\s*(?:\]|=)")  # 弄坏开关 ignore-attribute-without-space 换回的旧写法
+ ATTRIBUTE_START = re.compile(r"#!?\s*\[")
+ # 属性与 fn 之间可以夹的限定词（一次认一个，从 fn 往前剥）
+ FUNCTION_QUALIFIER_AT_END = re.compile(r'(?:\bpub(?:\s*\([^()]*\))?|\basync|\bunsafe|\bconst|\bextern(?:\s*"[^"]*")?)$')
+-# 编译期拼出来的文件名：include! / include_str! / include_bytes! 套 concat!（拼出来的是哪一份认不出，整包不减）
+-COMPILE_TIME_CONCATENATED_INCLUDE = re.compile(r"\binclude(?:_str|_bytes)?!\s*[(\[{]\s*concat!")
++# 编译期算出来的文件名：include! / include_str! / include_bytes!（宏名前带不带 ::core:: / std:: 这类路径都算）的参数不以字符串字面量开头——
++# 套 concat!、env!、option_env! 或别的宏，读的是哪一份认不出，按宽处理（这个包的测试文件、mutations.tsv 与 src/bin/ 都不减）
++COMPILE_TIME_COMPUTED_INCLUDE = re.compile(r'\binclude(?:_str|_bytes)?\s*!\s*[(\[{]\s*(?!b?r#*"|b?")\S')
++# 弄坏开关 concat-include-only 换回的旧写法：只认紧跟着不带路径的 concat!
++COMPILE_TIME_CONCATENATED_INCLUDE_ONLY = re.compile(r"\binclude(?:_str|_bytes)?!\s*[(\[{]\s*concat!")
+ # 崩溃枚举用例的输入里减去的、不是测试文件的那几份：仓根起的路径 → 为什么用例读不到它（有代码按文件名点名它时照留）
+ CRASH_CASE_FILES_NOT_READ = {"crates/mutations.tsv": "crates 变异表：59 号按它改源码再跑点名的测试，用例编译期与运行期都不读它"}
+ # 集成测试拿本包 bin 的路径靠这个前缀的环境变量；没有代码读它时，src/bin/ 下的文件编不进也读不到用例
+@@ -497,12 +543,19 @@
+ 
+ 
+ def program_contents(words, base_directory, environment):
+-    """首词是程序、其后是参数的一个值：交回那个程序的内容（进指纹）；找不到的交「找不到」一句（值本身另有一行进指纹）。"""
++    """首词是程序、其后是参数的一个值：交回那个程序的内容（进指纹），找不到的交「找不到」一句（值本身另有一行进指纹）；
++    首词之后指到现存文件的参数（绝对路径，或从 base_directory 起的相对路径）接着按内容进：`bash tools/r.sh` 这一类，真正定行为的脚本在参数里。
++    那个脚本再 source、再读的文件不进（文件头「管不到的」）。"""
+     program = words[0] if words else ""
+     path = resolved_program(program, base_directory, environment)
+-    if path and os.path.isfile(path):
+-        return read_configuration_file(path)
+-    return f"找不到：{program}".encode("utf-8", "surrogateescape")
++    contents = read_configuration_file(path) if path and os.path.isfile(path) else f"找不到：{program}".encode("utf-8", "surrogateescape")
++    if break_is_set("runner-program-only"):
++        return contents
++    for argument in words[1:]:
++        candidate = argument if os.path.isabs(argument) else os.path.join(base_directory, argument)
++        if os.path.isfile(candidate):
++            contents += b"\n<" + argument.encode("utf-8", "surrogateescape") + b">\n" + read_configuration_file(candidate)
++    return contents
+ 
+ 
+ def compiler_version(program, root, environment, described_as):
+@@ -1040,15 +1093,18 @@
+ 
+ # ── 崩溃枚举用例（门禁 54 号：逐条按复用判定跑、逐条记全绿标记）────────────────
+ #
+-# 一条用例的输入 = 登记路径（整个 crates/ 与 Cargo 清单、锁）下 git 列得出的文件，减去用例读不到的文件，再加判它的 54 号、
+-# 准入模块（这一份）、工具链、构建环境与这条用例的登记行（54 号按 --extra-file、--toolchain、--build-environment 给）。用例读不到的文件有三种：
++# 一条用例的输入 = 登记路径（整个 crates/ 与 Cargo 清单、锁）下 git 列得出的文件，减去用例读不到的文件，再加准入模块（这一份）里
++# 崩溃枚举用例的判法摘要、工具链、构建环境与这条用例的登记行（54 号按 --judging-digest、--toolchain、--build-environment 给；
++# 54 号自己不进：起用例的命令与环境由这一份的 crash-case-command 交出，在判法摘要里）。用例读不到的文件有三种：
+ #   ① 别的测试目标 X 独占的文件：它所在的包没有构建脚本（build.rs 或 package.build）、没写 [[test]] 与 package.autotests，包里没有
+-#      include! / include_str! / include_bytes! 套 concat! 的代码，任何一个包的构建脚本（注释去掉之后）都不出现整词 tests；
++#      参数是算出来的 include! / include_str! / include_bytes!（COMPILE_TIME_COMPUTED_INCLUDE：套 concat!、env!、option_env! 或别的宏，
++#      宏名前带不带 ::core:: / std:: 都算），任何一个包的构建脚本（注释去掉之后）都不出现整词 tests；
+ #      X 是 tests/X.rs（或 tests/X/main.rs 那种目录目标、连同那个目录），而 X 的名字不以整词出现在别处任何 .rs（注释去掉之后）与
+ #      Cargo.toml 里——`mod X;`、`#[path = "…X.rs"]`、`include_str!("…X.rs")`、运行期按字面路径读它，都让它留在输入里；
+ #   ② CRASH_CASE_FILES_NOT_READ 里的（crates/mutations.tsv），没有代码与 Cargo.toml 按文件名点名它；
+ #   ③ 没有任何代码读 CARGO_BIN_EXE_ 时，各包 src/bin/ 下的文件（包里有构建脚本、[[test]]、autotests 的不减；
+ #      src/bin/ 之外的代码按 `bin/<它在 src/bin/ 下的路径>` 点名它的不减）。
++#   ② ③ 两类在任何一份 .rs 里有参数是算出来的 include 时一份都不减（拼出来的可能就是它们）。
+ # 登记只写整个 crates/，不按用例手列它读哪些文件：新加的共用文件（tests/common.rs、build.rs、新拆出的 crate）默认就在输入里。
+ 
+ class CrashCase:
+@@ -1158,16 +1214,16 @@
+         single_file = os.path.join(package_directory, "tests", case.target + ".rs")
+         directory_target = os.path.join(package_directory, "tests", case.target)
+         raise RegistrationError(f"崩溃枚举用例 {case.key} 的测试目标 {case.target} 不在（没有 {single_file}，也没有 {directory_target}/main.rs）")
+-    for relative in files:
+-        with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+-            attributes = attributes_before_function(rust_code_without_comments(handle.read()), case.function)
+-        if attributes is None:
+-            continue
+-        if not attributes_mark_ignored(attributes):
+-            raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 没标 #[ignore]（{relative}）：不带 --ignored 的 "
+-                                    "cargo test 也会跑到全量；给它补上 #[ignore = \"<为什么平时不跑>\"]")
+-        return files
+-    raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 在 {'、'.join(files)} 里找不到（改了名？）")
++    marks = definitions_marked_ignored(root, files, case.function)
++    if not marks:
++        raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 在 {'、'.join(files)} 里找不到字面的 fn {case.function}(："
++                                "改了名？宏生成的用例判不出标没标 #[ignore]，要写成字面的函数")
++    unmarked = [relative for relative, marked in marks if not marked]
++    if unmarked:
++        raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 有 {len(unmarked)} 处定义没标 #[ignore]（{'、'.join(unmarked)}；"
++                                f"共 {len(marks)} 处，cfg 二选一的、子模块里同名的都算）：不带 --ignored 的 cargo test 也会跑到全量；"
++                                "给每一处补上 #[ignore = \"<为什么平时不跑>\"]")
++    return files
+ 
+ 
+ def rust_code_without_comments(text):
+@@ -1264,45 +1320,62 @@
+     return spans
+ 
+ 
+-def attributes_before_function(code, function):
+-    """去掉注释之后的代码里 `fn <function>(` 前面紧挨着的那串属性（原文，一条一个，按出现的次序）；没有这个函数交 None。
+-    属性与 fn 之间可以夹 pub、pub(…)、async、unsafe、const、extern "…"。"""
+-    found = re.search(r"\bfn\s+" + re.escape(function) + r"\s*\(", code)
+-    if not found:
+-        return None
+-    head = code[:found.start()].rstrip()
+-    while True:
+-        qualifier = FUNCTION_QUALIFIER_AT_END.search(head)
+-        if not qualifier:
++def attributes_before_each_definition(code, function):
++    """去掉注释之后的代码里每一处 `fn <function>(`（cfg 二选一的、子模块里同名的都算，按出现的次序）前面紧挨着的那串属性：
++    [[属性原文，一条一个，按出现的次序], …]；一处都没有交空表。属性与 fn 之间可以夹 pub、pub(…)、async、unsafe、const、extern "…"。
++    弄坏开关 first-definition-only 下只交第一处。"""
++    attribute_lists = []
++    for found in re.finditer(r"\bfn\s+" + re.escape(function) + r"\s*\(", code):
++        head = code[:found.start()].rstrip()
++        while True:
++            qualifier = FUNCTION_QUALIFIER_AT_END.search(head)
++            if not qualifier:
++                break
++            head = head[:qualifier.start()].rstrip()
++        start_of_attribute_ending_at = {end: start for start, end in attribute_spans(head)}
++        attributes = []
++        cursor = len(head)
++        while cursor in start_of_attribute_ending_at:
++            start = start_of_attribute_ending_at[cursor]
++            attributes.append(head[start:cursor])
++            cursor = len(head[:start].rstrip())
++        attribute_lists.append(list(reversed(attributes)))
++        if break_is_set("first-definition-only"):
+             break
+-        head = head[:qualifier.start()].rstrip()
+-    start_of_attribute_ending_at = {end: start for start, end in attribute_spans(head)}
+-    attributes = []
+-    cursor = len(head)
+-    while cursor in start_of_attribute_ending_at:
+-        start = start_of_attribute_ending_at[cursor]
+-        attributes.append(head[start:cursor])
+-        cursor = len(head[:start].rstrip())
+-    return list(reversed(attributes))
++    return attribute_lists
+ 
+ 
+ def attributes_mark_ignored(attributes):
+-    """那串属性里有没有 #[ignore] 或 #[ignore = "…"]。"""
+-    return any(IGNORE_ATTRIBUTE_FORM.match(attribute) for attribute in attributes)
++    """那串属性里有没有 #[ignore] 或 #[ignore = "…"]（# 与 [ 之间许空白）。"""
++    form = IGNORE_ATTRIBUTE_FORM_WITHOUT_SPACE if break_is_set("ignore-attribute-without-space") else IGNORE_ATTRIBUTE_FORM
++    return any(form.match(attribute) for attribute in attributes)
++
++
++def definitions_marked_ignored(root, relative_files, function):
++    """测试目标的源文件（relative_files，相对 root）里每一处 `fn <function>(` 标没标 #[ignore]：[(文件, 标了?)]，按文件与出现的次序；
++    一处都没有交空表，读不了抛 OSError。弄坏开关 first-definition-only 下只看头一份有定义的文件里的第一处。"""
++    marks = []
++    for relative in relative_files:
++        with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
++            attribute_lists = attributes_before_each_definition(rust_code_without_comments(handle.read()), function)
++        marks += [(relative, attributes_mark_ignored(attributes)) for attributes in attribute_lists]
++        if marks and break_is_set("first-definition-only"):
++            break
++    return marks
+ 
+ 
+ def test_function_is_marked_ignored(root, package_directory, target, function):
+-    """root 底下包目录 package_directory（相对 root）里测试目标 target 的用例函数 function 标没标 #[ignore]：标了 True，没标 False，
+-    目标不在、读不了、没有这个函数交 None。.claude/hooks/lib_heavy_tests.py（重型测试闸）按文件路径导入本模块调它，与 crash-cases 自查同一套判法。"""
+-    for relative in test_target_source_files(root, package_directory, target):
+-        try:
+-            with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+-                attributes = attributes_before_function(rust_code_without_comments(handle.read()), function)
+-        except OSError:
+-            return None
+-        if attributes is not None:
+-            return attributes_mark_ignored(attributes)
+-    return None
++    """root 底下包目录 package_directory（相对 root）里测试目标 target 的用例函数 function 标没标 #[ignore]：同名的每一处定义都标了 True，
++    有一处没标 False，目标不在、读不了、一处定义都找不到（宏生成的用例这一类）交 None。
++    .claude/hooks/lib_heavy_tests.py（重型测试闸）按文件路径导入本模块调它，与 crash-cases 自查同一套判法；闸把 None 按没标算。"""
++    files = test_target_source_files(root, package_directory, target)
++    try:
++        marks = definitions_marked_ignored(root, files, function)
++    except OSError:
++        return None
++    if not marks:
++        return None
++    return all(marked for _relative, marked in marks)
+ 
+ 
+ def whole_word_form(word):
+@@ -1378,12 +1451,12 @@
+     tests_word = whole_word_form("tests")
+     if any(tests_word.search(code_texts.get(name, "")) for name in build_script_names(root, package_directories, listed_set)):
+         return set()
+-    concatenating = [name for name, text in code_texts.items() if name.endswith(".rs") and COMPILE_TIME_CONCATENATED_INCLUDE.search(text)]
++    computing = files_with_computed_include(code_texts)
+     candidates = {}
+     for package_directory in package_directories:
+         if package_keeps_every_test_file(root, package_directory, listed_set):
+             continue
+-        if any(name.startswith(package_prefix(package_directory)) for name in concatenating):
++        if any(name.startswith(package_prefix(package_directory)) for name in computing):
+             continue
+         for target, files in test_targets_of_package(package_directory, listed_names).items():
+             if (os.path.normpath(package_directory), target) != (os.path.normpath(own_package_directory), own_target):
+@@ -1398,9 +1471,18 @@
+     return exclusive
+ 
+ 
++def files_with_computed_include(code_texts):
++    """code_texts 里有 include! / include_str! / include_bytes! 的参数是算出来的（不以字符串字面量开头）的 .rs：路径的清单。"""
++    form = COMPILE_TIME_CONCATENATED_INCLUDE_ONLY if break_is_set("concat-include-only") else COMPILE_TIME_COMPUTED_INCLUDE
++    return [name for name, text in code_texts.items() if name.endswith(".rs") and form.search(text)]
++
++
+ def files_crash_cases_do_not_read(root, listed_names, code_texts):
+-    """listed_names（仓根起的 str）里不是测试文件、用例也读不到的（str 的集合）：判法见本节开头的 ② ③。"""
++    """listed_names（仓根起的 str）里不是测试文件、用例也读不到的（str 的集合）：判法见本节开头的 ② ③。
++    任何一份 .rs 里有算出来的 include（files_with_computed_include）时一份都不减：它拼出来的可能就是 mutations.tsv 或 src/bin/ 下的文件。"""
+     listed_set = set(listed_names)
++    if files_with_computed_include(code_texts) and not break_is_set("computed-include-subtracts-non-test-files"):
++        return set()
+     left_out = {name for name in CRASH_CASE_FILES_NOT_READ
+                 if name in listed_set and not any(os.path.basename(name) in text for text in code_texts.values())}
+     if any(BIN_EXECUTABLE_VARIABLE_PREFIX in text for text in code_texts.values()):
+@@ -1524,9 +1606,28 @@
+         else:
+             thread_notes.append(note)
+     recorded_lines += ["parallel_finished=" + line for line in log_lines if line.startswith(LAYER0_PARALLEL_FINISHED_PREFIX)]
++    if not break_is_set("single-worker-threads-field"):
++        recorded_lines.append("started_worker_threads=" + started_worker_threads_text(case, thread_notes))
+     return problems, recorded_lines, thread_notes
+ 
+ 
++def started_worker_threads_text(case, thread_notes):
++    """全绿标记里「实际起的工作线程」那一格：登记了 threads= 的取判线程那几句（LAYER0_PARALLEL_FINISHED 里记的 worker_threads），
++    没登记的写「读不到」——配的是几个另记在 configured_worker_threads=，那不是起了几个。"""
++    if thread_notes:
++        return "；".join(thread_notes)
++    if case.thread_lines:
++        return "读不到：日志没判绿，线程那一格没判"
++    return ("读不到：这条用例没登记 threads=，门禁不读它起了几个工作线程（配的线程数在 configured_worker_threads=，不是起了几个；"
++            "日志里有 LAYER0_PARALLEL_FINISHED 的另原样记在 parallel_finished=）")
++
++
++def configured_worker_threads_text(machine_cores, threads, threads_origin):
++    """全绿标记里「配的线程数」那一格：传给用例的 SINGLEFS_LAYER0_THREADS、它是显式设的还是取的本机核数、本机几核。"""
++    origin = "显式设的" if threads_origin == "explicit" else "没设，取本机核数"
++    return f"SINGLEFS_LAYER0_THREADS={threads}（{origin}），本机 {machine_cores} 核"
++
++
+ def read_crash_case_marker(path):
+     """全绿标记的 key=value 行、原样的计数行与 input_file 行；读不了返回 None。"""
+     try:
+@@ -1635,6 +1736,109 @@
+     return marker_path
+ 
+ 
++def crash_case_worker_threads(environment):
++    """--full 跑崩溃枚举用例的线程数：(本机核数, 线程数, "explicit" 或 "default")。SINGLEFS_LAYER0_THREADS 设了（非空）就用它，
++    没设取本机核数；本机核数取 nproc（在 environment 的 PATH 里找，它认 OMP_NUM_THREADS 与 CPU 亲和）。
++    nproc 起不来、打的不是正整数，SINGLEFS_LAYER0_THREADS 不是正整数，都抛 InputManifestError。"""
++    nproc = shutil.which("nproc", path=environment.get("PATH")) or "nproc"
++    try:
++        completed = subprocess.run([nproc], capture_output=True, text=True, errors="replace", env=dict(environment))
++    except OSError as error:
++        raise InputManifestError(f"nproc 起不来：{error}") from error
++    cores_text = completed.stdout.strip()
++    if completed.returncode != 0 or not POSITIVE_INTEGER_FORM.fullmatch(cores_text):
++        raise InputManifestError(f"nproc 退 {completed.returncode}、打了「{cores_text}」，不是正整数")
++    configured = environment.get(LAYER0_THREADS_VARIABLE, "")
++    if not configured:
++        return int(cores_text), int(cores_text), "default"
++    if not POSITIVE_INTEGER_FORM.fullmatch(configured):
++        raise InputManifestError(f"{LAYER0_THREADS_VARIABLE}={configured} 不是正整数")
++    return int(cores_text), int(configured), "explicit"
++
++
++def crash_case_launch(root, case, fingerprint, start_over, environment):
++    """--full 跑一条崩溃枚举用例的命令与环境（门禁 54 号原样执行；54 号不进指纹，这一段在判法摘要里）：
++    返回 (本机核数, 线程数, "explicit" 或 "default", 续跑的进度目录, 整条命令的词)。
++    命令是 env 设好续跑的三个变量与线程数再起 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture：
++    进度目录 <git common-dir>/singlefs-layer0-progress/<这批输入的指纹>、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<指纹>；start_over 时
++    SINGLEFS_LAYER0_START_OVER=1，不然从调用方的环境里清掉它。取不到 common-dir、线程数取不到抛 InputManifestError。"""
++    common_directory = git_common_directory(root)
++    if common_directory is None:
++        raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），续跑的进度文件没处放")
++    machine_cores, threads, threads_origin = crash_case_worker_threads(environment)
++    progress_directory = os.path.join(common_directory, LAYER0_PROGRESS_DIRECTORY_NAME, fingerprint)
++    start_over_setting = [f"{LAYER0_START_OVER_VARIABLE}=1"] if start_over else ["-u", LAYER0_START_OVER_VARIABLE]
++    command = ["env", *start_over_setting, f"SINGLEFS_LAYER0_PROGRESS_DIRECTORY={progress_directory}",
++               f"SINGLEFS_LAYER0_INPUT_FINGERPRINT={fingerprint}", f"{LAYER0_THREADS_VARIABLE}={threads}",
++               "cargo", "test", "--release", "-p", case.package, "--test", case.target,
++               "--", "--include-ignored", "--exact", case.function, "--nocapture"]
++    return machine_cores, threads, threads_origin, progress_directory, command
++
++
++def top_level_definitions(tree):
++    """模块级的 def、class 与赋值：名字 → [节点]（同名的几处都留着）。"""
++    definitions = {}
++    for node in tree.body:
++        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
++            definitions.setdefault(node.name, []).append(node)
++        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
++            for target in (node.targets if isinstance(node, ast.Assign) else [node.target]):
++                if isinstance(target, ast.Name):
++                    definitions.setdefault(target.id, []).append(node)
++    return definitions
++
++
++def source_of_node(lines, node):
++    """一个模块级节点的原文（连同它的装饰器）。"""
++    first = min([node.lineno] + [decorator.lineno for decorator in getattr(node, "decorator_list", [])])
++    return "\n".join(lines[first - 1:node.end_lineno])
++
++
++def crash_case_judging_digest_text(source):
++    """准入模块 source 里崩溃枚举用例的判法摘要原文：返回 (原文的 bytes, 闭包里定义的个数)。
++    从 CRASH_CASE_JUDGING_ENTRIES 与分派表 COMMANDS 里 CRASH_CASE_JUDGING_SUBCOMMANDS 那几项指的函数起，顺着 ast 里引用的模块级名字
++    （def、class、赋值）求闭包；闭包里每个定义的原文按名字排好，再加分派表那几项（子命令 → 函数）、main 与 `if __name__` 那一段的原文
++    （这两样不往下顺：main 引自证，顺下去自证就进来了）。闭包之外的部分（实验准入、门禁复用、排除法、构建环境、自证）改了摘要不变。
++    分派表里少了那几项的，抛 InputManifestError。弄坏开关 whole-module-in-judging-digest 下原文是整份模块，judging-digest-without-dispatch 下不加分派那几项。"""
++    if break_is_set("whole-module-in-judging-digest"):
++        return source.encode("utf-8", "surrogateescape"), 0
++    tree = ast.parse(source)
++    lines = source.split("\n")
++    definitions = top_level_definitions(tree)
++    dispatch = {}
++    for node in definitions.get("COMMANDS", []):
++        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
++            for key, value in zip(node.value.keys, node.value.values):
++                if isinstance(key, ast.Constant) and key.value in CRASH_CASE_JUDGING_SUBCOMMANDS:
++                    dispatch[key.value] = ast.unparse(value)
++    missing = [name for name in CRASH_CASE_JUDGING_SUBCOMMANDS if name not in dispatch]
++    if missing:
++        raise InputManifestError(f"准入模块的分派表 COMMANDS 里没有 {'、'.join(missing)}：判法摘要算不全")
++    wanted = set()
++    queue = [name for name in CRASH_CASE_JUDGING_ENTRIES + tuple(dispatch.values()) if name in definitions]
++    while queue:
++        name = queue.pop()
++        if name in wanted or name in CRASH_CASE_JUDGING_LEAVES:
++            continue
++        wanted.add(name)
++        for node in definitions[name]:
++            queue += [inner.id for inner in ast.walk(node) if isinstance(inner, ast.Name) and inner.id in definitions and inner.id not in wanted]
++    pieces = [f"## {name}\n" + "\n".join(source_of_node(lines, node) for node in definitions[name]) for name in sorted(wanted)]
++    if not break_is_set("judging-digest-without-dispatch"):
++        pieces.append("## 分派\n" + "".join(f"{name} → {dispatch[name]}\n" for name in CRASH_CASE_JUDGING_SUBCOMMANDS))
++    pieces += [f"## {name}\n" + "\n".join(source_of_node(lines, node) for node in definitions.get(name, [])) for name in CRASH_CASE_JUDGING_LEAVES]
++    pieces += ["## 入口\n" + source_of_node(lines, node) for node in tree.body
++               if isinstance(node, ast.If) and "__name__" in ast.unparse(node.test)]
++    return "\n".join(pieces).encode("utf-8", "surrogateescape"), len(wanted)
++
++
++def crash_case_judging_digest_line():
++    """清单末尾那一行「判法摘要」：(名字, 原文)。原文取正在跑的这一份准入模块（__file__）。"""
++    with open(os.path.abspath(__file__), encoding="utf-8", errors="surrogateescape") as handle:
++        text, _count = crash_case_judging_digest_text(handle.read())
++    return (CRASH_CASE_JUDGING_DIGEST_NAME, text)
++
++
+ # ── 命令行 ────────────────────────────────────────────────────────────────────
+ 
+ def command_gate_reuse(arguments):
+@@ -1709,6 +1913,8 @@
+             named_lines.append(toolchain_line(root))
+         elif kind == "--build-environment":
+             named_lines.extend(build_environment_lines(root))
++        elif kind == "--judging-digest":
++            named_lines.append(crash_case_judging_digest_line())
+         else:
+             named_lines.append(registration_line)
+     return named_lines
+@@ -1813,16 +2019,18 @@
+ 
+ 
+ def command_crash_case_manifest(arguments):
+-    requested = named_line_requests(arguments[3:], ("--toolchain", "--build-environment")) if len(arguments) >= 3 else None
++    requested = (named_line_requests(arguments[3:], ("--toolchain", "--build-environment", "--judging-digest")) if len(arguments) >= 3
++                 else None)
+     if requested is None:
+-        print("  ✗ 用法：admission.py crash-case-manifest <项目根> <键> <清单文件> [--extra-file <名字> <文件>]... [--toolchain] [--build-environment]")
++        print("  ✗ 用法：admission.py crash-case-manifest <项目根> <键> <清单文件> [--extra-file <名字> <文件>]... [--judging-digest] [--toolchain] "
++              "[--build-environment]")
+         print("     → 怎么办：键照 .claude/gate.d/stage-inputs.tsv 里 crash-case: 开头的那一行写；末尾那几行按参数次序加")
+         return EXIT_REGISTRATION_ERROR
+     root, key, manifest_file = arguments[0], arguments[1], arguments[2]
+     try:
+         case = crash_case_of_key(read_registration_rows(root), key)
+         manifest, fingerprint, file_count, excluded = crash_case_manifest(root, case, named_lines_of(root, requested))
+-    except (RegistrationError, InputManifestError, OSError) as error:
++    except (RegistrationError, InputManifestError, OSError, SyntaxError) as error:
+         print(f"写不出 {key} 的输入清单：{error}")
+         return EXIT_REGISTRATION_ERROR
+     with open(manifest_file, "wb") as handle:
+@@ -1891,13 +2099,35 @@
+     return 0
+ 
+ 
++def command_crash_case_command(arguments):
++    """--full 跑一条崩溃枚举用例的命令与环境（crash_case_launch），stdout 以 NUL 分隔：本机核数、线程数、explicit 或 default、续跑的进度目录，
++    其后是整条命令的词。有错退 2，原因打在 stdout（不带 ✗，54 号自己打 ✗ 与出路）。"""
++    start_over = arguments[3:] == ["--start-over"]
++    if len(arguments) not in (3, 4) or (len(arguments) == 4 and not start_over) or not re.fullmatch(r"[0-9a-f]{64}", arguments[2] if len(arguments) > 2 else ""):
++        print("  ✗ 用法：admission.py crash-case-command <项目根> <键> <输入指纹> [--start-over]")
++        print("     → 怎么办：指纹取开跑时 crash-case-manifest 那一趟的（64 位十六进制）；要丢掉进度文件、从头跑才带 --start-over")
++        return EXIT_REGISTRATION_ERROR
++    root, key, fingerprint = arguments[:3]
++    try:
++        case = crash_case_of_key(read_registration_rows(root), key)
++        machine_cores, threads, threads_origin, progress_directory, command = crash_case_launch(root, case, fingerprint, start_over, os.environ)
++    except (RegistrationError, InputManifestError) as error:
++        print(f"交不出 {key} 的命令：{error}")
++        return EXIT_REGISTRATION_ERROR
++    words = [str(machine_cores), str(threads), threads_origin, progress_directory, *command]
++    sys.stdout.write("".join(word + "\0" for word in words))
++    return 0
++
++
+ def command_crash_case_record(arguments):
+-    names = ("--files", "--excluded", "--started", "--judged-root", "--threads-text")
++    names = ("--files", "--excluded", "--started", "--judged-root", "--machine-cores", "--threads", "--threads-origin")
+     values = option_values(arguments[5:], names) if len(arguments) >= 5 else None
+-    if values is None or set(values) != set(names):
++    if (values is None or set(values) != set(names) or not values["--machine-cores"].isdigit() or not values["--threads"].isdigit()
++            or values["--threads-origin"] not in ("explicit", "default")):
+         print("  ✗ 用法：admission.py crash-case-record <项目根> <键> <指纹> <清单文件> <记录行文件> --files <数> --excluded <数> "
+-              "--started <时刻> --judged-root <路径> --threads-text <一句>")
+-        print("     → 怎么办：指纹、清单文件、文件数与减去的文件数取开跑时 crash-case-manifest 那一趟的，记录行文件取 crash-case-judge 写的")
++              "--started <时刻> --judged-root <路径> --machine-cores <核数> --threads <线程数> --threads-origin explicit|default")
++        print("     → 怎么办：指纹、清单文件、文件数与减去的文件数取开跑时 crash-case-manifest 那一趟的，记录行文件取 crash-case-judge 写的，"
++              "核数、线程数与 explicit|default 取 crash-case-command 交的前三个")
+         return EXIT_REGISTRATION_ERROR
+     root, key, fingerprint, manifest_file, recorded_file = arguments[:5]
+     try:
+@@ -1906,9 +2136,11 @@
+             manifest_text = handle.read()
+         with open(recorded_file, encoding="utf-8", errors="surrogateescape") as handle:
+             recorded_lines = [line for line in handle.read().split("\n") if line]
++        configured = configured_worker_threads_text(values["--machine-cores"], values["--threads"], values["--threads-origin"])
++        thread_field = ("worker_threads", configured) if break_is_set("single-worker-threads-field") else ("configured_worker_threads", configured)
+         details = [("input_file_count", values["--files"]), ("excluded_file_count", values["--excluded"]),
+                    ("started_utc", values["--started"]), ("finished_utc", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+-                   ("judged_root", values["--judged-root"]), ("worker_threads", values["--threads-text"])]
++                   ("judged_root", values["--judged-root"]), thread_field]
+         marker_path = write_crash_case_marker(root, case, fingerprint, manifest_text, recorded_lines, details)
+     except (RegistrationError, InputManifestError, OSError) as error:
+         print(f"{key} 的全绿标记没写成：{error}")
+@@ -2147,6 +2379,7 @@
+         run_rust_comment_cells(selftest)
+         run_crash_case_input_cells(selftest, module)
+         run_crash_case_log_cells(selftest)
++        run_judging_digest_cells(selftest, module)
+         # ⑯ 门禁 54 号这一份的流程：拷进临时仓（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑
+         run_layer0_stage_cells(selftest, module)
+ 
+@@ -2162,7 +2395,9 @@
+         print("     → 怎么办：照上面每一格的说明改被测的那一段；判据与为什么这么定见文件头。弄坏开关那几格红不了，说明那一格分不出差别")
+         return 1
+     print(f"  ✓ admission.py 自证通过：{selftest.checked} 格都对（含弄坏开关 skip-unchanged、skip-preconditions、skip-gate-preconditions、"
+-          "ignore-gate-environment、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count "
++          "ignore-gate-environment、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count、"
++          "first-definition-only、ignore-attribute-without-space、concat-include-only、computed-include-subtracts-non-test-files、runner-program-only、"
++          "whole-module-in-judging-digest、judging-digest-without-dispatch、single-worker-threads-field "
+           "下各自那一格转红，弄坏 replay.sh 比对前删产物头那一步判对不上）")
+     return 0
+ 
+@@ -2568,13 +2803,21 @@
+         for label, changes in [("环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER（值带参数）",
+                                 {"CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER": program + " --flag"}),
+                                ("环境变量 RUSTC_WRAPPER", {"RUSTC_WRAPPER": program}),
+-                               ("环境变量 CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER（不带斜杠、在 PATH 里找）", {"CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER": "selftest-runner"})]:
++                               ("环境变量 CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER（不带斜杠、在 PATH 里找）", {"CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER": "selftest-runner"}),
++                               ("环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=bash <脚本>（首词是解释器，脚本在参数里）",
++                                {"CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER": "bash " + program})]:
+             before, after = program_edit_fingerprints(changes)
+             selftest.expect(f"构建环境：{label}指的程序换了内容、值不变，指纹变", before != after and not before.startswith("退"),
+                             f"换之前 {before[:16]}，换之后 {after[:16]}")
++        broken_before, broken_after = program_edit_fingerprints({"CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER": "bash " + program,
++                                                                 BREAK_VARIABLE: "runner-program-only"})
++        selftest.expect("弄坏开关 runner-program-only 下「runner = bash <脚本>，脚本换了内容」那一格红（指纹不变）", broken_before == broken_after,
++                        f"弄坏之后仍然变了：{broken_before[:16]} → {broken_after[:16]}")
+         repository_configuration = os.path.join(work, ".cargo/config.toml")
+         for label, configuration_text in [
+                 ("仓根 .cargo/config.toml 里 target.<三元组>.runner", f'[target.x86_64-unknown-linux-gnu]\nrunner = ["{program}", "--flag"]\n'),
++                ("仓根 .cargo/config.toml 里 target.<三元组>.runner = [\"bash\", <从 .cargo 那一层起的相对路径>]",
++                 f'[target.x86_64-unknown-linux-gnu]\nrunner = ["bash", "{os.path.relpath(program, work)}"]\n'),
+                 ("仓根 .cargo/config.toml 里 build.rustc-wrapper（从 .cargo 所在的那一层起的相对路径）",
+                  f'[build]\nrustc-wrapper = "{os.path.relpath(program, work)}"\n')]:
+             write_text(repository_configuration, configuration_text)
+@@ -2740,6 +2983,9 @@
+         with open(own_case_path, encoding="utf-8") as handle:
+             own_case_text = handle.read()
+         modules = "mod common;\nmod helper_target;\n"
++        cfg_split_case = "#[cfg(debug_assertions)]\n#[test]\n#[ignore]\nfn the_case() {}\n#[cfg(not(debug_assertions))]\n#[test]\nfn the_case() {}\n"
++        submodule_first_case = "mod slow {\n    #[test]\n    #[ignore]\n    fn the_case() {}\n}\n#[test]\nfn the_case() {}\n"
++        spaced_ignore_case = "#[test]\n# [ignore]\nfn the_case() {}\n"
+         ignore_cells = [
+             ("用例函数没标 #[ignore]", modules + "#[test]\nfn the_case() {}\n", False),
+             ("只有 cfg_attr 里的条件 ignore", modules + "#[test]\n#[cfg_attr(miri, ignore)]\nfn the_case() {}\n", False),
+@@ -2747,6 +2993,10 @@
+             ("#[ignore] 只写在注释里", modules + "#[test]\n// #[ignore]\nfn the_case() {}\n", False),
+             ("#[ignore] 在 #[test] 前面、fn 前面有 pub", modules + "#[ignore]\n#[test]\npub fn the_case() {}\n", True),
+             ("ignore 的理由里带方括号、引号与 //", modules + '#[test]\n#[ignore = "样本 [x] \\"y\\" // z"]\nfn the_case() {}\n', True),
++            ("同名函数 cfg 二选一：debug 那一份标 ignore、release 那一份不标", modules + cfg_split_case, False),
++            ("子模块里同名标 ignore 的写在前面、顶层那一份（--exact the_case 跑的）不标", modules + submodule_first_case, False),
++            ("# [ignore]（# 与 [ 之间有空格，rustc 认）", modules + spaced_ignore_case, True),
++            ("同名的两处都标了 ignore（cfg 二选一）", modules + cfg_split_case.replace("#[test]\nfn the_case", "#[test]\n#[ignore]\nfn the_case"), True),
+         ]
+         for label, source_text, marked in ignore_cells:
+             write_text(own_case_path, source_text)
+@@ -2754,6 +3004,14 @@
+             green = exit_code == 0 if marked else (exit_code == EXIT_REGISTRATION_ERROR and "没标 #[ignore]" in output)
+             selftest.expect(f"crash-cases 自查：{label} ⇒ {'退 0' if marked else '退 2 并说没标 #[ignore]'}", green,
+                             f"退 {exit_code}，stdout「{output.strip()}」")
++        for switch, label, source_text, broken_exit_code in (
++                ("first-definition-only", "同名函数 cfg 二选一、一份不标", modules + cfg_split_case, 0),
++                ("first-definition-only", "子模块里同名标 ignore 的写在前面、顶层那一份不标", modules + submodule_first_case, 0),
++                ("ignore-attribute-without-space", "# [ignore]", modules + spaced_ignore_case, EXIT_REGISTRATION_ERROR)):
++            write_text(own_case_path, source_text)
++            exit_code, output, _messages = admission("crash-cases", work, changes={BREAK_VARIABLE: switch})
++            selftest.expect(f"弄坏开关 {switch} 下「{label}」那一格红（crash-cases 退 {broken_exit_code}）", exit_code == broken_exit_code,
++                            f"弄坏之后退 {exit_code}：这一格分不出差别；stdout「{output.strip()}」")
+         write_text(own_case_path, own_case_text)
+ 
+         # 认得出形状、认不出读的是哪一份的按宽处理：包里 include!(concat!(…))、任何一个包的构建脚本出现整词 tests ⇒ 改 other_target.rs 指纹变
+@@ -2764,9 +3022,16 @@
+         two_members = '[workspace]\nmembers = ["crates/pkg", "crates/gen"]\n'
+         gen_package = '[package]\nname = "gen"\nversion = "0.0.0"\n'
+         reads_tests = 'fn main() { let _ = std::fs::read_dir("../pkg/tests"); }\n'
++        qualified_include = ('const PIECE: &str = ::core::include_str!(::core::concat!(env!("CARGO_MANIFEST_DIR"), "/tests/oth", '
++                             '"er_target.rs"));\n')
++        environment_include = 'const PIECE: &str = include_str!(env!("SAMPLE_FIXTURE"));\n'
+         wide_cells = [
+             ("用例里 include!(concat!(\"other_\", \"target.rs\"))", {"crates/pkg/tests/own_case.rs": own_case_text + 'include!(concat!("other_", "target.rs"));\n'},
+              True),
++            ("用例里 ::core::include_str!(::core::concat!(…))（宏名带路径）", {"crates/pkg/tests/own_case.rs": own_case_text + qualified_include}, True),
++            ("用例里 include_str!(env!(\"…\"))（路径在构建环境里）", {"crates/pkg/tests/own_case.rs": own_case_text + environment_include}, True),
++            ("对照：用例里 include_str!(\"helper_target.rs\")（字面量，读的是哪一份认得出）",
++             {"crates/pkg/tests/own_case.rs": own_case_text + 'const PIECE: &str = include_str!("helper_target.rs");\n'}, False),
+             ("别的包的 build.rs 按目录读 ../pkg/tests", {"Cargo.toml": two_members, "crates/gen/Cargo.toml": gen_package, "crates/gen/src/lib.rs": "",
+                                                     "crates/gen/build.rs": reads_tests}, True),
+             ("别的包 package.build 指的构建脚本按目录读 tests", {"Cargo.toml": two_members, "crates/gen/Cargo.toml": gen_package + 'build = "generate.rs"\n',
+@@ -2786,6 +3051,14 @@
+             shutil.rmtree(os.path.join(work, "crates/gen"), ignore_errors=True)
+             selftest.expect(f"崩溃枚举用例的输入：{label}，改 other_target.rs 指纹{'变' if should_move else '不变'}",
+                             (before != after) == should_move and not before.startswith("退"), f"改之前 {before[:16]}，改之后 {after[:16]}")
++        write_text(own_case_path, own_case_text + qualified_include)
++        broken_before, _count = fingerprint({BREAK_VARIABLE: "concat-include-only"})
++        write_text(other_target_path, "#[test]\nfn other() { assert!(true); }\n")
++        broken_after, _count = fingerprint({BREAK_VARIABLE: "concat-include-only"})
++        write_text(other_target_path, "#[test]\nfn other() {}\n")
++        write_text(own_case_path, own_case_text)
++        selftest.expect("弄坏开关 concat-include-only 下「::core::include_str!(::core::concat!(…))」那一格红（改 other_target.rs 指纹不变）",
++                        broken_before == broken_after, f"弄坏之后仍然变了：{broken_before[:16]} → {broken_after[:16]}")
+ 
+         # 用例读不到的非测试文件：crates/mutations.tsv 与（没有代码读 CARGO_BIN_EXE_ 时）src/bin/ 下的，改了指纹不变；有代码点名它们时照留
+         lib_path = os.path.join(work, "crates/pkg/src/lib.rs")
+@@ -2793,6 +3066,7 @@
+             lib_text = handle.read()
+         table_versions = ("# 样本变异表\n", "# 样本变异表\n多一行\n")
+         tool_versions = ("fn main() {}\n", "fn main() { let changed = 1; }\n")
++        concatenated_table_include = 'const TABLE_TEXT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../mutations", ".tsv"));\n'
+         not_read_cells = [
+             ("crates/mutations.tsv 加一行（没有代码点名它）", {}, "crates/mutations.tsv", table_versions, False),
+             ("lib.rs 的字符串里点名 mutations.tsv 时，crates/mutations.tsv 加一行", {"crates/pkg/src/lib.rs": lib_text + 'pub const TABLE: &str = "../mutations.tsv";\n'},
+@@ -2802,6 +3076,11 @@
+              "crates/pkg/src/bin/tool.rs", tool_versions, True),
+             ("lib.rs 用 #[path = \"bin/tool.rs\"] 把它编进来时，src/bin/tool.rs 改了", {"crates/pkg/src/lib.rs": lib_text + '#[path = "bin/tool.rs"]\nmod tool;\n'},
+              "crates/pkg/src/bin/tool.rs", tool_versions, True),
++            ("用例里 include_str!(concat!(…)) 拼出 ../mutations.tsv 时，crates/mutations.tsv 加一行",
++             {"crates/pkg/tests/own_case.rs": own_case_text + concatenated_table_include}, "crates/mutations.tsv", table_versions, True),
++            ("用例里 include!(concat!(…)) 拼出 src/bin/tool.rs 时，src/bin/tool.rs 改了",
++             {"crates/pkg/tests/own_case.rs": own_case_text + 'mod tool_code { include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/bin/", "tool.rs")); }\n'},
++             "crates/pkg/src/bin/tool.rs", tool_versions, True),
+         ]
+         for label, setup, relative, (first_text, second_text), should_move in not_read_cells:
+             for setup_relative, content in setup.items():
+@@ -2815,6 +3094,15 @@
+             write_text(lib_path, lib_text)
+             selftest.expect(f"崩溃枚举用例的输入：{label}，指纹{'变' if should_move else '不变'}", (before != after) == should_move and not before.startswith("退"),
+                             f"改之前 {before[:16]}，改之后 {after[:16]}")
++        write_text(own_case_path, own_case_text + concatenated_table_include)
++        write_text(os.path.join(work, "crates/mutations.tsv"), table_versions[0])
++        broken_before, _count = fingerprint({BREAK_VARIABLE: "computed-include-subtracts-non-test-files"})
++        write_text(os.path.join(work, "crates/mutations.tsv"), table_versions[1])
++        broken_after, _count = fingerprint({BREAK_VARIABLE: "computed-include-subtracts-non-test-files"})
++        os.remove(os.path.join(work, "crates/mutations.tsv"))
++        write_text(own_case_path, own_case_text)
++        selftest.expect("弄坏开关 computed-include-subtracts-non-test-files 下「include_str!(concat!(…)) 拼出 ../mutations.tsv」那一格红（指纹不变）",
++                        broken_before == broken_after, f"弄坏之后仍然变了：{broken_before[:16]} → {broken_after[:16]}")
+         restored_after_wide_cells, _count = fingerprint()
+         selftest.expect("崩溃枚举用例的输入：按宽处理与读不到的那几格改回之后，指纹回到原样", restored_after_wide_cells == baseline,
+                         f"原样 {baseline[:16]}，改回之后 {restored_after_wide_cells[:16]}")
+@@ -2824,10 +3112,24 @@
+         write_text(judged_file, "test_result=test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 1.00s\n"
+                                 "LAYER0 states=5 closed_form=5 exhaustive=true\nparallel_finished=LAYER0_PARALLEL_FINISHED states=5 slices=1\n")
+         fingerprint_now, _count = fingerprint()
+-        exit_code, marker_path, _messages = admission("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file,
+-                                                      "--files", "6", "--excluded", "1", "--started", "2026-09-26T00:00:00Z",
+-                                                      "--judged-root", work, "--threads-text", "样本")
++        record_arguments = ("crash-case-record", work, "crash-case:own", fingerprint_now, manifest_file, judged_file, "--files", "6", "--excluded", "1",
++                            "--started", "2026-09-26T00:00:00Z", "--judged-root", work, "--machine-cores", "32", "--threads", "7",
++                            "--threads-origin", "explicit")
++        exit_code, marker_path, _messages = admission(*record_arguments, changes={BREAK_VARIABLE: "single-worker-threads-field"})
++        with open(marker_path.strip(), encoding="utf-8") as handle:
++            broken_marker_lines = handle.read().split("\n")
++        selftest.expect("弄坏开关 single-worker-threads-field 下「配的与起的线程分两格记」那一格红（只剩一格 worker_threads=）",
++                        exit_code == 0 and any(line.startswith("worker_threads=") for line in broken_marker_lines)
++                        and not any(line.startswith("configured_worker_threads=") for line in broken_marker_lines),
++                        f"写退 {exit_code}，标记里 {[line for line in broken_marker_lines if 'threads' in line]}")
++        exit_code, marker_path, _messages = admission(*record_arguments)
+         marker_path = marker_path.strip()
++        with open(marker_path, encoding="utf-8") as handle:
++            marker_lines = handle.read().split("\n")
++        selftest.expect("crash-case-record 把配的线程数记成 configured_worker_threads=（线程数、显式设的、本机几核），不记旧的 worker_threads=",
++                        exit_code == 0 and "configured_worker_threads=SINGLEFS_LAYER0_THREADS=7（显式设的），本机 32 核" in marker_lines
++                        and not any(line.startswith("worker_threads=") for line in marker_lines),
++                        f"写退 {exit_code}，标记里 {[line for line in marker_lines if 'threads' in line]}")
+         exit_code_check, output, _messages = admission("crash-case-marker-check", work, "crash-case:own", fingerprint_now, manifest_file)
+         selftest.expect("crash-case-record 写的那一格，crash-case-marker-check 判作数并带出计数行",
+                         exit_code == 0 and os.path.isfile(marker_path) and exit_code_check == 0 and output.startswith(f"ok {marker_path} ")
+@@ -2906,6 +3208,84 @@
+             case, synthetic_layer0_log(worker_threads=1, resumed_slices=63, freshly_run_slices=1), 32, False)
+     selftest.expect("弄坏开关 threads-by-worker-count 下「只剩 1 片要跑、起 1 个线程」那一格红（照旧只看 worker_threads=1）", bool(problems),
+                     "弄坏之后仍判绿：这一格分不出「这一趟跑了几片」")
++    # 标记里「实际起的工作线程」那一格（started_worker_threads=）：登记了 threads= 的取 LAYER0_PARALLEL_FINISHED 里起了几个，没登记的写读不到
++    problems, recorded_lines, _notes = judge_crash_case_log(case, synthetic_layer0_log(worker_threads=24), 32, False)
++    started = [line for line in recorded_lines if line.startswith("started_worker_threads=")]
++    selftest.expect("判绿时记 started_worker_threads=：登记了 threads= 的记 LAYER0_PARALLEL_FINISHED 里起了几个（24 个，不是配的 32）",
++                    not problems and started == ["started_worker_threads=LAYER0：24 个工作线程跑了 64 片、从进度文件读回 0 片（共 64 片）"],
++                    f"判出 {problems}，记下 {started}")
++    unthreaded = parse_crash_case(RegistrationRow("crash-case:plain", ["crates/"], ["test=pkg:target:function", "count-line=PLAIN"], 1, ""))
++    problems, recorded_lines, _notes = judge_crash_case_log(unthreaded, "PLAIN states=4\n" + PASSED_ONE_LINE + "\n", 32, False)
++    started = [line for line in recorded_lines if line.startswith("started_worker_threads=")]
++    selftest.expect("判绿时记 started_worker_threads=：没登记 threads= 的记「读不到」（门禁不读它起了几个）",
++                    not problems and len(started) == 1 and started[0].startswith("started_worker_threads=读不到：这条用例没登记 threads="),
++                    f"判出 {problems}，记下 {started}")
++
++
++def edit_inside_definition(source, name, old, new):
++    """只在模块级定义 name（def、class 或赋值）的原文里把 old 换成 new，old 在那里要恰好一处；返回换过的整份源码。
++    自证拿它改准入模块自己的一份拷贝：只认那个定义里的那一处，自证里写着的同一串字不算。命中不是一处抛 ValueError。"""
++    nodes = top_level_definitions(ast.parse(source)).get(name, [])
++    if len(nodes) != 1:
++        raise ValueError(f"模块级定义 {name} 有 {len(nodes)} 处，要恰好一处")
++    lines = source.split("\n")
++    first = min([nodes[0].lineno] + [decorator.lineno for decorator in getattr(nodes[0], "decorator_list", [])])
++    head, body, tail = "\n".join(lines[:first - 1]), "\n".join(lines[first - 1:nodes[0].end_lineno]), "\n".join(lines[nodes[0].end_lineno:])
++    if body.count(old) != 1:
++        raise ValueError(f"{name} 里「{old}」有 {body.count(old)} 处，要恰好一处")
++    return head + "\n" + body.replace(old, new) + "\n" + tail
++
++
++# (说明, 改哪个模块级定义, 旧串, 新串, 判法摘要该不该变)：前四种是判法之外的改动（K4 那一轮量过它们让四条用例全重跑），后几种是判法本身
++JUDGING_DIGEST_VARIANTS = [
++    ("实验准入：admit_experiment 里加一行注释", "admit_experiment", "def admit_experiment(root, key):\n", "def admit_experiment(root, key):\n    # 样本\n",
++     False),
++    ("门禁复用：gate_reuse 的一句说明改字", "gate_reuse", "强制跑一趟", "强制跑一次", False),
++    ("自证：run_selftest 里加一行注释", "run_selftest", "def run_selftest():\n", "def run_selftest():\n    # 样本\n", False),
++    ("排除规则：files_crash_cases_do_not_read 里加一行注释（它的结果变了，清单自己会变）", "files_crash_cases_do_not_read",
++     "    listed_set = set(listed_names)\n", "    # 样本\n    listed_set = set(listed_names)\n", False),
++    ("判法：judge_worker_threads 把「至少两片」改成「至少三片」", "judge_worker_threads", "freshly_run_slices >= 2 and", "freshly_run_slices >= 3 and", True),
++    ("判法调的小函数：fields_of_line 改写法", "fields_of_line", "line.split()", 'line.split(" ")', True),
++    ("判法用的常量：PASSED_ONE_TEST_FORM 放宽", "PASSED_ONE_TEST_FORM", "1 passed", "[0-9]+ passed", True),
++    ("登记行怎么读：parse_crash_case 不再要求 exhaustive= / threads= 先登记成 count-line=", "parse_crash_case",
++     "if prefix not in count_lines]", "if False]", True),
++    ("起用例的命令：crash_case_launch 把 --include-ignored 换成 --ignored", "crash_case_launch", '"--include-ignored"', '"--ignored"', True),
++    ("标记里配的线程那一格：configured_worker_threads_text 改字", "configured_worker_threads_text", "本机 {machine_cores} 核", "{machine_cores} 核", True),
++    ("main：分派的写法改了", "main", "return COMMANDS[arguments[0]](arguments[1:])", "return COMMANDS[arguments[0]](arguments[2:])", True),
++]
++
++
++def run_judging_digest_cells(selftest, module):
++    """判法摘要（D2）：判法之外的改动摘要不变、判法（连同它调的小函数、常量、起用例的命令、main 与分派表那几项）改了摘要变；
++    两个弄坏开关下各自那一格转红。拿本模块自己的源码按 edit_inside_definition 改一份算，不动文件。"""
++    with open(module, encoding="utf-8") as handle:
++        source = handle.read()
++    baseline, definition_count = crash_case_judging_digest_text(source)
++    selftest.expect("判法摘要算得出来，闭包里有判日志、读写标记、起用例的命令与 crash-case-command 那几个定义",
++                    definition_count > 0 and all(f"## {name}\n".encode() in baseline for name in
++                                                 ("judge_crash_case_log", "crash_case_launch", "command_crash_case_command", "crash_case_marker_problems")),
++                    f"闭包 {definition_count} 个定义")
++    for label, name, old, new, should_change in JUDGING_DIGEST_VARIANTS:
++        try:
++            changed = crash_case_judging_digest_text(edit_inside_definition(source, name, old, new))[0]
++        except ValueError as error:
++            selftest.expect(f"判法摘要：{label} 这一格的改动做得出来", False, str(error))
++            continue
++        selftest.expect(f"判法摘要：{label} ⇒ 摘要{'变' if should_change else '不变'}", (changed != baseline) == should_change,
++                        f"摘要{'变了' if changed != baseline else '没变'}")
++    swapped = edit_inside_definition(source, "COMMANDS", '"crash-case-judge": command_crash_case_judge,\n    "crash-case-record": command_crash_case_record,',
++                                     '"crash-case-judge": command_crash_case_record,\n    "crash-case-record": command_crash_case_judge,')
++    selftest.expect("判法摘要：分派表里 crash-case-judge 与 crash-case-record 指的函数对调（闭包里的定义一个没变） ⇒ 摘要变",
++                    crash_case_judging_digest_text(swapped)[0] != baseline, "摘要没变：分派表那几项没进摘要")
++    with BreakSwitch("judging-digest-without-dispatch"):
++        broken_baseline, broken_swapped = crash_case_judging_digest_text(source)[0], crash_case_judging_digest_text(swapped)[0]
++    selftest.expect("弄坏开关 judging-digest-without-dispatch 下「分派表两项对调」那一格红（摘要没变）", broken_baseline == broken_swapped,
++                    "弄坏之后摘要照样变了：这一格分不出分派表进没进摘要")
++    commented = edit_inside_definition(source, "admit_experiment", "def admit_experiment(root, key):\n", "def admit_experiment(root, key):\n    # 样本\n")
++    with BreakSwitch("whole-module-in-judging-digest"):
++        broken_baseline, broken_commented = crash_case_judging_digest_text(source)[0], crash_case_judging_digest_text(commented)[0]
++    selftest.expect("弄坏开关 whole-module-in-judging-digest 下「实验准入加一行注释」那一格红（摘要变了）", broken_baseline != broken_commented,
++                    "弄坏之后摘要照样没变：这一格分不出摘要是不是整份模块")
+ 
+ 
+ # 假 cargo：-V 打版本；test 带 --include-ignored 的记下目标、过滤、续跑的三个环境变量，照控制目录里那条目标的日志与退出码打；
+@@ -2922,8 +3302,9 @@
+   elif [[ "$word" == --test ]]; then target="${arguments[position + 1]}"
+   elif [[ "$word" == --release ]]; then release=1; fi
+ done
+-printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$target" "$filter" "$include_ignored" "${SINGLEFS_LAYER0_PROGRESS_DIRECTORY-unset}" \
+-  "${SINGLEFS_LAYER0_INPUT_FINGERPRINT-unset}" "${SINGLEFS_LAYER0_START_OVER-unset}" "$exact" "$release" >> "$FAKE_CARGO_CONTROL/invocations"
++printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$target" "$filter" "$include_ignored" "${SINGLEFS_LAYER0_PROGRESS_DIRECTORY-unset}" \
++  "${SINGLEFS_LAYER0_INPUT_FINGERPRINT-unset}" "${SINGLEFS_LAYER0_START_OVER-unset}" "$exact" "$release" "${SINGLEFS_LAYER0_THREADS-unset}" \
++  >> "$FAKE_CARGO_CONTROL/invocations"
+ if (( ! include_ignored )); then echo "test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s"; exit 0; fi
+ if [[ -f "$FAKE_CARGO_CONTROL/touch-during-run" ]]; then
+   echo "// 跑的过程中改的" >> "$(cat "$FAKE_CARGO_CONTROL/touch-during-run")"
+@@ -2948,9 +3329,10 @@
+ 
+ def run_layer0_stage_cells(selftest, module):
+     """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 54-layer0-replay.sh），
+-    假 cargo、rustc、nproc 在 PATH 最前面。核：逐条跑、续跑的三个环境变量、判绿写标记、快档核标记、第二趟全复用、只重跑输入变了的那一条、
+-    --start-over、只剩 1 片要跑不误红、1 个线程跑了 64 片判红、0 passed 判红、cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、
+-    快档不带 SINGLEFS_GATE_FULL=1 时只改登记表、只改 54 号、只改准入模块照样核标记（不退 77）。"""
++    假 cargo、rustc、nproc 在 PATH 最前面。核：逐条跑、续跑的三个环境变量与线程数（由 crash-case-command 交出）、判绿写标记（线程分记配的与起的）、
++    快档核标记、第二趟全复用、只重跑输入变了的那一条、--start-over、显式设线程数、只剩 1 片要跑不误红、1 个线程跑了 64 片判红、0 passed 判红、
++    cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、快档不带 SINGLEFS_GATE_FULL=1 时只改登记表判红、只改 54 号与只改准入模块判法之外的部分
++    照样核标记而判绿（54 号不进指纹）、改准入模块的判法判红（都不退 77）。"""
+     repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
+     real_stage = os.path.join(repository_root, ".claude/gate.d/54-layer0-replay.sh")
+     work = tempfile.mkdtemp(prefix="admission-selftest-stage54-")
+@@ -2967,7 +3349,7 @@
+         write_text(os.path.join(work, REGISTRATION_TABLE), "".join(row + "\n" for row in rows))
+         os.makedirs(os.path.join(work, "research/scripts"))
+         shutil.copy(module, os.path.join(work, "research/scripts/admission.py"))
+-        for helper in ("stage-must-run.sh", "change-touches-crates.sh"):
++        for helper in ("stage-must-run.sh", "change-touches-crates.sh", "stage-run-or-skip.sh"):
+             shutil.copy(os.path.join(SELFTEST_HERE, helper), os.path.join(work, "research/scripts", helper))
+         stage_copy = os.path.join(work, ".claude/stage-under-test/54-layer0-replay.sh")
+         os.makedirs(os.path.dirname(stage_copy))
+@@ -3012,9 +3394,7 @@
+         def expected_fingerprint(key):
+             _exit_code, output, _messages = run_in_environment(
+                 [sys.executable, os.path.join(work, "research/scripts/admission.py"), "crash-case-manifest", work, key,
+-                 os.path.join(control, "expected-manifest"), "--extra-file", "<判它的 54 号：54-layer0-replay.sh>", stage_copy,
+-                 "--extra-file", "<判它的准入模块：admission.py>", os.path.join(work, "research/scripts/admission.py"),
+-                 "--toolchain", "--build-environment"], environment)
++                 os.path.join(control, "expected-manifest"), "--judging-digest", "--toolchain", "--build-environment"], environment)
+             return output.split()[0] if output.split() else ""
+ 
+         def markers():
+@@ -3037,6 +3417,23 @@
+         selftest.expect("54 号 --full 设续跑的环境变量：进度目录 <common-dir>/singlefs-layer0-progress/<这条用例的指纹>、输入指纹是这条用例的；"
+                         "调用方环境里的 SINGLEFS_LAYER0_START_OVER=1 在不带 --start-over 时被清掉",
+                         progress_settings_ok and len(set(fingerprints.values())) == 3, f"跑的时候看到 {runs}，这几条用例的指纹 {fingerprints}")
++        selftest.expect("54 号 --full 的线程数由 crash-case-command 交出：调用方没设 SINGLEFS_LAYER0_THREADS，用例看到的是 nproc 的 32",
++                        len(runs) == 3 and all(call[8] == "32" for call in runs), f"跑的时候看到 {runs}")
++
++        def marker_text(case_name):
++            names = [name for name in markers() if f".{case_name}." in name]
++            if len(names) != 1:
++                return ""
++            with open(os.path.join(common_directory, names[0]), encoding="utf-8") as handle:
++                return handle.read()
++        stream_a_marker, case_c_marker = marker_text("stream-a"), marker_text("case-c")
++        selftest.expect("54 号 --full 写的标记里线程分两格：configured_worker_threads= 记配的（没设，取本机核数 32），"
++                        "started_worker_threads= 记登记了 threads= 的用例起了几个（32 个工作线程），没登记的记读不到；没有旧的 worker_threads= 那一格",
++                        "\nconfigured_worker_threads=SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核\n" in stream_a_marker
++                        and "\nstarted_worker_threads=LAYER0：32 个工作线程跑了 64 片" in stream_a_marker
++                        and "\nstarted_worker_threads=读不到：这条用例没登记 threads=" in case_c_marker
++                        and not any(line.startswith("worker_threads=") for line in (stream_a_marker + case_c_marker).split("\n")),
++                        f"stream-a 那一格：{stream_a_marker[:600]}；case-c 那一格：{case_c_marker[:400]}")
+         exit_code, output, calls = stage()
+         selftest.expect("54 号快档：两条流跑不标 ignored 的用例，三条用例的标记都作数，判绿",
+                         exit_code == 0 and all(key in output for key, _t, _f, _c in LAYER0_STAGE_CASES) and not full_runs(calls)
+@@ -3061,6 +3458,15 @@
+         selftest.expect("54 号 --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格",
+                         exit_code == 0 and [(call[0], call[5]) for call in runs] == [("second_transaction_step_zero_layer0", "1")]
+                         and any(".stream-b." in name for name in markers()), f"退 {exit_code}，跑了 {runs}，输出尾部：{output.strip()[-600:]}")
++        for name in [name for name in markers() if ".stream-b." in name]:
++            os.remove(os.path.join(common_directory, name))
++        set_logs()
++        exit_code, output, messages = run_in_environment(["bash", stage_copy, "--full", work], dict(environment, SINGLEFS_LAYER0_THREADS="7"))
++        runs = full_runs(invocations())
++        selftest.expect("54 号 --full 显式设 SINGLEFS_LAYER0_THREADS=7：用例看到 7，标记里 configured_worker_threads= 记「显式设的」",
++                        exit_code == 0 and [(call[0], call[8]) for call in runs] == [("second_transaction_step_zero_layer0", "7")]
++                        and "configured_worker_threads=SINGLEFS_LAYER0_THREADS=7（显式设的），本机 32 核" in marker_text("stream-b"),
++                        f"退 {exit_code}，跑了 {runs}，输出尾部：{(output + messages).strip()[-600:]}")
+         exit_code, output, _calls = run_in_environment(["bash", stage_copy, "--start-over", work], environment)
+         selftest.expect("54 号 --start-over 不带 --full：退 2，说只跟 --full 一起用", exit_code == 2 and "只跟 --full 一起用" in output,
+                         f"退 {exit_code}，输出「{output.strip()}」")
+@@ -3125,21 +3531,35 @@
+         selftest.expect("54 号快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77", exit_code == 77,
+                         f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
+         every_case = [key for key, _target, _function, _conditions in LAYER0_STAGE_CASES]
++        copied_module = os.path.join(work, "research/scripts/admission.py")
++        # (说明, 改哪份, 怎么改, 该判红点名的用例；空表是标记照样作数、判绿)
+         scope_cells = [
+             ("只改登记表（stream-b 那一行第三列去掉 threads=LAYER0B）", os.path.join(work, REGISTRATION_TABLE),
+              lambda text: text.replace(" threads=LAYER0B", "", 1), ["crash-case:stream-b"]),
+-            ("只改 54 号（加一行注释）", stage_copy, lambda text: text + "# 样本：只改 54 号\n", every_case),
+-            ("只改准入模块（加一行注释）", os.path.join(work, "research/scripts/admission.py"), lambda text: text + "# 样本：只改准入模块\n", every_case),
++            ("只改 54 号（加一行注释；54 号不进指纹）", stage_copy, lambda text: text + "# 样本：只改 54 号\n", []),
++            ("只改准入模块判法之外的部分（文件尾加一行注释）", copied_module, lambda text: text + "# 样本：只改准入模块\n", []),
++            ("只改准入模块的判法（judge_worker_threads 把「至少两片」改成「至少三片」）", copied_module,
++             lambda text: edit_inside_definition(text, "judge_worker_threads", "freshly_run_slices >= 2 and", "freshly_run_slices >= 3 and"), every_case),
+         ]
+         for label, path, change, named_cases in scope_cells:
+             with open(path, encoding="utf-8") as handle:
+                 original_text = handle.read()
+-            write_text(path, change(original_text))
++            try:
++                changed_text = change(original_text)
++            except ValueError as error:
++                selftest.expect(f"54 号快档：{label} 这一格的改动做得出来", False, str(error))
++                continue
++            write_text(path, changed_text)
+             exit_code, output = quick_tier_without_forcing()
+             write_text(path, original_text)
+-            selftest.expect(f"54 号快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记，判红并点名 {'、'.join(named_cases)}，不退 77",
+-                            exit_code == 1 and "没有作数的全绿标记" in output and all(key in output for key in named_cases),
+-                            f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
++            if named_cases:
++                selftest.expect(f"54 号快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记，判红并点名 {'、'.join(named_cases)}，不退 77",
++                                exit_code == 1 and "没有作数的全绿标记" in output and all(key in output for key in named_cases),
++                                f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
++            else:
++                selftest.expect(f"54 号快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记（不退 77），三条标记都作数，判绿",
++                                exit_code == 0 and all(key in output for key in every_case) and "没有作数的全绿标记" not in output,
++                                f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
+     except (OSError, shutil.Error) as error:
+         selftest.expect("54 号这一份拷得进临时仓、跑得起来", False, f"{error}（真仓的 54 号在 {real_stage}）")
+     finally:
+@@ -3173,6 +3593,7 @@
+     "crash-cases": command_crash_cases,
+     "crash-case-manifest": command_crash_case_manifest,
+     "crash-case-marker-check": command_crash_case_marker_check,
++    "crash-case-command": command_crash_case_command,
+     "crash-case-judge": command_crash_case_judge,
+     "crash-case-record": command_crash_case_record,
+     "crash-case-marker-path": command_crash_case_marker_path,
+@@ -3184,7 +3605,7 @@
+         return run_selftest()
+     if not arguments or arguments[0] not in COMMANDS:
+         say("  ✗ 用法：admission.py {gate-reuse|gate-preconditions|gate-record-environment|experiment|paths|manifest|keys|crash-cases|"
+-            "crash-case-manifest|crash-case-marker-check|crash-case-judge|crash-case-record|crash-case-marker-path} … 或 --selftest")
++            "crash-case-manifest|crash-case-marker-check|crash-case-command|crash-case-judge|crash-case-record|crash-case-marker-path} … 或 --selftest")
+         say("     → 怎么办：各子命令的参数见文件头")
+         return EXIT_REGISTRATION_ERROR
+     return COMMANDS[arguments[0]](arguments[1:])
+--- a/.claude/hooks/lib_heavy_tests.py
++++ b/.claude/hooks/lib_heavy_tests.py
+@@ -11,6 +11,8 @@
+   command_under_launcher(words) -> (list[str], str | None) | None
+       words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序（/usr/bin/time、flock、rustup run、chrt、prlimit、systemd-run、strace、perf）时，
+       剥掉它交回它起的那条命令与那条命令的当前目录（None 是不变）；调用方把交回的命令再交给 lib_shell_words 切一遍、逐条判。
++      短选项合写（`-fo <文件>`、`-xw 10`、`-qu <名>`）逐个字母查那张表：头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；
++      systemd-run 的 `-E NAME=VALUE` / `--setenv=NAME=VALUE` 设的变量写在交回那条命令的最前面（再切一遍时当它的环境变量，认 runner 要用）。
+       这张表不进 lib_shell_words 的前缀表：bash-command-detector.sh 要按命令词认出 systemd-run，判它等不等结束。
+   classify_process(argv, cwd) -> list[HeavyTest]
+       一个在跑的进程：argv 是 /proc/<pid>/cmdline 按 NUL 切开的那一串，cwd 是 /proc/<pid>/cwd 指向的目录。
+@@ -27,20 +29,28 @@
+ 
+ 认的输入：cargo 命令行（test / t、run / r，以及起测试的 nextest run、miri、llvm-cov、hack、mutants）、按名字认的脚本与门禁阶段、
+ qemu-system-*、herd7，以及直接执行的测试二进制 `<target 目录>/[<目标三元组>/]<profile>/deps/<名字>-<16 位十六进制哈希>`：按 <名字> 判，
+-名字含 layer0 的算层 0。libtest 参数带 --list 的（只列用例、一条都不跑）不算重型。
++名字含 layer0 的算层 0。libtest 参数里 --list 当选项出现的（只列用例、一条都不跑）不算重型；跟在带一个值的 libtest 选项（--skip、--logfile、
++--test-threads、--format、--color、-Z、--shuffle-seed：LIBTEST_OPTIONS_WITH_VALUE）后面的 --list 是那个选项的值，照样全跑，不算只列。
+ 崩溃枚举用例（门禁 54 号逐条跑的那几条，登记在 .claude/gate.d/stage-inputs.tsv 键是 crash-case: 的行，第三列 test=<包>:<测试目标>:<用例函数>）：
+ 跑到它们的测试目标（cargo test 点名它、通配命中它、或不挑目标而包里有它；直接执行它的测试二进制）而下面任一条成立的算重型：
+   libtest 参数带 --ignored 或 --include-ignored（nextest 是 --run-ignored 的值不是 default）；
+-  可能带上它而看不见：cargo 全局选项 --config 里定了别名（alias.<名>，且子命令就是那个别名）或 runner（.runner），
+-  命令看得到的环境变量里有 CARGO_TARGET_*_RUNNER，或 CARGO_ALIAS_<名> 定的别名就是子命令；
+-  登记的用例函数没标 #[ignore]（读那个包里测试目标的源码，判法与 research/scripts/admission.py 的 crash-cases 自查同一份：本模块按文件路径导入它）。
++  可能带上它而看不见：cargo 全局选项 --config 里定了别名（alias.<名>，且子命令就是那个别名）或 runner（按正则认 .runner =，
++  另把值按 TOML 读，定了 target.<任何>.runner 也算：带引号的键 "runner" 这一类），
++  命令看得到的环境变量里有 CARGO_TARGET_*_RUNNER（systemd-run -E / --setenv 设给里面那条命令的也算），或 CARGO_ALIAS_<名> 定的别名就是子命令；
++  登记的用例函数有一处定义没标 #[ignore]，或判不出标没标（找不到那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py：都按没标算）。
++  读那个包里测试目标的源码，判法与 research/scripts/admission.py 的 crash-cases 自查同一份：本模块按文件路径导入它，同名的每一处 fn <名>( 都判。
+ 另有一条按参数认：任何命令（按文本处理参数的 grep、git、sed 这一类除外）参数里有 --ignored 或 --include-ignored、又有登记的用例函数名，
+ 按跑崩溃枚举用例算（拷走改名的测试二进制、find -exec 起的这类，名字认不出，靠点名的用例函数认）。
+ 登记表取两份的并：从命令的当前目录（有 --manifest-path 时取它所在的目录）往上找到的第一份，与这份文件所在仓的那一份。
+-接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒。
++接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒；
++同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了时，点名登记目标的 cargo test 一律拒。
+ 看不见的：.cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名用例函数的测试二进制；
+ cargo mutants -d 指到别处的树。别名与 runner 那两种由看门狗（research/scripts/agent-watch.py）在进程这一层兜：cargo 最后照样以原名
+ 带 --ignored 起那个测试二进制（推的，没量）；拷走改名、又不点名用例函数的，看门狗同样认不出。
++弄坏开关（只给自证用，证明那几格会红）：LIB_HEAVY_TESTS_BREAK 设成下面一个或几个（逗号分隔），--selftest 与 heavy-test-guard.sh --selftest 都必须判红：
++  launcher-whole-word-options（短选项合写不拆，照旧按整词查表）、launcher-drops-setenv（systemd-run -E / --setenv 设的变量不带进里面那条命令）、
++  list-by-presence（见到 --list 这个词就算只列）、undecided-ignore-allowed（判不出标没标时放行）、
++  runner-configuration-by-regex-only（--config 只按正则认 runner）。
+ """
+ import fnmatch, functools, glob, importlib.util, os, re, shlex, shutil, sys, tempfile, tomllib
+ from typing import NamedTuple
+@@ -88,6 +98,23 @@
+     return HeavyTest(kind, KIND_CATEGORY[kind], detail)
+ 
+ 
++def break_is_set(switch_name):
++    return switch_name in os.environ.get(BREAK_VARIABLE, "").split(",")
++
++
++def libtest_lists_only(libtest_arguments):
++    """libtest 的参数里 --list 当选项出现（只列用例、一条都不跑）：跳过带一个值的选项的那个值再找，`--skip --list` 里的 --list 不算。"""
++    if break_is_set("list-by-presence"):
++        return LIST_ONLY_TEST_ARGUMENT in libtest_arguments
++    position = 0
++    while position < len(libtest_arguments):
++        argument = libtest_arguments[position]
++        if argument == LIST_ONLY_TEST_ARGUMENT:
++            return True
++        position += 2 if argument in LIBTEST_OPTIONS_WITH_VALUE else 1
++    return False
++
++
+ # 崩溃枚举用例的登记表（与 research/scripts/admission.py 读的是同一份）：键是 crash-case: 的行，第三列 test=<包>:<测试目标>:<用例函数>
+ CRASH_CASE_REGISTRY = os.path.join(".claude", "gate.d", "stage-inputs.tsv")
+ CRASH_CASE_TEST_CONDITION = re.compile(r"^test=(?P<package>[A-Za-z0-9_-]+):(?P<target>[A-Za-z0-9_]+):(?P<function>[A-Za-z_][A-Za-z0-9_]*)$")
+@@ -95,6 +122,10 @@
+ IGNORED_TEST_ARGUMENTS = {"--ignored", "--include-ignored"}
+ # libtest 只列用例、一条都不跑的参数
+ LIST_ONLY_TEST_ARGUMENT = "--list"
++# libtest 带一个值的选项：`--skip --list` 里的 --list 是 --skip 的值（照样全跑），不是「只列」
++LIBTEST_OPTIONS_WITH_VALUE = {"--logfile", "--skip", "--test-threads", "--format", "--color", "-Z", "--shuffle-seed"}
++# 弄坏开关的环境变量（写法见文件头）
++BREAK_VARIABLE = "LIB_HEAVY_TESTS_BREAK"
+ # 判用例函数标没标 #[ignore] 的那一份（与门禁 54 号的 crash-cases 自查同一套判法）
+ ADMISSION_MODULE_PATH = os.path.join(HOOK_REPOSITORY, "research", "scripts", "admission.py")
+ # 按参数认崩溃枚举用例时不看的命令：它们把参数当文本搜、打印、比对，不执行测试二进制
+@@ -177,12 +208,16 @@
+ 
+ 
+ def crash_case_function_runs_without_ignored(case, package_directory):
+-    """登记的用例函数在 package_directory 这个包里没标 #[ignore]（不带 --ignored 的 cargo test 也会跑它）：没标 True；
+-    标了、找不到那个目标或那个函数、导入不了 admission.py 都交 False（判不出的不在这里拒，提交时 54 号的 crash-cases 自查判红）。"""
++    """登记的用例函数在 package_directory 这个包里可能不带 --ignored 也被跑到：同名的每一处定义都标了 #[ignore] 才交 False；
++    有一处没标，或判不出（找不到包、那个目标、那个函数，宏生成的用例，读不了源码，导入不了 admission.py）都交 True——
++    判不出时放行，这一条在提交时 54 号的 crash-cases 自查判红之前就已经跑完了。"""
+     module = admission_module()
+     if module is None or package_directory is None:
+-        return False
+-    return module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function) is False
++        return not break_is_set("undecided-ignore-allowed")
++    marked = module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function)
++    if break_is_set("undecided-ignore-allowed"):
++        return marked is False
++    return marked is not True
+ 
+ 
+ def manifest_sections(path):
+@@ -354,9 +389,21 @@
+     return None
+ 
+ 
++def configuration_value_names_runner(value):
++    """--config 的一个值按 TOML 读：定了 target.<任何>.runner（带不带引号的键、点号两边带不带空白都算）交 True；
++    读不成 TOML 的（多半是配置文件的路径，文件头「看不见的」）交 False，交给正则那一道。"""
++    try:
++        settings = tomllib.loads(value)
++    except ValueError:  # TOMLDecodeError 是 ValueError
++        return False
++    targets = settings.get("target") if isinstance(settings.get("target"), dict) else {}
++    return any(isinstance(table, dict) and "runner" in table for table in targets.values())
++
++
+ def runner_of_test_binaries(command, environment):
+     """--config 里定了 …runner、或环境变量里有 CARGO_TARGET_*_RUNNER 时交一句（runner 能替测试二进制加 --ignored，命令行上看不见）；没有交 None。"""
+-    if any(RUNNER_CONFIGURATION.search(value) for value in command.configuration_values):
++    by_table = not break_is_set("runner-configuration-by-regex-only")
++    if any(RUNNER_CONFIGURATION.search(value) or (by_table and configuration_value_names_runner(value)) for value in command.configuration_values):
+         return "--config 里定的 runner（它能替测试二进制加 --ignored）"
+     runners = sorted(name for name in environment if RUNNER_ENVIRONMENT_VARIABLE.match(name))
+     if runners:
+@@ -419,7 +466,7 @@
+         return None
+     described = f"cargo {found.subcommand}"
+     libtest_arguments = rest[rest.index("--") + 1:] if "--" in rest else []
+-    if LIST_ONLY_TEST_ARGUMENT in libtest_arguments:
++    if libtest_lists_only(libtest_arguments):
+         return None
+     if whole_workspace:
+         return heavy_test("full-cargo", f"{described} 带 --workspace / --all")
+@@ -553,17 +600,37 @@
+ }
+ # 选项之后、那条命令之前还有几个位置参数：flock 的锁文件、chrt 的优先级、rustup run 的工具链
+ LAUNCHER_POSITIONAL_COUNT = {"flock": 1, "chrt": 1, "rustup": 1}
++# 给里面那条命令设环境变量的选项（值是 NAME=VALUE）：设的变量写在交回那条命令的最前面
++LAUNCHER_ENVIRONMENT_OPTIONS = {"systemd-run": {"-E", "--setenv"}}
++# 交回的命令以 NAME=VALUE 打头时，那是设的变量、不是程序（值里的路径 basename 碰巧叫 strace 也不当包装剥）
++ENVIRONMENT_ASSIGNMENT_WORD = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+ # perf 起一条命令的子命令；后面还要再跟一个 record 的那几组
+ PERF_SUBCOMMANDS_RUNNING_A_COMMAND = {"stat", "record", "trace"}
+ PERF_GROUPS_WITH_RECORD = {"mem", "c2c", "sched", "lock", "kmem", "kwork"}
+ 
+ 
++def launcher_option(word, next_word, options_with_value):
++    """包装程序的一个选项词：交回 (选项名, 它的值, 这个选项占几个词)。长选项 `--名=值` 与 `--名 值` 按整词查表；
++    短选项合写（`-fo 文件`、`-xw 10`、`-o文件`）逐个字母查表，头一个要值的字母之后剩下的是它的值，没剩下就取下一个词；一个要值的字母都没有的只占自己。"""
++    if word.startswith("--") or break_is_set("launcher-whole-word-options"):
++        option, has_attached_value, attached_value = word.partition("=")
++        if has_attached_value:
++            return option, attached_value, 1
++        return (option, next_word, 2) if option in options_with_value else (option, "", 1)
++    for index, letter in enumerate(word[1:], start=1):
++        if "-" + letter in options_with_value:
++            attached_value = word[index + 1:]
++            return ("-" + letter, attached_value, 1) if attached_value else ("-" + letter, next_word, 2)
++    return word, "", 1
++
++
+ def command_under_launcher(words):
+     """words[0] 是 LAUNCHER_OPTIONS_WITH_VALUE 里的程序时，剥掉它（连同它的选项与位置参数），交回 (它起的那条命令的词, 那条命令的当前目录：
+     None 是不变，systemd-run --working-directory 给的是相对当前目录的写法)；不是这几样、或后面没有要起的命令（strace -p、flock 只给 fd）交 None。
++    选项词怎么切见 launcher_option；systemd-run 的 -E / --setenv 设的 NAME=VALUE 写在交回那条命令的最前面。
+     flock 的 -c <字符串> 交回成 sh -c <字符串>。rustup 只认 rustup run，perf 只认 stat / record / trace 与 <组> record。"""
+     name = os.path.basename(words[0])
+-    if name not in LAUNCHER_OPTIONS_WITH_VALUE:
++    if name not in LAUNCHER_OPTIONS_WITH_VALUE or ENVIRONMENT_ASSIGNMENT_WORD.match(words[0]):
+         return None
+     position = 1
+     if name == "rustup":
+@@ -577,7 +644,8 @@
+             position = 3
+         else:
+             return None
+-    options_with_value, working_directory = LAUNCHER_OPTIONS_WITH_VALUE[name], None
++    options_with_value, working_directory, assignments = LAUNCHER_OPTIONS_WITH_VALUE[name], None, []
++    environment_options = LAUNCHER_ENVIRONMENT_OPTIONS.get(name, set())
+     while position < len(words):
+         word = words[position]
+         if word == "--":
+@@ -585,15 +653,16 @@
+             break
+         if not word.startswith("-") or word == "-":
+             break
+-        option, has_attached_value, attached_value = word.partition("=")
+-        value = attached_value if has_attached_value else (words[position + 1] if position + 1 < len(words) else "")
++        option, value, word_count = launcher_option(word, words[position + 1] if position + 1 < len(words) else "", options_with_value)
+         if name == "systemd-run" and option == "--working-directory":
+             working_directory = value
+-        position += 2 if option in options_with_value and not has_attached_value else 1
++        if option in environment_options and "=" in value and not break_is_set("launcher-drops-setenv"):
++            assignments.append(value)
++        position += word_count
+     if name == "flock" and position + 1 < len(words) and words[position + 1] in ("-c", "--command"):
+         return (["sh", "-c", words[position + 2]], working_directory) if position + 2 < len(words) else None
+     position += LAUNCHER_POSITIONAL_COUNT.get(name, 0)
+-    return (words[position:], working_directory) if position < len(words) else None
++    return (assignments + words[position:], working_directory) if position < len(words) else None
+ 
+ 
+ def classify(words, directory, environment=None):
+@@ -604,7 +673,7 @@
+         return heavy_test(STAGE_KIND[stage], f"门禁 {stage} 号（{name}）") if stage in STAGE_KIND else None
+     binary = test_binary_name(words[0])
+     if binary is not None:
+-        if LIST_ONLY_TEST_ARGUMENT in arguments:
++        if libtest_lists_only(arguments):
+             return None
+         if "layer0" in binary:
+             return heavy_test("layer0-binary", f"直接执行名字含 layer0 的测试二进制（{binary}）")
+@@ -691,9 +760,11 @@
+ 
+ 
+ def build_sample_workspace(work):
+-    """仓根与 research/ 两个虚工作区，harness 里有一个名字含 layer0 的测试目标；登记表登记三条崩溃枚举用例：
++    """仓根与 research/ 两个虚工作区，harness 里有一个名字含 layer0 的测试目标；登记表登记七条崩溃枚举用例：
+     harness 里的 sample_crash_enumeration，与只有它一个测试目标的包 singlefs-checker 里的 checker_crash_enumeration（用例函数都标了 #[ignore]），
+-    harness 里用例函数没标 #[ignore] 的 unmarked_crash_enumeration。"""
++    harness 里用例函数没标 #[ignore] 的 unmarked_crash_enumeration；harness 里另四种写法：同名函数 cfg 二选一、一份不标（cfg_split），
++    子模块里同名标 ignore 的写在前面、顶层那一份不标（submodule_first），宏生成的用例（macro，没有字面的 fn <名>(），
++    `# [ignore]`（# 与 [ 之间有空格，spaced_ignore，算标了）。"""
+     def write(relative, text):
+         path = os.path.join(work, relative)
+         os.makedirs(os.path.dirname(path), exist_ok=True)
+@@ -709,12 +780,24 @@
+     marked_case = '#[test]\nfn quick_case() {}\n#[test]\n#[ignore = "崩溃枚举（样本）：平时不跑"]\nfn the_full_case() {}\n'
+     write("crates/singlefs-harness/tests/sample_crash_enumeration.rs", marked_case)
+     write("crates/singlefs-harness/tests/unmarked_crash_enumeration.rs", "#[test]\nfn the_unmarked_case() {}\n")
++    write("crates/singlefs-harness/tests/cfg_split_crash_enumeration.rs",
++          "#[cfg(debug_assertions)]\n#[test]\n#[ignore]\nfn the_split_case() {}\n#[cfg(not(debug_assertions))]\n#[test]\nfn the_split_case() {}\n")
++    write("crates/singlefs-harness/tests/submodule_first_crash_enumeration.rs",
++          "mod slow {\n    #[test]\n    #[ignore]\n    fn the_shadowed_case() {}\n}\n#[test]\nfn the_shadowed_case() {}\n")
++    write("crates/singlefs-harness/tests/macro_crash_enumeration.rs",
++          "macro_rules! crash_case {\n    ($name:ident) => {\n        #[test]\n        fn $name() {}\n    };\n}\ncrash_case!(the_generated_case);\n")
++    write("crates/singlefs-harness/tests/spaced_ignore_crash_enumeration.rs", "#[test]\n# [ignore]\nfn the_spaced_case() {}\n")
+     write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
+     write("crates/singlefs-checker/tests/checker_crash_enumeration.rs", marked_case)
+     write(CRASH_CASE_REGISTRY, "# 样本登记表\n54-layer0-replay.sh\tcrates/\t# 样本\n"
+                                "crash-case:sample\tcrates/ Cargo.toml\ttest=singlefs-harness:sample_crash_enumeration:the_full_case\t# 样本\n"
+                                "crash-case:checker\tcrates/ Cargo.toml\ttest=singlefs-checker:checker_crash_enumeration:the_full_case\t# 样本\n"
+-                               "crash-case:unmarked\tcrates/ Cargo.toml\ttest=singlefs-harness:unmarked_crash_enumeration:the_unmarked_case\t# 样本\n")
++                               "crash-case:unmarked\tcrates/ Cargo.toml\ttest=singlefs-harness:unmarked_crash_enumeration:the_unmarked_case\t# 样本\n"
++                               "crash-case:cfg-split\tcrates/ Cargo.toml\ttest=singlefs-harness:cfg_split_crash_enumeration:the_split_case\t# 样本\n"
++                               "crash-case:submodule-first\tcrates/ Cargo.toml\t"
++                               "test=singlefs-harness:submodule_first_crash_enumeration:the_shadowed_case\t# 样本\n"
++                               "crash-case:macro\tcrates/ Cargo.toml\ttest=singlefs-harness:macro_crash_enumeration:the_generated_case\t# 样本\n"
++                               "crash-case:spaced-ignore\tcrates/ Cargo.toml\ttest=singlefs-harness:spaced_ignore_crash_enumeration:the_spaced_case\t# 样本\n")
+     write("research/Cargo.toml", '[workspace]\nresolver = "2"\nmembers = ["e7-index-bench"]\n')
+     write("research/e7-index-bench/Cargo.toml", '[package]\nname = "e7-index-bench"\nversion = "0.0.0"\n')
+ 
+@@ -796,6 +879,35 @@
+              work, None),
+             ("环境变量里有 runner、点名不是崩溃枚举用例的目标", ["env", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/x", "cargo", "test", "-p", "singlefs-core",
+                                                   "--test", "core_contract"], work, None),
++            # --config 的值按 TOML 读：带引号的键、点号两边带空白的 runner 正则认不出（开关 runner-configuration-by-regex-only 下这两格红）
++            ("--config 里带引号的键 target.<三元组>.\"runner\"、点名崩溃枚举用例不带 --ignored",
++             ["cargo", "--config", 'target.x86_64-unknown-linux-gnu."runner"="/tmp/add-ignored.sh"', "test", "-p", "singlefs-harness", "--test",
++              "sample_crash_enumeration"], work, "crash-case-cargo"),
++            ("--config 里点号两边带空白的 target . <三元组> . runner",
++             ["cargo", "--config", 'target . x86_64-unknown-linux-gnu . runner = "/tmp/add-ignored.sh"', "test", "-p", "singlefs-harness", "--test",
++              "sample_crash_enumeration"], work, "crash-case-cargo"),
++            ("--config 定的是 build.jobs、不是 runner", ["cargo", "--config", "build.jobs=4", "test", "-p", "singlefs-harness", "--test",
++                                                    "sample_crash_enumeration"], work, None),
++            # --list 是 --skip、--logfile 这类带值选项的值时照样全跑（开关 list-by-presence 下前两格红）
++            ("点名崩溃枚举用例、-- --include-ignored --skip --list（--list 是 --skip 的值）",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--skip", "--list"], work, "crash-case-cargo"),
++            ("点名崩溃枚举用例、-- --include-ignored --exact the_full_case --logfile --list（--list 是日志文件名）",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--include-ignored", "--exact", "the_full_case",
++              "--logfile", "--list"], work, "crash-case-cargo"),
++            ("点名崩溃枚举用例、-- --ignored --test-threads 4 --list（只列）",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--test-threads", "4", "--list"], work, None),
++            ("点名崩溃枚举用例、-- --ignored --skip=--list（一个词，没有 --list 选项）",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration", "--", "--ignored", "--skip=--list"], work, "crash-case-cargo"),
++            # 用例函数的每一处定义都要标 #[ignore]；判不出标没标的按没标算（开关：admission.py 的 first-definition-only、ignore-attribute-without-space，
++            # 这里的 undecided-ignore-allowed）
++            ("点名同名函数 cfg 二选一、一份不标的登记目标、不带 --ignored", ["cargo", "test", "--release", "-p", "singlefs-harness", "--test",
++                                                          "cfg_split_crash_enumeration"], work, "crash-case-cargo"),
++            ("点名子模块里同名标 ignore 写在前面、顶层那一份不标的登记目标、不带 --ignored",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "submodule_first_crash_enumeration"], work, "crash-case-cargo"),
++            ("点名用例是宏生成的（找不到字面的 fn <名>(）登记目标、不带 --ignored：判不出按没标算",
++             ["cargo", "test", "-p", "singlefs-harness", "--test", "macro_crash_enumeration"], work, "crash-case-cargo"),
++            ("点名用例函数标的是 # [ignore]（# 与 [ 之间有空格）的登记目标、不带 --ignored", ["cargo", "test", "-p", "singlefs-harness", "--test",
++                                                                      "spaced_ignore_crash_enumeration"], work, None),
+         ]
+         # lib_shell_words 前缀表之外、包在命令外面照样起那条命令的程序（command_under_launcher）
+         launcher_cases = [
+@@ -823,6 +935,25 @@
+             ("rustup show 不是 rustup run", ["rustup", "show"], work, None),
+             ("perf report 不起命令", ["perf", "report", "-i", "perf.data"], work, None),
+             ("/usr/bin/time 包一个不重型的测试目标", ["/usr/bin/time", "-v", "cargo", "test", "-p", "singlefs-core", "--test", "core_contract"], work, None),
++            # 短选项合写：逐个字母查表，头一个要值的字母之后剩下的是值、没剩下取下一个词（开关 launcher-whole-word-options 下前四格红）
++            ("strace -fo 文件（短选项合写）", ["strace", "-fo", "/tmp/s", "cargo", "test", "--all"], work, "full-cargo"),
++            ("flock -xw 10 锁文件（短选项合写）", ["flock", "-xw", "10", "/tmp/l", "cargo", "test", "--all"], work, "full-cargo"),
++            ("systemd-run --user --scope -qu 名字（短选项合写）", ["systemd-run", "--user", "--scope", "-qu", "k1", "cargo", "test", "--all"], work, "full-cargo"),
++            ("/usr/bin/time -ao 文件（短选项合写）", ["/usr/bin/time", "-ao", "/tmp/t", "cargo", "test", "--all"], work, "full-cargo"),
++            ("strace -o文件（值贴着写）", ["strace", "-o/tmp/s", "cargo", "test", "--all"], work, "full-cargo"),
++            # systemd-run -E / --setenv 设的变量带进里面那条命令（开关 launcher-drops-setenv 下前三格红）
++            ("systemd-run -E 设 runner、点名崩溃枚举用例不带 --ignored",
++             ["systemd-run", "--user", "--scope", "-E", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
++              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
++            ("systemd-run --setenv= 设 runner、点名崩溃枚举用例不带 --ignored",
++             ["systemd-run", "--user", "--scope", "--setenv=CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
++              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
++            ("systemd-run -qE 合写设 runner、点名崩溃枚举用例不带 --ignored",
++             ["systemd-run", "--user", "--scope", "-qE", "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh", "cargo", "test", "-p",
++              "singlefs-harness", "--test", "sample_crash_enumeration"], work, "crash-case-cargo"),
++            ("systemd-run -E 设的不是 runner（值的末段叫 strace 也不当包装剥）、点名崩溃枚举用例不带 --ignored",
++             ["systemd-run", "--user", "--scope", "-E", "TRACER=/usr/bin/strace", "cargo", "test", "-p", "singlefs-harness", "--test",
++              "sample_crash_enumeration"], work, None),
+         ]
+         binary_cases = [
+             ("绝对路径的层 0 测试二进制", [os.path.join(work, "target", "release", "deps", layer0_binary), "--test-threads", "4"], work, "layer0-binary"),
+@@ -842,6 +973,11 @@
+             ("崩溃枚举用例的测试二进制 --ignored --list", [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"),
+                                                   "--ignored", "--list"], work, None),
+             ("层 0 测试二进制 --list", [os.path.join(work, "target", "release", "deps", layer0_binary), "--list"], work, None),
++            ("崩溃枚举用例的测试二进制 --include-ignored --skip --list（--list 是 --skip 的值）",
++             [os.path.join(work, "target", "release", "deps", "sample_crash_enumeration-0123456789abcdef"), "--include-ignored", "--skip", "--list"],
++             work, "crash-case-binary"),
++            ("层 0 测试二进制 --logfile --list（--list 是日志文件名）", [os.path.join(work, "target", "release", "deps", layer0_binary), "--logfile", "--list"],
++             work, "layer0-binary"),
+             # 名字认不出（拷走改名、find -exec）时按参数认：带 --ignored 又点名登记的用例函数
+             ("拷走改名的测试二进制带 --ignored --exact 登记的用例函数", ["/tmp/elsewhere/rc", "--ignored", "--exact", "the_full_case"], work, "crash-case-binary"),
+             ("find -exec 执行测试二进制、点名登记的用例函数",
+@@ -862,6 +998,17 @@
+         for label, argv, cwd, want in cargo_cases + launcher_cases + binary_cases:
+             found = classify_process(argv, cwd)
+             results.append((label, want, found[0].kind if found else None))
++        # 导入不了 admission.py 时判不出标没标：点名登记目标、不带 --ignored 的 cargo test 按没标算（开关 undecided-ignore-allowed 下这一格红）
++        module_globals, saved_module_path = globals(), ADMISSION_MODULE_PATH
++        module_globals["ADMISSION_MODULE_PATH"] = os.path.join(work, "no-such-admission.py")
++        admission_module.cache_clear()
++        try:
++            found = classify_process(["cargo", "test", "-p", "singlefs-harness", "--test", "sample_crash_enumeration"], work)
++        finally:
++            module_globals["ADMISSION_MODULE_PATH"] = saved_module_path
++            admission_module.cache_clear()
++        results.append(("导入不了 admission.py：点名标了 #[ignore] 的登记目标、不带 --ignored 的 cargo test 按没标算", "crash-case-cargo",
++                        found[0].kind if found else None))
+         name_cases = [
+             ("门禁阶段按名字判", ".claude/gate.d/12-no-prime-marks.sh", work, True),
+             ("仓内位置上的 gate-staged.sh 按名字判", "research/scripts/gate-staged.sh", work, True),
+@@ -908,13 +1055,16 @@
+     for label, want, got in failures:
+         print(f"  ✗ lib_heavy_tests 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
+     if failures:
+-        print("    → 看 classify()、cargo_subcommand()、cargo_use()、test_invocation()、crash_case_run()、command_under_launcher()、test_binary_name()、"
++        print("    → 看 classify()、cargo_subcommand()、cargo_use()、test_invocation()、crash_case_run()、command_under_launcher()、launcher_option()、"
++              "libtest_lists_only()、runner_of_test_binaries()、crash_case_function_runs_without_ignored()、test_binary_name()、"
+               "runs_compiled_code()、classify_process()、judged_by_name() 与 TEST_BINARY_PATH / BUILT_BINARY_PATH / COMPILED_CODE_SUBCOMMANDS / "
+-              "KNOWN_SCRIPT_LOCATIONS / LAUNCHER_OPTIONS_WITH_VALUE 几张表；判用例函数标没标 #[ignore] 的那一段在 research/scripts/admission.py")
++              "KNOWN_SCRIPT_LOCATIONS / LAUNCHER_OPTIONS_WITH_VALUE / LIBTEST_OPTIONS_WITH_VALUE 几张表；判用例函数标没标 #[ignore] 的那一段在 "
++              f"research/scripts/admission.py；{BREAK_VARIABLE} 或 ADMISSION_BREAK 设着的话这里本来就该红")
+         return 1
+     print(f"  ✓ lib_heavy_tests 自检通过（查了 {len(results)} 种：cargo 与包装过的命令行 {len(cargo_cases)} 种、"
+           f"/usr/bin/time、flock、systemd-run 这一类包在外面的 {len(launcher_cases)} 种、"
+-          f"直接执行的测试二进制 {len(binary_cases)} 种、按名字判的脚本 {len(name_cases)} 种、跑不跑编译出来的代码 {len(compiled_cases)} 种）")
++          f"直接执行的测试二进制 {len(binary_cases)} 种、按名字判的脚本 {len(name_cases)} 种、跑不跑编译出来的代码 {len(compiled_cases)} 种、"
++          "导入不了 admission.py 1 种）")
+     return 0
+ 
+ 
+--- a/.claude/hooks/heavy-test-guard.sh
++++ b/.claude/hooks/heavy-test-guard.sh
+@@ -21,7 +21,8 @@
+ # 一条命令 100 秒没判完、拖慢每个 agent 的每条命令（同一张表第 18 行）：所以直接执行的只读 shell 脚本，同一份脚本一次判定里只读一遍、只判一遍。
+ #
+ # 重型测试，按类（只认命令位置；「cargo test」在下面各类里一样指 cargo t、cargo nextest run、cargo miri test、cargo llvm-cov、cargo hack test、
+-# cargo mutants 与 --config / CARGO_ALIAS_ 定的别名；libtest 参数带 --list 的只列用例、一条都不跑，哪一类都不算）：
++# cargo mutants 与 --config / CARGO_ALIAS_ 定的别名；libtest 参数里 --list 当选项出现的只列用例、一条都不跑，哪一类都不算，
++# 跟在 --skip、--logfile 这类带值的选项后面的 --list 是那个选项的值，照算）：
+ #   层 0          cargo test 会跑到名字含 layer0 的测试二进制：--test 的名字含 layer0、--test 的通配命中它、
+ #                 或不带目标选择（带 --tests / --all-targets 也算）而包里有这种二进制；.claude/gate.d/54-*；
+ #                 直接执行名字含 layer0 的测试二进制（`<target 目录>/<profile>/deps/<名字>-<16 位十六进制哈希>`）
+@@ -36,8 +37,9 @@
+ #   E152 装置     e152-file-system-benchmark（直接起、或 cargo run 它）、research/scripts/e152-run.sh
+ #   崩溃枚举用例  .claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几条用例（门禁 54 号逐条跑）的测试目标——cargo test 点名它、--test 的通配命中它、
+ #                 或不挑目标而包里有它；直接执行它的测试二进制——而下面任一条成立：libtest 参数带 --ignored 或 --include-ignored（nextest 是
+-#                 --run-ignored only / all）；--config 或环境变量里定了测试二进制的 runner、或子命令是别名（带没带 --ignored 看不见）；
+-#                 登记的用例函数没标 #[ignore]（读源码判，不带 --ignored 也跑到全量）。另按参数认：任何命令（grep、git 这类按文本处理参数的除外）
++#                 --run-ignored only / all）；--config 或环境变量里定了测试二进制的 runner（--config 的值另按 TOML 读；systemd-run -E / --setenv
++#                 设给里面那条命令的也算）、或子命令是别名（带没带 --ignored 看不见）；登记的用例函数有一处定义没标 #[ignore]，或判不出标没标
++#                 （读源码判，同名的每一处都算；找不到函数、宏生成的、导入不了 admission.py 按没标算）。另按参数认：任何命令（grep、git 这类按文本处理参数的除外）
+ #                 带 --ignored / --include-ignored 又点名登记的用例函数（拷走改名的测试二进制、find -exec 起的）。判定与登记表取法在 lib_heavy_tests.py
+ #   .claude/gate.d/ 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑、不用带前缀。
+ # 谁、带什么才放行（都要带环境变量 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，别的值或没带一律拒）：
+@@ -80,7 +82,8 @@
+ #   命令词不带斜杠、从 PATH 里找到的脚本（直接执行的 `x.sh`）；同一条命令里用 WrittenScript 认不出的写法先写出再执行的脚本——
+ #   执行时文件还不在的按「不存在」放行并记检出，已经在的读到的是旧内容；source 进来的文件里 export 的变量对外层后面命令的影响；
+ #   .cargo/config.toml 与 `--config <文件>` 里定的别名与 runner；拷走改名、又不点名登记的用例函数的测试二进制（看门狗在进程这一层同样认不出）。
+-# 接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒。
++# 接受的误拒：`--include-ignored --exact <同一目标里的快用例>` 照拒（过滤之后剩下哪几条，执行前判不出）；别名展开之后不是 test 的照拒；
++#   同一目标里别的模块有与登记的用例函数同名、合法不标 #[ignore] 的快用例时照拒；admission.py 导入不了时点名登记目标的 cargo test 一律拒。
+ # 另一道，与重型不重型无关：子 agent 跑编译出来的代码——cargo test / t / run / r / bench（test、bench 带 --no-run 的只编不跑，不算）、
+ #   直接执行 cargo 编出来的二进制（lib_heavy_tests.runs_compiled_code）——要经 research/scripts/run-with-memory-cap.sh 跑，不经它的拒
+ #   （它先判整机放不放得下、放不下排队，撞了上限只杀这一条；records/2026-09-16-subagent拆分提案.md 第四十节第 30 行）。放在这里而不另起一个 hook：
+@@ -96,7 +99,8 @@
+ #
+ #   heavy-test-guard.sh             # 从 stdin 读 hook 的 JSON；拒绝退出 2，放行退出 0
+ #   heavy-test-guard.sh --selftest  # 在临时工作区里走一遍拒绝与放行（连同 lib_heavy_tests.py 的自检）；HEAVY_TEST_GUARD_DISABLE_CHECK=1、
+-#                                   # HEAVY_TEST_GUARD_IGNORE_WRITTEN_SCRIPTS=1（不认同一条命令里写出的脚本）、HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1（不判经没经内存包装）时自检必须判红
++#                                   # HEAVY_TEST_GUARD_IGNORE_WRITTEN_SCRIPTS=1（不认同一条命令里写出的脚本）、HEAVY_TEST_GUARD_IGNORE_MEMORY_CAP=1（不判经没经内存包装）时自检必须判红；
++#                                   # 判定那一半的弄坏开关（lib_heavy_tests.py 的 LIB_HEAVY_TESTS_BREAK、admission.py 的 ADMISSION_BREAK，写法在两份的文件头）设了哪一个也必须判红
+ set -uo pipefail
+ HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+ # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON（与 write-guard.sh 同一个坑）。
+@@ -767,6 +771,30 @@
+              commit + "/usr/bin/time -v bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test sample_crash_enumeration "
+              "-- --include-ignored --exact the_full_case", 0),
+             ("主 agent 不带前缀 flock 包一层跑 gate.sh", None, "flock /tmp/gate.lock bash .claude/scripts/gate.sh --staged", 2),
++            # 短选项合写、systemd-run -E 设的 runner、--list 是别的选项的值、--config 里带引号的 runner 键、用例函数有一处没标或判不出：
++            # lib_heavy_tests.py 的 LIB_HEAVY_TESTS_BREAK 与 admission.py 的 ADMISSION_BREAK 那几个开关下这几格红（开关写在两份的文件头）
++            ("实现员内存包装里 strace -fo 包一层跑崩溃枚举用例", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G strace -fo /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
++            ("实现员不经内存包装 strace -fo 包一层跑崩溃枚举用例", writer,
++             "strace -fo /tmp/s cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
++            ("实现员内存包装里 flock -xw 10 包一层跑崩溃枚举用例", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G flock -xw 10 /tmp/l cargo test -p singlefs-harness --test sample_crash_enumeration -- --ignored", 2),
++            ("实现员内存包装里 systemd-run -E 设 runner、不带 --ignored", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G systemd-run --user --scope -E CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER=/tmp/add-ignored.sh "
++             "cargo test -p singlefs-harness --test sample_crash_enumeration", 2),
++            ("实现员内存包装里 --config 带引号的 runner 键、不带 --ignored", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G cargo --config 'target.x86_64-unknown-linux-gnu.\"runner\"=\"/tmp/add-ignored.sh\"' test "
++             "-p singlefs-harness --test sample_crash_enumeration", 2),
++            ("实现员内存包装里 -- --include-ignored --skip --list（--list 是 --skip 的值）", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test sample_crash_enumeration -- --include-ignored --skip --list", 2),
++            ("实现员内存包装里直接执行崩溃枚举用例的测试二进制 --include-ignored --skip --list", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G ./target/release/deps/sample_crash_enumeration-0123456789abcdef --include-ignored --skip --list", 2),
++            ("实现员内存包装里跑同名函数 cfg 二选一、一份不标的登记目标（不带 --ignored）", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G cargo test --release -p singlefs-harness --test cfg_split_crash_enumeration", 2),
++            ("实现员内存包装里跑用例是宏生成的登记目标（判不出，按没标算）", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test macro_crash_enumeration", 2),
++            ("实现员内存包装里跑用例函数标 # [ignore] 的登记目标（算标了，不带 --ignored 放行）", writer,
++             "bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-harness --test spaced_ignore_crash_enumeration", 0),
+             # 起测试的外部子命令、别名与 runner、只列不跑、没标 #[ignore] 的登记用例
+             ("实现员经内存包装 cargo nextest run --run-ignored all 跑崩溃枚举用例", writer,
+              "bash research/scripts/run-with-memory-cap.sh 4G cargo nextest run -p singlefs-harness --test sample_crash_enumeration --run-ignored all", 2),
+--- a/.claude/rules/implementation-workflow.md
++++ b/.claude/rules/implementation-workflow.md
+@@ -55,9 +55,9 @@
+ - 整轮门禁：`gate.sh`（带什么参数都算）、`research/scripts/gate-staged.sh`（`--selftest` 不算）。
+ - 全部实验复跑：87 号。
+ - E152 装置：`e152-file-system-benchmark`（直接起、或 `cargo run --bin` 它）、`research/scripts/e152-run.sh`。
+-- 崩溃枚举用例：`.claude/gate.d/stage-inputs.tsv` 里键是 `crash-case:` 的那几条用例的测试目标（`cargo test` 点名它、`--test` 的通配命中它、或不挑目标而包里有它；直接执行它的测试二进制），而下面任一条成立的：libtest 参数带 `--ignored` 或 `--include-ignored`（`cargo nextest run` 是 `--run-ignored only` / `all`）；`--config` 或环境变量里定了测试二进制的 runner，或子命令是 `--config` / `CARGO_ALIAS_` 定的别名；登记的用例函数没标 `#[ignore]`。另外任何命令带 `--ignored` / `--include-ignored` 又点名登记的用例函数的也算（`grep`、`git` 这类按文本处理参数的除外）。不带这两个参数、用例函数标了 `#[ignore]`、只跑那个测试目标里快用例的不算。
++- 崩溃枚举用例：`.claude/gate.d/stage-inputs.tsv` 里键是 `crash-case:` 的那几条用例的测试目标（`cargo test` 点名它、`--test` 的通配命中它、或不挑目标而包里有它；直接执行它的测试二进制），而下面任一条成立的：libtest 参数带 `--ignored` 或 `--include-ignored`（`cargo nextest run` 是 `--run-ignored only` / `all`）；`--config` 或环境变量里定了测试二进制的 runner（`--config` 的值按 TOML 读，带引号的键也算；`systemd-run -E` / `--setenv` 设给里面那条命令的环境变量也算），或子命令是 `--config` / `CARGO_ALIAS_` 定的别名；登记的用例函数有一处定义没标 `#[ignore]`（同名的每一处 `fn <名>(` 都算），或判不出标没标（找不到那个函数、宏生成的用例、导入不了 `research/scripts/admission.py`，按没标算）。另外任何命令带 `--ignored` / `--include-ignored` 又点名登记的用例函数的也算（`grep`、`git` 这类按文本处理参数的除外）。不带这两个参数、用例函数标了 `#[ignore]`、只跑那个测试目标里快用例的不算。
+ 
+-只认命令位置；`bash -c`、`capped.sh`、`run-with-memory-cap.sh`、`nice`、`timeout`、`env` 这类包装里面的同样算，`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`prlimit`、`systemd-run`、`strace`、`perf stat|record|trace` 包在外面的剥掉照算。重型测试清单各类里的 `cargo test` 同样指 `cargo nextest run`、`cargo miri test`、`cargo llvm-cov`、`cargo hack test`、`cargo mutants` 与别名；libtest 参数带 `--list`（只列用例、一条都不跑）的哪一类都不算。命令位置上执行的脚本（`bash x.sh`、`./x.sh`、`source x`）闸读进去，逐行照同一个 `classify` 判，里面有一样就整条算（例：`.claude/scripts/fetch-deps.sh --check` 第 81 行调 `herd7 -version`，整条算 herd7）；门禁阶段与 `lib_heavy_tests.py` 的 `KNOWN_SCRIPT_LOCATIONS` 登记的仓内脚本按名字判、不读正文。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
++只认命令位置；`bash -c`、`capped.sh`、`run-with-memory-cap.sh`、`nice`、`timeout`、`env` 这类包装里面的同样算，`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`prlimit`、`systemd-run`、`strace`、`perf stat|record|trace` 包在外面的剥掉照算（短选项合写的 `strace -fo <文件>`、`flock -xw 10` 同样剥）。重型测试清单各类里的 `cargo test` 同样指 `cargo nextest run`、`cargo miri test`、`cargo llvm-cov`、`cargo hack test`、`cargo mutants` 与别名；libtest 参数里 `--list` 当选项出现（只列用例、一条都不跑）的哪一类都不算，跟在 `--skip`、`--logfile` 这类带值的选项后面的 `--list` 是那个选项的值，照算。命令位置上执行的脚本（`bash x.sh`、`./x.sh`、`source x`）闸读进去，逐行照同一个 `classify` 判，里面有一样就整条算（例：`.claude/scripts/fetch-deps.sh --check` 第 81 行调 `herd7 -version`，整条算 herd7）；门禁阶段与 `lib_heavy_tests.py` 的 `KNOWN_SCRIPT_LOCATIONS` 登记的仓内脚本按名字判、不读正文。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+ 
+ | 场合 | 跑不跑 |
+ |---|---|

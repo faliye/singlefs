@@ -1,0 +1,45 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_p3_attack.rs (/tmp/claude-1000/m2-safety-r3-opus/target/release/deps/opus_r3_p3_attack-b85a0c2313d795ef)
+
+running 1 test
+E9 384 P3 a-ow150 step40 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(51) avail_now=Some(183) Some("free=256 alloc=128 def=112 iso=0") [publish+:av[197, 197]/d6/n14/r14/def[98, 98]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step41 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(52) avail_now=Some(169) Some("free=242 alloc=142 def=126 iso=0") [publish+:av[183, 183]/d6/n14/r14/def[112, 112]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step42 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(53) avail_now=Some(155) Some("free=228 alloc=156 def=140 iso=0") [publish+:av[169, 169]/d6/n14/r14/def[126, 126]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step43 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(54) avail_now=Some(141) Some("free=214 alloc=170 def=154 iso=0") [publish+:av[155, 155]/d6/n14/r14/def[140, 140]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step44 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(55) avail_now=Some(127) Some("free=200 alloc=184 def=168 iso=0") [publish+:av[141, 141]/d6/n14/r14/def[154, 154]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step45 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(56) avail_now=Some(113) Some("free=186 alloc=198 def=182 iso=0") [publish+:av[127, 127]/d6/n14/r14/def[168, 168]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step46 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(57) avail_now=Some(99) Some("free=172 alloc=212 def=196 iso=0") [publish+:av[113, 113]/d6/n14/r14/def[182, 182]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step47 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(58) avail_now=Some(85) Some("free=158 alloc=226 def=210 iso=0") [publish+:av[99, 99]/d6/n14/r14/def[196, 196]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step48 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(59) avail_now=Some(71) Some("free=144 alloc=240 def=224 iso=0") [publish+:av[85, 85]/d6/n14/r14/def[210, 210]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step49 Ow(2999) -> ok empties+0 F=Some(42) txg=Some(60) avail_now=Some(59) Some("free=132 alloc=252 def=236 iso=0") [publish+:av[71, 71]/d6/n12/r12/def[224, 224]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P3 a-ow150 step50 Ow(2999) -> PlacementRefused[Data] empties+0 F=Some(42) txg=Some(60) avail_now=Some(59) Some("free=132 alloc=252 def=236 iso=0") []
+E9 384 P3 a-ow150 step51 Ow(2999) -> PlacementRefused[Data] empties+0 F=Some(42) txg=Some(60) avail_now=Some(59) Some("free=132 alloc=252 def=236 iso=0") []
+E9 384 P3 a-ow150 step52 Ow(2999) -> PlacementRefused[Data] empties+0 F=Some(42) txg=Some(60) avail_now=Some(59) Some("free=132 alloc=252 def=236 iso=0") []
+E9 384 P3 a-ow150 step53 Ow(2999) -> PlacementRefused[Data] empties+0 F=Some(42) txg=Some(60) avail_now=Some(59) Some("free=132 alloc=252 def=236 iso=0") []
+E9 384 P1 a-ow150 step40 Ow(2999) -> ok empties+0 F=Some(48) txg=Some(56) avail_now=Some(103) Some("free=272 alloc=112 def=96 iso=0") [publish+:av[131, 131]/d6/n14/r14/def[82, 82]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step41 Ow(2999) -> ok empties+0 F=Some(48) txg=Some(57) avail_now=Some(75) Some("free=258 alloc=126 def=110 iso=0") [publish+:av[103, 103]/d6/n14/r14/def[96, 96]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step42 Ow(2999) -> ok empties+0 F=Some(48) txg=Some(58) avail_now=Some(47) Some("free=244 alloc=140 def=124 iso=0") [publish+:av[75, 75]/d6/n14/r14/def[110, 110]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step43 Ow(2999) -> ok empties+0 F=Some(48) txg=Some(59) avail_now=Some(19) Some("free=230 alloc=154 def=138 iso=0") [publish+:av[47, 47]/d6/n14/r14/def[124, 124]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step44 Ow(2999) -> ok empties+0 F=Some(48) txg=Some(60) avail_now=Some(-5) Some("free=218 alloc=166 def=150 iso=0") [publish+:av[19, 19]/d6/n12/r12/def[138, 138]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step45 Ow(2999) -> ok empties+2 F=Some(57) txg=Some(63) avail_now=Some(167) Some("free=304 alloc=80 def=64 iso=0") [publish-:av[-5, -5]/d6/n12/r12/def[150, 150]/iso[0, 0]/mc68/ck5/rows1 publish+:av[191, 191]/d6/n12/r12/def[52, 52]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step46 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(64) avail_now=Some(143) Some("free=292 alloc=92 def=76 iso=0") [publish+:av[167, 167]/d6/n12/r12/def[64, 64]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step47 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(65) avail_now=Some(115) Some("free=278 alloc=106 def=90 iso=0") [publish+:av[143, 143]/d6/n14/r14/def[76, 76]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step48 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(66) avail_now=Some(87) Some("free=264 alloc=120 def=104 iso=0") [publish+:av[115, 115]/d6/n14/r14/def[90, 90]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step49 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(67) avail_now=Some(59) Some("free=250 alloc=134 def=118 iso=0") [publish+:av[87, 87]/d6/n14/r14/def[104, 104]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step50 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(68) avail_now=Some(31) Some("free=236 alloc=148 def=132 iso=0") [publish+:av[59, 59]/d6/n14/r14/def[118, 118]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step51 Ow(2999) -> ok empties+0 F=Some(57) txg=Some(69) avail_now=Some(3) Some("free=222 alloc=162 def=146 iso=0") [publish+:av[31, 31]/d6/n14/r14/def[132, 132]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step52 Ow(2999) -> ok empties+2 F=Some(66) txg=Some(72) avail_now=Some(159) Some("free=300 alloc=84 def=68 iso=0") [publish-:av[3, 3]/d6/n14/r14/def[146, 146]/iso[0, 0]/mc68/ck5/rows1 publish+:av[187, 187]/d6/n14/r14/def[54, 54]/iso[0, 0]/mc68/ck5/rows1]
+E9 384 P1 a-ow150 step53 Ow(2999) -> ok empties+0 F=Some(66) txg=Some(73) avail_now=Some(131) Some("free=286 alloc=98 def=82 iso=0") [publish+:av[159, 159]/d6/n14/r14/def[68, 68]/iso[0, 0]/mc68/ck5/rows1]
+test e9_step_by_step_trace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.14s
+

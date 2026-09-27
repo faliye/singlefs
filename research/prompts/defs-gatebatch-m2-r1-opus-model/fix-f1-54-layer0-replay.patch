@@ -1,0 +1,23 @@
+--- .claude/gate.d/54-layer0-replay.sh	2026-09-26 12:08:55.510242626 +0000
++++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/54-layer0-replay.sh	2026-09-26 13:16:48.386890804 +0000
+@@ -111,7 +111,9 @@
+     echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。"
+     exit 77
+   fi
+-  scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}")"
++  # 登记表、判它的 54 号与准入模块都进每条崩溃枚举用例的指纹：只改它们的一次改动同样要核标记（探针 A1–A4 的改法，被攻过零轮）
++  layer0_judge_paths=(.claude/gate.d/stage-inputs.tsv "$(realpath -m --relative-to="$ROOT" "$layer0_stage_script_path")" "$(realpath -m --relative-to="$ROOT" "$layer0_admission_module")")
++  scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}")"
+   scope_rc=$?
+   if [[ "$scope_rc" != 0 ]]; then
+     echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"
+@@ -165,7 +167,8 @@
+ write_crash_case_manifest() {
+   local manifest_summary
+   if ! manifest_summary="$(python3 "$layer0_admission_module" crash-case-manifest "$ROOT" "$1" "$2" \
+-      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" --toolchain --build-environment)"; then
++      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" \
++      --extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module" --toolchain --build-environment)"; then
+     case_manifest_problem="$manifest_summary"
+     return 1
+   fi

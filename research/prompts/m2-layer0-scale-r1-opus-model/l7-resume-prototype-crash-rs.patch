@@ -1,0 +1,252 @@
+--- a/crates/singlefs-harness/src/crash.rs
++++ b/crates/singlefs-harness/src/crash.rs
+@@ -2352,3 +2352,249 @@
+         );
+     }
+ }
++
++// ───────────── 攻方腿 L7 原型（只在草稿副本里）：按状态序号区间切片、进度文件追加 + fsync、续跑 ─────────────
++
++/// 续跑原型的解析口径：严格（整行、带校验、片区间与计划相符）或宽松（能解的 key=value 都收、缺的取 0）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum ResumeParser { Strict, Lenient }
++/// 并片次序：按片号，或按文件里出现的次序（新跑的片按跑完的次序接在后面）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum ResumeMerge { BySliceIndex, FileOrder }
++
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct ResumeStats {
++    pub slices_total: usize,
++    pub slices_from_file: usize,
++    pub slices_evaluated: usize,
++    pub states_evaluated: u64,
++    pub header_rejected: bool,
++    pub truncated_bytes: u64,
++    pub duplicate_slice_lines: usize,
++}
++
++fn hex_of(text: &str) -> String { text.bytes().map(|b| format!("{b:02x}")).collect() }
++fn unhex(text: &str) -> Option<String> {
++    if text.len() % 2 != 0 { return None; }
++    let bytes: Option<Vec<u8>> = (0..text.len()).step_by(2).map(|i| u8::from_str_radix(&text[i..i + 2], 16).ok()).collect();
++    String::from_utf8(bytes?).ok()
++}
++fn static_invariant(name: &str) -> &'static str {
++    singlefs_checker::image::IMPLEMENTED_INVARIANTS.iter().copied().find(|i| *i == name)
++        .unwrap_or_else(|| Box::leak(name.to_string().into_boxed_str()))
++}
++fn publish_key(publish: &Layer0PublishOfState) -> String {
++    match publish {
++        Layer0PublishOfState::UpToTheRootOf { root_write_index, instance, checkpoint_txg } => format!("U.{root_write_index}.{}.{}", instance.0, checkpoint_txg.0),
++        Layer0PublishOfState::AfterTheLastRoot => "A".to_string(),
++        Layer0PublishOfState::EveryWritePersisted => "E".to_string(),
++    }
++}
++fn publish_of_key(key: &str) -> Option<Layer0PublishOfState> {
++    let parts: Vec<&str> = key.split('.').collect();
++    match parts.as_slice() {
++        ["A"] => Some(Layer0PublishOfState::AfterTheLastRoot),
++        ["E"] => Some(Layer0PublishOfState::EveryWritePersisted),
++        ["U", r, i, t] => Some(Layer0PublishOfState::UpToTheRootOf { root_write_index: r.parse().ok()?, instance: InstanceGeneration(i.parse().ok()?), checkpoint_txg: CheckpointTxg(t.parse().ok()?) }),
++        _ => None,
++    }
++}
++
++/// 一片的计数写成一行（字段次序：先状态数，最后才是违例类——宽松解析截在半行时「状态数对、违例少」就是这样来的）。
++pub fn slice_line(slice_index: usize, slice: &Range<u64>, tally: &Layer0Tally) -> String {
++    let mut fields = vec![format!("S {slice_index} {} {}", slice.start, slice.end), format!("states={}", tally.states)];
++    for (publish, n) in &tally.states_by_publish { fields.push(format!("sbp:{}={n}", publish_key(publish))); }
++    for (name, value) in [
++        ("root_persisted_states", tally.root_persisted_states), ("no_file_states", tally.no_file_states), ("file_read_states", tally.file_read_states),
++        ("failed_states", tally.failed_states), ("journal_differing_states", tally.journal_differing_states), ("verification_ran_states", tally.verification_ran_states),
++        ("verification_failed_states", tally.verification_failed_states), ("record_root_without_record", tally.record_root_without_record),
++        ("record_claimed_state_missing_unit", tally.record_claimed_state_missing_unit),
++    ] { fields.push(format!("{name}={value}")); }
++    for (i, n) in &tally.checker_evaluated_states { fields.push(format!("ce:{i}={n}")); }
++    for (i, n) in &tally.checker_not_applicable_states { fields.push(format!("cn:{i}={n}")); }
++    fields.push(format!("violations={}", tally.violations));
++    fields.push(format!("ignored_violations={}", tally.ignored_violations));
++    for (i, n) in &tally.checker_violated_states { fields.push(format!("cv:{i}={n}")); }
++    if let Some(v) = &tally.first_violation { fields.push(format!("fv={}", hex_of(v))); }
++    if let Some(v) = &tally.first_ignored_violation { fields.push(format!("fiv={}", hex_of(v))); }
++    for (i, v) in &tally.checker_first_violation { fields.push(format!("cf:{i}={}", hex_of(v))); }
++    let body = fields.join(" ");
++    let crc = singlefs_core::checksum::crc32_castagnoli(body.as_bytes());
++    format!("{body} crc={crc:08x}\n")
++}
++
++fn parse_slice_fields(tokens: &[&str]) -> Layer0Tally {
++    let mut t = Layer0Tally::default();
++    for token in tokens {
++        let Some((key, value)) = token.split_once('=') else { continue };
++        let number = value.parse::<u64>().unwrap_or(0);
++        match key {
++            "states" => t.states = number,
++            "root_persisted_states" => t.root_persisted_states = number,
++            "no_file_states" => t.no_file_states = number,
++            "file_read_states" => t.file_read_states = number,
++            "failed_states" => t.failed_states = number,
++            "journal_differing_states" => t.journal_differing_states = number,
++            "verification_ran_states" => t.verification_ran_states = number,
++            "verification_failed_states" => t.verification_failed_states = number,
++            "record_root_without_record" => t.record_root_without_record = number,
++            "record_claimed_state_missing_unit" => t.record_claimed_state_missing_unit = number,
++            "violations" => t.violations = number,
++            "ignored_violations" => t.ignored_violations = number,
++            "fv" => t.first_violation = unhex(value),
++            "fiv" => t.first_ignored_violation = unhex(value),
++            _ => {
++                if let Some(p) = key.strip_prefix("sbp:") { if let Some(p) = publish_of_key(p) { t.states_by_publish.insert(p, number); } }
++                else if let Some(i) = key.strip_prefix("ce:") { t.checker_evaluated_states.insert(static_invariant(i), number); }
++                else if let Some(i) = key.strip_prefix("cn:") { t.checker_not_applicable_states.insert(static_invariant(i), number); }
++                else if let Some(i) = key.strip_prefix("cv:") { t.checker_violated_states.insert(static_invariant(i), number); }
++                else if let Some(i) = key.strip_prefix("cf:") { if let Some(v) = unhex(value) { t.checker_first_violation.insert(static_invariant(i), v); } }
++            }
++        }
++    }
++    t
++}
++
++/// 读进度文件：头行要与 `header` 逐字相同，否则整份作废（返回空、调用方从头跑）。
++/// 严格：每行要以换行结尾、crc 对、片区间与计划相符，遇到第一行不合格就停、把文件截到最后一行合格的末尾。
++/// 宽松：按换行切（最后一段没换行也收），能解的都收。重复的片号：两种都只收第一次。
++fn read_progress(path: &std::path::Path, header: &str, slices: &[Range<u64>], parser: ResumeParser, stats: &mut ResumeStats) -> Vec<(usize, Layer0Tally)> {
++    let Ok(bytes) = std::fs::read(path) else { return Vec::new() };
++    let text = String::from_utf8_lossy(&bytes).to_string();
++    let header_line = format!("{header}\n");
++    if !text.starts_with(&header_line) {
++        stats.header_rejected = !text.is_empty();
++        let _ = std::fs::remove_file(path);
++        return Vec::new();
++    }
++    let mut good_end = header_line.len();
++    let mut out: Vec<(usize, Layer0Tally)> = Vec::new();
++    let mut seen = BTreeSet::new();
++    let rest = &text[header_line.len()..];
++    let mut offset = header_line.len();
++    let pieces: Vec<&str> = rest.split_inclusive('\n').collect();
++    for piece in pieces {
++        let complete = piece.ends_with('\n');
++        let line = piece.trim_end_matches('\n');
++        let tokens: Vec<&str> = line.split(' ').collect();
++        let accepted = match parser {
++            ResumeParser::Strict => {
++                let crc_ok = line.rsplit_once(" crc=").is_some_and(|(body, crc)| {
++                    u32::from_str_radix(crc, 16).ok() == Some(singlefs_core::checksum::crc32_castagnoli(body.as_bytes()))
++                });
++                let range_ok = tokens.len() >= 4 && tokens[0] == "S" && tokens[1].parse::<usize>().ok().and_then(|i| slices.get(i)).is_some_and(|r| {
++                    tokens[2].parse::<u64>().ok() == Some(r.start) && tokens[3].parse::<u64>().ok() == Some(r.end)
++                });
++                complete && crc_ok && range_ok
++            }
++            ResumeParser::Lenient => tokens.len() >= 2 && tokens[0] == "S" && tokens[1].parse::<usize>().is_ok(),
++        };
++        if !accepted {
++            if parser == ResumeParser::Strict { break; } else { offset += piece.len(); continue; }
++        }
++        let slice_index: usize = tokens[1].parse().unwrap();
++        offset += piece.len();
++        good_end = offset;
++        if !seen.insert(slice_index) { stats.duplicate_slice_lines += 1; continue; }
++        out.push((slice_index, parse_slice_fields(&tokens[4.min(tokens.len())..])));
++    }
++    if parser == ResumeParser::Strict && good_end < bytes.len() {
++        stats.truncated_bytes = (bytes.len() - good_end) as u64;
++        let file = std::fs::OpenOptions::new().write(true).open(path).expect("开进度文件");
++        file.set_len(good_end as u64).expect("截掉半行");
++        file.sync_all().expect("fsync");
++    }
++    out
++}
++
++/// 续跑原型：片长固定（`states_per_slice`，不随线程数变）；已完成的片从进度文件读回，剩下的多线程跑，每跑完一片追加一行并 fsync。
++/// `stop_after_new_slices`：跑完这么多片新片就停（模拟被杀在片与片之间）。观察者只在新跑的状态上被调用。
++#[allow(clippy::too_many_arguments)]
++pub fn enumerate_layer0_resumable(
++    base: &MemoryPool,
++    writes: &[RetainedWrite],
++    segments: &[Vec<usize>],
++    judged_root_index: usize,
++    versions: &[PublishedVersion],
++    expand: &dyn Fn(usize, &[usize]) -> bool,
++    states_per_slice: NonZeroU64,
++    worker_threads: usize,
++    progress_path: &std::path::Path,
++    header: &str,
++    parser: ResumeParser,
++    merge: ResumeMerge,
++    stop_after_new_slices: Option<usize>,
++    observe_new_state: Option<&mut dyn FnMut(&CrashImage<'_>, &RecoveryReport)>,
++) -> (Option<Layer0Tally>, ResumeStats) {
++    use std::io::Write;
++    let plan = Layer0StatePlan::new(writes, segments, expand);
++    let parallelism = Layer0Parallelism { worker_threads: NonZeroUsize::new(worker_threads).unwrap(), worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller, slice_length: Layer0SliceLength::StatesPerSlice(states_per_slice) };
++    let slices = state_slices(plan.state_count, &parallelism);
++    let mut stats = ResumeStats { slices_total: slices.len(), ..ResumeStats::default() };
++    let from_file = read_progress(progress_path, header, &slices, parser, &mut stats);
++    stats.slices_from_file = from_file.len();
++    let done: BTreeSet<usize> = from_file.iter().map(|(i, _)| *i).collect();
++    if !progress_path.exists() {
++        let mut file = std::fs::OpenOptions::new().create_new(true).write(true).open(progress_path).expect("建进度文件");
++        file.write_all(format!("{header}\n").as_bytes()).expect("写头");
++        file.sync_all().expect("fsync");
++    }
++    let remaining: Vec<usize> = (0..slices.len()).filter(|i| !done.contains(i)).collect();
++    let budget = stop_after_new_slices.unwrap_or(usize::MAX);
++    let retention = if observe_new_state.is_some() { StateReportRetention::HandEachStateToObserver } else { StateReportRetention::CountOnly };
++    let file = std::sync::Mutex::new(std::fs::OpenOptions::new().append(true).open(progress_path).expect("开进度文件"));
++    let next = AtomicUsize::new(0);
++    let finished_in_order = std::sync::Mutex::new(Vec::<FinishedSlice>::new());
++    std::thread::scope(|scope| {
++        for _ in 0..worker_threads.min(remaining.len()).max(1) {
++            scope.spawn(|| loop {
++                let k = next.fetch_add(1, Ordering::Relaxed);
++                if k >= budget { break; }
++                let Some(slice_index) = remaining.get(k).copied() else { break };
++                let finished = evaluate_state_slice(base, writes, &plan, slice_index, slices[slice_index].clone(), judged_root_index, versions, retention);
++                let line = slice_line(slice_index, &slices[slice_index], &finished.tally);
++                {
++                    let mut f = file.lock().unwrap();
++                    f.write_all(line.as_bytes()).expect("追加");
++                    f.sync_data().expect("fsync");
++                }
++                finished_in_order.lock().unwrap().push(finished);
++            });
++        }
++    });
++    let mut new_slices = finished_in_order.into_inner().unwrap();
++    stats.slices_evaluated = new_slices.len();
++    stats.states_evaluated = new_slices.iter().map(|f| f.tally.states).sum();
++    if let Some(observe) = observe_new_state {
++        new_slices.sort_by_key(|f| f.slice_index);
++        for f in &mut new_slices {
++            for (persisted, report) in std::mem::take(&mut f.observed_states) {
++                observe(&CrashImage { base, writes, persisted }, &report);
++            }
++        }
++    }
++    if from_file.len() + new_slices.len() < slices.len() { return (None, stats); }
++    let mut all: Vec<(usize, Layer0Tally)> = from_file;
++    all.extend(new_slices.into_iter().map(|f| (f.slice_index, f.tally)));
++    if merge == ResumeMerge::BySliceIndex { all.sort_by_key(|(i, _)| *i); }
++    let mut merged = Layer0Tally::default();
++    for (_, t) in all { merged.absorb_following_slice(t); }
++    (Some(merged), stats)
++}
++
++/// 原型的测试口子：续跑那一套的片区间与读进度文件。
++pub fn resume_plan_slices(writes: &[RetainedWrite], segments: &[Vec<usize>], expand: &dyn Fn(usize, &[usize]) -> bool, states_per_slice: NonZeroU64) -> Vec<Range<u64>> {
++    let plan = Layer0StatePlan::new(writes, segments, expand);
++    let parallelism = Layer0Parallelism { worker_threads: NonZeroUsize::MIN, worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller, slice_length: Layer0SliceLength::StatesPerSlice(states_per_slice) };
++    state_slices(plan.state_count, &parallelism)
++}
++pub fn probe_read_progress(path: &std::path::Path, header: &str, slices: &[Range<u64>], parser: ResumeParser) -> (Vec<(usize, Layer0Tally)>, ResumeStats) {
++    let mut stats = ResumeStats::default();
++    let out = read_progress(path, header, slices, parser, &mut stats);
++    (out, stats)
++}
++/// 今天的默认切法（片长随线程数变）交回的片区间：续跑的片方案要是它，线程数一变片就对不齐。
++pub fn default_slices_for_threads(state_count: u64, worker_threads: usize) -> Vec<Range<u64>> {
++    let parallelism = Layer0Parallelism { worker_threads: NonZeroUsize::new(worker_threads).unwrap(), worker_threads_source: Layer0WorkerThreadsSource::GivenByCaller, slice_length: Layer0SliceLength::ScaledToWorkerThreads };
++    state_slices(state_count, &parallelism)
++}

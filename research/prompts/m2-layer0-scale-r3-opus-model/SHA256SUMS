@@ -1,0 +1,13 @@
+5e4536a7756d13603ad64f515a6bfc9c88db51bbeca541b10e035c0abfba397f  ./build-env-scenarios.sh
+1be6d50d8bb31053ec6fb788e481fecb21e595496c3551c9654dc8e4e43089cc  ./crash-rs-pub-helpers.patch
+4939cb18dc5f936b0c120ce96b7ba4e1dc88cc465496adde689d8a00caab570e  ./opus_r3_build_env_probe.rs
+ac82f73cd5a256bf2e62204bdc56a44447601897f2aefdc4d6499e602f9f6b99  ./opus_r3_probe.rs
+8ca05cddf2cfe541d5c4894d1cc1c8c3595542039e7246dbd0cffdd01076dc0c  ./outputs/build-env-scenarios.log
+9c8c6dbfcf95204863da2c985acaac52739abdd141080637b2a54f3f6513553d  ./outputs/r3a-sweep23.log
+5a2fca3b92343b5262a3fad29b6137544770b0321682f2032fdf0e6499e83b4f  ./outputs/r3a-uooouomsu.log
+b6c0142fa7122d560e91341c8d1d8b020df1df12b836139eca28374feb595796  ./outputs/r3b.log
+12999a25294f952e185d529fe6fa839a911e1c994700cafd315dc544d9dd8ab0  ./outputs/rerun-summary.log
+ffbdd917f6a4bd567e9e5072780b76b513d919ae293c76733c3bd576198e1ce9  ./rerun.sh
+21f4b4981d33b02a47dd11526424ae701a86ff9ccec4c1a7059efcac899dce40  ./runner.sh
+fc63a7121dfb484af5786fed223320a44413f6d72eaffd290077774c0a8acb45  ./rustc-as-RUSTC.sh
+9773940db93a512f4d38be53c8fe5edbc796ca81692cfb85bae129554ee9818d  ./rustc-wrapper.sh

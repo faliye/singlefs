@@ -1,0 +1,13 @@
+CONTROL	holds	C1 用例不读 other_target ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当不变	改前 3952c11fe92d6b10… 改后 3952c11fe92d6b10…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	C2 include_str!(concat!(…)) 拼出 other_target 的路径（Y5 认得的写法） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 9b27ba4a7bb989a4… 改后 b438cbbc180a8f1e…（文件数 / 减去数 改前 5/2 改后 5/2）
+ATTACK	BROKEN	M1 ::core::include_str!(::core::concat!(…))（带路径的宏名，编得过、读同一份） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 730d1b23600cc67d… 改后 730d1b23600cc67d…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	M2 include_str!(env!("K1_FIXTURE"))，路径在仓根 .cargo/config.toml 的 [env] 里（relative = true） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 07253dee10dc690a… 改后 07253dee10dc690a…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	C3 别的包 gen 的 build.rs 自己按目录读 pkg 的 tests/（Y5 认得的写法） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 ef6a8b194ce4e4f1… 改后 2857f30574c532e6…（文件数 / 减去数 改前 8/2 改后 8/2）
+ATTACK	BROKEN	M3 gen 的 build.rs 只写 mod scan;，按目录读 pkg 的 tests/ 的那几行在 scan.rs 里 ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 d5ad98ece8532053… 改后 d5ad98ece8532053…（文件数 / 减去数 改前 8/3 改后 8/3）
+ATTACK	BROKEN	M4 include_str!(concat!(…)) 拼出 crates/mutations.tsv ⇒ 改 crates/mutations.tsv 指纹应当变	改前 f4bcff450e202357… 改后 f4bcff450e202357…（文件数 / 减去数 改前 5/2 改后 5/2）
+ATTACK	BROKEN	M5 include!(concat!(…)) 拼出 src/bin/tool.rs 里的代码 ⇒ 改 crates/pkg/src/bin/tool.rs 指纹应当变	改前 43f35d7b9292b91e… 改后 43f35d7b9292b91e…（文件数 / 减去数 改前 5/2 改后 5/2）
+CONTROL	holds	C4 runner = <仓>/tools/r.sh（直接指脚本），改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 202fa8ae5b3a3723… 改后 4550274c048c485c…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	G1 runner = bash <仓>/tools/r.sh（前面带解释器，cargo 按空白切），改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 43d61d5de7dc5a05… 改后 43d61d5de7dc5a05…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	G2 .cargo/config.toml 里 runner = ["bash", "tools/r.sh"]，改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 f62727a21db0898f… 改后 f62727a21db0898f…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	G3 runner = <仓>/tools/r.sh，它 source 的 r-lib.sh 改了 ⇒ 改 tools/r-lib.sh 指纹应当变	改前 bbe7581bb94425fd… 改后 bbe7581bb94425fd…（文件数 / 减去数 改前 4/3 改后 4/3）
+SUMMARY K1 排除规则与 runner 指纹: cells=12 attack_cells_broken=8 control_cells_broken=0

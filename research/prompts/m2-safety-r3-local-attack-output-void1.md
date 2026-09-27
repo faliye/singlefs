@@ -1,0 +1,9 @@
+Question 1. Rule T's available(d) on each disk is 21 slots, and demand(d) is 6 slots. This would be wrong if the av[21, 21] in fact A1 did not represent rule T's available(d) for the write.
+
+Question 2. Rule P2's available(d) per disk cannot be determined because the deferred-pending-release per disk is not provided in the facts (only total deferred-pending-release of 65 is given in fact A6). Rule P2's demand(d) is 14 slots, derived from fact A1's n=14 (total newly-written slots), as rule P2 includes all roles rewritten without filtering. This would be wrong if the deferred-pending-release per disk was explicitly provided in the facts.
+
+Question 3. cannot be determined from the given facts. This would be wrong if the number of valid roots in the root ring immediately before the write in fact A1 was provided.
+
+Question 4. For target 20: rule P1 requires 1 empty publish, rule P3 requires 1 empty publish. For target 50: rule P1 requires 8 empty publishes and is 26 slots short, rule P3 requires 1 empty publish. For target 100: rule P1 requires 8 empty publishes and is 76 slots short, rule P3 requires 8 empty publishes and is 39 slots short. This would be wrong if the reclaimed slots per push for rule P1 or P3 differed from facts B3 and B4.
+
+Question 5. The 20/50/100 numbers represent the deficit (demand(d) minus current available(d)) for a pending write to pass admission. This would be wrong if the demand(d) for the specific delete-then-refused-write scenario in facts B3 and B4 was not the difference between the required slots and current available(d), requiring a fact like "Fact X, source ... line Y: 'demand(d) for the delete-then-refused-write scenario is Z slots'".

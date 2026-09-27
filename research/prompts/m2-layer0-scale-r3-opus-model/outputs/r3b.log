@@ -1,0 +1,44 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_r3_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r3_probe") generated 1 warning (run `cargo fix --test "opus_r3_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_probe.rs (target/release/deps/opus_r3_probe-8ea7212b0dc07571)
+
+running 1 test
+R3B writes=99 segments=16 closed_form_full=201326619 txg=(4, 5) data_slots=(50178, 50178)
+  R3STATE C513_units_of_txg5_landed_records_and_root_not eff=Some((1, 4)) layer0: oracle=1 oracle_ignored=1 checker_violated=7 record_root_without_record=0 record_claimed_state_missing_unit=1 red=true why=oracle=走读失败：MappingStillUnreadable { slot: SlotNumber(50178) }（持久的写：system_configuration_slot|system_configuration_slot|journal_record|journal_record|root_record_fua|s | oracle_ignored=走读失败：MappingStillUnreadable { slot: SlotNumber(50178) } | record:claimed_state_missing_unit | I-2.1:数据单元 在盘 0 槽 50178 的那一份与位置条目里的校验和对不上 | I-3.1:盘 0：记账的已分配 Some(262144)，遍历全部有效根得到 507904（其中隔离豁免 0）；机理：根环槽数 24、最新根 txg 4、环里自证过的根槽 5 个、最老的自证过的根 txg 0、遍历的候选根槽 5 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个 | I-3.10:盘 1 槽 50178 的分配记录（未释放、跨 2 槽）分配代 4，它罩住的单元头里的诞生代号是 5 | I-4.8:最新根（txg 4）出发的遍历有单元对不上或读不出 | I-5.1:盘 0：树表单元（槽 50178 跨 1）与 数据单元（槽 50178）重叠 | I-7.2:最新的根走不完：数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的 | I-7.4:最新根（txg 4）引用的单元已被复用或抹头（校验和对不上或头用不了）
+    R3RULE C513_units_of_txg5_landed_records_and_root_not Today missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecPers missing_groups(txg,slot16k)=[]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecPers513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecDisk missing_groups(txg,slot16k)=[]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecDisk513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecDiskRec missing_groups(txg,slot16k)=[]
+    R3RULE C513_units_of_txg5_landed_records_and_root_not SecDiskRec513 missing_groups(txg,slot16k)=[(4, 50178)]
+  R3STATE C513_everything_but_the_txg5_root eff=Some((1, 5)) layer0: oracle=0 oracle_ignored=1 checker_violated=7 record_root_without_record=0 record_claimed_state_missing_unit=1 red=true why=oracle_ignored=走读失败：MappingStillUnreadable { slot: SlotNumber(50178) } | record:claimed_state_missing_unit | I-2.1:数据单元 在盘 0 槽 50178 的那一份与位置条目里的校验和对不上 | I-3.1:盘 0：记账的已分配 Some(262144)，遍历全部有效根得到 507904（其中隔离豁免 0）；机理：根环槽数 24、最新根 txg 4、环里自证过的根槽 5 个、最老的自证过的根 txg 0、遍历的候选根槽 5 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个 | I-3.10:盘 1 槽 50178 的分配记录（未释放、跨 2 槽）分配代 4，它罩住的单元头里的诞生代号是 5 | I-4.8:最新根（txg 4）出发的遍历有单元对不上或读不出 | I-5.1:盘 0：树表单元（槽 50178 跨 1）与 数据单元（槽 50178）重叠 | I-7.2:最新的根走不完：数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的 | I-7.4:最新根（txg 4）引用的单元已被复用或抹头（校验和对不上或头用不了）
+    R3RULE C513_everything_but_the_txg5_root Today missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_everything_but_the_txg5_root SecPers missing_groups(txg,slot16k)=[]
+    R3RULE C513_everything_but_the_txg5_root SecPers513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_everything_but_the_txg5_root SecDisk missing_groups(txg,slot16k)=[]
+    R3RULE C513_everything_but_the_txg5_root SecDisk513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_everything_but_the_txg5_root SecDiskRec missing_groups(txg,slot16k)=[]
+    R3RULE C513_everything_but_the_txg5_root SecDiskRec513 missing_groups(txg,slot16k)=[(4, 50178)]
+  R3STATE C513_every_write_persisted eff=Some((1, 5)) layer0: oracle=0 oracle_ignored=0 checker_violated=6 record_root_without_record=0 record_claimed_state_missing_unit=1 red=true why=record:claimed_state_missing_unit | I-2.1:树表单元 在盘 0 槽 50178 的那一份与位置条目里的校验和对不上 | I-3.1:盘 0：记账的已分配 Some(262144)，遍历全部有效根得到 704512（其中隔离豁免 0）；机理：根环槽数 24、最新根 txg 5、环里自证过的根槽 6 个、最老的自证过的根 txg 0、遍历的候选根槽 6 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个 | I-3.10:盘 1 槽 50178 的分配记录（未释放、跨 2 槽）分配代 4，它罩住的单元头里的诞生代号是 5 | I-4.8:候选根 txg 0 出发的遍历有单元对不上或读不出 | I-5.1:盘 0：树表单元（槽 50178 跨 1）与 数据单元（槽 50178）重叠 | I-7.4:候选根 txg 0 引用的单元已被复用或抹头（校验和对不上或头用不了）
+    R3RULE C513_every_write_persisted Today missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_every_write_persisted SecPers missing_groups(txg,slot16k)=[]
+    R3RULE C513_every_write_persisted SecPers513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_every_write_persisted SecDisk missing_groups(txg,slot16k)=[]
+    R3RULE C513_every_write_persisted SecDisk513 missing_groups(txg,slot16k)=[(4, 50178)]
+    R3RULE C513_every_write_persisted SecDiskRec missing_groups(txg,slot16k)=[]
+    R3RULE C513_every_write_persisted SecDiskRec513 missing_groups(txg,slot16k)=[(4, 50178)]
+test r3b_c513_illegal_reuse_under_sector_wise_rules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.05s
+

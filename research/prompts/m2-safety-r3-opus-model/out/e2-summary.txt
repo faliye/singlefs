@@ -1,0 +1,13 @@
+臂 格 | 格数 | 吸收态（重挂两支、写、删、回退全不成） | 放开扫长度 ≤ 3 的用户序列之后仍写不进
+P1 end | 72 | 0 | 0
+P1 first-S4c | 53 | 53 | 53
+P1 first-refused | 17 | 0 | 0
+P2 end | 72 | 1 | 1
+P2 first-refused | 35 | 0 | 0
+P3 end | 72 | 0 | 0
+P3 first-refused | 28 | 0 | 0
+P3pl end | 72 | 0 | 0
+P3pl first-refused | 3 | 0 | 0
+T end | 72 | 0 | 0
+T first-S4c | 42 | 42 | 42
+T first-refused | 55 | 0 | 0

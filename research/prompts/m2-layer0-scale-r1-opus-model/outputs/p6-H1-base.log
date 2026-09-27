@@ -1,0 +1,39 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+H1 faulted_ranges_on_dev1=15
+H1 mount_under_fault chosen=(1,3) effective=(1,3) instance=2 rows=[InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }] row_publish_txg=5 warmups=[6, 7]
+STREAM H1 writes=166 segments=26 sizes=[2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 4, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 2] closed_form=202113075 reduced_closed_form=78
+KINDS H1 [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×18] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2]
+OVERWRITE H1 write#137 dev0 slot50182 txgSome(8) overwrites: stream=#41(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H1 write#138 dev1 slot50182 txgSome(8) overwrites: stream=#42(unit_write,txgSome(4)) mkfs_base_sectors=0
+  ARM_A2_BAD H1 seg=22 imask=0b0 cow=all record:claimed_state_missing_unit
+  ARM_A2_BAD H1 seg=22 imask=0b1 cow=all record:claimed_state_missing_unit
+  FULL_DIFF H1 seg=22 in_place_mask=0b0 cow_mask=0b10000010001010110000111: records RecordCheck { root_without_record: false, claimed_state_missing_unit: false } → RecordCheck { root_without_record: false, claimed_state_missing_unit: true }
+  FULL_DIFF H1 seg=22 in_place_mask=0b0 cow_mask=0b11011110101110111101011: records RecordCheck { root_without_record: false, claimed_state_missing_unit: false } → RecordCheck { root_without_record: false, claimed_state_missing_unit: true }
+ARMSEG H1 seg=22 txg=Some(8) in_place=2 cow=24 arm_a_bad=0 arm_a2_bad=3 full_sampled_extra_bad=124
+  ARM_A_BAD H1 seg=23 imask=0b0 record:claimed_state_missing_unit
+  ARM_A_BAD H1 seg=23 imask=0b1 record:claimed_state_missing_unit
+ARMSEG H1 seg=23 txg=Some(8) in_place=2 cow=0 arm_a_bad=3 arm_a2_bad=3 full_sampled_extra_bad=0
+  ARM_A_BAD H1 seg=24 imask=0b0 record:claimed_state_missing_unit
+ARMSEG H1 seg=24 txg=Some(8) in_place=1 cow=0 arm_a_bad=1 arm_a2_bad=1 full_sampled_extra_bad=0
+  ARM_A_BAD H1 seg=25 imask=0b0 record:claimed_state_missing_unit
+  ARM_A_BAD H1 seg=25 imask=0b1 record:claimed_state_missing_unit
+ARMSEG H1 seg=25 txg=None in_place=2 cow=0 arm_a_bad=3 arm_a2_bad=3 full_sampled_extra_bad=0
+ARMS H1 arm_a_states=78 arm_a_bad=7 arm_a2_states=93 arm_a2_bad=10 full_sampled_cow_states=1561 full_sampled_bad_beyond_arm_a=124
+test p6_three_arms_on_fixed_scripts_and_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 1.77s
+

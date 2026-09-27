@@ -1,0 +1,114 @@
+== probe cases-f13.json
+Q1-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q1-now	ask	主 agent	fg	exit=0	
+Q2-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q2-now	ask	主 agent	fg	exit=0	
+Q3-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q3-now	ask	主 agent	fg	exit=0	
+Q4-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q4-now	ask	主 agent	fg	exit=0	
+Q5-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q5-now	ask	主 agent	fg	exit=0	
+Q6-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q6-now	ask	主 agent	fg	exit=0	
+Q7-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q7-now	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q8-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q8-now	ask	主 agent	fg	exit=0	
+Q9-head	ask-head	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+Q9-now	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+# detections: 0 line(s) in /tmp/claude-1000/defs-m2-closeout-r2-opus/probe-detections-ynha9bq9.jsonl
+== probe cases-hooks.json
+P1	heavy	three-way-attack	fg	exit=0	
+P2	heavy	three-way-attack	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_three_acquisition_barrier_layer0（层 0）：three-way-attack 不跑「层 0」
+P3	heavy	three-way-attack	fg	exit=0	
+T1	heavy	implementation-writer	fg	exit=0	
+T2	heavy	crash-verifier	fg	exit=0	
+T3	heavy	implementation-writer	fg	exit=0	
+G1	heavy	gate-triage	fg	exit=0	
+G2	detector	gate-triage	rib	exit=0	
+G3	heavy	gate-triage	fg	exit=0	
+B1	detector	three-way-attack	rib	exit=0	
+B2	detector	three-way-attack	rib	exit=0	
+B3	detector	three-way-attack	fg	exit=0	
+B4	detector	three-way-attack	rib	exit=0	
+# detection: {"command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"}
+# detections: 1 line(s) in /tmp/claude-1000/defs-m2-closeout-r2-opus/probe-detections-smmskuqn.jsonl
+== probe cases-dispatch.json
+D1	dispatch	three-way-attack	fg	exit=2	✗ 派 three-way-attack 的提示要它跑「层 0」：「照定义第 3b 步，在原型里调 `enumerate_layer0` 跑小流，每次不超过约 10⁶ 个状态」
+D2	dispatch	three-way-attack	fg	exit=2	✗ 派 three-way-attack 的提示要它跑「层 0」：「崩溃状态照层 0 的枚举域取，用 enumerate_layer0_versions 跑每段历史」
+D3	dispatch	three-way-attack	fg	exit=2	✗ 派 three-way-attack 的提示要它跑「层 0」：「原型用 closed_form_state_count 先算状态数，再用 enumerate_layer0 跑」
+D4	dispatch	three-way-attack	fg	exit=0	
+D5	dispatch	gate-triage	fg	exit=0	
+D6	dispatch	crash-verifier	fg	exit=0	
+# detections: 0 line(s) in /tmp/claude-1000/defs-m2-closeout-r2-opus/probe-detections-b0p5s43a.jsonl
+== f13-fix-g1.sh
+copy selftest exit=0: 自检通过（查了 30 种） 
+Q1-fixG1	exit=2
+Q2-fixG1	exit=2
+Q3-fixG1	exit=2
+Q4-fixG1	exit=2
+Q5-fixG1	exit=2
+Q6-fixG1	exit=2
+Q7-fixG1	exit=2
+Q8-fixG1	exit=0
+Q9-fixG1	exit=2
+== nest-demo.sh
+  inner_cap=300M inner_key=nest-inner-a inner_exit=0
+outer_cap=200M outer_key=nest-outer-a outer_exit=0
+  inner_cap=300M inner_key=nest-inner-b inner_exit=252
+  内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 401 MiB（回收不掉的用量 9 MiB + 账上还没涨到量的 392 MiB），这一条要 300 MiB（峰值表里没有这条，按它的上限 300M 算），总上限 600 MiB
+outer_cap=400M outer_key=nest-outer-b outer_exit=0
+  inner_cap=300M inner_key=nest-inner-c inner_exit=252
+  内存不够排不上：等了 6 秒（上限 RUN_WITH_MEMORY_CAP_WAIT_SECONDS=6），slice 已占 300 MiB（回收不掉的用量 8 MiB + 账上还没涨到量的 292 MiB），这一条要 300 MiB（峰值表里没有这条，按它的上限 300M 算），总上限 600 MiB
+outer_cap=300M outer_key=nest-outer-c outer_exit=0
+  inner_cap=300M inner_key=nest-inner-d inner_exit=0
+outer_cap=300M outer_key=nest-outer-c outer_exit=0
+peaks recorded (MiB, cap, key):
+  1	300M	nest-inner-a
+  1	300M	nest-inner-d
+  13	200M	nest-outer-a
+  10	400M	nest-outer-b
+  11	300M	nest-outer-c
+== oom-demo.sh
+wrapped (cap 150M):
+  step1 ran
+  wrapper_exit=250
+unwrapped (ulimit -v 300000 KiB stands in for one failing stage):
+  step1 ran
+  step2 exit=1
+  step3 ran
+  step4 ran (2 s after the failing step)
+  exit=0
+== stage-demo.sh
+[baseline] 40-results-cited.sh exit=1 e999_lines=0
+[baseline] 86-experiment-orphans.sh exit=0 e999_lines=0
+[with-e999-no-page] 40-results-cited.sh exit=1 e999_lines=1
+         research/results/e999-probe-2026-09-26.out
+[with-e999-no-page] 86-experiment-orphans.sh exit=1 e999_lines=1
+          E999  research/results/e999-probe-2026-09-26.out 
+[after-step7-page] 40-results-cited.sh exit=1 e999_lines=0
+[after-step7-page] 86-experiment-orphans.sh exit=0 e999_lines=0
+== rc-stale-demo.sh
+batch1: s1=0 s2=0
+<bash: 作业被 KILL>                  { sleep 2; echo "$?" > "$work/s2.rc"; }
+batch2: s1=1 s2=0   # s2 这一件没写，读到的是第一批的
+== verdict-scan.py
+UNNAMED	cells_where_pad_taller_than_legacy=2	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	grid_cells=21	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	journal_differing_states=3	6 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+UNNAMED	layout_total=413	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+UNNAMED	legacy_entry_bytes=24	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	legacy_leaf_fanout=676	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	pad_entry_bytes=35	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	pad_leaf_fanout=463	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	prepaid_legacy=24	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	prepaid_pad=35	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+UNNAMED	today_resolves_registered=1000	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+UNNAMED	variants=6	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+UNNAMED	variants_fitting_512=6	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+NAMED-COUNT	control_violations_ok=true	15 处	例 research/results/e142-r18-controls-2026-09-26.out:226
+NAMED-COUNT	g6_violations_zero=true	10 处	例 research/results/e142-r18-controls-2026-09-26.out:226
+NAMED-COUNT	layer0_violations=zero	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+NAMED-COUNT	text_number_mismatches_zero=true	10 处	例 research/results/e142-r18-controls-2026-09-26.out:226
+合计 NAMED-FALSE 92、NAMED-COUNT 36、UNNAMED 18

@@ -1,0 +1,92 @@
+[
+ {
+  "id": "Q1-head",
+  "hook": "ask-head",
+  "command": "O3/O8两格：2 格一定该升成打中"
+ },
+ {
+  "id": "Q1-now",
+  "hook": "ask",
+  "command": "O3/O8两格：2 格一定该升成打中"
+ },
+ {
+  "id": "Q2-head",
+  "hook": "ask-head",
+  "command": "54/55号：2 道一定要带前缀"
+ },
+ {
+  "id": "Q2-now",
+  "hook": "ask",
+  "command": "54/55号：2 道一定要带前缀"
+ },
+ {
+  "id": "Q3-head",
+  "hook": "ask-head",
+  "command": "F1/F4两条：2 处一定都要改"
+ },
+ {
+  "id": "Q3-now",
+  "hook": "ask",
+  "command": "F1/F4两条：2 处一定都要改"
+ },
+ {
+  "id": "Q4-head",
+  "hook": "ask-head",
+  "command": "E142/第十六次跑：3 个字段一定是 0"
+ },
+ {
+  "id": "Q4-now",
+  "hook": "ask",
+  "command": "E142/第十六次跑：3 个字段一定是 0"
+ },
+ {
+  "id": "Q5-head",
+  "hook": "ask-head",
+  "command": "research/prompts下的判决：3 条一定都对"
+ },
+ {
+  "id": "Q5-now",
+  "hook": "ask",
+  "command": "research/prompts下的判决：3 条一定都对"
+ },
+ {
+  "id": "Q6-head",
+  "hook": "ask-head",
+  "command": "抓到40/无效：0，这张表一定全抓了"
+ },
+ {
+  "id": "Q6-now",
+  "hook": "ask",
+  "command": "抓到40/无效：0，这张表一定全抓了"
+ },
+ {
+  "id": "Q7-head",
+  "hook": "ask-head",
+  "command": "第十六次跑：3 个字段一定是 0"
+ },
+ {
+  "id": "Q7-now",
+  "hook": "ask",
+  "command": "第十六次跑：3 个字段一定是 0"
+ },
+ {
+  "id": "Q8-head",
+  "hook": "ask-head",
+  "command": "records/2026-09-16-subagent拆分提案.md:951 写着静态分支一定要走定义三方"
+ },
+ {
+  "id": "Q8-now",
+  "hook": "ask",
+  "command": "records/2026-09-16-subagent拆分提案.md:951 写着静态分支一定要走定义三方"
+ },
+ {
+  "id": "Q9-head",
+  "hook": "ask-head",
+  "command": "E1/E2 两格：3 条一定都打中"
+ },
+ {
+  "id": "Q9-now",
+  "hook": "ask",
+  "command": "E1/E2 两格：3 条一定都打中"
+ }
+]

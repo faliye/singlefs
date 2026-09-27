@@ -1,0 +1,98 @@
+--- a/research/scripts/admission.py
++++ b/research/scripts/admission.py
+@@ -150,12 +150,12 @@
+ PASSED_ONE_TEST_FORM = re.compile(r"^test result: ok\. 1 passed; 0 failed; ")
+ MARKER_DIFFERENCES_LISTED_AT_MOST = 20
+ # 用例函数要标的属性：#[ignore] 或 #[ignore = "…"]（cfg_attr 里的条件 ignore 不算：条件不成立时不带 --ignored 照样跑它）
+-IGNORE_ATTRIBUTE_FORM = re.compile(r"^#\[\s*ignore\s*(?:\]|=)")
++IGNORE_ATTRIBUTE_FORM = re.compile(r"^#\s*\[\s*ignore\s*(?:\]|=)")
+ ATTRIBUTE_START = re.compile(r"#!?\s*\[")
+ # 属性与 fn 之间可以夹的限定词（一次认一个，从 fn 往前剥）
+ FUNCTION_QUALIFIER_AT_END = re.compile(r'(?:\bpub(?:\s*\([^()]*\))?|\basync|\bunsafe|\bconst|\bextern(?:\s*"[^"]*")?)$')
+ # 编译期拼出来的文件名：include! / include_str! / include_bytes! 套 concat!（拼出来的是哪一份认不出，整包不减）
+-COMPILE_TIME_CONCATENATED_INCLUDE = re.compile(r"\binclude(?:_str|_bytes)?!\s*[(\[{]\s*concat!")
++COMPILE_TIME_CONCATENATED_INCLUDE = re.compile(r"\binclude(?:_str|_bytes)?!\s*[(\[{]\s*(?:(?:::)?\s*[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*(?:concat|env|option_env)!")
+ # 崩溃枚举用例的输入里减去的、不是测试文件的那几份：仓根起的路径 → 为什么用例读不到它（有代码按文件名点名它时照留）
+ CRASH_CASE_FILES_NOT_READ = {"crates/mutations.tsv": "crates 变异表：59 号按它改源码再跑点名的测试，用例编译期与运行期都不读它"}
+ # 集成测试拿本包 bin 的路径靠这个前缀的环境变量；没有代码读它时，src/bin/ 下的文件编不进也读不到用例
+@@ -500,9 +500,12 @@
+     """首词是程序、其后是参数的一个值：交回那个程序的内容（进指纹）；找不到的交「找不到」一句（值本身另有一行进指纹）。"""
+     program = words[0] if words else ""
+     path = resolved_program(program, base_directory, environment)
+-    if path and os.path.isfile(path):
+-        return read_configuration_file(path)
+-    return f"找不到：{program}".encode("utf-8", "surrogateescape")
++    content = read_configuration_file(path) if path and os.path.isfile(path) else f"找不到：{program}".encode("utf-8", "surrogateescape")
++    for word in words[1:]:
++        candidate = word if os.path.isabs(word) else os.path.join(base_directory, word)
++        if os.path.isfile(candidate):
++            content += b"\n<" + word.encode("utf-8", "surrogateescape") + b">\n" + read_configuration_file(candidate)
++    return content
+ 
+ 
+ def compiler_version(program, root, environment, described_as):
+@@ -1160,10 +1163,10 @@
+         raise RegistrationError(f"崩溃枚举用例 {case.key} 的测试目标 {case.target} 不在（没有 {single_file}，也没有 {directory_target}/main.rs）")
+     for relative in files:
+         with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+-            attributes = attributes_before_function(rust_code_without_comments(handle.read()), case.function)
+-        if attributes is None:
++            every = attributes_before_every_definition(rust_code_without_comments(handle.read()), case.function)
++        if every is None:
+             continue
+-        if not attributes_mark_ignored(attributes):
++        if not all(attributes_mark_ignored(attributes) for attributes in every):
+             raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 没标 #[ignore]（{relative}）：不带 --ignored 的 "
+                                     "cargo test 也会跑到全量；给它补上 #[ignore = \"<为什么平时不跑>\"]")
+         return files
+@@ -1286,6 +1289,26 @@
+     return list(reversed(attributes))
+ 
+ 
++def attributes_before_every_definition(code, function):
++    """同名的每一处 `fn <function>(`（cfg 二选一、子模块里同名的都算）前面那串属性；一处都没有交 None。"""
++    lists = []
++    for found in re.finditer(r"\bfn\s+" + re.escape(function) + r"\s*\(", code):
++        head = code[:found.start()].rstrip()
++        while True:
++            qualifier = FUNCTION_QUALIFIER_AT_END.search(head)
++            if not qualifier:
++                break
++            head = head[:qualifier.start()].rstrip()
++        start_of_attribute_ending_at = {end: start for start, end in attribute_spans(head)}
++        attributes, cursor = [], len(head)
++        while cursor in start_of_attribute_ending_at:
++            start = start_of_attribute_ending_at[cursor]
++            attributes.append(head[start:cursor])
++            cursor = len(head[:start].rstrip())
++        lists.append(list(reversed(attributes)))
++    return lists or None
++
++
+ def attributes_mark_ignored(attributes):
+     """那串属性里有没有 #[ignore] 或 #[ignore = "…"]。"""
+     return any(IGNORE_ATTRIBUTE_FORM.match(attribute) for attribute in attributes)
+@@ -1297,11 +1320,11 @@
+     for relative in test_target_source_files(root, package_directory, target):
+         try:
+             with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+-                attributes = attributes_before_function(rust_code_without_comments(handle.read()), function)
++                every = attributes_before_every_definition(rust_code_without_comments(handle.read()), function)
+         except OSError:
+             return None
+-        if attributes is not None:
+-            return attributes_mark_ignored(attributes)
++        if every is not None:
++            return all(attributes_mark_ignored(attributes) for attributes in every)
+     return None
+ 
+ 
+@@ -1401,6 +1424,8 @@
+ def files_crash_cases_do_not_read(root, listed_names, code_texts):
+     """listed_names（仓根起的 str）里不是测试文件、用例也读不到的（str 的集合）：判法见本节开头的 ② ③。"""
+     listed_set = set(listed_names)
++    if any(name.endswith(".rs") and COMPILE_TIME_CONCATENATED_INCLUDE.search(text) for name, text in code_texts.items()):
++        return set()
+     left_out = {name for name in CRASH_CASE_FILES_NOT_READ
+                 if name in listed_set and not any(os.path.basename(name) in text for text in code_texts.values())}
+     if any(BIN_EXECUTABLE_VARIABLE_PREFIX in text for text in code_texts.values()):

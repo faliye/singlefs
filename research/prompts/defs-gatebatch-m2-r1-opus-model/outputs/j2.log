@@ -1,0 +1,16 @@
+ATTACK	BROKEN	U1 用例在编译期 include!(concat!("other_", "target.rs")) 把别的测试目标编进自己；改那个目标 ⇒ 指纹应当变	改前 690d64c93af0962c…，改后 690d64c93af0962c…
+CONTROL	holds	U0 同一处写成字面路径 include_str!("other_target.rs") ⇒ 指纹变（整词命中）	改前 ff09d63269817a3d…，改后 6b53d369d66169d8…
+ATTACK	BROKEN	U2 另一个包的 build.rs 按目录读 crates/pkg/tests/（pkg 自己没有 build.rs）；改 pkg 里别的测试目标 ⇒ 指纹应当变	改前 8a3fb87ce708a3ea…，改后 8a3fb87ce708a3ea…
+INFO	holds	真仓拷贝 crash-case:layer0-first-stream	指纹 d042e14100dcbf5b…，留 69 个文件，减去 68 个
+INFO	holds	真仓拷贝 crash-case:layer0-second-stream	指纹 442d1c0e13c7cf84…，留 69 个文件，减去 68 个
+INFO	holds	真仓拷贝 crash-case:floor-raise-pushed-by-the-session	指纹 ae9df77ad9d9f8f3…，留 69 个文件，减去 68 个
+INFO	holds	真仓拷贝 crash-case:c561-sigma-full	指纹 8eadf090707afc85…，留 69 个文件，减去 68 个
+ATTACK	BROKEN	O1 只给 crates/mutations.tsv 加一行（没有哪条用例在编译期或运行期读它） ⇒ 读不到它的用例指纹应当不变	指纹变了、下一趟 --full 要重跑的：layer0-first-stream、layer0-second-stream、floor-raise-pushed-by-the-session、c561-sigma-full（共 4 条读不到它）
+ATTACK	BROKEN	O2 只给 tests/common_tree_split/mod.rs 加一个没人调的函数（四条用例的测试目标都不 mod 它） ⇒ 读不到它的用例指纹应当不变	指纹变了、下一趟 --full 要重跑的：layer0-first-stream、layer0-second-stream、floor-raise-pushed-by-the-session、c561-sigma-full（共 4 条读不到它）
+ATTACK	BROKEN	O3 只给 harness 的 src/bin/e142_first_transaction_write_dump.rs 加一个函数（集成测试不链接 bin，四条都不读 CARGO_BIN_EXE_*） ⇒ 读不到它的用例指纹应当不变	指纹变了、下一趟 --full 要重跑的：layer0-first-stream、layer0-second-stream、floor-raise-pushed-by-the-session、c561-sigma-full（共 4 条读不到它）
+ATTACK	BROKEN	O4 只给 tests/common_admission/mod.rs 加一个函数（只有 floor-raise 那条 mod 它） ⇒ 读不到它的用例指纹应当不变	指纹变了、下一趟 --full 要重跑的：layer0-first-stream、layer0-second-stream、c561-sigma-full（共 3 条读不到它）
+SUMMARY J2 排除法: cells=11 attack_cells_broken=6 control_cells_broken=0
+
+real	2m39.709s
+user	2m38.840s
+sys	0m0.595s

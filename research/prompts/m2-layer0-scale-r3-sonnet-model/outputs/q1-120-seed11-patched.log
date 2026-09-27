@@ -1,0 +1,142 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/n1_sonnet_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "n1_sonnet_probe") generated 1 warning (run `cargo fix --test "n1_sonnet_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/n1_sonnet_probe.rs (target/release/deps/n1_sonnet_probe-139315f60a9b7df7)
+
+running 1 test
+Q1 seq=SMU applied=SMU writes=285 segments=43 closed_form=211091552 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SROSSSUORS applied=S-OSSSUORS writes=407 segments=55 closed_form=605159532 cheap_checked=1592 skipped_groups=0 non_monotone=0
+Q1 seq=M applied=M writes=137 segments=23 closed_form=135004208 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRUMUOMS applied=--UMUOMS writes=525 segments=76 closed_form=2297561259 cheap_checked=536 skipped_groups=0 non_monotone=0
+Q1 seq=OORMROUM applied=OORMROUM writes=502 segments=73 closed_form=1353384104 cheap_checked=752 skipped_groups=0 non_monotone=0
+Q1 seq=MUMS applied=MUMS writes=381 segments=56 closed_form=1222705275 cheap_checked=0 skipped_groups=0 non_monotone=0
+test q1_search_non_monotone_cow_subsets_over_histories has been running for over 60 seconds
+Q1 seq=RRMUSSOOU applied=--MUSSOOU writes=528 segments=72 closed_form=4448190617 cheap_checked=616 skipped_groups=0 non_monotone=0
+Q1 seq=MRSUUROOS applied=M-SUUROOS writes=585 segments=82 closed_form=3435266225 cheap_checked=616 skipped_groups=0 non_monotone=0
+Q1 seq=R applied=- writes=70 segments=13 closed_form=134217752 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRUMOUOSSR applied=--UMOUOSSR writes=577 segments=82 closed_form=2427650225 cheap_checked=2024 skipped_groups=0 non_monotone=0
+Q1 seq=RURS applied=-URS writes=308 segments=46 closed_form=1217790051 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MMU applied=MMU writes=344 segments=53 closed_form=145031288 cheap_checked=536 skipped_groups=0 non_monotone=0
+Q1 seq=O applied=O writes=99 segments=16 closed_form=201326619 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=UMU applied=UMU writes=409 segments=63 closed_form=145621136 cheap_checked=536 skipped_groups=0 non_monotone=0
+Q1 seq=MRSSUMURM applied=M-SSUMURM writes=636 segments=93 closed_form=1295974616 cheap_checked=1040 skipped_groups=0 non_monotone=0
+Q1 seq=US applied=US writes=231 segments=36 closed_form=202702923 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=M applied=M writes=137 segments=23 closed_form=135004208 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MUMOMRS applied=MUMOMRS writes=525 segments=76 closed_form=2297561259 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=R applied=- writes=70 segments=13 closed_form=134217752 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SUUOM applied=SUUOM writes=433 segments=63 closed_form=1289879696 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=UMRSSOOM applied=UMRSSOOM writes=516 segments=72 closed_form=4436394137 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=SM applied=SM writes=145 segments=23 closed_form=201850928 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=UMOURRM applied=UMOURRM writes=622 segments=93 closed_form=1224999128 cheap_checked=1608 skipped_groups=0 non_monotone=0
+Q1 seq=OOR applied=OOR writes=172 segments=26 closed_form=268763187 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=ROUMUUSR applied=-OUMUUSR writes=638 segments=93 closed_form=1299710168 cheap_checked=1648 skipped_groups=0 non_monotone=0
+Q1 seq=RMS applied=-MS writes=166 segments=26 closed_form=202113075 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SURRSR applied=SURRSR writes=425 segments=63 closed_form=1285554320 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OOSR applied=OOSR writes=222 segments=32 closed_form=336134201 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RM applied=-M writes=137 segments=23 closed_form=135004208 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OMMMOUO applied=OMMMOUO writes=464 segments=66 closed_form=2359885971 cheap_checked=968 skipped_groups=0 non_monotone=0
+Q1 seq=RRSOMUOUS applied=--SOMUOUS writes=470 segments=66 closed_form=2426536083 cheap_checked=1224 skipped_groups=0 non_monotone=0
+Q1 seq=SRUORSUMOM applied=S-UORSUMOM writes=585 segments=83 closed_form=2428633280 cheap_checked=776 skipped_groups=0 non_monotone=0
+Q1 seq=UUSSURRSSR applied=UUSSURRSSR writes=746 segments=106 closed_form=3447324915 cheap_checked=2448 skipped_groups=0 non_monotone=0
+Q1 seq=UM applied=UM writes=273 segments=43 closed_form=140312672 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MRMSMMROOO applied=M-MSMM-OOO writes=453 segments=62 closed_form=4436000897 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MRUUR applied=M-UUR writes=490 segments=73 closed_form=161939624 cheap_checked=1240 skipped_groups=0 non_monotone=0
+Q1 seq=MRRROMU applied=M---OMU writes=352 segments=53 closed_form=211878008 cheap_checked=584 skipped_groups=0 non_monotone=0
+Q1 seq=RSUUROOU applied=-SUUROOU writes=579 segments=83 closed_form=2368471232 cheap_checked=424 skipped_groups=0 non_monotone=0
+Q1 seq=SSSMRS applied=SSSMRS writes=330 segments=45 closed_form=1418526804 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SMRO applied=SM-O writes=174 segments=26 closed_form=268959795 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MUMOSUOUOO applied=MUMOSUOUOO writes=714 segments=99 closed_form=4516937950 cheap_checked=1968 skipped_groups=0 non_monotone=0
+Q1 seq=MOM applied=MOM writes=216 segments=33 closed_form=206569544 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RROOMRMSUS applied=--OOMRMSUS writes=470 segments=66 closed_form=2426536083 cheap_checked=1224 skipped_groups=0 non_monotone=0
+Q1 seq=OUOSUO applied=OUOSUO writes=399 segments=56 closed_form=2421817467 cheap_checked=936 skipped_groups=0 non_monotone=0
+Q1 seq=OOUMUM applied=OOUMUM writes=496 segments=73 closed_form=284033192 cheap_checked=8 skipped_groups=0 non_monotone=0
+Q1 seq=OSS applied=OSS writes=157 segments=22 closed_form=335544353 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RUURMSU applied=-UURMSU writes=626 segments=93 closed_form=1228931288 cheap_checked=680 skipped_groups=0 non_monotone=0
+Q1 seq=USSUSMRUS applied=USSUSMRUS writes=675 segments=96 closed_form=3439067355 cheap_checked=1952 skipped_groups=0 non_monotone=0
+Q1 seq=RUOSUUOSRS applied=-UOSUUOSRS writes=637 segments=89 closed_form=4508090566 cheap_checked=1128 skipped_groups=0 non_monotone=0
+Q1 seq=OSSUSOOU applied=OSSUSOOU writes=528 segments=71 closed_form=3567386762 cheap_checked=808 skipped_groups=0 non_monotone=0
+Q1 seq=RS applied=-S writes=99 segments=16 closed_form=201326619 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SUM applied=SUM writes=281 segments=43 closed_form=207159392 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MRRU applied=M--U writes=281 segments=43 closed_form=148176992 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RMOMMUM applied=-MOMMUM writes=490 segments=73 closed_form=217383080 cheap_checked=584 skipped_groups=0 non_monotone=0
+Q1 seq=RUMM applied=-UMM writes=340 segments=53 closed_form=141099128 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MSOUORR applied=MSOUORR writes=443 segments=63 closed_form=2363162768 cheap_checked=520 skipped_groups=0 non_monotone=0
+Q1 seq=SUO applied=SUO writes=239 segments=36 closed_form=269549643 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SMMMMU applied=SMMMMU writes=486 segments=73 closed_form=213450920 cheap_checked=280 skipped_groups=0 non_monotone=0
+Q1 seq=ORMMUR applied=O-MMUR writes=425 segments=63 closed_form=220332176 cheap_checked=280 skipped_groups=0 non_monotone=0
+Q1 seq=US applied=US writes=231 segments=36 closed_form=202702923 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRUSMM applied=--USMM writes=348 segments=53 closed_form=207945848 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RSSOOMMUMS applied=-SSOOMMUMS writes=535 segments=75 closed_form=1483800732 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=M applied=M writes=137 segments=23 closed_form=135004208 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SUMMSOSU applied=SUMMSOSU writes=583 segments=82 closed_form=3434479793 cheap_checked=808 skipped_groups=0 non_monotone=0
+Q1 seq=UO applied=UO writes=231 segments=36 closed_form=202702923 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRURM applied=--URM writes=346 segments=53 closed_form=148766840 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OOROOM applied=OOROOM writes=301 segments=42 closed_form=407699537 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RUUOOSSMO applied=-UUOOSSMO writes=557 segments=75 closed_form=5518000284 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=ROOMRSRS applied=-OOMRSRS writes=328 segments=46 closed_form=2417098851 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=MOROORUMUR applied=MO-OORUMUR writes=705 segments=102 closed_form=2366111969 cheap_checked=1264 skipped_groups=0 non_monotone=0
+Q1 seq=SSMUMU applied=SSMUMU writes=492 segments=73 closed_form=280101032 cheap_checked=600 skipped_groups=0 non_monotone=0
+Q1 seq=ORSSUUMMS applied=O-SSUUMMS writes=600 segments=85 closed_form=1425408180 cheap_checked=376 skipped_groups=0 non_monotone=0
+Q1 seq=SMSURSMM applied=SMSURSMM writes=508 segments=73 closed_form=1357512872 cheap_checked=840 skipped_groups=0 non_monotone=0
+Q1 seq=UOUOMUMOOO applied=UOUOMUMOOO writes=735 segments=102 closed_form=3511550177 cheap_checked=1696 skipped_groups=0 non_monotone=0
+Q1 seq=OSOO applied=OSOO writes=186 segments=25 closed_form=402653220 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=UOMM applied=UOMM writes=348 segments=53 closed_form=207945848 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRURROOU applied=--URROOU writes=500 segments=73 closed_form=2296905896 cheap_checked=456 skipped_groups=0 non_monotone=0
+Q1 seq=URRUMUMROO applied=URRUMUMROO writes=881 segments=129 closed_form=2308833574 cheap_checked=1328 skipped_groups=0 non_monotone=0
+Q1 seq=SRSRM applied=S-SRM writes=222 segments=33 closed_form=273219656 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=USOORRRUOU applied=USOORRRUOU writes=772 segments=112 closed_form=3432120569 cheap_checked=1760 skipped_groups=0 non_monotone=0
+Q1 seq=SOOUR applied=SOOUR writes=358 segments=52 closed_form=341442665 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=U applied=U writes=202 segments=33 closed_form=135594056 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OOSROMMSMR applied=OOSROMMSMR writes=512 segments=72 closed_form=1483341977 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=RMRSO applied=-M-SO writes=199 segments=29 closed_form=1275854902 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MOMUMRMO applied=MOMUMRMO writes=588 segments=86 closed_form=1291714755 cheap_checked=584 skipped_groups=0 non_monotone=0
+Q1 seq=MUUSSOR applied=MUUSSOR writes=581 segments=82 closed_form=3375300785 cheap_checked=1368 skipped_groups=0 non_monotone=0
+Q1 seq=MMSSS applied=MMSSS writes=307 segments=42 closed_form=3360948305 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=UMSMMS applied=UMSMMS writes=452 segments=66 closed_form=2289107091 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=RUMSOUO applied=-UMSOUO writes=466 segments=66 closed_form=3366322323 cheap_checked=872 skipped_groups=0 non_monotone=0
+Q1 seq=OMRMRO applied=OM-M-O writes=249 segments=36 closed_form=1280311371 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OMORMOUMM applied=OMORMOUMM writes=579 segments=83 closed_form=1362231488 cheap_checked=1360 skipped_groups=0 non_monotone=0
+Q1 seq=MUSOSOS applied=MUSOSOS writes=446 segments=58 closed_form=5516886127 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=M applied=M writes=137 segments=23 closed_form=135004208 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RORUSMOOR applied=-O-USMOOR writes=399 segments=56 closed_form=2421817467 cheap_checked=64 skipped_groups=0 non_monotone=0
+Q1 seq=OSMR applied=OSMR writes=218 segments=33 closed_form=269287496 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MMSUUM applied=MMSUUM writes=559 segments=83 closed_form=1224605888 cheap_checked=1168 skipped_groups=0 non_monotone=0
+Q1 seq=MSMR applied=MSM- writes=216 segments=33 closed_form=206569544 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=ORMMU applied=O-MMU writes=352 segments=53 closed_form=211878008 cheap_checked=280 skipped_groups=0 non_monotone=0
+Q1 seq=RURR applied=-URR writes=340 segments=53 closed_form=144638072 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OUMRUSOO applied=OUMRUSOO writes=581 segments=82 closed_form=3434283185 cheap_checked=568 skipped_groups=0 non_monotone=0
+Q1 seq=UURU applied=UURU writes=547 segments=83 closed_form=154665152 cheap_checked=600 skipped_groups=0 non_monotone=0
+Q1 seq=UOMO applied=UOMO writes=314 segments=46 closed_form=1280901219 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=ORMU applied=O-MU writes=285 segments=43 closed_form=211091552 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MUMMRU applied=MUMMRU writes=616 segments=93 closed_form=155648216 cheap_checked=600 skipped_groups=0 non_monotone=0
+Q1 seq=OOOSMSOR applied=OOOSMSOR writes=346 segments=45 closed_form=2554921044 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RMS applied=-MS writes=166 segments=26 closed_form=202113075 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RMU applied=-MU writes=281 segments=43 closed_form=148176992 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OMRR applied=OM-- writes=145 segments=23 closed_form=201850928 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=SMMRSMROS applied=SMM-SMROS writes=426 segments=59 closed_form=3428909182 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RRUURROO applied=--UURROO writes=542 segments=79 closed_form=2297430190 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=URRSRSURMU applied=URRSRSURMU writes=837 segments=123 closed_form=2308112672 cheap_checked=1872 skipped_groups=0 non_monotone=0
+Q1 seq=OOMOMROU applied=OOMOMROU writes=445 segments=63 closed_form=1419640976 cheap_checked=744 skipped_groups=0 non_monotone=0
+Q1 seq=RRMMUUMOMM applied=--MMUUMOMM writes=701 segments=103 closed_form=1234043120 cheap_checked=1136 skipped_groups=0 non_monotone=0
+Q1 seq=OMRU applied=OM-U writes=285 segments=43 closed_form=211091552 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=RSRMOUS applied=-S-MOUS writes=322 segments=46 closed_form=345047139 cheap_checked=968 skipped_groups=0 non_monotone=0
+Q1 seq=RSUMOS applied=-SUMOS writes=347 segments=49 closed_form=2354643046 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1 seq=RRS applied=--S writes=99 segments=16 closed_form=201326619 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=OMMOOM applied=OMMOOM writes=328 segments=46 closed_form=2354577507 cheap_checked=0 skipped_groups=0 non_monotone=0
+Q1 seq=MMMSRU applied=MMMS-U writes=423 segments=63 closed_form=1219297424 cheap_checked=584 skipped_groups=0 non_monotone=0
+Q1 seq=USO applied=USO writes=264 segments=39 closed_form=1276444750 cheap_checked=32 skipped_groups=0 non_monotone=0
+Q1_TOTAL streams=120 streams_with_non_monotone=0 cheap_checked=51720 elapsed_seconds=1270.4
+test q1_search_non_monotone_cow_subsets_over_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 1270.45s
+
+q1-patched exit=0

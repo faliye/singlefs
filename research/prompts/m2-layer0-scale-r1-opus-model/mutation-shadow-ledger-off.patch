@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -828,7 +828,7 @@
+         reclaim_floor(effective_floor, oldest_valid_root),
+         ReclaimedReuse::Immediately,
+     );
+-    let shadow_ledger_computed = match shadow_ledger {
++    let shadow_ledger_computed = match ShadowLedger::Off {
+         ShadowLedger::On => isolate_slots_referenced_only_by_abandoned_roots(
+             devices,
+             &mut allocator,

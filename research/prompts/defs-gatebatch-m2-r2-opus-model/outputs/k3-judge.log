@@ -1,0 +1,16 @@
+# floor-raise 登记：count_lines=['LAYER0_PARALLEL_FINISHED'] exhaustive=[] threads=['LAYER0_PARALLEL_FINISHED']
+# c561 登记：count_lines=['C561_SIGMA_FULL'] exhaustive=[] threads=[]
+CONTROL	holds	F1 跑完全部片（512 片、32 线程） ⇒ 判绿（--full 写标记、快档认它）	--full 判：绿；快档核标记：作数
+CONTROL	holds	F2 只跑了一半的片（resumed 0 + fresh 256 ≠ 512），用例却报过了 ⇒ 判红	--full 判：红：LAYER0_PARALLEL_FINISHED 那一行读回的片 0 + 这一趟跑的片 256 ≠ 总片数 512：LAYER0_PARALLEL_FINISHED states=20493 slices=512 wor；快档核标记：—
+CONTROL	holds	F3 跑了 512 片却只起 1 个线程（没显式设） ⇒ 判红	--full 判：红：本机 32 核、线程数没显式设成 1，这一趟跑了 512 片却只起了 1 个工作线程（多半是线程数没传进去）：LAYER0_PARALLEL_FINISHED states=20493 slices=512 worker；快档核标记：—
+CONTROL	holds	F4 显式 SINGLEFS_LAYER0_THREADS=1 ⇒ 判绿（--full 写标记、快档认它）	--full 判：绿；快档核标记：作数
+CONTROL	holds	F5 用例 panic 在枚举之后（test result FAILED） ⇒ 判红	--full 判：红：读不到恰好一行「test result: ok. 1 passed; 0 failed; …」：过滤到 crash_states_inside_the_floor_raise_pushed_by_the_session_；快档核标记：—
+GAP	BROKEN	F6 片数守恒、线程对，但 states=64（展开被改窄、用例断言跟着改） ⇒ 判红	--full 判：绿；快档核标记：作数
+GAP	BROKEN	F7 片数守恒，但 resumed=256（NoProgressFile 下不该有读回的片） ⇒ 判红	--full 判：绿；快档核标记：作数
+CONTROL	holds	S1 262144 个状态、0 个判缺席 ⇒ 判绿（--full 写标记、快档认它）	--full 判：绿；快档核标记：作数
+GAP	BROKEN	S2 计数行 states=4（只评了 4 个状态、用例断言跟着改） ⇒ 判红	--full 判：绿；快档核标记：作数
+GAP	BROKEN	S3 计数行报 5 个判缺席（用例断言被改成不判它） ⇒ 判红	--full 判：绿；快档核标记：作数
+GAP	BROKEN	S4 单线程跑完（日志里没有线程的任何痕迹），本机 32 核、线程数没显式设 ⇒ 判红	--full 判：绿；快档核标记：作数
+CONTROL	holds	S5 计数行打了两遍 ⇒ 判红	--full 判：红：以「C561_SIGMA_FULL 」开头的计数行要恰好一行，读到 2 行；快档核标记：—
+GAPS 5
+SUMMARY K3 两条登记行的判法: cells=12 attack_cells_broken=0 control_cells_broken=0

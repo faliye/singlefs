@@ -87,6 +87,127 @@ impl Emitter {
     }
 }
 
+/// 准入模块（`research/scripts/admission.py`）用来说「登记或调用有错」的退出码；准入模块被信号杀掉、
+/// 放行却没给指纹行时装置也照这个码退出。
+const ADMISSION_REGISTRATION_ERROR_EXIT_CODE: i32 = 2;
+
+/// 产物头那几行的前缀：`replay.sh` 逐字节比对之前删掉它们，`name=done` 的条数不数它们。
+const ADMISSION_HEADER_PREFIX: &str = "E7INPUT ";
+
+/// 准入模块答完之后装置这一侧怎么办。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AdmissionDecision {
+    /// 放行：这几行原样打在产物最前面（输入指纹，强制重跑时还有理由）。
+    Admitted { header_lines: Vec<String> },
+    /// 不放行：照这个码退出，一行结果都不打。77 输入自上次产物以来没变，3 前提没齐，2 登记有错。
+    Refused { exit_code: i32 },
+}
+
+/// 把准入模块的退出码与 stdout 翻成判定。放行却没有指纹行、或 stdout 里混进别的行，按登记错处理：
+/// 放行的产物必须带指纹，不然下一次准入判不了「输入没变」。被信号杀掉（没有退出码）同样不许当成放行。
+pub fn admission_decision_of(exit_code: Option<i32>, admission_stdout: &str) -> AdmissionDecision {
+    match exit_code {
+        Some(0) => {
+            let header_lines: Vec<String> = admission_stdout.lines().map(String::from).collect();
+            let carries_fingerprint = header_lines
+                .iter()
+                .any(|header_line| header_line.starts_with("E7INPUT name=input_fingerprint "));
+            let only_header_lines = header_lines
+                .iter()
+                .all(|header_line| header_line.starts_with(ADMISSION_HEADER_PREFIX));
+            if carries_fingerprint && only_header_lines {
+                AdmissionDecision::Admitted { header_lines }
+            } else {
+                AdmissionDecision::Refused { exit_code: ADMISSION_REGISTRATION_ERROR_EXIT_CODE }
+            }
+        }
+        Some(refusing_exit_code) => AdmissionDecision::Refused { exit_code: refusing_exit_code },
+        None => AdmissionDecision::Refused { exit_code: ADMISSION_REGISTRATION_ERROR_EXIT_CODE },
+    }
+}
+
+/// 装置开跑之前问准入模块这一趟该不该跑（门禁与实验共用 `research/scripts/admission.py`，
+/// 登记表是 `.claude/gate.d/stage-inputs.tsv`）。放行就返回要打在产物最前面的几行；不放行就照准入模块的
+/// 退出码退出进程。手敲命令、`cargo run`、`replay.sh` 走的都是装置 `main` 里这一个入口，绕不过去。
+/// 说明由准入模块直接打到 stderr。仓库根在编译时写进二进制（`CARGO_MANIFEST_DIR` 往上两级）。
+pub fn admit_experiment_run_or_exit(admission_key: &str) -> Vec<String> {
+    let repository_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+    let admission_script = repository_root.join("research").join("scripts").join("admission.py");
+    let admission_output = match std::process::Command::new("python3")
+        .arg(&admission_script)
+        .arg("experiment")
+        .arg(&repository_root)
+        .arg(admission_key)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+    {
+        Ok(admission_output) => admission_output,
+        Err(error) => {
+            eprintln!("  ✗ 准入模块起不来（python3 {}）：{error}", admission_script.display());
+            eprintln!("     → 怎么办：装好 python3、确认仓库里有 research/scripts/admission.py；仓库挪了目录就重新编一次装置");
+            std::process::exit(ADMISSION_REGISTRATION_ERROR_EXIT_CODE);
+        }
+    };
+    let admission_stdout = String::from_utf8_lossy(&admission_output.stdout);
+    match admission_decision_of(admission_output.status.code(), &admission_stdout) {
+        AdmissionDecision::Admitted { header_lines } => header_lines,
+        AdmissionDecision::Refused { exit_code } => {
+            if exit_code == ADMISSION_REGISTRATION_ERROR_EXIT_CODE && admission_output.status.success() {
+                eprintln!("  ✗ 准入模块退 0 却没给出输入指纹行（stdout：{admission_stdout:?}）");
+                eprintln!("     → 怎么办：python3 research/scripts/admission.py experiment <仓库根> {admission_key} 单跑一次看它打了什么，修准入模块");
+            }
+            std::process::exit(exit_code)
+        }
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+
+    #[test]
+    fn exit_code_zero_with_a_fingerprint_line_admits_and_keeps_every_header_line_in_order() {
+        let admission_stdout = "E7INPUT name=input_fingerprint key=E142 sha256=ab files=145\nE7INPUT name=forced_rerun key=E142 overrode_unchanged=true reason=复核\n";
+        assert_eq!(
+            admission_decision_of(Some(0), admission_stdout),
+            AdmissionDecision::Admitted {
+                header_lines: vec![
+                    "E7INPUT name=input_fingerprint key=E142 sha256=ab files=145".to_string(),
+                    "E7INPUT name=forced_rerun key=E142 overrode_unchanged=true reason=复核".to_string(),
+                ]
+            },
+            "放行时两行产物头原样、按次序交回"
+        );
+    }
+
+    #[test]
+    fn exit_code_zero_without_a_fingerprint_line_is_refused_as_a_registration_error() {
+        assert_eq!(admission_decision_of(Some(0), ""), AdmissionDecision::Refused { exit_code: 2 }, "放行却没有指纹行不许放行");
+        assert_eq!(
+            admission_decision_of(Some(0), "E7INPUT name=forced_rerun key=E142 reason=复核\n"),
+            AdmissionDecision::Refused { exit_code: 2 },
+            "只有理由行、没有指纹行不许放行"
+        );
+    }
+
+    #[test]
+    fn exit_code_zero_with_a_stray_non_header_line_is_refused_as_a_registration_error() {
+        assert_eq!(
+            admission_decision_of(Some(0), "E7INPUT name=input_fingerprint key=E142 sha256=ab files=1\n放行 E142\n"),
+            AdmissionDecision::Refused { exit_code: 2 },
+            "stdout 混进不是 E7INPUT 的行会被写进产物，不许放行"
+        );
+    }
+
+    #[test]
+    fn refusing_exit_codes_pass_through_unchanged_and_a_signal_death_is_a_registration_error() {
+        assert_eq!(admission_decision_of(Some(77), ""), AdmissionDecision::Refused { exit_code: 77 }, "输入没变照 77 退出");
+        assert_eq!(admission_decision_of(Some(3), ""), AdmissionDecision::Refused { exit_code: 3 }, "前提没齐照 3 退出");
+        assert_eq!(admission_decision_of(Some(1), ""), AdmissionDecision::Refused { exit_code: 1 }, "准入模块抛异常退 1 照样不放行");
+        assert_eq!(admission_decision_of(None, ""), AdmissionDecision::Refused { exit_code: 2 }, "被信号杀掉不许当成放行");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

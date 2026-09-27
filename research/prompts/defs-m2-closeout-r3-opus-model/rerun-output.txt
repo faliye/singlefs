@@ -1,0 +1,225 @@
+== probe cases-k1.json
+K1-01	heavy	gate-triage	fg	exit=0	
+K1-02	heavy	gate-triage	fg	exit=0	
+K1-03	heavy	gate-triage	fg	exit=0	
+K1-04	heavy	gate-triage	fg	exit=0	
+K1-05	heavy	gate-triage	fg	exit=0	
+K1-06	heavy	gate-triage	fg	exit=0	
+K1-07	heavy	crash-verifier	fg	exit=0	
+K1-08	heavy	crash-verifier	fg	exit=0	
+K1-09	heavy	crash-verifier	fg	exit=0	
+K1-10	heavy	implementation-writer	fg	exit=0	
+K1-11	heavy	gate-triage	fg	exit=0	
+K1-12	heavy	three-way-attack	fg	exit=2	✗ 重型测试被拒：在工作区根（@COPY@）上不带 -p / --test / --lib / --bin 的 cargo test（全量测试）：three-way-attack 不跑「全量测试」
+K1-13	heavy	three-way-attack	fg	exit=0	
+# detections: 1 line(s)
+== probe cases-k3-detector.json
+D1	detector	three-way-attack	rib	exit=2	  ✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：（前面那个复合命令：圆括号、花括号、循环或 if））：外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何人
+		     → 怎么办：长活直接放 run_in_background，命令里只写那条活本身，不加 `&`（几条活要并行就在同一条命令里 `a & b & wait`，用 `wait` 等齐）；已经在跑、pid 已知的，另起一条 run_in_background 等它：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。这一道只拒这种写法，不停你在跑的任何东西
+D2	detector	three-way-attack	rib	exit=0	
+D3	detector	three-way-attack	rib	exit=2	  ✗ 把活放出了追踪（认出的写法：nohup … &）：进程移出 shell 的作业表或另起会话，随后的 wait 立刻返回、完成通知当场发出，它跑完不会叫醒任何人，成了没人追踪的孤儿
+		     → 怎么办：要等的活用 Bash 的 run_in_background: true 起，命令里只写那条活本身（不加 `disown`、`coproc`、`setsid -f`、`nohup … &`、`tmux` / `screen` 的分离模式、`systemd-run`），然后结束本轮，等它的完成通知再接着做；几条活要并行就在同一条命令里 `a & b & wait`，用不带参数的 `wait` 等齐
+D4	detector	three-way-attack	rib	exit=0	
+D5	detector	three-way-attack	rib	exit=0	
+D6	detector	gate-triage	rib	exit=2	  ✗ run_in_background 里又把活放到了后台（以单独的 & 收尾、之后同一条命令里没有 wait 的作业：（前面那个复合命令：圆括号、花括号、循环或 if））：外层 shell 起完它就退出，完成通知当场发出，真跑完的那个进程不会叫醒任何人
+		     → 怎么办：长活直接放 run_in_background，命令里只写那条活本身，不加 `&`（几条活要并行就在同一条命令里 `a & b & wait`，用 `wait` 等齐）；已经在跑、pid 已知的，另起一条 run_in_background 等它：`python3 .claude/singlefs-ai-sop/scripts/proc.py wait <pid> --timeout <秒>`。这一道只拒这种写法，不停你在跑的任何东西
+# detections: 0 line(s)
+== probe cases-k3-ask.json
+A1	ask	主 agent	fg	exit=0	
+A2	ask	主 agent	fg	exit=0	
+A3	ask	主 agent	fg	exit=0	
+A4	ask	主 agent	fg	exit=0	
+A5	ask	主 agent	fg	exit=0	
+A6	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+A7	ask	主 agent	fg	exit=2	✗ 弹窗里有 1 句带断言词，同一句里却没有出处，也没写明是推的——这样送到用户面前，推断就被当成了事实：
+A8	ask	主 agent	fg	exit=0	
+# detections: 0 line(s)
+== stage-cap-syntax-demo.sh
+== 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=12GiB
+  ✗ research 的构建或单测没过（cargo test 退出码 2）
+     → 怎么办：先修好——kb 里的实测结论全靠它们背书，编不过就等于那些数字今天没有来源。
+exit=1
+== 74 号，GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=12GiB
+  ✗ 内存上限要写成 正整数[K|M|G|T]（例 16G、512M），收到的是「12GiB」
+  → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
+  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
+     → 怎么办：单跑看细节（经内存包装，上限同这一道）：
+                bash research/scripts/run-with-memory-cap.sh 12GiB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
+exit=1
+== 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=16GB
+  ✗ research 的构建或单测没过（cargo test 退出码 2）
+     → 怎么办：先修好——kb 里的实测结论全靠它们背书，编不过就等于那些数字今天没有来源。
+exit=1
+== 74 号，GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=16GB
+  ✗ 内存上限要写成 正整数[K|M|G|T]（例 16G、512M），收到的是「16GB」
+  → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
+  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
+     → 怎么办：单跑看细节（经内存包装，上限同这一道）：
+                bash research/scripts/run-with-memory-cap.sh 16GB cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
+exit=1
+== 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=8g
+  ✗ research 的构建或单测没过（cargo test 退出码 2）
+     → 怎么办：先修好——kb 里的实测结论全靠它们背书，编不过就等于那些数字今天没有来源。
+exit=1
+== 74 号，GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=8g
+  ✗ 内存上限要写成 正整数[K|M|G|T]（例 16G、512M），收到的是「8g」
+  → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
+  ✗ 随机历史的测试二进制判红（上面是 cargo test 的尾部）
+     → 怎么办：单跑看细节（经内存包装，上限同这一道）：
+                bash research/scripts/run-with-memory-cap.sh 8g cargo test --release -p singlefs-harness --test second_transaction_supplement_three_random_history -- --nocapture
+                签名是 ModelDisagreement 的，是实现与理想模型对某一步的结局答得不一样：先看模型那一格引的条款，再判改实现还是改模型。
+exit=1
+== 15 号，GATE_RESEARCH_BUILD_MEMORY_MAX=16
+       ✗ 带内存上限的 scope 起不来：systemd-run --user --scope 退出码 137，命令一行都没跑（上面是 systemd-run 自己的报错）
+       → 怎么办：查用户级 systemd 与 D-Bus（systemctl --user status、echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑
+  ✗ research 的构建与单测没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
+     → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；
+               251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+exit=1
+== 74 号，GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=16
+  ✗ 带内存上限的 scope 起不来：systemd-run --user --scope 退出码 137，命令一行都没跑（上面是 systemd-run 自己的报错）
+  → 怎么办：查用户级 systemd 与 D-Bus（systemctl --user status、echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑
+  ✗ 随机历史的测试二进制没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 251（上限 16），这一次的输出不算判定
+     → 怎么办：照包装文件头「退出码」一段办：250 是这一道要的比上限多，把 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 设大再跑；
+                251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再整道重跑；不拿掉包装跑。
+exit=1
+== 包装本身，上限 12GiB（命令是 true）
+  ✗ 内存上限要写成 正整数[K|M|G|T]（例 16G、512M），收到的是「12GiB」
+  → 怎么办：照 systemd 的 MemoryMax 写法给；默认值与依据写在文件头
+exit=2
+== 包装本身，上限 16（命令是 true）
+  ✗ 带内存上限的 scope 起不来：systemd-run --user --scope 退出码 137，命令一行都没跑（上面是 systemd-run 自己的报错）
+  → 怎么办：查用户级 systemd 与 D-Bus（systemctl --user status、echo $DBUS_SESSION_BUS_ADDRESS $XDG_RUNTIME_DIR）；起不来就别跑这一步，不许退回无上限去跑
+exit=251
+== ampersand-demo.sh
+hook 出路的写法 a & b & wait：wait 之后 $?=0
+共用约束 ④ 的写法：.rc 文件 2 个，第 1 件退 3，第 2 件退 0
+== g2-results-cited-demo.sh
+== 基线（不加新文件）
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+     （第一道列出的未点名产物共 7 份）
+== 加 e14-discrimination-2026-09-26.out
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+     research/results/e14-discrimination-2026-09-26.out
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+     （第一道列出的未点名产物共 8 份）
+== 加 e14-discrimination-r2.out
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+     research/results/e14-discrimination-r2.out
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+     （第一道列出的未点名产物共 8 份）
+== 加 e14-discrimination.r2.out
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+     （第一道列出的未点名产物共 7 份）
+== 加 e14-discrimination.r12.out
+  ✗ 有实验产物没被 experiments.md 点名——跑过但没写回，或写回了却无法复核：
+     research/results/e14-discrimination.r12.out
+               并在口径段点名这份原始输出；确实是废弃产物就删掉它。
+     （第一道列出的未点名产物共 8 份）
+== cap-syntax-fix.py（改法，只在副本上）
+  ✗ GATE_RESEARCH_BUILD_MEMORY_MAX 写成了「12GiB」，内存包装不认（或认成字节数）：这一道没跑
+     → 怎么办：写成正整数加 K / M / G / T（例 16G），单位必写；不设就用默认 8G
+15 cap=12GiB exit=1
+  ✗ GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 写成了「12GiB」，内存包装不认（或认成字节数）：这一道没跑
+     → 怎么办：写成正整数加 K / M / G / T（例 16G），单位必写；不设就用默认 8G
+74 cap=12GiB exit=1
+  ✗ GATE_RESEARCH_BUILD_MEMORY_MAX 写成了「16」，内存包装不认（或认成字节数）：这一道没跑
+     → 怎么办：写成正整数加 K / M / G / T（例 16G），单位必写；不设就用默认 8G
+15 cap=16 exit=1
+  ✗ GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 写成了「16」，内存包装不认（或认成字节数）：这一道没跑
+     → 怎么办：写成正整数加 K / M / G / T（例 16G），单位必写；不设就用默认 8G
+74 cap=16 exit=1
+== claim-scan.py
+G4：甲批按句式分的拒数：路径:1 21、见 路径：12 21、文件名:3 286
+G4：甲批 10047 句（3349 个跟踪文件 × 3），拒 328 句
+    拒：.gitignore:1 写着这一格一定不变
+    拒：.gitignore:3 写着它一定为 0
+    拒：.gitkeep:3 写着它一定为 0
+    拒：.keep:3 写着它一定为 0
+    拒：.lkmm-static-only:3 写着它一定为 0
+    拒：.qemu-prerecorded:3 写着它一定为 0
+G4：乙批 8 句没有出处的断言，放过 7 句
+    放：F1/F4：2 处一定都要改
+    放：54/55：2 道一定要带前缀
+    放：E142/E156：3 个字段一定是 0
+    放：O3/O8：2 格一定该升成打中
+    放：r1/r2:2 处一定都要回退
+    放：H1/H2：2 格一定是打中
+    放：K1/K2：2 格一定都中
+F13：甲批按句式分的拒数：路径:1 21、见 路径：12 21、文件名:3 286
+F13：甲批 10047 句（3349 个跟踪文件 × 3），拒 328 句
+    拒：.gitignore:1 写着这一格一定不变
+    拒：.gitignore:3 写着它一定为 0
+    拒：.gitkeep:3 写着它一定为 0
+    拒：.keep:3 写着它一定为 0
+    拒：.lkmm-static-only:3 写着它一定为 0
+    拒：.qemu-prerecorded:3 写着它一定为 0
+F13：乙批 8 句没有出处的断言，放过 7 句
+    放：F1/F4：2 处一定都要改
+    放：54/55：2 道一定要带前缀
+    放：E142/E156：3 个字段一定是 0
+    放：O3/O8：2 格一定该升成打中
+    放：r1/r2:2 处一定都要回退
+    放：H1/H2：2 格一定是打中
+    放：K1/K2：2 格一定都中
+甲批里 G4 拒而 F13 放的 0 句，F13 拒而 G4 放的 0 句
+== verdict-fields.py
+判决行 26 条
+丁 不点名	control_false_alarm_zero=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	control_missed_zero=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	control_states_ok=true	22 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+丁 不点名	control_violations_ok=true	15 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+丁 不点名	e115_e124_cells_superseded=true	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+丁 不点名	file_read_ok=true	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+丁 不点名	file_read_wrong_content_zero=true	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+丁 不点名	g6_states_ok=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	g6_violations_zero=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	layer0_states_ok=true	6 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+丁 不点名	main_outcome_matrix_ok=true	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+丁 不点名	named_instances_ok=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	positive_control_main_geometry_ok=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	r18_g8_ok=true	4 处	例 research/results/e142-first-txn-dry-run-2026-09-26-r18-main-2.out:714
+丁 不点名	r18_g9_ok=true	4 处	例 research/results/e142-first-txn-dry-run-2026-09-26-r18-main-2.out:714
+丁 不点名	r18_root_flags_ok=true	6 处	例 research/results/e142-first-txn-dry-run-2026-09-26-r18-main-2.out:714
+丁 不点名	r18_system_configuration_fields_ok=true	6 处	例 research/results/e142-first-txn-dry-run-2026-09-26-r18-main-2.out:714
+丁 不点名	recover_full_ok=true	22 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+丁 不点名	role_label_contradictions_zero=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	role_labels_all_defined=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	root_persisted_ok=true	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+丁 不点名	self_describing_resolves_all=true	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+丁 不点名	text_number_mismatches_zero=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	text_numbers_all_classified=true	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+丁 不点名	write_list_ok=true	22 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+乙 点名	journal_differing_states=not_run	17 处	例 research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out:667
+乙 点名	layer0_states_ok=not_run	17 处	例 research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out:667
+乙 点名	layer0_violations=not_run	17 处	例 research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out:667
+己 不点名	cells_where_pad_taller_than_legacy=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	grid_cells=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	journal_differing_states=<整数>	6 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+己 不点名	layout_total=<整数>	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+己 不点名	legacy_entry_bytes=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	legacy_leaf_fanout=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	pad_entry_bytes=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	pad_leaf_fanout=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	prepaid_legacy=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	prepaid_pad=<整数>	1 处	例 research/results/e146-livelist-entry-width-2026-09-16-tree-table-200.out:129
+己 不点名	today_resolves_registered=<整数>	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+己 不点名	variants=<整数>	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+己 不点名	variants_fitting_512=<整数>	1 处	例 research/results/e147-system-configuration-recompute-from-layout-2026-09-13.out:13
+庚 不点名	layer0_violations=0	5 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+庚 不点名	today_ambiguous=0	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+庚 不点名	today_resolves_unregistered=0	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+庚 不点名	trees_with_height_difference=0	1 处	例 research/results/e145-self-describing-node-header-2026-09-16-tree-table-200.out:56
+庚 不点名	width_mismatches=0	22 处	例 research/results/e142-first-txn-dry-run-2026-09-18-change-count-three.out:283
+戊 不点名	layer0_violations=zero	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608
+甲 点名	control_outcome_matrix_ok=false	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+甲 点名	control_violations_ok=false	7 处	例 research/results/e142-first-txn-dry-run-2026-09-25-position-addressed-combined.out:667
+甲 点名	g7_states_ok=false	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+甲 点名	g7_violations_zero=false	10 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:686
+甲 点名	r18_g8_ok=false	2 处	例 research/results/e142-r18-controls-2026-09-26.out:220
+甲 点名	r18_g9_ok=false	2 处	例 research/results/e142-r18-controls-2026-09-26.out:224
+辛 字面没说	journal_reading=j_jia	1 处	例 research/results/e142-first-txn-dry-run-2026-09-25-r17-layer0.out:608

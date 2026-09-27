@@ -1,0 +1,441 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_p3_attack.rs (/tmp/claude-1000/m2-safety-r3-opus/target/release/deps/opus_r3_p3_attack-b85a0c2313d795ef)
+
+running 1 test
+test e6_newest_four_states_stay_candidates has been running for over 60 seconds
+E6 slots=240 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=240 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=240 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=240 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=240 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=240 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=240 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(9) txg=Some(13) state4"}
+E6 slots=240 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=240 arm=T script=i-seq6-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=240 arm=T script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 20, "user-mount-or-rollback:evicted(ring-has-2-states)": 38, "user-mount-or-rollback:evicted(ring-has-3-states)": 1} first={"other:evicted(ring-has-2-states)": "step36:Ow(2999)->SAR F=Some(0) txg=Some(31) state3", "user-mount-or-rollback:evicted(ring-has-2-states)": "step35:Rollback(1)->ok F=Some(0) txg=Some(31) state3", "user-mount-or-rollback:evicted(ring-has-3-states)": "step34:Rollback(1)->ok F=Some(0) txg=Some(30) state2"}
+E6 slots=240 arm=T script=k-seq6-ow-cmount2-x30 checked=14 lost={} first={}
+E6 slots=240 arm=T script=l-seq10-ow-cmount-x40 checked=11 lost={} first={}
+E6 slots=240 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=240 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=240 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=240 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=240 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=240 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=240 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(15) txg=Some(19) state6"}
+E6 slots=240 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={"admission-pushed:evicted(ring-has-2-states)": 12, "user-mount-or-rollback:evicted(ring-has-2-states)": 4, "user-mount-or-rollback:evicted(ring-has-3-states)": 1} first={"admission-pushed:evicted(ring-has-2-states)": "step73:Ow(2999)->SAR;budget(e7+p3) F=Some(11) txg=Some(37) state3", "user-mount-or-rollback:evicted(ring-has-2-states)": "step76:Rollback(1)->ok F=Some(23) txg=Some(50) state3", "user-mount-or-rollback:evicted(ring-has-3-states)": "step72:Rollback(1)->ok F=Some(6) txg=Some(30) state2"}
+E6 slots=240 arm=P1 script=i-seq6-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=240 arm=P1 script=j-rollback-pingpong checked=253 lost={"admission-pushed:evicted(ring-has-2-states)": 22, "user-mount-or-rollback:evicted(ring-has-2-states)": 42, "user-mount-or-rollback:evicted(ring-has-3-states)": 1} first={"admission-pushed:evicted(ring-has-2-states)": "step33:Ow(2999)->SAR;budget(e6+p3) F=Some(11) txg=Some(37) state3", "user-mount-or-rollback:evicted(ring-has-2-states)": "step32:Rollback(1)->ok F=Some(6) txg=Some(31) state3", "user-mount-or-rollback:evicted(ring-has-3-states)": "step31:Rollback(1)->ok F=Some(6) txg=Some(30) state2"}
+E6 slots=240 arm=P1 script=k-seq6-ow-cmount2-x30 checked=14 lost={} first={}
+E6 slots=240 arm=P1 script=l-seq10-ow-cmount-x40 checked=11 lost={} first={}
+E6 slots=240 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=240 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=240 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=240 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=240 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=240 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=240 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=240 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=240 arm=P2 script=i-seq6-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=240 arm=P2 script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 16, "other:evicted(ring-has-3-states)": 1, "user-mount-or-rollback:evicted(ring-has-2-states)": 30, "user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"other:evicted(ring-has-2-states)": "step42:Ow(2999)->SAR F=Some(0) txg=Some(37) state5", "other:evicted(ring-has-3-states)": "step39:Ow(2999)->SAR F=Some(0) txg=Some(35) state4", "user-mount-or-rollback:evicted(ring-has-2-states)": "step41:Rollback(1)->ok F=Some(0) txg=Some(37) state5", "user-mount-or-rollback:evicted(ring-has-3-states)": "step37:Rollback(1)->ok F=Some(0) txg=Some(34) state4"}
+E6 slots=240 arm=P2 script=k-seq6-ow-cmount2-x30 checked=31 lost={} first={}
+E6 slots=240 arm=P2 script=l-seq10-ow-cmount-x40 checked=36 lost={} first={}
+E6 slots=240 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=240 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=240 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=240 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=240 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=240 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=240 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=240 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=240 arm=P3 script=i-seq6-ow-cmount-x40 checked=52 lost={} first={}
+E6 slots=240 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=240 arm=P3 script=k-seq6-ow-cmount2-x30 checked=31 lost={} first={}
+E6 slots=240 arm=P3 script=l-seq10-ow-cmount-x40 checked=60 lost={} first={}
+E6 slots=256 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=256 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=256 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=256 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=256 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=256 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=256 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(10) txg=Some(16) state5"}
+E6 slots=256 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=256 arm=T script=i-seq6-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=256 arm=T script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 20, "user-mount-or-rollback:evicted(ring-has-2-states)": 38, "user-mount-or-rollback:evicted(ring-has-3-states)": 1} first={"other:evicted(ring-has-2-states)": "step36:Ow(2999)->SAR F=Some(0) txg=Some(31) state3", "user-mount-or-rollback:evicted(ring-has-2-states)": "step35:Rollback(1)->ok F=Some(0) txg=Some(31) state3", "user-mount-or-rollback:evicted(ring-has-3-states)": "step34:Rollback(1)->ok F=Some(0) txg=Some(30) state2"}
+E6 slots=256 arm=T script=k-seq6-ow-cmount2-x30 checked=14 lost={} first={}
+E6 slots=256 arm=T script=l-seq10-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=256 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=256 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=256 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=256 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=256 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=256 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=256 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(14) txg=Some(19) state6"}
+E6 slots=256 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={"admission-pushed:evicted(ring-has-2-states)": 2, "admission-pushed:evicted(ring-has-3-states)": 1, "other:evicted(ring-has-2-states)": 16, "other:evicted(ring-has-3-states)": 5, "user-mount-or-rollback:evicted(ring-has-2-states)": 8, "user-mount-or-rollback:evicted(ring-has-3-states)": 2} first={"admission-pushed:evicted(ring-has-2-states)": "step69:Ow(2999)->PlacementRefused[Data] F=Some(14) txg=Some(40) state4", "admission-pushed:evicted(ring-has-3-states)": "step61:Ow(2999)->PlacementRefused[Data] F=Some(10) txg=Some(35) state5", "other:evicted(ring-has-2-states)": "step70:Ow(2999)->PlacementRefused[Data] F=Some(14) txg=Some(40) state4", "other:evicted(ring-has-3-states)": "step62:Ow(2999)->PlacementRefused[Data] F=Some(10) txg=Some(35) state5", "user-mount-or-rollback:evicted(ring-has-2-states)": "step68:Rollback(1)->ok F=Some(10) txg=Some(37) state4", "user-mount-or-rollback:evicted(ring-has-3-states)": "step60:Rollback(1)->ok F=Some(9) txg=Some(33) state5"}
+E6 slots=256 arm=P1 script=i-seq6-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=256 arm=P1 script=j-rollback-pingpong checked=253 lost={"admission-pushed:evicted(ring-has-2-states)": 4, "other:evicted(ring-has-2-states)": 22, "user-mount-or-rollback:evicted(ring-has-2-states)": 48, "user-mount-or-rollback:evicted(ring-has-3-states)": 1} first={"admission-pushed:evicted(ring-has-2-states)": "step27:Ow(2999)->PlacementRefused[Data] F=Some(11) txg=Some(37) state4", "other:evicted(ring-has-2-states)": "step30:Ow(2999)->PlacementRefused[Data] F=Some(11) txg=Some(39) state4", "user-mount-or-rollback:evicted(ring-has-2-states)": "step28:Rollback(1)->ok F=Some(11) txg=Some(38) state4", "user-mount-or-rollback:evicted(ring-has-3-states)": "step26:Rollback(1)->ok F=Some(7) txg=Some(31) state3"}
+E6 slots=256 arm=P1 script=k-seq6-ow-cmount2-x30 checked=14 lost={} first={}
+E6 slots=256 arm=P1 script=l-seq10-ow-cmount-x40 checked=12 lost={} first={}
+E6 slots=256 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=256 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=256 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=256 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=256 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=256 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=256 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=256 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={"other:Publish[PlacementRefused]": 81, "user-mount-or-rollback:Publish[PlacementRefused]": 30} first={"other:Publish[PlacementRefused]": "step45:Ow(2999)->PlacementRefused[AllocationTreeNodeBelowTheRoot] F=Some(0) txg=Some(25) state10", "user-mount-or-rollback:Publish[PlacementRefused]": "step44:Rollback(1)->ok F=Some(0) txg=Some(25) state10"}
+E6 slots=256 arm=P2 script=i-seq6-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=256 arm=P2 script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 14, "other:evicted(ring-has-3-states)": 1, "user-mount-or-rollback:evicted(ring-has-2-states)": 26, "user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"other:evicted(ring-has-2-states)": "step45:Ow(2999)->SAR F=Some(0) txg=Some(40) state6", "other:evicted(ring-has-3-states)": "step42:Ow(2999)->PlacementRefused[Data] F=Some(0) txg=Some(38) state5", "user-mount-or-rollback:evicted(ring-has-2-states)": "step44:Rollback(1)->ok F=Some(0) txg=Some(40) state6", "user-mount-or-rollback:evicted(ring-has-3-states)": "step40:Rollback(1)->ok F=Some(0) txg=Some(37) state5"}
+E6 slots=256 arm=P2 script=k-seq6-ow-cmount2-x30 checked=39 lost={} first={}
+E6 slots=256 arm=P2 script=l-seq10-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=256 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=256 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=256 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=256 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=256 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=256 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=256 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=256 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=256 arm=P3 script=i-seq6-ow-cmount-x40 checked=76 lost={} first={}
+E6 slots=256 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=256 arm=P3 script=k-seq6-ow-cmount2-x30 checked=39 lost={} first={}
+E6 slots=256 arm=P3 script=l-seq10-ow-cmount-x40 checked=68 lost={} first={}
+E6 slots=320 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=320 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=320 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=320 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=320 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=320 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=320 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=320 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=320 arm=T script=i-seq6-ow-cmount-x40 checked=28 lost={} first={}
+E6 slots=320 arm=T script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 18, "other:evicted(ring-has-3-states)": 1, "user-mount-or-rollback:evicted(ring-has-2-states)": 34, "user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"other:evicted(ring-has-2-states)": "step39:Ow(2999)->SAR F=Some(0) txg=Some(34) state4", "other:evicted(ring-has-3-states)": "step36:Ow(2999)->SAR F=Some(0) txg=Some(32) state3", "user-mount-or-rollback:evicted(ring-has-2-states)": "step38:Rollback(1)->ok F=Some(0) txg=Some(34) state4", "user-mount-or-rollback:evicted(ring-has-3-states)": "step34:Rollback(1)->ok F=Some(0) txg=Some(31) state3"}
+E6 slots=320 arm=T script=k-seq6-ow-cmount2-x30 checked=19 lost={} first={}
+E6 slots=320 arm=T script=l-seq10-ow-cmount-x40 checked=20 lost={} first={}
+E6 slots=320 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=320 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=320 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=320 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=320 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=320 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=320 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=320 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=320 arm=P1 script=i-seq6-ow-cmount-x40 checked=28 lost={} first={}
+E6 slots=320 arm=P1 script=j-rollback-pingpong checked=253 lost={"admission-pushed:evicted(ring-has-2-states)": 8, "other:evicted(ring-has-2-states)": 16, "user-mount-or-rollback:evicted(ring-has-2-states)": 44, "user-mount-or-rollback:evicted(ring-has-3-states)": 2} first={"admission-pushed:evicted(ring-has-2-states)": "step30:Ow(2999)->PlacementRefused[Data] F=Some(17) txg=Some(43) state6", "other:evicted(ring-has-2-states)": "step33:Ow(2999)->PlacementRefused[Data] F=Some(17) txg=Some(45) state6", "user-mount-or-rollback:evicted(ring-has-2-states)": "step31:Rollback(1)->ok F=Some(17) txg=Some(44) state6", "user-mount-or-rollback:evicted(ring-has-3-states)": "step28:Rollback(1)->ok F=Some(13) txg=Some(37) state5"}
+E6 slots=320 arm=P1 script=k-seq6-ow-cmount2-x30 checked=19 lost={} first={}
+E6 slots=320 arm=P1 script=l-seq10-ow-cmount-x40 checked=20 lost={} first={}
+E6 slots=320 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=320 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=320 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=320 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=320 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=320 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=320 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=320 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=320 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=320 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=320 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={"user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"user-mount-or-rollback:evicted(ring-has-3-states)": "step81:CMount->ok F=Some(0) txg=Some(169) state25"}
+E6 slots=320 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=320 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=320 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=320 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=320 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=320 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=320 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=320 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=320 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=320 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=320 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=320 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=320 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=384 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=384 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=384 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=384 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=384 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=384 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=384 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=384 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=384 arm=T script=i-seq6-ow-cmount-x40 checked=36 lost={} first={}
+E6 slots=384 arm=T script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 16, "other:evicted(ring-has-3-states)": 1, "user-mount-or-rollback:evicted(ring-has-2-states)": 30, "user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"other:evicted(ring-has-2-states)": "step42:Ow(2999)->SAR F=Some(0) txg=Some(37) state5", "other:evicted(ring-has-3-states)": "step39:Ow(2999)->SAR F=Some(0) txg=Some(35) state4", "user-mount-or-rollback:evicted(ring-has-2-states)": "step41:Rollback(1)->ok F=Some(0) txg=Some(37) state5", "user-mount-or-rollback:evicted(ring-has-3-states)": "step37:Rollback(1)->ok F=Some(0) txg=Some(34) state4"}
+E6 slots=384 arm=T script=k-seq6-ow-cmount2-x30 checked=27 lost={} first={}
+E6 slots=384 arm=T script=l-seq10-ow-cmount-x40 checked=28 lost={} first={}
+E6 slots=384 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=384 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=384 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=384 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=384 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=384 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=384 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=384 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=384 arm=P1 script=i-seq6-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=384 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=384 arm=P1 script=k-seq6-ow-cmount2-x30 checked=27 lost={} first={}
+E6 slots=384 arm=P1 script=l-seq10-ow-cmount-x40 checked=28 lost={} first={}
+E6 slots=384 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=384 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=384 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=384 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=384 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=384 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=384 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=384 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=384 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=384 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=384 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=384 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=384 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=384 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=384 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=384 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=384 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=384 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=384 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=384 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=384 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=384 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=384 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=384 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=448 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=448 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=448 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=448 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=448 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=448 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=448 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=448 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=448 arm=T script=i-seq6-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=448 arm=T script=j-rollback-pingpong checked=253 lost={"other:evicted(ring-has-2-states)": 14, "other:evicted(ring-has-3-states)": 1, "user-mount-or-rollback:evicted(ring-has-2-states)": 26, "user-mount-or-rollback:evicted(ring-has-3-states)": 3} first={"other:evicted(ring-has-2-states)": "step45:Ow(2999)->SAR F=Some(0) txg=Some(40) state6", "other:evicted(ring-has-3-states)": "step42:Ow(2999)->SAR F=Some(0) txg=Some(38) state5", "user-mount-or-rollback:evicted(ring-has-2-states)": "step44:Rollback(1)->ok F=Some(0) txg=Some(40) state6", "user-mount-or-rollback:evicted(ring-has-3-states)": "step40:Rollback(1)->ok F=Some(0) txg=Some(37) state5"}
+E6 slots=448 arm=T script=k-seq6-ow-cmount2-x30 checked=39 lost={} first={}
+E6 slots=448 arm=T script=l-seq10-ow-cmount-x40 checked=44 lost={} first={}
+E6 slots=448 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=448 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=448 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=448 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=448 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=448 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=448 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=448 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=448 arm=P1 script=i-seq6-ow-cmount-x40 checked=60 lost={} first={}
+E6 slots=448 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=448 arm=P1 script=k-seq6-ow-cmount2-x30 checked=87 lost={"user-mount-or-rollback:evicted(ring-has-3-states)": 6} first={"user-mount-or-rollback:evicted(ring-has-3-states)": "step11:CMount->ok F=Some(6) txg=Some(31) state2"}
+E6 slots=448 arm=P1 script=l-seq10-ow-cmount-x40 checked=60 lost={} first={}
+E6 slots=448 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=448 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=448 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=448 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=448 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=448 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=448 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=448 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=448 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=448 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=448 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=448 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=448 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=448 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=448 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=448 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=448 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=448 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=448 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=448 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=448 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=448 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=448 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=448 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=512 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=512 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=512 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=512 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=512 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=512 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=512 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=512 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=512 arm=T script=i-seq6-ow-cmount-x40 checked=52 lost={} first={}
+E6 slots=512 arm=T script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=512 arm=T script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=512 arm=T script=l-seq10-ow-cmount-x40 checked=52 lost={} first={}
+E6 slots=512 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=512 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=512 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=512 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=512 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=512 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=512 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=512 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=512 arm=P1 script=i-seq6-ow-cmount-x40 checked=92 lost={} first={}
+E6 slots=512 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=512 arm=P1 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=512 arm=P1 script=l-seq10-ow-cmount-x40 checked=92 lost={} first={}
+E6 slots=512 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=512 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=512 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=512 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=512 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=512 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=512 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=512 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=512 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=512 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=512 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=512 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=512 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=512 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=512 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=512 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=512 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=512 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=512 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=512 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=512 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=512 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=512 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=512 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=640 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=640 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=640 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=640 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=640 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=640 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=640 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=640 arm=T script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=T script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=640 arm=T script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=640 arm=T script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=640 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=640 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=640 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=640 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=640 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=640 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=640 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=640 arm=P1 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=640 arm=P1 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=640 arm=P1 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=640 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=640 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=640 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=640 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=640 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=640 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=640 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=640 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=640 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=640 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=640 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=640 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=640 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=640 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=640 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=640 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=640 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=640 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=640 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=640 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=640 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=768 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=768 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=768 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=768 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=768 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=768 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=768 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=768 arm=T script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=T script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=768 arm=T script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=768 arm=T script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=768 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=768 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=768 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=768 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=768 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=768 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=768 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=768 arm=P1 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=768 arm=P1 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=768 arm=P1 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=768 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=768 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=768 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=768 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=768 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=768 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=768 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=768 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=768 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=768 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=768 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=768 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=768 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=768 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=768 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=768 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=768 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=768 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=768 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=768 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=768 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=T script=a-ow150 checked=597 lost={} first={}
+E6 slots=1024 arm=T script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=1024 arm=T script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=1024 arm=T script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=1024 arm=T script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=1024 arm=T script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=1024 arm=T script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=1024 arm=T script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=1024 arm=T script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=T script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=1024 arm=T script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=1024 arm=T script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P1 script=a-ow150 checked=597 lost={} first={}
+E6 slots=1024 arm=P1 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=1024 arm=P1 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=1024 arm=P1 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=1024 arm=P1 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=1024 arm=P1 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=1024 arm=P1 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=1024 arm=P1 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=1024 arm=P1 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P1 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=1024 arm=P1 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=1024 arm=P1 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P2 script=a-ow150 checked=597 lost={} first={}
+E6 slots=1024 arm=P2 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=1024 arm=P2 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=1024 arm=P2 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=1024 arm=P2 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=1024 arm=P2 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=1024 arm=P2 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=1024 arm=P2 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=1024 arm=P2 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P2 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=1024 arm=P2 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=1024 arm=P2 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P3 script=a-ow150 checked=597 lost={} first={}
+E6 slots=1024 arm=P3 script=b-shrink-rewrite-4-3 checked=329 lost={} first={}
+E6 slots=1024 arm=P3 script=c-grow6-truncate-x10 checked=277 lost={} first={}
+E6 slots=1024 arm=P3 script=d-empty-on-empty-x60 checked=241 lost={} first={}
+E6 slots=1024 arm=P3 script=e-inodes400-then-ow60 checked=253 lost={} first={}
+E6 slots=1024 arm=P3 script=f-fragment-5-1-4-2-3-1 checked=221 lost={} first={}
+E6 slots=1024 arm=P3 script=g-seq8-ow60-umount-every5 checked=289 lost={"before-last-umount(B1):below-F": 69} first={"before-last-umount(B1):below-F": "step6:UMount->ok F=Some(11) txg=Some(16) state6"}
+E6 slots=1024 arm=P3 script=h-seq6-ow60-rollback-every3 checked=321 lost={} first={}
+E6 slots=1024 arm=P3 script=i-seq6-ow-cmount-x40 checked=320 lost={} first={}
+E6 slots=1024 arm=P3 script=j-rollback-pingpong checked=253 lost={} first={}
+E6 slots=1024 arm=P3 script=k-seq6-ow-cmount2-x30 checked=359 lost={} first={}
+E6 slots=1024 arm=P3 script=l-seq10-ow-cmount-x40 checked=320 lost={} first={}
+test e6_newest_four_states_stay_candidates ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 284.63s
+

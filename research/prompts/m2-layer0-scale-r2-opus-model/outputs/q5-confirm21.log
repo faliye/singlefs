@@ -1,0 +1,70 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r2-opus/repo/crates/singlefs-harness)
+warning: unused import: `enumerate_layer0_selecting_versions`
+   --> crates/singlefs-harness/tests/opus_r2_probe.rs:777:31
+    |
+777 | use singlefs_harness::crash::{enumerate_layer0_selecting_versions, evaluate_state_for_versions, Layer0Tally};
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_r2_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r2_probe") generated 2 warnings (run `cargo fix --test "opus_r2_probe" -p singlefs-harness` to apply 2 suggestions)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.66s
+     Running tests/opus_r2_probe.rs (target/release/deps/opus_r2_probe-73e2b3dc9d85c497)
+
+running 1 test
+Q5 seq=OSMUMUOURSMMUR applied=OSMUMUOURSMMUR candidates=4 confirmed=true
+  CONFIRMED seq=OSMUMUOURSMMUR seg=143 txg=Some(44) u=#205(dev0 slot50334+1 txgSome(10)) l=#496(dev0 slot50334+2 txgSome(23)) x=#1003(dev0 slot50335+1 txgSome(44)) y=#1001(dev0 slot50334+1 txgSome(44)) why=record:claimed_state_missing_unit
+Q5 seq=OURSMUSRUSUUR applied=OURSMUSRUSUUR candidates=4 confirmed=true
+  CONFIRMED seq=OURSMUSRUSUUR seg=123 txg=Some(38) u=#80(dev0 slot50270+1 txgSome(5)) l=#506(dev0 slot50270+2 txgSome(23)) x=#883(dev0 slot50271+1 txgSome(38)) y=#881(dev0 slot50270+1 txgSome(38)) why=record:claimed_state_missing_unit
+Q5 seq=SUOSSOUSMRUSUR applied=SUOSSOUSMRUSUR candidates=4 confirmed=true
+  CONFIRMED seq=SUOSSOUSMRUSUR seg=122 txg=Some(38) u=#80(dev0 slot50270+1 txgSome(5)) l=#457(dev0 slot50270+2 txgSome(20)) x=#897(dev0 slot50271+1 txgSome(38)) y=#895(dev0 slot50270+1 txgSome(38)) why=record:claimed_state_missing_unit
+Q5 seq=RUOUOMUSRUSUOU applied=-UOUOMUSRUSUOU candidates=4 confirmed=true
+  CONFIRMED seq=RUOUOMUSRUSUOU seg=132 txg=Some(41) u=#208(dev0 slot50334+1 txgSome(11)) l=#569(dev0 slot50334+2 txgSome(26)) x=#930(dev0 slot50335+1 txgSome(41)) y=#928(dev0 slot50334+1 txgSome(41)) why=record:claimed_state_missing_unit
+Q5 seq=USUOOSSUURMSR applied=USUOOSSUURMSR candidates=8 confirmed=true
+  CONFIRMED seq=USUOOSSUURMSR seg=102 txg=Some(32) u=#82(dev0 slot50270+1 txgSome(5)) l=#354(dev0 slot50270+2 txgSome(17)) x=#741(dev0 slot50271+1 txgSome(32)) y=#739(dev0 slot50270+1 txgSome(32)) why=record:claimed_state_missing_unit
+Q5 seq=SOMSMOUSSSSOMU applied=SOMSMOUSSSSOMU candidates=4 confirmed=true
+  CONFIRMED seq=SOMSMOUSSSSOMU seg=88 txg=Some(28) u=#59(dev0 slot50262+1 txgSome(4)) l=#384(dev0 slot50262+2 txgSome(17)) x=#679(dev0 slot50263+1 txgSome(28)) y=#677(dev0 slot50262+1 txgSome(28)) why=record:claimed_state_missing_unit
+Q5 seq=USRMSSUSUSRORU applied=USRMSSUSUSRORU candidates=4 confirmed=true
+  CONFIRMED seq=USRMSSUSUSRORU seg=129 txg=Some(40) u=#59(dev0 slot50262+1 txgSome(4)) l=#514(dev0 slot50262+2 txgSome(23)) x=#929(dev0 slot50263+1 txgSome(40)) y=#927(dev0 slot50262+1 txgSome(40)) why=record:claimed_state_missing_unit
+Q5 seq=SSUURMSMUOOOU applied=SSUURMSMUOOOU candidates=2 confirmed=true
+  CONFIRMED seq=SSUURMSMUOOOU seg=108 txg=Some(34) u=#165(dev0 slot50304+1 txgSome(8)) l=#289(dev0 slot50304+2 txgSome(14)) x=#799(dev0 slot50305+1 txgSome(34)) y=#797(dev0 slot50304+1 txgSome(34)) why=record:claimed_state_missing_unit
+Q5 seq=MRSSUSROORSUU applied=M-SSUSROORSUU candidates=4 confirmed=true
+  CONFIRMED seq=MRSSUSROORSUU seg=99 txg=Some(31) u=#59(dev0 slot50262+1 txgSome(4)) l=#297(dev0 slot50262+2 txgSome(14)) x=#728(dev0 slot50263+1 txgSome(31)) y=#726(dev0 slot50262+1 txgSome(31)) why=record:claimed_state_missing_unit
+Q5 seq=RUSUSMUSOUS applied=-USUSMUSOUS candidates=4 confirmed=true
+  CONFIRMED seq=RUSUSMUSOUS seg=102 txg=Some(32) u=#82(dev0 slot50270+1 txgSome(5)) l=#354(dev0 slot50270+2 txgSome(17)) x=#745(dev0 slot50271+1 txgSome(32)) y=#743(dev0 slot50270+1 txgSome(32)) why=record:claimed_state_missing_unit
+Q5 seq=SSUMOOUSSROOMU applied=SSUMOOUSSROOMU candidates=4 confirmed=true
+  CONFIRMED seq=SSUMOOUSSROOMU seg=108 txg=Some(34) u=#59(dev0 slot50262+1 txgSome(4)) l=#453(dev0 slot50262+2 txgSome(20)) x=#805(dev0 slot50263+1 txgSome(34)) y=#803(dev0 slot50262+1 txgSome(34)) why=record:claimed_state_missing_unit
+Q5 seq=MMUSOUSMUSU applied=MMUSOUSMUSU candidates=4 confirmed=true
+  CONFIRMED seq=MMUSOUSMUSU seg=119 txg=Some(37) u=#59(dev0 slot50262+1 txgSome(4)) l=#508(dev0 slot50262+2 txgSome(23)) x=#860(dev0 slot50263+1 txgSome(37)) y=#858(dev0 slot50262+1 txgSome(37)) why=record:claimed_state_missing_unit
+Q5 seq=MUMUSRUORUMUR applied=MUMUSRUORUMUR candidates=4 confirmed=true
+  CONFIRMED seq=MUMUSRUORUMUR seg=163 txg=Some(50) u=#147(dev0 slot50334+1 txgSome(8)) l=#488(dev0 slot50334+2 txgSome(23)) x=#1133(dev0 slot50335+1 txgSome(50)) y=#1131(dev0 slot50334+1 txgSome(50)) why=record:claimed_state_missing_unit
+Q5 seq=UURUSOURSURS applied=UURUSOURSURS candidates=8 confirmed=true
+  CONFIRMED seq=UURUSOURSURS seg=133 txg=Some(41) u=#212(dev0 slot50334+1 txgSome(11)) l=#551(dev0 slot50334+2 txgSome(26)) x=#936(dev0 slot50335+1 txgSome(41)) y=#934(dev0 slot50334+1 txgSome(41)) why=record:claimed_state_missing_unit
+Q5 seq=UUOSUSMRROURS applied=UUOSUSMRROURS candidates=4 confirmed=true
+  CONFIRMED seq=UUOSUSMRROURS seg=119 txg=Some(37) u=#59(dev0 slot50262+1 txgSome(4)) l=#510(dev0 slot50262+2 txgSome(23)) x=#856(dev0 slot50263+1 txgSome(37)) y=#854(dev0 slot50262+1 txgSome(37)) why=record:claimed_state_missing_unit
+Q5 seq=SMUUOUSSOUUMUR applied=SMUUOUSSOUUMUR candidates=8 confirmed=true
+  CONFIRMED seq=SMUUOUSSOUUMUR seg=112 txg=Some(35) u=#176(dev0 slot50334+1 txgSome(9)) l=#425(dev0 slot50334+2 txgSome(20)) x=#812(dev0 slot50335+1 txgSome(35)) y=#810(dev0 slot50334+1 txgSome(35)) why=record:claimed_state_missing_unit
+Q5 seq=MSSSUMOOSRMORO applied=MSSSUMOOSRMORO candidates=2 confirmed=true
+  CONFIRMED seq=MSSSUMOOSRMORO seg=100 txg=Some(32) u=#14(dev0 slot50240+1 txgSome(3)) l=#299(dev0 slot50240+2 txgSome(14)) x=#763(dev0 slot50241+1 txgSome(32)) y=#761(dev0 slot50240+1 txgSome(32)) why=record:claimed_state_missing_unit
+Q5 seq=UOOUSUSOMMSU applied=UOOUSUSOMMSU candidates=4 confirmed=true
+  CONFIRMED seq=UOOUSUSOMMSU seg=109 txg=Some(34) u=#59(dev0 slot50262+1 txgSome(4)) l=#362(dev0 slot50262+2 txgSome(17)) x=#793(dev0 slot50263+1 txgSome(34)) y=#791(dev0 slot50262+1 txgSome(34)) why=record:claimed_state_missing_unit
+Q5 seq=MMOUOMSMUOUU applied=MMOUOMSMUOUU candidates=4 confirmed=true
+  CONFIRMED seq=MMOUOMSMUOUU seg=109 txg=Some(34) u=#120(dev0 slot50324+1 txgSome(7)) l=#439(dev0 slot50324+2 txgSome(20)) x=#775(dev0 slot50325+1 txgSome(34)) y=#773(dev0 slot50324+1 txgSome(34)) why=record:claimed_state_missing_unit
+Q5 seq=SUSOMUSORUSUR applied=SUSOMUSORUSUR candidates=8 confirmed=true
+  CONFIRMED seq=SUSOMUSORUSUR seg=113 txg=Some(35) u=#80(dev0 slot50270+1 txgSome(5)) l=#441(dev0 slot50270+2 txgSome(20)) x=#822(dev0 slot50271+1 txgSome(35)) y=#820(dev0 slot50270+1 txgSome(35)) why=record:claimed_state_missing_unit
+Q5 seq=OUROMUOUOSSURU applied=OUROMUOUOSSURU candidates=4 confirmed=true
+  CONFIRMED seq=OUROMUOUOSSURU seg=122 txg=Some(38) u=#80(dev0 slot50270+1 txgSome(5)) l=#506(dev0 slot50270+2 txgSome(23)) x=#885(dev0 slot50271+1 txgSome(38)) y=#883(dev0 slot50270+1 txgSome(38)) why=record:claimed_state_missing_unit
+test q5_confirm_and_shrink ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 7.25s
+

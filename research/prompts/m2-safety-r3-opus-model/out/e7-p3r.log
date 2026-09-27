@@ -1,0 +1,90 @@
+warning: unused import: `admission_reading_before_a_publish`
+  --> crates/singlefs-core/src/transaction.rs:27:5
+   |
+27 |     admission_reading_before_a_publish, admit_on_every_device, demand_of_the_roles_on_each_device,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r3_p3_attack.rs (/tmp/claude-1000/m2-safety-r3-opus/target/release/deps/opus_r3_p3_attack-b85a0c2313d795ef)
+
+running 1 test
+test e7_instance_rows_near_a_multiple_of_369 has been running for over 60 seconds
+E7 slots=256 arm=P3 rows0=360 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=363 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=364 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=365 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=366 admitted=2 stop=[step2:SAR;budget(e5+p3)] S4u=0 S4c=2 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[step0:SARBA [mount av[-1, -1] mc76 rows367] session_av=Some(7) session_rows0=366 then absorbing=true umount=no-session;mount=SARBA cmount=SARBA ow=no-session delete=no-session rollback=["no-session", "no-session", "no-session", "no-session"] escapes=0/259 shortest_escape=none]
+E7 slots=256 arm=P3 rows0=367 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=368 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=369 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3 rows0=370 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=360 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=363 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=364 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=365 admitted=1 stop=[step1:SAR;budget(e5+p3)] S4u=0 S4c=0 S4bu=0 S4bc=1 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=366 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=367 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=368 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=369 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=256 arm=P3r rows0=370 admitted=0 stop=[step0:SAR;budget(e6+p3)] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=363 admitted=36 stop=[step36:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=364 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=366 admitted=74 stop=[step74:PlacementRefused[Data]] S4u=0 S4c=3 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[step22:SARBA [mount av[-5, -5] mc76 rows367] session_av=Some(3) session_rows0=366 then absorbing=true umount=no-session;mount=SARBA cmount=SARBA ow=no-session delete=no-session rollback=["no-session", "no-session", "no-session", "no-session"] escapes=0/259 shortest_escape=none]
+E7 slots=320 arm=P3 rows0=367 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=368 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3 rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=363 admitted=36 stop=[step36:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=364 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=366 admitted=45 stop=[step45:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=367 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=368 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=320 arm=P3r rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=363 admitted=50 stop=[step50:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=364 admitted=57 stop=[step57:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=366 admitted=143 stop=[step143:PlacementRefused[Data]] S4u=0 S4c=3 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[step40:SARBA [mount av[-5, -5] mc76 rows367] session_av=Some(3) session_rows0=366 then absorbing=true umount=no-session;mount=SARBA cmount=SARBA ow=no-session delete=no-session rollback=["no-session", "no-session", "no-session", "no-session"] escapes=0/259 shortest_escape=none]
+E7 slots=384 arm=P3 rows0=367 admitted=140 stop=[step140:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=368 admitted=70 stop=[step70:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3 rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=363 admitted=50 stop=[step50:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=364 admitted=57 stop=[step57:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=366 admitted=156 stop=[step156:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=367 admitted=140 stop=[step140:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=368 admitted=70 stop=[step70:PlacementRefused[Data]] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=384 arm=P3r rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=363 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=364 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=366 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=367 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=368 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3 rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=360 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=363 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=364 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=365 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=366 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=367 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=368 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=369 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+E7 slots=448 arm=P3r rows0=370 admitted=200 stop=[] S4u=0 S4c=0 S4bu=0 S4bc=0 first_S4u=[] first_S4c=[]
+test e7_instance_rows_near_a_multiple_of_369 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 141.60s
+

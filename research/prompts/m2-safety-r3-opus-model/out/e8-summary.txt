@@ -1,0 +1,56 @@
+没有会话： E8 slots=240 arm=T k=2 order=ow-rb-abandon-after-ow pre=[okx5,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=T k=6 order=rb-ow-abandon pre=[okx4,SARx3,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=T k=6 order=ow-rb-abandon-after-ow pre=[okx4,SARx4,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=T k=12 order=rb-ow-abandon pre=[okx4,SARx9,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx4,SARx10,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=2 order=ow-rb-abandon-after-ow pre=[okx5,SAR;F-at-ceiling(e3),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=6 order=rb-ow-abandon pre=[okx6,SAR;F-at-ceiling(e2),ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=6 order=ow-rb-abandon-after-ow pre=[okx6,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0),ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=6 order=no-rollback-ow-abandon pre=[okx6,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x2,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=12 order=rb-ow-abandon pre=[okx6,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x6,ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=12 order=ow-rb-abandon-after-ow pre=[okx6,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x7,ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=240 arm=P1 k=12 order=no-rollback-ow-abandon pre=[okx6,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x8,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=T k=2 order=ow-rb-abandon-after-ow pre=[okx5,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=T k=6 order=rb-ow-abandon pre=[okx5,SARx2,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=T k=6 order=ow-rb-abandon-after-ow pre=[okx5,SARx3,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=T k=12 order=rb-ow-abandon pre=[okx5,SARx8,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx5,SARx9,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=6 order=rb-ow-abandon pre=[okx8,SAR;F-at-ceiling(e3),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=6 order=ow-rb-abandon-after-ow pre=[okx9,SAR;F-at-ceiling(e3),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=6 order=no-rollback-ow-abandon pre=[okx8,SAR;F-at-ceiling(e2),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=12 order=rb-ow-abandon pre=[okx8,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x4,ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=12 order=ow-rb-abandon-after-ow pre=[okx8,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x5,ok,SAR;F-at-ceiling(e0),abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P1 k=12 order=no-rollback-ow-abandon pre=[okx8,SAR;F-at-ceiling(e2),SAR;F-at-ceiling(e0)x6,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P2 k=12 order=rb-ow-abandon pre=[okx10,SARx3,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=256 arm=P2 k=12 order=ow-rb-abandon-after-ow pre=[okx10,SARx4,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=320 arm=T k=6 order=rb-ow-abandon pre=[okx8,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=320 arm=T k=6 order=ow-rb-abandon-after-ow pre=[okx7,SAR,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=320 arm=T k=12 order=rb-ow-abandon pre=[okx7,SARx6,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=320 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx7,SARx7,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=384 arm=T k=12 order=rb-ow-abandon pre=[okx9,SARx4,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=384 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx9,SARx5,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=448 arm=T k=12 order=rb-ow-abandon pre=[okx12,SAR,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=448 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx12,SARx2,ok,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+没有会话： E8 slots=512 arm=T k=12 order=ow-rb-abandon-after-ow pre=[okx15,SAR,abandon=abandon-mount:SARBA,viol_after_abandon=0] 抛弃之后没有会话
+臂 次序 | 格数 | S4u | S4c | S4bu | S4bc | 违例
+P1 no-rollback-ow-abandon | 23 | 0 | 240 | 0 | 1 | 0
+P1 ow-rb-abandon-after-ow | 22 | 0 | 131 | 0 | 0 | 0
+P1 rb-ow-abandon | 23 | 0 | 238 | 0 | 1 | 0
+P2 no-rollback-ow-abandon | 27 | 0 | 4 | 0 | 14 | 0
+P2 ow-rb-abandon-after-ow | 26 | 0 | 5 | 0 | 17 | 0
+P2 rb-ow-abandon | 26 | 0 | 4 | 0 | 15 | 0
+P3 no-rollback-ow-abandon | 27 | 0 | 4 | 0 | 0 | 0
+P3 ow-rb-abandon-after-ow | 27 | 0 | 5 | 0 | 0 | 0
+P3 rb-ow-abandon | 27 | 0 | 4 | 0 | 0 | 0
+P3pl no-rollback-ow-abandon | 27 | 0 | 4 | 0 | 0 | 0
+P3pl ow-rb-abandon-after-ow | 27 | 0 | 5 | 0 | 0 | 0
+P3pl rb-ow-abandon | 27 | 0 | 4 | 0 | 0 | 0
+T no-rollback-ow-abandon | 27 | 0 | 9 | 0 | 10 | 0
+T ow-rb-abandon-after-ow | 16 | 0 | 10 | 0 | 12 | 0
+T rb-ow-abandon | 19 | 0 | 9 | 0 | 12 | 0
+隔离槽：会话里（发布路径读数）与同一刻崩了再挂那一次挂载路径读数相比（放行的每一步各计一次）
+P1 {'相同': 7249, '挂载多': 383, '挂载少': 4968}
+P2 {'相同': 8443, '挂载多': 719}
+P3 {'相同': 11189, '挂载多': 722, '挂载少': 2404}
+P3pl {'相同': 12556, '挂载多': 722, '挂载少': 2922}
+T {'相同': 3419, '挂载多': 342}

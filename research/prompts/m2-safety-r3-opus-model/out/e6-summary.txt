@@ -1,0 +1,17 @@
+T （108 格）
+    before-last-umount(B1):below-F 621
+    other:evicted(ring-has-≤3-states) 91
+    user-mount-or-rollback:evicted(ring-has-≤3-states) 177
+P1 （108 格）
+    admission-pushed:evicted(ring-has-≤3-states) 49
+    before-last-umount(B1):below-F 621
+    other:evicted(ring-has-≤3-states) 59
+    user-mount-or-rollback:evicted(ring-has-≤3-states) 159
+P2 （108 格）
+    before-last-umount(B1):below-F 621
+    other:Publish[PlacementRefused] 81
+    other:evicted(ring-has-≤3-states) 32
+    user-mount-or-rollback:Publish[PlacementRefused] 30
+    user-mount-or-rollback:evicted(ring-has-≤3-states) 65
+P3 （108 格）
+    before-last-umount(B1):below-F 621

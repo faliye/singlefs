@@ -1,0 +1,7 @@
+504a4d3d6d875a6b5dd8212efaf37578d2b295de84c06edc3a5bf0ab277e469b  .claude/kb/decisions/28-挂载期承诺量.md
+950786e78f5f953bf3d608690a1beff77a8ecf4cbc02bb61f91096af17373325  .claude/kb/decisions/03-空间分配.md
+a284e2509c8af34e8b9b88a2702e9091bd732aa75bf3e1f9118af8f405826a94  .claude/kb/decisions/16-发布语义.md
+4b2e287b65c53ef0d1d40061ab17ee4139e05c545cd4263410ff6cbfb0c8ef05  .claude/kb/decisions/18-块里携带什么信息.md
+3c115967df2d5643d1316b88db61719f98367c1d2e8410b8c77ef7fb183f8757  .claude/kb/checks-owed.md
+9c8a5b194cf10b22abb2f4f0db0b31541aedae878e38517b6eac105164f8aae9  research/prompts/alloc-basis-forks.md
+428795e12c6abd65034ac0d8796f99b1a411dda6c677df2ae1c611fd74cfee47  research/prompts/m2-safety-r2-main-verification.md

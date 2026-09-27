@@ -1,0 +1,26 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+CONTROL plan=E18_54_all stream=E18 seg=54 txg=Some(18) sizes_of_segment=30 chosen=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] others_persisted=true
+test p7_exhaustive_control has been running for over 60 seconds
+PROGRESS seg=54 imask=0b0 states_so_far=65535 elapsed_seconds=163.7
+PROGRESS seg=54 imask=0b1 states_so_far=131070 elapsed_seconds=327.9
+PROGRESS seg=54 imask=0b10 states_so_far=196605 elapsed_seconds=488.0
+PROGRESS seg=54 imask=0b11 states_so_far=262140 elapsed_seconds=647.4
+CONTROL_RESULT plan=E18_54_all compared=262140 differing=0 differing_verdict=0 bad_only_when_cow_nonempty=0 elapsed_seconds=647.5
+test p7_exhaustive_control ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 647.48s
+

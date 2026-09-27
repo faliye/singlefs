@@ -1,0 +1,176 @@
+[
+{
+"id": "K1",
+"hook": "heavy",
+"command": "herd7 -version",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K2",
+"hook": "heavy",
+"command": "qemu-system-x86_64 --version",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K3",
+"hook": "heavy",
+"command": "./target/release/deps/second_transaction_step_zero_layer0-0123456789abcdef",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K4",
+"hook": "heavy",
+"command": "cargo test",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K5",
+"hook": "heavy",
+"command": "cargo test",
+"cwd": "/home/fy5090/code/singlefs/research"
+},
+{
+"id": "K6",
+"hook": "heavy",
+"command": "cargo test",
+"cwd": "/home/fy5090/code/singlefs/research/e7-index-bench"
+},
+{
+"id": "K7",
+"hook": "heavy",
+"command": "cargo t --workspace",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K8",
+"hook": "heavy",
+"command": "bash research/scripts/mutate.sh singlefs-harness crates/singlefs-core/src/lib.rs crates/mutations.tsv",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K9",
+"hook": "heavy",
+"command": "bash .claude/scripts/lkmm.sh --herd7-version",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K10",
+"hook": "heavy",
+"command": "bash .claude/scripts/gate.sh --selftest",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K11",
+"hook": "heavy",
+"command": "bash research/scripts/gate-staged.sh --selftest",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K12",
+"hook": "heavy",
+"command": "bash research/scripts/vm-bench.sh --selftest",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K13",
+"hook": "heavy",
+"command": "cargo run --release --bin e152-file-system-benchmark",
+"cwd": "/home/fy5090/code/singlefs/research"
+},
+{
+"id": "K14",
+"hook": "heavy",
+"command": "bash research/scripts/e152-run.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K15",
+"hook": "heavy",
+"command": "cargo test -p singlefs-harness --tests",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K16",
+"hook": "heavy",
+"command": "cargo test -p singlefs-harness --test 'second_transaction_step_zero_*'",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K17",
+"hook": "heavy",
+"command": "bash .claude/scripts/fetch-deps.sh --check",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K18",
+"hook": "heavy",
+"command": "cargo test -p singlefs-harness --lib",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K19",
+"hook": "heavy",
+"command": "bash .claude/scripts/check.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K20",
+"hook": "heavy",
+"command": "bash .claude/gate.d/87-replay.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K21",
+"hook": "heavy",
+"command": "cargo test -p singlefs-harness --test second_transaction_step_zero_layer0",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K22",
+"hook": "heavy",
+"command": "bash .claude/gate.d/54-layer0-replay.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K23",
+"hook": "heavy",
+"command": "bash .claude/gate.d/57-lkmm.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K24",
+"hook": "heavy",
+"command": "bash .claude/gate.d/59-crates-mutation-replay.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K25",
+"hook": "heavy",
+"command": "bash .claude/gate.d/55-qemu-first-transaction.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K26",
+"hook": "heavy",
+"command": "cargo test --all",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K27",
+"hook": "heavy",
+"command": "bash research/scripts/gate-staged.sh",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K28",
+"hook": "heavy",
+"command": "cargo test -p singlefs-harness",
+"cwd": "/home/fy5090/code/singlefs"
+},
+{
+"id": "K29",
+"hook": "heavy",
+"command": "cargo test -p e7-index-bench --lib",
+"cwd": "/home/fy5090/code/singlefs/research"
+}
+]

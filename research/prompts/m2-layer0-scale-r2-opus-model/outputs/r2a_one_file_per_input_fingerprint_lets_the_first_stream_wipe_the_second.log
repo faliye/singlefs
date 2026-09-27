@@ -1,0 +1,24 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_r2_resume_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r2_resume_probe") generated 1 warning (run `cargo fix --test "opus_r2_resume_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_r2_resume_probe.rs (target/release/deps/opus_r2_resume_probe-eae621dacd3f905f)
+
+running 1 test
+LAYER0_PARALLEL_START states=127 slices=1 states_per_slice=127 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller
+LAYER0_PROGRESS slice=1/1 states=[0,127) segments=0..=all_persisted finished_slices=1/1 finished_states=127/127 elapsed_seconds=1.5
+LAYER0_PARALLEL_FINISHED states=127 slices=1 worker_threads=1 configured_worker_threads=1 worker_threads_source=given_by_caller elapsed_seconds=1.5
+R2A first_run long_slices_total=43 long_slices_evaluated_before_kill=21 second_run short_header_rejected=true short_slices_from_file=0 long_header_rejected=true long_slices_from_file=0 long_slices_evaluated=43 result_equal=true
+R2A per_stream_files long_slices_from_file=21 long_slices_evaluated=22 result_equal=true
+test r2a_one_file_per_input_fingerprint_lets_the_first_stream_wipe_the_second ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 37.04s
+

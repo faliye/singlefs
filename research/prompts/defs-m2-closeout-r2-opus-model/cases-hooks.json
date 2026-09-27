@@ -1,0 +1,88 @@
+[
+ {
+  "id": "P1",
+  "hook": "heavy",
+  "agent": "three-way-attack",
+  "cwd": "@COPY@",
+  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_acquisition_barrier -- --nocapture"
+ },
+ {
+  "id": "P2",
+  "hook": "heavy",
+  "agent": "three-way-attack",
+  "cwd": "@COPY@",
+  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test second_transaction_step_three_acquisition_barrier_layer0 -- --nocapture"
+ },
+ {
+  "id": "P3",
+  "hook": "heavy",
+  "agent": "three-way-attack",
+  "cwd": "@COPY@",
+  "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G cargo test --release -p singlefs-harness --test proto_step_zero -- --nocapture"
+ },
+ {
+  "id": "T1",
+  "hook": "heavy",
+  "agent": "implementation-writer",
+  "command": "nice -n 19 bash .claude/gate.d/74-model-differential.sh"
+ },
+ {
+  "id": "T2",
+  "hook": "heavy",
+  "agent": "crash-verifier",
+  "command": "nice -n 19 bash .claude/gate.d/74-model-differential.sh"
+ },
+ {
+  "id": "T3",
+  "hook": "heavy",
+  "agent": "implementation-writer",
+  "command": "nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/74-model-differential.sh"
+ },
+ {
+  "id": "G1",
+  "hook": "heavy",
+  "agent": "gate-triage",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 32G bash .claude/scripts/gate.sh --staged"
+ },
+ {
+  "id": "G2",
+  "hook": "detector",
+  "agent": "gate-triage",
+  "rib": true,
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 32G bash .claude/scripts/gate.sh --staged"
+ },
+ {
+  "id": "G3",
+  "hook": "heavy",
+  "agent": "gate-triage",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 32G bash research/scripts/gate-staged.sh"
+ },
+ {
+  "id": "B1",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "for s in 1 2 3; do { nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r2-opus/job.sh \"$s\"; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r2-opus/s$s.rc; } & done; wait; for s in 1 2 3; do echo \"s$s=$(cat /tmp/claude-1000/defs-m2-closeout-r2-opus/s$s.rc)\"; done"
+ },
+ {
+  "id": "B2",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "for b in 1 2; do for s in 1 2; do { nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r2-opus/job.sh \"$b\" \"$s\"; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r2-opus/b$b-s$s.rc; } & done; wait; done; for f in /tmp/claude-1000/defs-m2-closeout-r2-opus/b*-s*.rc; do echo \"$f=$(cat \"$f\")\"; done"
+ },
+ {
+  "id": "B3",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": false,
+  "command": "for s in 1 2 3; do { nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r2-opus/job.sh \"$s\"; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r2-opus/s$s.rc; } & done; wait; for s in 1 2 3; do echo \"s$s=$(cat /tmp/claude-1000/defs-m2-closeout-r2-opus/s$s.rc)\"; done"
+ },
+ {
+  "id": "B4",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "{ nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r2-opus/a.sh; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r2-opus/a.rc; } & { nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r2-opus/b.sh; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r2-opus/b.rc; } & wait; echo \"a=$(cat /tmp/claude-1000/defs-m2-closeout-r2-opus/a.rc) b=$(cat /tmp/claude-1000/defs-m2-closeout-r2-opus/b.rc)\""
+ }
+]

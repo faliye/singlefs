@@ -1,0 +1,22 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/n1_sonnet_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "n1_sonnet_probe") generated 1 warning (run `cargo fix --test "n1_sonnet_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/n1_sonnet_probe.rs (target/release/deps/n1_sonnet_probe-139315f60a9b7df7)
+
+running 1 test
+test n12_non_monotone_fresh_seed_after_patch has been running for over 60 seconds
+N12_TOTAL seed=53 streams=150 streams_with_non_monotone=0 cheap_checked=77912 elapsed_seconds=2054.4
+test n12_non_monotone_fresh_seed_after_patch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 2054.42s
+
+n12 exit=0

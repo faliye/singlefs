@@ -1,0 +1,46 @@
+== t_release（release、debug-assertions 关）--list
+full_ignored: test
+quick: test
+slow::other_case: test
+spaced_ignore: test
+the_case: test
+== t_release（release、debug-assertions 关）--nocapture
+THE_CASE_RELEASE_UNIGNORED_RAN
+test result: ok. 2 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== t_release（release、debug-assertions 关）--include-ignored --skip --list --nocapture
+FULL_IGNORED_RAN
+test full_ignored ... SPACED_RAN
+THE_CASE_RELEASE_UNIGNORED_RAN
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+== t_release（release、debug-assertions 关）--include-ignored --exact full_ignored --logfile --list --nocapture
+FULL_IGNORED_RAN
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+== m_bin --exact the_case
+TOP_LEVEL_UNIGNORED_RAN
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+== strace -fo s.txt true
+rc=0
+== flock -xw 1 lockf true
+rc=0
+== /usr/bin/time -ao t.txt true
+rc=0
+== env -S 'echo ENV_S_RAN'
+ENV_S_RAN
+rc=0
+== systemd-run --user --scope -qu k1semantics1173677 true
+rc=0
+== systemd-run --scope -E 把变量带给里面那条命令
+K1_PROBE_VAR=seen
+== cargo --config target.<三元组>.runner=<脚本> run
+RUNNER_USED target/debug/semanticsprobe
+== cargo --config target.<三元组>."runner"=<脚本> run
+RUNNER_USED target/debug/semanticsprobe
+== runner 前面带解释器（环境变量）
+RUNNER_USED target/debug/semanticsprobe
+== cargo --config alias.k1zz="version" k1zz
+error: no such command: `k1zz`
+== CARGO_ALIAS_K1ZZ=version cargo k1zz
+cargo 1.98.0 (797e8a9bc 2026-08-05)
+== include_str!(env!(…)) 与 ::core::include_str!(::core::concat!(…))
+ENV_LEN=62 QUALIFIED_LEN=62 SAME=true
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

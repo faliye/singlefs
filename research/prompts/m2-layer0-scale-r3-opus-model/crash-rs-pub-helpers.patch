@@ -1,0 +1,20 @@
+--- a/crates/singlefs-harness/src/crash.rs
++++ b/crates/singlefs-harness/src/crash.rs
+@@ -741,7 +741,7 @@
+ 
+ /// 写表下标 `index` 那次写属于哪次发布：它后面第一条根槽 FUA 写写出的那条根的 checkpoint_txg（与 `publishes_in` 的归法相同）。
+ /// 后面没有根槽写（这次写属于写表里没做完的那次发布）时 `None`。
+-fn checkpoint_txg_of_the_publish_that_made_the_write(
++pub fn checkpoint_txg_of_the_publish_that_made_the_write(
+     writes: &[RetainedWrite],
+     index: usize,
+ ) -> Option<CheckpointTxg> {
+@@ -783,7 +783,7 @@
+ /// 前提有两条，写表的来路都满足：基镜像里的根带的 F 为 0（层 0 的基是 mkfs 之后，崩溃注入的基是空池），
+ /// 写表里没有写失败的根槽写（录制器只录落下了的写；写失败时旧根留在槽里、环不再按 txg 连续，上面那条关于被抛弃根的论证就不成立）。
+ /// 写表里这次写之前一条根槽写都没有时，环里是什么只有基镜像知道，一律按过得了。
+-fn reuse_is_not_proven_illegal_by_the_reclaim_predicate(
++pub fn reuse_is_not_proven_illegal_by_the_reclaim_predicate(
+     writes: &[RetainedWrite],
+     earlier_publish_txg: Option<CheckpointTxg>,
+     later_index: usize,

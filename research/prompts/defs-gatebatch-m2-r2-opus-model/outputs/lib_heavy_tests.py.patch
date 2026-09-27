@@ -1,0 +1,102 @@
+--- a/.claude/hooks/lib_heavy_tests.py
++++ b/.claude/hooks/lib_heavy_tests.py
+@@ -95,6 +95,17 @@
+ IGNORED_TEST_ARGUMENTS = {"--ignored", "--include-ignored"}
+ # libtest 只列用例、一条都不跑的参数
+ LIST_ONLY_TEST_ARGUMENT = "--list"
++# libtest 带一个值的选项：--skip --list 里的 --list 是 --skip 的值，不是「只列」
++LIBTEST_OPTIONS_WITH_VALUE = {"--logfile", "--skip", "--test-threads", "--format", "--color", "-Z", "--shuffle-seed"}
++
++
++def libtest_lists_only(arguments):
++    index = 0
++    while index < len(arguments):
++        if arguments[index] == LIST_ONLY_TEST_ARGUMENT:
++            return True
++        index += 2 if arguments[index] in LIBTEST_OPTIONS_WITH_VALUE else 1
++    return False
+ # 判用例函数标没标 #[ignore] 的那一份（与门禁 54 号的 crash-cases 自查同一套判法）
+ ADMISSION_MODULE_PATH = os.path.join(HOOK_REPOSITORY, "research", "scripts", "admission.py")
+ # 按参数认崩溃枚举用例时不看的命令：它们把参数当文本搜、打印、比对，不执行测试二进制
+@@ -182,7 +193,7 @@
+     module = admission_module()
+     if module is None or package_directory is None:
+         return False
+-    return module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function) is False
++    return module.test_function_is_marked_ignored(package_directory, ".", case.target, case.function) is not True
+ 
+ 
+ def manifest_sections(path):
+@@ -354,9 +365,19 @@
+     return None
+ 
+ 
++def configuration_names_runner(value):
++    """--config 的一个 KEY=VALUE 按 TOML 读：定了 target.<任何>.runner 交 True；读不成 TOML 的交 False（交给正则那一道）。"""
++    try:
++        parsed = tomllib.loads(value)
++    except ValueError:
++        return False
++    targets = parsed.get("target") if isinstance(parsed.get("target"), dict) else {}
++    return any(isinstance(table, dict) and "runner" in table for table in targets.values())
++
++
+ def runner_of_test_binaries(command, environment):
+     """--config 里定了 …runner、或环境变量里有 CARGO_TARGET_*_RUNNER 时交一句（runner 能替测试二进制加 --ignored，命令行上看不见）；没有交 None。"""
+-    if any(RUNNER_CONFIGURATION.search(value) for value in command.configuration_values):
++    if any(RUNNER_CONFIGURATION.search(value) or configuration_names_runner(value) for value in command.configuration_values):
+         return "--config 里定的 runner（它能替测试二进制加 --ignored）"
+     runners = sorted(name for name in environment if RUNNER_ENVIRONMENT_VARIABLE.match(name))
+     if runners:
+@@ -419,7 +440,7 @@
+         return None
+     described = f"cargo {found.subcommand}"
+     libtest_arguments = rest[rest.index("--") + 1:] if "--" in rest else []
+-    if LIST_ONLY_TEST_ARGUMENT in libtest_arguments:
++    if libtest_lists_only(libtest_arguments):
+         return None
+     if whole_workspace:
+         return heavy_test("full-cargo", f"{described} 带 --workspace / --all")
+@@ -577,7 +598,7 @@
+             position = 3
+         else:
+             return None
+-    options_with_value, working_directory = LAUNCHER_OPTIONS_WITH_VALUE[name], None
++    options_with_value, working_directory, assignments = LAUNCHER_OPTIONS_WITH_VALUE[name], None, []
+     while position < len(words):
+         word = words[position]
+         if word == "--":
+@@ -586,14 +607,23 @@
+         if not word.startswith("-") or word == "-":
+             break
+         option, has_attached_value, attached_value = word.partition("=")
++        if not word.startswith("--") and len(word) > 2 and not has_attached_value:
++            # 短选项合写（-fo <文件>、-xw 10、-qu <名>）：逐个字母看，头一个要值的字母之后剩下的是值，没剩下就取下一个词
++            for index, letter in enumerate(word[1:]):
++                if "-" + letter in options_with_value:
++                    option, attached_value = "-" + letter, word[index + 2:]
++                    has_attached_value = bool(attached_value)
++                    break
+         value = attached_value if has_attached_value else (words[position + 1] if position + 1 < len(words) else "")
+         if name == "systemd-run" and option == "--working-directory":
+             working_directory = value
++        if name == "systemd-run" and option in ("-E", "--setenv") and "=" in value:
++            assignments.append(value)
+         position += 2 if option in options_with_value and not has_attached_value else 1
+     if name == "flock" and position + 1 < len(words) and words[position + 1] in ("-c", "--command"):
+         return (["sh", "-c", words[position + 2]], working_directory) if position + 2 < len(words) else None
+     position += LAUNCHER_POSITIONAL_COUNT.get(name, 0)
+-    return (words[position:], working_directory) if position < len(words) else None
++    return (assignments + words[position:], working_directory) if position < len(words) else None
+ 
+ 
+ def classify(words, directory, environment=None):
+@@ -604,7 +634,7 @@
+         return heavy_test(STAGE_KIND[stage], f"门禁 {stage} 号（{name}）") if stage in STAGE_KIND else None
+     binary = test_binary_name(words[0])
+     if binary is not None:
+-        if LIST_ONLY_TEST_ARGUMENT in arguments:
++        if libtest_lists_only(arguments):
+             return None
+         if "layer0" in binary:
+             return heavy_test("layer0-binary", f"直接执行名字含 layer0 的测试二进制（{binary}）")

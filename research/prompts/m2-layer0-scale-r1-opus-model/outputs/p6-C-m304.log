@@ -1,0 +1,31 @@
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r1-opus/repo-m304/crates/singlefs-format)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r1-opus/repo-m304/crates/singlefs-core)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r1-opus/repo-m304/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r1-opus/repo-m304/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 14.87s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+STREAM C writes=166 segments=25 sizes=[2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 22, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 2] closed_form=206045220 reduced_closed_form=78
+KINDS C [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4,unit_write×18] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2]
+  ARM_A2_BAD C seg=12 imask=0b0 cow=all I-7.7:盘 0 槽 50304 的单元写序带实例代号 2，高于各盘系统配置的最大者 1（①）
+  ARM_A2_BAD C seg=12 imask=0b1 cow=all I-7.7:盘 0 槽 50304 的单元写序带实例代号 2，高于各盘系统配置的最大者 1（①）
+  FULL_DIFF C seg=12 in_place_mask=0b0 cow_mask=0b100: I-7.7 Holds → Violated("盘 0 槽 50306 的单元写序带实例代号 2，高于各盘系统配置的最大者 1（①）")
+  FULL_DIFF C seg=12 in_place_mask=0b0 cow_mask=0b1000000: I-7.7 Holds → Violated("盘 0 槽 50308 的单元写序带实例代号 2，高于各盘系统配置的最大者 1（①）")
+ARMSEG C seg=12 txg=Some(5) in_place=4 cow=18 arm_a_bad=0 arm_a2_bad=12 full_sampled_extra_bad=828
+ARMS C arm_a_states=78 arm_a_bad=0 arm_a2_states=108 arm_a2_bad=12 full_sampled_cow_states=2596 full_sampled_bad_beyond_arm_a=828
+test p6_three_arms_on_fixed_scripts_and_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 3.13s
+

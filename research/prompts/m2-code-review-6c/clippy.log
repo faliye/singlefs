@@ -1,0 +1,6 @@
+    Checking singlefs-format v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-format)
+    Checking singlefs-core v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-core)
+    Checking singlefs-checker v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-checker)
+    Checking singlefs-harness v0.1.0 (/home/fy5090/code/singlefs/crates/singlefs-harness)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.05s
+exit=0

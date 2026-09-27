@@ -1,0 +1,13 @@
+Q1. SRC-CLASS ENUMERATES-PATHS CLAIM-A FALSE REG-FIELD-TWO kb-scribe,experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-1's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q2. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-2's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q3. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-3's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q4. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner,kb-scribe,gate-triage CLAIM-B TRUE This would be refuted by: changing REG-4's second field to 'kb-scribe,gate-triage' to make CLAIM-B FALSE
+Q5. SRC-CLASS CHECKS-EXISTENCE CLAIM-A FALSE REG-FIELD-TWO kb-scribe,experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-5's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q6. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-6's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q7. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-7's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q8. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-8's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q9. SRC-CLASS ENUMERATES-PATHS CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-9's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q10. SRC-CLASS NAMES-PATH-ONLY CLAIM-A FALSE REG-FIELD-TWO experiment-runner CLAIM-B TRUE This would be refuted by: changing REG-10's second field to 'kb-scribe' to make CLAIM-B FALSE
+Q11. NONE This would be refuted by: changing SRC-1 to 'with open('.claude/kb/experiments.md') as f: data = f.read()' and keeping REG-1's second field as 'kb-scribe,experiment-runner' to make T1 have both CLAIM-A and CLAIM-B TRUE
+Q12. T1 ENUMERATES-PATHS T2 NAMES-PATH-ONLY T3 NAMES-PATH-ONLY T4 NAMES-PATH-ONLY T5 CHECKS-EXISTENCE T6 NAMES-PATH-ONLY T7 NAMES-PATH-ONLY T8 NAMES-PATH-ONLY T9 ENUMERATES-PATHS T10 NAMES-PATH-ONLY This would be refuted by: changing SRC-1 to 'with open('.claude/kb/experiments.md') as f: data = f.read()' to make CLAIM-A TRUE for T1
+Q13. SRC-1 NO SRC-2 NO SRC-3 NO SRC-4 NO SRC-5 NO SRC-6 NO SRC-7 NO SRC-8 NO SRC-9 NO SRC-10 NO This would be refuted by: changing SRC-1 to 'with open('.claude/kb/experiments.md') as f: f.read()' which would make SRC-1 YES but CLAIM-A was previously FALSE

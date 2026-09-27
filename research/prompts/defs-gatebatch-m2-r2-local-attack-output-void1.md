@@ -1,0 +1,15 @@
+1. For Row A's case, the --full log must have exactly one line starting with "LAYER0_PARALLEL_FINISHED " followed by a space, and the judge_worker_threads function must pass its checks (resumed_slices + freshly_run_slices equals slices, and the worker-thread conditions as described in Row R3). Since Row A has no exhaustive= token, there is no requirement for the enumeratedenumbered portion to cover the whole state space; the checks only ensure self-consistency of the slice counts and worker-thread behavior. This would be falsified if the log had exactly one LAYER0_PARALLEL_FINISHED line, the worker-thread checks passed, and the run covered only a partial state space but was still judged green.
+
+2. The log would be judged red because the count-line check for LAYER0_PARALLEL_FINISHED would fail due to zero matching lines, as Row R2 requires exactly one line for each count-line prefix. This would be falsified if a log with zero LAYER0_PARALLEL_FINISHED lines was still judged green.
+
+3. No, there is no field or check in Row R3 that would catch a slices field smaller than the true state space size, as Row R3 only verifies that resumed_slices plus freshly_run_slices equals the slices field and checks worker-thread conditions, not the absolute completeness of the state space. This would be falsified if the slices field was smaller than the true state space size but the judge_worker_threads check passed and the run was still judged green.
+
+4. No, judge_worker_threads is never called for Row B's case because it has no threads= token, so thread_lines is empty. A single-threaded run would not change the outcome compared to a multi-threaded run because Row B has no threads= token, so no worker-thread checks are performed by any row. This would be falsified if judge_worker_threads was called for Row B or if the worker-thread condition affected the judgment despite no threads= token.
+
+5. No, Table 3 contains no check for Row B's case that corresponds to the project rule's worker-thread requirement, as Row B has no threads= token and thus no worker-thread checks are performed by any row in Table 3. This would be falsified if any row in Table 3 included a worker-thread check for Row B.
+
+6. The re-check of the marker (Row R4) does not re-verify the worker-thread condition; it only checks input hash, case name, test-result line, count-line presence, and exhaustive field for prefixes with exhaustive= tokens. This would be falsified if the marker check included worker-thread checks.
+
+7. The LAYER0_PARALLEL_FINISHED line originates entirely from code in crash.rs, specifically in the enumerate_layer0_in_state_slices_or_one_shard function, as the test file itself has zero println! or eprintln! calls. This would be falsified if the test file second_transaction_crash_inside_the_floor_raise_pushed_by_the_session.rs contained a println! call for LAYER0_PARALLEL_FINISHED.
+
+8. The exact field names are "states=" and "record_claimed_state_missing_unit=", and the line does not contain exhaustive, worker_threads, or threads fields. This would be falsified if the line included any of the fields exhaustive, worker_threads, or threads.

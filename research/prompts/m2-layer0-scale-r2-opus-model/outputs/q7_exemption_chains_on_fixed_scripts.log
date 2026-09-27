@@ -1,0 +1,29 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r2-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_r2_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_r2_probe") generated 1 warning (run `cargo fix --test "opus_r2_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.66s
+     Running tests/opus_r2_probe.rs (target/release/deps/opus_r2_probe-73e2b3dc9d85c497)
+
+running 1 test
+H1 faulted_ranges_on_dev1=15
+H1 mount_under_fault chosen=(1,3) effective=(1,3) instance=2 rows=[InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(3), applied_transaction_high_water: 0, is_rollback: false }] row_publish_txg=5 warmups=[6, 7]
+Q7 stream=B writes=70 segments=13 chain_candidates=0 confirmed=false
+Q7 stream=C writes=166 segments=26 chain_candidates=0 confirmed=false
+Q7 stream=D writes=216 segments=33 chain_candidates=0 confirmed=false
+Q7 stream=E writes=425 segments=55 chain_candidates=0 confirmed=false
+Q7 stream=E18 writes=458 segments=58 chain_candidates=0 confirmed=false
+Q7 stream=H1 writes=166 segments=26 chain_candidates=0 confirmed=false
+Q7 stream=H2 writes=466 segments=65 chain_candidates=0 confirmed=false
+test q7_exemption_chains_on_fixed_scripts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.67s
+

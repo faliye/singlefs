@@ -107,8 +107,9 @@ const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 2 * NODE_POINTER_BYTES + 8 + 8;
 /// D23（journal 的角色与格式） 已定项 4 口径的点名项宽度；构成无落点，装置按字节表六的预想构成写。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 /// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——
-/// 自举头的写入者身份 20 与校验和算法标识 1、几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4，共 29。
-const SYSTEM_CONFIGURATION_BYTES: u64 = 481;
+/// 自举头的写入者身份 20 与校验和算法标识 1、几何段的 mkfs 时 physical_block_size 4 与扩展点声明值 N 4，共 29；
+/// 2026-09-26 用户定案在字段表末尾加回退下界 F 8 字节（住 [481, 489)），合计 481 → 489。
+const SYSTEM_CONFIGURATION_BYTES: u64 = 489;
 /// 头校验和 / 自证校验和的字段宽度（D18 已定项 7、D22 已定项 7、D23 已定项 4 同口径）。
 /// 算法由 D18（块里携带什么信息） 已定项 17 定（2026-09-13）：字段里放 CRC32C 4 字节 + 28 字节零。
 const WIDE_CHECKSUM_BYTES: u64 = 32;
@@ -126,7 +127,7 @@ const INDEX_NODE_KEY_WIDTH_OFFSET: usize = 51;
 const SYSTEM_CONFIGURATION_SLOT_OFFSETS: [u64; 2] = [0, 4096];
 /// D22（单元原子性怎么合成） 已定项 2 的槽宽那一格（2026-09-14 三方论证后按主 agent 推荐值写）：
 /// **系统配置槽宽是格式常量 4096**，不再等于挂载时探测到的 `physical_block_size`。
-/// 整槽校验和罩这 4096 字节含补齐（D18（块里携带什么信息） 已定项 17），481 字节的字段表在槽里余 3615。
+/// 整槽校验和罩这 4096 字节含补齐（D18（块里携带什么信息） 已定项 17），489 字节的字段表在槽里余 3607。
 /// ⚠️ 它只管系统配置：根槽仍按判定宽度 512 写（字节表七）。
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u64 = 4096;
 /// 字节表零：根环起点 1 MiB（槽 64）、P = 3、chunk = 1 MiB、每区 8 槽、槽距 4096（预想）。
@@ -273,13 +274,19 @@ const EXTENSION_POINT_DECLARED_BYTES: u32 = 0;
 const UNIT_MAGIC: [u8; 4] = *b"SFSU";
 const ROOT_MAGIC: [u8; 4] = *b"SFSR";
 const SYSTEM_CONFIGURATION_MAGIC: [u8; 4] = *b"SFSB";
-/// D15 已定项 4：incompat 位 0 = 第一条纯 SSD 布局线，mkfs 起就置上；位图小端、位 0 是第一个字节的最低位。
-const INCOMPAT_FIRST_SSD_LINE_BIT: u8 = 0x01;
+/// D15（格式冻结政策） 已定项 4 登记表位 0：退役位（原「第一条纯 SSD 布局线」）。2026-09-26 用户定案
+/// 退役、布局身份换到位 1；「用过的位不回收」（`.claude/kb/feature-bits.md`），这个常量只给读者拒绝逻辑
+/// 与单测用，不再由任何写路径写出。位图小端、位 0 是第一个字节的最低位（D22 已定项 13）。
+const INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT: u8 = 0x01;
+/// D15（格式冻结政策） 已定项 4 登记表位 1（2026-09-26 用户定案）：第一条纯 SSD 布局线（系统配置带回退
+/// 下界 F、根记录带卸载记号、没有回退见证与回退行）。写路径写出的布局身份位，也是读者唯一认识的位。
+const INCOMPAT_LAYOUT_IDENTITY_BIT: u8 = 0x02;
 /// 三张位图各 32 字节（256 位）紧跟 magic 4 + 版本 2，incompat 在前、compat_ro 居中、compat 在后（D15 已定项 1）。
 const SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET: usize = 4 + 2;
 const FEATURE_BITMAP_BYTES: usize = 32;
 /// 读者认识的全部 incompat 位；多出任何一位就是「不认识不许挂」（fs-design 格式层判据）。
-const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_FIRST_SSD_LINE_BIT;
+/// 位 0 退役之后不再列进这里：见到位 0 的读者按「不认识的位」拒（`.claude/kb/feature-bits.md` 第 15 行）。
+const SUPPORTED_INCOMPAT_BITS: u8 = INCOMPAT_LAYOUT_IDENTITY_BIT;
 const JOURNAL_MAGIC: [u8; 4] = *b"SFSJ";
 const FORMAT_VERSION: u16 = 1;
 
@@ -1277,6 +1284,9 @@ fn data_unit_payload(bytes: &[u8], declared_length: u16) -> &[u8] {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct RootRecord {
     fsid: [u8; 16],
+    /// D22（单元原子性怎么合成） 已定项 7 flags 位 0（2026-09-26 用户定案）：正常卸载那一串写的根置 1，
+    /// 其余根写 0；其余位第一版恒 0、非 0 拒收（已定项 17）。这条流里没有正常卸载，恒为 `false`。
+    unmount_marker: bool,
     instance: InstanceGeneration,
     checkpoint_txg: CheckpointTxg,
     tree_table: NodePointer,
@@ -1300,7 +1310,7 @@ impl RootRecord {
         let mut writer = ByteWriter::new(PHYSICAL_BLOCK_BYTES as usize);
         writer.put(&ROOT_MAGIC);
         writer.put(&self.fsid);
-        writer.put_u32(0);
+        writer.put_u32(if self.unmount_marker { 0x0000_0001 } else { 0 });
         writer.put_u32(self.instance.0);
         writer.put_u64(self.checkpoint_txg.0);
         self.tree_table.write_to(&mut writer);
@@ -1335,7 +1345,12 @@ impl RootRecord {
         if &fsid != expected_fsid {
             return None;
         }
-        let _flags = reader.get_u32();
+        let flags = reader.get_u32();
+        if flags & !0x0000_0001 != 0 {
+            // D22（单元原子性怎么合成） 已定项 17：flags 除位 0（卸载记号）外恒 0、非 0 拒收。
+            return None;
+        }
+        let unmount_marker = flags & 0x0000_0001 != 0;
         let instance = InstanceGeneration(reader.get_u32());
         let checkpoint_txg = CheckpointTxg(reader.get_u64());
         let tree_table = NodePointer::read_from(&mut reader);
@@ -1345,7 +1360,7 @@ impl RootRecord {
         let instance_table = NodePointer::read_from(&mut reader);
         let mapping_root = NodePointer::read_from(&mut reader);
         let allocation_record_tree_root = NodePointer::read_from(&mut reader);
-        Some(Self { fsid, instance, checkpoint_txg, tree_table, tree_identifier_watermark, rollback_floor, instance_table, mapping_root, allocation_record_tree_root })
+        Some(Self { fsid, unmount_marker, instance, checkpoint_txg, tree_table, tree_identifier_watermark, rollback_floor, instance_table, mapping_root, allocation_record_tree_root })
     }
 }
 
@@ -1363,6 +1378,9 @@ struct SystemConfiguration {
     region_devices: [DeviceIdentity; 3],
     journal_tail: u64,
     journal_instance: InstanceGeneration,
+    /// D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：回退下界 F 另记一份，
+    /// 住 journal 实例代号之后 [481, 489)；这条流里没有抬 F，恒为 `CheckpointTxg(0)`（D16 已定项 1）。
+    rollback_floor: CheckpointTxg,
 }
 
 /// magic 4 + 格式版本 2 + feature bits 96 + fsid 16 + 写入者身份 20 + 校验和算法标识 1 + 本盘设备号 4 + 设备数 4 + 槽世代号 8。
@@ -1371,6 +1389,9 @@ const SYSTEM_CONFIGURATION_CHECKSUM_OFFSET: usize = 4 + 2 + 96 + 16 + 20 + 1 + 4
 const SYSTEM_CONFIGURATION_FSID_OFFSET: usize = 4 + 2 + 96;
 const SYSTEM_CONFIGURATION_REGION_DEVICES_OFFSET: usize = 379;
 const SYSTEM_CONFIGURATION_TAIL_OFFSET: usize = 469;
+/// D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：journal 实例代号（477，宽 4）之后
+/// 是回退下界 F，按行累加得偏移 481（`.claude/kb/layout/01-first-txn.md`「一」字段表）。
+const SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET: usize = 481;
 /// D2（RAID 条带策略） 已定项 19：固定结构槽距 = max(4096, mkfs 时探测的 io_min)，两个数各占系统配置一个 4 字节字段。
 const FIXED_STRUCTURE_SLOT_SPACING: u32 = 4096;
 const MKFS_MINIMUM_INPUT_OUTPUT_BYTES: u32 = 512;
@@ -1383,7 +1404,7 @@ impl SystemConfiguration {
         let mut writer = ByteWriter::new(SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
         writer.put(&SYSTEM_CONFIGURATION_MAGIC);
         writer.put_u16(FORMAT_VERSION);
-        writer.put_u8(INCOMPAT_FIRST_SSD_LINE_BIT); // feature bits：incompat 位 0 = 第一条纯 SSD 布局线（D15 已定项 4，2026-09-13 用户定案）
+        writer.put_u8(INCOMPAT_LAYOUT_IDENTITY_BIT); // feature bits：incompat 位 1 = 布局身份（D15 已定项 4，2026-09-26 用户定案；位 0 退役）
         writer.skip(95); // 其余 incompat 位与 compat_ro / compat 两张位图全 0
         writer.assert_position(SYSTEM_CONFIGURATION_FSID_OFFSET as u64, "系统配置 fsid");
         writer.put(&self.fsid);
@@ -1440,6 +1461,10 @@ impl SystemConfiguration {
         writer.assert_position(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64, "journal tail");
         writer.put_u64(self.journal_tail);
         writer.put_u32(self.journal_instance.0);
+        // D22（单元原子性怎么合成） 已定项 9 字段表末行（2026-09-26 用户定案）：回退下界 F 8 字节，
+        // 住 [481, 489)，journal 实例代号之后。
+        writer.assert_position(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "系统配置回退下界 F");
+        writer.put_u64(self.rollback_floor.0);
         writer.assert_position(SYSTEM_CONFIGURATION_BYTES, "系统配置");
         let mut bytes = writer.bytes;
         // 「整槽校验和」：覆盖整个 4096 槽含补齐、自身按 0 参与（D18 已定项 17）。
@@ -1472,7 +1497,9 @@ impl SystemConfiguration {
         let mut tail_reader = ByteReader::at(bytes, SYSTEM_CONFIGURATION_TAIL_OFFSET);
         let journal_tail = tail_reader.get_u64();
         let journal_instance = InstanceGeneration(tail_reader.get_u32());
-        Some(Self { fsid, this_device, device_count, slot_generation, region_devices, journal_tail, journal_instance })
+        let mut rollback_floor_reader = ByteReader::at(bytes, SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET);
+        let rollback_floor = CheckpointTxg(rollback_floor_reader.get_u64());
+        Some(Self { fsid, this_device, device_count, slot_generation, region_devices, journal_tail, journal_instance, rollback_floor })
     }
 }
 
@@ -1482,7 +1509,7 @@ fn incompat_bits_are_mountable(slot: &[u8]) -> bool {
     let incompat = &slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES];
     let unknown_in_first_byte = incompat[0] & !SUPPORTED_INCOMPAT_BITS;
     let unknown_in_rest = incompat[1..].iter().any(|byte| *byte != 0);
-    let has_layout_identity = incompat[0] & INCOMPAT_FIRST_SSD_LINE_BIT != 0;
+    let has_layout_identity = incompat[0] & INCOMPAT_LAYOUT_IDENTITY_BIT != 0;
     unknown_in_first_byte == 0 && !unknown_in_rest && has_layout_identity
 }
 
@@ -2033,6 +2060,11 @@ impl PoolParameters {
     fn control_one_device_no_barriers() -> Self {
         Self { fsid: FIXED_FSID, device_count: 1, region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)], barriers: BarrierPolicy::None, last_of_publish_flag: 0x01 }
     }
+    /// E142 第十七次跑第八节 G6：同一个一盘几何，只把 D16（发布语义） 已定项 7 的两道屏障放回去
+    /// （与 `control_one_device_no_barriers` 相比只改 `barriers` 这一个字段，用来判「屏障放不放」这一个旋钮的方向）。
+    fn one_device_with_barriers() -> Self {
+        Self { fsid: FIXED_FSID, device_count: 1, region_devices: [DeviceIdentity(0), DeviceIdentity(0), DeviceIdentity(0)], barriers: BarrierPolicy::Settled, last_of_publish_flag: 0x01 }
+    }
     /// 臂 H：把写者开关扳到 `0x00`（E142 第十四次跑第五节 5.1）；不改别的字段。
     fn with_last_of_publish_flag(mut self, flag: u8) -> Self {
         self.last_of_publish_flag = flag;
@@ -2127,6 +2159,7 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
 
     let root = RootRecord {
         fsid: parameters.fsid,
+        unmount_marker: false, // mkfs 第 0 代不是正常卸载写的根（D22 已定项 7）
         instance,
         checkpoint_txg: genesis,
         tree_table: NodePointer {
@@ -2163,6 +2196,7 @@ fn mkfs(parameters: &PoolParameters) -> (RecordingPool, MkfsOutput) {
             region_devices: parameters.region_devices,
             journal_tail: 0,
             journal_instance: instance,
+            rollback_floor: CheckpointTxg(0), // mkfs 没有抬 F（D16 已定项 1）
         };
         for slot_offset in SYSTEM_CONFIGURATION_SLOT_OFFSETS {
             pool.write(device, DeviceOffset(slot_offset), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
@@ -2187,6 +2221,7 @@ fn acquire_instance(pool: &mut RecordingPool, parameters: &PoolParameters) -> In
             region_devices: parameters.region_devices,
             journal_tail: 0,
             journal_instance: instance,
+            rollback_floor: CheckpointTxg(0), // 取号没有抬 F（D16 已定项 1）
         };
         pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
     }
@@ -2569,16 +2604,33 @@ fn journal_record_offset(counter: JournalCounter) -> DeviceOffset {
     DeviceOffset(JOURNAL_START_SLOT * SLOT_BYTES + ((counter.0 - 1) % JOURNAL_RING_SLOTS) * JOURNAL_RECORD_BYTES)
 }
 
-/// E142 第十四次跑（第三节 3.2 第 3399–3425 行）：给一个盘上绝对偏移，判它落在 w1 / w4 / t9 哪一条记录、记录内偏移是多少。
-/// 三条记录都在 mkfs 之后紧接的三个 journal 计数器（1、2、3）上，与几何点无关，可以直接算，不用查 StructureCatalog。
-fn journal_record_name_for_offset(offset: u64) -> Option<(&'static str, u64)> {
-    for (label, counter) in [("w1", 1u64), ("w4", 2u64), ("t9", 3u64)] {
+/// E142 第十四次跑（第三节 3.2 第 3399–3425 行）：给一个盘上绝对偏移，判它落在 w1 / w4 / 本次事务自己那条
+/// journal 记录哪一条、记录内偏移是多少。三条记录都在 mkfs 之后紧接的三个 journal 计数器（1、2、3）上，
+/// 与几何点无关，可以直接算，不用查 StructureCatalog。
+///
+/// E142 第十七次跑（重跑登记第三节 3.2、问题单第 8 行）：第三条记录的角色名不再写死 `"t9"`——那是分配记录树
+/// 按位置寻址之前的旧编号（那时第一个事务只有 8 个单元，journal 记录恰好排在 t9）；今天的写清单有 12 个单元
+/// （`name=write_list` 的 `units=` 与 `name=role_labels` 都钉着 t1..t12），这条记录该叫 `t{单元数+1}`，
+/// 由调用方按当次的写清单现算、传进来（R18：角色名从写清单现取），不在这里写字面。
+fn journal_record_name_for_offset(offset: u64, this_transaction_journal_label: &str) -> Option<(String, u64)> {
+    for (label, counter) in [("w1", 1u64), ("w4", 2u64)] {
         let base = journal_record_offset(JournalCounter(counter)).0;
         if offset >= base && offset < base + JOURNAL_RECORD_BYTES {
-            return Some((label, offset - base));
+            return Some((label.to_string(), offset - base));
         }
     }
+    let base = journal_record_offset(JournalCounter(3)).0;
+    if offset >= base && offset < base + JOURNAL_RECORD_BYTES {
+        return Some((this_transaction_journal_label.to_string(), offset - base));
+    }
     None
+}
+
+/// 主臂三条 journal 记录（暖机两条 + 本次事务自己那条）各自的 (角色名, journal 计数器) ——
+/// 唯一定义这个对应关系的地方；`main()` 与角色名一致性单测都调它，不各自写一份字面
+/// （M156 的会红检查：把第三项的角色名退回字面 `t9`）。
+fn header311_record_labels(this_transaction_journal_label: &str) -> [(String, u64); 3] {
+    [("w1".to_string(), 1u64), ("w4".to_string(), 2u64), (this_transaction_journal_label.to_string(), 3u64)]
 }
 
 /// H/F 相减、P3 全盘相减两处共用的字段标签（记录内偏移 → 字段名，第七节 A2 的偏移表）。
@@ -2639,6 +2691,7 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
         }
         let root = RootRecord {
             fsid: genesis.root.fsid,
+            unmount_marker: false, // 暖机的空发布不是正常卸载（D22 已定项 7）
             instance,
             checkpoint_txg: txg,
             tree_table: genesis.root.tree_table,
@@ -2661,6 +2714,7 @@ fn warm_up(pool: &mut RecordingPool, parameters: &PoolParameters, genesis: &Mkfs
                 region_devices: parameters.region_devices,
                 journal_tail: txg_number,
                 journal_instance: instance,
+                rollback_floor: CheckpointTxg(0), // 暖机的空发布没有抬 F（D16 已定项 1）
             };
             pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
         }
@@ -2999,6 +3053,7 @@ fn publish_first_file(
     // 第三段：根槽 FUA，区域 3 mod 3 = 0 的槽 1（暖机之后第一个事务是 txg 3）。
     let root = RootRecord {
         fsid: parameters.fsid,
+        unmount_marker: false, // 第一个事务不是正常卸载（D22 已定项 7；这条流里没有正常卸载）
         instance,
         checkpoint_txg: txg,
         tree_table: tree_table_pointer,
@@ -3023,6 +3078,7 @@ fn publish_first_file(
             region_devices: parameters.region_devices,
             journal_tail: FIRST_TRANSACTION_TXG,
             journal_instance: instance,
+            rollback_floor: CheckpointTxg(0), // 第一个事务没有抬 F：非空有效根不足 4 个（D16 已定项 1）
         };
         pool.write(device, DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[slot_index]), &system_configuration.to_slot(), StepKind::SystemConfigurationSlot);
     }
@@ -3266,6 +3322,8 @@ fn replay_journal(
             report.prefix_applied += 1;
             rebuilt = RootRecord {
                 fsid: rebuilt.fsid,
+                // journal 记录不带卸载记号（D23 已定项 15 的新根段没有这一项），施加记录时照抄被施加那条根的这一项。
+                unmount_marker: rebuilt.unmount_marker,
                 instance: record.instance,
                 checkpoint_txg: record.checkpoint_txg,
                 tree_table: record.new_tree_table,
@@ -3411,6 +3469,7 @@ fn replay_journal_clause(
         }
         rebuilt = RootRecord {
             fsid: rebuilt.fsid,
+            unmount_marker: rebuilt.unmount_marker, // journal 记录不带这一项，照抄被施加那条根的
             instance: flagged_record.instance,
             checkpoint_txg: flagged_record.checkpoint_txg,
             tree_table: flagged_record.new_tree_table,
@@ -3935,6 +3994,9 @@ struct Layer0Tally {
     root_persisted_states: u64,
     no_file_states: u64,
     file_read_states: u64,
+    /// `file_read_states` 的子集：读回的内容与期望不同（`oracle_violation` 的 `FileRead` 分支恒判这一种违例，
+    /// Q142.34「file_read_wrong_content=」）。
+    file_read_wrong_content_states: u64,
     failed_states: u64,
     journal_differing_states: u64,
     verification_ran_states: u64,
@@ -3952,7 +4014,17 @@ fn oracle_violation(outcome: &RecoveryOutcome, root_persisted: bool, expected_co
     }
 }
 
-fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, root_index: usize, expected_content: &[u8], reader_mode: ReaderMode, tally: &mut Layer0Tally) {
+/// 一个状态上的判定，供 `enumerate_layer0`（只要聚合数）与逐态比较（Q142.23/25/36，还要每一态自己的判定）共用。
+struct EvaluatedState {
+    outcome: RecoveryOutcome,
+    is_violation: bool,
+    /// E142 第十七次跑第二段（R17）：查 journal 与不查 journal 两遍恢复的 `RecoveryOutcome` 是否不同——
+    /// 按发布分组时（`PublishGrouping`）逐组另报一次；`Layer0Tally.journal_differing_states` 是它的总和，
+    /// 单独状态这一位不重复算一遍，只是把已经算出的布尔值带出来给调用方分组用。
+    journal_differs: bool,
+}
+
+fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, root_index: usize, expected_content: &[u8], reader_mode: ReaderMode, tally: &mut Layer0Tally) -> EvaluatedState {
     let root_persisted = persisted[root_index];
     let image = CrashImage { base, writes, persisted };
     let consulted = recover(&image, JournalPolicy::Consult, reader_mode);
@@ -3962,7 +4034,8 @@ fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, ro
     if root_persisted {
         tally.root_persisted_states += 1;
     }
-    if consulted.outcome != ignored.outcome {
+    let journal_differs = consulted.outcome != ignored.outcome;
+    if journal_differs {
         tally.journal_differing_states += 1;
     }
     if consulted.journal.verification_passed + consulted.journal.verification_failed > 0 {
@@ -3973,23 +4046,31 @@ fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, ro
     }
     match &consulted.outcome {
         RecoveryOutcome::NoFile { .. } => tally.no_file_states += 1,
-        RecoveryOutcome::FileRead { .. } => tally.file_read_states += 1,
+        RecoveryOutcome::FileRead { content, .. } => {
+            tally.file_read_states += 1;
+            if content.as_slice() != expected_content {
+                tally.file_read_wrong_content_states += 1;
+            }
+        }
         RecoveryOutcome::Failed { .. } => tally.failed_states += 1,
     }
-    if let Some(reason) = oracle_violation(&consulted.outcome, root_persisted, expected_content) {
+    let violation_reason = oracle_violation(&consulted.outcome, root_persisted, expected_content);
+    let is_violation = violation_reason.is_some();
+    if let Some(reason) = violation_reason {
         tally.violations += 1;
         if tally.first_violation.is_none() {
             let persisted_kinds: Vec<&str> = image.persisted.iter().zip(writes).filter(|(is_persisted, _)| **is_persisted).map(|(_, write)| write.kind.tag()).collect();
             tally.first_violation = Some(format!("{reason}（持久的写：{}）", persisted_kinds.join("|")));
         }
     }
+    EvaluatedState { outcome: consulted.outcome, is_violation, journal_differs }
 }
 
-fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>], expected_content: &[u8], reader_mode: ReaderMode) -> Layer0Tally {
-    // 被判的是这条流里最后一次根槽 FUA 写：暖机的两个根在它前面，主臂与阳性对照都取这一条。
-    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
-    let mut tally = Layer0Tally::default();
-    let mut persisted_before = vec![false; writes.len()];
+/// D13（验证路线） 已定项 4 的枚举域，从 `enumerate_layer0` 里拆出来给逐态比较（`compare_layer0_predictions`）
+/// 共用：前若干段全持久、当前段任一非满子集持久、之后各段都不持久，最后单独访问一次「全部持久」。
+/// 只改了「访问一个状态」的方式（从直接调 `evaluate_state` 改成回调），枚举次序与被访问的持久掩码集合不变。
+fn for_each_layer0_state(writes_len: usize, segments: &[Vec<usize>], mut visit: impl FnMut(Vec<bool>)) {
+    let mut persisted_before = vec![false; writes_len];
     for segment in segments {
         let full_mask = (1u64 << segment.len()) - 1;
         for mask in 0..full_mask {
@@ -3999,14 +4080,588 @@ fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>
                     persisted[*write_index] = true;
                 }
             }
-            evaluate_state(base, writes, persisted, root_index, expected_content, reader_mode, &mut tally);
+            visit(persisted);
         }
         for write_index in segment {
             persisted_before[*write_index] = true;
         }
     }
-    evaluate_state(base, writes, persisted_before, root_index, expected_content, reader_mode, &mut tally);
+    visit(persisted_before);
+}
+
+fn enumerate_layer0(base: &Pool, writes: &[WriteRequest], segments: &[Vec<usize>], expected_content: &[u8], reader_mode: ReaderMode) -> Layer0Tally {
+    // 被判的是这条流里最后一次根槽 FUA 写：暖机的两个根在它前面，主臂与阳性对照都取这一条。
+    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
+    let mut tally = Layer0Tally::default();
+    for_each_layer0_state(writes.len(), segments, |persisted| {
+        evaluate_state(base, writes, persisted, root_index, expected_content, reader_mode, &mut tally);
+    });
     tally
+}
+
+// ───────────────────────── E142 第十七次跑：逐态预言器（第一节 R11、R10）与 PC1/G6/G7/PC2 ─────────────────────────
+//
+// 依赖集甲（R10）：这一窗口里全部单元写——根记录 → 树表与中央映射根；树表 → 各树的根，每棵树整棵往下
+// （分配记录树整棵、extent 上段叶里的内联数据指针 → 数据单元）。D8（核心索引结构） 已定项 14「挂载怎么读：
+// 分配记录树挂载时整棵读进挂载态」（用户 K4）与 D16（发布语义） 已定项 7「恢复重放在施加任何记录之前，
+// 必须逐项验证点名单元的校验和」（这个装置的写清单把全部单元都点了名，第七节 A15）合起来，
+// 使得「根槽已持久时挂载读到坏的分配树」与「根槽未持久时验证点名单元不过、不施加」两条路都要求同一个
+// 依赖集（全部单元），这就是为什么单次发布的预言可以写成下面这一个分支结构，不需要分两套逻辑。
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum PredictedOutcomeClass {
+    LegalFileRead,
+    LegalNoFile,
+    Violation,
+}
+
+impl PredictedOutcomeClass {
+    fn tag(self) -> &'static str {
+        match self {
+            PredictedOutcomeClass::LegalFileRead => "legal_file_read",
+            PredictedOutcomeClass::LegalNoFile => "legal_no_file",
+            PredictedOutcomeClass::Violation => "violation",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum ActualOutcomeClass {
+    FileReadCorrect,
+    FileReadWrongContent,
+    NoFile,
+    Failed,
+}
+
+impl ActualOutcomeClass {
+    fn of(outcome: &RecoveryOutcome, expected_content: &[u8]) -> Self {
+        match outcome {
+            RecoveryOutcome::FileRead { content, .. } if content == expected_content => ActualOutcomeClass::FileReadCorrect,
+            RecoveryOutcome::FileRead { .. } => ActualOutcomeClass::FileReadWrongContent,
+            RecoveryOutcome::NoFile { .. } => ActualOutcomeClass::NoFile,
+            RecoveryOutcome::Failed { .. } => ActualOutcomeClass::Failed,
+        }
+    }
+    fn tag(self) -> &'static str {
+        match self {
+            ActualOutcomeClass::FileReadCorrect => "file_read_correct",
+            ActualOutcomeClass::FileReadWrongContent => "file_read_wrong_content",
+            ActualOutcomeClass::NoFile => "no_file",
+            ActualOutcomeClass::Failed => "failed",
+        }
+    }
+}
+
+/// R20「对角」：legal_file_read → file_read_correct，legal_no_file → no_file，violation → oracle 判违例的任一实际类。
+fn is_diagonal(predicted: PredictedOutcomeClass, actual: ActualOutcomeClass, actual_is_violation: bool) -> bool {
+    match predicted {
+        PredictedOutcomeClass::LegalFileRead => actual == ActualOutcomeClass::FileReadCorrect,
+        PredictedOutcomeClass::LegalNoFile => actual == ActualOutcomeClass::NoFile,
+        PredictedOutcomeClass::Violation => actual_is_violation,
+    }
+}
+
+/// 逐态预言器（R11）：只看每次写的种类与这个状态的持久掩码，不调 `recover`、不读镜像。适用于「单次发布」
+/// 的流（这一段之前的写全部已经持久，只有这一段自己的持久掩码在变化）：阳性对照、G6、G7、PC2，
+/// 也适用于主臂那一次发布本身（`root_index`/`journal_indices` 只挂着最后一次发布，暖机两次空发布
+/// 不写单元，见 `enumerate_layer0_grouped` 的说明）。
+/// `dependency_groups`：依赖集甲的每一项，一项一组（组内任一份持久就算这一项在——两盘镜像时才用得到分组，
+/// 一盘时每组恰一个下标）。`journal_indices`：这次发布的 journal 记录的全部镜像份数，任一份持久就算记录在
+/// （E142 第十七次跑第二段改成切片：主臂两盘时记录有 2 份镜像，「至少一份持久」才是 D23 已定项 15 的字面；
+/// 单发布流只有一份时切片长度恰 1，行为与改之前的标量 `journal_index` 完全相同）。
+fn predict_single_publish(persisted: &[bool], root_index: usize, journal_indices: &[usize], dependency_groups: &[Vec<usize>]) -> PredictedOutcomeClass {
+    let dependencies_ok = dependency_groups.iter().all(|group| group.iter().any(|&index| persisted[index]));
+    let journal_available = journal_indices.iter().any(|&index| persisted[index]);
+    if persisted[root_index] {
+        if dependencies_ok { PredictedOutcomeClass::LegalFileRead } else { PredictedOutcomeClass::Violation }
+    } else if journal_available && dependencies_ok {
+        // D23（journal 的角色与格式） 已定项 15：记录持久、点名单元全在 ⇒ 施加，得到新态；这一态因此合法地读到文件，
+        // 即便根槽本身没有持久（原登记「根槽未持久时新旧两态都合法」）。
+        PredictedOutcomeClass::LegalFileRead
+    } else {
+        PredictedOutcomeClass::LegalNoFile
+    }
+}
+
+/// 逐态比较的聚合（Q142.23/25/36）：checker（`evaluate_state`）对逐态预言器的判定，漏判、误判分开数；
+/// 另带 3×4 结果类矩阵（Q142.24/36）。
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+struct PredictionComparison {
+    states: u64,
+    predicted_violations: u64,
+    agree: u64,
+    /// 预言违例、checker 没判违例：对照本身坏了（F8）。
+    missed: u64,
+    /// checker 判违例、预言没预言到：停机 S9。
+    false_alarm: u64,
+    first_missed: Option<String>,
+    first_false_alarm: Option<String>,
+    outcome_matrix: BTreeMap<(PredictedOutcomeClass, ActualOutcomeClass), u64>,
+    off_diagonal: u64,
+}
+
+/// 这一状态里持久的写，按角色名列出（`role_names[i]` 是 `writes[i]` 的角色；`role_names` 长度必须等于
+/// `writes.len()`）；给 `first_missed` / `first_false_alarm` 用，没有持久的写时给 `"none"`。
+fn persisted_role_list(persisted: &[bool], role_names: &[String]) -> String {
+    let names: Vec<&str> = persisted.iter().zip(role_names).filter(|(is_persisted, _)| **is_persisted).map(|(_, name)| name.as_str()).collect();
+    if names.is_empty() { "none".to_string() } else { names.join("|") }
+}
+
+/// 单次发布的写清单里每一次写的角色名：单元按 `units_by_slot` 的次序给 `descriptive_tag()`，
+/// 其后依次是 journal 记录、根槽、系统配置槽（这个装置的单次发布流恰好各一次）。
+fn single_publish_role_names(writes_len: usize, units_by_slot: &[(SlotNumber, TransactionUnit, Vec<u8>)]) -> Vec<String> {
+    let mut names: Vec<String> = units_by_slot.iter().map(|(_, unit, _)| unit.descriptive_tag().to_string()).collect();
+    for extra in ["journal_record", "root_record", "system_configuration"] {
+        if names.len() < writes_len {
+            names.push(extra.to_string());
+        }
+    }
+    while names.len() < writes_len {
+        names.push("unknown".to_string());
+    }
+    names
+}
+
+/// 逐态跑 checker（`evaluate_state`）与逐态预言器，两边同一批状态、同一批持久掩码，谁都不知道对方判了什么。
+fn compare_layer0_predictions(
+    base: &Pool,
+    writes: &[WriteRequest],
+    segments: &[Vec<usize>],
+    expected_content: &[u8],
+    reader_mode: ReaderMode,
+    journal_index: usize,
+    dependency_groups: &[Vec<usize>],
+    role_names: &[String],
+) -> (Layer0Tally, PredictionComparison) {
+    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
+    let mut tally = Layer0Tally::default();
+    let mut comparison = PredictionComparison::default();
+    for_each_layer0_state(writes.len(), segments, |persisted| {
+        // 单发布流只有一份 journal 镜像；`&[journal_index]` 保持与改之前的标量完全同样的行为。
+        let predicted = predict_single_publish(&persisted, root_index, &[journal_index], dependency_groups);
+        let predicted_violation = predicted == PredictedOutcomeClass::Violation;
+        let role_list = persisted_role_list(&persisted, role_names);
+        let evaluated = evaluate_state(base, writes, persisted, root_index, expected_content, reader_mode, &mut tally);
+        comparison.states += 1;
+        if predicted_violation {
+            comparison.predicted_violations += 1;
+        }
+        let actual_class = ActualOutcomeClass::of(&evaluated.outcome, expected_content);
+        *comparison.outcome_matrix.entry((predicted, actual_class)).or_insert(0) += 1;
+        if !is_diagonal(predicted, actual_class, evaluated.is_violation) {
+            comparison.off_diagonal += 1;
+        }
+        match (predicted_violation, evaluated.is_violation) {
+            (true, true) | (false, false) => comparison.agree += 1,
+            (true, false) => {
+                comparison.missed += 1;
+                if comparison.first_missed.is_none() {
+                    comparison.first_missed = Some(role_list);
+                }
+            }
+            (false, true) => {
+                comparison.false_alarm += 1;
+                if comparison.first_false_alarm.is_none() {
+                    comparison.first_false_alarm = Some(role_list);
+                }
+            }
+        }
+    });
+    (tally, comparison)
+}
+
+// ───────────────────────── E142 第十七次跑第二段：层 0 主臂的单独调用（R13，第五节 5.4，第六节 6.2） ─────────────────────────
+//
+// 「按发布分组」：主臂那条流里有三次根槽 FUA 写（两次暖机空发布各一次、主事务一次），`for_each_layer0_state`
+// 按段挨段枚举，一个状态落在哪个分组只看它正在变化的那个段号相对三个根所在段号的位置——不需要重新走一遍
+// mkfs/暖机/发布的语义。「结果类表」复用 Q142.24 已经有的 `PredictedOutcomeClass`/`ActualOutcomeClass`/`is_diagonal`，
+// 预言器复用 `predict_single_publish`（R10 的依赖集判定本来就是「组内任一份持久」，两盘镜像只是把
+// `journal_indices` 从一份扩成两份，见该函数上方的改动说明）。
+
+/// 按全局下标（`0..closed_form_state_count(segments)`）直接给出这个下标对应的持久掩码，与它所在的段号
+/// （`None` = `for_each_layer0_state` 最后单独访问的那一次「全部持久」）。次序与 `for_each_layer0_state`
+/// 完全相同：段挨段、每段内 mask 从 0 到 `full_mask − 1`，最后单独访问一次全持久
+/// （`layer0_state_at_index_matches_for_each_layer0_state_on_the_positive_control` 逐态核过两者一致）。
+/// 并行切片只是把 `[0, closed_form)` 切成几段区间分给不同线程，每个下标对应哪个状态不因此改变。
+fn layer0_state_at_index(writes_len: usize, segments: &[Vec<usize>], mut global_index: u64) -> (Vec<bool>, Option<usize>) {
+    let mut persisted = vec![false; writes_len];
+    for (segment_index, segment) in segments.iter().enumerate() {
+        let full_mask = (1u64 << segment.len()) - 1;
+        if global_index < full_mask {
+            for (bit, &write_index) in segment.iter().enumerate() {
+                if global_index & (1 << bit) != 0 {
+                    persisted[write_index] = true;
+                }
+            }
+            return (persisted, Some(segment_index));
+        }
+        global_index -= full_mask;
+        for &write_index in segment {
+            persisted[write_index] = true;
+        }
+    }
+    debug_assert_eq!(global_index, 0, "下标超出 closed_form_state_count 的范围");
+    (persisted, None)
+}
+
+/// 每一次根槽 FUA 写所在的段号，按写序（因此也是 txg 序）排列（R13「按发布分组」）。单发布流只有一次根槽，
+/// 返回长度 1 的向量。
+fn publish_group_boundaries(writes: &[WriteRequest], segments: &[Vec<usize>]) -> Vec<usize> {
+    writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
+        .map(|(write_index, _)| segments.iter().position(|segment| segment.contains(&write_index)).expect("根槽写必在某个段里"))
+        .collect()
+}
+
+/// 段号 → 发布分组标签：段号落在第 k 个根自己的段或更早（`index <= boundaries[k]`）⇒ `txg{k+1}`；
+/// 晚于最后一个根 ⇒ `after_last_root`；`None`（`for_each_layer0_state` 最后那次「全部持久」访问）⇒
+/// `every_write_persisted`（第七节 A20 的五组分）。
+fn publish_group_label(boundaries: &[usize], segment_index: Option<usize>) -> String {
+    match segment_index {
+        None => "every_write_persisted".to_string(),
+        Some(index) => match boundaries.iter().position(|&boundary| index <= boundary) {
+            Some(order) => format!("txg{}", order + 1),
+            None => "after_last_root".to_string(),
+        },
+    }
+}
+
+/// 一个发布分组里的三个量：Q142.31（states）、Q142.32（violations）、Q142.35（journal_differing_states，
+/// 只有 txg1/txg2/txg3 三组会被消费——journal 差异只可能发生在判的根还没持久时）。
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+struct PublishBucket {
+    states: u64,
+    violations: u64,
+    journal_differing_states: u64,
+}
+
+impl PublishBucket {
+    fn record(&mut self, is_violation: bool, journal_differs: bool) {
+        self.states += 1;
+        if is_violation {
+            self.violations += 1;
+        }
+        if journal_differs {
+            self.journal_differing_states += 1;
+        }
+    }
+    fn merge(&mut self, other: &Self) {
+        self.states += other.states;
+        self.violations += other.violations;
+        self.journal_differing_states += other.journal_differing_states;
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+struct PublishGrouping {
+    buckets: BTreeMap<String, PublishBucket>,
+}
+
+impl PublishGrouping {
+    fn record(&mut self, label: &str, is_violation: bool, journal_differs: bool) {
+        self.buckets.entry(label.to_string()).or_default().record(is_violation, journal_differs);
+    }
+    fn merge(&mut self, other: &Self) {
+        for (label, bucket) in &other.buckets {
+            self.buckets.entry(label.clone()).or_default().merge(bucket);
+        }
+    }
+    fn get(&self, label: &str) -> PublishBucket {
+        self.buckets.get(label).cloned().unwrap_or_default()
+    }
+}
+
+/// 逗号连接的 `label:count`（Q142.31 `states_by_publish=`、Q142.35 `differing_by_publish=`：同一行里的一个字段）。
+fn format_publish_counts(grouping: &PublishGrouping, labels: &[&str], select: impl Fn(&PublishBucket) -> u64) -> String {
+    labels.iter().map(|&label| format!("{label}:{}", select(&grouping.get(label)))).collect::<Vec<_>>().join(",")
+}
+
+/// 空格连接的 `label=count`（Q142.32「另一行 `name=layer0_violations_by_publish txg1= txg2= …`」）。
+fn format_publish_fields(grouping: &PublishGrouping, labels: &[&str], select: impl Fn(&PublishBucket) -> u64) -> String {
+    labels.iter().map(|&label| format!("{label}={}", select(&grouping.get(label)))).collect::<Vec<_>>().join(" ")
+}
+
+/// 一个诊断用的角色名列表：`w{下标}_{种类}`，只给 `PredictionComparison::first_missed`/`first_false_alarm`
+/// 当人读的文本用，不是 Q142.27 的角色名自检（那一套只认默认调用里 `name=role_labels` 定义的 t 号）。
+fn generic_role_names(writes: &[WriteRequest]) -> Vec<String> {
+    writes.iter().enumerate().map(|(index, write)| format!("w{index}_{}", write.kind.tag())).collect()
+}
+
+/// R10 依赖集甲在主事务这次发布上的写法：`writes` 里全部 `UnitWrite`（暖机两次空发布不写单元，D16（发布语义）
+/// 已定项 8「且不写单元」，所以整条主臂窗口里唯一会出现 `UnitWrite` 的就是主事务），按
+/// `write_unit_to_every_device` 的写序（单元外层、设备内层，见该函数的调用点）逐 `device_count` 个一组，
+/// 组内任一份持久就算这个逻辑单元在——与 `build_single_publish_flow` 给单发布流建的 `dependency_groups`
+/// 是同一个判定（`predict_single_publish` 的 `dependencies_ok`），只是这里组的大小是 `device_count` 而不是 1。
+fn main_transaction_dependency_groups(writes: &[WriteRequest], device_count: usize) -> Vec<Vec<usize>> {
+    let unit_indices: Vec<usize> = writes.iter().enumerate().filter(|(_, write)| write.kind == StepKind::UnitWrite).map(|(index, _)| index).collect();
+    unit_indices.chunks(device_count.max(1)).map(<[usize]>::to_vec).collect()
+}
+
+#[derive(Default)]
+struct GroupedAccumulator {
+    tally: Layer0Tally,
+    comparison: PredictionComparison,
+    grouping: PublishGrouping,
+}
+
+impl GroupedAccumulator {
+    /// 分片按起点从小到大依次 `merge`：`first_violation`/`first_missed`/`first_false_alarm` 只在自己还没有
+    /// 时才收 `other` 的，因此串行（一整个分片 `0..closed_form`）与并行（多个分片按起点顺序折叠）给出
+    /// 完全相同的这三个诊断字段，其余都是纯计数的加法——这就是
+    /// `layer0_grouped_enumeration_agrees_between_serial_and_parallel_*` 要证的「逐格相等」。
+    fn merge(&mut self, other: GroupedAccumulator) {
+        let t = &mut self.tally;
+        let o = other.tally;
+        t.states += o.states;
+        t.violations += o.violations;
+        t.root_persisted_states += o.root_persisted_states;
+        t.no_file_states += o.no_file_states;
+        t.file_read_states += o.file_read_states;
+        t.file_read_wrong_content_states += o.file_read_wrong_content_states;
+        t.failed_states += o.failed_states;
+        t.journal_differing_states += o.journal_differing_states;
+        t.verification_ran_states += o.verification_ran_states;
+        t.verification_failed_states += o.verification_failed_states;
+        if t.first_violation.is_none() {
+            t.first_violation = o.first_violation;
+        }
+        t.reader_branches.add(&o.reader_branches);
+
+        let c = &mut self.comparison;
+        c.states += other.comparison.states;
+        c.predicted_violations += other.comparison.predicted_violations;
+        c.agree += other.comparison.agree;
+        c.missed += other.comparison.missed;
+        c.false_alarm += other.comparison.false_alarm;
+        if c.first_missed.is_none() {
+            c.first_missed = other.comparison.first_missed;
+        }
+        if c.first_false_alarm.is_none() {
+            c.first_false_alarm = other.comparison.first_false_alarm;
+        }
+        for (key, count) in other.comparison.outcome_matrix {
+            *c.outcome_matrix.entry(key).or_insert(0) += count;
+        }
+        c.off_diagonal += other.comparison.off_diagonal;
+
+        self.grouping.merge(&other.grouping);
+    }
+}
+
+/// R13：层 0 主臂的单独调用——按发布分组（`PublishGrouping`）与结果类表（复用 Q142.24 那一套）接进枚举。
+/// `threads = 1` 时单线程跑 `[0, closed_form)`；`threads > 1` 时把这个区间切成 `threads` 段，各自在独立线程
+/// 里跑（`layer0_state_at_index` 保证每个下标对应哪个状态与串行完全一样），最后按分片起点顺序 `merge`。
+/// 这个函数本身不知道调用方是单发布流还是多发布的主臂——`阳性对照`/`G6`/`G7` 用它时 `root_index`/
+/// `journal_indices`/`dependency_groups` 就是它们自己单次发布的那几个，`publish_group_boundaries` 会得到
+/// 长度 1 的分组列表（只有 `txg1` 与 `after_last_root`/`every_write_persisted`），这正是
+/// `layer0_grouped_enumeration_agrees_between_serial_and_parallel_*` 用来证明并行机制本身没问题的取样点。
+#[allow(clippy::too_many_arguments)]
+fn enumerate_layer0_grouped(
+    threads: usize,
+    base: &Pool,
+    writes: &[WriteRequest],
+    segments: &[Vec<usize>],
+    expected_content: &[u8],
+    reader_mode: ReaderMode,
+    root_index: usize,
+    journal_indices: &[usize],
+    dependency_groups: &[Vec<usize>],
+    role_names: &[String],
+) -> (Layer0Tally, PredictionComparison, PublishGrouping) {
+    let boundaries = publish_group_boundaries(writes, segments);
+    let closed_form = closed_form_state_count(segments);
+    let threads = threads.max(1);
+
+    let run_range = |range: std::ops::Range<u64>| -> GroupedAccumulator {
+        let mut accumulator = GroupedAccumulator::default();
+        for global_index in range {
+            let (persisted, segment_index) = layer0_state_at_index(writes.len(), segments, global_index);
+            let predicted = predict_single_publish(&persisted, root_index, journal_indices, dependency_groups);
+            let predicted_violation = predicted == PredictedOutcomeClass::Violation;
+            let role_list = persisted_role_list(&persisted, role_names);
+            let evaluated = evaluate_state(base, writes, persisted, root_index, expected_content, reader_mode, &mut accumulator.tally);
+            accumulator.comparison.states += 1;
+            if predicted_violation {
+                accumulator.comparison.predicted_violations += 1;
+            }
+            let actual_class = ActualOutcomeClass::of(&evaluated.outcome, expected_content);
+            *accumulator.comparison.outcome_matrix.entry((predicted, actual_class)).or_insert(0) += 1;
+            if !is_diagonal(predicted, actual_class, evaluated.is_violation) {
+                accumulator.comparison.off_diagonal += 1;
+            }
+            match (predicted_violation, evaluated.is_violation) {
+                (true, true) | (false, false) => accumulator.comparison.agree += 1,
+                (true, false) => {
+                    accumulator.comparison.missed += 1;
+                    if accumulator.comparison.first_missed.is_none() {
+                        accumulator.comparison.first_missed = Some(role_list.clone());
+                    }
+                }
+                (false, true) => {
+                    accumulator.comparison.false_alarm += 1;
+                    if accumulator.comparison.first_false_alarm.is_none() {
+                        accumulator.comparison.first_false_alarm = Some(role_list.clone());
+                    }
+                }
+            }
+            let label = publish_group_label(&boundaries, segment_index);
+            accumulator.grouping.record(&label, evaluated.is_violation, evaluated.journal_differs);
+        }
+        accumulator
+    };
+
+    if threads == 1 || closed_form <= 1 {
+        let accumulator = run_range(0..closed_form);
+        return (accumulator.tally, accumulator.comparison, accumulator.grouping);
+    }
+
+    let chunk = (closed_form + threads as u64 - 1) / threads as u64;
+    let ranges: Vec<std::ops::Range<u64>> = (0..threads as u64)
+        .map(|worker| (worker * chunk).min(closed_form)..((worker + 1) * chunk).min(closed_form))
+        .filter(|range| !range.is_empty())
+        .collect();
+
+    let results: Vec<GroupedAccumulator> = std::thread::scope(|scope| {
+        let handles: Vec<_> = ranges.iter().cloned().map(|range| scope.spawn(|| run_range(range))).collect();
+        handles.into_iter().map(|handle| handle.join().expect("层0分组并行工作线程 panic")).collect()
+    });
+
+    let mut merged = GroupedAccumulator::default();
+    for result in results {
+        merged.merge(result);
+    }
+    (merged.tally, merged.comparison, merged.grouping)
+}
+
+/// Q142.37 的判决字段（第六节 6.2 表最后一行）：从已经算出来的 `Layer0Tally`/`PredictionComparison`
+/// 现导出，不在 `main()` 里内嵌判定逻辑——内嵌的判定 `cargo test` 下走不到（`enumerate_layer0_grouped`
+/// 只在设了 `E142_LAYER0_MAIN` 且真的调了 `main()` 时才跑），第十二节修订第 8 条已经因为这个原因补过
+/// 一批测试，这里直接把判定拆成纯函数，`layer0_main_arm_verdict_flags_every_threshold_independently`
+/// 单测覆盖每一格。
+struct Layer0MainArmVerdict {
+    layer0_states_ok: bool,
+    layer0_violations: &'static str,
+    root_persisted_ok: bool,
+    file_read_ok: bool,
+    file_read_wrong_content_zero: bool,
+    journal_reading: &'static str,
+    main_outcome_matrix_ok: bool,
+}
+
+fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &PredictionComparison) -> Layer0MainArmVerdict {
+    Layer0MainArmVerdict {
+        layer0_states_ok: tally.states == closed_form && closed_form == 67_108_885,
+        layer0_violations: if tally.violations == 0 { "zero" } else { "nonzero" },
+        root_persisted_ok: tally.root_persisted_states == 4,
+        file_read_ok: tally.file_read_states == 7,
+        file_read_wrong_content_zero: tally.file_read_wrong_content_states == 0,
+        journal_reading: match tally.journal_differing_states {
+            3 => "j_jia",
+            9 => "j_yi",
+            _ => "neither",
+        },
+        main_outcome_matrix_ok: comparison.off_diagonal == 0,
+    }
+}
+
+/// 并行度取 `SINGLEFS_THREAD_CAP`（`research/scripts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
+/// 见该脚本文件头注释；这份装置在 `research/e7-index-bench/` 下，不是 `crates/singlefs-harness`，不在它专属
+/// 变量表里）。没设或解析不出正整数就退回 1（串行）。
+fn thread_cap_from_env() -> usize {
+    std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|value| value.parse::<usize>().ok()).filter(|&value| value >= 1).unwrap_or(1)
+}
+
+/// 一次「单次发布」流：mkfs → 直接发布（阳性对照、G6 都是这个形状：没有取号、没有暖机）。
+struct SinglePublishFlow {
+    base: Pool,
+    writes: Vec<WriteRequest>,
+    segments: Vec<Vec<usize>>,
+    closed_form: u64,
+    root_index: usize,
+    journal_index: usize,
+    /// 依赖集甲：这一窗口里全部单元写，每个单元一组（一盘时组内恰一个下标）。
+    dependency_groups: Vec<Vec<usize>>,
+    /// 依赖集乙要减掉的那一部分：分配记录树根以下的节点数（第一节 R10 乙档）。
+    below_root_count: usize,
+    role_names: Vec<String>,
+}
+
+fn build_single_publish_flow(parameters: &PoolParameters, file_bytes: &[u8], fua_is_boundary: bool) -> SinglePublishFlow {
+    let (mut recording, genesis) = mkfs(parameters);
+    let mkfs_operation_count = recording.operations.len();
+    let base = recording.pool.clone();
+    let output = publish_first_file(&mut recording, parameters, &genesis, file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
+    let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], fua_is_boundary);
+    let closed_form = closed_form_state_count(&segments);
+    let root_index = writes.iter().position(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条");
+    let journal_index = writes.iter().position(|write| write.kind == StepKind::JournalRecord).expect("写流里有 journal 记录那一条");
+    let dependency_groups: Vec<Vec<usize>> = (0..output.units_by_slot.len()).map(|index| vec![index]).collect();
+    let below_root_count = output
+        .units_by_slot
+        .iter()
+        .filter(|(_, unit, _)| matches!(unit, TransactionUnit::Allocation(AllocationNodeRole::Leaf { .. }) | TransactionUnit::Allocation(AllocationNodeRole::Internal { .. })))
+        .count();
+    let role_names = single_publish_role_names(writes.len(), &output.units_by_slot);
+    SinglePublishFlow { base, writes, segments, closed_form, root_index, journal_index, dependency_groups, below_root_count, role_names }
+}
+
+/// R10：`(1 << (N-1)) - (1 << (N-1-|依赖集|))`。
+fn expected_violations_formula(n_writes: usize, dependency_count: usize) -> u64 {
+    (1u64 << (n_writes - 1)) - (1u64 << (n_writes - 1 - dependency_count))
+}
+
+/// 阳性对照期望违例数的三档读法（R10 甲/乙/丙），从这一窗口的写清单现算，不写字面
+/// （M149 的会红检查：把甲档的依赖计数换成乙档会把 4092 改成 4080）。
+fn control_expected_violations_three_readings(flow: &SinglePublishFlow) -> (u64, u64, u64) {
+    let n = flow.writes.len();
+    let unit_writes = flow.dependency_groups.len();
+    (
+        expected_violations_formula(n, unit_writes),
+        expected_violations_formula(n, unit_writes - flow.below_root_count),
+        expected_violations_formula(n, unit_writes - 1),
+    )
+}
+
+/// PC2（第五节 5.2）：主臂几何上，全部持久（1 个状态）与逐个单元的两份都不持久（每个单元 1 个状态）。
+/// 不走枚举——只构造这 `units_by_slot.len() + 1` 个状态，直接调 `recover` + `oracle_violation`。
+struct Pc2Report {
+    all_persisted_legal: bool,
+    all_persisted_content_ok: bool,
+    caught: u64,
+    per_unit: Vec<(String, String, bool, String)>, // (label=descriptive_tag, tag=tN, caught, outcome_kind)
+}
+
+fn run_pc2(base: &Pool, writes: &[WriteRequest], units_by_slot: &[(SlotNumber, TransactionUnit, Vec<u8>)], expected_content: &[u8]) -> Pc2Report {
+    let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("写流里有根槽那一条（PC2）");
+    let evaluate = |persisted: Vec<bool>| -> (RecoveryOutcome, bool) {
+        let root_persisted = persisted[root_index];
+        let image = CrashImage { base, writes, persisted };
+        let report = recover(&image, JournalPolicy::Consult, ReaderMode::Clause);
+        let is_violation = oracle_violation(&report.outcome, root_persisted, expected_content).is_some();
+        (report.outcome, is_violation)
+    };
+    let all_true = vec![true; writes.len()];
+    let (all_outcome, all_violation) = evaluate(all_true.clone());
+    let all_persisted_content_ok = matches!(&all_outcome, RecoveryOutcome::FileRead { content, .. } if content == expected_content);
+    let mut caught = 0u64;
+    let mut per_unit = Vec::new();
+    for (slot, unit, _) in units_by_slot {
+        let offset = slot.device_offset();
+        let indices: Vec<usize> = writes.iter().enumerate().filter(|(_, write)| write.kind == StepKind::UnitWrite && write.offset == offset).map(|(index, _)| index).collect();
+        assert!(!indices.is_empty(), "PC2：单元 {} 在写清单里一份镜像都找不到", unit.descriptive_tag());
+        let mut persisted = all_true.clone();
+        for index in &indices {
+            persisted[*index] = false;
+        }
+        let (outcome, is_violation) = evaluate(persisted);
+        if is_violation {
+            caught += 1;
+        }
+        per_unit.push((unit.descriptive_tag().to_string(), unit.tag().to_string(), is_violation, outcome_kind(&outcome).to_string()));
+    }
+    Pc2Report { all_persisted_legal: !all_violation, all_persisted_content_ok, caught, per_unit }
 }
 
 // ───────────────────────── 坏字节探针（里程碑步 6 验收） ─────────────────────────
@@ -4269,7 +4924,7 @@ fn explain_root_record_offset(offset: u64) -> (bool, String) {
     match offset {
         0..=3 => (true, "root magic".to_string()),
         4..=19 => (true, "fsid".to_string()),
-        20..=23 => (true, "flags 占位（恒 0）".to_string()),
+        20..=23 => (true, "flags（位 0 卸载记号）".to_string()),
         24..=27 => (true, "instance".to_string()),
         28..=35 => (true, "checkpoint_txg".to_string()),
         36..=121 => {
@@ -4446,7 +5101,7 @@ const GAPS: &[(&str, &str)] = &[
     ("G9", "journal两份镜像何时算「记录在」没有条款（一份合法即在、还是两份都要）；装置取任一份合法即在"),
     ("G10", "里程碑步4验收「把位置提示改坏、经映射仍读到」在字节层做不到：提示住父节点、父节点被树表指针里的整单元CRC罩着，改坏提示先红父节点；要验的是搬走单元那条路"),
     ("G11", "里程碑步1验收「同参数两次mkfs逐字节相同」与字节表「fsid=mkfs随机」矛盾：fsid必须是mkfs参数"),
-    ("G12", "已收口（2026-09-13 D15已定项4）：incompat位0=第一条纯SSD布局线，装置从mkfs起置上；位图其余全0"),
+    ("G12", "已收口（2026-09-26 D15已定项4）：incompat位1=第一条纯SSD布局线，位0退役、读者一律拒；装置从mkfs起置位1，位图其余全0"),
     ("G13", "已收口（2026-09-13 D8已定项11）：条目数2与条目宽2进头（偏移82+2k、84+2k），不再住载荷内部布局"),
     ("G14", "实例表链指针行宽2026-09-13从64改成88（C304，D18已定项11）；2026-09-14指针从83变86之后那3字节预留被吃掉，记录宽仍88⇒**这条记录没有余量了**，指针再宽一个字节INSTANCE_ROW_BYTES就要跟着涨（打包记录定长，kind0与kind1必须同宽），而条款里没有这一句"),
     ("G15", "已收口（2026-09-13 D18已定项18）：码2的声明长度=条目数×条目宽，条目区之后的补齐区恒0且参与载荷CRC，I-2.3射程扩到码2"),
@@ -4456,7 +5111,12 @@ const GAPS: &[(&str, &str)] = &[
     ("G19", "mkfs种根的21次操作（19写+2屏障，段序列12+1+1+1+4、4114个崩溃状态，D22已定项8第3条2026-09-23用户定案改写之后含两块盘各清根环三区域与journal环共8步）不在层0枚举里：装置从mkfs之后的池起枚举（取号、暖机与事务），mkfs的崩溃状态没有任何东西判；段序列另发一行钉住，与layout/01-first-txn.md八「mkfs种根」那一行登记的真值一致"),
     ("G20", "已收口（2026-09-14用户定案，C321还清）：映射条目回到一宽55⇒码2头那个u16的条目宽字段够用，声明长度=条目数×条目宽原样成立；装置删掉了「条目宽0当变长哨兵」那套自创取法，parse_index_node对条目宽0一律判结构错"),
     ("G21", "取号那一步（D23已定项16：第一次可写挂载写每一份系统配置之后才动单元）不是根槽写路径，layout/01-first-txn八那张表罩不到它；屏障怎么放没有条款，装置按最少屏障取「不另加屏障，靠暖机第一次空发布开头那道屏障收段」⇒段序列独占一行[system_configuration_slot×2]"),
-    ("G22", "**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节3472670720、全空聚簇段数3310、runs4三个数都随它变"),
+    // E142 第十七次跑（问题单第 8 行，R19）：这条原来把空闲字节、全空聚簇段数、runs 三个数写成字面
+    // （3472670720、3310、4），跟 `name=accounting` 现算出来的数各走各的、能悄悄漂开。占位符
+    // `{FREE_BYTES}`/`{EMPTY_CLUSTER_SEGMENTS}`/`{FRAGMENTATION_RUNS}` 在打印这一条时（main() 里的
+    // GAPS 循环，特判 id == "G22"）替换成 `output.accounting_entries` 现算的同一份值，与
+    // `name=accounting` 那一行同一个来源；文本数字自检（Q142.28/29）在同一行另加三个绑定字段核对。
+    ("G22", "**仍欠着**（C323，2026-09-14加注）：镜像大小（单元区的末端）全仓仍没有条款，D23已定项19③只定了「环≤设备容量÷4」⇒它给出容量的**下界**而不是值；装置按mkfs参数取4GiB（1GiB装不下默认768MiB的环）并在name=config里报出来，空闲字节{FREE_BYTES}、全空聚簇段数{EMPTY_CLUSTER_SEGMENTS}、runs{FRAGMENTATION_RUNS}三个数都随它变"),
     ("G23", "已收口（2026-09-14用户定案，C324还清）：码3打包容器按「数据单元」那一档取落点（起点32768对齐、两槽都空）；连同D3已定项10⑤的bump次序（树ID升序、树内先叶后根、映射树倒数第二、树表最末）⇒t2 extent根拿50240、游标停在50241而t3要对齐⇒t3拿50242–50243，**槽50241空着**、runs因此从3变4"),
     ("G24", "树表条目的「头ID」（D5已定项9，2026-09-14用户定案）只说了inode树写自己、extent树写12、其余写0，没说**这个数从哪来**：第一版只有一个可写头，装置按「inode树的树ID就是头ID」写；多头之后头ID与树ID还是不是一回事，条款没答"),
     ("G25", "journal记录头2026-09-14加的fsid8与MAC16，条款只说fsid「与单元头同口径」（系统配置fsid的低8字节）、MAC第一版全0；**读者拿fsid做什么没写**——装置按I-1.4把fsid不符的记录整条丢掉（不进重放前缀），而「丢掉」与「判损坏断链」在条款里分不出来"),
@@ -4961,13 +5621,351 @@ fn code2_field_rows(unit_tag: &str, device: u32, bytes: &[u8], header: &IndexNod
     out
 }
 
+// ───────────────────────── E142 第十七次跑：产物自检（问题单第 8 行，R18/R19/R20） ─────────────────────────
+//
+// 自检只读这一次真正打印出来的文本（下面的线程局部缓冲区），不读任何 Rust 变量本身——这样一条把某个
+// 打印点的角色名或数字改回字面的变异（M156/M157），只要它真的改了打印出来的字节，自检就看得见；
+// 反过来，只改了某个中间变量、打印点自己另有一套读法的改动，自检也看不见（这正是自检该有的边界：
+// 它核的是产物，不是代码）。
+
+thread_local! {
+    static EMITTED_LINES: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// 从一行「E7RESULT name=... k1=v1 k2=v2 ...」按空格切词、每词按第一个 `=` 切成 (key, value)。
+fn split_fields(line: &str) -> Vec<(&str, &str)> {
+    line.split_whitespace().filter_map(|token| token.split_once('=')).collect()
+}
+
+/// R18 的记号：`[mawt]` 后接十进制数字，前后都不是字母或数字（下划线不算字母数字，`field=t9_...`
+/// 的下划线前一样算；十六进制串里的 `a1` 因为前后是别的十六进制字符，天然被这条边界规则挡掉）。
+fn find_role_label_tokens(value: &str) -> Vec<&str> {
+    let bytes = value.as_bytes();
+    let mut tokens = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if matches!(byte, b'm' | b'a' | b'w' | b't') {
+            let prev_ok = index == 0 || !bytes[index - 1].is_ascii_alphanumeric();
+            let mut end = index + 1;
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            if prev_ok && end > index + 1 {
+                let next_ok = end == bytes.len() || !bytes[end].is_ascii_alphanumeric();
+                if next_ok {
+                    tokens.push(&value[index..end]);
+                    index = end;
+                    continue;
+                }
+            }
+        }
+        index += 1;
+    }
+    tokens
+}
+
+#[derive(Default, Debug, Clone)]
+struct RoleLabelCheck {
+    defined: usize,
+    used: usize,
+    undefined: usize,
+    contradictions: usize,
+    contradiction_rows: Vec<String>,
+    undefined_rows: Vec<String>,
+}
+
+/// R18 定义行：`name=role_labels` 的 `units=`（每个都是 unit）与 `journal_record=`/`root=`/
+/// `system_configuration=` 三个字段——今天产物里唯一给主臂那条流的角色名下定义的行种。
+/// R20 矛盾：只在「断言了一个具体种类」的字段键上判——`record=` 整个字段值就是角色名，
+/// `field=<记号>_...` 是「角色名当前缀」；这两种写法在今天的产物里专指 journal 记录。
+fn check_role_labels(lines: &[String]) -> RoleLabelCheck {
+    let mut definitions: BTreeMap<String, &'static str> = BTreeMap::new();
+    for line in lines {
+        let fields = split_fields(line);
+        if !fields.iter().any(|(key, value)| *key == "name" && *value == "role_labels") {
+            continue;
+        }
+        for (key, value) in &fields {
+            match *key {
+                "units" => {
+                    for tag in value.split(',') {
+                        if !tag.is_empty() {
+                            definitions.insert(tag.to_string(), "unit");
+                        }
+                    }
+                }
+                "journal_record" => {
+                    definitions.insert((*value).to_string(), "journal_record");
+                }
+                "root" => {
+                    definitions.insert((*value).to_string(), "root");
+                }
+                "system_configuration" => {
+                    definitions.insert((*value).to_string(), "system_configuration");
+                }
+                "warm_up_journal_records" => {
+                    for tag in value.split(',') {
+                        if !tag.is_empty() {
+                            definitions.insert(tag.to_string(), "journal_record");
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut check = RoleLabelCheck { defined: definitions.len(), ..RoleLabelCheck::default() };
+    let mut seen: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for line in lines {
+        let fields = split_fields(line);
+        for (key, value) in &fields {
+            for token in find_role_label_tokens(value) {
+                seen.insert(token.to_string());
+                let Some(&defined_kind) = definitions.get(token) else {
+                    check.undefined += 1;
+                    if check.undefined_rows.len() < 8 {
+                        check.undefined_rows.push(format!("label={token} row={}", line.replace(' ', "_")));
+                    }
+                    continue;
+                };
+                let asserted_kind: Option<&str> = if *key == "record" && *value == token {
+                    Some("journal_record")
+                } else if *key == "field" && value.len() > token.len() && value.starts_with(token) && value.as_bytes()[token.len()] == b'_' {
+                    Some("journal_record")
+                } else {
+                    None
+                };
+                if let Some(asserted) = asserted_kind {
+                    if asserted != defined_kind {
+                        check.contradictions += 1;
+                        if check.contradiction_rows.len() < 8 {
+                            check.contradiction_rows.push(format!("label={token} defined_as={defined_kind} used_as={asserted} row={}", line.replace(' ', "_")));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    check.used = seen.len();
+    check
+}
+
+#[derive(Default, Debug, Clone)]
+struct TextNumberCheck {
+    text_fields: usize,
+    numbers: usize,
+    bound: usize,
+    bound_mismatched: usize,
+    literal_allowlisted: usize,
+    unclassified: usize,
+    mismatch_rows: Vec<String>,
+    unclassified_rows: Vec<String>,
+}
+
+/// R19 的「自由文本字段」：值里含非 ASCII 字符（这个产物里就是含中文）的字段——`name=gap` 的 `text=`
+/// 是唯一大量出现的一种，逐条手写的空白清单条目属于这一类。
+fn is_free_text_value(value: &str) -> bool {
+    !value.is_ascii()
+}
+
+fn find_digit_runs(text: &str) -> Vec<(usize, &str)> {
+    let bytes = text.as_bytes();
+    let mut runs = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index].is_ascii_digit() {
+            let start = index;
+            let mut end = index + 1;
+            while end < bytes.len() && bytes[end].is_ascii_digit() {
+                end += 1;
+            }
+            runs.push((start, &text[start..end]));
+            index = end;
+        } else {
+            index += 1;
+        }
+    }
+    runs
+}
+
+/// 文本里形如 `YYYY-MM-DD` 的字节区间——落在这个区间里的三段数字都按「日期」白名单，不逐段单独判。
+fn date_byte_ranges(text: &str) -> Vec<(usize, usize)> {
+    let bytes = text.as_bytes();
+    let mut ranges = Vec::new();
+    let mut index = 0;
+    while index + 10 <= bytes.len() {
+        let window = &bytes[index..index + 10];
+        let is_date = window[0].is_ascii_digit()
+            && window[1].is_ascii_digit()
+            && window[2].is_ascii_digit()
+            && window[3].is_ascii_digit()
+            && window[4] == b'-'
+            && window[5].is_ascii_digit()
+            && window[6].is_ascii_digit()
+            && window[7] == b'-'
+            && window[8].is_ascii_digit()
+            && window[9].is_ascii_digit();
+        if is_date {
+            ranges.push((index, index + 10));
+            index += 10;
+        } else {
+            index += 1;
+        }
+    }
+    ranges
+}
+
+/// 字面白名单第一类：紧跟在这些记号字母之后（R19：编号的一部分）。
+const ROLE_LABEL_ALLOWLIST_LETTERS: &[u8] = b"DECGIMQBPSVFRTWKmawt";
+
+/// 「这个数紧跟着哪句中文提示语，就该跟哪个 `bound_*` 字段相等」——只登记这几组，见 `check_text_numbers`
+/// 用它判 `bound_mismatched` 那一段的注释：不是「同一行随便一个字段叫 `bound_*` 就把这一行剩下的数
+/// 全当绑歪」，那样会把 G22 文本里跟三个绑定值都无关的「1GiB」「768MiB」也当成绑歪的。
+const BOUND_TEXT_MARKERS: &[(&str, &str)] = &[("空闲字节", "bound_free_bytes_per_device"), ("全空聚簇段数", "bound_empty_cluster_segments_per_device"), ("runs", "bound_fragmentation_runs_per_device")];
+
+/// R19：产物里每个自由文本字段里的每一串数字，归绑定 / 字面白名单 / 没归类三档之一。
+/// 绑定：同一行别的字段（不是这个自由文本字段自己、也不是 `name`）里有一个数恰好等于它——现取来比；
+/// 找不到相等值、但这个数紧跟着 `BOUND_TEXT_MARKERS` 登记的某句提示语，算「绑定但对不上」
+/// （`bound_mismatched`，M157 的会红检查落在这里）。
+/// 字面白名单第三类（条款里的常量）：这个装置把 `const GAPS` 这张手写空白清单本身当成引用来源——
+/// 每一条的出处已经写在它自己的文字里（如「D8已定项11」），这里不逐个数字再配一次 `文件:行号`；
+/// 这条政策统一写在这里，不在下面每一类挑几个数字单独抄。
+/// R19 第一类「字面白名单」的两种写法：ASCII 记号字母紧跟着（`D8`、`E77`……）；这个产物里中文那一份
+/// 同一件事的另一种写法——「已定项」三个字紧跟着（`D18已定项17`空格换下划线之后是`D18_已定项_17`，
+/// 数字前一个字符是下划线不是字母，但再往前一段是「已定项」，说的是同一种「编号的一部分」）。
+fn is_id_component_prefix(value: &str, start: usize) -> bool {
+    if start == 0 {
+        return false;
+    }
+    if ROLE_LABEL_ALLOWLIST_LETTERS.contains(&value.as_bytes()[start - 1]) {
+        return true;
+    }
+    value[..start].trim_end_matches('_').ends_with("已定项")
+}
+
+/// `kinds=[unit_write×4,zero_fill×8,barrier]` 这类字段里 `×` 后面的数是「这个多重集里这种步骤出现几次」——
+/// 数字本身就是这个字段自己的构造规则给出来的（数出这个方括号里逗号分隔的项里有几个用这个 kind 起头，
+/// 应当恰好等于它），不是另配一个白名单条目；这里只判「紧跟在 × 后面」，不重新数一遍去核对相不相等
+/// （真出错时这条自检不判——只在角色名/文本数字自检覆盖不到的地方留一个已知边界，写进报告）。
+const MULTIPLICATION_SIGN_UTF8: [u8; 2] = [0xC3, 0x97];
+
+fn is_multiplicity_count(value: &str, start: usize) -> bool {
+    start >= 2 && value.as_bytes()[start - 2..start] == MULTIPLICATION_SIGN_UTF8
+}
+
+fn check_text_numbers(lines: &[String]) -> TextNumberCheck {
+    let mut check = TextNumberCheck::default();
+    for line in lines {
+        let fields = split_fields(line);
+        // R19 把 `name=gap` 的 `text=` 与「各行的 `reason=`」并列当自由文本字段的例子；这两种都是装置
+        // 自己写的解释性文字（空白清单的手写条目、`explain_offset`/`diff_explained` 算出来的归因说明），
+        // 不是需要另配「文件:行号」的产物测量值，统一按「条款/算法自己的文字」这一档字面白名单处理
+        // （G22 例外：它的号已经改成绑定，见下面同一行的 `bound_*` 字段，不会走到这一条）。
+        let is_documentation_line = fields.iter().any(|(key, value)| (*key == "name" && *value == "gap") || *key == "reason");
+        for (field_index, (key, value)) in fields.iter().enumerate() {
+            if *key == "name" || !is_free_text_value(value) {
+                continue;
+            }
+            check.text_fields += 1;
+            let dates = date_byte_ranges(value);
+            for (start, run) in find_digit_runs(value) {
+                check.numbers += 1;
+                let end = start + run.len();
+                let is_id_component = is_id_component_prefix(value, start);
+                let is_date = dates.iter().any(|&(date_start, date_end)| start >= date_start && end <= date_end);
+                let is_multiplicity = is_multiplicity_count(value, start);
+                if is_id_component || is_date || is_multiplicity {
+                    check.literal_allowlisted += 1;
+                    continue;
+                }
+                let run_value: Option<u64> = run.parse().ok();
+                let bound_sibling = fields.iter().enumerate().find(|(other_index, (other_key, other_value))| {
+                    *other_index != field_index && *other_key != "name" && find_digit_runs(other_value).iter().any(|(_, other_run)| Some(other_run.parse().ok()) == Some(run_value))
+                });
+                if bound_sibling.is_some() {
+                    check.bound += 1;
+                    continue;
+                }
+                // 这个数紧跟着一句「这本该绑定到哪个字段」的中文提示语（`BOUND_TEXT_MARKERS`），
+                // 但同一行那个字段的值跟它不相等——它本该绑定，只是绑歪了：算「绑定但对不上」
+                // （Q142.28 的 `bound_mismatched`），不是「没人管过」。**只认这几句提示语**，不是
+                // 「同一行随便哪个字段叫 `bound_*` 就把这一行所有剩下的数都当绑歪」——G22 的文本里
+                // 还有「1GiB」「768MiB」这类跟三个绑定字段都无关的数，那些数不该被这条规则捞进来。
+                let marked_binding = BOUND_TEXT_MARKERS.iter().find(|(marker, _)| value[..start].ends_with(marker));
+                if let Some((_, field_key)) = marked_binding {
+                    let bound_value = fields.iter().find(|(other_key, _)| other_key == field_key).map(|(_, v)| *v);
+                    check.bound_mismatched += 1;
+                    if check.mismatch_rows.len() < 8 {
+                        check.mismatch_rows.push(format!("field={key} number={run} bound_to={field_key} value={} row={}", bound_value.unwrap_or("missing"), line.replace(' ', "_")));
+                    }
+                    continue;
+                }
+                if is_documentation_line {
+                    check.literal_allowlisted += 1;
+                    continue;
+                }
+                check.unclassified += 1;
+                if check.unclassified_rows.len() < 8 {
+                    check.unclassified_rows.push(format!("field={key} number={run} row={}", line.replace(' ', "_")));
+                }
+            }
+        }
+    }
+    check
+}
+
+/// 在已经打印的行里找 `name=<line_name>` 那些行、第一个字段值不在 `exclude` 里的 `key=` 值——
+/// 供 Q142.29 从产物文本（不是 Rust 变量）里现取角色名与数字，才真的核到「打印出来的是什么」。
+fn find_field_value_excluding(lines: &[String], line_name: &str, key: &str, exclude: &[&str]) -> Option<String> {
+    for line in lines {
+        let fields = split_fields(line);
+        if !fields.iter().any(|(k, v)| *k == "name" && *v == line_name) {
+            continue;
+        }
+        if let Some((_, value)) = fields.iter().find(|(k, _)| *k == key) {
+            if !exclude.contains(value) {
+                return Some((*value).to_string());
+            }
+        }
+    }
+    None
+}
+
+fn extract_number_after_marker(text: &str, marker: &str) -> Option<u64> {
+    let start = text.find(marker)? + marker.len();
+    let rest = &text[start..];
+    let digit_len = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digit_len == 0 {
+        return None;
+    }
+    rest[..digit_len].parse().ok()
+}
+
+/// G22（问题单第 8 行）：把 `const GAPS` 里那条模板的三个占位符换成这一次产物自己现算的记账数——
+/// 唯一构造这段文本的地方，`main()` 与它的会红检查都调它（M157：第一个占位符退回字面 `3472670720`）。
+fn render_g22_text(template: &str, free_bytes_per_device: u64, empty_cluster_segments_per_device: u64, fragmentation_runs_per_device: u64) -> String {
+    template
+        .replace("{FREE_BYTES}", &free_bytes_per_device.to_string())
+        .replace("{EMPTY_CLUSTER_SEGMENTS}", &empty_cluster_segments_per_device.to_string())
+        .replace("{FRAGMENTATION_RUNS}", &fragmentation_runs_per_device.to_string())
+}
+
 // ───────────────────────── main：发结果行 ─────────────────────────
 
 fn emit(emitter: &mut Emitter, body: &str) {
-    println!("{}", emitter.emit_raw(body));
+    let line = emitter.emit_raw(body);
+    EMITTED_LINES.with(|lines| lines.borrow_mut().push(line.clone()));
+    println!("{line}");
 }
 
 fn main() {
+    // 准入（`.claude/gate.d/stage-inputs.tsv` 的 E142 与 E142/layer0 两行，判法在 `research/scripts/admission.py`）：
+    // 输入自上次产物以来没变就不重跑（退 77），第二段的前提没齐就不跑（退 3）；放行时输入指纹打在产物最前面。
+    let admission_key = std::env::var_os("E142_LAYER0_MAIN").map_or("E142", |_layer0_requested| "E142/layer0");
+    for admission_header_line in e7_index_bench::admit_experiment_run_or_exit(admission_key) {
+        println!("{admission_header_line}");
+    }
     let mut emitter = Emitter::new();
     // 2026-09-18 F1 诊断报告（research/prompts/e142-r11-f1-diagnosis.md）核过：跑前登记第一节第 1 条要求「同 3000 字节内容」，
     // 这一格此前与 `crates/singlefs-harness/src/scenario.rs::first_file_content()` 的公式不一样，量 5 的 11 处不等全部可以追到这一处；
@@ -5008,7 +6006,7 @@ fn main() {
         ("mapping_key", 27, MAPPING_KEY_BYTES),
         ("mapping_entry", 55, MAPPING_ENTRY_BYTES),
         ("location_entry", 14, LOC_ENTRY),
-        ("system_configuration", 481, SYSTEM_CONFIGURATION_BYTES),
+        ("system_configuration", 489, SYSTEM_CONFIGURATION_BYTES),
         ("system_configuration_slot", 4096, SYSTEM_CONFIGURATION_SLOT_BYTES),
         ("allocation_record_tree_internal_entry", 96, ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES),
         ("extent_tree_upper_leaf_entry", 113, EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES),
@@ -5024,6 +6022,9 @@ fn main() {
     let parameters = PoolParameters::settled_two_devices();
     let (mut recording, genesis) = mkfs(&parameters);
     let mkfs_operation_count = recording.operations.len();
+    // PC2（第五节 5.2）与第二段的层 0 主臂枚举都要「mkfs 之后、事务的写全没持久那一态」当基线——
+    // 在 acquire_instance / warm_up / publish_first_file 继续往 `recording.pool` 里真写字节之前先拷一份。
+    let base_after_mkfs = recording.pool.clone();
     let instance = acquire_instance(&mut recording, &parameters);
     let acquisition_operation_count = recording.operations.len();
     let (warm_up_roots, last_warm_up_record) = warm_up(&mut recording, &parameters, &genesis, instance);
@@ -5075,9 +6076,19 @@ fn main() {
     let instance_table = parse_packed_unit(&genesis.instance_table_unit).expect("mkfs 写出的实例表单元自检要过");
     let tree_table_genesis = parse_index_node(&genesis.tree_table_genesis_unit).expect("mkfs 写出的树表单元自检要过");
     emit(&mut emitter, &format!("name=mkfs_units instance_table_records={} instance_table_row_bytes={} tree_table_entries={} genesis_root_watermark={}", instance_table.records.len(), instance_table.record_width, tree_table_genesis.entries.len(), genesis.root.tree_identifier_watermark));
-    emit(&mut emitter, &format!("name=root_record checkpoint_txg={} instance={} tree_identifier_watermark={} rollback_floor={} record_bytes={} back_chain={}", output.root.checkpoint_txg.0, output.root.instance.0, output.root.tree_identifier_watermark, output.root.rollback_floor.0, output.record_bytes.len(), output.record.back_chain));
+    emit(&mut emitter, &format!("name=root_record checkpoint_txg={} instance={} tree_identifier_watermark={} rollback_floor={} unmount_marker={} record_bytes={} back_chain={}", output.root.checkpoint_txg.0, output.root.instance.0, output.root.tree_identifier_watermark, output.root.rollback_floor.0, output.root.unmount_marker, output.record_bytes.len(), output.record.back_chain));
     let slots: Vec<String> = output.units_by_slot.iter().map(|(slot, unit_identity, unit)| format!("{}@{}x{}", unit_identity.tag(), slot.0, unit.len())).collect();
     emit(&mut emitter, &format!("name=write_list writes={write_count} barriers={barrier_count} fua={fua_count} named={} units={}", output.record.named.len(), slots.join(",")));
+    // E142 第十七次跑（问题单第 8 行，R18）：这一条流的角色名定义表——单元的 t 号从写清单现数（`output.units_by_slot`），
+    // journal 记录、根槽、系统配置槽顺延排在单元之后，不写字面。这是角色名自检（Q142.27）唯一的定义来源。
+    let main_unit_count = output.units_by_slot.len();
+    let journal_label = format!("t{}", main_unit_count + 1);
+    let root_label = format!("t{}", main_unit_count + 2);
+    let system_configuration_label = format!("t{}", main_unit_count + 3);
+    emit(&mut emitter, &format!(
+        "name=role_labels scope=main_transaction units={} journal_record={journal_label} root={root_label} system_configuration={system_configuration_label} warm_up_journal_records=w1,w4",
+        output.units_by_slot.iter().map(|(_, unit, _)| unit.tag()).collect::<Vec<_>>().join(",")
+    ));
     for (tree, width) in &output.index_node_header_widths {
         emit(&mut emitter, &format!("name=index_node_header tree={tree} header_bytes={width} with_reserved={}", width + NONCE_MAC_RESERVED_BYTES as usize));
     }
@@ -5114,46 +6125,46 @@ fn main() {
     let (h_image, _h_output) = run_full_pipeline(&h_parameters, FIRST_TRANSACTION_TXG, &file_bytes);
     let f_image_for_hf = full.clone();
 
-    // Q142.2 / P2：H、F 逐字节相减，每一段按落在哪条记录（w1/w4/t9）、记录内哪个字段打标签。
+    // Q142.2 / P2：H、F 逐字节相减，每一段按落在哪条记录（w1/w4/本次事务自己那条）、记录内哪个字段打标签。
     let hf_differences = diff_pools(&h_image, &f_image_for_hf);
-    let mut hf_fields_by_record_device: BTreeMap<(&'static str, u32), Vec<String>> = BTreeMap::new();
+    let mut hf_fields_by_record_device: BTreeMap<(String, u32), Vec<String>> = BTreeMap::new();
     for segment in &hf_differences {
-        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset).unwrap_or(("unregistered", segment.offset));
+        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
         let field = journal_header_field_tag(offset_in_record);
         emit(&mut emitter, &format!(
             "name=header311_flag_diff device={} offset={} length={} old={} new={} record={record_name} field={field} offset_in_record={offset_in_record}",
             segment.device, segment.offset, segment.length, hex_bytes(&segment.old), hex_bytes(&segment.new)
         ));
-        hf_fields_by_record_device.entry((record_name, segment.device)).or_default().push(field.to_string());
+        hf_fields_by_record_device.entry((record_name.clone(), segment.device)).or_default().push(field.to_string());
     }
-    for record_name in ["w1", "w4", "t9"] {
+    for record_name in ["w1".to_string(), "w4".to_string(), journal_label.clone()] {
         for device_index in 0..u32::try_from(parameters.device_count).expect("设备数") {
-            let fields = hf_fields_by_record_device.get(&(record_name, device_index)).cloned().unwrap_or_default();
+            let fields = hf_fields_by_record_device.get(&(record_name.clone(), device_index)).cloned().unwrap_or_default();
             emit(&mut emitter, &format!("name=header311_flag_diff_fields record={record_name} device={device_index} fields={}", if fields.is_empty() { "none".to_string() } else { fields.join(",") }));
         }
     }
     emit(&mut emitter, &format!("name=header311_flag_diff_summary segments={}", hf_differences.len()));
 
-    // P3：全盘相减分得出一个字节——在各自镜像的副本上把设备 0 的 t9 记录偏移 87（本次发布内序号首字节）、
+    // P3：全盘相减分得出一个字节——在各自镜像的副本上把设备 0 的本次事务那条记录偏移 87（本次发布内序号首字节）、
     // 偏移 7（记录标志）各翻一位，与未翻的同一臂镜像相减；O 那一列由 `name=positive_control_change_count` 两行管（第五节 P3）。
-    let t9_base = journal_record_offset(JournalCounter(3)).0;
+    let this_transaction_record_base = journal_record_offset(JournalCounter(3)).0;
     for (arm_name, image) in [("H", &h_image), ("F", &f_image_for_hf)] {
         for (field_offset, field_tag) in [(87u64, "本次发布内序号"), (JOURNAL_RECORD_FLAGS_OFFSET_U64, "记录标志")] {
             let mut flipped = image.clone();
-            flip_byte(&mut flipped, DeviceIdentity(0), DeviceOffset(t9_base), field_offset);
+            flip_byte(&mut flipped, DeviceIdentity(0), DeviceOffset(this_transaction_record_base), field_offset);
             let segments = diff_pools(image, &flipped);
-            let matches_expected = segments.len() == 1 && segments[0].device == 0 && segments[0].length == 1 && segments[0].offset == t9_base + field_offset;
+            let matches_expected = segments.len() == 1 && segments[0].device == 0 && segments[0].length == 1 && segments[0].offset == this_transaction_record_base + field_offset;
             emit(&mut emitter, &format!(
-                "name=header311_p3 arm={arm_name} field=t9_{field_tag} segments={} device={} offset={} length={} matches_expected={matches_expected}",
+                "name=header311_p3 arm={arm_name} field={journal_label}_{field_tag} segments={} device={} offset={} length={} matches_expected={matches_expected}",
                 segments.len(), segments.first().map_or(0, |segment| segment.device), segments.first().map_or(0, |segment| segment.offset), segments.first().map_or(0, |segment| segment.length)
             ));
         }
     }
 
-    // Q142.6 附带：H、F 两臂 w4、t9 的反向链值（不当答案，只与第四节的线索并列给主 agent 看）。
+    // Q142.6 附带：H、F 两臂 w4、本次事务那条记录的反向链值（不当答案，只与第四节的线索并列给主 agent 看）。
     for (arm_name, image) in [("H", &h_image), ("F", &f_image_for_hf)] {
         let records = scan_journal(image, unit_fsid(&parameters.fsid));
-        for (label, counter) in [("w1", 1u64), ("w4", 2u64), ("t9", 3u64)] {
+        for (label, counter) in header311_record_labels(&journal_label) {
             if let Some(record) = records.get(&(InstanceGeneration(1), JournalCounter(counter))) {
                 emit(&mut emitter, &format!(
                     "name=header311_record_bytes arm={arm_name} record={label} device=0 flag_byte={:#04x} ordinal_bytes={} back_chain={}",
@@ -5183,22 +6194,29 @@ fn main() {
         ));
     }
 
-    // 第八节 8.2 G1（方向相反：本实例的第一条就是 t9）：装置原判据 5 那条路，按臂 H、臂 F 各跑一次、相减。
+    // 第八节 8.2 G1（方向相反：本实例的第一条就是这条流自己唯一的 journal 记录）：装置原判据 5 那条路，
+    // 按臂 H、臂 F 各跑一次、相减。这条流没有暖机，唯一的 journal 记录落在计数器 1（"w1" 分支），
+    // 不会走到 `journal_record_name_for_offset` 的第三分支——第二个参数按这条流自己的单元数算，图的是
+    // 万一以后这条流也带了暖机，标签仍然对，不留一个永远用不上、字面写死的角色名。
     let g1_control_h = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
     let g1_control_f = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
     let (mut g1_recording_h, g1_genesis_h) = mkfs(&g1_control_h);
     let _ = publish_first_file(&mut g1_recording_h, &g1_control_h, &g1_genesis_h, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
     let (mut g1_recording_f, g1_genesis_f) = mkfs(&g1_control_f);
-    let _ = publish_first_file(&mut g1_recording_f, &g1_control_f, &g1_genesis_f, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
+    let g1_output_f = publish_first_file(&mut g1_recording_f, &g1_control_f, &g1_genesis_f, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
+    // 前缀用 "c"（control，不进 `[mawt]` 那个字母表）：这条流是另一套几何（一盘、没有暖机），
+    // 它的单元数与主臂不同，用同一个 "t" 前缀会跟主臂 `name=role_labels` 的 t1..t12 撞号
+    // （这个几何 10 个单元 ⇒ 若用 "t11" 会跟主臂 t11=MappingTree 撞在角色名自检里，见第十二节修订）。
+    let g1_journal_label = format!("c{}", g1_output_f.units_by_slot.len() + 1);
     let g1_differences = diff_pools(&g1_recording_h.pool, &g1_recording_f.pool);
     let mut g1_fields: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for segment in &g1_differences {
-        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset).unwrap_or(("unregistered", segment.offset));
+        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &g1_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
         g1_fields.insert(format!("{record_name}:{}", journal_header_field_tag(offset_in_record)));
     }
     let g1_has_back_chain = g1_fields.iter().any(|field| field.ends_with(":back_chain"));
     emit(&mut emitter, &format!(
-        "name=header311_geometry sample=G1 record=t9 fields={} back_chain_present={g1_has_back_chain}",
+        "name=header311_geometry sample=G1 record={g1_journal_label} fields={} back_chain_present={g1_has_back_chain}",
         if g1_fields.is_empty() { "none".to_string() } else { g1_fields.iter().cloned().collect::<Vec<_>>().join(",") }
     ));
 
@@ -5206,15 +6224,16 @@ fn main() {
     let g2_h = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
     let g2_f = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
     let (g2_image_h, _) = run_full_pipeline(&g2_h, FIRST_TRANSACTION_TXG, &file_bytes);
-    let (g2_image_f, _) = run_full_pipeline(&g2_f, FIRST_TRANSACTION_TXG, &file_bytes);
+    let (g2_image_f, g2_output_f) = run_full_pipeline(&g2_f, FIRST_TRANSACTION_TXG, &file_bytes);
+    let g2_journal_label = format!("c{}", g2_output_f.units_by_slot.len() + 1);
     let g2_differences = diff_pools(&g2_image_h, &g2_image_f);
-    let mut g2_fields_by_record: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
+    let mut g2_fields_by_record: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for segment in &g2_differences {
-        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset).unwrap_or(("unregistered", segment.offset));
+        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &g2_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
         g2_fields_by_record.entry(record_name).or_default().push(journal_header_field_tag(offset_in_record).to_string());
     }
-    for record_name in ["w1", "w4", "t9"] {
-        let fields = g2_fields_by_record.get(record_name).cloned().unwrap_or_default();
+    for record_name in ["w1".to_string(), "w4".to_string(), g2_journal_label] {
+        let fields = g2_fields_by_record.get(&record_name).cloned().unwrap_or_default();
         emit(&mut emitter, &format!("name=header311_geometry sample=G2 record={record_name} fields={}", if fields.is_empty() { "none".to_string() } else { fields.join(",") }));
     }
 
@@ -5247,7 +6266,9 @@ fn main() {
             emit(&mut emitter, &format!("name=diff_explained index={index} structure={structure} offset_in_structure={offset_in_structure} reason={reason}"));
         } else {
             unexplained += 1;
-            emit(&mut emitter, &format!("name=gap id=CC{index} text=diff段{index}未归因_structure={structure}_offset={offset_in_structure}_detail={reason}"));
+            // `index_value=`/`offset_value=` 让文本数字自检（R19/Q142.28）能在同一行现取来比：
+            // `text=` 里嵌的 index、offset 两个数不是字面，是这一行本来就有的两个字段，绑定关系现成。
+            emit(&mut emitter, &format!("name=gap id=CC{index} text=diff段{index}未归因_structure={structure}_offset={offset_in_structure}_detail={reason} index_value={index} offset_value={offset_in_structure}"));
         }
     }
     emit(&mut emitter, &format!("name=diff_explained_summary segments={} unexplained={unexplained}", differences.len()));
@@ -5545,21 +6566,120 @@ fn main() {
     emit(&mut emitter, &format!("name=layer0_fua_not_boundary segments={} closed_form={}", segments_fua_free.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"), closed_form_state_count(&segments_fua_free)));
     emit(&mut emitter, "name=journal_effect arm=settled_two_devices states=not_run differing_states=not_run skipped=true reason=附带_够判后未跑");
     // S5（第八节）：(臂 F, 读者乙) 的层 0 里，第五节 5.1 读者乙 ①–④ 任一分支的计数——依赖上面跳过的枚举，同样不跑。
+    // E142 第十七次跑第二段没有碰这一格（不在 Q142.31–37 的够判点里），照旧跳过。
     emit(&mut emitter, "name=header311_reader_branch_counts skipped=true reason=附带_够判后未跑（依赖层0主臂枚举）");
 
+    // E142 第十七次跑第二段（问题单第 7 行，登记 R13、第五节 5.4）：层 0 主臂的单独调用方式。默认调用
+    // （`replay.sh` 走的那一种）不设 `E142_LAYER0_MAIN`，上面两行仍是 `skipped=true`；只在设了这个变量时
+    // 才真的跑 67108885 个状态的枚举，够判后由主 agent 用 `run-with-memory-cap.sh` 单独起。并行度取
+    // `SINGLEFS_THREAD_CAP`（`thread_cap_from_env` 的说明）。
+    if std::env::var_os("E142_LAYER0_MAIN").is_some() {
+        let layer0_main_start = std::time::Instant::now();
+        let layer0_main_threads = thread_cap_from_env();
+        let main_root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("主臂写流里有根槽那一条");
+        // 暖机两次空发布不写单元（D16（发布语义） 已定项 8「且不写单元」），整条主臂窗口里唯一会出现
+        // `JournalRecord` 三次（w1、w4、t13 各一次发布），主事务自己那一次镜像最后 `device_count` 份就是它。
+        let all_journal_indices: Vec<usize> = writes.iter().enumerate().filter(|(_, write)| write.kind == StepKind::JournalRecord).map(|(index, _)| index).collect();
+        let main_journal_indices = all_journal_indices[all_journal_indices.len() - parameters.device_count..].to_vec();
+        let main_dependency_groups = main_transaction_dependency_groups(&writes, parameters.device_count);
+        let main_role_names = generic_role_names(&writes);
+        let (main_tally, main_comparison, main_grouping) = enumerate_layer0_grouped(
+            layer0_main_threads, &base_after_mkfs, &writes, &segments, &file_bytes, ReaderMode::Clause,
+            main_root_index, &main_journal_indices, &main_dependency_groups, &main_role_names,
+        );
+        let publish_labels = ["txg1", "txg2", "txg3", "after_last_root", "every_write_persisted"];
+        emit(&mut emitter, &format!(
+            "name=layer0 arm=settled_two_devices segments={} states={} closed_form={closed_form} exhaustive={} states_by_publish={}",
+            segment_sizes.join("+"), main_tally.states, main_tally.states == closed_form,
+            format_publish_counts(&main_grouping, &publish_labels, |bucket| bucket.states)
+        ));
+        emit(&mut emitter, &format!(
+            "name=layer0_violations violations={} first_violation={}",
+            main_tally.violations, main_tally.first_violation.clone().unwrap_or_else(|| "none".to_string())
+        ));
+        emit(&mut emitter, &format!("name=layer0_violations_by_publish {}", format_publish_fields(&main_grouping, &publish_labels, |bucket| bucket.violations)));
+        emit(&mut emitter, &format!(
+            "name=journal_effect arm=settled_two_devices states={} differing_states={} differing_by_publish={}",
+            main_tally.states, main_tally.journal_differing_states,
+            format_publish_counts(&main_grouping, &["txg1", "txg2", "txg3"], |bucket| bucket.journal_differing_states)
+        ));
+        for (&(predicted, actual), count) in &main_comparison.outcome_matrix {
+            if *count > 0 {
+                emit(&mut emitter, &format!("name=layer0_outcome_matrix arm=settled_two_devices predicted={} actual={} count={count}", predicted.tag(), actual.tag()));
+            }
+        }
+        emit(&mut emitter, &format!("name=layer0_outcome_matrix_summary off_diagonal={}", main_comparison.off_diagonal));
+        // Q142.37：判决行，每个字段只对应第六节 6.2 一个格的门槛，不合成一个（同 Q142.30 的做法）。
+        // 判决字段本身从 `layer0_main_arm_verdict` 现算——这个函数被单测直接调用（不用真的跑一遍主臂
+        // 枚举），吸取第十二节修订第 8 条的教训：内嵌在 `main()` 里的逻辑在 `cargo test` 下永远走不到。
+        let verdict = layer0_main_arm_verdict(&main_tally, closed_form, &main_comparison);
+        emit(&mut emitter, &format!(
+            "name=verdict_layer0 layer0_states_ok={} layer0_violations={} root_persisted_ok={} file_read_ok={} file_read_wrong_content_zero={} journal_differing_states={} journal_reading={} main_outcome_matrix_ok={}",
+            verdict.layer0_states_ok, verdict.layer0_violations, verdict.root_persisted_ok, verdict.file_read_ok,
+            verdict.file_read_wrong_content_zero, main_tally.journal_differing_states, verdict.journal_reading, verdict.main_outcome_matrix_ok
+        ));
+        // 计时不在转发输出的循环里打：这里只在枚举真正跑完之后取一次挂钟差（`.claude/kb/vm-harness.md`）。
+        emit(&mut emitter, &format!("name=layer0_main_arm_elapsed seconds={:.3} states={} threads={layer0_main_threads}", layer0_main_start.elapsed().as_secs_f64(), main_tally.states));
+        emit(&mut emitter, "name=done_layer0_main");
+    }
+
     // 判据 5：阳性对照——一块盘、不放屏障，oracle 必须分得出「根在而单元不在」。
-    let control = PoolParameters::control_one_device_no_barriers();
-    let (mut control_recording, control_genesis) = mkfs(&control);
-    let control_mkfs_operation_count = control_recording.operations.len();
-    let _ = publish_first_file(&mut control_recording, &control, &control_genesis, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
-    let (control_base, _) = mkfs(&control);
-    let (control_writes, control_segments) = split_into_segments(&control_recording.operations[control_mkfs_operation_count..], false);
-    let control_closed_form = closed_form_state_count(&control_segments);
-    let control_tally = enumerate_layer0(&control_base.pool, &control_writes, &control_segments, &file_bytes, ReaderMode::Clause);
-    let control_expected_violations = (1u64 << (control_writes.len() - 1)) - (1u64 << (control_writes.len() - 1 - 8));
+    // E142 第十七次跑（问题单第 6 行）：期望违例数不再写死 `− 8`，改由这一窗口的写清单现算三档（R10）；
+    // 逐态比、结果类矩阵（Q142.23/24）与 G6、G7（Q142.25，第八节）、PC2（Q142.26，第五节 5.2）都在这里跑。
+    let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &file_bytes, false);
+    let (control_expected_jia, control_expected_yi, control_expected_bing) = control_expected_violations_three_readings(&control_flow);
+    let (control_tally, control_comparison) = compare_layer0_predictions(
+        &control_flow.base, &control_flow.writes, &control_flow.segments, &file_bytes, ReaderMode::Clause,
+        control_flow.journal_index, &control_flow.dependency_groups, &control_flow.role_names,
+    );
     emit(&mut emitter, &format!(
-        "name=layer0_control arm=one_device_no_barriers writes={} states={} closed_form={control_closed_form} violations={} expected_violations={control_expected_violations} root_persisted_states={} failed={}",
-        control_writes.len(), control_tally.states, control_tally.violations, control_tally.root_persisted_states, control_tally.failed_states
+        "name=layer0_control arm=one_device_no_barriers writes={} unit_writes={} states={} closed_form={} violations={} expected_violations={control_expected_jia} expected_basis=dependency_set_jia expected_violations_jia={control_expected_jia} expected_violations_yi={control_expected_yi} expected_violations_bing={control_expected_bing} root_persisted_states={} file_read={} no_file={} failed={} journal_differing={}",
+        control_flow.writes.len(), control_flow.dependency_groups.len(),
+        control_tally.states, control_flow.closed_form, control_tally.violations, control_tally.root_persisted_states, control_tally.file_read_states, control_tally.no_file_states, control_tally.failed_states, control_tally.journal_differing_states
+    ));
+    emit(&mut emitter, &format!(
+        "name=layer0_control_state_comparison arm=one_device_no_barriers states={} predicted_violations={} agree={} missed={} false_alarm={} first_missed={} first_false_alarm={}",
+        control_comparison.states, control_comparison.predicted_violations, control_comparison.agree, control_comparison.missed, control_comparison.false_alarm,
+        control_comparison.first_missed.as_deref().unwrap_or("none"), control_comparison.first_false_alarm.as_deref().unwrap_or("none")
+    ));
+    for ((predicted, actual), count) in &control_comparison.outcome_matrix {
+        emit(&mut emitter, &format!("name=layer0_control_outcome_matrix arm=one_device_no_barriers predicted={} actual={} count={count}", predicted.tag(), actual.tag()));
+    }
+    emit(&mut emitter, &format!("name=layer0_control_outcome_matrix_summary off_diagonal={}", control_comparison.off_diagonal));
+
+    // 第八节 G6：同一个一盘几何，把 D16（发布语义） 已定项 7 的两道屏障放回去（FUA 不切段）——违例该从正数翻成 0。
+    let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &file_bytes, false);
+    let (g6_tally, g6_comparison) = compare_layer0_predictions(
+        &g6_flow.base, &g6_flow.writes, &g6_flow.segments, &file_bytes, ReaderMode::Clause, g6_flow.journal_index, &g6_flow.dependency_groups, &g6_flow.role_names,
+    );
+    emit(&mut emitter, &format!(
+        "name=layer0_sensitivity point=G6 barriers=settled fua_is_boundary=false segments={} states={} closed_form={} violations={} missed={} false_alarm={} file_read={} journal_differing={}",
+        g6_flow.segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
+        g6_tally.states, g6_flow.closed_form, g6_tally.violations, g6_comparison.missed, g6_comparison.false_alarm, g6_tally.file_read_states, g6_tally.journal_differing_states
+    ));
+
+    // 第八节 G7：阳性对照的同一条写流，只把 FUA 当段边界（D13（验证路线） 已定项 4 字面）——状态数与违例都该翻。
+    let control_flow_fua = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &file_bytes, true);
+    let (g7_tally, g7_comparison) = compare_layer0_predictions(
+        &control_flow_fua.base, &control_flow_fua.writes, &control_flow_fua.segments, &file_bytes, ReaderMode::Clause,
+        control_flow_fua.journal_index, &control_flow_fua.dependency_groups, &control_flow_fua.role_names,
+    );
+    emit(&mut emitter, &format!(
+        "name=layer0_sensitivity point=G7 barriers=none fua_is_boundary=true segments={} states={} closed_form={} violations={} missed={} false_alarm={} file_read={} journal_differing={}",
+        control_flow_fua.segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
+        g7_tally.states, control_flow_fua.closed_form, g7_tally.violations, g7_comparison.missed, g7_comparison.false_alarm, g7_tally.file_read_states, g7_tally.journal_differing_states
+    ));
+
+    // PC2（第五节 5.2）：主臂几何上，全部持久、与逐个单元的两份都不持久（12 个单元、13 个状态）。
+    // `base_after_mkfs` + `writes`（mkfs 之后到第一个事务写完为止全部写）逐一持久/不持久，与 `enumerate_layer0`
+    // 用的是同一种 `CrashImage` 构造法（`base` 是 mkfs 之后的池，不是 `full` 那样已经全部写完的池）。
+    let pc2 = run_pc2(&base_after_mkfs, &writes, &output.units_by_slot, &file_bytes);
+    for (label, tag, caught, outcome) in &pc2.per_unit {
+        emit(&mut emitter, &format!("name=positive_control_main_geometry_unit label={label} unit={tag} caught={caught} outcome={outcome}"));
+    }
+    emit(&mut emitter, &format!(
+        "name=positive_control_main_geometry states={} all_persisted_legal={} all_persisted_content_ok={} units={} caught={}",
+        pc2.per_unit.len() + 1, pc2.all_persisted_legal, pc2.all_persisted_content_ok, pc2.per_unit.len(), pc2.caught
     ));
 
     // 判据 7：坏字节探针。
@@ -5626,9 +6746,20 @@ fn main() {
     let back_chain_by_counter: Vec<String> = records_on_disk.values().map(|record| format!("{}:{}", record.counter.0, record.back_chain)).collect();
     emit(&mut emitter, &format!("name=back_chain records={} chains={}", records_on_disk.len(), back_chain_by_counter.join(",")));
 
-    // 判据 8：空白清单。
+    // 判据 8：空白清单。G22 的文本改成从这份产物自己的记账现算（问题单第 8 行、R19）：占位符替换成
+    // `statistic_value` 现取的同一批数，另加三个绑定字段，让文本数字自检（Q142.28）在同一行找得到相等的兄弟字段。
+    let free_bytes_per_device = statistic_value(STATISTIC_FREE_BYTES);
+    let empty_cluster_segments_per_device = statistic_value(STATISTIC_EMPTY_CLUSTER_SEGMENTS);
+    let fragmentation_runs_per_device = statistic_value(STATISTIC_FRAGMENTATION_RUNS);
     for (gap_identifier, text) in GAPS {
-        emit(&mut emitter, &format!("name=gap id={gap_identifier} text={text}"));
+        if *gap_identifier == "G22" {
+            let text = render_g22_text(text, free_bytes_per_device, empty_cluster_segments_per_device, fragmentation_runs_per_device);
+            emit(&mut emitter, &format!(
+                "name=gap id={gap_identifier} text={text} bound_free_bytes_per_device={free_bytes_per_device} bound_empty_cluster_segments_per_device={empty_cluster_segments_per_device} bound_fragmentation_runs_per_device={fragmentation_runs_per_device}"
+            ));
+        } else {
+            emit(&mut emitter, &format!("name=gap id={gap_identifier} text={text}"));
+        }
     }
     emit(&mut emitter, &format!("name=gaps count={}", GAPS.len()));
 
@@ -5636,26 +6767,198 @@ fn main() {
     let system_configuration_slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
     let feature_bits = &system_configuration_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES];
     let mut unknown_incompat_slot = system_configuration_slot.clone();
+    // A28：0x03 = 退役位（0x01）加布局身份位（0x02）——布局身份在，但带着一个不认识的位，同样拒。
     unknown_incompat_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = 0x03;
     let mut no_layout_slot = system_configuration_slot.clone();
     no_layout_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = 0x00;
+    // R18 / A28（2026-09-26）：位 0 退役之后，读者见到位 0（不论单独还是与位 1 同时置）一律拒
+    // （`.claude/kb/feature-bits.md` 第 15 行）。
+    let mut retired_bit0_only_slot = system_configuration_slot.clone();
+    retired_bit0_only_slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] = INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT;
     emit(&mut emitter, &format!(
-        "name=feature_bits incompat_byte0={:#04x} incompat_rest_zero={} compat_ro_zero={} compat_zero={} refuses_unknown_incompat={} refuses_missing_layout_bit={}",
+        "name=feature_bits incompat_byte0={:#04x} incompat_rest_zero={} compat_ro_zero={} compat_zero={} refuses_unknown_incompat={} refuses_missing_layout_bit={} refuses_retired_bit0={}",
         feature_bits[0],
         feature_bits[1..FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0),
         feature_bits[FEATURE_BITMAP_BYTES..2 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0),
         feature_bits[2 * FEATURE_BITMAP_BYTES..].iter().all(|byte| *byte == 0),
         !incompat_bits_are_mountable(&unknown_incompat_slot),
         !incompat_bits_are_mountable(&no_layout_slot),
+        !incompat_bits_are_mountable(&retired_bit0_only_slot),
     ));
+
+    // 判据 8 续（问题单第 8 行）：产物自检——角色名（R18/R20，Q142.27）、文本里的数（R19，Q142.28）、
+    // 问题单点名的两处（R20，Q142.29）。只读这一次真正打印出来的行（`EMITTED_LINES`），不读 Rust 变量。
+    let emitted_so_far: Vec<String> = EMITTED_LINES.with(|lines| lines.borrow().clone());
+    let role_label_check = check_role_labels(&emitted_so_far);
+    emit(&mut emitter, &format!(
+        "name=self_check_role_labels defined={} used={} undefined={} contradictions={}",
+        role_label_check.defined, role_label_check.used, role_label_check.undefined, role_label_check.contradictions
+    ));
+    for row in &role_label_check.contradiction_rows {
+        emit(&mut emitter, &format!("name=self_check_role_label_contradiction {row}"));
+    }
+    for row in &role_label_check.undefined_rows {
+        emit(&mut emitter, &format!("name=self_check_role_label_undefined {row}"));
+    }
+
+    let text_number_check = check_text_numbers(&emitted_so_far);
+    emit(&mut emitter, &format!(
+        "name=self_check_text_numbers text_fields={} numbers={} bound={} bound_mismatched={} literal_allowlisted={} unclassified={}",
+        text_number_check.text_fields, text_number_check.numbers, text_number_check.bound, text_number_check.bound_mismatched, text_number_check.literal_allowlisted, text_number_check.unclassified
+    ));
+    for row in &text_number_check.mismatch_rows {
+        emit(&mut emitter, &format!("name=self_check_text_number_mismatch {row}"));
+    }
+    for row in &text_number_check.unclassified_rows {
+        emit(&mut emitter, &format!("name=self_check_text_number_unclassified {row}"));
+    }
+
+    // Q142.29：问题单点名的两处，各自从产物文本里现取来比（不读 Rust 变量），不依赖上面两个通用扫描器。
+    let header311_record_label = find_field_value_excluding(&emitted_so_far, "header311_record_bytes", "record", &["w1", "w4"]).unwrap_or_else(|| "not_found".to_string());
+    let write_list_journal_record_label = find_field_value_excluding(&emitted_so_far, "role_labels", "journal_record", &[]).unwrap_or_else(|| "not_found".to_string());
+    let labels_equal = header311_record_label == write_list_journal_record_label;
+    let g22_text = emitted_so_far
+        .iter()
+        .find(|line| {
+            let fields = split_fields(line);
+            fields.iter().any(|(k, v)| *k == "name" && *v == "gap") && fields.iter().any(|(k, v)| *k == "id" && *v == "G22")
+        })
+        .and_then(|line| split_fields(line).iter().find(|(k, _)| *k == "text").map(|(_, v)| (*v).to_string()))
+        .unwrap_or_default();
+    let g22_free_bytes = extract_number_after_marker(&g22_text, "空闲字节").unwrap_or(0);
+    let accounting_free_bytes_per_device: u64 = find_field_value_excluding(&emitted_so_far, "accounting", "free_bytes_per_device", &[]).and_then(|value| value.parse().ok()).unwrap_or(0);
+    let numbers_equal = g22_free_bytes == accounting_free_bytes_per_device;
+    emit(&mut emitter, &format!(
+        "name=self_check_named_instances header311_record_label={header311_record_label} write_list_journal_record_label={write_list_journal_record_label} labels_equal={labels_equal} g22_free_bytes={g22_free_bytes} accounting_free_bytes_per_device={accounting_free_bytes_per_device} numbers_equal={numbers_equal}"
+    ));
+
+    // R18 第五节 5.1 ④、第七节 A24–A27：模型自己核窗口两份系统配置槽与根槽的条款字段，
+    // 喂 Q142.45 的 r18_system_configuration_fields_ok、r18_root_flags_ok
+    // （输出字段名是登记写死的协议名，Rust 变量名按命名纪律另起，不必与它相同）。
+    let (window_system_configuration_generation, window_system_configuration_slot_index) = system_configuration_write_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let window_system_configuration_slot_offset = SYSTEM_CONFIGURATION_SLOT_OFFSETS[window_system_configuration_slot_index];
+    let mut window_system_configuration_clause_fields_ok = true;
+    for device in parameters.devices() {
+        let slot_bytes = recording.pool.read(device, DeviceOffset(window_system_configuration_slot_offset), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
+        let incompat_byte0_ok = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET] == INCOMPAT_LAYOUT_IDENTITY_BIT;
+        let feature_bits_rest_zero = slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES]
+            .iter()
+            .all(|byte| *byte == 0);
+        let rollback_floor_hex = hex_bytes(&slot_bytes[SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET..SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET + 8]);
+        let padding_after_489_zero = slot_bytes[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0);
+        let checksum_recomputes = wide_checksum_with_field_zeroed(&slot_bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET)
+            == slot_bytes[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32];
+        let field_ok = incompat_byte0_ok && feature_bits_rest_zero && rollback_floor_hex == "0000000000000000" && padding_after_489_zero && checksum_recomputes;
+        window_system_configuration_clause_fields_ok &= field_ok;
+        emit(&mut emitter, &format!(
+            "name=r18_clause_fields region=system_configuration device={} incompat_byte0={:#04x} feature_bits_rest_zero={feature_bits_rest_zero} rollback_floor_hex={rollback_floor_hex} padding_after_489_zero={padding_after_489_zero} checksum_recomputes={checksum_recomputes} ok={field_ok}",
+            device.0, slot_bytes[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET],
+        ));
+    }
+    let (window_root_region, window_root_slot) = ring_target_for_publish(CheckpointTxg(FIRST_TRANSACTION_TXG));
+    let window_root_bytes = recording.pool.read(parameters.region_devices[window_root_region as usize], ring_slot_offset(window_root_region, window_root_slot), PHYSICAL_BLOCK_BYTES as usize);
+    let root_flags_hex = hex_bytes(&window_root_bytes[20..24]);
+    let root_checksum_recomputes = wide_checksum_with_field_zeroed(&window_root_bytes, PHYSICAL_BLOCK_BYTES as usize, ROOT_CHECKSUM_OFFSET)
+        == window_root_bytes[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32];
+    let window_root_record_clause_fields_ok = root_flags_hex == "00000000" && root_checksum_recomputes;
+    emit(&mut emitter, &format!(
+        "name=r18_clause_fields region=root_record device={} flags_hex={root_flags_hex} checksum_recomputes={root_checksum_recomputes} ok={window_root_record_clause_fields_ok}",
+        parameters.region_devices[window_root_region as usize].0,
+    ));
+
+    // 第八节 G8（只在模型里）：把窗口里设备 0 的系统配置只换 F，与 F = 0 的那一份逐字节比、解析回来。
+    let rollback_floor_sensitivity_baseline = SystemConfiguration {
+        fsid: parameters.fsid,
+        this_device: DeviceIdentity(0),
+        device_count: u32::try_from(parameters.device_count).expect("设备数"),
+        slot_generation: window_system_configuration_generation,
+        region_devices: parameters.region_devices,
+        journal_tail: FIRST_TRANSACTION_TXG,
+        journal_instance: instance,
+        rollback_floor: CheckpointTxg(0),
+    };
+    let rollback_floor_sensitivity_modified = SystemConfiguration {
+        fsid: parameters.fsid,
+        this_device: DeviceIdentity(0),
+        device_count: u32::try_from(parameters.device_count).expect("设备数"),
+        slot_generation: window_system_configuration_generation,
+        region_devices: parameters.region_devices,
+        journal_tail: FIRST_TRANSACTION_TXG,
+        journal_instance: instance,
+        rollback_floor: CheckpointTxg(0x0807_0605_0403_0201),
+    };
+    let rollback_floor_sensitivity_baseline_bytes = rollback_floor_sensitivity_baseline.to_slot();
+    let rollback_floor_sensitivity_modified_bytes = rollback_floor_sensitivity_modified.to_slot();
+    let rollback_floor_sensitivity_differing_offsets: Vec<usize> = (0..rollback_floor_sensitivity_baseline_bytes.len())
+        .filter(|&index| rollback_floor_sensitivity_baseline_bytes[index] != rollback_floor_sensitivity_modified_bytes[index])
+        .collect();
+    let rollback_floor_sensitivity_expected_offsets: Vec<usize> = (155..159).chain(481..489).collect();
+    let rollback_floor_sensitivity_bytes_hex = hex_bytes(&rollback_floor_sensitivity_modified_bytes[SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET..SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET + 8]);
+    let rollback_floor_sensitivity_parse_round_trip = SystemConfiguration::parse_slot(&rollback_floor_sensitivity_modified_bytes)
+        .map(|parsed| parsed.rollback_floor == rollback_floor_sensitivity_modified.rollback_floor)
+        .unwrap_or(false);
+    let rollback_floor_sensitivity_offsets_text: Vec<String> = rollback_floor_sensitivity_differing_offsets.iter().map(ToString::to_string).collect();
+    emit(&mut emitter, &format!(
+        "name=r18_sensitivity point=G8 field=rollback_floor value=0x0807060504030201 bytes_hex={rollback_floor_sensitivity_bytes_hex} differing_offsets={} parse_round_trip={rollback_floor_sensitivity_parse_round_trip}",
+        rollback_floor_sensitivity_offsets_text.join(","),
+    ));
+    let rollback_floor_sensitivity_ok = rollback_floor_sensitivity_bytes_hex == "0102030405060708"
+        && rollback_floor_sensitivity_differing_offsets == rollback_floor_sensitivity_expected_offsets
+        && rollback_floor_sensitivity_parse_round_trip;
+
+    // 第八节 G9（只在模型里）：把窗口里第一个事务的根只把卸载记号置 1，与不置那一份逐字节比、解析回来；
+    // 另把 flags 改成除位 0 之外的一位（0x02），重算自证校验和之后必须被拒。
+    let unmount_marker_sensitivity_baseline = output.root;
+    let mut unmount_marker_sensitivity_marked = unmount_marker_sensitivity_baseline;
+    unmount_marker_sensitivity_marked.unmount_marker = true;
+    let unmount_marker_sensitivity_baseline_bytes = unmount_marker_sensitivity_baseline.to_slot();
+    let unmount_marker_sensitivity_marked_bytes = unmount_marker_sensitivity_marked.to_slot();
+    let unmount_marker_sensitivity_differing_offsets: Vec<usize> = (0..unmount_marker_sensitivity_baseline_bytes.len())
+        .filter(|&index| unmount_marker_sensitivity_baseline_bytes[index] != unmount_marker_sensitivity_marked_bytes[index])
+        .collect();
+    let unmount_marker_sensitivity_flags_hex = hex_bytes(&unmount_marker_sensitivity_marked_bytes[20..24]);
+    let unmount_marker_sensitivity_parse_marker = RootRecord::parse_slot(&unmount_marker_sensitivity_marked_bytes, &parameters.fsid).map(|parsed| parsed.unmount_marker).unwrap_or(false);
+    let mut unmount_marker_sensitivity_other_bit_bytes = unmount_marker_sensitivity_marked_bytes.clone();
+    unmount_marker_sensitivity_other_bit_bytes[20..24].copy_from_slice(&0x0000_0002u32.to_le_bytes());
+    let recomputed_root_checksum = wide_checksum_with_field_zeroed(&unmount_marker_sensitivity_other_bit_bytes, PHYSICAL_BLOCK_BYTES as usize, ROOT_CHECKSUM_OFFSET);
+    unmount_marker_sensitivity_other_bit_bytes[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&recomputed_root_checksum);
+    let unmount_marker_sensitivity_other_bit_rejected = RootRecord::parse_slot(&unmount_marker_sensitivity_other_bit_bytes, &parameters.fsid).is_none();
+    let unmount_marker_sensitivity_offsets_text: Vec<String> = unmount_marker_sensitivity_differing_offsets.iter().map(ToString::to_string).collect();
+    emit(&mut emitter, &format!(
+        "name=r18_sensitivity point=G9 field=unmount_marker flags_hex={unmount_marker_sensitivity_flags_hex} differing_offsets={} parse_marker={unmount_marker_sensitivity_parse_marker} other_bit_rejected={unmount_marker_sensitivity_other_bit_rejected}",
+        unmount_marker_sensitivity_offsets_text.join(","),
+    ));
+    let unmount_marker_sensitivity_expected_offsets: Vec<usize> = std::iter::once(20).chain(138..142).collect();
+    let unmount_marker_sensitivity_ok = unmount_marker_sensitivity_flags_hex == "01000000"
+        && unmount_marker_sensitivity_differing_offsets.iter().all(|offset| unmount_marker_sensitivity_expected_offsets.contains(offset))
+        && unmount_marker_sensitivity_differing_offsets.contains(&20)
+        && unmount_marker_sensitivity_parse_marker
+        && unmount_marker_sensitivity_other_bit_rejected;
 
     // Q142.9：层 0 主臂那两格（原判据 4）不跑，写 `not_run`；write_count / control 的门槛改按第七节
     // B5（29 写）、B10（8192 个状态）的新锚点算，不再钉旧布局的 21 / 2048（其余字段照报，不设门槛）。
     emit(&mut emitter, &format!(
-        "name=verdict width_mismatches={width_mismatches} write_list_ok={} recover_full_ok={content_matches} layer0_states_ok=not_run layer0_violations=not_run control_states_ok={} control_violations_ok={} journal_differing_states=not_run",
+        "name=verdict width_mismatches={width_mismatches} write_list_ok={} recover_full_ok={content_matches} layer0_states_ok=not_run layer0_violations=not_run control_states_ok={} control_violations_ok={} control_missed_zero={} control_false_alarm_zero={} control_outcome_matrix_ok={} g6_states_ok={} g6_violations_zero={} g7_states_ok={} g7_violations_zero={} positive_control_main_geometry_ok={} role_label_contradictions_zero={} role_labels_all_defined={} text_number_mismatches_zero={} text_numbers_all_classified={} named_instances_ok={} journal_differing_states=not_run r18_system_configuration_fields_ok={window_system_configuration_clause_fields_ok} r18_root_flags_ok={window_root_record_clause_fields_ok} r18_g8_ok={rollback_floor_sensitivity_ok} r18_g9_ok={unmount_marker_sensitivity_ok}",
         write_count == 29 && barrier_count == 2 && fua_count == 1,
-        control_tally.states == control_closed_form && control_closed_form == 8192,
-        control_tally.violations == control_expected_violations,
+        control_tally.states == control_flow.closed_form && control_flow.closed_form == 8192,
+        control_tally.violations == control_expected_jia,
+        control_comparison.missed == 0,
+        control_comparison.false_alarm == 0,
+        control_comparison.off_diagonal == 0,
+        // 第七节 A17/A18 的字面（1028、2050）：`states = closed_form` 只核内部自洽，这两格另核跟登记的
+        // 预言数对不对上——G7 对不上就是停机 S10（见第十二节修订：这个装置的 `split_into_segments` 与
+        // `crates/singlefs-harness/src/segments.rs` 都把 FUA 写并进它前面没被屏障断开的那一段，
+        // 不是登记 A18 假设的「FUA 恒自成一段」，两边一致、不作废）。
+        g6_tally.states == g6_flow.closed_form && g6_flow.closed_form == 1028,
+        g6_tally.violations == 0,
+        g7_tally.states == control_flow_fua.closed_form && control_flow_fua.closed_form == 2050,
+        g7_tally.violations == 0,
+        pc2.caught == 12 && pc2.all_persisted_legal && pc2.all_persisted_content_ok,
+        role_label_check.contradictions == 0,
+        role_label_check.undefined == 0,
+        text_number_check.bound_mismatched == 0,
+        text_number_check.unclassified == 0,
+        labels_equal && numbers_equal,
     ));
     println!("{}", emitter.finish());
 }
@@ -5746,11 +7049,12 @@ mod tests {
         assert_eq!(287 + 8, 295, "MAC 起点");
         assert_eq!(SYSTEM_CONFIGURATION_CHECKSUM_OFFSET, 155);
         assert_eq!(SYSTEM_CONFIGURATION_FSID_OFFSET, 102);
-        assert_eq!(SYSTEM_CONFIGURATION_BYTES, 481);
+        assert_eq!(SYSTEM_CONFIGURATION_BYTES, 489, "2026-09-26 用户定案加回退下界 F 8 字节，481 → 489");
         assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES, 4096, "系统配置槽宽是格式常量（D22 已定项 2，2026-09-14 三方论证后按主 agent 推荐值）");
-        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES - SYSTEM_CONFIGURATION_BYTES, 3615, "481 的系统配置在 4096 槽里余 3615");
+        assert_eq!(SYSTEM_CONFIGURATION_SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES + 3607, "489 的系统配置在 4096 槽里余 3607");
         assert_eq!(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1] - SYSTEM_CONFIGURATION_SLOT_OFFSETS[0], SYSTEM_CONFIGURATION_SLOT_BYTES, "槽距与槽宽同值 ⇒ 两个槽首尾相接、不重叠");
-        assert_eq!(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64 + 8 + 4, SYSTEM_CONFIGURATION_BYTES);
+        assert_eq!(SYSTEM_CONFIGURATION_TAIL_OFFSET as u64 + 8 + 4, SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64, "journal 实例代号之后紧跟回退下界 F");
+        assert_eq!(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET as u64 + 8, SYSTEM_CONFIGURATION_BYTES, "回退下界 F 8 字节是字段表末行（D22 已定项 9）");
         assert_eq!(MAPPING_KEY_BYTES, 27);
         assert_eq!(MAPPING_KEY_BYTES + 2 * LOC_ENTRY, MAPPING_ENTRY_BYTES);
         assert_eq!(MAPPING_ENTRY_BYTES, 55, "映射条目一律 55（D19 已定项 10，2026-09-14 用户定案）");
@@ -5901,10 +7205,11 @@ mod tests {
         }
     }
 
-    /// 系统配置 481（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段）：每个字段按**绝对偏移**读一遍，
-    /// 以及「整槽校验和罩整个 4096 槽」——改 481 之后那 3615 字节补齐里的任何一个字节，解析都要拒绝。
+    /// 系统配置 489（D22 已定项 9 + 已定项 15，2026-09-14 用户定案加四个字段；2026-09-26 用户定案再加
+    /// 回退下界 F 8 字节，481 → 489）：每个字段按**绝对偏移**读一遍，以及「整槽校验和罩整个 4096 槽」——
+    /// 改 489 之后那 3607 字节补齐里的任何一个字节，解析都要拒绝。
     #[test]
-    fn system_configuration_is_481_bytes_and_the_slot_checksum_covers_all_4096() {
+    fn system_configuration_is_489_bytes_and_the_slot_checksum_covers_all_4096() {
         let BuiltPool { recording, .. } = built_pool();
         let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[1]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
         assert_eq!(slot.len(), 4096, "系统配置槽宽是格式常量 4096（D22 已定项 2，2026-09-14 三方论证后）");
@@ -5929,7 +7234,10 @@ mod tests {
         assert_eq!(read_u32(425), 512, "mkfs 时的 io_min（D2 已定项 19）");
         assert_eq!(read_u32(429), 4096, "固定结构槽距（D2 已定项 19）");
         assert!(slot[445..469].iter().all(|byte| *byte == 0), "整理三条水位 24 字节恒 0（D22 已定项 15）");
-        assert!(slot[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0), "481 之后的 3615 字节补齐恒 0");
+        // 回退下界 F（2026-09-26 用户定案）：住 [481, 489)，第一个事务里没有抬 F，恒 0（D16 已定项 1）。
+        assert_eq!(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET, 481);
+        assert_eq!(read_u64(SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET), 0, "第一个事务里没有抬 F");
+        assert!(slot[SYSTEM_CONFIGURATION_BYTES as usize..].iter().all(|byte| *byte == 0), "489 之后的 3607 字节补齐恒 0");
         let mut padded = slot.clone();
         padded[SYSTEM_CONFIGURATION_BYTES as usize] ^= 0x01;
         assert!(SystemConfiguration::parse_slot(&padded).is_none(), "整槽校验和罩到补齐区（D18 已定项 17）");
@@ -5946,21 +7254,88 @@ mod tests {
         let parameters = PoolParameters::settled_two_devices();
         let (recording, _) = mkfs(&parameters);
         let slot = recording.pool.read(DeviceIdentity(0), DeviceOffset(SYSTEM_CONFIGURATION_SLOT_OFFSETS[0]), SYSTEM_CONFIGURATION_SLOT_BYTES as usize);
-        assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], INCOMPAT_FIRST_SSD_LINE_BIT, "mkfs 起 incompat 位 0 置 1（D15 已定项 4）");
+        // 2026-09-26 用户定案：布局身份换到位 1，位 0 退役（D15 已定项 4）。
+        assert_eq!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET], INCOMPAT_LAYOUT_IDENTITY_BIT, "mkfs 起 incompat 位 1 置 1（D15 已定项 4，2026-09-26 用户定案）");
         assert!(slot[SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 1..SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 3 * FEATURE_BITMAP_BYTES].iter().all(|byte| *byte == 0), "其余 95 字节全 0");
-        assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样可挂");
+        assert!(SystemConfiguration::parse_slot(&slot).is_some(), "原样（byte0 = 0x02）可挂（A28）");
         let reseal = |mut bytes: Vec<u8>, offset: usize, value: u8| {
             bytes[offset] = value;
             let digest = wide_checksum_with_field_zeroed(&bytes, SYSTEM_CONFIGURATION_SLOT_BYTES as usize, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
             bytes[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
             bytes
         };
-        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x03)).is_none(), "incompat 位 1 没登记：不认识不许挂");
         assert_eq!(SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 6);
-        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
+        // A28 四档拒挂：0x00（没有布局身份）、0x01（只有退役位）、0x03（退役位加位 1）、0x06（位 2 未分配）。
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x00)).is_none(), "没有布局身份：拒绝");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, INCOMPAT_RETIRED_FIRST_SSD_LINE_BIT)).is_none(), "只有退役的位 0：位 0 退役之后一律拒（.claude/kb/feature-bits.md 第 15 行）");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x03)).is_none(), "退役的位 0 加布局身份位 1：位 0 还在，照样拒");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET, 0x06)).is_none(), "位 1 加未分配的位 2：不认识的位拒");
+        assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES - 1, 0x80)).is_none(), "incompat 位 255 没登记：不认识不许挂");
         assert!(SystemConfiguration::parse_slot(&reseal(slot.clone(), SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat_ro 位不认识只读挂，读者照样解析");
         assert!(SystemConfiguration::parse_slot(&reseal(slot, SYSTEM_CONFIGURATION_FEATURE_BITS_OFFSET + 2 * FEATURE_BITMAP_BYTES, 0x01)).is_some(), "compat 位不认识随便");
+    }
+
+    /// 第八节 G8（A24）：回退下界 F 从 0 换成一个可辨识的模式值，差异字节必须恰好落在
+    /// [155, 159)（整槽校验和）与 [481, 489)（F 自己），解析要把值原样读回、不是从别的偏移读、不是大端。
+    #[test]
+    fn system_configuration_rollback_floor_round_trips_at_absolute_offset_481() {
+        let parameters = PoolParameters::settled_two_devices();
+        let baseline = SystemConfiguration {
+            fsid: parameters.fsid,
+            this_device: DeviceIdentity(0),
+            device_count: 2,
+            slot_generation: 5,
+            region_devices: parameters.region_devices,
+            journal_tail: 3,
+            journal_instance: InstanceGeneration(1),
+            rollback_floor: CheckpointTxg(0),
+        };
+        let modified = SystemConfiguration {
+            fsid: parameters.fsid,
+            this_device: DeviceIdentity(0),
+            device_count: 2,
+            slot_generation: 5,
+            region_devices: parameters.region_devices,
+            journal_tail: 3,
+            journal_instance: InstanceGeneration(1),
+            rollback_floor: CheckpointTxg(0x0807_0605_0403_0201),
+        };
+        let baseline_bytes = baseline.to_slot();
+        let modified_bytes = modified.to_slot();
+        assert_eq!(
+            &modified_bytes[SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET..SYSTEM_CONFIGURATION_ROLLBACK_FLOOR_OFFSET + 8],
+            &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08],
+            "F 8 字节小端写在 [481, 489)"
+        );
+        let differing_offsets: Vec<usize> = (0..baseline_bytes.len()).filter(|&index| baseline_bytes[index] != modified_bytes[index]).collect();
+        let expected_offsets: Vec<usize> = (155..159).chain(481..489).collect();
+        assert_eq!(differing_offsets, expected_offsets, "F 从 0 换成非 0，只应该动 [155, 159) 的校验和与 [481, 489) 的 F 自己");
+        let parsed = SystemConfiguration::parse_slot(&modified_bytes).expect("重算过校验和的槽要能解析");
+        assert_eq!(parsed.rollback_floor, CheckpointTxg(0x0807_0605_0403_0201), "F 原样读回");
+    }
+
+    /// 第八节 G9（A27）：根记录 flags 位 0 是卸载记号，其余位第一版恒 0、非 0 拒收；卸载记号能原样解析回来。
+    #[test]
+    fn root_record_unmount_marker_round_trips_and_other_flag_bits_are_rejected() {
+        let parameters = PoolParameters::settled_two_devices();
+        let (_, genesis) = mkfs(&parameters);
+        let baseline = genesis.root;
+        let mut marked = baseline;
+        marked.unmount_marker = true;
+        let baseline_bytes = baseline.to_slot();
+        let marked_bytes = marked.to_slot();
+        assert_eq!(&baseline_bytes[20..24], &[0, 0, 0, 0], "mkfs 的根不带卸载记号");
+        assert_eq!(&marked_bytes[20..24], &[1, 0, 0, 0], "卸载记号写进 flags 位 0（小端）");
+        let differing_offsets: Vec<usize> = (0..baseline_bytes.len()).filter(|&index| baseline_bytes[index] != marked_bytes[index]).collect();
+        assert!(differing_offsets.contains(&20), "flags 第一字节要变");
+        assert!(differing_offsets.iter().all(|offset| *offset == 20 || (138..142).contains(offset)), "只应该动 flags 与自证校验和");
+        let parsed = RootRecord::parse_slot(&marked_bytes, &parameters.fsid).expect("重算过校验和的根槽要能解析");
+        assert!(parsed.unmount_marker, "卸载记号原样解析回来");
+        let mut other_bit = marked_bytes.clone();
+        other_bit[20..24].copy_from_slice(&0x0000_0002u32.to_le_bytes());
+        let digest = wide_checksum_with_field_zeroed(&other_bit, PHYSICAL_BLOCK_BYTES as usize, ROOT_CHECKSUM_OFFSET);
+        other_bit[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+        assert!(RootRecord::parse_slot(&other_bit, &parameters.fsid).is_none(), "flags 位 1 非 0：拒收（D22 已定项 17，其余位第一版恒 0）");
     }
 
     #[test]
@@ -6153,6 +7528,248 @@ mod tests {
         assert_eq!(tally.states, 8192, "第七节 B10「control_states=8192」");
         assert_eq!(tally.violations, 4092, "第七节 B11「violations_reader_reads_whole_allocation_tree=4092」");
         assert_eq!(tally.root_persisted_states, 4096);
+    }
+
+    // ═════════ E142 第十七次跑（重跑登记 research/prompts/e142-r17-prereg.md）：问题单第 6、8 行 ═════════
+
+    /// 第七节 B16：阳性对照的三档期望违例数都从写清单现算——单元数 10、总写数 13、分配记录树根以下 2 个。
+    /// M149 的会红检查：把 `control_expected_jia` 的依赖计数换成乙档（10 − 2 = 8）会把这一格从 4092 改成
+    /// 4080，与 R10 主读法（依赖集甲）对不上。
+    #[test]
+    fn control_expected_violations_three_readings_match_the_written_out_clause() {
+        let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
+        assert_eq!(control_flow.writes.len(), 13, "第七节 B16「control writes=13」");
+        assert_eq!(control_flow.dependency_groups.len(), 10, "第七节 B16「unit_writes=10」");
+        assert_eq!(control_flow.below_root_count, 2, "第七节 B16「allocation_nodes_below_root=2」");
+        assert_eq!(expected_violations_formula(13, 10), 4092, "第七节 B16「expected_violations jia=4092」");
+        assert_eq!(expected_violations_formula(13, 10 - 2), 4080, "第七节 B16「expected_violations yi=4080」");
+        assert_eq!(expected_violations_formula(13, 10 - 1), 4088, "第七节 B16「expected_violations bing=4088」");
+        // M149 的会红检查：这条走 `main()` 真调的那个函数，不是重算一遍公式——甲档换成乙档的依赖计数
+        // 会让这里从 4092 变 4080。
+        assert_eq!(control_expected_violations_three_readings(&control_flow), (4092, 4080, 4088));
+    }
+
+    /// PC4：逐态预言器自己的闭式——原登记那一档（11 次写、8 个单元写）预言 2048 个状态、1020 个违例
+    /// （原登记第 20/41 行、附录判据 5），与这一次一盘 13 次写那一档（4092，上一条测试）不是同一个数，
+    /// 不许混着核。
+    #[test]
+    fn original_era_positive_control_predicts_2048_states_1020_violations() {
+        assert_eq!(1u64 << 11, 2048, "原登记判据 5：states = 2^11");
+        assert_eq!(expected_violations_formula(11, 8), 1020, "原登记判据 5：violations = 2^10 − 2^2 = 1020");
+    }
+
+    /// M156 的会红检查：主臂三条 journal 记录的角色名——第三条必须用写清单给的动态标签，退回旧编号
+    /// （分配记录树按位置寻址之前只有 8 个单元时代的 `t9`）就是 M156 描述的破坏。
+    #[test]
+    fn header311_record_labels_third_entry_uses_the_dynamic_write_list_label() {
+        let labels = header311_record_labels("t13");
+        assert_eq!(labels, [("w1".to_string(), 1u64), ("w4".to_string(), 2u64), ("t13".to_string(), 3u64)]);
+    }
+
+    /// M157 的会红检查：G22 的文本把三个占位符换成真给的记账数，不是写死的旧字面。
+    #[test]
+    fn render_g22_text_fills_in_the_current_accounting_numbers() {
+        let template = GAPS.iter().find(|(id, _)| *id == "G22").expect("GAPS 里有 G22").1;
+        let text = render_g22_text(template, 42, 7, 3);
+        assert_eq!(extract_number_after_marker(&text, "空闲字节"), Some(42));
+        assert!(!text.contains("3472670720"), "不许把旧字面留在模板替换的结果里");
+    }
+
+    /// M152 的会红检查：D16（发布语义） 已定项 7「恢复重放在施加任何记录之前，必须逐项验证点名单元的
+    /// 校验和」——主臂根停在暖机第二次（txg 2），第一个事务自己的记录（txg 3，与根同一个实例，重放不会
+    /// 卡在实例边界）已持久，但它点名的 12 个单元里 t1（数据单元）两份都没持久：验证不过就不该施加，
+    /// 应该停在暖机的旧态（没有文件）。
+    #[test]
+    fn main_arm_transaction_record_is_not_applied_when_a_named_unit_is_missing() {
+        let (base, writes, output) = s_star_writes(&PoolParameters::settled_two_devices(), &sample_file());
+        let mut persisted = s_star_persisted(&writes);
+        let (slot, unit, _) = &output.units_by_slot[0];
+        assert_eq!(*unit, TransactionUnit::Data, "第 0 个单元是数据单元（t1）");
+        let offset = slot.device_offset();
+        let mut cleared = 0;
+        for (index, write) in writes.iter().enumerate() {
+            if write.kind == StepKind::UnitWrite && write.offset == offset {
+                persisted[index] = false;
+                cleared += 1;
+            }
+        }
+        assert_eq!(cleared, 2, "t1 两份镜像都要抹掉");
+        let image = CrashImage { base: &base, writes: &writes, persisted };
+        let report = recover(&image, JournalPolicy::Consult, ReaderMode::Clause);
+        match &report.outcome {
+            RecoveryOutcome::NoFile { .. } => {}
+            other => panic!("t1 缺一份都不该施加这条记录，应停在暖机旧态（NoFile），实际是 {other:?}"),
+        }
+    }
+
+    /// PC1／Q142.23：逐态预言器（依赖集甲）对阳性对照 8192 个状态逐一比较，checker 与预言器必须
+    /// 逐态一致——`missed = 0`（对照本身是好的）、`false_alarm = 0`（期望值没有算多）。
+    /// M150（预言器依赖集漏掉数据单元）、M151（依赖集退回乙档）、M155（取错写的种类）都会让这条变红。
+    #[test]
+    fn control_state_comparison_predictor_matches_checker_on_every_state() {
+        let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
+        let (tally, comparison) = compare_layer0_predictions(
+            &control_flow.base, &control_flow.writes, &control_flow.segments, &sample_file(), ReaderMode::Clause,
+            control_flow.journal_index, &control_flow.dependency_groups, &control_flow.role_names,
+        );
+        assert_eq!(comparison.states, 8192);
+        assert_eq!(tally.violations, 4092);
+        assert_eq!(comparison.predicted_violations, 4092, "预言器自己数出来的违例数");
+        assert_eq!(comparison.agree, 8192, "{:?} / {:?}", comparison.first_missed, comparison.first_false_alarm);
+        assert_eq!(comparison.missed, 0, "对照本身坏了：{:?}", comparison.first_missed);
+        assert_eq!(comparison.false_alarm, 0, "期望值算多了：{:?}", comparison.first_false_alarm);
+    }
+
+    /// Q142.24：阳性对照结果类矩阵——这个装置没有暖机、`journal` 的记录属于实例 1 而所选（旧）根停在
+    /// mkfs 的实例 0，重放「按严格前缀停在实例边界」（D23（journal 的角色与格式） 已定项 14 注 1）不跨实例
+    /// 施加记录：根没持久、journal 与全部单元都持久的 2 个状态，预言器按「记录能施加」预言
+    /// `legal_file_read`，checker 真的走 `recover` 判出 `no_file`——这不是违例（两边都同意「合法」，
+    /// 只是合法的哪一种），`off_diagonal = 2` 是这次新发现的正当结果（F13），不是这份自检的漏洞。
+    #[test]
+    fn control_outcome_matrix_off_diagonal_is_exactly_the_known_instance_boundary_gap() {
+        let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
+        let (_, comparison) = compare_layer0_predictions(
+            &control_flow.base, &control_flow.writes, &control_flow.segments, &sample_file(), ReaderMode::Clause,
+            control_flow.journal_index, &control_flow.dependency_groups, &control_flow.role_names,
+        );
+        assert_eq!(comparison.off_diagonal, 2, "F13：一盘上、根没持久时，记录跨不过实例边界，2 个状态从「预言读得到文件」变成「实测读不到」");
+        assert_eq!(
+            comparison.outcome_matrix.get(&(PredictedOutcomeClass::LegalFileRead, ActualOutcomeClass::NoFile)).copied().unwrap_or(0),
+            2,
+            "唯一的越对角格：预言 legal_file_read、实测 no_file"
+        );
+    }
+
+    /// 第八节 A17/B17：G6（一盘、把 D16（发布语义） 已定项 7 的两道屏障放回去、FUA 不切段）——
+    /// 屏障隔开了根槽与它前面的写，根槽照样自成一段：1028 个状态、0 个违例（方向与阳性对照相反）。
+    #[test]
+    fn g6_matches_a17_1028_states_zero_violations() {
+        let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
+        assert_eq!(g6_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![10, 1, 2], "第七节 A17「段 [U],[1],[2]」");
+        assert_eq!(g6_flow.closed_form, 1028, "第七节 A17「1028 个状态」");
+        let (tally, comparison) = compare_layer0_predictions(
+            &g6_flow.base, &g6_flow.writes, &g6_flow.segments, &sample_file(), ReaderMode::Clause, g6_flow.journal_index, &g6_flow.dependency_groups, &g6_flow.role_names,
+        );
+        assert_eq!(tally.states, 1028);
+        assert_eq!(tally.violations, 0, "{:?}", tally.first_violation);
+        assert_eq!(comparison.missed, 0);
+        assert_eq!(comparison.false_alarm, 0);
+    }
+
+    /// 第八节 G7（停机 S10，见第十二节修订）：阳性对照的同一条写流只把 FUA 当段边界——这个装置的
+    /// `split_into_segments` 与 `crates/singlefs-harness/src/segments.rs`（doc comment「FUA 写关掉
+    /// 自己所在的那一段」）一致地把 FUA 写并进它前面没被屏障断开的写，不是登记 A18 假设的「FUA 恒自成
+    /// 一段」；这条流没有屏障，于是 [单元×10, journal] 与根槽合并成一段 [12]，状态数 4097、违例 2046，
+    /// 不是 A18 写的 2050 / 0。预言器与 checker 在这一点上逐态一致（`missed = false_alarm = 0`）——
+    /// 分歧只在「这个装置的切法是不是 D13（验证路线） 已定项 4 的字面」，不在依赖集读法上。
+    /// M154 把切法换成「FUA 自成一段」会让这条测试变红（4097→2050、2046→0），用来证「这条判别力来自
+    /// 切法，不是巧合」。
+    #[test]
+    fn g7_fua_merges_with_preceding_unbarriered_writes_not_a18() {
+        let g7_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), true);
+        assert_eq!(g7_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![12, 1], "实测切法：单元+journal+根槽合并成一段，系统配置槽单独一段");
+        assert_eq!(g7_flow.closed_form, 4097, "1 + (2^12 − 1) + (2^1 − 1)");
+        let (tally, comparison) = compare_layer0_predictions(
+            &g7_flow.base, &g7_flow.writes, &g7_flow.segments, &sample_file(), ReaderMode::Clause, g7_flow.journal_index, &g7_flow.dependency_groups, &g7_flow.role_names,
+        );
+        assert_eq!(tally.states, 4097);
+        assert_eq!(tally.violations, 2046, "根被并进那个 12 项段之后，根持久而依赖集不全的子集都判违例：(2^12)/2 − 2 = 2046");
+        assert_eq!(comparison.missed, 0);
+        assert_eq!(comparison.false_alarm, 0, "预言器与 checker 在这个（有争议的）切法上仍逐态一致");
+    }
+
+    /// PC2（第五节 5.2、第七节 B22）：主臂几何上，全部持久合法，逐个单元的两份都不持久必被判违例——
+    /// 12 个单元、`caught = 12`。
+    #[test]
+    fn pc2_main_geometry_catches_every_single_unit_dependency() {
+        let BuiltPool { recording, output, mkfs_operation_count, .. } = built_pool();
+        // PC2 要「mkfs 之后、事务写全没持久那一态」当基线（同 main() 里的 `base_after_mkfs`）：
+        // 同一份 `PoolParameters` 单独重新 mkfs 一次，取它的池，不复用 `built_pool()` 已经写完事务的池。
+        let mkfs_pool = mkfs(&PoolParameters::settled_two_devices()).0.pool;
+        let (writes, _) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+        let pc2 = run_pc2(&mkfs_pool, &writes, &output.units_by_slot, &sample_file());
+        assert_eq!(pc2.per_unit.len(), 12, "第七节 B22「pc2 units=12」");
+        assert_eq!(pc2.caught, 12, "第七节 B22「caught=12」");
+        assert!(pc2.all_persisted_legal && pc2.all_persisted_content_ok, "全部持久时判合法、读回内容对");
+        for (label, _, caught, _) in &pc2.per_unit {
+            assert!(*caught, "单元 {label} 两份都缺时该判违例");
+        }
+    }
+
+    /// 第八节判别力自证第 1 条：把第 6 行的判定门槛挪到阳性对照（4092）与 G6（0）之间——
+    /// 例如「违例数 ≥ 1 才算对照有效」——G6 必须判「无效」、阳性对照必须判「有效」，
+    /// 证明这个门槛不是摆设。
+    #[test]
+    fn judgment_threshold_between_control_and_g6_discriminates_both_ways() {
+        let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
+        let control_tally = enumerate_layer0(&control_flow.base, &control_flow.writes, &control_flow.segments, &sample_file(), ReaderMode::Clause);
+        let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
+        let g6_tally = enumerate_layer0(&g6_flow.base, &g6_flow.writes, &g6_flow.segments, &sample_file(), ReaderMode::Clause);
+        let threshold_says_effective = |violations: u64| violations >= 1;
+        assert!(threshold_says_effective(control_tally.violations), "阳性对照必须判「有效」");
+        assert!(!threshold_says_effective(g6_tally.violations), "G6 必须判「无效」");
+    }
+
+    /// PC3 之一（角色名自检，R18/R20）：合成一份产物——`name=role_labels` 把 `t9` 定义成单元，
+    /// 另一行把 `t9` 当 journal 记录用（`record=t9`），第三行用一个没定义过的 `t99`。
+    /// M158（矛盾判定恒为 false）会让第一个断言变红。
+    #[test]
+    fn role_label_self_check_catches_a_contradiction_and_an_undefined_label() {
+        let dirty: Vec<String> = vec![
+            "E7RESULT name=role_labels scope=main_transaction units=t1,t9 journal_record=t13 root=t14 system_configuration=t15 warm_up_journal_records=w1,w4".to_string(),
+            "E7RESULT name=header311_flag_diff device=0 offset=1 length=1 old=00 new=01 record=t9 field=record_flags offset_in_record=7".to_string(),
+            "E7RESULT name=some_other_line odd_field=t99_suffix".to_string(),
+        ];
+        let check = check_role_labels(&dirty);
+        assert_eq!(check.contradictions, 1, "{:?}", check.contradiction_rows);
+        assert_eq!(check.undefined, 1, "{:?}", check.undefined_rows);
+
+        let clean: Vec<String> = vec![
+            "E7RESULT name=role_labels scope=main_transaction units=t1,t9 journal_record=t13 root=t14 system_configuration=t15 warm_up_journal_records=w1,w4".to_string(),
+            "E7RESULT name=header311_flag_diff device=0 offset=1 length=1 old=00 new=01 record=t13 field=record_flags offset_in_record=7".to_string(),
+        ];
+        let clean_check = check_role_labels(&clean);
+        assert_eq!(clean_check.contradictions, 0);
+        assert_eq!(clean_check.undefined, 0);
+    }
+
+    /// PC3 之二（文本数字自检，R19）：合成一份产物——一行有 `bound_count=6`、自由文本里嵌的却是 5
+    /// （绑定但对不上）；一行有一个既没绑定、也不在字面白名单里的数（`text=用了99次`）。
+    /// M159（把每个数都归进字面白名单）会让第二个断言变红；M157（G22 绑定退回字面）就是第一种情形的真实版本。
+    #[test]
+    fn text_number_self_check_catches_a_bound_mismatch_and_an_unclassified_number() {
+        let dirty: Vec<String> = vec![
+            "E7RESULT name=gap id=G22 text=空闲字节5 bound_free_bytes_per_device=6".to_string(),
+            "E7RESULT name=probe_summary text=这一批一共用了99次".to_string(),
+        ];
+        let check = check_text_numbers(&dirty);
+        assert_eq!(check.bound_mismatched, 1, "{:?}", check.mismatch_rows);
+        assert_eq!(check.unclassified, 1, "{:?}", check.unclassified_rows);
+
+        let clean: Vec<String> = vec!["E7RESULT name=gap id=G22 text=空闲字节6 bound_free_bytes_per_device=6".to_string()];
+        let clean_check = check_text_numbers(&clean);
+        assert_eq!(clean_check.bound_mismatched, 0);
+        assert_eq!(clean_check.unclassified, 0);
+    }
+
+    /// Q142.29 两处点名（问题单第 8 行）：从真实产物文本（不是 Rust 变量）里现取 header311 与
+    /// write_list 两处的记录标签、G22 与记账两处的空闲字节，逐字节相同。
+    #[test]
+    fn named_instances_header311_and_write_list_agree_and_g22_matches_accounting() {
+        let lines: Vec<String> = vec![
+            "E7RESULT name=role_labels scope=main_transaction units=t1,t2 journal_record=t13 root=t14 system_configuration=t15 warm_up_journal_records=w1,w4".to_string(),
+            "E7RESULT name=header311_record_bytes arm=F record=w1 device=0 flag_byte=0x00 ordinal_bytes=1 back_chain=0".to_string(),
+            "E7RESULT name=header311_record_bytes arm=F record=t13 device=0 flag_byte=0x01 ordinal_bytes=1 back_chain=123".to_string(),
+            "E7RESULT name=accounting entries=1 allocated_bytes_per_device=1 free_bytes_per_device=42 empty_cluster_segments_per_device=1 fragmentation_runs_per_device=1 inode_watermark=1 unreclaimable_per_device=0 defer_queue_per_device=0 pending_delete=0 committed_reservation=0 sequence_all_one=true generation=1".to_string(),
+            "E7RESULT name=gap id=G22 text=空闲字节42、全空聚簇段数1、runs1三个数都随它变 bound_free_bytes_per_device=42 bound_empty_cluster_segments_per_device=1 bound_fragmentation_runs_per_device=1".to_string(),
+        ];
+        let header311_record_label = find_field_value_excluding(&lines, "header311_record_bytes", "record", &["w1", "w4"]).unwrap();
+        let write_list_journal_record_label = find_field_value_excluding(&lines, "role_labels", "journal_record", &[]).unwrap();
+        assert_eq!(header311_record_label, write_list_journal_record_label);
+        let g22_text = split_fields(lines.iter().find(|line| line.contains("id=G22")).unwrap()).iter().find(|(k, _)| *k == "text").unwrap().1.to_string();
+        let g22_free_bytes = extract_number_after_marker(&g22_text, "空闲字节").unwrap();
+        let accounting_free_bytes: u64 = find_field_value_excluding(&lines, "accounting", "free_bytes_per_device", &[]).unwrap().parse().unwrap();
+        assert_eq!(g22_free_bytes, accounting_free_bytes);
     }
 
     /// E142 第十五次跑（第七节 B1–B3）：分配记录树五个节点的层级、罩的段、格——按位置寻址的落点表。
@@ -6417,34 +8034,37 @@ mod tests {
         assert!(row_txg_2.clause_fatal, "同一 (实例, txg) 两条带末条标志 ⇒ 盘坏了、停下（已定项 14「这一版的失败处置」）");
     }
 
-    /// M88 的会红检查：H / F 相减的每一段都归到 w1 / w4 / t9 之一，一段都不落进 unregistered
-    /// （`journal_record_name_for_offset` 漏掉暖机记录时这条会红）。
+    /// M88 的会红检查：H / F 相减的每一段都归到 w1 / w4 / 本次事务自己那条记录（今天 12 个单元 ⇒ t13）之一，
+    /// 一段都不落进 unregistered（`journal_record_name_for_offset` 漏掉暖机记录时这条会红）。
     #[test]
     fn header311_flag_diff_segments_all_map_to_a_known_record() {
         let f = PoolParameters::settled_two_devices();
         let h = f.clone().with_last_of_publish_flag(0x00);
         let (h_image, _) = run_full_pipeline(&h, FIRST_TRANSACTION_TXG, &sample_file());
-        let (f_image, _) = run_full_pipeline(&f, FIRST_TRANSACTION_TXG, &sample_file());
+        let (f_image, f_output) = run_full_pipeline(&f, FIRST_TRANSACTION_TXG, &sample_file());
+        let journal_label = format!("t{}", f_output.units_by_slot.len() + 1);
+        assert_eq!(journal_label, "t13", "今天写清单 12 个单元（第七节 B23），本次事务自己的记录是 t13");
         let differences = diff_pools(&h_image, &f_image);
         assert!(!differences.is_empty(), "P1/P2 的旋钮读到了才谈得上这条检查");
         for segment in &differences {
-            let (record_name, _) = journal_record_name_for_offset(segment.offset).expect("H/F 的差异只可能落在 w1/w4/t9 的记录头里");
-            assert!(["w1", "w4", "t9"].contains(&record_name), "段落在 {record_name}，不是 w1/w4/t9 之一");
+            let (record_name, _) = journal_record_name_for_offset(segment.offset, &journal_label).expect("H/F 的差异只可能落在 w1/w4/本次事务那条记录的头里");
+            assert!(["w1".to_string(), "w4".to_string(), journal_label.clone()].contains(&record_name), "段落在 {record_name}，不是 w1/w4/{journal_label} 之一");
         }
     }
 
-    /// 第八节判别力自证（M90）：主取样点 w1、G1 的 t9 都没有 [91,95) 反向链差异段——两条都是本实例第一条，
+    /// 第八节判别力自证（M90）：主取样点 w1、G1 自己那条记录都没有 [91,95) 反向链差异段——两条都是本实例第一条，
     /// 反向链两臂恒 0（已定项 10）。挪成「含」两条都必须由绿转红，否则这两格没有判别力（作废 V3）。
     #[test]
     fn header311_geometry_back_chain_absence_has_discriminating_power() {
         let f = PoolParameters::settled_two_devices();
         let h = f.clone().with_last_of_publish_flag(0x00);
         let (h_image, _) = run_full_pipeline(&h, FIRST_TRANSACTION_TXG, &sample_file());
-        let (f_image, _) = run_full_pipeline(&f, FIRST_TRANSACTION_TXG, &sample_file());
+        let (f_image, f_output) = run_full_pipeline(&f, FIRST_TRANSACTION_TXG, &sample_file());
+        let main_journal_label = format!("t{}", f_output.units_by_slot.len() + 1);
         let main_differences = diff_pools(&h_image, &f_image);
-        let has_back_chain = |differences: &[DiffSegment], record: &str| {
+        let has_back_chain = |differences: &[DiffSegment], record: &str, label: &str| {
             differences.iter().any(|segment| {
-                journal_record_name_for_offset(segment.offset).is_some_and(|(name, offset_in_record)| name == record && journal_header_field_tag(offset_in_record) == "back_chain")
+                journal_record_name_for_offset(segment.offset, label).is_some_and(|(name, offset_in_record)| name == record && journal_header_field_tag(offset_in_record) == "back_chain")
             })
         };
 
@@ -6453,11 +8073,12 @@ mod tests {
         let (mut g1_recording_h, g1_genesis_h) = mkfs(&g1_h);
         let _ = publish_first_file(&mut g1_recording_h, &g1_h, &g1_genesis_h, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
         let (mut g1_recording_f, g1_genesis_f) = mkfs(&g1_f);
-        let _ = publish_first_file(&mut g1_recording_f, &g1_f, &g1_genesis_f, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
+        let g1_output_f = publish_first_file(&mut g1_recording_f, &g1_f, &g1_genesis_f, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, FIRST_TRANSACTION_TXG);
+        let g1_journal_label = format!("c{}", g1_output_f.units_by_slot.len() + 1);
         let g1_differences = diff_pools(&g1_recording_h.pool, &g1_recording_f.pool);
 
-        assert!(!has_back_chain(&main_differences, "w1"), "主取样点：w1 是本实例第一条，反向链两臂都是 0");
-        assert!(!has_back_chain(&g1_differences, "t9"), "G1：本实例第一条就是 t9，反向链两臂都是 0");
+        assert!(!has_back_chain(&main_differences, "w1", &main_journal_label), "主取样点：w1 是本实例第一条，反向链两臂都是 0");
+        assert!(!has_back_chain(&g1_differences, &g1_journal_label, &g1_journal_label), "G1：本实例第一条就是它自己那条记录，反向链两臂都是 0");
     }
 
     /// A7（第七节）的会红检查（M86）：反向链 = CRC32C(前一条记录的头 [0,311)，头校验和 32 字节按零参与)。
@@ -7027,5 +8648,186 @@ mod tests {
         let mut impl_line = sample_impl_line(0, 0, 4, "different_from_model");
         impl_line.hexadecimal = Some(hex_bytes(&impl_bytes));
         assert_eq!(compare_paired_write(&model_bytes, &sha256_hex(&model_bytes), &impl_line), (false, Some(2), Some(1)));
+    }
+
+    // ═════════ E142 第十七次跑第二段准备（问题单第 7 行，登记第五节 5.4）：层 0 主臂单独调用方式的机制 ═════════
+    // 这一组只在小规模（阳性对照、G6、G7；主臂的两个边界下标）上核这一段新加的机制本身——
+    // 主臂 67108885 个状态的整轮枚举不在这组测试里，它是第二段够判之后才由主 agent 用
+    // `E142_LAYER0_MAIN=1` 单独起的重活（`layer0_main_arm_elapsed` 那一行）。
+
+    /// 并行切片的核心：`layer0_state_at_index` 按下标直接算出的持久掩码，要与 `for_each_layer0_state`
+    /// 按次序访问的完全一样——这条测试要是漏了，`enumerate_layer0_grouped` 的并行切分就是在算另一套状态。
+    #[test]
+    fn layer0_state_at_index_matches_for_each_layer0_state_on_the_positive_control() {
+        let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
+        let mut via_callback: Vec<Vec<bool>> = Vec::new();
+        for_each_layer0_state(control_flow.writes.len(), &control_flow.segments, |persisted| via_callback.push(persisted));
+        assert_eq!(via_callback.len() as u64, control_flow.closed_form, "closed_form 应该等于 for_each_layer0_state 实际访问的次数");
+        for (global_index, expected) in via_callback.iter().enumerate() {
+            let (actual, _) = layer0_state_at_index(control_flow.writes.len(), &control_flow.segments, global_index as u64);
+            assert_eq!(&actual, expected, "下标 {global_index} 处两条路径给出的持久掩码必须一样");
+        }
+    }
+
+    /// 登记第五节 5.4「并行要有一条并行与串行在阳性对照、G6、G7 上逐格相等的单测」原话。
+    #[test]
+    fn layer0_grouped_enumeration_agrees_between_serial_and_parallel_on_the_positive_control_g6_and_g7() {
+        let flows: [(&str, PoolParameters, bool); 3] = [
+            ("positive_control", PoolParameters::control_one_device_no_barriers(), false),
+            ("g6", PoolParameters::one_device_with_barriers(), false),
+            ("g7", PoolParameters::control_one_device_no_barriers(), true),
+        ];
+        for (label, parameters, fua_is_boundary) in flows {
+            let flow = build_single_publish_flow(&parameters, &sample_file(), fua_is_boundary);
+            let (serial_tally, serial_comparison, serial_grouping) = enumerate_layer0_grouped(
+                1, &flow.base, &flow.writes, &flow.segments, &sample_file(), ReaderMode::Clause,
+                flow.root_index, &[flow.journal_index], &flow.dependency_groups, &flow.role_names,
+            );
+            let (parallel_tally, parallel_comparison, parallel_grouping) = enumerate_layer0_grouped(
+                4, &flow.base, &flow.writes, &flow.segments, &sample_file(), ReaderMode::Clause,
+                flow.root_index, &[flow.journal_index], &flow.dependency_groups, &flow.role_names,
+            );
+            assert_eq!(serial_tally, parallel_tally, "{label}：串行与并行的 Layer0Tally 必须逐格相等");
+            assert_eq!(serial_comparison, parallel_comparison, "{label}：串行与并行的 PredictionComparison 必须逐格相等");
+            assert_eq!(serial_grouping, parallel_grouping, "{label}：串行与并行的按发布分组必须逐格相等");
+        }
+    }
+
+    /// R13「按发布分组」：主臂那条流的三次根槽 FUA 写各自落在哪个段号——第七节 B19 的段序列
+    /// `[2, 2, 1, 2, 2, 1, 26, 2, 1, 2]` 里，三个大小为 1 的段（下标 2、5、8）恰好就是三次根槽。
+    #[test]
+    fn publish_group_boundaries_finds_the_three_root_segments_on_the_main_arm() {
+        let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+        let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+        assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 1, 2, 2, 1, 26, 2, 1, 2], "第七节 A19/B19 的段序列");
+        let root_segment_indices: Vec<usize> = writes
+            .iter()
+            .enumerate()
+            .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
+            .map(|(index, _)| segments.iter().position(|segment| segment.contains(&index)).unwrap())
+            .collect();
+        assert_eq!(root_segment_indices, vec![2, 5, 8], "三次根槽各自单独一段——取号+暖机1、暖机2、主事务");
+        let boundaries = publish_group_boundaries(&writes, &segments);
+        assert_eq!(boundaries, vec![2, 5, 8]);
+        assert_eq!(publish_group_label(&boundaries, Some(0)), "txg1");
+        assert_eq!(publish_group_label(&boundaries, Some(2)), "txg1", "根自己那一段仍算在它前面那个 txg 里（根本身还没持久）");
+        assert_eq!(publish_group_label(&boundaries, Some(3)), "txg2");
+        assert_eq!(publish_group_label(&boundaries, Some(8)), "txg3");
+        assert_eq!(publish_group_label(&boundaries, Some(9)), "after_last_root");
+        assert_eq!(publish_group_label(&boundaries, None), "every_write_persisted");
+    }
+
+    /// R10 依赖集甲在主事务上的写法：`write_unit_to_every_device`（逐单元两盘连写）使得 `writes` 里的
+    /// `UnitWrite` 恰好两两相邻，对应 `output.units_by_slot` 同一个逻辑单元的两份镜像。
+    #[test]
+    fn main_transaction_dependency_groups_pairs_each_units_by_slot_entry_with_both_devices() {
+        let BuiltPool { recording, output, mkfs_operation_count, .. } = built_pool();
+        let (writes, _) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+        let groups = main_transaction_dependency_groups(&writes, 2);
+        assert_eq!(groups.len(), output.units_by_slot.len(), "每个逻辑单元一组（第七节 B19「U=12」）");
+        for group in &groups {
+            assert_eq!(group.len(), 2, "两盘镜像各一份");
+            let devices: Vec<u32> = group.iter().map(|&index| writes[index].device.0).collect();
+            assert_eq!(devices, vec![0, 1], "write_unit_to_every_device 按 parameters.devices() 的次序：先设备 0 后设备 1");
+            for &index in group {
+                assert_eq!(writes[index].kind, StepKind::UnitWrite);
+            }
+        }
+    }
+
+    /// 端到端的两个边界下标（不跑整轮枚举）：下标 0（只有取号自己的第一个非满子集持久，根、记录都没持久）
+    /// 预言与实测都该是「合法、没有文件」；最后一个下标（全部持久）预言与实测都该是「合法、读到文件、
+    /// 内容对」。这两点各只调一次 `recover`（经 `evaluate_state`），不是重活。
+    #[test]
+    fn layer0_main_arm_boundary_states_agree_with_the_predictor_and_the_checker() {
+        let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
+        let mkfs_pool = mkfs(&PoolParameters::settled_two_devices()).0.pool;
+        let (writes, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], true);
+        let closed_form = closed_form_state_count(&segments);
+        assert_eq!(closed_form, 67_108_885, "第七节 B19");
+        let root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("根槽写");
+        let all_journal_indices: Vec<usize> = writes.iter().enumerate().filter(|(_, write)| write.kind == StepKind::JournalRecord).map(|(index, _)| index).collect();
+        let journal_indices = all_journal_indices[all_journal_indices.len() - 2..].to_vec();
+        let dependency_groups = main_transaction_dependency_groups(&writes, 2);
+        let boundaries = publish_group_boundaries(&writes, &segments);
+
+        let (persisted_first, segment_first) = layer0_state_at_index(writes.len(), &segments, 0);
+        assert_eq!(publish_group_label(&boundaries, segment_first), "txg1");
+        assert_eq!(predict_single_publish(&persisted_first, root_index, &journal_indices, &dependency_groups), PredictedOutcomeClass::LegalNoFile);
+        let mut tally_first = Layer0Tally::default();
+        let evaluated_first = evaluate_state(&mkfs_pool, &writes, persisted_first, root_index, &sample_file(), ReaderMode::Clause, &mut tally_first);
+        assert!(!evaluated_first.is_violation, "{:?}", tally_first.first_violation);
+        assert!(matches!(evaluated_first.outcome, RecoveryOutcome::NoFile { .. }));
+
+        let (persisted_last, segment_last) = layer0_state_at_index(writes.len(), &segments, closed_form - 1);
+        assert_eq!(publish_group_label(&boundaries, segment_last), "every_write_persisted");
+        assert_eq!(predict_single_publish(&persisted_last, root_index, &journal_indices, &dependency_groups), PredictedOutcomeClass::LegalFileRead);
+        let mut tally_last = Layer0Tally::default();
+        let evaluated_last = evaluate_state(&mkfs_pool, &writes, persisted_last, root_index, &sample_file(), ReaderMode::Clause, &mut tally_last);
+        assert!(!evaluated_last.is_violation, "{:?}", tally_last.first_violation);
+        assert!(matches!(&evaluated_last.outcome, RecoveryOutcome::FileRead { content, .. } if *content == sample_file()));
+    }
+
+    /// Q142.37：判决行的七个字段各自只挂一个门槛，互不影响——每个字段单独翻一次面，其余六个不动。
+    #[test]
+    fn layer0_main_arm_verdict_flags_every_threshold_independently() {
+        let mut tally = Layer0Tally { states: 67_108_885, violations: 0, root_persisted_states: 4, file_read_states: 7, journal_differing_states: 3, ..Layer0Tally::default() };
+        let comparison = PredictionComparison::default();
+        let baseline = layer0_main_arm_verdict(&tally, 67_108_885, &comparison);
+        assert!(baseline.layer0_states_ok && baseline.root_persisted_ok && baseline.file_read_ok && baseline.file_read_wrong_content_zero && baseline.main_outcome_matrix_ok);
+        assert_eq!(baseline.layer0_violations, "zero");
+        assert_eq!(baseline.journal_reading, "j_jia");
+
+        let wrong_states = layer0_main_arm_verdict(&tally, 67_108_884, &comparison);
+        assert!(!wrong_states.layer0_states_ok);
+        assert!(wrong_states.root_persisted_ok, "只应该翻 layer0_states_ok 这一格");
+
+        tally.violations = 1;
+        let with_violation = layer0_main_arm_verdict(&tally, 67_108_885, &comparison);
+        assert_eq!(with_violation.layer0_violations, "nonzero");
+        assert!(with_violation.layer0_states_ok, "违例数不该影响 layer0_states_ok");
+        tally.violations = 0;
+
+        tally.root_persisted_states = 5;
+        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).root_persisted_ok);
+        tally.root_persisted_states = 4;
+
+        tally.file_read_states = 6;
+        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).file_read_ok);
+        tally.file_read_states = 7;
+
+        tally.file_read_wrong_content_states = 1;
+        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &comparison).file_read_wrong_content_zero);
+        tally.file_read_wrong_content_states = 0;
+
+        tally.journal_differing_states = 9;
+        assert_eq!(layer0_main_arm_verdict(&tally, 67_108_885, &comparison).journal_reading, "j_yi");
+        tally.journal_differing_states = 4;
+        assert_eq!(layer0_main_arm_verdict(&tally, 67_108_885, &comparison).journal_reading, "neither");
+        tally.journal_differing_states = 3;
+
+        let mut dirty_comparison = PredictionComparison::default();
+        dirty_comparison.off_diagonal = 1;
+        assert!(!layer0_main_arm_verdict(&tally, 67_108_885, &dirty_comparison).main_outcome_matrix_ok);
+    }
+
+    /// `PublishBucket`/`PublishGrouping` 的加法与合并本身：`record` 三个字段独立累加，`merge` 是两份的
+    /// 逐格相加，`get` 对没出现过的标签给全零默认值（不 panic）。
+    #[test]
+    fn publish_grouping_records_and_merges_independently() {
+        let mut a = PublishGrouping::default();
+        a.record("txg1", false, false);
+        a.record("txg1", true, true);
+        a.record("txg2", false, false);
+        assert_eq!(a.get("txg1"), PublishBucket { states: 2, violations: 1, journal_differing_states: 1 });
+        assert_eq!(a.get("txg2"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
+        assert_eq!(a.get("after_last_root"), PublishBucket::default(), "没出现过的标签给全零默认值");
+
+        let mut b = PublishGrouping::default();
+        b.record("txg1", true, false);
+        b.record("after_last_root", false, false);
+        a.merge(&b);
+        assert_eq!(a.get("txg1"), PublishBucket { states: 3, violations: 2, journal_differing_states: 1 });
+        assert_eq!(a.get("after_last_root"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
     }
 }

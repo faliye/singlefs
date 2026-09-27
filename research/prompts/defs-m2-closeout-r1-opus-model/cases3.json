@@ -1,0 +1,23 @@
+[
+ {
+  "id": "B12",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "{ nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.rc; } & { nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/b.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.log 2>&1; echo \"$?\" > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.rc; } & wait; cat /tmp/claude-1000/defs-m2-closeout-r1-opus/a.rc /tmp/claude-1000/defs-m2-closeout-r1-opus/b.rc"
+ },
+ {
+  "id": "B13",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1 & p1=$!; nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/b.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/b.log 2>&1 & p2=$!; wait \"$p1\" \"$p2\""
+ },
+ {
+  "id": "B14",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "nice -n 19 bash /tmp/claude-1000/defs-m2-closeout-r1-opus/a.sh > /tmp/claude-1000/defs-m2-closeout-r1-opus/a.log 2>&1 & p1=$!; wait \"$p1\"; echo \"a=$?\""
+ }
+]

@@ -1,0 +1,61 @@
+E7INPUT name=crates_snapshot key=E158 sha256=74912842b9a57eeb09336fbe3207866c9204fd565bbc1930c994b9bede44a41a
+E7RESULT name=r3_compare_input arm=bing-cfg verdict=pass lines=1099
+E7RESULT name=r3_compare_input arm=bing-cfg-carry verdict=pass lines=1099
+E7RESULT name=r3_compare_input arm=jia-cfg verdict=pass lines=235
+E7RESULT name=r3_compare_input arm=jia-cfg-carry verdict=pass lines=235
+E7RESULT name=r3_compare_input arm=jia-slot verdict=pass lines=1051
+E7RESULT name=r3_compare_input arm=today verdict=pass lines=1867
+E7RESULT name=r3_compare_input arm=yi-cfg verdict=pass lines=1196
+E7RESULT name=r3_compare_input arm=yi-cfg-carry verdict=pass lines=1196
+E7RESULT name=r3_compare_input arm=yi-slot verdict=pass lines=2828
+E7RESULT name=r3_section_seven_three arm=today row=4 item="今天那一臂减自己的多读 = 0" cells=75 nonzero_cells=0 verdict=pass
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg family=PC-N cells=2 positive_cells=0 total_extra_read_calls=-846 total_extra_read_bytes=-3170304 minimum_extra_read_calls=-423 maximum_extra_read_calls=-423
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg family=h1d cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg family=h1e cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r3_positive_control arm=jia-cfg control=PC-extra-reads verdict=pass expectation=not_registered_for_this_arm extra_read_calls=-423 faults=3
+E7RESULT name=r3_positive_control arm=jia-cfg control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg-carry family=PC-N cells=2 positive_cells=0 total_extra_read_calls=-846 total_extra_read_bytes=-3170304 minimum_extra_read_calls=-423 maximum_extra_read_calls=-423
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg-carry family=h1d cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r3_q5_extra_reads arm=jia-cfg-carry family=h1e cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r3_positive_control arm=jia-cfg-carry control=PC-extra-reads verdict=pass expectation=not_registered_for_this_arm extra_read_calls=-423 faults=3
+E7RESULT name=r3_positive_control arm=jia-cfg-carry control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=jia-slot family=PC-N cells=2 positive_cells=0 total_extra_read_calls=-854 total_extra_read_bytes=-3203072 minimum_extra_read_calls=-427 maximum_extra_read_calls=-427
+E7RESULT name=r3_q5_extra_reads arm=jia-slot family=h1d cells=48 positive_cells=0 total_extra_read_calls=-10634 total_extra_read_bytes=-39403520 minimum_extra_read_calls=-508 maximum_extra_read_calls=0
+E7RESULT name=r3_q5_extra_reads arm=jia-slot family=h1e cells=16 positive_cells=0 total_extra_read_calls=-3526 total_extra_read_bytes=-12828672 minimum_extra_read_calls=-508 maximum_extra_read_calls=0
+E7RESULT name=r3_positive_control arm=jia-slot control=PC-extra-reads verdict=pass expectation=not_registered_for_this_arm extra_read_calls=-427 faults=3
+E7RESULT name=r3_positive_control arm=jia-slot control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg family=PC-N cells=2 positive_cells=1 total_extra_read_calls=-324 total_extra_read_bytes=-1068032 minimum_extra_read_calls=-416 maximum_extra_read_calls=92
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg family=h1d cells=48 positive_cells=15 total_extra_read_calls=-13536 total_extra_read_bytes=-47271936 minimum_extra_read_calls=-500 maximum_extra_read_calls=92
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg family=h1e cells=16 positive_cells=0 total_extra_read_calls=-6904 total_extra_read_bytes=-24965120 minimum_extra_read_calls=-500 maximum_extra_read_calls=-376
+E7RESULT name=r3_positive_control arm=yi-cfg control=PC-extra-reads verdict=fail expectation=extra_reads_at_least_r_times_faults_and_positive extra_read_calls=-416 faults=3
+E7RESULT name=r3_positive_control arm=yi-cfg control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg-carry family=PC-N cells=2 positive_cells=1 total_extra_read_calls=-320 total_extra_read_bytes=-1051648 minimum_extra_read_calls=-416 maximum_extra_read_calls=96
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg-carry family=h1d cells=48 positive_cells=15 total_extra_read_calls=-13472 total_extra_read_bytes=-47009792 minimum_extra_read_calls=-500 maximum_extra_read_calls=96
+E7RESULT name=r3_q5_extra_reads arm=yi-cfg-carry family=h1e cells=16 positive_cells=0 total_extra_read_calls=-6904 total_extra_read_bytes=-24965120 minimum_extra_read_calls=-500 maximum_extra_read_calls=-376
+E7RESULT name=r3_positive_control arm=yi-cfg-carry control=PC-extra-reads verdict=fail expectation=extra_reads_at_least_r_times_faults_and_positive extra_read_calls=-416 faults=3
+E7RESULT name=r3_positive_control arm=yi-cfg-carry control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=yi-slot family=PC-N cells=2 positive_cells=1 total_extra_read_calls=-340 total_extra_read_bytes=-1133568 minimum_extra_read_calls=-424 maximum_extra_read_calls=84
+E7RESULT name=r3_q5_extra_reads arm=yi-slot family=h1d cells=48 positive_cells=15 total_extra_read_calls=-3286 total_extra_read_bytes=-9441280 minimum_extra_read_calls=-505 maximum_extra_read_calls=84
+E7RESULT name=r3_q5_extra_reads arm=yi-slot family=h1e cells=16 positive_cells=0 total_extra_read_calls=-3506 total_extra_read_bytes=-12660736 minimum_extra_read_calls=-505 maximum_extra_read_calls=0
+E7RESULT name=r3_positive_control arm=yi-slot control=PC-extra-reads verdict=fail expectation=extra_reads_at_least_r_times_faults_and_positive extra_read_calls=-424 faults=3
+E7RESULT name=r3_positive_control arm=yi-slot control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg family=PC-N cells=2 positive_cells=2 total_extra_read_calls=2226 total_extra_read_bytes=9412608 minimum_extra_read_calls=1113 maximum_extra_read_calls=1113
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg family=h1d cells=48 positive_cells=48 total_extra_read_calls=59948 total_extra_read_bytes=260833280 minimum_extra_read_calls=1032 maximum_extra_read_calls=1572
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg family=h1e cells=16 positive_cells=16 total_extra_read_calls=17596 total_extra_read_bytes=75530240 minimum_extra_read_calls=1032 maximum_extra_read_calls=1154
+E7RESULT name=r3_positive_control arm=bing-cfg control=PC-extra-reads verdict=pass expectation=extra_reads_positive extra_read_calls=1113 faults=3
+E7RESULT name=r3_positive_control arm=bing-cfg control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg-carry family=PC-N cells=2 positive_cells=2 total_extra_read_calls=2226 total_extra_read_bytes=9412608 minimum_extra_read_calls=1113 maximum_extra_read_calls=1113
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg-carry family=h1d cells=48 positive_cells=48 total_extra_read_calls=60012 total_extra_read_bytes=261095424 minimum_extra_read_calls=1032 maximum_extra_read_calls=1576
+E7RESULT name=r3_q5_extra_reads arm=bing-cfg-carry family=h1e cells=16 positive_cells=16 total_extra_read_calls=17596 total_extra_read_bytes=75530240 minimum_extra_read_calls=1032 maximum_extra_read_calls=1154
+E7RESULT name=r3_positive_control arm=bing-cfg-carry control=PC-extra-reads verdict=pass expectation=extra_reads_positive extra_read_calls=1113 faults=3
+E7RESULT name=r3_positive_control arm=bing-cfg-carry control=PC-N0-same-as-today verdict=pass cells=8 differences=0
+E7RESULT name=r3_section_seven_three row=2 witness=device_n_cfg jia_arm=jia-cfg cells=75 mismatches=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=2 witness=device_n_slot jia_arm=jia-slot cells=75 mismatches=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=today cells=17 differences=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=jia-cfg cells=17 differences=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=jia-cfg-carry cells=17 differences=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=jia-slot cells=17 differences=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=bing-cfg cells=17 differences=0 verdict=pass
+E7RESULT name=r3_section_seven_three row=3 arm=bing-cfg-carry cells=17 differences=0 verdict=pass
+E7RESULT name=r3_f11 cells=58 cells_differing_outside_o1_and_cell_22=0 verdict=inference_holds
+E7RESULT name=done emitted=60

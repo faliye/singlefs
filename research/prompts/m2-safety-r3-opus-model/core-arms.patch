@@ -1,0 +1,217 @@
+diff -ru a/crates/singlefs-core/src/admission.rs b/crates/singlefs-core/src/admission.rs
+--- a/crates/singlefs-core/src/admission.rs	2026-09-26 06:46:30.578841537 +0000
++++ b/crates/singlefs-core/src/admission.rs	2026-09-26 06:46:30.579426447 +0000
+@@ -584,7 +584,7 @@
+ ) -> AdmissionReading {
+     let checkpoint_cost =
+         checkpoint_cost_of_the_version_to_build_on(version_to_build_on, allocator);
+-    AdmissionReading::of_allocator(
++    let reading = AdmissionReading::of_allocator(
+         allocator,
+         instance_switch_reserve_on_one_device(
+             allocator.instance_rows_after_this_mounts_row_publish(),
+@@ -594,9 +594,129 @@
+             checkpoint_cost,
+             ReplicaCount::of_every_device_in_the_pool(allocator),
+         )),
++    );
++    // OPUS R3 ARMS（草稿副本）：ND 删掉「− defer 待释放」——发布与可写挂载共用这一个读数，两处一起删。
++    if opus_r3_arms().drop_defer_term {
++        opus_r3_reading_without_defer(&reading)
++    } else {
++        reading
++    }
++}
++
++// ======================= OPUS R3 ARMS (draft copy only, m2-safety-r3 opus leg) =======================
++/// 这一轮攻方腿自己实现的式子两处改动（只在草稿副本里）。线程局部：每个工作线程各设各的。
++/// C283（准入不够先推空发布抬 F）不在这里：它是准入的调用方的事（本文件 `AdmissionRefusedOnSomeDevices` 的文档），在驱动里。
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub struct OpusR3Arms {
++    /// ND：可用(d) 去掉「− defer 待释放(d)」。
++    pub drop_defer_term: bool,
++    /// A1n：需求(d) = 这次发布重写的全部角色的 span_slots（不按 `space_budget_of_role` 过滤），不加换下的槽。
++    pub charge_all_new_writes: bool,
++    /// 攻方腿自己的零轮变体（只在这条腿的模型上量过）：发布路径的挂载期承诺量按下一次可写挂载的 rows0（这次挂载的 rows0 + 1）算，
++    /// 让发布放行时就给下一次挂载要写的那一行留出链多一片的份额；挂载路径不变。
++    pub publish_reserves_next_mount_row: bool,
++}
++
++/// 一次准入读数的痕迹（给驱动读）：哪一处算的、逐盘可用与各项（槽）、需求。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct OpusR3Trace {
++    pub site: &'static str,
++    pub available_slots: Vec<i128>,
++    pub allocated_slots: Vec<u64>,
++    pub deferred_slots: Vec<u64>,
++    pub isolated_slots: Vec<u64>,
++    pub mount_commitment_slots: u64,
++    pub checkpoint_share_slots: u64,
++    pub rows0: u64,
++    /// 今天的需求（`Demand` 那一类）。
++    pub demand_today_slots: u64,
++    /// 这次重写的全部角色。
++    pub all_new_slots: u64,
++    /// 这次换下的槽（参考）。
++    pub released_slots: u64,
++    /// 判的是哪个需求（臂取的）。
++    pub judged_demand_slots: u64,
++    pub judged: bool,
++    pub admitted: bool,
++}
++
++thread_local! {
++    static OPUS_R3_ARMS: std::cell::Cell<OpusR3Arms> = std::cell::Cell::new(OpusR3Arms { drop_defer_term: false, charge_all_new_writes: false, publish_reserves_next_mount_row: false });
++    static OPUS_R3_TRACES: std::cell::RefCell<Vec<OpusR3Trace>> = const { std::cell::RefCell::new(Vec::new()) };
++}
++
++pub fn set_opus_r3_arms(arms: OpusR3Arms) {
++    OPUS_R3_ARMS.with(|cell| cell.set(arms));
++}
++#[must_use]
++pub fn opus_r3_arms() -> OpusR3Arms {
++    OPUS_R3_ARMS.with(std::cell::Cell::get)
++}
++pub fn opus_r3_push_trace(trace: OpusR3Trace) {
++    OPUS_R3_TRACES.with(|traces| traces.borrow_mut().push(trace));
++}
++#[must_use]
++pub fn opus_r3_take_traces() -> Vec<OpusR3Trace> {
++    OPUS_R3_TRACES.with(|traces| std::mem::take(&mut *traces.borrow_mut()))
++}
++
++/// 发布路径的读数：臂开了 `publish_reserves_next_mount_row` 就按 rows0 + 1 算挂载期承诺量，否则就是 [`admission_reading_before_a_publish`]。
++#[must_use]
++pub fn opus_r3_publish_reading(allocator: &PoolAllocator, version_to_build_on: Option<&TransactionOutput>) -> AdmissionReading {
++    if !opus_r3_arms().publish_reserves_next_mount_row {
++        return admission_reading_before_a_publish(allocator, version_to_build_on);
++    }
++    let checkpoint_cost = checkpoint_cost_of_the_version_to_build_on(version_to_build_on, allocator);
++    let reading = AdmissionReading::of_allocator(
++        allocator,
++        instance_switch_reserve_on_one_device(allocator.instance_rows_after_this_mounts_row_publish() + 1, checkpoint_cost),
++        PoolWideCommitments::of_the_first_version(checkpoint_reserve_pool(
++            checkpoint_cost,
++            ReplicaCount::of_every_device_in_the_pool(allocator),
++        )),
++    );
++    if opus_r3_arms().drop_defer_term {
++        opus_r3_reading_without_defer(&reading)
++    } else {
++        reading
++    }
++}
++
++/// 读数里「defer 待释放」置 0。
++#[must_use]
++pub fn opus_r3_reading_without_defer(reading: &AdmissionReading) -> AdmissionReading {
++    AdmissionReading::new(
++        reading
++            .per_device()
++            .iter()
++            .map(|terms| DeviceAdmissionTerms {
++                deferred: BytesOnOneDevice::ZERO,
++                ..*terms
++            })
++            .collect(),
++        reading.pool_wide(),
++        reading.replicas(),
+     )
+ }
+ 
++/// 一份读数的痕迹骨架（各项折成槽）。
++#[must_use]
++pub fn opus_r3_trace_of(site: &'static str, reading: &AdmissionReading, allocator: &PoolAllocator) -> OpusR3Trace {
++    let slot = i128::from(SLOT_BYTES);
++    OpusR3Trace {
++        site,
++        available_slots: reading.available_on_each_device().iter().map(|(_, a)| a.0.div_euclid(slot)).collect(),
++        allocated_slots: reading.per_device().iter().map(|t| t.allocated.0 / SLOT_BYTES).collect(),
++        deferred_slots: allocator.devices.iter().map(|d| d.deferred_slots()).collect(),
++        isolated_slots: reading.per_device().iter().map(|t| t.abandoned_root_exclusive.0 / SLOT_BYTES).collect(),
++        mount_commitment_slots: reading.per_device().first().map_or(0, |t| t.mount_time_commitment.0 / SLOT_BYTES),
++        checkpoint_share_slots: reading.pool_wide().checkpoint_reserve_pool.share_of_one_device(reading.replicas()).0 / SLOT_BYTES,
++        rows0: allocator.instance_rows_after_this_mounts_row_publish(),
++        ..OpusR3Trace::default()
++    }
++}
++// ======================= END OPUS R3 ARMS =======================
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
+diff -ru a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+--- a/crates/singlefs-core/src/mount.rs	2026-09-26 06:46:30.578878407 +0000
++++ b/crates/singlefs-core/src/mount.rs	2026-09-26 06:46:30.579995127 +0000
+@@ -2198,10 +2198,16 @@
+                     bytes: BytesOnOneDevice::ZERO,
+                 })
+                 .collect();
+-            admit_on_every_device(
+-                &admission_reading_before_a_publish(&allocator, start.previous.file_version()),
+-                &no_demand_on_any_device,
+-            )
++            let opus_r3_reading =
++                admission_reading_before_a_publish(&allocator, start.previous.file_version());
++            let opus_r3_verdict = admit_on_every_device(&opus_r3_reading, &no_demand_on_any_device);
++            {
++                let mut trace = crate::admission::opus_r3_trace_of("mount", &opus_r3_reading, &allocator);
++                trace.judged = true;
++                trace.admitted = opus_r3_verdict.is_ok();
++                crate::admission::opus_r3_push_trace(trace);
++            }
++            opus_r3_verdict
+             .map_err(
+                 |refusal| MountError::SpaceAdmissionRefusedBeforeAcquisition {
+                     instance_to_acquire,
+diff -ru a/crates/singlefs-core/src/transaction.rs b/crates/singlefs-core/src/transaction.rs
+--- a/crates/singlefs-core/src/transaction.rs	2026-09-26 06:46:30.578931647 +0000
++++ b/crates/singlefs-core/src/transaction.rs	2026-09-26 06:46:30.580433036 +0000
+@@ -4721,12 +4721,41 @@
+             .any(|demand_on_device| demand_on_device.bytes != BytesOnOneDevice::ZERO),
+         SpaceAdmission::SkippedByTheTestOnlySwitch => false,
+     };
+-    if demand_is_judged {
+-        admit_on_every_device(
+-            &admission_reading_before_a_publish(allocator, previous),
+-            &demand,
+-        )
+-        .map_err(PublishError::SpaceAdmissionRefused)?;
++    // OPUS R3 ARMS（草稿副本）：A1n 把需求换成这次重写的全部角色；判不判照今天（有普通分配才判），只换判的量。
++    {
++        let arms = crate::admission::opus_r3_arms();
++        let all_new_slots: u64 = settled
++            .resolved
++            .rewritten_roles
++            .iter()
++            .map(|role| role.span_slots())
++            .sum();
++        let demand_today_slots: u64 = demand.first().map_or(0, |d| d.bytes.0 / singlefs_format::SLOT_BYTES);
++        let released_slots: u64 = settled.release.iter().map(|placement| placement.span).sum();
++        let judged_demand: Vec<crate::admission::DemandOnDevice> = if arms.charge_all_new_writes {
++            demand
++                .iter()
++                .map(|on_device| crate::admission::DemandOnDevice {
++                    device: on_device.device,
++                    bytes: BytesOnOneDevice::of_slots(all_new_slots),
++                })
++                .collect()
++        } else {
++            demand.clone()
++        };
++        if demand_is_judged {
++            let reading = crate::admission::opus_r3_publish_reading(allocator, previous);
++            let verdict = admit_on_every_device(&reading, &judged_demand);
++            let mut trace = crate::admission::opus_r3_trace_of("publish", &reading, allocator);
++            trace.demand_today_slots = demand_today_slots;
++            trace.all_new_slots = all_new_slots;
++            trace.released_slots = released_slots;
++            trace.judged_demand_slots = judged_demand.first().map_or(0, |d| d.bytes.0 / singlefs_format::SLOT_BYTES);
++            trace.judged = true;
++            trace.admitted = verdict.is_ok();
++            crate::admission::opus_r3_push_trace(trace);
++            verdict.map_err(PublishError::SpaceAdmissionRefused)?;
++        }
+     }
+     // 经映射核到的那几个单元，释放之前再按位置项读盘核一次校验和（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1）：只读，
+     // 读不到就在动分配器、发任何一个写之前返回。第一个文件版本换下的 mkfs 那片树表与树表 0 条那一版的分配记录树节点不经映射，不核。

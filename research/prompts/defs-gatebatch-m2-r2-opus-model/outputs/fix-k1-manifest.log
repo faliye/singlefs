@@ -1,0 +1,13 @@
+CONTROL	holds	C1 用例不读 other_target ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当不变	改前 3952c11fe92d6b10… 改后 3952c11fe92d6b10…（文件数 / 减去数 改前 4/3 改后 4/3）
+CONTROL	holds	C2 include_str!(concat!(…)) 拼出 other_target 的路径（Y5 认得的写法） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 6bd0655ea48f0641… 改后 a0a9067fa22cd7a0…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	holds	M1 ::core::include_str!(::core::concat!(…))（带路径的宏名，编得过、读同一份） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 72476b461264130f… 改后 e6f8fc846ca3035d…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	holds	M2 include_str!(env!("K1_FIXTURE"))，路径在仓根 .cargo/config.toml 的 [env] 里（relative = true） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 98952592a29d09e1… 改后 e1f2d9b20bd8805d…（文件数 / 减去数 改前 7/0 改后 7/0）
+CONTROL	holds	C3 别的包 gen 的 build.rs 自己按目录读 pkg 的 tests/（Y5 认得的写法） ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 f0bb0e62986bbd59… 改后 919365a60ab6b205…（文件数 / 减去数 改前 10/0 改后 10/0）
+ATTACK	BROKEN	M3 gen 的 build.rs 只写 mod scan;，按目录读 pkg 的 tests/ 的那几行在 scan.rs 里 ⇒ 改 crates/pkg/tests/other_target.rs 指纹应当变	改前 d8dbd079ea31b394… 改后 d8dbd079ea31b394…（文件数 / 减去数 改前 10/1 改后 10/1）
+ATTACK	holds	M4 include_str!(concat!(…)) 拼出 crates/mutations.tsv ⇒ 改 crates/mutations.tsv 指纹应当变	改前 e8a3da52c6d8b3d3… 改后 a641f9cb37345a04…（文件数 / 减去数 改前 7/0 改后 7/0）
+ATTACK	holds	M5 include!(concat!(…)) 拼出 src/bin/tool.rs 里的代码 ⇒ 改 crates/pkg/src/bin/tool.rs 指纹应当变	改前 42bcf6f1a3dff2cb… 改后 958f5127e71ffe6e…（文件数 / 减去数 改前 7/0 改后 7/0）
+CONTROL	holds	C4 runner = <仓>/tools/r.sh（直接指脚本），改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 f0dafa63f9d15135… 改后 4a55ec6ac558c9f3…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	holds	G1 runner = bash <仓>/tools/r.sh（前面带解释器，cargo 按空白切），改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 a67cd7152c038aee… 改后 f1e771afcce8beea…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	holds	G2 .cargo/config.toml 里 runner = ["bash", "tools/r.sh"]，改 r.sh ⇒ 改 tools/r.sh 指纹应当变	改前 d42e0c84514605d6… 改后 a96ddf5f7d35c1d3…（文件数 / 减去数 改前 4/3 改后 4/3）
+ATTACK	BROKEN	G3 runner = <仓>/tools/r.sh，它 source 的 r-lib.sh 改了 ⇒ 改 tools/r-lib.sh 指纹应当变	改前 2b556491f69a175e… 改后 2b556491f69a175e…（文件数 / 减去数 改前 4/3 改后 4/3）
+SUMMARY K1 排除规则与 runner 指纹: cells=12 attack_cells_broken=2 control_cells_broken=0

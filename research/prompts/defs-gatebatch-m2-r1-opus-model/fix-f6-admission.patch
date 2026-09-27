@@ -1,0 +1,19 @@
+--- research/scripts/admission.py	2026-09-26 12:08:55.511374321 +0000
++++ /tmp/claude-1000/defs-gatebatch-r1-opus/fix/admission.py	2026-09-26 13:16:48.412944951 +0000
+@@ -1060,8 +1060,14 @@
+     function_form = re.compile(r"\bfn\s+" + re.escape(case.function) + r"\s*\(")
+     for relative in files:
+         with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+-            if function_form.search(rust_code_without_comments(handle.read())):
+-                return files
++            code = rust_code_without_comments(handle.read())
++        found = function_form.search(code)
++        if found:
++            # 探针 I1/I2 的改法（被攻过零轮）：登记的用例函数要标 #[ignore]，否则「不带 --ignored」就跑到全量，重型测试闸认不出
++            attributes = re.search(r"((?:#\[[^\]]*\]\s*)+)$", code[:found.start()])
++            if not attributes or "#[ignore" not in attributes.group(1):
++                raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 没标 #[ignore]：不带 --ignored 的 cargo test 就会跑到全量")
++            return files
+     raise RegistrationError(f"崩溃枚举用例 {case.key} 的用例函数 {case.function} 在 {'、'.join(files)} 里找不到（改了名？）")
+ 
+ 

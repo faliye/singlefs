@@ -1,0 +1,38 @@
+[
+ {
+  "id": "D1",
+  "hook": "dispatch",
+  "agent": "three-way-attack",
+  "command": "照定义第 3b 步，在原型里调 `enumerate_layer0` 跑小流，每次不超过约 10⁶ 个状态。"
+ },
+ {
+  "id": "D2",
+  "hook": "dispatch",
+  "agent": "three-way-attack",
+  "command": "崩溃状态照层 0 的枚举域取，用 enumerate_layer0_versions 跑每段历史。"
+ },
+ {
+  "id": "D3",
+  "hook": "dispatch",
+  "agent": "three-way-attack",
+  "command": "原型用 closed_form_state_count 先算状态数，再用 enumerate_layer0 跑。"
+ },
+ {
+  "id": "D4",
+  "hook": "dispatch",
+  "agent": "three-way-attack",
+  "command": "原型的测试目标名字不带 layer0，每段历史的崩溃状态一个不落。"
+ },
+ {
+  "id": "D5",
+  "hook": "dispatch",
+  "agent": "gate-triage",
+  "command": "gate.sh 整条经内存包装的上限：32G。跑 gate.sh --staged。"
+ },
+ {
+  "id": "D6",
+  "hook": "dispatch",
+  "agent": "crash-verifier",
+  "command": "54 号上限 16G、55 号上限 14G、57 号上限 4G；跑 54、55、57、59 号。"
+ }
+]

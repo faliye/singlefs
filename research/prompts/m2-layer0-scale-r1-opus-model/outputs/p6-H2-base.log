@@ -1,0 +1,108 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+STREAM H2 writes=466 segments=65 sizes=[2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 4, 16, 2, 1, 18, 2, 1, 18, 2, 1, 4, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 30, 2, 1, 30, 2, 1, 4, 16, 2, 1, 18, 2, 1, 18, 2, 1, 4, 22, 2, 1, 18, 2, 1, 18, 2, 1, 30, 2, 1, 2] closed_form=3429236868 reduced_closed_form=210
+KINDS H2 [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×18] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×28] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×28] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×22] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×28] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2]
+OVERWRITE H2 write#202 dev0 slot50178 txgSome(11) overwrites: stream= mkfs_base_sectors=32
+OVERWRITE H2 write#203 dev1 slot50178 txgSome(11) overwrites: stream= mkfs_base_sectors=32
+OVERWRITE H2 write#231 dev0 slot50180 txgSome(12) overwrites: stream=#12(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#232 dev1 slot50180 txgSome(12) overwrites: stream=#13(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#364 dev0 slot50240 txgSome(17) overwrites: stream=#14(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#365 dev1 slot50240 txgSome(17) overwrites: stream=#15(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#366 dev0 slot50242 txgSome(17) overwrites: stream=#16(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#367 dev1 slot50242 txgSome(17) overwrites: stream=#17(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#368 dev0 slot50243 txgSome(17) overwrites: stream=#16(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#369 dev1 slot50243 txgSome(17) overwrites: stream=#17(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#370 dev0 slot50244 txgSome(17) overwrites: stream=#18(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#371 dev1 slot50244 txgSome(17) overwrites: stream=#19(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#372 dev0 slot50245 txgSome(17) overwrites: stream=#20(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#373 dev1 slot50245 txgSome(17) overwrites: stream=#21(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#374 dev0 slot50246 txgSome(17) overwrites: stream=#22(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#375 dev1 slot50246 txgSome(17) overwrites: stream=#23(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#376 dev0 slot50247 txgSome(17) overwrites: stream=#24(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#377 dev1 slot50247 txgSome(17) overwrites: stream=#25(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#378 dev0 slot50248 txgSome(17) overwrites: stream=#26(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#379 dev1 slot50248 txgSome(17) overwrites: stream=#27(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#380 dev0 slot50249 txgSome(17) overwrites: stream=#28(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#381 dev1 slot50249 txgSome(17) overwrites: stream=#29(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#382 dev0 slot50250 txgSome(17) overwrites: stream=#30(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#383 dev1 slot50250 txgSome(17) overwrites: stream=#31(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#384 dev0 slot50251 txgSome(17) overwrites: stream=#32(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#385 dev1 slot50251 txgSome(17) overwrites: stream=#33(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#391 dev0 slot50252 txgSome(18) overwrites: stream=#34(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#392 dev1 slot50252 txgSome(18) overwrites: stream=#35(unit_write,txgSome(3)) mkfs_base_sectors=0
+OVERWRITE H2 write#393 dev0 slot50253 txgSome(18) overwrites: stream=#43(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#394 dev1 slot50253 txgSome(18) overwrites: stream=#44(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#395 dev0 slot50254 txgSome(18) overwrites: stream=#45(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#396 dev1 slot50254 txgSome(18) overwrites: stream=#46(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#397 dev0 slot50255 txgSome(18) overwrites: stream=#45(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#398 dev1 slot50255 txgSome(18) overwrites: stream=#46(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#399 dev0 slot50256 txgSome(18) overwrites: stream=#47(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#400 dev1 slot50256 txgSome(18) overwrites: stream=#48(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#401 dev0 slot50257 txgSome(18) overwrites: stream=#49(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#402 dev1 slot50257 txgSome(18) overwrites: stream=#50(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#403 dev0 slot50258 txgSome(18) overwrites: stream=#51(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#404 dev1 slot50258 txgSome(18) overwrites: stream=#52(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#405 dev0 slot50259 txgSome(18) overwrites: stream=#53(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#406 dev1 slot50259 txgSome(18) overwrites: stream=#54(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#412 dev0 slot50260 txgSome(19) overwrites: stream=#55(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#413 dev1 slot50260 txgSome(19) overwrites: stream=#56(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#414 dev0 slot50261 txgSome(19) overwrites: stream=#57(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#415 dev1 slot50261 txgSome(19) overwrites: stream=#58(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#416 dev0 slot50262 txgSome(19) overwrites: stream=#59(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#417 dev1 slot50262 txgSome(19) overwrites: stream=#60(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#418 dev0 slot50263 txgSome(19) overwrites: stream=#61(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#419 dev1 slot50263 txgSome(19) overwrites: stream=#62(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#420 dev0 slot50264 txgSome(19) overwrites: stream=#63(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#421 dev1 slot50264 txgSome(19) overwrites: stream=#64(unit_write,txgSome(4)) mkfs_base_sectors=0
+OVERWRITE H2 write#422 dev0 slot50265 txgSome(19) overwrites: stream=#72(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#423 dev1 slot50265 txgSome(19) overwrites: stream=#73(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#424 dev0 slot50266 txgSome(19) overwrites: stream=#74(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#425 dev1 slot50266 txgSome(19) overwrites: stream=#75(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#426 dev0 slot50267 txgSome(19) overwrites: stream=#76(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#427 dev1 slot50267 txgSome(19) overwrites: stream=#77(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#433 dev0 slot50176 txgSome(20) overwrites: stream= mkfs_base_sectors=64
+OVERWRITE H2 write#434 dev1 slot50176 txgSome(20) overwrites: stream= mkfs_base_sectors=64
+OVERWRITE H2 write#435 dev0 slot50268 txgSome(20) overwrites: stream=#78(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#436 dev1 slot50268 txgSome(20) overwrites: stream=#79(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#437 dev0 slot50270 txgSome(20) overwrites: stream=#82(unit_write,txgSome(5)),#84(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#438 dev1 slot50270 txgSome(20) overwrites: stream=#83(unit_write,txgSome(5)),#85(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#439 dev0 slot50272 txgSome(20) overwrites: stream=#86(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#440 dev1 slot50272 txgSome(20) overwrites: stream=#87(unit_write,txgSome(5)) mkfs_base_sectors=0
+OVERWRITE H2 write#441 dev0 slot50273 txgSome(20) overwrites: stream=#93(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#442 dev1 slot50273 txgSome(20) overwrites: stream=#94(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#443 dev0 slot50274 txgSome(20) overwrites: stream=#95(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#444 dev1 slot50274 txgSome(20) overwrites: stream=#96(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#445 dev0 slot50275 txgSome(20) overwrites: stream=#97(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#446 dev1 slot50275 txgSome(20) overwrites: stream=#98(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#447 dev0 slot50276 txgSome(20) overwrites: stream=#99(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#448 dev1 slot50276 txgSome(20) overwrites: stream=#100(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#449 dev0 slot50277 txgSome(20) overwrites: stream=#101(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#450 dev1 slot50277 txgSome(20) overwrites: stream=#102(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#451 dev0 slot50278 txgSome(20) overwrites: stream=#103(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#452 dev1 slot50278 txgSome(20) overwrites: stream=#104(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#453 dev0 slot50279 txgSome(20) overwrites: stream=#105(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#454 dev1 slot50279 txgSome(20) overwrites: stream=#106(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#455 dev0 slot50280 txgSome(20) overwrites: stream=#107(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#456 dev1 slot50280 txgSome(20) overwrites: stream=#108(unit_write,txgSome(6)) mkfs_base_sectors=0
+OVERWRITE H2 write#457 dev0 slot50281 txgSome(20) overwrites: stream=#114(unit_write,txgSome(7)) mkfs_base_sectors=0
+OVERWRITE H2 write#458 dev1 slot50281 txgSome(20) overwrites: stream=#115(unit_write,txgSome(7)) mkfs_base_sectors=0
+OVERWRITE H2 write#459 dev0 slot50282 txgSome(20) overwrites: stream=#116(unit_write,txgSome(7)) mkfs_base_sectors=0
+OVERWRITE H2 write#460 dev1 slot50282 txgSome(20) overwrites: stream=#117(unit_write,txgSome(7)) mkfs_base_sectors=0
+ARMS H2 arm_a_states=210 arm_a_bad=0 arm_a2_states=252 arm_a2_bad=0 full_sampled_cow_states=4396 full_sampled_bad_beyond_arm_a=0
+test p6_three_arms_on_fixed_scripts_and_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 9.49s
+

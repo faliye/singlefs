@@ -1,0 +1,15 @@
+[
+ {"id": "K1-01", "hook": "heavy", "agent": "gate-triage", "command": "GATE_RESEARCH_BUILD_MEMORY_MAX=16G SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged"},
+ {"id": "K1-02", "hook": "heavy", "agent": "gate-triage", "command": "SINGLEFS_HEAVY_TESTS=commit GATE_RESEARCH_BUILD_MEMORY_MAX=16G nice -n 19 bash .claude/scripts/gate.sh --staged"},
+ {"id": "K1-03", "hook": "heavy", "agent": "gate-triage", "command": "export GATE_RESEARCH_BUILD_MEMORY_MAX=16G; SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged"},
+ {"id": "K1-04", "hook": "heavy", "agent": "gate-triage", "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 env GATE_RESEARCH_BUILD_MEMORY_MAX=16G bash .claude/scripts/gate.sh --staged"},
+ {"id": "K1-05", "hook": "heavy", "agent": "gate-triage", "command": "GATE_RESEARCH_BUILD_MEMORY_MAX=16G GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=12G SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged"},
+ {"id": "K1-06", "hook": "heavy", "agent": "gate-triage", "command": "GATE_RESEARCH_BUILD_MEMORY_MAX=16G nice -n 19 bash .claude/gate.d/15-research-build.sh"},
+ {"id": "K1-07", "hook": "heavy", "agent": "crash-verifier", "command": "GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=12G nice -n 19 bash .claude/gate.d/74-model-differential.sh"},
+ {"id": "K1-08", "hook": "heavy", "agent": "crash-verifier", "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh"},
+ {"id": "K1-09", "hook": "heavy", "agent": "crash-verifier", "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 4G bash .claude/gate.d/57-lkmm.sh"},
+ {"id": "K1-10", "hook": "heavy", "agent": "implementation-writer", "command": "GATE_MODEL_DIFFERENTIAL_MEMORY_MAX=12GiB nice -n 19 bash .claude/gate.d/74-model-differential.sh"},
+ {"id": "K1-11", "hook": "heavy", "agent": "gate-triage", "command": "bash research/scripts/run-with-memory-cap.sh --status"},
+ {"id": "K1-12", "hook": "heavy", "agent": "three-way-attack", "cwd": "@COPY@", "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 24G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 16 cargo test --offline --release --no-run"},
+ {"id": "K1-13", "hook": "heavy", "agent": "three-way-attack", "cwd": "@COPY@", "command": "nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 24G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 16 cargo build --offline --release --tests"}
+]

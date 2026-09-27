@@ -1,0 +1,101 @@
+45: const fn registered_record_width(record_type
+67: fn data_unit_bytes() -> usize {
+70: fn node_bytes() -> usize {
+73: fn tree_table_entry_bytes() -> usize {
+76: fn allocation_record_bytes() -> usize {
+79: fn extent_leaf_record_bytes() -> usize {
+82: fn inode_internal_entry_bytes() -> usize {
+85: fn accounting_entry_bytes() -> usize {
+90: fn mapping_entry_bytes() -> usize {
+100: fn field_table_width_of_tree_kind(kind
+157: fn node_pointer_bytes() -> usize {
+162: fn internal_entry_bytes(schema
+228: fn chain_record_view(record
+250:     fn value(self) -> u64 {
+257:     fn name(self) -> &'static str {
+275: fn birth_identity_in_the_header(unit
+323:     fn judge_birth_identity_of_a_referenced_unit(
+369:     fn starting_with(
+398:     fn note_reference(&mut self, location
+410:     fn judge_unit_header(&mut self, unit
+478:     fn read_index_node(
+542:     fn walk_root(&mut self, record
+566:     fn walk_version_applied_only_by_records(&mut self, version
+574:     fn walk_tree_table_and_central_mapping_root(
+617:     fn walk_central_mapping_entries(&mut self, entries
+654:     fn walk_code_two_subtree(
+785:     fn entry_width_holds(
+824:     fn walk_tree_table_entry(&mut self, entry
+928:     fn walk_inode_root(&mut self, root
+1079:     fn walk_instance_table_chain(
+1171:     fn judge_instance_table_rows(&mut self, pages
+1210:     fn judge_packed_container(
+1238:     fn walk_extent_data_pointer(
+1292:     fn position_and_entry_width_hold(
+1330:     fn walk_allocation_record_tree(&mut self, root_pointer_bytes
+1353:     fn walk_allocation_record_node(
+1454:     fn walk_extent_upper_node(
+1556:     fn walk_extent_lower_node(
+1649: fn written_after_its_instance_was_last_applied(
+1668: fn scanned_tree_identifiers(
+1712: fn unit_write_order_instance(bytes
+1736: fn instance_carriers(
+1783: fn judge_instance_carriers(
+1859: fn parse_allocation_record(entry
+1884:     const fn of(code
+1916:     fn note(&mut self, pointer
+1927: fn read_unit_without_judging(
+1944: fn read_index_node_without_judging(
+1973: fn references_of_root(
+2084: fn note_instance_table_pages_after_the_first(
+2130: fn note_every_node_below(
+2163: fn allocation_record_tree_without_judging(
+2225: fn extent_tree_without_judging(
+2329: fn collect_tree_references(
+2403: fn judge_release_generations(
+2487: fn judge_tree_table_birth_txg(scanned
+2541: fn judge_release_generation_and_tree_table_birth(
+2603: fn judge_allocation_records_disjoint(
+2660: fn birth_txg_in_a_usable_unit_header(header
+2686: fn tree_table_pointer_of_the_version_the_next_mount_applies_first(
+2716: fn allocation_record_node_pointers_of_the_candidate_versions(
+2764: fn judge_allocation_generations_against_unit_births(
+2843: fn user_visible_tree_root_pointers(
+2876: fn parse_instance_table_row(row
+2892: fn instance_table_rows_of_root_without_judging(
+2943: fn abandoned_by_instance_table_rows(
+2964:     pub fn read(reader
+2970:     pub fn abandons(&self, instance
+2980: fn rollback_floor_ceiling_from(
+3000: fn newest_first_distinct_state_txgs(
+3047: fn rollback_floor_ceiling_before_the_raise(
+3154: fn judge_rollback_floor_raises_against_their_ceilings(
+3248: fn judge_system_configuration_floor_against_the_roots_on_each_device(
+3291: fn judge_allocation_record_ranges(
+3339:     fn at(&mut self, device
+3374: fn quarantined_slots_exempted_per_device(
+3450: pub fn allocation_record_count_under_root(
+3529:     fn instance(self) -> u32 {
+3538:     fn birth_txg(self) -> u64 {
+3550:     fn write_order_under_the_published_predicate(
+3571:     fn of(unit_class_tag
+3579:     fn header_offsets(self) -> ContentUnitHeaderOffsets {
+3604:     fn name(self) -> &'static str {
+3631:     fn holds_for(&self, write_order
+3690:     fn describe(&self) -> String {
+3702: fn content_unit_of_header(
+3755: fn scanned_content_units(
+3784: fn payload_checksum_holds_on_disk(reader
+3802: fn judge_merged_version_total_order(
+3902: fn judge_root_ring_health(roots
+3943:     const fn of(byte
+3976: fn scanned_journal_records_of_device(
+4017: fn scanned_journal_records_by_device(
+4048: fn judge_journal_back_chain(
+4118: fn judge_transaction_numbers_per_instance(
+4202: fn judge_commit_markers_per_transaction(
+4335: fn judge_publish_ordinals_and_last_record_flags(
+4488:     fn tree_table_and_mapping_root_pointers(&self) -> (&[u8], &[u8]) {
+4514: fn versions_applied_only_by_records(
+4572: fn slots_referenced_per_device(
+4584: pub fn check_pool_image(reader

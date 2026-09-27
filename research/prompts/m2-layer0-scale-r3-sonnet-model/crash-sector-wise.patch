@@ -1,0 +1,72 @@
+--- /tmp/claude-1000/l0scale-r1-frozen/crates/singlefs-harness/src/crash.rs	2026-09-25 22:14:09.080511883 +0000
++++ /tmp/claude-1000/m2-layer0-scale-r3-sonnet/repo/crates/singlefs-harness/src/crash.rs	2026-09-26 04:15:13.358363270 +0000
+@@ -691,27 +691,52 @@
+     // （C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑）：只看「流里有没有更晚的写」的那一版在这里失声）。
+     // 更晚那次写已经落盘、而那次复用证得出违反 D16（发布语义） 已定项 1 的回收谓词时也不算盖过（C513（复用豁免不判那次复用合不合法）：
+     // C22（刚释放的块立即重分配） 那一类，块刚释放就在同一个可回退窗口里重新分出去，位置让出去了、但让得不合规范）。
+-    let written_over_later = |index: usize| {
++    // N1 辩方补丁（m2-layer0-scale-r3，C561）：复用豁免按扇区判，不再要求后写整份还在位。
++    // 一份副本的某个扇区缺席 ⟺ 这个扇区上的字节不是这份副本自己的，而这个扇区上也没有一次更晚、
++    // 已持久、字节仍在、且复用没被回收谓词证否的写（C513 的检查原样保留，只是判定粒度从整份写
++    // 收紧到扇区）。
++    const SECTOR_BYTES_FOR_REUSE_EXEMPTION: u64 = 512;
++    let sector_bytes_of = |index: usize, sector_start: u64, length: usize| -> Vec<u8> {
+         let write = &writes[index];
++        let mut buffer = vec![0u8; length];
++        write
++            .contents
++            .copy_range_into(usize::try_from(sector_start - write.offset.0).expect("扇区内偏移装得进 usize"), &mut buffer);
++        buffer
++    };
++    let sector_missing = |copy: usize| {
++        let write = &writes[copy];
+         let start = write.offset.0;
+         let end = start + write.length_in_bytes();
+-        let earlier_publish_txg = checkpoint_txg_of_the_publish_that_made_the_write(writes, index);
+-        (index + 1..writes.len()).any(|later_index| {
+-            let later = &writes[later_index];
+-            let later_start = later.offset.0;
+-            let later_end = later_start + later.length_in_bytes();
+-            later.device == write.device
+-                && later_start < end
+-                && start < later_end
+-                && in_place(later_index)
+-                && reuse_is_not_proven_illegal_by_the_reclaim_predicate(
+-                    writes,
+-                    earlier_publish_txg,
+-                    later_index,
+-                )
+-        })
++        let earlier_publish_txg = checkpoint_txg_of_the_publish_that_made_the_write(writes, copy);
++        let mut sector = start;
++        while sector < end {
++            let length_u64 = SECTOR_BYTES_FOR_REUSE_EXEMPTION.min(end - sector);
++            let length = usize::try_from(length_u64).expect("扇区长度装得进 usize");
++            let disk = reader.read(write.device, DeviceOffsetInBytes(sector), length).unwrap_or_default();
++            let ours = sector_bytes_of(copy, sector, length);
++            if disk != ours {
++                let explained = (copy + 1..writes.len()).any(|later_index| {
++                    let later = &writes[later_index];
++                    later.device == write.device
++                        && later.offset.0 <= sector
++                        && sector + length_u64 <= later.offset.0 + later.length_in_bytes()
++                        && disk == sector_bytes_of(later_index, sector, length)
++                        && reuse_is_not_proven_illegal_by_the_reclaim_predicate(
++                            writes,
++                            earlier_publish_txg,
++                            later_index,
++                        )
++                });
++                if !explained {
++                    return true;
++                }
++            }
++            sector += length_u64;
++        }
++        false
+     };
+-    let copy_is_missing = |copy: usize| !in_place(copy) && !written_over_later(copy);
++    let copy_is_missing = |copy: usize| sector_missing(copy);
+     let mut check = RecordCheck::default();
+     for publish in publishes_in(writes) {
+         if !publish.records.is_empty()

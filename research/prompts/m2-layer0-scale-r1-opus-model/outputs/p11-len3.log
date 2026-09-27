@@ -1,0 +1,191 @@
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.00s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+SWEEP fault=false seq= applied= writes=70 segments=13 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=O applied=O writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=M applied=M writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=U applied=U writes=202 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=R applied=- writes=70 segments=13 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OO applied=OO writes=128 segments=19 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OM applied=OM writes=145 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OU applied=OU writes=210 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OR applied=O- writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MO applied=MO writes=166 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MM applied=MM writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MU applied=MU writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MR applied=M- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UO applied=UO writes=231 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UM applied=UM writes=273 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UU applied=UU writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UR applied=UR writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RO applied=-O writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RM applied=-M writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RU applied=-U writes=202 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RR applied=-- writes=70 segments=13 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OOO applied=OOO writes=157 segments=22 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OOM applied=OOM writes=174 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OOU applied=OOU writes=222 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OOR applied=OOR writes=172 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OMO applied=OMO writes=174 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+test p11_user_action_sweep has been running for over 60 seconds
+SWEEP fault=false seq=OMM applied=OMM writes=216 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OMU applied=OMU writes=285 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OMR applied=OM- writes=145 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OUO applied=OUO writes=239 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OUM applied=OUM writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OUU applied=OUU writes=354 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=OUR applied=OUR writes=283 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ORO applied=O-O writes=128 segments=19 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ORM applied=O-M writes=145 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ORU applied=O-U writes=210 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ORR applied=O-- writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MOO applied=MOO writes=199 segments=29 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MOM applied=MOM writes=216 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MOU applied=MOU writes=285 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MOR applied=MO- writes=166 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MMO applied=MMO writes=241 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MMM applied=MMM writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MMU applied=MMU writes=344 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MMR applied=MM- writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MUO applied=MUO writes=314 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MUM applied=MUM writes=348 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MUU applied=MUU writes=417 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MUR applied=MUR writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MRO applied=M-O writes=166 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MRM applied=M-M writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MRU applied=M-U writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=MRR applied=M-- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UOO applied=UOO writes=264 segments=39 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UOM applied=UOM writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UOU applied=UOU writes=350 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UOR applied=UOR writes=279 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UMO applied=UMO writes=306 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UMM applied=UMM writes=340 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UMU applied=UMU writes=409 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UMR applied=UMR writes=338 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UUO applied=UUO writes=379 segments=56 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UUM applied=UUM writes=413 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UUU applied=UUU writes=482 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=UUR applied=UUR writes=411 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=URO applied=URO writes=308 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=URM applied=URM writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=URU applied=URU writes=411 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=URR applied=URR writes=340 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ROO applied=-OO writes=128 segments=19 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ROM applied=-OM writes=145 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ROU applied=-OU writes=210 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=ROR applied=-O- writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RMO applied=-MO writes=166 segments=26 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RMM applied=-MM writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RMU applied=-MU writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RMR applied=-M- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RUO applied=-UO writes=231 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RUM applied=-UM writes=273 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RUU applied=-UU writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RUR applied=-UR writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RRO applied=--O writes=99 segments=16 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RRM applied=--M writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RRU applied=--U writes=202 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=false seq=RRR applied=--- writes=70 segments=13 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq= applied= writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=O applied=O writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=M applied=M writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=U applied=U writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=R applied=- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=OO applied=OO writes=199 segments=29 arm_a_bad=16 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OM applied=OM writes=216 segments=33 arm_a_bad=36 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OU applied=OU writes=285 segments=43 arm_a_bad=72 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OR applied=O- writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=MO applied=MO writes=241 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MM applied=MM writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MU applied=MU writes=344 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MR applied=M- writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UO applied=UO writes=314 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UM applied=UM writes=348 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UU applied=UU writes=417 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UR applied=UR writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RO applied=-O writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=RM applied=-M writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RU applied=-U writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RR applied=-- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=OOO applied=OOO writes=232 segments=32 arm_a_bad=24 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OOM applied=OOM writes=249 segments=36 arm_a_bad=44 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OOU applied=OOU writes=293 segments=43 arm_a_bad=72 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OOR applied=OO- writes=199 segments=29 arm_a_bad=16 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OMO applied=OMO writes=249 segments=36 arm_a_bad=44 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OMM applied=OMM writes=283 segments=43 arm_a_bad=72 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OMU applied=OMU writes=348 segments=53 arm_a_bad=108 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OMR applied=OM- writes=216 segments=33 arm_a_bad=36 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OUO applied=OUO writes=318 segments=46 arm_a_bad=80 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OUM applied=OUM writes=352 segments=53 arm_a_bad=108 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OUU applied=OUU writes=417 segments=63 arm_a_bad=144 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=OUR applied=OUR writes=350 segments=53 arm_a_bad=108 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ORO applied=O-O writes=199 segments=29 arm_a_bad=16 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ORM applied=O-M writes=216 segments=33 arm_a_bad=36 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ORU applied=O-U writes=285 segments=43 arm_a_bad=72 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ORR applied=O-- writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=MOO applied=MOO writes=274 segments=39 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MOM applied=MOM writes=287 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MOU applied=MOU writes=356 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MOR applied=MO- writes=241 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MMO applied=MMO writes=308 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MMM applied=MMM writes=342 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MMU applied=MMU writes=411 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MMR applied=MM- writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MUO applied=MUO writes=377 segments=56 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MUM applied=MUM writes=415 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MUU applied=MUU writes=488 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MUR applied=MUR writes=417 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MRO applied=M-O writes=241 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MRM applied=M-M writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MRU applied=M-U writes=344 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=MRR applied=M-- writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UOO applied=UOO writes=347 segments=49 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UOM applied=UOM writes=360 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UOU applied=UOU writes=429 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UOR applied=UOR writes=358 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UMO applied=UMO writes=381 segments=56 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UMM applied=UMM writes=415 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UMU applied=UMU writes=484 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UMR applied=UMR writes=413 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UUO applied=UUO writes=450 segments=66 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UUM applied=UUM writes=488 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UUU applied=UUU writes=561 segments=83 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=UUR applied=UUR writes=490 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=URO applied=URO writes=379 segments=56 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=URM applied=URM writes=413 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=URU applied=URU writes=482 segments=73 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=URR applied=URR writes=411 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=ROO applied=-OO writes=199 segments=29 arm_a_bad=16 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ROM applied=-OM writes=216 segments=33 arm_a_bad=36 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ROU applied=-OU writes=285 segments=43 arm_a_bad=72 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=ROR applied=-O- writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=RMO applied=-MO writes=241 segments=36 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RMM applied=-MM writes=275 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RMU applied=-MU writes=344 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RMR applied=-M- writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RUO applied=-UO writes=314 segments=46 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RUM applied=-UM writes=348 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RUU applied=-UU writes=417 segments=63 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RUR applied=-UR writes=346 segments=53 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RRO applied=--O writes=166 segments=26 arm_a_bad=8 full_sampled_extra_bad=104 differing_states=104
+SWEEP fault=true seq=RRM applied=--M writes=208 segments=33 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RRU applied=--U writes=281 segments=43 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP fault=true seq=RRR applied=--- writes=137 segments=23 arm_a_bad=0 full_sampled_extra_bad=0 differing_states=0
+SWEEP_TOTAL streams=170 arm_a_misses_a_red_stream=0 streams_with_any_observation_difference=27 elapsed_seconds=583.9
+test p11_user_action_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 583.91s
+

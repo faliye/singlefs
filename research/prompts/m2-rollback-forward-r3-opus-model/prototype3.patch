@@ -1,0 +1,327 @@
+--- crates/singlefs-core/src/recovery.rs
++++ crates/singlefs-core/src/recovery.rs
+@@ -879,6 +879,15 @@
+             .or_insert(root.rollback_floor);
+         *highest = (*highest).max(root.rollback_floor);
+     }
++    // 原型（m2-rollback-forward-r3 攻方腿副本）：SYSCFG 臂 = 取最大值，再与系统配置里读得出的 F 的最大值取大。
++    if PROTOTYPE_SYSCFG_MODE.load(std::sync::atomic::Ordering::SeqCst) != 0 {
++        let from_roots = highest_per_device
++            .values()
++            .copied()
++            .max()
++            .unwrap_or(CheckpointTxg(0));
++        return from_roots.max(prototype_syscfg_floor(reader));
++    }
+     // 原型（m2-rollback-forward-r2 攻方腿副本）：C419 取「各幸存盘所带 F 的最大值」那一臂。
+     if PROTOTYPE_FLOOR_RULE_MAX.load(std::sync::atomic::Ordering::SeqCst) {
+         return highest_per_device
+@@ -3089,3 +3098,135 @@
+         );
+     }
+ }
++
++// ---- 原型（m2-rollback-forward-r3 云端攻方腿副本，不是条款，被攻过零轮）：SYSCFG 臂的 F 另一份载体 ----
++// 模拟「F 另写进每块盘的两个系统配置槽」：每块盘末尾两块（4 KiB）各放一份 [magic 4 | seq 8 | F 8 | crc 4]，按 seq 轮换写较旧的那一份。
++// 不动真的系统配置槽（改它是格式改动）；读取按「读得出的份里 F 的最大值」。
++
++/// 0 = 关；1 = 抬 F 那一串在预演之后、第一次发布之前写（pre）；2 = 这一串落满每块盘之后写（post）；
++/// 3 = post，且每次可写挂载取号时把 max(F_生效, 系统配置里的 F) 写进去（post+mount）。取号时一律把已有的 F 接着写（carry）。
++pub static PROTOTYPE_SYSCFG_MODE: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
++
++pub const PROTOTYPE_SYSCFG_MAGIC: [u8; 4] = *b"SFSF";
++
++/// 第 `copy` 份（0 / 1）在一块 `size` 字节的盘上的偏移。
++#[must_use]
++pub fn prototype_syscfg_offset(size: u64, copy: u64) -> DeviceOffsetInBytes {
++    DeviceOffsetInBytes(size - 4096 * (copy + 1))
++}
++
++/// 一份读得出就交回 (seq, F)。
++#[must_use]
++pub fn prototype_syscfg_parse(bytes: &[u8]) -> Option<(u64, u64)> {
++    if bytes.len() < 24 || bytes[..4] != PROTOTYPE_SYSCFG_MAGIC {
++        return None;
++    }
++    let crc = u32::from_le_bytes(bytes[20..24].try_into().ok()?);
++    if crc32_castagnoli(&bytes[..20]) != crc {
++        return None;
++    }
++    Some((
++        u64::from_le_bytes(bytes[4..12].try_into().ok()?),
++        u64::from_le_bytes(bytes[12..20].try_into().ok()?),
++    ))
++}
++
++#[must_use]
++pub fn prototype_syscfg_bytes(seq: u64, floor: u64) -> Vec<u8> {
++    let mut bytes = vec![0u8; 4096];
++    bytes[..4].copy_from_slice(&PROTOTYPE_SYSCFG_MAGIC);
++    bytes[4..12].copy_from_slice(&seq.to_le_bytes());
++    bytes[12..20].copy_from_slice(&floor.to_le_bytes());
++    let crc = crc32_castagnoli(&bytes[..20]);
++    bytes[20..24].copy_from_slice(&crc.to_le_bytes());
++    bytes
++}
++
++/// 盘上读得出的每一份：(盘, 份, seq, F)。
++#[must_use]
++pub fn prototype_syscfg_copies<Reader: PoolReader + ?Sized>(reader: &Reader) -> Vec<(DeviceIdentity, u64, u64, u64)> {
++    let mut copies = Vec::new();
++    for device in reader.device_identities() {
++        let Some(size) = reader.device_size_in_bytes(device) else { continue };
++        for copy in 0..2 {
++            if let Some(bytes) = reader.read(device, prototype_syscfg_offset(size, copy), 512) {
++                if let Some((seq, floor)) = prototype_syscfg_parse(&bytes) {
++                    copies.push((device, copy, seq, floor));
++                }
++            }
++        }
++    }
++    copies
++}
++
++/// 系统配置里读得出的 F 的最大值（读不出一份都没有 ⇒ 0）。
++#[must_use]
++pub fn prototype_syscfg_floor<Reader: PoolReader + ?Sized>(reader: &Reader) -> CheckpointTxg {
++    CheckpointTxg(prototype_syscfg_copies(reader).iter().map(|c| c.3).max().unwrap_or(0))
++}
++
++/// 同 [`prototype_syscfg_write`]，不发屏障（跟在系统配置轮换后面，持久由之后的屏障保证）。
++///
++/// # Errors
++/// 块设备的错。
++pub fn prototype_syscfg_write_without_barrier<Device: BlockDevice>(
++    devices: &mut [(DeviceIdentity, Device)],
++    floor: CheckpointTxg,
++) -> Result<usize, crate::block_device::BlockDeviceError> {
++    let copies = prototype_syscfg_copies(&*devices);
++    let mut written = 0;
++    for (identity, device) in devices.iter_mut() {
++        let size = device.size_in_bytes();
++        let mine: Vec<&(DeviceIdentity, u64, u64, u64)> = copies.iter().filter(|c| c.0 == *identity).collect();
++        let next_seq = mine.iter().map(|c| c.2).max().unwrap_or(0) + 1;
++        let target = (0..2u64)
++            .min_by_key(|copy| mine.iter().find(|c| c.1 == *copy).map_or(0, |c| c.2))
++            .expect("两份");
++        device.write_at(
++            prototype_syscfg_offset(size, target),
++            &prototype_syscfg_bytes(next_seq, floor.0),
++            crate::block_device::WriteDurability::Plain,
++        )?;
++        written += 1;
++    }
++    PROTOTYPE_SYSCFG_WRITES.fetch_add(u64::try_from(written).expect("数"), std::sync::atomic::Ordering::SeqCst);
++    Ok(written)
++}
++
++/// 每块盘写一份（轮换到 seq 较小或读不出的那一份），之后一道屏障。交回写了几块盘。
++///
++/// # Errors
++/// 块设备的错。
++pub fn prototype_syscfg_write<Device: BlockDevice>(
++    devices: &mut [(DeviceIdentity, Device)],
++    floor: CheckpointTxg,
++) -> Result<usize, crate::block_device::BlockDeviceError> {
++    let copies = prototype_syscfg_copies(&*devices);
++    let mut written = 0;
++    for (identity, device) in devices.iter_mut() {
++        let size = device.size_in_bytes();
++        let mine: Vec<&(DeviceIdentity, u64, u64, u64)> = copies.iter().filter(|c| c.0 == *identity).collect();
++        let next_seq = mine.iter().map(|c| c.2).max().unwrap_or(0) + 1;
++        let target = (0..2u64)
++            .min_by_key(|copy| mine.iter().find(|c| c.1 == *copy).map_or(0, |c| c.2))
++            .expect("两份");
++        device.write_at(
++            prototype_syscfg_offset(size, target),
++            &prototype_syscfg_bytes(next_seq, floor.0),
++            crate::block_device::WriteDurability::Plain,
++        )?;
++        written += 1;
++    }
++    for (_, device) in devices.iter_mut() {
++        device.barrier()?;
++    }
++    PROTOTYPE_SYSCFG_BARRIERED_WRITES.fetch_add(u64::try_from(written).expect("数"), std::sync::atomic::Ordering::SeqCst);
++    PROTOTYPE_SYSCFG_WRITES.fetch_add(u64::try_from(written).expect("数"), std::sync::atomic::Ordering::SeqCst);
++    Ok(written)
++}
++
++/// 原型计数：SYSCFG 臂一共写了几份（每份 4 KiB 一块、有效载荷 24 字节）。
++pub static PROTOTYPE_SYSCFG_WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
++
++/// 原型计数：SYSCFG 臂抬 F 之前另发（带屏障）的写份数。
++pub static PROTOTYPE_SYSCFG_BARRIERED_WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+--- crates/singlefs-core/src/transaction.rs
++++ crates/singlefs-core/src/transaction.rs
+@@ -913,7 +913,19 @@
+     writer.perform(CommitStep::RotateSystemConfigurationSlots {
+         journal_tail,
+         journal_instance,
+-    })
++    })?;
++    // 原型（m2-rollback-forward-r3 攻方腿副本）：SYSCFG 臂里系统配置槽轮换时带着 F（取这条根的 F 与系统配置里已有的最大值的大者）；
++    // 模型里那 8 字节住每块盘末尾两块（`recovery::prototype_syscfg_write` 的注释），紧跟在这次轮换之后写、不另发屏障。
++    let mode = crate::recovery::PROTOTYPE_SYSCFG_MODE.load(std::sync::atomic::Ordering::SeqCst);
++    if mode == 1 || mode == 4 {
++        let root_floor = u64::from_le_bytes(root_slot[130..138].try_into().expect("8 字节"));
++        let existing = crate::recovery::prototype_syscfg_floor(&*writer.devices).0;
++        crate::recovery::prototype_syscfg_write_without_barrier(
++            writer.devices,
++            CheckpointTxg(root_floor.max(existing)),
++        )?;
++    }
++    Ok(())
+ }
+ 
+ /// 零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）：屏障 → 空记录 → 屏障 → 根槽 FUA → 系统配置槽轮换；
+--- crates/singlefs-core/src/mount.rs
++++ crates/singlefs-core/src/mount.rs
+@@ -1049,6 +1049,7 @@
+     // 「前一条」只在有效根里找：被抛弃时间线的根与 F 之下的根不算（D16（发布语义） 已定项 1「非空」从盘上怎么认）。
+     let previous_candidates: &[RootRecord] = &valid;
+     let mut non_empty: Vec<CheckpointTxg> = Vec::new();
++    let mut non_empty_pointers: Vec<(CheckpointTxg, InstanceGeneration, UserVisibleTreeRootPointers)> = Vec::new();
+     for root in &valid {
+         let previous_valid_root = previous_candidates
+             .iter()
+@@ -1064,6 +1065,20 @@
+         let root_pointers = pointers_of(root)?;
+         if user_visible_trees_changed(&root_pointers, &previous_pointers) {
+             non_empty.push(root.checkpoint_txg);
++            non_empty_pointers.push((root.checkpoint_txg, root.instance, root_pointers));
++        }
++    }
++    // 原型（m2-rollback-forward-r3 攻方腿副本）：K3 的去重——从新到旧数非空根，一条只有在它的 (inode, extent) 根指针与每一条更新的、
++    // 已计入的根都不同时才计入。
++    if PROTOTYPE_CEILING_DEDUP.load(std::sync::atomic::Ordering::SeqCst) {
++        non_empty_pointers.sort_by(|a, b| (b.0, b.1).cmp(&(a.0, a.1)));
++        let mut counted: Vec<UserVisibleTreeRootPointers> = Vec::new();
++        non_empty.clear();
++        for (txg, _, pointers) in &non_empty_pointers {
++            if counted.iter().all(|seen| user_visible_trees_changed(pointers, seen)) {
++                counted.push(pointers.clone());
++                non_empty.push(*txg);
++            }
+         }
+     }
+     Ok(
+@@ -1255,6 +1270,12 @@
+             );
+         }
+     };
++    // 原型（m2-rollback-forward-r3 攻方腿副本）：SYSCFG 臂的 pre 那一读——预演过了、第一次发布之前，把新 F 写进每块盘的系统配置（带屏障）。
++    if crate::recovery::PROTOTYPE_SYSCFG_MODE.load(std::sync::atomic::Ordering::SeqCst) == 1 {
++        let existing = crate::recovery::prototype_syscfg_floor(&*pool.devices);
++        crate::recovery::prototype_syscfg_write(pool.devices, new_floor.max(existing))
++            .expect("原型：内存盘上写系统配置里的 F 不报错");
++    }
+     let mut publishes = Vec::new();
+     // 迭代上界是预演过的次数（至多根环区域数）；跨轮携带的是现行那一版（下一次的计划接着它）。
+     for planned_txg in &planned_txgs {
+@@ -3233,3 +3254,6 @@
+     }
+ }
+ include!("prototype_rbf2.rs");
++
++/// 原型（m2-rollback-forward-r3 攻方腿副本）：真 ⇒ 抬 F 的上限按 K3 的去重数「第 4 新的非空根」。
++pub static PROTOTYPE_CEILING_DEDUP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+--- crates/singlefs-core/src/prototype_rbf2.rs
++++ crates/singlefs-core/src/prototype_rbf2.rs
+@@ -15,6 +15,11 @@
+     WatermarkOfNewestOnly,
+     /// 候选集不按实例表判仍然有效。
+     WithoutTableValidityCheck,
++    /// m2-rollback-forward-r3 正文 K1 的式子照字面：释放 = 现行账里仍分配 ∧ 不在新根的走读集合里（全部落点，不只用户可见的）；
++    /// 复活 = R_old 的用户可见落点里现行账记作已释放的（没有核）；inode 号水位只取环里读得出的根的 max（不另取现行那一版内存里的）。
++    Formula,
++    /// 同 `Formula`，候选不按现行那一版的实例表判仍然有效（K2 关掉那一判）。
++    FormulaWithoutTableValidityCheck,
+ }
+ 
+ /// 原型的拒绝。
+@@ -51,6 +56,10 @@
+     pub inode_watermark_of_newest: u64,
+     pub inode_watermark_of_the_ring: u64,
+     pub target_allocation_record_tree_nodes: u64,
++    /// 现行那一版的账里仍分配、而现行那一版自己不引用的落点（孤儿）：式子会释放它们，按用户可见单元求差的不会。
++    pub orphans_allocated_not_referenced: u64,
++    /// 复活那一步碰到的「现行账已释放、而且已回收」的落点（式子照字面要改回仍分配；原型只计数、跳过）。
++    pub formula_revive_reclaimed: u64,
+ }
+ 
+ /// 用户可见树那一族的角色：数据单元、extent 树、inode 树。
+@@ -161,7 +170,10 @@
+     let table = instance_table_chain_of_root(&*devices, &current.root)
+         .map_err(|_unreadable_or_malformed| MountError::InstanceTableMalformed)?
+         .records;
+-    if arm != Rbf2Arm::WithoutTableValidityCheck && abandoned_by_table(&target_root, &table) {
++    if arm != Rbf2Arm::WithoutTableValidityCheck
++        && arm != Rbf2Arm::FormulaWithoutTableValidityCheck
++        && abandoned_by_table(&target_root, &table)
++    {
+         return Err(Rbf2Error::OnAbandonedTimeline);
+     }
+     let records = scan_journal(&*devices, &system_configuration);
+@@ -235,9 +247,13 @@
+         }
+     }
+     if arm != Rbf2Arm::WatermarkOfNewestOnly {
+-        let watermark = counts
+-            .inode_watermark_of_newest
+-            .max(counts.inode_watermark_of_the_ring);
++        let watermark = if matches!(arm, Rbf2Arm::Formula | Rbf2Arm::FormulaWithoutTableValidityCheck) {
++            counts.inode_watermark_of_the_ring
++        } else {
++            counts
++                .inode_watermark_of_newest
++                .max(counts.inode_watermark_of_the_ring)
++        };
+         for entry in &mut hybrid.accounting_entries {
+             if entry.statistic == crate::records::STATISTIC_INODE_WATERMARK {
+                 entry.value = watermark;
+@@ -259,7 +275,8 @@
+         .filter(|record| record.device == first_device && !record.is_released)
+         .map(|record| (record.slot.0, (record.span_slots, record.generation)))
+         .collect();
+-    let check = arm != Rbf2Arm::WithoutProtectionCheck;
++    let formula = matches!(arm, Rbf2Arm::Formula | Rbf2Arm::FormulaWithoutTableValidityCheck);
++    let check = arm != Rbf2Arm::WithoutProtectionCheck && !formula;
+     let record_now = |working: &PoolAllocator, slot: u64| {
+         working
+             .records()
+@@ -319,6 +336,7 @@
+                     .iter()
+                     .any(|device| working.prototype_is_reclaimed(device.device, SlotNumber(*slot)));
+                 if reclaimed {
++                    counts.formula_revive_reclaimed += 1;
+                     if check {
+                         return Err(Rbf2Error::TargetUnitNotProtected {
+                             slot: SlotNumber(*slot),
+@@ -356,6 +374,26 @@
+             }
+         }
+     }
++    // 孤儿：现行那一版的账里仍分配、现行那一版不引用的落点。
++    {
++        let referenced_by_current: BTreeSet<u64> = current.units.iter().map(|unit| unit.slot.0).collect();
++        let orphans: Vec<AllocationRecord> = working
++            .records()
++            .iter()
++            .filter(|record| record.device == first_device && !record.is_released)
++            .filter(|record| !referenced_by_current.contains(&record.slot.0) && !old_user_slots.contains(&record.slot.0))
++            .copied()
++            .collect();
++        counts.orphans_allocated_not_referenced = u64::try_from(orphans.len()).expect("数");
++        if formula {
++            for record in orphans {
++                working.release(
++                    Placement { slot: record.slot, span: u64::from(record.span_slots) },
++                    rollback_txg,
++                );
++            }
++        }
++    }
+     let tree_identifier_watermark = highest_tree_identifier_watermark_in_the_ring(
+         &*devices,
+         &system_configuration.immutable.region_devices,

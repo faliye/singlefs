@@ -1,0 +1,69 @@
+臂 rows0 | S4u | S4c | S4bu | S4bc（各盘宽求和）
+P1 360 | 0 | 41 | 0 | 0
+P1 363 | 0 | 44 | 0 | 0
+P1 364 | 0 | 42 | 0 | 0
+P1 365 | 0 | 44 | 0 | 0
+P1 366 | 0 | 56 | 0 | 0
+P1 367 | 0 | 44 | 0 | 0
+P1 368 | 0 | 44 | 0 | 0
+P1 369 | 0 | 25 | 0 | 1
+P1 370 | 0 | 30 | 0 | 0
+P2 360 | 0 | 0 | 0 | 3
+P2 363 | 0 | 0 | 0 | 4
+P2 364 | 0 | 0 | 0 | 2
+P2 365 | 0 | 0 | 0 | 1
+P2 366 | 0 | 0 | 0 | 4
+P2 367 | 0 | 0 | 0 | 3
+P2 368 | 0 | 0 | 0 | 3
+P2 369 | 0 | 0 | 0 | 3
+P2 370 | 0 | 0 | 0 | 3
+P3 360 | 0 | 0 | 0 | 1
+P3 363 | 0 | 0 | 0 | 1
+P3 364 | 0 | 0 | 0 | 1
+P3 365 | 0 | 0 | 0 | 0
+P3 366 | 0 | 8 | 0 | 0
+P3 367 | 0 | 0 | 0 | 0
+P3 368 | 0 | 0 | 0 | 0
+P3 369 | 0 | 0 | 0 | 0
+P3 370 | 0 | 0 | 0 | 0
+P3pl 360 | 0 | 0 | 0 | 1
+P3pl 363 | 0 | 0 | 0 | 1
+P3pl 364 | 0 | 0 | 0 | 1
+P3pl 365 | 0 | 0 | 0 | 0
+P3pl 366 | 0 | 15 | 0 | 0
+P3pl 367 | 0 | 0 | 0 | 0
+P3pl 368 | 0 | 0 | 0 | 0
+P3pl 369 | 0 | 0 | 0 | 0
+P3pl 370 | 0 | 0 | 0 | 0
+T 360 | 0 | 2 | 0 | 2
+T 363 | 0 | 3 | 0 | 0
+T 364 | 0 | 3 | 0 | 0
+T 365 | 0 | 3 | 0 | 1
+T 366 | 0 | 4 | 0 | 1
+T 367 | 0 | 3 | 0 | 0
+T 368 | 0 | 3 | 0 | 1
+T 369 | 0 | 2 | 0 | 2
+T 370 | 0 | 1 | 0 | 3
+推行数时就被拒 / 没推到的格：
+   E7 slots=240 arm=T 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=240 arm=T target=360 没推到 rows0=0
+   E7 slots=240 arm=P1 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=240 arm=P1 target=360 没推到 rows0=0
+   E7 slots=240 arm=P2 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=240 arm=P2 target=360 没推到 rows0=0
+   E7 slots=240 arm=P3 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=240 arm=P3 target=360 没推到 rows0=0
+   E7 slots=240 arm=P3pl 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=240 arm=P3pl target=360 没推到 rows0=0
+   E7 slots=256 arm=T 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=256 arm=T target=360 没推到 rows0=0
+   E7 slots=256 arm=P1 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=256 arm=P1 target=360 没推到 rows0=0
+   E7 slots=320 arm=T 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=320 arm=T target=360 没推到 rows0=0
+   E7 slots=320 arm=P1 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=320 arm=P1 target=360 没推到 rows0=0
+   E7 slots=384 arm=T 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=384 arm=T target=360 没推到 rows0=0
+   E7 slots=384 arm=P1 推行数时挂载被拒 rows0=0 SARBA
+   E7 slots=384 arm=P1 target=360 没推到 rows0=0

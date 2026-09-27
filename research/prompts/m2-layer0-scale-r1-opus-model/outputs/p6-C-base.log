@@ -1,0 +1,23 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m2-layer0-scale-r1-opus/repo/crates/singlefs-harness)
+warning: variable does not need to be mutable
+   --> crates/singlefs-harness/tests/opus_scale_probe.rs:329:9
+    |
+329 |     let mut result = SegmentComparison { segment_index, in_place: in_place.len(), cow: n, compared: 0, differing: 0, differing_verd...
+    |         ----^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "opus_scale_probe") generated 1 warning (run `cargo fix --test "opus_scale_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.45s
+     Running tests/opus_scale_probe.rs (target/release/deps/opus_scale_probe-40861f65b3722f0c)
+
+running 1 test
+STREAM C writes=166 segments=26 sizes=[2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 4, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 2] closed_form=202113075 reduced_closed_form=78
+KINDS C [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×4] [unit_write×18] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×16] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2,unit_write×24] [journal_record×2] [root_record_fua×1] [system_configuration_slot×2]
+ARMS C arm_a_states=78 arm_a_bad=0 arm_a2_states=93 arm_a2_bad=0 full_sampled_cow_states=1561 full_sampled_bad_beyond_arm_a=0
+test p6_three_arms_on_fixed_scripts_and_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 2.12s
+

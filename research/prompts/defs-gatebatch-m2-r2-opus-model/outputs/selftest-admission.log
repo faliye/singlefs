@@ -1,0 +1,168 @@
+  ✓ 老产物没有指纹行时放行并报判不了
+  ✓ 放行时产物头第一行是带键的输入指纹
+  ✓ 输入没变时拒绝（退 77、stdout 为空、出路写强制开关）
+  ✓ 弄坏开关 skip-unchanged 下「输入没变」那一格红（放行了）
+  ✓ 改一个输入字节就放行并报变了
+  ✓ 字节写回原样又判没变
+  ✓ 登记目录下新加一个未跟踪文件就放行
+  ✓ 强制开关带理由时放行、理由原样进产物头
+  ✓ 强制开关理由为空时退 2
+  ✓ 前提没齐时拒绝（退 3）并点名那一行
+  ✓ 弄坏开关 skip-preconditions 下「前提没齐」那一格红（放行了）
+  ✓ 前提齐了放行，且别的键的同一个指纹不算数
+  ✓ 产物判决字段不是要的值时拒绝（退 3）
+  ✓ 问题单判的是另一个候选时拒绝（退 3）
+  ✓ 没登记的实验键退 2
+  ✓ 登记的路径列不出文件时退 2
+  ✓ 登记的路径罩住 research/results/ 或 replay.sh 时退 2（新产物一存进来指纹就对不上自己）
+  ✓ 认不出的准入条件退 2
+  ✓ 登记表自查点得出认不出的条件
+  ✓ 登记行改了就放行（登记行本身进指纹）
+  ✓ 产物指纹对得上时状态是 matched
+  ✓ 输入变了时状态是 stale
+  ✓ 没有一份带这个键指纹的产物时状态是 unfingerprinted
+  ✓ 没登记的键状态是 unregistered
+  ✓ 清单与另算的一遍（sha256sum、sort -zu、cargo -V && rustc -V）逐字节相同
+  ✓ 门禁复用判定出异常时 stage-must-run.sh 判要跑
+  ✓ 门禁前提都齐时退 0、stdout 一个字不打
+  ✓ 门禁前提 command= 缺了判红（退 1）：点名那个可执行名，带出路与那一行的注释
+  ✓ 弄坏开关 skip-gate-preconditions 下「前提没齐」那一格红（放行了）
+  ✓ 门禁前提 readwrite= 不可写判红（退 1）并点名那个路径（以 root 跑这一格判不出）
+  ✓ 门禁前提 probe= 退非 0 判红（退 1），明细带出探针自己打的那几行
+  ✓ 登记表里没有那一道时退 2，照样打 ✗ 与出路
+  ✓ 自查点得出门禁行写实验的种类、实验行写门禁的种类、probe= 指的脚本不在
+  ✓ 登记了 environment= 的门禁，输入相同而环境没记下时判要跑
+  ✓ 不是 gate-staged.sh 起的（没有 SINGLEFS_STAGED_TREE）不记环境、一个字不打
+  ✓ 判绿之后记下环境：打一行「·」，记录落在 git common-dir
+  ✓ 输入与环境都没变时判可跳过，依据句带出 herd7 的版本
+  ✓ herd7 的版本变了判要跑，依据句带出记下的与现在的两个版本
+  ✓ 弄坏开关 ignore-gate-environment 下「版本变了」那一格红（判成可跳过）
+  ✓ herd7 不在时环境取不出来，判要跑
+  ✓ herd7 不在时 gate-preconditions 判红（退 1），明细带出探针打的那一行
+  ✓ 环境相同、但记下环境的那一趟判的是另一批输入时判要跑
+  ✓ 在这一批输入上重新记下环境之后又判可跳过
+  ✓ 登记目录底下的中文文件名没变时判可跳过
+  ✓ 登记的路径本身是中文、没变时判可跳过
+  ✓ 登记目录底下的中文文件改了判要跑，依据句里是原样的中文路径（不是八进制转义）
+  ✓ 登记的路径本身是中文、改了判要跑
+  ✓ replay.sh：老产物没有产物头、新跑的有，比对前删掉产物头之后判字节一致
+  ✓ 弄坏 replay.sh 比对前删产物头那一步（换成 cat）判对不上：上一格分得出差别
+  ✓ replay.sh：留存产物头上的指纹与今天的输入相同时判「输入没变」、装置一次都没跑、汇总报没跑 1 行
+  ✓ replay.sh：前提没齐时判跑不了（准入退 3）、装置一次都没跑
+  ✓ replay.sh：登记了准入、装置却没打指纹行时判跑不了
+  ✓ 构建环境：加一份仓根往上一层的 .cargo/config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 .cargo/config，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根自己的 .cargo/config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份CARGO_HOME 下的 config.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份CARGO_HOME 下的 config，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 rust-toolchain，指纹变；删掉又回到原样
+  ✓ 构建环境：加一份仓根往上一层的 rust-toolchain.toml，指纹变；删掉又回到原样
+  ✓ 构建环境：设了环境变量 RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_ENCODED_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_BUILD_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS，指纹变
+  ✓ 构建环境：设了环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER，指纹变
+  ✓ 构建环境：设了环境变量 RUSTC_WRAPPER，指纹变
+  ✓ 构建环境：设了环境变量 RUSTC_WORKSPACE_WRAPPER，指纹变
+  ✓ 构建环境：只设 CARGO_BUILD_JOBS（编译并行度，包装会设它），指纹不变
+  ✓ 构建环境：RUSTC 设了指纹变；同一个 RUSTC 的 -V 变了，指纹也变
+  ✓ 登记路径下指向目录的符号链接：链接指向的目录里的文件改了，指纹变
+  ✓ 弄坏开关 ignore-linked-directories 下「链接那头改了」那一格红（指纹不变）
+  ✓ 弄坏开关 skip-build-environment 下「上一层的 .cargo/config.toml」那一格红（指纹不变）
+  ✓ 构建环境：环境变量 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER（值带参数）指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：环境变量 RUSTC_WRAPPER指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：环境变量 CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER（不带斜杠、在 PATH 里找）指的程序换了内容、值不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 target.<三元组>.runner指的程序换了内容、配置原文不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 build.rustc-wrapper（从 .cargo 所在的那一层起的相对路径）指的程序换了内容、配置原文不变，指纹变
+  ✓ 构建环境：仓根 .cargo/config.toml 里 build.rustc 指的编译器 -V 变了、配置原文不变，指纹变
+  ✓ 构建环境：配置文件与环境变量都拿掉之后，指纹回到原样
+  ✓ 实验的输入指纹同样带构建环境：设了 RUSTFLAGS，产物头的指纹变
+  ✓ 去注释找点名：行注释里提到不算
+  ✓ 去注释找点名：可嵌套的块注释里提到不算
+  ✓ 去注释找点名：文档注释里提到不算
+  ✓ 去注释找点名：mod 声明算
+  ✓ 去注释找点名：字符串里的路径算
+  ✓ 去注释找点名：字符串里带 // 之后的代码照样算
+  ✓ 去注释找点名：原始字符串里带引号之后的代码照样算
+  ✓ 去注释找点名：字符字面量是双引号之后的代码照样算
+  ✓ 去注释找点名：生命周期之后的代码照样算
+  ✓ 去注释找点名：转义的单引号字符之后的代码照样算
+  ✓ 去注释找点名：更长的名字里含它不算（按整词）
+  ✓ crash-cases 逐条打「键、包、测试目标、用例函数」
+  ✓ 减去的恰好是没被代码点名的 other_target.rs（注释里提到不算）；被 mod 点名的、被字符串点名的、共用的 common/ 与用例自己都留着
+  ✓ 崩溃枚举用例的输入：改别的测试目标独占的 other_target.rs，指纹不变
+  ✓ 崩溃枚举用例的输入：新加一个没人点名的测试目标 new_unrelated.rs，指纹不变
+  ✓ 崩溃枚举用例的输入：改被用例 mod 点名的 helper_target.rs，指纹变
+  ✓ 崩溃枚举用例的输入：改被 lib.rs 里的字符串点名的 string_named.rs，指纹变
+  ✓ 崩溃枚举用例的输入：改共用的 tests/common/mod.rs，指纹变
+  ✓ 崩溃枚举用例的输入：新加一份与 common/mod.rs 并存的 tests/common.rs（用例写着 mod common），指纹变
+  ✓ 崩溃枚举用例的输入：改 src/lib.rs，指纹变
+  ✓ 弄坏开关 exclude-mentioned-test-targets 下「改被 mod 点名的 helper_target.rs」那一格红（指纹不变）
+  ✓ 包里有 build.rs 时这个包的测试文件一份都不减（指纹变、减去 0 个）
+  ✓ 改了这条用例登记行的第三列，指纹变
+  ✓ crash-cases 自查：用例函数在测试目标里找不到，退 2 并说出来
+  ✓ crash-cases 自查：测试目标不在，退 2 并说出来
+  ✓ crash-cases 自查：包不是工作区成员，退 2 并说出来
+  ✓ crash-cases 自查：test= 写了两条，退 2 并说出来
+  ✓ crash-cases 自查：exhaustive= 点名的前缀没登记成 count-line=，退 2 并说出来
+  ✓ crash-cases 自查：认不出的条件，退 2 并说出来
+  ✓ crash-cases 自查：同一个键两行，退 2 并说出来
+  ✓ crash-cases 自查：用例函数没标 #[ignore] ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：只有 cfg_attr 里的条件 ignore ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 挂在前一个函数上 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 只写在注释里 ⇒ 退 2 并说没标 #[ignore]
+  ✓ crash-cases 自查：#[ignore] 在 #[test] 前面、fn 前面有 pub ⇒ 退 0
+  ✓ crash-cases 自查：ignore 的理由里带方括号、引号与 // ⇒ 退 0
+  ✓ 崩溃枚举用例的输入：用例里 include!(concat!("other_", "target.rs"))，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：别的包的 build.rs 按目录读 ../pkg/tests，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：别的包 package.build 指的构建脚本按目录读 tests，改 other_target.rs 指纹变
+  ✓ 崩溃枚举用例的输入：对照：别的包的 build.rs 不读 tests，改 other_target.rs 指纹不变
+  ✓ 崩溃枚举用例的输入：crates/mutations.tsv 加一行（没有代码点名它），指纹不变
+  ✓ 崩溃枚举用例的输入：lib.rs 的字符串里点名 mutations.tsv 时，crates/mutations.tsv 加一行，指纹变
+  ✓ 崩溃枚举用例的输入：src/bin/tool.rs 改了（没有代码读 CARGO_BIN_EXE_），指纹不变
+  ✓ 崩溃枚举用例的输入：用例读 CARGO_BIN_EXE_tool 时，src/bin/tool.rs 改了，指纹变
+  ✓ 崩溃枚举用例的输入：lib.rs 用 #[path = "bin/tool.rs"] 把它编进来时，src/bin/tool.rs 改了，指纹变
+  ✓ 崩溃枚举用例的输入：按宽处理与读不到的那几格改回之后，指纹回到原样
+  ✓ crash-case-record 写的那一格，crash-case-marker-check 判作数并带出计数行
+  ✓ 输入变了的那一批没有自己那一格：不作数，并比出与最近写的一格不同的是哪个文件
+  ✓ 全绿标记记的指纹被改了：不作数并说出来
+  ✓ 全绿标记计数行不带 exhaustive=true：不作数并说出来
+  ✓ 全绿标记计数行抄了两遍：不作数并说出来
+  ✓ 全绿标记test result 不是 1 passed：不作数并说出来
+  ✓ 判 --full 日志：全量、32 个线程跑了 64 片 ⇒ 绿
+  ✓ 判 --full 日志：全部 64 片从进度文件读回、起 0 个线程 ⇒ 绿
+  ✓ 判 --full 日志：读回 63 片、只剩 1 片要跑、起 1 个线程 ⇒ 绿
+  ✓ 判 --full 日志：跑了 64 片却只起 1 个线程（本机 32 核、线程数没显式设） ⇒ 红
+  ✓ 判 --full 日志：跑了 64 片只起 1 个线程，线程数显式设成 1 ⇒ 绿
+  ✓ 判 --full 日志：跑了 64 片只起 1 个线程，本机只有 1 核 ⇒ 绿
+  ✓ 判 --full 日志：跑了 5 片却报起了 0 个线程 ⇒ 红
+  ✓ 判 --full 日志：读回的片 + 这一趟跑的片 ≠ 总片数 ⇒ 红
+  ✓ 判 --full 日志：LAYER0_PARALLEL_FINISHED 缺续跑片数（旧格式） ⇒ 红
+  ✓ 判 --full 日志：没有状态数对得上的 LAYER0_PARALLEL_FINISHED ⇒ 红
+  ✓ 判 --full 日志：过滤之后一条用例都没跑（0 passed） ⇒ 红
+  ✓ 判 --full 日志：没有 test result 行 ⇒ 红
+  ✓ 判 --full 日志：不是全量（exhaustive=false） ⇒ 红
+  ✓ 判 --full 日志：LAYER0 计数行抄了两遍 ⇒ 红
+  ✓ 判 --full 日志：没有 CHECKER 行 ⇒ 红
+  ✓ 弄坏开关 threads-by-worker-count 下「只剩 1 片要跑、起 1 个线程」那一格红（照旧只看 worker_threads=1）
+  ✓ 54 号 --full 头一趟：三条用例在 release 下逐条跑（--include-ignored --exact 各自的用例函数），各写一格标记
+  ✓ 54 号 --full 设续跑的环境变量：进度目录 <common-dir>/singlefs-layer0-progress/<这条用例的指纹>、输入指纹是这条用例的；调用方环境里的 SINGLEFS_LAYER0_START_OVER=1 在不带 --start-over 时被清掉
+  ✓ 54 号快档：两条流跑不标 ignored 的用例，三条用例的标记都作数，判绿
+  ✓ 54 号 --full 第二趟：输入没变，三条全复用、一条都不跑
+  ✓ 54 号 --full：只改了 case_c 独占的测试文件，只重跑 case_c，另两条复用
+  ✓ 54 号快档：删掉 stream-b 那一格标记就判红，点名 crash-case:stream-b，出路是 --full
+  ✓ 54 号 --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格
+  ✓ 54 号 --start-over 不带 --full：退 2，说只跟 --full 一起用
+  ✓ 54 号 --full：这批输入那一格在而不作数就重跑，重跑判红时删掉那一格（先绿后红，前一趟的不再作数）
+  ✓ 54 号 --full：stream-b 跑了 64 片却只起 1 个线程 ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-b 过滤之后一条用例都没跑（0 passed） ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-b cargo test 退非 0 ⇒ 这一条判红、不写标记，退 1
+  ✓ 54 号 --full：stream-a 判红之后接着跑下一条，stream-b 与 case-c 照样判绿、写标记
+  ✓ 54 号 --full：跑的过程中共用的 src/lib.rs 被改了 ⇒ 那一条判红、不写标记，出路里列出变了的文件
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改登记表（stream-b 那一行第三列去掉 threads=LAYER0B） ⇒ 照样核标记，判红并点名 crash-case:stream-b，不退 77
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改 54 号（加一行注释） ⇒ 照样核标记，判红并点名 crash-case:stream-a、crash-case:stream-b、crash-case:case-c，不退 77
+  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改准入模块（加一行注释） ⇒ 照样核标记，判红并点名 crash-case:stream-a、crash-case:stream-b、crash-case:case-c，不退 77
+  ✓ 真仓的登记表 .claude/gate.d/stage-inputs.tsv 自查没有问题
+  ✓ admission.py 自证通过：167 格都对（含弄坏开关 skip-unchanged、skip-preconditions、skip-gate-preconditions、ignore-gate-environment、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count 下各自那一格转红，弄坏 replay.sh 比对前删产物头那一步判对不上）

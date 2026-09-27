@@ -1,0 +1,10 @@
+[
+ {"id": "A1", "hook": "ask", "command": "F1/F4：2 处一定都要改，要不要先改 F1？"},
+ {"id": "A2", "hook": "ask", "command": "54/55：2 道一定要带前缀，要不要一起改？"},
+ {"id": "A3", "hook": "ask", "command": "K1/K2：2 格一定都中，要不要交用户？"},
+ {"id": "A4", "hook": "ask", "command": ".claude/kb/experiments/05-nonce唯一性×崩溃点重放.md:12 写着这一格一定不变，要不要回看？"},
+ {"id": "A5", "hook": "ask", "command": ".claude/kb/experiments/116-打包容器的账·补元数据写与整理策略.md:3 写着它一定为 0，要不要回看？"},
+ {"id": "A6", "hook": "ask", "command": ".gitignore:12 写着 memory-peaks.tsv 一定不进 git，要不要改？"},
+ {"id": "A7", "hook": "ask", "command": "research/prompts/m2-newq-r1-opus-model/out/mmm-off(today).tsv:3 那一行一定是 0，要不要重跑？"},
+ {"id": "A8", "hook": "ask", "command": "records/2026-09-16-subagent拆分提案.md:40 写着这一件一定要交 SOP 会话，要不要现在交？"}
+]

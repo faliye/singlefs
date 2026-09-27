@@ -1,0 +1,1 @@
+  ✓ lib_heavy_tests 自检通过（查了 109 种：cargo 与包装过的命令行 41 种、/usr/bin/time、flock、systemd-run 这一类包在外面的 19 种、直接执行的测试二进制 18 种、按名字判的脚本 5 种、跑不跑编译出来的代码 26 种）

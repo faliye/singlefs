@@ -1,0 +1,34 @@
+MEASURE admission.py 全文 3194 行；闭包 37 个定义、365 行（11%）；自证从第 1944 行起到文件尾共 1251 行
+MEASURE 闭包里的名字：BREAK_VARIABLE COUNT_LINE_PREFIX_FORM CRASH_CASE_CONDITION_FORM CRASH_CASE_KEY_FORM CRASH_CASE_KEY_PREFIX CRASH_CASE_MARKER_PREFIX CRASH_CASE_TEST_FORM CrashCase EXIT_REGISTRATION_ERROR InputManifestError LAYER0_PARALLEL_FINISHED_PREFIX MARKER_DIFFERENCES_LISTED_AT_MOST PASSED_ONE_TEST_FORM REGISTRATION_TABLE RegistrationError RegistrationRow break_is_set check_crash_case_marker command_crash_case_judge command_crash_case_marker_check command_crash_case_record crash_case_marker_path crash_case_marker_problems crash_case_of_key crash_cases_of fields_of_line git_common_directory git_output judge_crash_case_log judge_worker_threads manifest_differences option_values parse_crash_case read_crash_case_marker read_registration_rows rows_of_key write_crash_case_marker
+COST	holds	V1 实验准入：admit_experiment 里加一行注释 ⇒ 判法摘要应当不变	判法摘要没变；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+COST	holds	V2 门禁复用：gate_reuse 的一句说明改字 ⇒ 判法摘要应当不变	判法摘要没变；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+COST	holds	V3 自证：run_selftest 里加一行注释 ⇒ 判法摘要应当不变	判法摘要没变；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+COST	holds	V4 排除规则：files_crash_cases_do_not_read 改一句（输出的清单变了会自己进指纹） ⇒ 判法摘要应当不变	判法摘要没变；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+CONTROL	holds	V5 判法：judge_worker_threads 把「至少两片」改成「至少三片」 ⇒ 判法摘要应当变	判法摘要变了；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+CONTROL	holds	V6 判法调的小函数：fields_of_line 改写法 ⇒ 判法摘要应当变	判法摘要变了；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+CONTROL	holds	V7 判法用的常量：PASSED_ONE_TEST_FORM 放宽 ⇒ 判法摘要应当变	判法摘要变了；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+CONTROL	holds	V8 登记行怎么读：parse_crash_case 不再要求 exhaustive= 先登记成 count-line= ⇒ 判法摘要应当变	判法摘要变了；整份 admission.py 的哈希（Y1 进指纹的那一份）变了
+MEASURE 改法之前的备份 /tmp/claude-1000/gate-batch-m2-r1-fixes/backup/research/scripts/admission.py：判法摘要 0f18d61a0a890957…，今天 0f18d61a0a890957…，相同；闭包名字差：多 [] 少 []
+HUNK 新文件第 21–23 行：闭包外（模块级文字 / 文件头）
+HUNK 新文件第 33–38 行：闭包外（模块级文字 / 文件头）
+HUNK 新文件第 62–62 行：闭包外（模块级文字 / 文件头）
+HUNK 新文件第 96–103 行：闭包外（模块级文字 / 文件头）
+HUNK 新文件第 152–162 行：闭包外（ATTRIBUTE_START、BIN_EXECUTABLE_VARIABLE_PREFIX、COMPILE_TIME_CONCATENATED_INCLUDE、CRASH_CASE_FILES_NOT_READ、FUNCTION_QUALIFIER_AT_END、IGNORE_ATTRIBUTE_FORM）
+HUNK 新文件第 172–178 行：闭包外（BUILD_ENVIRONMENT_COMPILER_VARIABLES、BUILD_ENVIRONMENT_PROGRAM_VARIABLES、BUILD_ENVIRONMENT_PROGRAM_VARIABLE_FORMS、CONFIGURATION_PROGRAM_BUILD_KEYS）
+HUNK 新文件第 458–460 行：闭包外（build_environment_lines）
+HUNK 新文件第 471–541 行：闭包外（build_environment_lines、compiler_version、configured_program_lines、program_contents、resolved_program）
+HUNK 新文件第 1043–1052 行：闭包外（模块级文字 / 文件头）
+HUNK 新文件第 1137–1169 行：闭包外（crash_case_test_files、test_target_source_files）
+HUNK 新文件第 1199–1204 行：闭包外（rust_code_without_comments）
+HUNK 新文件第 1212–1307 行：闭包外（attribute_spans、attributes_before_function、attributes_mark_ignored、end_of_literal、test_function_is_marked_ignored）
+HUNK 新文件第 1315–1315 行：闭包外（test_targets_of_package）
+HUNK 新文件第 1330–1361 行：闭包外（build_script_names、listed_code_texts、package_directories_among、package_keeps_every_test_file、package_prefix）
+HUNK 新文件第 1371–1420 行：闭包外（files_crash_cases_do_not_read、files_exclusive_to_other_test_targets、listed_code_texts）
+HUNK 新文件第 1429–1433 行：闭包外（crash_case_manifest）
+HUNK 新文件第 2558–2593 行：闭包外（run_build_environment_cells）
+HUNK 新文件第 2738–2821 行：闭包外（run_crash_case_input_cells）
+HUNK 新文件第 2952–2953 行：闭包外（run_layer0_stage_cells）
+HUNK 新文件第 3016–3016 行：闭包外（run_layer0_stage_cells）
+HUNK 新文件第 3112–3142 行：闭包外（run_layer0_stage_cells）
+MEASURE 附录二 admission.py 的 21 个 hunk：落在判法闭包里 0 个，闭包外 21 个
+SUMMARY K4 窄的判法摘要: cells=8 attack_cells_broken=0 control_cells_broken=0

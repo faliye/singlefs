@@ -1,0 +1,8 @@
+d7edba6bad3f04b0ad7192a1a7c935e8de3f263c54b53a7613c63a441da45704  ./crash-sector-wise.patch
+c967f8b3137f354dc3a0b2383f26879c03dd01f5a8d10c35653cdcfc0f8192c2  ./n1_sonnet_probe.rs
+1b593570348a1885d1a2db7f0c4d35b0e3fac01d4b8ec1d5c370f8e2402729b7  ./outputs/n12-150-seed53-patched.log
+c1075fecfc4eb7ad749ec89582e8510b6c98393833bc5da2ec8bd1e28f0c1cfa  ./outputs/n13-sigma-full-and-arm-a2-patched.log
+220bbda117592ae9095b40fc8fdba3cedcb74d2aafe87a88b087de987f79b7cf  ./outputs/q10-forced-zero-reuse-window-patched.log
+a5d37a6930ed39ec6107461f4a3db3a8db0d2980670e3fb9380eb05d76f2017c  ./outputs/q1-120-seed11-patched.log
+1036f62bb9b0e9cb4066e257cf77690725d58b04674ad6d339e6af74f5f32c16  ./outputs/q9-baseline-unpatched.log
+6fdcd60111a6526bc37657e7d78fefa0f00be28245af1542f22df58eae033af7  ./rerun.sh

@@ -1,0 +1,2 @@
+RBF2 g1_sweep totals={"histories": 2400, "other_bad_roots": 0, "released_sum": 19833, "remounts": 972, "revived_sum": 20694, "rollback_done": 5316, "rollback_to_instance_1": 1772, "rollbacks_with_revive": 4688}
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 567.76s

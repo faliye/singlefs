@@ -1,0 +1,33 @@
+[
+ {
+  "id": "H35",
+  "hook": "heavy",
+  "agent": "gate-triage",
+  "command": "bash .claude/scripts/env.sh"
+ },
+ {
+  "id": "H36",
+  "hook": "heavy",
+  "agent": "implementation-writer",
+  "command": "nice -n 19 bash .claude/gate.d/15-research-build.sh"
+ },
+ {
+  "id": "H37",
+  "hook": "heavy",
+  "agent": "three-way-attack",
+  "command": "bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test attack_model_crash_points"
+ },
+ {
+  "id": "H38",
+  "hook": "heavy",
+  "agent": "crash-verifier",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/59-crates-mutation-replay.sh"
+ },
+ {
+  "id": "B11",
+  "hook": "detector",
+  "agent": "three-way-attack",
+  "rib": true,
+  "command": "RUN_WITH_MEMORY_CAP_TIME_LIMIT=600 nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test attack_model_batch > /tmp/claude-1000/defs-m2-closeout-r1-opus/batch1.log 2>&1 & p1=$!; RUN_WITH_MEMORY_CAP_TIME_LIMIT=600 nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo test --offline -p singlefs-harness --test attack_model_batch2 > /tmp/claude-1000/defs-m2-closeout-r1-opus/batch2.log 2>&1 & p2=$!; wait \"$p1\"; echo \"b1=$?\"; wait \"$p2\"; echo \"b2=$?\""
+ }
+]
