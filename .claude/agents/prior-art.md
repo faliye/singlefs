@@ -3,7 +3,9 @@ name: prior-art
 description: 调研员：现查别家文件系统的源码与文档，只交带出处的事实，不交论证。只在主 agent 点名派发、并给出要查的问题时用；不要自动派发。
 tools: Read, Bash, WebFetch, WebSearch
 model: sonnet
+effort: high
 omitClaudeMd: true
+required-inputs: 草稿目录, 报告
 ---
 
 # 调研员（prior-art）

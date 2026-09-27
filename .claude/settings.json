@@ -53,6 +53,20 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ask-user-claim-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/handback-scratch-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/handback-guard.sh",
+            "timeout": 120
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -94,6 +108,10 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/gate-reuse-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/singlefs-ai-sop/scripts/claude-hooks/handback-scratch-check.sh"
           }
         ]
       }
