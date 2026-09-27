@@ -1,0 +1,469 @@
+E7INPUT name=crates_snapshot key=E158 sha256=bb5ca9bef0b09eb957906317adf7d2b47567d901ef341e85c14b6fe23a37cf4b
+E7RESULT name=r4_compare_input arm=today path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-today.out lines=1902 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-jia-cfg.out lines=270 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg-carry path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-jia-cfg-carry.out lines=270 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-slot path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-jia-slot.out lines=1086 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-cfg.out lines=2097 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg-carry path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-cfg-carry.out lines=2097 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-slot path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-slot.out lines=2865 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-narrow-cfg.out lines=1665 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg-carry path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-narrow-cfg-carry.out lines=1665 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-slot path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-yi-narrow-slot.out lines=2865 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-bing-cfg.out lines=1134 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg-carry path=research/results/e158-root-choice-repair-2026-09-27-r4-seg1-bing-cfg-carry.out lines=1134 verdict=pass
+E7RESULT name=r4_section_seven_three row=4 arm=today cells=64 nonzero_cells=0 verdict=pass
+E7RESULT name=r4_q4 arm=bing-cfg family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=24772 total_extra_read_bytes=109838336 minimum_extra_read_calls=1540 maximum_extra_read_calls=1573
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=35208 total_extra_read_bytes=151126016 minimum_extra_read_calls=1032 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17604 total_extra_read_bytes=75563008 minimum_extra_read_calls=1032 maximum_extra_read_calls=1155
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-21)expected=Some(-21)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass total=Some(3112)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass total=Some(3112)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass total=Some(3108)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass total=Some(3108)jia_total=Some(1572)
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=24836 total_extra_read_bytes=110100480 minimum_extra_read_calls=1544 maximum_extra_read_calls=1577
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=35208 total_extra_read_bytes=151126016 minimum_extra_read_calls=1032 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17604 total_extra_read_bytes=75563008 minimum_extra_read_calls=1032 maximum_extra_read_calls=1155
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(-17)expected=Some(-17)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass total=Some(3112)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass total=Some(3112)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass total=Some(3108)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-reads-iii sentence=bing_minus_jia_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass total=Some(3108)jia_total=Some(1572)
+E7RESULT name=r4_q4 arm=jia-cfg family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_q4 arm=jia-slot family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=8,T=8,W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-10634 total_extra_read_bytes=-39403520 minimum_extra_read_calls=-508 maximum_extra_read_calls=-387
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-3526 total_extra_read_bytes=-12828672 minimum_extra_read_calls=-508 maximum_extra_read_calls=-387
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_q4 arm=yi-cfg family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=50136 total_extra_read_bytes=207872000 minimum_extra_read_calls=1488 maximum_extra_read_calls=1639
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17836 total_extra_read_bytes=75395072 minimum_extra_read_calls=1047 maximum_extra_read_calls=1174
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17836 total_extra_read_bytes=75395072 minimum_extra_read_calls=1047 maximum_extra_read_calls=1174
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(1553)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass after=Some(1553)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=reads_zeros] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(1554)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass after=Some(1554)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=reads_zeros] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=50264 total_extra_read_bytes=208396288 minimum_extra_read_calls=1492 maximum_extra_read_calls=1643
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17836 total_extra_read_bytes=75395072 minimum_extra_read_calls=1047 maximum_extra_read_calls=1174
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=17836 total_extra_read_bytes=75395072 minimum_extra_read_calls=1047 maximum_extra_read_calls=1174
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(1553)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass after=Some(1553)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=reads_zeros] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(1554)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass after=Some(1554)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=reads_zeros] tag=measure verdict=pass total=Some(3126)
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=942 total_extra_read_bytes=5744640 minimum_extra_read_calls=-38 maximum_extra_read_calls=111
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-9938 total_extra_read_bytes=-37656576 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(4)expected=Some(4)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(25)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass after=Some(25)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=reads_zeros] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(26)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass after=Some(24)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=reads_zeros] tag=measure verdict=pass total=Some(1596)
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=1038 total_extra_read_bytes=6137856 minimum_extra_read_calls=-34 maximum_extra_read_calls=115
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-9938 total_extra_read_bytes=-37656576 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=pass measured_extra_read_calls=Some(8)expected=Some(8)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(25)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros] tag=arm verdict=fail before=Some(1573)jia_total=Some(1574)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=reads_zeros] tag=arm verdict=pass after=Some(25)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=reads_zeros] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(26)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(1598)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass before=Some(1572)jia_total=Some(1572)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=reads_zeros] tag=arm verdict=pass after=Some(24)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=reads_zeros] tag=measure verdict=pass total=Some(1596)
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=40 positive_cells=15 total_extra_read_calls=496 total_extra_read_bytes=3289088 minimum_extra_read_calls=-46 maximum_extra_read_calls=103
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-3362 total_extra_read_bytes=-12601344 minimum_extra_read_calls=-487 maximum_extra_read_calls=-364
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-3362 total_extra_read_bytes=-12601344 minimum_extra_read_calls=-487 maximum_extra_read_calls=-364
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1569)jia_total=Some(1570)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(21)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(1590)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1568)jia_total=Some(1568)
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(22)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(1590)
+E7RESULT name=r4_q4 arm=yi-slot family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=40 positive_cells=16 total_extra_read_calls=24928 total_extra_read_bytes=103362560 minimum_extra_read_calls=-1 maximum_extra_read_calls=1631
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1d@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=8854 total_extra_read_bytes=37435392 minimum_extra_read_calls=1039 maximum_extra_read_calls=1166
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=8854 total_extra_read_bytes=37435392 minimum_extra_read_calls=1039 maximum_extra_read_calls=1166
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N-ring sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=W] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N-cover sentence=same_as_today[form=reads_zeros duration=T1] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=0 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=0 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=1 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=1 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=2 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=2 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=3 c=C] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-N0 sentence=same_as_today[n1=3 c=U] tag=arm verdict=pass differing_fields=none
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=0 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=1 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=2 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=C] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-ii sentence=point_value[n1=3 c=U] tag=arm verdict=fail measured_extra_read_calls=Some(0)expected=Some(24)instance_table_pages=Some(1)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails] tag=arm verdict=fail before=Some(1569)jia_total=Some(1570)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-ring form=read_fails] tag=arm verdict=pass after=Some(1549)f=Some(2)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-ring form=read_fails] tag=measure verdict=pass total=Some(3118)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=first_pass_reads_equal_jia_total[control=PC-N-cover form=read_fails] tag=arm verdict=pass before=Some(1568)jia_total=Some(1568)
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=reads_after_the_mark_at_least_r_times_f_and_positive[control=PC-N-cover form=read_fails] tag=arm verdict=pass after=Some(1550)f=Some(3)r=1
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-reads-iii sentence=total_is_before_plus_after[control=PC-N-cover form=read_fails] tag=measure verdict=pass total=Some(3118)
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=today control=PC-22 sentence=an_m_with_ok_zero_count_zero_isolation tag=today verdict=not_constructible route=F2
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_cfg jia_arm=jia-cfg cells=64 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_slot jia_arm=jia-slot cells=64 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg cells=16 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg-carry cells=16 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg cells=16 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg-carry cells=16 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-slot cells=16 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=today cells=16 differences=0 verdict=pass
+E7RESULT name=r4_f11 cells=48 cells_differing_outside_o1_and_cell_22=0 verdict=inference_holds
+E7RESULT name=r4_base_identity arm=bing-cfg prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=bing-cfg-carry prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg-carry prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-slot prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=today prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg-carry prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg-carry prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-slot prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-slot prefixes=8 differing=0 verdict=pass
+E7RESULT name=r4_loss arm=bing-cfg family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=912 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=912
+E7RESULT name=r4_loss arm=bing-cfg family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=912 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=912
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-slot family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=864 lost_write_cells=152 q1_overwrite_cells=134 q2_rollback_cells=24 q3_lost_cells=144 q3c_lost_cells=4 q3_last_confirmed_cells=720
+E7RESULT name=r4_loss arm=jia-slot family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=32 q2_rollback_cells=32 q3_lost_cells=0 q3c_lost_cells=16 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=today family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=1680 lost_write_cells=304 q1_overwrite_cells=268 q2_rollback_cells=48 q3_lost_cells=288 q3c_lost_cells=8 q3_last_confirmed_cells=1392
+E7RESULT name=r4_loss arm=today family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=64 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=1792 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=1792
+E7RESULT name=r4_loss arm=yi-cfg family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=1792 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=1792
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=1360 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=1360
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=1360 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=1360
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=2560 lost_write_cells=288 q1_overwrite_cells=264 q2_rollback_cells=32 q3_lost_cells=272 q3c_lost_cells=5 q3_last_confirmed_cells=2288
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-slot family=h1d geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=2560 lost_write_cells=288 q1_overwrite_cells=264 q2_rollback_cells=32 q3_lost_cells=272 q3c_lost_cells=5 q3_last_confirmed_cells=2288
+E7RESULT name=r4_loss arm=yi-slot family=h1e geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-both-mounted voided=true basis=PC-extra-reads-ii:point_value[n1=0 c=C](arm),PC-extra-reads-ii:point_value[n1=0 c=U](arm),PC-extra-reads-ii:point_value[n1=1 c=C](arm),PC-extra-reads-ii:point_value[n1=1 c=U](arm),PC-extra-reads-ii:point_value[n1=2 c=C](arm),PC-extra-reads-ii:point_value[n1=2 c=U](arm),PC-extra-reads-ii:point_value[n1=3 c=C](arm),PC-extra-reads-ii:point_value[n1=3 c=U](arm)
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm)
+E7RESULT name=r4_void arm=yi-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm)
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3 voided=true basis=PC-N-cover:destination_chosen_or_applied[form=reads_zeros duration=T1](arm),PC-N-cover:ok_after_one_round_chosen_hidden_no_rollback[form=reads_zeros duration=T1](arm),PC-N-cover:row_publish_txg_is_hidden_txg_plus_one[form=reads_zeros duration=T1](arm)
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm)
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3 voided=true basis=PC-N-cover:destination_chosen_or_applied[form=reads_zeros duration=T1](arm),PC-N-cover:ok_after_one_round_chosen_hidden_no_rollback[form=reads_zeros duration=T1](arm),PC-N-cover:row_publish_txg_is_hidden_txg_plus_one[form=reads_zeros duration=T1](arm)
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm)
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-both-mounted voided=true basis=PC-extra-reads-ii:point_value[n1=0 c=C](arm),PC-extra-reads-ii:point_value[n1=0 c=U](arm),PC-extra-reads-ii:point_value[n1=1 c=C](arm),PC-extra-reads-ii:point_value[n1=1 c=U](arm),PC-extra-reads-ii:point_value[n1=2 c=C](arm),PC-extra-reads-ii:point_value[n1=2 c=U](arm),PC-extra-reads-ii:point_value[n1=3 c=C](arm),PC-extra-reads-ii:point_value[n1=3 c=U](arm)
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm)
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-both-mounted voided=true basis=PC-extra-reads-ii:point_value[n1=0 c=C](arm),PC-extra-reads-ii:point_value[n1=0 c=U](arm),PC-extra-reads-ii:point_value[n1=1 c=C](arm),PC-extra-reads-ii:point_value[n1=1 c=U](arm),PC-extra-reads-ii:point_value[n1=2 c=C](arm),PC-extra-reads-ii:point_value[n1=2 c=U](arm),PC-extra-reads-ii:point_value[n1=3 c=C](arm),PC-extra-reads-ii:point_value[n1=3 c=U](arm)
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-refused voided=true basis=PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm)
+E7RESULT name=r4_void arm=yi-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_missed_arm_and_today_sentences count=52 list=yi-narrow-cfg:PC-N-cover:destination_chosen_or_applied[form=reads_zeros duration=T1](arm),yi-narrow-cfg:PC-N-cover:ok_after_one_round_chosen_hidden_no_rollback[form=reads_zeros duration=T1](arm),yi-narrow-cfg:PC-N-cover:row_publish_txg_is_hidden_txg_plus_one[form=reads_zeros duration=T1](arm),yi-narrow-cfg-carry:PC-N-cover:destination_chosen_or_applied[form=reads_zeros duration=T1](arm),yi-narrow-cfg-carry:PC-N-cover:ok_after_one_round_chosen_hidden_no_rollback[form=reads_zeros duration=T1](arm),yi-narrow-cfg-carry:PC-N-cover:row_publish_txg_is_hidden_txg_plus_one[form=reads_zeros duration=T1](arm),jia-slot:PC-extra-reads-ii:point_value[n1=0 c=C](arm),jia-slot:PC-extra-reads-ii:point_value[n1=0 c=U](arm),jia-slot:PC-extra-reads-ii:point_value[n1=1 c=C](arm),jia-slot:PC-extra-reads-ii:point_value[n1=1 c=U](arm),jia-slot:PC-extra-reads-ii:point_value[n1=2 c=C](arm),jia-slot:PC-extra-reads-ii:point_value[n1=2 c=U](arm),jia-slot:PC-extra-reads-ii:point_value[n1=3 c=C](arm),jia-slot:PC-extra-reads-ii:point_value[n1=3 c=U](arm),yi-cfg:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),yi-cfg:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm),yi-cfg-carry:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),yi-cfg-carry:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm),yi-narrow-cfg:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),yi-narrow-cfg:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm),yi-narrow-cfg-carry:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),yi-narrow-cfg-carry:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=reads_zeros](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=0 c=C](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=0 c=U](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=1 c=C](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=1 c=U](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=2 c=C](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=2 c=U](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=3 c=C](arm),yi-narrow-slot:PC-extra-reads-ii:point_value[n1=3 c=U](arm),yi-narrow-slot:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),yi-slot:PC-extra-reads-ii:point_value[n1=0 c=C](arm),yi-slot:PC-extra-reads-ii:point_value[n1=0 c=U](arm),yi-slot:PC-extra-reads-ii:point_value[n1=1 c=C](arm),yi-slot:PC-extra-reads-ii:point_value[n1=1 c=U](arm),yi-slot:PC-extra-reads-ii:point_value[n1=2 c=C](arm),yi-slot:PC-extra-reads-ii:point_value[n1=2 c=U](arm),yi-slot:PC-extra-reads-ii:point_value[n1=3 c=C](arm),yi-slot:PC-extra-reads-ii:point_value[n1=3 c=U](arm),yi-slot:PC-extra-reads-iii:first_pass_reads_equal_jia_total[control=PC-N-ring form=read_fails](arm),bing-cfg:PC-extra-refusal:today_ok_on_the_cell(today),bing-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-slot:PC-extra-refusal:today_ok_on_the_cell(today),today:PC-22:an_m_with_ok_zero_count_zero_isolation(today)
+E7RESULT name=done emitted=468

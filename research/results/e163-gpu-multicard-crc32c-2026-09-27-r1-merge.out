@@ -1,0 +1,11 @@
+E7RESULT name=merge_line body=MERGE_INPUT_HEADER seed=0xE163092700000001 unit_count=2560
+E7RESULT name=merge_line body=MERGE total_units=2560 shards=2
+E7RESULT name=merge_line body=MERGE matched_count=2560
+E7RESULT name=merge_line body=MERGE mismatched_count=0 mismatched_global_unit_identifiers=[]
+E7RESULT name=merge_line body=MERGE missing_count=0 missing_global_unit_identifiers=[]
+E7RESULT name=merge_line body=MERGE duplicated_count=0 duplicated_global_unit_identifiers=[]
+E7RESULT name=merge_line body=MERGE all_reference_values_distinct=true
+E7RESULT name=merge_line body=MERGE sample_unit=0 recomputed=6ADED98F cpu_reference=6ADED98F equal=true
+E7RESULT name=merge_line body=MERGE sample_unit=1279 recomputed=4483D5D5 cpu_reference=4483D5D5 equal=true
+E7RESULT name=merge_line body=MERGE sample_unit=2559 recomputed=D3044B07 cpu_reference=D3044B07 equal=true
+E7RESULT name=done emitted=11

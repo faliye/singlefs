@@ -1,0 +1,20 @@
+mutate: 这一轮开 1 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 1 个；表里 13 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 4（调用方的 CARGO_BUILD_JOBS）
+mutate: e162-crash-verdict-block-store 在 e7-index-bench/src/bin/../../Cargo.toml 里挂了 required-features，每次 cargo test 带 --features e7-index-bench/e162-block-stores
+基线：全绿
+✅ [M1_F写路径换成朴素写法直接写终名] 红：tests::file_registered_write_path_leaves_no_partial_file_at_any_abandoned_step
+✅ [M2_redb提交用DurabilityNone] 红：tests::every_registered_arm_commit_waits_for_the_device,tests::redb_registered_write_path_keeps_every_confirmed_block_across_sigkill
+✅ [M3_K的同步写关掉WAL仍开] 红：tests::every_registered_arm_commit_waits_for_the_device
+✅ [M4_K关掉WAL] 红：tests::every_registered_arm_commit_waits_for_the_device,tests::rocksdb_registered_write_path_keeps_every_confirmed_block_across_sigkill
+✅ [M5_F读路径不查长度魔数与CRC] 红：tests::file_read_path_reports_a_half_written_file_as_a_read_error
+✅ [M6_核对只比块值前4096字节] 红：tests::silent_corruption_control_finds_exactly_block_seven_on_every_arm
+✅ [M7_核对把在途而读不到记成丢块] 红：tests::block_classification_follows_the_registered_table,tests::file_registered_write_path_keeps_every_confirmed_block_across_sigkill,tests::file_registered_write_path_leaves_no_partial_file_at_any_abandoned_step,tests::in_flight_block_that_never_landed_is_not_a_lost_block,tests::redb_registered_write_path_keeps_every_confirmed_block_across_sigkill,tests::rocksdb_registered_write_path_keeps_every_confirmed_block_across_sigkill
+✅ [M8_核对不枚举键] 红：tests::phantom_key_control_finds_exactly_one_key_on_every_arm,tests::silent_corruption_control_finds_exactly_block_seven_on_every_arm
+✅ [M9_打开失败时新建空库接着跑] 红：tests::open_breaking_control_counts_exactly_one_open_failure_on_every_arm
+✅ [M10_杀点总在第1个C之后] 红：tests::permutation_and_kill_plan_match_registered_anchor_values
+✅ [M11_提交计时两次Instant都在提交调用之前] 红：tests::commit_timing_includes_the_injected_five_millisecond_sleep
+✅ [M12_P-rand块值全0] 红：tests::random_block_values_match_registered_anchor_values
+✅ [M13_块键整数按小端编码] 红：tests::fingerprint_and_interleaved_keys_match_registered_anchor_values
+计数：内存撞顶 0 条（上限 16G）、超时 0 条
+已还原，基线仍全绿
+rc=0
+2026-09-27T07:11:48Z

@@ -1,0 +1,42 @@
+E7RESULT name=config part=s2 arm=R0 tier=feasibility blocks=10000 states_per_block=65536 seed_s2=0xe162000000000002 seed_read=0xe162000000000005 seed_large=0xe162000000000008
+E7RESULT name=environment filesystem_type=ext2/ext3 available_bytes=1979590852608 filesystem_voids_everything=false too_little_space_to_start=false logical_processors=32 redb=4.3.0 rocksdb=0.25.0
+E7RESULT name=processors part=s2 arm=R0 p_a=32 p_b_command=ssh_-o_BatchMode=yes_-o_ConnectTimeout=10_faliye-jplife_nproc p_b_answer=32 p_a_plus_p_b=64 t_state=pending_e161
+E7RESULT name=timed_attempt cell=pc-rate-plain arm=R0 attempt=0 quiet_wait_seconds=0 interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3134354:cargo interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3134354:cargo load_before=20.08/30.36/39.14 load_after=20.08/30.36/39.14 nvme0n1_written_sectors_before=145091619978 nvme0n1_written_sectors_after=145091987098 exit_code=0
+E7RESULT name=timed_attempt cell=pc-rate-sleep arm=R0 attempt=0 quiet_wait_seconds=0 interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3134354:cargo interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3134354:cargo,3136015:clippy-driver load_before=20.08/30.36/39.14 load_after=20.15/30.20/39.04 nvme0n1_written_sectors_before=145091987098 nvme0n1_written_sectors_after=145092411042 exit_code=0
+E7RESULT name=positive_control control=PC-rate arm=R0 plain_commit_median_microseconds=888 sleep_commit_median_microseconds=6206 difference_microseconds=5318 ok=true
+E7RESULT name=timed_attempt cell=pc-read arm=R0 attempt=0 quiet_wait_seconds=0 interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3134354:cargo,3136015:clippy-driver interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3136177:cargo,3137017:rustc,3137019:rustc,3137020:rustc,3137021:rustc
+E7RESULT name=positive_control control=PC-read arm=R0 plain_median_microseconds=27 sleep_median_microseconds=5102 difference_microseconds=5075 ok=true
+E7RESULT name=positive_control control=PC-space arm=R0 before_bytes=131227648 after_bytes=1204973568 difference_bytes=1073745920 ok=true
+E7RESULT name=timed_attempt cell=S2-main arm=R0 attempt=0 quiet_wait_seconds=0 interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3136177:cargo,3137017:rustc,3137237:rustc,3137498:rustc,3137504:rustc interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3138531:cargo load_before=20.92/30.03/38.89 load_after=21.93/29.30/38.32 nvme0n1_written_sectors_before=145095291146 nvme0n1_written_sectors_after=145120660890 exit_code=0
+E7RESULT name=throughput cell=S2-main arm=R0 blocks=10000 elapsed_microseconds=33886274 blocks_per_second=295.105 write_states_per_second=19339984.1 commit_median_microseconds=903 commit_percentile_99_microseconds=8299 commit_maximum_microseconds=2558476 raw_median_microseconds=782 commit_waits_for_device=true interfered=true writer_exit=0 writer_error=- stopped_h3=false open_microseconds=4750 break_even_thread_seconds_per_state_thread_seconds=3.309206e-6 q2a_verdict=pending_e161
+E7RESULT name=window cell=S2-main arm=R0 window=0 end_microseconds=969110 states_per_second=67624934.2
+E7RESULT name=window cell=S2-main arm=R0 window=1 end_microseconds=1821933 states_per_second=76845957.5
+E7RESULT name=window cell=S2-main arm=R0 window=2 end_microseconds=2714642 states_per_second=73412500.6
+E7RESULT name=window cell=S2-main arm=R0 window=3 end_microseconds=15944945 states_per_second=4953476.9
+E7RESULT name=window cell=S2-main arm=R0 window=4 end_microseconds=25130117 states_per_second=7134978.0
+E7RESULT name=window cell=S2-main arm=R0 window=5 end_microseconds=25999096 states_per_second=75417242.5
+E7RESULT name=window cell=S2-main arm=R0 window=6 end_microseconds=26876778 states_per_second=74669413.3
+E7RESULT name=window cell=S2-main arm=R0 window=7 end_microseconds=32074796 states_per_second=12607882.5
+E7RESULT name=window cell=S2-main arm=R0 window=8 end_microseconds=32983298 states_per_second=72136329.9
+E7RESULT name=window cell=S2-main arm=R0 window=9 end_microseconds=33886274 states_per_second=72577787.2
+E7RESULT name=window_summary cell=S2-main arm=R0 windows=10 minimum_states_per_second=4953476.9 last_states_per_second=72577787.2 break_even_thread_seconds_per_state_minimum_window_thread_seconds=1.292022e-5 q2b_verdict=pending_e161
+E7RESULT name=backlog cell=S2-main arm=R0 backlog_rate_percent_of_measured=50 maximum_backlog_states=9950 peak_at_block=1
+E7RESULT name=backlog cell=S2-main arm=R0 backlog_rate_percent_of_measured=75 maximum_backlog_states=80273056 peak_at_block=4157
+E7RESULT name=backlog cell=S2-main arm=R0 backlog_rate_percent_of_measured=90 maximum_backlog_states=150801190 peak_at_block=4157
+E7RESULT name=backlog cell=S2-main arm=R0 backlog_rate_percent_of_measured=100 maximum_backlog_states=197819946 peak_at_block=4157
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=1000 written_after=1000 occupancy_bytes=131325952 ratio_high=2.0039 ratio_low=2.0039
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=2000 written_after=2000 occupancy_bytes=262463488 ratio_high=2.0024 ratio_low=2.0024
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=3000 written_after=3000 occupancy_bytes=393584640 ratio_high=2.0019 ratio_low=2.0019
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=4000 written_after=4000 occupancy_bytes=524619776 ratio_high=2.0013 ratio_low=2.0013
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=5000 written_after=5000 occupancy_bytes=655728640 ratio_high=2.0011 ratio_low=2.0011
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=6000 written_after=6000 occupancy_bytes=786833408 ratio_high=2.0010 ratio_low=2.0010
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=7000 written_after=7000 occupancy_bytes=918085632 ratio_high=2.0013 ratio_low=2.0013
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=8000 written_after=8000 occupancy_bytes=1049190400 ratio_high=2.0012 ratio_low=2.0012
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=9000 written_after=9000 occupancy_bytes=1180295168 ratio_high=2.0011 ratio_low=2.0011
+E7RESULT name=occupancy cell=S2-main arm=R0 written_before=10000 written_after=10000 occupancy_bytes=1311547392 ratio_high=2.0013 ratio_low=2.0013
+E7RESULT name=occupancy_summary cell=S2-main arm=R0 samples=10 peak_ratio_high=2.0039 peak_ratio_low=2.0039 after_close_bytes=1311809536 after_close_ratio=2.0017 milestone_bytes_at_peak_high=38073625000 clause_bytes_at_peak_high=30058125000 available_bytes=1979590852608 q2e_flips_at_1_9e10=false q2e_flips_at_1_5e10=false q2e_flips_at_1_9e10_using_low=false
+E7RESULT name=a_count cell=S2-main arm=R0 keys=10000 value_bytes=655360000 expected_keys=10000 expected_value_bytes=655360000 a_count_ok=true
+E7RESULT name=random_read cell=S2-main arm=R0 pass=cold cache_dropped=true reads=10000 distinct_blocks=6308 median_microseconds=229 percentile_99_microseconds=366 maximum_microseconds=686 mismatches=0 read_bytes_delta=827822080 v8_cold_cache_ok=true open_microseconds=1212 t_state_flip_below_thread_seconds=5.584717e-9 q2d_verdict=pending_e161 interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3138531:cargo interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo
+E7RESULT name=random_read cell=S2-main arm=R0 pass=warm cache_dropped=true reads=10000 distinct_blocks=6308 median_microseconds=5 percentile_99_microseconds=11 maximum_microseconds=19 mismatches=0 read_bytes_delta=0 v8_cold_cache_ok=true open_microseconds=1212 t_state_flip_below_thread_seconds=1.678467e-10 q2d_verdict=report_only interference_at_start=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo,3138531:cargo interference_at_end=2390448:cargo,3106693:cargo,3129290:cargo,3131267:cargo
+E7RESULT name=verdict part=s2 arm=R0 tier=feasibility judgement=not_judged_feasibility_tier_only blocks=10000 pc_rate_ok=true pc_read_ok=true pc_space_ok=true s2_main_write_states_per_second=19339984.1 q2a_verdict=pending_e161 s1_large=not_run_feasibility_tier
+E7RESULT name=done emitted=42

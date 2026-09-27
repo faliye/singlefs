@@ -1,0 +1,375 @@
+E7INPUT name=crates_snapshot key=E158 sha256=ad9f544263a5a61bf0bed305ea6e98701042e63ff2ad5e96f2b66552f360f9dc
+E7RESULT name=r4_compare_input arm=today path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-today.out lines=1833 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-jia-cfg.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-jia-cfg-carry.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-jia-slot.out lines=1777 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-cfg.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-cfg-carry.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-slot.out lines=1777 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-narrow-cfg.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-narrow-cfg-carry.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-yi-narrow-slot.out lines=1777 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-bing-cfg.out lines=1751 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg2-bing-cfg-carry.out lines=1751 verdict=pass
+E7RESULT name=r4_section_seven_three row=4 arm=today cells=537 nonzero_cells=0 verdict=pass
+E7RESULT name=r4_q4 arm=bing-cfg family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=bing-cfg family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=bing-cfg family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=bing-cfg family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=bing-cfg family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-21 total_extra_read_bytes=-28672 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=0 total_extra_read_calls=-5775 total_extra_read_bytes=-7884800 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=0 total_extra_read_calls=-714 total_extra_read_bytes=-974848 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=0 total_extra_read_calls=-63 total_extra_read_bytes=-86016 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392721 total_extra_read_bytes=1608728576 minimum_extra_read_calls=392721 maximum_extra_read_calls=392721
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=18 total_extra_read_calls=7068416 total_extra_read_bytes=28939788288 minimum_extra_read_calls=392583 maximum_extra_read_calls=392785
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=30 total_extra_read_calls=11781682 total_extra_read_bytes=48244514816 minimum_extra_read_calls=392617 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392835 total_extra_read_bytes=1609736192 minimum_extra_read_calls=392835 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392835 total_extra_read_bytes=1609736192 minimum_extra_read_calls=392835 maximum_extra_read_calls=392835
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg-carry family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg-carry family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg-carry family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg-carry family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=bing-cfg-carry family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-17 total_extra_read_bytes=-12288 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=0 total_extra_read_calls=-4675 total_extra_read_bytes=-3379200 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=0 total_extra_read_calls=-578 total_extra_read_bytes=-417792 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=0 total_extra_read_calls=-51 total_extra_read_bytes=-36864 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392721 total_extra_read_bytes=1608728576 minimum_extra_read_calls=392721 maximum_extra_read_calls=392721
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=18 total_extra_read_calls=7068416 total_extra_read_bytes=28939788288 minimum_extra_read_calls=392583 maximum_extra_read_calls=392785
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=30 total_extra_read_calls=11781682 total_extra_read_bytes=48244514816 minimum_extra_read_calls=392617 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392835 total_extra_read_bytes=1609736192 minimum_extra_read_calls=392835 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392835 total_extra_read_bytes=1609736192 minimum_extra_read_calls=392835 maximum_extra_read_calls=392835
+E7RESULT name=r4_q4 arm=jia-cfg family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=jia-cfg family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=jia-cfg family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=jia-cfg family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=jia-cfg family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=4 total_extra_read_bytes=16384 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=1100 total_extra_read_bytes=4505600 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=136 total_extra_read_bytes=557056 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=12 total_extra_read_bytes=49152 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-497 total_extra_read_bytes=-1921024 minimum_extra_read_calls=-497 maximum_extra_read_calls=-497
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=0 total_extra_read_calls=-9508 total_extra_read_bytes=-51707904 minimum_extra_read_calls=-635 maximum_extra_read_calls=-433
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=0 total_extra_read_calls=-14858 total_extra_read_bytes=-74940416 minimum_extra_read_calls=-601 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-383 total_extra_read_bytes=-913408 minimum_extra_read_calls=-383 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-383 total_extra_read_bytes=-913408 minimum_extra_read_calls=-383 maximum_extra_read_calls=-383
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg-carry family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg-carry family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg-carry family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg-carry family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=jia-cfg-carry family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=8 total_extra_read_bytes=32768 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=2200 total_extra_read_bytes=9011200 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=272 total_extra_read_bytes=1114112 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=24 total_extra_read_bytes=98304 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-497 total_extra_read_bytes=-1921024 minimum_extra_read_calls=-497 maximum_extra_read_calls=-497
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=0 total_extra_read_calls=-9508 total_extra_read_bytes=-51707904 minimum_extra_read_calls=-635 maximum_extra_read_calls=-433
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=0 total_extra_read_calls=-14858 total_extra_read_bytes=-74940416 minimum_extra_read_calls=-601 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-383 total_extra_read_bytes=-913408 minimum_extra_read_calls=-383 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-383 total_extra_read_bytes=-913408 minimum_extra_read_calls=-383 maximum_extra_read_calls=-383
+E7RESULT name=r4_q4 arm=jia-slot family=eighth-crash@harness-4gib compared_tested_mounts=10 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=h-random-all@harness-4gib compared_tested_mounts=326 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=h-random@harness-4gib compared_tested_mounts=164 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=seventh-crash@harness-4gib compared_tested_mounts=9 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=seventh-fault@harness-4gib compared_tested_mounts=28 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=eighth-crash@harness-4gib cells=10 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h-random-all@harness-4gib cells=326 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h-random@harness-4gib cells=164 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=seventh-crash@harness-4gib cells=9 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=seventh-fault@harness-4gib cells=23 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=seventh-fault@harness-4gib cells=5 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=a] tag=arm verdict=pass seed=base+2differing_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=b] tag=arm verdict=pass seed=shortestdiffering_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=c] tag=arm verdict=pass seed=row43differing_orders=[]
+E7RESULT name=r4_q4 arm=yi-cfg family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-cfg family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=yi-cfg family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=yi-cfg family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-cfg family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=4 total_extra_read_bytes=16384 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=1100 total_extra_read_bytes=4505600 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=136 total_extra_read_bytes=557056 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=11 total_extra_read_bytes=45056 minimum_extra_read_calls=3 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392735 total_extra_read_bytes=1608714240 minimum_extra_read_calls=392735 maximum_extra_read_calls=392735
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=18 total_extra_read_calls=7068185 total_extra_read_bytes=28938128896 minimum_extra_read_calls=392543 maximum_extra_read_calls=392793
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=30 total_extra_read_calls=11781473 total_extra_read_bytes=48241827328 minimum_extra_read_calls=392569 maximum_extra_read_calls=392852
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392852 total_extra_read_bytes=1609730560 minimum_extra_read_calls=392852 maximum_extra_read_calls=392852
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392852 total_extra_read_bytes=1609730560 minimum_extra_read_calls=392852 maximum_extra_read_calls=392852
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg-carry family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg-carry family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg-carry family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg-carry family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-cfg-carry family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=8 total_extra_read_bytes=32768 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=2200 total_extra_read_bytes=9011200 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=272 total_extra_read_bytes=1114112 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=23 total_extra_read_bytes=94208 minimum_extra_read_calls=7 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392735 total_extra_read_bytes=1608714240 minimum_extra_read_calls=392735 maximum_extra_read_calls=392735
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=18 total_extra_read_calls=7068185 total_extra_read_bytes=28938128896 minimum_extra_read_calls=392543 maximum_extra_read_calls=392793
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=30 total_extra_read_calls=11781473 total_extra_read_bytes=48241827328 minimum_extra_read_calls=392569 maximum_extra_read_calls=392852
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392852 total_extra_read_bytes=1609730560 minimum_extra_read_calls=392852 maximum_extra_read_calls=392852
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=392852 total_extra_read_bytes=1609730560 minimum_extra_read_calls=392852 maximum_extra_read_calls=392852
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=4 total_extra_read_bytes=16384 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=1100 total_extra_read_bytes=4505600 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=136 total_extra_read_bytes=557056 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=11 total_extra_read_bytes=45056 minimum_extra_read_calls=3 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-473 total_extra_read_bytes=-1865728 minimum_extra_read_calls=-473 maximum_extra_read_calls=-473
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=0 total_extra_read_calls=-9237 total_extra_read_bytes=-50991616 minimum_extra_read_calls=-629 maximum_extra_read_calls=-411
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=0 total_extra_read_calls=-14353 total_extra_read_bytes=-73875968 minimum_extra_read_calls=-595 maximum_extra_read_calls=-358
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-358 total_extra_read_bytes=-857600 minimum_extra_read_calls=-358 maximum_extra_read_calls=-358
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-358 total_extra_read_bytes=-857600 minimum_extra_read_calls=-358 maximum_extra_read_calls=-358
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=eighth-crash@harness-4gib compared_tested_mounts=2 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h-random-all@harness-4gib compared_tested_mounts=293 extra_refusals=0 intercepted="W=18"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h-random@harness-4gib compared_tested_mounts=64 extra_refusals=0 intercepted="W=30"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=seventh-crash@harness-4gib compared_tested_mounts=4 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=seventh-fault@harness-4gib compared_tested_mounts=1 extra_refusals=0 intercepted="W=1"
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg-carry family=eighth-crash@harness-4gib tested_mounts_after_divergence=4 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg-carry family=h-random-all@harness-4gib tested_mounts_after_divergence=31 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg-carry family=h-random@harness-4gib tested_mounts_after_divergence=94 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg-carry family=seventh-crash@harness-4gib tested_mounts_after_divergence=6 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q4_after_divergence arm=yi-narrow-cfg-carry family=seventh-fault@harness-4gib tested_mounts_after_divergence=21 refusals_with_truth_newer_false=0
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=eighth-crash@harness-4gib cells=1 positive_cells=1 total_extra_read_calls=8 total_extra_read_bytes=32768 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h-random-all@harness-4gib cells=275 positive_cells=275 total_extra_read_calls=2200 total_extra_read_bytes=9011200 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h-random@harness-4gib cells=34 positive_cells=34 total_extra_read_calls=272 total_extra_read_bytes=1114112 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=seventh-crash@harness-4gib cells=3 positive_cells=3 total_extra_read_calls=23 total_extra_read_bytes=94208 minimum_extra_read_calls=7 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=eighth-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-473 total_extra_read_bytes=-1865728 minimum_extra_read_calls=-473 maximum_extra_read_calls=-473
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h-random-all@harness-4gib cells=18 positive_cells=0 total_extra_read_calls=-9237 total_extra_read_bytes=-50991616 minimum_extra_read_calls=-629 maximum_extra_read_calls=-411
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h-random@harness-4gib cells=30 positive_cells=0 total_extra_read_calls=-14353 total_extra_read_bytes=-73875968 minimum_extra_read_calls=-595 maximum_extra_read_calls=-358
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=seventh-crash@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-358 total_extra_read_bytes=-857600 minimum_extra_read_calls=-358 maximum_extra_read_calls=-358
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=seventh-fault@harness-4gib cells=1 positive_cells=0 total_extra_read_calls=-358 total_extra_read_bytes=-857600 minimum_extra_read_calls=-358 maximum_extra_read_calls=-358
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=eighth-crash@harness-4gib compared_tested_mounts=10 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h-random-all@harness-4gib compared_tested_mounts=326 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h-random@harness-4gib compared_tested_mounts=164 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=seventh-crash@harness-4gib compared_tested_mounts=9 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=seventh-fault@harness-4gib compared_tested_mounts=28 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=eighth-crash@harness-4gib cells=10 positive_cells=0 total_extra_read_calls=-3 total_extra_read_bytes=-12288 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h-random-all@harness-4gib cells=326 positive_cells=0 total_extra_read_calls=-20 total_extra_read_bytes=-81920 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h-random@harness-4gib cells=164 positive_cells=0 total_extra_read_calls=-43 total_extra_read_bytes=-176128 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=seventh-crash@harness-4gib cells=9 positive_cells=0 total_extra_read_calls=-2 total_extra_read_bytes=-8192 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=seventh-fault@harness-4gib cells=23 positive_cells=0 total_extra_read_calls=-5 total_extra_read_bytes=-20480 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=seventh-fault@harness-4gib cells=5 positive_cells=0 total_extra_read_calls=-1 total_extra_read_bytes=-4096 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=a] tag=arm verdict=pass seed=base+2differing_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=b] tag=arm verdict=pass seed=shortestdiffering_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=c] tag=arm verdict=pass seed=row43differing_orders=[]
+E7RESULT name=r4_q4 arm=yi-slot family=eighth-crash@harness-4gib compared_tested_mounts=10 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=h-random-all@harness-4gib compared_tested_mounts=326 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=h-random@harness-4gib compared_tested_mounts=164 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=seventh-crash@harness-4gib compared_tested_mounts=9 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=seventh-fault@harness-4gib compared_tested_mounts=28 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=eighth-crash@harness-4gib cells=10 positive_cells=0 total_extra_read_calls=-3 total_extra_read_bytes=-12288 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h-random-all@harness-4gib cells=326 positive_cells=0 total_extra_read_calls=-20 total_extra_read_bytes=-81920 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h-random@harness-4gib cells=164 positive_cells=0 total_extra_read_calls=-43 total_extra_read_bytes=-176128 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=seventh-crash@harness-4gib cells=9 positive_cells=0 total_extra_read_calls=-2 total_extra_read_bytes=-8192 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=seventh-fault@harness-4gib cells=23 positive_cells=0 total_extra_read_calls=-5 total_extra_read_bytes=-20480 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=seventh-fault@harness-4gib cells=5 positive_cells=0 total_extra_read_calls=-1 total_extra_read_bytes=-4096 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=a] tag=arm verdict=pass seed=base+2differing_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=b] tag=arm verdict=pass seed=shortestdiffering_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-random sentence=slot_arm_same_as_today_up_to_the_crash_recovery_step[of=c] tag=arm verdict=pass seed=row43differing_orders=[]
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=today control=PC-22 sentence=an_m_with_ok_zero_count_zero_isolation tag=today verdict=not_constructible route=F2
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_cfg jia_arm=jia-cfg cells=513 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_slot jia_arm=jia-slot cells=537 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg cells=0 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg-carry cells=0 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg cells=0 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg-carry cells=0 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-slot cells=0 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=today cells=0 differences=0 verdict=pass
+E7RESULT name=r4_f11 cells=520 cells_differing_outside_o1_and_cell_22=0 verdict=inference_holds
+E7RESULT name=r4_base_identity arm=bing-cfg prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=bing-cfg-carry prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg-carry prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-slot prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=today prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg-carry prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg-carry prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-slot prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-slot prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_loss arm=bing-cfg family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=bing-cfg family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=bing-cfg family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=bing-cfg family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=bing-cfg-carry family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=bing-cfg-carry family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=bing-cfg-carry family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=jia-cfg family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=jia-cfg family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=jia-cfg family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=jia-cfg family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=jia-cfg-carry family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=jia-cfg-carry family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=jia-cfg-carry family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=jia-slot family=h-random geometry=harness-4gib cells=43 lost_write_cells=43 q1_overwrite_cells=32 q2_rollback_cells=38 q3_lost_cells=6 q3c_lost_cells=40 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=jia-slot family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=10 q1_overwrite_cells=4 q2_rollback_cells=6 q3_lost_cells=4 q3c_lost_cells=10 q3_last_confirmed_cells=6
+E7RESULT name=r4_loss arm=jia-slot family=seventh-crash geometry=harness-4gib cells=5 lost_write_cells=1 q1_overwrite_cells=1 q2_rollback_cells=1 q3_lost_cells=0 q3c_lost_cells=1 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=jia-slot family=eighth-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=2 q2_rollback_cells=2 q3_lost_cells=1 q3c_lost_cells=2 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=today family=h-random geometry=harness-4gib cells=43 lost_write_cells=43 q1_overwrite_cells=32 q2_rollback_cells=38 q3_lost_cells=6 q3c_lost_cells=40 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=today family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=10 q1_overwrite_cells=4 q2_rollback_cells=6 q3_lost_cells=4 q3c_lost_cells=10 q3_last_confirmed_cells=6
+E7RESULT name=r4_loss arm=today family=seventh-crash geometry=harness-4gib cells=5 lost_write_cells=1 q1_overwrite_cells=1 q2_rollback_cells=1 q3_lost_cells=0 q3c_lost_cells=1 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=today family=eighth-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=2 q2_rollback_cells=2 q3_lost_cells=1 q3c_lost_cells=2 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=yi-cfg family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-cfg family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=yi-cfg family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=yi-cfg family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-cfg-carry family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=yi-cfg-carry family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=yi-cfg-carry family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h-random geometry=harness-4gib cells=37 lost_write_cells=6 q1_overwrite_cells=2 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=6 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=10
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=seventh-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=3 q3c_lost_cells=0 q3_last_confirmed_cells=3
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=eighth-crash geometry=harness-4gib cells=2 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=2
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h-random geometry=harness-4gib cells=43 lost_write_cells=43 q1_overwrite_cells=32 q2_rollback_cells=38 q3_lost_cells=6 q3c_lost_cells=40 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-narrow-slot family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=10 q1_overwrite_cells=4 q2_rollback_cells=6 q3_lost_cells=4 q3c_lost_cells=10 q3_last_confirmed_cells=6
+E7RESULT name=r4_loss arm=yi-narrow-slot family=seventh-crash geometry=harness-4gib cells=5 lost_write_cells=1 q1_overwrite_cells=1 q2_rollback_cells=1 q3_lost_cells=0 q3c_lost_cells=1 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=yi-narrow-slot family=eighth-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=2 q2_rollback_cells=2 q3_lost_cells=1 q3c_lost_cells=2 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=yi-slot family=h-random geometry=harness-4gib cells=43 lost_write_cells=43 q1_overwrite_cells=32 q2_rollback_cells=38 q3_lost_cells=6 q3c_lost_cells=40 q3_last_confirmed_cells=37
+E7RESULT name=r4_loss arm=yi-slot family=seventh-fault geometry=harness-4gib cells=10 lost_write_cells=10 q1_overwrite_cells=4 q2_rollback_cells=6 q3_lost_cells=4 q3c_lost_cells=10 q3_last_confirmed_cells=6
+E7RESULT name=r4_loss arm=yi-slot family=seventh-crash geometry=harness-4gib cells=5 lost_write_cells=1 q1_overwrite_cells=1 q2_rollback_cells=1 q3_lost_cells=0 q3c_lost_cells=1 q3_last_confirmed_cells=5
+E7RESULT name=r4_loss arm=yi-slot family=eighth-crash geometry=harness-4gib cells=6 lost_write_cells=3 q1_overwrite_cells=2 q2_rollback_cells=2 q3_lost_cells=1 q3c_lost_cells=2 q3_last_confirmed_cells=5
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_missed_arm_and_today_sentences count=12 list=bing-cfg:PC-extra-refusal:today_ok_on_the_cell(today),bing-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-slot:PC-extra-refusal:today_ok_on_the_cell(today),today:PC-22:an_m_with_ok_zero_count_zero_isolation(today)
+E7RESULT name=done emitted=374

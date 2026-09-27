@@ -1,0 +1,23 @@
+E163（GPU多卡算单元校验和）F2：让片 1 少 1 条结果（本机 R1 两片配置），验证比对本身会不会红（M3）。
+跑于 2026-09-27（JST），本机。注入：片 1（单元 1280-2559）里丢弃全局单元 1480 这一行。
+
+===== run-shard 片 1（--inject-drop 1480） =====
+$ bash research/scripts/run-with-memory-cap.sh 8G ./target/release/e163-gpu-multicard-crc32c run-shard --input <input> --start 1280 --count 1280 --adapter-index 1 --output f2-shard1.out --inject-drop 1480
+RUN_SHARD_ADAPTER index=1 name="NVIDIA GeForce RTX 5060 Ti" vendor=0x10DE device=0x2D04 device_type=DiscreteGpu driver="NVIDIA" driver_info="595.84" backend=Vulkan
+RUN_SHARD_INPUT_HEADER seed=0xE163092700000001 unit_count=2560
+RUN_SHARD start=1280 count=1280 adapter_index=1 build_device_ms=235.445 transfer_compute_readback_ms=95.738 total_ms=862.794 anchors_cpu_match=true anchors_gpu_match=true sentinel_and_gid_ok=true record_count=1279 output="/tmp/claude-1000/e163-runner/data/f2-shard1.out"
+
+===== merge（片 0 复用 R1 的 r1-shard0.out，片 1 用上面这份缺一条的结果） =====
+$ bash research/scripts/run-with-memory-cap.sh 8G ./target/release/e163-gpu-multicard-crc32c merge --original-input <input> --total-units 2560 --shard r1-shard0.out --shard f2-shard1.out
+MERGE_INPUT_HEADER seed=0xE163092700000001 unit_count=2560
+MERGE total_units=2560 shards=2
+MERGE matched_count=2559
+MERGE mismatched_count=0 mismatched_global_unit_identifiers=[]
+MERGE missing_count=1 missing_global_unit_identifiers=[1480]
+MERGE duplicated_count=0 duplicated_global_unit_identifiers=[]
+MERGE all_reference_values_distinct=true
+MERGE sample_unit=0 recomputed=6ADED98F cpu_reference=6ADED98F equal=true
+MERGE sample_unit=1279 recomputed=4483D5D5 cpu_reference=4483D5D5 equal=true
+MERGE sample_unit=2559 recomputed=D3044B07 cpu_reference=D3044B07 equal=true
+
+判定：missing_global_unit_identifiers=[1480]，只缺这一个，Q9 过。

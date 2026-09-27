@@ -1,0 +1,762 @@
+E7INPUT name=crates_snapshot key=E158 sha256=bb5ca9bef0b09eb957906317adf7d2b47567d901ef341e85c14b6fe23a37cf4b
+E7RESULT name=r4_compare_input arm=today path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-today.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-jia-cfg.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-jia-cfg-carry.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=jia-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-jia-slot.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-cfg.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-cfg-carry.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-slot.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-cfg.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-cfg-carry.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-slot path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-slot.out lines=1658 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-bing-cfg.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=bing-cfg-carry path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-bing-cfg-carry.out lines=1205 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-cfg-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-cfg-carry-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-cfg-carry-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-slot-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-slot-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-cfg-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-cfg-carry-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-cfg-carry-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_compare_input arm=yi-narrow-slot-three-rounds path=/home/fy5090/code/singlefs/research/results/e158-root-choice-repair-2026-09-27-r4-seg5-yi-narrow-slot-three-rounds.out lines=582 verdict=pass
+E7RESULT name=r4_section_seven_three row=4 arm=today cells=488 nonzero_cells=0 verdict=pass
+E7RESULT name=r4_q4 arm=bing-cfg family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="T=14,W=14"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=22108 total_extra_read_bytes=103849984 minimum_extra_read_calls=1565 maximum_extra_read_calls=1610
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6291652 total_extra_read_bytes=25778978816 minimum_extra_read_calls=393220 maximum_extra_read_calls=393253
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=24388 total_extra_read_bytes=109641728 minimum_extra_read_calls=1516 maximum_extra_read_calls=1549
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=24964 total_extra_read_bytes=109936640 minimum_extra_read_calls=1552 maximum_extra_read_calls=1585
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-720 total_extra_read_bytes=-655360 minimum_extra_read_calls=-45 maximum_extra_read_calls=-45
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-144 total_extra_read_bytes=-360448 minimum_extra_read_calls=-9 maximum_extra_read_calls=-9
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-168 total_extra_read_bytes=-229376 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-168 total_extra_read_bytes=-229376 minimum_extra_read_calls=-21 maximum_extra_read_calls=-21
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=60 positive_cells=0 total_extra_read_calls=-2736 total_extra_read_bytes=-3637248 minimum_extra_read_calls=-46 maximum_extra_read_calls=-45
+E7RESULT name=r4_q5 arm=bing-cfg column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=60 positive_cells=0 total_extra_read_calls=-576 total_extra_read_bytes=-2531328 minimum_extra_read_calls=-10 maximum_extra_read_calls=-9
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=31124 total_extra_read_bytes=138444800 minimum_extra_read_calls=1091 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=32 positive_cells=32 total_extra_read_calls=12568968 total_extra_read_bytes=51489406976 minimum_extra_read_calls=392712 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=24840 total_extra_read_bytes=145817600 minimum_extra_read_calls=672 maximum_extra_read_calls=843
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=40392 total_extra_read_bytes=153780224 minimum_extra_read_calls=1212 maximum_extra_read_calls=1311
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15562 total_extra_read_bytes=69222400 minimum_extra_read_calls=1091 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284484 total_extra_read_bytes=25744703488 minimum_extra_read_calls=392712 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6588 total_extra_read_bytes=-23527424 minimum_extra_read_calls=-480 maximum_extra_read_calls=-357
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=12420 total_extra_read_bytes=72908800 minimum_extra_read_calls=672 maximum_extra_read_calls=843
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20196 total_extra_read_bytes=76890112 minimum_extra_read_calls=1212 maximum_extra_read_calls=1311
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284224 total_extra_read_bytes=25740345344 minimum_extra_read_calls=392712 maximum_extra_read_calls=392793
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6848 total_extra_read_bytes=-27885568 minimum_extra_read_calls=-480 maximum_extra_read_calls=-399
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=12 positive_cells=12 total_extra_read_calls=48 total_extra_read_bytes=196608 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=bing-cfg column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=12 positive_cells=12 total_extra_read_calls=48 total_extra_read_bytes=196608 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="T=14,W=14"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="T=16,W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=bing-cfg-carry family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=22164 total_extra_read_bytes=104079360 minimum_extra_read_calls=1569 maximum_extra_read_calls=1614
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6291716 total_extra_read_bytes=25779240960 minimum_extra_read_calls=393224 maximum_extra_read_calls=393257
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=24452 total_extra_read_bytes=109903872 minimum_extra_read_calls=1520 maximum_extra_read_calls=1553
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=25028 total_extra_read_bytes=110198784 minimum_extra_read_calls=1556 maximum_extra_read_calls=1589
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-656 total_extra_read_bytes=-393216 minimum_extra_read_calls=-41 maximum_extra_read_calls=-41
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-80 total_extra_read_bytes=-98304 minimum_extra_read_calls=-5 maximum_extra_read_calls=-5
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-136 total_extra_read_bytes=-98304 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-136 total_extra_read_bytes=-98304 minimum_extra_read_calls=-17 maximum_extra_read_calls=-17
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=60 positive_cells=0 total_extra_read_calls=-2496 total_extra_read_bytes=-2654208 minimum_extra_read_calls=-42 maximum_extra_read_calls=-41
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=60 positive_cells=0 total_extra_read_calls=-336 total_extra_read_bytes=-1548288 minimum_extra_read_calls=-6 maximum_extra_read_calls=-5
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=31124 total_extra_read_bytes=138444800 minimum_extra_read_calls=1091 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=32 positive_cells=32 total_extra_read_calls=12568968 total_extra_read_bytes=51489406976 minimum_extra_read_calls=392712 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=24840 total_extra_read_bytes=145817600 minimum_extra_read_calls=672 maximum_extra_read_calls=843
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=40392 total_extra_read_bytes=153780224 minimum_extra_read_calls=1212 maximum_extra_read_calls=1311
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15562 total_extra_read_bytes=69222400 minimum_extra_read_calls=1091 maximum_extra_read_calls=1155
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284484 total_extra_read_bytes=25744703488 minimum_extra_read_calls=392712 maximum_extra_read_calls=392835
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6588 total_extra_read_bytes=-23527424 minimum_extra_read_calls=-480 maximum_extra_read_calls=-357
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=12420 total_extra_read_bytes=72908800 minimum_extra_read_calls=672 maximum_extra_read_calls=843
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20196 total_extra_read_bytes=76890112 minimum_extra_read_calls=1212 maximum_extra_read_calls=1311
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284224 total_extra_read_bytes=25740345344 minimum_extra_read_calls=392712 maximum_extra_read_calls=392793
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6848 total_extra_read_bytes=-27885568 minimum_extra_read_calls=-480 maximum_extra_read_calls=-399
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=12 positive_cells=12 total_extra_read_calls=48 total_extra_read_bytes=196608 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=bing-cfg-carry column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=12 positive_cells=12 total_extra_read_calls=48 total_extra_read_bytes=196608 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=jia-cfg family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="O=14,T=14,W=14"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 positive_cells=0 total_extra_read_calls=-18048 total_extra_read_bytes=-60317696 minimum_extra_read_calls=-459 maximum_extra_read_calls=-381
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-36628 total_extra_read_bytes=-85983232 minimum_extra_read_calls=-864 maximum_extra_read_calls=-695
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-13300 total_extra_read_bytes=-74039296 minimum_extra_read_calls=-324 maximum_extra_read_calls=-227
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5954 total_extra_read_bytes=-19079168 minimum_extra_read_calls=-445 maximum_extra_read_calls=-381
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-12172 total_extra_read_bytes=-28049408 minimum_extra_read_calls=-864 maximum_extra_read_calls=-695
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-4396 total_extra_read_bytes=-24068096 minimum_extra_read_calls=-324 maximum_extra_read_calls=-227
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-7232 total_extra_read_bytes=-29458432 minimum_extra_read_calls=-504 maximum_extra_read_calls=-423
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-7232 total_extra_read_bytes=-29458432 minimum_extra_read_calls=-504 maximum_extra_read_calls=-423
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3463 total_extra_read_bytes=-11747328 minimum_extra_read_calls=-627 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1447 total_extra_read_bytes=-10715136 minimum_extra_read_calls=-267 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="O=14,T=14,W=14"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=16,T=16,W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=jia-cfg-carry family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 positive_cells=0 total_extra_read_calls=-18048 total_extra_read_bytes=-60317696 minimum_extra_read_calls=-459 maximum_extra_read_calls=-381
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=48 positive_cells=0 total_extra_read_calls=-21076 total_extra_read_bytes=-78020608 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-36628 total_extra_read_bytes=-85983232 minimum_extra_read_calls=-864 maximum_extra_read_calls=-695
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=48 positive_cells=0 total_extra_read_calls=-13300 total_extra_read_bytes=-74039296 minimum_extra_read_calls=-324 maximum_extra_read_calls=-227
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5954 total_extra_read_bytes=-19079168 minimum_extra_read_calls=-445 maximum_extra_read_calls=-381
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6988 total_extra_read_bytes=-25395200 minimum_extra_read_calls=-504 maximum_extra_read_calls=-383
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-12172 total_extra_read_bytes=-28049408 minimum_extra_read_calls=-864 maximum_extra_read_calls=-695
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-4396 total_extra_read_bytes=-24068096 minimum_extra_read_calls=-324 maximum_extra_read_calls=-227
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-7232 total_extra_read_bytes=-29458432 minimum_extra_read_calls=-504 maximum_extra_read_calls=-423
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-7232 total_extra_read_bytes=-29458432 minimum_extra_read_calls=-504 maximum_extra_read_calls=-423
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3463 total_extra_read_bytes=-11747328 minimum_extra_read_calls=-627 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=jia-cfg-carry column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1447 total_extra_read_bytes=-10715136 minimum_extra_read_calls=-267 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=jia-slot family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="O=7,T=7,W=7"
+E7RESULT name=r4_q4 arm=jia-slot family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=8,T=8,W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=8,T=8,W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=8,T=8,W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=7"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=jia-slot family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=jia-slot family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=21 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=21 positive_cells=0 total_extra_read_calls=-9108 total_extra_read_bytes=-30502912 minimum_extra_read_calls=-463 maximum_extra_read_calls=-385
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=-10634 total_extra_read_bytes=-39403520 minimum_extra_read_calls=-508 maximum_extra_read_calls=-387
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-18410 total_extra_read_bytes=-43384832 minimum_extra_read_calls=-868 maximum_extra_read_calls=-699
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-6746 total_extra_read_bytes=-37412864 minimum_extra_read_calls=-328 maximum_extra_read_calls=-231
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=-3005 total_extra_read_bytes=-9654272 minimum_extra_read_calls=-449 maximum_extra_read_calls=-385
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-3526 total_extra_read_bytes=-12828672 minimum_extra_read_calls=-508 maximum_extra_read_calls=-387
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-3526 total_extra_read_bytes=-12828672 minimum_extra_read_calls=-508 maximum_extra_read_calls=-387
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-6118 total_extra_read_bytes=-14155776 minimum_extra_read_calls=-868 maximum_extra_read_calls=-699
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-2230 total_extra_read_bytes=-12165120 minimum_extra_read_calls=-328 maximum_extra_read_calls=-231
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-6199 total_extra_read_bytes=-15466496 minimum_extra_read_calls=-866 maximum_extra_read_calls=-737
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-2311 total_extra_read_bytes=-13475840 minimum_extra_read_calls=-326 maximum_extra_read_calls=-269
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-3535 total_extra_read_bytes=-12042240 minimum_extra_read_calls=-631 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=jia-slot column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-1519 total_extra_read_bytes=-11010048 minimum_extra_read_calls=-271 maximum_extra_read_calls=0
+E7RESULT name=r4_q4 arm=yi-cfg family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=44234 total_extra_read_bytes=187707392 minimum_extra_read_calls=1550 maximum_extra_read_calls=1618
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=32 positive_cells=32 total_extra_read_calls=12583896 total_extra_read_bytes=51546152960 minimum_extra_read_calls=393168 maximum_extra_read_calls=393319
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=50904 total_extra_read_bytes=208265216 minimum_extra_read_calls=1464 maximum_extra_read_calls=1711
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=49752 total_extra_read_bytes=207675392 minimum_extra_read_calls=1500 maximum_extra_read_calls=1603
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15774 total_extra_read_bytes=69072896 minimum_extra_read_calls=1108 maximum_extra_read_calls=1177
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284716 total_extra_read_bytes=25744535552 minimum_extra_read_calls=392727 maximum_extra_read_calls=392854
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=13036 total_extra_read_bytes=72937472 minimum_extra_read_calls=711 maximum_extra_read_calls=886
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20236 total_extra_read_bytes=76623872 minimum_extra_read_calls=1215 maximum_extra_read_calls=1318
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15774 total_extra_read_bytes=69072896 minimum_extra_read_calls=1108 maximum_extra_read_calls=1177
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284716 total_extra_read_bytes=25744535552 minimum_extra_read_calls=392727 maximum_extra_read_calls=392854
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6356 total_extra_read_bytes=-23695360 minimum_extra_read_calls=-465 maximum_extra_read_calls=-338
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=13036 total_extra_read_bytes=72937472 minimum_extra_read_calls=711 maximum_extra_read_calls=886
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20236 total_extra_read_bytes=76623872 minimum_extra_read_calls=1215 maximum_extra_read_calls=1318
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284472 total_extra_read_bytes=25740300288 minimum_extra_read_calls=392729 maximum_extra_read_calls=392813
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6600 total_extra_read_bytes=-27930624 minimum_extra_read_calls=-463 maximum_extra_read_calls=-379
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3451 total_extra_read_bytes=-11354112 minimum_extra_read_calls=-625 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1435 total_extra_read_bytes=-10321920 minimum_extra_read_calls=-265 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-cfg-carry family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=44346 total_extra_read_bytes=188166144 minimum_extra_read_calls=1554 maximum_extra_read_calls=1622
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=32 positive_cells=32 total_extra_read_calls=12584024 total_extra_read_bytes=51546677248 minimum_extra_read_calls=393172 maximum_extra_read_calls=393323
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=51032 total_extra_read_bytes=208789504 minimum_extra_read_calls=1468 maximum_extra_read_calls=1715
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=32 positive_cells=32 total_extra_read_calls=49880 total_extra_read_bytes=208199680 minimum_extra_read_calls=1504 maximum_extra_read_calls=1607
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15774 total_extra_read_bytes=69072896 minimum_extra_read_calls=1108 maximum_extra_read_calls=1177
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284716 total_extra_read_bytes=25744535552 minimum_extra_read_calls=392727 maximum_extra_read_calls=392854
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=13036 total_extra_read_bytes=72937472 minimum_extra_read_calls=711 maximum_extra_read_calls=886
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20236 total_extra_read_bytes=76623872 minimum_extra_read_calls=1215 maximum_extra_read_calls=1318
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=14 total_extra_read_calls=15774 total_extra_read_bytes=69072896 minimum_extra_read_calls=1108 maximum_extra_read_calls=1177
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284716 total_extra_read_bytes=25744535552 minimum_extra_read_calls=392727 maximum_extra_read_calls=392854
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6356 total_extra_read_bytes=-23695360 minimum_extra_read_calls=-465 maximum_extra_read_calls=-338
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=13036 total_extra_read_bytes=72937472 minimum_extra_read_calls=711 maximum_extra_read_calls=886
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=20236 total_extra_read_bytes=76623872 minimum_extra_read_calls=1215 maximum_extra_read_calls=1318
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=16 total_extra_read_calls=6284472 total_extra_read_bytes=25740300288 minimum_extra_read_calls=392729 maximum_extra_read_calls=392813
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6600 total_extra_read_bytes=-27930624 minimum_extra_read_calls=-463 maximum_extra_read_calls=-379
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3451 total_extra_read_bytes=-11354112 minimum_extra_read_calls=-625 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-cfg-carry column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1435 total_extra_read_bytes=-10321920 minimum_extra_read_calls=-265 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=1474 total_extra_read_bytes=12562432 minimum_extra_read_calls=26 maximum_extra_read_calls=90
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=23 total_extra_read_calls=942 total_extra_read_bytes=5744640 minimum_extra_read_calls=-38 maximum_extra_read_calls=111
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=1518 total_extra_read_bytes=6039552 minimum_extra_read_calls=-62 maximum_extra_read_calls=183
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=654 total_extra_read_bytes=5597184 minimum_extra_read_calls=-26 maximum_extra_read_calls=75
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=32 total_extra_read_bytes=131072 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=216 total_extra_read_bytes=884736 minimum_extra_read_calls=4 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5606 total_extra_read_bytes=-18499584 minimum_extra_read_calls=-420 maximum_extra_read_calls=-353
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=-9938 total_extra_read_bytes=-37656576 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-17138 total_extra_read_bytes=-41342976 minimum_extra_read_calls=-817 maximum_extra_read_calls=-644
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-6338 total_extra_read_bytes=-35813376 minimum_extra_read_calls=-313 maximum_extra_read_calls=-212
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5606 total_extra_read_bytes=-18499584 minimum_extra_read_calls=-420 maximum_extra_read_calls=-353
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-11404 total_extra_read_bytes=-27168768 minimum_extra_read_calls=-817 maximum_extra_read_calls=-644
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-4204 total_extra_read_bytes=-23482368 minimum_extra_read_calls=-313 maximum_extra_read_calls=-212
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6856 total_extra_read_bytes=-28979200 minimum_extra_read_calls=-481 maximum_extra_read_calls=-397
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6856 total_extra_read_bytes=-28979200 minimum_extra_read_calls=-481 maximum_extra_read_calls=-397
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3451 total_extra_read_bytes=-11354112 minimum_extra_read_calls=-625 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1435 total_extra_read_bytes=-10321920 minimum_extra_read_calls=-265 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="O=4,T=4,W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=14"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=16"
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=16 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-cfg-carry family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=28 positive_cells=28 total_extra_read_calls=1586 total_extra_read_bytes=13021184 minimum_extra_read_calls=30 maximum_extra_read_calls=94
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=23 total_extra_read_calls=1038 total_extra_read_bytes=6137856 minimum_extra_read_calls=-34 maximum_extra_read_calls=115
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=1614 total_extra_read_bytes=6432768 minimum_extra_read_calls=-58 maximum_extra_read_calls=187
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=23 total_extra_read_calls=750 total_extra_read_bytes=5990400 minimum_extra_read_calls=-22 maximum_extra_read_calls=79
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=16 positive_cells=16 total_extra_read_calls=128 total_extra_read_bytes=524288 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=8 positive_cells=8 total_extra_read_calls=64 total_extra_read_bytes=262144 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=54 total_extra_read_calls=432 total_extra_read_bytes=1769472 minimum_extra_read_calls=8 maximum_extra_read_calls=8
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5606 total_extra_read_bytes=-18499584 minimum_extra_read_calls=-420 maximum_extra_read_calls=-353
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=-9938 total_extra_read_bytes=-37656576 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-17138 total_extra_read_bytes=-41342976 minimum_extra_read_calls=-817 maximum_extra_read_calls=-644
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=24 positive_cells=0 total_extra_read_calls=-6338 total_extra_read_bytes=-35813376 minimum_extra_read_calls=-313 maximum_extra_read_calls=-212
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=14 positive_cells=0 total_extra_read_calls=-5606 total_extra_read_bytes=-18499584 minimum_extra_read_calls=-420 maximum_extra_read_calls=-353
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6604 total_extra_read_bytes=-24711168 minimum_extra_read_calls=-481 maximum_extra_read_calls=-356
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-11404 total_extra_read_bytes=-27168768 minimum_extra_read_calls=-817 maximum_extra_read_calls=-644
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=16 positive_cells=0 total_extra_read_calls=-4204 total_extra_read_bytes=-23482368 minimum_extra_read_calls=-313 maximum_extra_read_calls=-212
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=l3@G_default(S=8,ring=768MiB) cells=16 positive_cells=0 total_extra_read_calls=-6856 total_extra_read_bytes=-28979200 minimum_extra_read_calls=-481 maximum_extra_read_calls=-397
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=l3@G_small_ring(S=8,ring=49152) cells=16 positive_cells=0 total_extra_read_calls=-6856 total_extra_read_bytes=-28979200 minimum_extra_read_calls=-481 maximum_extra_read_calls=-397
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-3451 total_extra_read_bytes=-11354112 minimum_extra_read_calls=-625 maximum_extra_read_calls=4
+E7RESULT name=r4_q5 arm=yi-narrow-cfg-carry column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=12 total_extra_read_calls=-1435 total_extra_read_bytes=-10321920 minimum_extra_read_calls=-265 maximum_extra_read_calls=4
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=7"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=7"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-narrow-slot family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=35 positive_cells=14 total_extra_read_calls=624 total_extra_read_bytes=5818368 minimum_extra_read_calls=-1 maximum_extra_read_calls=82
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=40 positive_cells=15 total_extra_read_calls=496 total_extra_read_bytes=3289088 minimum_extra_read_calls=-46 maximum_extra_read_calls=103
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=40 positive_cells=15 total_extra_read_calls=880 total_extra_read_bytes=3485696 minimum_extra_read_calls=-70 maximum_extra_read_calls=175
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=40 positive_cells=15 total_extra_read_calls=304 total_extra_read_bytes=3190784 minimum_extra_read_calls=-34 maximum_extra_read_calls=67
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=-3 total_extra_read_bytes=-12288 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=-2855 total_extra_read_bytes=-9462784 minimum_extra_read_calls=-428 maximum_extra_read_calls=-361
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-3362 total_extra_read_bytes=-12601344 minimum_extra_read_calls=-487 maximum_extra_read_calls=-364
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-5762 total_extra_read_bytes=-13830144 minimum_extra_read_calls=-823 maximum_extra_read_calls=-652
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-2162 total_extra_read_bytes=-11986944 minimum_extra_read_calls=-319 maximum_extra_read_calls=-220
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=-2855 total_extra_read_bytes=-9462784 minimum_extra_read_calls=-428 maximum_extra_read_calls=-361
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-3362 total_extra_read_bytes=-12601344 minimum_extra_read_calls=-487 maximum_extra_read_calls=-364
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-3362 total_extra_read_bytes=-12601344 minimum_extra_read_calls=-487 maximum_extra_read_calls=-364
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-5762 total_extra_read_bytes=-13830144 minimum_extra_read_calls=-823 maximum_extra_read_calls=-652
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-2162 total_extra_read_bytes=-11986944 minimum_extra_read_calls=-319 maximum_extra_read_calls=-220
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-5851 total_extra_read_bytes=-15288320 minimum_extra_read_calls=-822 maximum_extra_read_calls=-692
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-2251 total_extra_read_bytes=-13445120 minimum_extra_read_calls=-318 maximum_extra_read_calls=-260
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-3523 total_extra_read_bytes=-11649024 minimum_extra_read_calls=-629 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-narrow-slot column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-1507 total_extra_read_bytes=-10616832 minimum_extra_read_calls=-269 maximum_extra_read_calls=0
+E7RESULT name=r4_q4 arm=yi-slot family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=42 extra_refusals=0 intercepted="W=7"
+E7RESULT name=r4_q4 arm=yi-slot family=h1d-uncut@G_default(S=8,ring=768MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1d-uncut@S16(S=16,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1d-uncut@S4(S=4,ring=3MiB) compared_tested_mounts=48 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) compared_tested_mounts=14 extra_refusals=0 intercepted="W=7"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e@G_default(S=8,ring=768MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e@G_small_ring(S=8,ring=49152) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=h1e@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=0 intercepted="W=8"
+E7RESULT name=r4_q4 arm=yi-slot family=l2@S16(S=16,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=l2@S4(S=4,ring=3MiB) compared_tested_mounts=16 extra_refusals=8 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=l3@G_default(S=8,ring=768MiB) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=l3@G_small_ring(S=8,ring=49152) compared_tested_mounts=24 extra_refusals=0 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=l5@S16(S=16,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q4 arm=yi-slot family=l5@S4(S=4,ring=3MiB) compared_tested_mounts=72 extra_refusals=6 intercepted=""
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=35 positive_cells=14 total_extra_read_calls=21996 total_extra_read_bytes=93358080 minimum_extra_read_calls=-1 maximum_extra_read_calls=1610
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1d-uncut@G_default(S=8,ring=768MiB) cells=40 positive_cells=16 total_extra_read_calls=6291808 total_extra_read_bytes=25772503040 minimum_extra_read_calls=-1 maximum_extra_read_calls=393311
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1d-uncut@S16(S=16,ring=3MiB) cells=40 positive_cells=16 total_extra_read_calls=25312 total_extra_read_bytes=103559168 minimum_extra_read_calls=-1 maximum_extra_read_calls=1703
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1d-uncut@S4(S=4,ring=3MiB) cells=40 positive_cells=16 total_extra_read_calls=24736 total_extra_read_bytes=103264256 minimum_extra_read_calls=-1 maximum_extra_read_calls=1595
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=0 total_extra_read_calls=-3 total_extra_read_bytes=-12288 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=-4 total_extra_read_bytes=-16384 minimum_extra_read_calls=-1 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l3@G_default(S=8,ring=768MiB) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l3@G_small_ring(S=8,ring=49152) cells=24 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l5@S16(S=16,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=both_mounted family=l5@S4(S=4,ring=3MiB) cells=54 positive_cells=0 total_extra_read_calls=0 total_extra_read_bytes=0 minimum_extra_read_calls=0 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1d-uncut-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=7 total_extra_read_calls=7831 total_extra_read_bytes=34307072 minimum_extra_read_calls=1100 maximum_extra_read_calls=1169
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1d-uncut@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=3142294 total_extra_read_bytes=12872005632 minimum_extra_read_calls=392719 maximum_extra_read_calls=392846
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1d-uncut@S16(S=16,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=6454 total_extra_read_bytes=36206592 minimum_extra_read_calls=703 maximum_extra_read_calls=878
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1d-uncut@S4(S=4,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=10054 total_extra_read_bytes=38049792 minimum_extra_read_calls=1207 maximum_extra_read_calls=1310
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e-k2@GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=7 positive_cells=7 total_extra_read_calls=7831 total_extra_read_bytes=34307072 minimum_extra_read_calls=1100 maximum_extra_read_calls=1169
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e@G_default(S=8,ring=768MiB) cells=8 positive_cells=8 total_extra_read_calls=3142294 total_extra_read_bytes=12872005632 minimum_extra_read_calls=392719 maximum_extra_read_calls=392846
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e@G_small_ring(S=8,ring=49152) cells=8 positive_cells=0 total_extra_read_calls=-3242 total_extra_read_bytes=-12109824 minimum_extra_read_calls=-473 maximum_extra_read_calls=-346
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e@S16(S=16,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=6454 total_extra_read_bytes=36206592 minimum_extra_read_calls=703 maximum_extra_read_calls=878
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=h1e@S4(S=4,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=10054 total_extra_read_bytes=38049792 minimum_extra_read_calls=1207 maximum_extra_read_calls=1310
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=l2@S16(S=16,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=6365 total_extra_read_bytes=34748416 minimum_extra_read_calls=706 maximum_extra_read_calls=838
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=l2@S4(S=4,ring=3MiB) cells=8 positive_cells=8 total_extra_read_calls=9965 total_extra_read_bytes=36591616 minimum_extra_read_calls=1210 maximum_extra_read_calls=1270
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=l5@S16(S=16,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-3523 total_extra_read_bytes=-11649024 minimum_extra_read_calls=-629 maximum_extra_read_calls=0
+E7RESULT name=r4_q5 arm=yi-slot column=refused_minus_today family=l5@S4(S=4,ring=3MiB) cells=18 positive_cells=0 total_extra_read_calls=-1507 total_extra_read_bytes=-10616832 minimum_extra_read_calls=-269 maximum_extra_read_calls=0
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=bing-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=jia-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-carry-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-cfg-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-carry-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-cfg-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-narrow-slot-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=yi-slot-three-rounds control=PC-extra-refusal sentence=today_ok_on_the_cell tag=today verdict=not_constructible n1=1,2,3
+E7RESULT name=r4_cross_arm_sentence arm=today control=PC-22 sentence=an_m_with_ok_zero_count_zero_isolation tag=today verdict=not_constructible route=F2
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_cfg jia_arm=jia-cfg cells=488 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=2 witness=device_n_slot jia_arm=jia-slot cells=488 mismatches=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg cells=62 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=bing-cfg-carry cells=62 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg cells=62 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-cfg-carry cells=62 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=jia-slot cells=62 differences=0 verdict=pass
+E7RESULT name=r4_section_seven_three row=3 arm=today cells=62 differences=0 verdict=pass
+E7RESULT name=r4_f11 cells=282 cells_differing_outside_o1_and_cell_22=0 verdict=inference_holds
+E7RESULT name=r4_base_identity arm=bing-cfg prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=bing-cfg-carry prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-cfg-carry prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=jia-slot prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=today prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg-carry prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg-carry-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-cfg-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg-carry prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg-carry-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-cfg-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-slot prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-narrow-slot-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-slot prefixes=36 differing=0 verdict=pass
+E7RESULT name=r4_base_identity arm=yi-slot-three-rounds prefixes=0 differing=0 verdict=pass
+E7RESULT name=r4_loss arm=bing-cfg family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=42
+E7RESULT name=r4_loss arm=bing-cfg family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=bing-cfg geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=bing-cfg geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=42
+E7RESULT name=r4_loss arm=bing-cfg-carry family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=bing-cfg-carry geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=bing-cfg-carry geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=jia-cfg family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=42
+E7RESULT name=r4_loss arm=jia-cfg family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=jia-cfg geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=jia-cfg geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=42
+E7RESULT name=r4_loss arm=jia-cfg-carry family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=jia-cfg-carry geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=jia-cfg-carry geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=jia-slot family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=24 q1_overwrite_cells=6 q2_rollback_cells=24 q3_lost_cells=24 q3c_lost_cells=4 q3_last_confirmed_cells=24
+E7RESULT name=r4_loss arm=jia-slot family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=32 q2_rollback_cells=32 q3_lost_cells=0 q3c_lost_cells=16 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-slot family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=24 q1_overwrite_cells=6 q2_rollback_cells=24 q3_lost_cells=24 q3c_lost_cells=4 q3_last_confirmed_cells=24
+E7RESULT name=r4_loss arm=jia-slot family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=32 q2_rollback_cells=32 q3_lost_cells=0 q3c_lost_cells=16 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-slot family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=24 q1_overwrite_cells=6 q2_rollback_cells=24 q3_lost_cells=24 q3c_lost_cells=4 q3_last_confirmed_cells=24
+E7RESULT name=r4_loss arm=jia-slot family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=32 q2_rollback_cells=32 q3_lost_cells=0 q3c_lost_cells=16 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-slot family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=32 q1_overwrite_cells=32 q2_rollback_cells=32 q3_lost_cells=0 q3c_lost_cells=16 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=jia-slot family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=21 q1_overwrite_cells=3 q2_rollback_cells=21 q3_lost_cells=21 q3c_lost_cells=3 q3_last_confirmed_cells=21
+E7RESULT name=r4_loss arm=jia-slot family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=28 q1_overwrite_cells=24 q2_rollback_cells=28 q3_lost_cells=0 q3c_lost_cells=24 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=jia-slot geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=jia-slot geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=today family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=48 lost_write_cells=48 q1_overwrite_cells=12 q2_rollback_cells=48 q3_lost_cells=48 q3c_lost_cells=8 q3_last_confirmed_cells=0
+E7RESULT name=r4_loss arm=today family=h1e geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=today family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=48 lost_write_cells=48 q1_overwrite_cells=12 q2_rollback_cells=48 q3_lost_cells=48 q3c_lost_cells=8 q3_last_confirmed_cells=0
+E7RESULT name=r4_loss arm=today family=h1e geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=today family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=48 lost_write_cells=48 q1_overwrite_cells=12 q2_rollback_cells=48 q3_lost_cells=48 q3c_lost_cells=8 q3_last_confirmed_cells=0
+E7RESULT name=r4_loss arm=today family=h1e geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=today family=h1e geometry=G_small_ring(S=8,ring=49152) cells=64 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=today family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=42 lost_write_cells=42 q1_overwrite_cells=6 q2_rollback_cells=42 q3_lost_cells=42 q3c_lost_cells=6 q3_last_confirmed_cells=0
+E7RESULT name=r4_loss arm=today family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=56 q1_overwrite_cells=48 q2_rollback_cells=56 q3_lost_cells=0 q3c_lost_cells=48 q3_last_confirmed_cells=56
+E7RESULT name=r4_q6 arm=today geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=3 verdict=not_covered
+E7RESULT name=r4_q6 arm=today geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=3 verdict=not_covered
+E7RESULT name=r4_loss arm=yi-cfg family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_loss arm=yi-cfg family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-cfg geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-cfg geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_loss arm=yi-cfg-carry family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-cfg-carry geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-cfg-carry geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-cfg-carry-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=96
+E7RESULT name=r4_loss arm=yi-cfg-carry-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=320
+E7RESULT name=r4_loss arm=yi-cfg-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=96
+E7RESULT name=r4_loss arm=yi-cfg-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=320
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_loss arm=yi-narrow-cfg family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-narrow-cfg geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-narrow-cfg geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=64
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=56
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-narrow-cfg-carry geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-narrow-cfg-carry geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=96
+E7RESULT name=r4_loss arm=yi-narrow-cfg-carry-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=320
+E7RESULT name=r4_loss arm=yi-narrow-cfg-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=96
+E7RESULT name=r4_loss arm=yi-narrow-cfg-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=0 q1_overwrite_cells=0 q2_rollback_cells=0 q3_lost_cells=0 q3c_lost_cells=0 q3_last_confirmed_cells=320
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=28 q1_overwrite_cells=4 q2_rollback_cells=28 q3_lost_cells=28 q3c_lost_cells=4 q3_last_confirmed_cells=28
+E7RESULT name=r4_loss arm=yi-narrow-slot family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=56 q1_overwrite_cells=48 q2_rollback_cells=56 q3_lost_cells=0 q3c_lost_cells=48 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-narrow-slot geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-narrow-slot geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-narrow-slot-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=48 q1_overwrite_cells=12 q2_rollback_cells=48 q3_lost_cells=48 q3c_lost_cells=7 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=yi-narrow-slot-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=160 q1_overwrite_cells=160 q2_rollback_cells=160 q3_lost_cells=0 q3c_lost_cells=80 q3_last_confirmed_cells=320
+E7RESULT name=r4_loss arm=yi-slot family=h1d-uncut geometry=S4(S=4,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-slot family=h1e geometry=S4(S=4,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-slot family=h1d-uncut geometry=S16(S=16,ring=3MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-slot family=h1e geometry=S16(S=16,ring=3MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-slot family=h1d-uncut geometry=G_default(S=8,ring=768MiB) cells=64 lost_write_cells=32 q1_overwrite_cells=8 q2_rollback_cells=32 q3_lost_cells=32 q3c_lost_cells=5 q3_last_confirmed_cells=32
+E7RESULT name=r4_loss arm=yi-slot family=h1e geometry=G_default(S=8,ring=768MiB) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-slot family=h1e geometry=G_small_ring(S=8,ring=49152) cells=128 lost_write_cells=64 q1_overwrite_cells=64 q2_rollback_cells=64 q3_lost_cells=0 q3c_lost_cells=32 q3_last_confirmed_cells=128
+E7RESULT name=r4_loss arm=yi-slot family=h1d-uncut-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=56 lost_write_cells=28 q1_overwrite_cells=4 q2_rollback_cells=28 q3_lost_cells=28 q3c_lost_cells=4 q3_last_confirmed_cells=28
+E7RESULT name=r4_loss arm=yi-slot family=h1e-k2 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=112 lost_write_cells=56 q1_overwrite_cells=48 q2_rollback_cells=56 q3_lost_cells=0 q3c_lost_cells=48 q3_last_confirmed_cells=112
+E7RESULT name=r4_q6 arm=yi-slot geometry=S16(S=16,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_q6 arm=yi-slot geometry=S4(S=4,ring=3MiB) cells=72 not_covered_cells=0 verdict=covered
+E7RESULT name=r4_loss arm=yi-slot-three-rounds family=h1d-uncut-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=96 lost_write_cells=48 q1_overwrite_cells=12 q2_rollback_cells=48 q3_lost_cells=48 q3c_lost_cells=7 q3_last_confirmed_cells=48
+E7RESULT name=r4_loss arm=yi-slot-three-rounds family=h1e-r3 geometry=GEOMETRY_PRIMARY(S=8,ring=3MiB) cells=320 lost_write_cells=160 q1_overwrite_cells=160 q2_rollback_cells=160 q3_lost_cells=0 q3c_lost_cells=80 q3_last_confirmed_cells=320
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=bing-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=jia-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=today quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-carry-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-cfg-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-carry-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-cfg-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-narrow-slot-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot quantity=read-only voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q1-Q3 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q1-Q3-random-histories voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q4 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q5-both-mounted voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q5-refused voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=Q6 voided=false basis=none
+E7RESULT name=r4_void arm=yi-slot-three-rounds quantity=read-only voided=false basis=none
+E7RESULT name=r4_missed_arm_and_today_sentences count=18 list=bing-cfg:PC-extra-refusal:today_ok_on_the_cell(today),bing-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg:PC-extra-refusal:today_ok_on_the_cell(today),jia-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),jia-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg-carry-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),yi-cfg-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg-carry:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg-carry-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-cfg-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-narrow-slot-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),yi-slot:PC-extra-refusal:today_ok_on_the_cell(today),yi-slot-three-rounds:PC-extra-refusal:today_ok_on_the_cell(today),today:PC-22:an_m_with_ok_zero_count_zero_isolation(today)
+E7RESULT name=done emitted=761
