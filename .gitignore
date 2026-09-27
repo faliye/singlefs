@@ -15,6 +15,9 @@ target/
 
 .env
 
+# 层 0 崩溃重放双机分片的本地配置（第二台机器的别名、仓副本路径、清场命令），模板在仓根 layer0-shard.env.example
+/layer0-shard.env
+
 # 本机个人权限规则（含本机路径），不进仓
 .claude/settings.local.json
 
