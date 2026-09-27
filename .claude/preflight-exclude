@@ -1,0 +1,194 @@
+# 准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）不判的脚本：一行一条 <路径>  # 理由。
+# 库一直留着；标「还没改完」的改完一个删一行，排除只缩不涨。
+.claude/gate.d/lib-format-const.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-history-brief.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-index-vs-body.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-item-ref-status.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-manifest.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-open-item-review.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-owed.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/gate.d/lib-prime-marks.py  # 被门禁阶段 import 的函数库，没有自己的入口，不单独调
+.claude/hooks/lib_heavy_tests.py  # 被钩子 import 的函数库（--selftest 由 hooks-registered 与 63 号经钩子跑），不单独调
+.claude/hooks/lib_selftest_scratch.py  # 被钩子 import 的函数库（--selftest 由 hooks-registered 与 63 号经钩子跑），不单独调
+.claude/hooks/lib_shell_words.py  # 被钩子 import 的函数库（--selftest 由 hooks-registered 与 63 号经钩子跑），不单独调
+research/scripts/changed-paths.sh  # 被门禁阶段 source 的函数库（gate_diff_base、gate_changed_paths），不单独调
+research/scripts/stage-run-or-skip.sh  # 被门禁阶段 source 的函数库（stage_run_or_skip）；它的 --selftest 由 47 号跑
+research/scripts/lib_atomic_replace.py  # 被 replace-once.py、insert-row.py import 的函数库，不单独调
+research/scripts/e125-zoned-wp-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e129-tear-injector.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e129-thin-neighbour.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e129-thin-rmw.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e152-run.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e152-stage-root.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e152-tables.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e21-compute.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e21-prove-gpu.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e21-transfer.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e34-iomin-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e56-report.py  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e56-sweep.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e6-units.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/e72-devtable-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/local-repro-tuned.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/local-repro.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/stripe-map-probe.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/vm-bench.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/scripts/vm-geom.sh  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e100_system_configuration_slot.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e101_node_tag_reserve.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e102_unit_class_registry.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e103_inode_update_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e104_current_version.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e105_extent_leaf_packed.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e106_stripe_member_table.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e107_stripe_table_wa.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e108_plaintext_layer_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e109_position_authority.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e110_stripe_table_steady.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e111_stripe_table_key.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e112_old_writer_unknown_tree.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e113_unknown_tree_full_arms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e114_pack_ledger.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e116_pack_settle.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e117_reserved_header.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e118_single_disk_recovery.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e119_slot_tiers.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e120_tier_ratio.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e121_capacity_tiers.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e122_directory_locality.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e123_reuse_window_versus_rollback_depth.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e124_system_configuration_recompute.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e126_system_configuration_slot_width.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e127_group_identity_under_split_merge.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e128_pointer_birth_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e12_lifecycle.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e130_livelist_bounded_destroy.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e131_livelist_carrier.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e132_livelist_carrier_recount.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e133_map_key_format_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e134_map_key_slot_baselines.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e135_rollback_floor.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e136_fork_cost_rows.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e137_map_key_performance.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e138_per_disk_floor.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e139_tightened_floor.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e140_header_alignment.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e141_switch_reserve_mount_admission.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e142_region_diff_independent.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e143_one_unit_per_transaction_journal.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e144_header_checksum_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e145_self_describing_node_header.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e146_livelist_entry_width.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e147_system_configuration_recompute_from_layout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e148_commit_fixpoint_two_record_trees.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e149_pack_container_repair_options.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e14_discrimination.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e150_rollback_reuse_of_abandoned_roots.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e151_arrival_and_container_arms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e152_file_system_benchmark.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e153_ledger_shape_and_ring_holes.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e154_two_gates_serial_rejudge_and_reclaim_timing.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e155_fourth_run_group_commit_concurrency.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e155_fsync_write_volume.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e155_second_run_fsync_write_volume.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e155_third_run_release_cascade.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e157_parallel_line_one_clauses.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e160_random_small_read_share.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e16_journal.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e17_merge.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e18_branch.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e19_defer.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e20_fanout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e21_cpu.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e23_journal_geom.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e24_recovery.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e25_journal_reserve.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e26_accounting.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e27_snapshot_accounting_risk_paths.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e28_map_rebuild.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e29_blast_radius.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e30_range_rebuild.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e31_aad_snapshot.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e32_journal_timeline.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e33_pin_rules.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e34_ring_iomin.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e35_head_forms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e36_slot_mapping.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e37_log_epoch.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e38_accounting_copy_on_write.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e39_back_chain.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e40_checksum_width.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e41_root_ring_geom.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e42_transaction_records.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e43_extension_point_budget.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e44_jsn_width.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e45_span_ring_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e46_region_spacing.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e47_ring_loss.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e48_ring_placement.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e49_chain_width.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e50_ring_slots.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e51_chain_chances.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e52_head_mechanisms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e53_ring_failure.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e54_accounting_generations.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e56_epsilon.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e57_field_authority.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e58_csum_grain.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e59_message_recompute.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e60_rebalance.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e61_chain_hash.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e62_ring_home.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e63_width_rule.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e65_write_grain.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e66_small_files.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e67_device_subset.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e68_inline_threshold.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e69_backref_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e6_multicore.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e6_units.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e70_ckpt_thresholds.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e71_accounting_keys.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e73_key_range.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e74_allocation_records.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e75_record_size.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e76_payload_checksum.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e77_publish_order.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e78_replay_start.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e79_root_record.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e7_index.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e80_partial_stripe.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e81_commit_fixpoint.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e82_admission_overlay.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e83_tombstone_grain.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e84_tombstone_pinning.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e85_unit_header.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e86_scan_step.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e87_fixed_placement.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e88_impostor_orphan.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e89_interval_frontier.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e8_split.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e90_tree_aad.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e91_ring_admission.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e92_reuse_requirement.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e93_aging_placement.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e94_move_touchset.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e95_node_layout_arms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e96_hybrid_consistency.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e97_entry_encoding.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e98_inode_record.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e99_writebuffer_sequence.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+research/e7-index-bench/src/bin/e9_keylayout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
+crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-harness/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动还要走代码三方（门禁 56 号）
+crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
+crates/singlefs-harness/src/bin/first_transaction_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
+crates/singlefs-harness/src/bin/first_transaction_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试并走代码三方（门禁 56 号）
+.claude/scripts/preflight.sh  # 被项目脚本 source 的函数库：找到规范副本里的 preflight.sh（本树或主仓）就 source 它，找不到就定义一个当场判红的 preflight；不单独调
+.claude/scripts/project_preflight.py  # 被项目的 python 脚本 import 的函数库：找到规范副本里的 preflight.py（本树或主仓）再转调，找不到判红；不单独调
+.claude/gate.d/lib-governance-refs.py  # 被门禁 10 号调的函数库（治理文档里的门禁号、路径与「小节」指不指得到），不单独调

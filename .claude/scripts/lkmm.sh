@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 判的是此刻 litmus/ 与代码里的锚点，上一次的结论不替这一次作保（门禁 57 号的复用另由 stage-must-run.sh 判）
+# run-condition: none herd7 与内核树由它自己找（PATH、opam、fetch-deps.sh），找不到就判红并给出路，57 号靠这一条判红，不交给调用方预判
 # 用 LKMM 判内存序结论：herd7 给模型判定。
 #
 # 这是本工程自己的一份：上游 singlefs-ai-sop 2026-09-16 起不再管 herd7 / LKMM（移交那次的记录与删前原样在提交 fbae43e 里，`git show fbae43e:.claude/handover/qemu-herd7/README.md`），
@@ -7,6 +9,8 @@
 #
 #   lkmm.sh [项目根]                  跑 <项目根>/litmus/*.litmus
 #   lkmm.sh [项目根] --static-only    只跑不需要 herd7 的检查；全过也退 3——它不是通过
+#   lkmm.sh --herd7-version           只找 herd7（与全量判定同一段找法，PATH 里没有就试 opam 的环境），stdout 打它版本输出的第一行、退 0；
+#                                     找不到退 1。门禁 57 号经登记表（.claude/gate.d/stage-inputs.tsv）拿它判前提、把版本当复用判定的一项输入
 #
 # 每个 .litmus 必须在文件里声明期望判定：
 #
@@ -40,14 +44,40 @@
 # 1–4 都排在 herd7 探测之前：它们不需要 herd7，
 # 该红的先红出来（selftest 的样本也靠这一点才喂得进去）。
 source "$(dirname "${BASH_SOURCE[0]}")/../singlefs-ai-sop/scripts/lib.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
-STATIC_ONLY=0; ROOT=""
+STATIC_ONLY=0; HERD7_VERSION_ONLY=0; ROOT=""
 for argument in "$@"; do
   case "$argument" in
     --static-only) STATIC_ONLY=1 ;;
+    --herd7-version) HERD7_VERSION_ONLY=1 ;;
     *) ROOT="$argument" ;;
   esac
 done
+
+# herd7 不在 PATH 里就试一次 opam 的环境；找得到返回 0。全量判定与 --herd7-version 共用这一段找法。
+find_herd7() {
+  if ! command -v herd7 >/dev/null 2>&1 && command -v opam >/dev/null 2>&1; then
+    export OPAMROOT="${OPAMROOT:-$HOME/.opam}"
+    eval "$(opam env --root="$OPAMROOT" --set-root 2>/dev/null)" || true
+  fi
+  command -v herd7 >/dev/null 2>&1
+}
+report_herd7_missing() {
+  bad "herd7 缺失"
+  howto "opam install herdtools7" \
+        "（装完若命令仍找不到，先 eval \"\$(opam env)\"）"
+}
+if [[ $HERD7_VERSION_ONLY -eq 1 ]]; then
+  find_herd7 || { report_herd7_missing; exit 1; }
+  if ! herd7_version_output="$(herd7 -version 2>&1)"; then
+    bad "herd7 -version 退非 0：$herd7_version_output"
+    howto "herd7 装坏了：opam reinstall herdtools7，再跑一次 bash .claude/scripts/lkmm.sh --herd7-version"
+    exit 1
+  fi
+  printf '%s\n' "${herd7_version_output%%$'\n'*}"
+  exit 0
+fi
 ROOT="${ROOT:-$(project_root)}"
 # 对照组判据靠内嵌的 python3。缺了它，$(is_fence_removal_of …) 失败被当成「不匹配」，
 # 于是每条 Never 都报「没有配对的对照组」——症状指着 litmus，病根在环境（审计实测）。
@@ -297,16 +327,7 @@ if [[ $STATIC_ONLY -eq 1 ]]; then
 fi
 
 # ── herd7 ──
-if ! command -v herd7 >/dev/null 2>&1 && command -v opam >/dev/null 2>&1; then
-  export OPAMROOT="${OPAMROOT:-$HOME/.opam}"
-  eval "$(opam env --root="$OPAMROOT" --set-root 2>/dev/null)" || true
-fi
-command -v herd7 >/dev/null 2>&1 || {
-  bad "herd7 缺失"
-  howto "opam install herdtools7" \
-        "（装完若命令仍找不到，先 eval \"\$(opam env)\"）"
-  exit 1
-}
+find_herd7 || { report_herd7_missing; exit 1; }
 
 # ── 内核树（herd7 要在 tools/memory-model 里跑，模型文件是相对路径引的）──
 if [[ -z "$KTREE" ]]; then

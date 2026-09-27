@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# admission: always 判的是此刻 decisions/ 下的正文，门禁 21 号每一轮都拿它的输出与索引页现比
+# run-condition: none 只读仓里的决策正文，除了 python3 之外没有环境要求
 """从 decisions/ 下的正文抽出每条决策的分项清单，打印成 markdown。
 
 **它存在的唯一理由是「同一个事实只许一处权威记录」**：分项的权威记录是各决策正文，
@@ -20,7 +22,12 @@ checkpoint 序号怎么共存」曾让按行内关键字判状态的老版本把
 「这条决策有几个分项、其中几个还没定」看一眼就有数，而三态词看不出这个。
 三态词的权威记录仍是各正文首行 `## D<n> 简称 —— 状态`，索引列不再抄它一遍。
 """
-import re, glob, sys
+import os, re, glob, sys
+# 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from project_preflight import preflight  # noqa: E402
+preflight(__file__)
 
 def clip(text, n):
     """截到 n 个字符，**但不许留下没闭合的括注**。

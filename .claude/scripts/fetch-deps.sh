@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# admission: always 取之前现查本机缺什么，已经取过的它自己认出来跳过，上一次的结论不替这一次作保
+# run-condition: none 缺的工具它自己逐项查出来、打印装法（系统包不跑 sudo），取不了的那一项判红，不交给调用方预判
 # 取测试依赖。安装期可以后台跑，也可以不跑——各测试脚本会在真要用时调它。
 #
 #   fetch-deps.sh              取全部能自动取的
@@ -7,7 +9,9 @@
 #
 # 边界（rules/command-safety.md）：**本脚本不跑 sudo。**
 # 系统包只打印那条命令，由人自己执行——静默改系统比缺个包危险得多。
+# gate-lint:nocount 它取的是几样固定的依赖（内核树、系统包提示），不扫一批对象，成功句报的是取到的那一样在哪
 source "$(dirname "${BASH_SOURCE[0]}")/../singlefs-ai-sop/scripts/lib.sh"
+preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/singlefs"
 KTREE_CACHE="$CACHE/linux-memory-model"

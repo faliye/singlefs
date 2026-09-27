@@ -1,0 +1,2 @@
+# check.sh 的 fmt、clippy、build、test 四条 cargo 各经这一行跑（规矩在 .claude/singlefs-ai-sop/rules/command-safety.md「一个脚本里的检测项，能并行就并行」那一节末尾）。
+bash research/scripts/run-with-memory-cap.sh 24G bash research/scripts/capped.sh 16  # 内存上限与线程上限：全量构建量过的峰值 9.95 GB（research/scripts/memory-peaks.tsv，上限 16G 那一次），全量测试没量过、24G 是推的；线程 16 = 32 核的一半，给同时在跑的 agent 留位
