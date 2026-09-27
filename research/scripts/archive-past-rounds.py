@@ -20,7 +20,7 @@
   留 —— 工作区里新加或改过的（本轮在产生的）、三方判决 `*-main-verification.md`（kb 的依据指着它）、
         `abandoned-rounds.tsv`（登记表，门禁 66 号的输入）、还被代码当输入的产物（still_an_input）。
   ⚠️ 删文件会让别处指向它的链接指空，所以 --apply 同时把那些引用**只留文件名、去掉路径**，
-     不留一个指空的路径——共享门禁的「链接指向」阶段判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
+     不留一个指空的路径——共享 `gate.sh` 的「链接指向」阶段（`.claude/singlefs-ai-sop/scripts/link-targets.py`）判的就是这个。「找不到就去 git 历史里看」写在 `.claude/agent-common.md`，不逐处重复。
 """
 import os
 import re
@@ -281,7 +281,7 @@ def run(root, apply_changes):
         for entry in stale:                                        # gate-lint:detail
             print("      %s" % entry)
         print("     → 怎么办：把它们从各自的排除表里删掉——排除只缩不涨，指不到的排除会让人以为那批文件已经被绕开了。")
-    print("     → 下一步：跑共享门禁的「链接指向」阶段确认没有指空的链接，再跑一次本脚本 --check 判绿。")
+    print("     → 下一步：在仓库根单跑共享「链接指向」那一道 `python3 .claude/singlefs-ai-sop/scripts/link-targets.py` 确认没有指空的链接，再跑一次本脚本 --check 判绿。")
     return 0
 
 

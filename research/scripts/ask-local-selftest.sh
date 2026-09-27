@@ -58,15 +58,22 @@ python3 -c 'import sys; sys.exit(0 if open(sys.argv[1]).read() == open(sys.argv[
 
 # ④ 检测器没跑成（崩了退 2）或找不到 ⇒ 必须退 6、stdout 为空、正文留成作废副本：退 0 会被只看退出码的调用方当成过了闸
 # 强制进入不加测试缝：把被测脚本拷进临时目录，旁边放退 2 的假检测器，或什么都不放（检测器按脚本所在目录找）
-mkdir -p "$D/broken" "$D/missing"
-cp "$ASK_LOCAL" "$D/broken/ask-local.sh"; cp "$ASK_LOCAL" "$D/missing/ask-local.sh"
-for checker in corruption-check.py oov-check.py; do printf 'import sys\nsys.exit(2)\n' > "$D/broken/$checker"; done
+# 副本放在与仓里相同的相对位置 research/scripts/ 下，旁边用符号链接接上 .claude/scripts 与 .claude/singlefs-ai-sop：
+# ask-local.sh 按自己所在目录往上两级找准入垫片，副本旁边没有它就 source 失败、参数被清空，退的是「提示为空」的 2 而不是被测的 6
+ASK_LOCAL_REPOSITORY_ROOT="$(cd "$(dirname "$ASK_LOCAL")/../.." && pwd)"
+for variant in broken missing; do
+  mkdir -p "$D/$variant/research/scripts" "$D/$variant/.claude"
+  ln -s "$ASK_LOCAL_REPOSITORY_ROOT/.claude/scripts" "$D/$variant/.claude/scripts"
+  ln -s "$ASK_LOCAL_REPOSITORY_ROOT/.claude/singlefs-ai-sop" "$D/$variant/.claude/singlefs-ai-sop"
+  cp "$ASK_LOCAL" "$D/$variant/research/scripts/ask-local.sh"
+done
+for checker in corruption-check.py oov-check.py; do printf 'import sys\nsys.exit(2)\n' > "$D/broken/research/scripts/$checker"; done
 case_count=2; assertion_count=5   # ①② 两个用例、5 条断言；下面每个变体加 1 个用例、3 条断言
 for variant in broken missing; do
   case_count=$((case_count + 1)); assertion_count=$((assertion_count + 3))
   if [[ $variant == broken ]]; then label="崩了"; else label="找不到"; fi
   printf 'ask-local selftest prompt %s.\n' "$variant" > "$D/case-$variant-prompt.md"
-  ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$D/$variant/ask-local.sh" "$D/case-$variant-prompt.md" >"$D/o-$variant" 2>"$D/e-$variant"
+  ASK_LOCAL_FAKE_TEXT="$D/clean.txt" bash "$D/$variant/research/scripts/ask-local.sh" "$D/case-$variant-prompt.md" >"$D/o-$variant" 2>"$D/e-$variant"
   rc=$?
   [[ $rc -eq 6 ]] || { say ✗ "检测器${label}时应退 6，实际 $rc——没验过的一份会被当成过了闸"; fail=1; }
   [[ ! -s "$D/o-$variant" ]] || { say ✗ "检测器${label}时 stdout 却有正文——没验过的输出会顶着合法名字落盘"; fail=1; }

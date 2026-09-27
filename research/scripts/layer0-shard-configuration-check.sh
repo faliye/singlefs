@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # 层 0 崩溃重放双机分片（里程碑三第六项，.claude/kb/milestone/03-third-txn.md 第六节）的本地配置：在不在、键齐不齐、写得对不对、
 # 第二台连不连得上、它上面有没有 cargo。门禁 54 号 --full 拿它定走不走分片；research/scripts/layer0-shard-run.sh 拿它当运行条件。
+# PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 research/scripts/run-with-memory-cap.sh 起那一片；本机那一片由起 54 号的那一层包装管），
+# 写法照 run-with-memory-cap.sh：正整数加 K / M / G / T，单位必写。
 #
 #   layer0-shard-configuration-check.sh [<仓根>]
 #       退 0 能分片（stdout 一句：配置在哪、第二台是谁）；退 1 不能（stdout 一句原因，下一行是出路）。
@@ -21,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 layer0_shard_check_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-LAYER0_SHARD_CONFIGURATION_KEYS=(PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY
+LAYER0_SHARD_CONFIGURATION_KEYS=(PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND)
 
 emit_assignments=0
@@ -68,6 +70,8 @@ done
 for directory_key in PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY; do
   [[ "${configuration[$directory_key]}" == /* ]] || refuse "$directory_key 要写第二台上的绝对路径，读到「${configuration[$directory_key]}」"
 done
+[[ "${configuration[PEER_MEMORY_CAP]}" =~ ^[1-9][0-9]*[KMGT]$ ]] \
+  || refuse "PEER_MEMORY_CAP 要写第二台那一片的内存上限（正整数加 K / M / G / T，例 24G，单位必写），读到「${configuration[PEER_MEMORY_CAP]}」"
 for command_pair in "QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND" "QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND"; do
   read -r action_key check_key <<< "$command_pair"
   if [[ -n "${configuration[$action_key]}" && -z "${configuration[$check_key]}" ]] || [[ -z "${configuration[$action_key]}" && -n "${configuration[$check_key]}" ]]; then

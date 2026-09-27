@@ -1,0 +1,7 @@
+M1_合并比对恒判相同	                if values[0] == cpu_reference[global_unit_identifier as usize] {	                if true {
+M2_合并只遍历收到的记录不按0..N查缺	    for global_unit_identifier in 0..total_units {	    for global_unit_identifier in seen_crc_by_unit.keys().copied().collect::<Vec<u64>>() {
+M3_着色器用未反射的多项式	const CRC32C_REFLECTED_POLYNOMIAL: u32 = 0x82F63B78u;	const CRC32C_REFLECTED_POLYNOMIAL: u32 = 0x1EDC6F41u;
+M4_着色器漏最后取反	    results[local_offset].crc = crc_register ^ CRC32C_INITIAL_VALUE;	    results[local_offset].crc = crc_register;
+M6_着色器按大端取字节	        let shift = 8u * (byte_index % 4u);	        let shift = 8u * (3u - byte_index % 4u);
+M7_结果的gid不从设备回读	    for chunk in mapped.chunks_exact(RESULT_ENTRY_BYTE_LENGTH) {\n        let crc = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);\n        let local_offset = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);\n        results.push((crc, local_offset));\n    }	    for chunk in mapped.chunks_exact(RESULT_ENTRY_BYTE_LENGTH) {\n        let crc = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);\n        results.push((crc, 0u32));\n    }
+M8_每次只派一半工作组	        compute_pass.dispatch_workgroups(workgroup_count, 1, 1);	        compute_pass.dispatch_workgroups(workgroup_count / 2, 1, 1);

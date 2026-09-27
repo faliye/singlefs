@@ -448,3 +448,44 @@ path = "src/bin/e159_fsync_wait_group_commit.rs"
 [[bin]]
 name = "e142-region-diff-independent"
 path = "src/bin/e142_region_diff_independent.rs"
+
+# E162（崩溃放量判定块存储选型）的两个存储候选；版本照跑前登记 1.3 钉死，只有这个 bin 用。
+# 设成可选、挂在不默认打开的特性上：librocksdb-sys 要现编 C++，而且它的 bindgen 在本机找不到 stdbool.h
+# （只有 libclang、没有 clang 的头文件），要 BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include 才编得过；
+# 不设成可选，这个包里每个 bin 的构建都会去编它、在没设那个变量的地方编不过。
+# 编这个 bin：cargo build --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store
+[dependencies.redb]
+version = "=4.3.0"
+optional = true
+
+[dependencies.rocksdb]
+version = "=0.25.0"
+optional = true
+
+[features]
+e162-block-stores = ["dep:redb", "dep:rocksdb"]
+# E163（GPU 多卡算单元校验和）：只这一个 bin 用，见下方 [dependencies.wgpu] 旁的注释。
+e163-gpu = ["dep:wgpu", "dep:pollster"]
+
+[[bin]]
+name = "e162-crash-verdict-block-store"
+path = "src/bin/e162_crash_verdict_block_store.rs"
+required-features = ["e162-block-stores"]
+
+# E163（GPU 多卡算单元校验和）跑前登记第五节：只这一个 bin 用，设成可选、挂在不默认打开的
+# 特性 e163-gpu 上（写法照上面 E162 的先例），门禁 15 号不编它。版本照登记钉死。
+# 编这个 bin：cargo build --release -p e7-index-bench --features e163-gpu --bin e163-gpu-multicard-crc32c
+[dependencies.wgpu]
+version = "=30.0.1"
+default-features = false
+features = ["vulkan", "wgsl", "std"]
+optional = true
+
+[dependencies.pollster]
+version = "=1.0.1"
+optional = true
+
+[[bin]]
+name = "e163-gpu-multicard-crc32c"
+path = "src/bin/e163_gpu_multicard_crc32c.rs"
+required-features = ["e163-gpu"]

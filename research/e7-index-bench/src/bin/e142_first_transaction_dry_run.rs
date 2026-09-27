@@ -103,7 +103,8 @@ const JOURNAL_HEADER_BYTES: u64 = 311;
 /// 十个字段那一段另登记成格式常量，好让门禁分得清它与整个头（D23 已定项 4）。
 const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 /// D23（journal 的角色与格式） 已定项 15：新根段 = 树表单元指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8。
-const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 2 * NODE_POINTER_BYTES + 8 + 8;
+const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 188;
+const _: () = assert!(JOURNAL_NEW_ROOT_SEGMENT_BYTES == 2 * NODE_POINTER_BYTES + 8 + 8);
 /// D23（journal 的角色与格式） 已定项 4 口径的点名项宽度；构成无落点，装置按字节表六的预想构成写。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 /// 系统配置字段表合计（D22（单元原子性怎么合成） 已定项 9 + 已定项 15）：2026-09-14 用户定案加四个字段——

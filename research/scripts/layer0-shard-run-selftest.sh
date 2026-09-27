@@ -12,6 +12,12 @@
 #   ④ 「第二台」那一片没写账本 ⇒ 判红，删这批输入那一格标记
 #   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 layer0-shard.env.example
 #   ⑥ 没登记 shard=across-machines 的用例 ⇒ 拒
+#   ⑦ 发现日志：--merged-log 时三趟各有一份，merge 那一份是 <日志文件>.findings.tsv（一节、begin 行不带 shard=、有 summary），
+#      两片的在各自日志旁边（begin 行带 shard=0/2、shard=1/2），第二台上那一份拷回之后删了，三份路径都打进驱动的输出；单独跑时三份在 common-dir 下这一趟的目录里
+# 假 cargo 设了 SINGLEFS_LAYER0_FINDINGS_FILE 就往里追加一节（行格式照 crates/singlefs-harness/src/crash.rs 的发现日志），标准输出另打一行 LAYER0_FINDINGS。
+#   ⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP）：假 cargo 在 1/2 那一片记下自己的 cgroup，
+#      要在 singlefs-memory-cap- 那个 scope 里；驱动的输出里那一行写着经它起；配置缺 PEER_MEMORY_CAP、写成不带单位的数，配置判法拒
+# 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ 判错。
 # 成功行报核了几格（现算）。
 #
 # admission: always 自证判的是这一刻的驱动脚本与仓，每次调都要现跑
@@ -65,15 +71,25 @@ if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-layer0-shard-selftest"; exit 0; 
 [[ "${1:-}" == test ]] || { echo "假 cargo 只认 -V 与 test：$*"; exit 101; }
 count_line="LAYER0_SHARDED states=29 closed_form=29 violations=0 exhaustive=true"
 passed="test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+write_findings_section() { # write_findings_section <begin 行多出来的字段>：设了 SINGLEFS_LAYER0_FINDINGS_FILE 就追加一节（0 个签名），标准输出打 LAYER0_FINDINGS
+  if [[ -n "${SINGLEFS_LAYER0_FINDINGS_FILE:-}" ]]; then
+    printf 'layer0_findings_begin\tformat=1\tstream=stand-in\tstates=29%s\nlayer0_findings_summary\tsignatures=0\tred_states=0\tstates=29\tstates_by_finding=none\n' "$1" \
+      >> "$SINGLEFS_LAYER0_FINDINGS_FILE" || exit 101
+  fi
+  echo "LAYER0_FINDINGS signatures=0 red_states=0 states=29"
+}
 case "${SINGLEFS_LAYER0_SHARD-}" in
   "")
+    write_findings_section ""
     echo "LAYER0_PARALLEL_FINISHED states=29 slices=4 worker_threads=2 configured_worker_threads=2 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=4 progress_file_after_completion=none elapsed_seconds=0.1"
     printf '%s\n%s\n' "$count_line" "$passed" ;;
   0/2|1/2)
     [[ -n "${SINGLEFS_LAYER0_PROGRESS_DIRECTORY:-}" && -n "${SINGLEFS_LAYER0_INPUT_FINGERPRINT:-}" ]] || { echo "分片跑没设进度目录或输入指纹"; exit 101; }
+    if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_CGROUP:-}" ]]; then cat /proc/self/cgroup >> "$LAYER0_SHARD_SELFTEST_PEER_CGROUP"; fi
     shard_index="${SINGLEFS_LAYER0_SHARD%/2}"
     ledger="$SINGLEFS_LAYER0_PROGRESS_DIRECTORY/layer0-shard-stand-in-shard-${shard_index}-of-2.tally"
     mkdir -p "$SINGLEFS_LAYER0_PROGRESS_DIRECTORY" && printf 'input_fingerprint=%s\n' "$SINGLEFS_LAYER0_INPUT_FINGERPRINT" > "$ledger" || exit 101
+    write_findings_section "$(printf '\tshard=%s\tshard_states=15' "$SINGLEFS_LAYER0_SHARD")"
     printf 'LAYER0_PROGRESS slice=1/2 shard=%s\nLAYER0_SHARD mode=run shard=%s ledger=%s\n%s\n' "$SINGLEFS_LAYER0_SHARD" "$SINGLEFS_LAYER0_SHARD" "$ledger" "$passed" ;;
   merge/2)
     [[ -z "${SINGLEFS_LAYER0_START_OVER+set}" ]] || { echo "merge 那一趟带了 SINGLEFS_LAYER0_START_OVER"; exit 101; }
@@ -82,6 +98,7 @@ case "${SINGLEFS_LAYER0_SHARD-}" in
       [[ "$(cat "$ledger" 2>/dev/null)" == "input_fingerprint=${SINGLEFS_LAYER0_INPUT_FINGERPRINT:-}" ]] || { echo "merge：第 $shard_index 片的账本缺或输入指纹不同（$ledger）"; exit 101; }
     done
     echo "LAYER0_SHARD mode=merge shards=2 ledgers=${SINGLEFS_LAYER0_PROGRESS_DIRECTORY}"
+    write_findings_section ""
     echo "LAYER0_PARALLEL_FINISHED states=29 slices=4 worker_threads=4 configured_worker_threads=4 worker_threads_source=shard_ledgers resumed_slices=0 freshly_run_slices=4 shards=2 shard_worker_threads=2,2 shard_configured_worker_threads=2,2 shard_worker_threads_sources=environment_variable,environment_variable shard_available_parallelism=2,2 shard_resumed_slices=0,0 shard_freshly_run_slices=2,2 shard_elapsed_milliseconds=10,10 progress_file_after_completion=kept elapsed_seconds=0.1"
     printf '%s\n%s\n' "$count_line" "$passed" ;;
   *) echo "假 cargo 认不出 SINGLEFS_LAYER0_SHARD=${SINGLEFS_LAYER0_SHARD}"; exit 101 ;;
@@ -100,6 +117,7 @@ write_configuration() { # write_configuration <文件> <PEER_CARGO_BIN_DIRECTORY
 PEER_SSH_HOST=selftest-peer-is-this-machine
 PEER_REPOSITORY_DIRECTORY=$work/peer
 PEER_CARGO_BIN_DIRECTORY=$2
+PEER_MEMORY_CAP=1G
 QUIESCE_STOP_COMMAND=touch $work/quiesced
 QUIESCE_STOPPED_CHECK_COMMAND=test -e $work/quiesced
 QUIESCE_START_COMMAND=rm -f $work/quiesced
@@ -123,7 +141,8 @@ unsharded_count_line="$(grep '^LAYER0_SHARDED ' "$work/unsharded.log")"
 expect "不分片跑登记的那条用例：退 0，恰好一行 LAYER0_SHARDED 计数行" "$([[ $unsharded_exit == 0 && $(grep -c '^LAYER0_SHARDED ' "$work/unsharded.log") == 1 ]]; echo $?)" \
   "退 $unsharded_exit；日志尾部：$(tail -5 "$work/unsharded.log" | tr '\n' '|')"
 
-# ① 单独跑：两片、merge、判、写标记
+# ① 单独跑：两片、merge、判、写标记（假 cargo 在第二台那一片记下自己的 cgroup，⑧ 核它在内存包装的 scope 里）
+export LAYER0_SHARD_SELFTEST_PEER_CGROUP="$work/peer-cgroup"
 bash "$driver" "$selftest_case_key" "$copy" > "$work/standalone.log" 2>&1
 standalone_exit=$?
 fingerprint="$(python3 "$admission_module" crash-case-manifest "$copy" "$selftest_case_key" "$work/manifest" \
@@ -144,12 +163,43 @@ expect "① 清了场、跑完复原了（回读过），第二台这一趟的�
      && [[ -z "$(ls -A "$work/peer/runs" 2>/dev/null)" ]]; echo $?)" \
   "清场标记还在：$([[ -e "$work/quiesced" ]] && echo 是 || echo 否)；第二台 runs/ 下：$(ls -A "$work/peer/runs" 2>/dev/null | tr '\n' ' ')"
 
+# ⑧ 第二台那一片经内存包装起
+peer_cap_problems=()
+grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash research/scripts/run-with-memory-cap.sh 1G 起' "$work/standalone.log" \
+  || peer_cap_problems+=("驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh 1G 起")
+if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]] && ! grep -q 'singlefs-memory-cap-' "$work/peer-cgroup" 2>/dev/null; then
+  peer_cap_problems+=("假 cargo 在第二台那一片记下的 cgroup 不在 singlefs-memory-cap- 的 scope 里：$(tr '\n' ' ' < "$work/peer-cgroup" 2>/dev/null)")
+fi
+expect "⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP=1G）" "${#peer_cap_problems[@]}" \
+  "$(IFS='；'; echo "${peer_cap_problems[*]}")"
+unset LAYER0_SHARD_SELFTEST_PEER_CGROUP
+
 # ② --merged-log：门禁 54 号调的那一条
 bash "$driver" --merged-log "$selftest_case_key" "$copy" "$fingerprint" "$work/merged.log" > "$work/merged-driver.log" 2>&1
 merged_exit=$?
 expect "② --merged-log：退 0，merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数" \
   "$([[ $merged_exit == 0 ]] && grep -q 'LAYER0_SHARD mode=merge shards=2 ' "$work/merged.log" && [[ "$(grep '^LAYER0_SHARDED ' "$work/merged.log")" == "$unsharded_count_line" ]]; echo $?)" \
   "退 $merged_exit；驱动脚本输出尾部：$(tail -10 "$work/merged-driver.log" | tr '\n' '|')"
+
+# ⑦ 发现日志：merge 那一份是 <日志文件>.findings.tsv（54 号读的那一份），两片的在各自日志旁边，第二台上那一份拷回之后删了，三份路径都打进输出
+findings_problems=()
+merge_findings="$work/merged.log.findings.tsv"
+local_findings="$work/merged.log.shard-0-of-2.log.findings.tsv"
+fetched_findings="$work/merged.log.shard-1-of-2.log.findings.tsv"
+[[ "$(grep -c '^layer0_findings_begin' "$merge_findings" 2>/dev/null)" == 1 && "$(grep -c '^layer0_findings_summary' "$merge_findings" 2>/dev/null)" == 1 ]] \
+  || findings_problems+=("merge 那一份 $merge_findings 不是恰好一节带 summary")
+if grep -q $'^layer0_findings_begin\t.*shard=' "$merge_findings" 2>/dev/null; then findings_problems+=("merge 那一份的 begin 行带了 shard="); fi
+grep -q $'^layer0_findings_begin\t.*\tshard=0/2\t' "$local_findings" 2>/dev/null || findings_problems+=("本机那一片的 $local_findings 没有 shard=0/2 那一节")
+grep -q $'^layer0_findings_begin\t.*\tshard=1/2\t' "$fetched_findings" 2>/dev/null || findings_problems+=("第二台那一片没拷回到 $fetched_findings（或没有 shard=1/2 那一节）")
+leftover_peer_findings="$(find "$work/peer/runs" -maxdepth 1 -name '*.findings.tsv' 2>/dev/null)"
+[[ -z "$leftover_peer_findings" ]] || findings_problems+=("第二台上的发现日志没删：$leftover_peer_findings")
+for findings_path in "$local_findings" "$fetched_findings" "$merge_findings"; do
+  grep -qF -- "$findings_path" "$work/merged-driver.log" || findings_problems+=("驱动的输出里没打 $findings_path")
+done
+standalone_findings_count="$(find "$(git -C "$copy" rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-logs" -name '*.findings.tsv' -size +0 2>/dev/null | grep -c .)"
+[[ "$standalone_findings_count" == 3 ]] || findings_problems+=("单独跑那一趟 common-dir 下 singlefs-layer0-logs/ 里非空的发现日志是 ${standalone_findings_count} 份，不是 3 份")
+expect "⑦ 发现日志：merge 那一份在 <日志文件>.findings.tsv（一节、不带 shard=、有 summary），两片的在各自日志旁边（shard=0/2、1/2），第二台上那一份拷回后删了，三份路径都打进输出；单独跑时三份在 common-dir 下" \
+  "${#findings_problems[@]}" "$(IFS='；'; echo "${findings_problems[*]}")"
 
 # ③ 「第二台」的 rustc -Vv 第一行不同
 mkdir -p "$work/other-toolchain"
@@ -191,6 +241,18 @@ expect "⑤ 配置缺键 PEER_CARGO_BIN_DIRECTORY、配置文件不在 ⇒ 配�
   "$([[ $missing_key_exit == 1 && $no_configuration_exit == 1 ]] && grep -q '双机分片不能用' "$work/missing-key.log" && grep -q '双机分片不能用' "$work/no-configuration.log" \
      && grep -q 'layer0-shard.env.example' "$work/missing-key.log" && grep -q 'layer0-shard.env.example' "$work/no-configuration.log"; echo $?)" \
   "缺键退 $missing_key_exit（$(tail -3 "$work/missing-key.log" | tr '\n' '|')），不在退 $no_configuration_exit（$(tail -3 "$work/no-configuration.log" | tr '\n' '|')）"
+
+# ⑧ 配置缺 PEER_MEMORY_CAP、写成不带单位的数 ⇒ 配置判法拒
+grep -v '^PEER_MEMORY_CAP=' "$work/layer0-shard.env" > "$work/missing-memory-cap.env"
+sed 's/^PEER_MEMORY_CAP=.*/PEER_MEMORY_CAP=16/' "$work/layer0-shard.env" > "$work/unitless-memory-cap.env"
+SINGLEFS_LAYER0_SHARD_CONFIG="$work/missing-memory-cap.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/missing-memory-cap.log" 2>&1
+missing_memory_cap_exit=$?
+SINGLEFS_LAYER0_SHARD_CONFIG="$work/unitless-memory-cap.env" bash "$driver" "$selftest_case_key" "$copy" > "$work/unitless-memory-cap.log" 2>&1
+unitless_memory_cap_exit=$?
+expect "⑧ 配置缺 PEER_MEMORY_CAP、写成不带单位的 16 ⇒ 配置判法各拒（退 1），说出是哪个键" \
+  "$([[ $missing_memory_cap_exit == 1 && $unitless_memory_cap_exit == 1 ]] && grep -q '缺键 PEER_MEMORY_CAP' "$work/missing-memory-cap.log" \
+     && grep -q 'PEER_MEMORY_CAP 要写第二台那一片的内存上限' "$work/unitless-memory-cap.log"; echo $?)" \
+  "缺键退 $missing_memory_cap_exit（$(tail -3 "$work/missing-memory-cap.log" | tr '\n' '|')），不带单位退 $unitless_memory_cap_exit（$(tail -3 "$work/unitless-memory-cap.log" | tr '\n' '|')）"
 
 # ⑥ 没登记 shard=across-machines 的用例
 bash "$driver" crash-case:c561-sigma-full "$copy" > "$work/not-shardable.log" 2>&1

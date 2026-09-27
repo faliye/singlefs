@@ -206,7 +206,11 @@ E158|@driver_e158_q2_1_hc1_lower_bound||e158-root-choice-repair-2026-09-24-q2-1-
 E158|@driver_e158_r2_all||e158-root-choice-repair-2026-09-27-r2-all-today.out|exact
 E158|@driver_e158_r3_seg1_today||e158-root-choice-repair-2026-09-27-r3-seg1-today.out|exact
 E158|@driver_e158_r3_seg1_compare||e158-root-choice-repair-2026-09-27-r3-seg1-compare.out|exact
+E158|@driver_e158_r4_compare||e158-root-choice-repair-2026-09-27-r4-compare.out|exact
 E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
+E162|@driver_e162_anchors||e162-crash-verdict-block-store-2026-09-27-anchors.out|exact
+E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing
+E163|@driver_e163_r1_merge||e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out|exact
 TSV
 )
 
@@ -491,6 +495,13 @@ driver_e142() {
 # 整个装置就活在 crates/singlefs-harness 里，没有 research/e7-index-bench 侧的配对二进制，先例同 E142（第 371 行注释）——
 # 两个 cargo workspace 互相看不到对方，不能合并成一次调用。确定性：同一个二进制跑两遍逐字节一致（2026-09-25 现查：
 # 这一段的产物两次跑出 `cmp` 逐字节一致）。
+# E161（崩溃放量的去重与分段耗时）可行性档（2026-09-27，用户定只验能跑能用，登记 12.2）：入库装置 `feasibility` 模式。
+# crates 的层 0 枚举（S3、S4 对拍时调的）往标准输出打 LAYER0_* 进度行（带墙钟秒数），产物只留 E7RESULT 行。
+# 计时字段一律以 _elapsed_ns 或 _ratio 结尾，按 timing 比结构；PC3 的判定行随计时可能翻，翻了是新观测。线程数钉 10；内存上限跟 REPLAY_MEMORY_CAP（默认 8G，2026-09-27 收窄前曾写死 16G，改成跟脚本头默认值一致）。
+driver_e161_feasibility() {
+  (cd .. && set -o pipefail && E161_THREADS=10 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e161_crash_state_dedup_and_time_split -- feasibility | grep '^E7RESULT ')
+}
+
 driver_e156() {
   (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q -p singlefs-harness --bin e156_allocation_basis_counts)
 }
@@ -651,6 +662,44 @@ driver_e158_r3_seg1_today() {
 }
 driver_e158_r3_seg1_compare() {
   (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- r3-compare research/results/e158-root-choice-repair-2026-09-27-r3-seg1)
+}
+# E158 第 4 次跑（重跑登记 `research/prompts/e158-r4-prereg.md`，2026-09-27）：五段（seg1、seg2b、seg3、seg4、seg5）的臂产物都在
+# `research/mutations/e158_arms.tsv` 的 r4 行套出来的快照副本上编、跑，今天那一臂也是快照副本（工作树的 `crates/` 在快照之后
+# 已合进 C554 乙，不再是「今天那一臂」），各段的臂产物都不登记（同第 2、3 次跑的先例）。这里只登记五段合并的 `r4-compare`：
+# 它只读 `research/results/` 下那五组臂产物、不碰 `crates/`，复跑逐字节可比；第二段以装置撞键修过之后重跑的 seg2b 为准，
+# 撞键之前那一份 seg2 不喂进来。产物头的 `E7INPUT name=crates_snapshot` 那一行比对前删掉。
+driver_e158_r4_compare() {
+  (cd .. && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-harness --bin e158_root_choice_repair -- r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg1 research/results/e158-root-choice-repair-2026-09-27-r4-seg2b research/results/e158-root-choice-repair-2026-09-27-r4-seg3 research/results/e158-root-choice-repair-2026-09-27-r4-seg4 research/results/e158-root-choice-repair-2026-09-27-r4-seg5)
+}
+
+# E162（崩溃放量判定块存储选型）：只登记确定性的 anchors（跑前登记 7.2 的锚点）。S1、S2 与几何取样点的产物带杀点与计时，
+# 两次跑本来就不同，不登记逐字节比对，复跑命令写在实验页。这个 bin 挂在不默认打开的特性 e162-block-stores 上
+# （librocksdb-sys 要现编 C++），它的 bindgen 在本机要 BINDGEN_EXTRA_CLANG_ARGS 指到 gcc 的 stdbool.h 才编得过。
+driver_e162_anchors() {
+  BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/gcc/x86_64-linux-gnu/13/include}" \
+    cargo build -q --release -p e7-index-bench --features e162-block-stores --bin e162-crash-verdict-block-store >/dev/null 2>&1 || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" ./target/release/e162-crash-verdict-block-store anchors
+}
+
+# E163（GPU多卡算单元校验和）：只登记 R1（单机两张卡）的 merge 输出——它是唯一不含计时字段、
+# 逐字节可比的一段（每片结果文件自己带 build_device_ms 等计时字段，两次跑不同，不登记）。
+# 这个 bin 挂在不默认打开的特性 e163-gpu 上（wgpu、pollster，只有这个 bin 用），装置本身不用
+# e7_index_bench::Emitter 的 E7RESULT 协议，这里在驱动函数里把 merge 的原始输出包一层，
+# 满足下面「跑不了」判定要的 E7RESULT / name=done 收尾行；要机器上至少两张能起上下文的 NVIDIA 独显卡。
+driver_e163_r1_merge() {
+  cargo build -q --release -p e7-index-bench --features e163-gpu --bin e163-gpu-multicard-crc32c >/dev/null 2>&1 || return 1
+  local bin=./target/release/e163-gpu-multicard-crc32c
+  local input="$OUT_DIR/e163-r1-merge-input.bin"
+  local shard0="$OUT_DIR/e163-r1-merge-shard0.out"
+  local shard1="$OUT_DIR/e163-r1-merge-shard1.out"
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" gen-input --output "$input" --units 2560 --seed 0xE163092700000001 >/dev/null || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 0 --count 1280 --adapter-index 0 --output "$shard0" >/dev/null || return 1
+  bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" run-shard --input "$input" --start 1280 --count 1280 --adapter-index 1 --output "$shard1" >/dev/null || return 1
+  local merge_output line_count
+  merge_output="$(bash scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" "$bin" merge --original-input "$input" --total-units 2560 --shard "$shard0" --shard "$shard1")" || return 1
+  line_count=$(printf '%s\n' "$merge_output" | grep -c .)
+  printf '%s\n' "$merge_output" | awk '{print "E7RESULT name=merge_line body=" $0}'
+  echo "E7RESULT name=done emitted=$((line_count + 1))"
 }
 
 # --admission-only：只问准入（research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。

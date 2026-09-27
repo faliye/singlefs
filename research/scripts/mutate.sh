@@ -10,7 +10,13 @@
 # （singlefs-ai-sop/rules/command-safety.md「脚本改文件之后要回读确认」）。
 #
 #   mutate.sh --selftest    拿一个假的 cargo 在临时 workspace 里走一遍各种结局（抓到、没红、无效、超时、内存撞顶、基线撞顶、scope 起不来），
-#                           再走一遍并行的几样（进程数不同 stdout 逐字相同、各用各的副本、丢一份结果整道判红、锚点腐化派活之前退 3）
+#                           再走一遍并行的几样（进程数不同 stdout 逐字相同、各用各的副本、丢一份结果整道判红、锚点腐化派活之前退 3），
+#                           再走一遍 required-features（挂了的 bin 带上 --features 跑得起来，没挂的 bin 的 cargo 参数与改前逐字相同）
+#
+# bin 在 Cargo.toml 的 [[bin]] 里挂了 required-features 的：每次 cargo test 带 `--features <包名>/<feature>,…`，
+#   feature 从那一节现读，不在命令行上手敲、不写死在这里；没挂的 bin，cargo 的参数与改前逐字相同（`test --release --bin <名>`）。
+#   不带的话 cargo 不编这个 bin、直接退 101，基线停在「基线就是红的」，一条变异都没跑。
+#   那几个 feature 的依赖要的环境（E162 的 rocksdb 要 BINDGEN_EXTRA_CLANG_ARGS）由调用方设，原样传给 cargo。
 #
 # 并行（command-safety.md「一个脚本里的检测项，能并行就并行」，形态照 .claude/gate.d/59-crates-mutation-replay.sh）：
 #   每个工作进程一份被测装置的副本（research/ 里编译要用的那部分）、一个自己的 CARGO_TARGET_DIR，不在同一份源码上并发改：
@@ -39,7 +45,8 @@
 #   带上限的 scope 起不来（没有用户级 systemd、D-Bus 连不上）就退 7，一条都不跑，不退回无上限去跑。
 # 弄坏开关 MUTATE_BREAK（只给 --selftest 证明它会红用，几个用逗号连）：memoryascaught 把撞顶记成抓到、memorynotfail 撞顶不让整轮判失败、
 #   droprow 工作进程把表里第 2 条的判定丢掉不写、countblind 父进程不数派出去与收回来的条数（只读在的那几份）、
-#   sharedcopy 所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）；
+#   sharedcopy 所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）、
+#   nofeatures 不读 required-features、cargo test 一律不带 --features（改前的跑法）；
 #   RUN_WITH_MEMORY_CAP_BREAK=nocap 原样传给 run-with-memory-cap.sh，就是改前那种不设上限的跑法。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -67,6 +74,18 @@ run_selftest() {
 behavior="$(sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' bench/src/bin/fake_bench.rs | head -1)"
 echo "$PWD|${CARGO_TARGET_DIR:-}|$behavior|$*" >>"$FAKE_CARGO_LOG"
 passing_output() { printf 'running 2 tests\ntest tests::adds ... ok\ntest tests::subtracts ... ok\n\ntest result: ok. 2 passed; 0 failed\n'; }
+# 照真 cargo：bin 挂了 required-features 而 --features 里没给全（写成 feature 或 包名/feature 都认），不编、退 101
+enabled=""; previous=""
+for argument in "$@"; do
+  [[ "$previous" == --features ]] && enabled+=",$argument"
+  [[ "$argument" == --features=* ]] && enabled+=",${argument#--features=}"
+  previous="$argument"
+done
+for feature in $(grep '^required-features' bench/Cargo.toml | grep -o '"[^"]*"' | tr -d '"'); do
+  if [[ ",$enabled," != *",$feature,"* && ",$enabled," != *",bench/$feature,"* ]]; then
+    printf 'error: target `fake-bench` in package `bench` requires the features: `%s`\n' "$feature"; exit 101
+  fi
+done
 case "$behavior" in
   PASS) passing_output; exit 0 ;;
   RED) printf 'running 2 tests\ntest tests::adds ... FAILED\ntest tests::subtracts ... ok\n\ntest result: FAILED. 1 passed; 1 failed\n'; exit 101 ;;
@@ -210,6 +229,27 @@ FAKE_CARGO
     fail "锚点腐化的表应当在派活之前退 3、点名那一条、一次 cargo 都不调、stdout 一行都没有，实际退 $status、调了 $(wc -l <"$scratch/stale-anchor.cargo") 次：$(cat "$scratch/stale-anchor.out")"
   fi
 
+  # ── required-features ──
+  # 没挂 required-features 的 bin：每次 cargo 的参数与改前逐字相同（上面 caught-only 那一次的调用记录）
+  local unexpected_arguments
+  checked=$((checked + 1))
+  unexpected_arguments="$(cut -d'|' -f4- "$scratch/caught-only.cargo" | grep -vxF 'test --release --bin fake-bench')"
+  if [[ ! -s "$scratch/caught-only.cargo" || -n "$unexpected_arguments" ]]; then
+    fail "没挂 required-features 的 bin，cargo 的参数应当逐字是「test --release --bin fake-bench」，实际调了 $(wc -l <"$scratch/caught-only.cargo") 次、对不上的：${unexpected_arguments:-（一次都没调）}"
+  fi
+  # 挂了两个 feature 的 bin：从清单现读、带「包名/feature」跑，基线绿、变异照常判抓到；
+  # 不读（MUTATE_BREAK=nofeatures，改前的跑法）假 cargo 照真 cargo 退 101，停在基线、退 2
+  printf 'required-features = ["fake-feature", "fake-other"]\n' >>"$scratch/research/bench/Cargo.toml"
+  run_case required-features mutations/caught-only.tsv
+  checked=$((checked + 1))
+  status="$(cat "$scratch/required-features.rc")"
+  unexpected_arguments="$(cut -d'|' -f4- "$scratch/required-features.cargo" | grep -vxF 'test --release --bin fake-bench --features bench/fake-feature,bench/fake-other')"
+  if [[ "$status" != 0 || ! -s "$scratch/required-features.cargo" || -n "$unexpected_arguments" ]] \
+     || ! grep -qF "✅ [抓到] 红：tests::adds" "$scratch/required-features.stdout"; then
+    fail "挂了 required-features 的 bin 应当每次带「--features bench/fake-feature,bench/fake-other」跑、抓到那一条、退 0，实际退 $status、对不上的参数：${unexpected_arguments:-无}：$(cat "$scratch/required-features.out")"
+  fi
+  printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$scratch/research/bench/Cargo.toml"
+
   # 基线（没改的源码）就撞上限：退 2 并说是内存上限，不说成「基线就是红的」。
   # 表里的原文要在 HOG 版源码里命中得上（锚点在基线之前核，命中不上就先退 3 了），所以用只改注释的那张表
   printf '// 注释行\nfn main() {} // BEHAVIOR: HOG\n' >"$scratch/research/bench/src/bin/fake_bench.rs"
@@ -224,13 +264,15 @@ FAKE_CARGO
   if ((failures)); then
     echo "  ✗ mutate.sh 自检 $failures 处不对（查了 $checked 项）"
     echo "  → 怎么办：照上面逐条改——判结局的在 judge_mutation（退出码 124 / $MEMORY_CAP_HIT_EXIT / $MEMORY_CAP_UNAVAILABLE_EXIT 的分支），基线与收尾计数在主流程，"
-    echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order；MUTATE_BREAK 或 RUN_WITH_MEMORY_CAP_BREAK 设着的话这里本来就该红"
+    echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order，required-features 在 read_required_features；"
+    echo "    MUTATE_BREAK 或 RUN_WITH_MEMORY_CAP_BREAK 设着的话这里本来就该红"
     exit 1
   fi
   echo "  ✓ mutate.sh 自检通过（查了 $checked 项：抓到、没红、无效、超时、内存撞顶五种结局各归各类，撞顶不记成抓到或没红、整轮判失败并单列计数，\
 上限之内正常的变异照旧判抓到退 0，scope 起不来退 7 且一次 cargo 都没跑，基线撞顶退 2 并说是内存上限；\
 并行：MUTATE_JOBS=1 与 =4 的 stdout 逐字相同、没红的照样判失败、头一行报开了几个、各工作进程各用一份副本与编译目录，\
-丢一份判定退 8 而拿掉那道闸就静默判绿，MUTATE_JOBS 写错退 2，锚点腐化派活之前退 3）"
+丢一份判定退 8 而拿掉那道闸就静默判绿，MUTATE_JOBS 写错退 2，锚点腐化派活之前退 3；\
+required-features：没挂的 bin 的 cargo 参数逐字不变，挂了两个的带「包名/feature」跑得起来、照常判抓到）"
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then
@@ -265,6 +307,46 @@ else
     echo "mutate: $SRC 没有显式 [[bin]]，自动发现的名字是 '$_stem'，不是 '$BIN'" >&2
     echo "        改的文件与跑的测试对不上，整份证明作废。用： mutate.sh $_stem $SRC $TABLE" >&2
     exit 6
+  fi
+fi
+
+# bin 挂了 required-features 的，cargo test 要带上那几个 feature（文件头 required-features 那一段）。
+# 从 $_manifest 里名字是 $BIN 的那一节 [[bin]] 现读，写成「包名/feature」逗号连起来打到 stdout；没挂、或清单里没有这一节，打空行。
+# 写成带包名的形式：research/ 是虚拟 workspace，在它的根上不带包名的 --features 要靠被选中的包碰巧有那个 feature
+read_required_features() {
+  MANIFEST="$_manifest" BIN="$BIN" python3 - <<'PY'
+import os, sys, tomllib
+manifest_path = os.environ["MANIFEST"]; binary_name = os.environ["BIN"]
+if not os.path.isfile(manifest_path):
+    print(""); sys.exit(0)
+try:
+    with open(manifest_path, "rb") as handle:
+        manifest = tomllib.load(handle)
+except tomllib.TOMLDecodeError as error:
+    sys.stderr.write("读不懂 %s：%s\n" % (manifest_path, error)); sys.exit(1)
+features = []
+for target in manifest.get("bin", []):
+    if target.get("name") == binary_name:
+        features = target.get("required-features", [])
+        break
+if features:
+    package_name = manifest.get("package", {}).get("name")
+    if not package_name:
+        sys.stderr.write("%s 里 %s 挂了 required-features，清单却没有 [package] name\n" % (manifest_path, binary_name)); sys.exit(1)
+    print(",".join("%s/%s" % (package_name, feature) for feature in features))
+else:
+    print("")
+PY
+}
+cargo_feature_arguments=()
+if ! is_broken nofeatures; then
+  if ! required_features="$(read_required_features)"; then
+    echo "mutate: 读不出 $_manifest 里 $BIN 的 required-features（上面是原因），一条变异都没跑" >&2
+    echo "        → 怎么办：先让 cargo metadata --manifest-path $_manifest 读得通这份清单，再整张表重跑" >&2
+    exit 2
+  fi
+  if [[ -n "$required_features" ]]; then
+    cargo_feature_arguments=(--features "$required_features")
   fi
 fi
 
@@ -339,6 +421,10 @@ worker_count_and_head_line() {
   echo "mutate: 这一轮开 $WORKER_COUNT 个工作进程（各项取最小、至少 1）：${joined_texts%；}。卡在${binding}这一项${floor_note}；每个 cargo 编译并行度 $CARGO_JOBS_PER_WORKER（${CARGO_JOBS_SOURCE}）" >&2
 }
 worker_count_and_head_line
+# 开几个工作进程那一行仍是 stderr 的头一行；挂了 required-features 的 bin 跟在它后面报带了哪几个
+if ((${#cargo_feature_arguments[@]})); then
+  echo "mutate: $BIN 在 $_manifest 里挂了 required-features，每次 cargo test 带 ${cargo_feature_arguments[*]}" >&2
+fi
 export CARGO_BUILD_JOBS="$CARGO_JOBS_PER_WORKER"
 
 SHARD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-mutate-XXXXXX")"
@@ -406,7 +492,7 @@ for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
 done
 # 在第 $1 个工作进程的副本上、用它的编译目录跑一次不限时的 cargo test（基线与还原之后那一次）
 run_tests_in_copy() {
-  ( cd "$(copy_directory_of "$1")" && CARGO_TARGET_DIR="$(target_directory_of "$1")" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" )
+  ( cd "$(copy_directory_of "$1")" && CARGO_TARGET_DIR="$(target_directory_of "$1")" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"} )
 }
 
 # 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红。每份副本各跑一次、一起跑，按副本号逐个收退出码
@@ -470,7 +556,7 @@ mutate: [$name] 替换没命中，证明作废
   # ⇒ 每条变异单独限时。默认 120 秒——本仓最慢的单测不到 1 秒，撞到它就是真挂了。
   # ⚠️ **第六种结局：内存先于超时撞顶。** 无界分配的破坏几十秒就能吃满整机，等不到 120 秒；2026-09-25 E142 的一条变异两次把整机拖进 OOM。
   # ⇒ 每条变异同时放进内存上限（MUTATE_MEMORY_MAX，见文件头），撞顶与超时同一类记。
-  out="$(cd "$copy_directory" && CARGO_TARGET_DIR="$target_directory" timeout "${MUTATE_TIMEOUT:-120}" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" 2>&1)"
+  out="$(cd "$copy_directory" && CARGO_TARGET_DIR="$target_directory" timeout "${MUTATE_TIMEOUT:-120}" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"} 2>&1)"
   row_exit=$?
   cp "$PRISTINE" "$copy_directory/$SRC"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
   if [[ $row_exit -eq 124 ]]; then

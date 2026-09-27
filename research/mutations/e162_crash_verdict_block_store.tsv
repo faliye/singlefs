@@ -1,0 +1,13 @@
+M1_F写路径换成朴素写法直接写终名	            WritePath::Registered => self.put_blocks_registered(blocks),	            WritePath::Registered => self.put_blocks_direct_in_place(blocks),
+M2_redb提交用DurabilityNone	        WritePath::Registered => redb::Durability::Immediate,	        WritePath::Registered => redb::Durability::None,
+M3_K的同步写关掉WAL仍开	    write_options.set_sync(!disable_write_ahead_log);	    write_options.set_sync(false);
+M4_K关掉WAL	    let disable_write_ahead_log = write_path == WritePath::RocksDatabaseWithoutWriteAheadLog;	    let disable_write_ahead_log = true;
+M5_F读路径不查长度魔数与CRC	            Ok(bytes) => match validate_block_file(&bytes, key) {	            Ok(bytes) => match Ok::<Vec<u8>, String>(bytes.get(FILE_HEADER_BYTES..).unwrap_or(&[]).to_vec()) {
+M6_核对只比块值前4096字节	    found.len() == expected.len() && found == expected	    found[..4096.min(found.len())] == expected[..4096.min(expected.len())]
+M7_核对把在途而读不到记成丢块	        (BlockClass::InFlight, ReadKind::NotFound) => BlockVerdict::Correct,	        (BlockClass::InFlight, ReadKind::NotFound) => BlockVerdict::LostConfirmed,
+M8_核对不枚举键	    let enumerated = store.enumerate_keys_with_value_lengths();	    let enumerated: Result<Vec<(Vec<u8>, u64)>, StoreError> = Ok(Vec::new());
+M9_打开失败时新建空库接着跑	        Err(open_error) => match record_open_failure_then_try_repair(candidate, library, open_error, &mut report) {	        Err(_open_error) => match open_store_for_writing(candidate, WritePath::Registered, &library.join("recreated-after-open-failure")).ok() {
+M10_杀点总在第1个C之后	                    confirmations_before_kill: 1 + first_output % WRITE_PHASE_CONFIRMATION_MODULUS,	                    confirmations_before_kill: 1,
+M11_提交计时两次Instant都在提交调用之前	        let commit_returned = Instant::now();	        let commit_returned = commit_started;
+M12_P-rand块值全0	                value.extend_from_slice(&generator.next_output().to_le_bytes());	                value.extend_from_slice(&[0u8; 8]);
+M13_块键整数按小端编码	    key[0..4].copy_from_slice(&node.to_be_bytes());\n    key[4..8].copy_from_slice(&segment.to_be_bytes());\n    key[8..16].copy_from_slice(&first_state.to_be_bytes());	    key[0..4].copy_from_slice(&node.to_le_bytes());\n    key[4..8].copy_from_slice(&segment.to_le_bytes());\n    key[8..16].copy_from_slice(&first_state.to_le_bytes());

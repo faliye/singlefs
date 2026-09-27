@@ -17,8 +17,13 @@
 # 复原挂在 EXIT 上，跑红了也复原）；④ 两片同时跑，各记 pid、各 wait 取退出码、各写自己的日志，LAYER0_PROGRESS 边跑边转出来；
 # ⑤ 第二台的账本拷回本机进度目录；⑥ 本机 merge；⑦ 删掉第二台上这一趟的树与编译目录（两片的进度目录留着：被杀之后下一趟接着跑）。
 # 进度目录：本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>（与 54 号相同），第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>。
-# 线程：本机那一片取 SINGLEFS_LAYER0_THREADS（没设取本机 nproc），第二台那一片取第二台的 nproc。SINGLEFS_LAYER0_START_OVER=1 交给两片，
+# 线程：本机那一片取 SINGLEFS_LAYER0_THREADS（没设取本机 nproc），第二台那一片取第二台的 nproc；两台的 nproc 都清掉 OMP_NUM_THREADS、
+# OMP_THREAD_LIMIT 再跑（nproc 认这两个变量，漏进来就把核数压成它们的值）。SINGLEFS_LAYER0_START_OVER=1 交给两片，
 # merge 那一趟不带。只接登记了 shard=across-machines 的用例（它的枚举经 Layer0Resume::from_environment 认分片开关）。
+# 内存：第二台那一片在第二台上经那棵树副本里的 research/scripts/run-with-memory-cap.sh 起，上限取配置的 PEER_MEMORY_CAP（第二台不在本机的进程树里，
+# 本机包在外面的那一层罩不到它）；本机那一片与 merge 照旧，由起 54 号 / 这个驱动的那一层包装管。第二台那一片退 250–254 是包装自己的结局
+# （含义见 run-with-memory-cap.sh 文件头「退出码」），那一片的输出不算结果，判红。
+# 判与写标记：merge 那一趟的日志交 admission.py crash-case-judge 判，判绿交 crash-case-record 写；核数与线程数由它们自己现取，这里不转。
 # 登记的崩溃枚举用例都标了 #[ignore]，三趟 cargo test 都带 --include-ignored --exact <用例函数>；只供测试的开关
 # SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0 时不带 --include-ignored（--selftest 那条小流用例不标 ignore，不必把别的 ignore 用例放进过滤范围）。
 #
@@ -27,6 +32,14 @@
 # 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（research/scripts/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
 # cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
 # 重型：跑的是标了 ignore 的崩溃枚举用例（--include-ignored），只在提交时（SINGLEFS_HEAVY_TESTS=commit）或用户要求时跑；--selftest 不算。
+#
+# 日志与发现日志（用户 2026-09-27 定全量与发现双份，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；行格式以 crates/singlefs-harness/src/crash.rs 为准）：
+# 三趟 cargo 各设 SINGLEFS_LAYER0_FINDINGS_FILE，发现日志一律是那一趟的日志同名加 .findings.tsv，开跑前先删掉旧的。--merged-log 时两片的日志放在
+# 给的日志文件旁边（<日志文件>.shard-0-of-2.log、.shard-1-of-2.log），merge 那一趟的发现日志是 <日志文件>.findings.tsv——门禁 54 号读的就是这一份；
+# 单独跑时三份日志放 <git common-dir>/singlefs-layer0-logs/<这一趟>/。第二台那一片的发现日志先写在第二台 runs/<这一趟>.shard-1-of-2.findings.tsv，
+# 两片跑完拷回本机、放在那一片的日志旁边，再删第二台上那一份。三份路径都打进输出；发现表归 54 号读、归 54 号判，这里不判。
+# 弄坏开关（只给证红用）LAYER0_SHARD_RUN_BREAK=<项>：no-peer-findings-copy 不拷回第二台那一片的发现日志，no-merge-findings 不给 merge 那一趟设发现日志；
+# 各自打开时 --selftest 的 ⑦ 那一格判错。peer-without-memory-cap 第二台那一片不经 run-with-memory-cap.sh 起，打开时 --selftest 的 ⑧ 那一格判错。
 #
 # 配置在不在、判不判得过不写成运行条件（--selftest 不要配置）：开跑之后第一件事调配置判法，判不过照它的原因与出路退 1。
 #
@@ -90,6 +103,17 @@ if ! git_common_directory="$(git -C "$tree_root" rev-parse --path-format=absolut
 fi
 run_label="${case_key#crash-case:}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 peer_run_directory="$PEER_REPOSITORY_DIRECTORY/runs/$run_label"
+peer_findings_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.findings.tsv"
+layer0_shard_break="${LAYER0_SHARD_RUN_BREAK:-}"
+# 三趟的日志放哪（跑完不删）：--merged-log 时在给的日志文件旁边，单独跑时在 common-dir 下这一趟的目录里
+if [[ "$layer0_shard_mode" == merged-log ]]; then
+  log_prefix="$merged_log_file"
+  merge_findings_file="$merged_log_file.findings.tsv"
+else
+  log_prefix="$git_common_directory/singlefs-layer0-logs/$run_label/${case_key#crash-case:}"
+  merge_findings_file="$log_prefix.merge.log.findings.tsv"
+fi
+mkdir -p -- "$(dirname "$log_prefix")" || fail "建不了日志目录 $(dirname "$log_prefix")" "看它可不可写、盘满没满"
 scratch_directory="$(mktemp -d)"
 quiesced=0
 restore_on_exit() {
@@ -132,12 +156,12 @@ local_toolchain="$(bash -c "$toolchain_description_command")" || fail "本机 ru
 peer_toolchain="$(run_on_peer / "$toolchain_description_command")" || fail "第二台 rustc / cargo 报不出版本" "看 $PEER_CARGO_BIN_DIRECTORY 下有没有 rustc 与 cargo"
 [[ "$local_toolchain" == "$peer_toolchain" ]] \
   || fail "两台的工具链不同：本机「${local_toolchain//$'\n'/；}」，第二台「${peer_toolchain//$'\n'/；}」" "两台装同一个 rustup 工具链（rustc -Vv 的 commit 相同）再跑"
-local_cores="$(nproc)"
-peer_cores="$(run_on_peer / nproc)" || fail "第二台 nproc 跑不起来" "看 ssh $PEER_SSH_HOST 能不能跑命令"
+local_cores="$(env -u OMP_NUM_THREADS -u OMP_THREAD_LIMIT nproc)"
+peer_cores="$(run_on_peer / "env -u OMP_NUM_THREADS -u OMP_THREAD_LIMIT nproc")" || fail "第二台 nproc 跑不起来" "看 ssh $PEER_SSH_HOST 能不能跑命令"
 if [[ -n "${SINGLEFS_LAYER0_THREADS:-}" ]]; then
-  local_threads="$SINGLEFS_LAYER0_THREADS"; local_threads_origin=explicit; local_threads_text="SINGLEFS_LAYER0_THREADS=${local_threads}（显式设的）"
+  local_threads="$SINGLEFS_LAYER0_THREADS"; local_threads_text="SINGLEFS_LAYER0_THREADS=${local_threads}（显式设的）"
 else
-  local_threads="$local_cores"; local_threads_origin=default; local_threads_text="SINGLEFS_LAYER0_THREADS=${local_threads}（没设，取本机核数）"
+  local_threads="$local_cores"; local_threads_text="SINGLEFS_LAYER0_THREADS=${local_threads}（没设，取本机核数）"
 fi
 echo "  · ① 工具链两台相同（${local_toolchain%%$'\n'*}）；本机 ${local_cores} 核跑 0/2（${local_threads_text}），第二台 ${peer_cores} 核跑 1/2（取第二台核数）"
 
@@ -182,51 +206,73 @@ start_over_settings=(-u SINGLEFS_LAYER0_START_OVER)
 start_over_text=""
 if [[ "${SINGLEFS_LAYER0_START_OVER:-0}" == 1 ]]; then start_over_settings=(SINGLEFS_LAYER0_START_OVER=1); start_over_text="SINGLEFS_LAYER0_START_OVER=1 "; fi
 libtest_arguments=(--exact "$case_function" --nocapture)
+# 第二台那一片经那棵树副本里的内存包装起（上限 PEER_MEMORY_CAP）；弄坏开关 peer-without-memory-cap 下不经它
+peer_memory_cap_text="bash research/scripts/run-with-memory-cap.sh $(printf '%q' "$PEER_MEMORY_CAP") "
+if [[ "$layer0_shard_break" == peer-without-memory-cap ]]; then
+  peer_memory_cap_text=""
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap：第二台那一片不经 run-with-memory-cap.sh 起"
+fi
 case "${SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED:-1}" in
   1) libtest_arguments=(--include-ignored "${libtest_arguments[@]}") ;;
   0) echo "  ! 不带 --include-ignored（只供测试的开关 SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0；标了 ignore 的用例这样跑一条都跑不到，会判红）" ;;
   *) fail "SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED 只许 0 或 1，读到「${SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED}」" "不设它（默认 1）；只有 --selftest 设成 0" ;;
 esac
 cargo_test_text="cargo test --release -p $case_package --test $case_target -- ${libtest_arguments[*]}"
-local_log="$scratch_directory/shard-0-of-2.log"
-peer_log="$scratch_directory/shard-1-of-2.log"
-rm -f -- "$scratch_directory"/exit.*
+local_log="$log_prefix.shard-0-of-2.log"
+peer_log="$log_prefix.shard-1-of-2.log"
+local_findings_file="$local_log.findings.tsv"
+fetched_peer_findings_file="$peer_log.findings.tsv"
+rm -f -- "$scratch_directory"/exit.* "$local_log" "$peer_log" "$local_findings_file" "$fetched_peer_findings_file" "$merge_findings_file"
+run_on_peer / "rm -f -- $(printf '%q' "$peer_findings_file")" || fail "第二台删不了旧的发现日志 $peer_findings_file" "看 PEER_REPOSITORY_DIRECTORY 可不可写"
+echo "  · 发现日志：本机 0/2 $local_findings_file；第二台 1/2 写在第二台 $peer_findings_file、跑完拷回 $fetched_peer_findings_file；merge $merge_findings_file"
 {
   ( cd "$tree_root" && env "${start_over_settings[@]}" SINGLEFS_LAYER0_SHARD=0/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY="$local_progress_directory" \
-    SINGLEFS_LAYER0_INPUT_FINGERPRINT="$local_fingerprint" SINGLEFS_LAYER0_THREADS="$local_threads" \
+    SINGLEFS_LAYER0_INPUT_FINGERPRINT="$local_fingerprint" SINGLEFS_LAYER0_THREADS="$local_threads" SINGLEFS_LAYER0_FINDINGS_FILE="$local_findings_file" \
     cargo test --release -p "$case_package" --test "$case_target" -- "${libtest_arguments[@]}" ) 2>&1 \
     | tee "$local_log" | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } | sed -u 's/^/    [本机 0\/2] /'
   echo "${PIPESTATUS[0]}" > "$scratch_directory/exit.local"
 } &
 local_shard_process=$!
 {
-  run_on_peer "$peer_run_directory" "env SINGLEFS_HEAVY_TESTS=${SINGLEFS_HEAVY_TESTS:-} ${start_over_text}SINGLEFS_LAYER0_SHARD=1/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=$(printf '%q' "$peer_progress_directory") SINGLEFS_LAYER0_INPUT_FINGERPRINT=$local_fingerprint SINGLEFS_LAYER0_THREADS=$peer_cores $(printf '%q ' cargo test --release -p "$case_package" --test "$case_target" -- "${libtest_arguments[@]}") 2>&1" \
+  run_on_peer "$peer_run_directory" "env SINGLEFS_HEAVY_TESTS=${SINGLEFS_HEAVY_TESTS:-} ${start_over_text}SINGLEFS_LAYER0_SHARD=1/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=$(printf '%q' "$peer_progress_directory") SINGLEFS_LAYER0_INPUT_FINGERPRINT=$local_fingerprint SINGLEFS_LAYER0_THREADS=$peer_cores SINGLEFS_LAYER0_FINDINGS_FILE=$(printf '%q' "$peer_findings_file") ${peer_memory_cap_text}$(printf '%q ' cargo test --release -p "$case_package" --test "$case_target" -- "${libtest_arguments[@]}") 2>&1" \
     | tee "$peer_log" | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } | sed -u 's/^/    [第二台 1\/2] /'
   echo "${PIPESTATUS[0]}" > "$scratch_directory/exit.peer"
 } &
 peer_shard_process=$!
-echo "  · ④ 两片开跑：本机 ${start_over_text}SINGLEFS_LAYER0_SHARD=0/2 $cargo_test_text（pid $local_shard_process），第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条（pid $peer_shard_process）"
+echo "  · ④ 两片开跑：本机 ${start_over_text}SINGLEFS_LAYER0_SHARD=0/2 $cargo_test_text（pid $local_shard_process），第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 ${peer_memory_cap_text:-（不经内存包装）}起（pid $peer_shard_process）"
 wait "$local_shard_process"
 wait "$peer_shard_process"
 local_exit="$(cat "$scratch_directory/exit.local" 2>/dev/null || echo missing)"
 peer_exit="$(cat "$scratch_directory/exit.peer" 2>/dev/null || echo missing)"
 shard_problems=()
 [[ "$local_exit" == 0 ]] || shard_problems+=("本机那一片 cargo test 退 $local_exit")
-[[ "$peer_exit" == 0 ]] || shard_problems+=("第二台那一片 cargo test 退 $peer_exit")
+case "$peer_exit" in
+  0) ;;
+  25[0-4]) shard_problems+=("第二台那一片退 $peer_exit：内存包装 run-with-memory-cap.sh 自己的结局（250 撞了 PEER_MEMORY_CAP、251 起不了带上限的 scope、252 排不上、253 超时、254 被总上限挤掉），那一片的输出不算结果") ;;
+  *) shard_problems+=("第二台那一片 cargo test 退 $peer_exit") ;;
+esac
 grep -q 'LAYER0_SHARD mode=run shard=0/2 ' "$local_log" || shard_problems+=("本机的日志里没有 LAYER0_SHARD mode=run shard=0/2 那一行（这条用例没按分片跑）")
 grep -q 'LAYER0_SHARD mode=run shard=1/2 ' "$peer_log" || shard_problems+=("第二台的日志里没有 LAYER0_SHARD mode=run shard=1/2 那一行（这条用例没按分片跑）")
-remove_peer_run_directory() { # ⑦ 删掉第二台上这一趟的树与编译目录
+# 第二台那一片的发现日志拷回本机、放在那一片的日志旁边（两片跑红了也拷：死之前找到的签名在里面）；第二台上那一份随 ⑦ 删掉
+if [[ "$layer0_shard_break" == no-peer-findings-copy ]]; then
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy：第二台那一片的发现日志不拷回"
+elif copy_to_peer "$(peer_path "$peer_findings_file")" "$fetched_peer_findings_file" 2>/dev/null; then
+  echo "  · 第二台那一片的发现日志拷回 $fetched_peer_findings_file"
+else
+  echo "  ! 第二台那一片的发现日志没拷回来（第二台上 $peer_findings_file 不在：那一片的枚举一趟都没走到，或它不走读 SINGLEFS_LAYER0_FINDINGS_FILE 的入口）"
+fi
+remove_peer_run_directory() { # ⑦ 删掉第二台上这一趟的树与编译目录，连同第二台上那一片的发现日志（已拷回）
   local peer_run_size
   peer_run_size="$(run_on_peer / "du -sh $(printf '%q' "$peer_run_directory") | cut -f1")"
-  if run_on_peer / "rm -rf -- $(printf '%q' "${peer_run_directory:?}")"; then
+  if run_on_peer / "rm -rf -- $(printf '%q' "${peer_run_directory:?}") $(printf '%q' "${peer_findings_file:?}")"; then
     echo "  · ⑦ 删掉第二台上这一趟的树与编译目录 $peer_run_directory（${peer_run_size:-大小没读到}）；两片的进度目录留着"
   else
     echo "  ! 第二台上的 $peer_run_directory 没删掉：下一趟另起一个目录，不碍事；手动删它"
   fi
 }
 if (( ${#shard_problems[@]} > 0 )); then
-  echo "    本机那一片的日志尾部："; tail -20 "$local_log" | sed 's/^/      /'
-  echo "    第二台那一片的日志尾部："; tail -20 "$peer_log" | sed 's/^/      /'
+  echo "    本机那一片的日志尾部（全文 $local_log）："; tail -20 "$local_log" | sed 's/^/      /'
+  echo "    第二台那一片的日志尾部（全文 $peer_log）："; tail -20 "$peer_log" | sed 's/^/      /'
   remove_peer_run_directory
   fail_after_the_run "$(IFS='；'; echo "${shard_problems[*]}")" "单跑那一片看细节（本机：SINGLEFS_LAYER0_SHARD=0/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=… SINGLEFS_LAYER0_INPUT_FINGERPRINT=… $cargo_test_text）；断言消息里是第一处对不上的计数或违例"
 fi
@@ -244,25 +290,29 @@ echo "  · ⑤ 第二台的账本拷回 ${fetched_ledgers[0]}"
 
 # ⑥ 本机 merge：只读两份账本、核齐、按切片序号并，照旧走用例钉死的计数断言
 merge_log="$scratch_directory/merge.log"
+if [[ "$layer0_shard_mode" == standalone ]]; then merge_log="$log_prefix.merge.log"; fi
+merge_findings_setting=(SINGLEFS_LAYER0_FINDINGS_FILE="$merge_findings_file")
+if [[ "$layer0_shard_break" == no-merge-findings ]]; then merge_findings_setting=(-u SINGLEFS_LAYER0_FINDINGS_FILE); fi
 merge_exit=0
-( cd "$tree_root" && env -u SINGLEFS_LAYER0_START_OVER SINGLEFS_LAYER0_SHARD=merge/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY="$local_progress_directory" \
+( cd "$tree_root" && env -u SINGLEFS_LAYER0_START_OVER "${merge_findings_setting[@]}" SINGLEFS_LAYER0_SHARD=merge/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY="$local_progress_directory" \
   SINGLEFS_LAYER0_INPUT_FINGERPRINT="$local_fingerprint" SINGLEFS_LAYER0_THREADS="$local_threads" \
   cargo test --release -p "$case_package" --test "$case_target" -- "${libtest_arguments[@]}" ) > "$merge_log" 2>&1 || merge_exit=$?
 if [[ "$merge_exit" == 0 ]] && ! grep -q 'LAYER0_SHARD mode=merge shards=2 ' "$merge_log"; then merge_exit=merge-line-missing; fi
+echo "  · ⑥ 三份发现日志：本机 0/2 $local_findings_file；第二台 1/2 $fetched_peer_findings_file；merge $merge_findings_file"
 if [[ "$layer0_shard_mode" == merged-log ]]; then
   cp -- "$merge_log" "$merged_log_file"
-  echo "  · ⑥ merge 那一趟退 $merge_exit，整段输出交给 54 号判（$merged_log_file）"
+  echo "  · ⑥ merge 那一趟退 $merge_exit，整段输出交给 54 号判（$merged_log_file），发现日志交给 54 号读（$merge_findings_file）"
   [[ "$merge_exit" == 0 ]] && exit 0
   exit 1
 fi
 if [[ "$merge_exit" != 0 ]]; then
+  echo "    merge 那一趟的日志尾部（全文 $merge_log）："
   tail -40 "$merge_log" | sed 's/^/      /'
   fail_after_the_run "merge 那一趟退 $merge_exit（上面是它的尾部；merge-line-missing 是日志里没有 LAYER0_SHARD mode=merge shards=2 那一行）" "账本核不齐时 panic 那一句说清缺哪一片、哪一处不同；计数断言红了与单机全量红了是同一回事，照 54 号 --full 的出路查"
 fi
 judged_lines_file="$scratch_directory/judged"
 case_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-if ! judge_output="$(python3 "$admission_module" crash-case-judge "$tree_root" "$case_key" "$merge_log" "$judged_lines_file" \
-    --machine-cores "$local_cores" --threads "$local_threads" --threads-origin "$local_threads_origin")"; then
+if ! judge_output="$(python3 "$admission_module" crash-case-judge "$tree_root" "$case_key" "$merge_log" "$judged_lines_file")"; then
   printf '%s\n' "$judge_output" | sed 's/^/       /'
   fail_after_the_run "merge 那一趟跑过了，日志却判不绿（上面逐条列出）" "计数行、test result、exhaustive=true、每一片的工作线程，照 54 号 --full 同一句出路查"
 fi
@@ -273,8 +323,7 @@ finish_summary="$(python3 "$admission_module" crash-case-manifest "$tree_root" "
   || fail "跑的过程中这条用例的输入变了（开跑 ${local_fingerprint:0:16}…，跑完 ${finish_summary:0:16}…）：不写全绿标记" "别在有人改这些路径的树里跑；在 HEAD + 暂存区的 worktree 里重跑"
 threads_text="${judge_output//$'\n'/；}${judge_output:+；}双机分片：本机 ${local_threads_text}、本机 ${local_cores} 核，第二台 ${peer_cores} 核"
 record_output="$(python3 "$admission_module" crash-case-record "$tree_root" "$case_key" "$local_fingerprint" "$local_manifest" "$judged_lines_file" \
-  --files "$local_file_count" --excluded "$local_excluded_count" --started "$case_started_utc" --judged-root "$tree_root" \
-  --machine-cores "$local_cores" --threads "$local_threads" --threads-origin "$local_threads_origin")" \
+  --files "$local_file_count" --excluded "$local_excluded_count" --started "$case_started_utc" --judged-root "$tree_root")" \
   || fail "判绿，全绿标记却没写成：$record_output" "看 $git_common_directory 可不可写、盘满没满"
-echo "  ✓ $case_key 双机分片判绿（${threads_text}）：全绿标记写进 ${record_output}，记下的行原样："
+echo "  ✓ $case_key 双机分片判绿（${threads_text}；三趟的日志与发现日志在 $(dirname "$log_prefix")/）：全绿标记写进 ${record_output}，记下的行原样："
 sed 's/^/      /' "$judged_lines_file"
