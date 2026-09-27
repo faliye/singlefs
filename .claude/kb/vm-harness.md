@@ -130,6 +130,8 @@ E12（攒批的顺序追加 vs 不攒批的随机页读改写） 更是靠它做
 | 来宾 `/sys/block/<名>/stat` 的写请求数 = 程序的写数 + FLUSH 数（盘 0：23 + 12 = 35） | 比对用写扇区数（= 字节 ÷ 512）与 FLUSH 数；FLUSH 数是 stat 的下标 15，不是 14（14 是 discard 耗时，读它会得到 0） |
 | 走页缓存时设备侧的写被合并 | m1（32 KiB）与 m2（16 KiB）回写成一个 48 KiB 的写；这是阳性对照判红的地方 |
 
+⚠️ **日志盘要装得下全部写的数据**：`log<d>.img` 的大小取 `VM_LOG_MB`（MiB），`vm-bench.sh` 自己的默认是 256。mkfs 按 4 MiB 一块写零 768 MiB 之后，每块盘的日志实用约 770 MiB（2026-09-27 实测，VM_DISKS=2、每盘 4096 MiB，六档都在 769–771 MiB）；256 MiB 时 direct、second-transaction、second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`；page-cache、skip-first-transaction-barrier、raise-rollback-floor 三档那一次没报，为什么没查。门禁 55 号因此默认传 `VM_LOG_MB=4096`（一块数据盘的大小，镜像是稀疏文件，只占真写进去的那些）；别处开 blklogwrites 模式的，照写的数据量设 `VM_LOG_MB`。
+
 ⚠️ 这一档验的是「程序发出的写与 FLUSH 在虚拟设备上原样到达、次序不变」，不是真盘的持久语义：`cache=none` 下设备侧 FLUSH 映射成宿主上的 `fdatasync`，宿主盘自己的缓存不在射程里。
 
 ## 附加根与盘镜像预分配（E152（按里程碑对比六家文件系统的文件性能） 加的两个开关）

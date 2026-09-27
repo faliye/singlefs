@@ -16,6 +16,36 @@
 
 ## 历史版本
 
+### 2026-09-27（下午）：E162（崩溃放量判定块存储选型） S1 够判档
+
+- **改前**：实验页现状是「可行性档已跑（2026-09-27）」，S1、S2 都记「未判（只跑了可行性档）」——S1 只杀了 20 次、S2 只写了 10⁴ 块；索引行状态同上。
+- **改后**：按主 agent 派发（继承用户 2026-09-27 定案「可以跑 可以用 然后把 验证交给 Milestone 2 remaining tasks 去」）把 S1 从可行性档的 20 次杀补到登记原定的 200 次，四条臂（F、R1、R0、K）各跑一遍，登记第六节 6.1、第十一节 11.1 V1–V6 的判据未改。S1 现在够判：四条臂 200 次杀里 Q1a–Q1f 全部 0，阳性对照与 V6 门槛（Q1g_kills_inside_commit ≥ 100，四臂 178–180）都过；重开用时 R0（默认修复）中位 124 691 µs 比 R1（quick-repair）中位 1015 µs 慢两个量级，方向与 redb 4.3.0 文档一致，只当轨迹观察不进判据。S2、S3、S1-large、四个几何取样点这一段未跑。实验页标题改「S1 够判档已交，S2 / S3 还没跑（2026-09-27）」，加「S1 够判档」一节；索引行同步改状态与结论。新产物 4 份（`e162-crash-verdict-block-store-2026-09-27-s1-{F,R1,R0,K}-decisive.out`），不覆盖、不删可行性档的旧产物；`replay.sh` 未新增登记（S1 每次挂钟杀点不同，与可行性档同一读法，不逐字节比）。**这一段跑产物之前没有先给登记补「修订七」记这次收窄范围，是执行员的疏漏**，产物已跑出按纪律不再改登记，交主 agent 处置。跑之前重跑单测 23 passed / 0 failed（`BINDGEN_EXTRA_CLANG_ARGS=-I/usr/lib/gcc/x86_64-linux-gnu/13/include` 解开了上一版记的 `librocksdb-sys` 构建卡点），没有改源码，没有重跑变异表（13 条不变）。
+- **依据**：跑前登记 `research/prompts/e162-preregistration.md`（第十二节修订六、修订五 V15 干扰重跑逐条命中）；产物 `research/results/e162-crash-verdict-block-store-2026-09-27-s1-{F,R1,R0,K}-decisive.out`；交接来历 `records/2026-09-24-里程碑二收尾调度.md` 第三节。
+
+### 2026-09-27：E163（GPU多卡算单元校验和） 建页，第一次跑
+
+- **改前**：只有跑前登记 `research/prompts/e163-preregistration.md`，没有装置、产物与实验页。
+- **改后**：新写独立手写模型 `research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs`（bin `e163-gpu-multicard-crc32c`，挂在特性 `e163-gpu` 上，依赖 `wgpu = "=30.0.1"`、`pollster = "=1.0.1"`），10 单测全绿；建实验页 [163-GPU多卡算单元校验和.md](experiments/163-GPU多卡算单元校验和.md)。M1（单机两张卡）判「能」（2560/2560 逐个相同）；M2（双机五张卡）在今天的显存条件下判「不能」（4/5 张卡成功，第 5 张因显存余量 141 MiB 建不起上下文）；M3（比对会不会红）判「会红」（翻位与丢一条两种注入都被如实报出）。变异表 `research/mutations/e163_gpu_multicard_crc32c.tsv`（7 条）；另有两条（臂 C 与着色器同改成同一个错误多项式、本机收到的结果文件截掉末行）因 `mutate.sh` 的机制限制没进 TSV，手工验证抓到，共 9 条全抓。`research/scripts/replay.sh` 加 `driver_e163_r1_merge` 一行（登记 R1 里唯一不含计时字段的 merge 输出，逐字节一致）。过程中发现并修好一个 `cargo test` 默认并行度下三条 GPU 单测互相踩踏导致挂起 39 分钟的真实 bug（加 `GPU_TEST_MUTEX` 序列化）。
+- **依据**：跑前登记 `research/prompts/e163-preregistration.md`；产物 `research/results/e163-gpu-multicard-crc32c-2026-09-27-{r1,r2,f1,f2,r1-merge}.out`。
+
+### 2026-09-27：E158（择根与修复四岔路） 第 3 次跑第一段与第 4 次跑——C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 怎么修的岔路单三行
+
+- **改前**：实验页的现状是「2026-09-26：第 2 次跑第一段」一节，标题状态是「部分已跑（2026-09-23 第一段 + 2026-09-24 各段 + 2026-09-26 第 2 次跑第一段）」那一长串括注；第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`）与第 4 次跑（重跑登记 `research/prompts/e158-r4-prereg.md`）的产物已在 `research/results/`，页上没有写，门禁 40 号报它们没被点名。
+- **改后**：页首加「2026-09-27：第 4 次跑」一节（现状）与「2026-09-27：第 3 次跑第一段」一节（只当参考），标题改成「第 4 次跑已交（岔路 1、2 用户已定，3 记欠）」。第 4 次跑十八条臂、五段（第二段装置撞键修过、整段重跑成 seg2b，以 seg2b 为准），跨段的量以五段合并的 `research/results/e158-root-choice-repair-2026-09-27-r4-compare.out` 为准：今天与 -槽 各臂全族丢写 > 0；乙-配置 在 H1g 丢写 16 / 32、乙-配置续 0 / 32，两者在 H-随 同是 6 / 37（全是 ③c 尾巴，不算 ③c 2 格，Q1 只算环内且不算 ③c 1 格）；L 族多拒两者同是 22；同成多读乙-配置 每格 +3 或 +4、乙-配置续 +7 或 +8；读缓存峰值没量（岔路单第 3 行记欠）。`research/scripts/replay.sh` 加 `driver_e158_r4_compare` 一行。影响的决策表 D23（journal 的角色与格式） 已定项 14 那一行（主 agent 同日改成支撑）补上产物指针，另四行回看仍是备料。
+- **依据**：`research/prompts/e158-r4-prereg.md`（第十二节执行员修订第 1–30 条与各段之后的主 agent 认定）；各段执行员报告 `research/prompts/e158-r4-seg1-runner-report.md`、`research/prompts/e158-r4-seg2-runner-report.md`、`research/prompts/e158-r4-seg2b-runner-report.md`、`research/prompts/e158-r4-seg3-runner-report.md`、`research/prompts/e158-r4-seg4-runner-report.md`、`research/prompts/e158-r4-seg5-runner-report.md`，撞键调查 `research/prompts/e158-r4-seg2-ledger-investigation-report.md`；岔路单 `research/prompts/c554-fix-forks.md`。
+
+### 2026-09-27：E162（崩溃放量判定块存储选型） 可行性档
+
+- **改前**：只有跑前登记 `research/prompts/e162-preregistration.md`（含执行员第十二节修订一至六），没有实验页与索引行；装置、变异表与 8 份 S1/S2 产物加 1 份 anchors 产物已在仓里（前几次同一天的会话跑出），但没有被任何 kb 页点名。
+- **改后**：建实验页 [162-崩溃放量判定块存储选型.md](experiments/162-崩溃放量判定块存储选型.md)；按用户 2026-09-27 定（登记修订六）只跑可行性档：四条臂 F/R1/R0/K 各杀 20 次（S1）、各写 10⁴ 块（S2），S1-large、四个几何取样点与 S3 未跑；S1、S2 一律记「未判（只跑了可行性档）」。`research/scripts/replay.sh` 只登记 anchors 一行（`driver_e162_anchors`，前几次同一天的会话已加）。
+- **依据**：登记第十二节修订六（用户 2026-09-27 定只验可行性）；产物 `research/results/e162-crash-verdict-block-store-2026-09-27-{s1,s2}-{F,R1,R0,K}-feasibility.out`、`research/results/e162-crash-verdict-block-store-2026-09-27-anchors.out`。
+
+### 2026-09-27：E161（崩溃放量的去重与分段耗时） 可行性档
+
+- **改前**：只有跑前登记 `research/prompts/e161-preregistration.md`，没有装置、产物与实验页。
+- **改后**：入库装置 `crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`（13 单测，`crates/mutations.tsv` 追加 12 条变异）；按用户定只跑可行性档（第一条流写数少于 26 的各段全量、两条流的甲二快档全域、两个 26 写段各 4096 个段头），停机条款 S1–S6、登记第七节全部锚点与 crates 逐状态对拍全过，G1–G5 未判。
+- **依据**：登记第十二节 12.2（用户 2026-09-27 定只验可行性）；产物 `research/results/e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out`。
+
 ### 2026-09-26：E156（alloc-basis 四条岔路的代价数） 第 4 次重跑——三个前提在装置上复现、岔路单第 3 行按前提 2 失效、第 1 行 38 条历史量完
 
 - **改前**：装置 `crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`（4335 行，11 单测 / 12 条变异）照挂载时回退、挂载内不回收的旧实现写：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh 八族，岔路 1 只在 S = 8 与 S = 4、ρ = 1、回收时点「实」、洞位置「后」、k ≤ 2 上量过；开工时单测 U11、U13 就红（挂载时回退已删）。索引行状态「部分已跑（2026-09-22 第一、二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二、三段（缩小范围，只在 S=8、ρ=1 一个几何取样点上），入库装置，确定性，5 单测 / 4 条变异全抓；岔路 2、7 已跑；岔路 3 一个几何格已跑（X8（小池耗尽两口径构造）-A 未做）；岔路 1 三个洞数取样点已跑（S×ρ 全扫未做））」；结论列原样：K1 逐字核对相符（盘 0 记账第 1/2/5 项 13/211955/1）；岔路 2：清单 L（4 处）漏了命令抓到的 41 处（`|M∖L|=41`），门禁 51 号本身不用改（数据驱动），但登记给的两步说明本身漏了一处公式副本；岔路 7（R2 第一段改成只读被判镜像之后重跑）：G27 在 H0/HR/HK 共 168 个真实合法状态上零误报（Q7b）；判别力自测①（不减第 5 项）在这一段测过的 7 个可达基底（β0/β1/β2 与 HK 的四个观测点）上都没看到规定的转色，触发登记里的作废条款，Q7a 整张表按登记规则作废——Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释（HK-F0、β_syn 上量法测得到 0），根因当时收窄到「可达合法状态第 5 项从来不是 0」；**这句结论已被 2026-09-25 第 3 次重跑续派段推翻**：补一个新的可达基底（`beta_hr_rollback_row`，HR 家族回退写行那一步，`family=HR kind=rollback_row txg=76`，第 5 项恰为 0）之后，判别力自证①第一次在可达基底上转色（`flips_red_to_green=true`），详见实验页「历史版本」2026-09-25 续派段；岔路 3（一个 HF 几何格）：G7（公开入口重组）与 F-扣（真实实现）的 D_rel 完全相同（都是 0，非空发布计），差别不大（`max_diff=0≤3`），K9 未验到预期的 3；岔路 1（三个 Hh(k) 洞数取样点，k=0/1/2）：Q1a−Q1b 之差 Δ 随洞数单调 +50/洞（20→70→120），从 h=0 起就越过 2 槽/1 槽两个门槛，但 h=0 的基线值 20 本身未查透机制。
@@ -26,7 +56,7 @@
 
 - **改前**：实验页只有第一次跑（跑前登记 `research/prompts/e158-preregistration.md`）的记录，被抛弃根全靠挂载时回退造，今天的代码里那条路已删；装置单测 43 条里 `mount_writable_trajectory_distinguishes_persistent_from_transient_faults` 开工就红；臂表 `research/mutations/e158_arms.tsv` 是字段表 481 那一版，锚点不再命中。
 - **改后**：入库装置加第 2 次跑那一节（`r2-all` 等模式，第一次跑的模式原样留着）；臂表照重跑登记 5.2、5.3 重写（A1、甲-txg、乙F-留环、乙 / 丁四臂，几条臂相同的行用「、」连写）；在今天与七份臂副本上各跑一次：问题单前提 1–3 都成立，H1d 每臂 800 格三格在今天与岔路单第 2 行六臂上逐格相同、A1 只多拒 2 格；PC1-a/b/c（今天）与 A1 的 PC1-a 都过；装置单测 57 条全绿，`crates/mutations.tsv` 末尾加 17 行。实验页正文最前加「2026-09-26：第 2 次跑第一段」一节，标题与索引行接上这一段。
-- **依据**：`research/prompts/e158-r2-prereg.md`（第十二节 12.1 七条修订，均在产物之前）；产物 `research/results/e158-root-choice-repair-2026-09-26-r2-all-today.out`（`replay.sh` 登记在 `E158` 下的 `driver_e158_r2_all`，复跑逐字节一致）与同名前缀的 `-today-snapshot`、`-a1`、`-jia-txg`、`-yif-keep-ring`、`-yi-keep-ring`、`-yi-config-only`、`-ding-keep-ring`、`-ding-config-only` 八份。
+- **依据**：`research/prompts/e158-r2-prereg.md`（第十二节 12.1 七条修订，均在产物之前）；产物 `research/results/e158-root-choice-repair-2026-09-26-r2-all-today.out`（`replay.sh` 登记在 `E158`（择根与修复四岔路） 下的 `driver_e158_r2_all`，复跑逐字节一致）与同名前缀的 `-today-snapshot`、`-a1`、`-jia-txg`、`-yif-keep-ring`、`-yi-keep-ring`、`-yi-config-only`、`-ding-keep-ring`、`-ding-config-only` 八份。
 
 ### 2026-09-25：E142（第一个事务的干跑） 第十六次跑第一段——α/β/ι/γ/δ 五格收成 D8（核心索引结构） 已定项 14、D18（块里携带什么信息） 已定项 2 射程写死的唯一写法，与 `crates/` 逐区域比对判「全等」
 
