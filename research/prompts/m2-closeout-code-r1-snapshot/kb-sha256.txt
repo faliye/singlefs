@@ -1,0 +1,10 @@
+fe720b089ff80d3177feb168e7b5cbf09505912c3f8e99ad04f1e05cc2ae1039  .claude/kb/invariants.md
+805287d6343c01d8aebfd412ab479db45ff4b55a175ea1e369e102fdf7e933b8  .claude/kb/checks-owed.md
+b779b105b19c079f09fb636dfb491ed4c392fa8040e1377a0e1c831e041ce5e6  .claude/kb/decisions/13-验证路线.md
+070d60ad0a2f3b92f07c41cc0c7a766b1627e003649ad15d1f25eb88ebbfdb16  .claude/kb/decisions/16-发布语义.md
+0217aad0c83bcf93a06946ec7db3d3e28c4f153e69173e5bd39b62f72b0929b0  .claude/kb/decisions/23-journal的角色与格式.md
+33e92e204f305de5724469035eb5185c6e55b8f2ceb473ddd8f4c0ac4f7e1a9b  .claude/kb/decisions/28-挂载期承诺量.md
+c49d96e56bfb4cdc67856bad8946ba42c68bf45b7ffe72fe548bd72b12724f9c  .claude/kb/decisions/22-单元原子性怎么合成.md
+4b2e287b65c53ef0d1d40061ab17ee4139e05c545cd4263410ff6cbfb0c8ef05  .claude/kb/decisions/18-块里携带什么信息.md
+987fcc777595c55d560c3fcee185fc21616556813d31d2bc2e914349f72c6f17  .claude/kb/decisions/02-RAID条带策略.md
+a33bb1ed3adb467412ad0bc5156571e719861c7fb5a0882c3389d976c540394f  .claude/kb/decisions/15-格式冻结政策.md

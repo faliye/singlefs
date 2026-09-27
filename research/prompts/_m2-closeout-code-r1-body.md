@@ -43,6 +43,7 @@
   - core：`admission.rs`、`allocation_record_tree.rs`、`allocator.rs`、`code_two_tree.rs`、`extent_tree.rs`、`instance_table.rs`、`journal.rs`、`lib.rs`、`make_filesystem.rs`、`mount.rs`、`mounted_read.rs`、`recovery.rs`、`rollback_witness.rs`（删）、`root_record.rs`、`system_configuration.rs`、`transaction.rs`、`unit.rs`、`write_request_split.rs`；
   - format：`lib.rs`；
   - harness：`bin/e142_first_transaction_write_dump.rs`、`bin/e142_first_transaction_write_dump_one_device.rs`、`bin/e156_allocation_basis_counts.rs`、`bin/e158_root_choice_repair.rs`、`bin/first_transaction_on_device.rs`、`bin/first_transaction_region_bytes.rs`、`crash.rs`、`crash_injection.rs`、`device_log.rs`、`fault_injection.rs`、`first_transaction_regions.rs`、`history.rs`、`lib.rs`、`model.rs`、`model_comparison.rs`、`on_device_modes.rs`、`read_tally.rs`、`segments.rs`。
+  - 另有两份新文件不在上面 41 份里（材料员按范围现查出来的，全文在附录二「二、新文件全文」）：core `mounted_session.rs`（291 行，实审 A1 第 23 条与 A2c 加的会话一侧错误成员）、harness `layer0_progress.rs`（1911 行，实六的层 0 续跑）。Z3、Z5 连它们一起判。
 - `bin/e142_*`、`bin/e156_*`、`bin/e158_*` 是实验装置，对不对由各自实验页的变异表与单测判，不在这一轮的八格里；判决里只按路径点名，写明为什么不判。
 - **在飞、不在快照里、归第二轮的**：A4c（`admission.rs`、`allocator.rs`、`mount.rs`：每块盘改几片叶、C545 那一格、压小容量）、C11b（format 里剩下 8 个带算术的常量、`journal_in_flight_record_limit` 三方各算）、B3c-2（崩溃注入第二、三截交记录核对器的写表）、B3a-3c（4 份层 0 文件重新布置流、position_addressed 的打印溢出）、A3（坏盘 panic、可写挂载判全树头与 key 次序、读者判预留位、挂载侧单元区起点随环长），以及 C554 的修法（E158 第 4 次跑之后用户定）。
 - **已知、不算打中**（腿打中这几格时写「已知」并点名去向）：
